@@ -1,34 +1,126 @@
-From: vannigenua@gmail.com (Vanni Genua)
-Date: Fri, 7 Sep 2012 07:37:43 +0000
-Subject: Perf doesn't support coresight or it doesn't read the PMU registers
- on Pandaboard Rev.A2
-In-Reply-To: <CAO8ONPyN_c9Tek1ym3jNx0K4B7SvEghRCON_ZP-dMeFP_jcirA@mail.gmail.com>
-References: <CAO8ONPyN_c9Tek1ym3jNx0K4B7SvEghRCON_ZP-dMeFP_jcirA@mail.gmail.com>
-Message-ID: <CAO8ONPwRiWi6JOHXVVK7wx9UOZ9Bsv-L7yV-w2hcCKpjXfLhOw@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 07 Sep 2012 13:54:52 +0300
+Subject: Converting OMAP's custom vram allocator
+In-Reply-To: <019b01cd8cbd$6fef8c50$4fcea4f0$%szyprowski@samsung.com>
+References: <1346839733.32747.1.camel@deskari>
+ <019b01cd8cbd$6fef8c50$4fcea4f0$%szyprowski@samsung.com>
+Message-ID: <1347015292.2646.23.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi there,
-I'm testing a Pandaboard (OMAP4430, ARMv7) with Linux kernel 3.0.27-rt46
-installed on it.
-The following instruction is not working due to unsupported cache-misses
-event.
-#perf stat -e cache-misses echo "Hello"
-Performance counter stats for 'echo "Hello"
-':
+On Fri, 2012-09-07 at 07:55 +0200, Marek Szyprowski wrote:
+> Hello,
+> 
+> On Wednesday, September 05, 2012 12:09 PM Tomi Valkeinen wrote:
+> 
+> > OMAP has a custom video ram allocator, which I'd like to remove and use
+> > the standard dma allocation functions.
+> > 
+> > There are two problems for which I'd like to hear suggestions or
+> > comments:
+> > 
+> > First one is that the dma_alloc_* functions map the allocated memory for
+> > cpu use. In many cases with OMAP DSS (display subsystem) this is not
+> > needed: the memory may be written only by the SGX or the DSP, and it's
+> > only read by the DSS, so it's never touched by the CPU.
+> > 
+> > This is even more true when using VRFB on omap3 (and probably TILER on
+> > omap4) for rotation, as VRFB hides the actual memory and offers rotated
+> > views. In this case the backend memory is never accessed by anyone else
+> > than VRFB.
+> > 
+> > Is there a way to allocate the memory without creating a mapping? While
+> > it won't break anything as such, the allocated areas can be quite large
+> > thus causing large areas of the kernel's memory space to be needlessly
+> > reserved.
+> 
+> Please check commits d5724f172fd1 and 955c757e090 merged to v3.6-rc1. 
+> Support for this attribute is now only available in IOMMU-aware 
+> dma-mapping implementation, but I plan to add it also to standard linear
+> ARM dma-mapping implementation based on alloc_pages_exact().
 
+Ok, good to know. Do you have any guestimate when the non-iommu version
+could end up in the mainline? Any chance for 3.7? I volunteer for
+testing if needed =).
 
-   <not supported>
-cache-misses
+> Some not-well-documented example can be found here: 
+> https://patchwork.kernel.org/patch/1323591/ (at the bottom).
+> 
+> You probably might need to add your own custom dma_map_ops set of functions
+> for TILER device, but I'm not really sure if I get right what does that 
+> device do and what will be the use cases for it.
 
+I think we have three different cases how we need to manage the memory
+used for video on OMAP.
 
-       0.007507575 seconds time elapsed
+1) Conventional case, without VRFB/TILER. We need large contiguous
+areas. I think we usually want both normal kernel and userspace mapping
+in this case, although some use cases could not need those.
 
-How to solve this problem?
-Is there any patch for Perf o Linux kernel?
-Thank you.
-Best regards.
-Vanni Genua
+2) VRFB (omap3). In this case we need large contigous area, which is
+given to the VRFB hardware to be used as a storage. This area is never
+mapped. VRFB offers four rotated "views" (i.e. memory areas), which give
+a 0/90/180/270 degree view of the same image, and we will create mapping
+of these views with ioremap. The actual data is stored in the memory by
+VRFB in a proprietary format.
+
+3) TILER (omap4). I'm not too familiar with TILER, but afaik it's kinda
+like a better version of VRFB. In this case we don't need contiguous
+memory, but like VRFB, we never create mapping for the memory. (Rob,
+correct me if I'm wrong).
+
+I think we can manage all of those with dma_alloc_attrs(), even though
+contiguous area is not really needed for TILER.
+
+So, if I define DMA_ATTR_NO_KERNEL_MAPPING, there's no point in defining
+DMA_ATTR_WRITE_COMBINE at the same time, right?
+
+Can I still create the kernel mapping for the allocated memory later,
+yielding the same result as if I would've omitted
+DMA_ATTR_NO_KERNEL_MAPPING?
+
+> > The second case is passing a framebuffer address from the bootloader to
+> > the kernel. Often with mobile devices the bootloader will initialize the
+> > display hardware, showing a company logo or such. To keep the image on
+> > the screen when kernel starts we need to reserve the same physical
+> > memory area early at boot, and use that for the framebuffer.
+> > 
+> > I'm not sure if there's any actual problem with this one, presuming
+> > there is a solution for the first case. Somehow the memory is reserved
+> > at early boot time, and this is passed to the fb driver. But can the
+> > memory be managed the same way as in normal case (for example freeing
+> > it), or does it need to be handled as a special case?
+> 
+> The only solution I see here is to use custom coherent memory pool for the
+> framebuffer device and setup it starting from the physical address of the
+> framebuffer configured by bootloader. See dma_declare_coherent() function.
+> Some usage example on ARM architecture can be found in 
+> arch/arm/plat-samsung/s5p-dev-mfc.c
+> 
+> The other possibility is to enable Contiguous Memory Allocator and define
+> a custom contiguous memory area for framebuffer device at the same 
+> physical address as configured by bootloader:
+> http://git.linaro.org/gitweb?p=people/mszyprowski/linux-archive.git;a=commitdiff;h=f8ff4f99cfa4f67e09a3c948e007e82a0c21434a
+> 
+> Feel free to comment both possibilities, maybe we can work out something
+> better for solving this quite common use case.
+
+I think CMA is definitely the way to go.
+
+But I'm not quite sure how it should be used in this case. I understand
+how to reserve the memory area at boot time, as the patch in your link
+shows, but how should the driver get the memory?
+
+Normally the driver would just use dma_alloc_*, and the reserved CMA
+area would be used automatically, right? But in this case we want to get
+the allocation from a particular physical address of the private area.
+
+ Tomi
+
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/39e2a12d/attachment.html>
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/d499273c/attachment.sig>
