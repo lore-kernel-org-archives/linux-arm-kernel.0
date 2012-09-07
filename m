@@ -1,92 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 7 Sep 2012 09:41:38 +0200
-Subject: [PATCH 7/9] pwm i.MX: fix clock lookup
-In-Reply-To: <1355578446.3801048.1346958582085.JavaMail.root@advansee.com>
-References: <20120906184256.GJ26594@pengutronix.de>
- <1355578446.3801048.1346958582085.JavaMail.root@advansee.com>
-Message-ID: <20120907074138.GN26594@pengutronix.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 7 Sep 2012 07:59:55 +0000
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <201209070209.35379.marex@denx.de>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <201209060405.08997.marex@denx.de> <20120906174531.GX1303@atomide.com>
+ <201209070209.35379.marex@denx.de>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 09:09:42PM +0200, Beno?t Th?baudeau wrote:
-> On Thursday, September 6, 2012 8:42:56 PM, Sascha Hauer wrote:
-> > On Thu, Sep 06, 2012 at 08:31:58PM +0200, Beno?t Th?baudeau wrote:
-> > > On Thursday, September 6, 2012 2:48:13 PM, Sascha Hauer wrote:
+On Fri, Sep 07, 2012 at 05:39:35, Marek Vasut wrote:
+> Dear Tony Lindgren,
+> 
+> > * Marek Vasut <marex@denx.de> [120905 19:05]:
+> > > Hi Tony,
+> > > 
+> > > > * Marek Vasut <marex@denx.de> [120904 20:13]:
+> > > > > Dear Bryan Wu,
+> > > > > 
+> > > > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > > > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > > > > > > device pointer, pinctrl driver configure SoC pins to GPIO
+> > > > > > > mode according to definitions provided in .dts file.
+> > > > > > 
+> > > > > > Thanks for this, actually Marek Vasut submitted a similar patch
+> > > > > > before. I'm pretty fine with this patch.
+> > > > > 
+> > > > > Thanks for submitting this actually ... I didn't have time to
+> > > > > properly investigate this.
+> > > > > 
+> > > > > > But without proper DT setting, it will also give us warning I
+> > > > > > think. or we can provide some dummy functions as a temp solution
+> > > > > > as Shawn pointed out before.
+> > > > > 
+> > > > > But this driver is also used on hardware that's not yet coverted to
+> > > > > DT, so I'd say dev_warn() if CONFIG_OF is enabled and otherwise
+> > > > > simply go on ? Actually, can we not skip whole this pinctrl thing if
+> > > > > CONFIG_OF is disabled? Actually (2), what's the relationship between
+> > > > > OF and pinctrl?
 > > > > 
-> > > > +	int ret;
-> > > > +
-> > > > +	ret = clk_prepare_enable(imx->clk_ipg);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > >  
-> > > > -	return imx->config(chip, pwm, duty_ns, period_ns);
-> > > > +	ret = imx->config(chip, pwm, duty_ns, period_ns);
-> > > > +
-> > > > +	clk_disable_unprepare(imx->clk_ipg);
-> > > > +
-> > > > +	return ret;
-> > > >  }
-> > > >  
-> > > >  static int imx_pwm_enable(struct pwm_chip *chip, struct
-> > > >  pwm_device
-> > > >  *pwm)
-> > > > @@ -169,7 +179,7 @@ static int imx_pwm_enable(struct pwm_chip
-> > > > *chip,
-> > > > struct pwm_device *pwm)
-> > > >  	struct imx_chip *imx = to_imx_chip(chip);
-> > > >  	int ret;
-> > > >  
-> > > > -	ret = clk_prepare_enable(imx->clk);
-> > > > +	ret = clk_prepare_enable(imx->clk_per);
-> > > >  	if (ret)
-> > > >  		return ret;
+> > > > The warning should be pinctrl related as the pinctrl drivers may not be
+> > > > device tree based drivers.
 > > > 
-> > > Have you tested that this actually works on i.MX53?
-> > > 
-> > > I have tested it successfully on i.MX35 (with a few additions to
-> > > platform code).
-> > > But i.MX35 has a single bit controlling both PWM IPG and PER clock
-> > > gates.
-> > > 
-> > > On i.MX53, there are 2 separate control bits for these. So, if ipg
-> > > clk is
-> > > strictly required to access PWM registers, even if per clk is
-> > > enabled, this code
-> > > should not work without adding
+> > > Exactly my concern. Also the warning shouldnt be present on systems where
+> > > pinctrl is disabled.
 > > 
-> > I tested this on i.MX53, but you're right, this seems to be wrong.
-> > I'll
-> > recheck tomorrow.
+> > But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
+> > CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
 > 
-> I've performed a few more tests with bare register accesses in the bootloader to
-> see how the PWM IP behaves.
+> Oh all right then.
 > 
-> On i.MX25, i.MX35 and i.MX51, read accesses always work, whatever the state of
-> the IPG and PER clock gates.
-> 
-> On i.MX25 and i.MX51, write accesses always work, whatever the state of the IPG
-> and PER clock gates.
-> 
-> On i.MX35, write accesses work if and only if the IPG and PER clocks are not
-> gated off (single control bit for both).
 
-Ok, I tested on i.MX53 and i.MX27.
+Bryan,
 
-On i.MX53 the registers are always accessible. I also measured with an
-oscilloscope that the ipg/per clock gates en/disable the PWM when it's
-configured for the corresponding clock.
+If this patch looks fine, can you queue this for 3.7?
 
-On i.MX27 register accesses also work regardless of the clock gates.
-Here we have a single clock gate which only gates the ipg clock.
-
-btw the i.MX6 has a single gate per pwm which are described as "PWMx clocks"
-
-So it seems while not 100% correct the current code seems to be safe.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+AnilKumar
