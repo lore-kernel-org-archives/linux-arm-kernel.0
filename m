@@ -1,59 +1,56 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Sep 2012 10:19:46 -0600
-Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
-In-Reply-To: <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
+Date: Fri, 07 Sep 2012 10:24:04 -0600
+Subject: [PATCH v3 08/10] of/address: Handle #address-cells > 2 specially
+In-Reply-To: <20120815200655.GC12870@avionic-0098.mockup.avionic-design.de>
 References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
- <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
-Message-ID: <504A1EA2.9030008@wwwdotorg.org>
+ <1343332512-28762-9-git-send-email-thierry.reding@avionic-design.de>
+ <50183DA3.8020308@gmail.com>
+ <20120815200655.GC12870@avionic-0098.mockup.avionic-design.de>
+Message-ID: <504A1FA4.9040302@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2012 01:42 PM, Bjorn Helgaas wrote:
-> On Wed, Aug 15, 2012 at 1:28 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
->> On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
->>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
->>> <thierry.reding@avionic-design.de> wrote:
->>>> When using deferred driver probing, PCI host controller drivers may
->>>> actually require this function after the init stage.
->>>>
->>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>>> ---
->>>> Changes in v3:
->>>> - none
->>>>
->>>> Changes in v2:
->>>> - use __devinit annotations
+On 08/15/2012 02:06 PM, Thierry Reding wrote:
+> On Tue, Jul 31, 2012 at 03:18:43PM -0500, Rob Herring wrote:
+>> On 07/26/2012 02:55 PM, Thierry Reding wrote:
+>>> When a bus specifies #address-cells > 2, of_bus_default_map()
+>>> now assumes that the mapping isn't for a physical address but
+>>> rather an identifier that needs to match exactly.
+>>> 
+>>> This is required by bindings that use multiple cells to
+>>> translate a resource to the parent bus (device index, type,
+>>> ...).
+>>> 
+>>> See here for the discussion:
+>>> 
+>>> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-June/016577.html
 >>>
->>> Your original patch removed __init completely.  Here you change it to
->>> __devinit.  That means we decide whether to discard the function based
->>> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
->>> about hotplug; it's merely that we should be able to scan a PCI bus
->>> after init-time.  We ought to be able to do a late PCI scan even if
->>> hotplug is not supported.
 >>>
->>> Therefore, I'd be inclined to remove __init completely unless you have
->>> another reason for preferring __devinit.
->>
->> I thought __devinit would resolve to nothing if HOTPLUG is defined and
->> __init otherwise. That seemed more appropriate. However you are right
->> that it is useful to always have it available, so I'm fine with removing
->> the annotations altogether. Do you want me to follow up with a patch? Or
->> can you just take the first version? I'm not sure if it still applies.
+>>> 
+Originally-by: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Thierry Reding
+>>> <thierry.reding@avionic-design.de>
+>> 
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
 > 
-> You're right about how __devinit works.  It's just that I don't think
-> hotplug is actually relevant here.  We're trying to make
-> pci_fixup_irqs() work after init, whether it's because of hotplug or
-> simply because the arch scans host bridges after init.
+> Hi Rob,
 > 
-> I applied this to my "next" branch.  Thanks!
+> Were you going to take this through your DT tree? I'm trying to
+> reduce the number of patches in this series to make it more
+> manageable and split it into smaller chunks. There are also a
+> couple of issues that need to be resolved so I don't know if I can
+> get the whole series into shape for 3.7.
+> 
+> However if you don't think this patch is useful to be applied by
+> itself I can also carry it until the complete series is ready.
 
-Bjorn, I don't see this patch in next-20120907. Did it get dropped for
-some reason?
+Rob,
 
-For the full history, see: http://patchwork.ozlabs.org/patch/173495/.
+Are you able to take this patch now for 3.7, or should it be held off
+until the Tegra PCIe driver is re-written and requires this
+functionality (in which case I'd expect to take this through the Tegra
+tree at that time).
+
+For reference, it's at http://patchwork.ozlabs.org/patch/173497/.
 
 Thanks.
