@@ -1,7 +1,9 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri,  7 Sep 2012 08:21:52 +0300
-Subject: [PATCH] serial: omap: fix compile breakage
-Message-ID: <1346995312-2872-1-git-send-email-balbi@ti.com>
+Date: Fri,  7 Sep 2012 08:25:31 +0300
+Subject: [PATCH v2] serial: omap: fix compile breakage
+In-Reply-To: <1346995312-2872-1-git-send-email-balbi@ti.com>
+References: <1346995312-2872-1-git-send-email-balbi@ti.com>
+Message-ID: <1346995531-3197-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,9 +19,27 @@ members on struct uart_omap_port.
 Reported-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 4 ++++
- 1 file changed, 4 insertions(+)
 
+Changes since v1:
+	. remove the fields from <plat/omap-serial.h>
+
+ arch/arm/plat-omap/include/plat/omap-serial.h | 4 ----
+ drivers/tty/serial/omap-serial.c              | 4 ++++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+index 57ff78c..74caddc 100644
+--- a/arch/arm/plat-omap/include/plat/omap-serial.h
++++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+@@ -79,8 +79,4 @@ struct omap_uart_port_info {
+ 	void (*enable_wakeup)(struct device *, bool);
+ };
+ 
+-
+-	int			DTR_gpio;
+-	int			DTR_inverted;
+-	int			DTR_active;
+ #endif /* __OMAP_SERIAL_H__ */
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
 index e31d291..8e4a7aa 100644
 --- a/drivers/tty/serial/omap-serial.c
