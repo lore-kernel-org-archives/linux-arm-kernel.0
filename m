@@ -1,34 +1,27 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 7 Sep 2012 15:10:37 +0200
-Subject: [PATCH v3] pwm i.MX: add devicetree support
-In-Reply-To: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
-References: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120907131037.GD29340@avionic-0098.mockup.avionic-design.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Fri, 07 Sep 2012 15:13:31 +0200
+Subject: [PATCH] ARM: ixp4xx: move fixed mapping of internal devices into
+ vmalloc region
+In-Reply-To: <201209071223.30275.arnd@arndb.de> (Arnd Bergmann's message of
+ "Fri, 7 Sep 2012 12:23:29 +0000")
+References: <1346996400-5824-1-git-send-email-gerg@snapgear.com>
+ <201209071223.30275.arnd@arndb.de>
+Message-ID: <m3oblic6x0.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 02:48:06PM +0200, Sascha Hauer wrote:
-> The following is the third version of the i.MX pwm series. I integrated
-> the remaining comments from Shawn and Beno?t and added their tags.
-> 
-> So Thierry, please pull the attached patches. The pull request only
-> contains the pwm framework specific patches, the remaining two I'd
-> like to push via the arm-soc tree in case the i.MX5 also gets devicetree
-> clock lookups.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Hi Sascha,
+>>   BUG: mapping for 0xc8000000 at 0xffbeb000 out of vmalloc space
+>>   BUG: mapping for 0xc4000000 at 0xffbfe000 out of vmalloc space
+>>   BUG: mapping for 0xc0000000 at 0xffbff000 out of vmalloc space
 
-Sorry for taking so long to get back to you. Apart from my comments to
-patch 1, I really like how this series cleans up the i.MX driver. It's
-already a bit late in the 3.6 release cycle for these kinds of changes
-and none of them fix any regressions, so I'd like to queue them for
-3.7 after my comments have been addressed.
+> Imre, Krzysztof: do you prefer to take this patch into a branch of yours
+> and send a pull request, or should we just apply it directly into arm-soc.
+> In the former case, can you provide an Ack?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/38f0010b/attachment.sig>
+My intention is to push the following instead:
+
+http://git.kernel.org/?p=linux/kernel/git/chris/linux.git;a=commitdiff;h=f62736b567ff532fb772afea76fccdbcd92ab473;hp=23e3b6cf1c37ef0615d90681d3705a8821305b5f
+-- 
+Krzysztof Halasa
