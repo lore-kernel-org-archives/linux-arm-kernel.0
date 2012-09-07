@@ -1,69 +1,30 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri,  7 Sep 2012 11:38:22 +0530
-Subject: [PATCH] ARM: SAMSUNG: Use spin_lock_{irqsave,
- irqrestore} in clk_set_rate
-Message-ID: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 07 Sep 2012 16:48:02 +1000
+Subject: [PATCH] ARM: ep93xx: Fix build error due to 'SZ_32M' undeclared
+In-Reply-To: <CAF+7xWko4wokuU-OiMYq3a2RJyaSb=qXM+LOpJCKHYpEB1Xi2Q@mail.gmail.com>
+References: <1346675368.15950.0.camel@phoenix> <5049346B.5020205@gmail.com>
+ <CAF+7xWko4wokuU-OiMYq3a2RJyaSb=qXM+LOpJCKHYpEB1Xi2Q@mail.gmail.com>
+Message-ID: <504998A2.6000705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spinlock clocks_lock can be held during ISR, hence it is not safe to
-hold that lock with disabling interrupts.
+On 07/09/12 15:48, Axel Lin wrote:
+>> Hi Axel,
+>>
+>> The patch looks fine. I notice that the other ep93xx boards are also
+>> using the SZ_ defines, but are indirectly including linux/sizes.h via
+>> asm/memory.h, which in turn is indirectly included via asm/io.h. That
+> Seems this is also true for other platforms ( e.g. mach-pxa, mach-ux500, etc)
+> 
+>> seems a bit flaky, so I wonder if we should just explicitly include
+>> <linux/sizes.h> in all the board files which use the SZ_ macros as per
+>> the patch below. Thoughts?
+> I'm 50/50 on this.
+> But if we do these changes, this patch is more than a build fix.
 
-It fixes following potential deadlock.
+Fair enough,
 
-=========================================================
-[ INFO: possible irq lock inversion dependency detected ]
-3.6.0-rc4+ #2 Not tainted
----------------------------------------------------------
-swapper/0/1 just changed the state of lock:
- (&(&host->lock)->rlock){-.....}, at: [<c027fb0d>] sdhci_irq+0x15/0x564
-but this lock took another, HARDIRQ-unsafe lock in the past:
- (clocks_lock){+.+...}
+I've applied your patch as-is to my ep93xx-fixes branch.
 
-and interrupts could create inverse lock ordering between them.
-
-other info that might help us debug this:
- Possible interrupt unsafe locking scenario:
-
-       CPU0                    CPU1
-       ----                    ----
-  lock(clocks_lock);
-                               local_irq_disable();
-                               lock(&(&host->lock)->rlock);
-                               lock(clocks_lock);
-  <Interrupt>
-    lock(&(&host->lock)->rlock);
-
- *** DEADLOCK ***
-
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- arch/arm/plat-samsung/clock.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index 65c5eca..9b71719 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -144,6 +144,7 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
- 
- int clk_set_rate(struct clk *clk, unsigned long rate)
- {
-+	unsigned long flags;
- 	int ret;
- 
- 	if (IS_ERR(clk))
-@@ -159,9 +160,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 	if (clk->ops == NULL || clk->ops->set_rate == NULL)
- 		return -EINVAL;
- 
--	spin_lock(&clocks_lock);
-+	spin_lock_irqsave(&clocks_lock, flags);
- 	ret = (clk->ops->set_rate)(clk, rate);
--	spin_unlock(&clocks_lock);
-+	spin_unlock_irqrestore(&clocks_lock, flags);
- 
- 	return ret;
- }
--- 
-1.7.4.1
+Thanks,
+~Ryan
