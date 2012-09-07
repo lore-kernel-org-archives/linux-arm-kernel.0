@@ -1,40 +1,38 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  7 Sep 2012 17:26:48 +0100
-Subject: [PATCH v3 13/31] arm64: Device specific operations
+Date: Fri,  7 Sep 2012 17:26:51 +0100
+Subject: [PATCH v3 16/31] arm64: ELF definitions
 In-Reply-To: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1347035226-18649-14-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1347035226-18649-17-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds several definitions for device communication, including
-I/O accessors and ioremap(). The __raw_* accessors are implemented as
-inline asm to avoid compiler generation of post-indexed accesses (less
-efficient to emulate in a virtualised environment).
+This patch adds definitions for the ELF format, including personality
+personality setting and EXEC_PAGESIZE. The are only two hwcap
+definitions for 64-bit applications - HWCAP_FP and HWCAP_ASIMD.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm64/include/asm/device.h |   26 ++++
- arch/arm64/include/asm/fb.h     |   34 +++++
- arch/arm64/include/asm/io.h     |  263 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/io.c          |   64 ++++++++++
- arch/arm64/mm/ioremap.c         |   84 +++++++++++++
- 5 files changed, 471 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/device.h
- create mode 100644 arch/arm64/include/asm/fb.h
- create mode 100644 arch/arm64/include/asm/io.h
- create mode 100644 arch/arm64/kernel/io.c
- create mode 100644 arch/arm64/mm/ioremap.c
+ arch/arm64/include/asm/auxvec.h   |   22 +++++
+ arch/arm64/include/asm/elf.h      |  179 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/hwcap.h    |   53 +++++++++++
+ arch/arm64/include/asm/param.h    |   23 +++++
+ arch/arm64/include/asm/shmparam.h |   28 ++++++
+ 5 files changed, 305 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/auxvec.h
+ create mode 100644 arch/arm64/include/asm/elf.h
+ create mode 100644 arch/arm64/include/asm/hwcap.h
+ create mode 100644 arch/arm64/include/asm/param.h
+ create mode 100644 arch/arm64/include/asm/shmparam.h
 
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+diff --git a/arch/arm64/include/asm/auxvec.h b/arch/arm64/include/asm/auxvec.h
 new file mode 100644
-index 0000000..0d8453c
+index 0000000..22d6d88
 --- /dev/null
-+++ b/arch/arm64/include/asm/device.h
-@@ -0,0 +1,26 @@
++++ b/arch/arm64/include/asm/auxvec.h
+@@ -0,0 +1,22 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -50,23 +48,19 @@ index 0000000..0d8453c
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_DEVICE_H
-+#define __ASM_DEVICE_H
++#ifndef __ASM_AUXVEC_H
++#define __ASM_AUXVEC_H
 +
-+struct dev_archdata {
-+	struct dma_map_ops *dma_ops;
-+};
-+
-+struct pdev_archdata {
-+};
++/* vDSO location */
++#define AT_SYSINFO_EHDR	33
 +
 +#endif
-diff --git a/arch/arm64/include/asm/fb.h b/arch/arm64/include/asm/fb.h
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
 new file mode 100644
-index 0000000..adb88a6
+index 0000000..cf28464
 --- /dev/null
-+++ b/arch/arm64/include/asm/fb.h
-@@ -0,0 +1,34 @@
++++ b/arch/arm64/include/asm/elf.h
+@@ -0,0 +1,179 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -82,35 +76,177 @@ index 0000000..adb88a6
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_FB_H_
-+#define __ASM_FB_H_
++#ifndef __ASM_ELF_H
++#define __ASM_ELF_H
 +
-+#include <linux/fb.h>
-+#include <linux/fs.h>
-+#include <asm/page.h>
++#include <asm/hwcap.h>
 +
-+static inline void fb_pgprotect(struct file *file, struct vm_area_struct *vma,
-+				unsigned long off)
-+{
-+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-+}
-+
-+static inline int fb_is_primary_device(struct fb_info *info)
-+{
-+	return 0;
-+}
-+
-+#endif /* __ASM_FB_H_ */
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-new file mode 100644
-index 0000000..48fa83f
---- /dev/null
-+++ b/arch/arm64/include/asm/io.h
-@@ -0,0 +1,263 @@
 +/*
-+ * Based on arch/arm/include/asm/io.h
-+ *
-+ * Copyright (C) 1996-2000 Russell King
++ * ELF register definitions..
++ */
++#include <asm/ptrace.h>
++#include <asm/user.h>
++
++typedef unsigned long elf_greg_t;
++typedef unsigned long elf_freg_t[3];
++
++#define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
++typedef elf_greg_t elf_gregset_t[ELF_NGREG];
++
++typedef struct user_fp elf_fpregset_t;
++
++#define EM_AARCH64		183
++
++/*
++ * AArch64 static relocation types.
++ */
++
++/* Miscellaneous. */
++#define R_ARM_NONE			0
++#define R_AARCH64_NONE			256
++
++/* Data. */
++#define R_AARCH64_ABS64			257
++#define R_AARCH64_ABS32			258
++#define R_AARCH64_ABS16			259
++#define R_AARCH64_PREL64		260
++#define R_AARCH64_PREL32		261
++#define R_AARCH64_PREL16		262
++
++/* Instructions. */
++#define R_AARCH64_MOVW_UABS_G0		263
++#define R_AARCH64_MOVW_UABS_G0_NC	264
++#define R_AARCH64_MOVW_UABS_G1		265
++#define R_AARCH64_MOVW_UABS_G1_NC	266
++#define R_AARCH64_MOVW_UABS_G2		267
++#define R_AARCH64_MOVW_UABS_G2_NC	268
++#define R_AARCH64_MOVW_UABS_G3		269
++
++#define R_AARCH64_MOVW_SABS_G0		270
++#define R_AARCH64_MOVW_SABS_G1		271
++#define R_AARCH64_MOVW_SABS_G2		272
++
++#define R_AARCH64_LD_PREL_LO19		273
++#define R_AARCH64_ADR_PREL_LO21		274
++#define R_AARCH64_ADR_PREL_PG_HI21	275
++#define R_AARCH64_ADR_PREL_PG_HI21_NC	276
++#define R_AARCH64_ADD_ABS_LO12_NC	277
++#define R_AARCH64_LDST8_ABS_LO12_NC	278
++
++#define R_AARCH64_TSTBR14		279
++#define R_AARCH64_CONDBR19		280
++#define R_AARCH64_JUMP26		282
++#define R_AARCH64_CALL26		283
++#define R_AARCH64_LDST16_ABS_LO12_NC	284
++#define R_AARCH64_LDST32_ABS_LO12_NC	285
++#define R_AARCH64_LDST64_ABS_LO12_NC	286
++#define R_AARCH64_LDST128_ABS_LO12_NC	299
++
++#define R_AARCH64_MOVW_PREL_G0		287
++#define R_AARCH64_MOVW_PREL_G0_NC	288
++#define R_AARCH64_MOVW_PREL_G1		289
++#define R_AARCH64_MOVW_PREL_G1_NC	290
++#define R_AARCH64_MOVW_PREL_G2		291
++#define R_AARCH64_MOVW_PREL_G2_NC	292
++#define R_AARCH64_MOVW_PREL_G3		293
++
++
++/*
++ * These are used to set parameters in the core dumps.
++ */
++#define ELF_CLASS	ELFCLASS64
++#define ELF_DATA	ELFDATA2LSB
++#define ELF_ARCH	EM_AARCH64
++
++#define ELF_PLATFORM_SIZE	16
++#define ELF_PLATFORM		("aarch64")
++
++/*
++ * This is used to ensure we don't load something for the wrong architecture.
++ */
++#define elf_check_arch(x)		((x)->e_machine == EM_AARCH64)
++
++#define elf_read_implies_exec(ex,stk)	(stk != EXSTACK_DISABLE_X)
++
++#define CORE_DUMP_USE_REGSET
++#define ELF_EXEC_PAGESIZE	PAGE_SIZE
++
++/*
++ * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
++ * use of this is to invoke "./ld.so someprog" to test out a new version of
++ * the loader.  We need to make sure that it is out of the way of the program
++ * that it will "exec", and that there is sufficient room for the brk.
++ */
++extern unsigned long randomize_et_dyn(unsigned long base);
++#define ELF_ET_DYN_BASE	(randomize_et_dyn(2 * TASK_SIZE_64 / 3))
++
++/*
++ * When the program starts, a1 contains a pointer to a function to be
++ * registered with atexit, as per the SVR4 ABI.  A value of 0 means we have no
++ * such handler.
++ */
++#define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
++
++#define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
++
++#define ARCH_DLINFO							\
++do {									\
++	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
++		    (elf_addr_t)current->mm->context.vdso);		\
++} while (0)
++
++#define ARCH_HAS_SETUP_ADDITIONAL_PAGES
++struct linux_binprm;
++extern int arch_setup_additional_pages(struct linux_binprm *bprm,
++				       int uses_interp);
++
++/* 1GB of VA */
++#ifdef CONFIG_COMPAT
++#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
++						0x7ff >> (PAGE_SHIFT - 12) : \
++						0x3ffff >> (PAGE_SHIFT - 12))
++#else
++#define STACK_RND_MASK			(0x3ffff >> (PAGE_SHIFT - 12))
++#endif
++
++struct mm_struct;
++extern unsigned long arch_randomize_brk(struct mm_struct *mm);
++#define arch_randomize_brk arch_randomize_brk
++
++#ifdef CONFIG_COMPAT
++#define EM_ARM				40
++#define COMPAT_ELF_PLATFORM		("v8l")
++
++#define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
++
++/* AArch32 registers. */
++#define COMPAT_ELF_NGREG		18
++typedef unsigned int			compat_elf_greg_t;
++typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
++
++/* AArch32 EABI. */
++#define EF_ARM_EABI_MASK		0xff000000
++#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
++					 ((x)->e_flags & EF_ARM_EABI_MASK))
++
++#define compat_start_thread		compat_start_thread
++#define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
++#define COMPAT_ARCH_DLINFO
++extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
++				      int uses_interp);
++#define compat_arch_setup_additional_pages \
++					aarch32_setup_vectors_page
++
++#endif /* CONFIG_COMPAT */
++
++#endif
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+new file mode 100644
+index 0000000..f8190ba
+--- /dev/null
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -0,0 +1,53 @@
++/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -125,260 +261,51 @@ index 0000000..48fa83f
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_IO_H
-+#define __ASM_IO_H
-+
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+
-+#include <asm/byteorder.h>
-+#include <asm/barrier.h>
-+#include <asm/pgtable.h>
++#ifndef __ASM_HWCAP_H
++#define __ASM_HWCAP_H
 +
 +/*
-+ * Generic IO read/write.  These perform native-endian accesses.
++ * HWCAP flags - for elf_hwcap (in kernel) and AT_HWCAP
 + */
-+static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strb %w0, [%1]" : : "r" (val), "r" (addr));
-+}
++#define HWCAP_FP		(1 << 0)
++#define HWCAP_ASIMD		(1 << 1)
 +
-+static inline void __raw_writew(u16 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strh %w0, [%1]" : : "r" (val), "r" (addr));
-+}
++#define COMPAT_HWCAP_HALF	(1 << 1)
++#define COMPAT_HWCAP_THUMB	(1 << 2)
++#define COMPAT_HWCAP_FAST_MULT	(1 << 4)
++#define COMPAT_HWCAP_VFP	(1 << 6)
++#define COMPAT_HWCAP_EDSP	(1 << 7)
++#define COMPAT_HWCAP_NEON	(1 << 12)
++#define COMPAT_HWCAP_VFPv3	(1 << 13)
++#define COMPAT_HWCAP_TLS	(1 << 15)
++#define COMPAT_HWCAP_VFPv4	(1 << 16)
++#define COMPAT_HWCAP_IDIVA	(1 << 17)
++#define COMPAT_HWCAP_IDIVT	(1 << 18)
++#define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
 +
-+static inline void __raw_writel(u32 val, volatile void __iomem *addr)
-+{
-+	asm volatile("str %w0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
-+{
-+	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline u8 __raw_readb(const volatile void __iomem *addr)
-+{
-+	u8 val;
-+	asm volatile("ldrb %w0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u16 __raw_readw(const volatile void __iomem *addr)
-+{
-+	u16 val;
-+	asm volatile("ldrh %w0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u32 __raw_readl(const volatile void __iomem *addr)
-+{
-+	u32 val;
-+	asm volatile("ldr %w0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u64 __raw_readq(const volatile void __iomem *addr)
-+{
-+	u64 val;
-+	asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+/* IO barriers */
-+#define __iormb()		rmb()
-+#define __iowmb()		wmb()
-+
-+#define mmiowb()		do { } while (0)
-+
++#if defined(__KERNEL__) && !defined(__ASSEMBLY__)
 +/*
-+ * Relaxed I/O memory access primitives. These follow the Device memory
-+ * ordering rules but do not guarantee any ordering relative to Normal memory
-+ * accesses.
++ * This yields a mask that user programs can use to figure out what
++ * instruction set this cpu supports.
 + */
-+#define readb_relaxed(c)	({ u8  __v = __raw_readb(c); __v; })
-+#define readw_relaxed(c)	({ u16 __v = le16_to_cpu((__force __le16)__raw_readw(c)); __v; })
-+#define readl_relaxed(c)	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
++#define ELF_HWCAP		(elf_hwcap)
++#define COMPAT_ELF_HWCAP	(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
++				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
++				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
++				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
++				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
 +
-+#define writeb_relaxed(v,c)	((void)__raw_writeb((v),(c)))
-+#define writew_relaxed(v,c)	((void)__raw_writew((__force u16)cpu_to_le16(v),(c)))
-+#define writel_relaxed(v,c)	((void)__raw_writel((__force u32)cpu_to_le32(v),(c)))
++extern unsigned int elf_hwcap;
++#endif
 +
-+/*
-+ * I/O memory access primitives. Reads are ordered relative to any
-+ * following Normal memory access. Writes are ordered relative to any prior
-+ * Normal memory access.
-+ */
-+#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
-+#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
-+#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-+
-+#define writeb(v,c)		({ __iowmb(); writeb_relaxed((v),(c)); })
-+#define writew(v,c)		({ __iowmb(); writew_relaxed((v),(c)); })
-+#define writel(v,c)		({ __iowmb(); writel_relaxed((v),(c)); })
-+
-+/*
-+ *  I/O port access primitives.
-+ */
-+#define IO_SPACE_LIMIT		0xffff
-+
-+/*
-+ * We currently don't have any platform with PCI support, so just leave this
-+ * defined to 0 until needed.
-+ */
-+#define PCI_IOBASE		((void __iomem *)0)
-+
-+static inline u8 inb(unsigned long addr)
-+{
-+	return readb(addr + PCI_IOBASE);
-+}
-+
-+static inline u16 inw(unsigned long addr)
-+{
-+	return readw(addr + PCI_IOBASE);
-+}
-+
-+static inline u32 inl(unsigned long addr)
-+{
-+	return readl(addr + PCI_IOBASE);
-+}
-+
-+static inline void outb(u8 b, unsigned long addr)
-+{
-+	writeb(b, addr + PCI_IOBASE);
-+}
-+
-+static inline void outw(u16 b, unsigned long addr)
-+{
-+	writew(b, addr + PCI_IOBASE);
-+}
-+
-+static inline void outl(u32 b, unsigned long addr)
-+{
-+	writel(b, addr + PCI_IOBASE);
-+}
-+
-+#define inb_p(addr)	inb(addr)
-+#define inw_p(addr)	inw(addr)
-+#define inl_p(addr)	inl(addr)
-+
-+#define outb_p(x, addr)	outb((x), (addr))
-+#define outw_p(x, addr)	outw((x), (addr))
-+#define outl_p(x, addr)	outl((x), (addr))
-+
-+static inline void insb(unsigned long addr, void *buffer, int count)
-+{
-+	u8 *buf = buffer;
-+	while (count--)
-+		*buf++ = __raw_readb(addr + PCI_IOBASE);
-+}
-+
-+static inline void insw(unsigned long addr, void *buffer, int count)
-+{
-+	u16 *buf = buffer;
-+	while (count--)
-+		*buf++ = __raw_readw(addr + PCI_IOBASE);
-+}
-+
-+static inline void insl(unsigned long addr, void *buffer, int count)
-+{
-+	u32 *buf = buffer;
-+	while (count--)
-+		*buf++ = __raw_readl(addr + PCI_IOBASE);
-+}
-+
-+static inline void outsb(unsigned long addr, const void *buffer, int count)
-+{
-+	const u8 *buf = buffer;
-+	while (count--)
-+		__raw_writeb(*buf++, addr + PCI_IOBASE);
-+}
-+
-+static inline void outsw(unsigned long addr, const void *buffer, int count)
-+{
-+	const u16 *buf = buffer;
-+	while (count--)
-+		__raw_writew(*buf++, addr + PCI_IOBASE);
-+}
-+
-+static inline void outsl(unsigned long addr, const void *buffer, int count)
-+{
-+	const u32 *buf = buffer;
-+	while (count--)
-+		__raw_writel(*buf++, addr + PCI_IOBASE);
-+}
-+
-+#define insb_p(port,to,len)	insb(port,to,len)
-+#define insw_p(port,to,len)	insw(port,to,len)
-+#define insl_p(port,to,len)	insl(port,to,len)
-+
-+#define outsb_p(port,from,len)	outsb(port,from,len)
-+#define outsw_p(port,from,len)	outsw(port,from,len)
-+#define outsl_p(port,from,len)	outsl(port,from,len)
-+
-+/*
-+ * String version of I/O memory access operations.
-+ */
-+extern void __memcpy_fromio(void *, const volatile void __iomem *, size_t);
-+extern void __memcpy_toio(volatile void __iomem *, const void *, size_t);
-+extern void __memset_io(volatile void __iomem *, int, size_t);
-+
-+#define memset_io(c,v,l)	__memset_io((c),(v),(l))
-+#define memcpy_fromio(a,c,l)	__memcpy_fromio((a),(c),(l))
-+#define memcpy_toio(c,a,l)	__memcpy_toio((c),(a),(l))
-+
-+/*
-+ * I/O memory mapping functions.
-+ */
-+extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
-+extern void __iounmap(volatile void __iomem *addr);
-+
-+#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
-+#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_XN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-+#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL_NC))
-+
-+#define ioremap(addr, size)		__ioremap((addr), (size), PROT_DEVICE_nGnRE)
-+#define ioremap_nocache(addr, size)	__ioremap((addr), (size), PROT_DEVICE_nGnRE)
-+#define ioremap_wc(addr, size)		__ioremap((addr), (size), PROT_NORMAL_NC)
-+#define iounmap				__iounmap
-+
-+#define ARCH_HAS_IOREMAP_WC
-+#include <asm-generic/iomap.h>
-+
-+/*
-+ * More restrictive address range checking than the default implementation
-+ * (PHYS_OFFSET and PHYS_MASK taken into account).
-+ */
-+#define ARCH_HAS_VALID_PHYS_ADDR_RANGE
-+extern int valid_phys_addr_range(unsigned long addr, size_t size);
-+extern int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
-+
-+extern int devmem_is_allowed(unsigned long pfn);
-+
-+/*
-+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
-+ * access
-+ */
-+#define xlate_dev_mem_ptr(p)	__va(p)
-+
-+/*
-+ * Convert a virtual cached pointer to an uncached pointer
-+ */
-+#define xlate_dev_kmem_ptr(p)	p
-+
-+#endif	/* __KERNEL__ */
-+#endif	/* __ASM_IO_H */
-diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
++#endif
+diff --git a/arch/arm64/include/asm/param.h b/arch/arm64/include/asm/param.h
 new file mode 100644
-index 0000000..7d37ead
+index 0000000..8e3a281
 --- /dev/null
-+++ b/arch/arm64/kernel/io.c
-@@ -0,0 +1,64 @@
++++ b/arch/arm64/include/asm/param.h
+@@ -0,0 +1,23 @@
 +/*
-+ * Based on arch/arm/kernel/io.c
-+ *
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -393,66 +320,21 @@ index 0000000..7d37ead
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++#ifndef __ASM_PARAM_H
++#define __ASM_PARAM_H
 +
-+#include <linux/export.h>
-+#include <linux/types.h>
-+#include <linux/io.h>
++#define EXEC_PAGESIZE	65536
 +
-+/*
-+ * Copy data from IO memory space to "real" memory space.
-+ */
-+void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
-+{
-+	unsigned char *t = to;
-+	while (count) {
-+		count--;
-+		*t = readb(from);
-+		t++;
-+		from++;
-+	}
-+}
-+EXPORT_SYMBOL(__memcpy_fromio);
++#include <asm-generic/param.h>
 +
-+/*
-+ * Copy data from "real" memory space to IO memory space.
-+ */
-+void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
-+{
-+	const unsigned char *f = from;
-+	while (count) {
-+		count--;
-+		writeb(*f, to);
-+		f++;
-+		to++;
-+	}
-+}
-+EXPORT_SYMBOL(__memcpy_toio);
-+
-+/*
-+ * "memset" on IO memory space.
-+ */
-+void __memset_io(volatile void __iomem *dst, int c, size_t count)
-+{
-+	while (count) {
-+		count--;
-+		writeb(c, dst);
-+		dst++;
-+	}
-+}
-+EXPORT_SYMBOL(__memset_io);
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
++#endif
+diff --git a/arch/arm64/include/asm/shmparam.h b/arch/arm64/include/asm/shmparam.h
 new file mode 100644
-index 0000000..1725cd6
+index 0000000..4df608a
 --- /dev/null
-+++ b/arch/arm64/mm/ioremap.c
-@@ -0,0 +1,84 @@
++++ b/arch/arm64/include/asm/shmparam.h
+@@ -0,0 +1,28 @@
 +/*
-+ * Based on arch/arm/mm/ioremap.c
-+ *
-+ * (C) Copyright 1995 1996 Linus Torvalds
-+ * Hacked for ARM by Phil Blundell <philb@gnu.org>
-+ * Hacked to allow all architectures to build, and various cleanups
-+ * by Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -467,66 +349,16 @@ index 0000000..1725cd6
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++#ifndef __ASM_SHMPARAM_H
++#define __ASM_SHMPARAM_H
 +
-+#include <linux/export.h>
-+#include <linux/mm.h>
-+#include <linux/vmalloc.h>
-+#include <linux/io.h>
++/*
++ * For IPC syscalls from compat tasks, we need to use the legacy 16k
++ * alignment value. Since we don't have aliasing D-caches, the rest of
++ * the time we can safely use PAGE_SIZE.
++ */
++#define COMPAT_SHMLBA	0x4000
 +
-+static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
-+				      pgprot_t prot, void *caller)
-+{
-+	unsigned long last_addr;
-+	unsigned long offset = phys_addr & ~PAGE_MASK;
-+	int err;
-+	unsigned long addr;
-+	struct vm_struct *area;
++#include <asm-generic/shmparam.h>
 +
-+	/*
-+	 * Page align the mapping address and size, taking account of any
-+	 * offset.
-+	 */
-+	phys_addr &= PAGE_MASK;
-+	size = PAGE_ALIGN(size + offset);
-+
-+	/*
-+	 * Don't allow wraparound, zero size or outside PHYS_MASK.
-+	 */
-+	last_addr = phys_addr + size - 1;
-+	if (!size || last_addr < phys_addr || (last_addr & ~PHYS_MASK))
-+		return NULL;
-+
-+	/*
-+	 * Don't allow RAM to be mapped.
-+	 */
-+	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-+		return NULL;
-+
-+	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-+	if (!area)
-+		return NULL;
-+	addr = (unsigned long)area->addr;
-+
-+	err = ioremap_page_range(addr, addr + size, phys_addr, prot);
-+	if (err) {
-+		vunmap((void *)addr);
-+		return NULL;
-+	}
-+
-+	return (void __iomem *)(offset + addr);
-+}
-+
-+void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot)
-+{
-+	return __ioremap_caller(phys_addr, size, prot,
-+				__builtin_return_address(0));
-+}
-+EXPORT_SYMBOL(__ioremap);
-+
-+void __iounmap(volatile void __iomem *io_addr)
-+{
-+	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-+
-+	vunmap(addr);
-+}
-+EXPORT_SYMBOL(__iounmap);
++#endif /* __ASM_SHMPARAM_H */
