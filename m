@@ -1,22 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Sep 2012 09:25:57 -0600
-Subject: [PATCH] ARM: tegra: Fix data type for io address
-In-Reply-To: <1346996455-31697-1-git-send-email-pgaikwad@nvidia.com>
-References: <1346996455-31697-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <504A1205.7090405@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 7 Sep 2012 08:31:36 -0700
+Subject: [PATCH v2] serial: omap: fix compile breakage
+In-Reply-To: <1346995531-3197-1-git-send-email-balbi@ti.com>
+References: <1346995312-2872-1-git-send-email-balbi@ti.com>
+ <1346995531-3197-1-git-send-email-balbi@ti.com>
+Message-ID: <20120907153136.GA8634@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2012 11:40 PM, Prashant Gaikwad wrote:
-> Warnings were generated because following commit changed data type for
-> address pointer
+On Fri, Sep 07, 2012 at 08:25:31AM +0300, Felipe Balbi wrote:
+> when rebasing patches on top of Greg's tty-next,
+> it looks like automerge broke a few things which
+> I didn't catch (for whatever reason I didn't
+> have OMAP Serial enabled on .config) so I ended
+> up breaking the build on Greg's tty-next branch.
 > 
-> 195bbca ARM: 7500/1: io: avoid writeback addressing modes for __raw_ accessors
+> Fix the breakage by re-adding the three missing
+> members on struct uart_omap_port.
 > 
-> arch/arm/mach-tegra/tegra30_clocks.c: In function 'clk_measure_input_freq':
-> arch/arm/mach-tegra/tegra30_clocks.c:418:2: warning: passing argument 2 of '__raw_writel' makes pointer from integer without a cast
-> .../arch/arm/include/asm/io.h:88:20: note: expected 'volatile void *' but argument is of type 'unsigned int
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
 > 
-> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> Changes since v1:
+> 	. remove the fields from <plat/omap-serial.h>
+> 
+>  arch/arm/plat-omap/include/plat/omap-serial.h | 4 ----
+>  drivers/tty/serial/omap-serial.c              | 4 ++++
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 
-Thanks, applied to Tegra's for-3.7/common-clk branch.
+This applies with fuzz, what tree did you make it against?
+
+patching file arch/arm/plat-omap/include/plat/omap-serial.h
+Hunk #1 succeeded at 105 with fuzz 1 (offset 26 lines).
+patching file drivers/tty/serial/omap-serial.c
+Hunk #1 succeeded at 100 (offset -23 lines).
+
+Should I still apply it?
+
+greg k-h
