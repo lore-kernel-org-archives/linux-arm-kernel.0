@@ -1,36 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 19:37:18 +0000
-Subject: [PATCH v3 11/31] arm64: IRQ handling
-In-Reply-To: <1347035226-18649-12-git-send-email-catalin.marinas@arm.com>
+Date: Fri, 7 Sep 2012 19:37:47 +0000
+Subject: [PATCH v3 12/31] arm64: Atomic operations
+In-Reply-To: <1347035226-18649-13-git-send-email-catalin.marinas@arm.com>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-12-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201209071937.19156.arnd@arndb.de>
+ <1347035226-18649-13-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201209071937.47670.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 07 September 2012, Catalin Marinas wrote:
+> This patch introduces the atomic, mutex and futex operations. Many
+> atomic operations use the load-acquire and store-release operations
+> which imply barriers, avoiding the need for explicit DMB.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-> +#define __inc_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)++
-> +#define __get_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)
-
-Isn't this something that the IRQ core code already keeps track of?
-
-> +#endif /* __ASM_HARDIRQ_H */
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> new file mode 100644
-> index 0000000..a4e1cad
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -0,0 +1,8 @@
-> +#ifndef __ASM_IRQ_H
-> +#define __ASM_IRQ_H
-> +
-> +#include <asm-generic/irq.h>
-> +
-> +extern void (*handle_arch_irq)(struct pt_regs *);
-> +
-> +#endif
-
-Is this one still needed?
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
