@@ -1,32 +1,36 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri,  7 Sep 2012 14:45:03 -0700
-Subject: [PATCH] msm_serial: fix clock rate on DMA-based uarts
-Message-ID: <1347054303-5643-1-git-send-email-davidb@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Sep 2012 14:46:33 -0700
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <CACRpkdYgcYAFy7bBn3XNcrkSoCpeA8yNaa9LZNd4w33Zp3Jjnw@mail.gmail.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <201209050513.08588.marex@denx.de>
+ <20120905233416.GP1303@atomide.com>
+ <201209060405.08997.marex@denx.de>
+ <20120906174531.GX1303@atomide.com>
+ <CACRpkdYgcYAFy7bBn3XNcrkSoCpeA8yNaa9LZNd4w33Zp3Jjnw@mail.gmail.com>
+Message-ID: <20120907214633.GO1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver explicitly requests a clock rate for the UART, but it is
-off by a factor of four from the dividers that it programs into the
-UART.  Fix this by setting the rate to 1/4 of the current value.
+* Linus Walleij <linus.walleij@linaro.org> [120907 14:40]:
+> On Thu, Sep 6, 2012 at 7:45 PM, Tony Lindgren <tony@atomide.com> wrote:
+> 
+> >> > The warning should be pinctrl related as the pinctrl drivers may not be
+> >> > device tree based drivers.
+> >>
+> >> Exactly my concern. Also the warning shouldnt be present on systems where
+> >> pinctrl is disabled.
+> >
+> > But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
+> > CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
+> 
+> This is correct, nothing to worry about.
+> 
+> The one troublesome case is if a pinctrl driver is present but not
+> being used, then you might need to call pinctrl_provide_dummies().
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- drivers/tty/serial/msm_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks that's good to know.
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index 8131e2c..033e0bc 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -896,7 +896,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
- 			return PTR_ERR(msm_port->clk);
- 
- 	if (msm_port->is_uartdm)
--		clk_set_rate(msm_port->clk, 7372800);
-+		clk_set_rate(msm_port->clk, 1843200);
- 
- 	port->uartclk = clk_get_rate(msm_port->clk);
- 	printk(KERN_INFO "uartclk = %d\n", port->uartclk);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+
+Tony
