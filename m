@@ -1,21 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Sep 2012 09:49:38 +0100
-Subject: [PATCH 2/2] ARM: kexec: Check segment memory addresses
-In-Reply-To: <1347007260-13271-3-git-send-email-matthew.leach@arm.com>
-References: <1347007260-13271-1-git-send-email-matthew.leach@arm.com>
- <1347007260-13271-3-git-send-email-matthew.leach@arm.com>
-Message-ID: <20120907084937.GC13739@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 7 Sep 2012 10:55:18 +0200
+Subject: [PATCH] ARM: dts: omap3-beagle: Add heartbeat and mmc LEDs support
+Message-ID: <5049B676.1080004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 09:41:00AM +0100, Matthew Leach wrote:
-> Ensure that the memory regions that are set within the segments
-> correspond to physical contiguous memory regions.
-> 
-> Reviewed-by: Simon Horman <horms@verge.net.au>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Add the support for D6 and D7 LEDs on Beagle board.
+- D6 will be used for heartbeat
+- D7 will be used for mmc0
 
-What about platforms which pull out bits of physical RAM from memblock
-via arm_memblock_steal() ?  Doesn't this mean such platforms will reduce
-their available memory on each subsequent kexec?
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
+
+It is based on top of the LEDB support added by Florian.
+
+Regards,
+Benoit
+
+ arch/arm/boot/dts/omap3-beagle.dts |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 3fe35c2..ca46fb2 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -24,6 +24,18 @@
+ 			label = "beagleboard::pmu_stat";
+ 			gpios = <&twl_gpio 19 0>; /* LEDB */
+ 		};
++
++		heartbeat {
++			label = "beagleboard::usr0";
++			gpios = <&gpio5 22 0>; /* 150 -> D6 LED */
++			linux,default-trigger = "heartbeat";
++		};
++
++		mmc {
++			label = "beagleboard::usr1";
++			gpios = <&gpio5 21 0>; /* 149 -> D7 LED */
++			linux,default-trigger = "mmc0";
++		};
+ 	};
+ };
+ 
+-- 
+1.7.0.4
