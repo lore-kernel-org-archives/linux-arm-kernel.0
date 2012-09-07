@@ -1,29 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Sep 2012 09:46:56 +0100
-Subject: [PATCH v3 0/2] ARM: shmobile: enable PMU(Performance Monitoring
- Unit)
-In-Reply-To: <504952F7.6090906@kmckk.co.jp>
-References: <50487370.6000409@kmckk.co.jp>
- <1346930047-9541-1-git-send-email-koba@kmckk.co.jp>
- <20120906112109.GG858@mudshark.cambridge.arm.com>
- <504952F7.6090906@kmckk.co.jp>
-Message-ID: <20120907084656.GB15916@mudshark.cambridge.arm.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Fri, 7 Sep 2012 10:48:39 +0200
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+Message-ID: <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 02:50:47AM +0100, Tetsuyuki Kobayashi wrote:
-> (2012/09/06 20:21), Will Deacon wrote:
-> > On Thu, Sep 06, 2012 at 12:14:05PM +0100, Tetsuyuki Kobayshi wrote:
-> >> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-> > Actually, it's better if you just base your branch against that one when you
-> > send it to arm-soc for merging. That way, other SoCs can also develop
-> > against that branch without having to worry about each other.
-> >
-> I see.
-> I thought that removing ARM_PMU_DEVICE_CPU depends on your pmu/cleanup 
-> branch, but I found it does not.
+On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> device pointer, pinctrl driver configure SoC pins to GPIO
+> mode according to definitions provided in .dts file.
 
-It will probably build alright for you without my patches, but I don't
-thinkt it will work correctly as we'll fail to reserve the PMU.
+Shouldn't be the interaction with the pinctrl layer left to gpiolib?
 
-Will
+Cheers,
+Domenico
