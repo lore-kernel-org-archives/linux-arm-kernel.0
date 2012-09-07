@@ -1,63 +1,234 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Sep 2012 11:27:29 -0700
-Subject: [PATCH] serial: omap: Request pins using pinctrl framework
-In-Reply-To: <20120907175939.GE1303@atomide.com>
-References: <20120907175939.GE1303@atomide.com>
-Message-ID: <20120907182729.GK1303@atomide.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 7 Sep 2012 11:36:04 -0700
+Subject: [PATCH 1/2] hwmon: Add devicetree bindings to gpio-fan
+In-Reply-To: <1347035675-23907-2-git-send-email-jm@lentin.co.uk>
+References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
+ <1347035675-23907-2-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120907183604.GA26986@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120907 11:00]:
-> Request pins using pinctrl framework. Only show a warning
-> on error as some boards set the pins in the bootloader
-> even if CONFIG_PINCTRL is enabled.
+On Fri, Sep 07, 2012 at 05:34:34PM +0100, Jamie Lentin wrote:
+> Allow a gpio-fan to be defined in devicetree, see binding documentation
+> for details.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 > ---
+>  .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
+>  drivers/hwmon/gpio-fan.c                           |  111 ++++++++++++++++++++
+>  2 files changed, 136 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
 > 
-> Note that this has only so far been tested with the legacy
-> non-devicetree boot as devicetree boot now has a regression
-> issue with omap-serial.
-
-Now also tested with devicetree case on top tty-next +
-Felipe's "[PATCH] serial: omap: fix DeviceTree boot.
-
-Tony
- 
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -40,6 +40,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/of.h>
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-fan.txt b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
+> new file mode 100644
+> index 0000000..2dd457a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
+> @@ -0,0 +1,25 @@
+> +Bindings for fan connected to GPIO lines
+> +
+> +Required properties:
+> +- compatible : "gpio-fan"
+> +- gpios: Specifies the pins that map to bits in the control value,
+> +  ordered MSB-->LSB.
+> +- gpio-fan,speed-map: A mapping of possible fan RPM speeds and the
+> +  control value that should be set to achieve them. This array
+> +  must have the RPM values in ascending order.
+> +
+> +Optional properties:
+> +- alarm-gpios: This pin going active indicates something is wrong with
+> +  the fan, and a udev event will be fired.
+> +
+> +Examples:
+> +
+> +	gpio_fan {
+> +		compatible = "gpio-fan";
+> +		gpios = <&gpio1 14 1
+> +			 &gpio1 13 1>;
+> +		gpio-fan,speed-map = <0    0
+> +				      3000 1
+> +				      6000 2>;
+> +		alarm-gpios = <&gpio1 15 1>;
+> +	};
+> diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
+> index 2f4b01b..876ce41 100644
+> --- a/drivers/hwmon/gpio-fan.c
+> +++ b/drivers/hwmon/gpio-fan.c
+> @@ -31,6 +31,8 @@
+>  #include <linux/hwmon.h>
 >  #include <linux/gpio.h>
-> +#include <linux/pinctrl/consumer.h>
+>  #include <linux/gpio-fan.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_gpio.h>
 >  
->  #include <plat/omap-serial.h>
+>  struct gpio_fan_data {
+>  	struct platform_device	*pdev;
+> @@ -400,12 +402,120 @@ static ssize_t show_name(struct device *dev,
 >  
-> @@ -108,6 +109,7 @@ struct uart_omap_port {
->  	u32			latency;
->  	u32			calc_latency;
->  	struct work_struct	qos_work;
-> +	struct pinctrl		*pins;
->  };
+>  static DEVICE_ATTR(name, S_IRUGO, show_name, NULL);
 >  
->  #define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
-> @@ -1371,6 +1373,13 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
->  		goto err_port_line;
->  	}
->  
-> +	up->pins = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(up->pins)) {
-> +		dev_warn(&pdev->dev, "did not get pins for uart%i error: %li\n",
-> +			 up->port.line, PTR_ERR(up->pins));
-> +		up->pins = NULL;
+> +
+> +#ifdef CONFIG_OF
+> +/*
+> + * Translate OpenFirmware node properties into platform_data
+> + */
+> +static int gpio_fan_get_of_pdata(struct device *dev,
+> +			    struct gpio_fan_platform_data *pdata)
+> +{
+> +	struct device_node *node;
+> +	struct gpio_fan_speed  *speed;
+> +	unsigned *ctrl;
+> +	unsigned i;
+> +	u32 u;
+> +	struct property *prop;
+> +	const __be32 *p;
+> +
+> +	node = dev->of_node;
+> +
+> +	/* Fill GPIO pin array */
+> +	pdata->num_ctrl = of_gpio_count(node);
+> +	ctrl = devm_kzalloc(dev, pdata->num_ctrl * sizeof(unsigned),
+> +				GFP_KERNEL);
+> +	if (!ctrl)
+> +		return -ENOMEM;
+> +	for (i = 0; i < of_gpio_count(node); i++) {
+> +		int val;
+> +
+> +		val = of_get_gpio(node, i);
+> +		if (val >= 0)
+> +			ctrl[i] = val;
+> +		else
+> +			return -EINVAL;
+
+I very much prefer not to hide the error code and reverse the logic.
+
+		if (val < 0)
+			return val;
+		ctrl[i] = val;
+
+> +	}
+> +	pdata->ctrl = ctrl;
+> +
+> +	/* Get speed map array size */
+> +	i = 0;
+> +	of_property_for_each_u32(node, "gpio-fan,speed-map", prop, p, u)
+> +		i++;
+
+Looking through the of code, isn't there a function which returns the
+number of elements ?
+
+Something like
+	int length;
+	struct property *prop;
+	
+	prop = of_find_property(node, "gpio-fan,speed-map", &length);
+
+> +	if (i & 1) {
+> +		dev_err(dev, "gpio-fan,speed-map contains odd number of entries");
+> +		return -ENODEV;
+> +	}
+
+How about i == 0 ?
+
+> +	pdata->num_speed = i >> 1;
+> +	speed = devm_kzalloc(dev,
+> +			pdata->num_speed * sizeof(struct gpio_fan_speed),
+> +			GFP_KERNEL);
+> +	if (!speed)
+> +		return -ENOMEM;
+> +
+> +	/* Populate speed map */
+> +	i = 0;
+> +	of_property_for_each_u32(node, "gpio-fan,speed-map", prop, p, u) {
+> +		if (i & 1)
+> +			speed[i >> 1].ctrl_val = (int)u;
+> +		else
+> +			speed[i >> 1].rpm = (int)u;
+
+Are those type casts necessary ?
+
+> +		i++;
+> +	}
+> +	pdata->speed = speed;
+> +
+> +	/* Alarm GPIO if one exists */
+> +	if (of_gpio_named_count(node, "alarm-gpios")) {
+> +		struct gpio_fan_alarm *alarm;
+> +		int val;
+> +		enum of_gpio_flags flags;
+> +
+> +		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
+> +					GFP_KERNEL);
+> +		if (!alarm)
+> +			return -ENOMEM;
+> +
+> +		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
+> +		if (val >= 0) {
+> +			alarm->gpio = val;
+> +			alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
+> +		} else
+> +			return -EINVAL;
+> +
+How about
+		if (val < 0)
+			return val;
+		alarm->gpio = val;
+		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
+
+> +		pdata->alarm = alarm;
 > +	}
 > +
->  	sprintf(up->name, "OMAP UART%d", up->port.line);
->  	up->port.mapbase = mem->start;
->  	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id of_gpio_fan_match[] = {
+> +	{ .compatible = "gpio-fan", },
+> +	{},
+> +};
+> +#endif /* CONFIG_OF_GPIO */
+> +
+>  static int __devinit gpio_fan_probe(struct platform_device *pdev)
+>  {
+>  	int err;
+>  	struct gpio_fan_data *fan_data;
+>  	struct gpio_fan_platform_data *pdata = pdev->dev.platform_data;
+>  
+> +#ifdef CONFIG_OF
+> +	if (!pdata) {
+> +		struct gpio_fan_platform_data *alt_pdata;
+> +
+Why not just use pdata ? I don't really see a reason for introducing
+a second variable. After all, we know here that pdata is NULL, and that it won't
+be used.
+
+> +		alt_pdata = devm_kzalloc(&pdev->dev,
+> +					sizeof(struct gpio_fan_platform_data),
+> +					GFP_KERNEL);
+> +		if (!alt_pdata)
+> +			return -ENOMEM;
+> +
+> +		err = gpio_fan_get_of_pdata(&pdev->dev, alt_pdata);
+> +		if (err)
+> +			return err;
+> +		pdata = alt_pdata;
+> +	}
+> +#endif /* CONFIG_OF_GPIO */
+> +
+>  	if (!pdata)
+>  		return -EINVAL;
+
+#else case, maybe ?
+
+>  
+> @@ -511,6 +621,7 @@ static struct platform_driver gpio_fan_driver = {
+>  	.driver	= {
+>  		.name	= "gpio-fan",
+>  		.pm	= GPIO_FAN_PM,
+> +		.of_match_table = of_match_ptr(of_gpio_fan_match),
+>  	},
+>  };
+>  
+> -- 
+> 1.7.10.4
+> 
+> 
