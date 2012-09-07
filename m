@@ -1,51 +1,300 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 07 Sep 2012 14:30:53 +0900
-Subject: [PATCH 0/2] ARM: EXYNOS: Set the capability of pdm0 and pdm1 as
- DMA_PRIVATE
-In-Reply-To: <1346374330.15463.5.camel@vkoul-mobl4>
-References: <1346215585-31023-1-git-send-email-tushar.behera@linaro.org>
- <1346374330.15463.5.camel@vkoul-mobl4>
-Message-ID: <243801cd8cb9$f303e6d0$d90bb470$%kim@samsung.com>
+From: gerg@snapgear.com (gerg at snapgear.com)
+Date: Fri, 7 Sep 2012 15:35:39 +1000
+Subject: [PATCH] ARM: ks8695: add board support for the OpenGear boards based
+ on the KS8695
+Message-ID: <1346996139-5692-1-git-send-email-gerg@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul wrote:
-> 
-> On Wed, 2012-08-29 at 10:16 +0530, Tushar Behera wrote:
-> > DMA clients pdma0 and pdma1 are internal to the SoC and are used only
-> > by dedicated peripherals. Since they cannot be used for generic
-> > purpose, their capability should be set as DMA_PRIVATE.
-> >
-> > The patches are rebased on top of v3.6-rc3.
-> Kukjin, if you ack them I can take thru my tree, other way round is fine
-> with me too.
+From: Greg Ungerer <gerg@uclinux.org>
 
-Hi Vinod,
+A number of boards produced by OpenGear and based on the Micrel KS8695 SoC.
+Add board support to the KS8695 kernel code to support them.
 
-Looks good to me, please pick them into your tree with my ack.
+The following machine type entries will need to be added back into the
+mach-types file with these in mainline:
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+    cm4008      MACH_CM4008       CM4008       624
+    cm41xx      MACH_CM41XX       CM41XX       672
+    cm4002      MACH_CM4002       CM4002       876
+    im42xx      MACH_IM42XX       IM42XX       1105
+    im4004      MACH_IM4004       IM4004       1400
 
-If any problems, please kindly let me know.
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+---
+ arch/arm/mach-ks8695/Kconfig    |   39 ++++++++
+ arch/arm/mach-ks8695/Makefile   |    5 +
+ arch/arm/mach-ks8695/board-og.c |  199 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 243 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ks8695/board-og.c
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> >
-> > Tushar Behera (2):
-> >   ARM: EXYNOS: Set the capability of pdm0 and pdm1 as DMA_PRIVATE
-> >   DMA: PL330: Set the capability of pdm0 and pdm1 as DMA_PRIVATE
-> >
-> >  arch/arm/mach-exynos/dma.c |    2 ++
-> >  drivers/dma/pl330.c        |    1 +
-> >  2 files changed, 3 insertions(+), 0 deletions(-)
-> >
-> 
-> --
-> ~Vinod Koul
-> Intel Corp.
+diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
+index f6b737e..a545976 100644
+--- a/arch/arm/mach-ks8695/Kconfig
++++ b/arch/arm/mach-ks8695/Kconfig
+@@ -43,6 +43,45 @@ config MACH_SE4200
+ 	  Internet Router.
+ 	  See http://www.securecomputing.com for more details.
+ 
++config MACH_CM4002
++	bool "OpenGear CM4002"
++	help
++	  Say 'Y' here if you want your kernel to support the OpenGear
++	  CM4002 Secure Access Server. See http://www.opengear.com for
++	  more details.
++
++config MACH_CM4008
++	bool "OpenGear CM4008"
++	select MIGHT_HAVE_PCI
++	help
++	  Say 'Y' here if you want your kernel to support the OpenGear
++	  CM4008 Console Server. See http://www.opengear.com for more
++	  details.
++
++config MACH_CM41xx
++	bool "OpenGear CM41xx"
++	select MIGHT_HAVE_PCI
++	help
++	  Say 'Y' here if you want your kernel to support the OpenGear
++	  CM4016 or CM4048 Console Servers. See http://www.opengear.com for
++	  more details.
++
++config MACH_IM4004
++	bool "OpenGear IM4004"
++	select MIGHT_HAVE_PCI
++	help
++	  Say 'Y' here if you want your kernel to support the OpenGear
++	  IM4004 Secure Access Server. See http://www.opengear.com for
++	  more details.
++
++config MACH_IM42xx
++	bool "OpenGear IM42xx"
++	select MIGHT_HAVE_PCI
++	help
++	  Say 'Y' here if you want your kernel to support the OpenGear
++	  IM4216 or IM4248 Console Servers. See http://www.opengear.com for
++	  more details.
++
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-ks8695/Makefile b/arch/arm/mach-ks8695/Makefile
+index 9673c0c..50980e6 100644
+--- a/arch/arm/mach-ks8695/Makefile
++++ b/arch/arm/mach-ks8695/Makefile
+@@ -21,3 +21,8 @@ obj-$(CONFIG_MACH_ACS5K)	+= board-acs5k.o
+ obj-$(CONFIG_MACH_LITE300)	+= board-sg.o
+ obj-$(CONFIG_MACH_SG310)	+= board-sg.o
+ obj-$(CONFIG_MACH_SE4200)	+= board-sg.o
++obj-$(CONFIG_MACH_CM4002)	+= board-og.o
++obj-$(CONFIG_MACH_CM4008)	+= board-og.o
++obj-$(CONFIG_MACH_CM41xx)	+= board-og.o
++obj-$(CONFIG_MACH_IM4004)	+= board-og.o
++obj-$(CONFIG_MACH_IM42xx)	+= board-og.o
+diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
+new file mode 100644
+index 0000000..1623ba4
+--- /dev/null
++++ b/arch/arm/mach-ks8695/board-og.c
+@@ -0,0 +1,199 @@
++/*
++ * board-og.c -- support for the OpenGear KS8695 based boards.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/init.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/gpio.h>
++#include <linux/irq.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <mach/devices.h>
++#include <mach/regs-gpio.h>
++#include <mach/gpio-ks8695.h>
++#include "generic.h"
++
++static int og_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
++{
++	if (machine_is_im4004() && (slot == 8))
++		return KS8695_IRQ_EXTERN1;
++	return KS8695_IRQ_EXTERN0;
++}
++
++static struct ks8695_pci_cfg __initdata og_pci = {
++	.mode		= KS8695_MODE_PCI,
++	.map_irq	= og_pci_map_irq,
++};
++
++static void __init og_register_pci(void)
++{
++	/* Initialize the GPIO lines for interrupt mode */
++	ks8695_gpio_interrupt(KS8695_GPIO_0, IRQ_TYPE_LEVEL_LOW);
++
++	/* Cardbus Slot */
++	if (machine_is_im4004())
++		ks8695_gpio_interrupt(KS8695_GPIO_1, IRQ_TYPE_LEVEL_LOW);
++
++	ks8695_init_pci(&og_pci);
++}
++
++/*
++ * The PCI bus reset is driven by a dedicated GPIO line. Toggle it here
++ * and bring the PCI bus out of reset.
++ */
++static void __init og_pci_bus_reset(void)
++{
++	unsigned int rstline = 1;
++
++	/* Some boards use a different GPIO as the PCI reset line */
++	if (machine_is_im4004())
++		rstline = 2;
++	else if (machine_is_im42xx())
++		rstline = 0;
++
++	gpio_request(rstline, "PCI reset");
++	gpio_direction_output(rstline, 0);
++
++	/* Drive a reset on the PCI reset line */
++	gpio_set_value(rstline, 1);
++	gpio_set_value(rstline, 0);
++	mdelay(100);
++	gpio_set_value(rstline, 1);
++	mdelay(100);
++}
++
++/*
++ * Direct connect serial ports (non-PCI that is).
++ */
++#define	S8250_PHYS	0x03800000
++#define	S8250_VIRT	0xf4000000
++#define	S8250_SIZE	0x00100000
++
++static struct __initdata map_desc og_io_desc[] = {
++	{
++		.virtual	= S8250_VIRT,
++		.pfn		= __phys_to_pfn(S8250_PHYS),
++		.length		= S8250_SIZE,
++		.type		= MT_DEVICE,
++	}
++};
++
++static struct resource og_uart_resources[] = {
++	{
++		.start		= S8250_VIRT,
++		.end		= S8250_VIRT + S8250_SIZE,
++		.flags		= IORESOURCE_MEM
++	},
++};
++
++static struct plat_serial8250_port og_uart_data[] = {
++	{
++		.mapbase	= S8250_VIRT,
++		.membase	= (char *) S8250_VIRT,
++		.irq		= 3,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
++		.iotype		= UPIO_MEM,
++		.regshift	= 2,
++		.uartclk	= 115200 * 16,
++	},
++	{ },
++};
++
++static struct platform_device og_uart = {
++	.name			= "serial8250",
++	.id			= 0,
++	.dev.platform_data	= og_uart_data,
++	.num_resources		= 1,
++	.resource		= og_uart_resources
++};
++
++static struct platform_device *og_devices[] __initdata = {
++	&og_uart
++};
++
++static void __init og_init(void)
++{
++	ks8695_register_gpios();
++
++	if (machine_is_cm4002()) {
++		ks8695_gpio_interrupt(KS8695_GPIO_1, IRQ_TYPE_LEVEL_HIGH);
++		iotable_init(og_io_desc, ARRAY_SIZE(og_io_desc));
++		platform_add_devices(og_devices, ARRAY_SIZE(og_devices));
++	} else {
++		og_pci_bus_reset();
++		og_register_pci();
++	}
++
++	ks8695_add_device_lan();
++	ks8695_add_device_wan();
++}
++
++#ifdef CONFIG_MACH_CM4002
++MACHINE_START(CM4002, "OpenGear/CM4002")
++	/* OpenGear Inc. */
++	.atag_offset	= 0x100,
++	.map_io		= ks8695_map_io,
++	.init_irq	= ks8695_init_irq,
++	.init_machine	= og_init,
++	.timer		= &ks8695_timer,
++	.restart        = ks8695_restart,
++MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_CM4008
++MACHINE_START(CM4008, "OpenGear/CM4008")
++	/* OpenGear Inc. */
++	.atag_offset	= 0x100,
++	.map_io		= ks8695_map_io,
++	.init_irq	= ks8695_init_irq,
++	.init_machine	= og_init,
++	.timer		= &ks8695_timer,
++	.restart        = ks8695_restart,
++MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_CM41xx
++MACHINE_START(CM41XX, "OpenGear/CM41xx")
++	/* OpenGear Inc. */
++	.atag_offset	= 0x100,
++	.map_io		= ks8695_map_io,
++	.init_irq	= ks8695_init_irq,
++	.init_machine	= og_init,
++	.timer		= &ks8695_timer,
++	.restart        = ks8695_restart,
++MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_IM4004
++MACHINE_START(IM4004, "OpenGear/IM4004")
++	/* OpenGear Inc. */
++	.atag_offset	= 0x100,
++	.map_io		= ks8695_map_io,
++	.init_irq	= ks8695_init_irq,
++	.init_machine	= og_init,
++	.timer		= &ks8695_timer,
++	.restart        = ks8695_restart,
++MACHINE_END
++#endif
++
++#ifdef CONFIG_MACH_IM42xx
++MACHINE_START(IM42XX, "OpenGear/IM42xx")
++	/* OpenGear Inc. */
++	.atag_offset	= 0x100,
++	.map_io		= ks8695_map_io,
++	.init_irq	= ks8695_init_irq,
++	.init_machine	= og_init,
++	.timer		= &ks8695_timer,
++	.restart        = ks8695_restart,
++MACHINE_END
++#endif
+-- 
+1.7.0.4
