@@ -1,33 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Sep 2012 15:19:52 -0700
-Subject: [PATCH v2 RESEND] ARM: Build dtb files in all target
-In-Reply-To: <20120907145701.GB19437@titan.lakedaemon.net>
-References: <1346691487-17534-1-git-send-email-andrew@lunn.ch>
- <20120907145701.GB19437@titan.lakedaemon.net>
-Message-ID: <20120907221952.GA4428@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Sep 2012 15:22:24 -0700
+Subject: [PATCH 08/10] ARM: OMAP: Clean-up timer posted mode support
+In-Reply-To: <1346871872-24413-9-git-send-email-jon-hunter@ti.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-9-git-send-email-jon-hunter@ti.com>
+Message-ID: <20120907222223.GQ1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 10:57:01AM -0400, Jason Cooper wrote:
-> On Mon, Sep 03, 2012 at 06:58:07PM +0200, Andrew Lunn wrote:
-> > Tools like kisskb are good at finding build regressions in the kernel
-> > sources. However, regressions in the DT desscriptions are not found,
-> > because generally these build systems don't build the DT binary blobs.
-> > 
-> > Extend the ARM all target to build all enabled DTB files.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > Reviewed-by: Dave Martin <dave.martin@linaro.org>
+* Jon Hunter <jon-hunter@ti.com> [120905 12:05]:
+> The dmtimer functions to read and write the dmtimer registers are currently
+> defined as follows ...
 > 
-> Arnd, Olof,
+> static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
+> 						int posted);
+> static inline void __omap_dm_timer_write(struct omap_dm_timer *timer,
+> 						u32 reg, u32 val, int posted);
 > 
-> Is it appropriate to take this directly into your tree or should it go
-> through Russell's?
+> The posted variable indicates if the timer is configured to use the posted mode
+> when performing register accesses. The posted mode configuration of the dmtimer
+> is stored in the omap_dm_timer structure that is also being passed to the above
+> functions and therefore we do not need to pass the posted variable separately.
+> Therefore, simplify the above functions by removing the posted variable as an
+> argument as this is not necessary.
 
-Please send it to Russell's patch tracker, and feel free to add my:
+I believe the reason for passing the posted flag was to optimize out some
+functions from the timer code as that's being run all the time.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Care to check the assembly before and after this patch for the timer
+functions with objdump -d to make sure it does not add tons of bloat
+there?
 
+Thanks,
 
--Olof
+Tony
