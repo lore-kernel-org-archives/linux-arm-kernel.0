@@ -1,69 +1,24 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 7 Sep 2012 05:45:17 +0000
-Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
- and OMAP2430 SoC
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EAA8779@DBDE01.ent.ti.com>
-References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
- <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
- <5044C2DD.5000705@ti.com> <504578B3.3090804@ti.com> <5045D557.30404@ti.com>
- <79CD15C6BA57404B839C016229A409A83EAA7C99@DBDE01.ent.ti.com>
- <50470C1E.7090300@ti.com>
- <79CD15C6BA57404B839C016229A409A83EAA8014@DBDE01.ent.ti.com>
- <5047544B.60105@ti.com>
- <79CD15C6BA57404B839C016229A409A83EAA8779@DBDE01.ent.ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA29468@DBDE01.ent.ti.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 7 Sep 2012 13:48:30 +0800
+Subject: [PATCH] ARM: ep93xx: Fix build error due to 'SZ_32M' undeclared
+In-Reply-To: <5049346B.5020205@gmail.com>
+References: <1346675368.15950.0.camel@phoenix> <5049346B.5020205@gmail.com>
+Message-ID: <CAF+7xWko4wokuU-OiMYq3a2RJyaSb=qXM+LOpJCKHYpEB1Xi2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 20:11:11, Hiremath, Vaibhav wrote:
-> On Wed, Sep 05, 2012 at 19:01:55, Cousson, Benoit wrote:
-> > Hi Vaibhav,
-> > 
-> > On 09/05/2012 11:15 AM, Hiremath, Vaibhav wrote:
-> > > On Wed, Sep 05, 2012 at 13:53:58, Ujfalusi, Peter wrote:
-> > >> Hi,
-> > >>
-> > >> On 09/05/2012 09:11 AM, Hiremath, Vaibhav wrote:
-> > >>>> Not yet, but we discussed that with Peter and since he does have these
-> > >>>> patches for DT, he'll be able to test your series with the McBSP changes.
-> > >>>>
-> > >>>
-> > >>> Great.
-> > >>
-> > >> With his series and your patch for omap-hwmod audio was probing and working on
-> > >> OMAP3/4/5 without issues.
-> > >>
-> > > Peter,
-> > > Care to provide your Tested-By??
-> > > 
-> > > Benoit,
-> > > Can we merge this patch now?
-> > 
-> > Yes, I'll include it in the pull request along with DTS patches.
-> > 
-> > I've just tested it as well on OMAP4 by hacking the DTS for GPIO.
-> > I'll try to update at least all the OMAP4 IPs as well with the proper
-> > DTS resources for 3.7.
-> > 
-> 
-> Thanks Benoit,
-> 
-> There are other patches which are pending,
-> 
-> arm/dts: AM33XX: Convert all hex numbers to lower-case
-> https://patchwork.kernel.org/patch/1377351/
-> arm/dts: AM33XX: Specify reg and interrupt property for all nodes
-> https://patchwork.kernel.org/patch/1377361/
+> Hi Axel,
 >
+> The patch looks fine. I notice that the other ep93xx boards are also
+> using the SZ_ defines, but are indirectly including linux/sizes.h via
+> asm/memory.h, which in turn is indirectly included via asm/io.h. That
+Seems this is also true for other platforms ( e.g. mach-pxa, mach-ux500, etc)
 
-Few more DT patches which are pending
+> seems a bit flaky, so I wonder if we should just explicitly include
+> <linux/sizes.h> in all the board files which use the SZ_ macros as per
+> the patch below. Thoughts?
+I'm 50/50 on this.
+But if we do these changes, this patch is more than a build fix.
 
-arm/dts: AM33XX: Add basic pinctrl device tree data
-http://www.spinics.net/lists/linux-omap/msg76684.html
-arm/dts: AM33XX: Configure pinmuxs for user leds control on Bone
-http://www.spinics.net/lists/linux-omap/msg76682.html
-arm/dts: AM33XX: Add D_CAN device tree data
-http://www.spinics.net/lists/linux-omap/msg76683.html
-
-Thanks
-AnilKumar
+Regards,
+Axel
