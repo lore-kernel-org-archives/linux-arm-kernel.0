@@ -1,29 +1,54 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 6 Sep 2012 18:00:10 -0700
-Subject: [PATCH 1/4] clk: Provide option for clk_get_rate to issue hw for
- new rate
-In-Reply-To: <20120907001927.20289.41627@nucleus>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
- <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
- <20120831192906.31162.97714@nucleus>
- <CAPDyKFrS7tKu5AcjL7+R8V5Nvo0O+BVwc8HtGFqQGSf12wMioQ@mail.gmail.com>
- <20120907001927.20289.41627@nucleus>
-Message-ID: <CAJOA=zM-u5ss8ZYWFHg43V7r5B6TXhRN70=JUccNjrppx4fDyg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Sep 2012 09:01:45 +0800
+Subject: mxs: mmc: Problems resetting first SSP/MMC module upon boot
+In-Reply-To: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
+References: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
+Message-ID: <20120907010143.GD26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 5:19 PM, Mike Turquette <mturquette@ti.com> wrote:
-> I'll take this series into clk-next.
->
+On Thu, Sep 06, 2012 at 03:34:30PM +0200, Peter Turczak wrote:
+> Hi,
+> 
+> while porting kernel 3.5 (pulled from the arm-soc git tree) to a new board based upon an MXS processor (ARM926EJ-S) I encountered a strange problem initializing the two ssp/mmc.
+> 
+> Given situation:
+> - The device has two mmc devices on board, connected to SSP0 and SSP2.
+> - When booting from the MMC both mmc are properly detected.
+> - When booting from usb, ethernet or NAND flash first mmc to be initialized in the machine init function fails. So when doing (example given is nearly literally from the code, the board name is not yet allocated with the registry):
+>         mx28_add_mxs_mmc(2, &board_mmc_pdata[2]);
+>         mx28_add_mxs_mmc(0, &board_mmc_pdata[0]);
+>    mmc0 works, mmc2 does not. When initializing mmc0 first mmc0 works.
 
-Oops, I forgot to ask about patch #3.  Which tree do you want that to
-go through?
+When initializing mmc0 first, you meant mmc0 works or does not work?
 
-Thanks,
-Mike
+> - The init fails when trying to reset the respective ssp block in stmp_reset_block() from lib/stmp_device.c due to a timeout waiting for CLKGATE to become set again after setting the SFTRST   bit.
+> 
+> Things I tried:
+> - Check code of lib/stmp_device.c against reference manual of processor (i.MX28 Applications Processor Reference Manual, Rev. 1, 2010) says in section 39.5.10 (Correct Way to Soft Reset a Block): Seems ok, as it successfully resets some other blocks.
+> - Added a routine to also wait for (de-) assertion of the reset/clock gating bits as advised by the reference manual. No success here.
+> - Checked the pin muxing, just to be sure. Not expecting anything and as expected gained nothing.
+> 
+> Ideas: 
+> - Maybe it the clock derivation is not set up properly before resetting as at least two ssp-modules seem to derive the clock from the same clock source. But I have no idea how to test or debug this.
+> 
+ssp0 and ssp1 share one clock source, while ssp2 and ssp3 share
+another one.  I'm not sure if it's the cause, but 3.5 kernel did miss
+one bug fix below.
 
-> Regards,
-> Mike
->
->> Kind regards
->> Ulf Hansson
+  64e2bc4 clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
+
+You can get it from 3.6-rc1 kernel.
+
+> Therefore help is very much appreciated, maybe I'm missing something here.
+> 
+> Thank you in advance,
+>   Peter Turczak
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Regards,
+Shawn
