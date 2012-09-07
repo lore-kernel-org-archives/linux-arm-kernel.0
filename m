@@ -1,74 +1,110 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 07 Sep 2012 07:58:31 +0200
-Subject: [PATCH] arm: mm: fix DMA pool affiliation check
-In-Reply-To: <1346676232-3566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1346676232-3566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <019c01cd8cbd$d29e7500$77db5f00$%szyprowski@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Sep 2012 14:05:54 +0800
+Subject: Tracking down suspend/resume ext3/mmc issues on imx233
+In-Reply-To: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+Message-ID: <20120907060552.GL26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Copy a few more lists to get wider audience ...
 
-On Monday, September 03, 2012 2:44 PM Thomas Petazzoni wrote:
+Regards,
+Shawn
 
-> The __free_from_pool() function was changed in
-> e9da6e9905e639b0f842a244bc770b48ad0523e9. Unfortunately, the test that
-> checks whether the provided (start,size) is within the DMA pool has
-> been improperly modified. It used to be:
+On Thu, Sep 06, 2012 at 10:03:35PM -0700, Mike Thompson wrote:
+> Hi,
 > 
->   if (start < coherent_head.vm_start || end > coherent_head.vm_end)
+> I'm working on adding power management support for the imx233 on
+> 3.6-rc2.  In general I'm working on porting the pm.c file from the
+> Freescale 2.6.35 kernel for both "standby" and "mem" suspend/resume.
+> I'm making pretty good progress on porting the code, but I'm running
+> into an issue outside the immediate code I'm working on.
 > 
-> Where coherent_head.vm_end was non-inclusive (i.e, it did not include
-> the first byte after the pool). The test has been changed to:
+> Right now I'm just testing out imx233 suspend/resume functionality by
+> implementing a dummy "standby" function that just returns rather than
+> putting the SoC into a low power state.  I believe this should have
+> the kernel go through suspend operations, hit my dummy function which
+> does nothing and then go through resume operations.  Unfortunately,
+> upon resume I'm getting ext3 file system errors in that nothing can be
+> read from the root file system on the SD card.  A trace of the
+> suspend/resume cycle is show below:
 > 
->   if (start < pool->vaddr || start > pool->vaddr + pool->size)
+> root at olinuxino:~# echo standby > /sys/power/state
+> [   90.080000] PM: Syncing filesystems ... done.
+> [   90.110000] mmc0: card aaaa removed
+> [   90.330000] Freezing user space processes ... (elapsed 0.01 seconds) done.
+> [   90.360000] Freezing remaining freezable tasks ... (elapsed 0.01
+> seconds) done.
+> [   90.400000] mxs_mmc_suspend()
+> [   90.400000] PM: suspend of devices complete after 19.531 msecs
+> [   90.410000] PM: late suspend of devices complete after 2.843 msecs
+> [   90.420000] PM: noirq suspend of devices complete after 4.531 msecs
+> [   90.430000] PM: noirq resume of devices complete after 1.906 msecs
+> [   90.440000] PM: early resume of devices complete after 1.843 msecs
+> [   90.450000] mxs_mmc_resume()
+> [   90.500000] PM: resume of devices complete after 51.062 msecs
+> [   90.510000] Restarting tasks ... done.
+> [   90.640000] mmc0: host does not support reading read-only switch.
+> assuming write-enable.
+> [   90.650000] mmc0: new high speed SD card at address aaaa
+> [   90.670000] mmcblk0: mmc0:aaaa SU02G 1.84 GiB
+> [   90.680000]  mmcblk0: p1 p2
+> [   90.700000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #15970 offset 0
+> [   90.710000] Aborting journal on device mmcblk0p2.
+> [   90.720000] JBD: Error -5 detected when updating journal superblock
+> for mmcblk0p2.
+> [   90.730000] EXT3-fs (mmcblk0p2): error: remounting filesystem read-only
+> [   90.730000] EXT3-fs (mmcblk0p2): I/O error while writing superblock
+> [   90.740000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #2 offset 0
+> udevd[1309]: failed to execute '/sbin/modprobe' '/sbin/modprobe -b
+> mmc:block': No such file or directory
+> [   90.790000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #15970 offset 0
+> udevd[1310]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
+> /dev/.tmp-block-179:8': No such file or directory
+> udevd[1311]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
+> /dev/.tmp-block-179:10': No such file or directory
+> udevd[1312]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
+> /dev/.tmp-block-179:9': No such file or directory
+> root at olinuxino:~#
+> root at olinuxino:~# ls
+> [  432.780000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #55890 offset 0
+> [  432.790000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #55891 offset 0
+> [  432.800000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #55890 offset 0
+> [  432.810000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #15970 offset 0
+> [  432.820000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #7985 offset 0
+> [  432.840000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
+> reading directory #55890 offset 0
+> -bash: ls: command not found
+> root at olinuxino:~#
 > 
-> So now pool->vaddr + pool->size is inclusive (i.e, it includes the
-> first byte after the pool), so the test should be >= instead of >.
+> The first reported error is in the ext3 filesystem buffer code where
+> the file system buffers aren't being filled by the underlying block
+> device.  At least that's how I'm interpreting the portion of the ext3
+> file system code that is failing.  However, the mmc device is
+> correctly reporting finding p1 and p2 partitions on the device which
+> it would indicate the partition data is being read from the SD card.
 > 
-> This bug causes the following message when freeing the *first* DMA
-> coherent buffer that has been allocated, because its virtual address
-> is exactly equal to pool->vaddr + pool->size :
+> I'm hoping others might have suggestions on how I should go about
+> tracking down why the ext3 file system can no longer read from the mmc
+> device upon resume.  For instance, useful places to put some tracing
+> code to understand what might be failing, or how to determine what
+> differences there might be before suspend and after resume that might
+> point to the failure.
 > 
-> WARNING: at /home/thomas/projets/linux-2.6/arch/arm/mm/dma-mapping.c:463
-> __free_from_pool+0xa4/0xc0()
-> freeing wrong coherent size from pool
+> Thanks,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Lior Amsalem <alior@marvell.com>
-> Cc: Maen Suleiman <maen@marvell.com>
-> Cc: Tawfik Bayouk <tawfik@marvell.com>
-> Cc: Shadi Ammouri <shadi@marvell.com>
-> Cc: Eran Ben-Avi <benavi@marvell.com>
-> Cc: Yehuda Yitschak <yehuday@marvell.com>
-> Cc: Nadav Haklai <nadavh@marvell.com>
-
-Thanks for spotting this issue and providing a fix. I will add it to my dma-mapping fixes branch for
-v3.6 kernels.
-
-> ---
->  arch/arm/mm/dma-mapping.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Mike Thompson
 > 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 4e7d118..59d9062 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -456,7 +456,7 @@ static int __free_from_pool(void *start, size_t size)
->  	unsigned long pageno, count;
->  	unsigned long flags;
-> 
-> -	if (start < pool->vaddr || start > pool->vaddr + pool->size)
-> +	if (start < pool->vaddr || start >= pool->vaddr + pool->size)
->  		return 0;
-> 
->  	if (start + size > pool->vaddr + pool->size) {
-> --
-> 1.7.9.5
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
