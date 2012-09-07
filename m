@@ -1,44 +1,67 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Sep 2012 11:56:46 +0800
-Subject: [PATCH v2 1/6] usb: pxa27x_udc: remove IRQ_USB define
-In-Reply-To: <1346960563-18689-2-git-send-email-robherring2@gmail.com>
-References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1346960563-18689-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CAMPhdO9pyVDaR03Cy53gXbPttbnekaejuP_60qARttUuaBUwWg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 6 Sep 2012 20:57:40 -0700
+Subject: [GIT PULL] omap fixes for v3.6-rc4
+Message-ID: <20120907035740.GR1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 3:42 AM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> IRQ_USB was implicitly included by gpio.h. Use the existing variable
-> instead of IRQ_USB.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+  Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
 
-Greg, guess this can go through the ARM tree.
+are available in the git repository at:
 
-> ---
->  drivers/usb/gadget/pxa27x_udc.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
-> index 644b430..7a8713c 100644
-> --- a/drivers/usb/gadget/pxa27x_udc.c
-> +++ b/drivers/usb/gadget/pxa27x_udc.c
-> @@ -2508,7 +2508,7 @@ static int __init pxa_udc_probe(struct platform_device *pdev)
->                         IRQF_SHARED, driver_name, udc);
->         if (retval != 0) {
->                 dev_err(udc->dev, "%s: can't get irq %i, err %d\n",
-> -                       driver_name, IRQ_USB, retval);
-> +                       driver_name, udc->irq, retval);
->                 goto err_irq;
->         }
->         retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
-> --
-> 1.7.9.5
->
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.6-rc4
+
+for you to fetch changes up to 6ab019b62e0505289b26bd00d997dc7686192fa4:
+
+  Merge tag 'omap-fixes-a-for-3.6rc' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into fixes (2012-09-05 10:09:31 -0700)
+
+----------------------------------------------------------------
+
+Fixes for timer, sram, memory corruption, and one board
+file that affect booting on various omaps. Then some PM
+related fixes for reset, sleep and wakeup.
+
+----------------------------------------------------------------
+Aaro Koskinen (2):
+      ARM: OMAP: sram: fix OMAP4 errata handling
+      ARM: OMAP: sram: skip the first 16K on OMAP3 HS
+
+Igor Grinberg (1):
+      ARM: OMAP: timer: obey the !CONFIG_OMAP_32K_TIMER
+
+Misael Lopez Cruz (1):
+      ARM: OMAP: hwmod code: Disable module when hwmod enable fails
+
+Paul Walmsley (2):
+      ARM: OMAP3xxx: clockdomain: fix software supervised wakeup/sleep
+      Merge branches 'clkdev_fixes_3.6rc', 'clkdm_fixes_3.6rc' and 'hwmod_data_fixes_a_3.6rc' into omap_fixes_a_3.6rc
+
+Radek Pilar (1):
+      ARM: OMAP: Config fix for omap3-touchbook board
+
+Tero Kristo (2):
+      ARM: OMAP3: hwmod data: fix iva2 reset info
+      ARM: OMAP4: hwmod data: temporarily comment out data for the sl2if IP block
+
+Tony Lindgren (3):
+      ARM: OMAP4: Fix array size for irq_target_cpu
+      Merge branch 'fixes-wakeupgen' into fixes
+      Merge tag 'omap-fixes-a-for-3.6rc' of git://git.kernel.org/.../pjw/omap-pending into fixes
+
+Vaibhav Hiremath (1):
+      ARM: OMAP2+: am33xx: Fix the timer fck clock naming convention
+
+ arch/arm/mach-omap2/Kconfig                |    3 +-
+ arch/arm/mach-omap2/Makefile               |    2 +-
+ arch/arm/mach-omap2/clock33xx_data.c       |   14 ++++----
+ arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   50 ++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/cm-regbits-34xx.h      |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c       |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c           |    1 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   15 +++++++--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   12 +++----
+ arch/arm/mach-omap2/timer.c                |    7 ++++
+ arch/arm/plat-omap/sram.c                  |   11 ++++--
+ 11 files changed, 94 insertions(+), 24 deletions(-)
