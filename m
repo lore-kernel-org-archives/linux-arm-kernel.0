@@ -1,45 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 7 Sep 2012 15:22:23 +0100
-Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
-In-Reply-To: <201209071358.38598.arnd@arndb.de>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <201209071241.17198.arnd@arndb.de>
- <20120907130114.GF29601@gmail.com>
- <201209071358.38598.arnd@arndb.de>
-Message-ID: <20120907142220.GL29601@gmail.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 7 Sep 2012 14:30:59 +0000
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <20120907110251.GA7968@glitch>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
+ <20120907110251.GA7968@glitch>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 01:58:38PM +0000, Arnd Bergmann wrote:
-> On Friday 07 September 2012, Lee Jones wrote:
-> > Just running this by you, as there is method in the madness.
-> > 
-> > Linus wanted to keep changes to the Device Tree and changes
-> > in platform code separate, which is my reason for submitting
-> > all of my changes to date that way.
-> > 
-> > What I do (not sure if I've achieved that here yet, I'll need
-> > to take another look) is; make changes to the driver which
-> > enable it for Device Tree use. Then apply the DT node and remove 
-> > platform registration in two subsequent patches respectively. 
-> > Then when we come to bisect and land in between them we still
-> > have a perfectly working driver, only the second probe fails 
-> > which the only side-effect is some warnings in the boot log.
+On Fri, Sep 07, 2012 at 16:32:51, Domenico Andreoli wrote:
+> On Fri, Sep 07, 2012 at 09:10:50AM +0000, AnilKumar, Chimata wrote:
+> > Hi Domenico,
 > 
-> I'm sorry that you are getting conflicting directions from Linus
-> and me. We can use the approach you suggest here this time,
-> but I'd prefer if we can all agree on how to do this in the
-> future.
+> Hi,
+> 
+> > On Fri, Sep 07, 2012 at 14:18:39, Domenico Andreoli wrote:
+> > > On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > > > device pointer, pinctrl driver configure SoC pins to GPIO
+> > > > mode according to definitions provided in .dts file.
+> > > 
+> > > Shouldn't be the interaction with the pinctrl layer left to gpiolib?
+> > > 
+> > 
+> > No, these gpio's are configured specifically for user leds.
+> 
+> So there are some special pad configs to make the leds work which are not
+> only muxing and direction setting? Because I expect these to be managed
+> privately between gpiolib and pinctrl but now I'm not sure any more,
+> I'll look the code.
 
-I don't have an issue with that.
+How can gpio driver knows that leds-gpio driver require
+these 4 pins?
 
-It would be good to have some guidelines to adhere to.
+> 
+> > So, leds-gpio driver should have this call, because these gpio
+> > pins are used by leds-gpio driver.
+> > 
+> > +       am33xx_pinmux: pinmux at 44e10800 {
+> > +               userled_pins: pinmux_userled_pins {
+> > +                       pinctrl-single,pins = <
+> > +                               0x54 0x7       
+> > +                               0x58 0x17       
+> > +                               0x5c 0x7        
+> > +                               0x60 0x17       
+> > +                       >;
+> > +               };
+> > +       };
+> > +
+> > 
+> > [...]
+> > 
+> > +               leds {
+> > +                       compatible = "gpio-leds";
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&userled_pins>;
+> >                                       ^^^^^^^^^^^^
+> 
+> I'm surprised to not see any gpio controller (ala irq) involved.
 
-I'll double check that these ones are in the correct order, but
-otherwise leave them as they are for this submission.
+GPIO controller data will be in GPIO node, should not be here.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> > Lets take gpio-keypad driver, in that case we have to configure
+> > pins as INPUT mode (generic gpio driver might not know what
+> > the end usecase is) and this leds case we configure as OUTPUT
+> > mode.
+> 
+> gpio direction is modeled by gpiolib so, if no other out-of-gpiolib
+> capabilities are required for that led gpio, there is no need to directly
+> use pinctrl.
+> 
+
+Here leds-gpio driver requirement is to set mux configuration of
+those 4 pins to GPIO mode (mode 7) as well direction OUTPUT/INPUT.
+
+Set mux mode to 7 (GPIO usage) should be from led driver, because
+this driver have the requirement.
+
+Thanks
+AnilKumar
