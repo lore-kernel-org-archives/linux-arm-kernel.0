@@ -1,78 +1,49 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Sep 2012 11:08:45 -0400
-Subject: [PATCH 04/12] ARM: mvebu: move debug macros to include/debug
-In-Reply-To: <1346962375-26163-5-git-send-email-robherring2@gmail.com>
+Date: Fri, 7 Sep 2012 11:11:30 -0400
+Subject: [PATCH 10/12] ARM: mvebu: move armada-370-xp.h in mach dir
+In-Reply-To: <1346962375-26163-11-git-send-email-robherring2@gmail.com>
 References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-5-git-send-email-robherring2@gmail.com>
-Message-ID: <20120907150845.GE19437@titan.lakedaemon.net>
+ <1346962375-26163-11-git-send-email-robherring2@gmail.com>
+Message-ID: <20120907151130.GF19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 03:12:47PM -0500, Rob Herring wrote:
+On Thu, Sep 06, 2012 at 03:12:53PM -0500, Rob Herring wrote:
 > From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Move mvebu debug-macro.S over to common debug macro directory.
 > 
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
 > Cc: Andrew Lunn <andrew@lunn.ch>
 
-As with the other patch involving -mvebu, please include Gregory Clement
-in the Cc:  I've added him to bring this patch to his attention.
+also, Cc: Gregory Clement for -mvebu, please.
 
 thx,
 
 Jason.
 
 > ---
->  arch/arm/Kconfig.debug                             |    8 ++++++++
->  .../mach/debug-macro.S => include/debug/mvebu.S}   |    3 ++-
->  2 files changed, 10 insertions(+), 1 deletion(-)
->  rename arch/arm/{mach-mvebu/include/mach/debug-macro.S => include/debug/mvebu.S} (86%)
+>  arch/arm/mach-mvebu/armada-370-xp.c                |    2 +-
+>  .../mach-mvebu/{include/mach => }/armada-370-xp.h  |    0
+>  2 files changed, 1 insertion(+), 1 deletion(-)
+>  rename arch/arm/mach-mvebu/{include/mach => }/armada-370-xp.h (100%)
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 525d9bd..3bafdd2 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -261,6 +261,13 @@ choice
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to the serial port on MSM 8960 devices.
->  
-> +	config DEBUG_MVEBU_UART
-> +		bool "Kernel low-level debugging messages via MVEBU UART"
-> +		depends on ARCH_MVEBU
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on MVEBU based platforms.
-> +
->  	config DEBUG_REALVIEW_STD_PORT
->  		bool "RealView Default UART"
->  		depends on ARCH_REALVIEW
-> @@ -377,6 +384,7 @@ config DEBUG_LL_INCLUDE
->  	string
->  	default "debug/icedcc.S" if DEBUG_ICEDCC
->  	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
-> +	default "debug/mvebu.S" if DEBUG_MVEBU_UART
->  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
->  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
->  	default "mach/debug-macro.S"
-> diff --git a/arch/arm/mach-mvebu/include/mach/debug-macro.S b/arch/arm/include/debug/mvebu.S
-> similarity index 86%
-> rename from arch/arm/mach-mvebu/include/mach/debug-macro.S
-> rename to arch/arm/include/debug/mvebu.S
-> index 2282576..865c6d0 100644
-> --- a/arch/arm/mach-mvebu/include/mach/debug-macro.S
-> +++ b/arch/arm/include/debug/mvebu.S
-> @@ -11,7 +11,8 @@
->   * published by the Free Software Foundation.
->  */
->  
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+> index 4ef923b..b46418a 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> @@ -20,7 +20,7 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/time.h>
 > -#include <mach/armada-370-xp.h>
-> +#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
-> +#define ARMADA_370_XP_REGS_VIRT_BASE	0xfeb00000
+> +#include "armada-370-xp.h"
+>  #include "common.h"
 >  
->  	.macro	addruart, rp, rv, tmp
->  	ldr	\rp, =ARMADA_370_XP_REGS_PHYS_BASE
+>  static struct map_desc armada_370_xp_io_desc[] __initdata = {
+> diff --git a/arch/arm/mach-mvebu/include/mach/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
+> similarity index 100%
+> rename from arch/arm/mach-mvebu/include/mach/armada-370-xp.h
+> rename to arch/arm/mach-mvebu/armada-370-xp.h
 > -- 
 > 1.7.9.5
 > 
