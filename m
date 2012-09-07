@@ -1,47 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 06 Sep 2012 20:17:21 -0700
-Subject: [PATCHv2 2/2] msm: io: Change the default static iomappings to
- be shared
-In-Reply-To: <1346951799-9415-1-git-send-email-rvaswani@codeaurora.org>
-References: <CAOesGMgC2OxEs-wGRQku-GeoiaO2Wa_dZ2AuwnKd3Nze4gknqQ@mail.gmail.com>
- <1346951799-9415-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <50496741.8000305@codeaurora.org>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 7 Sep 2012 03:23:16 +0000
+Subject: [PATCH v6 2/3] arm/dts: AM33XX: Configure pinmuxs for user leds
+ control on Bone
+In-Reply-To: <20120906205811.GO1303@atomide.com>
+References: <1346845260-10978-1-git-send-email-anilkumar@ti.com>
+ <1346845260-10978-3-git-send-email-anilkumar@ti.com>
+ <20120906205811.GO1303@atomide.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA291DD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/12 10:16, Rohit Vaswani wrote:
->  static struct map_desc msm_io_desc[] __initdata = {
-> -	MSM_DEVICE(VIC),
-> -	MSM_CHIP_DEVICE(CSR, MSM7X00),
-> -	MSM_DEVICE(DMOV),
-> -	MSM_CHIP_DEVICE(GPIO1, MSM7X00),
-> -	MSM_CHIP_DEVICE(GPIO2, MSM7X00),
-> -	MSM_DEVICE(CLK_CTL),
-> +	MSM_DEVICE_TYPE(VIC, MT_DEVICE_NONSHARED),
-> +	MSM_CHIP_DEVICE_TYPE(CSR, MSM7X00, MT_DEVICE_NONSHARED),
-> +	MSM_DEVICE_TYPE(DMOV, MT_DEVICE_NONSHARED),
-> +	MSM_CHIP_DEVICE_TYPE(GPIO1, MSM7X00, MT_DEVICE_NONSHARED),
-> +	MSM_CHIP_DEVICE_TYPE(GPIO2, MSM7X00, MT_DEVICE_NONSHARED),
-> +	MSM_CHIP_DEVICE_TYPE(CLK_CTL, MSM7X00, MT_DEVICE_NONSHARED),
+Tony,
 
-This one is supposed to be MSM_DEVICE_TYPE.
+On Fri, Sep 07, 2012 at 02:28:12, Tony Lindgren wrote:
+> * AnilKumar Ch <anilkumar@ti.com> [120905 04:42]:
+> > Adds GPIO pinctrl nodes to am3358_pinmux master node to control
+> > user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
+> > 
+> > [koen at dominion.thruhere.net: led0, led1 suggested by koen]
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am335x-bone.dts |   43 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> > index c634f87..822efe6 100644
+> > --- a/arch/arm/boot/dts/am335x-bone.dts
+> > +++ b/arch/arm/boot/dts/am335x-bone.dts
+> > @@ -18,11 +18,54 @@
+> >  		reg = <0x80000000 0x10000000>; /* 256 MB */
+> >  	};
+> >  
+> > +	am3358_pinmux: pinmux at 44e10800 {
+> > +		userled_pins: pinmux_userled_pins {
+> > +			pinctrl-single,pins = <
+> > +				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
+> > +				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
+> > +				0x5c 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
+> > +				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
+> > +			>;
+> > +		};
+> > +	};
+> > +
+> 
+> Just checking.. am3358_pinmux should be am33xx_pinmux in this patch
+> too as discussed.
+> 
 
-Please squash this in:
+Yes, this is also changed in v7.
 
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index 35d6926..d908a37 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -52,7 +52,7 @@ static struct map_desc msm_io_desc[] __initdata = {
-        MSM_DEVICE_TYPE(DMOV, MT_DEVICE_NONSHARED),
-        MSM_CHIP_DEVICE_TYPE(GPIO1, MSM7X00, MT_DEVICE_NONSHARED),
-        MSM_CHIP_DEVICE_TYPE(GPIO2, MSM7X00, MT_DEVICE_NONSHARED),
--       MSM_CHIP_DEVICE_TYPE(CLK_CTL, MSM7X00, MT_DEVICE_NONSHARED),
-+       MSM_DEVICE_TYPE(CLK_CTL, MT_DEVICE_NONSHARED),
- #if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-        defined(CONFIG_DEBUG_MSM_UART3)
-        MSM_DEVICE_TYPE(DEBUG_UART, MT_DEVICE_NONSHARED),
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks
+AnilKumar
