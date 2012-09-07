@@ -1,64 +1,49 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 7 Sep 2012 22:10:17 +0200
-Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
-In-Reply-To: <20120907172612.GU26594@pengutronix.de>
-References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
- <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
- <20120830223219.GF3613@r65073-Latitude-D630>
- <20120831130723.GS26594@pengutronix.de>
- <20120907132955.GH29340@avionic-0098.mockup.avionic-design.de>
- <20120907172612.GU26594@pengutronix.de>
-Message-ID: <20120907201017.GA17043@avionic-0098.mockup.avionic-design.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 7 Sep 2012 15:26:44 -0500
+Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
+In-Reply-To: <20120830201415.GX1303@atomide.com>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+ <5000D647.4090200@gmail.com> <500439A8.1050705@ti.com>
+ <500D6CAB.4030504@ti.com> <502B67DD.6050904@ti.com> <502D0BEE.3010609@ti.com>
+ <20120830201415.GX1303@atomide.com>
+Message-ID: <504A5884.1010805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 07:26:12PM +0200, Sascha Hauer wrote:
-> On Fri, Sep 07, 2012 at 03:29:55PM +0200, Thierry Reding wrote:
-> > On Fri, Aug 31, 2012 at 03:07:23PM +0200, Sascha Hauer wrote:
-> > > On Fri, Aug 31, 2012 at 06:32:20AM +0800, Shawn Guo wrote:
-> > > > On Tue, Aug 28, 2012 at 01:48:23PM +0200, Sascha Hauer wrote:
-> > [...]
-> > > > >  arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
-> > > > >  arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
-> > > > >  2 files changed, 18 insertions(+)
-> > > > > 
-> > > > > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > > > > index cd37165..7ec17e4 100644
-> > > > > --- a/arch/arm/boot/dts/imx53.dtsi
-> > > > > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > > > > @@ -189,6 +189,20 @@
-> > > > >  				status = "disabled";
-> > > > >  			};
-> > > > >  
-> > > > > +			pwm1: pwm at 53fb4000 {
-> > > > > +				#pwm-cells = <3>;
-> > > > 
-> > > > pwm-cells should be 2?
-> > > 
-> > > Yes, right. We have a patch internally that allows us to pass a
-> > > 'inverted' flag to the pwm, hence I accidently have 3 here.
-> > 
-> > There are patches in for-next that add support for setting the PWM
-> > polarity, though there's currently no support for specifying it via a
-> > third cell in the specifier. Would you mind sharing the patches that add
-> > this?
-> 
-> Yes, will do. I was afraid this leads to some discussion, so I skipped
-> them so far.
-> 
-> The basic idea was that the third cell is for flags from which bit0 set
-> means 'inverted'. We currently implemented this i.MX specific, but if
-> you think this is acceptable it's propably a good idea to implement this
-> in a generic manner.
+Hi Tony,
 
-Absolutely. That's exactly what I had in mind as well, so if you have
-the code ready I don't have to write it myself.
+On 08/30/2012 03:14 PM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [120816 08:05]:
+>> On 08/15/2012 04:11 AM, Vaibhav Hiremath wrote:
+>>>
+>>> Did we get conclude on this? I haven't got anything further on this
+>>> thread, this may block baseport support for the new devices in omap2
+>>> family, like AM33xx and OMAP5.
+>>
+>> Sorry I have been out of the office. However, no update on this so far.
+>> I need to check with Tony if he has any preference for handling this. I
+>> will follow-up with him and keep you posted.
+> 
+> Jon please repost these without the RFC in the subject line
+> assuming the pending comments have been addressed so people
+> can ack them.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/80fb1cd7/attachment.sig>
+I have been working on updating this series to request timer by their
+capabilities and avoid using a device ID altogether. In the updated
+series using device IDs to request a timer will still work as it does
+today, but not when you boot with DT. I have something working now that
+is booting fine on omap4 with and without DT [1]. However, I need to do
+more thorough testing of the timers in general, probably next week.
+
+Once I have completed my testing I would like to post for review.
+However, since posting the original series I have been working on some
+needed timer fixes/clean-up which I posted this week [2] for review.
+Ideally I should rebase my DT timer work on my timer fixes series but
+wanted to see what you thought first.
+
+Cheers
+Jon
+
+[1] https://github.com/jonhunter/linux/tree/dev-dt-timer
+[2] http://marc.info/?l=linux-omap&m=134687188921835&w=2
