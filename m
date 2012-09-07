@@ -1,87 +1,89 @@
-From: gerg@snapgear.com (gerg at snapgear.com)
-Date: Fri, 7 Sep 2012 15:40:00 +1000
-Subject: [PATCH] ARM: ixp4xx: move fixed mapping of internal devices into
- vmalloc region
-Message-ID: <1346996400-5824-1-git-send-email-gerg@snapgear.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 07 Sep 2012 14:38:52 +0900
+Subject: [PATCH v2] gpio: samsung: add devicetree init for s3c24xx arches
+In-Reply-To: <201208282355.44268.heiko@sntech.de>
+References: <201208282355.44268.heiko@sntech.de>
+Message-ID: <243901cd8cbb$10ad0580$32071080$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Ungerer <gerg@uclinux.org>
+Heiko St?bner wrote:
+> 
+> Until now the Exynos-SoC was the only Samsung-SoC supporting the GPIOs
+> via the device tree. This patch implements dt-support for the
+> s3c24xx arches.
+> 
+> The controllers contain only 3 cells, as the underlying gpio controller
+> does not support controlling the drive strength on a gpio level.
+> 
+> Tested with the gpio-keys driver on a s3c2416 based machine.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
 
-The current fixed physical/virtual mappings for the internal peripherals
-of the ixp4xx SoC devices is using a virtual address outside of the vmalloc
-region. This results in kernel warnings like this on the boot console:
+[...]
 
-  BUG: mapping for 0xc8000000 at 0xffbeb000 out of vmalloc space
-  BUG: mapping for 0xc4000000 at 0xffbfe000 out of vmalloc space
-  BUG: mapping for 0xc0000000 at 0xffbff000 out of vmalloc space
+> +#if defined(CONFIG_PLAT_S3C24XX) && defined(CONFIG_OF)
 
-The virtual kernel memory layout lists this for the vmalloc region:
+[...]
 
-    ...
-    vmalloc : 0xc2800000 - 0xff000000   ( 968 MB)
-    ...
+> +static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip
+> *chip,
+> +						 u64 base, u64 offset)
+> +{
 
-With a little adjustment to the virtual address used we can map these
-internal devices in the vmalloc region.
+[...]
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
- arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+> +}
+> +#elif defined(CONFIG_PLAT_S3C24XX)
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-index 97c530f..ad66605 100644
---- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-@@ -32,11 +32,11 @@
-  *
-  * 0x6000000	0x00004000	ioremap'd	QMgr
-  *
-- * 0xC0000000	0x00001000	0xffbff000	PCI CFG
-+ * 0xC0000000	0x00001000	0xfebff000	PCI CFG
-  *
-- * 0xC4000000	0x00001000	0xffbfe000	EXP CFG
-+ * 0xC4000000	0x00001000	0xfebfe000	EXP CFG
-  *
-- * 0xC8000000	0x00013000	0xffbeb000	On-Chip Peripherals
-+ * 0xC8000000	0x00013000	0xfebeb000	On-Chip Peripherals
-  */
- 
- /*
-@@ -49,21 +49,21 @@
-  * Expansion BUS Configuration registers
-  */
- #define IXP4XX_EXP_CFG_BASE_PHYS	(0xC4000000)
--#define IXP4XX_EXP_CFG_BASE_VIRT	(0xFFBFE000)
-+#define IXP4XX_EXP_CFG_BASE_VIRT	(0xFEBFE000)
- #define IXP4XX_EXP_CFG_REGION_SIZE	(0x00001000)
- 
- /*
-  * PCI Config registers
-  */
- #define IXP4XX_PCI_CFG_BASE_PHYS	(0xC0000000)
--#define	IXP4XX_PCI_CFG_BASE_VIRT	(0xFFBFF000)
-+#define	IXP4XX_PCI_CFG_BASE_VIRT	(0xFEBFF000)
- #define IXP4XX_PCI_CFG_REGION_SIZE	(0x00001000)
- 
- /*
-  * Peripheral space
-  */
- #define IXP4XX_PERIPHERAL_BASE_PHYS	(0xC8000000)
--#define IXP4XX_PERIPHERAL_BASE_VIRT	(0xFFBEB000)
-+#define IXP4XX_PERIPHERAL_BASE_VIRT	(0xFEBEB000)
- #define IXP4XX_PERIPHERAL_REGION_SIZE	(0x00013000)
- 
- /*
-@@ -73,7 +73,7 @@
-  * aligned so that it * can be used with the low-level debug code.
-  */
- #define	IXP4XX_DEBUG_UART_BASE_PHYS	(0xC8000000)
--#define	IXP4XX_DEBUG_UART_BASE_VIRT	(0xffb00000)
-+#define	IXP4XX_DEBUG_UART_BASE_VIRT	(0xfeb00000)
- #define	IXP4XX_DEBUG_UART_REGION_SIZE	(0x00001000)
- 
- #define IXP4XX_EXP_CS0_OFFSET	0x00
--- 
-1.7.0.4
+Heiko, above line breaks building for other samsung stuff except s3c24xx. I fixed with following which has been amended in your patch. If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+index 5dcdcda..a006f0d 100644
+--- a/drivers/gpio/gpio-samsung.c
++++ b/drivers/gpio/gpio-samsung.c
+@@ -991,7 +991,7 @@ static __init void s3c24xx_gpiolib_attach_ofnode(struct samsun
+ 	gc->of_gpio_n_cells = 3;
+ 	gc->of_xlate = s3c24xx_gpio_xlate;
+ }
+-#elif defined(CONFIG_PLAT_S3C24XX)
++#else
+ static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
+ 						u64 base, u64 offset)
+ {
+
+> +static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip
+> *chip,
+> +						 u64 base, u64 offset)
+> +{
+> +	return;
+> +}
+> +#endif /* defined(CONFIG_PLAT_S3C24XX) && defined(CONFIG_OF) */
+> +
+>  static void __init s3c24xx_gpiolib_add_chips(struct samsung_gpio_chip
+> *chip,
+>  					     int nr_chips, void __iomem *base)
+>  {
+> @@ -962,6 +1023,8 @@ static void __init s3c24xx_gpiolib_add_chips(struct
+> samsung_gpio_chip *chip,
+>  			gc->direction_output = samsung_gpiolib_2bit_output;
+> 
+>  		samsung_gpiolib_add(chip);
+> +
+> +		s3c24xx_gpiolib_attach_ofnode(chip, S3C24XX_PA_GPIO, i *
+> 0x10);
+>  	}
+>  }
+> 
+> --
+> 1.7.2.3
