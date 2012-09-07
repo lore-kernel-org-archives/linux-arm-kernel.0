@@ -1,74 +1,100 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 7 Sep 2012 12:30:39 +0300
-Subject: [PATCHv4 4/8] ARM: OMAP3: add manual control for mpu / core
- pwrdm usecounting
-In-Reply-To: <CAORVsuUDo7VB3FnbQWJo=zowrviNDNbPM4DtqQMNrYAmOOat4w@mail.gmail.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-5-git-send-email-t-kristo@ti.com> <878ve5j8se.fsf@ti.com>
- <1343637607.9847.13.camel@sokoban>
- <CAORVsuUDo7VB3FnbQWJo=zowrviNDNbPM4DtqQMNrYAmOOat4w@mail.gmail.com>
-Message-ID: <1347010239.10702.94.camel@sokoban>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Fri, 7 Sep 2012 11:57:18 +0200 (CEST)
+Subject: [PATCH 7/9] pwm i.MX: fix clock lookup
+In-Reply-To: <20120907074138.GN26594@pengutronix.de>
+Message-ID: <1500638147.3845571.1347011838934.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-08-06 at 12:14 +0200, Jean Pihet wrote:
-> Hi Tero,
+On Friday, September 7, 2012 9:41:38 AM, Sascha Hauer wrote:
+> On Thu, Sep 06, 2012 at 09:09:42PM +0200, Beno?t Th?baudeau wrote:
+> > On Thursday, September 6, 2012 8:42:56 PM, Sascha Hauer wrote:
+> > > On Thu, Sep 06, 2012 at 08:31:58PM +0200, Beno?t Th?baudeau
+> > > wrote:
+> > > > On Thursday, September 6, 2012 2:48:13 PM, Sascha Hauer wrote:
+> > > > > 
+> > > > > +	int ret;
+> > > > > +
+> > > > > +	ret = clk_prepare_enable(imx->clk_ipg);
+> > > > > +	if (ret)
+> > > > > +		return ret;
+> > > > >  
+> > > > > -	return imx->config(chip, pwm, duty_ns, period_ns);
+> > > > > +	ret = imx->config(chip, pwm, duty_ns, period_ns);
+> > > > > +
+> > > > > +	clk_disable_unprepare(imx->clk_ipg);
+> > > > > +
+> > > > > +	return ret;
+> > > > >  }
+> > > > >  
+> > > > >  static int imx_pwm_enable(struct pwm_chip *chip, struct
+> > > > >  pwm_device
+> > > > >  *pwm)
+> > > > > @@ -169,7 +179,7 @@ static int imx_pwm_enable(struct pwm_chip
+> > > > > *chip,
+> > > > > struct pwm_device *pwm)
+> > > > >  	struct imx_chip *imx = to_imx_chip(chip);
+> > > > >  	int ret;
+> > > > >  
+> > > > > -	ret = clk_prepare_enable(imx->clk);
+> > > > > +	ret = clk_prepare_enable(imx->clk_per);
+> > > > >  	if (ret)
+> > > > >  		return ret;
+> > > > 
+> > > > Have you tested that this actually works on i.MX53?
+> > > > 
+> > > > I have tested it successfully on i.MX35 (with a few additions
+> > > > to
+> > > > platform code).
+> > > > But i.MX35 has a single bit controlling both PWM IPG and PER
+> > > > clock
+> > > > gates.
+> > > > 
+> > > > On i.MX53, there are 2 separate control bits for these. So, if
+> > > > ipg
+> > > > clk is
+> > > > strictly required to access PWM registers, even if per clk is
+> > > > enabled, this code
+> > > > should not work without adding
+> > > 
+> > > I tested this on i.MX53, but you're right, this seems to be
+> > > wrong.
+> > > I'll
+> > > recheck tomorrow.
+> > 
+> > I've performed a few more tests with bare register accesses in the
+> > bootloader to
+> > see how the PWM IP behaves.
+> > 
+> > On i.MX25, i.MX35 and i.MX51, read accesses always work, whatever
+> > the state of
+> > the IPG and PER clock gates.
+> > 
+> > On i.MX25 and i.MX51, write accesses always work, whatever the
+> > state of the IPG
+> > and PER clock gates.
+> > 
+> > On i.MX35, write accesses work if and only if the IPG and PER
+> > clocks are not
+> > gated off (single control bit for both).
 > 
-> On Mon, Jul 30, 2012 at 10:40 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> > On Fri, 2012-07-27 at 12:36 -0700, Kevin Hilman wrote:
-> >> Tero Kristo <t-kristo@ti.com> writes:
-> >>
-> >> > mpu / core powerdomain usecounts are now statically increased
-> >> > by 1 during MPU activity. This allows the domains to reflect
-> >> > actual usage, and will allow the usecount to reach 0 just before
-> >> > all CPUs are ready to idle. Proper powerdomain usecounts are
-> >> > propageted to voltagedomain level also, and will allow vc
-> >> > callbacks to be triggered at right point of time.
-> >> >
-> >> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >> > Cc: Paul Walmsley <paul@pwsan.com>
-> >> > Cc: Kevin Hilman <khilman@ti.com>
-> >>
-> >> IMO, the idea is fine, but I'm not crazy about the implementation in
-> >> powerdomain.c, which is meant for pwrdm generic code.   In particular,
-> >> I'm not crazy about the pwrdm lookups in powerdomain.c.
-> >>
-> >> Since pm<soc>.c already has references to mpu_pwrdm and core_pwrdm, why
-> >> not just add the pwrdm_clkdm_enable/disable calls directly in pm<soc>.c
-> >
-> > I think this was how the patch was in some earlier rev but I thought I'd
-> > try to be more clever with this. :) I can revert the implementation back
-> > to this.
-> Furthermore after the changes in pre/post transitions [1], some more
-> checks will be needed to identify the transitions on the mpu and core
-> power domains.
+> Ok, I tested on i.MX53 and i.MX27.
 > 
-> [1] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=e055548953355b6e69c56f9e54388845b29b4e97
+> On i.MX53 the registers are always accessible. I also measured with
+> an
+> oscilloscope that the ipg/per clock gates en/disable the PWM when
+> it's
+> configured for the corresponding clock.
 > 
-> Regards,
-> Jean
-
-Hi Kevin,
-
-What is the latest status regarding this one, seeing the patch mentioned
-got reverted due to problems? Should I do some changes for this or not?
-
-I can look at moving the code away from the generic powerdomain.c at
-least, but is there anything else?
-
--Tero 
-
+> On i.MX27 register accesses also work regardless of the clock gates.
+> Here we have a single clock gate which only gates the ipg clock.
 > 
-> >
-> >> Also, the changelog should be a bit more specific about why CORE
-> >> powerdomain is also handled here when most of the code only talks about
-> >> the CPU.
-> >
-> > Yea, I'll add some beef to this also.
-> >
-> > -Tero
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> btw the i.MX6 has a single gate per pwm which are described as "PWMx
+> clocks"
+> 
+> So it seems while not 100% correct the current code seems to be safe.
+
+Agreed.
+
+Best regards,
+Beno?t
