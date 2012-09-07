@@ -1,67 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2012 20:57:40 -0700
-Subject: [GIT PULL] omap fixes for v3.6-rc4
-Message-ID: <20120907035740.GR1303@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Sep 2012 04:04:44 +0000
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <50495A94.2060904@wwwdotorg.org>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+ <201209060904.14903.arnd@arndb.de> <50495A94.2060904@wwwdotorg.org>
+Message-ID: <201209070404.45120.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+On Friday 07 September 2012, Stephen Warren wrote:
+> >> diff --git a/arch/arm/mach-bcm2708/common.c b/arch/arm/mach-bcm2708/common.c
+> >
+> > I think when this is the only file, we probably want to name this one bcm2708.c,
+> > same as the platform.
+> 
+> This was originally named bcm2708.c downstream, but I renamed it to
+> common.c following the example of mach-picoxcell and mach-zynq, which
+> IIRC you had pointed out as exemplary platforms. Still, I can rename it
+> back if you want.
 
-  Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
+It's not a big thing either way. Highbank and socfpga are also good examples
+and they use the name of the platform.
 
-are available in the git repository at:
+> >> diff --git a/arch/arm/mach-bcm2708/include/mach/timex.h b/arch/arm/mach-bcm2708/include/mach/timex.h
+> > 
+> > Very close to not being required any more, so you probably won't need it in 3.7.
+> 
+> OK. It's required right now though. I assume we should aim to check this
+> in for 3.7. Should I rebase this patch on top of whatever change removes
+> the need for timex.h? Such a patch doesn't appear to be in linux-next
+> right now though.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.6-rc4
+Let's not worry about it for now, it's easy enough to remove later.
 
-for you to fetch changes up to 6ab019b62e0505289b26bd00d997dc7686192fa4:
-
-  Merge tag 'omap-fixes-a-for-3.6rc' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into fixes (2012-09-05 10:09:31 -0700)
-
-----------------------------------------------------------------
-
-Fixes for timer, sram, memory corruption, and one board
-file that affect booting on various omaps. Then some PM
-related fixes for reset, sleep and wakeup.
-
-----------------------------------------------------------------
-Aaro Koskinen (2):
-      ARM: OMAP: sram: fix OMAP4 errata handling
-      ARM: OMAP: sram: skip the first 16K on OMAP3 HS
-
-Igor Grinberg (1):
-      ARM: OMAP: timer: obey the !CONFIG_OMAP_32K_TIMER
-
-Misael Lopez Cruz (1):
-      ARM: OMAP: hwmod code: Disable module when hwmod enable fails
-
-Paul Walmsley (2):
-      ARM: OMAP3xxx: clockdomain: fix software supervised wakeup/sleep
-      Merge branches 'clkdev_fixes_3.6rc', 'clkdm_fixes_3.6rc' and 'hwmod_data_fixes_a_3.6rc' into omap_fixes_a_3.6rc
-
-Radek Pilar (1):
-      ARM: OMAP: Config fix for omap3-touchbook board
-
-Tero Kristo (2):
-      ARM: OMAP3: hwmod data: fix iva2 reset info
-      ARM: OMAP4: hwmod data: temporarily comment out data for the sl2if IP block
-
-Tony Lindgren (3):
-      ARM: OMAP4: Fix array size for irq_target_cpu
-      Merge branch 'fixes-wakeupgen' into fixes
-      Merge tag 'omap-fixes-a-for-3.6rc' of git://git.kernel.org/.../pjw/omap-pending into fixes
-
-Vaibhav Hiremath (1):
-      ARM: OMAP2+: am33xx: Fix the timer fck clock naming convention
-
- arch/arm/mach-omap2/Kconfig                |    3 +-
- arch/arm/mach-omap2/Makefile               |    2 +-
- arch/arm/mach-omap2/clock33xx_data.c       |   14 ++++----
- arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   50 ++++++++++++++++++++++++++--
- arch/arm/mach-omap2/cm-regbits-34xx.h      |    1 +
- arch/arm/mach-omap2/omap-wakeupgen.c       |    2 +-
- arch/arm/mach-omap2/omap_hwmod.c           |    1 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   15 +++++++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   12 +++----
- arch/arm/mach-omap2/timer.c                |    7 ++++
- arch/arm/plat-omap/sram.c                  |   11 ++++--
- 11 files changed, 94 insertions(+), 24 deletions(-)
+	Arnd
