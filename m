@@ -1,22 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Sep 2012 23:36:41 +0200
+Date: Fri, 7 Sep 2012 23:39:48 +0200
 Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+In-Reply-To: <20120906174531.GX1303@atomide.com>
 References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
-Message-ID: <CACRpkdYE_ysxatAoVwDCf25+-1LLffVnQhbtzwpEWMMAWSnE8A@mail.gmail.com>
+ <201209050513.08588.marex@denx.de>
+ <20120905233416.GP1303@atomide.com>
+ <201209060405.08997.marex@denx.de>
+ <20120906174531.GX1303@atomide.com>
+Message-ID: <CACRpkdYgcYAFy7bBn3XNcrkSoCpeA8yNaa9LZNd4w33Zp3Jjnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+On Thu, Sep 6, 2012 at 7:45 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-> Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> device pointer, pinctrl driver configure SoC pins to GPIO
-> mode according to definitions provided in .dts file.
+>> > The warning should be pinctrl related as the pinctrl drivers may not be
+>> > device tree based drivers.
+>>
+>> Exactly my concern. Also the warning shouldnt be present on systems where
+>> pinctrl is disabled.
 >
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
+> CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
 
-Looks good from a pinctrl point of view!
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+This is correct, nothing to worry about.
+
+The one troublesome case is if a pinctrl driver is present but not
+being used, then you might need to call pinctrl_provide_dummies().
 
 Yours,
 Linus Walleij
