@@ -1,44 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Sep 2012 14:18:09 +0200
-Subject: [PATCHv2 0/7] gpios: Add daisy-chaining and dt support to 74x164
-Message-ID: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri,  7 Sep 2012 14:18:10 +0200
+Subject: [PATCH 1/7] gpio: 74x164: Use module_spi_driver boiler plate function
+In-Reply-To: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1347020296-18796-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Florian Fainelli <florian@openwrt.org>
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-74x164.c |   13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-This is the second attempt at adding the support for chained 8 bit
-shift registers that are present in the cfa-10049.
-
-This patchset also adds dt support to the 74x164 gpio driver.
-
-Thanks,
-Maxime
-
-Changes since v1:
-  * Added back the possibility to set the gpio base from the platform
-    data
-  * Removed the output-latch-gpios dt property to use the regular spi
-    chip select mechanism that works in the same way.
-  * Moved from multiple spi_write to a single spi_sync call because the
-    chip select must be enabled during the whole transfer in our case,
-    and not disabled after sending every byte.
-
-Maxime Ripard (7):
-  gpio: 74x164: Use module_spi_driver boiler plate function
-  gpio: 74x164: Use devm_kzalloc
-  gpio: 74x164: Use dynamic gpio number assignment if no pdata is
-    present
-  gpio: 74x164: Add device tree support
-  gpio: 74x164: Add support for the daisy-chaining
-  gpio: 74x164: dts: Add documentation for the dt binding
-  ARM: dts: cfa10049: Add the 74HC595 gpio expanders
-
- .../devicetree/bindings/gpio/gpio-74x164.txt       |   22 ++++
- arch/arm/boot/dts/imx28-cfa10049.dts               |   21 ++++
- drivers/gpio/gpio-74x164.c                         |  105 ++++++++++++++------
- 3 files changed, 120 insertions(+), 28 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-74x164.txt
-
+diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
+index a31ad6f..2975036 100644
+--- a/drivers/gpio/gpio-74x164.c
++++ b/drivers/gpio/gpio-74x164.c
+@@ -159,18 +159,7 @@ static struct spi_driver gen_74x164_driver = {
+ 	.probe		= gen_74x164_probe,
+ 	.remove		= __devexit_p(gen_74x164_remove),
+ };
+-
+-static int __init gen_74x164_init(void)
+-{
+-	return spi_register_driver(&gen_74x164_driver);
+-}
+-subsys_initcall(gen_74x164_init);
+-
+-static void __exit gen_74x164_exit(void)
+-{
+-	spi_unregister_driver(&gen_74x164_driver);
+-}
+-module_exit(gen_74x164_exit);
++module_spi_driver(gen_74x164_driver);
+ 
+ MODULE_AUTHOR("Gabor Juhos <juhosg@openwrt.org>");
+ MODULE_AUTHOR("Miguel Gaio <miguel.gaio@efixo.com>");
 -- 
 1.7.9.5
