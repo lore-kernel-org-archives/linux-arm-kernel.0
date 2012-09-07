@@ -1,39 +1,59 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Sep 2012 12:14:53 +0100
-Subject: [PATCH 13/19] ARM: ux500: Stop registering I2C sub-devices for HREF
- when DT is enabled
+Date: Fri,  7 Sep 2012 12:14:54 +0100
+Subject: [PATCH 14/19] ARM: ux500: Apply tc3589x's GPIO/IRQ properties to
+ HREF's DT
 In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1347016499-29354-14-git-send-email-lee.jones@linaro.org>
+Message-ID: <1347016499-29354-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we remove all calls to register I2C sub-devices from platform
-code when Device Tree is enabled. Instead the I2C driver will parse
-the Device Tree for them.
+This patch ensures the tc3589x and tc3598x-gpio devices are
+rightfully given interrupt controller status. We also describe
+the tc3598x-gpio GPIO expander in full and specify it as a GPIO
+controller. Finally we reference that the external MMC slot's
+Card Detection GPIO on the HREF is located on the tc3598x-gpio
+expander.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    7 -------
- 1 file changed, 7 deletions(-)
+ arch/arm/boot/dts/hrefv60plus.dts |   17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 0219c276..181ed25 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -840,13 +840,6 @@ static void __init u8500_init_machine(void)
- 		platform_add_devices(mop500_platform_devs,
- 				ARRAY_SIZE(mop500_platform_devs));
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index ec9ec4f..b3290c7 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -42,7 +42,7 @@
+ 			mmc-cap-mmc-highspeed;
+ 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
  
--		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
--		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
--
--		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--		i2c_register_board_info(2, mop500_i2c2_devices,
--					ARRAY_SIZE(mop500_i2c2_devices));
--
- 		mop500_uib_init();
- 	}
+-			cd-gpios  = <&gpio2 31 0x4>; // 95
++			cd-gpios  = <&tc3589x_gpio 3 0x4>;
  
+ 			status = "okay";
+ 		};
+@@ -100,6 +100,21 @@
+ 			tc3589x at 42 {
+ 				compatible = "tc3589x";
+ 				reg = <0x42>;
++				interrupt-parent = <&gpio6>;
++				interrupts = <25 0x1>;
++
++				interrupt-controller;
++				#interrupt-cells = <2>;
++
++				tc3589x_gpio: tc3589x_gpio {
++					compatible = "tc3589x-gpio";
++					interrupts = <0 0x1>;
++
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					gpio-controller;
++					#gpio-cells = <2>;
++				};
+ 			};
+ 			tps61052 at 33 {
+ 				compatible = "tps61052";
 -- 
 1.7.9.5
