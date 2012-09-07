@@ -1,46 +1,45 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Sat, 8 Sep 2012 00:15:11 +1000
-Subject: [PATCH] ARM: ixp4xx: move fixed mapping of internal devices into
- vmalloc region
-In-Reply-To: <201209071323.56574.arnd@arndb.de>
-References: <1346996400-5824-1-git-send-email-gerg@snapgear.com>
- <201209071223.30275.arnd@arndb.de> <m3oblic6x0.fsf@intrepid.localdomain>
- <201209071323.56574.arnd@arndb.de>
-Message-ID: <504A016F.6020304@snapgear.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 7 Sep 2012 15:22:23 +0100
+Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
+In-Reply-To: <201209071358.38598.arnd@arndb.de>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <201209071241.17198.arnd@arndb.de>
+ <20120907130114.GF29601@gmail.com>
+ <201209071358.38598.arnd@arndb.de>
+Message-ID: <20120907142220.GL29601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2012 11:23 PM, Arnd Bergmann wrote:
-> On Friday 07 September 2012, Krzysztof Halasa wrote:
->>>>    BUG: mapping for 0xc8000000 at 0xffbeb000 out of vmalloc space
->>>>    BUG: mapping for 0xc4000000 at 0xffbfe000 out of vmalloc space
->>>>    BUG: mapping for 0xc0000000 at 0xffbff000 out of vmalloc space
->>
->>> Imre, Krzysztof: do you prefer to take this patch into a branch of yours
->>> and send a pull request, or should we just apply it directly into arm-soc.
->>> In the former case, can you provide an Ack?
->>
->> My intention is to push the following instead:
->>
->> http://git.kernel.org/?p=linux/kernel/git/chris/linux.git;a=commitdiff;h=f62736b567ff532fb772afea76fccdbcd92ab473;hp=23e3b6cf1c37ef0615d90681d3705a8821305b5f
->>
->
-> Ok, fine with me. I noticed however that this is missing
-> a changelog. Maybe you can take the text that Greg sent.
->
-> I also wonder if this patch needs to be applied to earlier
-> versions as well. Is linux-3.6 still working?
+On Fri, Sep 07, 2012 at 01:58:38PM +0000, Arnd Bergmann wrote:
+> On Friday 07 September 2012, Lee Jones wrote:
+> > Just running this by you, as there is method in the madness.
+> > 
+> > Linus wanted to keep changes to the Device Tree and changes
+> > in platform code separate, which is my reason for submitting
+> > all of my changes to date that way.
+> > 
+> > What I do (not sure if I've achieved that here yet, I'll need
+> > to take another look) is; make changes to the driver which
+> > enable it for Device Tree use. Then apply the DT node and remove 
+> > platform registration in two subsequent patches respectively. 
+> > Then when we come to bisect and land in between them we still
+> > have a perfectly working driver, only the second probe fails 
+> > which the only side-effect is some warnings in the boot log.
+> 
+> I'm sorry that you are getting conflicting directions from Linus
+> and me. We can use the approach you suggest here this time,
+> but I'd prefer if we can all agree on how to do this in the
+> future.
 
-It only seemed to be a warning. The boards I tested on worked with
-no problems that I could see. That was on a linux-3.5 kernel.
+I don't have an issue with that.
 
-Regards
-Greg
+It would be good to have some guidelines to adhere to.
 
+I'll double check that these ones are in the correct order, but
+otherwise leave them as they are for this submission.
 
 -- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
