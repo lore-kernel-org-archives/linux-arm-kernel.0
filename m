@@ -1,107 +1,64 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 7 Sep 2012 18:00:25 +0200
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Sat, 8 Sep 2012 00:00:47 +0800
 Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
 References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
- <20120907110251.GA7968@glitch>
- <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
-Message-ID: <20120907160025.GB14330@glitch>
+ <201209060405.08997.marex@denx.de> <20120906174531.GX1303@atomide.com>
+ <201209070209.35379.marex@denx.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
+Message-ID: <CAK5ve-KZdpLm6hNN+k7RZJSUp34vqoGwRRkk2dzWH2n+aLxLKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 02:30:59PM +0000, AnilKumar, Chimata wrote:
-> On Fri, Sep 07, 2012 at 16:32:51, Domenico Andreoli wrote:
-> > On Fri, Sep 07, 2012 at 09:10:50AM +0000, AnilKumar, Chimata wrote:
-> > > On Fri, Sep 07, 2012 at 14:18:39, Domenico Andreoli wrote:
-> > > > On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > > > > device pointer, pinctrl driver configure SoC pins to GPIO
-> > > > > mode according to definitions provided in .dts file.
-> > > > 
-> > > > Shouldn't be the interaction with the pinctrl layer left to gpiolib?
-> > > > 
-> > > 
-> > > No, these gpio's are configured specifically for user leds.
-> > 
-> > So there are some special pad configs to make the leds work which are not
-> > only muxing and direction setting? Because I expect these to be managed
-> > privately between gpiolib and pinctrl but now I'm not sure any more,
-> > I'll look the code.
-> 
-> How can gpio driver knows that leds-gpio driver require
-> these 4 pins?
+On Fri, Sep 7, 2012 at 3:59 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
+> On Fri, Sep 07, 2012 at 05:39:35, Marek Vasut wrote:
+>> Dear Tony Lindgren,
+>>
+>> > * Marek Vasut <marex@denx.de> [120905 19:05]:
+>> > > Hi Tony,
+>> > >
+>> > > > * Marek Vasut <marex@denx.de> [120904 20:13]:
+>> > > > > Dear Bryan Wu,
+>> > > > >
+>> > > > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
+>> > > > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+>> > > > > > > device pointer, pinctrl driver configure SoC pins to GPIO
+>> > > > > > > mode according to definitions provided in .dts file.
+>> > > > > >
+>> > > > > > Thanks for this, actually Marek Vasut submitted a similar patch
+>> > > > > > before. I'm pretty fine with this patch.
+>> > > > >
+>> > > > > Thanks for submitting this actually ... I didn't have time to
+>> > > > > properly investigate this.
+>> > > > >
+>> > > > > > But without proper DT setting, it will also give us warning I
+>> > > > > > think. or we can provide some dummy functions as a temp solution
+>> > > > > > as Shawn pointed out before.
+>> > > > >
+>> > > > > But this driver is also used on hardware that's not yet coverted to
+>> > > > > DT, so I'd say dev_warn() if CONFIG_OF is enabled and otherwise
+>> > > > > simply go on ? Actually, can we not skip whole this pinctrl thing if
+>> > > > > CONFIG_OF is disabled? Actually (2), what's the relationship between
+>> > > > > OF and pinctrl?
+>> > > >
+>> > > > The warning should be pinctrl related as the pinctrl drivers may not be
+>> > > > device tree based drivers.
+>> > >
+>> > > Exactly my concern. Also the warning shouldnt be present on systems where
+>> > > pinctrl is disabled.
+>> >
+>> > But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
+>> > CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
+>>
+>> Oh all right then.
+>>
+>
+> Bryan,
+>
+> If this patch looks fine, can you queue this for 3.7?
+>
 
-because leds-gpio requests each gpio (specified in the DT against a specific
-gpio controller) before assuming it is available?  gpiolib then asks to
-pinctrl if those pins are available for gpio and possibly reserve them
-(configuring the mux, if necessary) for the device.
+I've applied this to my for-next branch.
 
-But this idea does not correspond to the code, so I must have filled in
-the blanks of something I didn't fully understand.
-
-> > > So, leds-gpio driver should have this call, because these gpio
-> > > pins are used by leds-gpio driver.
-> > > 
-> > > +       am33xx_pinmux: pinmux at 44e10800 {
-> > > +               userled_pins: pinmux_userled_pins {
-> > > +                       pinctrl-single,pins = <
-> > > +                               0x54 0x7       
-> > > +                               0x58 0x17       
-> > > +                               0x5c 0x7        
-> > > +                               0x60 0x17       
-> > > +                       >;
-> > > +               };
-> > > +       };
-> > > +
-> > > 
-> > > [...]
-> > > 
-> > > +               leds {
-> > > +                       compatible = "gpio-leds";
-> > > +                       pinctrl-names = "default";
-> > > +                       pinctrl-0 = <&userled_pins>;
-> > >                                       ^^^^^^^^^^^^
-> > 
-> > I'm surprised to not see any gpio controller (ala irq) involved.
-> 
-> GPIO controller data will be in GPIO node, should not be here.
-
-So is this the preferred way to attach gpio users to gpio provides in DT
-whenever gpios are muxed?
-
-I would well see these info hidden in the gpio controller so, at least
-for gpios, no magic numbers would be required in the DT (except the gpio
-number relative to the owning controller).
-
-> > > Lets take gpio-keypad driver, in that case we have to configure
-> > > pins as INPUT mode (generic gpio driver might not know what
-> > > the end usecase is) and this leds case we configure as OUTPUT
-> > > mode.
-> > 
-> > gpio direction is modeled by gpiolib so, if no other out-of-gpiolib
-> > capabilities are required for that led gpio, there is no need to directly
-> > use pinctrl.
-> > 
-> 
-> Here leds-gpio driver requirement is to set mux configuration of
-> those 4 pins to GPIO mode (mode 7) as well direction OUTPUT/INPUT.
-
-Direction info is passed to gpiolib in the exact instant
-gpio_set_direction_*() is invoked.
-
-> Set mux mode to 7 (GPIO usage) should be from led driver, because
-> this driver have the requirement.
-
-This GPIO mode value is known to the pinctrl driver, actually it's _specific_
-for that driver. So the only info pinctrl would really need to know is which
-pin is requested to be used as GPIO, something that gpiolib already manages.
-
-So I really don't see why the gpiolib could not be (I've understood it isn't)
-the one-stop for GPIO users. Of course direct pinctrl configuration would be
-required for all those specific gpio parameters not modeled by the gpiolib
-(like debounce times, etc).
-
-cheers,
-Domenico
+Thanks,
+-Bryan
