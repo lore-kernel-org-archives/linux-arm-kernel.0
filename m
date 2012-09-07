@@ -1,33 +1,57 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 06 Sep 2012 17:08:19 -0700
-Subject: [PATCH 0/1] clk: add DT fixed-factor-clock binding support
-In-Reply-To: <5048CC37.6060509@gmail.com>
-References: <1346194382-11405-1-git-send-email-gregory.clement@free-electrons.com>
- <5048CC37.6060509@gmail.com>
-Message-ID: <20120907000819.20289.87301@nucleus>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 7 Sep 2012 02:09:35 +0200
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <20120906174531.GX1303@atomide.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <201209060405.08997.marex@denx.de> <20120906174531.GX1303@atomide.com>
+Message-ID: <201209070209.35379.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2012-09-06 09:15:51)
-> On 08/28/2012 05:53 PM, Gregory CLEMENT wrote:
-> > Hi,
+Dear Tony Lindgren,
+
+> * Marek Vasut <marex@denx.de> [120905 19:05]:
+> > Hi Tony,
 > > 
-> > During the port of the clock common framework for the armada 370/XP, I
-> > need to get "fixed-factor-clock" using the device tree. For this need
-> > I add support DT for "fixed-factor-clock" in the same way that the
-> > existing support for "fixed-rate-clock". It turned out that finally I
-> > didn't need it anymore, but as the code was written and tested, here
-> > it is.
+> > > * Marek Vasut <marex@denx.de> [120904 20:13]:
+> > > > Dear Bryan Wu,
+> > > > 
+> > > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > > > > > device pointer, pinctrl driver configure SoC pins to GPIO
+> > > > > > mode according to definitions provided in .dts file.
+> > > > > 
+> > > > > Thanks for this, actually Marek Vasut submitted a similar patch
+> > > > > before. I'm pretty fine with this patch.
+> > > > 
+> > > > Thanks for submitting this actually ... I didn't have time to
+> > > > properly investigate this.
+> > > > 
+> > > > > But without proper DT setting, it will also give us warning I
+> > > > > think. or we can provide some dummy functions as a temp solution
+> > > > > as Shawn pointed out before.
+> > > > 
+> > > > But this driver is also used on hardware that's not yet coverted to
+> > > > DT, so I'd say dev_warn() if CONFIG_OF is enabled and otherwise
+> > > > simply go on ? Actually, can we not skip whole this pinctrl thing if
+> > > > CONFIG_OF is disabled? Actually (2), what's the relationship between
+> > > > OF and pinctrl?
+> > > 
+> > > The warning should be pinctrl related as the pinctrl drivers may not be
+> > > device tree based drivers.
 > > 
+> > Exactly my concern. Also the warning shouldnt be present on systems where
+> > pinctrl is disabled.
 > 
-> It looks fine to me, but I'd like to see a user of it.
-> 
+> But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
+> CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
 
-Agreed.  I'll hold off on merging it until someone else depends on it.
+Oh all right then.
 
-Thanks for submitting this Gregory.
+> Or do you get some warning if CONFIG_PINCTRL is not selected for your
+> hardware?
 
-Regards,
-Mike
+No, I don't have much hardware like such anymore :-(
 
-> Rob
+Best regards,
+Marek Vasut
