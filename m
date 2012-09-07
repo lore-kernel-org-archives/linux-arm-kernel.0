@@ -1,71 +1,32 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 07 Sep 2012 14:59:27 -0700
-Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <CAPDyKFrWGKP+jNcti939-ARp_Q8ugLUrdSn9pb59v24nH=D36A@mail.gmail.com>
-References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
- <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
- <20120907124050.GN26709@S2101-09.ap.freescale.net>
- <CAPDyKFrWGKP+jNcti939-ARp_Q8ugLUrdSn9pb59v24nH=D36A@mail.gmail.com>
-Message-ID: <20120907215927.20289.29648@nucleus>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 7 Sep 2012 15:00:24 -0700
+Subject: [GIT PULL] ARM: LPC32xx: dts update
+In-Reply-To: <50488F8B.4070801@antcom.de>
+References: <50488F8B.4070801@antcom.de>
+Message-ID: <20120907220024.GC3139@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2012-09-07 06:26:21)
-> On 7 September 2012 14:40, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Fri, Sep 07, 2012 at 01:59:40PM +0200, Ulf Hansson wrote:
-> >> Hi Shawn and Mike,
-> >>
-> >> In general I am in favor of this patch, but I also see some
-> >> corresponding problems to resolve. Please correct me if I am wrong.
-> >>
-> >> I suppose most machines is relying on that it enough to only take care
-> >> of the notification by using "cpufreq_notify_transition" from their
-> >> cpufreq drivers. Thus those have to make sure the updates for smp_twd
-> >> clock is supported from within the cpufreq driver I suppose.
-> >>
-> >> In other words the cpufreq drivers needs to do clk_get of "smp_twd"
-> >> clock and then do a set_rate on it when it's has changed, to trigger a
-> >> rate change notification. Is this what you also have in mind or do you
-> >> have any other idea of how this should work?
-> >>
-> > Here is how it works on imx6q.
-> >
-> > 1) There are clks arm and twd defined in imx6q clock tree.  And twd
-> >    is registered to clock framework as one child of arm clk with a fixed
-> >    divider 2.
-> >
-> >         /*                                    name         parent_name     mult div */
-> >         clk[twd]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
-> >
-> > 2) Register lookup "cpu0" and "smp_twd" for cpufreq and smp_twd drivers
-> >    respectively.
-> >
-> >         clk_register_clkdev(clk[twd], NULL, "smp_twd");
-> >         clk_register_clkdev(clk[arm], NULL, "cpu0");
-> >
-> > That's it.  The clock framework will just handle all the work nicely.
-> > When cpufreq driver scales arm clk, the framework will propagate the
-> > rate change to twd clk automatically.  And once twd clk rate changes,
-> > smp_twd will get the notification.
-> >
+On Thu, Sep 06, 2012 at 01:56:59PM +0200, Roland Stigge wrote:
+> Hi Arnd and Olof,
 > 
-> That's a nice solution!
-> This won't work for ux500 that simple though. Maybe I might be able to
-> use some kind of clock "parent" thing though, let's see. Thanks for
-> the information!
-
-Hi Ulf,
-
-Why won't this work for ux500?
-
-Thanks,
-Mike
-
+> below is the LPC32xx dts update branch for 3.7. Updates for reference boards
+> PHY3250 and EA3250.
 > 
-> Kind regards
-> Ulf Hansson
+> Thanks,
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Roland
+> 
+> 
+> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+> 
+>   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.antcom.de/linux-2.6.git lpc32xx/dts
+
+Thanks, pulled into next/dt.
+
+
+-Olof
