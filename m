@@ -1,207 +1,314 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 7 Sep 2012 19:33:38 +0200
-Subject: [PATCH 1/2] gpio/twl4030: get platform data from device tree
-In-Reply-To: <1346831186-29947-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
- <1346831186-29947-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <504A2FF2.7070607@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 7 Sep 2012 23:04:15 +0530
+Subject: [PATCH v2 2/2] ARM: da850/omap-l138: Add EVM specific code for
+ VPIF to work
+In-Reply-To: <504A2C7D.1090702@ti.com>
+References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
+ <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
+ <504A2C7D.1090702@ti.com>
+Message-ID: <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi Sekhar,
 
-I've just noticed that this patch is reporting some CHECK issues.
+Thanks for the review.
 
-d1f5052 - gpio/twl4030: get platform data from device tree
-CHECK: Alignment should match open parenthesis
-#66: FILE: drivers/gpio/gpio-twl4030.c:412:
-+	of_property_read_u32(dev->of_node, "ti,debounce",
-+				&omap_twl_info->debounce);
+On Fri, Sep 7, 2012 at 10:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> Hi Prabhakar,
+>
+> On 8/20/2012 7:38 PM, Prabhakar Lad wrote:
+>> From: Manjunath Hadli <manjunath.hadli@ti.com>
+>>
+>> Include the expander settings to select VPIF peripheral on
+>> UI card and add registration call in EVM init. Also add platform
+>> data to configure display and capture devices.
+>>
+>> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>>  arch/arm/mach-davinci/Kconfig           |    9 ++
+>>  arch/arm/mach-davinci/board-da850-evm.c |  178 +++++++++++++++++++++++++++++++
+>>  2 files changed, 187 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+>> index ab99c3c..436b47c 100644
+>> --- a/arch/arm/mach-davinci/Kconfig
+>> +++ b/arch/arm/mach-davinci/Kconfig
+>> @@ -186,6 +186,15 @@ config DA850_UI_RMII
+>>         NOTE: Please take care while choosing this option, MII PHY will
+>>         not be functional if RMII mode is selected.
+>>
+>> +config DA850_UI_SD_VIDEO_PORT
+>> +     bool "Video Port Interface"
+>> +     help
+>> +       Say Y if you want to use Video Port Interface (VPIF) on the
+>> +       DA850/OMAP-L138 EVM. The Video decoders/encoders are found on the
+>> +       UI daughter card that is supplied with the EVM.
+>
+>> +       NOTE: Please make sure to disable RMII and CLCD options when you
+>> +       select Video Port Interface.
+>
+> I thought you agreed to remove this note. CLCD is not present in
+> mainline and RMII cannot be selected along with video because of the
+> choice. So, the note is basically useless.
+>
+Ok.
 
-CHECK: Alignment should match open parenthesis
-#68: FILE: drivers/gpio/gpio-twl4030.c:414:
-+	of_property_read_u32(dev->of_node, "ti,mmc-cd",
-+				(u32 *)&omap_twl_info->mmc_cd);
+>> +
+>>  endchoice
+>>
+>>  config DA850_WL12XX
+>> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+>> index 0149fb4..cdbbced 100644
+>> --- a/arch/arm/mach-davinci/board-da850-evm.c
+>> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+>> @@ -45,6 +45,8 @@
+>>  #include <mach/aemif.h>
+>>  #include <mach/spi.h>
+>>
+>> +#include <media/tvp514x.h>
+>> +
+>>  #define DA850_EVM_PHY_ID             "davinci_mdio-0:00"
+>>  #define DA850_LCD_PWR_PIN            GPIO_TO_PIN(2, 8)
+>>  #define DA850_LCD_BL_PIN             GPIO_TO_PIN(2, 15)
+>> @@ -121,6 +123,12 @@ static struct spi_board_info da850evm_spi_info[] = {
+>>       },
+>>  };
+>>
+>> +#define TVP5147_CH0          "tvp514x-0"
+>> +#define TVP5147_CH1          "tvp514x-1"
+>> +
+>> +#define VPIF_STATUS          0x002c
+>> +#define VPIF_STATUS_CLR              0x0030
+>> +
+>>  #ifdef CONFIG_MTD
+>>  static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
+>>  {
+>> @@ -452,6 +460,15 @@ static void da850_evm_ui_keys_init(unsigned gpio)
+>>       }
+>>  }
+>>
+>> +#ifdef CONFIG_DA850_UI_SD_VIDEO_PORT
+>> +static inline void da850_evm_setup_video_port(int video_sel)
+>> +{
+>> +     gpio_set_value_cansleep(video_sel, 0);
+>> +}
+>> +#else
+>> +static inline void da850_evm_setup_video_port(int video_sel) { }
+>> +#endif
+>> +
+>>  static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
+>>                                               unsigned ngpio, void *c)
+>>  {
+>> @@ -497,6 +514,8 @@ static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
+>>
+>>       da850_evm_setup_emac_rmii(sel_a);
+>>
+>> +     da850_evm_setup_video_port(sel_c);
+>> +
+>>       return 0;
+>>
+>>  exp_setup_keys_fail:
+>> @@ -1149,6 +1168,133 @@ static __init int da850_evm_init_cpufreq(void)
+>>  static __init int da850_evm_init_cpufreq(void) { return 0; }
+>>  #endif
+>>
+>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>> +
+>> +/* VPIF capture configuration */
+>> +static struct tvp514x_platform_data tvp5146_pdata = {
+>> +     .clk_polarity = 0,
+>> +     .hs_polarity = 1,
+>> +     .vs_polarity = 1
+>
+> A ',' needed at the end of above line. It will be nice to line up the
+> initialization using tabs too.
+>
+Ok.
 
-CHECK: Alignment should match open parenthesis
-#70: FILE: drivers/gpio/gpio-twl4030.c:416:
-+	of_property_read_u32(dev->of_node, "ti,pullups",
-+				&omap_twl_info->pullups);
+>> +};
+>> +
+>> +#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
+>> +
+>> +static const struct vpif_input da850_ch0_inputs[] = {
+>> +     {
+>> +             .input = {
+>> +                     .index = 0,
+>> +                     .name = "Composite",
+>> +                     .type = V4L2_INPUT_TYPE_CAMERA,
+>> +                     .std = TVP514X_STD_ALL,
+>> +             },
+>> +             .subdev_name = TVP5147_CH0,
+>> +     },
+>> +};
+>> +
+>> +static const struct vpif_input da850_ch1_inputs[] = {
+>> +     {
+>> +             .input = {
+>> +                     .index = 0,
+>> +                     .name = "S-Video",
+>> +                     .type = V4L2_INPUT_TYPE_CAMERA,
+>> +                     .std = TVP514X_STD_ALL,
+>> +             },
+>> +             .subdev_name = TVP5147_CH1,
+>> +     },
+>> +};
+>> +#endif
+>> +
+>> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
+>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>
+> You agreed to get rid of these multiple ifdefs but you have not fixed that.
+>
+I have merged the top one, at later stage when we go  ahead and add sensor
+support then we would have require to have define two
+da850_vpif_capture_sdev_info
+so to avoid it I have kept this one.
 
-CHECK: Alignment should match open parenthesis
-#72: FILE: drivers/gpio/gpio-twl4030.c:418:
-+	of_property_read_u32(dev->of_node, "ti,pulldowns",
-+				&omap_twl_info->pulldowns);
+>> +     {
+>> +             .name   = TVP5147_CH0,
+>> +             .board_info = {
+>> +                     I2C_BOARD_INFO("tvp5146", 0x5d),
+>> +                     .platform_data = &tvp5146_pdata,
+>> +             },
+>> +             .input = INPUT_CVBS_VI2B,
+>> +             .output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
+>> +             .can_route = 1,
+>> +             .vpif_if = {
+>> +                     .if_type = VPIF_IF_BT656,
+>> +                     .hd_pol = 1,
+>> +                     .vd_pol = 1,
+>> +                     .fid_pol = 0,
+>> +             },
+>> +     },
+>> +     {
+>> +             .name   = TVP5147_CH1,
+>> +             .board_info = {
+>> +                     I2C_BOARD_INFO("tvp5146", 0x5c),
+>> +                     .platform_data = &tvp5146_pdata,
+>> +             },
+>> +             .input = INPUT_SVIDEO_VI2C_VI1C,
+>> +             .output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
+>> +             .can_route = 1,
+>> +             .vpif_if = {
+>> +                     .if_type = VPIF_IF_BT656,
+>> +                     .hd_pol = 1,
+>> +                     .vd_pol = 1,
+>> +                     .fid_pol = 0,
+>> +             },
+>> +     },
+>> +#endif
+>> +};
+>> +
+>> +static struct vpif_capture_config da850_vpif_capture_config = {
+>> +     .subdev_info = da850_vpif_capture_sdev_info,
+>> +     .subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
+>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>> +     .chan_config[0] = {
+>> +             .inputs = da850_ch0_inputs,
+>> +             .input_count = ARRAY_SIZE(da850_ch0_inputs),
+>> +     },
+>> +     .chan_config[1] = {
+>> +             .inputs = da850_ch1_inputs,
+>> +             .input_count = ARRAY_SIZE(da850_ch1_inputs),
+>> +     },
+>> +#endif
+>> +     .card_name      = "DA850/OMAP-L138 Video Capture",
+>> +};
+>> +
+>> +/* VPIF display configuration */
+>> +static struct vpif_subdev_info da850_vpif_subdev[] = {
+>> +     {
+>> +             .name   = "adv7343",
+>> +             .board_info = {
+>> +                     I2C_BOARD_INFO("adv7343", 0x2a),
+>> +             },
+>> +     },
+>> +};
+>> +
+>> +static const char const *vpif_output[] = {
+>> +     "Composite",
+>> +     "Component",
+>> +     "S-Video",
+>> +};
+>> +
+>> +static struct vpif_display_config da850_vpif_display_config = {
+>> +     .subdevinfo     = da850_vpif_subdev,
+>> +     .subdev_count   = ARRAY_SIZE(da850_vpif_subdev),
+>> +     .output         = vpif_output,
+>> +     .output_count   = ARRAY_SIZE(vpif_output),
+>> +     .card_name      = "DA850/OMAP-L138 Video Display",
+>> +};
+>> +
+>> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY) ||\
+>> +             defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY_MODULE)
+>> +#define HAS_VPIF_DISPLAY 1
+>> +#else
+>> +#define HAS_VPIF_DISPLAY 0
+>> +#endif
+>> +
+>> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) ||\
+>> +             defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE_MODULE)
+>> +#define HAS_VPIF_CAPTURE 1
+>> +#else
+>> +#define HAS_VPIF_CAPTURE 0
+>> +#endif
+>> +
+>>  #ifdef CONFIG_DA850_WL12XX
+>>
+>>  static void wl12xx_set_power(int index, bool power_on)
+>> @@ -1375,6 +1521,38 @@ static __init void da850_evm_init(void)
+>>               pr_warning("da850_evm_init: suspend registration failed: %d\n",
+>>                               ret);
+>>
+>> +     if (HAS_VPIF_DISPLAY || HAS_VPIF_CAPTURE) {
+>> +             ret = da850_register_vpif();
+>> +             if (ret)
+>> +                     pr_warn("da850_evm_init: VPIF setup failed: %d\n", ret);
+>> +     }
+>> +
+>> +     if (HAS_VPIF_CAPTURE) {
+>> +             ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
+>> +             if (ret)
+>> +                     pr_warn(
+>> +                     "da850_evm_init: VPIF capture mux setup failed: %d\n",
+>> +                     ret);
+>> +
+>> +             ret = da850_register_vpif_capture(&da850_vpif_capture_config);
+>> +             if (ret)
+>> +                     pr_warn(
+>> +                     "da850_evm_init: VPIF capture setup failed: %d\n", ret);
+>> +     }
+>> +
+>> +     if (HAS_VPIF_DISPLAY) {
+>> +             ret = davinci_cfg_reg_list(da850_vpif_display_pins);
+>> +             if (ret)
+>> +                     pr_warn(
+>> +                     "da850_evm_init: VPIF display mux setup failed: %d\n",
+>> +                     ret);
+>> +
+>> +             ret = da850_register_vpif_display(&da850_vpif_display_config);
+>> +             if (ret)
+>> +                     pr_warn(
+>> +                     "da850_evm_init: VPIF display setup failed: %d\n", ret);
+>> +     }
+>> +
+>
+> Registering the platform device only when driver is configured is not
+> required. Platform device registration should just reflect what is
+> present in the hardware. Removing this should also get rid of the ugly
+> line breaks above.
+>
+Ok.
 
-CHECK: Alignment should match open parenthesis
-+				pdata->pullups, pdata->pulldowns,
+Thanks,
+--Prabhakar
 
-CHECK: Alignment should match open parenthesis
-#139: FILE: drivers/gpio/gpio-twl4030.c:479:
-+		dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
-+				pdata->debounce, pdata->mmc_cd,
-
-total: 0 errors, 0 warnings, 6 checks, 118 lines checked
-
-
-I fixed them since it was trivial, but next time you should ensure that the patch pass checkpatch before posting.
-
-Just let me know if you have any issue with the following update.
-
-Regards,
-Benoit
-
----
->From f74ce8fb849e9f9c54a494cff5fc30d53ca4e963 Mon Sep 17 00:00:00 2001
-From: Florian Vaussard <florian.vaussard@epfl.ch>
-Date: Wed, 5 Sep 2012 09:46:25 +0200
-Subject: [PATCH] gpio/twl4030: get platform data from device tree
-
-Adds a number of missing device tree properties for
-twl4030/gpio, and update bindings:
-- "ti,use-leds"  -> .use_leds
-- "ti,debounce"  -> .debounce
-- "ti,mmc-cd"    -> .mmc_cd
-- "ti,pullups"   -> .pullups
-- "ti,pulldowns" -> .pulldowns
-
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
-[b-cousson at ti.com: Fix some checkpatch CHECK issues]
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
- .../devicetree/bindings/gpio/gpio-twl4030.txt      |    6 ++
- drivers/gpio/gpio-twl4030.c                        |   82 +++++++++++++-------
- 2 files changed, 61 insertions(+), 27 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt b/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
-index 16695d9..66788fd 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
-@@ -11,6 +11,11 @@ Required properties:
- - interrupt-controller: Mark the device node as an interrupt controller
-   The first cell is the GPIO number.
-   The second cell is not used.
-+- ti,use-leds : Enables LEDA and LEDB outputs if set
-+- ti,debounce : if n-th bit is set, debounces GPIO-n
-+- ti,mmc-cd : if n-th bit is set, GPIO-n controls VMMC(n+1)
-+- ti,pullups : if n-th bit is set, set a pullup on GPIO-n
-+- ti,pulldowns : if n-th bit is set, set a pulldown on GPIO-n
- 
- Example:
- 
-@@ -20,4 +25,5 @@ twl_gpio: gpio {
-     gpio-controller;
-     #interrupt-cells = <2>;
-     interrupt-controller;
-+    ti,use-leds;
- };
-diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
-index 94256fe..f923252 100644
---- a/drivers/gpio/gpio-twl4030.c
-+++ b/drivers/gpio/gpio-twl4030.c
-@@ -395,6 +395,31 @@ static int __devinit gpio_twl4030_debounce(u32 debounce, u8 mmc_cd)
- 
- static int gpio_twl4030_remove(struct platform_device *pdev);
- 
-+static struct twl4030_gpio_platform_data *of_gpio_twl4030(struct device *dev)
-+{
-+	struct twl4030_gpio_platform_data *omap_twl_info;
-+
-+	omap_twl_info = devm_kzalloc(dev, sizeof(*omap_twl_info), GFP_KERNEL);
-+	if (!omap_twl_info)
-+		return NULL;
-+
-+	omap_twl_info->gpio_base = -1;
-+
-+	omap_twl_info->use_leds = of_property_read_bool(dev->of_node,
-+			"ti,use-leds");
-+
-+	of_property_read_u32(dev->of_node, "ti,debounce",
-+			     &omap_twl_info->debounce);
-+	of_property_read_u32(dev->of_node, "ti,mmc-cd",
-+			     (u32 *)&omap_twl_info->mmc_cd);
-+	of_property_read_u32(dev->of_node, "ti,pullups",
-+			     &omap_twl_info->pullups);
-+	of_property_read_u32(dev->of_node, "ti,pulldowns",
-+			     &omap_twl_info->pulldowns);
-+
-+	return omap_twl_info;
-+}
-+
- static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
- {
- 	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
-@@ -423,39 +448,42 @@ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
- 	twl4030_gpio_irq_base = irq_base;
- 
- no_irqs:
--	twl_gpiochip.base = -1;
- 	twl_gpiochip.ngpio = TWL4030_GPIO_MAX;
- 	twl_gpiochip.dev = &pdev->dev;
- 
--	if (pdata) {
--		twl_gpiochip.base = pdata->gpio_base;
-+	if (node)
-+		pdata = of_gpio_twl4030(&pdev->dev);
- 
--		/*
--		 * NOTE:  boards may waste power if they don't set pullups
--		 * and pulldowns correctly ... default for non-ULPI pins is
--		 * pulldown, and some other pins may have external pullups
--		 * or pulldowns.  Careful!
--		 */
--		ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
--		if (ret)
--			dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
--					pdata->pullups, pdata->pulldowns,
--					ret);
--
--		ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
--		if (ret)
--			dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
--					pdata->debounce, pdata->mmc_cd,
--					ret);
--
--		/*
--		 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
--		 * is (still) clear if use_leds is set.
--		 */
--		if (pdata->use_leds)
--			twl_gpiochip.ngpio += 2;
-+	if (pdata == NULL) {
-+		dev_err(&pdev->dev, "Platform data is missing\n");
-+		return -ENXIO;
- 	}
- 
-+	twl_gpiochip.base = pdata->gpio_base;
-+
-+	/*
-+	 * NOTE:  boards may waste power if they don't set pullups
-+	 * and pulldowns correctly ... default for non-ULPI pins is
-+	 * pulldown, and some other pins may have external pullups
-+	 * or pulldowns.  Careful!
-+	 */
-+	ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
-+	if (ret)
-+		dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
-+			pdata->pullups, pdata->pulldowns, ret);
-+
-+	ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
-+	if (ret)
-+		dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
-+			pdata->debounce, pdata->mmc_cd, ret);
-+
-+	/*
-+	 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
-+	 * is (still) clear if use_leds is set.
-+	 */
-+	if (pdata->use_leds)
-+		twl_gpiochip.ngpio += 2;
-+
- 	ret = gpiochip_add(&twl_gpiochip);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
--- 
-1.7.0.4
+> Thanks,
+> Sekhar
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
