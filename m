@@ -1,23 +1,27 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 08 Sep 2012 11:36:30 +0900
-Subject: [PATCH] ARM: dts: exynos4: Enable serial controllers on Origen and
- SMDKV310
-In-Reply-To: <1808225.QZz0WEipT7@amdc1227>
-References: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
- <1346675674-16034-4-git-send-email-t.figa@samsung.com>
- <1808225.QZz0WEipT7@amdc1227>
-Message-ID: <24d901cd8d6a$c10c9710$4325c530$%kim@samsung.com>
+Date: Sat, 08 Sep 2012 11:37:50 +0900
+Subject: [PATCH v2 2/5] ARM: Exynos4: dts: Specify address and size cells
+ for i2c controllers
+In-Reply-To: <CAJuYYwSDcVTi=4dmgQ_FrN7hiWxoPiEy4_dUFRe9JYrcBx9BgA@mail.gmail.com>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1346748609-11115-3-git-send-email-t.figa@samsung.com>
+ <CAJuYYwSDcVTi=4dmgQ_FrN7hiWxoPiEy4_dUFRe9JYrcBx9BgA@mail.gmail.com>
+Message-ID: <24da01cd8d6a$f07631a0$d16294e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Thomas Abraham wrote:
 > 
-> This patch adds status override of serial nodes to enable used serial
-> ports
-> on Origen and SMDKV310 board.
+> On 4 September 2012 14:20, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos4.dtsi | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
 > 
-Well...I'm not sure about the status of Origen serial, but all of the
-serials are enabled on SMDKV310, is it right?
+> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+> 
+Looks OK to me, will apply.
 
 Thanks.
 
