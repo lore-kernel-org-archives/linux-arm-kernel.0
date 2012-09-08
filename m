@@ -1,36 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Sep 2012 11:17:24 +0100
-Subject: [PATCH v4 2/2] OMAP:IOMMU:flush L1 and L2 caches
-In-Reply-To: <CADysL2YwpyuhgzwF6djObZQTpgdHCsLp=K7NsCJth6wAXuFV=A@mail.gmail.com>
-References: <CADysL2YwpyuhgzwF6djObZQTpgdHCsLp=K7NsCJth6wAXuFV=A@mail.gmail.com>
-Message-ID: <20120908101724.GB28448@n2100.arm.linux.org.uk>
+From: simon@fire.lp0.eu (Simon Arlott)
+Date: Sat, 08 Sep 2012 13:37:01 +0100
+Subject: [PATCH V2] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <1347083284-17799-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347083284-17799-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <504B3BED.9080204@simon.arlott.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2012 at 10:50:24AM +0530, Gupta, Ramesh wrote:
->  static void flush_iopgd_range(u32 *first, u32 *last)
->  {
-> -	/* FIXME: L2 cache should be taken care of if it exists */
-> -	do {
-> -		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
-> -		    : : "r" (first));
-> -		first += L1_CACHE_BYTES / sizeof(*first);
-> -	} while (first <= last);
-> +	flush_iommu_mem(first, last);
-> +	outer_flush_range(virt_to_phys(first), virt_to_phys(last));
+On 08/09/12 06:48, Stephen Warren wrote:
+> +void __init bcm2708_init_irq(void)
+> +{
+> +}
+...
+> +static void __init bcm2708_timer_init(void)
+> +{
+> +}
 
-I think this would be safer if these operated on an area rather than a
-range - which means taking a start plus size.
+There's no timer and no interrupt handler so it won't even finish
+booting. It's going to stall when it tries to calculate loops per jiffy.
 
-	phys_addr_t phys = virt_to_phys(start);
+I don't know what you're trying to achieve. This does not add support
+for the BCM2708.
 
-	iommu_flush_area(start, size);
-	outer_flush_range(phys, phys + size);
+See https://github.com/lp0/linux/commits/rpi-split from June 21 onwards
+for separate patch commits that apply to specific devices.
 
-is safer than the above if virt_to_phys() is non-linear.
 
->  		*iopgd = virt_to_phys(iopte) | IOPGD_TABLE;
-> -		flush_iopgd_range(iopgd, iopgd);
-> +		flush_iopgd_range(iopgd, iopgd + 1);
+On 08/09/12 06:48, Stephen Warren wrote:
+> v2:
+> * Rename *_BASE to *_PHYS to match Simon's rpi-split branch.
 
-And operating on a start + size also makes this kind of stuff clearer.
+You've definitely used the rpi-linear branch if you're missing things.
+The HEAD of the two branches is identical but rpi-split has a rebased
+history.
+
+-- 
+Simon Arlott
