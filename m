@@ -1,56 +1,53 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 8 Sep 2012 13:48:58 +0530
-Subject: [PATCH] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
- read/write
-In-Reply-To: <CAMQu2gzCz+bS7U1ypFWzcp3zTpkfHdPzZfFtJ8Cd4ap8FSzJQg@mail.gmail.com>
-References: <alpine.DEB.2.00.1209052333410.11516@utopia.booyaka.com>
- <CAMQu2gzCz+bS7U1ypFWzcp3zTpkfHdPzZfFtJ8Cd4ap8FSzJQg@mail.gmail.com>
-Message-ID: <CAMQu2gw-KPQzYKtjJUxZjEX+_HKLL9WTxXXA35_ki8KbN+WDYg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 08 Sep 2012 10:21:35 +0200
+Subject: [PATCH v2 5/5] ARM: Exynos: Add basic dts file for Samsung Trats
+ board
+In-Reply-To: <24dd01cd8d6c$41586970$c4093c50$%kim@samsung.com>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <3039444.Ol4zGlGWJ2@flatron>
+ <24dd01cd8d6c$41586970$c4093c50$%kim@samsung.com>
+Message-ID: <7700294.NPoOn06yTZ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Kgene,
 
-On Thu, Sep 6, 2012 at 12:05 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
->
-> On Thu, Sep 6, 2012 at 5:04 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > The wakeupgen context-save code reads and stores the AUXCOREBOOT0 and
-> > AUXCOREBOOT1 register contents twice.  This seems like a waste of
-> > time, so, remove the duplicates.
-> >
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > ---
-> Looks fine to me. Thanks Paul.
-> Reviewed-by: Santosh Shilimkar ,santosh.shilimkar at ti.com>
->
-> While reviewing your patch, i noticed a typo in the code.
-> Since the patch fixes nearby code as the subject patch, I generated
-> that patch on top of yours. Same is end of the email as well as
-> attachment. The patch applies on top of your patch.
->
-> Regards
-> Santosh
->
-> From 5fcd24e5782e502aa607b73de78be68b394f9639 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Thu, 6 Sep 2012 11:51:34 +0530
-> Subject: [PATCH] ARM: OMAP4: wakeupgen: Fix the typo in AUXCOREBOOT
-> register
->  save
->
-> The wakeupgen context-save code reads AUXCOREBOOT0 register
-> instead of AUXCOREBOOT1 register contents while saving AUXCOREBOOT1.
->
-> Fix the same.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
+On Saturday 08 of September 2012 11:47:15 Kukjin Kim wrote:
+> > > > +       memory {
+> > > > +               reg =  <0x40000000 0x20000000
+> > > > +                       0x60000000 0x20000000>;
+> > > > +       };
+> > > 
+> > > Why does this have to be split. Why not have a single entry with the
+> > > size as 0x40000000?
+> > 
+> > The memory node corresponds to struct meminfo and each entry (with two
+> > values) makes one struct membank defining a memory bank.
+> 
+> Well...
+> 
+> > I've been talking with Kyungmin about this. Originally bootloaders used
+> > to report 4 banks of 256 MiB, but it turned out that real bank
+> > configuration on Trats is 2 banks of 512 MiB.
+> 
+> I think, following should ok here.
+> 
+> memory {
+> 	reg = <0x40000000 0x40000000>;
+> };
 
-Will you able to pick up these couple of wakeupgen fixes from  here or
-do you want me to send you a pull request for 3.6-rc5/6
+This will not boot with CONFIG_SPARSEMEM, unless maximum section size is 
+increased to 1024MiB.
 
-Regards
-Santosh
+> > > Probably, the interrupts can be listed when we have pinctrl driver
+> > > merged in Samsung tree.
+> > 
+> > Right.
+> 
+> Note, you can do it on top of samsung tree :-)
+
+OK.
+
+--
+Best regards,
+Tomasz Figa
