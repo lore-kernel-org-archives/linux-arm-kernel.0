@@ -1,29 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 8 Sep 2012 11:45:58 +0200
-Subject: [PATCH 1/4] ARM: ks-8695: merge the timer header into the timer
- driver
-In-Reply-To: <CAOesGMiyd8xnXSMbeHXEed7r-PR2CnNcp=nMA3W5sM6Q-3p1xw@mail.gmail.com>
-References: <1346264802-20306-1-git-send-email-linus.walleij@linaro.org>
- <CAOesGMiyd8xnXSMbeHXEed7r-PR2CnNcp=nMA3W5sM6Q-3p1xw@mail.gmail.com>
-Message-ID: <CACRpkdZZdMf07ayGSZ4FBz3hL-LXEqKnsfhwVQMXoYwqGM7SbQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Sep 2012 11:14:20 +0100
+Subject: [PATCH v4 1/2] ARM: new cache maintenance api for iommu
+In-Reply-To: <CADysL2bGP_FKW4dnxM4zbziOPfrbAemRazZYd_mS9i++bZGcqQ@mail.gmail.com>
+References: <CADysL2bGP_FKW4dnxM4zbziOPfrbAemRazZYd_mS9i++bZGcqQ@mail.gmail.com>
+Message-ID: <20120908101420.GA28448@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 8, 2012 at 5:34 AM, Olof Johansson <olof@lixom.net> wrote:
+On Thu, Jul 05, 2012 at 10:50:17AM +0530, Gupta, Ramesh wrote:
+> + *	flush_iommu_mem(start, end)
+> + *
+> + *		Clean and invalidate the specified virtual address range.
+> + *		This is	to support the non coherent iommu drivers.
+> + *		The iommu driver need to call this api with the page
+> + *		table memory address range to ensure the data held in
+> + *		the cache is visible to the slave processor MMU.
+> + *		- start  - virtual start address
+> + *		- end    - virtual end address
 
->> This <mach/regs-timer.h> is broadcasted in the entire kernel for
->> no good reason, since it's only used by the timer driver. Merge
->> it into the driver.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Actually, it's also included in the watchdog timer that is only
-> enabled on the acs5k defconfigs today, not on the main ks8695 one :(
->
-> drivers/watchdog/ks8695_wdt.c:27:29: fatal error: mach/regs-timer.h:
-> No such file or directory
+I think:
+	iommu_flush_range(start, end)
+or
+	iommu_flush_area(start, size)
+		Perform CPU specific cache operations are required to
+		ensure that the IOMMU page table mappings covering the
+		specified block of memory are visiable to the IOMMU.
 
-OK I'll fix pronto.
+Notice that it's defined by purpose, not by implementation.  Also notice
+the distinction between _range taking two addresses, and _area taking
+a start plus size.
 
-Yours,
-Linus Walleij
+Also notice that it is defined just for IOMMU page tables, not for general
+data for other processors.
+
+Note that iommu_flush_area is safer if your virt_to_phys() are non-linear.
