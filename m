@@ -1,27 +1,28 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 08 Sep 2012 10:24:33 +0200
-Subject: [PATCH 2/3] ARM: EXYNOS: pm_domain: Fix power domain name
- initialization
-In-Reply-To: <CAJuYYwQWEN3FiNwQdugeKRV53cA65WdW79trcmP2kqqOPbz+sg@mail.gmail.com>
-References: <1346924286-9584-1-git-send-email-t.figa@samsung.com>
- <1346924286-9584-3-git-send-email-t.figa@samsung.com>
- <CAJuYYwQWEN3FiNwQdugeKRV53cA65WdW79trcmP2kqqOPbz+sg@mail.gmail.com>
-Message-ID: <3430339.QiHB9nIcXj@flatron>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 8 Sep 2012 13:58:49 +0530
+Subject: [PATCH v3 28/31] arm64: Generic timers support
+In-Reply-To: <1347035226-18649-29-git-send-email-catalin.marinas@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-29-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAMQu2gyLihPnujff6Nq3wzRaX3n+je+4fVfUE_OPVsb_dO14FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Saturday 08 of September 2012 13:37:59 Thomas Abraham wrote:
-> > -               pd->name = np->name;
-> > +               pd->pd.name = kstrdup(np->name, GFP_KERNEL);
-> > +               pd->name = pd->pd.name;
-> 
-> Since device tree blob is always resident, why not just use np->name
-> instead of copying it to a new place?
-
-The problem is that np->name is const, while pd->pd.name is not.
-
---
-Best regards,
-Tomasz Figa
+On Fri, Sep 7, 2012 at 9:57 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+>
+> This patch adds support for the ARM generic timers with A64 instructions
+> for accessing the timer registers. It uses the physical counter as the
+> clock source and the virtual counter as sched_clock.
+>
+> The timer frequency can be specified via DT or read from the CNTFRQ_EL0
+> register. The physical counter is also accessible from user space
+> allowing fast gettimeofday() implementation.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ---
+Thanks for C3STOP update.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
