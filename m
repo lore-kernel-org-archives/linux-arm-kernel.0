@@ -1,52 +1,59 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 07 Sep 2012 18:39:36 -0600
-Subject: [PATCH 0/6] ARM: OMAP2+: clean up the Makefile
-Message-ID: <20120908002614.4648.31150.stgit@dusk.lan>
+Date: Fri, 07 Sep 2012 18:39:48 -0600
+Subject: [PATCH 2/6] ARM: OMAP2+: clean up omap_hwmod.o build directives in
+ Makefile
+In-Reply-To: <20120908002614.4648.31150.stgit@dusk.lan>
+References: <20120908002614.4648.31150.stgit@dusk.lan>
+Message-ID: <20120908003938.4648.33787.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series, intended for 3.7 cleanup, cleans up the Makefile in
-arch/arm/mach-omap2.  It places PRCM-related lines in the PRCM
-sections, clock lines in the clock sections, etc.; and fixes some
-formatting and whitespace.  This is meant to serve as a base for
-future cleanups to avoid conflicts as lines get removed.
+Move the omap_hwmod_common_data.o build directive down to the hwmod
+data Makefile section where it belongs.  Move the omap_hwmod.o build
+directive to the top 'Common support' line, since we have no separate
+hwmod code Makefile section, and it's currently needed for all OMAP2+.
 
-Boot and build test logs can be found at:
-
-    http://www.pwsan.com/omap/testlogs/makefile_cleanup_3.7/20120905143119/
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/Makefile |   15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-object size (delta in bytes from test_v3.6-rc4 (4cbe5a555fa58a79b6ecbb6c531b8bab0650778d)):
-  text    data     bss   total  kernel
-     0       0       0       0  2430_testconfig
-     0       0       0       0  5912osk_testconfig
-     0       0       0       0  am33xx_testconfig
-    +8       0       0      +8  n800_b_testconfig
-    +8       0       0      +8  n800_multi_omap2xxx
-    +8       0       0      +8  n800_testconfig
-     0       0       0       0  omap1510_defconfig
-     0       0       0       0  omap1_defconfig
-   +32       0       0     +32  omap2_4_testconfig
-    +8       0       0      +8  omap2plus_defconfig
-   +16       0       0     +16  omap2plus_no_pm
-    -8       0       0      -8  omap3_4_testconfig
-   -56       0       0     -56  omap3_testconfig
-     0       0       0       0  omap4_testconfig
-     0       0       0       0  rmk_omap3430_ldp_oldconfig
-     0       0       0       0  rmk_omap4430_sdp_oldconfig
-
-Paul Walmsley (6):
-      ARM: OMAP2+: clean up whitespace in Makefile
-      ARM: OMAP2+: clean up omap_hwmod.o build directives in Makefile
-      ARM: OMAP2+: move MPU INTCPS, secure monitor, SDRC build directives in Makefile
-      ARM: OMAP2+: clean up OMAP4 PRM & sleep build directives in Makefile
-      ARM: OMAP2+: clean up OMAP clock Makefile sections
-      ARM: OMAP2+: clean up PRCM sections of the Makefile
-
-
- arch/arm/mach-omap2/Makefile |  108 +++++++++++++++++-------------------------
- 1 file changed, 44 insertions(+), 64 deletions(-)
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 22ee340..bdcf508 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -4,20 +4,18 @@
+ 
+ # Common support
+ obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
+-	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o
++	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o
+ 
+ omap-2-3-common				= irq.o
+-hwmod-common				= omap_hwmod.o \
+-					  omap_hwmod_common_data.o
+ clock-common				= clock.o clock_common_data.o \
+ 					  clkt_dpll.o clkt_clksel.o
+ secure-common				= omap-smc.o omap-secure.o
+ 
+-obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
+-obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
+-obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
+-obj-$(CONFIG_SOC_AM33XX) += irq.o $(hwmod-common)
+-obj-$(CONFIG_SOC_OMAP5)	 += prm44xx.o $(hwmod-common) $(secure-common)
++obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common)
++obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(secure-common)
++obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(secure-common)
++obj-$(CONFIG_SOC_AM33XX) += irq.o
++obj-$(CONFIG_SOC_OMAP5)	 += prm44xx.o $(secure-common)
+ 
+ ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
+ obj-y += mcbsp.o
+@@ -181,6 +179,7 @@ obj-$(CONFIG_SOC_OMAP2420)		+= opp2420_data.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= opp2430_data.o
+ 
+ # hwmod data
++obj-y					+= omap_hwmod_common_data.o
+ obj-$(CONFIG_SOC_OMAP2420)		+= omap_hwmod_2xxx_ipblock_data.o
+ obj-$(CONFIG_SOC_OMAP2420)		+= omap_hwmod_2xxx_3xxx_ipblock_data.o
+ obj-$(CONFIG_SOC_OMAP2420)		+= omap_hwmod_2xxx_interconnect_data.o
