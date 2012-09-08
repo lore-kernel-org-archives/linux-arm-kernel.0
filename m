@@ -1,49 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 08 Sep 2012 12:03:29 +0900
-Subject: [PATCH 0/3] ARM: dts: Exynos4 dts reorganization
-In-Reply-To: <CAJuYYwRWqvzw_MdLa7NfE9ppbPiz8=HTXUW+-mXedvu2GPQWBg@mail.gmail.com>
-References: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
- <CAJuYYwRWqvzw_MdLa7NfE9ppbPiz8=HTXUW+-mXedvu2GPQWBg@mail.gmail.com>
-Message-ID: <24de01cd8d6e$860fe500$922faf00$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 8 Sep 2012 04:12:38 +0100
+Subject: [PATCHv2 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <1346844964-24839-1-git-send-email-sourav.poddar@ti.com>
+References: <1346844964-24839-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120908031237.GA31018@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> On 3 September 2012 18:04, Tomasz Figa <t.figa@samsung.com> wrote:
-> > This patch series prepares existing Exynos4210 DT infrastructure to be
-> > further extended for new SoCs from Exynos4 line and new boards.
-> >
-> > Tomasz Figa (3):
-> >   ARM: dts: Move parts common to Exynos4 from Exynos4210.dtsi to
-> >     Exynos4.dtsi
-> >   ARM: EXYNOS: exynos4-dt: Use exynos4 prefix instead of exynos4210
-> >   ARM: dts: exynos4: Assume status of all optional nodes as disabled
-> >
-> >  arch/arm/boot/dts/exynos4.dtsi            | 232
-> ++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/exynos4210-origen.dts   |  58 +-------
-> >  arch/arm/boot/dts/exynos4210-smdkv310.dts |  52 +------
-> >  arch/arm/boot/dts/exynos4210.dtsi         | 181 +----------------------
-> >  arch/arm/mach-exynos/mach-exynos4-dt.c    |  18 +--
-> >  5 files changed, 248 insertions(+), 293 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/exynos4.dtsi
-> >
-> 
-> Thanks, we can build Exynos4412 device tree support on top of this series.
-> 
-> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+On Wed, Sep 05, 2012 at 05:06:04PM +0530, Sourav Poddar wrote:
 
-Thomas, thanks for your ack on this series and I'm OK on this series.
+> +static struct regmap_config smsc_regmap_config = {
+> +		.reg_bits = 8,
+> +		.val_bits = 8,
+> +		.max_register = SMSC_MAX_REGISTER - 1;
 
-But you know, Donjin Kim submitted almost same patch except gpio stuff one
-month before this series but needs to update something though. So would be
-nice if either Tomasz or Dongjin could ack on the other patch?
+That max_register setup looks very odd...
 
-Thanks.
+> +		.cache_type = REGCACHE_COMPRESSED,
+> +};
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Are you sure the compressed type is sensible?  It would normally only
+make sense with a large number of closely packed registers but this
+device has 8 bit register values.
+
+> +#ifdef CONFIG_OF
+> +	of_property_read_u32(node, "clock", &smsc->clk);
+> +#endif
+
+> +	ret = regmap_write(smsc->regmap, SMSC_CLK_CTRL, smsc->clk);
+> +	if (ret)
+> +		goto err;
+
+What happens on non-DT systems?
+
+> +static int smsc_i2c_remove(struct i2c_client *i2c)
+> +{
+> +	return 0;
+> +}
+
+Remove empty functions, though it's rather surprising that there's
+nothing at all to do here..  Normally an MFD would at least remove its
+children.
