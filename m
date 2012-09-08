@@ -1,42 +1,36 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 8 Sep 2012 13:37:59 +0530
-Subject: [PATCH 2/3] ARM: EXYNOS: pm_domain: Fix power domain name
- initialization
-In-Reply-To: <1346924286-9584-3-git-send-email-t.figa@samsung.com>
-References: <1346924286-9584-1-git-send-email-t.figa@samsung.com>
- <1346924286-9584-3-git-send-email-t.figa@samsung.com>
-Message-ID: <CAJuYYwQWEN3FiNwQdugeKRV53cA65WdW79trcmP2kqqOPbz+sg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 08 Sep 2012 10:15:29 +0200
+Subject: [PATCH v2 4/5] ARM: EXYNOS: Increase maximum possible memory bank
+ size to 512MiB
+In-Reply-To: <24dc01cd8d6b$7426cf50$5c746df0$%kim@samsung.com>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1346748609-11115-5-git-send-email-t.figa@samsung.com>
+ <24dc01cd8d6b$7426cf50$5c746df0$%kim@samsung.com>
+Message-ID: <1796354.EpclCk5CFg@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2012 15:08, Tomasz Figa <t.figa@samsung.com> wrote:
-> This patch adds initialization of name field in generic power domain
-> struct.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm_domains.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index d1abc1a..5b7ce7e 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -98,7 +98,8 @@ static __init int exynos_pm_dt_parse_domains(void)
->                         return -ENOMEM;
->                 }
->
-> -               pd->name = np->name;
-> +               pd->pd.name = kstrdup(np->name, GFP_KERNEL);
-> +               pd->name = pd->pd.name;
+Hi Kgene,
 
-Since device tree blob is always resident, why not just use np->name
-instead of copying it to a new place?
+On Saturday 08 of September 2012 11:41:31 Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > Some boards have larger memory banks than 256MiB. This patch increses
+> > maximum bank size for Exynos-based boards to 512MiB.
+> 
+> Well...the meaning of SECTION_SIZE_BITS is a little bit different you
+> know.
+> 
+> Please refer to following thread.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020184.ht
+> ml
 
->                 pd->base = of_iomap(np, 0);
->                 pd->pd.power_off = exynos_pd_power_off;
->                 pd->pd.power_on = exynos_pd_power_on;
-> --
-> 1.7.12
->
+Well, I agree, but the effect of this patch is that it is possible to have 
+first bank (or rather section) up to 512MiB, in case of CONFIG_SPARSEMEM.
+
+Still, we could go the other way and just define more smaller sections 
+instead and simply drop this patch. (Assuming that the correspondence of 
+sections and memory banks is irrelevant.)
+
+--
+Best regards,
+Tomasz Figa
