@@ -1,64 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 08 Sep 2012 11:47:15 +0900
-Subject: [PATCH v2 5/5] ARM: Exynos: Add basic dts file for Samsung Trats
- board
-In-Reply-To: <3039444.Ol4zGlGWJ2@flatron>
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1346748609-11115-6-git-send-email-t.figa@samsung.com>
- <CAJuYYwTV1giNYJ7RTz=DHqK=i6FD2GsV4rNY2p5scVAnQz0kdg@mail.gmail.com>
- <3039444.Ol4zGlGWJ2@flatron>
-Message-ID: <24dd01cd8d6c$41586970$c4093c50$%kim@samsung.com>
+Date: Sat, 08 Sep 2012 12:03:29 +0900
+Subject: [PATCH 0/3] ARM: dts: Exynos4 dts reorganization
+In-Reply-To: <CAJuYYwRWqvzw_MdLa7NfE9ppbPiz8=HTXUW+-mXedvu2GPQWBg@mail.gmail.com>
+References: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
+ <CAJuYYwRWqvzw_MdLa7NfE9ppbPiz8=HTXUW+-mXedvu2GPQWBg@mail.gmail.com>
+Message-ID: <24de01cd8d6e$860fe500$922faf00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Thomas Abraham wrote:
 > 
-> Hi,
-> 
-> Thanks for reviewing the patch.
-> 
-> On Wednesday 05 of September 2012 09:35:49 Thomas Abraham wrote:
-> > > +
-> > > +       memory {
-> > > +               reg =  <0x40000000 0x20000000
-> > > +                       0x60000000 0x20000000>;
-> > > +       };
+> On 3 September 2012 18:04, Tomasz Figa <t.figa@samsung.com> wrote:
+> > This patch series prepares existing Exynos4210 DT infrastructure to be
+> > further extended for new SoCs from Exynos4 line and new boards.
 > >
-> > Why does this have to be split. Why not have a single entry with the
-> > size as 0x40000000?
-> 
-> The memory node corresponds to struct meminfo and each entry (with two
-> values) makes one struct membank defining a memory bank.
-> 
-Well...
-
-> I've been talking with Kyungmin about this. Originally bootloaders used to
-> report 4 banks of 256 MiB, but it turned out that real bank configuration
-> on Trats is 2 banks of 512 MiB.
-> 
-I think, following should ok here.
-
-memory {
-	reg = <0x40000000 0x40000000>;
-};
-
-> I'm not into memory management internals, so I don't know if this has any
-> significance, but I defined the node to represent the real configuration
-> (otherwise I would have probably used 4 banks of 256 MiB and drop the 4th
-> patch).
-> 
-> > > +               max8997_pmic at 66 {
-> > > +                       compatible = "maxim,max8997-pmic";
-> > > +
-> > > +                       reg = <0x66>;
+> > Tomasz Figa (3):
+> >   ARM: dts: Move parts common to Exynos4 from Exynos4210.dtsi to
+> >     Exynos4.dtsi
+> >   ARM: EXYNOS: exynos4-dt: Use exynos4 prefix instead of exynos4210
+> >   ARM: dts: exynos4: Assume status of all optional nodes as disabled
 > >
-> > Probably, the interrupts can be listed when we have pinctrl driver
-> > merged in Samsung tree.
+> >  arch/arm/boot/dts/exynos4.dtsi            | 232
+> ++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/exynos4210-origen.dts   |  58 +-------
+> >  arch/arm/boot/dts/exynos4210-smdkv310.dts |  52 +------
+> >  arch/arm/boot/dts/exynos4210.dtsi         | 181 +----------------------
+> >  arch/arm/mach-exynos/mach-exynos4-dt.c    |  18 +--
+> >  5 files changed, 248 insertions(+), 293 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/exynos4.dtsi
 > >
 > 
-> Right.
+> Thanks, we can build Exynos4412 device tree support on top of this series.
 > 
-Note, you can do it on top of samsung tree :-)
+> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+
+Thomas, thanks for your ack on this series and I'm OK on this series.
+
+But you know, Donjin Kim submitted almost same patch except gpio stuff one
+month before this series but needs to update something though. So would be
+nice if either Tomasz or Dongjin could ack on the other patch?
 
 Thanks.
 
