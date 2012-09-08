@@ -1,45 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 08 Sep 2012 14:48:35 +0530
-Subject: [PATCH v3 00/31] AArch64 Linux kernel port
-In-Reply-To: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <504B0D6B.9010908@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 8 Sep 2012 11:45:58 +0200
+Subject: [PATCH 1/4] ARM: ks-8695: merge the timer header into the timer
+ driver
+In-Reply-To: <CAOesGMiyd8xnXSMbeHXEed7r-PR2CnNcp=nMA3W5sM6Q-3p1xw@mail.gmail.com>
+References: <1346264802-20306-1-git-send-email-linus.walleij@linaro.org>
+ <CAOesGMiyd8xnXSMbeHXEed7r-PR2CnNcp=nMA3W5sM6Q-3p1xw@mail.gmail.com>
+Message-ID: <CACRpkdZZdMf07ayGSZ4FBz3hL-LXEqKnsfhwVQMXoYwqGM7SbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
+On Sat, Sep 8, 2012 at 5:34 AM, Olof Johansson <olof@lixom.net> wrote:
 
-On Friday 07 September 2012 09:56 PM, Catalin Marinas wrote:
-> This is the 3rd version of patches implementing Linux kernel support for
-> the 64-bit ARM architecture. Most of the review comments for the
-> previous release have been implemented. There are a few left (like
-> generic timer dts specification) but the main goal was to freeze the
-> user ABI.
+>> This <mach/regs-timer.h> is broadcasted in the entire kernel for
+>> no good reason, since it's only used by the timer driver. Merge
+>> it into the driver.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> The Linux kernel patches are available on this tree:
+> Actually, it's also included in the watchdog timer that is only
+> enabled on the acs5k defconfigs today, not on the main ks8695 one :(
 >
-Firstly thanks for clarifying the questions asked on the previous
-version and also for the update on the arch timer code.
+> drivers/watchdog/ks8695_wdt.c:27:29: fatal error: mach/regs-timer.h:
+> No such file or directory
 
-Mostly I was looking at the series from SOC boot and CPU PM
-point of view and boot part seems to just fine.
+OK I'll fix pronto.
 
-As per discussion at LPC, I have gone through the SMC
-proposal which ARM has published. In general the boot part
-with SMC seems to be doable and can be standardized across SOCs.
-The part which will be conflicting is the CPU power management.
-That seems to be the harder one and the document is at too
-infancy stage from the details point of view. Some bits about
-save, restore are related to switcher kind of architecture, which
-may not be the requirement for all the SoCs.
-
-Ofcourse the SMC discussion is not related to $subject series
-as such. Also the PM support for ARMv8 not seems be the scope
-of the series so the discussion can be parked aside till we
-need to talk about it. I have few more questions on the various
-MM attribute usage, exceptions and PL's but I will do some
-reading before asking those to you.
-
-For the series itself, feel free to add my ack if yo
-need one.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Yours,
+Linus Walleij
