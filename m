@@ -1,24 +1,64 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 08 Sep 2012 11:41:31 +0900
-Subject: [PATCH v2 4/5] ARM: EXYNOS: Increase maximum possible memory bank
- size to 512MiB
-In-Reply-To: <1346748609-11115-5-git-send-email-t.figa@samsung.com>
+Date: Sat, 08 Sep 2012 11:47:15 +0900
+Subject: [PATCH v2 5/5] ARM: Exynos: Add basic dts file for Samsung Trats
+ board
+In-Reply-To: <3039444.Ol4zGlGWJ2@flatron>
 References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1346748609-11115-5-git-send-email-t.figa@samsung.com>
-Message-ID: <24dc01cd8d6b$7426cf50$5c746df0$%kim@samsung.com>
+ <1346748609-11115-6-git-send-email-t.figa@samsung.com>
+ <CAJuYYwTV1giNYJ7RTz=DHqK=i6FD2GsV4rNY2p5scVAnQz0kdg@mail.gmail.com>
+ <3039444.Ol4zGlGWJ2@flatron>
+Message-ID: <24dd01cd8d6c$41586970$c4093c50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tomasz Figa wrote:
 > 
-> Some boards have larger memory banks than 256MiB. This patch increses
-> maximum bank size for Exynos-based boards to 512MiB.
+> Hi,
 > 
-Well...the meaning of SECTION_SIZE_BITS is a little bit different you know.
+> Thanks for reviewing the patch.
+> 
+> On Wednesday 05 of September 2012 09:35:49 Thomas Abraham wrote:
+> > > +
+> > > +       memory {
+> > > +               reg =  <0x40000000 0x20000000
+> > > +                       0x60000000 0x20000000>;
+> > > +       };
+> >
+> > Why does this have to be split. Why not have a single entry with the
+> > size as 0x40000000?
+> 
+> The memory node corresponds to struct meminfo and each entry (with two
+> values) makes one struct membank defining a memory bank.
+> 
+Well...
 
-Please refer to following thread.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020184.html
+> I've been talking with Kyungmin about this. Originally bootloaders used to
+> report 4 banks of 256 MiB, but it turned out that real bank configuration
+> on Trats is 2 banks of 512 MiB.
+> 
+I think, following should ok here.
 
+memory {
+	reg = <0x40000000 0x40000000>;
+};
+
+> I'm not into memory management internals, so I don't know if this has any
+> significance, but I defined the node to represent the real configuration
+> (otherwise I would have probably used 4 banks of 256 MiB and drop the 4th
+> patch).
+> 
+> > > +               max8997_pmic at 66 {
+> > > +                       compatible = "maxim,max8997-pmic";
+> > > +
+> > > +                       reg = <0x66>;
+> >
+> > Probably, the interrupts can be listed when we have pinctrl driver
+> > merged in Samsung tree.
+> >
+> 
+> Right.
+> 
+Note, you can do it on top of samsung tree :-)
 
 Thanks.
 
@@ -27,28 +67,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/include/mach/memory.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-
-> exynos/include/mach/memory.h
-> index 374ef2c..d4db508 100644
-> --- a/arch/arm/mach-exynos/include/mach/memory.h
-> +++ b/arch/arm/mach-exynos/include/mach/memory.h
-> @@ -15,8 +15,8 @@
-> 
->  #define PLAT_PHYS_OFFSET		UL(0x40000000)
-> 
-> -/* Maximum of 256MiB in one bank */
-> +/* Maximum of 512MiB in one bank */
->  #define MAX_PHYSMEM_BITS	32
-> -#define SECTION_SIZE_BITS	28
-> +#define SECTION_SIZE_BITS	29
-> 
->  #endif /* __ASM_ARCH_MEMORY_H */
-> --
-> 1.7.12
