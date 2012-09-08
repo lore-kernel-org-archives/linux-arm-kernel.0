@@ -1,38 +1,36 @@
-From: simon@fire.lp0.eu (Simon Arlott)
-Date: Sat, 08 Sep 2012 13:37:01 +0100
-Subject: [PATCH V2] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <1347083284-17799-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347083284-17799-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <504B3BED.9080204@simon.arlott.org.uk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 8 Sep 2012 20:12:31 +0530
+Subject: [PATCH v3 00/31] AArch64 Linux kernel port
+In-Reply-To: <alpine.LFD.2.02.1209080950170.28681@xanadu.home>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <504B0D6B.9010908@ti.com> <alpine.LFD.2.02.1209080950170.28681@xanadu.home>
+Message-ID: <CAMQu2gzEWf_T0MjOMZgDUiEUa8J5bEmmwHxQd61SCjSXe-==1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/12 06:48, Stephen Warren wrote:
-> +void __init bcm2708_init_irq(void)
-> +{
-> +}
-...
-> +static void __init bcm2708_timer_init(void)
-> +{
-> +}
+On Sat, Sep 8, 2012 at 7:29 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Sat, 8 Sep 2012, Santosh Shilimkar wrote:
+>
+>> Mostly I was looking at the series from SOC boot and CPU PM
+>> point of view and boot part seems to just fine.
+>>
+>> As per discussion at LPC, I have gone through the SMC
+>> proposal which ARM has published. In general the boot part
+>> with SMC seems to be doable and can be standardized across SOCs.
+>> The part which will be conflicting is the CPU power management.
+>> That seems to be the harder one and the document is at too
+>> infancy stage from the details point of view. Some bits about
+>> save, restore are related to switcher kind of architecture, which
+>> may not be the requirement for all the SoCs.
+>
+> I've reviewed an earlier draft of that document.  Although the examples
+> in the latest document appear to be geared towards switcher usage, my
+> suggestions to the ARM folks was to take into account the CPU hotplug
+> scenario instead.  The provided examples remained switcher centric, but
+> the API in the published document is now much more generic than it used
+> to be.  I think it should cover all usage scenarios now.
+>
+Thanks for the background Nicolas.
 
-There's no timer and no interrupt handler so it won't even finish
-booting. It's going to stall when it tries to calculate loops per jiffy.
-
-I don't know what you're trying to achieve. This does not add support
-for the BCM2708.
-
-See https://github.com/lp0/linux/commits/rpi-split from June 21 onwards
-for separate patch commits that apply to specific devices.
-
-
-On 08/09/12 06:48, Stephen Warren wrote:
-> v2:
-> * Rename *_BASE to *_PHYS to match Simon's rpi-split branch.
-
-You've definitely used the rpi-linear branch if you're missing things.
-The HEAD of the two branches is identical but rpi-split has a rebased
-history.
-
--- 
-Simon Arlott
+Regards,
+Santosh
