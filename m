@@ -1,64 +1,49 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 07 Sep 2012 18:39:56 -0600
-Subject: [PATCH 5/6] ARM: OMAP2+: clean up OMAP clock Makefile sections
-In-Reply-To: <20120908002614.4648.31150.stgit@dusk.lan>
-References: <20120908002614.4648.31150.stgit@dusk.lan>
-Message-ID: <20120908003954.4648.5528.stgit@dusk.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 07 Sep 2012 17:49:37 -0700
+Subject: [PATCH 8/9] ARM: msm: Add DT support for 8960
+In-Reply-To: <20120907225853.GA21585@codeaurora.org>
+References: <1346873339-10927-1-git-send-email-sboyd@codeaurora.org>
+ <1346873339-10927-9-git-send-email-sboyd@codeaurora.org>
+ <20120907225853.GA21585@codeaurora.org>
+Message-ID: <504A9621.8020301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean up the OMAP clock code sections of the Makefile to save
-some lines of diff.
+On 09/07/12 15:58, David Brown wrote:
+> On Wed, Sep 05, 2012 at 12:28:58PM -0700, Stephen Boyd wrote:
+>
+>> +DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
+> The description string should specify the general name of what this is
+> suspporting.  Right now, with these patches, it would list
+>
+>   Qualcomm MSM (Flattened Device Tree)
+>
+> twice as the two targets we support (and isn't helpful when you see
+> which one it picks).  I'd put the "MSM" name by itself without
+> thinking about it too much.  It wasn't that confusing, since there was
+> only one at the time.
+>
+> Perhaps make the 8660 one "Qualcomm MSM8660 (Flattened Device Tree)"
+> and the 8960 one "Qualcomm MSM8960 (Flattened Device Tree)"
+>
+> I realize that the chip numbers are a bit confusing, so probably best
+> to pick a canonical name for the description.
+>
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/Makefile |   21 ++++++++-------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
+I think we don't need to do anything. Basically machine name is always
+"Qualcomm MSM (Flattened Device Tree)" but then the model name in the
+devicetree blob says a more descriptive value "Qualcomm MSM8960 CDP" or
+"Qualcomm MSM8660 SURF", etc. All this info is printed in the kernel log
+upon boot:
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index e9de8d2..89e0daf 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -6,9 +6,6 @@
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
- 	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o
- 
--clock-common				= clock.o clock_common_data.o \
--					  clkt_dpll.o clkt_clksel.o
--
- # INTCPS IP block support - XXX should be moved to drivers/
- obj-$(CONFIG_ARCH_OMAP2)		+= irq.o
- obj-$(CONFIG_ARCH_OMAP3)		+= irq.o
-@@ -155,24 +152,22 @@ obj-$(CONFIG_SOC_OMAP5)			+= $(clockdomain-common)
- obj-$(CONFIG_SOC_OMAP5)			+= clockdomain44xx.o
- 
- # Clock framework
--obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o
--obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_sys.o
--obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpllcore.o
-+obj-y					+= clock.o clock_common_data.o \
-+					   clkt_dpll.o clkt_clksel.o
-+obj-$(CONFIG_ARCH_OMAP2)		+= clock2xxx.o
-+obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpllcore.o clkt2xxx_sys.o
- obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_virt_prcm_set.o
- obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_apll.o clkt2xxx_osc.o
- obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpll.o clkt_iclk.o
- obj-$(CONFIG_SOC_OMAP2420)		+= clock2420_data.o
- obj-$(CONFIG_SOC_OMAP2430)		+= clock2430.o clock2430_data.o
--obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= clock3xxx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o clkt34xx_dpll3m2.o
--obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o clock36xx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o clock36xx.o clkt_iclk.o
- obj-$(CONFIG_ARCH_OMAP3)		+= dpll3xxx.o clock3xxx_data.o
--obj-$(CONFIG_ARCH_OMAP3)		+= clkt_iclk.o
--obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common) clock44xx_data.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= clock44xx_data.o
- obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o dpll44xx.o
--obj-$(CONFIG_SOC_AM33XX)		+= $(clock-common) dpll3xxx.o
--obj-$(CONFIG_SOC_AM33XX)		+= clock33xx_data.o
--obj-$(CONFIG_SOC_OMAP5)			+= $(clock-common)
-+obj-$(CONFIG_SOC_AM33XX)		+= dpll3xxx.o clock33xx_data.o
- obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o dpll44xx.o
- 
- # OMAP2 clock rate set data (old "OPP" data)
+[    0.000000] Machine: Qualcomm MSM (Flattened Device Tree), model: Qualcomm MSM8960 CDP
+
+
+In fact, it should be possible to put the two dt board files together at
+some point if we can somehow drive the map_io routine from devicetree.
+In this case we could even have the same machine descriptor used for
+both machines.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
