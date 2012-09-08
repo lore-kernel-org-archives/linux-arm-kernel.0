@@ -1,23 +1,23 @@
-From: popcornmix@gmail.com (popcornmix)
-Date: Sat, 8 Sep 2012 18:53:07 +0100
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <504B84E3.1030709@wwwdotorg.org>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
- <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
- <50491F65.2020302@simon.arlott.org.uk>
- <CAEi1pCTvXTbbNX8iDDKB_YtRTVeiSqf9y_cO2AjqtDCdBbK7qA@mail.gmail.com>
- <504B84E3.1030709@wwwdotorg.org>
-Message-ID: <CAEi1pCSvk9y2jixTJH4QCNiPGidb_H6kNBNoVXuZY7u-a-Zf5A@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 8 Sep 2012 20:09:45 +0200
+Subject: sata_mv hangs up while probing on LaCie Kirkwood boards
+In-Reply-To: <20120908165050.GA31897@kw.sim.vm.gnt>
+References: <20120908165050.GA31897@kw.sim.vm.gnt>
+Message-ID: <20120908180945.GB3451@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 8, 2012 at 6:48 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> Popcornmix, I notice that a number of commits in Simon's repo are
-> Signed-off-by yourself. However, those S-o-b tags use the alias
-> "popcornmix" rather than your real name, and hence aren't considered
-> valid by upstream. It'd be great if you could give your permission to
-> Simon to rebase his branch and update all those tags with your real
-> name, or give others permission to rewrite your existing S-o-b tags with
-> your real name when taking those patches and sending them upstream.
+On Sat, Sep 08, 2012 at 06:50:51PM +0200, Simon Guinot wrote:
+> Hi,
+> 
+> I have noticed recently that Linux 3.6.0-rc* hangs up while booting on
+> LaCie Kirkwood-based boards. I have only tested on Network Space v2 and
+> 2Big Network v2 boards.
 
-No problem. Permission is granted to change the alias popcornmix to Dom Cobley.
+Yes, I do hope the fix for this hits -rc sometime soon.
+
+http://www.spinics.net/lists/arm-kernel/msg189311.html
+
+Add "coherent_pool=1M" to the kernel parameters.
+
+    Andrew
