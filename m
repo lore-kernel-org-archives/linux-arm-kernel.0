@@ -1,41 +1,65 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 08 Sep 2012 09:59:40 -0400 (EDT)
-Subject: [PATCH v3 00/31] AArch64 Linux kernel port
-In-Reply-To: <504B0D6B.9010908@ti.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <504B0D6B.9010908@ti.com>
-Message-ID: <alpine.LFD.2.02.1209080950170.28681@xanadu.home>
+From: mpthompson@gmail.com (Mike Thompson)
+Date: Sat, 8 Sep 2012 09:17:42 -0700
+Subject: Tracking down suspend/resume ext3/mmc issues on imx233
+In-Reply-To: <20120907060552.GL26709@S2101-09.ap.freescale.net>
+References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+ <20120907060552.GL26709@S2101-09.ap.freescale.net>
+Message-ID: <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 8 Sep 2012, Santosh Shilimkar wrote:
+I figured the source of my problem.  Normally, the Linux kernel will
+treat mmc cards as removed during suspend.  This is in case the card
+is swapped by the user during the suspend.  However, on the OLinuXino
+the mmc device is the root file system  If the Linux kernel treats the
+mmc card as removed the frozen tasks with open file handles to the
+root filesystem device (such as the journal tasks) will fail when they
+are thawed during resume.  This is the problem I was seeing.
 
-> Mostly I was looking at the series from SOC boot and CPU PM
-> point of view and boot part seems to just fine.
-> 
-> As per discussion at LPC, I have gone through the SMC
-> proposal which ARM has published. In general the boot part
-> with SMC seems to be doable and can be standardized across SOCs.
-> The part which will be conflicting is the CPU power management.
-> That seems to be the harder one and the document is at too
-> infancy stage from the details point of view. Some bits about
-> save, restore are related to switcher kind of architecture, which
-> may not be the requirement for all the SoCs.
+Fortunately, there is already a specific kernel config setting
+CONFIG_MMC_UNSAFE_RESUME that needs to be set for systems such as the
+OLinuXino that uses the mmc device for the root filesystem.  I
+overlooked this config setting and spent half a day trying to figure
+out the source of the file system errors on resume.  Next time I'll do
+a better job of looking through related config settings before trying
+to debug an issue that is probably already dealt with.
 
-I've reviewed an earlier draft of that document.  Although the examples 
-in the latest document appear to be geared towards switcher usage, my 
-suggestions to the ARM folks was to take into account the CPU hotplug 
-scenario instead.  The provided examples remained switcher centric, but 
-the API in the published document is now much more generic than it used 
-to be.  I think it should cover all usage scenarios now.
+Mike
 
-> Ofcourse the SMC discussion is not related to $subject series
-> as such. Also the PM support for ARMv8 not seems be the scope
-> of the series so the discussion can be parked aside till we
-> need to talk about it.
-
-If you wish to discuss this further (maybe in a separate thread) I'll be 
-glad to discuss this with you.
-
-
-Nicolas
+On Thu, Sep 6, 2012 at 11:05 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Copy a few more lists to get wider audience ...
+>
+> Regards,
+> Shawn
+>
+> On Thu, Sep 06, 2012 at 10:03:35PM -0700, Mike Thompson wrote:
+>> I'm working on adding power management support for the imx233 on
+>> 3.6-rc2.  In general I'm working on porting the pm.c file from the
+>> Freescale 2.6.35 kernel for both "standby" and "mem" suspend/resume.
+>> I'm making pretty good progress on porting the code, but I'm running
+>> into an issue outside the immediate code I'm working on.
+>>
+>> ...
+>>
+>> The first reported error is in the ext3 filesystem buffer code where
+>> the file system buffers aren't being filled by the underlying block
+>> device.  At least that's how I'm interpreting the portion of the ext3
+>> file system code that is failing.  However, the mmc device is
+>> correctly reporting finding p1 and p2 partitions on the device which
+>> it would indicate the partition data is being read from the SD card.
+>>
+>> I'm hoping others might have suggestions on how I should go about
+>> tracking down why the ext3 file system can no longer read from the mmc
+>> device upon resume.  For instance, useful places to put some tracing
+>> code to understand what might be failing, or how to determine what
+>> differences there might be before suspend and after resume that might
+>> point to the failure.
+>>
+>> Thanks,
+>>
+>> Mike Thompson
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
