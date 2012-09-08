@@ -1,35 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Sep 2012 01:04:30 +0100
-Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <504A848B.1090703@wwwdotorg.org>
-References: <50201E1D.5060200@wwwdotorg.org>
- <20120813174003.GA2527@avionic-0098.mockup.avionic-design.de>
- <50294BCA.1070807@wwwdotorg.org>
- <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
- <502AA96B.2050709@wwwdotorg.org>
- <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
- <CAErSpo4Bm_Ryx=OK+svjqAwD4N8v0vrheLVdc-N1ijx8i_-N3w@mail.gmail.com>
- <502AD82F.3080702@wwwdotorg.org> <502AE485.8060307@wwwdotorg.org>
- <504A848B.1090703@wwwdotorg.org>
-Message-ID: <20120908000430.GF13739@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 8 Sep 2012 09:10:26 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: SoC for 3.7
+In-Reply-To: <20120907214951.GA2766@quad.lixom.net>
+References: <1346896928-5750-1-git-send-email-horms@verge.net.au>
+ <20120907214951.GA2766@quad.lixom.net>
+Message-ID: <20120908001024.GA28510@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 05:34:35PM -0600, Stephen Warren wrote:
-> I guess it's a pretty basic premise of the current PCI code that all the
-> PCI scanning happens well before any device drivers are registered,
-> which in turn means that device_add() doesn't trigger the device's
-> probe() until much later, after all the fixups and resource assignments
-> are done?
+On Fri, Sep 07, 2012 at 02:49:51PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Thu, Sep 06, 2012 at 11:02:07AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Arnd,
+> > 
+> > please consider the following SoC enhancement from
+> > Phil Edworthy for inclusion in 3.7.
+> > 
+> > ----------------------------------------------------------------
+> > The following changes since commit 7952717adb69efc1d2443a1858f96d23c2fb93e0:
+> > 
+> >   ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
+> 
+> The above is based on the previous branch we pulled from you (kzm9g), and
+> contains a patch to support rebooting of a board. I would have expected that to
+> be the base for your board branch but not the SoC branch.
+> 
+> Did you mean to base them like this for some other reason that I didn't
+> realize, or would you mind switching the two branches so that the board
+> one includes the restart change but not the other way around?
 
-Are you saying that the PCI layer is again screwed up after all my
-hard work several years ago to ensure that PCI devices are properly
-setup _before_ they're made available to the PCI drivers then?  That
-was around the time I was looking at Cardbus stuff, ensuring that that
-worked with the same guarantees.
-
-Not amused.
-
-What is wrong with the "probe devices, apply fixups, setup resources,
-apply more fixups, publish" process that it's had to be yet again
-broken?
+Sorry about that, I'll switch things around.
