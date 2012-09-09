@@ -1,62 +1,38 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Sun, 9 Sep 2012 14:40:25 +1000
-Subject: [PATCH] ARM: ks8695: add board support for the OpenGear boards
- based on the KS8695
-In-Reply-To: <CAOesGMiixufaORkZcabnYRyCWHcG6KT4Q0if3+-PZrUUpprCNg@mail.gmail.com>
-References: <1346996139-5692-1-git-send-email-gerg@snapgear.com>
- <201209071221.56938.arnd@arndb.de>
- <CAOesGMiixufaORkZcabnYRyCWHcG6KT4Q0if3+-PZrUUpprCNg@mail.gmail.com>
-Message-ID: <504C1DB9.2020305@snapgear.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun,  9 Sep 2012 10:12:28 +0200
+Subject: [PATCH] ARM: mark kernelmode mem{cpy,set} non-experimental
+Message-ID: <1347178348-9522-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+This feature was added in 2009, I've been using it off and on and
+never had any problems with it on my systems. I cannot see why
+it needs to be marked experimental, make it a normal feature and
+let us discover its possible shortcomings as people try to turn
+it on instead.
 
-On 09/08/2012 01:20 PM, Olof Johansson wrote:
-> On Fri, Sep 7, 2012 at 5:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Friday 07 September 2012, gerg at snapgear.com wrote:
->>> From: Greg Ungerer <gerg@uclinux.org>
->>>
->>> A number of boards produced by OpenGear and based on the Micrel KS8695 SoC.
->>> Add board support to the KS8695 kernel code to support them.
->>>
->>> The following machine type entries will need to be added back into the
->>> mach-types file with these in mainline:
->>>
->>>      cm4008      MACH_CM4008       CM4008       624
->>>      cm41xx      MACH_CM41XX       CM41XX       672
->>>      cm4002      MACH_CM4002       CM4002       876
->>>      im42xx      MACH_IM42XX       IM42XX       1105
->>>      im4004      MACH_IM4004       IM4004       1400
->>>
->>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
->
-> Both patches applied to a ks8695/boards branch, part of next/boards in arm-soc.
->
-> Greg, you should submit separate patch to add the machine types to
-> Russell's patch tracker.
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yep, I'll create some patches for those.
-
-
-> We are of course looking forward to efforts
-> to move these platforms to device tree, since we want to avoid adding
-> non-dt boards from here on out.
-
-Yes that would be nice. I am not sure when I will have some time
-to take that on. But hopefully sometime soon.
-
-Regards
-Greg
-
-
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2f88d8d..e040b47 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1849,8 +1849,8 @@ config ALIGNMENT_TRAP
+ 	  configuration it is safe to say N, otherwise say Y.
+ 
+ config UACCESS_WITH_MEMCPY
+-	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user() (EXPERIMENTAL)"
+-	depends on MMU && EXPERIMENTAL
++	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user()"
++	depends on MMU
+ 	default y if CPU_FEROCEON
+ 	help
+ 	  Implement faster copy_to_user and clear_user methods for CPU
 -- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+1.7.11.4
