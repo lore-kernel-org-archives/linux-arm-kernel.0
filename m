@@ -1,51 +1,46 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Sun, 09 Sep 2012 10:46:34 +0200
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <1729018.3VWhxcipzn@wuerfel>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
- <201209061546.45242.arnd@arndb.de>
- <20120908215609.GH13739@n2100.arm.linux.org.uk> <1729018.3VWhxcipzn@wuerfel>
-Message-ID: <op.wkc1bwjx2s3iss@ecaz>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 9 Sep 2012 20:08:11 +0800
+Subject: [GIT PULL][for 3.7] pull request of clk branch in arch-pxa git tree
+Message-ID: <CAN1soZzAxZR6245WO8dNHABiKo+frBKW0Tfx1Tk856HCcA0eSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 09 Sep 2012 03:16:54 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Arnd & Olof,
 
-<snip>
+Please help to merge patches from clk branch of arch pxa git tree.
 
->> so in that case I'm not going to know if anything is broken on an IOP32x
->> kernel until that gets rebooted (which it will do soon because I want to
->> change its disks - but hopefully not before 62 days time.)
->
-> I was specifically saying "a port gets started", not "a port is fully
-> working". The example I was thinking of is the mach-cns3xxx, which
-> was introduced in a very minimal state about 2 years ago. The only
-> users I could find on the internet are on OpenWRT, which adds
-> support for an actual board file (upstream only has the evaluation
-> board) as well as SMP, clock, i2c, ethernet, gpio, and a bunch of
-> bug fixes[1]. I'd say we should either find someone who is willing to
-> submit the patches upstream and make sure they work with at least
-> one version, or we can remove what we have today because it's evidently
-> not used.
+The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
 
-For some time now you have to have clocks support to be able to get SMP  
-and co working. Without that and DT it doesn't really make sense to submit  
-those patches.
+  Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
 
-<snip>
+are available in the git repository at:
 
-> * ixp4xx is (as expected) actively used, but a lot of patches are stuck
-> in openwrt[2] and not getting submitted.
-> Greg also submitted a regression fix, Ben Hutchins promised
-> another fix from Debian.
+  git://github.com/hzhuang1/linux.git clk
 
-Mostly the same as above. Don't forget that DT support will essentially  
-get rid of all separate board support files, so those patches will have to  
-be translated to dts files instead.
+for you to fetch changes up to 7f744b17140af1a9c8804a1c81c9dae6bb52a7fb:
 
-Since I'm doing all the OpenWrt work (as well as upstreaming non-ARM  
-stuff) in my free time, things got stuck and will likely stay that way for  
-another month or so.
+  ARM: mmp: remove unused definition in APBC and APMU (2012-09-08
+23:40:09 +0800)
 
+----------------------------------------------------------------
+Chao Xie (5):
+      arm: mmp: make private clock definition exclude from common clock
+      arm: mmp: move pxa168 clock definition to separated file
+      arm: mmp: move pxa910 clock definition to separated file
+      ARM: mmp: move mmp2 clock definition to separated file
+      ARM: mmp: remove unused definition in APBC and APMU
 
-Imre
+ arch/arm/mach-mmp/Makefile                 |    8 +-
+ arch/arm/mach-mmp/clock-mmp2.c             |  111 ++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/clock-pxa168.c           |   91 +++++++++++++++++++++++
+ arch/arm/mach-mmp/clock-pxa910.c           |   67 +++++++++++++++++
+ arch/arm/mach-mmp/common.h                 |    3 +
+ arch/arm/mach-mmp/include/mach/regs-apbc.h |   95 ------------------------
+ arch/arm/mach-mmp/include/mach/regs-apmu.h |   15 ----
+ arch/arm/mach-mmp/mmp2.c                   |   71 ++----------------
+ arch/arm/mach-mmp/pxa168.c                 |   58 ++-------------
+ arch/arm/mach-mmp/pxa910.c                 |   40 +---------
+ 10 files changed, 293 insertions(+), 266 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/clock-mmp2.c
+ create mode 100644 arch/arm/mach-mmp/clock-pxa168.c
+ create mode 100644 arch/arm/mach-mmp/clock-pxa910.c
