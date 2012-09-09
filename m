@@ -1,33 +1,169 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 9 Sep 2012 20:11:14 +0800
-Subject: [GIT PULL][for 3.7] pull requst of board branch in arch pxa
-Message-ID: <CAN1soZyXD7Zucp=LvhXVpaid4YUXd5punrF9mco0N5GtcQ=gzA@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Sun,  9 Sep 2012 17:01:02 +0200
+Subject: [PATCH] clk: Make the managed clk functions generically available
+Message-ID: <1347202862-1617-1-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+The managed clk functions are currently only available when the generic clk
+lookup framework is build. But the managed clk functions are merely wrappers
+around clk_get and clk_put and do not depend on any specifics of the generic
+lookup functions and there are still quite a few custom implementations of the
+clk API. So make the managed functions available whenever the clk API is
+implemented.
 
-Please help to merge board branch of arch pxa git tree.
+The patch also removes the custom implementation of devm_clk_get for the
+coldfire platform.
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+---
+ arch/m68k/platform/coldfire/clk.c |    6 ----
+ drivers/clk/Makefile              |    1 +
+ drivers/clk/clk-devres.c          |   55 +++++++++++++++++++++++++++++++++++++
+ drivers/clk/clkdev.c              |   45 ------------------------------
+ 4 files changed, 56 insertions(+), 51 deletions(-)
+ create mode 100644 drivers/clk/clk-devres.c
 
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git board
-
-for you to fetch changes up to ec9b22eebbcf6ff1dfc121ec1e76bbb98a0418b4:
-
-  ARM: mmp: enable debug uart port in defconfig (2012-08-16 17:49:08 +0800)
-
-----------------------------------------------------------------
-Haojian Zhuang (2):
-      ARM: mmp: implement DEBUG_LL port choice
-      ARM: mmp: enable debug uart port in defconfig
-
- arch/arm/Kconfig.debug                       |   14 ++++++++++++++
- arch/arm/configs/mmp2_defconfig              |    5 ++++-
- arch/arm/configs/pxa910_defconfig            |    4 +++-
- arch/arm/mach-mmp/include/mach/debug-macro.S |   12 ++++++++++--
- 4 files changed, 31 insertions(+), 4 deletions(-)
+diff --git a/arch/m68k/platform/coldfire/clk.c b/arch/m68k/platform/coldfire/clk.c
+index 75f9ee9..9cd13b4 100644
+--- a/arch/m68k/platform/coldfire/clk.c
++++ b/arch/m68k/platform/coldfire/clk.c
+@@ -146,9 +146,3 @@ struct clk_ops clk_ops1 = {
+ };
+ #endif /* MCFPM_PPMCR1 */
+ #endif /* MCFPM_PPMCR0 */
+-
+-struct clk *devm_clk_get(struct device *dev, const char *id)
+-{
+-	return NULL;
+-}
+-EXPORT_SYMBOL(devm_clk_get);
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 6327536..b7b8620 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,4 +1,5 @@
+ # common clock types
++obj-$(CONFIG_HAVE_CLK)		+= clk-devres.o
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+ 				   clk-mux.o clk-divider.o clk-fixed-factor.o
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+new file mode 100644
+index 0000000..f1e7a83
+--- /dev/null
++++ b/drivers/clk/clk-devres.c
+@@ -0,0 +1,55 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/clk.h>
++#include <linux/device.h>
++#include <linux/export.h>
++#include <linux/gfp.h>
++
++static void devm_clk_release(struct device *dev, void *res)
++{
++	clk_put(*(struct clk **)res);
++}
++
++struct clk *devm_clk_get(struct device *dev, const char *id)
++{
++	struct clk **ptr, *clk;
++
++	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	clk = clk_get(dev, id);
++	if (!IS_ERR(clk)) {
++		*ptr = clk;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return clk;
++}
++EXPORT_SYMBOL(devm_clk_get);
++
++static int devm_clk_match(struct device *dev, void *res, void *data)
++{
++	struct clk **c = res;
++	if (!c || !*c) {
++		WARN_ON(!c || !*c);
++		return 0;
++	}
++	return *c == data;
++}
++
++void devm_clk_put(struct device *dev, struct clk *clk)
++{
++	int ret;
++
++	ret = devres_destroy(dev, devm_clk_release, devm_clk_match, clk);
++
++	WARN_ON(ret);
++}
++EXPORT_SYMBOL(devm_clk_put);
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index d423c9b..442a313 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -171,51 +171,6 @@ void clk_put(struct clk *clk)
+ }
+ EXPORT_SYMBOL(clk_put);
+ 
+-static void devm_clk_release(struct device *dev, void *res)
+-{
+-	clk_put(*(struct clk **)res);
+-}
+-
+-struct clk *devm_clk_get(struct device *dev, const char *id)
+-{
+-	struct clk **ptr, *clk;
+-
+-	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+-	if (!ptr)
+-		return ERR_PTR(-ENOMEM);
+-
+-	clk = clk_get(dev, id);
+-	if (!IS_ERR(clk)) {
+-		*ptr = clk;
+-		devres_add(dev, ptr);
+-	} else {
+-		devres_free(ptr);
+-	}
+-
+-	return clk;
+-}
+-EXPORT_SYMBOL(devm_clk_get);
+-
+-static int devm_clk_match(struct device *dev, void *res, void *data)
+-{
+-	struct clk **c = res;
+-	if (!c || !*c) {
+-		WARN_ON(!c || !*c);
+-		return 0;
+-	}
+-	return *c == data;
+-}
+-
+-void devm_clk_put(struct device *dev, struct clk *clk)
+-{
+-	int ret;
+-
+-	ret = devres_destroy(dev, devm_clk_release, devm_clk_match, clk);
+-
+-	WARN_ON(ret);
+-}
+-EXPORT_SYMBOL(devm_clk_put);
+-
+ void clkdev_add(struct clk_lookup *cl)
+ {
+ 	mutex_lock(&clocks_mutex);
+-- 
+1.7.2.5
