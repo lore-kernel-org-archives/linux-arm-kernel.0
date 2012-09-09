@@ -1,31 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Sep 2012 11:39:17 -0400
-Subject: sata_mv hangs up while probing on LaCie Kirkwood boards
-In-Reply-To: <20120908180945.GB3451@lunn.ch>
-References: <20120908165050.GA31897@kw.sim.vm.gnt>
- <20120908180945.GB3451@lunn.ch>
-Message-ID: <20120909153917.GI19437@titan.lakedaemon.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 9 Sep 2012 18:31:56 +0200
+Subject: [PATCH v3 31/31] arm64: MAINTAINERS update
+In-Reply-To: <1347035226-18649-32-git-send-email-catalin.marinas@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-32-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120909163156.GA31430@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 08, 2012 at 08:09:45PM +0200, Andrew Lunn wrote:
-> On Sat, Sep 08, 2012 at 06:50:51PM +0200, Simon Guinot wrote:
-> > Hi,
-> > 
-> > I have noticed recently that Linux 3.6.0-rc* hangs up while booting on
-> > LaCie Kirkwood-based boards. I have only tested on Network Space v2 and
-> > 2Big Network v2 boards.
+On 17:27 Fri 07 Sep     , Catalin Marinas wrote:
+> This patch updates the MAINTAINERS file for the AArch64 Linux kernel
+> port.
 > 
-> Yes, I do hope the fix for this hits -rc sometime soon.
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  MAINTAINERS |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
 > 
-> http://www.spinics.net/lists/arm-kernel/msg189311.html
-> 
-> Add "coherent_pool=1M" to the kernel parameters.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index fdc0119..de368a5 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1209,6 +1209,12 @@ S:	Maintained
+>  F:	arch/arm/mach-pxa/z2.c
+>  F:	arch/arm/mach-pxa/include/mach/z2.h
+>  
+> +ARM64 PORT (AARCH64 ARCHITECTURE)
+> +M:	Catalin Marinas <catalin.marinas@arm.com>
+we should put Russell too
 
-This just went in last night, v3.6-rc5:
-
-cb01b63 ARM: Kirkwood: increase atomic coherent pool size
-
-hth,
-
-Jason.
+Best Regards,
+J.
