@@ -1,29 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Sep 2012 15:36:16 -0400
-Subject: [PATCH V3 5/6] arm: mvebu: add Aurora L2 Cache Controller to
- the DT
-In-Reply-To: <1346852677-5381-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
- <1346852677-5381-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120909193616.GI4575@titan.lakedaemon.net>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sun, 09 Sep 2012 21:57:15 +0200
+Subject: [alsa-devel] [RFC update 0/2] dmaengine/ASoC: omap: Enable
+ element mode in cyclic DMA
+In-Reply-To: <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
+References: <E1T8a09-0002vz-Bl@rmk-PC.arm.linux.org.uk>
+ <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1402174.PkzhGH5Vno@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 03:44:36PM +0200, Gregory CLEMENT wrote:
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
-> Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
+On Tue, 4 Sep 2012 15:08:00 Peter Ujfalusi wrote:
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
+> Enable the element mode (thus allowing mono playback and probably 
+unblocking
+> OMAP1, OMAP2420) in OMAP dmaengine and omap-pcm.
+> 
+> Janusz: would it be possible for you to test Russell's series plus 
+this on
+> OMAP1 to make sure that we do not broke it?
 
-Applied to:
+Hi,
+I can confirm that sound works for me as before, both capture and 
+playback, on my OMAP1 Amstrad Delta with Russell's and Peter's patches 
+applied on top of linux-3.6-rc3, with the OMAP DMA engine driver built 
+in. I was not able make audible tests with applications other than a 
+soft phone as I didn't get back home for this weekend, but I think that 
+the asterisk soft phone is quite a demanding use case.
 
-git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
+The only thing I'm not sure about is why the sysfs provided 
+bytes_transferred values never change from their initial zeros.
 
-thx,
+For OMAP1:
+Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Jason.
+Thanks,
+Janusz
