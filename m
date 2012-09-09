@@ -1,30 +1,42 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Sep 2012 15:28:01 -0400
-Subject: [PATCH V3 2/6] arm: cache-l2x0: add an optional register to
- save/restore
-In-Reply-To: <1346852677-5381-3-git-send-email-gregory.clement@free-electrons.com>
+Date: Sun, 9 Sep 2012 15:33:15 -0400
+Subject: [PATCH V3 3/6] arm: cache-l2x0: add support for Aurora L2
+ cache ctrl
+In-Reply-To: <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
 References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
- <1346852677-5381-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120909192801.GF4575@titan.lakedaemon.net>
+ <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20120909193315.GG4575@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 03:44:33PM +0200, Gregory CLEMENT wrote:
+On Wed, Sep 05, 2012 at 03:44:34PM +0200, Gregory CLEMENT wrote:
+> Aurora Cache Controller was designed to be compatible with the ARM L2
+> Cache Controller. It comes with some difference or improvement such
+> as:
+> - no cache id part number available through hardware (need to get it
+>   by the DT).
+> - always write through mode available.
+> - two flavors of the controller outer cache and system cache (meaning
+>   maintenance operations on L1 are broadcasted to the L2 and L2
+>   performs the same operation).
+> - in outer cache mode, the cache maintenance operations are improved and
+>   can be done on a range inside a page and are not limited to a cache
+>   line.
+> 
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 > Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
 > 
 > Cc: Barry Song <21cnbao@gmail.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 > Cc: Arnd Bergmann <arnd@arndb.de>
 > Cc: Olof Johansson <olof@lixom.net>
 
 Applied to:
 
-git://git.infradead.org/users/jcooper/linux.git arm/cache-l2x0
-
-also going through rmk's tree.
+git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
 
 thx,
 
