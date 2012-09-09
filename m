@@ -1,38 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun,  9 Sep 2012 10:12:28 +0200
-Subject: [PATCH] ARM: mark kernelmode mem{cpy,set} non-experimental
-Message-ID: <1347178348-9522-1-git-send-email-linus.walleij@linaro.org>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Sun, 09 Sep 2012 10:46:34 +0200
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <1729018.3VWhxcipzn@wuerfel>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+ <201209061546.45242.arnd@arndb.de>
+ <20120908215609.GH13739@n2100.arm.linux.org.uk> <1729018.3VWhxcipzn@wuerfel>
+Message-ID: <op.wkc1bwjx2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This feature was added in 2009, I've been using it off and on and
-never had any problems with it on my systems. I cannot see why
-it needs to be marked experimental, make it a normal feature and
-let us discover its possible shortcomings as people try to turn
-it on instead.
+On Sun, 09 Sep 2012 03:16:54 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+<snip>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2f88d8d..e040b47 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1849,8 +1849,8 @@ config ALIGNMENT_TRAP
- 	  configuration it is safe to say N, otherwise say Y.
- 
- config UACCESS_WITH_MEMCPY
--	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user() (EXPERIMENTAL)"
--	depends on MMU && EXPERIMENTAL
-+	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user()"
-+	depends on MMU
- 	default y if CPU_FEROCEON
- 	help
- 	  Implement faster copy_to_user and clear_user methods for CPU
--- 
-1.7.11.4
+>> so in that case I'm not going to know if anything is broken on an IOP32x
+>> kernel until that gets rebooted (which it will do soon because I want to
+>> change its disks - but hopefully not before 62 days time.)
+>
+> I was specifically saying "a port gets started", not "a port is fully
+> working". The example I was thinking of is the mach-cns3xxx, which
+> was introduced in a very minimal state about 2 years ago. The only
+> users I could find on the internet are on OpenWRT, which adds
+> support for an actual board file (upstream only has the evaluation
+> board) as well as SMP, clock, i2c, ethernet, gpio, and a bunch of
+> bug fixes[1]. I'd say we should either find someone who is willing to
+> submit the patches upstream and make sure they work with at least
+> one version, or we can remove what we have today because it's evidently
+> not used.
+
+For some time now you have to have clocks support to be able to get SMP  
+and co working. Without that and DT it doesn't really make sense to submit  
+those patches.
+
+<snip>
+
+> * ixp4xx is (as expected) actively used, but a lot of patches are stuck
+> in openwrt[2] and not getting submitted.
+> Greg also submitted a regression fix, Ben Hutchins promised
+> another fix from Debian.
+
+Mostly the same as above. Don't forget that DT support will essentially  
+get rid of all separate board support files, so those patches will have to  
+be translated to dts files instead.
+
+Since I'm doing all the OpenWrt work (as well as upstreaming non-ARM  
+stuff) in my free time, things got stuck and will likely stay that way for  
+another month or so.
+
+
+Imre
