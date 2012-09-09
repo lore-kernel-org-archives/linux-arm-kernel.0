@@ -1,70 +1,46 @@
 From: cavokz@gmail.com (Domenico Andreoli)
-Date: Sun, 9 Sep 2012 01:44:35 +0200
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CACRpkdbz7CQtaj9e-1kcRVszpCSoqKz=19YT68sTMF9SOyWa8w@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
- <20120907110251.GA7968@glitch>
- <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
- <20120907160025.GB14330@glitch>
- <CACRpkdbz7CQtaj9e-1kcRVszpCSoqKz=19YT68sTMF9SOyWa8w@mail.gmail.com>
-Message-ID: <20120908234435.GA13519@glitch>
+Date: Sun, 9 Sep 2012 02:30:27 +0200
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <20120908215609.GH13739@n2100.arm.linux.org.uk>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+ <201209060904.14903.arnd@arndb.de> <20120906094703.GA7308@glitch>
+ <201209061546.45242.arnd@arndb.de>
+ <20120908215609.GH13739@n2100.arm.linux.org.uk>
+Message-ID: <20120909003027.GB13519@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 11:57:59PM +0200, Linus Walleij wrote:
-> On Fri, Sep 7, 2012 at 6:00 PM, Domenico Andreoli <cavokz@gmail.com> wrote:
-> > On Fri, Sep 07, 2012 at 02:30:59PM +0000, AnilKumar, Chimata wrote:
+On Sat, Sep 08, 2012 at 10:56:10PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 06, 2012 at 03:46:44PM +0000, Arnd Bergmann wrote:
+> > We just had a discussion about
+> > stale platforms at the ARM mini summit in San Diego. IMHO if a port
+> > gets started and then nobody works on filling the gaps for two
+> > years, we should remove it again. 
 > 
-> >> How can gpio driver knows that leds-gpio driver require
-> >> these 4 pins?
-> >
-> > because leds-gpio requests each gpio (specified in the DT against a specific
-> > gpio controller) before assuming it is available?  gpiolib then asks to
-> > pinctrl if those pins are available for gpio and possibly reserve them
-> > (configuring the mux, if necessary) for the device.
+> One of the issues there is that you don't know if the reason it's not
+> receiving patches or comments is because it works and people are using
+> it, and they don't have anything to report against it.
 > 
-> So this is not an either-or situation but a both-and case.
->
-...
-> 
-> If all you need to to is to multiplex the pins into GPIO mode,
-> then the gpio_get() call on this driver *can* call through to
-> pinctrl_request_gpio() which will in turn fall through to the
-> above pinmux driver calls (.gpio_request_enable, etc).
+> That's certainly true of a number of platforms we currently have.
 
-So if the GPIO driver doesn't coordinate with the pinctrl driver, it's
-all left to the GPIO user to configure the pin before using it, right?
+I would also like to know the usefulness/completeness requirements of
+new platforms.
 
-I can understand the concerns of Tony, whether a pin must be requested
-or not before the gpio then depends on the GPIO driver implementation,
-which may or may not call through the pinctrl layer, isn't it?.
+Expecting the latest designs in each area, what is wanted for a first
+submission, besides the core stuff required for booting?
 
-> But that's as far as it goes! The GPIO abstraction cannot
-> call through to e.g. set some specific biasing on the pins
-> (pull up etc). Doing that would require us to reimplement
-> every interface that pinctrl already has again in the
-> GPIO layer, which is not a good idea.
+ - clocks
+ - gpios
+ - pinctrl
+ - devicetree
+ - uarts
+ - dma
+ - i2c
+ - ...
 
-Yes, clear. Never meant that, I thought that the pinctrl was anyway
-available for stuff not modeled by the GPIO layer, as you say below.
-
-> So the pinctrl handle can be used for such config, and it
-> can also be used for multiplexing if that is desired - if not
-> done by the fall through functions pinctrl_gpio_*().
-> 
-> You can use a combination of both too, Stephen patched
-> pinctrl some time back so that a pin can be muxed for a
-> certain function and used as GPIO at the same time, so
-> these two are now orthogonal, it's a bit relaxed and gives some
-> feeling of loss of control but was necessary for certain
-> usecases. (For example we can snoop on a I2C pin using
-> its corresponding GPIO registers in the U300...)
->
-> There is some flexibility here, I hope it's not too confusing :-/
-
-Thank you for clarifying :)
+For instance, I'm absolutely not interested in audio, displays and GPUs at
+the moment, at least not those equipping this board. So I will not spend
+any time to contribute anything of them. Would this be a stopper?
 
 Regards,
 Domenico
