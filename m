@@ -1,43 +1,57 @@
 From: gerg@snapgear.com (Greg Ungerer)
-Date: Sun, 9 Sep 2012 14:38:07 +1000
+Date: Sun, 9 Sep 2012 14:40:25 +1000
 Subject: [PATCH] ARM: ks8695: add board support for the OpenGear boards
  based on the KS8695
-In-Reply-To: <20120907215609.GA3139@quad.lixom.net>
+In-Reply-To: <CAOesGMiixufaORkZcabnYRyCWHcG6KT4Q0if3+-PZrUUpprCNg@mail.gmail.com>
 References: <1346996139-5692-1-git-send-email-gerg@snapgear.com>
- <201209071221.56938.arnd@arndb.de> <504A00AB.3050702@snapgear.com>
- <20120907215609.GA3139@quad.lixom.net>
-Message-ID: <504C1D2F.40401@snapgear.com>
+ <201209071221.56938.arnd@arndb.de>
+ <CAOesGMiixufaORkZcabnYRyCWHcG6KT4Q0if3+-PZrUUpprCNg@mail.gmail.com>
+Message-ID: <504C1DB9.2020305@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof,
 
-On 09/08/2012 07:56 AM, Olof Johansson wrote:
-> On Sat, Sep 08, 2012 at 12:11:55AM +1000, Greg Ungerer wrote:
->>> 	Arnd
+On 09/08/2012 01:20 PM, Olof Johansson wrote:
+> On Fri, Sep 7, 2012 at 5:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Friday 07 September 2012, gerg at snapgear.com wrote:
+>>> From: Greg Ungerer <gerg@uclinux.org>
 >>>
->>> 8<----
->>> ARM: ks8695: add maintainers entry
+>>> A number of boards produced by OpenGear and based on the Micrel KS8695 SoC.
+>>> Add board support to the KS8695 kernel code to support them.
 >>>
->>> Greg Ungerer has hardware for this platform and is testing it
->>> regularly.
+>>> The following machine type entries will need to be added back into the
+>>> mach-types file with these in mainline:
 >>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>>      cm4008      MACH_CM4008       CM4008       624
+>>>      cm41xx      MACH_CM41XX       CM41XX       672
+>>>      cm4002      MACH_CM4002       CM4002       876
+>>>      im42xx      MACH_IM42XX       IM42XX       1105
+>>>      im4004      MACH_IM4004       IM4004       1400
+>>>
+>>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 >>
->> Acked-by: Greg Ungerer <gerg@uclinux.org>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
 >
-> Great, applied to next/maintainers.
 >
-> Greg, do you want to collect a repo that you send pull requests for,
-> or just ack and send patches for us to apply? The former is preferred
-> by us in case there's a significant patch volume, for lower traffic
-> platforms we can apply patches from email though though.
+> Both patches applied to a ks8695/boards branch, part of next/boards in arm-soc.
+>
+> Greg, you should submit separate patch to add the machine types to
+> Russell's patch tracker.
 
-I'll create a new git repository on kernel.org along with my others
-there.
+Yep, I'll create some patches for those.
+
+
+> We are of course looking forward to efforts
+> to move these platforms to device tree, since we want to avoid adding
+> non-dt boards from here on out.
+
+Yes that would be nice. I am not sure when I will have some time
+to take that on. But hopefully sometime soon.
 
 Regards
 Greg
+
 
 
 -- 
