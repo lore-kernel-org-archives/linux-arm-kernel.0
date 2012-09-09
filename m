@@ -1,47 +1,185 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 10 Sep 2012 08:20:21 +0800
-Subject: [PATCH] clk: Make the managed clk functions generically available
-In-Reply-To: <20120910001524.GL13739@n2100.arm.linux.org.uk>
-References: <1347202862-1617-1-git-send-email-lars@metafoo.de>
- <20120909235059.GA2643@sirena.org.uk>
- <20120910001524.GL13739@n2100.arm.linux.org.uk>
-Message-ID: <20120910002020.GB16249@opensource.wolfsonmicro.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 9 Sep 2012 16:45:19 -0400
+Subject: [PATCH 1/5] arm: plat-orion: use 'void __iomem *' in addr-map code
+In-Reply-To: <1344003237-13575-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1344003237-13575-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20120909204519.GL4575@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 01:15:24AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 10, 2012 at 12:50:59AM +0100, Mark Brown wrote:
+On Fri, Aug 03, 2012 at 04:13:53PM +0200, Thomas Petazzoni wrote:
+> Use 'void __iomem *' instead of u32 where appropriate in the addr-map
+> code. It requires adding a few casts in SoC-specific addr-map.c files,
+> but those casts will disappear once those SoC are migrated to the
+> device tree, in which case the address will come from the DT instead
+> of from #define values.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> > I posted a patch for this (clk: Move devm_ APIs out of clkdev into
-> > HAVE_CLK) towards the end of the last release cycle and I think reposted
-> > it since and it had been sent to the patch tracker too (though I can't
-> > find any record of anything except the submission mail now).  It would
-> > be *really* good to get this merged.
+Thomas,
 
-> Note that the patch system doesn't always return error messages anymore
-> (it used to do that reliably, but as it's now a favourite target for
-> spammers and was creating soo much backscatter, which was then filling
-> my mailbox with bounces... that had to change.)
+I just wanted to make sure this came to your attention.  While
+discussing the finer points of branch management for pull requests, Olof
+had the following comments regarding this patch:
 
-Hrm, that's not ideal.  It'd be nice if it were able to do something
-like always reply if there were patch contents, or if it found things
-like the KernelVersion line in there.  Obviously e-mail is also not time
-guaranteed so deciding it's not responded (and then working out why it
-did that) is going to be unreliable too.
+> >       arm: plat-orion: use 'void __iomem *' in addr-map code
+> 
+> Hmm, I would prefer if the actual constants were annotated instead of
+> cast in the code here. See how we handled that on tegra with IOMEM().
+> That will also help sparse catch unannotated uses of those constants.
 
-I do recall seeing the patch in the database but it's not showing up any
-more so perhaps I was thinking of a different patch.
+Could you please take a look at this?  I assume the rest of this series
+relies on this patch, so I'm holding off until it's resolved.
 
-> > Who's looking after clkdev these days?  Mike doesn't seem to take
-> > patches as he's expecting Russell to take them which was happening for a
-> > while but I'm not sure that's the case any more, especially given
-> > Russell's followup here.  Due to the patch tracker the usual things for
-> > following up on unapplied patches don't work terribly well, it's much
-> > less likely that it's just an oversight there.
+thx,
 
-> Well, in theory I'm the maintainer for clkdev and clk API, so I should
-> take the patch...
+Jason.
 
-OK, that's what I'd thought was going on - it was the fact that you'd
-just acked the patch rather than asked for it to go to the patch tracker
-or something which made me wonder if things had changed.
+> ---
+>  arch/arm/mach-dove/addr-map.c               |    2 +-
+>  arch/arm/mach-kirkwood/addr-map.c           |    5 +++--
+>  arch/arm/mach-mv78xx0/addr-map.c            |    4 ++--
+>  arch/arm/mach-orion5x/addr-map.c            |    5 +++--
+>  arch/arm/plat-orion/addr-map.c              |   11 ++++-------
+>  arch/arm/plat-orion/include/plat/addr-map.h |    4 ++--
+>  6 files changed, 15 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/mach-dove/addr-map.c b/arch/arm/mach-dove/addr-map.c
+> index 2a06c01..adb428e 100644
+> --- a/arch/arm/mach-dove/addr-map.c
+> +++ b/arch/arm/mach-dove/addr-map.c
+> @@ -47,7 +47,7 @@ static inline void __iomem *ddr_map_sc(int i)
+>  static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+>  	.num_wins = 8,
+>  	.remappable_wins = 4,
+> -	.bridge_virt_base = BRIDGE_VIRT_BASE,
+> +	.bridge_virt_base = (void __iomem *) BRIDGE_VIRT_BASE,
+>  };
+>  
+>  static const struct __initdata orion_addr_map_info addr_map_info[] = {
+> diff --git a/arch/arm/mach-kirkwood/addr-map.c b/arch/arm/mach-kirkwood/addr-map.c
+> index e9a7180..2b27de6 100644
+> --- a/arch/arm/mach-kirkwood/addr-map.c
+> +++ b/arch/arm/mach-kirkwood/addr-map.c
+> @@ -41,7 +41,7 @@
+>  static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+>  	.num_wins = 8,
+>  	.remappable_wins = 4,
+> -	.bridge_virt_base = BRIDGE_VIRT_BASE,
+> +	.bridge_virt_base = (void __iomem *) BRIDGE_VIRT_BASE,
+>  };
+>  
+>  static const struct __initdata orion_addr_map_info addr_map_info[] = {
+> @@ -86,5 +86,6 @@ void __init kirkwood_setup_cpu_mbus(void)
+>  	/*
+>  	 * Setup MBUS dram target info.
+>  	 */
+> -	orion_setup_cpu_mbus_target(&addr_map_cfg, DDR_WINDOW_CPU_BASE);
+> +	orion_setup_cpu_mbus_target(&addr_map_cfg,
+> +				    (void __iomem *) DDR_WINDOW_CPU_BASE);
+>  }
+> diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+> index 62b53d7..bac31e4 100644
+> --- a/arch/arm/mach-mv78xx0/addr-map.c
+> +++ b/arch/arm/mach-mv78xx0/addr-map.c
+> @@ -71,10 +71,10 @@ void __init mv78xx0_setup_cpu_mbus(void)
+>  	 */
+>  	if (mv78xx0_core_index() == 0)
+>  		orion_setup_cpu_mbus_target(&addr_map_cfg,
+> -					    DDR_WINDOW_CPU0_BASE);
+> +					    (void __iomem *) DDR_WINDOW_CPU0_BASE);
+>  	else
+>  		orion_setup_cpu_mbus_target(&addr_map_cfg,
+> -					    DDR_WINDOW_CPU1_BASE);
+> +					    (void __iomem *) DDR_WINDOW_CPU1_BASE);
+>  }
+>  
+>  void __init mv78xx0_setup_pcie_io_win(int window, u32 base, u32 size,
+> diff --git a/arch/arm/mach-orion5x/addr-map.c b/arch/arm/mach-orion5x/addr-map.c
+> index eaac83d..bfe4f10 100644
+> --- a/arch/arm/mach-orion5x/addr-map.c
+> +++ b/arch/arm/mach-orion5x/addr-map.c
+> @@ -79,7 +79,7 @@ static int __init cpu_win_can_remap(const struct orion_addr_map_cfg *cfg,
+>  static struct orion_addr_map_cfg addr_map_cfg __initdata = {
+>  	.num_wins = 8,
+>  	.cpu_win_can_remap = cpu_win_can_remap,
+> -	.bridge_virt_base = ORION5X_BRIDGE_VIRT_BASE,
+> +	.bridge_virt_base = (void __iomem *) ORION5X_BRIDGE_VIRT_BASE,
+>  };
+>  
+>  static const struct __initdata orion_addr_map_info addr_map_info[] = {
+> @@ -113,7 +113,8 @@ void __init orion5x_setup_cpu_mbus_bridge(void)
+>  	/*
+>  	 * Setup MBUS dram target info.
+>  	 */
+> -	orion_setup_cpu_mbus_target(&addr_map_cfg, ORION5X_DDR_WINDOW_CPU_BASE);
+> +	orion_setup_cpu_mbus_target(&addr_map_cfg,
+> +				    (void __iomem *) ORION5X_DDR_WINDOW_CPU_BASE);
+>  }
+>  
+>  void __init orion5x_setup_dev_boot_win(u32 base, u32 size)
+> diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+> index 367ca89..a7b8060 100644
+> --- a/arch/arm/plat-orion/addr-map.c
+> +++ b/arch/arm/plat-orion/addr-map.c
+> @@ -48,7 +48,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+>  static void __init __iomem *
+>  orion_win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
+>  {
+> -	return (void __iomem *)(cfg->bridge_virt_base + (win << 4));
+> +	return cfg->bridge_virt_base + (win << 4);
+>  }
+>  
+>  /*
+> @@ -143,19 +143,16 @@ void __init orion_config_wins(struct orion_addr_map_cfg * cfg,
+>   * Setup MBUS dram target info.
+>   */
+>  void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+> -					const u32 ddr_window_cpu_base)
+> +					const void __iomem *ddr_window_cpu_base)
+>  {
+> -	void __iomem *addr;
+>  	int i;
+>  	int cs;
+>  
+>  	orion_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
+>  
+> -	addr = (void __iomem *)ddr_window_cpu_base;
+> -
+>  	for (i = 0, cs = 0; i < 4; i++) {
+> -		u32 base = readl(addr + DDR_BASE_CS_OFF(i));
+> -		u32 size = readl(addr + DDR_SIZE_CS_OFF(i));
+> +		u32 base = readl(ddr_window_cpu_base + DDR_BASE_CS_OFF(i));
+> +		u32 size = readl(ddr_window_cpu_base + DDR_SIZE_CS_OFF(i));
+>  
+>  		/*
+>  		 * Chip select enabled?
+> diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
+> index fd556f7..0a746fd 100644
+> --- a/arch/arm/plat-orion/include/plat/addr-map.h
+> +++ b/arch/arm/plat-orion/include/plat/addr-map.h
+> @@ -16,7 +16,7 @@ extern struct mbus_dram_target_info orion_mbus_dram_info;
+>  struct orion_addr_map_cfg {
+>  	const int num_wins;	/* Total number of windows */
+>  	const int remappable_wins;
+> -	const u32 bridge_virt_base;
+> +	void __iomem * const bridge_virt_base;
+>  
+>  	/* If NULL, the default cpu_win_can_remap will be used, using
+>  	   the value in remappable_wins */
+> @@ -49,5 +49,5 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+>  				const u8 attr, const int remap);
+>  
+>  void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+> -					const u32 ddr_window_cpu_base);
+> +					const void __iomem *ddr_window_cpu_base);
+>  #endif
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
