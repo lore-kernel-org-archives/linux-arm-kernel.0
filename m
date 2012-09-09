@@ -1,25 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 9 Sep 2012 21:57:03 +0100
-Subject: [PATCH] clk: Make the managed clk functions generically available
-In-Reply-To: <1347202862-1617-1-git-send-email-lars@metafoo.de>
-References: <1347202862-1617-1-git-send-email-lars@metafoo.de>
-Message-ID: <20120909205703.GJ13739@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 09 Sep 2012 19:29:24 -0400 (EDT)
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <20120909172046.GB31430@game.jcrosoft.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org>
+Message-ID: <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 09, 2012 at 05:01:02PM +0200, Lars-Peter Clausen wrote:
-> The managed clk functions are currently only available when the generic clk
-> lookup framework is build. But the managed clk functions are merely wrappers
-> around clk_get and clk_put and do not depend on any specifics of the generic
-> lookup functions and there are still quite a few custom implementations of the
-> clk API. So make the managed functions available whenever the clk API is
-> implemented.
-> 
-> The patch also removes the custom implementation of devm_clk_get for the
-> coldfire platform.
-> 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-Definitely-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+> > +4. Call the kernel image
+> > +------------------------
+> > +
+> > +Requirement: MANDATORY
+> > +
+> > +The decompressed kernel image contains a 32-byte header as follows:
+> > +
+> > +  u32 magic	= 0x14000008;	/* branch to stext, little-endian */
+> > +  u32 res0	= 0;		/* reserved */
+> > +  u64 text_offset;		/* Image load offset */
+> > +  u64 res1	= 0;		/* reserved */
+> > +  u64 res2	= 0;		/* reserved */
+> we need to have a magic to known it's a arm64 kernel
 
-Thanks for finally cooking up a patch for this.
+You have it: it's 0x14000008 at the beginning.
+
+> > +
+> > +The image must be placed at the specified offset (currently 0x80000)
+> > +from the start of the system RAM and called there. The start of the
+> > +system RAM must be aligned to 2MB.
+> can we drop this
+
+Drop what?
+And why?
+
+
+Nicolas
