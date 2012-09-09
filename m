@@ -1,32 +1,25 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 9 Sep 2012 18:15:04 +0000 (UTC)
-Subject: OMAP baseline test results for v3.6-rc5
-In-Reply-To: <alpine.DEB.2.00.1209091743430.28047@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209091743430.28047@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1209091814380.28047@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 9 Sep 2012 15:11:54 -0400
+Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
+In-Reply-To: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
+References: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20120909191154.GB4575@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One other thing to mention:
-
-On Sun, 9 Sep 2012, Paul Walmsley wrote:
-
-> PM tests:
+On Sat, Sep 01, 2012 at 11:26:25AM +0200, Andrew Lunn wrote:
+> Based on previous work by Michael Walle and Jason Cooper.
 > 
-> * 37xx EVM: CORE not entering dynamic off-idle
->   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
->     off works
+> Made their work actually work, which required added interrupt from DT
+> and auxdata, along with setting the dma_mask, which DT does not
+> currently do.
 > 
-> * 4430ES2 Panda: UART corruption during long transmit buffers
->   - Presumably due to either a missing hardware workaround or a bug in
->     the OMAP serial driver
-> 
-> * 4430ES2 Panda: CORE, L4PER, L3INIT, TESLA, IVAHD not going idle
->   - Cause unknown; may be partially due to McPDM reset problem
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock gate ("debug ignore_loglevel")
-  - Not shown in the current test logs; cause unknown
+Applied to:
 
+git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
 
-- Paul
+thx,
+
+Jason.
