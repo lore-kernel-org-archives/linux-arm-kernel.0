@@ -1,36 +1,45 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Sep 2012 15:37:02 -0400
-Subject: [PATCH V3 6/6] arm: l2x0: add aurora related properties to OF
- binding
-In-Reply-To: <1346852677-5381-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
- <1346852677-5381-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120909193702.GJ4575@titan.lakedaemon.net>
+Date: Sun, 9 Sep 2012 17:01:26 -0400
+Subject: [PATCH] ARM: Dove: allow PCI to be disabled
+In-Reply-To: <20120909205521.GI13739@n2100.arm.linux.org.uk>
+References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
+ <20120909204705.GD3451@lunn.ch>
+ <20120909205521.GI13739@n2100.arm.linux.org.uk>
+Message-ID: <20120909210126.GM4575@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 03:44:37PM +0200, Gregory CLEMENT wrote:
-> Aurora is a L2 Cache Controller designed to be compatible with the
-> L2x0 Cache Controller. L2X0 OF bindings are extended to support some
-> specificity of Aurora (no cache id part number available through
-> hardware, always write through mode, choice between outer cache and
-> system cache).
+On Sun, Sep 09, 2012 at 09:55:21PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Sep 09, 2012 at 10:47:05PM +0200, Andrew Lunn wrote:
+> > On Sun, Sep 09, 2012 at 08:34:13PM +0100, Russell King wrote:
+> > > Allow PCI support for Dove to be disabled.  Some platforms do not have
+> > > anything connected to the PCIe ports, so requiring PCI support to be
+> > > built into the kernel just wastes space, and presents a lot more config
+> > > options than are necessary.
+> > > 
+> > > However, select USB_ARCH_HAS_EHCI so that we can still have EHCI
+> > > support.
+> > 
+> > Hi Russel
+> > 
+> > I have a patch in GregKH usb-next which also ensures USB_ARCH_HAS_EHCI
+> > is selected.
+> > 
+> > http://git.kernel.org/?p=linux/kernel/git/gregkh/usb.git;a=commitdiff;h=ba2f9dff6c914b91005f687a9d75c8eac110d323
+> > 
+> > So we might not need your select as well, although it does not harm.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Barry Song <21cnbao@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
+> That depends on how this patch is handled.  If it gets into mainline via
+> a separate path to GregKH's USB tree, then it must be kept together as
+> otherwise it _will_ cause regressions - namely EHCI becomes impossible
+> to select when PCI=n.  That in turn makes the CuBox (and probably other
+> Dove platforms) a rather useless di
+[message trucated, I need to working on file locking for my email
+auto-flagging script... :-/]
 
-Applied to:
-
-git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
+greg just pulled Andrew's patch into his usb tree within the past few
+days.  Russell, would you prefer to submit this to greg's usb tree, or
+resend without USB_ARCH_HAS_EHCI?
 
 thx,
 
