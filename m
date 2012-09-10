@@ -1,77 +1,82 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 10 Sep 2012 18:34:20 +0200
-Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
- hardware
-In-Reply-To: <1347294020-22661-1-git-send-email-mporter@ti.com>
-References: <1347294020-22661-1-git-send-email-mporter@ti.com>
-Message-ID: <504E168C.6060603@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Sep 2012 17:43:34 +0100
+Subject: [PATCH 07/17] Documentation: Define the MSP Driver Device Tree
+ bindings
+In-Reply-To: <1345816913-4113-8-git-send-email-lee.jones@linaro.org>
+References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
+ <1345816913-4113-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120910164333.GB24506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Tony
+Ola poke.
 
-Hi Matt,
-
-30 minutes too late for my pull request :-(
-
-There are a couple of am33xx patches under discussion, so I'll take them
-and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
-
-On 09/10/2012 06:20 PM, Matt Porter wrote:
-> On AM33xx, the datasheet and TRM refer to four GPIO instances that
-> are 0-based, GPIO0-3.
-
-Or maybe you should just update the spec to use a 1-based GPIO number
-like OMAP :-)
-
-Regards,
-Benoit
-
-
+On Fri, Aug 24, 2012 at 03:01:43PM +0100, Lee Jones wrote:
+> Here we add the required documentation for the new Device Tree
+> bindings pertaining to the MSP CPU-side DAI Driver.
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
+> CC: alsa-devel at alsa-project.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
 > 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index bb31bff..1369bfc 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -62,7 +62,7 @@
->  			reg = <0x48200000 0x1000>;
->  		};
->  
-> -		gpio1: gpio at 44e07000 {
-> +		gpio0: gpio at 44e07000 {
->  			compatible = "ti,omap4-gpio";
->  			ti,hwmods = "gpio1";
->  			gpio-controller;
-> @@ -74,7 +74,7 @@
->  			interrupts = <96>;
->  		};
->  
-> -		gpio2: gpio at 4804c000 {
-> +		gpio1: gpio at 4804c000 {
->  			compatible = "ti,omap4-gpio";
->  			ti,hwmods = "gpio2";
->  			gpio-controller;
-> @@ -86,7 +86,7 @@
->  			interrupts = <98>;
->  		};
->  
-> -		gpio3: gpio at 481ac000 {
-> +		gpio2: gpio at 481ac000 {
->  			compatible = "ti,omap4-gpio";
->  			ti,hwmods = "gpio3";
->  			gpio-controller;
-> @@ -98,7 +98,7 @@
->  			interrupts = <32>;
->  		};
->  
-> -		gpio4: gpio at 481ae000 {
-> +		gpio3: gpio at 481ae000 {
->  			compatible = "ti,omap4-gpio";
->  			ti,hwmods = "gpio4";
->  			gpio-controller;
+> diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+> new file mode 100644
+> index 0000000..99acd9c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+> @@ -0,0 +1,43 @@
+> +* ux500 MSP (CPU-side Digital Audio Interface)
+> +
+> +Required properties:
+> + - compatible       :"stericsson,ux500-msp-i2s"
+> + - reg              : Physical base address and length of the device's registers.
+> +
+> +Optional properties:
+> + - interrupts       : The interrupt output from the device.
+> + - interrupt-parent : The parent interrupt controller.
+> + - <name>-supply    : Phandle to the regulator <name> supply
+> +
+> +Example:
+> +
+> +	sound {
+> +		compatible = "stericsson,snd-soc-mop500";
+> +
+> +		stericsson,platform-pcm-dma = <&pcm>;
+> +		stericsson,cpu-dai = <&msp1 &msp3>;
+> +		stericsson,audio-codec = <&codec>;
+> +	};
+> +
+> +	pcm: ux500-pcm {
+> +		compatible = "stericsson,ux500-pcm";
+> +	};
+> +
+> +	msp1: msp at 80124000 {
+> +		compatible = "stericsson,ux500-msp-i2s";
+> +		reg = <0x80124000 0x1000>;
+> +		interrupts = <0 62 0x4>;
+> +		v-ape-supply = <&db8500_vape_reg>;
+> +	};
+> +
+> +	msp3: msp at 80125000 {
+> +		compatible = "stericsson,ux500-msp-i2s";
+> +		reg = <0x80125000 0x1000>;
+> +		interrupts = <0 62 0x4>;
+> +		v-ape-supply = <&db8500_vape_reg>;
+> +	};
+> +
+> +	codec: ab8500-codec {
+> +		compatible = "stericsson,ab8500-codec";
+> +		stericsson,earpeice-cmv = <950>; /* Units in mV. */
+> +	};
+> -- 
+> 1.7.9.5
 > 
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
