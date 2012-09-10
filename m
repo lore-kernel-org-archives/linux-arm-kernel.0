@@ -1,77 +1,40 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 10 Sep 2012 13:46:31 +0300
-Subject: [PATCH v4 13/14] ASoC: twl4030: Add pointer to pdata within the
- private data
+Date: Mon, 10 Sep 2012 13:46:30 +0300
+Subject: [PATCH v4 12/14] ASoC: twl4030: Convert to use devm_kzalloc
 In-Reply-To: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347273992-9107-14-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1347273992-9107-13-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Access the pdata via a pointer within the twl4030_priv structure.
-In preparation for DeviceTree support.
+Allocate the private data with devm_kzalloc.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- sound/soc/codecs/twl4030.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ sound/soc/codecs/twl4030.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-index 413e698..8b13d50 100644
+index 27ccea4..413e698 100644
 --- a/sound/soc/codecs/twl4030.c
 +++ b/sound/soc/codecs/twl4030.c
-@@ -153,8 +153,7 @@ struct twl4030_priv {
- 	u8 predrivel_enabled, predriver_enabled;
- 	u8 carkitl_enabled, carkitr_enabled;
- 
--	/* Delay needed after enabling the digimic interface */
--	unsigned int digimic_delay;
-+	struct twl4030_codec_data *pdata;
- };
- 
- /*
-@@ -348,7 +347,7 @@ static void twl4030_init_chip(struct snd_soc_codec *codec)
- 	if (!pdata)
- 		return;
- 
--	twl4030->digimic_delay = pdata->digimic_delay;
-+	twl4030->pdata = pdata;
- 
- 	reg = twl4030_read_reg_cache(codec, TWL4030_REG_HS_POPN_SET);
- 	reg &= ~TWL4030_RAMP_DELAY;
-@@ -749,9 +748,9 @@ static int aif_event(struct snd_soc_dapm_widget *w,
- 
- static void headset_ramp(struct snd_soc_codec *codec, int ramp)
+@@ -2231,7 +2231,8 @@ static int twl4030_soc_probe(struct snd_soc_codec *codec)
  {
--	struct twl4030_codec_data *pdata = codec->dev->platform_data;
- 	unsigned char hs_gain, hs_pop;
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
-+	struct twl4030_codec_data *pdata = twl4030->pdata;
- 	/* Base values for ramp delay calculation: 2^19 - 2^26 */
- 	unsigned int ramp_base[] = {524288, 1048576, 2097152, 4194304,
- 				    8388608, 16777216, 33554432, 67108864};
-@@ -864,9 +863,10 @@ static int digimic_event(struct snd_soc_dapm_widget *w,
- 		struct snd_kcontrol *kcontrol, int event)
- {
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(w->codec);
-+	struct twl4030_codec_data *pdata = twl4030->pdata;
+ 	struct twl4030_priv *twl4030;
  
--	if (twl4030->digimic_delay)
--		twl4030_wait_ms(twl4030->digimic_delay);
-+	if (pdata && pdata->digimic_delay)
-+		twl4030_wait_ms(pdata->digimic_delay);
- 	return 0;
- }
- 
-@@ -2248,8 +2248,8 @@ static int twl4030_soc_probe(struct snd_soc_codec *codec)
- 
- static int twl4030_soc_remove(struct snd_soc_codec *codec)
- {
--	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
-+	struct twl4030_codec_data *pdata = twl4030->pdata;
- 
+-	twl4030 = kzalloc(sizeof(struct twl4030_priv), GFP_KERNEL);
++	twl4030 = devm_kzalloc(codec->dev, sizeof(struct twl4030_priv),
++			       GFP_KERNEL);
+ 	if (twl4030 == NULL) {
+ 		dev_err(codec->dev, "Can not allocate memory\n");
+ 		return -ENOMEM;
+@@ -2253,7 +2254,6 @@ static int twl4030_soc_remove(struct snd_soc_codec *codec)
  	/* Reset registers to their chip default before leaving */
  	twl4030_reset_registers(codec);
+ 	twl4030_set_bias_level(codec, SND_SOC_BIAS_OFF);
+-	kfree(twl4030);
+ 
+ 	if (pdata && pdata->hs_extmute && gpio_is_valid(pdata->hs_extmute_gpio))
+ 		gpio_free(pdata->hs_extmute_gpio);
 -- 
 1.7.12
