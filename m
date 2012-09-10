@@ -1,67 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Sep 2012 09:29:42 +0100
-Subject: [PATCH] ARM: Dove: allow PCI to be disabled
-In-Reply-To: <20120910014422.GQ4575@titan.lakedaemon.net>
-References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
- <20120909204705.GD3451@lunn.ch>
- <20120909205521.GI13739@n2100.arm.linux.org.uk>
- <20120909210126.GM4575@titan.lakedaemon.net>
- <20120910004511.GN13739@n2100.arm.linux.org.uk>
- <20120910014422.GQ4575@titan.lakedaemon.net>
-Message-ID: <20120910082941.GO13739@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 10 Sep 2012 10:29:55 +0200
+Subject: [PATCH 1/2] gpio/twl4030: get platform data from device tree
+In-Reply-To: <504DA20D.7020903@epfl.ch>
+References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
+ <1346831186-29947-2-git-send-email-florian.vaussard@epfl.ch>
+ <504A2FF2.7070607@ti.com> <504DA20D.7020903@epfl.ch>
+Message-ID: <504DA503.5050901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 09, 2012 at 09:44:22PM -0400, Jason Cooper wrote:
-> iiuc, the regression you are refering to would occur iff this patch
-> (without the select) makes it into mainline _before_ Andrew's patch in
-> Greg's tree.  As I haven't pulled this patch yet, I can add a dependency
-> in the tag message listing the patch in gregkh's usb tree.
+Hi Florian,
 
-For the regression to occur, you need to land on a commit in the tree
-where this patch (without the select) is in the history but not the
-patch in Greg's tree.
+On 09/10/2012 10:17 AM, Florian Vaussard wrote:
+> Hello Benoit,
+> 
+> Le 07/09/2012 19:33, Benoit Cousson a ?crit :
+>> Hi Florian,
+>>
+>> I've just noticed that this patch is reporting some CHECK issues.
+>>
+>> d1f5052 - gpio/twl4030: get platform data from device tree
+>> CHECK: Alignment should match open parenthesis
+>> #66: FILE: drivers/gpio/gpio-twl4030.c:412:
+>> +    of_property_read_u32(dev->of_node, "ti,debounce",
+>> +                &omap_twl_info->debounce);
+>>
+>> CHECK: Alignment should match open parenthesis
+>> #68: FILE: drivers/gpio/gpio-twl4030.c:414:
+>> +    of_property_read_u32(dev->of_node, "ti,mmc-cd",
+>> +                (u32 *)&omap_twl_info->mmc_cd);
+>>
+>> CHECK: Alignment should match open parenthesis
+>> #70: FILE: drivers/gpio/gpio-twl4030.c:416:
+>> +    of_property_read_u32(dev->of_node, "ti,pullups",
+>> +                &omap_twl_info->pullups);
+>>
+>> CHECK: Alignment should match open parenthesis
+>> #72: FILE: drivers/gpio/gpio-twl4030.c:418:
+>> +    of_property_read_u32(dev->of_node, "ti,pulldowns",
+>> +                &omap_twl_info->pulldowns);
+>>
+>> CHECK: Alignment should match open parenthesis
+>> +                pdata->pullups, pdata->pulldowns,
+>>
+>> CHECK: Alignment should match open parenthesis
+>> #139: FILE: drivers/gpio/gpio-twl4030.c:479:
+>> +        dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
+>> +                pdata->debounce, pdata->mmc_cd,
+>>
+>> total: 0 errors, 0 warnings, 6 checks, 118 lines checked
+>>
+>>
+>> I fixed them since it was trivial, but next time you should ensure
+>> that the patch pass checkpatch before posting.
+> 
+> Sorry for these errors. I however checked my patches before submitting,
+> and had no such warnings. I redone, and remarked that these warnings
+> appear only with the "--strict" option, which is not enabled by default.
+> Is this the recommended  guideline? Thus why not enabling it by default?
 
-The commit history remains a series of independent branches even after
-trees are merged into Linus' tree - there is _no_ linearisation of the
-history in git.
+That's a pretty good question :-)
 
-This means when anyone comes to use git bisect, they _can_ land on any
-commit in any branch, which means if this patch and the other patch
-take two different routes, and this patch does not have the select, you
-_will_ hit the regression.
+Maybe the --strict is more a nice to have than a strong requirement?
+Anyway, we'd better run checkpatch with --strict and thus fix any
+cosmetic details that might be in the patch.
 
-Let me illustrate:
+>> Just let me know if you have any issue with the following update.
+> 
+> I will test, but should not have any issue with your fix.
+> 
+> Thank you very much for fixing my patch, I send you a virtual chocolate
+> from Switzerland!
 
----A----B----C----D---...---E----M
-   `--G----H----I----J---...---K-'
+Cool, I love chocolate. That being said, I'm not sure how tasteful will
+be the *virtual* chocolate.
 
-Let's say A-E is Greg's tree, and D is the commit you are talking about.
-Let's say G-K is Arnd's tree, and H is my patch without the 'select'
-statement.  Let's also say that '...' in each case includes a significant
-number of commits.
-
-If, through a git bisect (or manual commit selection) you end up trying
-to build at any commit I to K, you will not be builting a tree with D
-in, but you will be building a tree with H in.  You end up with EHCI
-being disabled in your configuration.
-
-What this also means is that when building Arnd's tree without Greg's tree,
-you will also end up with EHCI disabled in those configurations (because
-you also don't have commit D.)
-
-See?  There is no such thing as "lets make sure tree X gets merged before
-tree Y because commit A depends on commit B".  That "solution" doesn't fix
-any dependency between the two commits - it merely gives the impression
-that it does because you're looking only at the result.
-
-That kind of solution is broken thinking.
-
-> Arnd and
-> Olof would heed this and make sure this patch comes after Andrews.  This
-> should prevent the regression.
-
-As you can see from the above, tree order does not solve these issues.
-It gives the impression from the final result that it does, but it
-doesn't.  It breaks at least our most powerful regression debug tool -
-git bisect.
+Regards,
+Benoit
