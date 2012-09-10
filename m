@@ -1,32 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 10 Sep 2012 11:07:56 -0700
-Subject: [PATCH v2 1/6] usb: pxa27x_udc: remove IRQ_USB define
-In-Reply-To: <CAMPhdO9pyVDaR03Cy53gXbPttbnekaejuP_60qARttUuaBUwWg@mail.gmail.com>
-References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1346960563-18689-2-git-send-email-robherring2@gmail.com>
- <CAMPhdO9pyVDaR03Cy53gXbPttbnekaejuP_60qARttUuaBUwWg@mail.gmail.com>
-Message-ID: <20120910180756.GD31046@kroah.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 10 Sep 2012 14:15:48 -0400
+Subject: [PATCH V2 1/2] hwmon: Add devicetree bindings to gpio-fan
+In-Reply-To: <alpine.DEB.2.00.1209101656120.10589@marmot.wormnet.eu>
+References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
+ <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
+ <1347285112-13542-2-git-send-email-jm@lentin.co.uk>
+ <20120910152814.GA6050@lunn.ch>
+ <alpine.DEB.2.00.1209101656120.10589@marmot.wormnet.eu>
+Message-ID: <20120910181548.GH15277@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 11:56:46AM +0800, Eric Miao wrote:
-> On Fri, Sep 7, 2012 at 3:42 AM, Rob Herring <robherring2@gmail.com> wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> >
-> > IRQ_USB was implicitly included by gpio.h. Use the existing variable
-> > instead of IRQ_USB.
-> >
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Eric Miao <eric.y.miao@gmail.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+On Mon, Sep 10, 2012 at 05:04:26PM +0100, Jamie Lentin wrote:
+> On Mon, 10 Sep 2012, Andrew Lunn wrote:
 > 
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> >On Mon, Sep 10, 2012 at 02:51:51PM +0100, Jamie Lentin wrote:
+> >>Allow a gpio-fan to be defined in devicetree, see binding documentation
+> >>for details.
+> >>
+> >>Changes since V1:-
+> >>* Don't hide return codes [Guenter Roeck]
+> >>* Remove typecast noise [Guenter Roeck]
+> >>* Use of_find_property instead of counting u32s [Guenter Roeck]
+> >>* Don't count GPIOs twice [Andrew Lunn]
+> >>* Use of_prop_next_u32 to get records in a more obvious fashion
+> >>* Use CONFIG_OF_GPIO instead of CONFIG_OF
+> >>* Apply __devinitdata to of_gpio_fan_match [Andrew Lunn]
+> >>
+> >>Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> >>---
+> >> .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
+> >> drivers/hwmon/gpio-fan.c                           |  116 ++++++++++++++++++++
+> >> 2 files changed, 141 insertions(+)
+> >> create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
+> >
+> >Hi Jamie
+> >
+> >Thanks for addressing all the issues raised. However...
+> >
+> >Anything before the --- ends up in the changelog entry. Anything
+> >afterwards does not.
+> >
+> >The changes you made to address review comments is not something for
+> >the changelog, so Changes since V1:- should be after the --- .
 > 
-> Greg, guess this can go through the ARM tree.
+> Okay, whilst I was submitting the initial DT support it was
+> suggested by Grant Likely they should be above the '---'. I think I
+> prefer this also, but I'll go with whatever is more likely to get
+> patches accepted :)
+> 
+> Can resend with the content jiggled if you want, but will put them
+> after the '---' in future.
 
-That's fine, but note, I'm not the drivers/usb/gadget maintainer, Felipe
-needs to know about this as well.
+There's no need to resend if this is the only issue.  I'll just clean it
+up when I pull it in.  In the future, though, please do as Andrew
+suggested.
 
-Rob, the tool, scripts/get_maintainer.pl is your friend, please use it :)
+thx,
 
-greg k-h
+Jason.
