@@ -1,45 +1,31 @@
-From: jgutierrez@ti.com (Gutierrez, Juan)
-Date: Tue, 11 Sep 2012 09:47:40 -0500
-Subject: [PATCH] omap: remoteproc: set bootaddr support
-In-Reply-To: <CAK=Wgbb6EKS1YqR89y08stkwz3zFw786J3an2iDT+rKFWyo+5A@mail.gmail.com>
-References: <1345044348-19898-1-git-send-email-jgutierrez@ti.com>
- <CAK=Wgbb6EKS1YqR89y08stkwz3zFw786J3an2iDT+rKFWyo+5A@mail.gmail.com>
-Message-ID: <CADVn9RHC7ikoxWkuTxEc56nP5CPvSp5KZtY_24NjwqtibCVDiw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 10 Sep 2012 01:40:29 -0400
+Subject: [GIT PULL V2] ARM: cache-l2x0 for rmk's tree
+In-Reply-To: <20120829001129.GO19437@titan.lakedaemon.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+Message-ID: <20120910054029.GB15277@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cool. Thanks Ohad
+On Will Deacon's advice, this pull-request is intended to go through
+rmk's tree.  It is a dependency for subsequent branches going through
+arm-soc.  Please let me know if I've flubbed this up in any way.
 
-On Tue, Sep 11, 2012 at 7:30 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+thx,
 
-> Hi Juan,
->
-> On Wed, Aug 15, 2012 at 6:25 PM, Juan Gutierrez <jgutierrez@ti.com> wrote:
-> > Some remote processors (like Omap4's DSP) need to explicitly
-> > set a boot address from which they start executing code when
-> > taken out of reset.
-> >
-> > Support for this has been added to remoteproc code through
-> > a set_bootaddr function in the platform data which, if needed,
-> > must be set according to the backend rproc.
-> >
-> > For omap4's dsp we can use the next control funtion:
-> >
-> >   .set_bootaddr  = omap_ctrl_write_dsp_boot_addr
-> >
-> > Signed-off-by: Juan Gutierrez <jgutierrez@ti.com>
->
-> Applied with slight changes to the commit log. Thanks!
->
-> Ohad.
->
+Jason.
 
+The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
 
+  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
 
--- 
-Thanks
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux.git arm/cache-l2x0
 
-juan gutierrez
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/c9be81c6/attachment-0001.html>
+Gregory CLEMENT (2):
+      arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
+      arm: cache-l2x0: add an optional register to save/restore
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
+ arch/arm/mm/cache-l2x0.c                   |   38 ++++++++++++++++++++++------
+ 2 files changed, 31 insertions(+), 8 deletions(-)
