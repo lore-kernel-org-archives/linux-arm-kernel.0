@@ -1,83 +1,20 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Sep 2012 21:44:22 -0400
-Subject: [PATCH] ARM: Dove: allow PCI to be disabled
-In-Reply-To: <20120910004511.GN13739@n2100.arm.linux.org.uk>
-References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
- <20120909204705.GD3451@lunn.ch>
- <20120909205521.GI13739@n2100.arm.linux.org.uk>
- <20120909210126.GM4575@titan.lakedaemon.net>
- <20120910004511.GN13739@n2100.arm.linux.org.uk>
-Message-ID: <20120910014422.GQ4575@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Sep 2012 09:51:45 +0800
+Subject: [PATCH 5/7] gpio: 74x164: Add support for the daisy-chaining
+In-Reply-To: <CACRpkda9QHBQN-6fuAu27OdVN0JySdDd3H+L3rhs_UuJfnb7bw@mail.gmail.com>
+References: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1347020296-18796-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkda9QHBQN-6fuAu27OdVN0JySdDd3H+L3rhs_UuJfnb7bw@mail.gmail.com>
+Message-ID: <20120910015142.GQ26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 01:45:11AM +0100, Russell King - ARM Linux wrote:
-> On Sun, Sep 09, 2012 at 05:01:26PM -0400, Jason Cooper wrote:
-> > On Sun, Sep 09, 2012 at 09:55:21PM +0100, Russell King - ARM Linux wrote:
-> > > On Sun, Sep 09, 2012 at 10:47:05PM +0200, Andrew Lunn wrote:
-> > > > On Sun, Sep 09, 2012 at 08:34:13PM +0100, Russell King wrote:
-> > > > > Allow PCI support for Dove to be disabled.  Some platforms do not have
-> > > > > anything connected to the PCIe ports, so requiring PCI support to be
-> > > > > built into the kernel just wastes space, and presents a lot more config
-> > > > > options than are necessary.
-> > > > > 
-> > > > > However, select USB_ARCH_HAS_EHCI so that we can still have EHCI
-> > > > > support.
-> > > > 
-> > > > Hi Russel
-> > > > 
-> > > > I have a patch in GregKH usb-next which also ensures USB_ARCH_HAS_EHCI
-> > > > is selected.
-> > > > 
-> > > > http://git.kernel.org/?p=linux/kernel/git/gregkh/usb.git;a=commitdiff;h=ba2f9dff6c914b91005f687a9d75c8eac110d323
-> > > > 
-> > > > So we might not need your select as well, although it does not harm.
-> > > 
-> > > That depends on how this patch is handled.  If it gets into mainline via
-> > > a separate path to GregKH's USB tree, then it must be kept together as
-> > > otherwise it _will_ cause regressions - namely EHCI becomes impossible
-> > > to select when PCI=n.  That in turn makes the CuBox (and probably other
-> > > Dove platforms) a rather useless di
-> > [message trucated, I need to working on file locking for my email
-> > auto-flagging script... :-/]
-> > 
-> > greg just pulled Andrew's patch into his usb tree within the past few
-> > days.  Russell, would you prefer to submit this to greg's usb tree, or
-> > resend without USB_ARCH_HAS_EHCI?
+On Fri, Sep 07, 2012 at 11:07:33PM +0200, Linus Walleij wrote:
+> I'm stalling 5 thru 7 waiting for Florians comments to be addressed.
 > 
-> I thought I'd already answered the latter point.
-> 
-> As I said, it breaks the patch to remove that select, so it can not be
-> removed.  Removing it will create regressions - can I be any more clear
-> about that.  So no, I will not remove that select statement because I
-> can't without _breaking_ my Dove builds here.
+I expect that patch #7 does not apply on your tree at all, so I will
+take it via mxs/dt branch to ease the process.
 
-My apologies.  I was simply trying to achieve the cleanest solution.
-Andrew's patch selects USB_ARCH_HAS_EHCI whenever PLAT_ORION is enabled,
-of which dove is one.  Purely from the pov of the code, this makes the
-select redundant.
-
-iiuc, the regression you are refering to would occur iff this patch
-(without the select) makes it into mainline _before_ Andrew's patch in
-Greg's tree.  As I haven't pulled this patch yet, I can add a dependency
-in the tag message listing the patch in gregkh's usb tree.  Arnd and
-Olof would heed this and make sure this patch comes after Andrews.  This
-should prevent the regression.
-
-If the above is true, then indeed, the select is not necessary.  Is
-there something else I'm missing?
-
-> I don't think submitting this patch to Greg's USB tree is also
-> appropriate either, it's clearly ARM specific in nature, or even PCI
-> specific.  It isn't a USB patch.
-
-Agreed, please chalk that up to new maintainer crack-smoking. :-)
-
-> Neither is a patch changing a USB setting in arch/arm/Kconfig.  If any
-> tree, these patches should be going through arm-soc.
-
-Agreed.
-
-thx,
-
-Jason.
+-- 
+Regards,
+Shawn
