@@ -1,66 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 04:42:36 -0700
-Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed via
- Device Tree
-In-Reply-To: <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 10 Sep 2012 13:52:27 +0200
+Subject: [PATCH 0/2] ARM: omap/dts: Add support for Gumstix Overo with
+ Tobi expansion
+In-Reply-To: <504DD128.1000803@ti.com>
+References: <1346429172-5902-1-git-send-email-florian.vaussard@epfl.ch>
+ <20120906205227.GM1303@atomide.com> <504DB202.5050500@epfl.ch>
+ <504DD128.1000803@ti.com>
+Message-ID: <504DD47B.8080706@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> Each I2C device can be correctly probed already using Device Tree,
-> but the sub-devices still have to be registered by calls to
-> i2c_register_board_info(). After this patch, each sub-device can
-> be registered directly from Device Tree instead, removing the
-> requirement for the aforementioned calls from platform code.
+>>
+>> What is the status Benoit?
 >
-> CC: linux-i2c at vger.kernel.org
-> CC: Wolfram Sang <w.sang@pengutronix.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-The patch as such is fine.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-...but there will be merge issues (of the type I'm
-discussing with Arnd in another thread).
-
-> ---
->  drivers/i2c/busses/i2c-nomadik.c |    4 ++++
->  1 file changed, 4 insertions(+)
+> Patches looks good to me. I just adding them right now in my for_3.7/dts tree.
 >
-> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-> index 5d1a970..01231c2 100644
-> --- a/drivers/i2c/busses/i2c-nomadik.c
-> +++ b/drivers/i2c/busses/i2c-nomadik.c
-> @@ -26,6 +26,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/platform_data/i2c-nomadik.h>
->  #include <linux/of.h>
-> +#include <linux/of_i2c.h>
+> I've just slightly changed the subjects:
+>
+> Documentation: dt: Update the OMAP documentation with Overo/Toby
+> ARM: dts: OMAP3: Add support for Gumstix Overo with Tobi expansion board
+>
+> If you want to give it a try, here is the branch that contains all the DTS series I
+> already pulled. It includes your gpio-twl4030 patches as well.
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.7/dts
 
-This is clearly dependent on the other patches to I2C to
-be merged first (the include above is not yet there in
-linux-next even), so this patch should go into Wolfram's
-tree right? Else we have to rip out all the patches to the
-I2C driver from his tree and funnel it all through ARM SoC.
+Great, thank you! I will test your branch on my Overo ASAP.
 
-With the changes to the device tree itself being dependent
-on this, they should thus also go through the I2C tree.
-
-But they may be heavily dependent on the other DT
-changes you've done, so they cannot be applied to
-Wolfram's tree...
-
-And thus you may need to hold this change off
-until the I2C changes are upstream, or start creating
-cross-tree dependencies.
-
-Maybe I shouldn't worry about these things and just
-ACK stuff, but I have such problems with cross-tree
-merges myself so just trying to be helpful :-/
-
-Yours,
-Linus Walleij
+Regards,
+Florian
