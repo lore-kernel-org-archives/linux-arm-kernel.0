@@ -1,124 +1,29 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Sep 2012 16:39:59 +0200
-Subject: [PATCH] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <1347284313-2857-1-git-send-email-richard.genoud@gmail.com>
-References: <1347284313-2857-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <504DFBBF.5010202@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Sep 2012 14:48:20 +0000
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <alpine.LFD.2.02.1209101007160.28681@xanadu.home>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <201209101353.34325.arnd@arndb.de>
+ <alpine.LFD.2.02.1209101007160.28681@xanadu.home>
+Message-ID: <201209101448.20745.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 03:38 PM, Richard Genoud wrote:
-> This rules are useful for appended device tree conforming to the
-> CONFIG_ARM_APPENDED_DTB kernel option.
+On Monday 10 September 2012, Nicolas Pitre wrote:
+> On Mon, 10 Sep 2012, Arnd Bergmann wrote:
+> > On Monday 10 September 2012, Catalin Marinas wrote:
+> > > On Mon, Sep 10, 2012 at 06:53:39AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > I think a bunch of other architectures can have relocatable kernels, which
+> > is useful e.g. for kdump. It does imply a small runtime cost and may have
+> > other disadvantages though.
 > 
-> The rule dtbImage.<dt> is actually just a:
-> cat zImage <dt>.dtb > dtbImage.<dt>
-> 
-> The dtbuImage.<dt> makes an uImage out of the dtbImage.<dt> file.
+> Relocatable in physical space is what kdump actually needs, and that's 
+> what we already have here (as well as on ARM32 for that matter with 
+> CONFIG_ARM_PATCH_PHYS_VIRT).  Relocatable in the virtual space is costly 
+> and we shouldn't need to go there.
 
-Tested on my Armada XP board, it worked as expected.
-You can add my Tested-by.
+Ah, I see. I thought that the other architectures (powerpc and x86)
+doing this were actually building with -fPIC, but they do the same
+kind of early patching that we do.
 
-> 
-> KernelVersion: v3.6-rc5
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  arch/arm/Makefile      |   30 ++++++++++++++++--------------
->  arch/arm/boot/Makefile |   11 +++++++++++
->  scripts/Makefile.lib   |    6 ++++++
->  3 files changed, 33 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 30eae87..c5f2673 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -278,7 +278,7 @@ archprepare:
->  # Convert bzImage to zImage
->  bzImage: zImage
->  
-> -zImage Image xipImage bootpImage uImage: vmlinux
-> +zImage Image xipImage bootpImage uImage dtbImage.% dtbuImage.% : vmlinux
->  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
->  
->  zinstall uinstall install: vmlinux
-> @@ -300,17 +300,19 @@ i zi:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
->  
->  
->  define archhelp
-> -  echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
-> -  echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-> -  echo  '* xipImage      - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
-> -  echo  '  uImage        - U-Boot wrapped zImage'
-> -  echo  '  bootpImage    - Combined zImage and initial RAM disk' 
-> -  echo  '                  (supply initrd image via make variable INITRD=<path>)'
-> -  echo  '  dtbs          - Build device tree blobs for enabled boards'
-> -  echo  '  install       - Install uncompressed kernel'
-> -  echo  '  zinstall      - Install compressed kernel'
-> -  echo  '  uinstall      - Install U-Boot wrapped compressed kernel'
-> -  echo  '                  Install using (your) ~/bin/$(INSTALLKERNEL) or'
-> -  echo  '                  (distribution) /sbin/$(INSTALLKERNEL) or'
-> -  echo  '                  install to $$(INSTALL_PATH) and run lilo'
-> +  echo  '* zImage         - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
-> +  echo  '  Image          - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-> +  echo  '* xipImage       - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
-> +  echo  '  uImage         - U-Boot wrapped zImage'
-> +  echo  '  bootpImage     - Combined zImage and initial RAM disk'
-> +  echo  '                   (supply initrd image via make variable INITRD=<path>)'
-> +  echo  '  dtbs           - Build device tree blobs for enabled boards'
-> +  echo  '  dtbImage.<dt>  - zImage with an appended device tree blob'
-> +  echo  '  dtbuImage.<dt> - uImage with an embedded device tree blob'
-> +  echo  '  install        - Install uncompressed kernel'
-> +  echo  '  zinstall       - Install compressed kernel'
-> +  echo  '  uinstall       - Install U-Boot wrapped compressed kernel'
-> +  echo  '                   Install using (your) ~/bin/$(INSTALLKERNEL) or'
-> +  echo  '                   (distribution) /sbin/$(INSTALLKERNEL) or'
-> +  echo  '                   install to $$(INSTALL_PATH) and run lilo'
->  endef
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index c877087..35c01a8 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -98,6 +98,17 @@ $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
->  	$(call if_changed,objcopy)
->  	@echo '  Kernel: $@ is ready'
->  
-> +# dtbImage.% - a dtbImage is a zImage with an appended device tree blob
-> +$(obj)/dtbImage.%: $(obj)/zImage $(obj)/%.dtb FORCE
-> +	$(call if_changed,cat)
-> +	@echo '  Kernel: $@ is ready'
-> +
-> +# dtbuImage.% - a dtbuImage is a uImage with an embedded device tree blob
-> +$(obj)/dtbuImage.%: $(obj)/dtbImage.% FORCE
-> +	@$(check_for_multiple_loadaddr)
-> +	$(call if_changed,uimage)
-> +	@echo '  Image $@ is ready'
-> +
->  PHONY += initrd FORCE
->  initrd:
->  	@test "$(INITRD_PHYS)" != "" || \
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 0be6f11..8550466 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -235,6 +235,12 @@ cmd_ld = $(LD) $(LDFLAGS) $(ldflags-y) $(LDFLAGS_$(@F)) \
->  quiet_cmd_objcopy = OBJCOPY $@
->  cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $(OBJCOPYFLAGS_$(@F)) $< $@
->  
-> +# Cat
-> +# ---------------------------------------------------------------------------
-> +
-> +quiet_cmd_cat = CAT     $@
-> +cmd_cat = (cat $(filter-out FORCE,$^) > $@) || (rm -f $@ ; false)
-> +
->  # Gzip
->  # ---------------------------------------------------------------------------
->  
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
