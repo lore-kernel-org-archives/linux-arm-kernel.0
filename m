@@ -1,133 +1,59 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 10 Sep 2012 10:59:33 +0200
-Subject: [PATCH 3/7] pwm: i.MX: add functions to enable/disable pwm.
-In-Reply-To: <1347267577-3296-1-git-send-email-s.hauer@pengutronix.de>
-References: <1347267577-3296-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1347267577-3296-4-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 10 Sep 2012 10:59:30 +0200
+Subject: [PATCH v4] pwm: i.MX: add devicetree support
+Message-ID: <1347267577-3296-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We used to enable/disable the PWM only by switching the
-clock on or off. Instead, use the dedicated register bits.
-These differ on different SoCs, so introduce a SoC specific
-function for this.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
-Reviewed-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- drivers/pwm/pwm-imx.c |   48 ++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 44 insertions(+), 4 deletions(-)
+Changes since v3:
 
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index 5d426ff..13d4d22 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -25,6 +25,7 @@
- #define MX1_PWMS    0x04   /* PWM Sample Register */
- #define MX1_PWMP    0x08   /* PWM Period Register */
- 
-+#define MX1_PWMC_EN		(1 << 4)
- 
- /* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
- 
-@@ -49,6 +50,7 @@ struct imx_chip {
- 
- 	int (*config)(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns);
-+	void (*set_enable)(struct pwm_chip *chip, bool enable);
- };
- 
- #define to_imx_chip(chip)	container_of(chip, struct imx_chip, chip)
-@@ -82,6 +84,21 @@ static int imx_pwm_config_v1(struct pwm_chip *chip,
- 	return 0;
- }
- 
-+static void imx_pwm_set_enable_v1(struct pwm_chip *chip, bool enable)
-+{
-+	struct imx_chip *imx = to_imx_chip(chip);
-+	u32 val;
-+
-+	val = readl(imx->mmio_base + MX1_PWMC);
-+
-+	if (enable)
-+		val |= MX1_PWMC_EN;
-+	else
-+		val &= ~MX1_PWMC_EN;
-+
-+	writel(val, imx->mmio_base + MX1_PWMC);
-+}
-+
- static int imx_pwm_config_v2(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns)
- {
-@@ -116,7 +133,10 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 
- 	cr = MX3_PWMCR_PRESCALER(prescale) |
- 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
--		MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
-+		MX3_PWMCR_DBGEN;
-+
-+	if (imx->enabled)
-+		cr |= MX3_PWMCR_EN;
- 
- 	if (cpu_is_mx25())
- 		cr |= MX3_PWMCR_CLKSRC_IPG;
-@@ -128,6 +148,21 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 	return 0;
- }
- 
-+static void imx_pwm_set_enable_v2(struct pwm_chip *chip, bool enable)
-+{
-+	struct imx_chip *imx = to_imx_chip(chip);
-+	u32 val;
-+
-+	val = readl(imx->mmio_base + MX3_PWMCR);
-+
-+	if (enable)
-+		val |= MX3_PWMCR_EN;
-+	else
-+		val &= ~MX3_PWMCR_EN;
-+
-+	writel(val, imx->mmio_base + MX3_PWMCR);
-+}
-+
- static int imx_pwm_config(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns)
- {
-@@ -145,6 +180,8 @@ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	if (ret)
- 		return ret;
- 
-+	imx->set_enable(chip, true);
-+
- 	imx->enabled = 1;
- 
- 	return 0;
-@@ -154,7 +191,7 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
- 
--	writel(0, imx->mmio_base + MX3_PWMCR);
-+	imx->set_enable(chip, false);
- 
- 	clk_disable_unprepare(imx->clk);
- 	imx->enabled = 0;
-@@ -199,10 +236,13 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
- 	if (imx->mmio_base == NULL)
- 		return -EADDRNOTAVAIL;
- 
--	if (cpu_is_mx1() || cpu_is_mx21())
-+	if (cpu_is_mx1() || cpu_is_mx21()) {
- 		imx->config = imx_pwm_config_v1;
--	else
-+		imx->set_enable = imx_pwm_set_enable_v1;
-+	} else {
- 		imx->config = imx_pwm_config_v2;
-+		imx->set_enable = imx_pwm_set_enable_v2;
-+	}
- 
- 	ret = pwmchip_add(&imx->chip);
- 	if (ret < 0)
--- 
-1.7.10.4
+- Change patches to subject 'pwm:'
+- Use uppercase PWM when referring to PWMs
+- Change commit message for "factor out SoC specific functions" patch
+
+Changes since v2:
+
+- check return value of clk_prepare_enable
+- remove platform based probing
+
+Changes since v1:
+
+- Add devicetree binding documentation
+- Merge 5/9 and 9/9
+- fix #pwm-cells (must be 2 instead of 3)
+- fix wrong name in MODULE_DEVICE_TABLE
+- drop platform based probing while introducing devicetree based probe
+
+
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-pwm-oftree
+
+for you to fetch changes up to 5e39af20dedff5dca77c36209ddb09729cfe090e:
+
+  pwm: i.MX: fix clock lookup (2012-09-10 10:40:27 +0200)
+
+----------------------------------------------------------------
+Cleanup i.MX PWM driver and add devicetree support
+
+----------------------------------------------------------------
+Philipp Zabel (2):
+      pwm: i.MX: add devicetree support
+      pwm: i.MX: fix clock lookup
+
+Sascha Hauer (5):
+      pwm: i.MX: factor out SoC specific functions
+      pwm: i.MX: remove unnecessary if in pwm_[en|dis]able
+      pwm: i.MX: add functions to enable/disable pwm.
+      pwm: i.MX: Use module_platform_driver
+      pwm: i.MX: use per clock unconditionally
+
+ Documentation/devicetree/bindings/pwm/imx-pwm.txt |   17 ++
+ drivers/pwm/pwm-imx.c                             |  278 ++++++++++++++-------
+ 2 files changed, 199 insertions(+), 96 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/imx-pwm.txt
