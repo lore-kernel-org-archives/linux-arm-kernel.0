@@ -1,33 +1,43 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 10 Sep 2012 14:57:41 +0530
-Subject: [PATCH v2 2/2] ARM: da850/omap-l138: Add EVM specific code for
- VPIF to work
-In-Reply-To: <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
-References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
- <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
- <504A2C7D.1090702@ti.com>
- <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
-Message-ID: <504DB28D.3070005@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Sep 2012 11:27:48 +0200
+Subject: [PATCH 7/7] ARM: dts: cfa10049: Add the 74HC595 gpio expanders
+In-Reply-To: <20120910022342.GR26709@S2101-09.ap.freescale.net>
+References: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1347020296-18796-8-git-send-email-maxime.ripard@free-electrons.com>
+ <20120910022342.GR26709@S2101-09.ap.freescale.net>
+Message-ID: <504DB294.7050309@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Hi Shawn,
 
-On 9/7/2012 11:04 PM, Prabhakar Lad wrote:
-> On Fri, Sep 7, 2012 at 10:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-
->>> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
->>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+Le 10/09/2012 04:23, Shawn Guo a ?crit :
+> On Fri, Sep 07, 2012 at 02:18:16PM +0200, Maxime Ripard wrote:
+>> ---
+>>  arch/arm/boot/dts/imx28-cfa10049.dts |   21 +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
 >>
->> You agreed to get rid of these multiple ifdefs but you have not fixed that.
->>
-> I have merged the top one, at later stage when we go  ahead and add sensor
-> support then we would have require to have define two
-> da850_vpif_capture_sdev_info
-> so to avoid it I have kept this one.
+>> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+>> index 1f7fa50..05c892e 100644
+>> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
+>> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+>> @@ -27,6 +27,8 @@
+>>  					fsl,pinmux-ids = <
+>>  						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
+>>  						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
+>> +						0x0111 /* MX28_PAD_GPMI_CE1N__SSP3_D3 */
+>> +						0x01a2 /* MX28_PAD_GPMI_ALE__SSP3_D4 */
+> 
+> What are these two pins used for?
 
-Lets get to that when we actually add sensor support. It might make
-sense then. Right now, there is no reason to have them.
+The SSP_D3, D4 and D5 are used as chip select 0, 1 and 2 by the SSP
+controller when it runs in the two SPI (motorola and Winbond) modes.
+Thus, here, I'm using them as chip selects.
 
-Thanks,
-Sekhar
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
