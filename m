@@ -1,73 +1,109 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 10 Sep 2012 10:23:39 -0500
-Subject: [PATCH V3 1/8] ARM: OMAP3: Add debugss HWMOD data
-In-Reply-To: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1347290626-21164-2-git-send-email-jon-hunter@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 08:23:51 -0700
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <20120908234435.GA13519@glitch>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
+ <20120907110251.GA7968@glitch>
+ <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
+ <20120907160025.GB14330@glitch>
+ <CACRpkdbz7CQtaj9e-1kcRVszpCSoqKz=19YT68sTMF9SOyWa8w@mail.gmail.com>
+ <20120908234435.GA13519@glitch>
+Message-ID: <CACRpkdZySZqf-gPoQLGgMZ_B9m+8+Jbr4b6aA+j_OFDCHc2cGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable PMU with runtime PM support on OMAP3 devices we need to be able to
-dynamically enable and disable the debug sub-system at runtime. By adding HWMOD
-data for the debug sub-system for OMAP3, we can build the PMU device using the
-debug sub-system HWMOD and control this power domain using runtime PM.
+On Sun, Sep 9, 2012 at 1:44 AM, Domenico Andreoli <cavokz@gmail.com> wrote:
+> On Fri, Sep 07, 2012 at 11:57:59PM +0200, Linus Walleij wrote:
+>>
+>> If all you need to to is to multiplex the pins into GPIO mode,
+>> then the gpio_get() call on this driver *can* call through to
+>> pinctrl_request_gpio() which will in turn fall through to the
+>> above pinmux driver calls (.gpio_request_enable, etc).
+>
+> So if the GPIO driver doesn't coordinate with the pinctrl driver, it's
+> all left to the GPIO user to configure the pin before using it, right?
 
-Reviewed-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Yes, more or less, or should I say that certain aspects of pinctrl
+are orthogonal to GPIO and the two mostly do not know of each
+other due to a separation of concerns.
+
+So the driver may need to tie things up and request its pinctrl
+and GPIOs independently.
+
+> I can understand the concerns of Tony, whether a pin must be requested
+> or not before the gpio then depends on the GPIO driver implementation,
+> which may or may not call through the pinctrl layer, isn't it?.
+
+Yes that is a sematic limitation, indeed.
+
+I think the best way of trying to eliminate that is to bring the two
+subsystems closer (which is some long-term project) but in the
+meantime we could propose a documentation fixup to make the
+semantics clear, what about this:
+
+>From a92d754367861cf564c09e0b15746e02f0a96f3f Mon Sep 17 00:00:00 2001
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Mon, 10 Sep 2012 17:22:00 +0200
+Subject: [PATCH] pinctrl: document semantics vs GPIO
+
+The semantics of the interactions between GPIO and pinctrl may be
+unclear, e.g. which one do you request first? This amends the
+documentation to make this clear.
+
+Reported-by: Domenico Andreoli <cavokz@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ Documentation/pinctrl.txt | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index c9e3820..78a0c2d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -114,6 +114,24 @@ static struct omap_hwmod omap3xxx_iva_hwmod = {
- 	.main_clk	= "iva2_ck",
- };
- 
-+/*
-+ * 'debugss' class
-+ * debug and emulation sub system
-+ */
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index 1479aca..941e783 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -289,6 +289,29 @@ Interaction with the GPIO subsystem
+ The GPIO drivers may want to perform operations of various types on the same
+ physical pins that are also registered as pin controller pins.
+
++First and foremost, the two subsystems can be used as completely orthogonal,
++so say that your driver is fetching its resources like this:
 +
-+static struct omap_hwmod_class omap3xxx_debugss_hwmod_class = {
-+	.name	= "debugss",
-+};
++#include <linux/pinctrl/consumer.h>
++#include <linux/gpio.h>
 +
-+/* debugss */
-+static struct omap_hwmod omap3xxx_debugss_hwmod = {
-+	.name		= "debugss",
-+	.class		= &omap3xxx_debugss_hwmod_class,
-+	.clkdm_name	= "emu_clkdm",
-+	.main_clk	= "emu_src_ck",
-+	.flags		= HWMOD_NO_IDLEST,
-+};
++struct pinctrl *pinctrl;
++int gpio;
 +
- /* timer class */
- static struct omap_hwmod_class_sysconfig omap3xxx_timer_1ms_sysc = {
- 	.rev_offs	= 0x0000,
-@@ -2093,6 +2111,13 @@ static struct omap_hwmod_ocp_if omap3xxx_mpu__l3_main = {
- 	.user	= OCP_USER_MPU,
- };
- 
-+/* l3 -> debugss */
-+static struct omap_hwmod_ocp_if omap3xxx_l3_main__l4_debugss = {
-+	.master		= &omap3xxx_l3_main_hwmod,
-+	.slave		= &omap3xxx_debugss_hwmod,
-+	.user		= OCP_USER_MPU,
-+};
++pinctrl = devm_pinctrl_get_select_default(&dev);
++gpio = devm_gpio_request(&dev, 14, "foo");
 +
- /* DSS -> l3 */
- static struct omap_hwmod_ocp_if omap3430es1_dss__l3 = {
- 	.master		= &omap3430es1_dss_core_hwmod,
-@@ -3272,6 +3297,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
- 	&omap3xxx_l3_main__l4_core,
- 	&omap3xxx_l3_main__l4_per,
- 	&omap3xxx_mpu__l3_main,
-+	&omap3xxx_l3_main__l4_debugss,
- 	&omap3xxx_l4_core__l4_wkup,
- 	&omap3xxx_l4_core__mmc3,
- 	&omap3_l4_core__uart1,
++Here we first request a certain pin state and then request GPIO 14 to be
++used. If you're using the subsystems orthogonally like this, always get
++your pinctrl handle and select the desired pinctrl state BEFORE requesting
++the GPIO. This is a semantic convention to avoid situations that can be
++electrically unpleasant, you may certainly want to mux in and bias pins
++a certain way before the GPIO subsystems starts to deal with them.
++
++But there are also situations where it makes sense for the GPIO subsystem
++to communicate with with the pinctrl subsystem, using the latter as a
++back-end.
++
+ Since the pin controller subsystem have its pinspace local to the pin
+ controller we need a mapping so that the pin control subsystem can figure out
+ which pin controller handles control of a certain GPIO pin. Since a single
+@@ -359,6 +382,7 @@ will get an pin number into its handled number
+range. Further it is also passed
+ the range ID value, so that the pin controller knows which range it should
+ deal with.
+
++
+ PINMUX interfaces
+ =================
+
 -- 
-1.7.9.5
+1.7.11.3
+
+
+Yours,
+Linus Walleij
