@@ -1,31 +1,45 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon, 10 Sep 2012 12:14:11 -0500
-Subject: [PATCH 2/2] ARM: OMAP: hwmod: revise deassert sequence
-In-Reply-To: <5048BD7A.7060408@ti.com>
-References: <1345614150-25723-1-git-send-email-omar.luna@linaro.org>
- <1345614150-25723-3-git-send-email-omar.luna@linaro.org>
- <5048BD7A.7060408@ti.com>
-Message-ID: <CALLhW=4SnyXRwHWToAy6Lxyxr5P7GAMUZ5e=zGhr30cE_sEU6Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 10 Sep 2012 11:17:50 -0600
+Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <20120910011741.GP26709@S2101-09.ap.freescale.net>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+ <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
+ <5049252D.9000802@wwwdotorg.org>
+ <20120907025847.GI26709@S2101-09.ap.freescale.net>
+ <504A26E4.4070600@wwwdotorg.org>
+ <20120910011741.GP26709@S2101-09.ap.freescale.net>
+Message-ID: <504E20BE.8050107@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On 09/09/2012 07:17 PM, Shawn Guo wrote:
+> On Fri, Sep 07, 2012 at 10:55:00AM -0600, Stephen Warren wrote:
+>> Yes, that does solve the problem (well, with s/late_init/late_initcall/).
+>>
+>> As you imply, that change wouldn't help if cpu-tegra.c was built as a
+>> module.
+> 
+> I doubt that.  Have you confirmed it with testing?  When you install
+> module cpu-tegra, the pcie initialization has been done, right?
 
-On 6 September 2012 10:12, Benoit Cousson <b-cousson@ti.com> wrote:
-> The sequence is good, I'm just a little bit concern about the
-> duplication of code compared to _enable sequence.
->
-> That being said, this is the consequence of removing the hardreset
-> sequence outside of the main _enable/_shutdown sequence.
->
-> So I'm not sure I have any better way of doing that :-(
+Never mind, the code can't be built as a module anyway.
 
-Indeed, it should be exactly the same as putting back the reset
-sequence into _enable/_shutdown, so with these patches I was expecting
-we could gather the hard reset users and see if they needed anything
-else beyond these functions, if not, perhaps just put back the reset
-code into _enable/_shutdown paths.
+Aside from that, I misinterpreted your test patch, and thought that it
+was moving the Tegra cpufreq driver initialization earlier, but it's
+actually moving it later, and in fact by chance after PCIe
+initialization, which explains why it solves the issue.
 
-Thanks,
+I think the root of the problem is that cpufreq is lowering the CPU
+frequency, yet the patch which converted Tegra to the common clock
+framework removed the code that actually changes the CPU clock rate. So,
+cpufreq thinks the CPU is running at e.g. 216MHz, but it's actually
+still running at 1.0GHz, and hence re-calculating the delay loops breaks
+things, since delays aren't as long as the system thinks they are. The
+variability is due to whether lowering the CPU frequency just happens to
+occur before or after the PCIe controller is initialized.
 
-Omar
+Prashant, are you able to fix the clock driver deficiency within the
+next 2-3 days or so (so I can include the fix in the pull requests I
+send for 3.7, which need to be sent before the end of the week)? Or, do
+we need to disable cpufreq for Tegra because of this?
