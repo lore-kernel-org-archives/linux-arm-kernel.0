@@ -1,67 +1,47 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 10 Sep 2012 10:17:17 +0200
-Subject: [PATCH 1/2] gpio/twl4030: get platform data from device tree
-In-Reply-To: <504A2FF2.7070607@ti.com>
-References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
- <1346831186-29947-2-git-send-email-florian.vaussard@epfl.ch>
- <504A2FF2.7070607@ti.com>
-Message-ID: <504DA20D.7020903@epfl.ch>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 10 Sep 2012 11:21:34 +0300
+Subject: [alsa-devel] [RFC update 0/2] dmaengine/ASoC: omap: Enable element
+ mode in cyclic DMA
+In-Reply-To: <1402174.PkzhGH5Vno@acer>
+References: <E1T8a09-0002vz-Bl@rmk-PC.arm.linux.org.uk>
+ <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
+ <1402174.PkzhGH5Vno@acer>
+Message-ID: <504DA30E.9030304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Benoit,
+Hi Janusz,
 
-Le 07/09/2012 19:33, Benoit Cousson a ?crit :
-> Hi Florian,
->
-> I've just noticed that this patch is reporting some CHECK issues.
->
-> d1f5052 - gpio/twl4030: get platform data from device tree
-> CHECK: Alignment should match open parenthesis
-> #66: FILE: drivers/gpio/gpio-twl4030.c:412:
-> +	of_property_read_u32(dev->of_node, "ti,debounce",
-> +				&omap_twl_info->debounce);
->
-> CHECK: Alignment should match open parenthesis
-> #68: FILE: drivers/gpio/gpio-twl4030.c:414:
-> +	of_property_read_u32(dev->of_node, "ti,mmc-cd",
-> +				(u32 *)&omap_twl_info->mmc_cd);
->
-> CHECK: Alignment should match open parenthesis
-> #70: FILE: drivers/gpio/gpio-twl4030.c:416:
-> +	of_property_read_u32(dev->of_node, "ti,pullups",
-> +				&omap_twl_info->pullups);
->
-> CHECK: Alignment should match open parenthesis
-> #72: FILE: drivers/gpio/gpio-twl4030.c:418:
-> +	of_property_read_u32(dev->of_node, "ti,pulldowns",
-> +				&omap_twl_info->pulldowns);
->
-> CHECK: Alignment should match open parenthesis
-> +				pdata->pullups, pdata->pulldowns,
->
-> CHECK: Alignment should match open parenthesis
-> #139: FILE: drivers/gpio/gpio-twl4030.c:479:
-> +		dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
-> +				pdata->debounce, pdata->mmc_cd,
->
-> total: 0 errors, 0 warnings, 6 checks, 118 lines checked
->
->
-> I fixed them since it was trivial, but next time you should ensure that the patch pass checkpatch before posting.
+On 09/09/2012 10:57 PM, Janusz Krzysztofik wrote:
+> On Tue, 4 Sep 2012 15:08:00 Peter Ujfalusi wrote:
+>>
+>> Enable the element mode (thus allowing mono playback and probably 
+> unblocking
+>> OMAP1, OMAP2420) in OMAP dmaengine and omap-pcm.
+>>
+>> Janusz: would it be possible for you to test Russell's series plus 
+> this on
+>> OMAP1 to make sure that we do not broke it?
+> 
+> Hi,
+> I can confirm that sound works for me as before, both capture and 
+> playback, on my OMAP1 Amstrad Delta with Russell's and Peter's patches 
+> applied on top of linux-3.6-rc3, with the OMAP DMA engine driver built 
+> in. I was not able make audible tests with applications other than a 
+> soft phone as I didn't get back home for this weekend, but I think that 
+> the asterisk soft phone is quite a demanding use case.
 
-Sorry for these errors. I however checked my patches before submitting, 
-and had no such warnings. I redone, and remarked that these warnings 
-appear only with the "--strict" option, which is not enabled by default. 
-Is this the recommended  guideline? Thus why not enabling it by default?
+Thank you very much for taking time to test this! This is indeed a good news.
 
->
-> Just let me know if you have any issue with the following update.
+> The only thing I'm not sure about is why the sysfs provided 
+> bytes_transferred values never change from their initial zeros.
 
-I will test, but should not have any issue with your fix.
+I have not looked at those files in sysfs, but if the same applies for
+OMAP3/4/5 I can look at it and fix it which should correct OMAP1 at the same time.
 
-Thank you very much for fixing my patch, I send you a virtual chocolate 
-from Switzerland!
+> 
+> For OMAP1:
+> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-Regards,
-Florian
+Again, thanks for the testing,
+P?ter
