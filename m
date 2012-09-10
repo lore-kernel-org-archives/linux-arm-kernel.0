@@ -1,42 +1,33 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Mon, 10 Sep 2012 16:28:57 -0400
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120910055339.GC31430@game.jcrosoft.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org>
- <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
- <20120910055339.GC31430@game.jcrosoft.org>
-Message-ID: <504E4D89.3020203@jonmasters.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Sep 2012 22:35:38 +0200
+Subject: [PATCHv3 0/3] gpios: Add daisy-chaining and dt support to 74x164
+Message-ID: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 01:53 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 19:29 Sun 09 Sep     , Nicolas Pitre wrote:
->> On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>
->>> On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
->>>> +4. Call the kernel image
->>>> +------------------------
->>>> +
->>>> +Requirement: MANDATORY
->>>> +
->>>> +The decompressed kernel image contains a 32-byte header as follows:
->>>> +
->>>> +  u32 magic	= 0x14000008;	/* branch to stext, little-endian */
->>>> +  u32 res0	= 0;		/* reserved */
->>>> +  u64 text_offset;		/* Image load offset */
->>>> +  u64 res1	= 0;		/* reserved */
->>>> +  u64 res2	= 0;		/* reserved */
->>> we need to have a magic to known it's a arm64 kernel
->>
->> You have it: it's 0x14000008 at the beginning.
-> fragile
+Hi all,
 
-Others have commented on the relocatable kernel non-issue. But to this 
-part, also bear in mind that Catalin pointed out boot standardization 
-work may change how some AArch64 systems ultimately end up booting.
+This is an attempt at adding the support for chained 8 bit shift registers that
+are present in the cfa-10049.
+
+This patchset also adds dt documentation to the 74x164 gpio driver.
 
 Thanks,
+Maxime
 
-Jon.
+Changes since v2:
+  * Fixed a memleak in the _write_config function when having an error.
+
+Maxime Ripard (3):
+  gpio: 74x164: Add support for the daisy-chaining
+  gpio: 74x164: dts: Add documentation for the dt binding
+  ARM: dts: cfa10049: Add the 74HC595 gpio expanders
+
+ .../devicetree/bindings/gpio/gpio-74x164.txt       |   22 +++++++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |   21 ++++++
+ drivers/gpio/gpio-74x164.c                         |   68 ++++++++++++++++++--
+ 3 files changed, 104 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-74x164.txt
+
+-- 
+1.7.9.5
