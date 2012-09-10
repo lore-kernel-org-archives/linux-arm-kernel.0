@@ -1,27 +1,36 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 10 Sep 2012 16:00:05 -0700
-Subject: [PATCH] serial: mxs-auart: put the device when exit or error
-In-Reply-To: <1346985187-30459-1-git-send-email-b32955@freescale.com>
-References: <20120907024349.GH26709@S2101-09.ap.freescale.net>
- <1346985187-30459-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120910230005.GA15782@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 10 Sep 2012 17:12:37 -0600
+Subject: [PATCH 1/2] ARM: tegra: fix overflow in tegra20_pll_clk_round_rate()
+Message-ID: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 10:33:07AM +0800, Huang Shijie wrote:
-> We call the get_device() in the mxs_auart_probe().
-> For the balance of the reference count, we should put the
-> device in the mxs_auart_remove() or in the error path of
-> probe.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/tty/serial/mxs-auart.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+From: Stephen Warren <swarren@nvidia.com>
 
-I already applied the previous version, so can you make up a patch
-against the tty-next tree that fixes it up properly based on this patch?
+32-bit math isn't enough when e.g. *prate=12000000, and sel->n=1000.
+Use 64-bit math to prevent this.
 
-thanks,
+Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Prashant, can you please audit all of the Tegra clock driver to see if
+there are any other instances of the same issue? Thanks.
+---
+ arch/arm/mach-tegra/tegra20_clocks.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-greg k-h
+diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
+index ee6922b..e2a43e4 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks.c
++++ b/arch/arm/mach-tegra/tegra20_clocks.c
+@@ -798,7 +798,7 @@ static long tegra20_pll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct clk_tegra *c = to_clk_tegra(hw);
+ 	const struct clk_pll_freq_table *sel;
+ 	unsigned long input_rate = *prate;
+-	unsigned long output_rate = *prate;
++	u64 output_rate = *prate;
+ 	int mul;
+ 	int div;
+ 
+-- 
+1.7.0.4
