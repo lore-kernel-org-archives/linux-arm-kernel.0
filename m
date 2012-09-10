@@ -1,73 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 10 Sep 2012 12:45:10 -0400 (EDT)
-Subject: [PATCH] ARM: Dove: allow PCI to be disabled
-In-Reply-To: <20120910014422.GQ4575@titan.lakedaemon.net>
-References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
- <20120909204705.GD3451@lunn.ch>
- <20120909205521.GI13739@n2100.arm.linux.org.uk>
- <20120909210126.GM4575@titan.lakedaemon.net>
- <20120910004511.GN13739@n2100.arm.linux.org.uk>
- <20120910014422.GQ4575@titan.lakedaemon.net>
-Message-ID: <alpine.LFD.2.02.1209101239510.28681@xanadu.home>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Sep 2012 17:45:20 +0100
+Subject: [PATCH 06/22] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+In-Reply-To: <CACRpkdb09UnPj6xV-rNxoeUS2yPLurA+n6zygWEA3_7OQfb0nA@mail.gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdb09UnPj6xV-rNxoeUS2yPLurA+n6zygWEA3_7OQfb0nA@mail.gmail.com>
+Message-ID: <20120910164518.GE24506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 9 Sep 2012, Jason Cooper wrote:
+Ola poke.
 
-> On Mon, Sep 10, 2012 at 01:45:11AM +0100, Russell King - ARM Linux wrote:
-> > On Sun, Sep 09, 2012 at 05:01:26PM -0400, Jason Cooper wrote:
-> > > On Sun, Sep 09, 2012 at 09:55:21PM +0100, Russell King - ARM Linux wrote:
-> > > > On Sun, Sep 09, 2012 at 10:47:05PM +0200, Andrew Lunn wrote:
-> > > > > On Sun, Sep 09, 2012 at 08:34:13PM +0100, Russell King wrote:
-> > > > > > Allow PCI support for Dove to be disabled.  Some platforms do not have
-> > > > > > anything connected to the PCIe ports, so requiring PCI support to be
-> > > > > > built into the kernel just wastes space, and presents a lot more config
-> > > > > > options than are necessary.
-> > > > > > 
-> > > > > > However, select USB_ARCH_HAS_EHCI so that we can still have EHCI
-> > > > > > support.
-> > > > > 
-> > > > > Hi Russel
-> > > > > 
-> > > > > I have a patch in GregKH usb-next which also ensures USB_ARCH_HAS_EHCI
-> > > > > is selected.
-> > > > > 
-> > > > > http://git.kernel.org/?p=linux/kernel/git/gregkh/usb.git;a=commitdiff;h=ba2f9dff6c914b91005f687a9d75c8eac110d323
-> > > > > 
-> > > > > So we might not need your select as well, although it does not harm.
-> > > > 
-> > > > That depends on how this patch is handled.  If it gets into mainline via
-> > > > a separate path to GregKH's USB tree, then it must be kept together as
-> > > > otherwise it _will_ cause regressions - namely EHCI becomes impossible
-> > > > to select when PCI=n.  That in turn makes the CuBox (and probably other
-> > > > Dove platforms) a rather useless di
-> > > [message trucated, I need to working on file locking for my email
-> > > auto-flagging script... :-/]
-> > > 
-> > > greg just pulled Andrew's patch into his usb tree within the past few
-> > > days.  Russell, would you prefer to submit this to greg's usb tree, or
-> > > resend without USB_ARCH_HAS_EHCI?
-> > 
-> > I thought I'd already answered the latter point.
-> > 
-> > As I said, it breaks the patch to remove that select, so it can not be
-> > removed.  Removing it will create regressions - can I be any more clear
-> > about that.  So no, I will not remove that select statement because I
-> > can't without _breaking_ my Dove builds here.
+On Tue, Aug 14, 2012 at 10:55:59AM +0200, Linus Walleij wrote:
+> On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> My apologies.  I was simply trying to achieve the cleanest solution.
-> Andrew's patch selects USB_ARCH_HAS_EHCI whenever PLAT_ORION is enabled,
-> of which dove is one.  Purely from the pov of the code, this makes the
-> select redundant.
+> > Register both parts of the MSP driver from Device Tree so that they
+> > are probed when Device Tree is enabled. Also, as there is platform
+> > data involved, we ensure that there is allocated memory to place the
+> > configuration into and that the correct information is extracted from
+> > the DT binary.
+> >
+> > CC: alsa-devel at alsa-project.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Looks like it's doing what's intended...
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Yours,
+> Linus Walleij
 
-Are we trying to split hairs here?
-
-At best, the select will be redundant and that is trivially cleaned up 
-later.  At worst, you'll have a trivial git merge conflict to solve (and 
-that happens all the time).
-
-So the simplest thing to do is to keep the select there to prevent build 
-issues and remember that perfection is the enemy of the good.
-
-
-Nicolas
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
