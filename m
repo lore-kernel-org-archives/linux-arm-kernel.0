@@ -1,43 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 10 Sep 2012 10:12:19 -0400 (EDT)
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <201209101353.34325.arnd@arndb.de>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <20120910055339.GC31430@game.jcrosoft.org> <20120910125137.GC27042@arm.com>
- <201209101353.34325.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1209101007160.28681@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Sep 2012 14:22:13 +0000
+Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <502D201E.9030304@codethink.co.uk>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <5028D040.60604@codethink.co.uk> <502D201E.9030304@codethink.co.uk>
+Message-ID: <201209101422.13875.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Sep 2012, Arnd Bergmann wrote:
-
-> On Monday 10 September 2012, Catalin Marinas wrote:
-> > On Mon, Sep 10, 2012 at 06:53:39AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 19:29 Sun 09 Sep     , Nicolas Pitre wrote:
-> > > > On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
-> > > > > > +The image must be placed at the specified offset (currently 0x80000)
-> > > > > > +from the start of the system RAM and called there. The start of the
-> > > > > > +system RAM must be aligned to 2MB.
-> > > > > can we drop this
-> > > > 
-> > > > Drop what?
-> > > > And why?
-> > > This contrain the must be loadable at any address
-> > 
-> > You can't easily load the kernel image at any address, unless it can
-> > relocate itself and you have a way to specify PHYS_OFFSET. We don't want
-> > a compile-time PHYS_OFFSET, the kernel detects it at boot time based on
-> > the load address.
+On Thursday 16 August 2012, Ian Molton wrote:
+> Ping :)
 > 
-> I think a bunch of other architectures can have relocatable kernels, which
-> is useful e.g. for kdump. It does imply a small runtime cost and may have
-> other disadvantages though.
+> Can we get some consensus on the right approach here? I'm loathe to code
+> this if its going to be rejected.
+> 
+> I'd prefer the driver to be properly split so we dont have the MDIO
+> driver mapping the ethernet drivers address spaces, but if thats not
+> going to be merged, I'm not feeling like doing the work for nothing.
+> 
+> If the driver is to use the overlapping-address mapped-by-the-mdio
+> scheme, then so be it, but I could do with knowing.
+> 
+> Another point against the latter scheme is that the MDIO driver could
+> sensibly be used (the block is identical) on the ArmadaXP, which has 4
+> ethernet blocks rather than two, yet grouped in two pairs with a
+> discontiguous address range.
+> 
+> I'd like to get this moved along as soon as possible though.
 
-Relocatable in physical space is what kdump actually needs, and that's 
-what we already have here (as well as on ARM32 for that matter with 
-CONFIG_ARM_PATCH_PHYS_VIRT).  Relocatable in the virtual space is costly 
-and we shouldn't need to go there.
+Following up on the old discussion, I talked briefly about this
+issue with BenH at the kernel summit. The outcome basically is that
+it's a bit sad to have incompatible bindings, but it's not the end
+of the world,and it's more important to do it right this time.
 
+Just make sure that you use different values for the 'compatible'
+strings and then do what you need to get the ARM hardware working.
 
-Nicolas
+Ideally, the new binding should be written in a way that powerpc
+machines can use the same one, but the existing ones all use
+an version of Open Firmware that is not going to get updated
+and it's also not too likely that we are going to see new
+powerpc machines based on this chip.
+
+	Arnd
