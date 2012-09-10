@@ -1,204 +1,24 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 10 Sep 2012 10:23:44 -0500
-Subject: [PATCH V3 6/8] ARM: OMAP4: Route PMU IRQs to CTI IRQs
-In-Reply-To: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1347290626-21164-7-git-send-email-jon-hunter@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 08:24:49 -0700
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <20120910161428.879618aea62e5be6340ed93c@canb.auug.org.au>
+References: <20120910161428.879618aea62e5be6340ed93c@canb.auug.org.au>
+Message-ID: <CACRpkdbf94QG59pvqcN_grCG_tcpri7JyypZ9ZMu3R=LwvSoXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ming Lei <ming.lei@canonical.com>
+On Mon, Sep 10, 2012 at 8:14 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 
-For OMAP4430 there are no dedicate PMU interrupts, however, PMU events can be
-routed to via the CTI IRQs. This allows tools such as PERF and OPROFILE to work
-on OMAP4430.
+> Today's linux-next merge of the clk tree got a conflict in
+> arch/arm/mach-ux500/clock.c between commit 79964bcd792f ("ARM: ux500:
+> Correct Ux500 family names usage") from the arm-soc tree and commit
+> ebc96db7632f ("ARM: ux500: Switch to use common clock framework") from
+> the clk tree.
+>
+> The latter removed the file so I did that - there may be more fixup
+> required.
 
-The idea is from Woodruff Richard in the disscussion about "Oprofile on
-Pandaboard / Omap4" on pandaboard at googlegroups.com.
+This is the correct solution, thanks!
 
-Ming's original patch was called "arm: omap4: support pmu" [1] and has been
-renamed and modified by Jon Hunter. There main differences from the original
-patch are ...
-
-1. Instead of only configuring the CTI interrupt once during boot, the
-   interrupts are configured everytime the the PMU is used. The reason for this
-   is because during power transitions the CTI logic state will be lost and so
-   we will need to configure the interrupts everytime they are used. This is
-   accomplished by using the PM runtime callbacks which will be called whenever
-   the PMU is used.
-2. Assign the PMU events to different cross triggering channels. This prevents
-   a single PMU event generating interrupts to both CPUs and hence can cause
-   spurious interrupts to occur. Reported by Ming [2].
-
-[1] http://marc.info/?l=linux-arm-kernel&m=132227620816504&w=2
-[2] http://permalink.gmane.org/gmane.linux.linaro.devel/10532
-
-Acked-by: Jean Pihet <j-pihet@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Woodruff Richard <r-woodruff2@ti.com>
-Cc: Ming Lei <ming.lei@canonical.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/pmu.c                  |   98 +++++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap44xx.h |    3 +
- 2 files changed, 99 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-index 03007b6..5918098 100644
---- a/arch/arm/mach-omap2/pmu.c
-+++ b/arch/arm/mach-omap2/pmu.c
-@@ -16,6 +16,7 @@
- #include <linux/pm_runtime.h>
- 
- #include <asm/pmu.h>
-+#include <asm/cti.h>
- 
- #include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
-@@ -24,6 +25,91 @@ static char *omap2_pmu_oh_names[] = {"mpu"};
- static char *omap3_pmu_oh_names[] = {"mpu", "debugss"};
- static char *omap4430_pmu_oh_names[] = {"l3_main_3", "l3_instr", "debugss"};
- static struct platform_device *omap_pmu_dev;
-+static struct arm_pmu_platdata omap_pmu_data;
-+static struct cti omap4_cti[2];
-+
-+/**
-+ * omap4_pmu_runtime_resume - PMU runtime resume callback
-+ * @dev		OMAP PMU device
-+ *
-+ * Platform specific PMU runtime resume callback for OMAP4430 devices to
-+ * configure the cross trigger interface for routing PMU interrupts. This
-+ * is called by the PM runtime framework.
-+ */
-+static int omap4_pmu_runtime_resume(struct device *dev)
-+{
-+	/* configure CTI0 for PMU IRQ routing */
-+	cti_unlock(&omap4_cti[0]);
-+	cti_map_trigger(&omap4_cti[0], 1, 6, 2);
-+	cti_enable(&omap4_cti[0]);
-+
-+	/* configure CTI1 for PMU IRQ routing */
-+	cti_unlock(&omap4_cti[1]);
-+	cti_map_trigger(&omap4_cti[1], 1, 6, 3);
-+	cti_enable(&omap4_cti[1]);
-+
-+	return 0;
-+}
-+
-+/**
-+ * omap4_pmu_runtime_suspend - PMU runtime suspend callback
-+ * @dev		OMAP PMU device
-+ *
-+ * Platform specific PMU runtime suspend callback for OMAP4430 devices to
-+ * disable the cross trigger interface interrupts. This is called by the
-+ * PM runtime framework.
-+ */
-+static int omap4_pmu_runtime_suspend(struct device *dev)
-+{
-+	cti_disable(&omap4_cti[0]);
-+	cti_disable(&omap4_cti[1]);
-+
-+	return 0;
-+}
-+
-+/**
-+ * omap4_pmu_handle_irq - PMU IRQ Handler
-+ * @irq		OMAP CTI IRQ number
-+ * @dev		OMAP PMU device
-+ * @handler	ARM PMU interrupt handler
-+ *
-+ * Platform specific PMU IRQ handler for OMAP4430 devices that route PMU
-+ * interrupts via cross trigger interface. This is called by the PMU driver.
-+ */
-+static irqreturn_t
-+omap4_pmu_handle_irq(int irq, void *dev, irq_handler_t handler)
-+{
-+	if (irq == OMAP44XX_IRQ_CTI0)
-+		cti_irq_ack(&omap4_cti[0]);
-+	else if (irq == OMAP44XX_IRQ_CTI1)
-+		cti_irq_ack(&omap4_cti[1]);
-+
-+	return handler(irq, dev);
-+}
-+
-+/**
-+ * omap4_init_cti - initialise cross trigger interface instances
-+ *
-+ * Initialises two cross trigger interface (CTI) instances in preparation
-+ * for routing PMU interrupts to the OMAP interrupt controller. Note that
-+ * this does not configure the actual CTI hardware but just the CTI
-+ * software structures to be used.
-+ */
-+static int __init omap4_init_cti(void)
-+{
-+	omap4_cti[0].base = ioremap(OMAP44XX_CTI0_BASE, SZ_4K);
-+	omap4_cti[1].base = ioremap(OMAP44XX_CTI1_BASE, SZ_4K);
-+
-+	if (!omap4_cti[0].base || !omap4_cti[1].base) {
-+		pr_err("ioremap for OMAP4 CTI failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	cti_init(&omap4_cti[0], omap4_cti[0].base, OMAP44XX_IRQ_CTI0, 6);
-+	cti_init(&omap4_cti[1], omap4_cti[1].base, OMAP44XX_IRQ_CTI1, 6);
-+
-+	return 0;
-+}
- 
- /**
-  * omap2_init_pmu - creates and registers PMU platform device
-@@ -51,8 +137,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
- 		}
- 	}
- 
--	omap_pmu_dev = omap_device_build_ss(dev_name, -1, oh, oh_num, NULL, 0,
--				NULL, 0, 0);
-+	omap_pmu_dev = omap_device_build_ss(dev_name, -1, oh, oh_num,
-+			&omap_pmu_data, sizeof(omap_pmu_data), NULL, 0, 0);
- 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
- 				dev_name);
- 
-@@ -66,6 +152,7 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
- 
- static int __init omap_init_pmu(void)
- {
-+	int r;
- 	unsigned oh_num;
- 	char **oh_names;
- 
-@@ -84,6 +171,13 @@ static int __init omap_init_pmu(void)
- 		oh_num = ARRAY_SIZE(omap3_pmu_oh_names);
- 		oh_names = omap3_pmu_oh_names;
- 	} else if (cpu_is_omap443x()) {
-+		r = omap4_init_cti();
-+		if (r)
-+			return r;
-+
-+		omap_pmu_data.handle_irq = omap4_pmu_handle_irq;
-+		omap_pmu_data.runtime_resume = omap4_pmu_runtime_resume;
-+		omap_pmu_data.runtime_suspend = omap4_pmu_runtime_suspend;
- 		oh_num = ARRAY_SIZE(omap4430_pmu_oh_names);
- 		oh_names = omap4430_pmu_oh_names;
- 	} else {
-diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
-index c0d478e..1800a9b 100644
---- a/arch/arm/plat-omap/include/plat/omap44xx.h
-+++ b/arch/arm/plat-omap/include/plat/omap44xx.h
-@@ -58,5 +58,8 @@
- #define OMAP44XX_HSUSB_OHCI_BASE	(L4_44XX_BASE + 0x64800)
- #define OMAP44XX_HSUSB_EHCI_BASE	(L4_44XX_BASE + 0x64C00)
- 
-+#define OMAP44XX_CTI0_BASE		(L4_EMU_44XX_BASE + 0x148000)
-+#define OMAP44XX_CTI1_BASE		(L4_EMU_44XX_BASE + 0x149000)
-+
- #endif /* __ASM_ARCH_OMAP44XX_H */
- 
--- 
-1.7.9.5
+Yours,
+Linus Walleij
