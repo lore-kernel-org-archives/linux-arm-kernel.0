@@ -1,26 +1,57 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Sep 2012 15:56:10 -0400
-Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <50431871.1030507@gmail.com>
-References: <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
- <50366E44.4030606@wwwdotorg.org> <50369305.6050304@gmail.com>
- <50369FEE.8000003@wwwdotorg.org> <5036B639.20608@gmail.com>
- <5036F651.4020700@wwwdotorg.org> <5038F50E.7030807@gmail.com>
- <503AF8B4.1070206@wwwdotorg.org>
- <CACRpkdYsPadKr1i8m5cCAFUUvJYUnLmc3j8evKM_6rPU5oGzRg@mail.gmail.com>
- <50431871.1030507@gmail.com>
-Message-ID: <20120909195610.GK4575@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Sep 2012 01:45:11 +0100
+Subject: [PATCH] ARM: Dove: allow PCI to be disabled
+In-Reply-To: <20120909210126.GM4575@titan.lakedaemon.net>
+References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
+ <20120909204705.GD3451@lunn.ch>
+ <20120909205521.GI13739@n2100.arm.linux.org.uk>
+ <20120909210126.GM4575@titan.lakedaemon.net>
+Message-ID: <20120910004511.GN13739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 02, 2012 at 10:27:29AM +0200, Sebastian Hesselbarth wrote:
-> there is a v3 of the patch under internal review right now.
+On Sun, Sep 09, 2012 at 05:01:26PM -0400, Jason Cooper wrote:
+> On Sun, Sep 09, 2012 at 09:55:21PM +0100, Russell King - ARM Linux wrote:
+> > On Sun, Sep 09, 2012 at 10:47:05PM +0200, Andrew Lunn wrote:
+> > > On Sun, Sep 09, 2012 at 08:34:13PM +0100, Russell King wrote:
+> > > > Allow PCI support for Dove to be disabled.  Some platforms do not have
+> > > > anything connected to the PCIe ports, so requiring PCI support to be
+> > > > built into the kernel just wastes space, and presents a lot more config
+> > > > options than are necessary.
+> > > > 
+> > > > However, select USB_ARCH_HAS_EHCI so that we can still have EHCI
+> > > > support.
+> > > 
+> > > Hi Russel
+> > > 
+> > > I have a patch in GregKH usb-next which also ensures USB_ARCH_HAS_EHCI
+> > > is selected.
+> > > 
+> > > http://git.kernel.org/?p=linux/kernel/git/gregkh/usb.git;a=commitdiff;h=ba2f9dff6c914b91005f687a9d75c8eac110d323
+> > > 
+> > > So we might not need your select as well, although it does not harm.
+> > 
+> > That depends on how this patch is handled.  If it gets into mainline via
+> > a separate path to GregKH's USB tree, then it must be kept together as
+> > otherwise it _will_ cause regressions - namely EHCI becomes impossible
+> > to select when PCI=n.  That in turn makes the CuBox (and probably other
+> > Dove platforms) a rather useless di
+> [message trucated, I need to working on file locking for my email
+> auto-flagging script... :-/]
+> 
+> greg just pulled Andrew's patch into his usb tree within the past few
+> days.  Russell, would you prefer to submit this to greg's usb tree, or
+> resend without USB_ARCH_HAS_EHCI?
 
-Sebastian,
+I thought I'd already answered the latter point.
 
-What is the status of v3?  I'd like to get it (and gpio, which depends
-on this work) in for v3.7, but it's getting close...
+As I said, it breaks the patch to remove that select, so it can not be
+removed.  Removing it will create regressions - can I be any more clear
+about that.  So no, I will not remove that select statement because I
+can't without _breaking_ my Dove builds here.
 
-thx,
-
-Jason.
+I don't think submitting this patch to Greg's USB tree is also appropriate
+either, it's clearly ARM specific in nature, or even PCI specific.  It
+isn't a USB patch.  Neither is a patch changing a USB setting in
+arch/arm/Kconfig.  If any tree, these patches should be going through
+arm-soc.
