@@ -1,30 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Sep 2012 17:45:20 +0100
-Subject: [PATCH 06/22] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
-In-Reply-To: <CACRpkdb09UnPj6xV-rNxoeUS2yPLurA+n6zygWEA3_7OQfb0nA@mail.gmail.com>
+Date: Mon, 10 Sep 2012 17:45:43 +0100
+Subject: [PATCH 05/22] ASoC: Ux500: Enable MOP500 driver for Device Tree
+In-Reply-To: <CACRpkdZ+zgEf48qpCRg_fz9=_oSGohuSsFLQoC3BzTgSDdNnZA@mail.gmail.com>
 References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdb09UnPj6xV-rNxoeUS2yPLurA+n6zygWEA3_7OQfb0nA@mail.gmail.com>
-Message-ID: <20120910164518.GE24506@gmail.com>
+ <1344527268-5964-6-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ+zgEf48qpCRg_fz9=_oSGohuSsFLQoC3BzTgSDdNnZA@mail.gmail.com>
+Message-ID: <20120910164542.GF24506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Ola poke.
 
-On Tue, Aug 14, 2012 at 10:55:59AM +0200, Linus Walleij wrote:
+On Tue, Aug 14, 2012 at 10:52:23AM +0200, Linus Walleij wrote:
 > On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> > Register both parts of the MSP driver from Device Tree so that they
-> > are probed when Device Tree is enabled. Also, as there is platform
-> > data involved, we ensure that there is allocated memory to place the
-> > configuration into and that the correct information is extracted from
-> > the DT binary.
+> > Here we ensure that the MOP500 audio driver will be probed during a
+> > Device Tree boot. We also parse the sound node to link together the
+> > codec, dma and the CPU-side Digital Audio Interface.
 > >
 > > CC: alsa-devel at alsa-project.org
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Looks like it's doing what's intended...
 > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> But only if Mark agrees with the overall approach.
 > 
 > Yours,
 > Linus Walleij
