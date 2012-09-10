@@ -1,52 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 10 Sep 2012 12:14:20 -0700
-Subject: [PATCH 05/11] clk: Versatile Express clock generators ("osc")
- driver
-In-Reply-To: <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
-References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
- <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
-Message-ID: <20120910191420.20289.1923@nucleus>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Mon, 10 Sep 2012 20:19:18 +0100
+Subject: [PATCH 08/14] tty/serial/kgdboc: Add and wire up clear_irqs
+ callback
+In-Reply-To: <20120910175704.GA11392@lizard>
+References: <20120910040802.GA1261@lizard> <20120910041357.GH29537@lizard>
+ <20120910121624.226c1a88@pyramind.ukuu.org.uk>
+ <20120910175704.GA11392@lizard>
+Message-ID: <20120910201918.1e3c8fd0@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pawel Moll (2012-09-03 09:25:25)
-> +static int vexpress_osc_probe(struct vexpress_config_device *vecdev)
-> +{
-> +       int err;
-> +       struct device_node *node = vecdev->dev.of_node;
-> +       struct vexpress_osc_info *info = vecdev->dev.platform_data;
-> +       struct clk_init_data init;
-> +       struct vexpress_osc *osc;
-> +       struct clk *clk;
-> +       const char * const *dev_ids = NULL;
-> +       u32 range[2];
-> +
-> +       if (vecdev->status & VEXPRESS_CONFIG_DEVICE_PROBED_EARLY)
-> +               return 0;
-> +
-> +       osc = kzalloc(sizeof(*osc), GFP_KERNEL);
-> +       if (!osc) {
-> +               err = -ENOMEM;
-> +               goto error;
+On Mon, 10 Sep 2012 10:57:04 -0700
+Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
 
-Minor nitpick: the error label tries to free osc, which in this case
-shouldn't be freed because it is NULL.
+> On Mon, Sep 10, 2012 at 12:16:24PM +0100, Alan Cox wrote:
+> > > serial port, the CPU receives NMI exception, and we fall into KDB
+> > > shell.  So, it is our "debug console", and it is able to interrupt
+> > > (and thus debug) even IRQ handlers themselves.
+> > 
+> > You seem to have an assumption of single core here. What happens if
+> > the NMI hits CPU #0 and the serial IRQ hits CPU #1 simultaneously ?
+> 
+> If you can't redirect all serial IRQs to NMI context, e.g. sometimes you get
+> NMIs, sometimes IRQs, then your NMI handling is not deterministic, and surely
+> this is not supported.
 
-<snip>
-> +error:
-> +       kfree(osc);
-> +       return err;
+This seems like arch specific magic leaking into the tty code. Surely
+this should be buried in the depths of the platform IRQ code ?
 
-Would be better to have something like:
-
-		error_clk:
-			kfree(osc);
-		error_osc:
-			return err;
-
-Otherwise patch looks good to me.  There are some changes to headers in
-this patch, and it is part of a larger series.  How did you want the
-common clk patches to get merged?
-
-Regards,
-Mike
+Alan
