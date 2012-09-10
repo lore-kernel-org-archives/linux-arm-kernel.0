@@ -1,87 +1,99 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Sep 2012 17:11:59 +0100
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120909172046.GB31430@game.jcrosoft.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org>
-Message-ID: <20120910161159.GH27042@arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 10 Sep 2012 18:17:03 +0200
+Subject: [PATCH 1/3] arm: omap: hwmod: add a new addr space in otg for
+ writing to control module
+In-Reply-To: <20120910155855.GE7464@arwen.pp.htv.fi>
+References: <1346943331-18120-1-git-send-email-kishon@ti.com>
+ <1346943331-18120-2-git-send-email-kishon@ti.com> <5048C2A2.2020104@ti.com>
+ <20120906171301.GC17754@arwen.pp.htv.fi>
+ <20120906171803.GA30717@arwen.pp.htv.fi> <20120906195607.GB1303@atomide.com>
+ <20120910155855.GE7464@arwen.pp.htv.fi>
+Message-ID: <504E127F.6020406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
-> > +The device tree blob (dtb) must be no bigger than 2 megabytes in size
-> > +and placed at a 2-megabyte boundary within the first 512 megabytes from
-> > +the start of the kernel image. This is to allow the kernel to map the
-> > +blob using a single section mapping in the initial page tables.
-> why do you want to restrict the DT to be less tahn 2MiB?
+Hi Felipe,
 
-That's a restriction due on the initial memory map. At some point we may
-add support in head.S to parse the dtb and extract the size information.
-Not critical at this stage.
+On 09/10/2012 05:58 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Sep 06, 2012 at 12:56:07PM -0700, Tony Lindgren wrote:
+>> * Felipe Balbi <balbi@ti.com> [120906 10:23]:
+>>> Hi,
+>>>
+>>> On Thu, Sep 06, 2012 at 08:13:03PM +0300, Felipe Balbi wrote:
+>>>> Hi,
+>>>>
+>>>> On Thu, Sep 06, 2012 at 09:04:58PM +0530, Vaibhav Hiremath wrote:
+>>>>>
+>>>>>
+>>>>> On 9/6/2012 8:25 PM, Kishon Vijay Abraham I wrote:
+>>>>>> The mailbox register for usb otg in omap is present in control module.
+>>>>>> On detection of any events VBUS or ID, this register should be written
+>>>>>> to send the notification to musb core.
+>>>>>>
+>>>>>> Till we have a separate control module driver to write to control module,
+>>>>>> omap2430 will handle the register writes to control module by itself. So
+>>>>>> a new address space to represent this control module register is added
+>>>>>> to usb_otg_hs.
+>>>>>>
+>>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>>> ---
+>>>>>>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
+>>>>>>  1 file changed, 5 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>>>>> index 242aee4..02341bc 100644
+>>>>>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>>>>> @@ -5890,6 +5890,11 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
+>>>>>>  		.pa_end		= 0x4a0ab003,
+>>>>>>  		.flags		= ADDR_TYPE_RT
+>>>>>>  	},
+>>>>>> +	{
+>>>>>> +		.pa_start	= 0x4a00233c,
+>>>>>> +		.pa_end		= 0x4a00233f,
+>>>>>> +		.flags		= ADDR_TYPE_RT
+>>>>>> +	},
+>>>>>
+>>>>> I do not have any objection/comment here, but I believe this is control
+>>>>> module address space required for USB module, right?
+>>>>> I am not sure this is right way of accessing control module space.
+>>>>> Actually Control Module Access required for drivers is one of the
+>>>>> blocking issue we have currently.
+>>>>>
+>>>>> Also there was some effort put up by 'Konstantine' to convert Control
+>>>>> module to MFD driver, I haven't seen any further update on it. But it
+>>>>> would be good to check with him.
+>>>>
+>>>> this was an agreement with Benoit since we already lost a couple merge
+>>>> windows for this patchset. We agreed to wait until -rc4 for SCM driver
+>>>> and if it wasn't ready, we'd go ahead with this and SCM author would fix
+>>>> it up on a patch converting users to new SCM driver.
+>>>
+>>> Tony, can I get your Acked-by to this patch so I can take it together
+>>> with the rest of the series ? Thanks
+>>>
+>>> ps: I'll apply this to my 'musb' branch which is immutable, so it's safe
+>>> to merge it into your tree once I apply.
+>>
+>> It would be best if this got acked by Benoit and Paul as they may
+>> have some other patches queued up. I'll ack if they ack ;)
+> 
+> Benoit, care to ack this patch ???
 
-> > +Before jumping into the kernel, the following conditions must be met:
-> > +
-> > +- Quiesce all DMA capable devices so that memory does not get
-> > +  corrupted by bogus network packets or disk data.  This will save
-> > +  you many hours of debug.
-> > +
-> > +- Primary CPU general-purpose register settings
-> > +  x0 = physical address of device tree blob (dtb) in system RAM.
-> > +  x1 = 0 (reserved for future use)
-> > +  x2 = 0 (reserved for future use)
-> > +  x3 = 0 (reserved for future use)
-> > +
-> > +- CPU mode
-> > +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
-> > +  IRQ and FIQ).
-> > +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
-> > +  the virtualisation extensions) or non-secure EL1.
-> > +
-> > +- Caches, MMUs
-> > +  The MMU must be off.
-> > +  Instruction cache may be on or off.
-> > +  Data cache must be off and invalidated.
-> > +  External caches (if present) must be configured and disabled.
-> > +
-> > +- Architected timers
-> > +  CNTFRQ must be programmed with the timer frequency.
-> > +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
-> > +  set where available.
-> can you explain why?
+Gosh, that's hard to ack something like that :-)
 
-Otherwise the kernel cannot access the generic timer registers (it is
-described in the AArch64 exception model which isn't public yet).
+But considering that the control module driver is not there yet, I have
+no choice but accepting that one if we want to have the functionality
+we've been waiting for years.
 
-> > +- The primary CPU must jump directly to the first instruction of the
-> > +  kernel image.  The device tree blob passed by this CPU must contain
-> > +  for each CPU node:
-> > +
-> > +    1. An 'enable-method' property. Currently, the only supported value
-> > +       for this field is the string "spin-table".
-> > +
-> > +    2. A 'cpu-release-addr' property identifying a 64-bit,
-> > +       zero-initialised memory location.
-> > +
-> > +  It is expected that the bootloader will generate these device tree
-> > +  properties and insert them into the blob prior to kernel entry.
-> > +
-> > +- Any secondary CPUs must spin outside of the kernel in a reserved area
-> > +  of memory (communicated to the kernel by a /memreserve/ region in the
-> > +  device tree) polling their cpu-release-addr location, which must be
-> > +  contained in the reserved region.  A wfe instruction may be inserted
-> > +  to reduce the overhead of the busy-loop and a sev will be issued by
-> > +  the primary CPU.  When a read of the location pointed to by the
-> > +  cpu-release-addr returns a non-zero value, the CPU must jump directly
-> > +  to this value.
-> do you plan AMP boot?
+Could you just update the patch with a big disclaimer on top of the
+address range to explain that this should not belong here and will be
+removed ASAP, when the proper driver will be done.
 
-What do you mean by AMP?
+Then you sign the patch with your blood and that should be fine for me :-).
 
-If you only want to use 3 CPUs out of 4 for example, you change the FDT
-information that gets passed to the kernel accordingly. So the kernel
-wouldn't touch the 4th one.
-
--- 
-Catalin
+Thanks,
+Benoit
