@@ -1,30 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Sep 2012 13:49:08 +0000
-Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
-In-Reply-To: <CACRpkdbPwiaF8tfEE7NNd_KE3VGtVx-pPwL-HObhh3fRYXqH=g@mail.gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <201209101013.16697.arnd@arndb.de>
- <CACRpkdbPwiaF8tfEE7NNd_KE3VGtVx-pPwL-HObhh3fRYXqH=g@mail.gmail.com>
-Message-ID: <201209101349.08857.arnd@arndb.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 10 Sep 2012 15:49:38 +0200
+Subject: [PATCH 1/1] ARM: dts: OMAP3: Add gpio-twl4030 properties for Overo
+In-Reply-To: <504DEDB4.1070804@ti.com>
+References: <1347282996-31190-1-git-send-email-florian.vaussard@epfl.ch>
+ <1347282996-31190-2-git-send-email-florian.vaussard@epfl.ch>
+ <504DEA4E.7080109@ti.com> <504DEC36.4020704@epfl.ch>
+ <504DEDB4.1070804@ti.com>
+Message-ID: <504DEFF2.5060007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 September 2012, Linus Walleij wrote:
-> > When the driver offers
-> > two ways of probing a device, this lets us change from one way to
-> > the other without going through a phase where we use neither of them
-> > or (worse) both at the same time.
+On 09/10/2012 03:40 PM, Benoit Cousson wrote:
+> On 09/10/2012 03:33 PM, Florian Vaussard wrote:
+>>>> Support the blue LED connected to the LEDB pin of the TWL4030
+>>>> on the Gumstix Overo.
+>>>>
+>>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>> ---
+>>>>   arch/arm/boot/dts/omap3-overo.dtsi |   15 +++++++++++++++
+>>>>   1 files changed, 15 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> b/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> index d6cc5e2..89808ce 100644
+>>>> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+>>>> @@ -13,6 +13,17 @@
+>>>>
+>>>>   /include/ "omap3.dtsi"
+>>>>
+>>>> +/ {
+>>>
+>>> BTW, I'm just wondering. Cannot we use overo without tobi?
+>>>
+>>> In that case, the model and compatible should probably be used as well:
+>>>
+>>>     model = "TI OMAP3 Gumstix Overo";
+>>>     compatible = "ti,omap3-overo", "ti,omap3";
+>>
+>> No, it cannot. The Overo needs to be plugged into an expansion board, at
+>> least to get the power. Hence the absence of model and compatible in
+>> omap3-overo.dtsi.
 > 
-> Maybe unrelated, but as usual it works as long as there are no
-> DMA channels or callback functions :-/
+> OK, cool. I was wondering because we already have a board-overo.c in the
+> kernel, and there is no mention of tobi.
 > 
-> The MMC, PL022 patches in this patch set: both need
-> AUXDATA and DT data simultaneously due to DMA channels
-> and callbacks passed in as AUXDATA.
+> OK, I'm adding that patch on top of the other then.
 
-Yes, that's another discussion. When this happens, we obviously
-keep the platform data (or add a new version of it), but I'd still
-use one patch to add the node to the device tree and simultaneously
-add the auxdata and remove the static device registration.
+I'm just going to update the subject to:
+ARM: dts: omap3-overo: Add support for the blue LED
 
-	Arnd
+regards,
+Benoit
