@@ -1,40 +1,43 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Mon, 10 Sep 2012 22:02:01 +1000
-Subject: [PATCH] ARM: add back in KS8695 based SnapGear board entries
-In-Reply-To: <20120910084259.GQ13739@n2100.arm.linux.org.uk>
-References: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
- <20120910084259.GQ13739@n2100.arm.linux.org.uk>
-Message-ID: <504DD6B9.9050803@snapgear.com>
+From: prabhakar.lad@ti.com (Prabhakar Lad)
+Date: Mon, 10 Sep 2012 17:36:13 +0530
+Subject: [PATCH v2 2/2] ARM: da850/omap-l138: Add EVM specific code for
+ VPIF to work
+In-Reply-To: <504DB28D.3070005@ti.com>
+References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
+ <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
+ <504A2C7D.1090702@ti.com>
+ <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
+ <504DB28D.3070005@ti.com>
+Message-ID: <504DD7B5.40908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 06:42 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 10, 2012 at 01:30:15PM +1000, gerg at snapgear.com wrote:
->> From: Greg Ungerer <gerg@uclinux.org>
->>
->> Board support code for the SnapGear boards based on the Micrel KS8695 SoC
->> will soon appear in mainline kernel. The board IDs had been removed from
->> the mach-types file, so add them back in.
->
-> Nak.  You must add platform support for these numbers _along_ _side_
-> adding them back to mach-types, otherwise my scripts will simply delete
-> them again.  These entries have been aged out due to lack of merging of
-> the platforms.
+Hi Sekhar,
 
-So if I combine this with:
+On Monday 10 September 2012 02:57 PM, Sekhar Nori wrote:
+> Hi Prabhakar,
+> 
+> On 9/7/2012 11:04 PM, Prabhakar Lad wrote:
+>> On Fri, Sep 7, 2012 at 10:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> 
+>>>> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
+>>>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>>>
+>>> You agreed to get rid of these multiple ifdefs but you have not fixed that.
+>>>
+>> I have merged the top one, at later stage when we go  ahead and add sensor
+>> support then we would have require to have define two
+>> da850_vpif_capture_sdev_info
+>> so to avoid it I have kept this one.
+> 
+> Lets get to that when we actually add sensor support. It might make
+> sense then. Right now, there is no reason to have them.
+> 
+Ok I'll fix it for v3.
 
- 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-September/118237.html
+Regards,
+--Prabhakar
 
-and submit as a single patch (through the arm-soc tree) will that cause
-your scripts any problems?
-
-Regards
-Greg
-
-
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+> Thanks,
+> Sekhar
+> 
