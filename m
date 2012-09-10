@@ -1,89 +1,32 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon, 10 Sep 2012 12:52:10 -0400
-Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
- hardware
-In-Reply-To: <504E168C.6060603@ti.com>
-References: <1347294020-22661-1-git-send-email-mporter@ti.com>
- <504E168C.6060603@ti.com>
-Message-ID: <20120910165210.GJ27758@beef>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 10 Sep 2012 09:51:45 -0700
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <CACRpkdbf94QG59pvqcN_grCG_tcpri7JyypZ9ZMu3R=LwvSoXw@mail.gmail.com>
+References: <20120910161428.879618aea62e5be6340ed93c@canb.auug.org.au>
+ <CACRpkdbf94QG59pvqcN_grCG_tcpri7JyypZ9ZMu3R=LwvSoXw@mail.gmail.com>
+Message-ID: <20120910165145.20289.71159@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 06:34:20PM +0200, Benoit Cousson wrote:
-> + Tony
+Quoting Linus Walleij (2012-09-10 08:24:49)
+> On Mon, Sep 10, 2012 at 8:14 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 > 
-> Hi Matt,
+> > Today's linux-next merge of the clk tree got a conflict in
+> > arch/arm/mach-ux500/clock.c between commit 79964bcd792f ("ARM: ux500:
+> > Correct Ux500 family names usage") from the arm-soc tree and commit
+> > ebc96db7632f ("ARM: ux500: Switch to use common clock framework") from
+> > the clk tree.
+> >
+> > The latter removed the file so I did that - there may be more fixup
+> > required.
 > 
-> 30 minutes too late for my pull request :-(
+> This is the correct solution, thanks!
 > 
-> There are a couple of am33xx patches under discussion, so I'll take them
-> and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
 
-Yeah, believe me, I did a faceplant when I saw your pull request come by
-at the same time I discovered this issue. ;) In particular, AnilKumar's
-user leds patch would need to be adjusted for this change. I can
-resubmit with the user leds dts changes adjusted as well if that
-discussion comes to a conclusion and his patches accepted.
- 
-> On 09/10/2012 06:20 PM, Matt Porter wrote:
-> > On AM33xx, the datasheet and TRM refer to four GPIO instances that
-> > are 0-based, GPIO0-3.
-> 
-> Or maybe you should just update the spec to use a 1-based GPIO number
-> like OMAP :-)
+Yes.  Removal of the file is the only fixup required.
 
-I am powerless here. :)
+Regards,
+Mike
 
--Matt
-
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > ---
-> >  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> > index bb31bff..1369bfc 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -62,7 +62,7 @@
-> >  			reg = <0x48200000 0x1000>;
-> >  		};
-> >  
-> > -		gpio1: gpio at 44e07000 {
-> > +		gpio0: gpio at 44e07000 {
-> >  			compatible = "ti,omap4-gpio";
-> >  			ti,hwmods = "gpio1";
-> >  			gpio-controller;
-> > @@ -74,7 +74,7 @@
-> >  			interrupts = <96>;
-> >  		};
-> >  
-> > -		gpio2: gpio at 4804c000 {
-> > +		gpio1: gpio at 4804c000 {
-> >  			compatible = "ti,omap4-gpio";
-> >  			ti,hwmods = "gpio2";
-> >  			gpio-controller;
-> > @@ -86,7 +86,7 @@
-> >  			interrupts = <98>;
-> >  		};
-> >  
-> > -		gpio3: gpio at 481ac000 {
-> > +		gpio2: gpio at 481ac000 {
-> >  			compatible = "ti,omap4-gpio";
-> >  			ti,hwmods = "gpio3";
-> >  			gpio-controller;
-> > @@ -98,7 +98,7 @@
-> >  			interrupts = <32>;
-> >  		};
-> >  
-> > -		gpio4: gpio at 481ae000 {
-> > +		gpio3: gpio at 481ae000 {
-> >  			compatible = "ti,omap4-gpio";
-> >  			ti,hwmods = "gpio4";
-> >  			gpio-controller;
-> > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Yours,
+> Linus Walleij
