@@ -1,79 +1,43 @@
-From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
-Date: Mon, 10 Sep 2012 16:31:23 +0200
-Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator
- for NFC v1.
-In-Reply-To: <201209061056.12386.jbe@pengutronix.de>
-References: <1345811288.2848.308.camel@sauron.fi.intel.com>
- <1345825064-9147-1-git-send-email-gcembed@gmail.com>
- <201209061056.12386.jbe@pengutronix.de>
-Message-ID: <504DF9BB.8050509@gmail.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Mon, 10 Sep 2012 15:35:53 +0100
+Subject: [PATCH] ARM: kirkwood: Trim excess #includes in board-dnskw.c
+Message-ID: <1347287753-2805-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
-On 09/06/2012 10:56 AM, Juergen Beisert wrote:
-> Hi Ga?tan,
->
-> Ga?tan Carlier wrote:
->> Any comments for this patch ?
->
-> Sorry, a little bit late.
->
->> Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
->> in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
->> Warning: The same solution needs to be applied to the boot loader and the
->> flash programmer.
->
-> What sense does it make to swap the bytes at offset 0x7D0 and 0x835?
->
-> Background: the NFC in the i.MX27/i.MX31 (NFCv1) and i.MX25/i.MX35 (NFCv2) can
-> only handle 512 byte pages with 16 bit OOB at once. To get them work with 2 k
-> page NANDs they only do the 512 + 16 step four times. The result is, a 2 k
-> page NAND is not handled as 2 k data and 64 bytes OOB, its handled instead as
-> a stream of 2112 bytes:
->
->                 |<-------- 2112 bytes --------->|
->                 512+16 | 512+16 | 512+16 | 512+16
->
-> Which means the NFC mixes data and OOB/checksums into its internal SRAM. But
-> all upper routines still use this SRAM content with a 2048 (data) + 64 (OOB)
-> bytes layout (to be more precise also the NFC hardware uses this layout).
-> Result is, the factory bad block markers are lost, because the NFC stores the
-> first 48 bytes from each OOB into the SRAM's data area (beginning with offset
-> 2000 (= 0x7D0) in the data area).
->
-> So, the main goal of this swap patch should be to keep the factory bad block
-> markers _and_ to make use of them.
->
-> But the i.MX driver does not register its own bad block pattern description,
-> so the default one is used with the BBM at position NAND_LARGE_BADBLOCK_POS
-> (which means offset 0 in the OOB area).
->
-> So, I think, all upper layers still search for the BBM at offset 0 of the OOB
-> area, which results to SRAM's offset 0x800 (for NFCv1) and not 0x835. This
-> means this patch keeps the factory bad block markers, but they won't still be
-> used as expected.
->
-> IMHO the bytes at SRAM's offset 0x7D0 and 0x800 for the NFCv1 must be swapped
-> (and 0x7D0 and 0x1000 for the NFCv2) to keep the factory bad block markers
-> _and_ to make use of them. Or am I wrong?
->
-> Regards,
-> Juergen
->
-The point is not the necessity of swapping bytes if factory bad block 
-markers are not used.
-In my case, the bytes must be swapped because all previous operations on 
-flash swapped these bytes :
-* Flashes redboot (bootloader) via JTAG using OpenOCD which swaps bytes;
-* Writes kernel and rootfs via TFTP using redboot which swaps bytes;
-So to be able to read rootfs partition, mxc-nand driver have to swap 
-bytes otherwise, JFFS2 detects error on partition and is unable to mount it.
+Lots of code has now moved into the devicetree, leaving a collection of
+useless header files. Tidy them up.
 
-I have not chosen to swap these bytes. In a training, I received redboot 
-and kernel 2.6.22 with set of patches to support i.MX27 and these 
-patches included swap of bytes in nand driver. So I start my development 
-with this workaround and it is now impossible to get back because boards 
-are already in production.
-Regards,
-Ga?tan Carlier.
+This applies cleanly atop of my previous patch, "[PATCH V2 2/2] ARM:
+kirkwood: Use devicetree to define DNS-32[05] fan", which also removes
+gpio-fan.h
+
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+ arch/arm/mach-kirkwood/board-dnskw.c |    9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+index 6ac7a8d..43d16d6 100644
+--- a/arch/arm/mach-kirkwood/board-dnskw.c
++++ b/arch/arm/mach-kirkwood/board-dnskw.c
+@@ -14,17 +14,8 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/of.h>
+ #include <linux/gpio.h>
+-#include <linux/input.h>
+-#include <linux/leds.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <mach/kirkwood.h>
+-#include <mach/bridge-regs.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+-- 
+1.7.10.4
