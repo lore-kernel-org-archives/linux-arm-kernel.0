@@ -1,43 +1,33 @@
-From: prabhakar.lad@ti.com (Prabhakar Lad)
-Date: Mon, 10 Sep 2012 17:36:13 +0530
-Subject: [PATCH v2 2/2] ARM: da850/omap-l138: Add EVM specific code for
- VPIF to work
-In-Reply-To: <504DB28D.3070005@ti.com>
-References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
- <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
- <504A2C7D.1090702@ti.com>
- <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
- <504DB28D.3070005@ti.com>
-Message-ID: <504DD7B5.40908@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2012 13:51:37 +0100
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <20120910055339.GC31430@game.jcrosoft.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org>
+ <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
+ <20120910055339.GC31430@game.jcrosoft.org>
+Message-ID: <20120910125137.GC27042@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Mon, Sep 10, 2012 at 06:53:39AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 19:29 Sun 09 Sep     , Nicolas Pitre wrote:
+> > On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+> > > > +The image must be placed at the specified offset (currently 0x80000)
+> > > > +from the start of the system RAM and called there. The start of the
+> > > > +system RAM must be aligned to 2MB.
+> > > can we drop this
+> > 
+> > Drop what?
+> > And why?
+> This contrain the must be loadable at any address
 
-On Monday 10 September 2012 02:57 PM, Sekhar Nori wrote:
-> Hi Prabhakar,
-> 
-> On 9/7/2012 11:04 PM, Prabhakar Lad wrote:
->> On Fri, Sep 7, 2012 at 10:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> 
->>>> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
->>>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
->>>
->>> You agreed to get rid of these multiple ifdefs but you have not fixed that.
->>>
->> I have merged the top one, at later stage when we go  ahead and add sensor
->> support then we would have require to have define two
->> da850_vpif_capture_sdev_info
->> so to avoid it I have kept this one.
-> 
-> Lets get to that when we actually add sensor support. It might make
-> sense then. Right now, there is no reason to have them.
-> 
-Ok I'll fix it for v3.
+You can't easily load the kernel image at any address, unless it can
+relocate itself and you have a way to specify PHYS_OFFSET. We don't want
+a compile-time PHYS_OFFSET, the kernel detects it at boot time based on
+the load address.
 
-Regards,
---Prabhakar
-
-> Thanks,
-> Sekhar
-> 
+-- 
+Catalin
