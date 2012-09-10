@@ -1,83 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Sep 2012 12:51:44 -0500
-Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
-In-Reply-To: <20120910155224.GE31430@game.jcrosoft.org>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-8-git-send-email-robherring2@gmail.com>
- <20120910155224.GE31430@game.jcrosoft.org>
-Message-ID: <504E28B0.5040404@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 10 Sep 2012 11:52:14 -0600
+Subject: Another tree for "next"
+In-Reply-To: <m31ui9g4ff.fsf@intrepid.localdomain>
+References: <m3obli3j7a.fsf@intrepid.localdomain>
+ <20120910100144.dcbe2715cde0fea51345a354@canb.auug.org.au>
+ <m31ui9g4ff.fsf@intrepid.localdomain>
+Message-ID: <504E28CE.6020103@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 10:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:12 Thu 06 Sep     , Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> In preparation to support multi-platform kernels, move all the dtb targets
->> out of the mach Makefile.boot and into the arch/arm/boot/dts/Makefile
->> which is closer to the sources.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Andrew Victor <linux@maxim.org.za>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Viresh Kumar <viresh.linux@gmail.com>
->> Cc: Shiraz Hashim <shiraz.hashim@st.com>
->> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>  arch/arm/boot/Makefile                |    2 ++
->>  arch/arm/boot/dts/Makefile            |   41 +++++++++++++++++++++++++++++++++
->>  arch/arm/mach-at91/Makefile.boot      |   24 -------------------
->>  arch/arm/mach-exynos/Makefile.boot    |    3 ---
->>  arch/arm/mach-imx/Makefile.boot       |    7 ------
->>  arch/arm/mach-kirkwood/Makefile.boot  |   11 ---------
->>  arch/arm/mach-lpc32xx/Makefile.boot   |    2 --
->>  arch/arm/mach-mvebu/Makefile.boot     |    2 --
->>  arch/arm/mach-mxs/Makefile.boot       |    9 --------
->>  arch/arm/mach-spear13xx/Makefile.boot |    3 ---
->>  arch/arm/mach-spear3xx/Makefile.boot  |    4 ----
->>  arch/arm/mach-spear6xx/Makefile.boot  |    2 --
->>  arch/arm/mach-tegra/Makefile.boot     |    8 -------
->>  arch/arm/mach-ux500/Makefile.boot     |    2 --
->>  arch/arm/mach-vexpress/Makefile.boot  |    5 ----
->>  15 files changed, 43 insertions(+), 82 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/Makefile
->>
->> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
->> index c877087..3fdab01 100644
->> --- a/arch/arm/boot/Makefile
->> +++ b/arch/arm/boot/Makefile
->> @@ -15,6 +15,8 @@ ifneq ($(MACHINE),)
->>  include $(srctree)/$(MACHINE)/Makefile.boot
->>  endif
->>  
->> +include $(srctree)/arch/arm/boot/dts/Makefile
->> +
->>  # Note: the following conditions must always be true:
->>  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
->>  #   PARAMS_PHYS must be within 4MB of ZRELADDR
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> new file mode 100644
->> index 0000000..e59586b
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -0,0 +1,41 @@
->> +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
-> sorry I see no need of the dtb-y
+On 09/10/2012 11:42 AM, Krzysztof Halasa wrote:
+> Stephen Rothwell <sfr@canb.auug.org.au> writes:
 > 
-> just do all the time
+>>> could you please add the following to your "next" tree?
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux.git  branch: next
+> 
+>> Could you be a bit more clear about what will be in that tree, please?
+>> Also when you repost this request, please post it a bit more widely among
+>> other people/lists who may be interested in this work.  Remember that
+>> linux-next is really only for stuff that is ready for Linus to pull into
+>> the next merge window (or bug fixes).  Also, would this tree be pulled
+>> directly by Linus, or via some other tree?
+> 
+> My plan is to merge all the stuff I'm (eventually) working on in the
+> above tree. For now - mostly IXP4xx (ARM CPU etc.) stuff which goes to
+> Linus
 
-That's not how it works today. dtb's only for all enabled platforms are
-built. Changing the behavior should be a different patch.
+ARM-SoC-related pull requests should be sent to the arm-soc tree, who
+will then aggregate all the ARM-SoC-related changes and issue pull
+requests to Linus.
 
-Rob
+That is, arm at kernel.org, plus the Linux ARM kernel list CC'd.
+
+The patches would also need to be sent to the Linux ARM kernel list (and
+any other relevant lists) before being applied to your tree.
+
+ARM core changes would likely go through Russell King's tree, perhaps
+depending on what dependencies they have.
