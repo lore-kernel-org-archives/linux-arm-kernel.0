@@ -1,88 +1,47 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Sun, 9 Sep 2012 21:14:42 -0700
-Subject: [PATCH 14/14] ARM: versatile: Make able to use UART ports for KGDB
- FIQ debugger
-In-Reply-To: <20120910040802.GA1261@lizard>
-References: <20120910040802.GA1261@lizard>
-Message-ID: <20120910041442.GN29537@lizard>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 10 Sep 2012 12:49:23 +0800
+Subject: [PATCH] ARM: davinci: dm644x: move the dereference below the NULL test
+Message-ID: <CAPgLHd81OwYR65x56Fe1+hcWQsK1wiA6+MQYLBwvP59o-kH8QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+The dereference should be moved below the NULL test.
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+spatch with a semantic match is used to found this.
+(http://coccinelle.lip6.fr/)
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+ arch/arm/mach-davinci/board-dm644x-evm.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 66f4f81..5972886 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -336,6 +336,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_FPGA_IRQ
- 	select ARM_TIMER_SP804
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index d34ed55..b54dc03 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -518,13 +518,11 @@ static int dm6444evm_msp430_get_pins(void)
+ 	char buf[4];
+ 	struct i2c_msg msg[2] = {
+ 		{
+-			.addr = dm6446evm_msp->addr,
+ 			.flags = 0,
+ 			.len = 2,
+ 			.buf = (void __force *)txbuf,
+ 		},
+ 		{
+-			.addr = dm6446evm_msp->addr,
+ 			.flags = I2C_M_RD,
+ 			.len = 4,
+ 			.buf = buf,
+@@ -535,6 +533,9 @@ static int dm6444evm_msp430_get_pins(void)
+ 	if (!dm6446evm_msp)
+ 		return -ENXIO;
  
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
++	msg[0].addr = dm6446evm_msp->addr;
++	msg[1].addr = dm6446evm_msp->addr;
 +
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.7.11.5
+ 	/* Command 4 == get input state, returns port 2 and port3 data
+ 	 *   S Addr W [A] len=2 [A] cmd=4 [A]
+ 	 *   RS Addr R [A] [len=4] A [cmd=4] A [port2] A [port3] N P
