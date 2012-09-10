@@ -1,42 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Sep 2012 22:17:57 +0100
-Subject: [PATCH v3 31/31] arm64: MAINTAINERS update
-In-Reply-To: <alpine.LFD.2.02.1209101355000.28681@xanadu.home>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-32-git-send-email-catalin.marinas@arm.com>
- <20120909163156.GA31430@game.jcrosoft.org>
- <alpine.LFD.2.02.1209101355000.28681@xanadu.home>
-Message-ID: <20120910211757.GD31998@n2100.arm.linux.org.uk>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 10 Sep 2012 16:59:36 -0500
+Subject: [PATCH 08/10] ARM: OMAP: Clean-up timer posted mode support
+In-Reply-To: <20120907222223.GQ1303@atomide.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-9-git-send-email-jon-hunter@ti.com>
+ <20120907222223.GQ1303@atomide.com>
+Message-ID: <504E62C8.8030100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 01:57:57PM -0400, Nicolas Pitre wrote:
-> On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > On 17:27 Fri 07 Sep     , Catalin Marinas wrote:
-> > > This patch updates the MAINTAINERS file for the AArch64 Linux kernel
-> > > port.
-> > > 
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > >  MAINTAINERS |    6 ++++++
-> > >  1 files changed, 6 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/MAINTAINERS b/MAINTAINERS
-> > > index fdc0119..de368a5 100644
-> > > --- a/MAINTAINERS
-> > > +++ b/MAINTAINERS
-> > > @@ -1209,6 +1209,12 @@ S:	Maintained
-> > >  F:	arch/arm/mach-pxa/z2.c
-> > >  F:	arch/arm/mach-pxa/include/mach/z2.h
-> > >  
-> > > +ARM64 PORT (AARCH64 ARCHITECTURE)
-> > > +M:	Catalin Marinas <catalin.marinas@arm.com>
-> > we should put Russell too
-> 
-> He is not maintaining the ARM64 code.
 
-And, let's say the rest of it - it doesn't take much inteligence to work
-out what that means for me personally.
+On 09/07/2012 05:22 PM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [120905 12:05]:
+>> The dmtimer functions to read and write the dmtimer registers are currently
+>> defined as follows ...
+>>
+>> static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
+>> 						int posted);
+>> static inline void __omap_dm_timer_write(struct omap_dm_timer *timer,
+>> 						u32 reg, u32 val, int posted);
+>>
+>> The posted variable indicates if the timer is configured to use the posted mode
+>> when performing register accesses. The posted mode configuration of the dmtimer
+>> is stored in the omap_dm_timer structure that is also being passed to the above
+>> functions and therefore we do not need to pass the posted variable separately.
+>> Therefore, simplify the above functions by removing the posted variable as an
+>> argument as this is not necessary.
+> 
+> I believe the reason for passing the posted flag was to optimize out some
+> functions from the timer code as that's being run all the time.
+> 
+> Care to check the assembly before and after this patch for the timer
+> functions with objdump -d to make sure it does not add tons of bloat
+> there?
+
+Hi Tony,
+
+Thanks for the details here. I see that makes sense and that the
+compiler could take advantage of this as the functions are inlined.
+
+I have taken a look at the disassembled output using objdump as you
+mentioned. What I see is ...
+
+1. For dmtimer.c the impact appears negligible, the total number of
+   lines outputted by objdump only changed by 8 with (1215 lines) and
+   without (1207 lines) the patch applied.
+
+2. For timer.c the impact is greater. I see that
+   omap2_gp_timer_set_next_event() increased by 6 instructions from 29
+   to 35. clocksource_read_cycles() increased by 2 instructions 15 to
+   17 instructions. dmtimer_read_sched_clock() increased by 2
+   instructions from 17 to 19. omap2_gp_timer_set_mode() increased by
+   21 instructions from 102 to 123.
+
+I imagine that we are mainly concerned about
+omap2_gp_timer_set_next_event(), clocksource_read_cycles() and
+dmtimer_read_sched_clock() as these will be called often. Therefore, I
+am not sure if you wish to drop this patch.
+
+By the way, if we do drop this patch, I would then need to fix the
+setting of the posted variable in mach-omap2/timer.c for clock-source in
+the case where a dmtimer is used. Today the code assumes that for
+clock-source and clock-events posted mode is always used. However, with
+the errata i103/i767 we will disable posted mode for clock-source on
+omap2/3/4/5/am33xx devices.
+
+Cheers
+Jon
