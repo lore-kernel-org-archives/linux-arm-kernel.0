@@ -1,28 +1,62 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 10 Sep 2012 12:13:20 +0100
-Subject: [PATCH 06/14] tty/serial/core: Introduce poll_init callback
-In-Reply-To: <20120910041335.GF29537@lizard>
-References: <20120910040802.GA1261@lizard>
-	<20120910041335.GF29537@lizard>
-Message-ID: <20120910121320.03c9dfc7@pyramind.ukuu.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 04:11:10 -0700
+Subject: [PATCH 09/19] ARM: ux500: Enable SSP (SPI) for HREF when booting
+ Device Tree
+In-Reply-To: <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaC_enpxUFNM_wteAQWKER_naUNUH-s1pJtiGzVFSV+og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> +	tport = &state->port;
-> +	if (!(tport->flags & ASYNC_INITIALIZED) && port->ops->poll_init) {
-> +		mutex_lock(&tport->mutex);
-> +		ret = port->ops->poll_init(port);
-> +		/*
-> +		 * We don't set ASYNCB_INITIALIZED as we only initialized the
-> +		 * hw, e.g. state->xmit is still uninitialized.
-> +		 */
-> +		mutex_unlock(&tport->mutex);
-> +		if (ret)
-> +			return ret;
-> +	}
+> Here we add a new SSP node to the HREF's Device Tree file which
+> activates the generic one found in the .dtsi file. This will
+> allow probing of the SSP driver when Device Tree is enabled.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-What stops a parallel open or close changing ASYNC_INITIALIZED after you
-test and before you lock ?
+We have to look closer at this.
 
-Alan
+There are merged PL022 DT bindings (by Roland Stigge)
+nowadays, see commit 6d3952a7dfa80919842bbe01ac7f693d40a1eb84
+in linux-next:
+
+ Optional properties:
++- num-cs : total number of chipselects
+ - cs-gpios : should specify GPIOs used for chipselects.
+   The gpios will be referred to as reg = <index> in the SPI child nodes.
+   If unspecified, a single SPI device without a chip select can be used.
+
++SPI slave nodes must be children of the SPI master node and can
++contain the following properties.
++
++- pl022,interface : interface type:
++       0: SPI
++       1: Texas Instruments Synchronous Serial Frame Format
++       2: Microwire (Half Duplex)
++- pl022,com-mode : polling, interrupt or dma
++- pl022,rx-level-trig : Rx FIFO watermark level
++- pl022,tx-level-trig : Tx FIFO watermark level
++- pl022,ctrl-len : Microwire interface: Control length
++- pl022,wait-state : Microwire interface: Wait state
++- pl022,duplex : Microwire interface: Full/Half duplex
+
+Currently this is defined as auxdata in board-mop500.c
+but notanly cs-gpios (num chipselects) should come from
+device tree instead.
+
+It appears Roland has written his bindings such that DT
+data augments platform data (yes, I am also getting crazy
+about this prioritization, mea culpa for ACKing this without
+proper discussion) so it appears that you could actually
+use AUXDATA and some stuff in the DT at the same
+time.
+
+Or you could keep it like this and only have AUXDATA
+as it stands, I just want a discussion about what is the right
+thing to do before we commit to anything.
+
+Yours,
+Linus Walleij
