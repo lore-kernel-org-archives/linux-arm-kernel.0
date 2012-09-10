@@ -1,79 +1,54 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 10 Sep 2012 10:29:55 +0200
-Subject: [PATCH 1/2] gpio/twl4030: get platform data from device tree
-In-Reply-To: <504DA20D.7020903@epfl.ch>
-References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
- <1346831186-29947-2-git-send-email-florian.vaussard@epfl.ch>
- <504A2FF2.7070607@ti.com> <504DA20D.7020903@epfl.ch>
-Message-ID: <504DA503.5050901@ti.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 10 Sep 2012 10:30:14 +0200
+Subject: [PATCH v8 0/3] GPMC driver conversion
+In-Reply-To: <20120907221034.GP1303@atomide.com>
+References: <cover.1346846464.git.afzal@ti.com>
+ <20120907221034.GP1303@atomide.com>
+Message-ID: <504DA516.1020405@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hello,
 
-On 09/10/2012 10:17 AM, Florian Vaussard wrote:
-> Hello Benoit,
-> 
-> Le 07/09/2012 19:33, Benoit Cousson a ?crit :
->> Hi Florian,
+Le 08/09/2012 00:10, Tony Lindgren a ?crit :
+> * Afzal Mohammed <afzal@ti.com> [120905 05:37]:
+>> Hi,
 >>
->> I've just noticed that this patch is reporting some CHECK issues.
+>> Basic gpmc driver conversion series. Driver that is now created out of
+>> gpmc code is a simple one, it handles tasks that were earlier executed
+>> by gpmc_init. Now instead of relying on cpu_is_* checks, it obtains
+>> resources and clk handle in the standard Linux way. The existing gpmc
+>> interface works as was without this series.
 >>
->> d1f5052 - gpio/twl4030: get platform data from device tree
->> CHECK: Alignment should match open parenthesis
->> #66: FILE: drivers/gpio/gpio-twl4030.c:412:
->> +    of_property_read_u32(dev->of_node, "ti,debounce",
->> +                &omap_twl_info->debounce);
+>> HWMOD patch also has been brought into this series back with v7 series
 >>
->> CHECK: Alignment should match open parenthesis
->> #68: FILE: drivers/gpio/gpio-twl4030.c:414:
->> +    of_property_read_u32(dev->of_node, "ti,mmc-cd",
->> +                (u32 *)&omap_twl_info->mmc_cd);
+>> As this creates only a basic driver, further gpmc driver work can be
+>> based over this, while having a driver first in place.
 >>
->> CHECK: Alignment should match open parenthesis
->> #70: FILE: drivers/gpio/gpio-twl4030.c:416:
->> +    of_property_read_u32(dev->of_node, "ti,pullups",
->> +                &omap_twl_info->pullups);
+>> This series is based on l-o/testing-cleanup as on 5-Sep-12,
+>> i.e. over commit,
 >>
->> CHECK: Alignment should match open parenthesis
->> #72: FILE: drivers/gpio/gpio-twl4030.c:418:
->> +    of_property_read_u32(dev->of_node, "ti,pulldowns",
->> +                &omap_twl_info->pulldowns);
+>> e3a5c14 ARM: OMAP1: Move SoC specific headers from plat to mach for omap1
 >>
->> CHECK: Alignment should match open parenthesis
->> +                pdata->pullups, pdata->pulldowns,
+>> per Tony's suggestion.
 >>
->> CHECK: Alignment should match open parenthesis
->> #139: FILE: drivers/gpio/gpio-twl4030.c:479:
->> +        dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
->> +                pdata->debounce, pdata->mmc_cd,
->>
->> total: 0 errors, 0 warnings, 6 checks, 118 lines checked
->>
->>
->> I fixed them since it was trivial, but next time you should ensure
->> that the patch pass checkpatch before posting.
-> 
-> Sorry for these errors. I however checked my patches before submitting,
-> and had no such warnings. I redone, and remarked that these warnings
-> appear only with the "--strict" option, which is not enabled by default.
-> Is this the recommended  guideline? Thus why not enabling it by default?
+>> It is available
+>> @git://gitorious.org/x0148406-public/linux-kernel.git gpmc-drv-v8
+> Great, this all looks good to me. I suggest that on top of this
+> we add minimal devicetree binding that does not even attempt to
+> deal with the timings yet.
+>
+> Then once the minimal devicetree binding is in place, we can
+> call the current GPMC timing functions using the compatible flags
+> and auxdata in the gpmc.c driver.
+>
+> That way we get all the legacy boards booting with GPMC support
+> for smsc911x etc, and can even remove some less used board-*.c
+> files.
 
-That's a pretty good question :-)
-
-Maybe the --strict is more a nice to have than a strong requirement?
-Anyway, we'd better run checkpatch with --strict and thus fix any
-cosmetic details that might be in the patch.
-
->> Just let me know if you have any issue with the following update.
-> 
-> I will test, but should not have any issue with your fix.
-> 
-> Thank you very much for fixing my patch, I send you a virtual chocolate
-> from Switzerland!
-
-Cool, I love chocolate. That being said, I'm not sure how tasteful will
-be the *virtual* chocolate.
+This would be great. If you happen to have DT bindings for GPMC,
+I would be happy to test them with my Overo board, as well as
+with my CAN chips on a custom board.
 
 Regards,
-Benoit
+Florian
