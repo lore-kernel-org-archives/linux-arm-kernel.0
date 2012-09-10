@@ -1,69 +1,76 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 10 Sep 2012 16:59:36 -0500
-Subject: [PATCH 08/10] ARM: OMAP: Clean-up timer posted mode support
-In-Reply-To: <20120907222223.GQ1303@atomide.com>
-References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
- <1346871872-24413-9-git-send-email-jon-hunter@ti.com>
- <20120907222223.GQ1303@atomide.com>
-Message-ID: <504E62C8.8030100@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 10 Sep 2012 15:24:29 -0700
+Subject: [PATCH] ARM: smp: Formalize an IPI for wakeup
+Message-ID: <1347315869-28285-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove the offset from ipi_msg_type and assume that SGI0 is the
+wakeup interrupt now that all WFI hotplug users call
+gic_raise_softirq() with 0 instead of 1. This allows us to 
+track how many wakeup interrupts are sent and also removes the
+unknown IPI printk message for WFI hotplug based systems.
 
-On 09/07/2012 05:22 PM, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [120905 12:05]:
->> The dmtimer functions to read and write the dmtimer registers are currently
->> defined as follows ...
->>
->> static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
->> 						int posted);
->> static inline void __omap_dm_timer_write(struct omap_dm_timer *timer,
->> 						u32 reg, u32 val, int posted);
->>
->> The posted variable indicates if the timer is configured to use the posted mode
->> when performing register accesses. The posted mode configuration of the dmtimer
->> is stored in the omap_dm_timer structure that is also being passed to the above
->> functions and therefore we do not need to pass the posted variable separately.
->> Therefore, simplify the above functions by removing the posted variable as an
->> argument as this is not necessary.
-> 
-> I believe the reason for passing the posted flag was to optimize out some
-> functions from the timer code as that's being run all the time.
-> 
-> Care to check the assembly before and after this patch for the timer
-> functions with objdump -d to make sure it does not add tons of bloat
-> there?
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/kernel/smp.c          | 13 +++++++++----
+ 2 files changed, 10 insertions(+), 5 deletions(-)
 
-Hi Tony,
-
-Thanks for the details here. I see that makes sense and that the
-compiler could take advantage of this as the functions are inlined.
-
-I have taken a look at the disassembled output using objdump as you
-mentioned. What I see is ...
-
-1. For dmtimer.c the impact appears negligible, the total number of
-   lines outputted by objdump only changed by 8 with (1215 lines) and
-   without (1207 lines) the patch applied.
-
-2. For timer.c the impact is greater. I see that
-   omap2_gp_timer_set_next_event() increased by 6 instructions from 29
-   to 35. clocksource_read_cycles() increased by 2 instructions 15 to
-   17 instructions. dmtimer_read_sched_clock() increased by 2
-   instructions from 17 to 19. omap2_gp_timer_set_mode() increased by
-   21 instructions from 102 to 123.
-
-I imagine that we are mainly concerned about
-omap2_gp_timer_set_next_event(), clocksource_read_cycles() and
-dmtimer_read_sched_clock() as these will be called often. Therefore, I
-am not sure if you wish to drop this patch.
-
-By the way, if we do drop this patch, I would then need to fix the
-setting of the posted variable in mach-omap2/timer.c for clock-source in
-the case where a dmtimer is used. Today the code assumes that for
-clock-source and clock-events posted mode is always used. However, with
-the errata i103/i767 we will disable posted mode for clock-source on
-omap2/3/4/5/am33xx devices.
-
-Cheers
-Jon
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 436e60b..2740c2a2 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	5
++#define NR_IPI	6
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ebd8ad2..d98c37e 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -51,7 +51,8 @@
+ struct secondary_data secondary_data;
+ 
+ enum ipi_msg_type {
+-	IPI_TIMER = 2,
++	IPI_WAKEUP,
++	IPI_TIMER,
+ 	IPI_RESCHEDULE,
+ 	IPI_CALL_FUNC,
+ 	IPI_CALL_FUNC_SINGLE,
+@@ -347,7 +348,8 @@ void arch_send_call_function_single_ipi(int cpu)
+ }
+ 
+ static const char *ipi_types[NR_IPI] = {
+-#define S(x,s)	[x - IPI_TIMER] = s
++#define S(x,s)	[x] = s
++	S(IPI_WAKEUP, "CPU wakeup interrupts"),
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+@@ -500,10 +502,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+-	if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
+-		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
++	if (ipinr < NR_IPI)
++		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
+ 
+ 	switch (ipinr) {
++	case IPI_WAKEUP:
++		break;
++
+ 	case IPI_TIMER:
+ 		irq_enter();
+ 		ipi_timer();
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
