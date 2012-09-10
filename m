@@ -1,54 +1,52 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 10 Sep 2012 15:49:38 +0200
-Subject: [PATCH 1/1] ARM: dts: OMAP3: Add gpio-twl4030 properties for Overo
-In-Reply-To: <504DEDB4.1070804@ti.com>
-References: <1347282996-31190-1-git-send-email-florian.vaussard@epfl.ch>
- <1347282996-31190-2-git-send-email-florian.vaussard@epfl.ch>
- <504DEA4E.7080109@ti.com> <504DEC36.4020704@epfl.ch>
- <504DEDB4.1070804@ti.com>
-Message-ID: <504DEFF2.5060007@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Sep 2012 21:50:37 +0800
+Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
+In-Reply-To: <504DBB10.9030702@bluegiga.com>
+References: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20120910060840.GT26709@S2101-09.ap.freescale.net>
+ <504DBB10.9030702@bluegiga.com>
+Message-ID: <20120910135034.GD13076@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 03:40 PM, Benoit Cousson wrote:
-> On 09/10/2012 03:33 PM, Florian Vaussard wrote:
->>>> Support the blue LED connected to the LEDB pin of the TWL4030
->>>> on the Gumstix Overo.
->>>>
->>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>>> ---
->>>>   arch/arm/boot/dts/omap3-overo.dtsi |   15 +++++++++++++++
->>>>   1 files changed, 15 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi
->>>> b/arch/arm/boot/dts/omap3-overo.dtsi
->>>> index d6cc5e2..89808ce 100644
->>>> --- a/arch/arm/boot/dts/omap3-overo.dtsi
->>>> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
->>>> @@ -13,6 +13,17 @@
->>>>
->>>>   /include/ "omap3.dtsi"
->>>>
->>>> +/ {
->>>
->>> BTW, I'm just wondering. Cannot we use overo without tobi?
->>>
->>> In that case, the model and compatible should probably be used as well:
->>>
->>>     model = "TI OMAP3 Gumstix Overo";
->>>     compatible = "ti,omap3-overo", "ti,omap3";
->>
->> No, it cannot. The Overo needs to be plugged into an expansion board, at
->> least to get the power. Hence the absence of model and compatible in
->> omap3-overo.dtsi.
+On Mon, Sep 10, 2012 at 01:04:00PM +0300, Lauri Hintsala wrote:
+> >>@@ -187,6 +188,9 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+> >>  {
+> >>  	struct mxs_mmc_host *host = mmc_priv(mmc);
+> >>
+> >>+	if (host->broken_cd)
+> >>+		return -ENOSYS;
+> >>+
+> >
+> >The .get_cd caller does not check for error.  This change makes no
+> >sense to me.
 > 
-> OK, cool. I was wondering because we already have a board-overo.c in the
-> kernel, and there is no mention of tobi.
+> In our case we don't want to read card detect bit and we have to
+> continue MMC probing because card detect pin is routed nowhere.
 > 
-> OK, I'm adding that patch on top of the other then.
+> Could it be better to return zero instead of error? ENOSYS is used
+> to indicate "unreachable card detect" in other drivers (e.g.
+> atmel-mci, omap_hsmmc) and I followed them.
+> 
+I was wrong.  Even the kerneldoc of .get_cd suggests return -ENOSYS
+for that case.
 
-I'm just going to update the subject to:
-ARM: dts: omap3-overo: Add support for the blue LED
+> 
+> >Instead, the driver needs to set MMC_CAP_NEEDS_POLL in
+> >case of "broken-cd".
+> 
+> MMC_CAP_NEEDS_POLL is always set in mxs-mmc.
+> 
+Oops, I forgot that.  But this is really something that needs to be
+fixed.  Per my understanding, flag MMC_CAP_NEEDS_POLL should only
+be set when card-detect is not working.
 
-regards,
-Benoit
+Also the card-detect in gpio support is missing.
+
+But for this patch:
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+-- 
+Regards,
+Shawn
