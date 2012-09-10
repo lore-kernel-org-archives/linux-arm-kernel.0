@@ -1,27 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Sep 2012 14:25:43 +0800
-Subject: [PATCH v2 1/4] clk: add of_clk_src_onecell_get() support
-In-Reply-To: <20120907192444.20289.97042@nucleus>
-References: <1345642590-29905-1-git-send-email-shawn.guo@linaro.org>
- <1345642590-29905-2-git-send-email-shawn.guo@linaro.org>
- <20120831064125.GA3271@r65073-Latitude-D630>
- <20120906221155.20289.73650@nucleus>
- <20120907002618.GB26709@S2101-09.ap.freescale.net>
- <20120907192444.20289.97042@nucleus>
-Message-ID: <20120910062535.GU26709@S2101-09.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 10 Sep 2012 15:17:56 +0800
+Subject: [PATCH] ARM:IMX6Q:use pll2_pfd2_396m as the enfc_sel's parent
+Message-ID: <1347261476-9799-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 12:24:44PM -0700, Mike Turquette wrote:
-> Done.  I've taken patch #1 "clk: add of_clk_src_onecell_get() support"
-> into clk-next.
-> 
-Thanks, Mike.
+The gpmi-nand driver can support the ONFI nand chip's EDO (extra data out)
+mode in the asynchrounous mode. In the asynchrounous mode 5, the gpmi
+needs 100MHz clock for the IO. But with the pll2_pfd0_352m, we can not
+get the 100MHz clock.
 
-I'm still waiting for a stable branch like clk-3.7, which I can ask
-arm-soc folks to pull as a dependency.  I have some imx and mxs 3.7
-material currently pending on this.
+So choose pll2_pfd2_396m as enfc_sel's parent.
 
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4233d9e..58705b6 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -440,6 +440,13 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[ahb], "ahb", NULL);
+ 	clk_register_clkdev(clk[cko1], "cko1", NULL);
+ 
++	/*
++	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
++	 * We can not get the 100MHz from the pll2_pfd0_352m.
++	 * So choose pll2_pfd2_396m as enfc_sel's parent.
++	 */
++	clk_set_parent(clk[enfc_sel], clk[pll2_pfd2_396m]);
++
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clk[clks_init_on[i]]);
+ 
 -- 
-Regards,
-Shawn
+1.7.0.4
