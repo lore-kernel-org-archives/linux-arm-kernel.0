@@ -1,31 +1,40 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 10 Sep 2012 13:52:27 +0200
-Subject: [PATCH 0/2] ARM: omap/dts: Add support for Gumstix Overo with
- Tobi expansion
-In-Reply-To: <504DD128.1000803@ti.com>
-References: <1346429172-5902-1-git-send-email-florian.vaussard@epfl.ch>
- <20120906205227.GM1303@atomide.com> <504DB202.5050500@epfl.ch>
- <504DD128.1000803@ti.com>
-Message-ID: <504DD47B.8080706@epfl.ch>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Mon, 10 Sep 2012 22:02:01 +1000
+Subject: [PATCH] ARM: add back in KS8695 based SnapGear board entries
+In-Reply-To: <20120910084259.GQ13739@n2100.arm.linux.org.uk>
+References: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
+ <20120910084259.GQ13739@n2100.arm.linux.org.uk>
+Message-ID: <504DD6B9.9050803@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/10/2012 06:42 PM, Russell King - ARM Linux wrote:
+> On Mon, Sep 10, 2012 at 01:30:15PM +1000, gerg at snapgear.com wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
 >>
->> What is the status Benoit?
+>> Board support code for the SnapGear boards based on the Micrel KS8695 SoC
+>> will soon appear in mainline kernel. The board IDs had been removed from
+>> the mach-types file, so add them back in.
 >
-> Patches looks good to me. I just adding them right now in my for_3.7/dts tree.
->
-> I've just slightly changed the subjects:
->
-> Documentation: dt: Update the OMAP documentation with Overo/Toby
-> ARM: dts: OMAP3: Add support for Gumstix Overo with Tobi expansion board
->
-> If you want to give it a try, here is the branch that contains all the DTS series I
-> already pulled. It includes your gpio-twl4030 patches as well.
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.7/dts
+> Nak.  You must add platform support for these numbers _along_ _side_
+> adding them back to mach-types, otherwise my scripts will simply delete
+> them again.  These entries have been aged out due to lack of merging of
+> the platforms.
 
-Great, thank you! I will test your branch on my Overo ASAP.
+So if I combine this with:
 
-Regards,
-Florian
+ 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-September/118237.html
+
+and submit as a single patch (through the arm-soc tree) will that cause
+your scripts any problems?
+
+Regards
+Greg
+
+
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
