@@ -1,20 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Sep 2012 09:42:59 +0100
-Subject: [PATCH] ARM: add back in KS8695 based SnapGear board entries
-In-Reply-To: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
-References: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
-Message-ID: <20120910084259.GQ13739@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 01:47:09 -0700
+Subject: [PATCH 01/19] ARM: ux500: Add skeleton Device Tree for the HREF
+ reference board
+In-Reply-To: <1347016499-29354-2-git-send-email-lee.jones@linaro.org>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbWVjiqrehj_v7M=cgnytEio5whTXOcax5wo0YSRe=-yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 01:30:15PM +1000, gerg at snapgear.com wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
-> 
-> Board support code for the SnapGear boards based on the Micrel KS8695 SoC
-> will soon appear in mainline kernel. The board IDs had been removed from
-> the mach-types file, so add them back in.
+On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Nak.  You must add platform support for these numbers _along_ _side_
-adding them back to mach-types, otherwise my scripts will simply delete
-them again.  These entries have been aged out due to lack of merging of
-the platforms.
+> First commit applying the new Device Tree for ST-Ericsson's u8500
+> based hardware reference board.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+> +/dts-v1/;
+> +/include/ "dbx5x0.dtsi"
+
+This include is not even in linux-next, is this patch series dependent
+on some other series I have not seen, or that I have forgot that
+I saw (and even possibly ACKed...)
+
+Apart from that it looks good.
+
+Yours,
+Linus Walleij
