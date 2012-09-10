@@ -1,44 +1,20 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Sep 2012 17:28:14 +0200
-Subject: [PATCH V2 1/2] hwmon: Add devicetree bindings to gpio-fan
-In-Reply-To: <1347285112-13542-2-git-send-email-jm@lentin.co.uk>
-References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
- <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
- <1347285112-13542-2-git-send-email-jm@lentin.co.uk>
-Message-ID: <20120910152814.GA6050@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 10 Sep 2012 12:39:00 -0300
+Subject: Early crash on linux-nex:t 20120906
+In-Reply-To: <CAOMZO5DN8iEH=1f+1LAQHbJpQ5PSHJW7ucHVrFc7cpRfoRW9Bw@mail.gmail.com>
+References: <CAOMZO5DN8iEH=1f+1LAQHbJpQ5PSHJW7ucHVrFc7cpRfoRW9Bw@mail.gmail.com>
+Message-ID: <CAOMZO5Bf+Yp_QKLCJDaT+LVEvPD4YgQcGMrkTw1b9m91_13X2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 02:51:51PM +0100, Jamie Lentin wrote:
-> Allow a gpio-fan to be defined in devicetree, see binding documentation
-> for details.
-> 
-> Changes since V1:-
-> * Don't hide return codes [Guenter Roeck]
-> * Remove typecast noise [Guenter Roeck]
-> * Use of_find_property instead of counting u32s [Guenter Roeck]
-> * Don't count GPIOs twice [Andrew Lunn]
-> * Use of_prop_next_u32 to get records in a more obvious fashion
-> * Use CONFIG_OF_GPIO instead of CONFIG_OF
-> * Apply __devinitdata to of_gpio_fan_match [Andrew Lunn]
-> 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> ---
->  .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
->  drivers/hwmon/gpio-fan.c                           |  116 ++++++++++++++++++++
->  2 files changed, 141 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
+On Sat, Sep 8, 2012 at 10:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi,
+>
+> Booting a linux-nex:t 20120906 kernel on a mx31pdk board I get a very
+> early crash:
 
-Hi Jamie
+Ok, on next-20120910 this issue is not present.
 
-Thanks for addressing all the issues raised. However...
+Regards,
 
-Anything before the --- ends up in the changelog entry. Anything
-afterwards does not.
-
-The changes you made to address review comments is not something for
-the changelog, so Changes since V1:- should be after the --- .
-
-There is more detail in Documentation/SubmittingPatches
-
-      Andrew
+Fabio Estevam
