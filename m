@@ -1,25 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Sep 2012 17:48:15 +0100
-Subject: [PATCH v3 09/31] arm64: Cache maintenance routines
-In-Reply-To: <201209071928.09999.arnd@arndb.de>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-10-git-send-email-catalin.marinas@arm.com>
- <201209071928.09999.arnd@arndb.de>
-Message-ID: <20120910164815.GB8238@arm.com>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 10 Sep 2012 12:52:10 -0400
+Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
+ hardware
+In-Reply-To: <504E168C.6060603@ti.com>
+References: <1347294020-22661-1-git-send-email-mporter@ti.com>
+ <504E168C.6060603@ti.com>
+Message-ID: <20120910165210.GJ27758@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 08:28:09PM +0100, Arnd Bergmann wrote:
-> On Friday 07 September 2012, Catalin Marinas wrote:
-> > +
-> > +/*
-> > + *	dmac_inv_range(start,end)
+On Mon, Sep 10, 2012 at 06:34:20PM +0200, Benoit Cousson wrote:
+> + Tony
 > 
-> all of these appear to be unused now. Can you remove them?
+> Hi Matt,
+> 
+> 30 minutes too late for my pull request :-(
+> 
+> There are a couple of am33xx patches under discussion, so I'll take them
+> and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
 
-They aren't currently used but I expect some partners to make use of
-them on their private development. I could drop them from the upstream
-branch temporarily.
+Yeah, believe me, I did a faceplant when I saw your pull request come by
+at the same time I discovered this issue. ;) In particular, AnilKumar's
+user leds patch would need to be adjusted for this change. I can
+resubmit with the user leds dts changes adjusted as well if that
+discussion comes to a conclusion and his patches accepted.
+ 
+> On 09/10/2012 06:20 PM, Matt Porter wrote:
+> > On AM33xx, the datasheet and TRM refer to four GPIO instances that
+> > are 0-based, GPIO0-3.
+> 
+> Or maybe you should just update the spec to use a 1-based GPIO number
+> like OMAP :-)
 
--- 
-Catalin
+I am powerless here. :)
+
+-Matt
+
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > index bb31bff..1369bfc 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -62,7 +62,7 @@
+> >  			reg = <0x48200000 0x1000>;
+> >  		};
+> >  
+> > -		gpio1: gpio at 44e07000 {
+> > +		gpio0: gpio at 44e07000 {
+> >  			compatible = "ti,omap4-gpio";
+> >  			ti,hwmods = "gpio1";
+> >  			gpio-controller;
+> > @@ -74,7 +74,7 @@
+> >  			interrupts = <96>;
+> >  		};
+> >  
+> > -		gpio2: gpio at 4804c000 {
+> > +		gpio1: gpio at 4804c000 {
+> >  			compatible = "ti,omap4-gpio";
+> >  			ti,hwmods = "gpio2";
+> >  			gpio-controller;
+> > @@ -86,7 +86,7 @@
+> >  			interrupts = <98>;
+> >  		};
+> >  
+> > -		gpio3: gpio at 481ac000 {
+> > +		gpio2: gpio at 481ac000 {
+> >  			compatible = "ti,omap4-gpio";
+> >  			ti,hwmods = "gpio3";
+> >  			gpio-controller;
+> > @@ -98,7 +98,7 @@
+> >  			interrupts = <32>;
+> >  		};
+> >  
+> > -		gpio4: gpio at 481ae000 {
+> > +		gpio3: gpio at 481ae000 {
+> >  			compatible = "ti,omap4-gpio";
+> >  			ti,hwmods = "gpio4";
+> >  			gpio-controller;
+> > 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
