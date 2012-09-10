@@ -1,92 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Sep 2012 09:01:05 -0700
-Subject: [PATCH v3 1/8] ARM/dts: omap2: Add McBSP entries for OMAP2420
- and OMAP2430 SoC
-In-Reply-To: <504DC975.5070609@ti.com>
-References: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
- <1346846336-27321-2-git-send-email-peter.ujfalusi@ti.com>
- <20120907222953.GS1303@atomide.com> <504D9FBC.9030609@ti.com>
- <504DC975.5070609@ti.com>
-Message-ID: <20120910160105.GV1303@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 10 Sep 2012 18:58:57 +0300
+Subject: [PATCH 1/3] arm: omap: hwmod: add a new addr space in otg for
+ writing to control module
+In-Reply-To: <20120906195607.GB1303@atomide.com>
+References: <1346943331-18120-1-git-send-email-kishon@ti.com>
+ <1346943331-18120-2-git-send-email-kishon@ti.com>
+ <5048C2A2.2020104@ti.com> <20120906171301.GC17754@arwen.pp.htv.fi>
+ <20120906171803.GA30717@arwen.pp.htv.fi>
+ <20120906195607.GB1303@atomide.com>
+Message-ID: <20120910155855.GE7464@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120910 04:05]:
-> Hi Benoit,
-> 
-> On 09/10/2012 11:07 AM, Benoit Cousson wrote:
-> > Hi Tony,
-> > 
-> > On 09/08/2012 12:29 AM, Tony Lindgren wrote:
-> >> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120905 04:59]:
-> >>> +
-> >>> +	ocp {
-> >>> +		mcbsp1: mcbsp at 48074000 {
-> >>> +			compatible = "ti,omap2420-mcbsp";
-> >>> +			reg = <0x48074000 0xff>;
-> >>> +			reg-names = "mpu";
-> >>> +			interrupts = <59>, /* TX interrupt */
-> >>> +				     <60>; /* RX interrupt */
-> >>> +			interrupt-names = "tx", "rx";
-> >>> +			interrupt-parent = <&intc>;
-> >>> +			ti,hwmods = "mcbsp1";
-> >>> +		};
-> >>> +
-> >>> +		mcbsp2: mcbsp at 48076000 {
-> >>> +			compatible = "ti,omap2420-mcbsp";
-> >>> +			reg = <0x48076000 0xff>;
-> >>> +			reg-names = "mpu";
-> >>> +			interrupts = <62>, /* TX interrupt */
-> >>> +				     <63>; /* RX interrupt */
-> >>> +			interrupt-names = "tx", "rx";
-> >>> +			interrupt-parent = <&intc>;
-> >>> +			ti,hwmods = "mcbsp2";
-> >>> +		};
-> >>> +	};
-> >>
-> >> Hmm don't you need to specify the interrupt chip and offset for
-> >> the interrupts here?
-> > 
-> > Mmm, I'm not sure to get your question, there is the link to the
-> > interrupt-parent.
-> > 
-> > The interrupt number is relative to the parent interrupt domain. So even
-> > if the INTC IRQ offset start at 32 instead of 0, DT IRQ mechanism will
-> > convert that to the proper hwirq thanks to irqdomain.
-> > In that case we should always provide interrupt number relative to the
-> > interrupt controller HW number and not assuming any Linux IRQ number
-> > offset like before.
+Hi,
 
-Yes never mind, I was confused. We have #interrupt-cells = <1> and the
-interrupt specifier is just the interrupt offset..
+On Thu, Sep 06, 2012 at 12:56:07PM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [120906 10:23]:
+> > Hi,
+> > 
+> > On Thu, Sep 06, 2012 at 08:13:03PM +0300, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Sep 06, 2012 at 09:04:58PM +0530, Vaibhav Hiremath wrote:
+> > > > 
+> > > > 
+> > > > On 9/6/2012 8:25 PM, Kishon Vijay Abraham I wrote:
+> > > > > The mailbox register for usb otg in omap is present in control module.
+> > > > > On detection of any events VBUS or ID, this register should be written
+> > > > > to send the notification to musb core.
+> > > > > 
+> > > > > Till we have a separate control module driver to write to control module,
+> > > > > omap2430 will handle the register writes to control module by itself. So
+> > > > > a new address space to represent this control module register is added
+> > > > > to usb_otg_hs.
+> > > > > 
+> > > > > Cc: Benoit Cousson <b-cousson@ti.com>
+> > > > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > > > > ---
+> > > > >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
+> > > > >  1 file changed, 5 insertions(+)
+> > > > > 
+> > > > > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > > > > index 242aee4..02341bc 100644
+> > > > > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > > > > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> > > > > @@ -5890,6 +5890,11 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
+> > > > >  		.pa_end		= 0x4a0ab003,
+> > > > >  		.flags		= ADDR_TYPE_RT
+> > > > >  	},
+> > > > > +	{
+> > > > > +		.pa_start	= 0x4a00233c,
+> > > > > +		.pa_end		= 0x4a00233f,
+> > > > > +		.flags		= ADDR_TYPE_RT
+> > > > > +	},
+> > > > 
+> > > > I do not have any objection/comment here, but I believe this is control
+> > > > module address space required for USB module, right?
+> > > > I am not sure this is right way of accessing control module space.
+> > > > Actually Control Module Access required for drivers is one of the
+> > > > blocking issue we have currently.
+> > > > 
+> > > > Also there was some effort put up by 'Konstantine' to convert Control
+> > > > module to MFD driver, I haven't seen any further update on it. But it
+> > > > would be good to check with him.
+> > > 
+> > > this was an agreement with Benoit since we already lost a couple merge
+> > > windows for this patchset. We agreed to wait until -rc4 for SCM driver
+> > > and if it wasn't ready, we'd go ahead with this and SCM author would fix
+> > > it up on a patch converting users to new SCM driver.
+> > 
+> > Tony, can I get your Acked-by to this patch so I can take it together
+> > with the rest of the series ? Thanks
+> > 
+> > ps: I'll apply this to my 'musb' branch which is immutable, so it's safe
+> > to merge it into your tree once I apply.
+> 
+> It would be best if this got acked by Benoit and Paul as they may
+> have some other patches queued up. I'll ack if they ack ;)
 
-Regards,
+Benoit, care to ack this patch ???
 
-Tony 
-
-> > And in fact the interrupt-parent is not even needed, by default if will
-> > look to the parent to get the interrupt-controller.
-> 
-> This is true, but it makes the 'code' a bit more readable if I (we) specify
-> the interrupt-parent.
-> 
-> > 
-> > Extract from [1]
-> > 
-> > interrupt-parent:
-> > "Because the hierarchy of the nodes in the interrupt tree might not
-> > match the device tree, the interrupt-parent property is available to
-> > make the definition of an interrupt parent explicit.
-> > The value is the phandle to the interrupt parent. If this property is
-> > missing from a device, its interrupt parent is assumed to be its device
-> > tree parent."
-> > 
-> > [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-> > 
-> > Regards,
-> > Benoit
-> > 
-> 
-> 
-> -- 
-> P?ter
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120910/f04477e0/attachment.sig>
