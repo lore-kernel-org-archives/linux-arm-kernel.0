@@ -1,114 +1,105 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 10 Sep 2012 18:09:38 +0300
-Subject: [PATCH v5 0/8] ARM: OMAP2+: PM: introduce the power domains
- functional states
-In-Reply-To: <CAMQu2gyV6gX=KFjMZ1r_BwsJXmgjuLMAWHrrLCYLgKEBRne0Ow@mail.gmail.com>
-References: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
- <CAMQu2gxznhsbK3--nyQmYdHqyGjwpCSa3CJx8aYpF4wwR1qBSg@mail.gmail.com>
- <alpine.DEB.2.00.1208151842380.8833@utopia.booyaka.com>
- <CAMQu2gyV6gX=KFjMZ1r_BwsJXmgjuLMAWHrrLCYLgKEBRne0Ow@mail.gmail.com>
-Message-ID: <1347289778.10702.128.camel@sokoban>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 10 Sep 2012 10:11:48 -0500
+Subject: Tracking down suspend/resume ext3/mmc issues on imx233
+In-Reply-To: <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
+References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+ <20120907060552.GL26709@S2101-09.ap.freescale.net>
+ <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
+Message-ID: <CAKGA1bnug8nqcideOBZyLQZmiVo=G5L3aRHq4k4SNZyH132Y=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-08-16 at 11:20 +0530, Shilimkar, Santosh wrote:
-> Paul,
-> 
-> On Thu, Aug 16, 2012 at 6:18 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > Hi Santosh,
-> >
-> > On Wed, 15 Aug 2012, Shilimkar, Santosh wrote:
-> >
-> > > On Wed, Aug 15, 2012 at 3:32 PM, Jean Pihet <jean.pihet@newoldbits.com>
-> > > wrote:
-> > >
-> > > I didn't find any mention here about why are we going in this path and
-> > > not
-> > > in the direction proposed in another RFC [1]
-> > > I have already given my comments[2] against the introduction of another
-> > > PD
-> > > layer which can be avoided easily as demonstrated by the RFC[1]. The
-> > > comments
-> > > are still applicable for this series too.
-> > >
-> > > We really need to reduce OMAP specific framework overhead and
-> > > move towards more generic PM frameworks. For me, this series is
-> > > a step back-ward from that direction. Am really sorry for being critical
-> > > again but I remain unconvinced about this series and the problem it
-> > > is trying to solve.
-> > >
-> > > May be you have valid reasons not to follow the approach in [1] and in
-> > > that case, it will be good to clarify that so that some of us get
-> > > to know your rationale.
-> >
-> > I've asked Jean to handle the work of evaluating and/or integrating any
-> > feedback from you and Rajendra into this series.  Jean, has this latest
-> > series fully considered those issues?  Or are there still some areas of
-> > misalignment / lack of clarity?
-> >
-> Thanks for the information. The main objection to this series was to
-> not add un-necessary glue layer which still remains.
-> 
-> From our discussion in past on and off list, your main intention for such
-> a series was -
-> 
-> 1. Need a way to support OSWR.
-> - OSWR by definition is a RET with configurable logic and memory states.
-> Its a true power state from PD point of view and its not a logical state.
-> Now since we have agreed to make the OSWR as a static definition
-> (in all products so far OSWR is used as a static definition with logic
-> lost, memory retained kind of configuration.)
-> 
-> - The above requirement can be easily fixed by adding the OSWR
-> as an additional basic power state as demonstrated in RFC.
-> 
-> - There is no need to add another glue layer for above.
-> 
-> 2. Locking so that the low level APIs don't race and henec abstracting the
-> exported API to 1 or 2 and making rest as private functions.
-> 
-> -- Even before this series, except low level PM code, only one
-> common API was used to set the PD low power state.
-> int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
-> 
-> -- Once we make OSWR as basic power state, we also avoid usage of
-> pwrdm_set_logic_retst() API.
-> 
-> -- We implement lock at this API and export only above API +
-> may be omap_get_pwrdm_state() kind of API based on need.
-> 
-> -- This solves the second requirement too.
-> 
-> Even if we have more requirement, they can be addressed
-> too without need of another layer.
-> 
-> If you look at the diffstat alone between two approaches, it is
-> evident how small piece of code is needed to support above.
-> Am not too much into the lines of code but basic objection we
-> have is not to add another glue layer.
-> 
-> Thinking bit loud, for the logical layer for power domain
-> we should move towards common device power domain
-> APIs and if needed add/enhance them to support OMAP.
->    drivers/base/power/domain.c
-> May be this though is bit premature but the intetion is
-> to move towards generic linux framework.
-> 
-> > Anyway.  If there's a problem with this process, it sounds like you,
-> > Rajendra, Jean, Beno?t and I should schedule some time to talk over the
-> > same issues that you discussed with me on the phone.  Perhaps next week?
-> >
-> We can surely do a call if needed. But the comments given so far and the
-> RFC makes things more or less clear the contention point against the
-> $subject series.
+Wouldn't it be better if the root filesystem was marked as
+non-removable in the device tree - or in the case of a truly removable
+card, just marked in the MMC subsystem - and the MMC subsystem skipped
+the "it could be removed" for suspend/resume operations?
 
-What is the latest status with this set? This is kind of blocking the
-omap4 core retention feature also as I am supposed to put the patches on
-top of this set. Do we have a consensus which way this set should
-evolve?
+Whether you can or you cannot remove an SD memory device or eMMC
+controller, having an option that marked "DANGEROUS" that says "MMC
+layer will assume that all cards stayed in their respective slots
+during the suspend" implies that on a system such as the
+numbering-more-than-I-can-count embedded devices here with eMMC and
+any number greater than zero SD card slots (most of them having at
+least two), ALL of them are treated as unsafe resume, when in fact
+only one of them might be.
 
-Or, should I just base the core retention patches on top of baseline and
-forget about the functional power states for now?
+My use cases here are usually boot from eMMC or boot from external SD
+card (Snowball, Efika MX but one SD card slot is usually not needed to
+go through the unsafe-resume process, all FSL i.MX boards since MX51
+Babbage through the new MX6 boards, Pandaboard, Beagleboard). Just
+because it's possible to boot from external, removable SD card
+shouldn't mean we all have to configure our kernels explicitly to go
+through a strange and unusual path for suspend and resume which leaves
+ALL cards 'mounted' unecessarily over suspend/resume, especially in
+the common case where eMMC is also not the ONLY boot medium (PATA,
+SATA, non-eMMC flash) and eMMC or SD *MAY* only be the root filesystem
+(as opposed to *WILL*)
 
--Tero
+??
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
+
+
+On Sat, Sep 8, 2012 at 11:17 AM, Mike Thompson <mpthompson@gmail.com> wrote:
+> I figured the source of my problem.  Normally, the Linux kernel will
+> treat mmc cards as removed during suspend.  This is in case the card
+> is swapped by the user during the suspend.  However, on the OLinuXino
+> the mmc device is the root file system  If the Linux kernel treats the
+> mmc card as removed the frozen tasks with open file handles to the
+> root filesystem device (such as the journal tasks) will fail when they
+> are thawed during resume.  This is the problem I was seeing.
+>
+> Fortunately, there is already a specific kernel config setting
+> CONFIG_MMC_UNSAFE_RESUME that needs to be set for systems such as the
+> OLinuXino that uses the mmc device for the root filesystem.  I
+> overlooked this config setting and spent half a day trying to figure
+> out the source of the file system errors on resume.  Next time I'll do
+> a better job of looking through related config settings before trying
+> to debug an issue that is probably already dealt with.
+>
+> Mike
+>
+> On Thu, Sep 6, 2012 at 11:05 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> Copy a few more lists to get wider audience ...
+>>
+>> Regards,
+>> Shawn
+>>
+>> On Thu, Sep 06, 2012 at 10:03:35PM -0700, Mike Thompson wrote:
+>>> I'm working on adding power management support for the imx233 on
+>>> 3.6-rc2.  In general I'm working on porting the pm.c file from the
+>>> Freescale 2.6.35 kernel for both "standby" and "mem" suspend/resume.
+>>> I'm making pretty good progress on porting the code, but I'm running
+>>> into an issue outside the immediate code I'm working on.
+>>>
+>>> ...
+>>>
+>>> The first reported error is in the ext3 filesystem buffer code where
+>>> the file system buffers aren't being filled by the underlying block
+>>> device.  At least that's how I'm interpreting the portion of the ext3
+>>> file system code that is failing.  However, the mmc device is
+>>> correctly reporting finding p1 and p2 partitions on the device which
+>>> it would indicate the partition data is being read from the SD card.
+>>>
+>>> I'm hoping others might have suggestions on how I should go about
+>>> tracking down why the ext3 file system can no longer read from the mmc
+>>> device upon resume.  For instance, useful places to put some tracing
+>>> code to understand what might be failing, or how to determine what
+>>> differences there might be before suspend and after resume that might
+>>> point to the failure.
+>>>
+>>> Thanks,
+>>>
+>>> Mike Thompson
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
