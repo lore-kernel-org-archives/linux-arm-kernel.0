@@ -1,37 +1,67 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 10 Sep 2012 10:40:06 +0200
-Subject: [PATCH 1/2] gpio/twl4030: get platform data from device tree
-In-Reply-To: <504DA503.5050901@ti.com>
-References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
- <1346831186-29947-2-git-send-email-florian.vaussard@epfl.ch>
- <504A2FF2.7070607@ti.com> <504DA20D.7020903@epfl.ch>
- <504DA503.5050901@ti.com>
-Message-ID: <504DA766.1080304@epfl.ch>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 10 Sep 2012 10:39:43 +0200
+Subject: [PATCH v3 6/9] ARM: mvebu: add pinctrl device in DT for Armada 370/XP
+ SoCs
+In-Reply-To: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Benoit,
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
->>
->> I fixed them since it was trivial, but next time you should ensure
->> that the patch pass checkpatch before posting.
->> Sorry for these errors. I however checked my patches before submitting,
->> and had no such warnings. I redone, and remarked that these warnings
->> appear only with the "--strict" option, which is not enabled by default.
->> Is this the recommended  guideline? Thus why not enabling it by default?
-> That's a pretty good question :-)
->
-> Maybe the --strict is more a nice to have than a strong requirement?
-> Anyway, we'd better run checkpatch with --strict and thus fix any
-> cosmetic details that might be in the patch.
+The Armada 370 and XP SoCs have configurable muxing for a certain
+number of their pins, controlled through a pinctrl driver.
 
-Good to know, I will use --strict for the next submissions.
+The 'compatible' property is defined in the SoC-specific .dtsi files,
+since the compatible string identifies the number of pins and other
+SoC-specific properties.
 
-> Cool, I love chocolate. That being said, I'm not sure how tasteful 
-> will be the *virtual* chocolate. Regards, Benoit 
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+v3:
+- cleaned whitespaces
 
-Even *virtual*, Swiss chocolate will be the most tasteful (hope no Belgium
-friends will see this thread) :-)
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Rob Landley <rob@landley.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Regards,
-Florian
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 16cc82c..ff1c7a6 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -68,6 +68,13 @@
+ 			compatible = "marvell,armada-addr-decoding-controller";
+ 			reg = <0xd0020000 0x258>;
+ 		};
++
++		pinctrl at d0018000 {
++			reg = <0xd0018000 0x38>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++		};
+ 	};
+ };
+ 
+-- 
+1.7.10.4
