@@ -1,63 +1,73 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Sep 2012 17:44:49 +0100
-Subject: [PATCH 05/17] ASoC: Ux500: Minor coding layout changes
-In-Reply-To: <1345816913-4113-6-git-send-email-lee.jones@linaro.org>
-References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
- <1345816913-4113-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120910164448.GD24506@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 10 Sep 2012 12:45:10 -0400 (EDT)
+Subject: [PATCH] ARM: Dove: allow PCI to be disabled
+In-Reply-To: <20120910014422.GQ4575@titan.lakedaemon.net>
+References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
+ <20120909204705.GD3451@lunn.ch>
+ <20120909205521.GI13739@n2100.arm.linux.org.uk>
+ <20120909210126.GM4575@titan.lakedaemon.net>
+ <20120910004511.GN13739@n2100.arm.linux.org.uk>
+ <20120910014422.GQ4575@titan.lakedaemon.net>
+Message-ID: <alpine.LFD.2.02.1209101239510.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ola poke.
+On Sun, 9 Sep 2012, Jason Cooper wrote:
 
-On Fri, Aug 24, 2012 at 03:01:41PM +0100, Lee Jones wrote:
-> Includes removal of duplicate debug print affirming entry into
-> the probe function, an unnecessary line break of a coding line
-> <80 chars and a white space change (unintentional tab).
+> On Mon, Sep 10, 2012 at 01:45:11AM +0100, Russell King - ARM Linux wrote:
+> > On Sun, Sep 09, 2012 at 05:01:26PM -0400, Jason Cooper wrote:
+> > > On Sun, Sep 09, 2012 at 09:55:21PM +0100, Russell King - ARM Linux wrote:
+> > > > On Sun, Sep 09, 2012 at 10:47:05PM +0200, Andrew Lunn wrote:
+> > > > > On Sun, Sep 09, 2012 at 08:34:13PM +0100, Russell King wrote:
+> > > > > > Allow PCI support for Dove to be disabled.  Some platforms do not have
+> > > > > > anything connected to the PCIe ports, so requiring PCI support to be
+> > > > > > built into the kernel just wastes space, and presents a lot more config
+> > > > > > options than are necessary.
+> > > > > > 
+> > > > > > However, select USB_ARCH_HAS_EHCI so that we can still have EHCI
+> > > > > > support.
+> > > > > 
+> > > > > Hi Russel
+> > > > > 
+> > > > > I have a patch in GregKH usb-next which also ensures USB_ARCH_HAS_EHCI
+> > > > > is selected.
+> > > > > 
+> > > > > http://git.kernel.org/?p=linux/kernel/git/gregkh/usb.git;a=commitdiff;h=ba2f9dff6c914b91005f687a9d75c8eac110d323
+> > > > > 
+> > > > > So we might not need your select as well, although it does not harm.
+> > > > 
+> > > > That depends on how this patch is handled.  If it gets into mainline via
+> > > > a separate path to GregKH's USB tree, then it must be kept together as
+> > > > otherwise it _will_ cause regressions - namely EHCI becomes impossible
+> > > > to select when PCI=n.  That in turn makes the CuBox (and probably other
+> > > > Dove platforms) a rather useless di
+> > > [message trucated, I need to working on file locking for my email
+> > > auto-flagging script... :-/]
+> > > 
+> > > greg just pulled Andrew's patch into his usb tree within the past few
+> > > days.  Russell, would you prefer to submit this to greg's usb tree, or
+> > > resend without USB_ARCH_HAS_EHCI?
+> > 
+> > I thought I'd already answered the latter point.
+> > 
+> > As I said, it breaks the patch to remove that select, so it can not be
+> > removed.  Removing it will create regressions - can I be any more clear
+> > about that.  So no, I will not remove that select statement because I
+> > can't without _breaking_ my Dove builds here.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  sound/soc/ux500/mop500.c |    7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-> index 6840df7..356611d 100644
-> --- a/sound/soc/ux500/mop500.c
-> +++ b/sound/soc/ux500/mop500.c
-> @@ -88,8 +88,6 @@ static int __devinit mop500_probe(struct platform_device *pdev)
->  	struct device_node *np = pdev->dev.of_node;
->  	int ret;
->  
-> -	pr_debug("%s: Enter.\n", __func__);
-> -
->  	dev_dbg(&pdev->dev, "%s: Enter.\n", __func__);
->  
->  	mop500_card.dev = &pdev->dev;
-> @@ -117,8 +115,7 @@ static int __devinit mop500_probe(struct platform_device *pdev)
->  	ret = snd_soc_register_card(&mop500_card);
->  	if (ret)
->  		dev_err(&pdev->dev,
-> -			"Error: snd_soc_register_card failed (%d)!\n",
-> -			ret);
-> +			"Error: snd_soc_register_card failed (%d)!\n", ret);
->  
->  	return ret;
->  }
-> @@ -131,7 +128,7 @@ static int __devexit mop500_remove(struct platform_device *pdev)
->  
->  	snd_soc_unregister_card(mop500_card);
->  	mop500_ab8500_remove(mop500_card);
-> -	
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.7.9.5
-> 
+> My apologies.  I was simply trying to achieve the cleanest solution.
+> Andrew's patch selects USB_ARCH_HAS_EHCI whenever PLAT_ORION is enabled,
+> of which dove is one.  Purely from the pov of the code, this makes the
+> select redundant.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Are we trying to split hairs here?
+
+At best, the select will be redundant and that is trivially cleaned up 
+later.  At worst, you'll have a trivial git merge conflict to solve (and 
+that happens all the time).
+
+So the simplest thing to do is to keep the select there to prevent build 
+issues and remember that perfection is the enemy of the good.
+
+
+Nicolas
