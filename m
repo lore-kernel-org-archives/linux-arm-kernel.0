@@ -1,49 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 06:20:52 -0700
-Subject: [PATCH 19/19] gpio: Enable the tc3298x GPIO expander driver for
- Device Tree
-In-Reply-To: <1347016499-29354-20-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-20-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZ4-_dqoNoCa_vRq04Or-8PjWz-bgHrvsLJFs8pOAE9xQ@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 10 Sep 2012 15:25:34 +0200
+Subject: [PATCH 1/1] ARM: dts: OMAP3: Add gpio-twl4030 properties for Overo
+In-Reply-To: <1347282996-31190-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1347282996-31190-1-git-send-email-florian.vaussard@epfl.ch>
+ <1347282996-31190-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <504DEA4E.7080109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 09/10/2012 03:16 PM, Florian Vaussard wrote:
+> Support the blue LED connected to the LEDB pin of the TWL4030
+> on the Gumstix Overo.
+> 
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  arch/arm/boot/dts/omap3-overo.dtsi |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+> index d6cc5e2..89808ce 100644
+> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+> @@ -13,6 +13,17 @@
+>  
+>  /include/ "omap3.dtsi"
+>  
+> +/ {
 
-> Here we provide a means to probe and extract vital information
-> from Device Tree when booting with it enabled. Without this
-> patch sub-devices wouldn't be able to reference the tc3589x-gpio
-> expander from Device Tree.
->
-> CC: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+BTW, I'm just wondering. Cannot we use overo without tobi?
 
-Basically this looks very good, but:
+In that case, the model and compatible should probably be used as well:
 
-> @@ -337,9 +343,11 @@ static int __devinit tc3589x_gpio_probe(struct platform_device *pdev)
->         tc3589x_gpio->chip = template_chip;
->         tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
->         tc3589x_gpio->chip.dev = &pdev->dev;
-> -       tc3589x_gpio->chip.base = pdata->gpio_base;
-> +       tc3589x_gpio->chip.base = (pdata) ? pdata->gpio_base : -1;
->
-> -       tc3589x_gpio->irq_base = tc3589x->irq_base + TC3589x_INT_GPIO(0);
-> +#ifdef CONFIG_OF_GPIO
-> +        tc3589x_gpio->chip.of_node = np;
-> +#endif
+	model = "TI OMAP3 Gumstix Overo";
+	compatible = "ti,omap3-overo", "ti,omap3";
 
-Isn't the newstyle way of doing this something like:
 
-if (IS_ENABLED(CONFIG_OF_GPIO))
-  tc3589x_gpio->chip.of_node = np;
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		overo {
+> +			label = "overo:blue:COM";
+> +			gpios = <&twl_gpio 19 0>;
+> +			linux,default-trigger = "mmc0";
+> +		};
+> +	};
+> +};
+> +
+>  &i2c1 {
+>  	clock-frequency = <2600000>;
+>  
+> @@ -40,3 +51,7 @@
+>  &mmc2 {
+>  	bus-width = <4>;
+>  };
+> +
+> +&twl_gpio {
+> +	ti,use-leds;
+> +};
+> 
 
-I'm a bit uncertain about this since I never quite used
-it myself, test it with OF disabled and see if it works.
+Otherwise, it is fine.
 
-This construct also accepts modules using OF, see
-include/linux/kconfig.h, somebody might be using this as
-a module.
-
-Yours,
-Linus Walleij
+Thanks,
+Benoit
