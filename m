@@ -1,82 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Sep 2012 17:43:34 +0100
-Subject: [PATCH 07/17] Documentation: Define the MSP Driver Device Tree
- bindings
-In-Reply-To: <1345816913-4113-8-git-send-email-lee.jones@linaro.org>
-References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
- <1345816913-4113-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120910164333.GB24506@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2012 17:43:28 +0100
+Subject: [PATCH v3 08/31] arm64: CPU support
+In-Reply-To: <201209071924.38430.arnd@arndb.de>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-9-git-send-email-catalin.marinas@arm.com>
+ <201209071924.38430.arnd@arndb.de>
+Message-ID: <20120910164328.GA8238@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ola poke.
+On Fri, Sep 07, 2012 at 08:24:38PM +0100, Arnd Bergmann wrote:
+> On Friday 07 September 2012, Catalin Marinas wrote:
+> > +#include <asm/cputable.h>
+> > +
+> > +extern unsigned long __cpu_setup(void);
+> > +
+> > +struct cpu_info __initdata cpu_table[] = {
+> > +	{
+> > +		.cpu_id_val	= 0x000f0000,
+> > +		.cpu_id_mask	= 0x000f0000,
+> > +		.cpu_name	= "AArch64 Processor",
+> > +		.cpu_setup	= __cpu_setup,
+> > +	},
+> > +	{ /* Empty */ },
+> > +};
+> 
+> > +#define MAIR(attr, mt)	((attr) << ((mt) * 8))
+> > +
+> > +ENTRY(cpu_proc_init)
+> > +	ret
+> > +ENDPROC(cpu_proc_init)
+> > +
+> > +ENTRY(cpu_proc_fin)
+> > +	ret
+> > +ENDPROC(cpu_proc_fin)
+> 
+> 
+> These seem to be leftovers from multi-cpu support that can be removed.
 
-On Fri, Aug 24, 2012 at 03:01:43PM +0100, Lee Jones wrote:
-> Here we add the required documentation for the new Device Tree
-> bindings pertaining to the MSP CPU-side DAI Driver.
-> 
-> CC: alsa-devel at alsa-project.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
-> new file mode 100644
-> index 0000000..99acd9c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
-> @@ -0,0 +1,43 @@
-> +* ux500 MSP (CPU-side Digital Audio Interface)
-> +
-> +Required properties:
-> + - compatible       :"stericsson,ux500-msp-i2s"
-> + - reg              : Physical base address and length of the device's registers.
-> +
-> +Optional properties:
-> + - interrupts       : The interrupt output from the device.
-> + - interrupt-parent : The parent interrupt controller.
-> + - <name>-supply    : Phandle to the regulator <name> supply
-> +
-> +Example:
-> +
-> +	sound {
-> +		compatible = "stericsson,snd-soc-mop500";
-> +
-> +		stericsson,platform-pcm-dma = <&pcm>;
-> +		stericsson,cpu-dai = <&msp1 &msp3>;
-> +		stericsson,audio-codec = <&codec>;
-> +	};
-> +
-> +	pcm: ux500-pcm {
-> +		compatible = "stericsson,ux500-pcm";
-> +	};
-> +
-> +	msp1: msp at 80124000 {
-> +		compatible = "stericsson,ux500-msp-i2s";
-> +		reg = <0x80124000 0x1000>;
-> +		interrupts = <0 62 0x4>;
-> +		v-ape-supply = <&db8500_vape_reg>;
-> +	};
-> +
-> +	msp3: msp at 80125000 {
-> +		compatible = "stericsson,ux500-msp-i2s";
-> +		reg = <0x80125000 0x1000>;
-> +		interrupts = <0 62 0x4>;
-> +		v-ape-supply = <&db8500_vape_reg>;
-> +	};
-> +
-> +	codec: ab8500-codec {
-> +		compatible = "stericsson,ab8500-codec";
-> +		stericsson,earpeice-cmv = <950>; /* Units in mV. */
-> +	};
-> -- 
-> 1.7.9.5
-> 
+Actually cpu_proc_fin() needs to be implemented for turning the caches
+off during setup_restart(). But I'll rename it to something more
+meaningful like cpu_cache_off(). The other can go.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
