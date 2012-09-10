@@ -1,91 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 10 Sep 2012 18:58:57 +0300
-Subject: [PATCH 1/3] arm: omap: hwmod: add a new addr space in otg for
- writing to control module
-In-Reply-To: <20120906195607.GB1303@atomide.com>
-References: <1346943331-18120-1-git-send-email-kishon@ti.com>
- <1346943331-18120-2-git-send-email-kishon@ti.com>
- <5048C2A2.2020104@ti.com> <20120906171301.GC17754@arwen.pp.htv.fi>
- <20120906171803.GA30717@arwen.pp.htv.fi>
- <20120906195607.GB1303@atomide.com>
-Message-ID: <20120910155855.GE7464@arwen.pp.htv.fi>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Mon, 10 Sep 2012 17:04:26 +0100 (BST)
+Subject: [PATCH V2 1/2] hwmon: Add devicetree bindings to gpio-fan
+In-Reply-To: <20120910152814.GA6050@lunn.ch>
+References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
+ <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
+ <1347285112-13542-2-git-send-email-jm@lentin.co.uk>
+ <20120910152814.GA6050@lunn.ch>
+Message-ID: <alpine.DEB.2.00.1209101656120.10589@marmot.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 10 Sep 2012, Andrew Lunn wrote:
 
-On Thu, Sep 06, 2012 at 12:56:07PM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [120906 10:23]:
-> > Hi,
-> > 
-> > On Thu, Sep 06, 2012 at 08:13:03PM +0300, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Thu, Sep 06, 2012 at 09:04:58PM +0530, Vaibhav Hiremath wrote:
-> > > > 
-> > > > 
-> > > > On 9/6/2012 8:25 PM, Kishon Vijay Abraham I wrote:
-> > > > > The mailbox register for usb otg in omap is present in control module.
-> > > > > On detection of any events VBUS or ID, this register should be written
-> > > > > to send the notification to musb core.
-> > > > > 
-> > > > > Till we have a separate control module driver to write to control module,
-> > > > > omap2430 will handle the register writes to control module by itself. So
-> > > > > a new address space to represent this control module register is added
-> > > > > to usb_otg_hs.
-> > > > > 
-> > > > > Cc: Benoit Cousson <b-cousson@ti.com>
-> > > > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > > > > ---
-> > > > >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
-> > > > >  1 file changed, 5 insertions(+)
-> > > > > 
-> > > > > diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > > > > index 242aee4..02341bc 100644
-> > > > > --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > > > > +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> > > > > @@ -5890,6 +5890,11 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
-> > > > >  		.pa_end		= 0x4a0ab003,
-> > > > >  		.flags		= ADDR_TYPE_RT
-> > > > >  	},
-> > > > > +	{
-> > > > > +		.pa_start	= 0x4a00233c,
-> > > > > +		.pa_end		= 0x4a00233f,
-> > > > > +		.flags		= ADDR_TYPE_RT
-> > > > > +	},
-> > > > 
-> > > > I do not have any objection/comment here, but I believe this is control
-> > > > module address space required for USB module, right?
-> > > > I am not sure this is right way of accessing control module space.
-> > > > Actually Control Module Access required for drivers is one of the
-> > > > blocking issue we have currently.
-> > > > 
-> > > > Also there was some effort put up by 'Konstantine' to convert Control
-> > > > module to MFD driver, I haven't seen any further update on it. But it
-> > > > would be good to check with him.
-> > > 
-> > > this was an agreement with Benoit since we already lost a couple merge
-> > > windows for this patchset. We agreed to wait until -rc4 for SCM driver
-> > > and if it wasn't ready, we'd go ahead with this and SCM author would fix
-> > > it up on a patch converting users to new SCM driver.
-> > 
-> > Tony, can I get your Acked-by to this patch so I can take it together
-> > with the rest of the series ? Thanks
-> > 
-> > ps: I'll apply this to my 'musb' branch which is immutable, so it's safe
-> > to merge it into your tree once I apply.
-> 
-> It would be best if this got acked by Benoit and Paul as they may
-> have some other patches queued up. I'll ack if they ack ;)
+> On Mon, Sep 10, 2012 at 02:51:51PM +0100, Jamie Lentin wrote:
+>> Allow a gpio-fan to be defined in devicetree, see binding documentation
+>> for details.
+>>
+>> Changes since V1:-
+>> * Don't hide return codes [Guenter Roeck]
+>> * Remove typecast noise [Guenter Roeck]
+>> * Use of_find_property instead of counting u32s [Guenter Roeck]
+>> * Don't count GPIOs twice [Andrew Lunn]
+>> * Use of_prop_next_u32 to get records in a more obvious fashion
+>> * Use CONFIG_OF_GPIO instead of CONFIG_OF
+>> * Apply __devinitdata to of_gpio_fan_match [Andrew Lunn]
+>>
+>> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+>> ---
+>>  .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
+>>  drivers/hwmon/gpio-fan.c                           |  116 ++++++++++++++++++++
+>>  2 files changed, 141 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
+>
+> Hi Jamie
+>
+> Thanks for addressing all the issues raised. However...
+>
+> Anything before the --- ends up in the changelog entry. Anything
+> afterwards does not.
+>
+> The changes you made to address review comments is not something for
+> the changelog, so Changes since V1:- should be after the --- .
 
-Benoit, care to ack this patch ???
+Okay, whilst I was submitting the initial DT support it was suggested by 
+Grant Likely they should be above the '---'. I think I prefer this also, 
+but I'll go with whatever is more likely to get patches accepted :)
+
+Can resend with the content jiggled if you want, but will put them after 
+the '---' in future.
+
+>
+> There is more detail in Documentation/SubmittingPatches
+>
+>      Andrew
+>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120910/f04477e0/attachment.sig>
+Jamie Lentin
