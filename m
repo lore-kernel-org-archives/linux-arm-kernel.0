@@ -1,27 +1,107 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 19:43:21 +0200
-Subject: [PATCH] pinctrl/nomadik : add MC1_a_2 pin MC1 function group list
-In-Reply-To: <504E2583.4070602@wwwdotorg.org>
-References: <1347265874-3342-1-git-send-email-linus.walleij@stericsson.com>
- <504E2583.4070602@wwwdotorg.org>
-Message-ID: <CACRpkdY5RdKDgU3_aR7G2jd2C-s=dpjsjF=0v_9zA6Ek5JpfTA@mail.gmail.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Mon, 10 Sep 2012 13:43:23 -0400
+Subject: [PATCH v2 16/22] ARM: mm: cleanup checks for membank overlap
+ with vmalloc area
+In-Reply-To: <alpine.LFD.2.02.1208120034220.5231@xanadu.home>
+References: <1344648306-15619-1-git-send-email-cyril@ti.com>
+ <1344648306-15619-17-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208120034220.5231@xanadu.home>
+Message-ID: <504E26BB.4020205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 10:38 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/10/2012 02:31 AM, Linus Walleij wrote:
->> From: Patrice Chotard <patrice.chotard@stericsson.com>
->>
->> Another possible pin configuration for the MC1 pin group.
+On 8/12/2012 12:36 AM, Nicolas Pitre wrote:
+> On Fri, 10 Aug 2012, Cyril Chemparathy wrote:
 >
-> I have no objection to this, but I wonder if these will keep trickling
-> in. Is it a good idea to audit the whole driver and add everything
-> that's missing in one go?
+>> On Keystone platforms, physical memory is entirely outside the 32-bit
+>> addressible range.  Therefore, the (bank->start > ULONG_MAX) check below marks
+>> the entire system memory as highmem, and this causes unpleasentness all over.
+>>
+>> This patch eliminates the extra bank start check (against ULONG_MAX) by
+>> checking bank->start against the physical address corresponding to vmalloc_min
+>> instead.
+>>
+>> In the process, this patch also cleans up parts of the highmem sanity check
+>> code by removing what has now become a redundant check for banks that entirely
+>> overlap with the vmalloc range.
+>
+> Are you sure of this?  The code that you removed not only checks for
+> banks that fall into the vmalloc area, but it also skipp them.  This is
+> now lost.
+>
 
-I think Patrice has most of it working and is adding the minor missing
-pieces to make it perfect ... in our case the group set is driven from
-usecases rather than specification, and we have a few different
-boards around.
+I almost missed out on this email...
 
-Yours,
-Linus Walleij
+The check is not quite lost, we still have the following in the 
+!CONFIG_HIGHMEM block:
+
+	if (highmem) {
+		printk(...);
+		continue;
+	}
+
+The change is that highmem is now set outside the #ifdef when 
+(bank->start >= vmalloc_limit), and therefore the check is truly redundant.
+
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>> ---
+>>   arch/arm/mm/mmu.c |   19 +------------------
+>>   1 file changed, 1 insertion(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index f764c03..3d685c6 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -901,15 +901,12 @@ void __init sanity_check_meminfo(void)
+>>   		struct membank *bank = &meminfo.bank[j];
+>>   		*bank = meminfo.bank[i];
+>>
+>> -		if (bank->start > ULONG_MAX)
+>> -			highmem = 1;
+>> -
+>> -#ifdef CONFIG_HIGHMEM
+>>   		if (bank->start >= vmalloc_limit)
+>>   			highmem = 1;
+>>
+>>   		bank->highmem = highmem;
+>>
+>> +#ifdef CONFIG_HIGHMEM
+>>   		/*
+>>   		 * Split those memory banks which are partially overlapping
+>>   		 * the vmalloc area greatly simplifying things later.
+>> @@ -932,8 +929,6 @@ void __init sanity_check_meminfo(void)
+>>   			bank->size = vmalloc_limit - bank->start;
+>>   		}
+>>   #else
+>> -		bank->highmem = highmem;
+>> -
+>>   		/*
+>>   		 * Highmem banks not allowed with !CONFIG_HIGHMEM.
+>>   		 */
+>> @@ -946,18 +941,6 @@ void __init sanity_check_meminfo(void)
+>>   		}
+>>
+>>   		/*
+>> -		 * Check whether this memory bank would entirely overlap
+>> -		 * the vmalloc area.
+>> -		 */
+>> -		if (bank->start >= vmalloc_limit) {
+>> -			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+>> -			       "(vmalloc region overlap).\n",
+>> -			       (unsigned long long)bank->start,
+>> -			       (unsigned long long)bank->start + bank->size - 1);
+>> -			continue;
+>> -		}
+>> -
+>> -		/*
+>>   		 * Check whether this memory bank would partially overlap
+>>   		 * the vmalloc area.
+>>   		 */
+>> --
+>> 1.7.9.5
+>>
+
+-- 
+Thanks
+- Cyril
