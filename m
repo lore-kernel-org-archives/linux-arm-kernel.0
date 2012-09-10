@@ -1,59 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Sep 2012 14:01:06 +0000
-Subject: mfd: Implement devicetree support for AB8500 Btemp
-In-Reply-To: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
-References: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
-Message-ID: <201209101401.06859.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2012 15:01:48 +0100
+Subject: [PATCH v3 17/31] arm64: System calls handling
+In-Reply-To: <201209101351.52902.arnd@arndb.de>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <201209071943.37184.arnd@arndb.de> <20120910095619.GA27042@arm.com>
+ <201209101351.52902.arnd@arndb.de>
+Message-ID: <20120910140148.GD27042@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 September 2012, Rajanikanth HV wrote:
-> +
-> +supplied-to:
-> +       This is a logical binding w.r.t power supply event change
-> +       across energy-management-module drivers where in the
-> +       runtime battery properties are shared along with uevent
-> +       notification.
-> +       ref: di->btemp_psy.external_power_changed =
-> +               ab8500_btemp_external_power_changed;
-> +               ab8500_btemp.c
-> +
-> +       Need for this property:
-> +               btemp, fg and charger updates power-supply properties
-> +               based on the events listed above.
-> +               Event handler invokes power supply change notifier
-> +               which in-turn invokes registered power supply class call-back
-> +               based on the 'supplied_to' string.
-> +               ref:
-> +               power_supply_changed_work(..) ./drivers/power/power_supply_core.c
-> +
-> +       example:
-> +       ab8500-btemp {
-> +               /* Other enery management module */
-> +               supplied-to = "ab8500_chargalg", "ab8500_fg";
-> +               num_supplicants = <2>;
-> +       };
-> +
+On Mon, Sep 10, 2012 at 02:51:52PM +0100, Arnd Bergmann wrote:
+> On Monday 10 September 2012, Catalin Marinas wrote:
+> > Yes, I've seen these but since Al's patches are not in mainline, I don't
+> > want to add additional dependencies to the arm64 patches (currently
+> > based on 3.6-rc4). Once they get into mainline, I'll add a patch that
+> > converts arm64 to the generic functions above.
+> > 
+> > For kernel_execve(), I think I can simplify it further and not rely on
+> > Al's patches (similar to other architectures doing an SVC from kernel):
+> 
+> Hmm, I thought one of the reasons for Al to do his series was to discourage
+> people from doing syscalls from kernel space, but I may be misremembering
+> things. Al?
 
-This looks like you're doing things the opposite way from everyone else.
-Normally, each device uses phandles to refer to other objects it depends
-on (gpio lines, regulators, clocks, interrupts, ...), rather than listing
-things that depend on it.
+If that was the aim, I'm happy to change the code similar to the
+arch/arm one. But as I said I would wait until Al's patches get into
+mainline.
 
-Can you turn this around to be more like the others?
-
-Note also that device tree identifiers should use '-' as a word separator,
-not '_', and that a binding document should specify the exact set of
-possible values. If the properties contain strings, please list every
-valid string.
-
-> +               thermister-internal-to-battery = <1>;
-> +               li_ion_9100_battery = <0>;
-
-Boolean properties should be empty when enabled and not present when
-disabled. In this example, one would just write
-
-		thermister-internal-to-battery;
-
-
-	Arnd
+-- 
+Catalin
