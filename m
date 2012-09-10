@@ -1,45 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Sep 2012 22:35:40 +0200
-Subject: [PATCH 2/3] gpio: 74x164: dts: Add documentation for the dt binding
+Date: Mon, 10 Sep 2012 22:35:41 +0200
+Subject: [PATCH 3/3] ARM: dts: cfa10049: Add the 74HC595 gpio expanders
 In-Reply-To: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1347309341-15447-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1347309341-15447-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the two daisy-chains of 74hc595s shift registers available on the
+CFA-10049.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/gpio/gpio-74x164.txt       |   22 ++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-74x164.txt
+ arch/arm/boot/dts/imx28-cfa10049.dts |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-74x164.txt b/Documentation/devicetree/bindings/gpio/gpio-74x164.txt
-new file mode 100644
-index 0000000..cc26080
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-74x164.txt
-@@ -0,0 +1,22 @@
-+* Generic 8-bits shift register GPIO driver
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index 1f7fa50..05c892e 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -27,6 +27,8 @@
+ 					fsl,pinmux-ids = <
+ 						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
+ 						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
++						0x0111 /* MX28_PAD_GPMI_CE1N__SSP3_D3 */
++						0x01a2 /* MX28_PAD_GPMI_ALE__SSP3_D4 */
+ 					>;
+ 					fsl,drive-strength = <1>;
+ 					fsl,voltage = <1>;
+@@ -39,6 +41,25 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&spi3_pins_cfa10049>;
+ 				status = "okay";
 +
-+Required properties:
-+- compatible : Should be "fairchild,74hc595"
-+- reg : chip select number
-+- gpio-controller : Marks the device node as a gpio controller.
-+- #gpio-cells : Should be two.  The first cell is the pin number and
-+  the second cell is used to specify the gpio polarity:
-+      0 = active high
-+      1 = active low
-+- registers-number: Number of daisy-chained shift registers
++				gpio5: gpio5 at 0 {
++					compatible = "fairchild,74hc595";
++					gpio-controller;
++					#gpio-cells = <2>;
++					reg = <0>;
++					registers-number = <2>;
++					spi-max-frequency = <100000>;
++				};
 +
-+Example:
++				gpio6: gpio6 at 1 {
++					compatible = "fairchild,74hc595";
++					gpio-controller;
++					#gpio-cells = <2>;
++					reg = <1>;
++					registers-number = <4>;
++					spi-max-frequency = <100000>;
++				};
 +
-+gpio5: gpio5 at 0 {
-+	compatible = "fairchild,74hc595";
-+	reg = <0>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	registers-number = <4>;
-+	spi-max-frequency = <100000>;
-+};
+ 			};
+ 		};
+ 
 -- 
 1.7.9.5
