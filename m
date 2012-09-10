@@ -1,52 +1,116 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Sep 2012 14:45:34 -0500
-Subject: [RFC PATCH] ARM: l2x0: avoid spinlock for sync op on pl310
-Message-ID: <1347306334-781-1-git-send-email-robherring2@gmail.com>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 10 Sep 2012 15:51:57 -0400
+Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
+ hardware
+In-Reply-To: <504E1C69.30602@ti.com>
+References: <1347294020-22661-1-git-send-email-mporter@ti.com>
+ <504E168C.6060603@ti.com> <20120910165210.GJ27758@beef>
+ <504E1C69.30602@ti.com>
+Message-ID: <20120910195156.GK27758@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Sep 10, 2012 at 06:59:21PM +0200, Benoit Cousson wrote:
+> On 09/10/2012 06:52 PM, Matt Porter wrote:
+> > On Mon, Sep 10, 2012 at 06:34:20PM +0200, Benoit Cousson wrote:
+> >> + Tony
+> >>
+> >> Hi Matt,
+> >>
+> >> 30 minutes too late for my pull request :-(
+> >>
+> >> There are a couple of am33xx patches under discussion, so I'll take them
+> >> and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
+> > 
+> > Yeah, believe me, I did a faceplant when I saw your pull request come by
+> > at the same time I discovered this issue. ;) In particular, AnilKumar's
+> > user leds patch would need to be adjusted for this change. I can
+> > resubmit with the user leds dts changes adjusted as well if that
+> > discussion comes to a conclusion and his patches accepted.
+> 
+> Yeah, I was wondering if the gpios label were already used somewhere.
+> I've just added this patch on top of my current series.
+> So you or Anil should just post the missing patches whenever they'll be
+> available and accepted.
 
-The sync op is atomic on the pl310, so a spinlock is not needed. It can
-be a bottleneck for code paths with register accesses, so remove it.
-Removing it gives a 30% improvement to pktgen throughput on highbank.
+Ok, I went ahead and posted a series that applies to your for_3.7/dts
+branch and Anil's series. That's assuming his v7 series is taken "as
+is" after the leds-gpio/pinctrl discussion comes to conclusion. I see
+Tony acked it aside from that discussion.
 
-A similar spinlock removal was originally done by Catalin Marinas[1], but
-the spinlock part was dropped in the merged version. It is unclear why
-other than it was not a runtime selection. As every readl/writel causes a
-outer_sync, the sync function is likely the most critical.
+Thanks,
+Matt
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/024514.html
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/cache-l2x0.c |    6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 2a8e380..6778238 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -130,6 +130,11 @@ static void l2x0_cache_sync(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-+static void pl310_cache_sync(void)
-+{
-+	cache_sync();
-+}
-+
- static void __l2x0_flush_all(void)
- {
- 	debug_writel(0x03);
-@@ -335,6 +340,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 		sync_reg_offset = L2X0_DUMMY_REG;
- #endif
- 		outer_cache.set_debug = pl310_set_debug;
-+		outer_cache.sync = pl310_cache_sync;
- 		break;
- 	case L2X0_CACHE_ID_PART_L210:
- 		ways = (aux >> 13) & 0xf;
--- 
-1.7.9.5
+> 
+> >> On 09/10/2012 06:20 PM, Matt Porter wrote:
+> >>> On AM33xx, the datasheet and TRM refer to four GPIO instances that
+> >>> are 0-based, GPIO0-3.
+> >>
+> >> Or maybe you should just update the spec to use a 1-based GPIO number
+> >> like OMAP :-)
+> > 
+> > I am powerless here. :)
+> 
+> That's too bad :-(
+> 
+> Benoit
+> 
+> > 
+> > -Matt
+> > 
+> >>> Signed-off-by: Matt Porter <mporter@ti.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+> >>>  1 file changed, 4 insertions(+), 4 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> >>> index bb31bff..1369bfc 100644
+> >>> --- a/arch/arm/boot/dts/am33xx.dtsi
+> >>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> >>> @@ -62,7 +62,7 @@
+> >>>  			reg = <0x48200000 0x1000>;
+> >>>  		};
+> >>>  
+> >>> -		gpio1: gpio at 44e07000 {
+> >>> +		gpio0: gpio at 44e07000 {
+> >>>  			compatible = "ti,omap4-gpio";
+> >>>  			ti,hwmods = "gpio1";
+> >>>  			gpio-controller;
+> >>> @@ -74,7 +74,7 @@
+> >>>  			interrupts = <96>;
+> >>>  		};
+> >>>  
+> >>> -		gpio2: gpio at 4804c000 {
+> >>> +		gpio1: gpio at 4804c000 {
+> >>>  			compatible = "ti,omap4-gpio";
+> >>>  			ti,hwmods = "gpio2";
+> >>>  			gpio-controller;
+> >>> @@ -86,7 +86,7 @@
+> >>>  			interrupts = <98>;
+> >>>  		};
+> >>>  
+> >>> -		gpio3: gpio at 481ac000 {
+> >>> +		gpio2: gpio at 481ac000 {
+> >>>  			compatible = "ti,omap4-gpio";
+> >>>  			ti,hwmods = "gpio3";
+> >>>  			gpio-controller;
+> >>> @@ -98,7 +98,7 @@
+> >>>  			interrupts = <32>;
+> >>>  		};
+> >>>  
+> >>> -		gpio4: gpio at 481ae000 {
+> >>> +		gpio3: gpio at 481ae000 {
+> >>>  			compatible = "ti,omap4-gpio";
+> >>>  			ti,hwmods = "gpio4";
+> >>>  			gpio-controller;
+> >>>
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
