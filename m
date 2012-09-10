@@ -1,21 +1,92 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 10 Sep 2012 17:57:17 +0200
-Subject: [PATCH v3 0/9] pinctrl: mvebu: pinctrl driver
-In-Reply-To: <CACRpkda0AxcwqeBy2rZXRymq5iYxbdYWQsHtALHMObYqTaKyKw@mail.gmail.com>
-References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>	<1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkda0AxcwqeBy2rZXRymq5iYxbdYWQsHtALHMObYqTaKyKw@mail.gmail.com>
-Message-ID: <504E0DDD.1050000@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Sep 2012 09:01:05 -0700
+Subject: [PATCH v3 1/8] ARM/dts: omap2: Add McBSP entries for OMAP2420
+ and OMAP2430 SoC
+In-Reply-To: <504DC975.5070609@ti.com>
+References: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
+ <1346846336-27321-2-git-send-email-peter.ujfalusi@ti.com>
+ <20120907222953.GS1303@atomide.com> <504D9FBC.9030609@ti.com>
+ <504DC975.5070609@ti.com>
+Message-ID: <20120910160105.GV1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 05:45 PM, Linus Walleij wrote:
-> This all looks good now, will this be pushed through some ARM SoC
-> tree along with Marvell changes or do you want me to take it all
-> through the pinctrl tree?
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120910 04:05]:
+> Hi Benoit,
+> 
+> On 09/10/2012 11:07 AM, Benoit Cousson wrote:
+> > Hi Tony,
+> > 
+> > On 09/08/2012 12:29 AM, Tony Lindgren wrote:
+> >> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120905 04:59]:
+> >>> +
+> >>> +	ocp {
+> >>> +		mcbsp1: mcbsp at 48074000 {
+> >>> +			compatible = "ti,omap2420-mcbsp";
+> >>> +			reg = <0x48074000 0xff>;
+> >>> +			reg-names = "mpu";
+> >>> +			interrupts = <59>, /* TX interrupt */
+> >>> +				     <60>; /* RX interrupt */
+> >>> +			interrupt-names = "tx", "rx";
+> >>> +			interrupt-parent = <&intc>;
+> >>> +			ti,hwmods = "mcbsp1";
+> >>> +		};
+> >>> +
+> >>> +		mcbsp2: mcbsp at 48076000 {
+> >>> +			compatible = "ti,omap2420-mcbsp";
+> >>> +			reg = <0x48076000 0xff>;
+> >>> +			reg-names = "mpu";
+> >>> +			interrupts = <62>, /* TX interrupt */
+> >>> +				     <63>; /* RX interrupt */
+> >>> +			interrupt-names = "tx", "rx";
+> >>> +			interrupt-parent = <&intc>;
+> >>> +			ti,hwmods = "mcbsp2";
+> >>> +		};
+> >>> +	};
+> >>
+> >> Hmm don't you need to specify the interrupt chip and offset for
+> >> the interrupts here?
+> > 
+> > Mmm, I'm not sure to get your question, there is the link to the
+> > interrupt-parent.
+> > 
+> > The interrupt number is relative to the parent interrupt domain. So even
+> > if the INTC IRQ offset start at 32 instead of 0, DT IRQ mechanism will
+> > convert that to the proper hwirq thanks to irqdomain.
+> > In that case we should always provide interrupt number relative to the
+> > interrupt controller HW number and not assuming any Linux IRQ number
+> > offset like before.
 
-Linus,
+Yes never mind, I was confused. We have #interrupt-cells = <1> and the
+interrupt specifier is just the interrupt offset..
 
-thanks for review and ACKs. Jason Cooper will take it through Marvell
-tree.
+Regards,
 
-Sebastian
+Tony 
+
+> > And in fact the interrupt-parent is not even needed, by default if will
+> > look to the parent to get the interrupt-controller.
+> 
+> This is true, but it makes the 'code' a bit more readable if I (we) specify
+> the interrupt-parent.
+> 
+> > 
+> > Extract from [1]
+> > 
+> > interrupt-parent:
+> > "Because the hierarchy of the nodes in the interrupt tree might not
+> > match the device tree, the interrupt-parent property is available to
+> > make the definition of an interrupt parent explicit.
+> > The value is the phandle to the interrupt parent. If this property is
+> > missing from a device, its interrupt parent is assumed to be its device
+> > tree parent."
+> > 
+> > [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+> > 
+> > Regards,
+> > Benoit
+> > 
+> 
+> 
+> -- 
+> P?ter
