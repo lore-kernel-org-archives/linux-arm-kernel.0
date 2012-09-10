@@ -1,135 +1,84 @@
-From: keshava_mgowda@ti.com (Munegowda, Keshava)
-Date: Mon, 10 Sep 2012 16:21:19 +0530
-Subject: [PATCH] ARM: OMAP2+: mux: add support for PAD wakeup event handler
-In-Reply-To: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
-References: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <CAP05o4J_baRm0i5dg-vHjpgJeBWiNdtUFbCd1vK53ks9rz-Utg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 10 Sep 2012 14:05:25 +0300
+Subject: [PATCH v3 1/8] ARM/dts: omap2: Add McBSP entries for OMAP2420
+ and OMAP2430 SoC
+In-Reply-To: <504D9FBC.9030609@ti.com>
+References: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
+ <1346846336-27321-2-git-send-email-peter.ujfalusi@ti.com>
+ <20120907222953.GS1303@atomide.com> <504D9FBC.9030609@ti.com>
+Message-ID: <504DC975.5070609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 4:08 PM, Ruslan Bilovol <ruslan.bilovol@ti.com> wrote:
-> OMAP mux now parses active wakeup events from pad registers and calls
-> corresponding handler, if handler is not registered - corresponding
-> hwmod ISRs once a wakeup is detected.
-> This is useful for cases when routing wakeups to corresponding hwmod
-> ISRs complicates those ISRs handlers (for example, ISR handler may
-> not know who the interrupt source is)
->
-> Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
-> ---
->  arch/arm/mach-omap2/mux.c                    |   14 +++++++++--
->  arch/arm/mach-omap2/omap_hwmod.c             |   29 ++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +++
->  3 files changed, 44 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-> index 9fe6829..2918638 100644
-> --- a/arch/arm/mach-omap2/mux.c
-> +++ b/arch/arm/mach-omap2/mux.c
-> @@ -372,6 +372,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
->         int i, irq;
->         unsigned int val;
->         u32 handled_irqs = 0;
-> +       bool retval = false;
->
->         for (i = 0; i < hmux->nr_pads_dynamic; i++) {
->                 struct omap_device_pad *pad = hmux->pads_dynamic[i];
-> @@ -384,8 +385,15 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
->                 if (!(val & OMAP_WAKEUP_EVENT))
->                         continue;
->
-> -               if (!hmux->irqs)
-> -                       return true;
-> +               if (hmux->wakeup_handler && hmux->wakeup_handler[i]) {
-> +                       hmux->wakeup_handler[i](hmux);
-> +                       continue;
-> +               }
-> +
-> +               if (!hmux->irqs) {
-> +                       retval = true;
-> +                       continue;
-> +               }
->
->                 irq = hmux->irqs[i];
->                 /* make sure we only handle each irq once */
-> @@ -397,7 +405,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
->                 generic_handle_irq(mpu_irqs[irq].irq);
->         }
->
-> -       return false;
-> +       return retval;
->  }
->
->  /**
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 6ca8e51..9a41d65 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -3656,6 +3656,35 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
->  }
->
->  /**
-> + * omap_hwmod_pad_wakeup_handler - add wakeup handler for an I/O pad wakeup
-> + * @oh: struct omap_hwmod * containing hwmod mux entries
-> + * @pad_idx: array index in oh->mux of the hwmod mux entry to handle wakeup
-> + * @wakeup_handler: the wakeup_handler function to trigger on wakeup
-> + */
-> +int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
-> +               int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux))
-> +{
-> +       might_sleep();
-> +
-> +       if (!oh || !oh->mux || pad_idx < 0 ||
-> +                       pad_idx >= oh->mux->nr_pads_dynamic)
-> +               return -EINVAL;
-> +
-> +       if (!oh->mux->wakeup_handler) {
-> +               /* XXX What frees this? */
-> +               oh->mux->wakeup_handler =
-> +                               kzalloc(sizeof(*(oh->mux->wakeup_handler)) *
-> +                               oh->mux->nr_pads_dynamic, GFP_KERNEL);
-> +
-> +               if (!oh->mux->wakeup_handler)
-> +                       return -ENOMEM;
-> +       }
-> +       oh->mux->wakeup_handler[pad_idx] = wakeup_handler;
-> +
-> +       return 0;
-> +}
-> +
-> +/**
->   * omap_hwmod_init - initialize the hwmod code
->   *
->   * Sets up some function pointers needed by the hwmod code to operate on the
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index 6132972..5c2bcc7 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -110,6 +110,7 @@ struct omap_hwmod_mux_info {
->         int                             nr_pads_dynamic;
->         struct omap_device_pad          **pads_dynamic;
->         int                             *irqs;
-> +       int                             (**wakeup_handler)(struct omap_hwmod_mux_info *hmux);
->         bool                            enabled;
->  };
->
-> @@ -646,6 +647,9 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
->
->  int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
->
-> +int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
-> +               int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux));
-> +
->  extern void __init omap_hwmod_init(void);
->
->  const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
-> --
-> 1.7.1
->
+Hi Benoit,
 
-This is good idea!
-         if tero is Ok with this patch ; I will use this for ehci
-remote wakeup implementation.
+On 09/10/2012 11:07 AM, Benoit Cousson wrote:
+> Hi Tony,
+> 
+> On 09/08/2012 12:29 AM, Tony Lindgren wrote:
+>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120905 04:59]:
+>>> +
+>>> +	ocp {
+>>> +		mcbsp1: mcbsp at 48074000 {
+>>> +			compatible = "ti,omap2420-mcbsp";
+>>> +			reg = <0x48074000 0xff>;
+>>> +			reg-names = "mpu";
+>>> +			interrupts = <59>, /* TX interrupt */
+>>> +				     <60>; /* RX interrupt */
+>>> +			interrupt-names = "tx", "rx";
+>>> +			interrupt-parent = <&intc>;
+>>> +			ti,hwmods = "mcbsp1";
+>>> +		};
+>>> +
+>>> +		mcbsp2: mcbsp at 48076000 {
+>>> +			compatible = "ti,omap2420-mcbsp";
+>>> +			reg = <0x48076000 0xff>;
+>>> +			reg-names = "mpu";
+>>> +			interrupts = <62>, /* TX interrupt */
+>>> +				     <63>; /* RX interrupt */
+>>> +			interrupt-names = "tx", "rx";
+>>> +			interrupt-parent = <&intc>;
+>>> +			ti,hwmods = "mcbsp2";
+>>> +		};
+>>> +	};
+>>
+>> Hmm don't you need to specify the interrupt chip and offset for
+>> the interrupts here?
+> 
+> Mmm, I'm not sure to get your question, there is the link to the
+> interrupt-parent.
+> 
+> The interrupt number is relative to the parent interrupt domain. So even
+> if the INTC IRQ offset start at 32 instead of 0, DT IRQ mechanism will
+> convert that to the proper hwirq thanks to irqdomain.
+> In that case we should always provide interrupt number relative to the
+> interrupt controller HW number and not assuming any Linux IRQ number
+> offset like before.
+> 
+> 
+> And in fact the interrupt-parent is not even needed, by default if will
+> look to the parent to get the interrupt-controller.
 
-regards
-keshava
+This is true, but it makes the 'code' a bit more readable if I (we) specify
+the interrupt-parent.
+
+> 
+> Extract from [1]
+> 
+> interrupt-parent:
+> "Because the hierarchy of the nodes in the interrupt tree might not
+> match the device tree, the interrupt-parent property is available to
+> make the definition of an interrupt parent explicit.
+> The value is the phandle to the interrupt parent. If this property is
+> missing from a device, its interrupt parent is assumed to be its device
+> tree parent."
+> 
+> [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+> 
+> Regards,
+> Benoit
+> 
+
+
+-- 
+P?ter
