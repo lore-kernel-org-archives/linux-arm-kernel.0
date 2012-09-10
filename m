@@ -1,116 +1,31 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Sep 2012 14:30:14 +0300
-Subject: [PATCH v2] perf: Use pre-empt safe cpu_get/put insted of
- smp_processor_id
-Message-ID: <1347276614-4334-1-git-send-email-rogerq@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 04:34:15 -0700
+Subject: [PATCH 11/19] ARM: ux500: Add all known I2C sub-device nodes to
+ the HREF DT
+In-Reply-To: <1347016499-29354-12-git-send-email-lee.jones@linaro.org>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdY+t9MwWewtZzpD7i4eeTxVHNk+NxSZ1E=T-k4a0mveHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-[   28.832916] debug_smp_processor_id: 18 callbacks suppressed
-[   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
-[   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+> Here we add the skeleton nodes for each of the known I2C sub-devices
+> currently registered on ST-Ericsson's HREF Development Platform. We
+> will fill these nodes in turn as the drivers are enabled for Device
+> Tree.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-changes in v2:
-- rebased on 3.6-rc5
-- use put_cpu() immediately after get_cpu() in omap3_pm_idle()
+Can't we have it the other way around (discussing patch ordering
+with Arnd simultaneously), so you first add the DT support to the
+subdevices, then add the more complete nodes to the device tree?
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/clock.c       |    9 ++++++---
- arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
- arch/arm/mach-omap2/powerdomain.c |    6 ++++--
- 3 files changed, 18 insertions(+), 9 deletions(-)
+And if you put in a device tree like this, will these devices
+not collide with the ones that are currently supplied from
+the boardfiles? I'm a bit confused here, maybe I'm not smart
+enough to understand this...
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index ea3f565..06747b6 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
- 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
- 
- 	if (clk->ops && clk->ops->disable) {
--		trace_clock_disable(clk->name, 0, smp_processor_id());
-+		trace_clock_disable(clk->name, 0, get_cpu());
-+		put_cpu();
- 		clk->ops->disable(clk);
- 	}
- 
-@@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
- 	}
- 
- 	if (clk->ops && clk->ops->enable) {
--		trace_clock_enable(clk->name, 1, smp_processor_id());
-+		trace_clock_enable(clk->name, 1, get_cpu());
-+		put_cpu();
- 		ret = clk->ops->enable(clk);
- 		if (ret) {
- 			WARN(1, "clock: %s: could not enable: %d\n",
-@@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
- 
- 	/* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
- 	if (clk->set_rate) {
--		trace_clock_set_rate(clk->name, rate, smp_processor_id());
-+		trace_clock_set_rate(clk->name, rate, get_cpu());
-+		put_cpu();
- 		ret = clk->set_rate(clk, rate);
- 	}
- 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 05bd8f0..5aa0a11 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -346,18 +346,22 @@ void omap_sram_idle(void)
- 
- static void omap3_pm_idle(void)
- {
-+	unsigned cpu;
-+
- 	local_fiq_disable();
- 
- 	if (omap_irq_pending())
- 		goto out;
- 
--	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
--	trace_cpu_idle(1, smp_processor_id());
-+	cpu = get_cpu();
-+	put_cpu();
-+	trace_power_start(POWER_CSTATE, 1, cpu);
-+	trace_cpu_idle(1, cpu);
- 
- 	omap_sram_idle();
- 
--	trace_power_end(smp_processor_id());
--	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
-+	trace_power_end(cpu);
-+	trace_cpu_idle(PWR_EVENT_EXIT, cpu);
- 
- out:
- 	local_fiq_enable();
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 69b36e1..138bf86 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
- 				       ((state & OMAP_POWERSTATE_MASK) << 8) |
- 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
- 			trace_power_domain_target(pwrdm->name, trace_state,
--						  smp_processor_id());
-+						  get_cpu());
-+			put_cpu();
- 		}
- 		break;
- 	default:
-@@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
- 		/* Trace the pwrdm desired target state */
- 		trace_power_domain_target(pwrdm->name, pwrst,
--					  smp_processor_id());
-+					  get_cpu());
-+		put_cpu();
- 		/* Program the pwrdm desired target state */
- 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
- 	}
--- 
-1.7.4.1
+Yours,
+Linus Walleij
