@@ -1,43 +1,52 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 10 Sep 2012 20:18:10 +0100
-Subject: [PATCH 06/14] tty/serial/core: Introduce poll_init callback
-In-Reply-To: <20120910175725.GA13673@lizard>
-References: <20120910040802.GA1261@lizard> <20120910041335.GF29537@lizard>
- <20120910121320.03c9dfc7@pyramind.ukuu.org.uk>
- <20120910175725.GA13673@lizard>
-Message-ID: <20120910201810.409a58ea@pyramind.ukuu.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 10 Sep 2012 12:14:20 -0700
+Subject: [PATCH 05/11] clk: Versatile Express clock generators ("osc")
+ driver
+In-Reply-To: <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <20120910191420.20289.1923@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > What stops a parallel open or close changing ASYNC_INITIALIZED after you
-> > test and before you lock ?
-> 
-> Yeah, I should do the whole thing under the mutex.
+Quoting Pawel Moll (2012-09-03 09:25:25)
+> +static int vexpress_osc_probe(struct vexpress_config_device *vecdev)
+> +{
+> +       int err;
+> +       struct device_node *node = vecdev->dev.of_node;
+> +       struct vexpress_osc_info *info = vecdev->dev.platform_data;
+> +       struct clk_init_data init;
+> +       struct vexpress_osc *osc;
+> +       struct clk *clk;
+> +       const char * const *dev_ids = NULL;
+> +       u32 range[2];
+> +
+> +       if (vecdev->status & VEXPRESS_CONFIG_DEVICE_PROBED_EARLY)
+> +               return 0;
+> +
+> +       osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+> +       if (!osc) {
+> +               err = -ENOMEM;
+> +               goto error;
 
-Can you use test_bit() as well. I'm trying to gradually push all the code
-that way so people habitually use set_bit() and we don't get any (more)
-races where some compile situations and architectures otherwise create
+Minor nitpick: the error label tries to free osc, which in this case
+shouldn't be freed because it is NULL.
 
-	load to register
-	register ored with constant
-	write back
+<snip>
+> +error:
+> +       kfree(osc);
+> +       return err;
 
-> Not related to this particular issue, but the fact that close() can powerdown
-> the hardware is quite bad. Today it is always possible to use open,close
-> sequence on /dev/ttyXXXX, and polling would break if close() deinitializes the
-> hardware (e.g. via uart_change_pm()).
+Would be better to have something like:
 
-One of the long term goals of tty_port has always ben to have an object
-with the lifetime of the physical port so this kind of thing can be fixed.
+		error_clk:
+			kfree(osc);
+		error_osc:
+			return err;
 
-> In console= case, serial core handles the issue via uart_console(), checking if
-> the port is used for console, preventing it to power down the hardware. We can
-> do the same, or make tty_find_polling_driver() refcount individual ports/lines.
-> But the issue is orthogonal to this particular patch, although needs to be
-> fixed some day.
+Otherwise patch looks good to me.  There are some changes to headers in
+this patch, and it is part of a larger series.  How did you want the
+common clk patches to get merged?
 
-Agreed - however you'll need a separate refcount than the main tty one
-for this, because we still need to do a hangup() on the final "tty" close
-even if the hardware is 'pinned' for a debugger.
-
-Alan
+Regards,
+Mike
