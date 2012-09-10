@@ -1,71 +1,116 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 10 Sep 2012 13:46:26 +0300
-Subject: [PATCH v4 08/14] Input: twl4030-vibra: Support for DT booted kernel
+Date: Mon, 10 Sep 2012 13:46:27 +0300
+Subject: [PATCH v4 09/14] ASoC: twl4030: Move hs_extmute GPIO handling to
+ driver
 In-Reply-To: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347273992-9107-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1347273992-9107-10-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support when the kernel has been booted with DT blob. In this case the
-pdata is NULL, we need to reach up to the core node and check if the codec
-part has been enabled to determine if we need to coexist with the codec or
-not.
+The external mute (if it is in use) is handled by a GPIO line. Prepare to
+remove the set_hs_extmute callback and replace it with:
+hs_extmute_gpio: the GPIO number to use for external mute
+
+When the users of set_hs_extmute has been converted the callback can be removed.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- drivers/input/misc/twl4030-vibra.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ include/linux/i2c/twl.h    |  4 +++-
+ sound/soc/codecs/twl4030.c | 32 ++++++++++++++++++++++++++++++--
+ 2 files changed, 33 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/input/misc/twl4030-vibra.c b/drivers/input/misc/twl4030-vibra.c
-index fc0ed9b..2194a3c 100644
---- a/drivers/input/misc/twl4030-vibra.c
-+++ b/drivers/input/misc/twl4030-vibra.c
-@@ -26,6 +26,7 @@
- #include <linux/module.h>
- #include <linux/jiffies.h>
+diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+index ac6488c..2040309 100644
+--- a/include/linux/i2c/twl.h
++++ b/include/linux/i2c/twl.h
+@@ -667,7 +667,9 @@ struct twl4030_codec_data {
+ 	unsigned int check_defaults:1;
+ 	unsigned int reset_registers:1;
+ 	unsigned int hs_extmute:1;
+-	void (*set_hs_extmute)(int mute);
++	void (*set_hs_extmute)(int mute); /* Deprecated, use hs_extmute_gpio and
++					     hs_extmute_disable_level */
++	int hs_extmute_gpio;
+ };
+ 
+ struct twl4030_vibra_data {
+diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
+index 391fcfc..5fc271a 100644
+--- a/sound/soc/codecs/twl4030.c
++++ b/sound/soc/codecs/twl4030.c
+@@ -28,6 +28,7 @@
  #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/workqueue.h>
  #include <linux/i2c/twl.h>
- #include <linux/mfd/twl4030-audio.h>
-@@ -194,13 +195,26 @@ static int twl4030_vibra_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(twl4030_vibra_pm_ops,
- 			 twl4030_vibra_suspend, twl4030_vibra_resume);
+ #include <linux/slab.h>
++#include <linux/gpio.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/pcm_params.h>
+@@ -302,6 +303,22 @@ static void twl4030_init_chip(struct snd_soc_codec *codec)
+ 	u8 reg, byte;
+ 	int i = 0;
  
-+static bool twl4030_vibra_check_coexist(struct twl4030_vibra_data *pdata,
-+			      struct device_node *node)
-+{
-+	if (pdata && pdata->coexist)
-+		return true;
++	if (pdata && pdata->hs_extmute &&
++	    gpio_is_valid(pdata->hs_extmute_gpio)) {
++		int ret;
 +
-+	if (of_find_node_by_name(node, "codec"))
-+		return true;
++		if (!pdata->hs_extmute_gpio)
++			dev_warn(codec->dev,
++				 "Extmute GPIO is 0 is this correct?\n");
 +
-+	return false;
-+}
++		ret = gpio_request_one(pdata->hs_extmute_gpio,
++				       GPIOF_OUT_INIT_LOW, "hs_extmute");
++		if (ret) {
++			dev_err(codec->dev, "Failed to get hs_extmute GPIO\n");
++			pdata->hs_extmute_gpio = -1;
++		}
++	}
 +
- static int __devinit twl4030_vibra_probe(struct platform_device *pdev)
+ 	/* Check defaults, if instructed before anything else */
+ 	if (pdata && pdata->check_defaults)
+ 		twl4030_check_defaults(codec);
+@@ -748,7 +765,10 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
+ 	/* Enable external mute control, this dramatically reduces
+ 	 * the pop-noise */
+ 	if (pdata && pdata->hs_extmute) {
+-		if (pdata->set_hs_extmute) {
++		if (gpio_is_valid(pdata->hs_extmute_gpio)) {
++			gpio_set_value(pdata->hs_extmute_gpio, 1);
++		} else if (pdata->set_hs_extmute) {
++			dev_warn(codec->dev, "set_hs_extmute is deprecated\n");
+ 			pdata->set_hs_extmute(1);
+ 		} else {
+ 			hs_pop |= TWL4030_EXTMUTE;
+@@ -786,7 +806,10 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
+ 
+ 	/* Disable external mute */
+ 	if (pdata && pdata->hs_extmute) {
+-		if (pdata->set_hs_extmute) {
++		if (gpio_is_valid(pdata->hs_extmute_gpio)) {
++			gpio_set_value(pdata->hs_extmute_gpio, 0);
++		} else if (pdata->set_hs_extmute) {
++			dev_warn(codec->dev, "set_hs_extmute is deprecated\n");
+ 			pdata->set_hs_extmute(0);
+ 		} else {
+ 			hs_pop &= ~TWL4030_EXTMUTE;
+@@ -2230,12 +2253,17 @@ static int twl4030_soc_probe(struct snd_soc_codec *codec)
+ 
+ static int twl4030_soc_remove(struct snd_soc_codec *codec)
  {
- 	struct twl4030_vibra_data *pdata = pdev->dev.platform_data;
-+	struct device_node *twl4030_core_node = pdev->dev.parent->of_node;
- 	struct vibra_info *info;
- 	int ret;
++	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
+ 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
  
--	if (!pdata) {
-+	if (!pdata && !twl4030_core_node) {
- 		dev_dbg(&pdev->dev, "platform_data not available\n");
- 		return -EINVAL;
- 	}
-@@ -210,7 +224,7 @@ static int __devinit twl4030_vibra_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ 	/* Reset registers to their chip default before leaving */
+ 	twl4030_reset_registers(codec);
+ 	twl4030_set_bias_level(codec, SND_SOC_BIAS_OFF);
+ 	kfree(twl4030);
++
++	if (pdata && pdata->hs_extmute && gpio_is_valid(pdata->hs_extmute_gpio))
++		gpio_free(pdata->hs_extmute_gpio);
++
+ 	return 0;
+ }
  
- 	info->dev = &pdev->dev;
--	info->coexist = pdata->coexist;
-+	info->coexist = twl4030_vibra_check_coexist(pdata, twl4030_core_node);
- 	INIT_WORK(&info->play_work, vibra_play_work);
- 
- 	info->input_dev = input_allocate_device();
 -- 
 1.7.12
