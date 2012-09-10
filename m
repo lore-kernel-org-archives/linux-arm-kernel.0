@@ -1,84 +1,26 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 10 Sep 2012 14:05:25 +0300
-Subject: [PATCH v3 1/8] ARM/dts: omap2: Add McBSP entries for OMAP2420
- and OMAP2430 SoC
-In-Reply-To: <504D9FBC.9030609@ti.com>
-References: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
- <1346846336-27321-2-git-send-email-peter.ujfalusi@ti.com>
- <20120907222953.GS1303@atomide.com> <504D9FBC.9030609@ti.com>
-Message-ID: <504DC975.5070609@ti.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Mon, 10 Sep 2012 12:11:05 +0100
+Subject: [PATCH 10/14] tty/serial: Add kgdb_nmi driver
+In-Reply-To: <20120910041412.GJ29537@lizard>
+References: <20120910040802.GA1261@lizard>
+	<20120910041412.GJ29537@lizard>
+Message-ID: <20120910121105.724f982f@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Sun, 9 Sep 2012 21:14:12 -0700
+Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
 
-On 09/10/2012 11:07 AM, Benoit Cousson wrote:
-> Hi Tony,
-> 
-> On 09/08/2012 12:29 AM, Tony Lindgren wrote:
->> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120905 04:59]:
->>> +
->>> +	ocp {
->>> +		mcbsp1: mcbsp at 48074000 {
->>> +			compatible = "ti,omap2420-mcbsp";
->>> +			reg = <0x48074000 0xff>;
->>> +			reg-names = "mpu";
->>> +			interrupts = <59>, /* TX interrupt */
->>> +				     <60>; /* RX interrupt */
->>> +			interrupt-names = "tx", "rx";
->>> +			interrupt-parent = <&intc>;
->>> +			ti,hwmods = "mcbsp1";
->>> +		};
->>> +
->>> +		mcbsp2: mcbsp at 48076000 {
->>> +			compatible = "ti,omap2420-mcbsp";
->>> +			reg = <0x48076000 0xff>;
->>> +			reg-names = "mpu";
->>> +			interrupts = <62>, /* TX interrupt */
->>> +				     <63>; /* RX interrupt */
->>> +			interrupt-names = "tx", "rx";
->>> +			interrupt-parent = <&intc>;
->>> +			ti,hwmods = "mcbsp2";
->>> +		};
->>> +	};
->>
->> Hmm don't you need to specify the interrupt chip and offset for
->> the interrupts here?
-> 
-> Mmm, I'm not sure to get your question, there is the link to the
-> interrupt-parent.
-> 
-> The interrupt number is relative to the parent interrupt domain. So even
-> if the INTC IRQ offset start at 32 instead of 0, DT IRQ mechanism will
-> convert that to the proper hwirq thanks to irqdomain.
-> In that case we should always provide interrupt number relative to the
-> interrupt controller HW number and not assuming any Linux IRQ number
-> offset like before.
-> 
-> 
-> And in fact the interrupt-parent is not even needed, by default if will
-> look to the parent to get the interrupt-controller.
+> This special driver makes it possible to temporary use NMI debugger port
+> as a normal console by issuing 'nmi_console' command (assuming that the
+> port is attached to KGDB).
 
-This is true, but it makes the 'code' a bit more readable if I (we) specify
-the interrupt-parent.
+No ref counting, no tty port, no compliance with the tty behaviour.
+Concept looks fine but it needs porting to reflect a kernel newer than
+about 2.6.18 8)
 
-> 
-> Extract from [1]
-> 
-> interrupt-parent:
-> "Because the hierarchy of the nodes in the interrupt tree might not
-> match the device tree, the interrupt-parent property is available to
-> make the definition of an interrupt parent explicit.
-> The value is the phandle to the interrupt parent. If this property is
-> missing from a device, its interrupt parent is assumed to be its device
-> tree parent."
-> 
-> [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-> 
-> Regards,
-> Benoit
-> 
+I would take a quick look at the tty_port helpers and also check v -next
+which makes the tty_port mandatory. That'll pretty much cover your needs
+for locking, semantics and the like.
 
-
--- 
-P?ter
+Alan
