@@ -1,103 +1,38 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Mon, 10 Sep 2012 13:04:00 +0300
-Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
-In-Reply-To: <20120910060840.GT26709@S2101-09.ap.freescale.net>
-References: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20120910060840.GT26709@S2101-09.ap.freescale.net>
-Message-ID: <504DBB10.9030702@bluegiga.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Sep 2012 10:13:16 +0000
+Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
+In-Reply-To: <CACRpkdZ-QpHzeEBO=RFVe-8S2DG4-thhwW9iVbAMXZrOe-FnAw@mail.gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <201209071358.38598.arnd@arndb.de>
+ <CACRpkdZ-QpHzeEBO=RFVe-8S2DG4-thhwW9iVbAMXZrOe-FnAw@mail.gmail.com>
+Message-ID: <201209101013.16697.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Monday 10 September 2012, Linus Walleij wrote:
+> Basically that was at a point when we were changing a lot of
+> subsystem trees with DT patches that were merged in out-of-order
+> fashion.
+> 
+> Then it's better to have the DT changes to be pushed
+> separately at the end of the merge window after all subtrees
+> with dependent changes are merged. (Or even in the next merge
+> window if there is no hurry, but we always seem to be in a hurry...)
+> 
+> If all the changes are in the same subtree (like ARM SoC with
+> ACKs from all over the place where needed) you can do it
+> this way instead, and I agree it looks better.
 
-On 09/10/2012 09:08 AM, Shawn Guo wrote:
-> On Fri, Sep 07, 2012 at 02:45:17PM +0300, Lauri Hintsala wrote:
->> This feature allows to use SDIO bus without wiring card detect
->> signal.
->
-> This looks like a case of "broken-cd" ...
->
->> This is relevant in cases where SDIO device is connected to
->> SDIO bus and there is no way to disconnect device from bus (device
->> is always present).
->>
-> ... while this sounds like a case of "non-removable".
+I think we're talking about different things:
 
-Right, I'll remove this comment.
+I think it's fine to do the device driver conversion separately
+from the platform changes, but doing that properly means that the
+platform changes should only go in after the drivers have changed.
 
-In our case the SDIO device is always physically connected to SDIO bus 
-but the power of the device can be controller. So in SW point of view 
-the device can be removed by switching the power off.
+Inside of the platform code, I absolutely think we should change the
+board file and the dts file simultaneously. When the driver offers
+two ways of probing a device, this lets us change from one way to
+the other without going through a phase where we use neither of them
+or (worse) both at the same time.
 
-
->> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
->> ---
->>   drivers/mmc/host/mxs-mmc.c |    7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
->> index ad3fcea..992760e 100644
->> --- a/drivers/mmc/host/mxs-mmc.c
->> +++ b/drivers/mmc/host/mxs-mmc.c
->> @@ -165,6 +165,7 @@ struct mxs_mmc_host {
->>   	int				sdio_irq_en;
->>   	int				wp_gpio;
->>   	bool				wp_inverted;
->> +	bool				broken_cd;
->>   };
->>
->>   static int mxs_mmc_get_ro(struct mmc_host *mmc)
->> @@ -187,6 +188,9 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
->>   {
->>   	struct mxs_mmc_host *host = mmc_priv(mmc);
->>
->> +	if (host->broken_cd)
->> +		return -ENOSYS;
->> +
->
-> The .get_cd caller does not check for error.  This change makes no
-> sense to me.
-
-In our case we don't want to read card detect bit and we have to 
-continue MMC probing because card detect pin is routed nowhere.
-
-Could it be better to return zero instead of error? ENOSYS is used to 
-indicate "unreachable card detect" in other drivers (e.g. atmel-mci, 
-omap_hsmmc) and I followed them.
-
-
-> Instead, the driver needs to set MMC_CAP_NEEDS_POLL in
-> case of "broken-cd".
-
-MMC_CAP_NEEDS_POLL is always set in mxs-mmc.
-
-
-Best regards,
-Lauri
-
-
->
-> Regards,
-> Shawn
->
->>   	return !(readl(host->base + HW_SSP_STATUS(host)) &
->>   		 BM_SSP_STATUS_CARD_DETECT);
->>   }
->> @@ -808,6 +812,9 @@ static int mxs_mmc_probe(struct platform_device *pdev)
->>   							&flags);
->>   		if (flags & OF_GPIO_ACTIVE_LOW)
->>   			host->wp_inverted = 1;
->> +
->> +		if (of_get_property(np, "broken-cd", NULL))
->> +			host->broken_cd = 1;
->>   	} else {
->>   		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
->>   			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
->> --
->> 1.7.9.5
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+	Arnd
