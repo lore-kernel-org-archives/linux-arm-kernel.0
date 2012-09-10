@@ -1,59 +1,45 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Mon, 10 Sep 2012 17:04:26 +0100 (BST)
-Subject: [PATCH V2 1/2] hwmon: Add devicetree bindings to gpio-fan
-In-Reply-To: <20120910152814.GA6050@lunn.ch>
-References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
- <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
- <1347285112-13542-2-git-send-email-jm@lentin.co.uk>
- <20120910152814.GA6050@lunn.ch>
-Message-ID: <alpine.DEB.2.00.1209101656120.10589@marmot.wormnet.eu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2012 17:08:56 +0100
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <20120910152102.GD31430@game.jcrosoft.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org>
+ <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
+ <20120910055339.GC31430@game.jcrosoft.org>
+ <20120910125137.GC27042@arm.com>
+ <20120910152102.GD31430@game.jcrosoft.org>
+Message-ID: <20120910160856.GG27042@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Sep 2012, Andrew Lunn wrote:
+On Mon, Sep 10, 2012 at 04:21:02PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 13:51 Mon 10 Sep     , Catalin Marinas wrote:
+> > On Mon, Sep 10, 2012 at 06:53:39AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 19:29 Sun 09 Sep     , Nicolas Pitre wrote:
+> > > > On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+> > > > > > +The image must be placed at the specified offset (currently 0x80000)
+> > > > > > +from the start of the system RAM and called there. The start of the
+> > > > > > +system RAM must be aligned to 2MB.
+> > > > > can we drop this
+> > > > 
+> > > > Drop what?
+> > > > And why?
+> > > This contrain the must be loadable at any address
+> > 
+> > You can't easily load the kernel image at any address, unless it can
+> > relocate itself and you have a way to specify PHYS_OFFSET. We don't want
+> > a compile-time PHYS_OFFSET, the kernel detects it at boot time based on
+> > the load address.
+> so NACK kexec and other boot loaders require it
 
-> On Mon, Sep 10, 2012 at 02:51:51PM +0100, Jamie Lentin wrote:
->> Allow a gpio-fan to be defined in devicetree, see binding documentation
->> for details.
->>
->> Changes since V1:-
->> * Don't hide return codes [Guenter Roeck]
->> * Remove typecast noise [Guenter Roeck]
->> * Use of_find_property instead of counting u32s [Guenter Roeck]
->> * Don't count GPIOs twice [Andrew Lunn]
->> * Use of_prop_next_u32 to get records in a more obvious fashion
->> * Use CONFIG_OF_GPIO instead of CONFIG_OF
->> * Apply __devinitdata to of_gpio_fan_match [Andrew Lunn]
->>
->> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
->> ---
->>  .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
->>  drivers/hwmon/gpio-fan.c                           |  116 ++++++++++++++++++++
->>  2 files changed, 141 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
->
-> Hi Jamie
->
-> Thanks for addressing all the issues raised. However...
->
-> Anything before the --- ends up in the changelog entry. Anything
-> afterwards does not.
->
-> The changes you made to address review comments is not something for
-> the changelog, so Changes since V1:- should be after the --- .
-
-Okay, whilst I was submitting the initial DT support it was suggested by 
-Grant Likely they should be above the '---'. I think I prefer this also, 
-but I'll go with whatever is more likely to get patches accepted :)
-
-Can resend with the content jiggled if you want, but will put them after 
-the '---' in future.
-
->
-> There is more detail in Documentation/SubmittingPatches
->
->      Andrew
->
+Just in case it wasn't clear, the kernel can be loaded at any address in
+RAM (and the RAM can start at any sane address). The way the kernel
+calculates PHYS_OFFSET is (load address - TEXT_OFFSET) unless we pass it
+by other means (none currently specified). For a kdump kernel, it just
+assumes that its PHYS_OFFSET is higher but it can ioremap the crashed
+kernel memory.
 
 -- 
-Jamie Lentin
+Catalin
