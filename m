@@ -1,30 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 10 Sep 2012 13:10:10 -0700
-Subject: [PATCH 06/11] clk: Common clocks implementation for Versatile
- Express
-In-Reply-To: <1346689531-7212-7-git-send-email-pawel.moll@arm.com>
-References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
- <1346689531-7212-7-git-send-email-pawel.moll@arm.com>
-Message-ID: <20120910201010.20289.46429@nucleus>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Mon, 10 Sep 2012 13:13:13 -0700
+Subject: [PATCH 08/14] tty/serial/kgdboc: Add and wire up clear_irqs
+ callback
+In-Reply-To: <20120910201918.1e3c8fd0@pyramind.ukuu.org.uk>
+References: <20120910040802.GA1261@lizard> <20120910041357.GH29537@lizard>
+ <20120910121624.226c1a88@pyramind.ukuu.org.uk>
+ <20120910175704.GA11392@lizard>
+ <20120910201918.1e3c8fd0@pyramind.ukuu.org.uk>
+Message-ID: <20120910201313.GA31746@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pawel Moll (2012-09-03 09:25:26)
-> This patch adds a DT and non-DT based implementation of
-> the common clock infrastructure for Versatile Express
-> platform. It registers (statically or using DT) all
-> required fixed clocks, initialises motherboard's SP810
-> cell (that provides clocks for SP804 timers) and
-> explicitely registers VE "osc" driver, to make the
-> clock generators availalable early.
+On Mon, Sep 10, 2012 at 08:19:18PM +0100, Alan Cox wrote:
+> On Mon, 10 Sep 2012 10:57:04 -0700
+> Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
 > 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+> > On Mon, Sep 10, 2012 at 12:16:24PM +0100, Alan Cox wrote:
+> > > > serial port, the CPU receives NMI exception, and we fall into KDB
+> > > > shell.  So, it is our "debug console", and it is able to interrupt
+> > > > (and thus debug) even IRQ handlers themselves.
+> > > 
+> > > You seem to have an assumption of single core here. What happens if
+> > > the NMI hits CPU #0 and the serial IRQ hits CPU #1 simultaneously ?
+> > 
+> > If you can't redirect all serial IRQs to NMI context, e.g. sometimes you get
+> > NMIs, sometimes IRQs, then your NMI handling is not deterministic, and surely
+> > this is not supported.
+> 
+> This seems like arch specific magic leaking into the tty code. Surely
+> this should be buried in the depths of the platform IRQ code ?
 
-Barring the DT-related comments by Arnd and others, the common
-clk-specific changes in this patch look good to me.  Which tree will
-this patch go through?  (same question I asked on patch 5)
+I'd not call this arch-specific. It's task-specific, and the task is quite
+peculiar, true, but still nothing to do with arch.
 
-Regards,
-Mike
+If the arch is not able to turn serial IRQs into NMIs, then surely that arch is
+not able to implement serial-triggered NMI/KDB-shell, so we don't support that
+arch.
+
+And we don't have any other way to accoplish the same: we need to clear the
+serial interrupts, not some arch-specific interrupts. It is the serial device
+that causes NMI, not some arch's magic. So we just provide the knob to manage
+the device's functionality.
+
+We do have a separate arch-specific NMI-masking knob that works at CPU level,
+but if we mask NMI source at CPU level, we have to keep it always masked,
+otherwise we'll keep reentering NMI. So, we really have to clear serial's
+interrupt line.
+
+That's why I came with clear_irqs callback, it has defined semantics for the
+serial driver, and zero knowledge about any underlaying architecture or task.
+
+Thanks,
+
+Anton.
