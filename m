@@ -1,23 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 04:12:23 -0700
-Subject: [PATCH 10/19] ARM: ux500: Remove redundant #gpio-cell properties
- from HREF and Snowball DT
-In-Reply-To: <1347016499-29354-11-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY_gyWRO20ZOfTmG=tzE_B3ObWZG_4f8gHS6vyiGZSh6Q@mail.gmail.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Mon, 10 Sep 2012 12:17:02 +0100
+Subject: [PATCH 09/14] tty/serial/amba-pl011: Implement clear_irqs callback
+In-Reply-To: <20120910041404.GI29537@lizard>
+References: <20120910040802.GA1261@lizard>
+	<20120910041404.GI29537@lizard>
+Message-ID: <20120910121702.550b8a90@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Sun, 9 Sep 2012 21:14:04 -0700
+Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
 
-> These properties have no place here as the populated nodes are
-> not related to GPIO Controllers.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> It's all pretty straightforward, except for TXIM interrupt. The interrupt
+> has meaning "ready to transmit", so it's almost always raised, and the
+> only way to silence it is to mask it. But that's OK, ops->start_tx will
+> unmask it.
+> 
+> Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 88e2df2..7522d97 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1308,6 +1308,18 @@ static void pl011_put_poll_char(struct uart_port *port,
+>  	writew(ch, uap->port.membase + UART01x_DR);
+>  }
+>  
+> +static void pl011_clear_irqs(struct uart_port *port)
+> +{
+> +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+> +	unsigned char __iomem *regs = uap->port.membase;
+> +
+> +	writew(readw(regs + UART011_MIS), regs + UART011_ICR);
+> +	/*
+> +	 * There is no way to clear TXIM, this is "ready to transmit IRQ", so
+> +	 * we simply mask it. ops->start_tx will unmask it.
+> +	 */
 
-Squash this into the previous patch adding them...
-I think Arnd already noted.
-
-Yours,
-Linus Walleij
+Not if you race here with the transmit start it won't.
