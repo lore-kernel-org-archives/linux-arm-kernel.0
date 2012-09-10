@@ -1,96 +1,46 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Mon, 10 Sep 2012 14:51:52 +0100
-Subject: [PATCH V2 2/2] ARM: kirkwood: Use devicetree to define DNS-32[05] fan
-In-Reply-To: <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
+Date: Mon, 10 Sep 2012 14:51:50 +0100
+Subject: [PATCH V2 0/2] hwmon: kirkwood: Add DT bindings to gpio-fan for
+ DNS-32[05]
+In-Reply-To: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
 References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
- <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1347285112-13542-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <1347285112-13542-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove more board-specific code by using devicetree to define the fan
-attached to both boards.
+Thanks to Guenter & Andrew---all the feedback made sense, and hopefully
+this patchset addresses everything.
+
+This is an attempt at getting DT support into gpio-fan, in a similar
+fashion to gpio-leds and gpio-keys. I guess the most contentious bit is
+going to be the bindings.
+
+Tested on a D-Link DNS-320.
 
 Changes since V1:-
-* Remove now-useless gpio-fan.h [Andrew Lunn]
 
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
----
- arch/arm/boot/dts/kirkwood-dnskw.dtsi |   10 ++++++++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   26 --------------------------
- 2 files changed, 10 insertions(+), 26 deletions(-)
+* Don't hide return codes [Guenter Roeck]
+* Remove typecast noise [Guenter Roeck]
+* Use of_find_property instead of counting u32s [Guenter Roeck]
+* Don't count GPIOs twice [Andrew Lunn]
+* Use of_prop_next_u32 to get records in a more obvious fashion
+* Use CONFIG_OF_GPIO instead of CONFIG_OF
+* Apply __devinitdata to of_gpio_fan_match [Andrew Lunn]
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 7408655..9b32d02 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -25,6 +25,16 @@
- 		};
- 	};
- 
-+	gpio_fan {
-+		/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
-+		compatible = "gpio-fan";
-+		gpios = <&gpio1 14 1
-+			 &gpio1 13 1>;
-+		gpio-fan,speed-map = <0    0
-+				      3000 1
-+				      6000 2>;
-+	};
-+
- 	ocp at f1000000 {
- 		sata at 80000 {
- 			status = "okay";
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 4ab3506..6ac7a8d 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -19,7 +19,6 @@
- #include <linux/of.h>
- #include <linux/gpio.h>
- #include <linux/input.h>
--#include <linux/gpio-fan.h>
- #include <linux/leds.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -67,29 +66,6 @@ static unsigned int dnskw_mpp_config[] __initdata = {
- 	0
- };
- 
--/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
--static struct gpio_fan_speed dnskw_fan_speed[] = {
--	{    0,  0 },
--	{ 3000,	 1 },
--	{ 6000,	 2 },
--};
--static unsigned dnskw_fan_pins[] = {46, 45};
--
--static struct gpio_fan_platform_data dnskw_fan_data = {
--	.num_ctrl	= ARRAY_SIZE(dnskw_fan_pins),
--	.ctrl		= dnskw_fan_pins,
--	.num_speed	= ARRAY_SIZE(dnskw_fan_speed),
--	.speed		= dnskw_fan_speed,
--};
--
--static struct platform_device dnskw_fan_device = {
--	.name	= "gpio-fan",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &dnskw_fan_data,
--	},
--};
--
- static void dnskw_power_off(void)
- {
- 	gpio_set_value(36, 1);
-@@ -114,8 +90,6 @@ void __init dnskw_init(void)
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
- 
--	platform_device_register(&dnskw_fan_device);
--
- 	/* Register power-off GPIO. */
- 	if (gpio_request(36, "dnskw:power:off") == 0
- 	    && gpio_direction_output(36, 0) == 0)
+* Remove useless gpio-fan.h [Andrew Lunn]
+
+Feedback appreciated!
+
+Jamie Lentin (2):
+  hwmon: Add devicetree bindings to gpio-fan
+  ARM: kirkwood: Use devicetree to define DNS-32[05] fan
+
+ .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   10 ++
+ arch/arm/mach-kirkwood/board-dnskw.c               |   26 -----
+ drivers/hwmon/gpio-fan.c                           |  116 ++++++++++++++++++++
+ 4 files changed, 151 insertions(+), 26 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
+
 -- 
 1.7.10.4
