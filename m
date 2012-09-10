@@ -1,47 +1,47 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 02:53:45 -0700
-Subject: [PATCH 06/19] ARM: ux500: Add nodes for the MSP into the HREF
- Device Tree
-In-Reply-To: <1347016499-29354-7-git-send-email-lee.jones@linaro.org>
+Date: Mon, 10 Sep 2012 02:56:20 -0700
+Subject: [PATCH 07/19] ARM: ux500: Add all encompassing sound node to the
+ HREF Device Tree
+In-Reply-To: <1347016499-29354-8-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbs9_hLB9c7WbWeR_6+Le4Svzc9Y5wTNVebOiRDB-o33g@mail.gmail.com>
+ <1347016499-29354-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbh5BFmHp4uurmWfBExUKD0GDJCOHGp8kJCu2tReTWKWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> This patch enables the two important MSP devices for ST-Ericsson's
-> hardware reference development board.
+> This is where we link together all of the SoC sound components for
+> a given platform. This all encompassing sound node is only found
+> in the very lowest hierarchical DTS file, since the component mix may
+> well change from board variant to board variant.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/hrefv60plus.dts |    8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm/boot/dts/hrefv60plus.dts |    7 +++++++
+>  1 file changed, 7 insertions(+)
 >
 > diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-> index 62b2ac1..4f0aee8 100644
+> index 4f0aee8..d8ed29e 100644
 > --- a/arch/arm/boot/dts/hrefv60plus.dts
 > +++ b/arch/arm/boot/dts/hrefv60plus.dts
-> @@ -77,5 +77,13 @@
->
+> @@ -78,6 +78,13 @@
 >                         status = "okay";
 >                 };
+>
+> +               sound {
+> +                       compatible = "stericsson,snd-soc-mop500";
 > +
-> +               msp1: msp at 80124000 {
-> +                       status = "okay";
-> +               };
-> +
-> +               msp3: msp at 80125000 {
-> +                       status = "okay";
-> +               };
->         };
->  };
+> +                       stericsson,cpu-dai = <&msp1 &msp3>;
+> +                       stericsson,audio-codec = <&codec>;
 
-Does this really "enable" the MSPs as the title claims?
+Where is this codec coming from?
 
-Aren's there any kind of bindings needed, not even a
-register base?
+It's certainly not in the linux-next tree...
+
+This is another of these patches that I prefer if Ola
+or Roger or even Mark could comment on, I really don't know
+too much about ASoC DT bindings...
 
 Yours,
 Linus Walleij
