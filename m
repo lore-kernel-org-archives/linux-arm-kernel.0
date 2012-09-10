@@ -1,35 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 10 Sep 2012 08:51:20 +0300
-Subject: OMAP baseline test results for v3.6-rc5
-In-Reply-To: <alpine.DEB.2.00.1209091814380.28047@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209091743430.28047@utopia.booyaka.com>
- <alpine.DEB.2.00.1209091814380.28047@utopia.booyaka.com>
-Message-ID: <20120910055118.GA19264@arwen.pp.htv.fi>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 10 Sep 2012 07:53:39 +0200
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org>
+ <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
+Message-ID: <20120910055339.GC31430@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 19:29 Sun 09 Sep     , Nicolas Pitre wrote:
+> On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+> > > +4. Call the kernel image
+> > > +------------------------
+> > > +
+> > > +Requirement: MANDATORY
+> > > +
+> > > +The decompressed kernel image contains a 32-byte header as follows:
+> > > +
+> > > +  u32 magic	= 0x14000008;	/* branch to stext, little-endian */
+> > > +  u32 res0	= 0;		/* reserved */
+> > > +  u64 text_offset;		/* Image load offset */
+> > > +  u64 res1	= 0;		/* reserved */
+> > > +  u64 res2	= 0;		/* reserved */
+> > we need to have a magic to known it's a arm64 kernel
+> 
+> You have it: it's 0x14000008 at the beginning.
+fragile
+> 
+> > > +
+> > > +The image must be placed at the specified offset (currently 0x80000)
+> > > +from the start of the system RAM and called there. The start of the
+> > > +system RAM must be aligned to 2MB.
+> > can we drop this
+> 
+> Drop what?
+> And why?
+This contrain the must be loadable at any address
 
-On Sun, Sep 09, 2012 at 06:15:04PM +0000, Paul Walmsley wrote:
-> > * 4430ES2 Panda: UART corruption during long transmit buffers
-> >   - Presumably due to either a missing hardware workaround or a bug in
-> >     the OMAP serial driver
-> > 
-> * 3730 Beagle XM: does not serial wake from off-idle suspend when console
->   UART doesn't clock gate ("debug ignore_loglevel")
->   - Not shown in the current test logs; cause unknown
-
-How do you trigger these two ? Can you share whatever script you wrote
-for this to fail ? I'm assuming the bugs are only triggered on those two
-particular platforms, so it could just be missing workaround on both
-cases (?)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120910/32579fea/attachment.sig>
+Best Regards,
+J.
