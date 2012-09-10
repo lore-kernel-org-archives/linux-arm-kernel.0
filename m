@@ -1,106 +1,135 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 10 Sep 2012 13:46:32 +0300
-Subject: [PATCH v4 14/14] ASoC: twl4030: Support for DT booted kernel
-In-Reply-To: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347273992-9107-15-git-send-email-peter.ujfalusi@ti.com>
+From: keshava_mgowda@ti.com (Munegowda, Keshava)
+Date: Mon, 10 Sep 2012 16:21:19 +0530
+Subject: [PATCH] ARM: OMAP2+: mux: add support for PAD wakeup event handler
+In-Reply-To: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
+References: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <CAP05o4J_baRm0i5dg-vHjpgJeBWiNdtUFbCd1vK53ks9rz-Utg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel has been booted with DT blob the platform data is NULL for
-the driver.
-We need to construct the pdata based on the DT information for runtime use.
+On Mon, Sep 10, 2012 at 4:08 PM, Ruslan Bilovol <ruslan.bilovol@ti.com> wrote:
+> OMAP mux now parses active wakeup events from pad registers and calls
+> corresponding handler, if handler is not registered - corresponding
+> hwmod ISRs once a wakeup is detected.
+> This is useful for cases when routing wakeups to corresponding hwmod
+> ISRs complicates those ISRs handlers (for example, ISR handler may
+> not know who the interrupt source is)
+>
+> Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+> ---
+>  arch/arm/mach-omap2/mux.c                    |   14 +++++++++--
+>  arch/arm/mach-omap2/omap_hwmod.c             |   29 ++++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +++
+>  3 files changed, 44 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+> index 9fe6829..2918638 100644
+> --- a/arch/arm/mach-omap2/mux.c
+> +++ b/arch/arm/mach-omap2/mux.c
+> @@ -372,6 +372,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
+>         int i, irq;
+>         unsigned int val;
+>         u32 handled_irqs = 0;
+> +       bool retval = false;
+>
+>         for (i = 0; i < hmux->nr_pads_dynamic; i++) {
+>                 struct omap_device_pad *pad = hmux->pads_dynamic[i];
+> @@ -384,8 +385,15 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
+>                 if (!(val & OMAP_WAKEUP_EVENT))
+>                         continue;
+>
+> -               if (!hmux->irqs)
+> -                       return true;
+> +               if (hmux->wakeup_handler && hmux->wakeup_handler[i]) {
+> +                       hmux->wakeup_handler[i](hmux);
+> +                       continue;
+> +               }
+> +
+> +               if (!hmux->irqs) {
+> +                       retval = true;
+> +                       continue;
+> +               }
+>
+>                 irq = hmux->irqs[i];
+>                 /* make sure we only handle each irq once */
+> @@ -397,7 +405,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
+>                 generic_handle_irq(mpu_irqs[irq].irq);
+>         }
+>
+> -       return false;
+> +       return retval;
+>  }
+>
+>  /**
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 6ca8e51..9a41d65 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -3656,6 +3656,35 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
+>  }
+>
+>  /**
+> + * omap_hwmod_pad_wakeup_handler - add wakeup handler for an I/O pad wakeup
+> + * @oh: struct omap_hwmod * containing hwmod mux entries
+> + * @pad_idx: array index in oh->mux of the hwmod mux entry to handle wakeup
+> + * @wakeup_handler: the wakeup_handler function to trigger on wakeup
+> + */
+> +int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
+> +               int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux))
+> +{
+> +       might_sleep();
+> +
+> +       if (!oh || !oh->mux || pad_idx < 0 ||
+> +                       pad_idx >= oh->mux->nr_pads_dynamic)
+> +               return -EINVAL;
+> +
+> +       if (!oh->mux->wakeup_handler) {
+> +               /* XXX What frees this? */
+> +               oh->mux->wakeup_handler =
+> +                               kzalloc(sizeof(*(oh->mux->wakeup_handler)) *
+> +                               oh->mux->nr_pads_dynamic, GFP_KERNEL);
+> +
+> +               if (!oh->mux->wakeup_handler)
+> +                       return -ENOMEM;
+> +       }
+> +       oh->mux->wakeup_handler[pad_idx] = wakeup_handler;
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+>   * omap_hwmod_init - initialize the hwmod code
+>   *
+>   * Sets up some function pointers needed by the hwmod code to operate on the
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 6132972..5c2bcc7 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -110,6 +110,7 @@ struct omap_hwmod_mux_info {
+>         int                             nr_pads_dynamic;
+>         struct omap_device_pad          **pads_dynamic;
+>         int                             *irqs;
+> +       int                             (**wakeup_handler)(struct omap_hwmod_mux_info *hmux);
+>         bool                            enabled;
+>  };
+>
+> @@ -646,6 +647,9 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
+>
+>  int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
+>
+> +int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
+> +               int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux));
+> +
+>  extern void __init omap_hwmod_init(void);
+>
+>  const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+> --
+> 1.7.1
+>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/codecs/twl4030.c | 55 +++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 47 insertions(+), 8 deletions(-)
+This is good idea!
+         if tero is Ok with this patch ; I will use this for ehci
+remote wakeup implementation.
 
-diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-index 8b13d50..8405ab9 100644
---- a/sound/soc/codecs/twl4030.c
-+++ b/sound/soc/codecs/twl4030.c
-@@ -26,6 +26,8 @@
- #include <linux/pm.h>
- #include <linux/i2c.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/i2c/twl.h>
- #include <linux/slab.h>
- #include <linux/gpio.h>
-@@ -295,13 +297,57 @@ static inline void twl4030_reset_registers(struct snd_soc_codec *codec)
- 
- }
- 
--static void twl4030_init_chip(struct snd_soc_codec *codec)
-+static void twl4030_setup_pdata_of(struct twl4030_codec_data *pdata,
-+				   struct device_node *node)
-+{
-+	int value;
-+
-+	of_property_read_u32(node, "ti,digimic_delay",
-+			     &pdata->digimic_delay);
-+	of_property_read_u32(node, "ti,ramp_delay_value",
-+			     &pdata->ramp_delay_value);
-+	of_property_read_u32(node, "ti,offset_cncl_path",
-+			     &pdata->offset_cncl_path);
-+	if (!of_property_read_u32(node, "ti,hs_extmute", &value))
-+		pdata->hs_extmute = value;
-+
-+	pdata->hs_extmute_gpio = of_get_named_gpio(node,
-+						   "ti,hs_extmute_gpio", 0);
-+	if (gpio_is_valid(pdata->hs_extmute_gpio))
-+		pdata->hs_extmute = 1;
-+}
-+
-+static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
- {
- 	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
-+	struct device_node *twl4030_codec_node = NULL;
-+
-+	twl4030_codec_node = of_find_node_by_name(codec->dev->parent->of_node,
-+						  "codec");
-+
-+	if (!pdata && twl4030_codec_node) {
-+		pdata = devm_kzalloc(codec->dev,
-+				     sizeof(struct twl4030_codec_data),
-+				     GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(codec->dev, "Can not allocate memory\n");
-+			return NULL;
-+		}
-+		twl4030_setup_pdata_of(pdata, twl4030_codec_node);
-+	}
-+
-+	return pdata;
-+}
-+
-+static void twl4030_init_chip(struct snd_soc_codec *codec)
-+{
-+	struct twl4030_codec_data *pdata;
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
- 	u8 reg, byte;
- 	int i = 0;
- 
-+	pdata = twl4030_get_pdata(codec);
-+
- 	if (pdata && pdata->hs_extmute &&
- 	    gpio_is_valid(pdata->hs_extmute_gpio)) {
- 		int ret;
-@@ -2284,13 +2330,6 @@ static struct snd_soc_codec_driver soc_codec_dev_twl4030 = {
- 
- static int __devinit twl4030_codec_probe(struct platform_device *pdev)
- {
--	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "platform_data is missing\n");
--		return -EINVAL;
--	}
--
- 	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_twl4030,
- 			twl4030_dai, ARRAY_SIZE(twl4030_dai));
- }
--- 
-1.7.12
+regards
+keshava
