@@ -1,53 +1,124 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Mon, 10 Sep 2012 15:55:17 +0530
-Subject: [PATCH v4 2/2] OMAP:IOMMU:flush L1 and L2 caches
-In-Reply-To: <20120908101724.GB28448@n2100.arm.linux.org.uk>
-References: <CADysL2YwpyuhgzwF6djObZQTpgdHCsLp=K7NsCJth6wAXuFV=A@mail.gmail.com>
- <20120908101724.GB28448@n2100.arm.linux.org.uk>
-Message-ID: <CADysL2YTmqrEbKfbqwGWaajWqHR7njViu=47zLh89rU76gq8Cg@mail.gmail.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Mon, 10 Sep 2012 13:38:48 +0300
+Subject: [PATCH] ARM: OMAP2+: mux: add support for PAD wakeup event handler
+Message-ID: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+OMAP mux now parses active wakeup events from pad registers and calls
+corresponding handler, if handler is not registered - corresponding
+hwmod ISRs once a wakeup is detected.
+This is useful for cases when routing wakeups to corresponding hwmod
+ISRs complicates those ISRs handlers (for example, ISR handler may
+not know who the interrupt source is)
 
+Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+---
+ arch/arm/mach-omap2/mux.c                    |   14 +++++++++--
+ arch/arm/mach-omap2/omap_hwmod.c             |   29 ++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +++
+ 3 files changed, 44 insertions(+), 3 deletions(-)
 
-On Sat, Sep 8, 2012 at 3:47 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 05, 2012 at 10:50:24AM +0530, Gupta, Ramesh wrote:
->>  static void flush_iopgd_range(u32 *first, u32 *last)
->>  {
->> -     /* FIXME: L2 cache should be taken care of if it exists */
->> -     do {
->> -             asm("mcr        p15, 0, %0, c7, c10, 1 @ flush_pgd"
->> -                 : : "r" (first));
->> -             first += L1_CACHE_BYTES / sizeof(*first);
->> -     } while (first <= last);
->> +     flush_iommu_mem(first, last);
->> +     outer_flush_range(virt_to_phys(first), virt_to_phys(last));
->
-> I think this would be safer if these operated on an area rather than a
-> range - which means taking a start plus size.
->
->         phys_addr_t phys = virt_to_phys(start);
->
->         iommu_flush_area(start, size);
->         outer_flush_range(phys, phys + size);
->
-> is safer than the above if virt_to_phys() is non-linear.
-
-Agree, I will use the area.
-
->
->>               *iopgd = virt_to_phys(iopte) | IOPGD_TABLE;
->> -             flush_iopgd_range(iopgd, iopgd);
->> +             flush_iopgd_range(iopgd, iopgd + 1);
->
-> And operating on a start + size also makes this kind of stuff clearer.
-
-Sure, I will cleanup this and send an updated patch series.
-
-
-Thank you for the inputs.
-
-Best regards
-Ramesh Gupta G
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 9fe6829..2918638 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -372,6 +372,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
+ 	int i, irq;
+ 	unsigned int val;
+ 	u32 handled_irqs = 0;
++	bool retval = false;
+ 
+ 	for (i = 0; i < hmux->nr_pads_dynamic; i++) {
+ 		struct omap_device_pad *pad = hmux->pads_dynamic[i];
+@@ -384,8 +385,15 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
+ 		if (!(val & OMAP_WAKEUP_EVENT))
+ 			continue;
+ 
+-		if (!hmux->irqs)
+-			return true;
++		if (hmux->wakeup_handler && hmux->wakeup_handler[i]) {
++			hmux->wakeup_handler[i](hmux);
++			continue;
++		}
++
++		if (!hmux->irqs) {
++			retval = true;
++			continue;
++		}
+ 
+ 		irq = hmux->irqs[i];
+ 		/* make sure we only handle each irq once */
+@@ -397,7 +405,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
+ 		generic_handle_irq(mpu_irqs[irq].irq);
+ 	}
+ 
+-	return false;
++	return retval;
+ }
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 6ca8e51..9a41d65 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3656,6 +3656,35 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
+ }
+ 
+ /**
++ * omap_hwmod_pad_wakeup_handler - add wakeup handler for an I/O pad wakeup
++ * @oh: struct omap_hwmod * containing hwmod mux entries
++ * @pad_idx: array index in oh->mux of the hwmod mux entry to handle wakeup
++ * @wakeup_handler: the wakeup_handler function to trigger on wakeup
++ */
++int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
++		int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux))
++{
++	might_sleep();
++
++	if (!oh || !oh->mux || pad_idx < 0 ||
++			pad_idx >= oh->mux->nr_pads_dynamic)
++		return -EINVAL;
++
++	if (!oh->mux->wakeup_handler) {
++		/* XXX What frees this? */
++		oh->mux->wakeup_handler =
++				kzalloc(sizeof(*(oh->mux->wakeup_handler)) *
++				oh->mux->nr_pads_dynamic, GFP_KERNEL);
++
++		if (!oh->mux->wakeup_handler)
++			return -ENOMEM;
++	}
++	oh->mux->wakeup_handler[pad_idx] = wakeup_handler;
++
++	return 0;
++}
++
++/**
+  * omap_hwmod_init - initialize the hwmod code
+  *
+  * Sets up some function pointers needed by the hwmod code to operate on the
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 6132972..5c2bcc7 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -110,6 +110,7 @@ struct omap_hwmod_mux_info {
+ 	int				nr_pads_dynamic;
+ 	struct omap_device_pad		**pads_dynamic;
+ 	int				*irqs;
++	int				(**wakeup_handler)(struct omap_hwmod_mux_info *hmux);
+ 	bool				enabled;
+ };
+ 
+@@ -646,6 +647,9 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
+ 
+ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
+ 
++int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
++		int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux));
++
+ extern void __init omap_hwmod_init(void);
+ 
+ const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+-- 
+1.7.1
