@@ -1,31 +1,72 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 10 Sep 2012 20:19:18 +0100
-Subject: [PATCH 08/14] tty/serial/kgdboc: Add and wire up clear_irqs
- callback
-In-Reply-To: <20120910175704.GA11392@lizard>
-References: <20120910040802.GA1261@lizard> <20120910041357.GH29537@lizard>
- <20120910121624.226c1a88@pyramind.ukuu.org.uk>
- <20120910175704.GA11392@lizard>
-Message-ID: <20120910201918.1e3c8fd0@pyramind.ukuu.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 10 Sep 2012 13:21:30 -0600
+Subject: [PATCH 1/2] i2c: s3c2410: add optional pin configuration using
+ pinctrl interface
+In-Reply-To: <CAJuYYwQCQDTnpPR5WABtbozZOgc6_SZRBv3b6D8KY78tzMt-Eg@mail.gmail.com>
+References: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
+ <1346923381-14144-2-git-send-email-thomas.abraham@linaro.org>
+ <2444562.GB3nOHUb9M@amdc1227>
+ <CAJuYYwQCQDTnpPR5WABtbozZOgc6_SZRBv3b6D8KY78tzMt-Eg@mail.gmail.com>
+Message-ID: <504E3DBA.3080603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Sep 2012 10:57:04 -0700
-Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
-
-> On Mon, Sep 10, 2012 at 12:16:24PM +0100, Alan Cox wrote:
-> > > serial port, the CPU receives NMI exception, and we fall into KDB
-> > > shell.  So, it is our "debug console", and it is able to interrupt
-> > > (and thus debug) even IRQ handlers themselves.
-> > 
-> > You seem to have an assumption of single core here. What happens if
-> > the NMI hits CPU #0 and the serial IRQ hits CPU #1 simultaneously ?
+On 09/06/2012 05:06 AM, Thomas Abraham wrote:
+> On 6 September 2012 15:04, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hi,
+>>
+>> This patch shows the problem of the need to explicitly migrate all drivers
+>> to pinctrl.
+>>
+>> Maybe we should consider extending the pinctrl subsystem to set the default
+>> state automatically before binding a driver to a device, at least in case
+>> of DT-based platforms?
 > 
-> If you can't redirect all serial IRQs to NMI context, e.g. sometimes you get
-> NMIs, sometimes IRQs, then your NMI handling is not deterministic, and surely
-> this is not supported.
+> The pinctrl driver allows for activating default pin configuration
+> when the pinctrl driver loads. This is referred to as "hogging". But
+> should hog be used or not is something that needs to be decided. Some
+> of the factors which favor the driver explicitly setting up the pin
+> configuration are
+> 
+> 1. After a suspend and resume cycle, the pin configuration registers
+> may be reset to default values. Hence, during resume, the pin
+> configuration has be redone.
 
-This seems like arch specific magic leaking into the tty code. Surely
-this should be buried in the depths of the platform IRQ code ?
+I'd think it's the pinctrl driver's responsibility to make hogging work
+correctly across suspend/resume.
 
-Alan
+> 2. Runtime muxing/config is possible.
+
+The "client" driver would definitely have to be involved there, I agree.
+
+> 3. Setting some of the config options such as pull-up by default might
+> start consuming power from boot time itself, which could be avoided if
+> such setup is done only when needed.
+
+Well, the difference in time between "just before driver binding" and
+"during probe" is minimal. If the driver/HW really needs to explicitly
+differentiate between those states to save power, I'd assert that it's
+covered by case (2) above.
+
+> Adding pinctrl driver support in device drivers seems to be simple
+> task. And it is just one time effort which can be reused on multiple
+> SoC's.
+> 
+>>
+>> This would be similar to what is done currently with samsung-gpio bindings
+>> - the pin is being configured by custom xlate callback based on additional
+>> cells in GPIO specifier, when the driver retrieves the pin using
+>> of_get{_named,}_gpio without the need of setting it up in the driver.
+> 
+> The Samsung gpio dt bindings was just a bootstrap method to get device
+> tree support going for Samsung platforms. The gpio xlate callback was
+> used as a back door to setup the pinmux/pinconfig due to lack of
+> generic driver interface to setup the pinmux/pinconfig for Samsung
+> platforms. From a linux perspective, gpio and pinmux/pinconfig are
+> separate entities. So using gpio xlate to setup pinmux/pinconfig was
+> not correct but helped getting device tree enabled for Samsung
+> platforms. With the pinctrl framework available now, there are generic
+> interfaces to setup gpio and pinmux /pinconfig.
+
+I agree; the Samsung GPIO bindings were surprising to me when I first
+realized what was in the GPIO specifiers...
