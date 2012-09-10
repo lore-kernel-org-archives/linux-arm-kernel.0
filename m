@@ -1,38 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Sep 2012 10:13:16 +0000
-Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
-In-Reply-To: <CACRpkdZ-QpHzeEBO=RFVe-8S2DG4-thhwW9iVbAMXZrOe-FnAw@mail.gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <201209071358.38598.arnd@arndb.de>
- <CACRpkdZ-QpHzeEBO=RFVe-8S2DG4-thhwW9iVbAMXZrOe-FnAw@mail.gmail.com>
-Message-ID: <201209101013.16697.arnd@arndb.de>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Mon, 10 Sep 2012 15:51:35 +0530
+Subject: [PATCH v4 1/2] ARM: new cache maintenance api for iommu
+In-Reply-To: <20120908101420.GA28448@n2100.arm.linux.org.uk>
+References: <CADysL2bGP_FKW4dnxM4zbziOPfrbAemRazZYd_mS9i++bZGcqQ@mail.gmail.com>
+ <20120908101420.GA28448@n2100.arm.linux.org.uk>
+Message-ID: <CADysL2Y7RP1OUthWri2v6cSqk-CRTh2R7urec7P2NdhaZ09KmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 September 2012, Linus Walleij wrote:
-> Basically that was at a point when we were changing a lot of
-> subsystem trees with DT patches that were merged in out-of-order
-> fashion.
-> 
-> Then it's better to have the DT changes to be pushed
-> separately at the end of the merge window after all subtrees
-> with dependent changes are merged. (Or even in the next merge
-> window if there is no hurry, but we always seem to be in a hurry...)
-> 
-> If all the changes are in the same subtree (like ARM SoC with
-> ACKs from all over the place where needed) you can do it
-> this way instead, and I agree it looks better.
+Hi Russell,
 
-I think we're talking about different things:
 
-I think it's fine to do the device driver conversion separately
-from the platform changes, but doing that properly means that the
-platform changes should only go in after the drivers have changed.
+On Sat, Sep 8, 2012 at 3:44 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jul 05, 2012 at 10:50:17AM +0530, Gupta, Ramesh wrote:
+>> + *   flush_iommu_mem(start, end)
+>> + *
+>> + *           Clean and invalidate the specified virtual address range.
+>> + *           This is to support the non coherent iommu drivers.
+>> + *           The iommu driver need to call this api with the page
+>> + *           table memory address range to ensure the data held in
+>> + *           the cache is visible to the slave processor MMU.
+>> + *           - start  - virtual start address
+>> + *           - end    - virtual end address
+>
+> I think:
+>         iommu_flush_range(start, end)
+> or
+>         iommu_flush_area(start, size)
+>                 Perform CPU specific cache operations are required to
+>                 ensure that the IOMMU page table mappings covering the
+>                 specified block of memory are visiable to the IOMMU.
 
-Inside of the platform code, I absolutely think we should change the
-board file and the dts file simultaneously. When the driver offers
-two ways of probing a device, this lets us change from one way to
-the other without going through a phase where we use neither of them
-or (worse) both at the same time.
+I prefer iommu_flush_area(start, size).
 
-	Arnd
+>
+> Notice that it's defined by purpose, not by implementation.  Also notice
+> the distinction between _range taking two addresses, and _area taking
+> a start plus size.
+> Also notice that it is defined just for IOMMU page tables, not for general
+> data for other processors.
+
+Agree with your comments, may be I can add an explicit comment for not
+using these apis other than IOMMU page tables.
+
+
+> Note that iommu_flush_area is safer if your virt_to_phys() are non-linear.
+
+Agree, I will send an updated patch series with iommu_flush_area.
+
+thank you for the review comments.
+
+Best regards
+Ramesh Gupta G
