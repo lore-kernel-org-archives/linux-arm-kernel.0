@@ -1,62 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 04:11:10 -0700
-Subject: [PATCH 09/19] ARM: ux500: Enable SSP (SPI) for HREF when booting
- Device Tree
-In-Reply-To: <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaC_enpxUFNM_wteAQWKER_naUNUH-s1pJtiGzVFSV+og@mail.gmail.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Mon, 10 Sep 2012 12:16:24 +0100
+Subject: [PATCH 08/14] tty/serial/kgdboc: Add and wire up clear_irqs
+ callback
+In-Reply-To: <20120910041357.GH29537@lizard>
+References: <20120910040802.GA1261@lizard>
+	<20120910041357.GH29537@lizard>
+Message-ID: <20120910121624.226c1a88@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> serial port, the CPU receives NMI exception, and we fall into KDB shell.
+> So, it is our "debug console", and it is able to interrupt (and thus
+> debug) even IRQ handlers themselves.
 
-> Here we add a new SSP node to the HREF's Device Tree file which
-> activates the generic one found in the .dtsi file. This will
-> allow probing of the SSP driver when Device Tree is enabled.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-We have to look closer at this.
+You seem to have an assumption of single core here. What happens if the
+NMI hits CPU #0 and the serial IRQ hits CPU #1 simultaneously ?
 
-There are merged PL022 DT bindings (by Roland Stigge)
-nowadays, see commit 6d3952a7dfa80919842bbe01ac7f693d40a1eb84
-in linux-next:
-
- Optional properties:
-+- num-cs : total number of chipselects
- - cs-gpios : should specify GPIOs used for chipselects.
-   The gpios will be referred to as reg = <index> in the SPI child nodes.
-   If unspecified, a single SPI device without a chip select can be used.
-
-+SPI slave nodes must be children of the SPI master node and can
-+contain the following properties.
-+
-+- pl022,interface : interface type:
-+       0: SPI
-+       1: Texas Instruments Synchronous Serial Frame Format
-+       2: Microwire (Half Duplex)
-+- pl022,com-mode : polling, interrupt or dma
-+- pl022,rx-level-trig : Rx FIFO watermark level
-+- pl022,tx-level-trig : Tx FIFO watermark level
-+- pl022,ctrl-len : Microwire interface: Control length
-+- pl022,wait-state : Microwire interface: Wait state
-+- pl022,duplex : Microwire interface: Full/Half duplex
-
-Currently this is defined as auxdata in board-mop500.c
-but notanly cs-gpios (num chipselects) should come from
-device tree instead.
-
-It appears Roland has written his bindings such that DT
-data augments platform data (yes, I am also getting crazy
-about this prioritization, mea culpa for ACKing this without
-proper discussion) so it appears that you could actually
-use AUXDATA and some stuff in the DT at the same
-time.
-
-Or you could keep it like this and only have AUXDATA
-as it stands, I just want a discussion about what is the right
-thing to do before we commit to anything.
-
-Yours,
-Linus Walleij
+Alan
