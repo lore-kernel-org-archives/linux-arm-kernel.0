@@ -1,20 +1,24 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 10 Sep 2012 10:23:41 -0500
-Subject: [PATCH V3 3/8] ARM: OMAP4: Re-map the CTIs IRQs from MPU to DEBUGSS
+Date: Mon, 10 Sep 2012 10:23:43 -0500
+Subject: [PATCH V3 5/8] ARM: OMAP2+: PMU: Add runtime PM support
 In-Reply-To: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
 References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1347290626-21164-4-git-send-email-jon-hunter@ti.com>
+Message-ID: <1347290626-21164-6-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to use the CTI interrupts inconjunction with the DEBUGSS we need to
-re-map the CTI IRQs to the DEBUGSS HWMOD. The purpose for doing this is so we
-can create a PMU device based upon the DEBUGSS HWMOD and use the CTI interrupts
-for routing ARM PMU events for OMAP4430 devices.
+The original implementation of this patch was done by Ming Lei for PMU on OMAP4
+[1]. Since then the PM runtime calls have been moved into the ARM PMU code and
+this greatly simplifies the changes.
 
-This is based upon Benoit Cousson's patch [1].
+The another differnce since the original version, is that it is no longer
+necessary to call pm_runtime_get/put during the PMU initialisation was we are no
+longer accessing the hardware at this stage.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073319.html
+By adding runtime PM support, we can ensure that the appropriate power and clock
+domains are kept on while PMU is being used.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074153.html
 
 Cc: Ming Lei <ming.lei@canonical.com>
 Cc: Will Deacon <will.deacon@arm.com>
@@ -22,42 +26,37 @@ Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/pmu.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 242aee4..7de8fbe 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -480,10 +480,17 @@ static struct omap_hwmod_class omap44xx_debugss_hwmod_class = {
- };
- 
- /* debugss */
-+static struct omap_hwmod_irq_info omap44xx_debugss_irqs[] = {
-+	{ .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
-+	{ .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
-+	{ .irq = -1 }
-+};
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index 7c137be..03007b6 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -13,6 +13,8 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
++#include <linux/pm_runtime.h>
 +
- static struct omap_hwmod omap44xx_debugss_hwmod = {
- 	.name		= "debugss",
- 	.class		= &omap44xx_debugss_hwmod_class,
- 	.clkdm_name	= "emu_sys_clkdm",
-+	.mpu_irqs	= omap44xx_debugss_irqs,
- 	.main_clk	= "trace_clk_div_ck",
- 	.prcm = {
- 		.omap4 = {
-@@ -2450,8 +2457,6 @@ static struct omap_hwmod_class omap44xx_mpu_hwmod_class = {
- /* mpu */
- static struct omap_hwmod_irq_info omap44xx_mpu_irqs[] = {
- 	{ .name = "pl310", .irq = 0 + OMAP44XX_IRQ_GIC_START },
--	{ .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
--	{ .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
- 	{ .irq = -1 }
- };
+ #include <asm/pmu.h>
  
+ #include <plat/omap_hwmod.h>
+@@ -54,7 +56,12 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+ 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
+ 				dev_name);
+ 
+-	return IS_ERR(omap_pmu_dev) ? PTR_ERR(omap_pmu_dev) : 0;
++	if (IS_ERR(omap_pmu_dev))
++		return PTR_ERR(omap_pmu_dev);
++
++	pm_runtime_enable(&omap_pmu_dev->dev);
++
++	return 0;
+ }
+ 
+ static int __init omap_init_pmu(void)
 -- 
 1.7.9.5
