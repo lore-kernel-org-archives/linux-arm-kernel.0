@@ -1,24 +1,77 @@
-From: tytso@mit.edu (Theodore Ts'o)
-Date: Mon, 10 Sep 2012 12:33:45 -0400
-Subject: Tracking down suspend/resume ext3/mmc issues on imx233
-In-Reply-To: <CAKGA1bnug8nqcideOBZyLQZmiVo=G5L3aRHq4k4SNZyH132Y=g@mail.gmail.com>
-References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
- <20120907060552.GL26709@S2101-09.ap.freescale.net>
- <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
- <CAKGA1bnug8nqcideOBZyLQZmiVo=G5L3aRHq4k4SNZyH132Y=g@mail.gmail.com>
-Message-ID: <20120910163345.GB3942@thunk.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 10 Sep 2012 18:34:20 +0200
+Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
+ hardware
+In-Reply-To: <1347294020-22661-1-git-send-email-mporter@ti.com>
+References: <1347294020-22661-1-git-send-email-mporter@ti.com>
+Message-ID: <504E168C.6060603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 10:11:48AM -0500, Matt Sealey wrote:
-> Wouldn't it be better if the root filesystem was marked as
-> non-removable in the device tree - or in the case of a truly removable
-> card, just marked in the MMC subsystem - and the MMC subsystem skipped
-> the "it could be removed" for suspend/resume operations?
++ Tony
 
-I agree, this makes a lot of sense.  If the root file system
-disappears, you're toasted either way, so it's fair to assume that the
-device on which the root file system is located should is
-non-removable.
+Hi Matt,
 
-						- Ted
+30 minutes too late for my pull request :-(
+
+There are a couple of am33xx patches under discussion, so I'll take them
+and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
+
+On 09/10/2012 06:20 PM, Matt Porter wrote:
+> On AM33xx, the datasheet and TRM refer to four GPIO instances that
+> are 0-based, GPIO0-3.
+
+Or maybe you should just update the spec to use a 1-based GPIO number
+like OMAP :-)
+
+Regards,
+Benoit
+
+
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index bb31bff..1369bfc 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -62,7 +62,7 @@
+>  			reg = <0x48200000 0x1000>;
+>  		};
+>  
+> -		gpio1: gpio at 44e07000 {
+> +		gpio0: gpio at 44e07000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio1";
+>  			gpio-controller;
+> @@ -74,7 +74,7 @@
+>  			interrupts = <96>;
+>  		};
+>  
+> -		gpio2: gpio at 4804c000 {
+> +		gpio1: gpio at 4804c000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio2";
+>  			gpio-controller;
+> @@ -86,7 +86,7 @@
+>  			interrupts = <98>;
+>  		};
+>  
+> -		gpio3: gpio at 481ac000 {
+> +		gpio2: gpio at 481ac000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio3";
+>  			gpio-controller;
+> @@ -98,7 +98,7 @@
+>  			interrupts = <32>;
+>  		};
+>  
+> -		gpio4: gpio at 481ae000 {
+> +		gpio3: gpio at 481ae000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio4";
+>  			gpio-controller;
+> 
