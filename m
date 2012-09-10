@@ -1,43 +1,27 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 10 Sep 2012 13:01:45 -0400 (EDT)
-Subject: [PATCH] ARM: Dove: allow PCI to be disabled
-In-Reply-To: <20120910082941.GO13739@n2100.arm.linux.org.uk>
-References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
- <20120909204705.GD3451@lunn.ch>
- <20120909205521.GI13739@n2100.arm.linux.org.uk>
- <20120909210126.GM4575@titan.lakedaemon.net>
- <20120910004511.GN13739@n2100.arm.linux.org.uk>
- <20120910014422.GQ4575@titan.lakedaemon.net>
- <20120910082941.GO13739@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1209101246580.28681@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Sep 2012 10:03:32 -0700
+Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
+ hardware
+In-Reply-To: <504E168C.6060603@ti.com>
+References: <1347294020-22661-1-git-send-email-mporter@ti.com>
+ <504E168C.6060603@ti.com>
+Message-ID: <20120910170332.GX1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Sep 2012, Russell King - ARM Linux wrote:
-
-> On Sun, Sep 09, 2012 at 09:44:22PM -0400, Jason Cooper wrote:
-> > iiuc, the regression you are refering to would occur iff this patch
-> > (without the select) makes it into mainline _before_ Andrew's patch in
-> > Greg's tree.  As I haven't pulled this patch yet, I can add a dependency
-> > in the tag message listing the patch in gregkh's usb tree.
+* Benoit Cousson <b-cousson@ti.com> [120910 09:35]:
+> + Tony
 > 
-> For the regression to occur, you need to land on a commit in the tree
-> where this patch (without the select) is in the history but not the
-> patch in Greg's tree.
+> Hi Matt,
 > 
-> The commit history remains a series of independent branches even after
-> trees are merged into Linus' tree - there is _no_ linearisation of the
-> history in git.
+> 30 minutes too late for my pull request :-(
+> 
+> There are a couple of am33xx patches under discussion, so I'll take them
+> and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
 
-@Jason:
+Yes please do, it' hard to say when exactly we need to stop merging,
+but probably we still have a bit more time.
 
-The dependency tracking done in the arm-soc tree performed by Arnd and 
-Olof is merely a way for you to _base_ your branch on top of other 
-people's branch before they pull it from you.  For example, you may 
-decide to build your branch on top of Greg's to get some prerequisite 
-commits for your work. In that case the goal for the arm-soc maintainers 
-is to avoid the situation where a pull of the arm-soc tree into mainline 
-would also pull greg's stuff without his asking for it.
+Regards,
 
-
-Nicolas
+Tony
