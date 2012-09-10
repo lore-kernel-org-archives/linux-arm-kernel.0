@@ -1,88 +1,78 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 11 Sep 2012 09:26:14 +1000
-Subject: Another tree for "next"
-In-Reply-To: <504E28CE.6020103@wwwdotorg.org>
-References: <m3obli3j7a.fsf@intrepid.localdomain>
- <20120910100144.dcbe2715cde0fea51345a354@canb.auug.org.au>
- <m31ui9g4ff.fsf@intrepid.localdomain>
- <504E28CE.6020103@wwwdotorg.org>
-Message-ID: <20120911092614.d42403c55b516ea898fb5e21@canb.auug.org.au>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 10 Sep 2012 19:31:14 -0400 (EDT)
+Subject: [PATCH v3 31/31] arm64: MAINTAINERS update
+In-Reply-To: <20120910211757.GD31998@n2100.arm.linux.org.uk>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-32-git-send-email-catalin.marinas@arm.com>
+ <20120909163156.GA31430@game.jcrosoft.org>
+ <alpine.LFD.2.02.1209101355000.28681@xanadu.home>
+ <20120910211757.GD31998@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1209101834530.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Mon, 10 Sep 2012, Russell King - ARM Linux wrote:
 
-On Mon, 10 Sep 2012 11:52:14 -0600 Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> On 09/10/2012 11:42 AM, Krzysztof Halasa wrote:
-> > Stephen Rothwell <sfr@canb.auug.org.au> writes:
+> On Mon, Sep 10, 2012 at 01:57:57PM -0400, Nicolas Pitre wrote:
+> > On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > > 
-> >>> could you please add the following to your "next" tree?
-> >>>
-> >>> git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux.git  branch: next
+> > > On 17:27 Fri 07 Sep     , Catalin Marinas wrote:
+> > > > This patch updates the MAINTAINERS file for the AArch64 Linux kernel
+> > > > port.
+> > > > 
+> > > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > > ---
+> > > >  MAINTAINERS |    6 ++++++
+> > > >  1 files changed, 6 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/MAINTAINERS b/MAINTAINERS
+> > > > index fdc0119..de368a5 100644
+> > > > --- a/MAINTAINERS
+> > > > +++ b/MAINTAINERS
+> > > > @@ -1209,6 +1209,12 @@ S:	Maintained
+> > > >  F:	arch/arm/mach-pxa/z2.c
+> > > >  F:	arch/arm/mach-pxa/include/mach/z2.h
+> > > >  
+> > > > +ARM64 PORT (AARCH64 ARCHITECTURE)
+> > > > +M:	Catalin Marinas <catalin.marinas@arm.com>
+> > > we should put Russell too
 > > 
-> >> Could you be a bit more clear about what will be in that tree, please?
-> >> Also when you repost this request, please post it a bit more widely among
-> >> other people/lists who may be interested in this work.  Remember that
-> >> linux-next is really only for stuff that is ready for Linus to pull into
-> >> the next merge window (or bug fixes).  Also, would this tree be pulled
-> >> directly by Linus, or via some other tree?
-> > 
-> > My plan is to merge all the stuff I'm (eventually) working on in the
-> > above tree. For now - mostly IXP4xx (ARM CPU etc.) stuff which goes to
-> > Linus
+> > He is not maintaining the ARM64 code.
 > 
-> ARM-SoC-related pull requests should be sent to the arm-soc tree, who
-> will then aggregate all the ARM-SoC-related changes and issue pull
-> requests to Linus.
-> 
-> That is, arm at kernel.org, plus the Linux ARM kernel list CC'd.
-> 
-> The patches would also need to be sent to the Linux ARM kernel list (and
-> any other relevant lists) before being applied to your tree.
-> 
-> ARM core changes would likely go through Russell King's tree, perhaps
-> depending on what dependencies they have.
+> And, let's say the rest of it - it doesn't take much inteligence to work
+> out what that means for me personally.
 
-OK, I have added your tree from today.
+For the record, let me state out loud what I think.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+I truly think that the core ARM code is a nice piece of art, and this is 
+because of your technical excellence and good taste with code.  The ARM 
+ecosystem is wide and varied, and keeping it from morphing into a horrid 
+mess is a thankless challenge.  We as a community certainly don't say 
+this very often if at all, but we certainly owe you a big "thank you" 
+for the excellent work you did so far, and I hope you'll go on with it 
+for quite some time yet. In any case, no one with excellent coding 
+skills such as yours is ever going to lack work and opportunities in 
+this community.
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
+Even x86, despite its long history in the Linux kernel, is less 
+fragmented and diversified than the ARM architecture.  For better or 
+worse, the ARM Ltd business model is different from Intel's.  That might 
+be good for the ARM market share and vendor differentiation, but this is 
+far from the ideal scenario for kernel developers.  I said it in the 
+past and I'll say it again: X86 is peanuts in comparison.
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
+Yet, X86 has 3 listed maintainers according to the MAINTAINERS file.  
+ARM has only one.  AS far as I can see, no one is crazy enough to be 
+maintainer for two or more architectures.
 
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+Unless you were to give up on the ARM 32 bit maintenance, I don't see 
+how you could be able to maintain both ARM and ARM64 at the same time 
+without losing your sanity or sacrificing on the quality of the code you 
+contribute. .  Fortunately, Catalin is willing to maintain the ARM64 
+port and he appears pretty motivated as well.  Unless he does screw up, 
+we should let him bear this weight.
 
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/aa068b86/attachment.sig>
+
+Nicolas
