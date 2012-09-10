@@ -1,55 +1,82 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 10 Sep 2012 13:13:13 -0700
-Subject: [PATCH 08/14] tty/serial/kgdboc: Add and wire up clear_irqs
- callback
-In-Reply-To: <20120910201918.1e3c8fd0@pyramind.ukuu.org.uk>
-References: <20120910040802.GA1261@lizard> <20120910041357.GH29537@lizard>
- <20120910121624.226c1a88@pyramind.ukuu.org.uk>
- <20120910175704.GA11392@lizard>
- <20120910201918.1e3c8fd0@pyramind.ukuu.org.uk>
-Message-ID: <20120910201313.GA31746@lizard>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 10 Sep 2012 22:22:44 +0200
+Subject: [PATCH] cpufreq: add helper function cpufreq_set_target()
+In-Reply-To: <20120910031341.GS26709@S2101-09.ap.freescale.net>
+References: <1346981599-28081-1-git-send-email-shawn.guo@linaro.org>
+ <201209072131.56593.rjw@sisk.pl>
+ <20120910031341.GS26709@S2101-09.ap.freescale.net>
+Message-ID: <201209102222.45165.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 08:19:18PM +0100, Alan Cox wrote:
-> On Mon, 10 Sep 2012 10:57:04 -0700
-> Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
-> 
-> > On Mon, Sep 10, 2012 at 12:16:24PM +0100, Alan Cox wrote:
-> > > > serial port, the CPU receives NMI exception, and we fall into KDB
-> > > > shell.  So, it is our "debug console", and it is able to interrupt
-> > > > (and thus debug) even IRQ handlers themselves.
-> > > 
-> > > You seem to have an assumption of single core here. What happens if
-> > > the NMI hits CPU #0 and the serial IRQ hits CPU #1 simultaneously ?
+On Monday, September 10, 2012, Shawn Guo wrote:
+> On Fri, Sep 07, 2012 at 09:31:56PM +0200, Rafael J. Wysocki wrote:
+> > > +	struct cpufreq_target_data data;
+> > > +
+> > > +	data.dev = cpu_dev;
+> > > +	data.clk = cpu_clk;
+> > > +	data.reg = cpu_reg;
+> > > +	data.tol = voltage_tolerance;
+> > > +	data.freq_table = freq_table;
+> > > +	data.policy = policy;
+> > > +	data.target_freq = target_freq;
+> > > +	data.relation = relation;
 > > 
-> > If you can't redirect all serial IRQs to NMI context, e.g. sometimes you get
-> > NMIs, sometimes IRQs, then your NMI handling is not deterministic, and surely
-> > this is not supported.
+> > I'm not sure what you need the new data structure for.  Both
+> > cpu0_set_target() and omap_target() have the same set of arguments, so it
+> > seems pointless to copy those values back and forth.
+> > 
+> But the first 4 arguments are driver specific.  They are existing
+> in cpufreq-cpu0 and omap-cpufreq drivers as global variables.  I
+> haven't thought of a good way to consolidate all these differences.
+
+Hmm.  Who's going to use the cpufreq-cpu0 driver, then?  Is OMAP going to be
+the only user?
+
+> > > +
+> > > +	return cpufreq_set_target(&data);
+> > 
+> > What about calling that function cpufreq_common_set_target()?
+> > 
+> All driver specific .set_target functions are named with a driver
+> specific prefix, so this shorter name seems explicit to tell the
+> "common", IMO.  But if you insist, I can change.
+
+Well, it's not exactly common, so to speak.  It only is shared between
+the cpu0 and OMAP drivers, so I'm not sure (see below).
+
+> > >  }
+> > >  
+> > >  static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
+> > > diff --git a/drivers/cpufreq/cpufreq.h b/drivers/cpufreq/cpufreq.h
+> > > new file mode 100644
+> > > index 0000000..ae380b3
+> > > --- /dev/null
+> > > +++ b/drivers/cpufreq/cpufreq.h
+> > 
+> > I don't think this header is really necessary.
+> > 
+> Put the stuff into include/linux/cpufreq.h?  But these stuff do not
+> necessarily need to be that public.
 > 
-> This seems like arch specific magic leaking into the tty code. Surely
-> this should be buried in the depths of the platform IRQ code ?
+> <snip>
+> 
+> > > +int cpufreq_set_target(struct cpufreq_target_data *d)
+> > 
+> > Why don't you use the original arguments of cpu0_set_target() here?
+> > 
+> As explained above, cpu_dev, cpu_clk, cpu_reg and voltage_tolerance
+> are used in the function as global variables in cpufreq-cpu0 driver.
+> 
+> And that's the primary reason why I think making this common set_target
+> thing is somehow a churn.
 
-I'd not call this arch-specific. It's task-specific, and the task is quite
-peculiar, true, but still nothing to do with arch.
+OK
 
-If the arch is not able to turn serial IRQs into NMIs, then surely that arch is
-not able to implement serial-triggered NMI/KDB-shell, so we don't support that
-arch.
+I'm concerned about the copy-pasting, but if that copy-pasting is going to
+go away when you move OMAP to the new driver, then I agree that adding more
+complexity just to avoid it is probably not a good idea.
 
-And we don't have any other way to accoplish the same: we need to clear the
-serial interrupts, not some arch-specific interrupts. It is the serial device
-that causes NMI, not some arch's magic. So we just provide the knob to manage
-the device's functionality.
+What's the planned time frame for the OMAP conversion?
 
-We do have a separate arch-specific NMI-masking knob that works at CPU level,
-but if we mask NMI source at CPU level, we have to keep it always masked,
-otherwise we'll keep reentering NMI. So, we really have to clear serial's
-interrupt line.
-
-That's why I came with clear_irqs callback, it has defined semantics for the
-serial driver, and zero knowledge about any underlaying architecture or task.
-
-Thanks,
-
-Anton.
+Rafael
