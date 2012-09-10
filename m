@@ -1,82 +1,123 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 10 Sep 2012 22:22:44 +0200
-Subject: [PATCH] cpufreq: add helper function cpufreq_set_target()
-In-Reply-To: <20120910031341.GS26709@S2101-09.ap.freescale.net>
-References: <1346981599-28081-1-git-send-email-shawn.guo@linaro.org>
- <201209072131.56593.rjw@sisk.pl>
- <20120910031341.GS26709@S2101-09.ap.freescale.net>
-Message-ID: <201209102222.45165.rjw@sisk.pl>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 10 Sep 2012 16:20:17 -0400
+Subject: [PATCH v3 0/3] DaVinci DMA engine conversion
+In-Reply-To: <5048A441.3010109@gmail.com>
+References: <1345684176-21472-1-git-send-email-mporter@ti.com>
+ <503B933F.2030803@gmail.com> <5048A441.3010109@gmail.com>
+Message-ID: <20120910202017.GL27758@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 10, 2012, Shawn Guo wrote:
-> On Fri, Sep 07, 2012 at 09:31:56PM +0200, Rafael J. Wysocki wrote:
-> > > +	struct cpufreq_target_data data;
-> > > +
-> > > +	data.dev = cpu_dev;
-> > > +	data.clk = cpu_clk;
-> > > +	data.reg = cpu_reg;
-> > > +	data.tol = voltage_tolerance;
-> > > +	data.freq_table = freq_table;
-> > > +	data.policy = policy;
-> > > +	data.target_freq = target_freq;
-> > > +	data.relation = relation;
-> > 
-> > I'm not sure what you need the new data structure for.  Both
-> > cpu0_set_target() and omap_target() have the same set of arguments, so it
-> > seems pointless to copy those values back and forth.
-> > 
-> But the first 4 arguments are driver specific.  They are existing
-> in cpufreq-cpu0 and omap-cpufreq drivers as global variables.  I
-> haven't thought of a good way to consolidate all these differences.
-
-Hmm.  Who's going to use the cpufreq-cpu0 driver, then?  Is OMAP going to be
-the only user?
-
-> > > +
-> > > +	return cpufreq_set_target(&data);
-> > 
-> > What about calling that function cpufreq_common_set_target()?
-> > 
-> All driver specific .set_target functions are named with a driver
-> specific prefix, so this shorter name seems explicit to tell the
-> "common", IMO.  But if you insist, I can change.
-
-Well, it's not exactly common, so to speak.  It only is shared between
-the cpu0 and OMAP drivers, so I'm not sure (see below).
-
-> > >  }
-> > >  
-> > >  static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
-> > > diff --git a/drivers/cpufreq/cpufreq.h b/drivers/cpufreq/cpufreq.h
-> > > new file mode 100644
-> > > index 0000000..ae380b3
-> > > --- /dev/null
-> > > +++ b/drivers/cpufreq/cpufreq.h
-> > 
-> > I don't think this header is really necessary.
-> > 
-> Put the stuff into include/linux/cpufreq.h?  But these stuff do not
-> necessarily need to be that public.
+On Thu, Sep 06, 2012 at 03:25:21PM +0200, Daniel Mack wrote:
+> Hi Matt,
 > 
-> <snip>
-> 
-> > > +int cpufreq_set_target(struct cpufreq_target_data *d)
+> On 27.08.2012 17:33, Daniel Mack wrote:
+> > On 23.08.2012 03:09, Matt Porter wrote:
+> >> This series begins the conversion of the DaVinci private EDMA API
+> >> implementation to a DMA engine driver and converts two of the three
+> >> in-kernel users of the private EDMA API to DMA engine.
+> >>
+> >> The approach taken is similar to the recent OMAP DMA Engine
+> >> conversion. The EDMA DMA Engine driver is a wrapper around the existing
+> >> private EDMA implementation and registers the platform device within
+> >> the driver.  This allows the conversion series to stand alone with just
+> >> the drivers and no changes to platform code. It also allows peripheral
+> >> drivers to continue to use the private EDMA implementation until they
+> >> are converted.
+> >>
+> >> The EDMA DMA Engine driver supports slave transfers only at this time. It
+> >> is planned to add cyclic transfers in support of audio peripherals.
+> >>
+> >> There are three users of the private EDMA API in the kernel now:
+> >> davinci_mmc, spi-davinci, and davinci-mcasp.  This series provides DMA
+> >> Engine conversions for the davinci_mmc and spi-davinci drivers which
+> >> use the supported slave transfers.
+> >>
+> >> This series has been tested on an AM18x EVM and Hawkboard with
+> >> driver performance comparable to that of the private EDMA API
+> >> implementations. Both MMC0 and MMC1 are tested which handles the
+> >> DA850/OMAP-L138/AM18x specific case where MMC1 uses DMA channels on
+> >> a second EDMA channel controller.  All other platforms have a simpler
+> >> design with just a single EDMA channel controller.
+> >>
+> >> For those wanting to easily test this series, I've pushed a branch for
+> >> each version to my github tree at https://github.com/ohporter/linux. The
+> >> current branch is edma-dmaengine-v3.
+> >>
+> >> After this series, the current plan is to complete the mcasp driver
+> >> conversion which includes adding cyclic dma support. This will then
+> >> enable the removal and refactoring of the private EDMA API functionality
+> >> into the EDMA DMA Engine driver.  Since EDMA is also used on the AM33xx
+> >> family of parts in mach-omap2/, the plan is to enable this driver on
+> >> that platform as well.
 > > 
-> > Why don't you use the original arguments of cpu0_set_target() here?
-> > 
-> As explained above, cpu_dev, cpu_clk, cpu_reg and voltage_tolerance
-> are used in the function as global variables in cpufreq-cpu0 driver.
+> > Once you have a patch for the McASP driver conversion, I can happily
+> > test this on a AM33xx board, together with Gururaja's latest McASP
+> > refactoring series. Let me know how I can help you here.
 > 
-> And that's the primary reason why I think making this common set_target
-> thing is somehow a churn.
+> Did you find some time yet to continue on this side? I don't want to
+> appear pushy, but as I need to finish some DT transition on a
+> AM33xx-based board, I would much like to help out here, in case I can do
+> anything to help speed things along.
+> 
+> 
+> Many thanks for your work!
 
-OK
+Hi Daniel,
 
-I'm concerned about the copy-pasting, but if that copy-pasting is going to
-go away when you move OMAP to the new driver, then I agree that adding more
-complexity just to avoid it is probably not a good idea.
+I'm working on porting this driver work to AM33xx right now. You can
+take a look at an ugly but functional WIP version at the above repo
+in the WIP/edma-dmaengine-am335x-v3.6-rc4-cpufreq branch. When I say
+ugly, I mean ugly...there's a few hacks I'm resolving before I plan
+to post an RFC series. However, I've been putting the slave sg transfer
+through a workout on hsmmc and mcspi and it is solid now.
 
-What's the planned time frame for the OMAP conversion?
+I don't expect to start on MCASP conversion until I get this AM33xx
+enablement series posted. There's a couple things you could help with
+here. First, I have done some preliminary work in understanding the
+various "old" platforms in mach-davinci/ that we are going to have to
+avoid breaking. The first big issue is that we have a split in h/w
+capabilities between the old platforms that have no AFIFO and our newer
+ones that do. Unless someone can convince me otherwise, the biggest
+(and possibly *only*) driver behind the need for SRAM-based ping-pong
+buffering. This SRAM-based ping-pong buffering is a PITA to deal with
+atm mostly because we need to encapsulate this behind the cyclic dma
+api. It's also IMHO, unneeded if you have one of the modern platforms
+that added the AFIFO since you aren't having to feed the serializer at
+an unreasonable rate...i.e. we can do fifo bursts.
 
-Rafael
+Now, we *can* handle SRAM ping-pong buffering within the dmaengine
+driver, however in the short-term it's a bit of a pain because of the
+way the wrapper driver is instantiated and I'd like to avoid any
+complication of having to feed it platform data until we absolutely have
+to. That is, with SRAM ping-pong buffering, we now have to have
+platform-specific data about the SRAM we can allocate. This is
+complicated by the fact that 1) the ARM SRAM consolidation series
+seemingly died last year...which btw, left some orphaned mcasp sram ping
+pong enablement patch out of tree for mach-davinci/ 2) the latest SRAM
+driver effort is specifically tied around DT atm which makes it
+short-term problematic to leverage on mach-davinci/ platforms where we
+really need it.
+
+My best idea at this point is to approach the McASP conversion in a
+couple stages. The first is to support cyclic dma in the dmaengine
+wrapper driver in continuous mode such that only platforms with AFIFO
+support (DA8xx/L138/AM180x and AM33xx/TI81xx to my knowledge) can
+utilize it. Also part of the first stage, of course, is the mcasp driver
+refactoring so that ping-pong buffering is an optional sub-config option
+for those old Davinci boards and continues to use the private EDMA API
+for now. I'm ok with this partially because those old platform seem to
+be unmaintained (nobody stepped up to test DM644x etc) and the SRAM
+ping-pong buffering code is completely unused in mainline right now.
+If those !AFIFO platforms were removed from the kernel then we wouldn't
+even have to deal with it.
+
+There's a few things you can help with:
+
+1) testing the WIP driver
+2) add cyclic dma support
+3) do the sram-less mcasp conversion
+
+I'll get to #2 and #3 next, but I have no problem if you beat me to it.
+
+-Matt
