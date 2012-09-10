@@ -1,30 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 06:10:59 -0700
-Subject: [PATCH 18/19] gpio: Provide the tc3589x GPIO expander driver with
- an IRQ domain
-In-Reply-To: <1347016499-29354-19-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-19-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYbWEq5mhTcewmxEpcivXkVyQS_56QRU67G40zcRXnUCA@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 10 Sep 2012 15:16:35 +0200
+Subject: [PATCH 0/1] ARM: dts: OMAP3: Add gpio-twl4030 properties for Overo
+Message-ID: <1347282996-31190-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hello,
 
-> In preparation for Device Tree enablement all IRQ controllers
-> should control their own IRQ domain. This patch provides just
-> that for the tc3589x GPIO expander.
->
-> CC: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+This patch adds the support for the blue LED connected to the LEDB
+pin of the TWL4030 on the Gumstix Overo when booting from the device
+tree.
 
-Looks very good again,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Build on top of Benoit's for_3.7/dts tree.
 
-I presume you will want to push the whole shebang through
-ARM SoC, but if that doesn't work out I am very tempted to
-apply this patch to the GPIO tree immediately so it lands
-in v3.7.
+Regards,
+Florian
 
-Yours,
-Linus Walleij
+
+Florian Vaussard (1):
+  ARM: dts: OMAP3: Add gpio-twl4030 properties for Overo
+
+ arch/arm/boot/dts/omap3-overo.dtsi |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
+
+-- 
+1.7.5.4
