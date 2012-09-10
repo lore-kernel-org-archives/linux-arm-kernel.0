@@ -1,43 +1,123 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 10 Sep 2012 10:57:25 -0700
-Subject: [PATCH 06/14] tty/serial/core: Introduce poll_init callback
-In-Reply-To: <20120910121320.03c9dfc7@pyramind.ukuu.org.uk>
-References: <20120910040802.GA1261@lizard> <20120910041335.GF29537@lizard>
- <20120910121320.03c9dfc7@pyramind.ukuu.org.uk>
-Message-ID: <20120910175725.GA13673@lizard>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 10 Sep 2012 14:07:34 -0400 (EDT)
+Subject: [PATCH v2 16/22] ARM: mm: cleanup checks for membank overlap
+ with vmalloc area
+In-Reply-To: <504E26BB.4020205@ti.com>
+References: <1344648306-15619-1-git-send-email-cyril@ti.com>
+ <1344648306-15619-17-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208120034220.5231@xanadu.home> <504E26BB.4020205@ti.com>
+Message-ID: <alpine.LFD.2.02.1209101406510.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 12:13:20PM +0100, Alan Cox wrote:
-> > +	tport = &state->port;
-> > +	if (!(tport->flags & ASYNC_INITIALIZED) && port->ops->poll_init) {
-> > +		mutex_lock(&tport->mutex);
-> > +		ret = port->ops->poll_init(port);
-> > +		/*
-> > +		 * We don't set ASYNCB_INITIALIZED as we only initialized the
-> > +		 * hw, e.g. state->xmit is still uninitialized.
-> > +		 */
-> > +		mutex_unlock(&tport->mutex);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
+On Mon, 10 Sep 2012, Cyril Chemparathy wrote:
+
+> On 8/12/2012 12:36 AM, Nicolas Pitre wrote:
+> > On Fri, 10 Aug 2012, Cyril Chemparathy wrote:
+> > 
+> > > On Keystone platforms, physical memory is entirely outside the 32-bit
+> > > addressible range.  Therefore, the (bank->start > ULONG_MAX) check below
+> > > marks
+> > > the entire system memory as highmem, and this causes unpleasentness all
+> > > over.
+> > > 
+> > > This patch eliminates the extra bank start check (against ULONG_MAX) by
+> > > checking bank->start against the physical address corresponding to
+> > > vmalloc_min
+> > > instead.
+> > > 
+> > > In the process, this patch also cleans up parts of the highmem sanity
+> > > check
+> > > code by removing what has now become a redundant check for banks that
+> > > entirely
+> > > overlap with the vmalloc range.
+> > 
+> > Are you sure of this?  The code that you removed not only checks for
+> > banks that fall into the vmalloc area, but it also skipp them.  This is
+> > now lost.
+> > 
 > 
-> What stops a parallel open or close changing ASYNC_INITIALIZED after you
-> test and before you lock ?
+> I almost missed out on this email...
+> 
+> The check is not quite lost, we still have the following in the
+> !CONFIG_HIGHMEM block:
+> 
+> 	if (highmem) {
+> 		printk(...);
+> 		continue;
+> 	}
+> 
+> The change is that highmem is now set outside the #ifdef when (bank->start >=
+> vmalloc_limit), and therefore the check is truly redundant.
 
-Yeah, I should do the whole thing under the mutex.
+OK.
 
-Not related to this particular issue, but the fact that close() can powerdown
-the hardware is quite bad. Today it is always possible to use open,close
-sequence on /dev/ttyXXXX, and polling would break if close() deinitializes the
-hardware (e.g. via uart_change_pm()).
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-In console= case, serial core handles the issue via uart_console(), checking if
-the port is used for console, preventing it to power down the hardware. We can
-do the same, or make tty_find_polling_driver() refcount individual ports/lines.
-But the issue is orthogonal to this particular patch, although needs to be
-fixed some day.
 
-Thanks!
 
-Anton.
+> 
+> > > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> > > Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> > > ---
+> > >   arch/arm/mm/mmu.c |   19 +------------------
+> > >   1 file changed, 1 insertion(+), 18 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> > > index f764c03..3d685c6 100644
+> > > --- a/arch/arm/mm/mmu.c
+> > > +++ b/arch/arm/mm/mmu.c
+> > > @@ -901,15 +901,12 @@ void __init sanity_check_meminfo(void)
+> > >   		struct membank *bank = &meminfo.bank[j];
+> > >   		*bank = meminfo.bank[i];
+> > > 
+> > > -		if (bank->start > ULONG_MAX)
+> > > -			highmem = 1;
+> > > -
+> > > -#ifdef CONFIG_HIGHMEM
+> > >   		if (bank->start >= vmalloc_limit)
+> > >   			highmem = 1;
+> > > 
+> > >   		bank->highmem = highmem;
+> > > 
+> > > +#ifdef CONFIG_HIGHMEM
+> > >   		/*
+> > >   		 * Split those memory banks which are partially overlapping
+> > >   		 * the vmalloc area greatly simplifying things later.
+> > > @@ -932,8 +929,6 @@ void __init sanity_check_meminfo(void)
+> > >   			bank->size = vmalloc_limit - bank->start;
+> > >   		}
+> > >   #else
+> > > -		bank->highmem = highmem;
+> > > -
+> > >   		/*
+> > >   		 * Highmem banks not allowed with !CONFIG_HIGHMEM.
+> > >   		 */
+> > > @@ -946,18 +941,6 @@ void __init sanity_check_meminfo(void)
+> > >   		}
+> > > 
+> > >   		/*
+> > > -		 * Check whether this memory bank would entirely overlap
+> > > -		 * the vmalloc area.
+> > > -		 */
+> > > -		if (bank->start >= vmalloc_limit) {
+> > > -			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+> > > -			       "(vmalloc region overlap).\n",
+> > > -			       (unsigned long long)bank->start,
+> > > -			       (unsigned long long)bank->start + bank->size -
+> > > 1);
+> > > -			continue;
+> > > -		}
+> > > -
+> > > -		/*
+> > >   		 * Check whether this memory bank would partially overlap
+> > >   		 * the vmalloc area.
+> > >   		 */
+> > > --
+> > > 1.7.9.5
+> > > 
+> 
+> -- 
+> Thanks
+> - Cyril
+> 
