@@ -1,124 +1,91 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Mon, 10 Sep 2012 13:38:48 +0300
-Subject: [PATCH] ARM: OMAP2+: mux: add support for PAD wakeup event handler
-Message-ID: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 10 Sep 2012 13:46:18 +0300
+Subject: [PATCH v4 00/14] MFD/ASoC/Input: twl4030-audio submodule DT support
+Message-ID: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP mux now parses active wakeup events from pad registers and calls
-corresponding handler, if handler is not registered - corresponding
-hwmod ISRs once a wakeup is detected.
-This is useful for cases when routing wakeups to corresponding hwmod
-ISRs complicates those ISRs handlers (for example, ISR handler may
-not know who the interrupt source is)
+Hello,
 
-Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+Generated on top of:
+git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git topic/omap
+
+Changes since v3:
+- Added Acked-by from Tony and Dmitry
+- Removed #ifdef around of_find_node_by_name() in the drivers
+
+Changed since v2:
+- Added commit message to patch 2 (as Tero requested it)
+- Fixed patch 6 (dt: Add empty...) since the previous patch caused x86_64 build
+  to fail due to missing struct before device_node.
+
+Changes since v1:
+- Get the MCLK frequencey from twl-core driver (via new API)
+- hs_extmute_disable_level parameter has been removed
+- empty of_find_node_by_name() in of.h for !CONFIG_OF builds
+
+Mark: the extmute GPIO handling (when it is used) remained in the codec driver
+for now. I can think more on how to add support for this type of mute control.
+If you can point me to other codec needing this it would help on designing
+something which is common enough for other users.
+
+As for now I have a separate series to add GPIO controlled output amps (hp/spk).
+I will send that to review soon. Currently this piece of code does not work when
+booted with device tree since I have done it on n900 which has the GPIO numbers
+as defines. I need to revisit the aproach on how to do it in a dynamic way.
+
+Introl mail from v1:
+
+The following series adds DT support for the twl4030 audio submodule which
+provides audio codec and vibra functionality.
+
+The MFD core driver is probed via DT, it will create the needed child devices
+based on the provided information in the DT blob.
+Child drivers (vibra, ASoC codec) will parse the core's node if needed to get
+the needed parameters for their configuration.
+
+In the ASoC codec driver the hs_extmute callback (which was used to toggle a
+GPIO line) has been removed. The codec driver will receive the GPIO number
+(if it is needed on the platform).
+
+If the series is OK (and no objections from the maintainers), it would be good
+if this can go via audio. Changed files are well contained within the
+twl4030-audio stack so I do not expect merge issues later.
+
+The series has been tested on BeagleBoard (with the McBSP DT series, and with
+the upcoming DT audio support for BeagleBoard).
+
+Regards,
+Peter
 ---
- arch/arm/mach-omap2/mux.c                    |   14 +++++++++--
- arch/arm/mach-omap2/omap_hwmod.c             |   29 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +++
- 3 files changed, 44 insertions(+), 3 deletions(-)
+Peter Ujfalusi (14):
+  MFD: twl4030-audio: Clean up MODULE_* and platform_driver part
+  MFD: twl4030-audio: Convert to use devm_kzalloc
+  MFD: twl4030-audio: Rearange and clean-up the probe function
+  MFD: twl-core: Add API to query the HFCLK rate
+  MFD: twl4030-audio: Get audio MCLK via twl-core API instead of pdata
+  dt: Add empty of_find_node_by_name() function
+  MFD: twl4030-audio: Add DT support
+  Input: twl4030-vibra: Support for DT booted kernel
+  ASoC: twl4030: Move hs_extmute GPIO handling to driver
+  ARM: OMAP/ASoC: Zoom2: Let the codec to handle the hs_extmute GPIO
+  ASoC/MFD: twl4030: Remove set_hs_extmute callback from platform data
+  ASoC: twl4030: Convert to use devm_kzalloc
+  ASoC: twl4030: Add pointer to pdata within the private data
+  ASoC: twl4030: Support for DT booted kernel
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 9fe6829..2918638 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -372,6 +372,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
- 	int i, irq;
- 	unsigned int val;
- 	u32 handled_irqs = 0;
-+	bool retval = false;
- 
- 	for (i = 0; i < hmux->nr_pads_dynamic; i++) {
- 		struct omap_device_pad *pad = hmux->pads_dynamic[i];
-@@ -384,8 +385,15 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
- 		if (!(val & OMAP_WAKEUP_EVENT))
- 			continue;
- 
--		if (!hmux->irqs)
--			return true;
-+		if (hmux->wakeup_handler && hmux->wakeup_handler[i]) {
-+			hmux->wakeup_handler[i](hmux);
-+			continue;
-+		}
-+
-+		if (!hmux->irqs) {
-+			retval = true;
-+			continue;
-+		}
- 
- 		irq = hmux->irqs[i];
- 		/* make sure we only handle each irq once */
-@@ -397,7 +405,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
- 		generic_handle_irq(mpu_irqs[irq].irq);
- 	}
- 
--	return false;
-+	return retval;
- }
- 
- /**
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6ca8e51..9a41d65 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -3656,6 +3656,35 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
- }
- 
- /**
-+ * omap_hwmod_pad_wakeup_handler - add wakeup handler for an I/O pad wakeup
-+ * @oh: struct omap_hwmod * containing hwmod mux entries
-+ * @pad_idx: array index in oh->mux of the hwmod mux entry to handle wakeup
-+ * @wakeup_handler: the wakeup_handler function to trigger on wakeup
-+ */
-+int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
-+		int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux))
-+{
-+	might_sleep();
-+
-+	if (!oh || !oh->mux || pad_idx < 0 ||
-+			pad_idx >= oh->mux->nr_pads_dynamic)
-+		return -EINVAL;
-+
-+	if (!oh->mux->wakeup_handler) {
-+		/* XXX What frees this? */
-+		oh->mux->wakeup_handler =
-+				kzalloc(sizeof(*(oh->mux->wakeup_handler)) *
-+				oh->mux->nr_pads_dynamic, GFP_KERNEL);
-+
-+		if (!oh->mux->wakeup_handler)
-+			return -ENOMEM;
-+	}
-+	oh->mux->wakeup_handler[pad_idx] = wakeup_handler;
-+
-+	return 0;
-+}
-+
-+/**
-  * omap_hwmod_init - initialize the hwmod code
-  *
-  * Sets up some function pointers needed by the hwmod code to operate on the
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 6132972..5c2bcc7 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -110,6 +110,7 @@ struct omap_hwmod_mux_info {
- 	int				nr_pads_dynamic;
- 	struct omap_device_pad		**pads_dynamic;
- 	int				*irqs;
-+	int				(**wakeup_handler)(struct omap_hwmod_mux_info *hmux);
- 	bool				enabled;
- };
- 
-@@ -646,6 +647,9 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- 
- int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
- 
-+int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
-+		int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux));
-+
- extern void __init omap_hwmod_init(void);
- 
- const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+ .../devicetree/bindings/mfd/twl4030-audio.txt      |  46 +++++++++
+ arch/arm/mach-omap2/board-zoom-peripherals.c       |   9 +-
+ arch/arm/mach-omap2/include/mach/board-zoom.h      |   2 -
+ drivers/input/misc/twl4030-vibra.c                 |  18 +++-
+ drivers/mfd/twl-core.c                             |  32 +++++++
+ drivers/mfd/twl4030-audio.c                        | 105 ++++++++++++++-------
+ include/linux/i2c/twl.h                            |   3 +-
+ include/linux/of.h                                 |   6 ++
+ sound/soc/codecs/twl4030.c                         | 101 ++++++++++++++++----
+ sound/soc/omap/zoom2.c                             |   4 -
+ 10 files changed, 255 insertions(+), 71 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/twl4030-audio.txt
+
 -- 
-1.7.1
+1.7.12
