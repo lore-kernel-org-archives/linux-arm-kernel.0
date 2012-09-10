@@ -1,33 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Sep 2012 13:51:37 +0100
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120910055339.GC31430@game.jcrosoft.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org>
- <alpine.LFD.2.02.1209091923180.28681@xanadu.home>
- <20120910055339.GC31430@game.jcrosoft.org>
-Message-ID: <20120910125137.GC27042@arm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 10 Sep 2012 14:53:40 +0200
+Subject: [PATCH 0/2] ARM: omap/dts: Add support for Gumstix Overo with
+ Tobi expansion
+In-Reply-To: <504DD128.1000803@ti.com>
+References: <1346429172-5902-1-git-send-email-florian.vaussard@epfl.ch>
+ <20120906205227.GM1303@atomide.com> <504DB202.5050500@epfl.ch>
+ <504DD128.1000803@ti.com>
+Message-ID: <504DE2D4.8030705@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 06:53:39AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 19:29 Sun 09 Sep     , Nicolas Pitre wrote:
-> > On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
-> > > > +The image must be placed at the specified offset (currently 0x80000)
-> > > > +from the start of the system RAM and called there. The start of the
-> > > > +system RAM must be aligned to 2MB.
-> > > can we drop this
-> > 
-> > Drop what?
-> > And why?
-> This contrain the must be loadable at any address
+>
+> Patches looks good to me. I just adding them right now in my for_3.7/dts tree.
+>
+> I've just slightly changed the subjects:
+>
+> Documentation: dt: Update the OMAP documentation with Overo/Toby
+> ARM: dts: OMAP3: Add support for Gumstix Overo with Tobi expansion board
+>
+> If you want to give it a try, here is the branch that contains all the DTS series I
+> already pulled. It includes your gpio-twl4030 patches as well.
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.7/dts
 
-You can't easily load the kernel image at any address, unless it can
-relocate itself and you have a way to specify PHYS_OFFSET. We don't want
-a compile-time PHYS_OFFSET, the kernel detects it at boot time based on
-the load address.
+Boot as expected on Gumstix Overo with Tobi expansion board.
 
--- 
-Catalin
+I will submit a patch to support the blue LED connected to the TWL4030, 
+as the DTS support was merged in your branch.
+
+And of course I will continue on getting features to work with 
+devicetree for the Overo.
+
+Regards,
+Florian
