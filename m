@@ -1,20 +1,23 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 10 Sep 2012 12:16:24 +0100
-Subject: [PATCH 08/14] tty/serial/kgdboc: Add and wire up clear_irqs
- callback
-In-Reply-To: <20120910041357.GH29537@lizard>
-References: <20120910040802.GA1261@lizard>
-	<20120910041357.GH29537@lizard>
-Message-ID: <20120910121624.226c1a88@pyramind.ukuu.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 04:12:23 -0700
+Subject: [PATCH 10/19] ARM: ux500: Remove redundant #gpio-cell properties
+ from HREF and Snowball DT
+In-Reply-To: <1347016499-29354-11-git-send-email-lee.jones@linaro.org>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdY_gyWRO20ZOfTmG=tzE_B3ObWZG_4f8gHS6vyiGZSh6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> serial port, the CPU receives NMI exception, and we fall into KDB shell.
-> So, it is our "debug console", and it is able to interrupt (and thus
-> debug) even IRQ handlers themselves.
+On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
+> These properties have no place here as the populated nodes are
+> not related to GPIO Controllers.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-You seem to have an assumption of single core here. What happens if the
-NMI hits CPU #0 and the serial IRQ hits CPU #1 simultaneously ?
+Squash this into the previous patch adding them...
+I think Arnd already noted.
 
-Alan
+Yours,
+Linus Walleij
