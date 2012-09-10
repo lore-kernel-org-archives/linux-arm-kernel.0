@@ -1,116 +1,69 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon, 10 Sep 2012 15:51:57 -0400
-Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
- hardware
-In-Reply-To: <504E1C69.30602@ti.com>
-References: <1347294020-22661-1-git-send-email-mporter@ti.com>
- <504E168C.6060603@ti.com> <20120910165210.GJ27758@beef>
- <504E1C69.30602@ti.com>
-Message-ID: <20120910195156.GK27758@beef>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Sep 2012 21:55:32 +0200
+Subject: [PATCH 1/2] i2c: s3c2410: add optional pin configuration using
+ pinctrl interface
+In-Reply-To: <1390693.DWkgTZ1iNF@amdc1227>
+References: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
+ <2444562.GB3nOHUb9M@amdc1227>
+ <CAJuYYwQCQDTnpPR5WABtbozZOgc6_SZRBv3b6D8KY78tzMt-Eg@mail.gmail.com>
+ <1390693.DWkgTZ1iNF@amdc1227>
+Message-ID: <CACRpkda+mu4P=-8UX1ad_UgCvJZ-2eYaO9vx27Ux20SYGYdKgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 06:59:21PM +0200, Benoit Cousson wrote:
-> On 09/10/2012 06:52 PM, Matt Porter wrote:
-> > On Mon, Sep 10, 2012 at 06:34:20PM +0200, Benoit Cousson wrote:
-> >> + Tony
-> >>
-> >> Hi Matt,
-> >>
-> >> 30 minutes too late for my pull request :-(
-> >>
-> >> There are a couple of am33xx patches under discussion, so I'll take them
-> >> and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
-> > 
-> > Yeah, believe me, I did a faceplant when I saw your pull request come by
-> > at the same time I discovered this issue. ;) In particular, AnilKumar's
-> > user leds patch would need to be adjusted for this change. I can
-> > resubmit with the user leds dts changes adjusted as well if that
-> > discussion comes to a conclusion and his patches accepted.
-> 
-> Yeah, I was wondering if the gpios label were already used somewhere.
-> I've just added this patch on top of my current series.
-> So you or Anil should just post the missing patches whenever they'll be
-> available and accepted.
+On Thu, Sep 6, 2012 at 2:28 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Thanks for your comments.
+>
+> On Thursday 06 of September 2012 16:36:08 Thomas Abraham wrote:
+>> > This patch shows the problem of the need to explicitly migrate all
+>> > drivers to pinctrl.
+>> >
+>> > Maybe we should consider extending the pinctrl subsystem to set the
+>> > default state automatically before binding a driver to a device, at
+>> > least in case of DT-based platforms?
+>>
+>> The pinctrl driver allows for activating default pin configuration
+>> when the pinctrl driver loads. This is referred to as "hogging".
+>
+> What I suggested is that such default configuration would be applied just
+> before binding a driver, i.e. when it's almost sure that the device will be
+> actually used and the configuration will be needed.
 
-Ok, I went ahead and posted a series that applies to your for_3.7/dts
-branch and Anil's series. That's assuming his v7 series is taken "as
-is" after the leds-gpio/pinctrl discussion comes to conclusion. I see
-Tony acked it aside from that discussion.
+In that case the pinctrl driver can poke down a default
+register configuration, but just like Stephen remarks I do not see
+the point either.
 
-Thanks,
-Matt
+Hogs should work just fine?
 
-> 
-> >> On 09/10/2012 06:20 PM, Matt Porter wrote:
-> >>> On AM33xx, the datasheet and TRM refer to four GPIO instances that
-> >>> are 0-based, GPIO0-3.
-> >>
-> >> Or maybe you should just update the spec to use a 1-based GPIO number
-> >> like OMAP :-)
-> > 
-> > I am powerless here. :)
-> 
-> That's too bad :-(
-> 
-> Benoit
-> 
-> > 
-> > -Matt
-> > 
-> >>> Signed-off-by: Matt Porter <mporter@ti.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
-> >>>  1 file changed, 4 insertions(+), 4 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> >>> index bb31bff..1369bfc 100644
-> >>> --- a/arch/arm/boot/dts/am33xx.dtsi
-> >>> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> >>> @@ -62,7 +62,7 @@
-> >>>  			reg = <0x48200000 0x1000>;
-> >>>  		};
-> >>>  
-> >>> -		gpio1: gpio at 44e07000 {
-> >>> +		gpio0: gpio at 44e07000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio1";
-> >>>  			gpio-controller;
-> >>> @@ -74,7 +74,7 @@
-> >>>  			interrupts = <96>;
-> >>>  		};
-> >>>  
-> >>> -		gpio2: gpio at 4804c000 {
-> >>> +		gpio1: gpio at 4804c000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio2";
-> >>>  			gpio-controller;
-> >>> @@ -86,7 +86,7 @@
-> >>>  			interrupts = <98>;
-> >>>  		};
-> >>>  
-> >>> -		gpio3: gpio at 481ac000 {
-> >>> +		gpio2: gpio at 481ac000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio3";
-> >>>  			gpio-controller;
-> >>> @@ -98,7 +98,7 @@
-> >>>  			interrupts = <32>;
-> >>>  		};
-> >>>  
-> >>> -		gpio4: gpio at 481ae000 {
-> >>> +		gpio3: gpio at 481ae000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio4";
-> >>>  			gpio-controller;
-> >>>
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Of course such functionality would not have to be obligatory. For example,
+> we could add new property, like pinctrl-set-default, to point in device
+> tree that this device should have its pinctrl state set up automatically.
+
+This doesn't have a semantic difference to a default hog AFAICT.
+
+>> 1. After a suspend and resume cycle, the pin configuration registers
+>> may be reset to default values. Hence, during resume, the pin
+>> configuration has be redone.
+>
+> In my opinion it should be saved and restored by pinctrl driver (as it was
+> done in case of GPIO subsystem previously).
+
+This is one way to do it. I see Stephen has the same idea.
+
+Another way is actually to go to the default state from the
+default state. Or from any state to itself rather.
+
+Currently pinctrl_select_state_locked() contains this:
+
+        if (p->state == state)
+                return 0;
+
+If we just add pinctrl_select_state_force() excluding that
+clause we can force re-poking of the state at any time.
+
+Compare regulator_force_disable() and similar.
+
+Maybe this is actually more helpful?
+
+Yours,
+Linus Walleij
