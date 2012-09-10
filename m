@@ -1,43 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 01:41:52 -0700
-Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
-In-Reply-To: <201209071358.38598.arnd@arndb.de>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <201209071241.17198.arnd@arndb.de>
- <20120907130114.GF29601@gmail.com>
- <201209071358.38598.arnd@arndb.de>
-Message-ID: <CACRpkdZ-QpHzeEBO=RFVe-8S2DG4-thhwW9iVbAMXZrOe-FnAw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Sep 2012 09:42:59 +0100
+Subject: [PATCH] ARM: add back in KS8695 based SnapGear board entries
+In-Reply-To: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
+References: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
+Message-ID: <20120910084259.GQ13739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 07 September 2012, Lee Jones wrote:
->> (...)
->> Linus wanted to keep changes to the Device Tree and changes
->> in platform code separate, which is my reason for submitting
->> all of my changes to date that way.
-> (...)
-> Linus: What is the reason you want to see the commits split up
-> like this?
+On Mon, Sep 10, 2012 at 01:30:15PM +1000, gerg at snapgear.com wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
+> 
+> Board support code for the SnapGear boards based on the Micrel KS8695 SoC
+> will soon appear in mainline kernel. The board IDs had been removed from
+> the mach-types file, so add them back in.
 
-Basically that was at a point when we were changing a lot of
-subsystem trees with DT patches that were merged in out-of-order
-fashion.
-
-Then it's better to have the DT changes to be pushed
-separately at the end of the merge window after all subtrees
-with dependent changes are merged. (Or even in the next merge
-window if there is no hurry, but we always seem to be in a hurry...)
-
-If all the changes are in the same subtree (like ARM SoC with
-ACKs from all over the place where needed) you can do it
-this way instead, and I agree it looks better.
-
-So basically two different merge strategies get you to split
-patches differently.
-
-Any way is fine with me, do as Arnd suggests if all is going
-in through ARM SoC.
-
-Yours,
-Linus Walleij
+Nak.  You must add platform support for these numbers _along_ _side_
+adding them back to mach-types, otherwise my scripts will simply delete
+them again.  These entries have been aged out due to lack of merging of
+the platforms.
