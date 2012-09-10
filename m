@@ -1,46 +1,116 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Sep 2012 04:29:29 -0700
-Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
-In-Reply-To: <201209101013.16697.arnd@arndb.de>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <201209071358.38598.arnd@arndb.de>
- <CACRpkdZ-QpHzeEBO=RFVe-8S2DG4-thhwW9iVbAMXZrOe-FnAw@mail.gmail.com>
- <201209101013.16697.arnd@arndb.de>
-Message-ID: <CACRpkdbPwiaF8tfEE7NNd_KE3VGtVx-pPwL-HObhh3fRYXqH=g@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 10 Sep 2012 14:30:14 +0300
+Subject: [PATCH v2] perf: Use pre-empt safe cpu_get/put insted of
+ smp_processor_id
+Message-ID: <1347276614-4334-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
 
-> I think it's fine to do the device driver conversion separately
-> from the platform changes, but doing that properly means that the
-> platform changes should only go in after the drivers have changed.
+[   28.832916] debug_smp_processor_id: 18 callbacks suppressed
+[   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
+[   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
 
-OK, in the diffstat we're discussing we have this:
+changes in v2:
+- rebased on 3.6-rc5
+- use put_cpu() immediately after get_cpu() in omap3_pm_idle()
 
- drivers/gpio/gpio-tc3589x.c            |  120 +++++++++++++++++++--------
- drivers/i2c/busses/i2c-nomadik.c       |    4 +
- drivers/mfd/mfd-core.c                 |   10 ++-
- drivers/mfd/tc3589x.c                  |  112 +++++++++++++++++++------
- include/linux/mfd/tc3589x.h            |    1 +
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/mach-omap2/clock.c       |    9 ++++++---
+ arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
+ arch/arm/mach-omap2/powerdomain.c |    6 ++++--
+ 3 files changed, 18 insertions(+), 9 deletions(-)
 
-> Inside of the platform code, I absolutely think we should change the
-> board file and the dts file simultaneously.
-
-Sure, no problem. But this patch series might have a title
-problem, as it is not isolated to the platform code at all.
-
-> When the driver offers
-> two ways of probing a device, this lets us change from one way to
-> the other without going through a phase where we use neither of them
-> or (worse) both at the same time.
-
-Maybe unrelated, but as usual it works as long as there are no
-DMA channels or callback functions :-/
-
-The MMC, PL022 patches in this patch set: both need
-AUXDATA and DT data simultaneously due to DMA channels
-and callbacks passed in as AUXDATA.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index ea3f565..06747b6 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
+ 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
+ 
+ 	if (clk->ops && clk->ops->disable) {
+-		trace_clock_disable(clk->name, 0, smp_processor_id());
++		trace_clock_disable(clk->name, 0, get_cpu());
++		put_cpu();
+ 		clk->ops->disable(clk);
+ 	}
+ 
+@@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
+ 	}
+ 
+ 	if (clk->ops && clk->ops->enable) {
+-		trace_clock_enable(clk->name, 1, smp_processor_id());
++		trace_clock_enable(clk->name, 1, get_cpu());
++		put_cpu();
+ 		ret = clk->ops->enable(clk);
+ 		if (ret) {
+ 			WARN(1, "clock: %s: could not enable: %d\n",
+@@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
+ 
+ 	/* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
+ 	if (clk->set_rate) {
+-		trace_clock_set_rate(clk->name, rate, smp_processor_id());
++		trace_clock_set_rate(clk->name, rate, get_cpu());
++		put_cpu();
+ 		ret = clk->set_rate(clk, rate);
+ 	}
+ 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 05bd8f0..5aa0a11 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -346,18 +346,22 @@ void omap_sram_idle(void)
+ 
+ static void omap3_pm_idle(void)
+ {
++	unsigned cpu;
++
+ 	local_fiq_disable();
+ 
+ 	if (omap_irq_pending())
+ 		goto out;
+ 
+-	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+-	trace_cpu_idle(1, smp_processor_id());
++	cpu = get_cpu();
++	put_cpu();
++	trace_power_start(POWER_CSTATE, 1, cpu);
++	trace_cpu_idle(1, cpu);
+ 
+ 	omap_sram_idle();
+ 
+-	trace_power_end(smp_processor_id());
+-	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
++	trace_power_end(cpu);
++	trace_cpu_idle(PWR_EVENT_EXIT, cpu);
+ 
+ out:
+ 	local_fiq_enable();
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 69b36e1..138bf86 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 				       ((state & OMAP_POWERSTATE_MASK) << 8) |
+ 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
+ 			trace_power_domain_target(pwrdm->name, trace_state,
+-						  smp_processor_id());
++						  get_cpu());
++			put_cpu();
+ 		}
+ 		break;
+ 	default:
+@@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+ 		/* Trace the pwrdm desired target state */
+ 		trace_power_domain_target(pwrdm->name, pwrst,
+-					  smp_processor_id());
++					  get_cpu());
++		put_cpu();
+ 		/* Program the pwrdm desired target state */
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+ 	}
+-- 
+1.7.4.1
