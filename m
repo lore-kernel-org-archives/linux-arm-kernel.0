@@ -1,40 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 10 Sep 2012 11:52:14 -0600
-Subject: Another tree for "next"
-In-Reply-To: <m31ui9g4ff.fsf@intrepid.localdomain>
-References: <m3obli3j7a.fsf@intrepid.localdomain>
- <20120910100144.dcbe2715cde0fea51345a354@canb.auug.org.au>
- <m31ui9g4ff.fsf@intrepid.localdomain>
-Message-ID: <504E28CE.6020103@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 10 Sep 2012 13:53:30 -0400 (EDT)
+Subject: [PATCH v3 00/31] AArch64 Linux kernel port
+In-Reply-To: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <alpine.LFD.2.02.1209101339270.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 11:42 AM, Krzysztof Halasa wrote:
-> Stephen Rothwell <sfr@canb.auug.org.au> writes:
+On Fri, 7 Sep 2012, Catalin Marinas wrote:
+
+> This is the 3rd version of patches implementing Linux kernel support for
+> the 64-bit ARM architecture. Most of the review comments for the
+> previous release have been implemented. There are a few left (like
+> generic timer dts specification) but the main goal was to freeze the
+> user ABI.
 > 
->>> could you please add the following to your "next" tree?
->>>
->>> git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux.git  branch: next
+> The Linux kernel patches are available on this tree:
 > 
->> Could you be a bit more clear about what will be in that tree, please?
->> Also when you repost this request, please post it a bit more widely among
->> other people/lists who may be interested in this work.  Remember that
->> linux-next is really only for stuff that is ready for Linus to pull into
->> the next merge window (or bug fixes).  Also, would this tree be pulled
->> directly by Linus, or via some other tree?
+> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git upstream
 > 
-> My plan is to merge all the stuff I'm (eventually) working on in the
-> above tree. For now - mostly IXP4xx (ARM CPU etc.) stuff which goes to
-> Linus
+> Main changes since the previous version:
+> - ptrace interface now using regsets for TLS and hardware debug
+>   registers.
+> - sys_personality fixes. PER_LINUX is the default for all tasks (32 or
+>   64-bit) and there is no compat_sys_personality defined.
+> - Kconfig clean-up (unused symbols, AARCH32_EMULATION removed in favour
+>   of COMPAT).
+> - Clean-up of the __cpuc_* function prefixes.
+> - CPU information table implemented in C rather than assembly.
+> - __bad_* function calls replaced with BUILD_BUG.
+> - Inline get_user/put_user (code cleaner, slightly bigger kernel Image).
+> - DMA API implementation simplified, defaulting to swiotlb. It will be
+>   extended as hardware becomes available.
+> - Arch-specific code in the generic timer patch moved to arch/arm64/.
+> - Comment fixes and clarifications.
 
-ARM-SoC-related pull requests should be sent to the arm-soc tree, who
-will then aggregate all the ARM-SoC-related changes and issue pull
-requests to Linus.
+For those patches in this series I didn't comment on already:
 
-That is, arm at kernel.org, plus the Linux ARM kernel list CC'd.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-The patches would also need to be sent to the Linux ARM kernel list (and
-any other relevant lists) before being applied to your tree.
+Small nit: please s/nico at cam.org/nico at fluxnic.net/.
 
-ARM core changes would likely go through Russell King's tree, perhaps
-depending on what dependencies they have.
+
+Nicolas
