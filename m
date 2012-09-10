@@ -1,32 +1,33 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 10 Sep 2012 11:25:22 +0200
-Subject: [PATCH 0/2] ARM: omap/dts: Add support for Gumstix Overo with
- Tobi expansion
-In-Reply-To: <20120906205227.GM1303@atomide.com>
-References: <1346429172-5902-1-git-send-email-florian.vaussard@epfl.ch>
- <20120906205227.GM1303@atomide.com>
-Message-ID: <504DB202.5050500@epfl.ch>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 10 Sep 2012 14:57:41 +0530
+Subject: [PATCH v2 2/2] ARM: da850/omap-l138: Add EVM specific code for
+ VPIF to work
+In-Reply-To: <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
+References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
+ <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
+ <504A2C7D.1090702@ti.com>
+ <CA+V-a8sGhrTLJnthX+nZESvJfaHFTV=x06eXjQOwwCZwGBxkPQ@mail.gmail.com>
+Message-ID: <504DB28D.3070005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/09/2012 22:52, Tony Lindgren a ?crit :
-> * Florian Vaussard <florian.vaussard@epfl.ch> [120831 09:07]:
->> The Gumstix Overo is a computer on module using an OMAP3 processor.
->> This module must be plugged into an expansion board.
->>
->> This patchset adds a first device tree support for the Overo, using the
->> Tobi expansion board. The current support is able to boot and mount
->> the rootfs from MMC, with a few extra features.
->>
->> The first patch creates the device tree for both the Overo and the
->> Tobi expansion board, and updates the dtb build target.
->>
->> The second patch updates the omap/dts documentation.
->>
->> This patchset applies on tony's tree [1], devel-dt branch.
-> Great, I'm assuming Benoit will pick this up as well.
+Hi Prabhakar,
 
-What is the status Benoit?
+On 9/7/2012 11:04 PM, Prabhakar Lad wrote:
+> On Fri, Sep 7, 2012 at 10:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
 
-Thank you,
-Florian
+>>> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
+>>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>>
+>> You agreed to get rid of these multiple ifdefs but you have not fixed that.
+>>
+> I have merged the top one, at later stage when we go  ahead and add sensor
+> support then we would have require to have define two
+> da850_vpif_capture_sdev_info
+> so to avoid it I have kept this one.
+
+Lets get to that when we actually add sensor support. It might make
+sense then. Right now, there is no reason to have them.
+
+Thanks,
+Sekhar
