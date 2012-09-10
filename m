@@ -1,51 +1,81 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 10 Sep 2012 10:32:26 -0700
-Subject: [PATCH v2 1/4] clk: add of_clk_src_onecell_get() support
-In-Reply-To: <20120910062535.GU26709@S2101-09.ap.freescale.net>
-References: <1345642590-29905-1-git-send-email-shawn.guo@linaro.org>
- <1345642590-29905-2-git-send-email-shawn.guo@linaro.org>
- <20120831064125.GA3271@r65073-Latitude-D630>
- <20120906221155.20289.73650@nucleus>
- <20120907002618.GB26709@S2101-09.ap.freescale.net>
- <20120907192444.20289.97042@nucleus>
- <20120910062535.GU26709@S2101-09.ap.freescale.net>
-Message-ID: <20120910173226.20289.88000@nucleus>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 10 Sep 2012 10:33:08 -0700
+Subject: [PATCH 10/9] ARM: msm: Allow msm_iomap-8x60 and msm_iomap-8960 to
+ coexist
+In-Reply-To: <1346873339-10927-1-git-send-email-sboyd@codeaurora.org>
+References: <1346873339-10927-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1347298389-12567-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Shawn Guo (2012-09-09 23:25:43)
-> On Fri, Sep 07, 2012 at 12:24:44PM -0700, Mike Turquette wrote:
-> > Done.  I've taken patch #1 "clk: add of_clk_src_onecell_get() support"
-> > into clk-next.
-> > 
-> Thanks, Mike.
-> 
-> I'm still waiting for a stable branch like clk-3.7, which I can ask
-> arm-soc folks to pull as a dependency.  I have some imx and mxs 3.7
-> material currently pending on this.
-> 
+Remove the unused GCC, ACC, and shared memory definitions in the
+8660 static mappings. This allows the 8660 header file to be
+included in msm_iomap.h unconditionally.
 
-Hi Shawn,
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h | 11 -----------
+ arch/arm/mach-msm/include/mach/msm_iomap.h      |  3 +--
+ arch/arm/mach-msm/io.c                          |  2 --
+ 3 files changed, 1 insertion(+), 15 deletions(-)
 
-I didn't realize you were waiting on a stable branch.  It seemed that no
-one used my clk-3.6 stable branch during the last cycle so I got lazy
-and decided not to have a clk-3.7 this time around.  However my current
-clk-next HEAD is stable so creating one is easy enough... done!
-
-Now that I have a clk-3.7 stable branch I'll plan on merging clk-next
-into clk-3.7 periodically as stability dictates.
-
-Arnd, how does the "arm-soc dependency" thing work?  Do I still issue a
-pull request to Linus for 3.7?
-
-Regards,
-Mike
-
-> -- 
-> Regards,
-> Shawn
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+index c6d38f1..199372e 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+@@ -41,21 +41,10 @@
+ #define MSM8X60_QGIC_CPU_PHYS	0x02081000
+ #define MSM8X60_QGIC_CPU_SIZE	SZ_4K
+ 
+-#define MSM_ACC_BASE		IOMEM(0xF0002000)
+-#define MSM_ACC_PHYS		0x02001000
+-#define MSM_ACC_SIZE		SZ_4K
+-
+-#define MSM_GCC_BASE		IOMEM(0xF0003000)
+-#define MSM_GCC_PHYS		0x02082000
+-#define MSM_GCC_SIZE		SZ_4K
+-
+ #define MSM_TLMM_BASE		IOMEM(0xF0004000)
+ #define MSM_TLMM_PHYS		0x00800000
+ #define MSM_TLMM_SIZE		SZ_16K
+ 
+-#define MSM_SHARED_RAM_BASE	IOMEM(0xF0100000)
+-#define MSM_SHARED_RAM_SIZE	SZ_1M
+-
+ #define MSM8X60_TMR_PHYS	0x02000000
+ #define MSM8X60_TMR_SIZE	SZ_4K
+ 
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
+index 00afdfb..2ab7cf0 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
+@@ -41,12 +41,11 @@
+ #include "msm_iomap-7x30.h"
+ #elif defined(CONFIG_ARCH_QSD8X50)
+ #include "msm_iomap-8x50.h"
+-#elif defined(CONFIG_ARCH_MSM8X60)
+-#include "msm_iomap-8x60.h"
+ #else
+ #include "msm_iomap-7x00.h"
+ #endif
+ 
++#include "msm_iomap-8x60.h"
+ #include "msm_iomap-8960.h"
+ 
+ #define MSM_DEBUG_UART_SIZE	SZ_4K
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 35d6926..e674b59 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -112,8 +112,6 @@ static struct map_desc msm8x60_io_desc[] __initdata = {
+ 	MSM_CHIP_DEVICE(QGIC_CPU, MSM8X60),
+ 	MSM_CHIP_DEVICE(TMR, MSM8X60),
+ 	MSM_CHIP_DEVICE(TMR0, MSM8X60),
+-	MSM_DEVICE(ACC),
+-	MSM_DEVICE(GCC),
+ #ifdef CONFIG_DEBUG_MSM8660_UART
+ 	MSM_DEVICE(DEBUG_UART),
+ #endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
