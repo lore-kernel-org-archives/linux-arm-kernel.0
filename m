@@ -1,40 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 10 Sep 2012 13:57:57 -0400 (EDT)
-Subject: [PATCH v3 31/31] arm64: MAINTAINERS update
-In-Reply-To: <20120909163156.GA31430@game.jcrosoft.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-32-git-send-email-catalin.marinas@arm.com>
- <20120909163156.GA31430@game.jcrosoft.org>
-Message-ID: <alpine.LFD.2.02.1209101355000.28681@xanadu.home>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Mon, 10 Sep 2012 10:56:01 -0700
+Subject: [PATCH 09/14] tty/serial/amba-pl011: Implement clear_irqs callback
+In-Reply-To: <20120910121702.550b8a90@pyramind.ukuu.org.uk>
+References: <20120910040802.GA1261@lizard> <20120910041404.GI29537@lizard>
+ <20120910121702.550b8a90@pyramind.ukuu.org.uk>
+Message-ID: <20120910175601.GA13164@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 9 Sep 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Mon, Sep 10, 2012 at 12:17:02PM +0100, Alan Cox wrote:
+[...]
+> > +static void pl011_clear_irqs(struct uart_port *port)
+> > +{
+> > +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+> > +	unsigned char __iomem *regs = uap->port.membase;
+> > +
+> > +	writew(readw(regs + UART011_MIS), regs + UART011_ICR);
+> > +	/*
+> > +	 * There is no way to clear TXIM, this is "ready to transmit IRQ", so
+> > +	 * we simply mask it. ops->start_tx will unmask it.
+> > +	 */
+> 
+> Not if you race here with the transmit start it won't.
 
-> On 17:27 Fri 07 Sep     , Catalin Marinas wrote:
-> > This patch updates the MAINTAINERS file for the AArch64 Linux kernel
-> > port.
-> > 
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  MAINTAINERS |    6 ++++++
-> >  1 files changed, 6 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index fdc0119..de368a5 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -1209,6 +1209,12 @@ S:	Maintained
-> >  F:	arch/arm/mach-pxa/z2.c
-> >  F:	arch/arm/mach-pxa/include/mach/z2.h
-> >  
-> > +ARM64 PORT (AARCH64 ARCHITECTURE)
-> > +M:	Catalin Marinas <catalin.marinas@arm.com>
-> we should put Russell too
+True, the race is possible. But I guess there will be no harm: only non-polling
+code uses ->start_tx(), but then we don't care, the port is used for NMI
+debugger, so the worst that can happen, is that we'll get another NMI just
+after the race, and so we'll mask it again.
 
-He is not maintaining the ARM64 code.
+And once we release the port from KDB, we never call this function anymore
+(since normal IRQ routine will be called instead).
 
+I guess I need to add some commens about this.
 
-Nicolas
+Thanks!
