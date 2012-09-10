@@ -1,113 +1,264 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 10 Sep 2012 17:48:30 +0200
-Subject: [GIT PULL] OMAP devicetree for 3.7
-Message-ID: <504E0BCE.3030301@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2012 16:50:33 +0100
+Subject: [PATCH v3 17/31] arm64: System calls handling
+In-Reply-To: <201209101424.21344.arnd@arndb.de>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <201209101351.52902.arnd@arndb.de> <20120910140148.GD27042@arm.com>
+ <201209101424.21344.arnd@arndb.de>
+Message-ID: <20120910155033.GF27042@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, Sep 10, 2012 at 03:24:21PM +0100, Arnd Bergmann wrote:
+> On Monday 10 September 2012, Catalin Marinas wrote:
+> > 
+> > On Mon, Sep 10, 2012 at 02:51:52PM +0100, Arnd Bergmann wrote:
+> > > On Monday 10 September 2012, Catalin Marinas wrote:
+> > > > Yes, I've seen these but since Al's patches are not in mainline, I don't
+> > > > want to add additional dependencies to the arm64 patches (currently
+> > > > based on 3.6-rc4). Once they get into mainline, I'll add a patch that
+> > > > converts arm64 to the generic functions above.
+> > > > 
+> > > > For kernel_execve(), I think I can simplify it further and not rely on
+> > > > Al's patches (similar to other architectures doing an SVC from kernel):
+> > > 
+> > > Hmm, I thought one of the reasons for Al to do his series was to discourage
+> > > people from doing syscalls from kernel space, but I may be misremembering
+> > > things. Al?
+> > 
+> > If that was the aim, I'm happy to change the code similar to the
+> > arch/arm one. But as I said I would wait until Al's patches get into
+> > mainline.
+> 
+> Ok. Another point: I wouldn't be too worried about dependencies for new
+> code, because it's not possible to bisect through your series anyway
+> (one needs all the patches before anything starts working really),
+> so from my point of view you could also write your code in a way that
+> expects Al's patches to get merged first.
 
-Please pull the following branch. It contains a bunch of devicetree related series.
+It's not about bisectability but rather a way to test the branch that I
+publish. On its own, my branch wouldn't even compile. Anyway, here's the
+update (tested on a local branch with Al's execve2 branch merged):
 
-It contains as well a gpio-twl4030 patch acked by Linus W.
 
-It is tested on omap4-panda, omap3-beagle, omap3-overo-tobi, am335x-bone, am335x-evm.
+arm64: Switch to generic sys_execve/kernel_execve
 
-It is based on your current devel-dt branch (a06ceff6f29e34edff5d6b082885c1c4139a0362).
+This patch converts the arm64 port to use the generic sys_execve and
+kernel_execve() functions. It introduces the ret_from_kernel_execve()
+function for starting the new user context and removes the
+(compat_)sys_execve_wrapper() functions.
 
-Thanks,
-Benoit
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
 
----
-The following changes since commit a06ceff6f29e34edff5d6b082885c1c4139a0362:
-  AnilKumar Ch (1):
-        arm/dts: Add tps65217 regulator DT data to am335x-bone.dts
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.7/dts
-
-Aneesh V (3):
-      Documentation: dt: device tree bindings for LPDDR2 memories
-      Documentation: dt: emif: device tree bindings for TI's EMIF sdram controller
-      ARM: dts: EMIF and LPDDR2 device tree data for OMAP4 boards
-
-Benoit Cousson (3):
-      ARM: dts: OMAP4: Cleanup and move GIC outside of the OCP
-      ARM: dts: omap3-beagle: Add heartbeat and mmc LEDs support
-      ARM: dts: OMAP4: Add reg and interrupts for every nodes
-
-Florian Vaussard (5):
-      gpio/twl4030: get platform data from device tree
-      ARM: dts: omap3: Add gpio-twl4030 properties for BeagleBoard and omap3-EVM
-      ARM: dts: OMAP3: Add support for Gumstix Overo with Tobi expansion board
-      Documentation: dt: Update the OMAP documentation with Overo/Toby
-      ARM: dts: omap3-overo: Add support for the blue LED
-
-Peter Ujfalusi (9):
-      ARM: OMAP: omap_device: Fix up resource names when booted with devicetree
-      ARM: dts: omap2: Add McBSP entries for OMAP2420 and OMAP2430 SoC
-      ARM: dts: omap2420-h4: Include omap2420.dtsi file instead the common omap2
-      ARM: dts: omap3: Add McBSP entries
-      ARM: dts: omap4: Add McBSP entries
-      ARM: dts: omap4: Add reg-names for McPDM and DMIC
-      ARM: dts: omap5: Add McBSP entries
-      ARM: dts: omap5: Add McPDM and DMIC section to the dtsi file
-      ARM: dts: omap3-beagle: Enable audio support
-
-Santosh Shilimkar (2):
-      ARM: OMAP4: Add L2 Cache Controller in Device Tree
-      ARM: OMAP4: Add local timer support for Device Tree
-
-Sourav Poddar (6):
-      ARM: dts: omap5-evm: Add I2C support
-      ARM: dts: omap5-evm: Add tmp102 sensor support
-      ARM: dts: omap5-evm: Add keypad data
-      ARM: dts: omap5-evm: Add bmp085 sensor support
-      ARM: dts: omap4-sdp: Add keypad data
-      Documentation: dt: i2c: trivial-devices: Update for tmp102
-
-Vaibhav Hiremath (3):
-      ARM: OMAP: omap_device: Do not overwrite resources allocated by OF layer
-      ARM: dts: AM33XX: Convert all hex numbers to lower-case
-      ARM: dts: AM33XX: Specify reg and interrupt property for all nodes
-
- .../devicetree/bindings/arm/omap/omap.txt          |    3 +
- .../devicetree/bindings/gpio/gpio-twl4030.txt      |    6 +
- .../devicetree/bindings/i2c/trivial-devices.txt    |    1 +
- .../devicetree/bindings/lpddr2/lpddr2-timings.txt  |   52 ++++++
- .../devicetree/bindings/lpddr2/lpddr2.txt          |  102 +++++++++++
- .../bindings/memory-controllers/ti/emif.txt        |   55 ++++++
- arch/arm/boot/dts/am335x-bone.dts                  |    4 +-
- arch/arm/boot/dts/am335x-evm.dts                   |    8 +-
- arch/arm/boot/dts/am33xx.dtsi                      |   62 ++++++-
- arch/arm/boot/dts/elpida_ecb240abacn.dtsi          |   67 +++++++
- arch/arm/boot/dts/omap2420-h4.dts                  |    2 +-
- arch/arm/boot/dts/omap2420.dtsi                    |   39 ++++
- arch/arm/boot/dts/omap2430.dtsi                    |   83 +++++++++
- arch/arm/boot/dts/omap3-beagle.dts                 |   46 +++++
- arch/arm/boot/dts/omap3-evm.dts                    |   13 ++
- arch/arm/boot/dts/omap3-overo.dtsi                 |   57 ++++++
- arch/arm/boot/dts/omap3-tobi.dts                   |   35 ++++
- arch/arm/boot/dts/omap3.dtsi                       |   69 ++++++++
- arch/arm/boot/dts/omap4-panda.dts                  |   11 ++
- arch/arm/boot/dts/omap4-sdp.dts                    |   81 +++++++++
- arch/arm/boot/dts/omap4.dtsi                       |  182 ++++++++++++++++----
- arch/arm/boot/dts/omap5-evm.dts                    |   33 ++++
- arch/arm/boot/dts/omap5.dtsi                       |   96 ++++++++++
- arch/arm/mach-omap2/Makefile.boot                  |    2 +-
- arch/arm/mach-omap2/omap4-common.c                 |    6 +-
- arch/arm/mach-omap2/omap_hwmod.c                   |   27 +++
- arch/arm/mach-omap2/timer.c                        |    6 +
- arch/arm/plat-omap/include/plat/omap_hwmod.h       |    1 +
- arch/arm/plat-omap/omap_device.c                   |   79 +++++++--
- drivers/gpio/gpio-twl4030.c                        |   82 ++++++---
- 30 files changed, 1220 insertions(+), 90 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/lpddr2/lpddr2-timings.txt
- create mode 100644 Documentation/devicetree/bindings/lpddr2/lpddr2.txt
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
- create mode 100644 arch/arm/boot/dts/elpida_ecb240abacn.dtsi
- create mode 100644 arch/arm/boot/dts/omap2420.dtsi
- create mode 100644 arch/arm/boot/dts/omap2430.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-overo.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-tobi.dts
+diff --git a/arch/arm64/include/asm/syscalls.h b/arch/arm64/include/asm/syscalls.h
+index 09ff335..81680a0 100644
+--- a/arch/arm64/include/asm/syscalls.h
++++ b/arch/arm64/include/asm/syscalls.h
+@@ -23,9 +23,6 @@
+ /*
+  * System call wrappers implemented in kernel/entry.S.
+  */
+-asmlinkage long sys_execve_wrapper(const char __user *filename,
+-				   const char __user *const __user *argv,
+-				   const char __user *const __user *envp);
+ asmlinkage long sys_clone_wrapper(unsigned long clone_flags,
+ 				  unsigned long newsp,
+ 				  void __user *parent_tid,
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index fe18a68..948cfb1 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -24,4 +24,7 @@
+ #include <asm/unistd32.h>
+ #endif
+ 
++#define __ARCH_WANT_SYS_EXECVE
++#define __ARCH_WANT_KERNEL_EXECVE
++
+ #endif /* __ASM_UNISTD_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 38cf853..5e0b28c 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -592,7 +592,7 @@ work_resched:
+ /*
+  * "slow" syscall return path.
+  */
+-ENTRY(ret_to_user)
++ret_to_user:
+ 	disable_irq				// disable interrupts
+ 	ldr	x1, [tsk, #TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+@@ -614,6 +614,22 @@ ENTRY(ret_from_fork)
+ ENDPROC(ret_from_fork)
+ 
+ /*
++ * ret_from_kernel_execve(struct pt_regs *normal, struct pt_regs *new)
++ *
++ * Turn a kernel thread into a user process.
++ */
++ENTRY(ret_from_kernel_execve)
++	str	xzr, [x1, #S_X0]		// returning 0
++	mov	x2, #-1
++	str	x2, [x1, #S_SYSCALLNO]		// not a syscall
++	mov	x2, #S_FRAME_SIZE
++	bl	memmove				// copy regs to the normal location
++	get_thread_info tsk
++	mov	sp, x0				// normal pt_regs
++	b	ret_to_user
++ENDPROC(ret_from_kernel_execve)
++
++/*
+  * SVC handler.
+  */
+ 	.align	6
+@@ -671,11 +687,6 @@ __sys_trace_return:
+ /*
+  * Special system call wrappers.
+  */
+-ENTRY(sys_execve_wrapper)
+-	mov	x3, sp
+-	b	sys_execve
+-ENDPROC(sys_execve_wrapper)
+-
+ ENTRY(sys_clone_wrapper)
+ 	mov	x5, sp
+ 	b	sys_clone
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index 905fcfb..9c77c0b 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -41,70 +41,6 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp,
+ 	return do_fork(clone_flags, newsp, regs, 0, parent_tidptr, child_tidptr);
+ }
+ 
+-/*
+- * sys_execve() executes a new program.
+- */
+-asmlinkage long sys_execve(const char __user *filenamei,
+-			   const char __user *const __user *argv,
+-			   const char __user *const __user *envp,
+-			   struct pt_regs *regs)
+-{
+-	long error;
+-	char * filename;
+-
+-	filename = getname(filenamei);
+-	error = PTR_ERR(filename);
+-	if (IS_ERR(filename))
+-		goto out;
+-	error = do_execve(filename, argv, envp, regs);
+-	putname(filename);
+-out:
+-	return error;
+-}
+-
+-int kernel_execve(const char *filename,
+-		  const char *const argv[],
+-		  const char *const envp[])
+-{
+-	struct pt_regs regs;
+-	int ret;
+-
+-	memset(&regs, 0, sizeof(struct pt_regs));
+-	ret = do_execve(filename,
+-			(const char __user *const __user *)argv,
+-			(const char __user *const __user *)envp, &regs);
+-	if (ret < 0)
+-		goto out;
+-
+-	/*
+-	 * Save argc to the register structure for userspace.
+-	 */
+-	regs.regs[0] = ret;
+-
+-	/*
+-	 * We were successful.  We won't be returning to our caller, but
+-	 * instead to user space by manipulating the kernel stack.
+-	 */
+-	asm(	"add	x0, %0, %1\n\t"
+-		"mov	x1, %2\n\t"
+-		"mov	x2, %3\n\t"
+-		"bl	memmove\n\t"	/* copy regs to top of stack */
+-		"mov	x27, #0\n\t"	/* not a syscall */
+-		"mov	x28, %0\n\t"	/* thread structure */
+-		"mov	sp, x0\n\t"	/* reposition stack pointer */
+-		"b	ret_to_user"
+-		:
+-		: "r" (current_thread_info()),
+-		  "Ir" (THREAD_START_SP - sizeof(regs)),
+-		  "r" (&regs),
+-		  "Ir" (sizeof(regs))
+-		: "x0", "x1", "x2", "x27", "x28", "x30", "memory");
+-
+- out:
+-	return ret;
+-}
+-EXPORT_SYMBOL(kernel_execve);
+-
+ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+ 			 unsigned long prot, unsigned long flags,
+ 			 unsigned long fd, off_t off)
+@@ -118,7 +54,6 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+ /*
+  * Wrappers to pass the pt_regs argument.
+  */
+-#define sys_execve		sys_execve_wrapper
+ #define sys_clone		sys_clone_wrapper
+ #define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
+ #define sys_sigaltstack		sys_sigaltstack_wrapper
+diff --git a/arch/arm64/kernel/sys32.S b/arch/arm64/kernel/sys32.S
+index 5e4dc93..903ba9d 100644
+--- a/arch/arm64/kernel/sys32.S
++++ b/arch/arm64/kernel/sys32.S
+@@ -36,11 +36,6 @@ compat_sys_vfork_wrapper:
+ 	b	compat_sys_vfork
+ ENDPROC(compat_sys_vfork_wrapper)
+ 
+-compat_sys_execve_wrapper:
+-	mov	x3, sp
+-	b	compat_sys_execve
+-ENDPROC(compat_sys_execve_wrapper)
+-
+ compat_sys_clone_wrapper:
+ 	mov	x5, sp
+ 	b	compat_sys_clone
+@@ -152,7 +147,7 @@ ENDPROC(compat_sys_fanotify_mark_wrapper)
+  */
+ #define sys_fork		compat_sys_fork_wrapper
+ #define sys_open		compat_sys_open
+-#define sys_execve		compat_sys_execve_wrapper
++#define sys_execve		compat_sys_execve
+ #define sys_lseek		compat_sys_lseek_wrapper
+ #define sys_mount		compat_sys_mount
+ #define sys_ptrace		compat_sys_ptrace
+diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
+index 967e92f..d77ba8e 100644
+--- a/arch/arm64/kernel/sys_compat.c
++++ b/arch/arm64/kernel/sys_compat.c
+@@ -51,24 +51,6 @@ asmlinkage int compat_sys_vfork(struct pt_regs *regs)
+ 		       regs, 0, NULL, NULL);
+ }
+ 
+-asmlinkage int compat_sys_execve(const char __user *filenamei,
+-				 compat_uptr_t argv, compat_uptr_t envp,
+-				 struct pt_regs *regs)
+-{
+-	int error;
+-	char * filename;
+-
+-	filename = getname(filenamei);
+-	error = PTR_ERR(filename);
+-	if (IS_ERR(filename))
+-		goto out;
+-	error = compat_do_execve(filename, compat_ptr(argv), compat_ptr(envp),
+-				 regs);
+-	putname(filename);
+-out:
+-	return error;
+-}
+-
+ asmlinkage int compat_sys_sched_rr_get_interval(compat_pid_t pid,
+ 						struct compat_timespec __user *interval)
+ {
