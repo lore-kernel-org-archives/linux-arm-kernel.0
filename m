@@ -1,36 +1,27 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Sep 2012 20:18:01 +0800
-Subject: [PATCH] i.MX: remove legacy clock support
-In-Reply-To: <1347346396-27669-1-git-send-email-s.hauer@pengutronix.de>
-References: <1347346396-27669-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120911121757.GA4513@S2101-09.ap.freescale.net>
+Date: Tue, 11 Sep 2012 20:20:29 +0800
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <87fw6orgcm.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829081020.GX26594@pengutronix.de>
+ <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829110137.GA26594@pengutronix.de>
+ <503E74E0.6040503@pengutronix.de>
+ <20120904141050.GB19897@richard-laptop>
+ <87fw6orgcm.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120911122027.GB4513@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 08:53:14AM +0200, Sascha Hauer wrote:
-> This removes the last leftovers from the i.MX legacy clock support.
-> As a bonus we get rid of mach/clock.h
+On Tue, Sep 11, 2012 at 01:42:01PM +0300, Alexander Shishkin wrote:
+> What about the other two patches? I guess they can go through arm tree
+> so we don't have to send it through Greg, right?
 > 
-> ----------------------------------------------------------------
-> Sascha Hauer (2):
->       ARM: i.MX clk pllv1: move mxc_decode_pll code to its user
->       ARM: i.MX remove last leftovers from legacy clock support
-> 
-Both:
+Right, those two will go via arm-soc tree once the first one gets
+applied on usb tree.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
->  arch/arm/mach-imx/Makefile             |    2 +-
->  arch/arm/mach-imx/clk-pllv1.c          |   49 +++++-
->  arch/arm/mach-imx/clk.c                |    3 +
->  arch/arm/mach-imx/clk.h                |    3 +-
->  arch/arm/mach-imx/mach-kzm_arm11_01.c  |    1 -
->  arch/arm/plat-mxc/Makefile             |    2 +-
->  arch/arm/plat-mxc/clock.c              |  257 --------------------------------
->  arch/arm/plat-mxc/cpufreq.c            |    1 -
->  arch/arm/plat-mxc/include/mach/clock.h |   70 ---------
->  9 files changed, 54 insertions(+), 334 deletions(-)
->  create mode 100644 arch/arm/mach-imx/clk.c
->  delete mode 100644 arch/arm/plat-mxc/clock.c
->  delete mode 100644 arch/arm/plat-mxc/include/mach/clock.h
-> 
+-- 
+Regards,
+Shawn
