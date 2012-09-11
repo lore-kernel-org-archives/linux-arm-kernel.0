@@ -1,59 +1,67 @@
-From: matthew@mattleach.net (Matthew Leach)
-Date: Tue, 11 Sep 2012 11:33:20 +0100
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20120911102905.GC14994@pengutronix.de> (Michael Olbrich's
- message of "Tue, 11 Sep 2012 12:29:05 +0200")
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
- <20120911084853.GT24458@pengutronix.de>
- <20120911113139.3b7b879f@archvile>
- <20120911102905.GC14994@pengutronix.de>
-Message-ID: <w51mx0wdf2n.fsf@mail.mattleach.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 11 Sep 2012 12:33:57 +0200
+Subject: [PATCH 08/14] tty: atmel_serial: add pinctrl support
+In-Reply-To: <1344603731-32667-8-git-send-email-plagnioj@jcrosoft.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-8-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <504F1395.8070509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/10/2012 03:02 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-serial at vger.kernel.org
+> ---
+> Hi Greg,
+> 
+> 	if you don't mind I would like to apply with the rest of the pinctrl
+> 	patch series
+> 
+> Best Regards,
+> J.
+>  drivers/tty/serial/atmel_serial.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 3d7e1ee..65f891b 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/atmel_pdc.h>
+>  #include <linux/atmel_serial.h>
+>  #include <linux/uaccess.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  #include <asm/io.h>
+>  #include <asm/ioctls.h>
+> @@ -1773,6 +1774,7 @@ static int __devinit atmel_serial_probe(struct platform_device *pdev)
+>  	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+>  	void *data;
+>  	int ret = -ENODEV;
+> +	struct pinctrl *pinctrl;
+>  
+>  	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
+>  
+> @@ -1805,6 +1807,12 @@ static int __devinit atmel_serial_probe(struct platform_device *pdev)
+>  
+>  	atmel_init_port(port, pdev);
+>  
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl)) {
+> +		ret = PTR_ERR(pinctrl);
+> +		goto err;
+> +	}
+> +
+>  	if (!atmel_use_dma_rx(&port->uart)) {
+>  		ret = -ENOMEM;
+>  		data = kmalloc(sizeof(struct atmel_uart_char)
 
-Michael Olbrich <mol@pengutronix.de> writes:
->> Btw, Here's what I get from it:
->> 
->> flexcan_chip_start:
->>         @ args = 0, pretend = 0, frame = 0
->>         @ frame_needed = 0, uses_anonymous_args = 0
->>         @ link register save eliminated.
->>         mov     r3, #0
->>         cmp     r0, #9
->>         str     r3, [r1, #0]
->>         ldrle   r3, [r1, #4]
->>         mov     r0, #0
->>         str     r3, [r1, #4]
->>         bx      lr
->>         .size   flexcan_chip_start, .-flexcan_chip_start
->>         .ident  "GCC: (OSELAS.Toolchain-2011.11.1) 4.6.3"
->>         .section        .note.GNU-stack,"",%progbits
->
-> How can I reproduce this output? I'd like to test this with different
-> toolchain versions.
 
-You can use this code fragment to produce the error:
+No: you should branch to "err_alloc_ring:".
 
-/* Structure of the hardware registers */
-struct flexcan_regs {
-	unsigned int mcr;
-	unsigned int rxfgmask;
-};
-
-#define flexcan_read(a) (*(volatile unsigned int *)(a))
-#define flexcan_write(v,a)      (*(volatile unsigned int *)(a) = (v))
-
-int flexcan_chip_start(int ver, struct flexcan_regs *regs)
-{
-	flexcan_write(0, &regs->mcr);
-
-	if (ver >= 10)
-		flexcan_write(0, &regs->rxfgmask);
-
-	return 0;
-}
-
-Matt
+Bye,
+-- 
+Nicolas Ferre
