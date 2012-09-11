@@ -1,127 +1,167 @@
-From: j-pihet@ti.com (Pihet-XID, Jean)
-Date: Tue, 11 Sep 2012 09:50:04 +0200
-Subject: [PATCH v5 0/8] ARM: OMAP2+: PM: introduce the power domains
- functional states
-In-Reply-To: <1347289778.10702.128.camel@sokoban>
-References: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
- <CAMQu2gxznhsbK3--nyQmYdHqyGjwpCSa3CJx8aYpF4wwR1qBSg@mail.gmail.com>
- <alpine.DEB.2.00.1208151842380.8833@utopia.booyaka.com>
- <CAMQu2gyV6gX=KFjMZ1r_BwsJXmgjuLMAWHrrLCYLgKEBRne0Ow@mail.gmail.com>
- <1347289778.10702.128.camel@sokoban>
-Message-ID: <CAN5iSWp4WhfhLd6K=qfyjvZOhp6K3hhOFJjey_0+00KZTa-+pQ@mail.gmail.com>
+From: david.jander@protonic.nl (David Jander)
+Date: Tue, 11 Sep 2012 09:54:27 +0200
+Subject: GCC 4.6.x miscompiling arm-linux?
+In-Reply-To: <20120911092753.7b8315d4@archvile>
+References: <20120910171654.1d4972b2@archvile>
+ <w51bohddcqw.fsf@mail.mattleach.net>
+ <20120911092753.7b8315d4@archvile>
+Message-ID: <20120911095427.763f8619@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero, Paul,
 
-After discussion with Paul at LPC I produced a new version that we are
-now internally reviewing.
+Hi all,
 
-Paul, what is your plan?
+On Tue, 11 Sep 2012 09:27:53 +0200
+David Jander <david.jander@protonic.nl> wrote:
+> Hi Matt,
+> 
+> On Mon, 10 Sep 2012 18:11:19 +0100
+> Matthew Leach <matthew@mattleach.net> wrote:
+> > David Jander <david.jander@protonic.nl> writes:
+> > > ...
+> > > 	.text
+> > > 	.align	2
+> > > 	.global	flexcan_chip_start
+> > > 	.type	flexcan_chip_start, %function
+> > > flexcan_chip_start:
+> > > 	@ args = 0, pretend = 0, frame = 0
+> > > 	@ frame_needed = 0, uses_anonymous_args = 0
+> > > 	@ link register save eliminated.
+> > > 	mov	r3, #0
+> > > 	cmp	r0, #9
+> > > 	str	r3, [r1, #0]
+> > > 	ldrle	r3, [r1, #4]
+> > > 	mov	r0, #0
+> > > 	str	r3, [r1, #4]
+> > > 	bx	lr
+> > > 	.size	flexcan_chip_start, .-flexcan_chip_start
+> > > 	.ident	"GCC: (OSELAS.Toolchain-2011.11.1) 4.6.2"
+> > > 	.section	.note.GNU-stack,"",%progbits
+> > >
+> > 
+> > This does indeed look wrong. I had a go at compile your code snippet the
+> > following assembly was produced:
+> > 
+> >         .text
+> >         .align  2
+> >         .global flexcan_chip_start
+> >         .type   flexcan_chip_start, %function
+> > flexcan_chip_start:
+> >         @ Function supports interworking.
+> >         @ args = 0, pretend = 0, frame = 0
+> >         @ frame_needed = 0, uses_anonymous_args = 0
+> >         @ link register save eliminated.
+> >         cmp     r0, #9
+> >         mov     r3, #0
+> >         str     r3, [r1, #0]
+> >         mov     r0, #0
+> >         strgt   r3, [r1, #4]
+> >         bx      lr
+> >         .size   flexcan_chip_start, .-flexcan_chip_start
+> >         .ident  "GCC: (GNU) 4.3.3"
+> >         .section        .note.GNU-stack,"",%progbits
+> > 
+> > I think this looks correct. Perhaps you could try the angstrom arm5te
+> > toolchain and see if it's a toolchain issue?
+> 
+> Yes, this looks a lot better, and is exactly what I get when I compile this
+> code with CodeSourcery GCC-4.4.1
+> 
+> I have tries building gcc-4.6.3 also with OSELAS/PTXdist, and it gives the
+> same (wrong) result as with gcc-4.6.2
+> 
+> > I think this looks correct. Perhaps you could try the angstrom arm5te
+> > toolchain and see if it's a toolchain issue?
+> >
+> > http://www.angstrom-distribution.org/toolchains/angstrom-2011.03-i686-linux-armv5te-linux-gnueabi-toolchain-qte-4.6.3.tar.bz2
+> 
+> This toolchain is a lot older:
+> 
+> $ ./usr/local/angstrom/arm/bin/arm-angstrom-linux-gnueabi-gcc --version
+> arm-angstrom-linux-gnueabi-gcc (GCC) 4.3.3
+> Copyright (C) 2008 Free Software Foundation, Inc.
+> This is free software; see the source for copying conditions.  There is NO
+> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+> 
+> The tar-ball says 4.6.3, but that is probably the version number of the qte
+> library, not that of gcc, which is 4.3.3, It does indeed produce
+> the same (correct) output as in your case.
+> 
+> The newest angstrom (next) toolchain has gcc version 4.5.3, and it produces
+> this (correct) output:
+> 
+> flexcan_chip_start:
+>         @ Function supports interworking.
+>         @ args = 0, pretend = 0, frame = 0
+>         @ frame_needed = 0, uses_anonymous_args = 0
+>         @ link register save eliminated.
+>         mov     r3, #0
+>         cmp     r0, #9
+>         str     r3, [r1, #0]
+>         mov     r0, #0
+>         strgt   r3, [r1, #4]
+>         bx      lr
+>         .size   flexcan_chip_start, .-flexcan_chip_start
+>         .ident  "GCC: (GNU) 4.5.3 20110311 (prerelease)"
+>         .section        .note.GNU-stack,"",%progbits
+> 
+> Anyone knows where I can download a pre-built toolchain for 32-bit linux that
+> is based on gcc-4.6 and/or gcc-4.7 to try out?
+> 
+> I have quite a hard time believing this issue is a yet unknown bug in GCC...
+> I'd rather believe that I lack sufficient GCC knowledge to know how to
+> correctly tell the compiler that this is a memory-IO operation. Anyone knows
+> how to do this correctly? Or to explain why the output of gcc-4.6 looks less
+> optimal than the output of older versions of GCC?
 
-Regards,
-Jean
+I finally found two linaro toolchains that I could download and try. The
+results are rather interesting though:
 
-On Mon, Sep 10, 2012 at 5:09 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> On Thu, 2012-08-16 at 11:20 +0530, Shilimkar, Santosh wrote:
->> Paul,
->>
->> On Thu, Aug 16, 2012 at 6:18 AM, Paul Walmsley <paul@pwsan.com> wrote:
->> >
->> > Hi Santosh,
->> >
->> > On Wed, 15 Aug 2012, Shilimkar, Santosh wrote:
->> >
->> > > On Wed, Aug 15, 2012 at 3:32 PM, Jean Pihet <jean.pihet@newoldbits.com>
->> > > wrote:
->> > >
->> > > I didn't find any mention here about why are we going in this path and
->> > > not
->> > > in the direction proposed in another RFC [1]
->> > > I have already given my comments[2] against the introduction of another
->> > > PD
->> > > layer which can be avoided easily as demonstrated by the RFC[1]. The
->> > > comments
->> > > are still applicable for this series too.
->> > >
->> > > We really need to reduce OMAP specific framework overhead and
->> > > move towards more generic PM frameworks. For me, this series is
->> > > a step back-ward from that direction. Am really sorry for being critical
->> > > again but I remain unconvinced about this series and the problem it
->> > > is trying to solve.
->> > >
->> > > May be you have valid reasons not to follow the approach in [1] and in
->> > > that case, it will be good to clarify that so that some of us get
->> > > to know your rationale.
->> >
->> > I've asked Jean to handle the work of evaluating and/or integrating any
->> > feedback from you and Rajendra into this series.  Jean, has this latest
->> > series fully considered those issues?  Or are there still some areas of
->> > misalignment / lack of clarity?
->> >
->> Thanks for the information. The main objection to this series was to
->> not add un-necessary glue layer which still remains.
->>
->> From our discussion in past on and off list, your main intention for such
->> a series was -
->>
->> 1. Need a way to support OSWR.
->> - OSWR by definition is a RET with configurable logic and memory states.
->> Its a true power state from PD point of view and its not a logical state.
->> Now since we have agreed to make the OSWR as a static definition
->> (in all products so far OSWR is used as a static definition with logic
->> lost, memory retained kind of configuration.)
->>
->> - The above requirement can be easily fixed by adding the OSWR
->> as an additional basic power state as demonstrated in RFC.
->>
->> - There is no need to add another glue layer for above.
->>
->> 2. Locking so that the low level APIs don't race and henec abstracting the
->> exported API to 1 or 2 and making rest as private functions.
->>
->> -- Even before this series, except low level PM code, only one
->> common API was used to set the PD low power state.
->> int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
->>
->> -- Once we make OSWR as basic power state, we also avoid usage of
->> pwrdm_set_logic_retst() API.
->>
->> -- We implement lock at this API and export only above API +
->> may be omap_get_pwrdm_state() kind of API based on need.
->>
->> -- This solves the second requirement too.
->>
->> Even if we have more requirement, they can be addressed
->> too without need of another layer.
->>
->> If you look at the diffstat alone between two approaches, it is
->> evident how small piece of code is needed to support above.
->> Am not too much into the lines of code but basic objection we
->> have is not to add another glue layer.
->>
->> Thinking bit loud, for the logical layer for power domain
->> we should move towards common device power domain
->> APIs and if needed add/enhance them to support OMAP.
->>    drivers/base/power/domain.c
->> May be this though is bit premature but the intetion is
->> to move towards generic linux framework.
->>
->> > Anyway.  If there's a problem with this process, it sounds like you,
->> > Rajendra, Jean, Beno?t and I should schedule some time to talk over the
->> > same issues that you discussed with me on the phone.  Perhaps next week?
->> >
->> We can surely do a call if needed. But the comments given so far and the
->> RFC makes things more or less clear the contention point against the
->> $subject series.
->
-> What is the latest status with this set? This is kind of blocking the
-> omap4 core retention feature also as I am supposed to put the patches on
-> top of this set. Do we have a consensus which way this set should
-> evolve?
->
-> Or, should I just base the core retention patches on top of baseline and
-> forget about the functional power states for now?
->
-> -Tero
->
+1.- Ubuntu package gcc-4.6-arm-linux-gnueabi 4.6.3-1ubuntu5cross1.62:
+
+flexcan_chip_start:
+        .fnstart
+        @ args = 0, pretend = 0, frame = 0
+        @ frame_needed = 0, uses_anonymous_args = 0
+        @ link register save eliminated.
+        mov     r3, #0
+        cmp     r0, #9
+        str     r3, [r1, #0]
+        ldrle   r3, [r1, #4]
+        mov     r0, #0
+        str     r3, [r1, #4]
+        bx      lr
+        .fnend
+        .size   flexcan_chip_start, .-flexcan_chip_start
+        .ident  "GCC: (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3"
+        .section        .note.GNU-stack,"",%progbits
+
+Wrong code.
+
+2. Linaro gcc-linaro-arm-linux-gnueabihf-2012.08-20120827_linux gcc 4.7.2:
+
+flexcan_chip_start:
+        .fnstart
+        @ args = 0, pretend = 0, frame = 0
+        @ frame_needed = 0, uses_anonymous_args = 0
+        @ link register save eliminated.
+        cmp     r0, #9
+        mov     r3, #0
+        str     r3, [r1, #0]
+        mov     r0, #0
+        strgt   r3, [r1, #4]
+        bx      lr
+        .fnend
+        .size   flexcan_chip_start, .-flexcan_chip_start
+        .ident  "GCC: (crosstool-NG linaro-1.13.1-2012.08-20120827 - Linaro GCC 2012.08) 4.7.2 20120731 (prerelease)"
+        .section        .note.GNU-stack,"",%progbits
+
+This looks correct again! Could it be that all versions 4.6.x of gcc are
+broken for ARM??
+
+Best regards,
+
+-- 
+David Jander
+Protonic Holland.
