@@ -1,10 +1,10 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 11 Sep 2012 04:27:56 +0000
+Date: Tue, 11 Sep 2012 16:32:35 +1200
 Subject: [PATCHv5 9/9] arm: vt8500: clk: Add Common Clock Framework support
 In-Reply-To: <20120910211209.20289.6795@nucleus>
 References: <1346626896-23070-1-git-send-email-linux@prisktech.co.nz>
  <20120910211209.20289.6795@nucleus>
-Message-ID: <1347337867.2134.2.camel@gitbox>
+Message-ID: <1347337955.2134.3.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
