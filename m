@@ -1,26 +1,36 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 14:31:09 -0400
-Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
-In-Reply-To: <20120911175332.GI32234@mudshark.cambridge.arm.com>
-References: <1347380341-28145-1-git-send-email-cyril@ti.com>
- <20120911162522.GE32234@mudshark.cambridge.arm.com> <504F6DFB.5030208@ti.com>
- <20120911172018.GG32234@mudshark.cambridge.arm.com> <504F74C5.2020805@ti.com>
- <20120911175332.GI32234@mudshark.cambridge.arm.com>
-Message-ID: <504F836D.6050302@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 11 Sep 2012 11:33:37 -0700
+Subject: [PATCH 05/11] clk: Versatile Express clock generators ("osc")
+ driver
+In-Reply-To: <1347379848.2497.13.camel@hornet>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
+ <20120910191420.20289.1923@nucleus> <1347379848.2497.13.camel@hornet>
+Message-ID: <20120911183337.20289.1935@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/11/2012 1:53 PM, Will Deacon wrote:
-> On Tue, Sep 11, 2012 at 06:28:37PM +0100, Cyril Chemparathy wrote:
->> I can re-verify with the respun 7530/1 if you'd like.
->
-> Sure, submitted as 7533/1:
->
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7533/1
->
+Quoting Pawel Moll (2012-09-11 09:10:48)
+> I'm re-working the series right now, but generally I planned to push
+> drivers/clk changes via your tree, unless you want me to get it in
+> through arm-soc.
+> 
 
-Works great.
+I'm happy to take the clk patches.  Just make it clear which patches you
+want to go through me (I think it's obvious which two, but clarity is
+always nice ;-)
 
--- 
-Thanks
-- Cyril
+Regards,
+Mike
+
+> Cheers!
+> 
+> Pawel
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
