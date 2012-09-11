@@ -1,62 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Sep 2012 17:37:13 +0200
-Subject: [PATCH 1/2] arm: mvebu: split Kconfig options for Armada 370 and XP
-In-Reply-To: <1347377834-19402-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347377834-19402-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1347377834-19402-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 11 Sep 2012 11:42:02 -0400
+Subject: [PATCH 09/16] ARM: tegra: move platform_data definitions
+In-Reply-To: <1347368390-31252-9-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Tue, 11 Sep 2012 14:59:43 +0200")
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-9-git-send-email-arnd@arndb.de>
+Message-ID: <871ui8y3at.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, all the code for Armada 370 and XP was common, so we had a
-single Kconfig option to support all boards using both SoCs. With the
-addition of pinctrl drivers, this situation has changed: those two
-SoCs are radically different in terms of pinctrl, so they have two
-separate drivers. Since pinctrl drivers are typically select-ed from
-the SoC Kconfig option, it makes sense to split the 370/XP option into
-two separate options: one for Armada 370 and another for Armada XP.
+Hi Arnd,
 
-We keep an hidden option selected by both ARMADA_370 and ARMADA_XP in
-order to easily compile common code.
+On Tue, Sep 11 2012, Arnd Bergmann wrote:
+> diff --git a/arch/arm/mach-tegra/include/mach/sdhci.h
+> b/include/linux/platform_data/mmc-sdhci-tegra.h
+> similarity index 100%
+> rename from arch/arm/mach-tegra/include/mach/sdhci.h
+> rename to include/linux/platform_data/mmc-sdhci-tegra.h
 
-A followup patch actually makes use of this split to select the
-appropriate pinctrl drivers.
+Looks like you aren't renaming the idempotency guards, so e.g.
+include/linux/platform_data/mmc-sdhci-tegra.h will contain:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/Kconfig |   16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+#ifndef __ASM_ARM_ARCH_TEGRA_SDHCI_H
+#define __ASM_ARM_ARCH_TEGRA_SDHCI_H
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index caa2c5e..b0924b1 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -3,13 +3,23 @@ if ARCH_MVEBU
- menu "Marvell SOC with device tree"
- 
- config MACH_ARMADA_370_XP
--	bool "Marvell Armada 370 and Aramada XP boards"
-+	bool
- 	select ARMADA_370_XP_TIMER
- 	select CPU_V7
-+
-+config MACH_ARMADA_370
-+	bool "Marvell Armada 370 boads"
-+	select MACH_ARMADA_370_XP
- 	help
-+	  Say 'Y' here if you want your kernel to support boards based
-+	  on the Marvell Armada XP SoC with device tree.
- 
--	  Say 'Y' here if you want your kernel to support boards based on
--	  Marvell Armada 370 or Armada XP with device tree.
-+config MACH_ARMADA_XP
-+	bool "Marvell Armada XP boards"
-+	select MACH_ARMADA_370_XP
-+	help
-+	  Say 'Y' here if you want your kernel to support boards based
-+	  on the Marvell Armada XP SoC with device tree.
- 
- endmenu
- 
+Is that intentional?  Thanks,
+
+- Chris.
 -- 
-1.7.9.5
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
