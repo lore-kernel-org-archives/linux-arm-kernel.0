@@ -1,10 +1,10 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2012 14:59:43 +0200
-Subject: [PATCH 09/16] ARM: tegra: move platform_data definitions
+Date: Tue, 11 Sep 2012 14:59:37 +0200
+Subject: [PATCH 03/16] ARM: ep93xx: move platform_data definitions
 In-Reply-To: <1347368390-31252-1-git-send-email-arnd@arndb.de>
 References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
  <1347368390-31252-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347368390-31252-9-git-send-email-arnd@arndb.de>
+Message-ID: <1347368390-31252-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,125 +12,269 @@ Platform data for device drivers should be defined in
 include/linux/platform_data/*.h, not in the architecture
 and platform specific directories.
 
-This moves such data out of the tegra include directories
+This moves such data out of the ep93xx include directories
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Colin Cross <ccross@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Chris Ball <cjb@laptop.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Jeff Garzik <jgarzik@pobox.com> (supporter:SERIAL ATA
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com> (maintainer:INPUT
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
 Cc: Liam Girdwood <lrg@ti.com>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: linux-tegra at vger.kernel.org
+Cc: Jaroslav Kysela <perex@perex.cz>
+Cc: Takashi Iwai <tiwai@suse.de>
+Cc: Mika Westerberg <mika.westerberg@iki.fi>
+Cc: Axel Lin <axel.lin@gmail.com>
 ---
- arch/arm/mach-tegra/board-harmony.c                                |    4 ++--
- arch/arm/mach-tegra/board-paz00.c                                  |    2 +-
- arch/arm/mach-tegra/board-trimslice.c                              |    2 +-
- drivers/input/keyboard/tegra-kbc.c                                 |    2 +-
- drivers/mmc/host/sdhci-tegra.c                                     |    2 +-
- .../linux/platform_data/asoc-tegra_wm8903.h                        |    0
- .../mach/kbc.h => include/linux/platform_data/keyboard-tegra-kbc.h |    0
- .../mach/sdhci.h => include/linux/platform_data/mmc-sdhci-tegra.h  |    0
- sound/soc/tegra/tegra_wm8903.c                                     |    2 +-
- 9 files changed, 7 insertions(+), 7 deletions(-)
- rename arch/arm/mach-tegra/include/mach/tegra_wm8903_pdata.h => include/linux/platform_data/asoc-tegra_wm8903.h (100%)
- rename arch/arm/mach-tegra/include/mach/kbc.h => include/linux/platform_data/keyboard-tegra-kbc.h (100%)
- rename arch/arm/mach-tegra/include/mach/sdhci.h => include/linux/platform_data/mmc-sdhci-tegra.h (100%)
+ Documentation/spi/ep93xx_spi                                     |    2 +-
+ arch/arm/mach-ep93xx/core.c                                      |    6 +++---
+ arch/arm/mach-ep93xx/dma.c                                       |    2 +-
+ arch/arm/mach-ep93xx/edb93xx.c                                   |    4 ++--
+ arch/arm/mach-ep93xx/simone.c                                    |    2 +-
+ arch/arm/mach-ep93xx/snappercl15.c                               |    2 +-
+ arch/arm/mach-ep93xx/vision_ep9307.c                             |    4 ++--
+ drivers/ata/pata_ep93xx.c                                        |    2 +-
+ drivers/dma/ep93xx_dma.c                                         |    2 +-
+ drivers/input/keyboard/ep93xx_keypad.c                           |    2 +-
+ drivers/spi/spi-ep93xx.c                                         |    4 ++--
+ drivers/video/ep93xx-fb.c                                        |    2 +-
+ .../mach/dma.h => include/linux/platform_data/dma-ep93xx.h       |    0
+ .../linux/platform_data/keypad-ep93xx.h                          |    0
+ .../ep93xx_spi.h => include/linux/platform_data/spi-ep93xx.h     |    0
+ .../mach/fb.h => include/linux/platform_data/video-ep93xx.h      |    0
+ sound/soc/ep93xx/ep93xx-ac97.c                                   |    2 +-
+ sound/soc/ep93xx/ep93xx-i2s.c                                    |    2 +-
+ sound/soc/ep93xx/ep93xx-pcm.c                                    |    2 +-
+ 19 files changed, 20 insertions(+), 20 deletions(-)
+ rename arch/arm/mach-ep93xx/include/mach/dma.h => include/linux/platform_data/dma-ep93xx.h (100%)
+ rename arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h => include/linux/platform_data/keypad-ep93xx.h (100%)
+ rename arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h => include/linux/platform_data/spi-ep93xx.h (100%)
+ rename arch/arm/mach-ep93xx/include/mach/fb.h => include/linux/platform_data/video-ep93xx.h (100%)
 
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index e65e837..31b3b72 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -35,10 +35,10 @@
- #include <asm/hardware/gic.h>
- #include <asm/setup.h>
- 
--#include <mach/tegra_wm8903_pdata.h>
-+#include <linux/platform_data/asoc-tegra_wm8903.h>
- #include <mach/iomap.h>
- #include <mach/irqs.h>
--#include <mach/sdhci.h>
-+#include <linux/platform_data/mmc-sdhci-tegra.h>
- 
- #include "board.h"
- #include "board-harmony.h"
-diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index 4b64af5..6dd6854 100644
---- a/arch/arm/mach-tegra/board-paz00.c
-+++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -40,7 +40,7 @@
- 
- #include <mach/iomap.h>
- #include <mach/irqs.h>
--#include <mach/sdhci.h>
-+#include <linux/platform_data/mmc-sdhci-tegra.h>
- 
- #include "board.h"
- #include "board-paz00.h"
-diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-index 776aa95..fb80c8f 100644
---- a/arch/arm/mach-tegra/board-trimslice.c
-+++ b/arch/arm/mach-tegra/board-trimslice.c
-@@ -34,7 +34,7 @@
- #include <asm/setup.h>
- 
- #include <mach/iomap.h>
--#include <mach/sdhci.h>
-+#include <linux/platform_data/mmc-sdhci-tegra.h>
- 
- #include "board.h"
- #include "clock.h"
-diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
-index 2c1c9ed..40aded8 100644
---- a/drivers/input/keyboard/tegra-kbc.c
-+++ b/drivers/input/keyboard/tegra-kbc.c
-@@ -30,7 +30,7 @@
- #include <linux/clk.h>
- #include <linux/slab.h>
- #include <mach/clk.h>
--#include <mach/kbc.h>
-+#include <linux/platform_data/keyboard-tegra-kbc.h>
- 
- #define KBC_MAX_DEBOUNCE_CNT	0x3ffu
- 
-diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
-index 0810ccc..d43e746 100644
---- a/drivers/mmc/host/sdhci-tegra.c
-+++ b/drivers/mmc/host/sdhci-tegra.c
-@@ -28,7 +28,7 @@
- #include <asm/gpio.h>
- 
- #include <mach/gpio-tegra.h>
--#include <mach/sdhci.h>
-+#include <linux/platform_data/mmc-sdhci-tegra.h>
- 
- #include "sdhci-pltfm.h"
- 
-diff --git a/arch/arm/mach-tegra/include/mach/tegra_wm8903_pdata.h b/include/linux/platform_data/asoc-tegra_wm8903.h
-similarity index 100%
-rename from arch/arm/mach-tegra/include/mach/tegra_wm8903_pdata.h
-rename to include/linux/platform_data/asoc-tegra_wm8903.h
-diff --git a/arch/arm/mach-tegra/include/mach/kbc.h b/include/linux/platform_data/keyboard-tegra-kbc.h
-similarity index 100%
-rename from arch/arm/mach-tegra/include/mach/kbc.h
-rename to include/linux/platform_data/keyboard-tegra-kbc.h
-diff --git a/arch/arm/mach-tegra/include/mach/sdhci.h b/include/linux/platform_data/mmc-sdhci-tegra.h
-similarity index 100%
-rename from arch/arm/mach-tegra/include/mach/sdhci.h
-rename to include/linux/platform_data/mmc-sdhci-tegra.h
-diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
-index d4f14e4..8deedf5 100644
---- a/sound/soc/tegra/tegra_wm8903.c
-+++ b/sound/soc/tegra/tegra_wm8903.c
-@@ -34,7 +34,7 @@
+diff --git a/Documentation/spi/ep93xx_spi b/Documentation/spi/ep93xx_spi
+index d8eb01c..832ddce 100644
+--- a/Documentation/spi/ep93xx_spi
++++ b/Documentation/spi/ep93xx_spi
+@@ -26,7 +26,7 @@ arch/arm/mach-ep93xx/ts72xx.c:
  #include <linux/gpio.h>
- #include <linux/of_gpio.h>
+ #include <linux/spi/spi.h>
  
--#include <mach/tegra_wm8903_pdata.h>
-+#include <linux/platform_data/asoc-tegra_wm8903.h>
+-#include <mach/ep93xx_spi.h>
++#include <linux/platform_data/spi-ep93xx.h>
  
- #include <sound/core.h>
- #include <sound/jack.h>
+ /* this is our GPIO line used for chip select */
+ #define MMC_CHIP_SELECT_GPIO EP93XX_GPIO_LINE_EGPIO9
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 4afe52a..e85bf17 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -36,9 +36,9 @@
+ #include <linux/export.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/fb.h>
+-#include <mach/ep93xx_keypad.h>
+-#include <mach/ep93xx_spi.h>
++#include <linux/platform_data/video-ep93xx.h>
++#include <linux/platform_data/keypad-ep93xx.h>
++#include <linux/platform_data/spi-ep93xx.h>
+ #include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-ep93xx/dma.c b/arch/arm/mach-ep93xx/dma.c
+index 16976d7..d8bfd02 100644
+--- a/arch/arm/mach-ep93xx/dma.c
++++ b/arch/arm/mach-ep93xx/dma.c
+@@ -25,7 +25,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ 
+-#include <mach/dma.h>
++#include <linux/platform_data/dma-ep93xx.h>
+ #include <mach/hardware.h>
+ 
+ #include "soc.h"
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index 337ab7c..b8f53d5 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -35,8 +35,8 @@
+ #include <sound/cs4271.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/fb.h>
+-#include <mach/ep93xx_spi.h>
++#include <linux/platform_data/video-ep93xx.h>
++#include <linux/platform_data/spi-ep93xx.h>
+ #include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/hardware/vic.h>
+diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+index 33dc079..0eb3f17 100644
+--- a/arch/arm/mach-ep93xx/simone.c
++++ b/arch/arm/mach-ep93xx/simone.c
+@@ -22,7 +22,7 @@
+ #include <linux/i2c-gpio.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/fb.h>
++#include <linux/platform_data/video-ep93xx.h>
+ #include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/hardware/vic.h>
+diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
+index 01abd35..50043ee 100644
+--- a/arch/arm/mach-ep93xx/snappercl15.c
++++ b/arch/arm/mach-ep93xx/snappercl15.c
+@@ -28,7 +28,7 @@
+ #include <linux/mtd/nand.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/fb.h>
++#include <linux/platform_data/video-ep93xx.h>
+ #include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/hardware/vic.h>
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index 2905a49..ba92e25 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -30,8 +30,8 @@
+ #include <linux/mmc/host.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/fb.h>
+-#include <mach/ep93xx_spi.h>
++#include <linux/platform_data/video-ep93xx.h>
++#include <linux/platform_data/spi-ep93xx.h>
+ #include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/hardware/vic.h>
+diff --git a/drivers/ata/pata_ep93xx.c b/drivers/ata/pata_ep93xx.c
+index 6ef2e37..e056406 100644
+--- a/drivers/ata/pata_ep93xx.c
++++ b/drivers/ata/pata_ep93xx.c
+@@ -43,7 +43,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/ktime.h>
+ 
+-#include <mach/dma.h>
++#include <linux/platform_data/dma-ep93xx.h>
+ #include <mach/platform.h>
+ 
+ #define DRV_NAME	"ep93xx-ide"
+diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+index c64917e..4aeaea7 100644
+--- a/drivers/dma/ep93xx_dma.c
++++ b/drivers/dma/ep93xx_dma.c
+@@ -26,7 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+-#include <mach/dma.h>
++#include <linux/platform_data/dma-ep93xx.h>
+ 
+ #include "dmaengine.h"
+ 
+diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
+index c46fc81..7363402 100644
+--- a/drivers/input/keyboard/ep93xx_keypad.c
++++ b/drivers/input/keyboard/ep93xx_keypad.c
+@@ -29,7 +29,7 @@
+ #include <linux/slab.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/ep93xx_keypad.h>
++#include <linux/platform_data/keypad-ep93xx.h>
+ 
+ /*
+  * Keypad Interface Register offsets
+diff --git a/drivers/spi/spi-ep93xx.c b/drivers/spi/spi-ep93xx.c
+index f97f1d2..3a21959 100644
+--- a/drivers/spi/spi-ep93xx.c
++++ b/drivers/spi/spi-ep93xx.c
+@@ -31,8 +31,8 @@
+ #include <linux/scatterlist.h>
+ #include <linux/spi/spi.h>
+ 
+-#include <mach/dma.h>
+-#include <mach/ep93xx_spi.h>
++#include <linux/platform_data/dma-ep93xx.h>
++#include <linux/platform_data/spi-ep93xx.h>
+ 
+ #define SSPCR0			0x0000
+ #define SSPCR0_MODE_SHIFT	6
+diff --git a/drivers/video/ep93xx-fb.c b/drivers/video/ep93xx-fb.c
+index 345d962..f2c092da 100644
+--- a/drivers/video/ep93xx-fb.c
++++ b/drivers/video/ep93xx-fb.c
+@@ -24,7 +24,7 @@
+ #include <linux/clk.h>
+ #include <linux/fb.h>
+ 
+-#include <mach/fb.h>
++#include <linux/platform_data/video-ep93xx.h>
+ 
+ /* Vertical Frame Timing Registers */
+ #define EP93XXFB_VLINES_TOTAL			0x0000	/* SW locked */
+diff --git a/arch/arm/mach-ep93xx/include/mach/dma.h b/include/linux/platform_data/dma-ep93xx.h
+similarity index 100%
+rename from arch/arm/mach-ep93xx/include/mach/dma.h
+rename to include/linux/platform_data/dma-ep93xx.h
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h b/include/linux/platform_data/keypad-ep93xx.h
+similarity index 100%
+rename from arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h
+rename to include/linux/platform_data/keypad-ep93xx.h
+diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h b/include/linux/platform_data/spi-ep93xx.h
+similarity index 100%
+rename from arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h
+rename to include/linux/platform_data/spi-ep93xx.h
+diff --git a/arch/arm/mach-ep93xx/include/mach/fb.h b/include/linux/platform_data/video-ep93xx.h
+similarity index 100%
+rename from arch/arm/mach-ep93xx/include/mach/fb.h
+rename to include/linux/platform_data/video-ep93xx.h
+diff --git a/sound/soc/ep93xx/ep93xx-ac97.c b/sound/soc/ep93xx/ep93xx-ac97.c
+index bdffab3..c352165 100644
+--- a/sound/soc/ep93xx/ep93xx-ac97.c
++++ b/sound/soc/ep93xx/ep93xx-ac97.c
+@@ -21,7 +21,7 @@
+ #include <sound/ac97_codec.h>
+ #include <sound/soc.h>
+ 
+-#include <mach/dma.h>
++#include <linux/platform_data/dma-ep93xx.h>
+ #include "ep93xx-pcm.h"
+ 
+ /*
+diff --git a/sound/soc/ep93xx/ep93xx-i2s.c b/sound/soc/ep93xx/ep93xx-i2s.c
+index 8df8f6d..ac4a751 100644
+--- a/sound/soc/ep93xx/ep93xx-i2s.c
++++ b/sound/soc/ep93xx/ep93xx-i2s.c
+@@ -28,7 +28,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/ep93xx-regs.h>
+-#include <mach/dma.h>
++#include <linux/platform_data/dma-ep93xx.h>
+ 
+ #include "ep93xx-pcm.h"
+ 
+diff --git a/sound/soc/ep93xx/ep93xx-pcm.c b/sound/soc/ep93xx/ep93xx-pcm.c
+index 4eea98b..665d9c9 100644
+--- a/sound/soc/ep93xx/ep93xx-pcm.c
++++ b/sound/soc/ep93xx/ep93xx-pcm.c
+@@ -25,7 +25,7 @@
+ #include <sound/soc.h>
+ #include <sound/dmaengine_pcm.h>
+ 
+-#include <mach/dma.h>
++#include <linux/platform_data/dma-ep93xx.h>
+ #include <mach/hardware.h>
+ #include <mach/ep93xx-regs.h>
+ 
 -- 
 1.7.10
