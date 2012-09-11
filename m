@@ -1,63 +1,95 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 12:01:53 +0200
-Subject: [PATCH v2 0/3] arm/dts: omap: add dt data for MUSB
-In-Reply-To: <CAAe_U6Kanxmvw5mWzGQ-7Jig6K75FA7UwxUipKfp4gURtntrRg@mail.gmail.com>
+Date: Tue, 11 Sep 2012 12:05:11 +0200
+Subject: [PATCH v2 1/3] arm/dts: Add twl6030-usb data
+In-Reply-To: <CAAe_U6KQX6LPT3p108stdBVkj_KnK0Q1Gxumy4Jn4ah38q0LwQ@mail.gmail.com>
 References: <1347345381-4390-1-git-send-email-kishon@ti.com>
- <504EF587.3080903@ti.com>
- <CAAe_U6JoW36bWSamHkRV66JX5fZ3QkLQv=4XJr-MuaFgaRjOaA@mail.gmail.com>
- <504F0053.6000808@ti.com>
- <CAAe_U6Kanxmvw5mWzGQ-7Jig6K75FA7UwxUipKfp4gURtntrRg@mail.gmail.com>
-Message-ID: <504F0C11.8050500@ti.com>
+ <1347345381-4390-2-git-send-email-kishon@ti.com> <504F03D4.5080800@ti.com>
+ <CAAe_U6KQX6LPT3p108stdBVkj_KnK0Q1Gxumy4Jn4ah38q0LwQ@mail.gmail.com>
+Message-ID: <504F0CD7.1090302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 11:16 AM, ABRAHAM, KISHON VIJAY wrote:
+On 09/11/2012 11:39 AM, ABRAHAM, KISHON VIJAY wrote:
 > Hi,
 > 
-> On Tue, Sep 11, 2012 at 2:41 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->> On 09/11/2012 10:44 AM, ABRAHAM, KISHON VIJAY wrote:
->>> Hi Benoit,
+> On Tue, Sep 11, 2012 at 2:56 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+>> On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
+>>> Add twl6030-usb data node in twl6030 device tree file
 >>>
->>> On Tue, Sep 11, 2012 at 1:55 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->>>> On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
->>>>> No major change from the previous version. Just removed the
->>>>> omap-usb2 dt data and sent that as a separate patch.
->>>>
->>>> Well, I think you'd better keep them in the same series :-)
->>>>
->>>>> Rebased on
->>>>> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git musb
->>>>
->>>> Since it is DTS stuf, you should rebase that on top of the latest
->>>> lo/devel-dt branch. All the latest DTS patches an in there for 3.7.
+>>> Acked-by: Felipe Balbi <balbi@ti.com>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>  arch/arm/boot/dts/omap4-panda.dts |    4 ++++
+>>>  arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
+>>>  arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
+>>>  3 files changed, 13 insertions(+)
 >>>
->>> The ocp2scp data is not in linux-omap :-( And omap-usb2 has to be a
->>> child of ocp2scp. So I used arm-soc tree to which ocp2scp stuff was
->>> pulled into.
+>>> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+>>> index 9880c12..2999eba 100644
+>>> --- a/arch/arm/boot/dts/omap4-panda.dts
+>>> +++ b/arch/arm/boot/dts/omap4-panda.dts
+>>> @@ -126,3 +126,7 @@
+>>>       ti,non-removable;
+>>>       bus-width = <4>;
+>>>  };
+>>> +
+>>> +&twlusb {
+>>> +     usb-supply = <&vusb>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+>>> index 72216e9..d8290c0 100644
+>>> --- a/arch/arm/boot/dts/omap4-sdp.dts
+>>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+>>> @@ -226,3 +226,7 @@
+>>>       bus-width = <4>;
+>>>       ti,non-removable;
+>>>  };
+>>> +
+>>> +&twlusb {
+>>> +     usb-supply = <&vusb>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+>>> index 3b2f351..8e3aac9 100644
+>>> --- a/arch/arm/boot/dts/twl6030.dtsi
+>>> +++ b/arch/arm/boot/dts/twl6030.dtsi
+>>> @@ -83,4 +83,9 @@
+>>>       clk32kg: regulator at 12 {
+>>>               compatible = "ti,twl6030-clk32kg";
+>>>       };
+>>> +
+>>> +     twlusb: twl6030-usb {
 >>
->> Mmm, but from what tree? It did not go through Tony?
->> What arm-soc branch exactly?
+>> That name should be a generic device class name is possible.
+>> What is twl6030-usb exactly? an USB PHY?
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-> (or) ocp2scp
+> Of late we are calling it the comparator as it's used only to detect
+> VBUS/ID events.
+> Should it be like usb-comparator? What should be the label?
 
+usb-comparator looks good and generic enough.
 
-OK, here it is:
+The label is useless until you reference it somewhere else. But in the
+case of the label, it can be more specific.
+But you can just use "twl-usb-comparator" for example.
 
-+
-+               ocp2scp {
-+                       compatible = "ti,omap-ocp2scp";
-+                       #address-cells = <1>;
-+                       #size-cells = <1>;
-+                       ranges;
-+                       ti,hwmods = "ocp2scp_usb_phy";
-+               };
+>>
+>>> +             compatible = "ti,twl6030-usb";
+>>> +             interrupts = < 4 10 >;
+>>
+>> If this is for two interrupts, you'd better split them to avoid
+>> confusion with irq specifiers that requires several attributes like for
+>> the GIC.
+> 
+> yeah. Thats for 2 interrupts.
+>>
+>> +               interrupts = <4>, <10>; /* IRQ1 blabla, IRQ2 blabla*/
+>>
+>> The comments are not mandatory assuming the binding is documented.
+> 
+> It's documented *usb: twl6030: Add dt support for twl6030 usb*
 
-
-In order to be consistent with the OMAP4 data now, you should update it
-to add the reg, and IRQ if applicable.
-
-But for that we do need a proper base with ocp2scp + devel-dt.
+Yeah, sorry for that, but it is indeed very confusing to review the DTS
+without having the binding documentation already merged :-(
 
 Regards,
 Benoit
