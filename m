@@ -1,44 +1,50 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 11 Sep 2012 10:13:51 -0700
-Subject: [PATCH] i.MX: remove legacy clock support
-In-Reply-To: <1347346396-27669-1-git-send-email-s.hauer@pengutronix.de>
-References: <1347346396-27669-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120911171351.20289.33788@nucleus>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Sep 2012 17:16:27 +0000
+Subject: [PATCH 03/16] ARM: ep93xx: move platform_data definitions
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F00206B1EB884D@AUSP01VMBX24.collaborationhost.net>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-3-git-send-email-arnd@arndb.de>
+ <ADE657CA350FB648AAC2C43247A983F00206B1EB884D@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <201209111716.27848.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sascha Hauer (2012-09-10 23:53:14)
-> This removes the last leftovers from the i.MX legacy clock support.
-> As a bonus we get rid of mach/clock.h
+On Tuesday 11 September 2012, H Hartley Sweeten wrote:
+> Arnd,
 > 
-> ----------------------------------------------------------------
-> Sascha Hauer (2):
->       ARM: i.MX clk pllv1: move mxc_decode_pll code to its user
->       ARM: i.MX remove last leftovers from legacy clock support
-> 
+> What about gpio-ep93xx.h? It does not have any platform_data in
+> it but the gpio driver (driver/gpio/gpio-ep93xx.c) does include it
+> from the mach-* directory.
 
-Nice!  For the series:
-Reviewed-by: Mike Turquette <mturquette@linaro.org>
+There are actually four such headers for ep93xx:
 
-Regards,
-Mike
+* mach/ep93xx-regs.h
+  sound/soc/ep93xx/ep93xx-i2s.c
+  sound/soc/ep93xx/ep93xx-pcm.c
 
->  arch/arm/mach-imx/Makefile             |    2 +-
->  arch/arm/mach-imx/clk-pllv1.c          |   49 +++++-
->  arch/arm/mach-imx/clk.c                |    3 +
->  arch/arm/mach-imx/clk.h                |    3 +-
->  arch/arm/mach-imx/mach-kzm_arm11_01.c  |    1 -
->  arch/arm/plat-mxc/Makefile             |    2 +-
->  arch/arm/plat-mxc/clock.c              |  257 --------------------------------
->  arch/arm/plat-mxc/cpufreq.c            |    1 -
->  arch/arm/plat-mxc/include/mach/clock.h |   70 ---------
->  9 files changed, 54 insertions(+), 334 deletions(-)
->  create mode 100644 arch/arm/mach-imx/clk.c
->  delete mode 100644 arch/arm/plat-mxc/clock.c
->  delete mode 100644 arch/arm/plat-mxc/include/mach/clock.h
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+* mach/gpio-ep93xx.h
+  drivers/gpio/gpio-ep93xx.c
+
+* mach/hardware.h
+  drivers/gpio/gpio-ep93xx.c
+  drivers/input/keyboard/ep93xx_keypad.c
+  drivers/net/ethernet/cirrus/ep93xx_eth.c
+  sound/soc/ep93xx/edb93xx.c
+  sound/soc/ep93xx/ep93xx-i2s.c
+  sound/soc/ep93xx/ep93xx-pcm.c
+  sound/soc/ep93xx/simone.c
+  sound/soc/ep93xx/snappercl15.c
+
+* mach/platform.h
+  drivers/ata/pata_ep93xx.c
+  drivers/misc/ep93xx_pwm.c
+
+If you are planning to allow building a combined kernel for ep93xx and
+another ARMv4/v5 platform, all of these inclusions need to be removed
+and done differently, plus you also need to start using the common clock
+subsystem and sparse-irq. 
+
+Any of those things would be greatly appreciated as a cleanup, but we're
+not going to require them any time soon.
+
+	Arnd
