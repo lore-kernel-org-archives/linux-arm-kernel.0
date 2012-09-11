@@ -1,33 +1,31 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 11 Sep 2012 11:42:02 -0400
-Subject: [PATCH 09/16] ARM: tegra: move platform_data definitions
-In-Reply-To: <1347368390-31252-9-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Tue, 11 Sep 2012 14:59:43 +0200")
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-9-git-send-email-arnd@arndb.de>
-Message-ID: <871ui8y3at.fsf@octavius.laptop.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Sep 2012 17:45:01 +0200
+Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <201209111310.00347.arnd@arndb.de>
+References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201209111310.00347.arnd@arndb.de>
+Message-ID: <20120911174501.2ddec831@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Arnd,
 
-On Tue, Sep 11 2012, Arnd Bergmann wrote:
-> diff --git a/arch/arm/mach-tegra/include/mach/sdhci.h
-> b/include/linux/platform_data/mmc-sdhci-tegra.h
-> similarity index 100%
-> rename from arch/arm/mach-tegra/include/mach/sdhci.h
-> rename to include/linux/platform_data/mmc-sdhci-tegra.h
+Le Tue, 11 Sep 2012 13:10:00 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-Looks like you aren't renaming the idempotency guards, so e.g.
-include/linux/platform_data/mmc-sdhci-tegra.h will contain:
+> Excellent!
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-#ifndef __ASM_ARM_ARCH_TEGRA_SDHCI_H
-#define __ASM_ARM_ARCH_TEGRA_SDHCI_H
+Related to this patch set, I have a question: wouldn't it make sense to
+make the .virtual field of struct map_desc anvoid __iomem pointer as
+well instead of an unsigned long? This would avoid all the (unsigned
+long) casts in map_descs array definitions, and would be a bit more
+consistent, no?
 
-Is that intentional?  Thanks,
-
-- Chris.
+Thomas
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
