@@ -1,47 +1,86 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 11:13:01 +0200
-Subject: [PATCH v2 1/3] arm: omap: hwmod: add a new addr space in otg
- for writing to control module
-In-Reply-To: <1347354580-5895-2-git-send-email-kishon@ti.com>
-References: <1347354580-5895-1-git-send-email-kishon@ti.com>
- <1347354580-5895-2-git-send-email-kishon@ti.com>
-Message-ID: <504F009D.3050208@ti.com>
+From: ola.o.lilja@stericsson.com (Ola Lilja)
+Date: Tue, 11 Sep 2012 11:08:22 +0200
+Subject: [PATCH 07/17] Documentation: Define the MSP Driver Device Tree
+ bindings
+In-Reply-To: <20120910164333.GB24506@gmail.com>
+References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
+ <1345816913-4113-8-git-send-email-lee.jones@linaro.org>
+ <20120910164333.GB24506@gmail.com>
+Message-ID: <504EFF86.10105@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 11:09 AM, Kishon Vijay Abraham I wrote:
-> The mailbox register for usb otg in omap is present in control module.
-> On detection of any events VBUS or ID, this register should be written
-> to send the notification to musb core.
-> 
-> Till we have a separate control module driver to write to control module,
-> omap2430 will handle the register writes to control module by itself. So
-> a new address space to represent this control module register is added
-> to usb_otg_hs.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 09/10/2012 06:43 PM, Lee Jones wrote:
 
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    6 ++++++
->  1 file changed, 6 insertions(+)
+> Ola poke.
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 242aee4..3c19120 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -5890,6 +5890,12 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
->  		.pa_end		= 0x4a0ab003,
->  		.flags		= ADDR_TYPE_RT
->  	},
-> +	{
-> +		/* XXX: Remove this once control module driver is in place */
-> +		.pa_start	= 0x4a00233c,
-> +		.pa_end		= 0x4a00233f,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
->  	{ }
->  };
->  
+> On Fri, Aug 24, 2012 at 03:01:43PM +0100, Lee Jones wrote:
+>> Here we add the required documentation for the new Device Tree
+>> bindings pertaining to the MSP CPU-side DAI Driver.
+>> 
+>> CC: alsa-devel at alsa-project.org
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>  .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++++++++++++
+>>  1 file changed, 43 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
+>> 
+>> diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+>> new file mode 100644
+>> index 0000000..99acd9c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+>> @@ -0,0 +1,43 @@
+>> +* ux500 MSP (CPU-side Digital Audio Interface)
+>> +
+>> +Required properties:
+>> + - compatible       :"stericsson,ux500-msp-i2s"
+>> + - reg              : Physical base address and length of the device's registers.
+>> +
+>> +Optional properties:
+>> + - interrupts       : The interrupt output from the device.
+>> + - interrupt-parent : The parent interrupt controller.
+>> + - <name>-supply    : Phandle to the regulator <name> supply
+>> +
+>> +Example:
+>> +
+>> +	sound {
+>> +		compatible = "stericsson,snd-soc-mop500";
+>> +
+>> +		stericsson,platform-pcm-dma = <&pcm>;
+>> +		stericsson,cpu-dai = <&msp1 &msp3>;
+>> +		stericsson,audio-codec = <&codec>;
+>> +	};
+>> +
+>> +	pcm: ux500-pcm {
+>> +		compatible = "stericsson,ux500-pcm";
+>> +	};
+>> +
+>> +	msp1: msp at 80124000 {
+>> +		compatible = "stericsson,ux500-msp-i2s";
+>> +		reg = <0x80124000 0x1000>;
+>> +		interrupts = <0 62 0x4>;
+>> +		v-ape-supply = <&db8500_vape_reg>;
+>> +	};
+>> +
+>> +	msp3: msp at 80125000 {
+>> +		compatible = "stericsson,ux500-msp-i2s";
+>> +		reg = <0x80125000 0x1000>;
+>> +		interrupts = <0 62 0x4>;
+>> +		v-ape-supply = <&db8500_vape_reg>;
+>> +	};
+>> +
+>> +	codec: ab8500-codec {
+>> +		compatible = "stericsson,ab8500-codec";
+>> +		stericsson,earpeice-cmv = <950>; /* Units in mV. */
+
+
+This parameter has nothing to do with the ASoC platform-driver. Some way or the
+other the earpiece-cmv should belong to the codec-driver. Also, this parameter
+was set in the previous patch as well?!
+
+>> +	};
+>> -- 
+>> 1.7.9.5
+>> 
 > 
