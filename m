@@ -1,114 +1,63 @@
-From: david.jander@protonic.nl (David Jander)
-Date: Tue, 11 Sep 2012 13:52:12 +0200
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20559.8716.124212.451155@pilspetsen.it.uu.se>
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
- <20558.61974.299424.536837@pilspetsen.it.uu.se>
- <20120911104925.3461603e@archvile>
- <20559.1844.786507.216580@pilspetsen.it.uu.se>
- <20120911123743.29e0ed40@archvile>
- <20559.8716.124212.451155@pilspetsen.it.uu.se>
-Message-ID: <20120911135212.187bd224@archvile>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 11 Sep 2012 13:57:30 +0200
+Subject: [PATCH] arm/dts: Add omap3-beagle.dts
+In-Reply-To: <504F208C.8030507@ti.com>
+References: <1347317870-13419-1-git-send-email-jon-hunter@ti.com>
+ <504F208C.8030507@ti.com>
+Message-ID: <504F272A.7010402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012 13:35:40 +0200
-Mikael Pettersson <mikpe@it.uu.se> wrote:
-
-> David Jander writes:
->  > > I can make the patches available if there's confirmation that a vanilla
->  > > upstream gcc-4.6.3 doesn't work.
->  > 
->  > I am pretty sure this is the case... do you have a patch series that you can
->  > easily tar and mail to me? I'd like to try those patches with OSELAS, to see
->  > if I can indeed build a gcc-4.6.3 toolchain that generates correct code.... I
->  > already know that I can generate one that doesn't ;-)
->  > 
-> ...
->  > > If you're sure no add-on patches were applied, then yes please do.
->  > 
->  > Pretty sure, but not 100%, so I'd like to try your patches first if you don't
->  > mind....
+On 09/11/2012 01:29 PM, Benoit Cousson wrote:
+> Hi Jon,
 > 
-> And I'd like to confirm first. Please tell us the following:
+> On 09/11/2012 12:57 AM, Jon Hunter wrote:
+>> Add a minimal dts for original OMAP3430/3530 version of the Beagle board. This
+>> version of the Beagle board has 256MB of DDR and features the same TWL4030
+>> power management IC (PMIC) as the Beagle board XM.
 > 
->  > >  > > 2: include the output of gcc -v which tells how that gcc was configured,
+> Thanks for the patch.
+> 
+>> Given that the Beagle and Beagle-XM boards use the same PMIC, move the
+>> definition of the VSIM regulator into the TWL4030.dtsi file so that we do not
+>> need to duplicate in the Beagle board dts file.
+> 
+> Good, catch, regulator definition has indeed nothing to do outside the
+> twl4030.dtsi.
+> 
+>> This has been boot tested on an OMAP3530 Beagle board and verifing that the
+>> SD/MMC interface is working with a SD card.
+>>
+>> This patch is generated on top of Tony's patch for adding the Beagle board XM
+>> dts file [1].
+> 
+> Tony has just updated his devel-dt with the DTS series I pushed plus the
+> beagle-xm introduction, so I'm gonna put this one on top and built a
+> for_3.7/dts_part2 branch sinec there are a couplf of USB / AM33xx pending.
 
-Using built-in specs.
-COLLECT_GCC=/opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/bin/arm-v5te-linux-gnueabi-gcc-4.6.3
-COLLECT_LTO_WRAPPER=/opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/libexec/gcc/arm-v5te-linux-gnueabi/4.6.3/lto-wrapper
-Target: arm-v5te-linux-gnueabi
-Configured with: /home/djander/ptxdist/OSELAS.Toolchain-2011.11.1/platform-arm-v5te-linux-gnueabi-gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/build-cross/gcc-4.6.3/configure --target=arm-v5te-linux-gnueabi --with-sysroot=/opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3
--glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/sysroot-arm-v5te-linux-gnueabi --disable-multilib --with-float=soft --with-fpu=vfp --with-cpu=arm926ej-s --enable-__cxa_atexit --disable-sjlj-exceptions --disable-nls --disable-decimal-float --disable-fixed-point --disable-win32-registry --enable-symvers=gnu --with-pkgversion=OSELAS.Toolchain-2011.11.1 --with-system-zlib --with-gmp=/home/djander/ptxdist/OSELAS.Toolchain-2011.11.1/platform-arm-v5te
--linux-gnueabi-gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/sysroot-host --with-mpfr=/home/djander/ptxdist/OSELAS.Toolchain-2011.11.1/platform-arm-v5te-linux-gnueabi-gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/sysroot-host --prefix=/opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized --enable-languages=c,c++ --enable-threads=posix --enable-c99 --enable-long-long --enable-libstdcxx-debug --enable-profile --enable-shared --disable-libssp --enable-checking=release
-Thread model: posix
-gcc version 4.6.3 (OSELAS.Toolchain-2011.11.1)
+OK, so in fact, it does not apply very well due to all the changes I
+introduced in my for_3.7/dts pull and then the beagle is now missing all
+the LEDs support recently added.
 
->  > >  > > 3: give the exact set of gcc options used then compiling the test case.
+So you should refresh that patch taking the latest devel-dt branch as a
+base and copying the latest beagle-xm.dts file.
 
-If I type this in a terminal:
+>> diff --git a/arch/arm/mach-omap2/Makefile.boot b/arch/arm/mach-omap2/Makefile.boot
+>> index 0e602b7..a469a55 100644
+>> --- a/arch/arm/mach-omap2/Makefile.boot
+>> +++ b/arch/arm/mach-omap2/Makefile.boot
+>> @@ -3,7 +3,8 @@ params_phys-y		:= 0x80000100
+>>  initrd_phys-y		:= 0x80800000
+>>  
+>>  dtb-$(CONFIG_SOC_OMAP2420)	+= omap2420-h4.dtb
+>> -dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle-xm.dtb omap3-evm.dtb
+>> +dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle.dtb omap3-beagle-xm.dtb \
+>> +				   omap3-evm.dtb
 
+You'd better duplicate the whole line like it is done for OMAP4 instead
+of using the "\"
 
-$ /opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/bin/arm-v5te-linux-gnueabi-gcc-4.6.3 -Os -S -o - -x c -
++dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-evm.dtb
 
-struct flexcan_regs {
-        unsigned int mcr;
-        unsigned int rxfgmask;
-};
-
-#define flexcan_read(a) (*(volatile unsigned int *)(a))
-#define flexcan_write(v,a)      (*(volatile unsigned int *)(a) = (v))
-
-int flexcan_chip_start(int ver, struct flexcan_regs *regs)
-{
-        flexcan_write(0, &regs->mcr);
-
-        if (ver >= 10)
-                flexcan_write(0, &regs->rxfgmask);
-
-        return 0;
-}
-
-
-I get this output after hitting <CTRL-D>:
-
-        .cpu arm926ej-s
-        .fpu softvfp
-        .eabi_attribute 20, 1
-        .eabi_attribute 21, 1
-        .eabi_attribute 23, 3
-        .eabi_attribute 24, 1
-        .eabi_attribute 25, 1
-        .eabi_attribute 26, 2
-        .eabi_attribute 30, 4
-        .eabi_attribute 18, 4
-        .file   ""
-        .text
-        .align  2
-        .global flexcan_chip_start
-        .type   flexcan_chip_start, %function
-flexcan_chip_start:
-        @ args = 0, pretend = 0, frame = 0
-        @ frame_needed = 0, uses_anonymous_args = 0
-        @ link register save eliminated.
-        mov     r3, #0
-        cmp     r0, #9
-        str     r3, [r1, #0]
-        ldrle   r3, [r1, #4]
-        mov     r0, #0
-        str     r3, [r1, #4]
-        bx      lr
-        .size   flexcan_chip_start, .-flexcan_chip_start
-        .ident  "GCC: (OSELAS.Toolchain-2011.11.1) 4.6.3"
-        .section        .note.GNU-stack,"",%progbits
-
-
-Do you need more information?
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+Regards,
+Benoit
