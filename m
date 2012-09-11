@@ -1,105 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 11 Sep 2012 06:35:26 +0000 (UTC)
-Subject: [PATCH 00/29] Move OMAP2+ over to use COMMON clock
-In-Reply-To: <1339678038-23082-1-git-send-email-rnayak@ti.com>
-References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Sep 2012 14:35:45 +0800
+Subject: [PATCH 4/4] efikamx: remove Efika MX-specific CHRGVBUS hack from
+ the USB driver
+In-Reply-To: <CAKGA1bnvu5WZMPc7Lv7ERDpaB=rz+bRHXg1ORiiwB3vWSK8dRQ@mail.gmail.com>
+References: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
+ <1343843371-14143-5-git-send-email-matt@genesi-usa.com>
+ <CAOMZO5CcUZ8NKM6uHkBB1Yo9MjeoBq9NzpOYwT1squM4TOgV7g@mail.gmail.com>
+ <CAKGA1bnvu5WZMPc7Lv7ERDpaB=rz+bRHXg1ORiiwB3vWSK8dRQ@mail.gmail.com>
+Message-ID: <20120911063541.GA2481@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 10, 2012 at 10:03:15AM -0500, Matt Sealey wrote:
+> On Sun, Sep 9, 2012 at 10:00 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Wed, Aug 1, 2012 at 2:49 PM, Matt Sealey <matt@genesi-usa.com> wrote:
+> >> Since we're removing Efika MX support from the tree (for now), remove
+> >> the hack present in the USB host driver since it will never run and
+> >> isn't useful on any other systems.
+> >>
+> >> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+> >
+> > You should Cc linux-usb list and the USB maintainer on this one.
+> 
+> Good call, I actually thought I did that (git send-email is not my
+> best friend this month).
+> 
+> Luckily though with the board removal patches in Shawn's tree going up
+> at some point, this code can't be compiled anyway so this patch not
+> making it in will not ruin anyone's day. I'll resubmit it in the near
+> future but I'm not considering it top priority because of the
+> abovementioned reason.
+> 
+Ok, I will drop this one from my tree, and send arch/arm/mach-imx
+changes alone.  And then the patch can be resubmitted to linux-usb
+tree later.
 
-Hi Rajendra,
-
-A CCF testing branch has been built here.  The base is v3.6-rc5, plus the 
-most recent version of the Common Clock Framework preparation patches that 
-you posted to the list, "[PATCH v4 0/3] Prepare for OMAP2+ movement to 
-Common Clk", but updated to take RMK's feedback into account.  Then the 
-'clk-next-omap-3.6-rc3' branch from your repo at 
-'git://github.com/rrnayak/linux.git' was added.  Then some patches to drop 
-the old arch/arm/mach-omap2/clock*_data.c files were added.
-
-This branch was then run through checkpatch.pl, and all of the parenthesis
-alignment warnings have been fixed.  I don't know what to do about these 
-crazy DECLARE_CLK_* macros; they have so many arguments that they are 
-basically impossible to read.  Mike and I discussed converting them 
-into C99 structure initializers with named fields, but am not sure if it's 
-a readability advantage; it's probably going to be "write-only data" 
-either way.  I've reflowed many of them to save diffstat but there are 
-quite a few more to go.
-
-The branch was then built with a set of testing Kconfigs.  Here's what was 
-found: (these are still being investigated)
-
-- The OMAP4-only testconfig and rmk's OMAP4430-SDP Kconfigs failed:
-  "undefined reference to `omap2_clkt_iclk_allow_idle'":
-
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/omap4_testconfig/
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/rmk_omap4430_sdp_oldconfig/
-
-- RMK's OMAP3430-LDP Kconfig failed with a whole set of warnings:
-
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/rmk_omap3430_ldp_oldconfig/
-
-
-The kernel built with omap2plus_defconfig was then booted on several 
-OMAP2+ boards.  Here's what was found:
-
-- The kernel wouldn't boot on either the 3517EVM nor CM-T3517 boards.
-  This turned out to be due to some missing AM35XX clkdev aliases, the 
-  lack of which cause the CCF code to panic.  The patch that adds the 
-  OMAP3 data has been updated to fix that bug and an HSOTGUSB clkdev
-  alias bug that was found by visual inspection.
-
-- The 3730 Beagle XM issued a warning and stack trace upon boot.  
-  Debugging with Mike, this turned out to be due to a bug in the
-  modified omap2_init_clksel_parent() function: it returned a register
-  bitfield rather than an array index.  The patch that modifies this
-  function was then updated to fix the bug.
-
-- The 2420 N800 seems to have some kind of MMC-related problem
-  that prevents it from booting.  Still looking into this:
-
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/2420n800/2420n800_log.txt
-
-
-Then the branch was PM-tested to determine whether it can suspend and 
-serial-resume properly, and whether dynamic idle works.  These tests 
-didn't go so well:
-
-- 3530ES3 Beagleboard here was able to enter retention-idle
-  suspend, and leave it with serial wakeup, but the CORE powerdomain never 
-  entered a low-power state.  Dynamic retention-idle with serial wakeup
-  never resumed, and the test stopped there:
-
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/3530es3beagle/3530es3beagle_log.txt
-
-- 37xx EVM and 3730 Beagle XM fared better; they made it through the whole 
-  test program, but the CORE powerdomain also never entered a low-power
-  state:
-
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/37xxevm/37xxevm_log.txt
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/3730beaglexm/3730beaglexm_log.txt
-
-- 4430ES2 Panda never made past the first retention-idle suspend:
-
-  http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/4430es2panda/4430es2panda_log.txt
-
-
-Could you please take a look and see if you can identify why the patches 
-aren't passing the tests?  I can't send these upstream until they pass the 
-PM tests.
-
-This testing branch can be found at the branch named 
-"common_clk_testing_devel_3.7" of git://git.pwsan.com/linux-2.6
-
-The testbed reports from this branch can be found here:
-  
-   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/
-
-And the baseline test reports from v3.6-rc5 can be found here:
-
-   http://www.pwsan.com/omap/testlogs/test_v3.6-rc5/20120908202511/
-
-
-
-- Paul
+-- 
+Regards,
+Shawn
