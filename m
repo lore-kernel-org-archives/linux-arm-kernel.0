@@ -1,161 +1,156 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Sep 2012 14:27:25 +0200
-Subject: [PATCH v4 12/17] arm: plat-orion: use void __iomem pointers for time
- functions
+Date: Tue, 11 Sep 2012 14:27:26 +0200
+Subject: [PATCH v4 13/17] arm: plat-orion: use void __iomem pointers for
+ addr-map functions
 In-Reply-To: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1347366450-26644-13-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1347366450-26644-14-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions for time management now take void __iomem pointers, so
-we remove the temporary "unsigned long" casts from the mach-*/common.c
-files.
+The functions for address mapping management now take void __iomem
+pointers, so we remove the temporary "unsigned long" casts from the
+mach-*/common.c files.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-dove/common.c             |    5 ++---
- arch/arm/mach-kirkwood/common.c         |    5 ++---
- arch/arm/mach-mv78xx0/common.c          |    5 ++---
- arch/arm/mach-orion5x/common.c          |    5 ++---
- arch/arm/plat-orion/include/plat/time.h |    4 ++--
- arch/arm/plat-orion/time.c              |    8 ++++----
- 6 files changed, 14 insertions(+), 18 deletions(-)
+ arch/arm/mach-dove/addr-map.c               |    2 +-
+ arch/arm/mach-kirkwood/addr-map.c           |    5 +++--
+ arch/arm/mach-mv78xx0/addr-map.c            |    4 ++--
+ arch/arm/mach-orion5x/addr-map.c            |    5 +++--
+ arch/arm/plat-orion/addr-map.c              |   11 ++++-------
+ arch/arm/plat-orion/include/plat/addr-map.h |    4 ++--
+ 6 files changed, 15 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index ba55f63..cb65599 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -185,7 +185,7 @@ void __init dove_i2c_init(void)
-  ****************************************************************************/
- void __init dove_init_early(void)
- {
--	orion_time_set_base((unsigned long) TIMER_VIRT_BASE);
-+	orion_time_set_base(TIMER_VIRT_BASE);
- }
- 
- static int get_tclk(void)
-@@ -196,8 +196,7 @@ static int get_tclk(void)
- 
- static void __init dove_timer_init(void)
- {
--	orion_time_init((unsigned long) BRIDGE_VIRT_BASE,
--			BRIDGE_INT_TIMER1_CLR,
-+	orion_time_init(BRIDGE_VIRT_BASE, BRIDGE_INT_TIMER1_CLR,
- 			IRQ_DOVE_BRIDGE, get_tclk());
- }
- 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index defceca..55bf919 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -514,7 +514,7 @@ void __init kirkwood_wdt_init(void)
-  ****************************************************************************/
- void __init kirkwood_init_early(void)
- {
--	orion_time_set_base((unsigned long) TIMER_VIRT_BASE);
-+	orion_time_set_base(TIMER_VIRT_BASE);
- 
- 	/*
- 	 * Some Kirkwood devices allocate their coherent buffers from atomic
-@@ -543,8 +543,7 @@ static void __init kirkwood_timer_init(void)
- {
- 	kirkwood_tclk = kirkwood_find_tclk();
- 
--	orion_time_init((unsigned long) BRIDGE_VIRT_BASE,
--			BRIDGE_INT_TIMER1_CLR,
-+	orion_time_init(BRIDGE_VIRT_BASE, BRIDGE_INT_TIMER1_CLR,
- 			IRQ_KIRKWOOD_BRIDGE, kirkwood_tclk);
- }
- 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index fcda4a4..f123517 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -338,13 +338,12 @@ void __init mv78xx0_uart3_init(void)
-  ****************************************************************************/
- void __init mv78xx0_init_early(void)
- {
--	orion_time_set_base((unsigned long) TIMER_VIRT_BASE);
-+	orion_time_set_base(TIMER_VIRT_BASE);
- }
- 
- static void mv78xx0_timer_init(void)
- {
--	orion_time_init((unsigned long) BRIDGE_VIRT_BASE,
--			BRIDGE_INT_TIMER1_CLR,
-+	orion_time_init(BRIDGE_VIRT_BASE, BRIDGE_INT_TIMER1_CLR,
- 			IRQ_MV78XX0_TIMER_1, get_tclk());
- }
- 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 79f9ffb..58b754f 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -203,7 +203,7 @@ void __init orion5x_wdt_init(void)
-  ****************************************************************************/
- void __init orion5x_init_early(void)
- {
--	orion_time_set_base((unsigned long) TIMER_VIRT_BASE);
-+	orion_time_set_base(TIMER_VIRT_BASE);
- }
- 
- int orion5x_tclk;
-@@ -224,8 +224,7 @@ static void __init orion5x_timer_init(void)
- {
- 	orion5x_tclk = orion5x_find_tclk();
- 
--	orion_time_init((unsigned long) ORION5X_BRIDGE_VIRT_BASE,
--			BRIDGE_INT_TIMER1_CLR,
-+	orion_time_init(ORION5X_BRIDGE_VIRT_BASE, BRIDGE_INT_TIMER1_CLR,
- 			IRQ_ORION5X_BRIDGE, orion5x_tclk);
- }
- 
-diff --git a/arch/arm/plat-orion/include/plat/time.h b/arch/arm/plat-orion/include/plat/time.h
-index 4d5f1f6..07527e4 100644
---- a/arch/arm/plat-orion/include/plat/time.h
-+++ b/arch/arm/plat-orion/include/plat/time.h
-@@ -11,9 +11,9 @@
- #ifndef __PLAT_TIME_H
- #define __PLAT_TIME_H
- 
--void orion_time_set_base(u32 timer_base);
-+void orion_time_set_base(void __iomem *timer_base);
- 
--void orion_time_init(u32 bridge_base, u32 bridge_timer1_clr_mask,
-+void orion_time_init(void __iomem *bridge_base, u32 bridge_timer1_clr_mask,
- 		     unsigned int irq, unsigned int tclk);
- 
- 
-diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
-index 1ed8d13..0f4fa86 100644
---- a/arch/arm/plat-orion/time.c
-+++ b/arch/arm/plat-orion/time.c
-@@ -180,13 +180,13 @@ static struct irqaction orion_timer_irq = {
+diff --git a/arch/arm/mach-dove/addr-map.c b/arch/arm/mach-dove/addr-map.c
+index b92c9c7..2a06c01 100644
+--- a/arch/arm/mach-dove/addr-map.c
++++ b/arch/arm/mach-dove/addr-map.c
+@@ -47,7 +47,7 @@ static inline void __iomem *ddr_map_sc(int i)
+ static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+ 	.num_wins = 8,
+ 	.remappable_wins = 4,
+-	.bridge_virt_base = (unsigned long) BRIDGE_VIRT_BASE,
++	.bridge_virt_base = BRIDGE_VIRT_BASE,
  };
  
- void __init
--orion_time_set_base(u32 _timer_base)
-+orion_time_set_base(void __iomem *_timer_base)
- {
--	timer_base = (void __iomem *)_timer_base;
-+	timer_base = _timer_base;
+ static const struct __initdata orion_addr_map_info addr_map_info[] = {
+diff --git a/arch/arm/mach-kirkwood/addr-map.c b/arch/arm/mach-kirkwood/addr-map.c
+index 1b8c75c..8f0d162 100644
+--- a/arch/arm/mach-kirkwood/addr-map.c
++++ b/arch/arm/mach-kirkwood/addr-map.c
+@@ -41,7 +41,7 @@
+ static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+ 	.num_wins = 8,
+ 	.remappable_wins = 4,
+-	.bridge_virt_base = (unsigned long) BRIDGE_VIRT_BASE,
++	.bridge_virt_base = BRIDGE_VIRT_BASE,
+ };
+ 
+ static const struct __initdata orion_addr_map_info addr_map_info[] = {
+@@ -86,5 +86,6 @@ void __init kirkwood_setup_cpu_mbus(void)
+ 	/*
+ 	 * Setup MBUS dram target info.
+ 	 */
+-	orion_setup_cpu_mbus_target(&addr_map_cfg, DDR_WINDOW_CPU_BASE);
++	orion_setup_cpu_mbus_target(&addr_map_cfg,
++				    (void __iomem *) DDR_WINDOW_CPU_BASE);
+ }
+diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+index 3358f07..a51fc24 100644
+--- a/arch/arm/mach-mv78xx0/addr-map.c
++++ b/arch/arm/mach-mv78xx0/addr-map.c
+@@ -71,10 +71,10 @@ void __init mv78xx0_setup_cpu_mbus(void)
+ 	 */
+ 	if (mv78xx0_core_index() == 0)
+ 		orion_setup_cpu_mbus_target(&addr_map_cfg,
+-					    DDR_WINDOW_CPU0_BASE);
++					    (void __iomem *) DDR_WINDOW_CPU0_BASE);
+ 	else
+ 		orion_setup_cpu_mbus_target(&addr_map_cfg,
+-					    DDR_WINDOW_CPU1_BASE);
++					    (void __iomem *) DDR_WINDOW_CPU1_BASE);
  }
  
- void __init
--orion_time_init(u32 _bridge_base, u32 _bridge_timer1_clr_mask,
-+orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
- 		unsigned int irq, unsigned int tclk)
- {
- 	u32 u;
-@@ -194,7 +194,7 @@ orion_time_init(u32 _bridge_base, u32 _bridge_timer1_clr_mask,
- 	/*
- 	 * Set SoC-specific data.
- 	 */
--	bridge_base = (void __iomem *)_bridge_base;
-+	bridge_base = _bridge_base;
- 	bridge_timer1_clr_mask = _bridge_timer1_clr_mask;
+ void __init mv78xx0_setup_pcie_io_win(int window, u32 base, u32 size,
+diff --git a/arch/arm/mach-orion5x/addr-map.c b/arch/arm/mach-orion5x/addr-map.c
+index d309f53..b5efc0f 100644
+--- a/arch/arm/mach-orion5x/addr-map.c
++++ b/arch/arm/mach-orion5x/addr-map.c
+@@ -79,7 +79,7 @@ static int __init cpu_win_can_remap(const struct orion_addr_map_cfg *cfg,
+ static struct orion_addr_map_cfg addr_map_cfg __initdata = {
+ 	.num_wins = 8,
+ 	.cpu_win_can_remap = cpu_win_can_remap,
+-	.bridge_virt_base = (unsigned long) ORION5X_BRIDGE_VIRT_BASE,
++	.bridge_virt_base = ORION5X_BRIDGE_VIRT_BASE,
+ };
  
- 	ticks_per_jiffy = (tclk + HZ/2) / HZ;
+ static const struct __initdata orion_addr_map_info addr_map_info[] = {
+@@ -113,7 +113,8 @@ void __init orion5x_setup_cpu_mbus_bridge(void)
+ 	/*
+ 	 * Setup MBUS dram target info.
+ 	 */
+-	orion_setup_cpu_mbus_target(&addr_map_cfg, ORION5X_DDR_WINDOW_CPU_BASE);
++	orion_setup_cpu_mbus_target(&addr_map_cfg,
++				    (void __iomem *) ORION5X_DDR_WINDOW_CPU_BASE);
+ }
+ 
+ void __init orion5x_setup_dev_boot_win(u32 base, u32 size)
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index 367ca89..a7b8060 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -48,7 +48,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+ static void __init __iomem *
+ orion_win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
+ {
+-	return (void __iomem *)(cfg->bridge_virt_base + (win << 4));
++	return cfg->bridge_virt_base + (win << 4);
+ }
+ 
+ /*
+@@ -143,19 +143,16 @@ void __init orion_config_wins(struct orion_addr_map_cfg * cfg,
+  * Setup MBUS dram target info.
+  */
+ void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+-					const u32 ddr_window_cpu_base)
++					const void __iomem *ddr_window_cpu_base)
+ {
+-	void __iomem *addr;
+ 	int i;
+ 	int cs;
+ 
+ 	orion_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
+ 
+-	addr = (void __iomem *)ddr_window_cpu_base;
+-
+ 	for (i = 0, cs = 0; i < 4; i++) {
+-		u32 base = readl(addr + DDR_BASE_CS_OFF(i));
+-		u32 size = readl(addr + DDR_SIZE_CS_OFF(i));
++		u32 base = readl(ddr_window_cpu_base + DDR_BASE_CS_OFF(i));
++		u32 size = readl(ddr_window_cpu_base + DDR_SIZE_CS_OFF(i));
+ 
+ 		/*
+ 		 * Chip select enabled?
+diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
+index fd556f7..0a746fd 100644
+--- a/arch/arm/plat-orion/include/plat/addr-map.h
++++ b/arch/arm/plat-orion/include/plat/addr-map.h
+@@ -16,7 +16,7 @@ extern struct mbus_dram_target_info orion_mbus_dram_info;
+ struct orion_addr_map_cfg {
+ 	const int num_wins;	/* Total number of windows */
+ 	const int remappable_wins;
+-	const u32 bridge_virt_base;
++	void __iomem * const bridge_virt_base;
+ 
+ 	/* If NULL, the default cpu_win_can_remap will be used, using
+ 	   the value in remappable_wins */
+@@ -49,5 +49,5 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+ 				const u8 attr, const int remap);
+ 
+ void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+-					const u32 ddr_window_cpu_base);
++					const void __iomem *ddr_window_cpu_base);
+ #endif
 -- 
 1.7.9.5
