@@ -1,53 +1,44 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 11 Sep 2012 19:54:00 +0530
-Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
-In-Reply-To: <201209111417.42879.arnd@arndb.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 11 Sep 2012 16:31:35 +0200 (CEST)
+Subject: [PATCH 04/16] ARM: imx: move platform_data definitions
+In-Reply-To: <201209111410.05698.arnd@arndb.de>
 References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368559-31329-1-git-send-email-arnd@arndb.de>
- <CAMQu2gwLoccyjGwjjgndiW2aR--_S=UhCCTdcav6LicvYWe5SQ@mail.gmail.com>
- <201209111417.42879.arnd@arndb.de>
-Message-ID: <CAMQu2gz8F2FcgRuok3x1uJ4pP8=0E2-9jhYGchzU9AUtUHjYhg@mail.gmail.com>
+ <1347368390-31252-4-git-send-email-arnd@arndb.de>
+ <Pine.LNX.4.64.1209111538000.22084@axis700.grange>
+ <201209111410.05698.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.64.1209111624240.22084@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 7:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
->> Just curious to know how you came with some of the above header names ?
->>
->> plat/mcbsp ---> dsp-mcbsp.h
->> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
->> better name.
->
-> This one was a mistake on my side, as Tony and  Peter already pointed out.
-> How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
->
-After re-reading the cover-letter and your below response,
-'asoc-omap-mcbsp.h' seems to be fine.
+On Tue, 11 Sep 2012, Arnd Bergmann wrote:
 
->> plat/nand.h --> /mtd-nand-omap2.h
->> plat/onenand.h --> /mtd-onenand-omap2.h
->> May be "omap-nand.h" and "omap-onenand.h"
->>
->> plat/mcspi.h-->spi-omap2-mcspi.h
->> May be "omap-spi.h"
->>
->
-> As I wrote in the introductory mail, I tried to always prefix the file
-> names with the subsystem, followed by the name of the driver, in order
-> to standardize on just one set of rules.
->
-Just read that now.
+> On Tuesday 11 September 2012, Guennadi Liakhovetski wrote:
+> > Hi Arnd
+> > 
+> > It probably wouldn't be very difficult to also include 
+> > arch/arm/plat-mxc/include/mach/ipu.h in this your patch, but you can also 
+> > leave it for later. Just to make sure it's not something that would make 
+> > your future patching more complicated.
+> > 
+> 
+> For now, I've done only the straight renames but left the ones that looked
+> like they need more complex changes of any sort. Looking at ipu.h, it seems
+> that this header file defines data that is used inside of the driver but not
+> in the platform device definition, so we'd need to split it up and move
+> the part that is only used inside of the driver into a different place.
+> 
+> Of course, I could alo be mistaken and not have realized that actually all
+> of this file is platform data.
 
-> The drivers implementing the three headers above are:
->
-> drivers/mtd/nand/omap2.c
-> drivers/mtd/onenand/omap2.c
-> drivers/spi/spi-omap2-mcspi.c
->
-> so these all seem appropriate.
->
-Sorry I missed the subsystem prefix point.
-These names seems to be fine then.
+ipu.h is used by the dmaengine and IRQ driver under drivers/dma/ipu/, and 
+by its users drivers/media/platform/soc_camera/mx3_camera.c and 
+drivers/video/mx3fb.c. It has been placed under arch/arm/... because it's 
+arch-specific, but in principle I don't see any reason why it cannot 
+happily live anywhere under include/...
 
-Regards
-Santosh
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
