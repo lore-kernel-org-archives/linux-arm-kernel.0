@@ -1,27 +1,92 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Sep 2012 20:20:29 +0800
-Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
-In-Reply-To: <87fw6orgcm.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
- <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
- <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829081020.GX26594@pengutronix.de>
- <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829110137.GA26594@pengutronix.de>
- <503E74E0.6040503@pengutronix.de>
- <20120904141050.GB19897@richard-laptop>
- <87fw6orgcm.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120911122027.GB4513@S2101-09.ap.freescale.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Sep 2012 14:27:13 +0200
+Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
+Message-ID: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 01:42:01PM +0300, Alexander Shishkin wrote:
-> What about the other two patches? I guess they can go through arm tree
-> so we don't have to send it through Greg, right?
-> 
-Right, those two will go via arm-soc tree once the first one gets
-applied on usb tree.
+Andrew, Jason, Gr?gory,
 
--- 
-Regards,
-Shawn
+Here is a patch set that introduces basic support for address decoding
+on Armada 370 and Armada XP. The aim of this basic support is
+essentially to be able to configure a window to remap the BootROM,
+which is needed to startup the secondary CPUs for the SMP support.
+
+As we had discussed already, the address decoding configuration is not
+described in the Device Tree, it is for now hardcoded on a per-SoC
+basis. We might later discuss how to extend this to the Device Tree.
+
+The patch set is relatively long, as it refactors some existing
+Dove/Kirkwood/MV78xx0/Orion code to use void __iomem pointers instead
+of unsigned long, as per the request of Arnd Bergmann and Olof
+Johansson.
+
+This patch set is split in several parts:
+
+ (1) Patches 1-4 replaces binary or operators used in register address
+     definitions by plus operators. This is necessary because followup
+     patches change the base addresses constants to void __iomem
+     pointers, and binary or arithmetic on pointers is not
+     allowed. Also, using the plus operator to add an offset to a base
+     address is much more traditional. In our case, the binary or
+     operator and plus operator seem equivalent, as the low-order bits
+     of the base addresses that were being or'ed with an offset were
+     all zero.
+
+ (2) Patches 5-9 use the IOMEM() macro to turn the various base
+     virtual addresses constants into void __iomem pointers. This
+     naturally makes all derived constants (virtual addresses of
+     specific registers or units) as void __iomem pointers as
+     well. The patches also adjust the code to take into this
+     change. It adds a few temporary "(unsigned long)" casts that are
+     removed by the following patches that rework a few plat-orion
+     APIs. These temporary casts are necessary to make the patch set
+     properly bisectable, without having a single big patch that does
+     the complete IOMEM() conversion. At the end of the patch set, the
+     only (unsigned long) casts that remain are the one in the
+     map_desc[] array definitions, and those ones are expected.
+
+ (3) Patches 10-13 rework some plat-orion APIs so that they use void
+     __iomem pointers instead of unsigned long for virtual
+     addresses. Those patches also remove the now useless "(unsigned
+     long)" casts added in step (2) above.
+
+ (4) Patch 14 introduces PLAT_ORION_LEGACY, which allows the Marvell
+     370/XP platforms to be part of PLAT_ORION, and therefore re-use
+     the existing address decoding code.
+
+ (5) Patch 15 makes a small change to an address decoding structure so
+     that we can define at runtime the virtual address of the
+     configuration registers. This is needed as on Armada 370/XP the
+     address decoding "controller" is declared in the Device Tree.
+
+ (6) Patch 16 adds the 370/XP address decoding code itself. For now,
+     it only maps the BootROM on Armada XP.
+
+ (7) Patch 17 adds the necessary DT code to instantiate the address
+     decoding "controller".
+
+This patch set has been:
+
+ * Built, boot tested on Armada XP. The operation of the address
+   mapping support has been tested as well.
+
+ * Built tested only on Dove, Kirkwood, Orion5x and MV78xx0.
+
+Changes since v3:
+ * As per the request of Olof Johansson, use void __iomem pointers
+   everywhere instead of introducing more casts in the patch set. This
+   change has significantly increased the patch set size, though
+   (going from 5 patches in v3 to 17 patches in v4)
+
+Changes since v2:
+ * Remove one more useless (void __iomem *) cast in the Armada 370/XP
+   addr-map.c file, as noticed by Arnd Bergmann.
+
+Changes since v1:
+ * Use void __iomem * in addr-map code. Suggested by Arnd Bergmann.
+ * Add Acked-by on patches 2->5 from Gr?gory Cl?ment
+
+Thanks,
+
+Thomas Petazzoni
