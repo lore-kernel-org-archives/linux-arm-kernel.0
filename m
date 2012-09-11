@@ -1,32 +1,30 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 11 Sep 2012 15:14:20 +0100
-Subject: [PATCH 08/12] tty/serial: Add kgdb_nmi driver
-In-Reply-To: <1347356106-25368-8-git-send-email-anton.vorontsov@linaro.org>
-References: <20120911093042.GA12471@lizard>
- <1347356106-25368-8-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <20120911151420.14a29485@pyramind.ukuu.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Sep 2012 14:10:05 +0000
+Subject: [PATCH 04/16] ARM: imx: move platform_data definitions
+In-Reply-To: <Pine.LNX.4.64.1209111538000.22084@axis700.grange>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-4-git-send-email-arnd@arndb.de>
+ <Pine.LNX.4.64.1209111538000.22084@axis700.grange>
+Message-ID: <201209111410.05698.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +struct kgdb_nmi_tty_priv {
-> +	struct tty_port port;
-> +	int opened;
-> +	struct tasklet_struct tlet;
-> +	STRUCT_KFIFO(char, KGDB_NMI_FIFO_SIZE) fifo;
+On Tuesday 11 September 2012, Guennadi Liakhovetski wrote:
+> Hi Arnd
+> 
+> It probably wouldn't be very difficult to also include 
+> arch/arm/plat-mxc/include/mach/ipu.h in this your patch, but you can also 
+> leave it for later. Just to make sure it's not something that would make 
+> your future patching more complicated.
+> 
 
-I don't see where "opened" is used.
+For now, I've done only the straight renames but left the ones that looked
+like they need more complex changes of any sort. Looking at ipu.h, it seems
+that this header file defines data that is used inside of the driver but not
+in the platform device definition, so we'd need to split it up and move
+the part that is only used inside of the driver into a different place.
 
+Of course, I could alo be mistaken and not have realized that actually all
+of this file is platform data.
 
-> +static const struct tty_operations kgdb_nmi_tty_ops = {
-> +	.open		= kgdb_nmi_tty_open,
-> +	.close		= kgdb_nmi_tty_close,
-> +	.install	= kgdb_nmi_tty_install,
-> +	.cleanup	= kgdb_nmi_tty_cleanup,
-> +	.write_room	= kgdb_nmi_tty_write_room,
-> +	.write		= kgdb_nmi_tty_write,
-
-And a hangup method (just using tty_port helpers will do the job - it's
-needed so vhangup() works as expected on a port)
-
-
-Alan
+	Arnd
