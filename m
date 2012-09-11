@@ -1,70 +1,82 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 13:39:11 -0400
-Subject: [PATCH v3 13/17] ARM: LPAE: factor out T1SZ and TTBR1 computations
+Date: Tue, 11 Sep 2012 13:39:02 -0400
+Subject: [PATCH v3 04/17] ARM: LPAE: use phys_addr_t on virt <--> phys
+ conversion
 In-Reply-To: <1347385155-11643-1-git-send-email-cyril@ti.com>
 References: <1347385155-11643-1-git-send-email-cyril@ti.com>
-Message-ID: <1347385155-11643-14-git-send-email-cyril@ti.com>
+Message-ID: <1347385155-11643-5-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the TTBR1 offset calculation and the T1SZ calculation out
-of the TTB setup assembly code.  This should not affect functionality in
-any way, but improves code readability as well as readability of subsequent
-patches in this series.
+This patch fixes up the types used when converting back and forth between
+physical and virtual addresses.
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/pgtable-3level-hwdef.h |   10 ++++++++++
- arch/arm/mm/proc-v7-3level.S                |   16 ++++------------
- 2 files changed, 14 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/memory.h |   26 ++++++++++++++++++--------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index d795282..b501650 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -74,4 +74,14 @@
- #define PHYS_MASK_SHIFT		(40)
- #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 512d234..a4fc01e 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -157,22 +157,32 @@ extern unsigned long	__pv_offset;
+ extern unsigned long	__pv_phys_offset;
+ #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
  
-+#if defined CONFIG_VMSPLIT_2G
-+#define TTBR1_OFFSET	(1 << 4)		/* skip two L1 entries */
-+#elif defined CONFIG_VMSPLIT_3G
-+#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
-+#else
-+#define TTBR1_OFFSET	0
-+#endif
+-static inline unsigned long __virt_to_phys(unsigned long x)
++static inline phys_addr_t __virt_to_phys(unsigned long x)
+ {
+ 	unsigned long t;
+ 	early_patch_imm8("add", t, x, __pv_offset, 0);
+ 	return t;
+ }
+ 
+-static inline unsigned long __phys_to_virt(unsigned long x)
++static inline unsigned long __phys_to_virt(phys_addr_t x)
+ {
+-	unsigned long t;
+-	early_patch_imm8("sub", t, x, __pv_offset, 0);
++	unsigned long t, xlo = x;
++	early_patch_imm8("sub", t, xlo, __pv_offset, 0);
+ 	return t;
+ }
 +
-+#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
+ #else
+-#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+-#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
++
++static inline phys_addr_t __virt_to_phys(unsigned long x)
++{
++	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
++}
++
++static inline unsigned long __phys_to_virt(phys_addr_t x)
++{
++	return x - PHYS_OFFSET + PAGE_OFFSET;
++}
 +
  #endif
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index c4f4251..5d93f00 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -128,18 +128,10 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	 * booting secondary CPUs would end up using TTBR1 for the identity
- 	 * mapping set up in TTBR0.
- 	 */
--	bhi	9001f				@ PHYS_OFFSET > PAGE_OFFSET?
--	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
--#if defined CONFIG_VMSPLIT_2G
--	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
--	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
--#elif defined CONFIG_VMSPLIT_3G
--	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
--	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
--#endif
--	/* CONFIG_VMSPLIT_1G does not need TTBR1 adjustment */
--9001:	mcr	p15, 0, \tmp, c2, c0, 2		@ TTB control register
--	mcrr	p15, 1, \ttbr1, \zero, c2	@ load TTBR1
-+	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
-+	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
-+	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
-+	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
- 	.endm
+ #endif
+ #endif /* __ASSEMBLY__ */
+@@ -210,14 +220,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
  
- 	__CPUINIT
+ static inline void *phys_to_virt(phys_addr_t x)
+ {
+-	return (void *)(__phys_to_virt((unsigned long)(x)));
++	return (void *)__phys_to_virt(x);
+ }
+ 
+ /*
+  * Drivers should NOT use these either.
+  */
+ #define __pa(x)			__virt_to_phys((unsigned long)(x))
+-#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
++#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+ 
+ /*
 -- 
 1.7.9.5
