@@ -1,43 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Sep 2012 22:30:49 -0700
-Subject: [PATCH 04/17] ARM: OMAP2+: Remove unused nand_irq for GPMC
+Date: Mon, 10 Sep 2012 22:31:04 -0700
+Subject: [PATCH 09/17] serial/8250: Limit the omap workarounds to omap1
 In-Reply-To: <20120911052934.29637.9190.stgit@muffinssi.local>
 References: <20120911052934.29637.9190.stgit@muffinssi.local>
-Message-ID: <20120911053049.29637.89271.stgit@muffinssi.local>
+Message-ID: <20120911053104.29637.95283.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed and assumes a fixed IRQ number
-that won't work with SPARSE_IRQ.
+These workarounds do not apply for CONFIG_ARCH_OMAP2PLUS at all,
+so let's make it just CONFIG_ARCH_OMAP1.
 
-Acked-by: Afzal Mohammed <afzal@ti.com>
+This is needed to for ARM common zImage changes for
+omap2+ to avoid including plat and mach headers.
+
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-serial at vger.kernel.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-flash.c      |    1 -
- arch/arm/plat-omap/include/plat/nand.h |    1 -
- 2 files changed, 2 deletions(-)
+ drivers/tty/serial/8250/8250.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index 53c39d2..9ceec38 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -140,7 +140,6 @@ __init board_nand_init(struct mtd_partition *nand_parts,
- 	board_nand_data.devsize		= nand_type;
+diff --git a/drivers/tty/serial/8250/8250.c b/drivers/tty/serial/8250/8250.c
+index 8123f78..5b3f2fe 100644
+--- a/drivers/tty/serial/8250/8250.c
++++ b/drivers/tty/serial/8250/8250.c
+@@ -2336,7 +2336,7 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			serial_port_out(port, UART_EFR, efr);
+ 	}
  
- 	board_nand_data.ecc_opt = OMAP_ECC_HAMMING_CODE_DEFAULT;
--	board_nand_data.gpmc_irq = OMAP_GPMC_IRQ_BASE + cs;
- 	gpmc_nand_init(&board_nand_data);
- }
- #endif /* CONFIG_MTD_NAND_OMAP2 || CONFIG_MTD_NAND_OMAP2_MODULE */
-diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-omap/include/plat/nand.h
-index 290cef5..1a68c1e 100644
---- a/arch/arm/plat-omap/include/plat/nand.h
-+++ b/arch/arm/plat-omap/include/plat/nand.h
-@@ -24,7 +24,6 @@ struct omap_nand_platform_data {
- 	struct gpmc_timings	*gpmc_t;
- 	int			nr_parts;
- 	bool			dev_ready;
--	int			gpmc_irq;
- 	enum nand_io		xfer_type;
- 	int			devsize;
- 	enum omap_ecc           ecc_opt;
+-#ifdef CONFIG_ARCH_OMAP
++#ifdef CONFIG_ARCH_OMAP1
+ 	/* Workaround to enable 115200 baud on OMAP1510 internal ports */
+ 	if (cpu_is_omap1510() && is_omap_port(up)) {
+ 		if (baud == 115200) {
+@@ -2426,7 +2426,7 @@ static unsigned int serial8250_port_size(struct uart_8250_port *pt)
+ {
+ 	if (pt->port.iotype == UPIO_AU)
+ 		return 0x1000;
+-#ifdef CONFIG_ARCH_OMAP
++#ifdef CONFIG_ARCH_OMAP1
+ 	if (is_omap_port(pt))
+ 		return 0x16 << pt->port.regshift;
+ #endif
