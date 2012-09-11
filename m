@@ -1,102 +1,137 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Sep 2012 09:17:15 +0200
-Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator
- for NFC v1.
-In-Reply-To: <504DF9BB.8050509@gmail.com>
-References: <1345811288.2848.308.camel@sauron.fi.intel.com>
- <1345825064-9147-1-git-send-email-gcembed@gmail.com>
- <201209061056.12386.jbe@pengutronix.de>
- <504DF9BB.8050509@gmail.com>
-Message-ID: <20120911071715.GB18243@pengutronix.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 11 Sep 2012 12:49:00 +0530
+Subject: [PATCH] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
+ read/write
+In-Reply-To: <alpine.DEB.2.00.1209110643010.23042@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209052333410.11516@utopia.booyaka.com>
+ <CAMQu2gzCz+bS7U1ypFWzcp3zTpkfHdPzZfFtJ8Cd4ap8FSzJQg@mail.gmail.com>
+ <CAMQu2gw-KPQzYKtjJUxZjEX+_HKLL9WTxXXA35_ki8KbN+WDYg@mail.gmail.com>
+ <20120910185535.GC1303@atomide.com>
+ <CAMQu2gxUES=s8fMpwJ77tnY1wz4b_T=yustj+C+WNkEMmEOx4w@mail.gmail.com>
+ <alpine.DEB.2.00.1209110636310.23042@utopia.booyaka.com>
+ <CAMQu2gyXOEs3Zbo=JrPwN2LmUNyYVc35iPWwGZqXCE3BCsn7xg@mail.gmail.com>
+ <alpine.DEB.2.00.1209110643010.23042@utopia.booyaka.com>
+Message-ID: <CAMQu2gxkQ1JAjbuhFZqUxgrgzrFLhMZk_Q8TzXW5q9Lr3JOmqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 04:31:23PM +0200, Ga?tan Carlier wrote:
-> Hi Juergen,
-> On 09/06/2012 10:56 AM, Juergen Beisert wrote:
-> >Hi Ga?tan,
-> >
-> >Ga?tan Carlier wrote:
-> >>Any comments for this patch ?
-> >
-> >Sorry, a little bit late.
-> >
-> >>Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
-> >>in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
-> >>Warning: The same solution needs to be applied to the boot loader and the
-> >>flash programmer.
-> >
-> >What sense does it make to swap the bytes at offset 0x7D0 and 0x835?
-> >
-> >Background: the NFC in the i.MX27/i.MX31 (NFCv1) and i.MX25/i.MX35 (NFCv2) can
-> >only handle 512 byte pages with 16 bit OOB at once. To get them work with 2 k
-> >page NANDs they only do the 512 + 16 step four times. The result is, a 2 k
-> >page NAND is not handled as 2 k data and 64 bytes OOB, its handled instead as
-> >a stream of 2112 bytes:
-> >
-> >                |<-------- 2112 bytes --------->|
-> >                512+16 | 512+16 | 512+16 | 512+16
-> >
-> >Which means the NFC mixes data and OOB/checksums into its internal SRAM. But
-> >all upper routines still use this SRAM content with a 2048 (data) + 64 (OOB)
-> >bytes layout (to be more precise also the NFC hardware uses this layout).
-> >Result is, the factory bad block markers are lost, because the NFC stores the
-> >first 48 bytes from each OOB into the SRAM's data area (beginning with offset
-> >2000 (= 0x7D0) in the data area).
-> >
-> >So, the main goal of this swap patch should be to keep the factory bad block
-> >markers _and_ to make use of them.
-> >
-> >But the i.MX driver does not register its own bad block pattern description,
-> >so the default one is used with the BBM at position NAND_LARGE_BADBLOCK_POS
-> >(which means offset 0 in the OOB area).
-> >
-> >So, I think, all upper layers still search for the BBM at offset 0 of the OOB
-> >area, which results to SRAM's offset 0x800 (for NFCv1) and not 0x835. This
-> >means this patch keeps the factory bad block markers, but they won't still be
-> >used as expected.
-> >
-> >IMHO the bytes at SRAM's offset 0x7D0 and 0x800 for the NFCv1 must be swapped
-> >(and 0x7D0 and 0x1000 for the NFCv2) to keep the factory bad block markers
-> >_and_ to make use of them. Or am I wrong?
-> >
-> >Regards,
-> >Juergen
-> >
-> The point is not the necessity of swapping bytes if factory bad
-> block markers are not used.
-> In my case, the bytes must be swapped because all previous
-> operations on flash swapped these bytes :
-> * Flashes redboot (bootloader) via JTAG using OpenOCD which swaps bytes;
-> * Writes kernel and rootfs via TFTP using redboot which swaps bytes;
-> So to be able to read rootfs partition, mxc-nand driver have to swap
-> bytes otherwise, JFFS2 detects error on partition and is unable to
-> mount it.
+On Tue, Sep 11, 2012 at 12:13 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Tue, 11 Sep 2012, Shilimkar, Santosh wrote:
+>
+>> On Tue, Sep 11, 2012 at 12:07 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>> > On Tue, 11 Sep 2012, Shilimkar, Santosh wrote:
+>> >
+>> >> On Tue, Sep 11, 2012 at 12:25 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> >> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120908 01:20]:
+>> >> >>
+>> >> >> Will you able to pick up these couple of wakeupgen fixes from  here or
+>> >> >> do you want me to send you a pull request for 3.6-rc5/6
+>> >> >
+>> >> > I can pick them into fixes-noncritical. But if the second one is
+>> >> > a major bug for the -rc series, the patch should be describe what
+>> >> > breaks (regression? oops?).
+>> >> >
+>> >> Fixes non critical is fine. No major issue without these patches.
+>> >
+>> > There's an ordering constraint though: Santosh's patch needs to go in
+>> > first, then mine.
+>> >
+>> Its other way round ;-)
+>> Mine I created after applying your change.
+>
+> The problem is that if my patch is applied first, then there will be a
+> point after my patch where the AUXCOREBOOT1 register won't be saved, which
+> might break PM.  So the patches may need to be updated.
+>
+Good point. It's trivial to re-order them.
 
-I am all in favour to be able to swap the factory bad block marker with
-the position the mtd framework expects it.
+Tony,
+Updated patches in the end of the email. Also attached.
 
-That according to our understanding are bytes 0x7d0 in the main area
-and byte 0x0 in the spare area.
+Regards
+Santosh
 
-> 
-> I have not chosen to swap these bytes. In a training, I received
-> redboot and kernel 2.6.22 with set of patches to support i.MX27 and
-> these patches included swap of bytes in nand driver. So I start my
-> development with this workaround and it is now impossible to get
-> back because boards are already in production.
+>From 4e1da2a44d92b956c3a740f5af6a45ff1c2dc294 Mon Sep 17 00:00:00 2001
+From: Paul Walmsley <paul@pwsan.com>
+Date: Tue, 11 Sep 2012 12:43:18 +0530
+Subject: [PATCH 2/2] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
+ read/write
 
-So you are swapping the factory bad block marker with some position
-where the mtd layer does not expect the bad block marker. With this
-you preserve the factor bad block marker, but do not use it to detect
-bad blocks.
+The wakeupgen context-save code reads and stores the AUXCOREBOOT0 and
+AUXCOREBOOT1 register contents twice.  This seems like a waste of
+time, so, remove the duplicates.
 
-In this form the patch is simply not correct and should be dropped.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap-wakeupgen.c |    6 ------
+ 1 file changed, 6 deletions(-)
 
-Sascha
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c
+b/arch/arm/mach-omap2/omap-wakeupgen.c
+index c3795c2..567f672 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -233,12 +233,6 @@ static inline void omap4_irq_save_context(void)
+ 	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
 
+ 	/* Save SyncReq generation logic */
+-	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+-	__raw_writel(val, sar_base + AUXCOREBOOT0_OFFSET);
+-	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+-	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
+-
+-	/* Save SyncReq generation logic */
+ 	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_MASK);
+ 	__raw_writel(val, sar_base + PTMSYNCREQ_MASK_OFFSET);
+ 	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_EN);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
+
+
+>From 6e3b8a3f6ec231f588b860d87b7a80f6ba38ce98 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 6 Sep 2012 11:51:34 +0530
+Subject: [PATCH 1/2] ARM: OMAP4: wakeupgen: Fix the typo in AUXCOREBOOT
+ register save
+
+The wakeupgen context-save code reads AUXCOREBOOT0 register
+instead of AUXCOREBOOT1 register contents while saving AUXCOREBOOT1.
+
+Fix the same.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/omap-wakeupgen.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c
+b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 05fdebf..c3795c2 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -229,7 +229,7 @@ static inline void omap4_irq_save_context(void)
+ 	/* Save AuxBoot* registers */
+ 	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+ 	__raw_writel(val, sar_base + AUXCOREBOOT0_OFFSET);
+-	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
++	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_1);
+ 	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
+
+ 	/* Save SyncReq generation logic */
+-- 
+1.7.9.5
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-ARM-OMAP4-wakeupgen-remove-duplicate-AUXCOREBOOT-rea.patch
+Type: application/octet-stream
+Size: 1413 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/8e624e0f/attachment-0002.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-OMAP4-wakeupgen-Fix-the-typo-in-AUXCOREBOOT-regi.patch
+Type: application/octet-stream
+Size: 1196 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/8e624e0f/attachment-0003.obj>
