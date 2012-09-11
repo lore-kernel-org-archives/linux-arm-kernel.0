@@ -1,48 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Sep 2012 10:48:53 +0200
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20120911092753.7b8315d4@archvile>
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
-Message-ID: <20120911084853.GT24458@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Sep 2012 09:49:14 +0100
+Subject: [GIT] Renesas ARM-based SoC: pmu/cleanup for 3.7
+In-Reply-To: <1347350727-11962-1-git-send-email-horms@verge.net.au>
+References: <1347350727-11962-1-git-send-email-horms@verge.net.au>
+Message-ID: <20120911084914.GB5372@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 09:27:53AM +0200, David Jander wrote:
-> 
-> Hi Matt,
-> 
-> >         @ Function supports interworking.
-> >         @ args = 0, pretend = 0, frame = 0
-> >         @ frame_needed = 0, uses_anonymous_args = 0
-> >         @ link register save eliminated.
-> >         cmp     r0, #9
-> >         mov     r3, #0
-> >         str     r3, [r1, #0]
-> >         mov     r0, #0
-> >         strgt   r3, [r1, #4]
-> >         bx      lr
-> >         .size   flexcan_chip_start, .-flexcan_chip_start
-> >         .ident  "GCC: (GNU) 4.3.3"
-> >         .section        .note.GNU-stack,"",%progbits
-> > 
-> > I think this looks correct. Perhaps you could try the angstrom arm5te
-> > toolchain and see if it's a toolchain issue?
-> 
-> Yes, this looks a lot better, and is exactly what I get when I compile this
-> code with CodeSourcery GCC-4.4.1
-> 
-> I have tries building gcc-4.6.3 also with OSELAS/PTXdist, and it gives the
-> same (wrong) result as with gcc-4.6.2
+On Tue, Sep 11, 2012 at 09:05:25AM +0100, Simon Horman wrote:
+> Hi Will,
 
-AFAIK our OSELAS/PTXdist Toolchains use Linaro patches, this would
-explain why both have the same result.
+Hi Simon,
 
-Sascha
+> please consider the following changes from Kobayashi-san
+> for the pmu/cleanup branch.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks for this. It probably makes more sense for the arm-soc guys to pull
+it in directly, rather than me send it as another pull request.
+
+Arnd, Olof -- can you pull this into an shmobile perf branch please?
+
+Will
+
+> ----------------------------------------------------------------
+> The following changes since commit 051f1b13144dd8553d5a5104dde94c7263ae3ba7:
+> 
+>   ARM: perf: move irq registration into pmu implementation (2012-08-23 11:35:52 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git pmu/cleanup
+> 
+> for you to fetch changes up to e433d4440bf7dd5955a4616cfb9bffd1ec6ab839:
+> 
+>   ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit) (2012-09-11 16:27:41 +0900)
+> 
+> ----------------------------------------------------------------
+> Tetsuyuki Kobayashi (2):
+>       ARM: shmobile: sh73a0: enable PMU(Performance Monitoring Unit)
+>       ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit)
+> 
+>  arch/arm/configs/kzm9d_defconfig      |    1 +
+>  arch/arm/configs/kzm9g_defconfig      |    1 +
+>  arch/arm/mach-shmobile/setup-emev2.c  |   21 +++++++++++++++++++++
+>  arch/arm/mach-shmobile/setup-sh73a0.c |   21 +++++++++++++++++++++
+>  4 files changed, 44 insertions(+)
