@@ -1,35 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 13:20:37 -0600
-Subject: [PATCH] ARM: dt: tegra: whistler: configure power off
-Message-ID: <1347391237-31044-1-git-send-email-swarren@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 Sep 2012 20:28:20 +0100
+Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
+In-Reply-To: <504F836D.6050302@ti.com>
+References: <1347380341-28145-1-git-send-email-cyril@ti.com>
+ <20120911162522.GE32234@mudshark.cambridge.arm.com> <504F6DFB.5030208@ti.com>
+ <20120911172018.GG32234@mudshark.cambridge.arm.com> <504F74C5.2020805@ti.com>
+ <20120911175332.GI32234@mudshark.cambridge.arm.com> <504F836D.6050302@ti.com>
+Message-ID: <20120911192820.GT13739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Tue, Sep 11, 2012 at 02:31:09PM -0400, Cyril Chemparathy wrote:
+> On 9/11/2012 1:53 PM, Will Deacon wrote:
+>> On Tue, Sep 11, 2012 at 06:28:37PM +0100, Cyril Chemparathy wrote:
+>>> I can re-verify with the respun 7530/1 if you'd like.
+>>
+>> Sure, submitted as 7533/1:
+>>
+>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7533/1
+>>
+>
+> Works great.
 
-Add DT property to tell the MAX8907 that it should provide the
-pm_power_off() implementation. This allows "shutdown" to work.
+Cyril, I notice you're trying repeatedly to get a new password out of
+the system.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I will probably squash this into "ARM: dt: configure power off for some
-boards" when applying.
+TI's mail system is known to silently drop the password reminders.
 
- arch/arm/boot/dts/tegra20-whistler.dts |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Please bug your IT provider about this, there's nothing I can do about
+it at my end - (and as such you won't receive a password reminder until
+something can be done about this.)
 
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index 4ae1e5d..c636d00 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -267,6 +267,8 @@
- 			reg = <0x3c>;
- 			interrupts = <0 86 0x4>;
- 
-+			maxim,system-power-controller;
-+
- 			mbatt-supply = <&usb0_vbus_reg>;
- 			in-v1-supply = <&mbatt_reg>;
- 			in-v2-supply = <&mbatt_reg>;
--- 
-1.7.0.4
+2012-09-11 19:45:53 1TBVT2-0008P4-2U => cyril at ti.com R=verp_domain_dnslookup T=verp_domain_smtp S=1041 H=ti.com.s9a1.psmtp.com [74.125.148.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
+2012-09-11 20:14:27 1TBVuf-0008S4-EC => cyril at ti.com R=verp_domain_dnslookup T=verp_domain_smtp S=1041 H=ti.com.s9a1.psmtp.com [74.125.148.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
+
+(Note that *.psmtp.com seems to actually be more trouble than its
+worth... previous history has shown it to be quite broken, silently
+dropping _real_ emails as well.  I'd call it an anti-HAM service rather
+than an anti-SPAM service.  The more people complain to Google about it
+the better chance it will get fixed.)
