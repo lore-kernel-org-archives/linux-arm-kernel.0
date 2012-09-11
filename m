@@ -1,56 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Sep 2012 07:48:15 +0200
-Subject: [PATCH] watchdog: ks8695: sink registers into driver
-Message-ID: <1347342495-6990-1-git-send-email-linus.walleij@linaro.org>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Tue, 11 Sep 2012 13:54:25 +0800
+Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <20120829182639.4450.99900@nucleus>
+References: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
+ <20120825002151.18366.99434@nucleus>
+ <CADApbehotHB7JSCHdo_eoTb08C5Pe6ewh7whwckQTyuCcMM=BQ@mail.gmail.com>
+ <20120829182639.4450.99900@nucleus>
+Message-ID: <CADApbejRM9RkEjX2VAPVG18gip=OH5WWeS_NwEoCKgOZ_PgmLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 70adc3f32adc2fb90b0107c020678588e4cf9f51
-"ARM: ks8695: merge the timer header into the timer driver"
-accidentally broke the ks8695 watchdog since it was using
-the timer registers in watchdog mode.
+On Thu, Aug 30, 2012 at 2:26 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Chao Xie (2012-08-26 18:19:02)
+>> On Sat, Aug 25, 2012 at 8:21 AM, Mike Turquette <mturquette@linaro.org> wrote:
+>> > Quoting Chao Xie (2012-08-19 19:55:10)
+>> >> From: Chao Xie <chao.xie@marvell.com>
+>> >>  arch/arm/mach-mmp/Kconfig    |    3 +
+>> >>  drivers/clk/Makefile         |    3 +
+>> >>  drivers/clk/mmp/Makefile     |    9 +
+>> >>  drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++++
+>> >>  drivers/clk/mmp/clk-apmu.c   |   97 +++++++++
+>> >>  drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++++
+>> >>  drivers/clk/mmp/clk-mmp2.c   |  449 ++++++++++++++++++++++++++++++++++++++++++
+>> >>  drivers/clk/mmp/clk-pxa168.c |  346 ++++++++++++++++++++++++++++++++
+>> >>  drivers/clk/mmp/clk-pxa910.c |  320 ++++++++++++++++++++++++++++++
+>> >>  drivers/clk/mmp/clk.h        |   35 ++++
+>> >
+>> > Looks like you are not removing your arch/arm/mach-mmp/clock.c.  Is that
+>> > intentional?
+>> >
+>> > When I apply your series against v3.6-rc3 I find that compilation breaks
+>> > with mmp2_defconfig due to conflicting definitions for the clk api
+>> > (clk_enable, clk_set_rate, etc).  This is not surprising since your
+>> > legacy clock code is neither deleted nor removed from compilation
+>> > conditionally by checking for CONFIG_COMMON_CLK.
+>> >
+>> > Did I somehow manage to misapply your patches or should your patches
+>> > have removed the arch-specific clock framework as well?
+>> >
+>> hi, Mike
+>> Yes. There are some patches for seperate the original clock code in arch.
+>> I had sent these patches before, but it seems that too many patches
+>> sent, and haojian missed it.
+>> I will sent out the patches for arch today. Thanks.
+>>
+>
+> I pulled in the dependency series and the build goes through nicely now.
+> I'm happy to take these five patches into clk-next but of course mmp
+> will have problems building clk-next without the dependencies, which I
+> assume are going through arm-soc.
+>
+> Regards,
+> Mike
+>
+>> > Regards,
+>> > Mike
+>> >
+>> >>  10 files changed, 1567 insertions(+), 0 deletions(-)
+>> >>  create mode 100644 drivers/clk/mmp/Makefile
+>> >>  create mode 100644 drivers/clk/mmp/clk-apbc.c
+>> >>  create mode 100644 drivers/clk/mmp/clk-apmu.c
+>> >>  create mode 100644 drivers/clk/mmp/clk-frac.c
+>> >>  create mode 100644 drivers/clk/mmp/clk-mmp2.c
+>> >>  create mode 100644 drivers/clk/mmp/clk-pxa168.c
+>> >>  create mode 100644 drivers/clk/mmp/clk-pxa910.c
+>> >>  create mode 100644 drivers/clk/mmp/clk.h
 
-Perform the same operation here: push the registers down
-into the driver, so it is self-contained, and we can keep
-depopulating the <mach/*> namespace.
-
-Reported-by: Olof Johansson <olof@lixom.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Requesting an ACK from the watchdog maintainer so we can
-merge this through the ARM SoC tree where the regression
-was introduced.
-
-And yes, the drive needs to take resources and ioremap(),
-but that is another patch.
----
- drivers/watchdog/ks8695_wdt.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/watchdog/ks8695_wdt.c b/drivers/watchdog/ks8695_wdt.c
-index 59e75d9..c1a4d3b 100644
---- a/drivers/watchdog/ks8695_wdt.c
-+++ b/drivers/watchdog/ks8695_wdt.c
-@@ -24,7 +24,19 @@
- #include <linux/io.h>
- #include <linux/uaccess.h>
- #include <mach/hardware.h>
--#include <mach/regs-timer.h>
-+
-+#define KS8695_TMR_OFFSET	(0xF0000 + 0xE400)
-+#define KS8695_TMR_VA		(KS8695_IO_VA + KS8695_TMR_OFFSET)
-+
-+/*
-+ * Timer registers
-+ */
-+#define KS8695_TMCON		(0x00)		/* Timer Control Register */
-+#define KS8695_T0TC		(0x08)		/* Timer 0 Timeout Count Register */
-+#define TMCON_T0EN		(1 << 0)	/* Timer 0 Enable */
-+
-+/* Timer0 Timeout Counter Register */
-+#define T0TC_WATCHDOG		(0xff)		/* Enable watchdog mode */
- 
- #define WDT_DEFAULT_TIME	5	/* seconds */
- #define WDT_MAX_TIME		171	/* seconds */
--- 
-1.7.11.4
+Thanks.
+I think Haojian who is the maintainer of pxa and mmp will help to
+integrate the dependency patches.
