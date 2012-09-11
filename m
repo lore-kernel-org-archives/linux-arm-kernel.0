@@ -1,150 +1,75 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Mon, 10 Sep 2012 20:29:13 -0400
-Subject: [PATCH] ARM: davinci: da8xx_register_spi() should not register SPI
- board info
-Message-ID: <1347323353-19764-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Sep 2012 17:58:02 -0700
+Subject: [PATCH 08/10] ARM: OMAP: Clean-up timer posted mode support
+In-Reply-To: <504E62C8.8030100@ti.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-9-git-send-email-jon-hunter@ti.com>
+ <20120907222223.GQ1303@atomide.com> <504E62C8.8030100@ti.com>
+Message-ID: <20120911005802.GE1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch, da8xx_register_spi() registers the SPI board info,
-the SPI controller, and sets its number of chipselect to the size of the
-static spi_board_info array. This is bad because a SPI board info may
-declare devices for different SPI buses, and because other code can also
-call spi_register_board_info() (e.g. a daughter board might provide
-additional SPI devices).
+* Jon Hunter <jon-hunter@ti.com> [120910 15:00]:
+> 
+> On 09/07/2012 05:22 PM, Tony Lindgren wrote:
+> > * Jon Hunter <jon-hunter@ti.com> [120905 12:05]:
+> >> The dmtimer functions to read and write the dmtimer registers are currently
+> >> defined as follows ...
+> >>
+> >> static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
+> >> 						int posted);
+> >> static inline void __omap_dm_timer_write(struct omap_dm_timer *timer,
+> >> 						u32 reg, u32 val, int posted);
+> >>
+> >> The posted variable indicates if the timer is configured to use the posted mode
+> >> when performing register accesses. The posted mode configuration of the dmtimer
+> >> is stored in the omap_dm_timer structure that is also being passed to the above
+> >> functions and therefore we do not need to pass the posted variable separately.
+> >> Therefore, simplify the above functions by removing the posted variable as an
+> >> argument as this is not necessary.
+> > 
+> > I believe the reason for passing the posted flag was to optimize out some
+> > functions from the timer code as that's being run all the time.
+> > 
+> > Care to check the assembly before and after this patch for the timer
+> > functions with objdump -d to make sure it does not add tons of bloat
+> > there?
+> 
+> Hi Tony,
+> 
+> Thanks for the details here. I see that makes sense and that the
+> compiler could take advantage of this as the functions are inlined.
+> 
+> I have taken a look at the disassembled output using objdump as you
+> mentioned. What I see is ...
+> 
+> 1. For dmtimer.c the impact appears negligible, the total number of
+>    lines outputted by objdump only changed by 8 with (1215 lines) and
+>    without (1207 lines) the patch applied.
+> 
+> 2. For timer.c the impact is greater. I see that
+>    omap2_gp_timer_set_next_event() increased by 6 instructions from 29
+>    to 35. clocksource_read_cycles() increased by 2 instructions 15 to
+>    17 instructions. dmtimer_read_sched_clock() increased by 2
+>    instructions from 17 to 19. omap2_gp_timer_set_mode() increased by
+>    21 instructions from 102 to 123.
+> 
+> I imagine that we are mainly concerned about
+> omap2_gp_timer_set_next_event(), clocksource_read_cycles() and
+> dmtimer_read_sched_clock() as these will be called often. Therefore, I
+> am not sure if you wish to drop this patch.
 
-This patch removes the spi_register_board_info() call from
-da8xx_register_spi(), renames this last one to da8xx_register_spi_bus()
-to be more explicit, takes the number of chipselect as a function
-parameter, and updates the impacted board-da8{3,5}0-evm.c, and
-board-mityomapl138.c files accordingly. It also sets the SPI platform
-data static, as it doesn't need to be exported.
+Well does it at lots of new ldr to the critical code?
+ 
+> By the way, if we do drop this patch, I would then need to fix the
+> setting of the posted variable in mach-omap2/timer.c for clock-source in
+> the case where a dmtimer is used. Today the code assumes that for
+> clock-source and clock-events posted mode is always used. However, with
+> the errata i103/i767 we will disable posted mode for clock-source on
+> omap2/3/4/5/am33xx devices.
 
-Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
----
- arch/arm/mach-davinci/board-da830-evm.c    |  9 +++++++--
- arch/arm/mach-davinci/board-da850-evm.c    |  9 +++++++--
- arch/arm/mach-davinci/board-mityomapl138.c |  9 +++++++--
- arch/arm/mach-davinci/devices-da8xx.c      | 14 +++-----------
- arch/arm/mach-davinci/include/mach/da8xx.h |  3 +--
- 5 files changed, 25 insertions(+), 19 deletions(-)
+Yes I see, I guess that means just adding a new systimer entry?
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 11c3db9..adb8d87 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -652,8 +652,13 @@ static __init void da830_evm_init(void)
- 	if (ret)
- 		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
- 
--	ret = da8xx_register_spi(0, da830evm_spi_info,
--				 ARRAY_SIZE(da830evm_spi_info));
-+	ret = spi_register_board_info(da830evm_spi_info,
-+				      ARRAY_SIZE(da830evm_spi_info));
-+	if (ret)
-+		pr_warning("da830_evm_init: spi info registration failed: %d\n",
-+			   ret);
-+
-+	ret = da8xx_register_spi_bus(0, ARRAY_SIZE(da830evm_spi_info));
- 	if (ret)
- 		pr_warning("da830_evm_init: spi 0 registration failed: %d\n",
- 			   ret);
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6659a90..3b2c9e3 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1374,8 +1374,13 @@ static __init void da850_evm_init(void)
- 		pr_warning("da850_evm_init: suspend registration failed: %d\n",
- 				ret);
- 
--	ret = da8xx_register_spi(1, da850evm_spi_info,
--				 ARRAY_SIZE(da850evm_spi_info));
-+	ret = spi_register_board_info(da850evm_spi_info,
-+				      ARRAY_SIZE(da850evm_spi_info));
-+	if (ret)
-+		pr_warning("da850_evm_init: spi info registration failed: %d\n",
-+			   ret);
-+
-+	ret = da8xx_register_spi_bus(1, ARRAY_SIZE(da850evm_spi_info));
- 	if (ret)
- 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
- 				ret);
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 3cfff55..9f92f11 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -529,8 +529,13 @@ static void __init mityomapl138_init(void)
- 
- 	mityomapl138_setup_nand();
- 
--	ret = da8xx_register_spi(1, mityomapl138_spi_flash_info,
--			       ARRAY_SIZE(mityomapl138_spi_flash_info));
-+	ret = spi_register_board_info(mityomapl138_spi_flash_info,
-+				      ARRAY_SIZE(mityomapl138_spi_flash_info));
-+	if (ret)
-+		pr_warning("spi info registration failed: %d\n", ret);
-+
-+	ret = da8xx_register_spi_bus(1,
-+				     ARRAY_SIZE(mityomapl138_spi_flash_info));
- 	if (ret)
- 		pr_warning("spi 1 registration failed: %d\n", ret);
- 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index d91ab9e..e86117b 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -792,7 +792,7 @@ static struct resource da8xx_spi1_resources[] = {
- 	},
- };
- 
--struct davinci_spi_platform_data da8xx_spi_pdata[] = {
-+static struct davinci_spi_platform_data da8xx_spi_pdata[] = {
- 	[0] = {
- 		.version	= SPI_VERSION_2,
- 		.intr_line	= 1,
-@@ -826,20 +826,12 @@ static struct platform_device da8xx_spi_device[] = {
- 	},
- };
- 
--int __init da8xx_register_spi(int instance, struct spi_board_info *info,
--			      unsigned len)
-+int __init da8xx_register_spi_bus(int instance, unsigned num_chipselect)
- {
--	int ret;
--
- 	if (instance < 0 || instance > 1)
- 		return -EINVAL;
- 
--	ret = spi_register_board_info(info, len);
--	if (ret)
--		pr_warning("%s: failed to register board info for spi %d :"
--			   " %d\n", __func__, instance, ret);
--
--	da8xx_spi_pdata[instance].num_chipselect = len;
-+	da8xx_spi_pdata[instance].num_chipselect = num_chipselect;
- 
- 	if (instance == 1 && cpu_is_davinci_da850()) {
- 		da8xx_spi1_resources[0].start = DA850_SPI1_BASE;
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 53ee8a2..aa2d665 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -76,7 +76,7 @@ void __init da850_init(void);
- int da830_register_edma(struct edma_rsv_info *rsv);
- int da850_register_edma(struct edma_rsv_info *rsv[2]);
- int da8xx_register_i2c(int instance, struct davinci_i2c_platform_data *pdata);
--int da8xx_register_spi(int instance, struct spi_board_info *info, unsigned len);
-+int da8xx_register_spi_bus(int instance, unsigned num_chipselect);
- int da8xx_register_watchdog(void);
- int da8xx_register_usb20(unsigned mA, unsigned potpgt);
- int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
-@@ -96,7 +96,6 @@ extern struct platform_device da8xx_serial_device;
- extern struct emac_platform_data da8xx_emac_pdata;
- extern struct da8xx_lcdc_platform_data sharp_lcd035q3dg01_pdata;
- extern struct da8xx_lcdc_platform_data sharp_lk043t1dg01_pdata;
--extern struct davinci_spi_platform_data da8xx_spi_pdata[];
- 
- extern struct platform_device da8xx_emac_device;
- extern struct platform_device da8xx_wdt_device;
--- 
-1.7.11.4
+Regards,
+
+Tony
