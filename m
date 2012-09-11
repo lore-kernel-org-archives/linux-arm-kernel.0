@@ -1,46 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 10 Sep 2012 23:43:37 -0600
-Subject: [PATCH 2/2] ARM: tegra: cpu-tegra: explicitly manage re-parenting
-In-Reply-To: <20120911044530.20289.8165@nucleus>
-References: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
- <1347318758-7954-2-git-send-email-swarren@wwwdotorg.org>
- <20120911044530.20289.8165@nucleus>
-Message-ID: <504ECF89.5050809@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Sep 2012 07:48:15 +0200
+Subject: [PATCH] watchdog: ks8695: sink registers into driver
+Message-ID: <1347342495-6990-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 10:45 PM, Mike Turquette wrote:
-> Quoting Stephen Warren (2012-09-10 16:12:38)
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> When changing a PLL's rate, it must have no active children. The CPU
->> clock cannot be stopped, and CPU clock's divider is not used. The old
->> clock driver used to handle this by internally reparenting the CPU clock
->> onto a different PLL when changing the CPU clock rate. However, the new
->> common-clock based clock driver does not do this, and probably cannot do
->> this due to the locking issues it would cause.
->>
-> 
-> This is possible today.  Clock drivers can call __clk_reparent to update
-> the common clk bookkeeping to reflect changes in parent muxing.  There
-> are some examples of this out in the wild, and the unmerged OMAP port
-> certainly uses this during the PLL relock sequence.
+Commit 70adc3f32adc2fb90b0107c020678588e4cf9f51
+"ARM: ks8695: merge the timer header into the timer driver"
+accidentally broke the ks8695 watchdog since it was using
+the timer registers in watchdog mode.
 
-The CPU clock's set_rate needs to both __clk_reparent() /and/ set the
-rate of the parent PLL. I think a (non-static) __clk_set_rate() is
-missing? (although perhaps that could be easily solved if desired).
+Perform the same operation here: push the registers down
+into the driver, so it is self-contained, and we can keep
+depopulating the <mach/*> namespace.
 
->> To solve this, have the Tegra cpufreq driver explicitly perform the
->> reparenting operations itself. This is probably reasonable anyway,
->> since such reparenting is somewhat a matter of policy (e.g. which
->> alternate clock source to use, whether to leave the CPU clock a child
->> of the alternate clock source if it's running at the desired rate),
->> and hence is something more appropriate for the cpufreq driver than
->> the core clock driver anyway.
-> 
-> I definitely agree about the policy.  Just FYI I'm hacking on an RFC to
-> make reparenting clocks from a call to clk_set_rate even easier, but
-> perhaps in your case it is better the cpufreq driver knows the clock
-> tree topology details.
+Reported-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Requesting an ACK from the watchdog maintainer so we can
+merge this through the ARM SoC tree where the regression
+was introduced.
 
-OK, sounds fine to me:-)
+And yes, the drive needs to take resources and ioremap(),
+but that is another patch.
+---
+ drivers/watchdog/ks8695_wdt.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/watchdog/ks8695_wdt.c b/drivers/watchdog/ks8695_wdt.c
+index 59e75d9..c1a4d3b 100644
+--- a/drivers/watchdog/ks8695_wdt.c
++++ b/drivers/watchdog/ks8695_wdt.c
+@@ -24,7 +24,19 @@
+ #include <linux/io.h>
+ #include <linux/uaccess.h>
+ #include <mach/hardware.h>
+-#include <mach/regs-timer.h>
++
++#define KS8695_TMR_OFFSET	(0xF0000 + 0xE400)
++#define KS8695_TMR_VA		(KS8695_IO_VA + KS8695_TMR_OFFSET)
++
++/*
++ * Timer registers
++ */
++#define KS8695_TMCON		(0x00)		/* Timer Control Register */
++#define KS8695_T0TC		(0x08)		/* Timer 0 Timeout Count Register */
++#define TMCON_T0EN		(1 << 0)	/* Timer 0 Enable */
++
++/* Timer0 Timeout Counter Register */
++#define T0TC_WATCHDOG		(0xff)		/* Enable watchdog mode */
+ 
+ #define WDT_DEFAULT_TIME	5	/* seconds */
+ #define WDT_MAX_TIME		171	/* seconds */
+-- 
+1.7.11.4
