@@ -1,53 +1,42 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue, 11 Sep 2012 13:46:38 -0400
-Subject: [PATCH 1/2] spi: omap2-mcspi: add pinctrl support
+Date: Tue, 11 Sep 2012 13:46:39 -0400
+Subject: [PATCH 2/2] ARM: OMAP2+: Enable pinctrl dummy states
 In-Reply-To: <1347385599-27558-1-git-send-email-mporter@ti.com>
 References: <1347385599-27558-1-git-send-email-mporter@ti.com>
-Message-ID: <1347385599-27558-2-git-send-email-mporter@ti.com>
+Message-ID: <1347385599-27558-3-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds pinctrl support to support OMAP platforms that boot from DT
-and rely on pinctrl support to set pinmuxes.
+Enable pinctrl dummy states for all OMAP platforms. This allows
+drivers to be converted to pinctrl while still running on
+platforms that do not provide pinctrl data.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- drivers/spi/spi-omap2-mcspi.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-omap2/devices.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index b2fb141..6c67cdb 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -38,6 +38,8 @@
- #include <linux/pm_runtime.h>
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index c00c689..577cd04 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -17,6 +17,7 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
  #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/err.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/omap4-keypad.h>
  
- #include <linux/spi/spi.h>
+ #include <mach/hardware.h>
+@@ -631,6 +632,9 @@ static inline void omap_init_vout(void) {}
  
-@@ -1124,6 +1126,7 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
- 	static int		bus_num = 1;
- 	struct device_node	*node = pdev->dev.of_node;
- 	const struct of_device_id *match;
-+	struct pinctrl *pinctrl;
- 
- 	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
- 	if (master == NULL) {
-@@ -1219,6 +1222,12 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
- 	if (status < 0)
- 		goto dma_chnl_free;
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		status = PTR_ERR(pinctrl);
-+		goto dma_chnl_free;
-+	}
+ static int __init omap2_init_devices(void)
+ {
++	/* Enable dummy states for those platforms without pinctrl support */
++	pinctrl_provide_dummies();
 +
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
- 	pm_runtime_enable(&pdev->dev);
+ 	/*
+ 	 * please keep these calls, and their implementations above,
+ 	 * in alphabetical order so they're easier to sort through.
 -- 
 1.7.9.5
