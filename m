@@ -1,36 +1,35 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 11 Sep 2012 15:12:09 +0530
-Subject: [PATCHv7 14/23] i2c: omap: always return IRQ_HANDLED
+Date: Tue, 11 Sep 2012 15:12:14 +0530
+Subject: [PATCHv7 19/23] i2c: omap: always return IRQ_HANDLED
 In-Reply-To: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
 References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347356538-23835-15-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1347356538-23835-20-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-Always return IRQ_HANDLED otherwise we could get our IRQ line disabled due
-to many spurious IRQs.
+even if our clocks are disabled, we still
+handled the IRQ, so we should return IRQ_HANDLED.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-[Trivial changes to commitlogs]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
  drivers/i2c/busses/i2c-omap.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 7918e48..96fd528 100644
+index 498a462..4a696bd 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -962,7 +962,7 @@ complete:
- 		}
- 	} while (stat);
+@@ -862,7 +862,7 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 	int err = 0, count = 0;
  
--	return count ? IRQ_HANDLED : IRQ_NONE;
-+	return IRQ_HANDLED;
- }
+ 	if (pm_runtime_suspended(dev->dev))
+-		return IRQ_NONE;
++		return IRQ_HANDLED;
  
- static const struct i2c_algorithm omap_i2c_algo = {
+ 	do {
+ 		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
 -- 
 1.7.5.4
