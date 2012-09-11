@@ -1,112 +1,56 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 11 Sep 2012 05:00:15 +0000
-Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
- hardware
-In-Reply-To: <504E1C69.30602@ti.com>
-References: <1347294020-22661-1-git-send-email-mporter@ti.com>
- <504E168C.6060603@ti.com> <20120910165210.GJ27758@beef>
- <504E1C69.30602@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB03EC@DBDE01.ent.ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 11 Sep 2012 07:09:22 +0200
+Subject: [PATCH] ARM: kirkwood: Trim excess #includes in board-dnskw.c
+In-Reply-To: <1347287753-2805-1-git-send-email-jm@lentin.co.uk>
+References: <1347287753-2805-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120911050922.GA6836@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 22:29:21, Cousson, Benoit wrote:
-> On 09/10/2012 06:52 PM, Matt Porter wrote:
-> > On Mon, Sep 10, 2012 at 06:34:20PM +0200, Benoit Cousson wrote:
-> >> + Tony
-> >>
-> >> Hi Matt,
-> >>
-> >> 30 minutes too late for my pull request :-(
-> >>
-> >> There are a couple of am33xx patches under discussion, so I'll take them
-> >> and send a for_3.7/dts-part2 pull request if this is not too late for Tony.
-> > 
-> > Yeah, believe me, I did a faceplant when I saw your pull request come by
-> > at the same time I discovered this issue. ;) In particular, AnilKumar's
-> > user leds patch would need to be adjusted for this change. I can
-> > resubmit with the user leds dts changes adjusted as well if that
-> > discussion comes to a conclusion and his patches accepted.
+On Mon, Sep 10, 2012 at 03:35:53PM +0100, Jamie Lentin wrote:
+> Lots of code has now moved into the devicetree, leaving a collection of
+> useless header files. Tidy them up.
 > 
-> Yeah, I was wondering if the gpios label were already used somewhere.
-> I've just added this patch on top of my current series.
-> So you or Anil should just post the missing patches whenever they'll be
-> available and accepted.
+> This applies cleanly atop of my previous patch, "[PATCH V2 2/2] ARM:
+> kirkwood: Use devicetree to define DNS-32[05] fan", which also removes
+> gpio-fan.h
 > 
-> >> On 09/10/2012 06:20 PM, Matt Porter wrote:
-> >>> On AM33xx, the datasheet and TRM refer to four GPIO instances that
-> >>> are 0-based, GPIO0-3.
-> >>
-> >> Or maybe you should just update the spec to use a 1-based GPIO number
-> >> like OMAP :-)
-> > 
-> > I am powerless here. :)
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> ---
+>  arch/arm/mach-kirkwood/board-dnskw.c |    9 ---------
+>  1 file changed, 9 deletions(-)
 > 
-> That's too bad :-(
-> 
+> diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+> index 6ac7a8d..43d16d6 100644
+> --- a/arch/arm/mach-kirkwood/board-dnskw.c
+> +++ b/arch/arm/mach-kirkwood/board-dnskw.c
+> @@ -14,17 +14,8 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/ata_platform.h>
+>  #include <linux/mv643xx_eth.h>
+> -#include <linux/of.h>
+>  #include <linux/gpio.h>
+> -#include <linux/input.h>
+> -#include <linux/leds.h>
+> -#include <asm/mach-types.h>
+> -#include <asm/mach/arch.h>
+> -#include <asm/mach/map.h>
+> -#include <mach/kirkwood.h>
+> -#include <mach/bridge-regs.h>
+>  #include "common.h"
+>  #include "mpp.h"
 
-I agree with Matt here. Also at this point of time it is too much change to 
-modify spec for this, and certainly it would be very confusing. 
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
+Hi Jamie
 
-Thanks,
-Vaibhav
+A minor point. I personally would of based this patch on top of a
+plain -rc tag and not on top of the gpio-fan code. The gpio-fan code
+might need more revisions before its acceptable, where as this change
+is very likely to be accepted first time and is not controversial in
+any way. So Jason is likely to apply this now, before the gpio-fan
+code hits.
 
-> Benoit
-> 
-> > 
-> > -Matt
-> > 
-> >>> Signed-off-by: Matt Porter <mporter@ti.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
-> >>>  1 file changed, 4 insertions(+), 4 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> >>> index bb31bff..1369bfc 100644
-> >>> --- a/arch/arm/boot/dts/am33xx.dtsi
-> >>> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> >>> @@ -62,7 +62,7 @@
-> >>>  			reg = <0x48200000 0x1000>;
-> >>>  		};
-> >>>  
-> >>> -		gpio1: gpio at 44e07000 {
-> >>> +		gpio0: gpio at 44e07000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio1";
-> >>>  			gpio-controller;
-> >>> @@ -74,7 +74,7 @@
-> >>>  			interrupts = <96>;
-> >>>  		};
-> >>>  
-> >>> -		gpio2: gpio at 4804c000 {
-> >>> +		gpio1: gpio at 4804c000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio2";
-> >>>  			gpio-controller;
-> >>> @@ -86,7 +86,7 @@
-> >>>  			interrupts = <98>;
-> >>>  		};
-> >>>  
-> >>> -		gpio3: gpio at 481ac000 {
-> >>> +		gpio2: gpio at 481ac000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio3";
-> >>>  			gpio-controller;
-> >>> @@ -98,7 +98,7 @@
-> >>>  			interrupts = <32>;
-> >>>  		};
-> >>>  
-> >>> -		gpio4: gpio at 481ae000 {
-> >>> +		gpio3: gpio at 481ae000 {
-> >>>  			compatible = "ti,omap4-gpio";
-> >>>  			ti,hwmods = "gpio4";
-> >>>  			gpio-controller;
-> >>>
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+     Andrew
