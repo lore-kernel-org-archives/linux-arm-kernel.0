@@ -1,83 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 11 Sep 2012 11:34:56 +0000
-Subject: [PATCH v2 3/3] usb: musb: omap: Add device tree support for
- omap musb glue
-In-Reply-To: <CAAe_U6LwGn+qbSox7BofTg7sJUxqytew3s_73MOYZytHs2qEWw@mail.gmail.com>
-References: <1347354580-5895-1-git-send-email-kishon@ti.com>
- <1347354580-5895-4-git-send-email-kishon@ti.com>	<504F0A33.9060606@ti.com>
- <CAAe_U6LwGn+qbSox7BofTg7sJUxqytew3s_73MOYZytHs2qEWw@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB0E00@DBDE01.ent.ti.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Tue, 11 Sep 2012 13:35:40 +0200
+Subject: GCC 4.6.x miscompiling arm-linux?
+In-Reply-To: <20120911123743.29e0ed40@archvile>
+References: <20120910171654.1d4972b2@archvile>
+ <w51bohddcqw.fsf@mail.mattleach.net>
+ <20120911092753.7b8315d4@archvile>
+ <20558.61974.299424.536837@pilspetsen.it.uu.se>
+ <20120911104925.3461603e@archvile>
+ <20559.1844.786507.216580@pilspetsen.it.uu.se>
+ <20120911123743.29e0ed40@archvile>
+Message-ID: <20559.8716.124212.451155@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 16:54:37, ABRAHAM, KISHON VIJAY wrote:
-> Hi,
-> 
-> On Tue, Sep 11, 2012 at 3:23 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
-> >
-> >
-> > On 9/11/2012 2:39 PM, Kishon Vijay Abraham I wrote:
-> >> Added device tree support for omap musb driver and updated the
-> >> Documentation with device tree binding information.
-> >>
-> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/usb/omap-usb.txt |   33 ++++++++++++
-> >>  drivers/usb/musb/omap2430.c                        |   54 ++++++++++++++++++++
-> >>  2 files changed, 87 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/usb/omap-usb.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
-> >> new file mode 100644
-> >> index 0000000..29a043e
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-> >> @@ -0,0 +1,33 @@
-> >> +OMAP GLUE
-> >> +
-> >> +OMAP MUSB GLUE
-> >> + - compatible : Should be "ti,omap4-musb" or "ti,omap3-musb"
-> >> + - ti,hwmods : must be "usb_otg_hs"
-> >> + - multipoint : Should be "1" indicating the musb controller supports
-> >> +   multipoint. This is a MUSB configuration-specific setting.
-> >> + - num_eps : Specifies the number of endpoints. This is also a
-> >> +   MUSB configuration-specific setting. Should be set to "16"
-> >> + - ram_bits : Specifies the ram address size. Should be set to "12"
-> >> + - interface_type : This is a board specific setting to describe the type of
-> >> +   interface between the controller and the phy. It should be "0" or "1"
-> >> +   specifying ULPI and UTMI respectively.
-> >> + - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
-> >> +   represents PERIPHERAL.
-> >> + - power : Should be "50". This signifies the controller can supply upto
-> >> +   100mA when operating in host mode.
-> >> +
-> >> +SOC specific device node entry
-> >> +usb_otg_hs: usb_otg_hs at 4a0ab000 {
-> >> +     compatible = "ti,omap4-musb";
-> >> +     ti,hwmods = "usb_otg_hs";
-> >> +     multipoint = <1>;
-> >> +     num_eps = <16>;
-> >> +     ram_bits = <12>;
-> >> +};
-> >
-> >
-> > reg and interrupt properties are missing here.
-> >
-> > I would encourage to specify "reg" and "interrupt" properties in every
-> > node getting newly added to the OMAP DTS files.
-> 
-> Sure. will add that in my next version.
-> 
+David Jander writes:
+ > > I can make the patches available if there's confirmation that a vanilla
+ > > upstream gcc-4.6.3 doesn't work.
+ > 
+ > I am pretty sure this is the case... do you have a patch series that you can
+ > easily tar and mail to me? I'd like to try those patches with OSELAS, to see
+ > if I can indeed build a gcc-4.6.3 toolchain that generates correct code.... I
+ > already know that I can generate one that doesn't ;-)
+ > 
+...
+ > > If you're sure no add-on patches were applied, then yes please do.
+ > 
+ > Pretty sure, but not 100%, so I'd like to try your patches first if you don't
+ > mind....
 
-I saw there is some discussion going-on for which baseline to use, so make 
-sure that you test the patches on top of below patch (already available in 
-linux-omap/devel-dt)
+And I'd like to confirm first. Please tell us the following:
 
-http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commit;h=b82b04e8eb27abe0cfe9cd7bf4fee8bb1bb9b013
+ > >  > > 2: include the output of gcc -v which tells how that gcc was configured,
+ > >  > > 3: give the exact set of gcc options used then compiling the test case.
 
-
-Thanks,
-Vaibhav
-> Thanks
-> Kishon
-> 
+and I'll check if vanilla upstream gcc is broken or not.
