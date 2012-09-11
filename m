@@ -1,110 +1,104 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 11 Sep 2012 15:20:59 +0200
-Subject: [PATCH 01/16] ARM: at91: move platform_data definitions
-In-Reply-To: <1347368390-31252-1-git-send-email-arnd@arndb.de>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-1-git-send-email-arnd@arndb.de>
-Message-ID: <20120911132059.GG31430@game.jcrosoft.org>
+Date: Tue, 11 Sep 2012 15:25:07 +0200
+Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
+In-Reply-To: <504ECF11.2000206@wwwdotorg.org>
+References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
+ <1346962375-26163-8-git-send-email-robherring2@gmail.com>
+ <20120910155224.GE31430@game.jcrosoft.org>
+ <504E28B0.5040404@gmail.com>
+ <20120911044907.GF31430@game.jcrosoft.org>
+ <504ECF11.2000206@wwwdotorg.org>
+Message-ID: <20120911132507.GH31430@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:59 Tue 11 Sep     , Arnd Bergmann wrote:
-> Platform data for device drivers should be defined in
-> include/linux/platform_data/*.h, not in the architecture
-> and platform specific directories.
+On 23:41 Mon 10 Sep     , Stephen Warren wrote:
+> On 09/10/2012 10:49 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 12:51 Mon 10 Sep     , Rob Herring wrote:
+> >> On 09/10/2012 10:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>> On 15:12 Thu 06 Sep     , Rob Herring wrote:
+> >>>> From: Rob Herring <rob.herring@calxeda.com>
+> >>>>
+> >>>> In preparation to support multi-platform kernels, move all the dtb targets
+> >>>> out of the mach Makefile.boot and into the arch/arm/boot/dts/Makefile
+> >>>> which is closer to the sources.
+> >>>>
+> >>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >>>> Cc: Russell King <linux@arm.linux.org.uk>
+> >>>> Cc: Andrew Victor <linux@maxim.org.za>
+> >>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>>> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> >>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >>>> Cc: Sascha Hauer <kernel@pengutronix.de>
+> >>>> Cc: Jason Cooper <jason@lakedaemon.net>
+> >>>> Cc: Andrew Lunn <andrew@lunn.ch>
+> >>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> >>>> Cc: Shawn Guo <shawn.guo@linaro.org>
+> >>>> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> >>>> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> >>>> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> >>>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> >>>> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> >>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >>>> ---
+> >>>>  arch/arm/boot/Makefile                |    2 ++
+> >>>>  arch/arm/boot/dts/Makefile            |   41 +++++++++++++++++++++++++++++++++
+> >>>>  arch/arm/mach-at91/Makefile.boot      |   24 -------------------
+> >>>>  arch/arm/mach-exynos/Makefile.boot    |    3 ---
+> >>>>  arch/arm/mach-imx/Makefile.boot       |    7 ------
+> >>>>  arch/arm/mach-kirkwood/Makefile.boot  |   11 ---------
+> >>>>  arch/arm/mach-lpc32xx/Makefile.boot   |    2 --
+> >>>>  arch/arm/mach-mvebu/Makefile.boot     |    2 --
+> >>>>  arch/arm/mach-mxs/Makefile.boot       |    9 --------
+> >>>>  arch/arm/mach-spear13xx/Makefile.boot |    3 ---
+> >>>>  arch/arm/mach-spear3xx/Makefile.boot  |    4 ----
+> >>>>  arch/arm/mach-spear6xx/Makefile.boot  |    2 --
+> >>>>  arch/arm/mach-tegra/Makefile.boot     |    8 -------
+> >>>>  arch/arm/mach-ux500/Makefile.boot     |    2 --
+> >>>>  arch/arm/mach-vexpress/Makefile.boot  |    5 ----
+> >>>>  15 files changed, 43 insertions(+), 82 deletions(-)
+> >>>>  create mode 100644 arch/arm/boot/dts/Makefile
+> >>>>
+> >>>> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> >>>> index c877087..3fdab01 100644
+> >>>> --- a/arch/arm/boot/Makefile
+> >>>> +++ b/arch/arm/boot/Makefile
+> >>>> @@ -15,6 +15,8 @@ ifneq ($(MACHINE),)
+> >>>>  include $(srctree)/$(MACHINE)/Makefile.boot
+> >>>>  endif
+> >>>>  
+> >>>> +include $(srctree)/arch/arm/boot/dts/Makefile
+> >>>> +
+> >>>>  # Note: the following conditions must always be true:
+> >>>>  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
+> >>>>  #   PARAMS_PHYS must be within 4MB of ZRELADDR
+> >>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>>> new file mode 100644
+> >>>> index 0000000..e59586b
+> >>>> --- /dev/null
+> >>>> +++ b/arch/arm/boot/dts/Makefile
+> >>>> @@ -0,0 +1,41 @@
+> >>>> +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+> >>>
+> >>> sorry I see no need of the dtb-y
+> >>>
+> >>> just do all the time
+> >>
+> >> That's not how it works today. dtb's only for all enabled platforms are
+> >> built. Changing the behavior should be a different patch.
+> >
+> > no I see no point to check if the platform is enable or not just build all
+> > 
+> > This will allow to check them
 > 
-> This moves such data out of the at91 include directories
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> ---
->  arch/arm/mach-at91/at91sam9g45_devices.c                             |    2 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c                              |    2 +-
->  arch/arm/mach-at91/include/mach/atmel-mci.h                          |    2 +-
->  drivers/dma/at_hdmac_regs.h                                          |    2 +-
->  include/linux/platform_data/atmel-aes.h                              |    2 +-
->  .../mach/at_hdmac.h => include/linux/platform_data/dma-atmel.h       |    0
->  6 files changed, 5 insertions(+), 5 deletions(-)
->  rename arch/arm/mach-at91/include/mach/at_hdmac.h => include/linux/platform_data/dma-atmel.h (100%)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 0607399..0aa9bdb 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -31,7 +31,7 @@
->  #include <mach/at91sam9g45_matrix.h>
->  #include <mach/at91_matrix.h>
->  #include <mach/at91sam9_smc.h>
-> -#include <mach/at_hdmac.h>
-> +#include <linux/platform_data/dma-atmel.h>
->  #include <mach/atmel-mci.h>
->  
->  #include <media/atmel-isi.h>
-> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-> index f09fff9..e4da717 100644
-> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-> @@ -22,7 +22,7 @@
->  #include <mach/at91sam9rl_matrix.h>
->  #include <mach/at91_matrix.h>
->  #include <mach/at91sam9_smc.h>
-> -#include <mach/at_hdmac.h>
-> +#include <linux/platform_data/dma-atmel.h>
-I prefer to have all of them in atmel.h
+> Why would I want to build 100 .dtbs that I don't care about? If I want
+> to check them, I can either build all the defconfigs, or simply write a
+> trivial sh for loop to loop over *.dts in the boot/dts directory.
+I do not like this idea to just build the dts per platform
 
-as I started
+It save nearly no time to compile
+
+it just make it fragile to maintain
 
 Best Regards,
 J.
->  
->  #include "generic.h"
->  
-> diff --git a/arch/arm/mach-at91/include/mach/atmel-mci.h b/arch/arm/mach-at91/include/mach/atmel-mci.h
-> index 998cb0c..cd580a1 100644
-> --- a/arch/arm/mach-at91/include/mach/atmel-mci.h
-> +++ b/arch/arm/mach-at91/include/mach/atmel-mci.h
-> @@ -1,7 +1,7 @@
->  #ifndef __MACH_ATMEL_MCI_H
->  #define __MACH_ATMEL_MCI_H
->  
-> -#include <mach/at_hdmac.h>
-> +#include <linux/platform_data/dma-atmel.h>
->  
->  /**
->   * struct mci_dma_data - DMA data for MCI interface
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index 8a6c8e8..116e4ad 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -11,7 +11,7 @@
->  #ifndef AT_HDMAC_REGS_H
->  #define	AT_HDMAC_REGS_H
->  
-> -#include <mach/at_hdmac.h>
-> +#include <linux/platform_data/dma-atmel.h>
->  
->  #define	AT_DMA_MAX_NR_CHANNELS	8
->  
-> diff --git a/include/linux/platform_data/atmel-aes.h b/include/linux/platform_data/atmel-aes.h
-> index e7a1949..ab68082 100644
-> --- a/include/linux/platform_data/atmel-aes.h
-> +++ b/include/linux/platform_data/atmel-aes.h
-> @@ -1,7 +1,7 @@
->  #ifndef __LINUX_ATMEL_AES_H
->  #define __LINUX_ATMEL_AES_H
->  
-> -#include <mach/at_hdmac.h>
-> +#include <linux/platform_data/dma-atmel.h>
->  
->  /**
->   * struct aes_dma_data - DMA data for AES
-> diff --git a/arch/arm/mach-at91/include/mach/at_hdmac.h b/include/linux/platform_data/dma-atmel.h
-> similarity index 100%
-> rename from arch/arm/mach-at91/include/mach/at_hdmac.h
-> rename to include/linux/platform_data/dma-atmel.h
-> -- 
-> 1.7.10
-> 
