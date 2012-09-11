@@ -1,93 +1,63 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 13:39:09 -0400
-Subject: [PATCH v3 11/17] ARM: LPAE: use 64-bit accessors for TTBR registers
+Date: Tue, 11 Sep 2012 13:39:04 -0400
+Subject: [PATCH v3 06/17] ARM: LPAE: use signed arithmetic for mask definitions
 In-Reply-To: <1347385155-11643-1-git-send-email-cyril@ti.com>
 References: <1347385155-11643-1-git-send-email-cyril@ti.com>
-Message-ID: <1347385155-11643-12-git-send-email-cyril@ti.com>
+Message-ID: <1347385155-11643-7-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds TTBR accessor macros, and modifies cpu_get_pgd() and
-the LPAE version of cpu_set_reserved_ttbr0() to use these instead.
+This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
+unsigned long math truncates the mask at the 32-bits.  This clearly does bad
+things on PAE systems.
 
-In the process, we also fix these functions to correctly handle cases
-where the physical address lies beyond the 4G limit of 32-bit addressing.
+This patch fixes this problem by defining these masks as signed quantities.
+We then rely on sign extension to do the right thing.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/proc-fns.h |   24 +++++++++++++++++++-----
- arch/arm/mm/context.c           |    9 ++-------
- 2 files changed, 21 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/page.h           |    2 +-
+ arch/arm/include/asm/pgtable-3level.h |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index 75b5f14..2d270b8 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -116,13 +116,27 @@ extern void cpu_resume(void);
- #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index ecf9019..1e0fe08 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -13,7 +13,7 @@
+ /* PAGE_SHIFT determines the page size */
+ #define PAGE_SHIFT		12
+ #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+-#define PAGE_MASK		(~(PAGE_SIZE-1))
++#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
  
- #ifdef CONFIG_ARM_LPAE
-+
-+#define cpu_get_ttbr(nr)					\
-+	({							\
-+		u64 ttbr;					\
-+		__asm__("mrrc	p15, " #nr ", %Q0, %R0, c2"	\
-+			: "=r" (ttbr)				\
-+			: : );					\
-+		ttbr;						\
-+	})
-+
-+#define cpu_set_ttbr(nr, val)					\
-+	do {							\
-+		u64 ttbr = val;					\
-+		__asm__("mcrr	p15, " #nr ", %Q0, %R0, c2"	\
-+			: : "r" (ttbr)				\
-+			: "cc");				\
-+	} while (0)
-+
- #define cpu_get_pgd()	\
- 	({						\
--		unsigned long pg, pg2;			\
--		__asm__("mrrc	p15, 0, %0, %1, c2"	\
--			: "=r" (pg), "=r" (pg2)		\
--			:				\
--			: "cc");			\
-+		u64 pg = cpu_get_ttbr(0);		\
- 		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
- 		(pgd_t *)phys_to_virt(pg);		\
- 	})
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 4e07eec..f03437e 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -16,6 +16,7 @@
- #include <asm/mmu_context.h>
- #include <asm/thread_notify.h>
- #include <asm/tlbflush.h>
-+#include <asm/proc-fns.h>
+ #ifndef __ASSEMBLY__
  
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
- unsigned int cpu_last_asid = ASID_FIRST_VERSION;
-@@ -23,17 +24,11 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
- #ifdef CONFIG_ARM_LPAE
- void cpu_set_reserved_ttbr0(void)
- {
--	unsigned long ttbl = __pa(swapper_pg_dir);
--	unsigned long ttbh = 0;
--
- 	/*
- 	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
- 	 * ASID is set to 0.
- 	 */
--	asm volatile(
--	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"
--	:
--	: "r" (ttbl), "r" (ttbh));
-+	cpu_set_ttbr(0, __pa(swapper_pg_dir));
- 	isb();
- }
- #else
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index b249035..ae39d11 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -48,16 +48,16 @@
+ #define PMD_SHIFT		21
+ 
+ #define PMD_SIZE		(1UL << PMD_SHIFT)
+-#define PMD_MASK		(~(PMD_SIZE-1))
++#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
+ #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
+ 
+ /*
+  * section address mask and size definitions.
+  */
+ #define SECTION_SHIFT		21
+ #define SECTION_SIZE		(1UL << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
++#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
+ 
+ #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
+ 
 -- 
 1.7.9.5
