@@ -1,128 +1,142 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 11 Sep 2012 15:12:18 +0530
-Subject: [PATCHv7 23/23] i2c: omap: sanitize exit path
-In-Reply-To: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347356538-23835-24-git-send-email-shubhrajyoti@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 11 Sep 2012 15:16:31 +0530
+Subject: [PATCH 00/29] Move OMAP2+ over to use COMMON clock
+In-Reply-To: <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
+Message-ID: <504F0877.4030907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
 
-move the goto out label one line down, so that
-it can be used when stat is read as zero. All
-other exits, can be done with a break statement.
 
-While at that, also break out as soon as we
-complete draining IRQ, since at that time
-we know we transferred everything there was
-to be transferred.
+On 9/11/2012 12:05 PM, Paul Walmsley wrote:
+> 
+> Hi Rajendra,
+> 
+> A CCF testing branch has been built here.  The base is v3.6-rc5, plus the 
+> most recent version of the Common Clock Framework preparation patches that 
+> you posted to the list, "[PATCH v4 0/3] Prepare for OMAP2+ movement to 
+> Common Clk", but updated to take RMK's feedback into account.  Then the 
+> 'clk-next-omap-3.6-rc3' branch from your repo at 
+> 'git://github.com/rrnayak/linux.git' was added.  Then some patches to drop 
+> the old arch/arm/mach-omap2/clock*_data.c files were added.
+> 
+> This branch was then run through checkpatch.pl, and all of the parenthesis
+> alignment warnings have been fixed.  I don't know what to do about these 
+> crazy DECLARE_CLK_* macros; they have so many arguments that they are 
+> basically impossible to read.  Mike and I discussed converting them 
+> into C99 structure initializers with named fields, but am not sure if it's 
+> a readability advantage; it's probably going to be "write-only data" 
+> either way.  I've reflowed many of them to save diffstat but there are 
+> quite a few more to go.
+> 
+> The branch was then built with a set of testing Kconfigs.  Here's what was 
+> found: (these are still being investigated)
+> 
+> - The OMAP4-only testconfig and rmk's OMAP4430-SDP Kconfigs failed:
+>   "undefined reference to `omap2_clkt_iclk_allow_idle'":
+> 
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/omap4_testconfig/
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/rmk_omap4430_sdp_oldconfig/
+> 
+> - RMK's OMAP3430-LDP Kconfig failed with a whole set of warnings:
+> 
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/rmk_omap3430_ldp_oldconfig/
+> 
+> 
+> The kernel built with omap2plus_defconfig was then booted on several 
+> OMAP2+ boards.  Here's what was found:
+> 
+> - The kernel wouldn't boot on either the 3517EVM nor CM-T3517 boards.
+>   This turned out to be due to some missing AM35XX clkdev aliases, the 
+>   lack of which cause the CCF code to panic.  The patch that adds the 
+>   OMAP3 data has been updated to fix that bug and an HSOTGUSB clkdev
+>   alias bug that was found by visual inspection.
+> 
+> - The 3730 Beagle XM issued a warning and stack trace upon boot.  
+>   Debugging with Mike, this turned out to be due to a bug in the
+>   modified omap2_init_clksel_parent() function: it returned a register
+>   bitfield rather than an array index.  The patch that modifies this
+>   function was then updated to fix the bug.
+> 
+> - The 2420 N800 seems to have some kind of MMC-related problem
+>   that prevents it from booting.  Still looking into this:
+> 
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/2420n800/2420n800_log.txt
+> 
+> 
+> Then the branch was PM-tested to determine whether it can suspend and 
+> serial-resume properly, and whether dynamic idle works.  These tests 
+> didn't go so well:
+> 
+> - 3530ES3 Beagleboard here was able to enter retention-idle
+>   suspend, and leave it with serial wakeup, but the CORE powerdomain never 
+>   entered a low-power state.  Dynamic retention-idle with serial wakeup
+>   never resumed, and the test stopped there:
+> 
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/3530es3beagle/3530es3beagle_log.txt
+> 
+> - 37xx EVM and 3730 Beagle XM fared better; they made it through the whole 
+>   test program, but the CORE powerdomain also never entered a low-power
+>   state:
+> 
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/37xxevm/37xxevm_log.txt
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/3730beaglexm/3730beaglexm_log.txt
+> 
+> - 4430ES2 Panda never made past the first retention-idle suspend:
+> 
+>   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/boot/4430es2panda/4430es2panda_log.txt
+> 
+> 
+> Could you please take a look and see if you can identify why the patches 
+> aren't passing the tests?  I can't send these upstream until they pass the 
+> PM tests.
+> 
+> This testing branch can be found at the branch named 
+> "common_clk_testing_devel_3.7" of git://git.pwsan.com/linux-2.6
+> 
+> The testbed reports from this branch can be found here:
+>   
+>    http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/
+> 
+> And the baseline test reports from v3.6-rc5 can be found here:
+> 
+>    http://www.pwsan.com/omap/testlogs/test_v3.6-rc5/20120908202511/
+> 
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   26 +++++++++++++-------------
- 1 files changed, 13 insertions(+), 13 deletions(-)
+I tried this branch on BeagleBone platform and needs one small typo
+correction in hwmod data patch (submitted earlier, which you are going
+to queue it)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 122f517..b149e32 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -901,27 +901,26 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 		if (!stat) {
- 			/* my work here is done */
--			spin_unlock_irqrestore(&dev->lock, flags);
--			return IRQ_HANDLED;
-+			goto out;
- 		}
- 
- 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
- 		if (count++ == 100) {
- 			dev_warn(dev->dev, "Too much work in one IRQ\n");
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_AL) {
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
--			goto out;
-+			break;
- 		}
- 
- 		/*
-@@ -934,7 +933,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 						OMAP_I2C_STAT_XRDY |
- 						OMAP_I2C_STAT_XDR |
- 						OMAP_I2C_STAT_ARDY));
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_RDR) {
-@@ -949,7 +948,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 				i2c_omap_errata_i207(dev, stat);
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RDR);
--			continue;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_RRDY) {
-@@ -972,10 +971,10 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
- 			if (ret < 0)
--				goto out;
-+				break;
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
--			continue;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XRDY) {
-@@ -987,7 +986,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
- 			if (ret < 0)
--				goto out;
-+				break;
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
- 			continue;
-@@ -997,19 +996,20 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 			dev_err(dev->dev, "Receive overrun\n");
- 			err |= OMAP_I2C_STAT_ROVR;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
- 			err |= OMAP_I2C_STAT_XUDF;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
--			goto out;
-+			break;
- 		}
- 	} while (stat);
- 
--out:
- 	omap_i2c_complete_cmd(dev, err);
-+
-+out:
- 	spin_unlock_irqrestore(&dev->lock, flags);
- 
- 	return IRQ_HANDLED;
--- 
-1.7.5.4
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index de7a3ab..767a77d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -1441,7 +1441,7 @@ static struct omap_hwmod am33xx_mmc2_hwmod = {
+        .clkdm_name     = "l3s_clkdm",
+        .mpu_irqs       = am33xx_mmc2_irqs,
+        .sdma_reqs      = am33xx_mmc2_edma_reqs,
+-       .main_clk       = "mmc2_fck",
++       .main_clk       = "mmc_clk",
+        .prcm           = {
+                .omap4  = {
+                      .clkctrl_offs = AM33XX_CM_PER_MMC2_CLKCTRL_OFFSET,
+
+
+With above change I boot tested it on BeagleBone platform and also
+verified the clock rates getting printed in debugfs.
+
+Thanks,
+Vaibhav
+> 
+> 
+> - Paul
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
