@@ -1,92 +1,256 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Sep 2012 14:27:13 +0200
-Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
-Message-ID: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 11 Sep 2012 14:27:14 +0200
+Subject: [PATCH v4 01/17] arm: mach-dove: use plus instead of or for address
+ definitions
+In-Reply-To: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1347366450-26644-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew, Jason, Gr?gory,
+Since we are going to use IOMEM() to define many base virtual
+addresses, we can no longer use binary or to define the individual
+register addresses ("binary or" arithmetic on pointers is not
+allowed). Instead, use the more conventional plus operator to do so.
 
-Here is a patch set that introduces basic support for address decoding
-on Armada 370 and Armada XP. The aim of this basic support is
-essentially to be able to configure a window to remap the BootROM,
-which is needed to startup the secondary CPUs for the SMP support.
+The binary or operators were actually not useful because the low-order
+bits of the base address were always zero, so the usage of the binary
+or operators was effectively identical to a plus operator.
 
-As we had discussed already, the address decoding configuration is not
-described in the Device Tree, it is for now hardcoded on a per-SoC
-basis. We might later discuss how to extend this to the Device Tree.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-dove/include/mach/bridge-regs.h |   16 ++--
+ arch/arm/mach-dove/include/mach/dove.h        |  118 ++++++++++++-------------
+ 2 files changed, 67 insertions(+), 67 deletions(-)
 
-The patch set is relatively long, as it refactors some existing
-Dove/Kirkwood/MV78xx0/Orion code to use void __iomem pointers instead
-of unsigned long, as per the request of Arnd Bergmann and Olof
-Johansson.
-
-This patch set is split in several parts:
-
- (1) Patches 1-4 replaces binary or operators used in register address
-     definitions by plus operators. This is necessary because followup
-     patches change the base addresses constants to void __iomem
-     pointers, and binary or arithmetic on pointers is not
-     allowed. Also, using the plus operator to add an offset to a base
-     address is much more traditional. In our case, the binary or
-     operator and plus operator seem equivalent, as the low-order bits
-     of the base addresses that were being or'ed with an offset were
-     all zero.
-
- (2) Patches 5-9 use the IOMEM() macro to turn the various base
-     virtual addresses constants into void __iomem pointers. This
-     naturally makes all derived constants (virtual addresses of
-     specific registers or units) as void __iomem pointers as
-     well. The patches also adjust the code to take into this
-     change. It adds a few temporary "(unsigned long)" casts that are
-     removed by the following patches that rework a few plat-orion
-     APIs. These temporary casts are necessary to make the patch set
-     properly bisectable, without having a single big patch that does
-     the complete IOMEM() conversion. At the end of the patch set, the
-     only (unsigned long) casts that remain are the one in the
-     map_desc[] array definitions, and those ones are expected.
-
- (3) Patches 10-13 rework some plat-orion APIs so that they use void
-     __iomem pointers instead of unsigned long for virtual
-     addresses. Those patches also remove the now useless "(unsigned
-     long)" casts added in step (2) above.
-
- (4) Patch 14 introduces PLAT_ORION_LEGACY, which allows the Marvell
-     370/XP platforms to be part of PLAT_ORION, and therefore re-use
-     the existing address decoding code.
-
- (5) Patch 15 makes a small change to an address decoding structure so
-     that we can define at runtime the virtual address of the
-     configuration registers. This is needed as on Armada 370/XP the
-     address decoding "controller" is declared in the Device Tree.
-
- (6) Patch 16 adds the 370/XP address decoding code itself. For now,
-     it only maps the BootROM on Armada XP.
-
- (7) Patch 17 adds the necessary DT code to instantiate the address
-     decoding "controller".
-
-This patch set has been:
-
- * Built, boot tested on Armada XP. The operation of the address
-   mapping support has been tested as well.
-
- * Built tested only on Dove, Kirkwood, Orion5x and MV78xx0.
-
-Changes since v3:
- * As per the request of Olof Johansson, use void __iomem pointers
-   everywhere instead of introducing more casts in the patch set. This
-   change has significantly increased the patch set size, though
-   (going from 5 patches in v3 to 17 patches in v4)
-
-Changes since v2:
- * Remove one more useless (void __iomem *) cast in the Armada 370/XP
-   addr-map.c file, as noticed by Arnd Bergmann.
-
-Changes since v1:
- * Use void __iomem * in addr-map code. Suggested by Arnd Bergmann.
- * Add Acked-by on patches 2->5 from Gr?gory Cl?ment
-
-Thanks,
-
-Thomas Petazzoni
+diff --git a/arch/arm/mach-dove/include/mach/bridge-regs.h b/arch/arm/mach-dove/include/mach/bridge-regs.h
+index f953bb5..99f259e 100644
+--- a/arch/arm/mach-dove/include/mach/bridge-regs.h
++++ b/arch/arm/mach-dove/include/mach/bridge-regs.h
+@@ -13,22 +13,22 @@
+ 
+ #include <mach/dove.h>
+ 
+-#define CPU_CONFIG		(BRIDGE_VIRT_BASE | 0x0000)
++#define CPU_CONFIG		(BRIDGE_VIRT_BASE + 0x0000)
+ 
+-#define CPU_CONTROL		(BRIDGE_VIRT_BASE | 0x0104)
++#define CPU_CONTROL		(BRIDGE_VIRT_BASE + 0x0104)
+ #define  CPU_CTRL_PCIE0_LINK	0x00000001
+ #define  CPU_RESET		0x00000002
+ #define  CPU_CTRL_PCIE1_LINK	0x00000008
+ 
+-#define RSTOUTn_MASK		(BRIDGE_VIRT_BASE | 0x0108)
++#define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
+ #define  SOFT_RESET_OUT_EN	0x00000004
+ 
+-#define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE | 0x010c)
++#define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE + 0x010c)
+ #define  SOFT_RESET		0x00000001
+ 
+ #define  BRIDGE_INT_TIMER1_CLR	(~0x0004)
+ 
+-#define IRQ_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0200)
++#define IRQ_VIRT_BASE		(BRIDGE_VIRT_BASE + 0x0200)
+ #define IRQ_CAUSE_LOW_OFF	0x0000
+ #define IRQ_MASK_LOW_OFF	0x0004
+ #define FIQ_MASK_LOW_OFF	0x0008
+@@ -47,9 +47,9 @@
+ #define ENDPOINT_MASK_HIGH	(IRQ_VIRT_BASE + ENDPOINT_MASK_HIGH_OFF)
+ #define PCIE_INTERRUPT_MASK	(IRQ_VIRT_BASE + PCIE_INTERRUPT_MASK_OFF)
+ 
+-#define POWER_MANAGEMENT	(BRIDGE_VIRT_BASE | 0x011c)
++#define POWER_MANAGEMENT	(BRIDGE_VIRT_BASE + 0x011c)
+ 
+-#define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
+-#define TIMER_PHYS_BASE         (BRIDGE_PHYS_BASE | 0x0300)
++#define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE + 0x0300)
++#define TIMER_PHYS_BASE         (BRIDGE_PHYS_BASE + 0x0300)
+ 
+ #endif
+diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+index d52b0ef..cccfd1d 100644
+--- a/arch/arm/mach-dove/include/mach/dove.h
++++ b/arch/arm/mach-dove/include/mach/dove.h
+@@ -64,75 +64,75 @@
+  */
+ 
+ /* SPI, I2C, UART */
+-#define DOVE_I2C_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x11000)
+-#define DOVE_UART0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x12000)
+-#define DOVE_UART0_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x12000)
+-#define DOVE_UART1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x12100)
+-#define DOVE_UART1_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x12100)
+-#define DOVE_UART2_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x12200)
+-#define DOVE_UART2_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x12200)
+-#define DOVE_UART3_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x12300)
+-#define DOVE_UART3_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x12300)
+-#define DOVE_SPI0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x10600)
+-#define DOVE_SPI1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x14600)
++#define DOVE_I2C_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x11000)
++#define DOVE_UART0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x12000)
++#define DOVE_UART0_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x12000)
++#define DOVE_UART1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x12100)
++#define DOVE_UART1_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x12100)
++#define DOVE_UART2_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x12200)
++#define DOVE_UART2_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x12200)
++#define DOVE_UART3_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x12300)
++#define DOVE_UART3_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x12300)
++#define DOVE_SPI0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x10600)
++#define DOVE_SPI1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x14600)
+ 
+ /* North-South Bridge */
+-#define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x20000)
+-#define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x20000)
++#define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x20000)
++#define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x20000)
+ 
+ /* Cryptographic Engine */
+-#define DOVE_CRYPT_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x30000)
++#define DOVE_CRYPT_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x30000)
+ 
+ /* PCIe 0 */
+-#define DOVE_PCIE0_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x40000)
++#define DOVE_PCIE0_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x40000)
+ 
+ /* USB */
+-#define DOVE_USB0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x50000)
+-#define DOVE_USB1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x51000)
++#define DOVE_USB0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x50000)
++#define DOVE_USB1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x51000)
+ 
+ /* XOR 0 Engine */
+-#define DOVE_XOR0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x60800)
+-#define DOVE_XOR0_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x60800)
+-#define DOVE_XOR0_HIGH_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x60A00)
+-#define DOVE_XOR0_HIGH_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x60A00)
++#define DOVE_XOR0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x60800)
++#define DOVE_XOR0_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x60800)
++#define DOVE_XOR0_HIGH_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x60A00)
++#define DOVE_XOR0_HIGH_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x60A00)
+ 
+ /* XOR 1 Engine */
+-#define DOVE_XOR1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x60900)
+-#define DOVE_XOR1_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x60900)
+-#define DOVE_XOR1_HIGH_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x60B00)
+-#define DOVE_XOR1_HIGH_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x60B00)
++#define DOVE_XOR1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x60900)
++#define DOVE_XOR1_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x60900)
++#define DOVE_XOR1_HIGH_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x60B00)
++#define DOVE_XOR1_HIGH_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x60B00)
+ 
+ /* Gigabit Ethernet */
+-#define DOVE_GE00_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x70000)
++#define DOVE_GE00_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x70000)
+ 
+ /* PCIe 1 */
+-#define DOVE_PCIE1_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x80000)
++#define DOVE_PCIE1_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x80000)
+ 
+ /* CAFE */
+-#define DOVE_SDIO0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x92000)
+-#define DOVE_SDIO1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x90000)
+-#define DOVE_CAM_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x94000)
+-#define DOVE_CAFE_WIN_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x98000)
++#define DOVE_SDIO0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x92000)
++#define DOVE_SDIO1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x90000)
++#define DOVE_CAM_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x94000)
++#define DOVE_CAFE_WIN_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x98000)
+ 
+ /* SATA */
+-#define DOVE_SATA_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xa0000)
++#define DOVE_SATA_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xa0000)
+ 
+ /* I2S/SPDIF */
+-#define DOVE_AUD0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xb0000)
+-#define DOVE_AUD1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xb4000)
++#define DOVE_AUD0_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xb0000)
++#define DOVE_AUD1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xb4000)
+ 
+ /* NAND Flash Controller */
+-#define DOVE_NFC_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xc0000)
++#define DOVE_NFC_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xc0000)
+ 
+ /* MPP, GPIO, Reset Sampling */
+-#define DOVE_MPP_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0200)
++#define DOVE_MPP_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
+ #define DOVE_PMU_MPP_GENERAL_CTRL (DOVE_MPP_VIRT_BASE + 0x10)
+-#define DOVE_RESET_SAMPLE_LO	(DOVE_MPP_VIRT_BASE | 0x014)
+-#define DOVE_RESET_SAMPLE_HI	(DOVE_MPP_VIRT_BASE | 0x018)
+-#define DOVE_GPIO_LO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0400)
+-#define DOVE_GPIO_HI_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0420)
+-#define DOVE_GPIO2_VIRT_BASE    (DOVE_SB_REGS_VIRT_BASE | 0xe8400)
+-#define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xe803c)
++#define DOVE_RESET_SAMPLE_LO	(DOVE_MPP_VIRT_BASE + 0x014)
++#define DOVE_RESET_SAMPLE_HI	(DOVE_MPP_VIRT_BASE + 0x018)
++#define DOVE_GPIO_LO_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0400)
++#define DOVE_GPIO_HI_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0420)
++#define DOVE_GPIO2_VIRT_BASE    (DOVE_SB_REGS_VIRT_BASE + 0xe8400)
++#define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xe803c)
+ #define  DOVE_AU1_SPDIFO_GPIO_EN	(1 << 1)
+ #define  DOVE_NAND_GPIO_EN		(1 << 0)
+ #define DOVE_MPP_CTRL4_VIRT_BASE	(DOVE_GPIO_LO_VIRT_BASE + 0x40)
+@@ -144,44 +144,44 @@
+ #define  DOVE_SD0_GPIO_SEL		(1 << 0)
+ 
+ /* Power Management */
+-#define DOVE_PMU_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xd0000)
++#define DOVE_PMU_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0000)
+ #define DOVE_PMU_SIG_CTRL	(DOVE_PMU_VIRT_BASE + 0x802c)
+ 
+ /* Real Time Clock */
+-#define DOVE_RTC_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xd8500)
++#define DOVE_RTC_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xd8500)
+ 
+ /* AC97 */
+-#define DOVE_AC97_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xe0000)
+-#define DOVE_AC97_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xe0000)
++#define DOVE_AC97_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xe0000)
++#define DOVE_AC97_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xe0000)
+ 
+ /* Peripheral DMA */
+-#define DOVE_PDMA_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xe4000)
+-#define DOVE_PDMA_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0xe4000)
++#define DOVE_PDMA_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xe4000)
++#define DOVE_PDMA_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xe4000)
+ 
+-#define DOVE_GLOBAL_CONFIG_1	(DOVE_SB_REGS_VIRT_BASE | 0xe802C)
++#define DOVE_GLOBAL_CONFIG_1	(DOVE_SB_REGS_VIRT_BASE + 0xe802C)
+ #define  DOVE_TWSI_ENABLE_OPTION1	(1 << 7)
+-#define DOVE_GLOBAL_CONFIG_2	(DOVE_SB_REGS_VIRT_BASE | 0xe8030)
++#define DOVE_GLOBAL_CONFIG_2	(DOVE_SB_REGS_VIRT_BASE + 0xe8030)
+ #define  DOVE_TWSI_ENABLE_OPTION2	(1 << 20)
+ #define  DOVE_TWSI_ENABLE_OPTION3	(1 << 21)
+ #define  DOVE_TWSI_OPTION3_GPIO		(1 << 22)
+-#define DOVE_SSP_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0xec000)
+-#define DOVE_SSP_CTRL_STATUS_1	(DOVE_SB_REGS_VIRT_BASE | 0xe8034)
++#define DOVE_SSP_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xec000)
++#define DOVE_SSP_CTRL_STATUS_1	(DOVE_SB_REGS_VIRT_BASE + 0xe8034)
+ #define  DOVE_SSP_ON_AU1		(1 << 0)
+ #define  DOVE_SSP_CLOCK_ENABLE		(1 << 1)
+ #define  DOVE_SSP_BPB_CLOCK_SRC_SSP	(1 << 11)
+ /* Memory Controller */
+-#define DOVE_MC_VIRT_BASE	(DOVE_NB_REGS_VIRT_BASE | 0x00000)
++#define DOVE_MC_VIRT_BASE	(DOVE_NB_REGS_VIRT_BASE + 0x00000)
+ 
+ /* LCD Controller */
+-#define DOVE_LCD_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE | 0x10000)
+-#define DOVE_LCD1_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE | 0x20000)
+-#define DOVE_LCD2_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE | 0x10000)
+-#define DOVE_LCD_DCON_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE | 0x30000)
++#define DOVE_LCD_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE + 0x10000)
++#define DOVE_LCD1_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE + 0x20000)
++#define DOVE_LCD2_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE + 0x10000)
++#define DOVE_LCD_DCON_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE + 0x30000)
+ 
+ /* Graphic Engine */
+-#define DOVE_GPU_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE | 0x40000)
++#define DOVE_GPU_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE + 0x40000)
+ 
+ /* Video Engine */
+-#define DOVE_VPU_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE | 0x400000)
++#define DOVE_VPU_PHYS_BASE	(DOVE_NB_REGS_PHYS_BASE + 0x400000)
+ 
+ #endif
+-- 
+1.7.9.5
