@@ -1,44 +1,54 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 11 Sep 2012 16:31:35 +0200 (CEST)
-Subject: [PATCH 04/16] ARM: imx: move platform_data definitions
-In-Reply-To: <201209111410.05698.arnd@arndb.de>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-4-git-send-email-arnd@arndb.de>
- <Pine.LNX.4.64.1209111538000.22084@axis700.grange>
- <201209111410.05698.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.64.1209111624240.22084@axis700.grange>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 11 Sep 2012 16:40:43 +0200
+Subject: [PATCH 5/7] pwm: i.MX: add devicetree support
+In-Reply-To: <1347267577-3296-6-git-send-email-s.hauer@pengutronix.de>
+References: <1347267577-3296-1-git-send-email-s.hauer@pengutronix.de>
+ <1347267577-3296-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120911144043.GA3824@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012, Arnd Bergmann wrote:
-
-> On Tuesday 11 September 2012, Guennadi Liakhovetski wrote:
-> > Hi Arnd
-> > 
-> > It probably wouldn't be very difficult to also include 
-> > arch/arm/plat-mxc/include/mach/ipu.h in this your patch, but you can also 
-> > leave it for later. Just to make sure it's not something that would make 
-> > your future patching more complicated.
-> > 
+On Mon, Sep 10, 2012 at 10:59:35AM +0200, Sascha Hauer wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> For now, I've done only the straight renames but left the ones that looked
-> like they need more complex changes of any sort. Looking at ipu.h, it seems
-> that this header file defines data that is used inside of the driver but not
-> in the platform device definition, so we'd need to split it up and move
-> the part that is only used inside of the driver into a different place.
+> At the same time remove platform based support. No user for
+> this driver has made it into mainline so far, so all we break
+> is out of tree stuff.
 > 
-> Of course, I could alo be mistaken and not have realized that actually all
-> of this file is platform data.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+> Reviewed-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+[...]
 
-ipu.h is used by the dmaengine and IRQ driver under drivers/dma/ipu/, and 
-by its users drivers/media/platform/soc_camera/mx3_camera.c and 
-drivers/video/mx3fb.c. It has been placed under arch/arm/... because it's 
-arch-specific, but in principle I don't see any reason why it cannot 
-happily live anywhere under include/...
+I was just doing some build tests on the series and noticed that it
+fails with this:
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+	  CC [M]  drivers/pwm/pwm-imx.o
+	/home/thierry.reding/src/kernel/linux-pwm.git/drivers/pwm/pwm-imx.c: In function 'imx_pwm_config_v2':
+	/home/thierry.reding/src/kernel/linux-pwm.git/drivers/pwm/pwm-imx.c:140:2: error: implicit declaration of function 'cpu_is_mx25' [-Werror=implicit-function-declaration]
+
+This breaks bisection in the middle of the series. It seems to be
+related to this change.
+
+> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> index a1e799e..b4e0ad3 100644
+> --- a/drivers/pwm/pwm-imx.c
+> +++ b/drivers/pwm/pwm-imx.c
+> @@ -16,8 +16,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/pwm.h>
+> -#include <mach/hardware.h>
+
+This probably needs to be postponed to the next patch, until the final
+reference to cpu_is_mx25() is removed.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/305a4e50/attachment.sig>
