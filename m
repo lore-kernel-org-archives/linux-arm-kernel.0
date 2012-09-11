@@ -1,78 +1,52 @@
-From: david.jander@protonic.nl (David Jander)
-Date: Tue, 11 Sep 2012 11:31:39 +0200
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20120911084853.GT24458@pengutronix.de>
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
- <20120911084853.GT24458@pengutronix.de>
-Message-ID: <20120911113139.3b7b879f@archvile>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 11 Sep 2012 11:32:11 +0200
+Subject: [PATCH] ARM: EXYNOS5: Add bus clock and set parent clock for FIMD
+In-Reply-To: <CAL1wa8f1=hVMYrw2qdnQK5wFh8CtLxjP79+8POOG7HHqOBU5yA@mail.gmail.com>
+References: <1347307866-30641-1-git-send-email-l.krishna@samsung.com>
+ <000101cd8fb3$90d10db0$b2732910$%han@samsung.com>
+ <CAL1wa8f1=hVMYrw2qdnQK5wFh8CtLxjP79+8POOG7HHqOBU5yA@mail.gmail.com>
+Message-ID: <504F051B.5070903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012 10:48:53 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 09/11/2012 11:19 AM, Leela Krishna Amudala wrote:
+>>> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+>>> index 774533c..f1281cf 100644
+>>> --- a/arch/arm/mach-exynos/clock-exynos5.c
+>>> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+>>> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+>>>       .ctrlbit        = (1 << 4),
+>>>  };
+>>>
+>>> +static struct clk exynos5_clk_fimd = {
+>>> +     .name           = "fimd",
+>>> +     .devname        = "exynos5-fb",
+>>
+>>
+>> Replace 'exynos5-fb' with 'exynos5-fb.1', as exynos4 fimd uses exynos4-fb.0
+>> as devname. Exynos5 can use fimd0 or fimd1. Also, Exynos5250 uses fimd1.
+>>
+>>
+> Currently s3c-fb driver using "exynos5-fb" as device name, hence used
+> the same name in the clock.
+> This code is tested with both drm-fimd and s3c-fb fimd and it is
+> working fine showing the display on LCD.
+> If I change the device name in clock file then I have to change it in
+> s3c-fb driver also.
+> So I feel it is better to keep the name as "exynos5-fb" in clock file
+> instead of changing in the driver.
 
-> On Tue, Sep 11, 2012 at 09:27:53AM +0200, David Jander wrote:
-> > 
-> > Hi Matt,
-> > 
-> > >         @ Function supports interworking.
-> > >         @ args = 0, pretend = 0, frame = 0
-> > >         @ frame_needed = 0, uses_anonymous_args = 0
-> > >         @ link register save eliminated.
-> > >         cmp     r0, #9
-> > >         mov     r3, #0
-> > >         str     r3, [r1, #0]
-> > >         mov     r0, #0
-> > >         strgt   r3, [r1, #4]
-> > >         bx      lr
-> > >         .size   flexcan_chip_start, .-flexcan_chip_start
-> > >         .ident  "GCC: (GNU) 4.3.3"
-> > >         .section        .note.GNU-stack,"",%progbits
-> > > 
-> > > I think this looks correct. Perhaps you could try the angstrom arm5te
-> > > toolchain and see if it's a toolchain issue?
-> > 
-> > Yes, this looks a lot better, and is exactly what I get when I compile this
-> > code with CodeSourcery GCC-4.4.1
-> > 
-> > I have tries building gcc-4.6.3 also with OSELAS/PTXdist, and it gives the
-> > same (wrong) result as with gcc-4.6.2
-> 
-> AFAIK our OSELAS/PTXdist Toolchains use Linaro patches, this would
-> explain why both have the same result.
+Yeah, makes sense. We can always add a clkdev entry with CLKDEV_INIT()
+if driver needs it. There is so much confusion now with having device name
+associated with platform clock name. It should be possible to freely define
+clock connection id and a platform clock association, not at the platform
+clock definition.
 
-It would indeed, if I had just used OSELAS as-is, but I didn't ;-)
-I made a copy of
-arm-v5te-linux-gnueabi_gcc-4.6.2_glibc-2.14.1_binutils-2.21.1a_kernel-2.6.39-sanitized.ptxconfig
-and replaced the version string 4.6.2 with 4.6.3. AFAIK, this way PTXdist will
-download pristine gcc-4.6.3 sources and not apply any patches, since there is
-no directory named patches/gcc-4.6.3, right? Can I assume that I have an
-unpatched version of gcc-4.6.3 then?
+I guess we can now clean all this up only during conversion to common clock
+framework.
 
-Btw, Here's what I get from it:
 
-flexcan_chip_start:
-        @ args = 0, pretend = 0, frame = 0
-        @ frame_needed = 0, uses_anonymous_args = 0
-        @ link register save eliminated.
-        mov     r3, #0
-        cmp     r0, #9
-        str     r3, [r1, #0]
-        ldrle   r3, [r1, #4]
-        mov     r0, #0
-        str     r3, [r1, #4]
-        bx      lr
-        .size   flexcan_chip_start, .-flexcan_chip_start
-        .ident  "GCC: (OSELAS.Toolchain-2011.11.1) 4.6.3"
-        .section        .note.GNU-stack,"",%progbits
-
-Wrong code.
-See the version string? It is clearly not an existing OSELAS version.
-
-Best regards,
-
+Regards,
 -- 
-David Jander
-Protonic Holland.
+Sylwester Nawrocki
+Samsung Poland R&D Center
