@@ -1,43 +1,36 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 11 Sep 2012 19:35:55 +0200
-Subject: [PATCH 1/2] arm: mvebu: split Kconfig options for Armada 370
- and XP
-In-Reply-To: <1347377834-19402-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347377834-19402-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347377834-19402-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <504F767B.1050705@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Sep 2012 10:36:26 -0700
+Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
+In-Reply-To: <201209111704.16708.arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <CAMQu2gz8F2FcgRuok3x1uJ4pP8=0E2-9jhYGchzU9AUtUHjYhg@mail.gmail.com>
+ <504F6249.2090501@ti.com> <201209111704.16708.arnd@arndb.de>
+Message-ID: <20120911173626.GF23092@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 05:37 PM, Thomas Petazzoni wrote:
-> A followup patch actually makes use of this split to select the
-> appropriate pinctrl drivers.
- >
-> [...]
- >
-> +config MACH_ARMADA_370
-> +	bool "Marvell Armada 370 boads"
+* Arnd Bergmann <arnd@arndb.de> [120911 10:05]:
+> On Tuesday 11 September 2012, Vaibhav Hiremath wrote:
+> > On 9/11/2012 7:54 PM, Shilimkar, Santosh wrote:
+> > > On Tue, Sep 11, 2012 at 7:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >> On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
+> > >>> Just curious to know how you came with some of the above header names ?
+> > >>>
+> > >>> plat/mcbsp ---> dsp-mcbsp.h
+> > >>> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
+> > >>> better name.
+> > >>
+> > >> This one was a mistake on my side, as Tony and  Peter already pointed out.
+> > >> How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
+> > >>
+> > > After re-reading the cover-letter and your below response,
+> > > 'asoc-omap-mcbsp.h' seems to be fine.
+> > > 
+> > 
+> > Note that mcbsp is also applicable to Davinci family of devices.
+> 
+> asoc-ti-mcbsp.h then?
 
-typo: boards
+Sounds good to me. Whatever the name ends up being:
 
-> +	select MACH_ARMADA_370_XP
->   	help
-> +	  Say 'Y' here if you want your kernel to support boards based
-> +	  on the Marvell Armada XP SoC with device tree.
-
-typo: Armada 370
-
->
-> -	  Say 'Y' here if you want your kernel to support boards based on
-> -	  Marvell Armada 370 or Armada XP with device tree.
-> +config MACH_ARMADA_XP
-> +	bool "Marvell Armada XP boards"
-> +	select MACH_ARMADA_370_XP
-> +	help
-> +	  Say 'Y' here if you want your kernel to support boards based
-> +	  on the Marvell Armada XP SoC with device tree.
->
->   endmenu
-
-Sebastian
+Acked-by: Tony Lindgren <tony@atomide.com>
