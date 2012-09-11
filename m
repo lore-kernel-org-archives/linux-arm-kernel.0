@@ -1,137 +1,92 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 11 Sep 2012 12:49:00 +0530
-Subject: [PATCH] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
- read/write
-In-Reply-To: <alpine.DEB.2.00.1209110643010.23042@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209052333410.11516@utopia.booyaka.com>
- <CAMQu2gzCz+bS7U1ypFWzcp3zTpkfHdPzZfFtJ8Cd4ap8FSzJQg@mail.gmail.com>
- <CAMQu2gw-KPQzYKtjJUxZjEX+_HKLL9WTxXXA35_ki8KbN+WDYg@mail.gmail.com>
- <20120910185535.GC1303@atomide.com>
- <CAMQu2gxUES=s8fMpwJ77tnY1wz4b_T=yustj+C+WNkEMmEOx4w@mail.gmail.com>
- <alpine.DEB.2.00.1209110636310.23042@utopia.booyaka.com>
- <CAMQu2gyXOEs3Zbo=JrPwN2LmUNyYVc35iPWwGZqXCE3BCsn7xg@mail.gmail.com>
- <alpine.DEB.2.00.1209110643010.23042@utopia.booyaka.com>
-Message-ID: <CAMQu2gxkQ1JAjbuhFZqUxgrgzrFLhMZk_Q8TzXW5q9Lr3JOmqQ@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 11 Sep 2012 10:23:55 +0300
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <20120829104559.GB25433@b20223-02.ap.freescale.net>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+ <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+ <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829083337.GI4011@b20223-02.ap.freescale.net>
+ <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829104559.GB25433@b20223-02.ap.freescale.net>
+Message-ID: <87ipblqayc.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 12:13 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Tue, 11 Sep 2012, Shilimkar, Santosh wrote:
->
->> On Tue, Sep 11, 2012 at 12:07 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> > On Tue, 11 Sep 2012, Shilimkar, Santosh wrote:
->> >
->> >> On Tue, Sep 11, 2012 at 12:25 AM, Tony Lindgren <tony@atomide.com> wrote:
->> >> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120908 01:20]:
->> >> >>
->> >> >> Will you able to pick up these couple of wakeupgen fixes from  here or
->> >> >> do you want me to send you a pull request for 3.6-rc5/6
->> >> >
->> >> > I can pick them into fixes-noncritical. But if the second one is
->> >> > a major bug for the -rc series, the patch should be describe what
->> >> > breaks (regression? oops?).
->> >> >
->> >> Fixes non critical is fine. No major issue without these patches.
->> >
->> > There's an ordering constraint though: Santosh's patch needs to go in
->> > first, then mine.
->> >
->> Its other way round ;-)
->> Mine I created after applying your change.
->
-> The problem is that if my patch is applied first, then there will be a
-> point after my patch where the AUXCOREBOOT1 register won't be saved, which
-> might break PM.  So the patches may need to be updated.
->
-Good point. It's trivial to re-order them.
+Richard Zhao <richard.zhao@freescale.com> writes:
 
-Tony,
-Updated patches in the end of the email. Also attached.
+> On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
+>> Richard Zhao <richard.zhao@freescale.com> writes:
+>> 
+>> > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
+>> >> Richard Zhao <richard.zhao@freescale.com> writes:
+>> >> 
+>> >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
+>> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
+>> >> >> 
+>> >> >> > One role failed, but the other role will possiblly still work.
+>> >> >> > For example, when udc start failed, if plug in a host device,
+>> >> >> > it works.
+>> >> >> 
+>> >> >> If you're a host device, ci->role should be HOST at this point and
+>> >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+>> >> >> role detection must be fixed. If ci_role_start() fails for host, but it
+>> >> >> still works when it's called again after the id pin change is detected,
+>> >> >> again, the problem is elsewhere.
+>> >> > The check is only for OTG device. For single role device, it just fail
+>> >> > if it start the role failed.
+>> >> 
+>> >> Sorry, can you rephrase?
+>> >> 
+>> >> >> 
+>> >> >> >
+>> >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> >> >> > ---
+>> >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
+>> >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
+>> >> >> >
+>> >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+>> >> >> > index 19ef324..8fd390a 100644
+>> >> >> > --- a/drivers/usb/chipidea/core.c
+>> >> >> > +++ b/drivers/usb/chipidea/core.c
+>> >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+>> >> >> >  	ret = ci_role_start(ci, ci->role);
+>> >> >> >  	if (ret) {
+>> >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+>> >> >> > -		ret = -ENODEV;
+>> >> >> > -		goto rm_wq;
+>> >> >> > +		ci->role = CI_ROLE_END;
+>> >> >> 
+>> >> >> So are you relying on id pin interrupt for initializing the role after
+>> >> >> this? Can you provide more details?
+>> >> > Yes. The ID pin detect still works. My case is, gadget role failed,
+>> >> > host role works. I was trying not to ruin host function.
+>> >> 
+>> >> But it shouldn't even try to start the gadget, because ci_otg_role()
+>> >> should set ci->role to HOST before ci_role_start() happens.
+>> > It depends on ID pin. If ID pin is gadget and gadget is not support well,
+>> > ci_role_start will fail. See below example.
+>> >> 
+>> >> Another question is, why does gadget start fail?
+>> > There's one example:
+>> > If usb phy don't support otg yet, otg_set_peripheral will fail, and
+>> > then cause udc_start fail.
+>> 
+>> So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
+>> platform data till the phy is fully implemented.
+> It's just an example. We can not assume udc_start always success. If it
+> fails, isn't it better to continue support of host than say game over?
 
-Regards
-Santosh
+Ok, I think what we need here is to rework error handling around role
+switching, so that we can allow certain things to fail and retry at a
+later point (say at id pin change), while being careful about the other
+failures.
 
->From 4e1da2a44d92b956c3a740f5af6a45ff1c2dc294 Mon Sep 17 00:00:00 2001
-From: Paul Walmsley <paul@pwsan.com>
-Date: Tue, 11 Sep 2012 12:43:18 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
- read/write
+If this patch is not crucial for imx right now, I'd prefer to leave it
+out.
 
-The wakeupgen context-save code reads and stores the AUXCOREBOOT0 and
-AUXCOREBOOT1 register contents twice.  This seems like a waste of
-time, so, remove the duplicates.
-
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap-wakeupgen.c |    6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c
-b/arch/arm/mach-omap2/omap-wakeupgen.c
-index c3795c2..567f672 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -233,12 +233,6 @@ static inline void omap4_irq_save_context(void)
- 	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
-
- 	/* Save SyncReq generation logic */
--	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
--	__raw_writel(val, sar_base + AUXCOREBOOT0_OFFSET);
--	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
--	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
--
--	/* Save SyncReq generation logic */
- 	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_MASK);
- 	__raw_writel(val, sar_base + PTMSYNCREQ_MASK_OFFSET);
- 	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_EN);
--- 
-1.7.9.5
-
-
->From 6e3b8a3f6ec231f588b860d87b7a80f6ba38ce98 Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Thu, 6 Sep 2012 11:51:34 +0530
-Subject: [PATCH 1/2] ARM: OMAP4: wakeupgen: Fix the typo in AUXCOREBOOT
- register save
-
-The wakeupgen context-save code reads AUXCOREBOOT0 register
-instead of AUXCOREBOOT1 register contents while saving AUXCOREBOOT1.
-
-Fix the same.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/omap-wakeupgen.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c
-b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 05fdebf..c3795c2 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -229,7 +229,7 @@ static inline void omap4_irq_save_context(void)
- 	/* Save AuxBoot* registers */
- 	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
- 	__raw_writel(val, sar_base + AUXCOREBOOT0_OFFSET);
--	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
-+	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_1);
- 	__raw_writel(val, sar_base + AUXCOREBOOT1_OFFSET);
-
- 	/* Save SyncReq generation logic */
--- 
-1.7.9.5
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-ARM-OMAP4-wakeupgen-remove-duplicate-AUXCOREBOOT-rea.patch
-Type: application/octet-stream
-Size: 1413 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/8e624e0f/attachment-0002.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-OMAP4-wakeupgen-Fix-the-typo-in-AUXCOREBOOT-regi.patch
-Type: application/octet-stream
-Size: 1196 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/8e624e0f/attachment-0003.obj>
+Regards,
+--
+Alex
