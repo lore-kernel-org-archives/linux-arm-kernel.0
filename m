@@ -1,51 +1,43 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Sep 2012 15:54:57 +0800
-Subject: [GIT PULL 2/4] mxs sparse-irq support
+Date: Tue, 11 Sep 2012 15:54:58 +0800
+Subject: [GIT PULL 3/4] mxs clk device tree lookup
 In-Reply-To: <1347350100-4674-1-git-send-email-shawn.guo@linaro.org>
 References: <1347350100-4674-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347350100-4674-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347350100-4674-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
+The following changes since commit 0a77398b5a68e298f03b1c356c5100fa1decb2e1:
 
-  Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
+  Merge tag 'mxs-dt-3.7' into mxs/clk-dt-lookup (2012-09-11 14:15:00 +0800)
 
 are available in the git repository at:
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-sparse-irq
 
-for you to fetch changes up to 6608f13fabdb1f9ecbd502763ba33ca2646834c8:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-clk-dt-lookup
 
-  ARM: mxs: remove mach/irqs.h (2012-09-03 09:32:17 +0800)
+for you to fetch changes up to 53f9443da63db38212e784b0aa205881168757aa:
 
-----------------------------------------------------------------
-mxs-sparse-irq
-
-The series adds irqdomain support for mach-mxs and then enables
-sparse-irq.  It dependes on pull request mxs-dt-3.7.
+  clk: mxs: replace imx23 clk_register_clkdev with clock DT lookup (2012-09-11 14:45:46 +0800)
 
 ----------------------------------------------------------------
-Shawn Guo (6):
-      gpio/mxs: adopt irq_domain support for mxs gpio driver
-      ARM: mxs: retrieve timer irq from device tree
-      ARM: mxs: select MULTI_IRQ_HANDLER
-      ARM: mxs: adopt irq_domain support for icoll driver
-      ARM: mxs: select SPARSE_IRQ
-      ARM: mxs: remove mach/irqs.h
+mxs-clk-dt-lookup
 
- arch/arm/Kconfig                             |    2 [32m+[m
- arch/arm/boot/dts/imx23.dtsi                 |    5 [32m+[m[31m-[m
- arch/arm/boot/dts/imx28.dtsi                 |    5 [32m+[m[31m-[m
- arch/arm/mach-mxs/icoll.c                    |   63 [32m++++++++++++++++++++++[m[31m----[m
- arch/arm/mach-mxs/include/mach/common.h      |    3 [32m+[m[31m-[m
- arch/arm/mach-mxs/include/mach/entry-macro.S |   35 [31m--------------[m
- arch/arm/mach-mxs/include/mach/irqs.h        |   32 [31m-------------[m
- arch/arm/mach-mxs/mach-mxs.c                 |   39 [32m++[m[31m--------------[m
- arch/arm/mach-mxs/timer.c                    |   13 [32m+++++[m[31m-[m
- drivers/clk/mxs/clk-imx23.c                  |    2 [32m+[m[31m-[m
- drivers/clk/mxs/clk-imx28.c                  |    2 [32m+[m[31m-[m
- drivers/gpio/gpio-mxs.c                      |   48 [32m++++++++++++[m[31m--------[m
- 12 files changed, 112 insertions(+), 137 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-mxs/include/mach/irqs.h
+It replaces clk_register_clkdev in mxs clock driver with DT lookup.
+The series depends on pull request mxs-dt-3.7 and Mike's clk branch
+below.
+
+----------------------------------------------------------------
+Shawn Guo (2):
+      clk: mxs: replace imx28 clk_register_clkdev with clock DT lookup
+      clk: mxs: replace imx23 clk_register_clkdev with clock DT lookup
+
+ .../devicetree/bindings/clock/imx23-clock.txt      |   76 [32m+++++++++++++[m
+ .../devicetree/bindings/clock/imx28-clock.txt      |   99 [32m+++++++++++++++++[m
+ arch/arm/boot/dts/imx23.dtsi                       |   16 [32m++[m[31m-[m
+ arch/arm/boot/dts/imx28.dtsi                       |   35 [32m+++++[m[31m-[m
+ drivers/clk/mxs/clk-imx23.c                        |   55 [32m++[m[31m--------[m
+ drivers/clk/mxs/clk-imx28.c                        |  113 [32m++[m[31m------------------[m
+ 6 files changed, 242 insertions(+), 152 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx23-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/imx28-clock.txt
