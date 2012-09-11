@@ -1,32 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 11 Sep 2012 20:09:48 +0000 (UTC)
-Subject: [PATCH 00/29] Move OMAP2+ over to use COMMON clock
-In-Reply-To: <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
-References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1209112005080.9444@utopia.booyaka.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 11 Sep 2012 22:35:38 +0200
+Subject: [PATCH] cpufreq: add helper function cpufreq_set_target()
+In-Reply-To: <20120911013405.GB13721@S2101-09.ap.freescale.net>
+References: <1346981599-28081-1-git-send-email-shawn.guo@linaro.org>
+ <201209102222.45165.rjw@sisk.pl>
+ <20120911013405.GB13721@S2101-09.ap.freescale.net>
+Message-ID: <201209112235.38246.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012, Paul Walmsley wrote:
+On Tuesday, September 11, 2012, Shawn Guo wrote:
+> On Mon, Sep 10, 2012 at 10:22:44PM +0200, Rafael J. Wysocki wrote:
+> > Hmm.  Who's going to use the cpufreq-cpu0 driver, then?  Is OMAP going to be
+> > the only user?
+> > 
+> Any platform that supports device tree (DT) will be able to use the
+> driver.  Right now, I have seen imx6q, AM35xx and highbank start using
+> the driver.
 
-> The branch was then built with a set of testing Kconfigs.  Here's what was 
-> found: (these are still being investigated)
-> 
-> - The OMAP4-only testconfig and rmk's OMAP4430-SDP Kconfigs failed:
->   "undefined reference to `omap2_clkt_iclk_allow_idle'":
-> 
->   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/omap4_testconfig/
->   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/rmk_omap4430_sdp_oldconfig/
-> 
-> - RMK's OMAP3430-LDP Kconfig failed with a whole set of warnings:
-> 
->   http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911000742/build/rmk_omap3430_ldp_oldconfig/
+OK, that would be sufficient.
 
-These build problems have been fixed and the branch updated.  Current test 
-logs at
+> > I'm concerned about the copy-pasting, but if that copy-pasting is going to
+> > go away when you move OMAP to the new driver, then I agree that adding more
+> > complexity just to avoid it is probably not a good idea.
+> > 
+> > What's the planned time frame for the OMAP conversion?
+> > 
+> That depends on when OMAP gets fully converted to DT.  OMAP is in the
+> middle of the DT transition right now.  There are in-tree users of
+> omap-cpufreq driver that does not support DT (board files).  Before
+> the DT conversion is fully done (all those non-DT board files gets
+> removed), the omap-cpufreq driver still needs to be for a while.
 
-http://www.pwsan.com/omap/testlogs/common_clk_testing_devel_3.7/20120911134655/
+I see.
 
+Well, then I'll push the driver to Linus for v3.7 as is and we'll see who
+and when starts to use it.
 
-- Paul
+Thanks,
+Rafael
