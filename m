@@ -1,43 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 16:23:19 -0600
-Subject: [PATCH v3 6/9] ARM: mvebu: add pinctrl device in DT for Armada
- 370/XP SoCs
-In-Reply-To: <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <504FB9D7.3030205@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 11 Sep 2012 22:28:22 +0000 (UTC)
+Subject: [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of
+ ocp2scp
+In-Reply-To: <1347008955-21310-1-git-send-email-kishon@ti.com>
+References: <1347008955-21310-1-git-send-email-kishon@ti.com>
+Message-ID: <alpine.DEB.2.00.1209112218440.9444@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 02:39 AM, Sebastian Hesselbarth wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> The Armada 370 and XP SoCs have configurable muxing for a certain
-> number of their pins, controlled through a pinctrl driver.
+Hi Kishon, Beno?t,
 
-Hmmm. I'd be tempted just to put the entire node definition there;
-putting in a .dtsi file just to share the reg property doesn't seem
-especially useful.
+On Fri, 7 Sep 2012, Kishon Vijay Abraham I wrote:
 
-> The 'compatible' property is defined in the SoC-specific .dtsi files,
-> since the compatible string identifies the number of pins and other
-> SoC-specific properties.
+> Made *ocp2scp_usb_phy_phy_48m* as the main_clk for ocp2scp. Since this 
+> ocp2scp module does not have any fck but does have a single opt_clock, 
+> it is added as the main_clk for ocp2scp. Also removed phy_48m as the 
+> optional clock since it is now made as the main clock. By this the 
+> driver need not enable/disable phy_48m clk separately and 
+> runtime_get/runtime_put will take care of that.
 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+Looking at this patch, it doesn't seem to make sense from a hardware point 
+of view.  If you look at the OMAP4430 TRM Rev. AE, Table 23-1166 "Clocks 
+and Resets", the 48MHz clock input is listed as an "Optional functional 
+clock".  The main functional clock is listed as "INIT_960M_FCLK", which 
+according to the same TRM, Section 3.6.3.9.1 "Overview", is an alias for 
+the clock we call "dpll_usb_clkdcoldo_ck".
 
-> +		pinctrl at d0018000 {
+So if any clock should be the main functional clock in the hwmod data, 
+shouldn't it be dpll_usb_clkdcoldo_ck?  The goal with the hwmod data 
+is/was to have it match the hardware.
 
-If this is the only pinctrl instance, you'd typically name the node just
-"pinctrl", since the "@d0018000" isn't needed to get unique node names.
+...
 
-> +			reg = <0xd0018000 0x38>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
+More to the point, I guess I don't see what the problem is with 
+adding a few lines to the ocp2scp driver to control the "phy_48m" optional 
+clock via the clock framework.  Is there some reason why you 
+couldn't prepare & enable it after the pm_runtime_get_*(), 
+and disable and unprepare it before the pm_runtime_put_*() ?
 
-What is "ranges" for; this isn't a memory-mapped bus, right?
 
-> +		};
->  	};
->  };
+- Paul
