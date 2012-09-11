@@ -1,89 +1,74 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 11 Sep 2012 06:49:07 +0200
-Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
-In-Reply-To: <504E28B0.5040404@gmail.com>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-8-git-send-email-robherring2@gmail.com>
- <20120910155224.GE31430@game.jcrosoft.org>
- <504E28B0.5040404@gmail.com>
-Message-ID: <20120911044907.GF31430@game.jcrosoft.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 11 Sep 2012 04:57:08 +0000
+Subject: [PATCH] ARM: dts: AM33XX: fix gpio node numbering to match
+ hardware
+In-Reply-To: <1347294020-22661-1-git-send-email-mporter@ti.com>
+References: <1347294020-22661-1-git-send-email-mporter@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAB03D3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:51 Mon 10 Sep     , Rob Herring wrote:
-> On 09/10/2012 10:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 15:12 Thu 06 Sep     , Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> In preparation to support multi-platform kernels, move all the dtb targets
-> >> out of the mach Makefile.boot and into the arch/arm/boot/dts/Makefile
-> >> which is closer to the sources.
-> >>
-> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Andrew Victor <linux@maxim.org.za>
-> >> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> >> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >> Cc: Sascha Hauer <kernel@pengutronix.de>
-> >> Cc: Jason Cooper <jason@lakedaemon.net>
-> >> Cc: Andrew Lunn <andrew@lunn.ch>
-> >> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> >> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> >> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> >> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> >> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >>  arch/arm/boot/Makefile                |    2 ++
-> >>  arch/arm/boot/dts/Makefile            |   41 +++++++++++++++++++++++++++++++++
-> >>  arch/arm/mach-at91/Makefile.boot      |   24 -------------------
-> >>  arch/arm/mach-exynos/Makefile.boot    |    3 ---
-> >>  arch/arm/mach-imx/Makefile.boot       |    7 ------
-> >>  arch/arm/mach-kirkwood/Makefile.boot  |   11 ---------
-> >>  arch/arm/mach-lpc32xx/Makefile.boot   |    2 --
-> >>  arch/arm/mach-mvebu/Makefile.boot     |    2 --
-> >>  arch/arm/mach-mxs/Makefile.boot       |    9 --------
-> >>  arch/arm/mach-spear13xx/Makefile.boot |    3 ---
-> >>  arch/arm/mach-spear3xx/Makefile.boot  |    4 ----
-> >>  arch/arm/mach-spear6xx/Makefile.boot  |    2 --
-> >>  arch/arm/mach-tegra/Makefile.boot     |    8 -------
-> >>  arch/arm/mach-ux500/Makefile.boot     |    2 --
-> >>  arch/arm/mach-vexpress/Makefile.boot  |    5 ----
-> >>  15 files changed, 43 insertions(+), 82 deletions(-)
-> >>  create mode 100644 arch/arm/boot/dts/Makefile
-> >>
-> >> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> >> index c877087..3fdab01 100644
-> >> --- a/arch/arm/boot/Makefile
-> >> +++ b/arch/arm/boot/Makefile
-> >> @@ -15,6 +15,8 @@ ifneq ($(MACHINE),)
-> >>  include $(srctree)/$(MACHINE)/Makefile.boot
-> >>  endif
-> >>  
-> >> +include $(srctree)/arch/arm/boot/dts/Makefile
-> >> +
-> >>  # Note: the following conditions must always be true:
-> >>  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
-> >>  #   PARAMS_PHYS must be within 4MB of ZRELADDR
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> new file mode 100644
-> >> index 0000000..e59586b
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -0,0 +1,41 @@
-> >> +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
-> > sorry I see no need of the dtb-y
-> > 
-> > just do all the time
+On Mon, Sep 10, 2012 at 21:50:20, Porter, Matt wrote:
+> On AM33xx, the datasheet and TRM refer to four GPIO instances that
+> are 0-based, GPIO0-3.
 > 
-> That's not how it works today. dtb's only for all enabled platforms are
-> built. Changing the behavior should be a different patch.
-no I see no point to check if the platform is enable or not just build all
 
-This will allow to check them
+Thanks Matt,
+I think Anil labeled it as gpio1-4 due to hwmod naming convention, as you 
+can not have gpioo id = 0 (refer to arch/arm/mach-omap2/gpio.c).
 
-Best Regards,
-J.
+But in case of DT we should simply follow TRM/Spec, as naming convention is 
+based on base-addr and not id, so your patch looks good me.
+
+Thanks,
+Vaibhav
+
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index bb31bff..1369bfc 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -62,7 +62,7 @@
+>  			reg = <0x48200000 0x1000>;
+>  		};
+>  
+> -		gpio1: gpio at 44e07000 {
+> +		gpio0: gpio at 44e07000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio1";
+>  			gpio-controller;
+> @@ -74,7 +74,7 @@
+>  			interrupts = <96>;
+>  		};
+>  
+> -		gpio2: gpio at 4804c000 {
+> +		gpio1: gpio at 4804c000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio2";
+>  			gpio-controller;
+> @@ -86,7 +86,7 @@
+>  			interrupts = <98>;
+>  		};
+>  
+> -		gpio3: gpio at 481ac000 {
+> +		gpio2: gpio at 481ac000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio3";
+>  			gpio-controller;
+> @@ -98,7 +98,7 @@
+>  			interrupts = <32>;
+>  		};
+>  
+> -		gpio4: gpio at 481ae000 {
+> +		gpio3: gpio at 481ae000 {
+>  			compatible = "ti,omap4-gpio";
+>  			ti,hwmods = "gpio4";
+>  			gpio-controller;
+> -- 
+> 1.7.9.5
+> 
+> 
