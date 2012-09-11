@@ -1,27 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 11 Sep 2012 11:49:44 +0530
-Subject: [PATCH] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
- read/write
-In-Reply-To: <20120910185535.GC1303@atomide.com>
-References: <alpine.DEB.2.00.1209052333410.11516@utopia.booyaka.com>
- <CAMQu2gzCz+bS7U1ypFWzcp3zTpkfHdPzZfFtJ8Cd4ap8FSzJQg@mail.gmail.com>
- <CAMQu2gw-KPQzYKtjJUxZjEX+_HKLL9WTxXXA35_ki8KbN+WDYg@mail.gmail.com>
- <20120910185535.GC1303@atomide.com>
-Message-ID: <CAMQu2gxUES=s8fMpwJ77tnY1wz4b_T=yustj+C+WNkEMmEOx4w@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 11 Sep 2012 11:49:26 +0530
+Subject: [PATCH 1/2] ARM: tegra: fix overflow in
+ tegra20_pll_clk_round_rate()
+In-Reply-To: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <504ED7EE.5050103@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 12:25 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120908 01:20]:
->>
->> Will you able to pick up these couple of wakeupgen fixes from  here or
->> do you want me to send you a pull request for 3.6-rc5/6
+On Tuesday 11 September 2012 04:42 AM, Stephen Warren wrote:
+> From: Stephen Warren<swarren@nvidia.com>
 >
-> I can pick them into fixes-noncritical. But if the second one is
-> a major bug for the -rc series, the patch should be describe what
-> breaks (regression? oops?).
->
-Fixes non critical is fine. No major issue without these patches.
+> 32-bit math isn't enough when e.g. *prate=12000000, and sel->n=1000.
+> Use 64-bit math to prevent this.
 
-Regards
-Santosh
+Thanks Stephen!!
+
+> Cc: Prashant Gaikwad<pgaikwad@nvidia.com>
+> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+> ---
+> Prashant, can you please audit all of the Tegra clock driver to see if
+> there are any other instances of the same issue? Thanks.
+
+Sure.
+
+> ---
+>   arch/arm/mach-tegra/tegra20_clocks.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
+> index ee6922b..e2a43e4 100644
+> --- a/arch/arm/mach-tegra/tegra20_clocks.c
+> +++ b/arch/arm/mach-tegra/tegra20_clocks.c
+> @@ -798,7 +798,7 @@ static long tegra20_pll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>   	struct clk_tegra *c = to_clk_tegra(hw);
+>   	const struct clk_pll_freq_table *sel;
+>   	unsigned long input_rate = *prate;
+> -	unsigned long output_rate = *prate;
+> +	u64 output_rate = *prate;
+>   	int mul;
+>   	int div;
+>
