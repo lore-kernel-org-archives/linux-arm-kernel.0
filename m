@@ -1,41 +1,58 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 11 Sep 2012 06:55:57 +0000
-Subject: [PATCH] ARM: OMAP2+: Makefile.boot: Add am335x evm and bone
- targets
-In-Reply-To: <1346435674-6207-1-git-send-email-hvaibhav@ti.com>
-References: <1346435674-6207-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB0764@DBDE01.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 11 Sep 2012 08:56:04 +0200
+Subject: [PATCH 13/25] macintosh/mediabay: add a const qualifier
+In-Reply-To: <1346837023.2257.57.camel@pasglop>
+References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1346812817.2257.23.camel@pasglop>
+ <20120905080249.GI28643@pengutronix.de>
+ <1346837023.2257.57.camel@pasglop>
+Message-ID: <20120911065604.GE28643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 23:24:34, Hiremath, Vaibhav wrote:
-> This adds am335x-evm and am335x-bone dtb targets to
-> 'make dtbs', just like other platforms.
+On Wed, Sep 05, 2012 at 07:23:43PM +1000, Benjamin Herrenschmidt wrote:
+> On Wed, 2012-09-05 at 10:02 +0200, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Wed, Sep 05, 2012 at 12:40:17PM +1000, Benjamin Herrenschmidt wrote:
+> > > On Mon, 2012-07-23 at 11:13 +0200, Uwe Kleine-K?nig wrote:
+> > > > This prepares *of_device_id.data becoming const. Without this change
+> > > > the following warning would occur:
+> > > > 
+> > > > 	drivers/macintosh/mediabay.c: In function 'media_bay_attach':
+> > > > 	drivers/macintosh/mediabay.c:589:11: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+> > > > 
+> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > ---
+> > > 
+> > > Ack all of these assuming you test built (I didn't).
+> > "all" means the two mediabay patches? And yes, they are all built
+> > tested.
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/Makefile.boot |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile.boot b/arch/arm/mach-omap2/Makefile.boot
-> index 6cf1c2d..1136072 100644
-> --- a/arch/arm/mach-omap2/Makefile.boot
-> +++ b/arch/arm/mach-omap2/Makefile.boot
-> @@ -7,3 +7,4 @@ dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle.dtb omap3-evm.dtb
->  dtb-$(CONFIG_ARCH_OMAP4)	+= omap4-panda.dtb omap4-pandaES.dtb
->  dtb-$(CONFIG_ARCH_OMAP4)	+= omap4-var_som.dtb omap4-sdp.dtb
->  dtb-$(CONFIG_SOC_OMAP5)		+= omap5-evm.dtb
-> +dtb-$(CONFIG_SOC_AM33XX)	+= am335x-evm.dtb am335x-bone.dtb
+> Yeah, anything powerpc you had in your series, but the two mediabay ones
+> are what I spotted when digging through stuff today :-)
+I added that to
 
-Tony,
+ serial/mpc52xx_uart: add a const qualifier
+ gpio/mpc8xxx: add a const qualifier
+ i2c/mpc: add a const qualifier
+ macintosh/mediabay: add a const qualifier
+ powerpc/83xx: add a const qualifier
+ powerpc/fsl_msi: add a const qualifier
+ powerpc/celleb_pci: add a const qualifier
+ watchdog/mpc8xxx: add a const qualifier
+ powerpc/fsl_msi: drop unneeded cast to non-const pointer
+ i2c/mpc: make data used as *of_device_id.data const
+ macintosh/mediabay: make data used as *of_device_id.data const
+ can: mpc5xxx_can: make data used as *of_device_id.data const
 
-Gentle reminder on this patch !!!
+in the hope I didn't interpret "anything powerpc" too wide. Please tell
+me if I did.
 
-Thanks,
-Vaibhav
+Thanks
+Uwe
 
-> -- 
-> 1.7.0.4
-> 
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
