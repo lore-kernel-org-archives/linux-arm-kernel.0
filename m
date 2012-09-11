@@ -1,43 +1,35 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 10:25:43 +0200
-Subject: [PATCH v2 0/3] arm/dts: omap: add dt data for MUSB
-In-Reply-To: <1347345381-4390-1-git-send-email-kishon@ti.com>
-References: <1347345381-4390-1-git-send-email-kishon@ti.com>
-Message-ID: <504EF587.3080903@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 11 Sep 2012 10:26:39 +0200
+Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D090EC3D747@wm021.weinmann.com>
+References: <cover.1345618760.git.n.voss@weinmann.de>
+ <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
+ <503B4919.6080306@atmel.com>
+ <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>,
+ <503B623C.4030304@atmel.com>
+ <BC0F374A1C27184AB96177CDFEC2F54225ECD36E@EXMDB06.org.aalto.fi>
+ <EF2E73589CA71846A15D0B2CDF79505D090EC3D6F6@wm021.weinmann.com>
+ <503B7D6E.7090906@atmel.com>
+ <EF2E73589CA71846A15D0B2CDF79505D090EC3D747@wm021.weinmann.com>
+Message-ID: <504EF5BF.2090404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
-> No major change from the previous version. Just removed the
-> omap-usb2 dt data and sent that as a separate patch.
-
-Well, I think you'd better keep them in the same series :-)
-
-> Rebased on
-> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git musb
-
-Since it is DTS stuf, you should rebase that on top of the latest
-lo/devel-dt branch. All the latest DTS patches an in there for 3.7.
-
-While you are there, could you please rename the patches with "ARM: dts"
-prefix. It seems that this is the new convention :-)
-
-Regards,
-Benoit
-
+On 08/27/2012 04:29 PM, Voss, Nikolaus :
+> ludovic.desroches wrote on Monday, August 27, 2012 4:00 PM :
+>> For the moment, I don't have the necessary knowledge about the TWI
+>> controller to take a decision. I would say it can be done in an other
+>> patch in order to have your driver included in the mainline quickly
+>> since it doesn't introduce a breakage.
 > 
-> Kishon Vijay Abraham I (3):
->   arm/dts: Add twl6030-usb data
->   arm/dts: Add twl4030-usb data
->   arm/dts: omap: Add usb_otg and glue data
-> 
->  arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
->  arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
->  arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
->  arch/arm/boot/dts/omap4-panda.dts  |   10 ++++++++++
->  arch/arm/boot/dts/omap4-sdp.dts    |   10 ++++++++++
->  arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
->  arch/arm/boot/dts/twl4030.dtsi     |   21 +++++++++++++++++++++
->  arch/arm/boot/dts/twl6030.dtsi     |    5 +++++
->  8 files changed, 74 insertions(+)
-> 
+> That would be the most pragmatic approach.
+> Wolfram, is the anything left to do from my side?
+
+Wolfram, ping?
+
+Can we imagine to have this support and the device tree patches from
+Ludovic in 3.7-final?
+
+Bye,
+-- 
+Nicolas Ferre
