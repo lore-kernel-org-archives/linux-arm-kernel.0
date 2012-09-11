@@ -1,42 +1,27 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 11 Sep 2012 13:46:39 -0400
-Subject: [PATCH 2/2] ARM: OMAP2+: Enable pinctrl dummy states
-In-Reply-To: <1347385599-27558-1-git-send-email-mporter@ti.com>
-References: <1347385599-27558-1-git-send-email-mporter@ti.com>
-Message-ID: <1347385599-27558-3-git-send-email-mporter@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 Sep 2012 18:51:26 +0100
+Subject: [PATCH] clk: Make the managed clk functions generically available
+In-Reply-To: <504F4E36.20309@metafoo.de>
+References: <1347202862-1617-1-git-send-email-lars@metafoo.de>
+ <20120909235059.GA2643@sirena.org.uk>
+ <20120910001524.GL13739@n2100.arm.linux.org.uk>
+ <20120910002020.GB16249@opensource.wolfsonmicro.com>
+ <20120910003913.GM13739@n2100.arm.linux.org.uk> <504F4E36.20309@metafoo.de>
+Message-ID: <20120911175125.GR13739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl dummy states for all OMAP platforms. This allows
-drivers to be converted to pinctrl while still running on
-platforms that do not provide pinctrl data.
+On Tue, Sep 11, 2012 at 04:44:06PM +0200, Lars-Peter Clausen wrote:
+> On 09/10/2012 02:39 AM, Russell King - ARM Linux wrote:
+> > On Mon, Sep 10, 2012 at 08:20:21AM +0800, Mark Brown wrote:
+> >>[...]
+> >> OK, that's what I'd thought was going on - it was the fact that you'd
+> >> just acked the patch rather than asked for it to go to the patch tracker
+> >> or something which made me wonder if things had changed.
+> > 
+> > I kind'a forgot because it's been soo long since I took any of those
+> > patches...
+> 
+> Ok, what's the plan? Should I add this patch to the patch tracker?
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/mach-omap2/devices.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index c00c689..577cd04 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -17,6 +17,7 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- #include <linux/of.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_data/omap4-keypad.h>
- 
- #include <mach/hardware.h>
-@@ -631,6 +632,9 @@ static inline void omap_init_vout(void) {}
- 
- static int __init omap2_init_devices(void)
- {
-+	/* Enable dummy states for those platforms without pinctrl support */
-+	pinctrl_provide_dummies();
-+
- 	/*
- 	 * please keep these calls, and their implementations above,
- 	 * in alphabetical order so they're easier to sort through.
--- 
-1.7.9.5
+Yes please.
