@@ -1,86 +1,60 @@
-From: ola.o.lilja@stericsson.com (Ola Lilja)
-Date: Tue, 11 Sep 2012 11:08:22 +0200
-Subject: [PATCH 07/17] Documentation: Define the MSP Driver Device Tree
- bindings
-In-Reply-To: <20120910164333.GB24506@gmail.com>
-References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
- <1345816913-4113-8-git-send-email-lee.jones@linaro.org>
- <20120910164333.GB24506@gmail.com>
-Message-ID: <504EFF86.10105@stericsson.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 11 Sep 2012 14:46:35 +0530
+Subject: [PATCH v2 0/3] arm/dts: omap: add dt data for MUSB
+In-Reply-To: <504F0053.6000808@ti.com>
+References: <1347345381-4390-1-git-send-email-kishon@ti.com>
+ <504EF587.3080903@ti.com>
+ <CAAe_U6JoW36bWSamHkRV66JX5fZ3QkLQv=4XJr-MuaFgaRjOaA@mail.gmail.com>
+ <504F0053.6000808@ti.com>
+Message-ID: <CAAe_U6Kanxmvw5mWzGQ-7Jig6K75FA7UwxUipKfp4gURtntrRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2012 06:43 PM, Lee Jones wrote:
+Hi,
 
-> Ola poke.
-> 
-> On Fri, Aug 24, 2012 at 03:01:43PM +0100, Lee Jones wrote:
->> Here we add the required documentation for the new Device Tree
->> bindings pertaining to the MSP CPU-side DAI Driver.
->> 
->> CC: alsa-devel at alsa-project.org
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++++++++++++
->>  1 file changed, 43 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
->> new file mode 100644
->> index 0000000..99acd9c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
->> @@ -0,0 +1,43 @@
->> +* ux500 MSP (CPU-side Digital Audio Interface)
->> +
->> +Required properties:
->> + - compatible       :"stericsson,ux500-msp-i2s"
->> + - reg              : Physical base address and length of the device's registers.
->> +
->> +Optional properties:
->> + - interrupts       : The interrupt output from the device.
->> + - interrupt-parent : The parent interrupt controller.
->> + - <name>-supply    : Phandle to the regulator <name> supply
->> +
->> +Example:
->> +
->> +	sound {
->> +		compatible = "stericsson,snd-soc-mop500";
->> +
->> +		stericsson,platform-pcm-dma = <&pcm>;
->> +		stericsson,cpu-dai = <&msp1 &msp3>;
->> +		stericsson,audio-codec = <&codec>;
->> +	};
->> +
->> +	pcm: ux500-pcm {
->> +		compatible = "stericsson,ux500-pcm";
->> +	};
->> +
->> +	msp1: msp at 80124000 {
->> +		compatible = "stericsson,ux500-msp-i2s";
->> +		reg = <0x80124000 0x1000>;
->> +		interrupts = <0 62 0x4>;
->> +		v-ape-supply = <&db8500_vape_reg>;
->> +	};
->> +
->> +	msp3: msp at 80125000 {
->> +		compatible = "stericsson,ux500-msp-i2s";
->> +		reg = <0x80125000 0x1000>;
->> +		interrupts = <0 62 0x4>;
->> +		v-ape-supply = <&db8500_vape_reg>;
->> +	};
->> +
->> +	codec: ab8500-codec {
->> +		compatible = "stericsson,ab8500-codec";
->> +		stericsson,earpeice-cmv = <950>; /* Units in mV. */
+On Tue, Sep 11, 2012 at 2:41 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> On 09/11/2012 10:44 AM, ABRAHAM, KISHON VIJAY wrote:
+>> Hi Benoit,
+>>
+>> On Tue, Sep 11, 2012 at 1:55 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+>>> On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
+>>>> No major change from the previous version. Just removed the
+>>>> omap-usb2 dt data and sent that as a separate patch.
+>>>
+>>> Well, I think you'd better keep them in the same series :-)
+>>>
+>>>> Rebased on
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git musb
+>>>
+>>> Since it is DTS stuf, you should rebase that on top of the latest
+>>> lo/devel-dt branch. All the latest DTS patches an in there for 3.7.
+>>
+>> The ocp2scp data is not in linux-omap :-( And omap-usb2 has to be a
+>> child of ocp2scp. So I used arm-soc tree to which ocp2scp stuff was
+>> pulled into.
+>
+> Mmm, but from what tree? It did not go through Tony?
+> What arm-soc branch exactly?
 
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+(or) ocp2scp
 
-This parameter has nothing to do with the ASoC platform-driver. Some way or the
-other the earpiece-cmv should belong to the codec-driver. Also, this parameter
-was set in the previous patch as well?!
-
->> +	};
->> -- 
->> 1.7.9.5
->> 
-> 
+Thanks
+Kishon
+>
+> In that case we need to merge Tony's devel-dt into arm-soc to have a
+> common base or ask Tony to rebase on top of arm-soc.
+>
+> I added a bunch of change inside OMAP4.dtsi, so we can expect some nice
+> conflicts.
+> That's why it is better to push DTS patches using a single channel.
+>
+>
+> Tony,
+> What will make more sense to avoid merge conflict later?
+>
+>
+> Regards,
+> Benoit
+>
+>
