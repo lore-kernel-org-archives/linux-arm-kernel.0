@@ -1,48 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2012 11:22:08 +0000
-Subject: mfd: Implement devicetree support for AB8500 Btemp
-In-Reply-To: <504EFA0F.2090102@stericsson.com>
-References: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
- <201209101401.06859.arnd@arndb.de> <504EFA0F.2090102@stericsson.com>
-Message-ID: <201209111122.08713.arnd@arndb.de>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 11 Sep 2012 16:54:37 +0530
+Subject: [PATCH v2 3/3] usb: musb: omap: Add device tree support for omap
+ musb glue
+In-Reply-To: <504F0A33.9060606@ti.com>
+References: <1347354580-5895-1-git-send-email-kishon@ti.com>
+ <1347354580-5895-4-git-send-email-kishon@ti.com>
+ <504F0A33.9060606@ti.com>
+Message-ID: <CAAe_U6LwGn+qbSox7BofTg7sJUxqytew3s_73MOYZytHs2qEWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 September 2012, Rajanikanth HV wrote:
-> >> +Supplied-to:
-> >> +     This shall be power supply class dependency where in the
-> runtime battery
-> >> +     properties will be shared across fuel guage and charging
-> algorithm driver.
-> >
-> > I probably don't understand enough of this, but shouldn't the other
-> devices
-> > that are supplied by this have a reference to this node rather than doing
-> > it this way around? Why use strings here instead of phandles?
-> 
-> This is a logical binding w.r.t power supply event change
-> across energy-management-module drivers where in runtime battery
-> properties are shared along with uevent notification.
-> ref: di->btemp_psy.external_power_
-> changed =
->      ab8500_btemp_external_power_changed;
->      ref: ab8500_btemp.c
-> 
-> Need for this property:
->  btemp, fg and charger updates power-supply properties
->  based on the events listed above.
->  Event handler invokes power supply change notifier
->  which in-turn invokes registered power supply class call-back
->  based on the 'supplied_to' string.
->  ref:
->    power_supply_changed_work(..) ./drivers/power/power_supply_core.c
-> 
-> In this case how to approach through phandle?
-> ============================
-> 
+Hi,
 
-Sorry, I really tried, but I cannot make sense of what you wrote
-there. Can you try again and describe in full English sentences
-how the hardware blocks are connected and what their purpose is?
+On Tue, Sep 11, 2012 at 3:23 PM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+>
+>
+> On 9/11/2012 2:39 PM, Kishon Vijay Abraham I wrote:
+>> Added device tree support for omap musb driver and updated the
+>> Documentation with device tree binding information.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/omap-usb.txt |   33 ++++++++++++
+>>  drivers/usb/musb/omap2430.c                        |   54 ++++++++++++++++++++
+>>  2 files changed, 87 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/omap-usb.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
+>> new file mode 100644
+>> index 0000000..29a043e
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+>> @@ -0,0 +1,33 @@
+>> +OMAP GLUE
+>> +
+>> +OMAP MUSB GLUE
+>> + - compatible : Should be "ti,omap4-musb" or "ti,omap3-musb"
+>> + - ti,hwmods : must be "usb_otg_hs"
+>> + - multipoint : Should be "1" indicating the musb controller supports
+>> +   multipoint. This is a MUSB configuration-specific setting.
+>> + - num_eps : Specifies the number of endpoints. This is also a
+>> +   MUSB configuration-specific setting. Should be set to "16"
+>> + - ram_bits : Specifies the ram address size. Should be set to "12"
+>> + - interface_type : This is a board specific setting to describe the type of
+>> +   interface between the controller and the phy. It should be "0" or "1"
+>> +   specifying ULPI and UTMI respectively.
+>> + - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
+>> +   represents PERIPHERAL.
+>> + - power : Should be "50". This signifies the controller can supply upto
+>> +   100mA when operating in host mode.
+>> +
+>> +SOC specific device node entry
+>> +usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>> +     compatible = "ti,omap4-musb";
+>> +     ti,hwmods = "usb_otg_hs";
+>> +     multipoint = <1>;
+>> +     num_eps = <16>;
+>> +     ram_bits = <12>;
+>> +};
+>
+>
+> reg and interrupt properties are missing here.
+>
+> I would encourage to specify "reg" and "interrupt" properties in every
+> node getting newly added to the OMAP DTS files.
 
-	Arnd
+Sure. will add that in my next version.
+
+Thanks
+Kishon
