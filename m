@@ -1,63 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 11:43:47 -0600
-Subject: [PATCH 2/2] ARM: dt: tegra: configure power off for some boards
-In-Reply-To: <1347385427-9676-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347385427-9676-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347385427-9676-2-git-send-email-swarren@wwwdotorg.org>
+From: mporter@ti.com (Matt Porter)
+Date: Tue, 11 Sep 2012 13:46:37 -0400
+Subject: [PATCH 0/2] Add pinctrl support to omap2-mcspi
+Message-ID: <1347385599-27558-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+This series enables pinctrl support for McSPI. Platforms that boot only
+from DT and rely on pinctrl to set pinmuxes appropriately require this
+for omap2-mcspi operation.
 
-For Seaboard, Ventana, and Cardhu, add DT property to tell the regulator
-that it should provide the pm_power_off() implementation. This allows
-"shutdown" to work.
+It has been tested on AM335x BeagleBone with an Adafruit SPI LCD attached
+and regression tested on Beagleboard xM booting in the !DT case, using
+board-omap3evm.c. There is a dependency on the patch to enable PINCTRL
+support (https://patchwork.kernel.org/patch/1376331/) for
+ARCH_OMAP2PLUS_TYPICAL.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra20-seaboard.dts |    2 ++
- arch/arm/boot/dts/tegra20-ventana.dts  |    2 ++
- arch/arm/boot/dts/tegra30-cardhu.dtsi  |    2 ++
- 3 files changed, 6 insertions(+), 0 deletions(-)
+Matt Porter (2):
+  spi: omap2-mcspi: add pinctrl support
+  ARM: OMAP2+: Enable pinctrl dummy states
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 92deb36..e60dc71 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -379,6 +379,8 @@
- 			reg = <0x34>;
- 			interrupts = <0 86 0x4>;
- 
-+			ti,system-power-controller;
-+
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 4ec6b4c..3e5952f 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -295,6 +295,8 @@
- 			reg = <0x34>;
- 			interrupts = <0 86 0x4>;
- 
-+			ti,system-power-controller;
-+
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 4794693..d10c9c5 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -156,6 +156,8 @@
- 			#interrupt-cells = <2>;
- 			interrupt-controller;
- 
-+			ti,system-power-controller;
-+
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 
+ arch/arm/mach-omap2/devices.c |    4 ++++
+ drivers/spi/spi-omap2-mcspi.c |    9 +++++++++
+ 2 files changed, 13 insertions(+)
+
 -- 
-1.7.0.4
+1.7.9.5
