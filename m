@@ -1,38 +1,35 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 11 Sep 2012 19:40:40 +0200
-Subject: [PATCH 2/2] arm: mvebu: select the pinctrl drivers for Armada
- 370 and Armada XP platforms
-In-Reply-To: <1347377834-19402-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347377834-19402-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347377834-19402-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <504F7798.6070501@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Sep 2012 11:43:46 -0600
+Subject: [PATCH 1/2] ARM: dt: tegra: harmony: configure power off
+Message-ID: <1347385427-9676-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 05:37 PM, Thomas Petazzoni wrote:
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index b0924b1..0da722e 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -10,6 +10,7 @@ config MACH_ARMADA_370_XP
->   config MACH_ARMADA_370
->   	bool "Marvell Armada 370 boads"
->   	select MACH_ARMADA_370_XP
-> +	select PINCTRL_ARMADA_370
->   	help
->   	  Say 'Y' here if you want your kernel to support boards based
->   	  on the Marvell Armada XP SoC with device tree.
-> @@ -17,6 +18,7 @@ config MACH_ARMADA_370
->   config MACH_ARMADA_XP
->   	bool "Marvell Armada XP boards"
->   	select MACH_ARMADA_370_XP
-> +	select PINCTRL_ARMADA_XP
->   	help
->   	  Say 'Y' here if you want your kernel to support boards based
->   	  on the Marvell Armada XP SoC with device tree.
+From: Stephen Warren <swarren@nvidia.com>
 
-Using PINCTRL_MVEBU on any mvebu SoC requires to
-"select PINCTRL" in arch/arm/Kconfig for ARCH_MVEBU, too.
+Add DT property to tell the TPS6586x that it should provide the
+pm_power_off() implementation. This allows "shutdown" to work.
 
-Sebastian
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+--
+Harmony is a separate patch, since the Harmony regulator support went into
+a different branch to other boards' regulator support.
+---
+ arch/arm/boot/dts/tegra20-harmony.dts |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 0eca40d..b98a1b3 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -281,6 +281,8 @@
+ 			reg = <0x34>;
+ 			interrupts = <0 86 0x4>;
+ 
++			ti,system-power-controller;
++
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+ 
+-- 
+1.7.0.4
