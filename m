@@ -1,37 +1,33 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 12:59:39 -0400
-Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
-In-Reply-To: <20120911162522.GE32234@mudshark.cambridge.arm.com>
-References: <1347380341-28145-1-git-send-email-cyril@ti.com>
- <20120911162522.GE32234@mudshark.cambridge.arm.com>
-Message-ID: <504F6DFB.5030208@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Sep 2012 17:04:16 +0000
+Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
+In-Reply-To: <504F6249.2090501@ti.com>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <CAMQu2gz8F2FcgRuok3x1uJ4pP8=0E2-9jhYGchzU9AUtUHjYhg@mail.gmail.com>
+ <504F6249.2090501@ti.com>
+Message-ID: <201209111704.16708.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/11/2012 12:25 PM, Will Deacon wrote:
-> On Tue, Sep 11, 2012 at 05:19:00PM +0100, Cyril Chemparathy wrote:
->> With the inclusion of asm-generic/timex.h, the ARM arch timer implementation
->> breaks on build.  This is because asm/arch_timer.h now defines
->> ARCH_HAS_READ_CURRENT_TIMER, only to have this macro undefined by the
->> subsequent inclusion of asm-generic/timex.h.
->>
->> This patch fixes the problem in asm/timex.h by including asm-generic/timex.h
->> early, and by defining get_cycles even earlier.
->>
->> This patch has been tested against linux-next-20120910, both with and without
->> arch timer support.
->
-> Is this still a problem with 7530/1 ("delay: add registration mechanism for
-> delay timer sources") applied?
->
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7530/1
->
+On Tuesday 11 September 2012, Vaibhav Hiremath wrote:
+> On 9/11/2012 7:54 PM, Shilimkar, Santosh wrote:
+> > On Tue, Sep 11, 2012 at 7:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
+> >>> Just curious to know how you came with some of the above header names ?
+> >>>
+> >>> plat/mcbsp ---> dsp-mcbsp.h
+> >>> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
+> >>> better name.
+> >>
+> >> This one was a mistake on my side, as Tony and  Peter already pointed out.
+> >> How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
+> >>
+> > After re-reading the cover-letter and your below response,
+> > 'asoc-omap-mcbsp.h' seems to be fine.
+> > 
+> 
+> Note that mcbsp is also applicable to Davinci family of devices.
 
-Excellent.
+asoc-ti-mcbsp.h then?
 
-This conflicts with linux-next-20120910, and needs an added include of 
-<asm/delay.h> in timex.h.  With that in place, it works for me.
-
--- 
-Thanks
-- Cyril
+	Arnd
