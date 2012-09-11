@@ -1,69 +1,70 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 11 Sep 2012 15:12:04 +0530
-Subject: [PATCHv7 09/23] i2c: omap: switch over to do {} while loop
+Date: Tue, 11 Sep 2012 15:12:12 +0530
+Subject: [PATCHv7 17/23] i2c: omap: get rid of the "complete" label
 In-Reply-To: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
 References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347356538-23835-10-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1347356538-23835-18-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-this will make sure that we execute at least once.
-No functional changes otherwise.
+we can ack stat and complete the command from
+the errata handling itself.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   20 ++++++++++++++------
- 1 files changed, 14 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   16 +++++++++++++---
+ 1 files changed, 13 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2c7d7cc..4045134 100644
+index f33bc5a..5d4bad4 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -827,20 +827,28 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 	struct omap_i2c_dev *dev = dev_id;
- 	u16 bits;
- 	u16 stat;
--	int err, count = 0;
-+	int err = 0, count = 0;
- 
- 	if (pm_runtime_suspended(dev->dev))
- 		return IRQ_NONE;
- 
--	bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
--	while ((stat = (omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG))) & bits) {
-+	do {
-+		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
-+		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-+		stat &= bits;
+@@ -775,6 +775,17 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev)
+ 		if (stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+ 			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
++			if (stat & OMAP_I2C_STAT_NACK) {
++				dev->cmd_err |= OMAP_I2C_STAT_NACK;
++				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
++			}
 +
-+		if (!stat) {
-+			/* my work here is done */
-+			return IRQ_HANDLED;
-+		}
++			if (stat & OMAP_I2C_STAT_AL) {
++				dev_err(dev->dev, "Arbitration lost\n");
++				dev->cmd_err |= OMAP_I2C_STAT_AL;
++				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
++			}
 +
- 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
- 		if (count++ == 100) {
- 			dev_warn(dev->dev, "Too much work in one IRQ\n");
--			break;
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
+ 			return -EIO;
  		}
  
--		err = 0;
- complete:
- 		/*
- 		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
-@@ -940,7 +948,7 @@ complete:
- 			dev_err(dev->dev, "Transmit underflow\n");
- 			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
+@@ -875,7 +886,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 			goto out;
  		}
--	}
-+	} while (stat);
  
- 	return count ? IRQ_HANDLED : IRQ_NONE;
- }
+-complete:
+ 		if (stat & OMAP_I2C_STAT_NACK) {
+ 			err |= OMAP_I2C_STAT_NACK;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+@@ -938,7 +948,7 @@ complete:
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
+ 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+-				goto complete;
++				goto out;
+ 
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
+ 			continue;
+@@ -954,7 +964,7 @@ complete:
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
+ 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+-				goto complete;
++				goto out;
+ 
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
+ 			continue;
 -- 
 1.7.5.4
