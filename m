@@ -1,54 +1,85 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Sep 2012 18:03:14 +0900
-Subject: [GIT] Renesas ARM-based SoC: pmu/cleanup for 3.7
-In-Reply-To: <20120911084914.GB5372@mudshark.cambridge.arm.com>
-References: <1347350727-11962-1-git-send-email-horms@verge.net.au>
- <20120911084914.GB5372@mudshark.cambridge.arm.com>
-Message-ID: <20120911090314.GA25322@verge.net.au>
+From: ola.o.lilja@stericsson.com (Ola Lilja)
+Date: Tue, 11 Sep 2012 11:06:00 +0200
+Subject: [PATCH 06/17] Documentation: Define the MOP500 Audio Machine
+ Driver Device Tree bindings
+In-Reply-To: <20120910164413.GC24506@gmail.com>
+References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
+ <1345816913-4113-7-git-send-email-lee.jones@linaro.org>
+ <20120910164413.GC24506@gmail.com>
+Message-ID: <504EFEF8.6020707@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 09:49:14AM +0100, Will Deacon wrote:
-> On Tue, Sep 11, 2012 at 09:05:25AM +0100, Simon Horman wrote:
-> > Hi Will,
-> 
-> Hi Simon,
-> 
-> > please consider the following changes from Kobayashi-san
-> > for the pmu/cleanup branch.
-> 
-> Thanks for this. It probably makes more sense for the arm-soc guys to pull
-> it in directly, rather than me send it as another pull request.
+On 09/10/2012 06:44 PM, Lee Jones wrote:
 
-Sorry, I was a bit confused about who does the pulling,
-naturally that is fine by me.
+> Ola poke.
+> 
+> On Fri, Aug 24, 2012 at 03:01:42PM +0100, Lee Jones wrote:
+>> Here we add the required documentation for the new Device Tree
+>> bindings pertaining to the MOP500 Audio Machine driver.
+>> 
+>> CC: alsa-devel at alsa-project.org
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>  .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/sound/ux500-mop500.txt
+>> 
+>> diff --git a/Documentation/devicetree/bindings/sound/ux500-mop500.txt b/Documentation/devicetree/bindings/sound/ux500-mop500.txt
+>> new file mode 100644
+>> index 0000000..48e071c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/sound/ux500-mop500.txt
+>> @@ -0,0 +1,39 @@
+>> +* MOP500 Audio Machine Driver
+>> +
+>> +This node is responsible for linking together all ux500 Audio Driver components.
+>> +
+>> +Required properties:
+>> + - compatible              : "stericsson,snd-soc-mop500"
+>> +
+>> +Non-standard properties:
+>> + - stericsson,cpu-dai      : Phandle to the CPU-side DAI
+>> + - stericsson,audio-codec  : Phandle to the Audio CODEC
+>> + - stericsson,card-name    : Over-ride default card name
+>> +
+>> +Example:
+>> +
+>> +	sound {
+>> +		compatible = "stericsson,snd-soc-mop500";
+>> +
+>> +		stericsson,cpu-dai = <&msp1 &msp3>;
+>> +		stericsson,audio-codec = <&codec>;
+>> +	};
+>> +
+>> +	msp1: msp at 80124000 {
+>> +		compatible = "stericsson,ux500-msp-i2s";
+>> +		reg = <0x80124000 0x1000>;
+>> +		interrupts = <0 62 0x4>;
+>> +		v-ape-supply = <&db8500_vape_reg>;
 
-> 
-> Arnd, Olof -- can you pull this into an shmobile perf branch please?
-> 
-> Will
-> 
-> > ----------------------------------------------------------------
-> > The following changes since commit 051f1b13144dd8553d5a5104dde94c7263ae3ba7:
-> > 
-> >   ARM: perf: move irq registration into pmu implementation (2012-08-23 11:35:52 +0100)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git pmu/cleanup
-> > 
-> > for you to fetch changes up to e433d4440bf7dd5955a4616cfb9bffd1ec6ab839:
-> > 
-> >   ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit) (2012-09-11 16:27:41 +0900)
-> > 
-> > ----------------------------------------------------------------
-> > Tetsuyuki Kobayashi (2):
-> >       ARM: shmobile: sh73a0: enable PMU(Performance Monitoring Unit)
-> >       ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit)
-> > 
-> >  arch/arm/configs/kzm9d_defconfig      |    1 +
-> >  arch/arm/configs/kzm9g_defconfig      |    1 +
-> >  arch/arm/mach-shmobile/setup-emev2.c  |   21 +++++++++++++++++++++
-> >  arch/arm/mach-shmobile/setup-sh73a0.c |   21 +++++++++++++++++++++
-> >  4 files changed, 44 insertions(+)
+
+I'm no DT-expert, but why are you adding MSP-stuff in the machine-driver? They
+are also added in the next patch.
+
+>> +	};
+>> +
+>> +	msp3: msp at 80125000 {
+>> +		compatible = "stericsson,ux500-msp-i2s";
+>> +		reg = <0x80125000 0x1000>;
+>> +		interrupts = <0 62 0x4>;
+>> +		v-ape-supply = <&db8500_vape_reg>;
+>> +	};
+>> +
+>> +	codec: ab8500-codec {
+>> +		compatible = "stericsson,ab8500-codec";
+>> +		stericsson,earpeice-cmv = <950>; /* Units in mV. */
+
+
+Only four voltages are allowed here. Maybe enumerate them in the comment?
+
+>> +	};
+>> -- 
+>> 1.7.9.5
+>> 
 > 
