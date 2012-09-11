@@ -1,47 +1,32 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 11 Sep 2012 10:12:21 +0800
-Subject: [PATCH v2] ARM: PRIMA2: rstc: Use helper function to read u32 values
-Message-ID: <1347329541-9110-1-git-send-email-Barry.Song@csr.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 11 Sep 2012 10:17:01 +0800
+Subject: [PATCH] ARM: PRIMA2: rstc: use of_property_read_u32 to replace
+ of_get_property and be32_to_cpup
+In-Reply-To: <20120907222333.GB4428@quad.lixom.net>
+References: <1345702192-1153-1-git-send-email-Barry.Song@csr.com>
+ <CAGsJ_4y+jCmE7V2ANySQAacgkA9DwoV+TX25O-7coSB1WONVhw@mail.gmail.com>
+ <20120907222333.GB4428@quad.lixom.net>
+Message-ID: <CAGsJ_4yFzBUhQ-QwU_bvoZz69NeMQRCmcXa-sqjHtSJk0YyR-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+2012/9/8 Olof Johansson <olof@lixom.net>:
+> On Wed, Sep 05, 2012 at 04:58:25PM +0800, Barry Song wrote:
+>> 2012/8/23 Barry Song <Barry.Song@csr.com>:
+>> > From: Barry Song <Baohua.Song@csr.com>
+>> >
+>> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>
+>> Olof, would you apply this or you want me to send a pull request for it?
+>
+> I can apply it but it needs a patch description, at least a short sentence.
 
-Use helper function of_property_read_u32() in place of of_get_property
-and be32_to_cpup() api's for code optimization.
+Thanks and done:
+http://www.spinics.net/lists/arm-kernel/msg194041.html
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v2: add patch description
+>
+>
+> -Olof
+>>
 
- arch/arm/mach-prima2/rstc.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index 762adb7..d03ff19 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -42,13 +42,10 @@ early_initcall(sirfsoc_of_rstc_init);
- 
- int sirfsoc_reset_device(struct device *dev)
- {
--	const unsigned int *prop = of_get_property(dev->of_node, "reset-bit", NULL);
--	unsigned int reset_bit;
-+	u32 reset_bit;
- 
--	if (!prop)
--		return -ENODEV;
--
--	reset_bit = be32_to_cpup(prop);
-+	if (of_property_read_u32(dev->of_node, "reset-bit", &reset_bit))
-+		return -EINVAL;
- 
- 	mutex_lock(&rstc_lock);
- 
--- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+-barry
