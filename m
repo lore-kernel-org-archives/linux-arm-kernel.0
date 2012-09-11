@@ -1,52 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Sep 2012 11:03:06 -0700
-Subject: [PATCH 2/2] ARM: OMAP2+: Enable pinctrl dummy states
-In-Reply-To: <1347385599-27558-3-git-send-email-mporter@ti.com>
-References: <1347385599-27558-1-git-send-email-mporter@ti.com>
- <1347385599-27558-3-git-send-email-mporter@ti.com>
-Message-ID: <20120911180306.GI23092@atomide.com>
+From: vikram186@gmail.com (Vikram Narayanan)
+Date: Tue, 11 Sep 2012 23:34:28 +0530
+Subject: [PATCH 5/9] mtd: gpmi: add a new field for HW_GPMI_CTRL1
+In-Reply-To: <1347344231-10295-6-git-send-email-b32955@freescale.com>
+References: <1347344231-10295-1-git-send-email-b32955@freescale.com>
+ <1347344231-10295-6-git-send-email-b32955@freescale.com>
+Message-ID: <504F7D2C.5090707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [120911 10:46]:
-> Enable pinctrl dummy states for all OMAP platforms. This allows
-> drivers to be converted to pinctrl while still running on
-> platforms that do not provide pinctrl data.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
+Hello Huang Shijie,
+
+On 9/11/2012 11:47 AM, Huang Shijie wrote:
+> add the WRN_DLY_SEL field for HW_GPMI_CTRL1.
+> This field is used as delay for gpmi write strobe.
+>
+> Signed-off-by: Huang Shijie<b32955@freescale.com>
 > ---
->  arch/arm/mach-omap2/devices.c |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index c00c689..577cd04 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -17,6 +17,7 @@
->  #include <linux/err.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
-> +#include <linux/pinctrl/machine.h>
->  #include <linux/platform_data/omap4-keypad.h>
->  
->  #include <mach/hardware.h>
-> @@ -631,6 +632,9 @@ static inline void omap_init_vout(void) {}
->  
->  static int __init omap2_init_devices(void)
->  {
-> +	/* Enable dummy states for those platforms without pinctrl support */
-> +	pinctrl_provide_dummies();
+>   drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    6 ++++++
+>   drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 ++
+>   drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    5 +++++
+>   3 files changed, 13 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> index eee0159..037438a 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> @@ -731,6 +731,7 @@ return_results:
+>   	hw->use_half_periods        = dll_use_half_periods;
+>   	hw->sample_delay_factor     = sample_delay_factor;
+>   	hw->device_busy_timeout     = 0x500; /* default busy timeout value. */
+> +	hw->wrn_dly_sel             = 0;
+>
+>   	/* Return success. */
+>   	return 0;
+> @@ -769,6 +770,11 @@ void gpmi_begin(struct gpmi_nand_data *this)
+>
+>   	/* [3] The following code is to set the HW_GPMI_CTRL1. */
+>
+> +	/* Set the WRN_DLY_SEL */
+> +	writel(BM_GPMI_CTRL1_WRN_DLY_SEL, gpmi_regs + HW_GPMI_CTRL1_CLR);
+> +	writel(BF_GPMI_CTRL1_WRN_DLY_SEL(hw.wrn_dly_sel),
+> +					gpmi_regs + HW_GPMI_CTRL1_SET);
 > +
->  	/*
->  	 * please keep these calls, and their implementations above,
->  	 * in alphabetical order so they're easier to sort through.
+>   	/* DLL_ENABLE must be set to 0 when setting RDN_DELAY or HALF_PERIOD. */
+>   	writel(BM_GPMI_CTRL1_DLL_ENABLE, gpmi_regs + HW_GPMI_CTRL1_CLR);
+>
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> index e68bbac..39f1f76 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> @@ -195,6 +195,7 @@ struct gpmi_nand_data {
+>    * @use_half_periods:          Indicates the clock is running slowly, so the
+>    *                             NFC DLL should use half-periods.
+>    * @sample_delay_factor:       The sample delay factor.
+> + * @wrn_dly_sel:               The delay on the GPMI write strobe.
+>    */
+>   struct gpmi_nfc_hardware_timing {
+>   	/* for HW_GPMI_TIMING0 */
+> @@ -208,6 +209,7 @@ struct gpmi_nfc_hardware_timing {
+>   	/* for HW_GPMI_CTRL1 */
+>   	bool     use_half_periods;
+>   	uint8_t  sample_delay_factor;
+> +	uint8_t  wrn_dly_sel;
+>   };
+>
+>   /**
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+> index 7961c14..ab428d6 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+> @@ -108,6 +108,11 @@
+>   #define HW_GPMI_CTRL1_CLR				0x00000068
+>   #define HW_GPMI_CTRL1_TOG				0x0000006c
+>
+> +#define BP_GPMI_CTRL1_WRN_DLY_SEL			22
+> +#define BM_GPMI_CTRL1_WRN_DLY_SEL			0x00C00000
 
-Hmm I think this may need to be board specific. And may need to
-be board specific and depend on unpopulated device tree?
+In [PATCH 3/9] mtd: gpmi: add a new field for HW_GPMI_TIMING1,
+the above is done in a different way.
 
-For board-generic.c we always want to see the warnings. And some boards
-insist on doing all the muxing only in the bootloader.
+#define BM_GPMI_TIMING1_BUSY_TIMEOUT	
+		(0xff << BP_GPMI_TIMING1_BUSY_TIMEOUT)
+
+I think it would be good if we follow the same conventions in all the 
+places.
+
+> +#define BF_GPMI_CTRL1_WRN_DLY_SEL(v)  \
+> +	(((v)<<  BP_GPMI_CTRL1_WRN_DLY_SEL)&  BM_GPMI_CTRL1_WRN_DLY_SEL)
+> +
+>   #define BM_GPMI_CTRL1_BCH_MODE				(1<<  18)
+>
+>   #define BP_GPMI_CTRL1_DLL_ENABLE			17
 
 Regards,
-
-Tony
+Vikram
