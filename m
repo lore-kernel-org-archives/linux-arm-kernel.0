@@ -1,59 +1,77 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 11 Sep 2012 17:21:45 +0200
-Subject: [PATCH 2/2] dmaengine: at_hdmac: check that each sg data length is
- non-null
-In-Reply-To: <77b1e7252fbc9a31e1ed8806e017f8bd8a4605e0.1347375975.git.nicolas.ferre@atmel.com>
-References: <77b1e7252fbc9a31e1ed8806e017f8bd8a4605e0.1347375975.git.nicolas.ferre@atmel.com>
-Message-ID: <4dd23d54172aedff69d4bb9be950cea18be9b848.1347375975.git.nicolas.ferre@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Sep 2012 09:22:59 -0600
+Subject: [RFC v5] V4L DT bindings
+In-Reply-To: <Pine.LNX.4.64.1209111555010.22084@axis700.grange>
+References: <Pine.LNX.4.64.1208242356051.20710@axis700.grange>
+ <Pine.LNX.4.64.1209051030230.16676@axis700.grange>
+ <5047DEE6.9020607@wwwdotorg.org>
+ <Pine.LNX.4.64.1209111555010.22084@axis700.grange>
+Message-ID: <504F5753.60407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid the construction of a malformed DMA request sent to
-the DMA controller.
-Log message is for debug only because this condition is unlikely to
-append and may only trigger at driver development time.
+On 09/11/2012 08:02 AM, Guennadi Liakhovetski wrote:
+> Hi Stephen
+> 
+> Thanks for the review.
+> 
+> On Wed, 5 Sep 2012, Stephen Warren wrote:
+> 
+>> On 09/05/2012 04:57 AM, Guennadi Liakhovetski wrote:
+>>> Hi all
+>>>
+>>> Version 5 of this RFC is a result of a discussion of its version 4, which 
+>>> took place during the recent Linux Plumbers conference in San Diego. 
+>>> Changes are:
+>>>
+>>> (1) remove bus-width properties from device (bridge and client) top level. 
+>>> This has actually already been decided upon during our discussions with 
+>>> Sylwester, I just forgot to actually remove them, sorry.
+>>>
+>>> (2) links are now grouped under "ports." This should help better describe 
+>>> device connection topology by making clearer, which interfaces links are 
+>>> attached to. (help needed: in my notes I see "port" optional if only one 
+>>> port is present, but I seem to remember, that the final decision was - 
+>>> make ports compulsory for uniformity. Which one is true?)
+>>
+>> I'd tend to make the port node compulsory.
+>>
+>> A related question: What code is going to parse all the port/link
+>> sub-nodes in a device?
+> 
+> I think we'll have to make a generic V4L DT parser. We certainly don't 
+> want each driver reimplement this.
+> 
+>> And, how does it know which sub-nodes are ports,
+>> and which are something else entirely? Perhaps the algorithm is that all
+>> port nodes must be named "port"?
+> 
+> Yes, that was the idea. Is anything speaking against it?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Stable <stable@vger.kernel.org> [2.6.31+]
----
- drivers/dma/at_hdmac.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+I think that's fine; it's certainly a nice and simple requirement. It's
+just a rule that will have to be thought about when designing bindings
+for all the devices that use this feature, to make sure they don't
+define any other kind of "port" node that would confuse the parser.
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 6c09e18..7ab6e26 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -689,6 +689,11 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 
- 			mem = sg_dma_address(sg);
- 			len = sg_dma_len(sg);
-+			if (unlikely(!len)) {
-+				dev_dbg(chan2dev(chan),
-+					"prep_slave_sg: sg(%d) data length is zero\n", i);
-+				goto err;
-+			}
- 			mem_width = 2;
- 			if (unlikely(mem & 3 || len & 3))
- 				mem_width = 0;
-@@ -724,6 +729,11 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 
- 			mem = sg_dma_address(sg);
- 			len = sg_dma_len(sg);
-+			if (unlikely(!len)) {
-+				dev_dbg(chan2dev(chan),
-+					"prep_slave_sg: sg(%d) data length is zero\n", i);
-+				goto err;
-+			}
- 			mem_width = 2;
- 			if (unlikely(mem & 3 || len & 3))
- 				mem_width = 0;
-@@ -757,6 +767,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 
- err_desc_get:
- 	dev_err(chan2dev(chan), "not enough descriptors available\n");
-+err:
- 	atc_desc_put(atchan, first);
- 	return NULL;
- }
--- 
-1.7.10
+I suppose if this ever becomes a problem, an individual binding could
+choose to avoid conflicts by placing the "port" nodes in some specific
+child node of its device node, and the driver would pass the name of
+that node into the common parsing code, which would default to using the
+device's main node when not otherwise specified. However, we should
+avoid the conflicts if we can. In other words:
+
+Normal:
+
+/foo {
+    port at 0 { ... };
+    port at 1 { ... };
+};
+
+If there's ever a need to resolve some conflict with that standard layout:
+
+/foo {
+    media-ports {
+        port at 0 { ... };
+        port at 1 { ... };
+    };
+};
