@@ -1,94 +1,65 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 11 Sep 2012 14:17:02 +0800
-Subject: [PATCH 0/9] add EDO feature for gpmi-nand driver
-Message-ID: <1347344231-10295-1-git-send-email-b32955@freescale.com>
+Date: Tue, 11 Sep 2012 14:17:04 +0800
+Subject: [PATCH 2/9] mtd: add helpers to get the supportted ONFI timing mode
+In-Reply-To: <1347344231-10295-1-git-send-email-b32955@freescale.com>
+References: <1347344231-10295-1-git-send-email-b32955@freescale.com>
+Message-ID: <1347344231-10295-3-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ONFI nand supports the EDO (extended data out) feature in 
-asynchronous mode when the host controller(such as gpmi-nand)
-uses a tRC of less then 30ns.
+add onfi_get_async_timing_mode() to get the supportted asynchronous
+timing mode.
 
-The gpmi can supports this EDO feature.
-This patch set adds the EDO support the gpmi-nand driver.
+add onfi_get_sync_timing_mode() to get the supportted synchronous
+timing mode.
 
-patch 1 ~ patch 2: 
-	 These two patches provide the infrastructure for the EDO feature.
-         They add necessary MTD helpers for the ONFI nand set/get features,
-	 and the help to get the supportted timing mode.
-	 These two patches are new version. The init version has been
-	 reviewed by Vikram & Florian.
+Also add the neccessary macros : the timing modes.
 
-patch 3 ~ patch 7:
-         These patches are clean-ups for the gpmi-nand's timing code.
-	 Also they make the some preparations for the EDO patch.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ include/linux/mtd/nand.h |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-patch 8: add the EDO feature to the gpmi-nand.
-
-
-patch 9: a small optimization for the timing. 
-         only set the timing registers one time.
-
-I tested this patch set on the IMX6Q-arm2 board with several Micron's
-ONFI nand chips. Some chips only can supports to mode 4, some chips
-can supports to mode 5.
-
-The performance is much improved. Take Micron MT29F32G08MAA for example
-(in mode 5, 100MHz):
-
-1) The test result BEFORE we add the EDO feature:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 209715200, eraseblock size 524288,
-			page size 4096, count of eraseblocks 400,
-			pages per eraseblock 128, OOB size 218
-.......................................
-mtd_speedtest: testing eraseblock read speed
-mtd_speedtest: eraseblock read speed is 3632 KiB/s
-.......................................
-mtd_speedtest: testing page read speed
-mtd_speedtest: page read speed is 3554 KiB/s
-.......................................
-mtd_speedtest: testing 2 page read speed
-mtd_speedtest: 2 page read speed is 3592 KiB/s
-.......................................
-=================================================
-
-2) The test result AFTER we add the EDO feature:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 209715200, eraseblock size 524288,
-			page size 4096, count of eraseblocks 400,
-			pages per eraseblock 128, OOB size 218
-.......................................
-mtd_speedtest: testing eraseblock read speed
-mtd_speedtest: eraseblock read speed is 19555 KiB/s
-.......................................
-mtd_speedtest: testing page read speed
-mtd_speedtest: page read speed is 17319 KiB/s
-.......................................
-mtd_speedtest: testing 2 page read speed
-mtd_speedtest: 2 page read speed is 18339 KiB/s
-.......................................
-=================================================
-
-The read data performance is much improved by more then 5 times.
-
-Huang Shijie (9):
-  mtd: add helpers to set/get features for ONFI nand
-  mtd: add helpers to get the supportted ONFI timing mode
-  mtd: gpmi: add a new field for HW_GPMI_TIMING1
-  mtd: gpmi: do not get the clock frequency in gpmi_begin()
-  mtd: gpmi: add a new field for HW_GPMI_CTRL1
-  mtd: gpmi: simplify the setting DLL code
-  mtd: gpmi: do not set the default values for the extra clocks
-  mtd: gpmi: add EDO feature for imx6q
-  mtd: gpmi: initialize the timing registers only one time
-
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |  273 +++++++++++++++++++++++++++++---
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   23 ++--
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   18 ++
- drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    8 +
- drivers/mtd/nand/nand_base.c           |   50 ++++++
- include/linux/mtd/nand.h               |   39 +++++
- 6 files changed, 375 insertions(+), 36 deletions(-)
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index 537f59c..7a7b246 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -231,6 +231,15 @@ typedef enum {
+ /* Keep gcc happy */
+ struct nand_chip;
+ 
++/* ONFI timing mode, used in both asynchronous and synchronous mode */
++#define ONFI_TIMING_MODE_0		(1 << 0)
++#define ONFI_TIMING_MODE_1		(1 << 1)
++#define ONFI_TIMING_MODE_2		(1 << 2)
++#define ONFI_TIMING_MODE_3		(1 << 3)
++#define ONFI_TIMING_MODE_4		(1 << 4)
++#define ONFI_TIMING_MODE_5		(1 << 5)
++#define ONFI_TIMING_MODE_UNKNOWN	(1 << 6)
++
+ /* ONFI feature address */
+ #define ONFI_FEATURE_ADDR_TIMING_MODE	0x1
+ 
+@@ -682,4 +691,20 @@ struct platform_nand_chip *get_platform_nandchip(struct mtd_info *mtd)
+ 	return chip->priv;
+ }
+ 
++/* return the supported asynchronous timing mode. */
++static inline int onfi_get_async_timing_mode(struct nand_chip *chip)
++{
++	if (!chip->onfi_version)
++		return ONFI_TIMING_MODE_UNKNOWN;
++	return le16_to_cpu(chip->onfi_params.async_timing_mode);
++}
++
++/* return the supported synchronous timing mode. */
++static inline int onfi_get_sync_timing_mode(struct nand_chip *chip)
++{
++	if (!chip->onfi_version)
++		return ONFI_TIMING_MODE_UNKNOWN;
++	return le16_to_cpu(chip->onfi_params.src_sync_timing_mode);
++}
++
+ #endif /* __LINUX_MTD_NAND_H */
+-- 
+1.7.0.4
