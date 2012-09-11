@@ -1,36 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Sep 2012 10:36:26 -0700
-Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
-In-Reply-To: <201209111704.16708.arnd@arndb.de>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <CAMQu2gz8F2FcgRuok3x1uJ4pP8=0E2-9jhYGchzU9AUtUHjYhg@mail.gmail.com>
- <504F6249.2090501@ti.com> <201209111704.16708.arnd@arndb.de>
-Message-ID: <20120911173626.GF23092@atomide.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 11 Sep 2012 13:39:10 -0400
+Subject: [PATCH v3 12/17] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
+In-Reply-To: <1347385155-11643-1-git-send-email-cyril@ti.com>
+References: <1347385155-11643-1-git-send-email-cyril@ti.com>
+Message-ID: <1347385155-11643-13-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120911 10:05]:
-> On Tuesday 11 September 2012, Vaibhav Hiremath wrote:
-> > On 9/11/2012 7:54 PM, Shilimkar, Santosh wrote:
-> > > On Tue, Sep 11, 2012 at 7:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >> On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
-> > >>> Just curious to know how you came with some of the above header names ?
-> > >>>
-> > >>> plat/mcbsp ---> dsp-mcbsp.h
-> > >>> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
-> > >>> better name.
-> > >>
-> > >> This one was a mistake on my side, as Tony and  Peter already pointed out.
-> > >> How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
-> > >>
-> > > After re-reading the cover-letter and your below response,
-> > > 'asoc-omap-mcbsp.h' seems to be fine.
-> > > 
-> > 
-> > Note that mcbsp is also applicable to Davinci family of devices.
-> 
-> asoc-ti-mcbsp.h then?
+This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
+On PAE systems, the absence of this override causes bootmem to incorrectly
+limit itself to 32-bit addressable physical memory.
 
-Sounds good to me. Whatever the name ends up being:
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+---
+ arch/arm/include/asm/memory.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 0643454..73caaeb 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -307,6 +307,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+ #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+ 
++#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
++
+ #endif
+ 
+ #include <asm-generic/memory_model.h>
+-- 
+1.7.9.5
