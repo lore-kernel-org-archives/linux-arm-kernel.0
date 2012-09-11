@@ -1,47 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Sep 2012 06:31:11 -0700
-Subject: [PATCH 12/16] ARM: nomadik: move platform_data definitions
-In-Reply-To: <1347368390-31252-12-git-send-email-arnd@arndb.de>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-12-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdb5Tkb5xGzuU=Mw9amfG+218dyzQaQsRZKm9cws71Vd9w@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 11 Sep 2012 21:33:15 +0800
+Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <CADApbejRM9RkEjX2VAPVG18gip=OH5WWeS_NwEoCKgOZ_PgmLA@mail.gmail.com>
+References: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
+ <20120825002151.18366.99434@nucleus>
+ <CADApbehotHB7JSCHdo_eoTb08C5Pe6ewh7whwckQTyuCcMM=BQ@mail.gmail.com>
+ <20120829182639.4450.99900@nucleus>
+ <CADApbejRM9RkEjX2VAPVG18gip=OH5WWeS_NwEoCKgOZ_PgmLA@mail.gmail.com>
+Message-ID: <CAN1soZxYrQL05TdWT1083_L23b6iApfS_oX+BKxmtaBpe6k+NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 5:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Sep 11, 2012 at 1:54 PM, Chao Xie <xiechao.mail@gmail.com> wrote:
+> On Thu, Aug 30, 2012 at 2:26 AM, Mike Turquette <mturquette@linaro.org> wrote:
+>> Quoting Chao Xie (2012-08-26 18:19:02)
+>>> On Sat, Aug 25, 2012 at 8:21 AM, Mike Turquette <mturquette@linaro.org> wrote:
+>>> > Quoting Chao Xie (2012-08-19 19:55:10)
+>>> >> From: Chao Xie <chao.xie@marvell.com>
+>>> >>  arch/arm/mach-mmp/Kconfig    |    3 +
+>>> >>  drivers/clk/Makefile         |    3 +
+>>> >>  drivers/clk/mmp/Makefile     |    9 +
+>>> >>  drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++++
+>>> >>  drivers/clk/mmp/clk-apmu.c   |   97 +++++++++
+>>> >>  drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++++
+>>> >>  drivers/clk/mmp/clk-mmp2.c   |  449 ++++++++++++++++++++++++++++++++++++++++++
+>>> >>  drivers/clk/mmp/clk-pxa168.c |  346 ++++++++++++++++++++++++++++++++
+>>> >>  drivers/clk/mmp/clk-pxa910.c |  320 ++++++++++++++++++++++++++++++
+>>> >>  drivers/clk/mmp/clk.h        |   35 ++++
+>>> >
+>>> > Looks like you are not removing your arch/arm/mach-mmp/clock.c.  Is that
+>>> > intentional?
+>>> >
+>>> > When I apply your series against v3.6-rc3 I find that compilation breaks
+>>> > with mmp2_defconfig due to conflicting definitions for the clk api
+>>> > (clk_enable, clk_set_rate, etc).  This is not surprising since your
+>>> > legacy clock code is neither deleted nor removed from compilation
+>>> > conditionally by checking for CONFIG_COMMON_CLK.
+>>> >
+>>> > Did I somehow manage to misapply your patches or should your patches
+>>> > have removed the arch-specific clock framework as well?
+>>> >
+>>> hi, Mike
+>>> Yes. There are some patches for seperate the original clock code in arch.
+>>> I had sent these patches before, but it seems that too many patches
+>>> sent, and haojian missed it.
+>>> I will sent out the patches for arch today. Thanks.
+>>>
+>>
+>> I pulled in the dependency series and the build goes through nicely now.
+>> I'm happy to take these five patches into clk-next but of course mmp
+>> will have problems building clk-next without the dependencies, which I
+>> assume are going through arm-soc.
+>>
+>> Regards,
+>> Mike
+>>
+>>> > Regards,
+>>> > Mike
+>>> >
+>>> >>  10 files changed, 1567 insertions(+), 0 deletions(-)
+>>> >>  create mode 100644 drivers/clk/mmp/Makefile
+>>> >>  create mode 100644 drivers/clk/mmp/clk-apbc.c
+>>> >>  create mode 100644 drivers/clk/mmp/clk-apmu.c
+>>> >>  create mode 100644 drivers/clk/mmp/clk-frac.c
+>>> >>  create mode 100644 drivers/clk/mmp/clk-mmp2.c
+>>> >>  create mode 100644 drivers/clk/mmp/clk-pxa168.c
+>>> >>  create mode 100644 drivers/clk/mmp/clk-pxa910.c
+>>> >>  create mode 100644 drivers/clk/mmp/clk.h
+>
+> Thanks.
+> I think Haojian who is the maintainer of pxa and mmp will help to
+> integrate the dependency patches.
 
->  arch/arm/mach-nomadik/board-nhk8815.c                                |    2 +-
->  arch/arm/mach-u300/core.c                                            |    2 +-
->  arch/arm/mach-ux500/board-mop500.c                                   |    2 +-
->  arch/arm/mach-ux500/cpu-db8500.c                                     |    2 +-
->  arch/arm/mach-ux500/devices-common.h                                 |    2 +-
->  arch/arm/mach-ux500/usb.c                                            |    2 +-
->  drivers/crypto/ux500/cryp/cryp_core.c                                |    2 +-
->  drivers/crypto/ux500/hash/hash_core.c                                |    2 +-
->  drivers/input/keyboard/nomadik-ske-keypad.c                          |    2 +-
->  drivers/mtd/nand/nomadik_nand.c                                      |    2 +-
->  drivers/pinctrl/pinctrl-coh901.c                                     |    2 +-
->  drivers/usb/musb/ux500_dma.c                                         |    2 +-
->  .../include/mach => include/linux/platform_data}/crypto-ux500.h      |    0
->  .../plat/ske.h => include/linux/platform_data/keypad-nomadik-ske.h   |    0
->  .../mach/nand.h => include/linux/platform_data/mtd-nomadik-nand.h    |    0
->  .../mach/gpio-u300.h => include/linux/platform_data/pinctrl-coh901.h |    0
-
-I sent a patch for moving gpio-u300.h like this in commit
-651728507140246e9cf4e809f1877cb2eddbc84e
-that is already in linux-next, is this the same patch or
-another one?
-
->  .../mach/usb.h => include/linux/platform_data/usb-musb-ux500.h       |    0
->  17 files changed, 12 insertions(+), 12 deletions(-)
->  rename {arch/arm/mach-ux500/include/mach => include/linux/platform_data}/crypto-ux500.h (100%)
->  rename arch/arm/plat-nomadik/include/plat/ske.h => include/linux/platform_data/keypad-nomadik-ske.h (100%)
->  rename arch/arm/mach-nomadik/include/mach/nand.h => include/linux/platform_data/mtd-nomadik-nand.h (100%)
->  rename arch/arm/mach-u300/include/mach/gpio-u300.h => include/linux/platform_data/pinctrl-coh901.h (100%)
->  rename arch/arm/mach-ux500/include/mach/usb.h => include/linux/platform_data/usb-musb-ux500.h (100%)
-
-For the rest, Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+I've applied. Now I'm waiting for Arnd's pull into arm-soc tree.
