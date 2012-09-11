@@ -1,92 +1,117 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 11 Sep 2012 10:23:55 +0300
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <20120829104559.GB25433@b20223-02.ap.freescale.net>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
- <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828092730.GY4011@b20223-02.ap.freescale.net>
- <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829083337.GI4011@b20223-02.ap.freescale.net>
- <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829104559.GB25433@b20223-02.ap.freescale.net>
-Message-ID: <87ipblqayc.fsf@ashishki-desk.ger.corp.intel.com>
+From: david.jander@protonic.nl (David Jander)
+Date: Tue, 11 Sep 2012 09:27:53 +0200
+Subject: GCC 4.6.x miscompiling arm-linux?
+In-Reply-To: <w51bohddcqw.fsf@mail.mattleach.net>
+References: <20120910171654.1d4972b2@archvile>
+ <w51bohddcqw.fsf@mail.mattleach.net>
+Message-ID: <20120911092753.7b8315d4@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
 
-> On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
->> Richard Zhao <richard.zhao@freescale.com> writes:
->> 
->> > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
->> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> 
->> >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
->> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> >> 
->> >> >> > One role failed, but the other role will possiblly still work.
->> >> >> > For example, when udc start failed, if plug in a host device,
->> >> >> > it works.
->> >> >> 
->> >> >> If you're a host device, ci->role should be HOST at this point and
->> >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
->> >> >> role detection must be fixed. If ci_role_start() fails for host, but it
->> >> >> still works when it's called again after the id pin change is detected,
->> >> >> again, the problem is elsewhere.
->> >> > The check is only for OTG device. For single role device, it just fail
->> >> > if it start the role failed.
->> >> 
->> >> Sorry, can you rephrase?
->> >> 
->> >> >> 
->> >> >> >
->> >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> >> >> > ---
->> >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
->> >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
->> >> >> >
->> >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->> >> >> > index 19ef324..8fd390a 100644
->> >> >> > --- a/drivers/usb/chipidea/core.c
->> >> >> > +++ b/drivers/usb/chipidea/core.c
->> >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->> >> >> >  	ret = ci_role_start(ci, ci->role);
->> >> >> >  	if (ret) {
->> >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
->> >> >> > -		ret = -ENODEV;
->> >> >> > -		goto rm_wq;
->> >> >> > +		ci->role = CI_ROLE_END;
->> >> >> 
->> >> >> So are you relying on id pin interrupt for initializing the role after
->> >> >> this? Can you provide more details?
->> >> > Yes. The ID pin detect still works. My case is, gadget role failed,
->> >> > host role works. I was trying not to ruin host function.
->> >> 
->> >> But it shouldn't even try to start the gadget, because ci_otg_role()
->> >> should set ci->role to HOST before ci_role_start() happens.
->> > It depends on ID pin. If ID pin is gadget and gadget is not support well,
->> > ci_role_start will fail. See below example.
->> >> 
->> >> Another question is, why does gadget start fail?
->> > There's one example:
->> > If usb phy don't support otg yet, otg_set_peripheral will fail, and
->> > then cause udc_start fail.
->> 
->> So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
->> platform data till the phy is fully implemented.
-> It's just an example. We can not assume udc_start always success. If it
-> fails, isn't it better to continue support of host than say game over?
+Hi Matt,
 
-Ok, I think what we need here is to rework error handling around role
-switching, so that we can allow certain things to fail and retry at a
-later point (say at id pin change), while being careful about the other
-failures.
+On Mon, 10 Sep 2012 18:11:19 +0100
+Matthew Leach <matthew@mattleach.net> wrote:
+> David Jander <david.jander@protonic.nl> writes:
+> > ...
+> > 	.text
+> > 	.align	2
+> > 	.global	flexcan_chip_start
+> > 	.type	flexcan_chip_start, %function
+> > flexcan_chip_start:
+> > 	@ args = 0, pretend = 0, frame = 0
+> > 	@ frame_needed = 0, uses_anonymous_args = 0
+> > 	@ link register save eliminated.
+> > 	mov	r3, #0
+> > 	cmp	r0, #9
+> > 	str	r3, [r1, #0]
+> > 	ldrle	r3, [r1, #4]
+> > 	mov	r0, #0
+> > 	str	r3, [r1, #4]
+> > 	bx	lr
+> > 	.size	flexcan_chip_start, .-flexcan_chip_start
+> > 	.ident	"GCC: (OSELAS.Toolchain-2011.11.1) 4.6.2"
+> > 	.section	.note.GNU-stack,"",%progbits
+> >
+> 
+> This does indeed look wrong. I had a go at compile your code snippet the
+> following assembly was produced:
+> 
+>         .text
+>         .align  2
+>         .global flexcan_chip_start
+>         .type   flexcan_chip_start, %function
+> flexcan_chip_start:
+>         @ Function supports interworking.
+>         @ args = 0, pretend = 0, frame = 0
+>         @ frame_needed = 0, uses_anonymous_args = 0
+>         @ link register save eliminated.
+>         cmp     r0, #9
+>         mov     r3, #0
+>         str     r3, [r1, #0]
+>         mov     r0, #0
+>         strgt   r3, [r1, #4]
+>         bx      lr
+>         .size   flexcan_chip_start, .-flexcan_chip_start
+>         .ident  "GCC: (GNU) 4.3.3"
+>         .section        .note.GNU-stack,"",%progbits
+> 
+> I think this looks correct. Perhaps you could try the angstrom arm5te
+> toolchain and see if it's a toolchain issue?
 
-If this patch is not crucial for imx right now, I'd prefer to leave it
-out.
+Yes, this looks a lot better, and is exactly what I get when I compile this
+code with CodeSourcery GCC-4.4.1
 
-Regards,
---
-Alex
+I have tries building gcc-4.6.3 also with OSELAS/PTXdist, and it gives the
+same (wrong) result as with gcc-4.6.2
+
+> I think this looks correct. Perhaps you could try the angstrom arm5te
+> toolchain and see if it's a toolchain issue?
+>
+> http://www.angstrom-distribution.org/toolchains/angstrom-2011.03-i686-linux-armv5te-linux-gnueabi-toolchain-qte-4.6.3.tar.bz2
+
+This toolchain is a lot older:
+
+$ ./usr/local/angstrom/arm/bin/arm-angstrom-linux-gnueabi-gcc --version
+arm-angstrom-linux-gnueabi-gcc (GCC) 4.3.3
+Copyright (C) 2008 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+The tar-ball says 4.6.3, but that is probably the version number of the qte
+library, not that of gcc, which is 4.3.3, It does indeed produce
+the same (correct) output as in your case.
+
+The newest angstrom (next) toolchain has gcc version 4.5.3, and it produces
+this (correct) output:
+
+flexcan_chip_start:
+        @ Function supports interworking.
+        @ args = 0, pretend = 0, frame = 0
+        @ frame_needed = 0, uses_anonymous_args = 0
+        @ link register save eliminated.
+        mov     r3, #0
+        cmp     r0, #9
+        str     r3, [r1, #0]
+        mov     r0, #0
+        strgt   r3, [r1, #4]
+        bx      lr
+        .size   flexcan_chip_start, .-flexcan_chip_start
+        .ident  "GCC: (GNU) 4.5.3 20110311 (prerelease)"
+        .section        .note.GNU-stack,"",%progbits
+
+Anyone knows where I can download a pre-built toolchain for 32-bit linux that
+is based on gcc-4.6 and/or gcc-4.7 to try out?
+
+I have quite a hard time believing this issue is a yet unknown bug in GCC...
+I'd rather believe that I lack sufficient GCC knowledge to know how to
+correctly tell the compiler that this is a memory-IO operation. Anyone knows
+how to do this correctly? Or to explain why the output of gcc-4.6 looks less
+optimal than the output of older versions of GCC?
+
+Best regards,
+
+-- 
+David Jander
+Protonic Holland.
