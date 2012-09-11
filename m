@@ -1,47 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Sep 2012 09:49:14 +0100
-Subject: [GIT] Renesas ARM-based SoC: pmu/cleanup for 3.7
-In-Reply-To: <1347350727-11962-1-git-send-email-horms@verge.net.au>
-References: <1347350727-11962-1-git-send-email-horms@verge.net.au>
-Message-ID: <20120911084914.GB5372@mudshark.cambridge.arm.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 11 Sep 2012 14:20:11 +0530
+Subject: [PATCH] arm/dts: omap: Add omap-usb2 dt data
+In-Reply-To: <504EF4FD.2080001@ti.com>
+References: <1347343932-3656-1-git-send-email-kishon@ti.com>
+ <504EF4FD.2080001@ti.com>
+Message-ID: <CAAe_U6+8MAUAZgLZq8+Yc6SxOCJ0xQ4NFO-R4p2kgiSOXHZL2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 09:05:25AM +0100, Simon Horman wrote:
-> Hi Will,
+Hi,
 
-Hi Simon,
+On Tue, Sep 11, 2012 at 1:53 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi Kishon,
+>
+> On 09/11/2012 08:12 AM, Kishon Vijay Abraham I wrote:
+>> Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+>> connected to ocp2scp, omap-usb2 dt data is added as a child node
+>> of ocp2scp.
+>
+> Could you add more details about the omap-usb2?
+I think information about omap-usb2 driver is added in
+ *usb: phy: add a new driver for omap usb2 phy.*.
+Do you want the same thing to be added here?
+>
+> You must update the Documentation binding with that compatible name.
+Yes. It's part of *usb: phy: add a new driver for omap usb2 phy.*
+> Is it already part of the driver serie? The MUSB driver is referring to
+> "ti,musb-omap2430" only.
 
-> please consider the following changes from Kobayashi-san
-> for the pmu/cleanup branch.
+Will correct the Documentation for MUSB.
 
-Thanks for this. It probably makes more sense for the arm-soc guys to pull
-it in directly, rather than me send it as another pull request.
-
-Arnd, Olof -- can you pull this into an shmobile perf branch please?
-
-Will
-
-> ----------------------------------------------------------------
-> The following changes since commit 051f1b13144dd8553d5a5104dde94c7263ae3ba7:
-> 
->   ARM: perf: move irq registration into pmu implementation (2012-08-23 11:35:52 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git pmu/cleanup
-> 
-> for you to fetch changes up to e433d4440bf7dd5955a4616cfb9bffd1ec6ab839:
-> 
->   ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit) (2012-09-11 16:27:41 +0900)
-> 
-> ----------------------------------------------------------------
-> Tetsuyuki Kobayashi (2):
->       ARM: shmobile: sh73a0: enable PMU(Performance Monitoring Unit)
->       ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit)
-> 
->  arch/arm/configs/kzm9d_defconfig      |    1 +
->  arch/arm/configs/kzm9g_defconfig      |    1 +
->  arch/arm/mach-shmobile/setup-emev2.c  |   21 +++++++++++++++++++++
->  arch/arm/mach-shmobile/setup-sh73a0.c |   21 +++++++++++++++++++++
->  4 files changed, 44 insertions(+)
+Thanks
+Kishon
