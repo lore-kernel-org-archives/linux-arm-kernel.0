@@ -1,71 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Sep 2012 09:27:25 -0700
-Subject: [PATCH] ARM: OMAP2+: mux: add support for PAD wakeup event handler
-In-Reply-To: <CAP05o4+sjt7JERPFN1i3kHswOwDL2rVvQcwTMQPBaJPMUXr86Q@mail.gmail.com>
-References: <1347273528-2056-1-git-send-email-ruslan.bilovol@ti.com>
- <20120910183943.GA1303@atomide.com>
- <CAP05o4+sjt7JERPFN1i3kHswOwDL2rVvQcwTMQPBaJPMUXr86Q@mail.gmail.com>
-Message-ID: <20120911162724.GB23092@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 11 Sep 2012 11:26:55 -0500
+Subject: [PATCH 03/16] ARM: ep93xx: move platform_data definitions
+In-Reply-To: <1347368390-31252-3-git-send-email-arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-3-git-send-email-arnd@arndb.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F00206B1EB884D@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Munegowda, Keshava <keshava_mgowda@ti.com> [120911 00:43]:
-> On Tue, Sep 11, 2012 at 12:09 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Ruslan Bilovol <ruslan.bilovol@ti.com> [120910 03:39]:
-> >> OMAP mux now parses active wakeup events from pad registers and calls
-> >> corresponding handler, if handler is not registered - corresponding
-> >> hwmod ISRs once a wakeup is detected.
-> >> This is useful for cases when routing wakeups to corresponding hwmod
-> >> ISRs complicates those ISRs handlers (for example, ISR handler may
-> >> not know who the interrupt source is)
-> >
-> > The mux code in arch/arm/mach-omap2 will be going away and replaced
-> > by device tree based pinctrl-single.
-> 
-> Thanks tony
->        when is this device tree based pinctrl-single will be available
-> in mainline?
+On Tuesday, September 11, 2012 6:00 AM, Arnd Bergmann wrote:
+> Platform data for device drivers should be defined in
+> include/linux/platform_data/*.h, not in the architecture
+> and platform specific directories.
+>
+> This moves such data out of the ep93xx include directories
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Jeff Garzik <jgarzik@pobox.com> (supporter:SERIAL ATA
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com> (maintainer:INPUT
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Jaroslav Kysela <perex@perex.cz>
+> Cc: Takashi Iwai <tiwai@suse.de>
+> Cc: Mika Westerberg <mika.westerberg@iki.fi>
+> Cc: Axel Lin <axel.lin@gmail.com>
+> ---
+>  Documentation/spi/ep93xx_spi                                     |    2 +-
+>  arch/arm/mach-ep93xx/core.c                                      |    6 +++---
+>  arch/arm/mach-ep93xx/dma.c                                       |    2 +-
+>  arch/arm/mach-ep93xx/edb93xx.c                                   |    4 ++--
+>  arch/arm/mach-ep93xx/simone.c                                    |    2 +-
+>  arch/arm/mach-ep93xx/snappercl15.c                               |    2 +-
+>  arch/arm/mach-ep93xx/vision_ep9307.c                             |    4 ++--
+>  drivers/ata/pata_ep93xx.c                                        |    2 +-
+>  drivers/dma/ep93xx_dma.c                                         |    2 +-
+>  drivers/input/keyboard/ep93xx_keypad.c                           |    2 +-
+>  drivers/spi/spi-ep93xx.c                                         |    4 ++--
+>  drivers/video/ep93xx-fb.c                                        |    2 +-
+>  .../mach/dma.h => include/linux/platform_data/dma-ep93xx.h       |    0
+>  .../linux/platform_data/keypad-ep93xx.h                          |    0
+>  .../ep93xx_spi.h => include/linux/platform_data/spi-ep93xx.h     |    0
+>  .../mach/fb.h => include/linux/platform_data/video-ep93xx.h      |    0
+>  sound/soc/ep93xx/ep93xx-ac97.c                                   |    2 +-
+>  sound/soc/ep93xx/ep93xx-i2s.c                                    |    2 +-
+>  sound/soc/ep93xx/ep93xx-pcm.c                                    |    2 +-
+>  19 files changed, 20 insertions(+), 20 deletions(-)
+>  rename arch/arm/mach-ep93xx/include/mach/dma.h => include/linux/platform_data/dma-ep93xx.h (100%)
+>  rename arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h => include/linux/platform_data/keypad-ep93xx.h (100%)
+>  rename arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h => include/linux/platform_data/spi-ep93xx.h (100%)
+>  rename arch/arm/mach-ep93xx/include/mach/fb.h => include/linux/platform_data/video-ep93xx.h (100%)
 
-It is already merged during v3.6 merge window, please see:
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-drivers/pinctrl/pinctrl-single.c
-Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+Arnd,
 
-For omap-serial, see the patch "serial: omap: Request pins using pinctrl
-framework" in tty-next.
-
-Then for setting up wake-up events, you can define alternative
-named states, such as:
-
-default: driver specific static pins that only get set once during the probe
-active:  subset of driver specific dynamic pins that are remuxed for runtime
-idle:    subset of driver specific dynamic pins that are remuxed for idle
-
-Then just in the pinctrl using driver probe do:
-
-foo->pins = pinctrl_get_select_default(&pdev->dev);
-...
-foo->pins_active = pinctrl_lookup_state(foo->pins, "active");
-...
-foo->pins_idle = pinctrl_lookup_state(foo->pins, PINCTRL_STATE_IDLE);
-...
-
-And then you can toggle the pin settings in foo_runtime_suspend and
-resume:
-
-if (foo->pins_idle) {
-	int res;
-
-	res = pinctrl_select_state(foo->pins, foo->pins_idle);
-	...
-}
-
-I don't think we have anything available for handling the wake-up
-events yet in the pinctrl framework, but that should be added in
-a Linux generic way to pinctrl framework so drivers can set up
-their wake-up handles. That we we don't end up patching a custom
-framework that's going away.
+What about gpio-ep93xx.h? It does not have any platform_data in
+it but the gpio driver (driver/gpio/gpio-ep93xx.c) does include it
+from the mach-* directory.
 
 Regards,
-
-Tony
+Hartley
