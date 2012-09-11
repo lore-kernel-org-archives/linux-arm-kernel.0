@@ -1,47 +1,35 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 11 Sep 2012 17:29:05 +0530
-Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
-In-Reply-To: <504E20BE.8050107@wwwdotorg.org>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
- <5049252D.9000802@wwwdotorg.org>
- <20120907025847.GI26709@S2101-09.ap.freescale.net>
- <504A26E4.4070600@wwwdotorg.org>
- <20120910011741.GP26709@S2101-09.ap.freescale.net>
- <504E20BE.8050107@wwwdotorg.org>
-Message-ID: <504F2789.1070006@nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 11 Sep 2012 07:02:58 -0500
+Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
+In-Reply-To: <20120907023955.GG26709@S2101-09.ap.freescale.net>
+References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
+ <1346962375-26163-8-git-send-email-robherring2@gmail.com>
+ <20120907022711.GE26709@S2101-09.ap.freescale.net>
+ <50495DB9.5030008@wwwdotorg.org>
+ <20120907023955.GG26709@S2101-09.ap.freescale.net>
+Message-ID: <504F2872.8080609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 September 2012 10:47 PM, Stephen Warren wrote:
-> On 09/09/2012 07:17 PM, Shawn Guo wrote:
->> On Fri, Sep 07, 2012 at 10:55:00AM -0600, Stephen Warren wrote:
->>> Yes, that does solve the problem (well, with s/late_init/late_initcall/).
->>>
->>> As you imply, that change wouldn't help if cpu-tegra.c was built as a
->>> module.
->> I doubt that.  Have you confirmed it with testing?  When you install
->> module cpu-tegra, the pcie initialization has been done, right?
-> Never mind, the code can't be built as a module anyway.
->
-> Aside from that, I misinterpreted your test patch, and thought that it
-> was moving the Tegra cpufreq driver initialization earlier, but it's
-> actually moving it later, and in fact by chance after PCIe
-> initialization, which explains why it solves the issue.
->
-> I think the root of the problem is that cpufreq is lowering the CPU
-> frequency, yet the patch which converted Tegra to the common clock
-> framework removed the code that actually changes the CPU clock rate. So,
-> cpufreq thinks the CPU is running at e.g. 216MHz, but it's actually
-> still running at 1.0GHz, and hence re-calculating the delay loops breaks
-> things, since delays aren't as long as the system thinks they are. The
-> variability is due to whether lowering the CPU frequency just happens to
-> occur before or after the PCIe controller is initialized.
->
-> Prashant, are you able to fix the clock driver deficiency within the
-> next 2-3 days or so (so I can include the fix in the pull requests I
-> send for 3.7, which need to be sent before the end of the week)? Or, do
-> we need to disable cpufreq for Tegra because of this?
+On 09/06/2012 09:39 PM, Shawn Guo wrote:
+> On Thu, Sep 06, 2012 at 08:36:41PM -0600, Stephen Warren wrote:
+>> On 09/06/2012 08:27 PM, Shawn Guo wrote:
+>>> On Thu, Sep 06, 2012 at 03:12:50PM -0500, Rob Herring wrote:
+>>>> +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+>>>> +dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
+>>>> +dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-harmony.dtb tegra20-paz00.dtb \
+>>>> +	tegra20-seaboard.dtb tegra20-trimslice.dtb tegra20-ventana.dtb \
+>>>> +	tegra20-whistler.dtb
+>>
+>> Hmm. The existing files all have one file per line, which makes
+>> adding/removing files have a little less impact; whole lines are
+>> added/removed rather than needing to reflow the whole list. Should we
+>> apply the same layout here too?
+>>
+> +1
 
-Your fix looks good to me except the concern I have mentioned in reply to that patch.
+Are you okay if I change i.MX entries to use CONFIG_ARCH_MXC instead of
+per SOC entries? I want to make things more consistent and primarily use
+the top level CONFIG_ARCH_xxx values.
+
+Rob
