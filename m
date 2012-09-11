@@ -1,22 +1,52 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 11 Sep 2012 17:08:06 +1000
-Subject: [PATCH 13/25] macintosh/mediabay: add a const qualifier
-In-Reply-To: <20120911065604.GE28643@pengutronix.de>
-References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
- <1346812817.2257.23.camel@pasglop> <20120905080249.GI28643@pengutronix.de>
- <1346837023.2257.57.camel@pasglop> <20120911065604.GE28643@pengutronix.de>
-Message-ID: <1347347286.2603.43.camel@pasglop>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 11 Sep 2012 15:10:12 +0800
+Subject: [PATCH v2] mtd: atmel_nand: fix the compile error which miss label
+ "err_ecc_ioremap".
+Message-ID: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-11 at 08:56 +0200, Uwe Kleine-K?nig wrote:
-> 
-> in the hope I didn't interpret "anything powerpc" too wide. Please
-> tell me if I did. 
+Add err_ecc_ioremap label to fix following errors:
+---8<--- 
+  CC      drivers/mtd/nand/atmel_nand.o
+drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
+drivers/mtd/nand/atmel_nand.c:1423: error: label 'err_ecc_ioremap' used but not defined
+make[3]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
+make[2]: *** [drivers/mtd/nand] Error 2
+make[1]: *** [drivers/mtd] Error 2
+make: *** [drivers] Error 2
+--->8---
 
-No, it's fine with me, give me a git URL if you want me to run that
-through my various config test builds.
+This error was introduced in b654a9a46fc2100b318050483f8c5b5d0f187303 (mtd: atmel nand: fix gpio missing request)
 
-Cheers,
-Ben.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+change logs:
+  Add detail information for the commit message.
+
+ drivers/mtd/nand/atmel_nand.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 6a5a35b..9144557 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -1399,7 +1399,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	if (pdev->dev.of_node) {
+ 		res = atmel_of_init_port(host, pdev->dev.of_node);
+ 		if (res)
+-			goto err_nand_ioremap;
++			goto err_ecc_ioremap;
+ 	} else {
+ 		memcpy(&host->board, pdev->dev.platform_data,
+ 		       sizeof(struct atmel_nand_data));
+@@ -1560,6 +1560,7 @@ err_no_card:
+ 	platform_set_drvdata(pdev, NULL);
+ 	if (host->dma_chan)
+ 		dma_release_channel(host->dma_chan);
++err_ecc_ioremap:
+ 	iounmap(host->io_base);
+ err_nand_ioremap:
+ 	kfree(host);
+-- 
+1.7.9.5
