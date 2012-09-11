@@ -1,41 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Sep 2012 20:28:20 +0100
-Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
-In-Reply-To: <504F836D.6050302@ti.com>
-References: <1347380341-28145-1-git-send-email-cyril@ti.com>
- <20120911162522.GE32234@mudshark.cambridge.arm.com> <504F6DFB.5030208@ti.com>
- <20120911172018.GG32234@mudshark.cambridge.arm.com> <504F74C5.2020805@ti.com>
- <20120911175332.GI32234@mudshark.cambridge.arm.com> <504F836D.6050302@ti.com>
-Message-ID: <20120911192820.GT13739@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Sep 2012 19:29:39 +0000
+Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <20120911174501.2ddec831@skate>
+References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201209111310.00347.arnd@arndb.de> <20120911174501.2ddec831@skate>
+Message-ID: <201209111929.39549.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 02:31:09PM -0400, Cyril Chemparathy wrote:
-> On 9/11/2012 1:53 PM, Will Deacon wrote:
->> On Tue, Sep 11, 2012 at 06:28:37PM +0100, Cyril Chemparathy wrote:
->>> I can re-verify with the respun 7530/1 if you'd like.
->>
->> Sure, submitted as 7533/1:
->>
->> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7533/1
->>
->
-> Works great.
+On Tuesday 11 September 2012, Thomas Petazzoni wrote:
+> Le Tue, 11 Sep 2012 13:10:00 +0000,
+> Arnd Bergmann <arnd@arndb.de> a ?crit :
+> 
+> > Excellent!
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Related to this patch set, I have a question: wouldn't it make sense to
+> make the .virtual field of struct map_desc anvoid __iomem pointer as
+> well instead of an unsigned long? This would avoid all the (unsigned
+> long) casts in map_descs array definitions, and would be a bit more
+> consistent, no?
+> 
 
-Cyril, I notice you're trying repeatedly to get a new password out of
-the system.
+I've actually tried this before, and got stuck at the point where we set
+up mappings that are not __iomem in mm/mmu.c: We have a bunch of calls
+to create_mapping that are not at all related to MMIO access, and as Russell
+pointed out back then, those should not take an __iomem pointer.
 
-TI's mail system is known to silently drop the password reminders.
+We can probably solve this by changing the prototype for create_mapping to 
 
-Please bug your IT provider about this, there's nothing I can do about
-it at my end - (and as such you won't receive a password reminder until
-something can be done about this.)
+static void __init create_mapping(unsigned long virtual, unsigned long pfn,
+			        unsigned long length, unsigned int type);
 
-2012-09-11 19:45:53 1TBVT2-0008P4-2U => cyril at ti.com R=verp_domain_dnslookup T=verp_domain_smtp S=1041 H=ti.com.s9a1.psmtp.com [74.125.148.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
-2012-09-11 20:14:27 1TBVuf-0008S4-EC => cyril at ti.com R=verp_domain_dnslookup T=verp_domain_smtp S=1041 H=ti.com.s9a1.psmtp.com [74.125.148.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
+and leave a single type cast in the iotable_init() function. There are
+a few callers that we'd have to change manually then:
 
-(Note that *.psmtp.com seems to actually be more trouble than its
-worth... previous history has shown it to be quite broken, silently
-dropping _real_ emails as well.  I'd call it an anti-HAM service rather
-than an anti-SPAM service.  The more people complain to Google about it
-the better chance it will get fixed.)
+arch/arm/mm/dma-mapping.c:dma_contiguous_remap()
+arch/arm/kernel/tcm.c:tcm_init()
+arch/arm/mach-davinci/d*.c:SRAM_VIRT
+arch/arm/mach-omap2/io.c:MT_MEMORY_SO
+arch/arm/mach-omap2/omap4-common.c:OMAP4_DRAM_BARRIER_VA
+
+My feeling is that we can special-case dma_contiguous_remap by introducing
+a different helper like
+
+extern void __init create_dma_ready_mapping(unsigned long virtual, size_t length);
+
+and add casts to __iomem for the other four.
+
+	Arnd
