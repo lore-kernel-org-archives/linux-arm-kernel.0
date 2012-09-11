@@ -1,126 +1,642 @@
-From: mol@pengutronix.de (Michael Olbrich)
-Date: Tue, 11 Sep 2012 15:07:34 +0200
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20120911124226.27fa248b@archvile>
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
- <20120911084853.GT24458@pengutronix.de>
- <20120911113139.3b7b879f@archvile>
- <20120911102905.GC14994@pengutronix.de>
- <20120911124226.27fa248b@archvile>
-Message-ID: <20120911130734.GD14994@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 11 Sep 2012 16:05:22 +0300
+Subject: [PATCH 02/16] ARM: davinci: move platform_data definitions
+In-Reply-To: <1347368390-31252-2-git-send-email-arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-2-git-send-email-arnd@arndb.de>
+Message-ID: <20120911130519.GW18907@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 12:42:26PM +0200, David Jander wrote:
-> On Tue, 11 Sep 2012 12:29:05 +0200
-> Michael Olbrich <mol@pengutronix.de> wrote:
+On Tue, Sep 11, 2012 at 02:59:36PM +0200, Arnd Bergmann wrote:
+> Platform data for device drivers should be defined in
+> include/linux/platform_data/*.h, not in the architecture
+> and platform specific directories.
 > 
-> > On Tue, Sep 11, 2012 at 11:31:39AM +0200, David Jander wrote:
-> > > On Tue, 11 Sep 2012 10:48:53 +0200
-> > > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > 
-> > > > On Tue, Sep 11, 2012 at 09:27:53AM +0200, David Jander wrote:
-> > > > > 
-> > > > > Hi Matt,
-> > > > > 
-> > > > > >         @ Function supports interworking.
-> > > > > >         @ args = 0, pretend = 0, frame = 0
-> > > > > >         @ frame_needed = 0, uses_anonymous_args = 0
-> > > > > >         @ link register save eliminated.
-> > > > > >         cmp     r0, #9
-> > > > > >         mov     r3, #0
-> > > > > >         str     r3, [r1, #0]
-> > > > > >         mov     r0, #0
-> > > > > >         strgt   r3, [r1, #4]
-> > > > > >         bx      lr
-> > > > > >         .size   flexcan_chip_start, .-flexcan_chip_start
-> > > > > >         .ident  "GCC: (GNU) 4.3.3"
-> > > > > >         .section        .note.GNU-stack,"",%progbits
-> > > > > > 
-> > > > > > I think this looks correct. Perhaps you could try the angstrom arm5te
-> > > > > > toolchain and see if it's a toolchain issue?
-> > > > > 
-> > > > > Yes, this looks a lot better, and is exactly what I get when I compile this
-> > > > > code with CodeSourcery GCC-4.4.1
-> > > > > 
-> > > > > I have tries building gcc-4.6.3 also with OSELAS/PTXdist, and it gives the
-> > > > > same (wrong) result as with gcc-4.6.2
-> > > > 
-> > > > AFAIK our OSELAS/PTXdist Toolchains use Linaro patches, this would
-> > > > explain why both have the same result.
-> > 
-> > No, OSELAS Toolchains only uses the Linaro GCC for Cortex-A8/-A9
-> > 
-> > > It would indeed, if I had just used OSELAS as-is, but I didn't ;-)
-> > > I made a copy of
-> > > arm-v5te-linux-gnueabi_gcc-4.6.2_glibc-2.14.1_binutils-2.21.1a_kernel-2.6.39-sanitized.ptxconfig
-> > > and replaced the version string 4.6.2 with 4.6.3. AFAIK, this way PTXdist will
-> > > download pristine gcc-4.6.3 sources and not apply any patches, since there is
-> > > no directory named patches/gcc-4.6.3, right? Can I assume that I have an
-> > > unpatched version of gcc-4.6.3 then?
-> > 
-> > Correct. This way you'll get gcc-4.6.3 without any patches.
-> > 
-> > > Btw, Here's what I get from it:
-> > > 
-> > > flexcan_chip_start:
-> > >         @ args = 0, pretend = 0, frame = 0
-> > >         @ frame_needed = 0, uses_anonymous_args = 0
-> > >         @ link register save eliminated.
-> > >         mov     r3, #0
-> > >         cmp     r0, #9
-> > >         str     r3, [r1, #0]
-> > >         ldrle   r3, [r1, #4]
-> > >         mov     r0, #0
-> > >         str     r3, [r1, #4]
-> > >         bx      lr
-> > >         .size   flexcan_chip_start, .-flexcan_chip_start
-> > >         .ident  "GCC: (OSELAS.Toolchain-2011.11.1) 4.6.3"
-> > >         .section        .note.GNU-stack,"",%progbits
-> > 
-> > How can I reproduce this output? I'd like to test this with different
-> > toolchain versions.
+> This moves such data out of the davinci include directories
 > 
-> I basically do this:
-> 
-> $ /opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/bin/arm-v5te-linux-gnueabi-gcc-4.6.3 -Os -S -o - -x c -
-> 
-> struct flexcan_regs {
->         unsigned int mcr;
->         unsigned int rxfgmask;
-> };
-> 
-> #define flexcan_read(a) (*(volatile unsigned int *)(a))
-> #define flexcan_write(v,a)      (*(volatile unsigned int *)(a) = (v))
-> 
-> int flexcan_chip_start(int ver, struct flexcan_regs *regs)
-> {
->         flexcan_write(0, &regs->mcr);
-> 
->         if (ver >= 10)
->                 flexcan_write(0, &regs->rxfgmask);
-> 
->         return 0;
-> }
-> 
-> > > Wrong code.
-> > > See the version string? It is clearly not an existing OSELAS version.
-> > 
-> > Hmmm, so far it seems all tested gcc-4.6.x versions produce wrong code,
-> > correct?
-> 
-> Looks like that, yes.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: "Ben Dooks" <ben-linux@fluff.org>
+> Cc: "Wolfram Sang" <w.sang@pengutronix.de>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
 
-Including the Linaro gcc releases it seems. I rebuilt the toolchain with
-Linaro GCC 4.6-2012.08 and the result is the same.
+for musb:
 
-Regards,
-Michael
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+> ---
+>  arch/arm/mach-davinci/aemif.c                                |    2 +-
+>  arch/arm/mach-davinci/board-da830-evm.c                      |    8 ++++----
+>  arch/arm/mach-davinci/board-da850-evm.c                      |    6 +++---
+>  arch/arm/mach-davinci/board-dm355-evm.c                      |    8 ++++----
+>  arch/arm/mach-davinci/board-dm355-leopard.c                  |    8 ++++----
+>  arch/arm/mach-davinci/board-dm365-evm.c                      |    8 ++++----
+>  arch/arm/mach-davinci/board-dm644x-evm.c                     |   10 +++++-----
+>  arch/arm/mach-davinci/board-dm646x-evm.c                     |    6 +++---
+>  arch/arm/mach-davinci/board-mityomapl138.c                   |    4 ++--
+>  arch/arm/mach-davinci/board-neuros-osd2.c                    |    8 ++++----
+>  arch/arm/mach-davinci/board-sffsdr.c                         |    4 ++--
+>  arch/arm/mach-davinci/davinci.h                              |    4 ++--
+>  arch/arm/mach-davinci/devices.c                              |    4 ++--
+>  arch/arm/mach-davinci/dm355.c                                |    4 ++--
+>  arch/arm/mach-davinci/dm365.c                                |    6 +++---
+>  arch/arm/mach-davinci/dm644x.c                               |    2 +-
+>  arch/arm/mach-davinci/dm646x.c                               |    2 +-
+>  arch/arm/mach-davinci/include/mach/da8xx.h                   |   10 +++++-----
+>  arch/arm/mach-davinci/include/mach/tnetv107x.h               |    4 ++--
+>  arch/arm/mach-davinci/usb.c                                  |    2 +-
+>  drivers/i2c/busses/i2c-davinci.c                             |    2 +-
+>  drivers/input/keyboard/davinci_keyscan.c                     |    2 +-
+>  drivers/media/video/davinci/vpbe_venc.c                      |    2 +-
+>  drivers/mmc/host/davinci_mmc.c                               |    2 +-
+>  drivers/mtd/nand/davinci_nand.c                              |    4 ++--
+>  drivers/spi/spi-davinci.c                                    |    2 +-
+>  drivers/usb/host/ohci-da8xx.c                                |    2 +-
+>  drivers/usb/musb/da8xx.c                                     |    2 +-
+>  .../asp.h => include/linux/platform_data/asoc-davinci-evm.h  |    0
+>  .../mach/i2c.h => include/linux/platform_data/i2c-davinci.h  |    0
+>  .../linux/platform_data/keyscan-davinci.h                    |    0
+>  .../mach/mmc.h => include/linux/platform_data/mmc-davinci.h  |    0
+>  .../linux/platform_data/mtd-davinci-aemif.h                  |    0
+>  .../mach/nand.h => include/linux/platform_data/mtd-davinci.h |    0
+>  .../mach/spi.h => include/linux/platform_data/spi-davinci.h  |    0
+>  .../mach/usb.h => include/linux/platform_data/usb-davinci.h  |    0
+>  sound/soc/davinci/davinci-evm.c                              |    2 +-
+>  sound/soc/davinci/davinci-i2s.c                              |    2 +-
+>  sound/soc/davinci/davinci-mcasp.h                            |    2 +-
+>  sound/soc/davinci/davinci-pcm.h                              |    2 +-
+>  40 files changed, 68 insertions(+), 68 deletions(-)
+>  rename arch/arm/mach-davinci/include/mach/asp.h => include/linux/platform_data/asoc-davinci-evm.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/i2c.h => include/linux/platform_data/i2c-davinci.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/keyscan.h => include/linux/platform_data/keyscan-davinci.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/mmc.h => include/linux/platform_data/mmc-davinci.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/aemif.h => include/linux/platform_data/mtd-davinci-aemif.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/nand.h => include/linux/platform_data/mtd-davinci.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/spi.h => include/linux/platform_data/spi-davinci.h (100%)
+>  rename arch/arm/mach-davinci/include/mach/usb.h => include/linux/platform_data/usb-davinci.h (100%)
+> 
+> diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
+> index 1ce70a9..f091a90 100644
+> --- a/arch/arm/mach-davinci/aemif.c
+> +++ b/arch/arm/mach-davinci/aemif.c
+> @@ -15,7 +15,7 @@
+>  #include <linux/module.h>
+>  #include <linux/time.h>
+>  
+> -#include <mach/aemif.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+>  
+>  /* Timing value configuration */
+>  
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 0031864..95b5e10 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -28,11 +28,11 @@
+>  
+>  #include <mach/cp_intc.h>
+>  #include <mach/mux.h>
+> -#include <mach/nand.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+>  #include <mach/da8xx.h>
+> -#include <mach/usb.h>
+> -#include <mach/aemif.h>
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/usb-davinci.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  
+>  #define DA830_EVM_PHY_ID		""
+>  /*
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 0149fb4..1295e61 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -40,10 +40,10 @@
+>  
+>  #include <mach/cp_intc.h>
+>  #include <mach/da8xx.h>
+> -#include <mach/nand.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+>  #include <mach/mux.h>
+> -#include <mach/aemif.h>
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  
+>  #define DA850_EVM_PHY_ID		"davinci_mdio-0:00"
+>  #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index 1c7b1f4..88ebea8 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -26,11 +26,11 @@
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+> -#include <mach/nand.h>
+> -#include <mach/mmc.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include "davinci.h"
+>  
+> diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+> index 8e77032..2f88103 100644
+> --- a/arch/arm/mach-davinci/board-dm355-leopard.c
+> +++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+> @@ -23,11 +23,11 @@
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+> -#include <mach/nand.h>
+> -#include <mach/mmc.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include "davinci.h"
+>  
+> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+> index 688a9c5..1b4a8ad 100644
+> --- a/arch/arm/mach-davinci/board-dm365-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
+> @@ -33,11 +33,11 @@
+>  
+>  #include <mach/mux.h>
+>  #include <mach/common.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+> -#include <mach/mmc.h>
+> -#include <mach/nand.h>
+> -#include <mach/keyscan.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/keyscan-davinci.h>
+>  
+>  #include <media/tvp514x.h>
+>  
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index d34ed55..ca72fc4 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -31,13 +31,13 @@
+>  #include <asm/mach/arch.h>
+>  
+>  #include <mach/common.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+>  #include <mach/mux.h>
+> -#include <mach/nand.h>
+> -#include <mach/mmc.h>
+> -#include <mach/usb.h>
+> -#include <mach/aemif.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+>  
+>  #include "davinci.h"
+>  
+> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> index 958679a..9944367 100644
+> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> @@ -38,11 +38,11 @@
+>  
+>  #include <mach/common.h>
+>  #include <mach/serial.h>
+> -#include <mach/i2c.h>
+> -#include <mach/nand.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+>  #include <mach/clock.h>
+>  #include <mach/cdce949.h>
+> -#include <mach/aemif.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+>  
+>  #include "davinci.h"
+>  #include "clock.h"
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> index beecde3..43e4a0d 100644
+> --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> @@ -26,9 +26,9 @@
+>  #include <mach/common.h>
+>  #include <mach/cp_intc.h>
+>  #include <mach/da8xx.h>
+> -#include <mach/nand.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+>  #include <mach/mux.h>
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  
+>  #define MITYOMAPL138_PHY_ID		""
+>  
+> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+> index f6b9fc7..144bf31 100644
+> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
+> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+> @@ -31,12 +31,12 @@
+>  #include <asm/mach/arch.h>
+>  
+>  #include <mach/common.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+>  #include <mach/mux.h>
+> -#include <mach/nand.h>
+> -#include <mach/mmc.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include "davinci.h"
+>  
+> diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+> index 9078acf..6957787 100644
+> --- a/arch/arm/mach-davinci/board-sffsdr.c
+> +++ b/arch/arm/mach-davinci/board-sffsdr.c
+> @@ -36,10 +36,10 @@
+>  #include <asm/mach/flash.h>
+>  
+>  #include <mach/common.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/serial.h>
+>  #include <mach/mux.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include "davinci.h"
+>  
+> diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+> index 8db0fc6..43ddf87 100644
+> --- a/arch/arm/mach-davinci/davinci.h
+> +++ b/arch/arm/mach-davinci/davinci.h
+> @@ -23,8 +23,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/spi/spi.h>
+>  
+> -#include <mach/asp.h>
+> -#include <mach/keyscan.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+> +#include <linux/platform_data/keyscan-davinci.h>
+>  #include <mach/hardware.h>
+>  
+>  #include <media/davinci/vpfe_capture.h>
+> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+> index d2f96662..3a42b6f 100644
+> --- a/arch/arm/mach-davinci/devices.c
+> +++ b/arch/arm/mach-davinci/devices.c
+> @@ -15,12 +15,12 @@
+>  #include <linux/io.h>
+>  
+>  #include <mach/hardware.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  #include <mach/irqs.h>
+>  #include <mach/cputype.h>
+>  #include <mach/mux.h>
+>  #include <mach/edma.h>
+> -#include <mach/mmc.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+>  #include <mach/time.h>
+>  
+>  #include "davinci.h"
+> diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+> index 678cd99..612e403 100644
+> --- a/arch/arm/mach-davinci/dm355.c
+> +++ b/arch/arm/mach-davinci/dm355.c
+> @@ -26,8 +26,8 @@
+>  #include <mach/time.h>
+>  #include <mach/serial.h>
+>  #include <mach/common.h>
+> -#include <mach/asp.h>
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  #include <mach/gpio-davinci.h>
+>  
+>  #include "davinci.h"
+> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+> index a50d49de..ee4b0b0 100644
+> --- a/arch/arm/mach-davinci/dm365.c
+> +++ b/arch/arm/mach-davinci/dm365.c
+> @@ -29,9 +29,9 @@
+>  #include <mach/time.h>
+>  #include <mach/serial.h>
+>  #include <mach/common.h>
+> -#include <mach/asp.h>
+> -#include <mach/keyscan.h>
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+> +#include <linux/platform_data/keyscan-davinci.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  #include <mach/gpio-davinci.h>
+>  
+>  #include "davinci.h"
+> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+> index c8b8666..9018a44 100644
+> --- a/arch/arm/mach-davinci/dm644x.c
+> +++ b/arch/arm/mach-davinci/dm644x.c
+> @@ -23,7 +23,7 @@
+>  #include <mach/time.h>
+>  #include <mach/serial.h>
+>  #include <mach/common.h>
+> -#include <mach/asp.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+>  #include <mach/gpio-davinci.h>
+>  
+>  #include "davinci.h"
+> diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+> index 9eb87c1..56f8e6e 100644
+> --- a/arch/arm/mach-davinci/dm646x.c
+> +++ b/arch/arm/mach-davinci/dm646x.c
+> @@ -24,7 +24,7 @@
+>  #include <mach/time.h>
+>  #include <mach/serial.h>
+>  #include <mach/common.h>
+> -#include <mach/asp.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+>  #include <mach/gpio-davinci.h>
+>  
+>  #include "davinci.h"
+> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+> index a2f1f27..a273d06 100644
+> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
+> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+> @@ -19,12 +19,12 @@
+>  
+>  #include <mach/serial.h>
+>  #include <mach/edma.h>
+> -#include <mach/i2c.h>
+> -#include <mach/asp.h>
+> -#include <mach/mmc.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  #include <mach/pm.h>
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  
+>  extern void __iomem *da8xx_syscfg0_base;
+>  extern void __iomem *da8xx_syscfg1_base;
+> diff --git a/arch/arm/mach-davinci/include/mach/tnetv107x.h b/arch/arm/mach-davinci/include/mach/tnetv107x.h
+> index 83e5926..1656a02 100644
+> --- a/arch/arm/mach-davinci/include/mach/tnetv107x.h
+> +++ b/arch/arm/mach-davinci/include/mach/tnetv107x.h
+> @@ -36,8 +36,8 @@
+>  #include <linux/input/matrix_keypad.h>
+>  #include <linux/mfd/ti_ssp.h>
+>  
+> -#include <mach/mmc.h>
+> -#include <mach/nand.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+>  #include <mach/serial.h>
+>  
+>  struct tnetv107x_device_info {
+> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+> index 23d2b6d..f77b953 100644
+> --- a/arch/arm/mach-davinci/usb.c
+> +++ b/arch/arm/mach-davinci/usb.c
+> @@ -10,7 +10,7 @@
+>  #include <mach/common.h>
+>  #include <mach/irqs.h>
+>  #include <mach/cputype.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #define DAVINCI_USB_OTG_BASE	0x01c64000
+>  
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index 79b4bcb..79a2542 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -40,7 +40,7 @@
+>  #include <linux/gpio.h>
+>  
+>  #include <mach/hardware.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  
+>  /* ----- global defines ----------------------------------------------- */
+>  
+> diff --git a/drivers/input/keyboard/davinci_keyscan.c b/drivers/input/keyboard/davinci_keyscan.c
+> index 9d82b3a..d5bacbb 100644
+> --- a/drivers/input/keyboard/davinci_keyscan.c
+> +++ b/drivers/input/keyboard/davinci_keyscan.c
+> @@ -36,7 +36,7 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/irqs.h>
+> -#include <mach/keyscan.h>
+> +#include <linux/platform_data/keyscan-davinci.h>
+>  
+>  /* Key scan registers */
+>  #define DAVINCI_KEYSCAN_KEYCTRL		0x0000
+> diff --git a/drivers/media/video/davinci/vpbe_venc.c b/drivers/media/video/davinci/vpbe_venc.c
+> index b21ecc8..0302669 100644
+> --- a/drivers/media/video/davinci/vpbe_venc.c
+> +++ b/drivers/media/video/davinci/vpbe_venc.c
+> @@ -27,7 +27,7 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/mux.h>
+> -#include <mach/i2c.h>
+> +#include <linux/platform_data/i2c-davinci.h>
+>  
+>  #include <linux/io.h>
+>  
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 7cf6c62..3dfd347 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -33,7 +33,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/mmc/mmc.h>
+>  
+> -#include <mach/mmc.h>
+> +#include <linux/platform_data/mmc-davinci.h>
+>  #include <mach/edma.h>
+>  
+>  /*
+> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> index d94b03c..f1deb1e 100644
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -34,8 +34,8 @@
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/slab.h>
+>  
+> -#include <mach/nand.h>
+> -#include <mach/aemif.h>
+> +#include <linux/platform_data/mtd-davinci.h>
+> +#include <linux/platform_data/mtd-davinci-aemif.h>
+>  
+>  /*
+>   * This is a device driver for the NAND flash controller found on the
+> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+> index 9b2901f..3afe2f4 100644
+> --- a/drivers/spi/spi-davinci.c
+> +++ b/drivers/spi/spi-davinci.c
+> @@ -30,7 +30,7 @@
+>  #include <linux/spi/spi_bitbang.h>
+>  #include <linux/slab.h>
+>  
+> -#include <mach/spi.h>
+> +#include <linux/platform_data/spi-davinci.h>
+>  #include <mach/edma.h>
+>  
+>  #define SPI_NO_RESOURCE		((resource_size_t)-1)
+> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+> index 269b1e0..0b815a8 100644
+> --- a/drivers/usb/host/ohci-da8xx.c
+> +++ b/drivers/usb/host/ohci-da8xx.c
+> @@ -17,7 +17,7 @@
+>  #include <linux/clk.h>
+>  
+>  #include <mach/da8xx.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #ifndef CONFIG_ARCH_DAVINCI_DA8XX
+>  #error "This file is DA8xx bus glue.  Define CONFIG_ARCH_DAVINCI_DA8XX."
+> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+> index 0f9fcec..15a2627 100644
+> --- a/drivers/usb/musb/da8xx.c
+> +++ b/drivers/usb/musb/da8xx.c
+> @@ -35,7 +35,7 @@
+>  #include <linux/dma-mapping.h>
+>  
+>  #include <mach/da8xx.h>
+> -#include <mach/usb.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include "musb_core.h"
+>  
+> diff --git a/arch/arm/mach-davinci/include/mach/asp.h b/include/linux/platform_data/asoc-davinci-evm.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/asp.h
+> rename to include/linux/platform_data/asoc-davinci-evm.h
+> diff --git a/arch/arm/mach-davinci/include/mach/i2c.h b/include/linux/platform_data/i2c-davinci.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/i2c.h
+> rename to include/linux/platform_data/i2c-davinci.h
+> diff --git a/arch/arm/mach-davinci/include/mach/keyscan.h b/include/linux/platform_data/keyscan-davinci.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/keyscan.h
+> rename to include/linux/platform_data/keyscan-davinci.h
+> diff --git a/arch/arm/mach-davinci/include/mach/mmc.h b/include/linux/platform_data/mmc-davinci.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/mmc.h
+> rename to include/linux/platform_data/mmc-davinci.h
+> diff --git a/arch/arm/mach-davinci/include/mach/aemif.h b/include/linux/platform_data/mtd-davinci-aemif.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/aemif.h
+> rename to include/linux/platform_data/mtd-davinci-aemif.h
+> diff --git a/arch/arm/mach-davinci/include/mach/nand.h b/include/linux/platform_data/mtd-davinci.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/nand.h
+> rename to include/linux/platform_data/mtd-davinci.h
+> diff --git a/arch/arm/mach-davinci/include/mach/spi.h b/include/linux/platform_data/spi-davinci.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/spi.h
+> rename to include/linux/platform_data/spi-davinci.h
+> diff --git a/arch/arm/mach-davinci/include/mach/usb.h b/include/linux/platform_data/usb-davinci.h
+> similarity index 100%
+> rename from arch/arm/mach-davinci/include/mach/usb.h
+> rename to include/linux/platform_data/usb-davinci.h
+> diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
+> index 10a2d8c..5717bed 100644
+> --- a/sound/soc/davinci/davinci-evm.c
+> +++ b/sound/soc/davinci/davinci-evm.c
+> @@ -22,7 +22,7 @@
+>  #include <asm/dma.h>
+>  #include <asm/mach-types.h>
+>  
+> -#include <mach/asp.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+>  #include <mach/edma.h>
+>  #include <mach/mux.h>
+>  
+> diff --git a/sound/soc/davinci/davinci-i2s.c b/sound/soc/davinci/davinci-i2s.c
+> index 0a74b95..6e58828 100644
+> --- a/sound/soc/davinci/davinci-i2s.c
+> +++ b/sound/soc/davinci/davinci-i2s.c
+> @@ -23,7 +23,7 @@
+>  #include <sound/initval.h>
+>  #include <sound/soc.h>
+>  
+> -#include <mach/asp.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+>  
+>  #include "davinci-pcm.h"
+>  #include "davinci-i2s.h"
+> diff --git a/sound/soc/davinci/davinci-mcasp.h b/sound/soc/davinci/davinci-mcasp.h
+> index 4681acc..302aab2 100644
+> --- a/sound/soc/davinci/davinci-mcasp.h
+> +++ b/sound/soc/davinci/davinci-mcasp.h
+> @@ -19,7 +19,7 @@
+>  #define DAVINCI_MCASP_H
+>  
+>  #include <linux/io.h>
+> -#include <mach/asp.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+>  #include "davinci-pcm.h"
+>  
+>  #define DAVINCI_MCASP_RATES	SNDRV_PCM_RATE_8000_96000
+> diff --git a/sound/soc/davinci/davinci-pcm.h b/sound/soc/davinci/davinci-pcm.h
+> index c0d6c9b..36d31cd 100644
+> --- a/sound/soc/davinci/davinci-pcm.h
+> +++ b/sound/soc/davinci/davinci-pcm.h
+> @@ -13,7 +13,7 @@
+>  #define _DAVINCI_PCM_H
+>  
+>  #include <mach/edma.h>
+> -#include <mach/asp.h>
+> +#include <linux/platform_data/asoc-davinci-evm.h>
+>  
+>  
+>  struct davinci_pcm_dma_params {
+> -- 
+> 1.7.10
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/2b4614e0/attachment-0001.sig>
