@@ -1,64 +1,78 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 11 Sep 2012 20:50:58 +0000
-Subject: [PATCHv5 9/9] arm: vt8500: clk: Add Common Clock Framework support
-In-Reply-To: <20120911175541.20289.95694@nucleus>
-References: <1346626896-23070-1-git-send-email-linux@prisktech.co.nz>
- <20120910211209.20289.6795@nucleus> <1347337955.2134.3.camel@gitbox>
- <20120911175541.20289.95694@nucleus>
-Message-ID: <1347396847.2141.1.camel@gitbox>
+Date: Tue, 11 Sep 2012 20:54:03 +0000
+Subject: [PATCH 10/16] ARM: vt8500: move platform_data definitions
+In-Reply-To: <1347368390-31252-10-git-send-email-arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-10-git-send-email-arnd@arndb.de>
+Message-ID: <1347397033.2141.4.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-11 at 10:55 -0700, Mike Turquette wrote:
-> Quoting Tony Prisk (2012-09-10 21:32:35)
-> > On Mon, 2012-09-10 at 14:12 -0700, Mike Turquette wrote:
-> > > Quoting Tony Prisk (2012-09-02 16:01:36)
-> > > > This patch adds common clock framework support for arch-vt8500.
-> > > > Support for PLL and device clocks on VT8500, WM8505 and WM8650
-> > > > are included.
-> > > > 
-> > > > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> > > > ---
-> > > > Changes made as per Mike's review.
-> > > > Split endisable() into enable/disable.
-> > > > Style tidy up - remove extra blank lines.
-> > > 
-> > > Hi Tony,
-> > > 
-> > > This looks good.  I've taken it into clk-next for some testing.
-> > > 
-> > > Regards,
-> > > Mike
-> > 
-> > Presumably this patch wouldn't apply cleanly unless you also added patch
-> > 6/9. Can you let me know how you handled it so I can work with Arnd to
-> > get all the other patches in through arm-soc.
-> > 
+On Tue, 2012-09-11 at 14:59 +0200, Arnd Bergmann wrote:
+> Platform data for device drivers should be defined in
+> include/linux/platform_data/*.h, not in the architecture
+> and platform specific directories.
 > 
-> I see no dependency between patch #9 and #6.  This patch simply
-> introduces a new C file and adds an entry into drivers/clk/Makefile.  Am
-> I missing something?
+> This moves such data out of the vt8500 include directories
 > 
-> Also, I did not push my clk-next branch out publicly last night with
-> this change so it is no problem for me to drop it.  Would you prefer the
-> whole series go through arm-soc?  If so this patch has my:
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tony Prisk <linux@prisktech.co.nz>
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> ---
+>  arch/arm/mach-vt8500/devices.c                                       |    2 +-
+>  drivers/video/vt8500lcdfb.c                                          |    2 +-
+>  drivers/video/wm8505fb.c                                             |    2 +-
+>  .../vt8500fb.h => include/linux/platform_data/video-vt8500lcdfb.h    |    0
+>  4 files changed, 3 insertions(+), 3 deletions(-)
+>  rename arch/arm/mach-vt8500/include/mach/vt8500fb.h => include/linux/platform_data/video-vt8500lcdfb.h (100%)
 > 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-> 
-> Regards,
-> Mike
-> 
-> > Regards,
-> > Tony P
+> diff --git a/arch/arm/mach-vt8500/devices.c b/arch/arm/mach-vt8500/devices.c
+> index 1fcdc36..82b4bce 100644
+> --- a/arch/arm/mach-vt8500/devices.c
+> +++ b/arch/arm/mach-vt8500/devices.c
+> @@ -23,7 +23,7 @@
+>  
+>  #include <asm/mach/arch.h>
+>  
+> -#include <mach/vt8500fb.h>
+> +#include <linux/platform_data/video-vt8500lcdfb.h>
+>  #include <mach/i8042.h>
+>  #include "devices.h"
+>  
+> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+> index 2a5fe6e..66a74f9 100644
+> --- a/drivers/video/vt8500lcdfb.c
+> +++ b/drivers/video/vt8500lcdfb.c
+> @@ -30,7 +30,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/wait.h>
+>  
+> -#include <mach/vt8500fb.h>
+> +#include <linux/platform_data/video-vt8500lcdfb.h>
+>  
+>  #include "vt8500lcdfb.h"
+>  #include "wmt_ge_rops.h"
+> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+> index c8703bd..ffeff48 100644
+> --- a/drivers/video/wm8505fb.c
+> +++ b/drivers/video/wm8505fb.c
+> @@ -29,7 +29,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/wait.h>
+>  
+> -#include <mach/vt8500fb.h>
+> +#include <linux/platform_data/video-vt8500lcdfb.h>
+>  
+>  #include "wm8505fb_regs.h"
+>  #include "wmt_ge_rops.h"
+> diff --git a/arch/arm/mach-vt8500/include/mach/vt8500fb.h b/include/linux/platform_data/video-vt8500lcdfb.h
+> similarity index 100%
+> rename from arch/arm/mach-vt8500/include/mach/vt8500fb.h
+> rename to include/linux/platform_data/video-vt8500lcdfb.h
 
-Mike,
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
 
-Sorry - I got that backwards - patch 6 has a dependency on this patch.
-It would definitely be easier for the whole lot to go through arm-soc
-since you're okay with that.
-
-Thanks for your time.
-
-Regards
-
-Tony P
+Be aware that my current patch series (which has now been finalized)
+drops mach-vt8500/devices.c so you might get a conflict depending on the
+patch order.
