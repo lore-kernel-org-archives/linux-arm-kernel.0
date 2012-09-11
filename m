@@ -1,10 +1,10 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2012 14:59:37 +0200
-Subject: [PATCH 03/16] ARM: ep93xx: move platform_data definitions
+Date: Tue, 11 Sep 2012 14:59:46 +0200
+Subject: [PATCH 12/16] ARM: nomadik: move platform_data definitions
 In-Reply-To: <1347368390-31252-1-git-send-email-arnd@arndb.de>
 References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
  <1347368390-31252-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347368390-31252-3-git-send-email-arnd@arndb.de>
+Message-ID: <1347368390-31252-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,269 +12,220 @@ Platform data for device drivers should be defined in
 include/linux/platform_data/*.h, not in the architecture
 and platform specific directories.
 
-This moves such data out of the ep93xx include directories
+This moves such data out of the nomadik include directories
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Cc: Jeff Garzik <jgarzik@pobox.com> (supporter:SERIAL ATA
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com> (maintainer:INPUT
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Jaroslav Kysela <perex@perex.cz>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: Mika Westerberg <mika.westerberg@iki.fi>
-Cc: Axel Lin <axel.lin@gmail.com>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Andreas Westin <andreas.westin@stericsson.com>
 ---
- Documentation/spi/ep93xx_spi                                     |    2 +-
- arch/arm/mach-ep93xx/core.c                                      |    6 +++---
- arch/arm/mach-ep93xx/dma.c                                       |    2 +-
- arch/arm/mach-ep93xx/edb93xx.c                                   |    4 ++--
- arch/arm/mach-ep93xx/simone.c                                    |    2 +-
- arch/arm/mach-ep93xx/snappercl15.c                               |    2 +-
- arch/arm/mach-ep93xx/vision_ep9307.c                             |    4 ++--
- drivers/ata/pata_ep93xx.c                                        |    2 +-
- drivers/dma/ep93xx_dma.c                                         |    2 +-
- drivers/input/keyboard/ep93xx_keypad.c                           |    2 +-
- drivers/spi/spi-ep93xx.c                                         |    4 ++--
- drivers/video/ep93xx-fb.c                                        |    2 +-
- .../mach/dma.h => include/linux/platform_data/dma-ep93xx.h       |    0
- .../linux/platform_data/keypad-ep93xx.h                          |    0
- .../ep93xx_spi.h => include/linux/platform_data/spi-ep93xx.h     |    0
- .../mach/fb.h => include/linux/platform_data/video-ep93xx.h      |    0
- sound/soc/ep93xx/ep93xx-ac97.c                                   |    2 +-
- sound/soc/ep93xx/ep93xx-i2s.c                                    |    2 +-
- sound/soc/ep93xx/ep93xx-pcm.c                                    |    2 +-
- 19 files changed, 20 insertions(+), 20 deletions(-)
- rename arch/arm/mach-ep93xx/include/mach/dma.h => include/linux/platform_data/dma-ep93xx.h (100%)
- rename arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h => include/linux/platform_data/keypad-ep93xx.h (100%)
- rename arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h => include/linux/platform_data/spi-ep93xx.h (100%)
- rename arch/arm/mach-ep93xx/include/mach/fb.h => include/linux/platform_data/video-ep93xx.h (100%)
+ arch/arm/mach-nomadik/board-nhk8815.c                                |    2 +-
+ arch/arm/mach-u300/core.c                                            |    2 +-
+ arch/arm/mach-ux500/board-mop500.c                                   |    2 +-
+ arch/arm/mach-ux500/cpu-db8500.c                                     |    2 +-
+ arch/arm/mach-ux500/devices-common.h                                 |    2 +-
+ arch/arm/mach-ux500/usb.c                                            |    2 +-
+ drivers/crypto/ux500/cryp/cryp_core.c                                |    2 +-
+ drivers/crypto/ux500/hash/hash_core.c                                |    2 +-
+ drivers/input/keyboard/nomadik-ske-keypad.c                          |    2 +-
+ drivers/mtd/nand/nomadik_nand.c                                      |    2 +-
+ drivers/pinctrl/pinctrl-coh901.c                                     |    2 +-
+ drivers/usb/musb/ux500_dma.c                                         |    2 +-
+ .../include/mach => include/linux/platform_data}/crypto-ux500.h      |    0
+ .../plat/ske.h => include/linux/platform_data/keypad-nomadik-ske.h   |    0
+ .../mach/nand.h => include/linux/platform_data/mtd-nomadik-nand.h    |    0
+ .../mach/gpio-u300.h => include/linux/platform_data/pinctrl-coh901.h |    0
+ .../mach/usb.h => include/linux/platform_data/usb-musb-ux500.h       |    0
+ 17 files changed, 12 insertions(+), 12 deletions(-)
+ rename {arch/arm/mach-ux500/include/mach => include/linux/platform_data}/crypto-ux500.h (100%)
+ rename arch/arm/plat-nomadik/include/plat/ske.h => include/linux/platform_data/keypad-nomadik-ske.h (100%)
+ rename arch/arm/mach-nomadik/include/mach/nand.h => include/linux/platform_data/mtd-nomadik-nand.h (100%)
+ rename arch/arm/mach-u300/include/mach/gpio-u300.h => include/linux/platform_data/pinctrl-coh901.h (100%)
+ rename arch/arm/mach-ux500/include/mach/usb.h => include/linux/platform_data/usb-musb-ux500.h (100%)
 
-diff --git a/Documentation/spi/ep93xx_spi b/Documentation/spi/ep93xx_spi
-index d8eb01c..832ddce 100644
---- a/Documentation/spi/ep93xx_spi
-+++ b/Documentation/spi/ep93xx_spi
-@@ -26,7 +26,7 @@ arch/arm/mach-ep93xx/ts72xx.c:
- #include <linux/gpio.h>
- #include <linux/spi/spi.h>
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index f4535a7..381c080 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -34,7 +34,7 @@
+ #include <plat/gpio-nomadik.h>
+ #include <plat/mtu.h>
  
--#include <mach/ep93xx_spi.h>
-+#include <linux/platform_data/spi-ep93xx.h>
+-#include <mach/nand.h>
++#include <linux/platform_data/mtd-nomadik-nand.h>
+ #include <mach/fsmc.h>
  
- /* this is our GPIO line used for chip select */
- #define MMC_CHIP_SELECT_GPIO EP93XX_GPIO_LINE_EGPIO9
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 4afe52a..e85bf17 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -36,9 +36,9 @@
- #include <linux/export.h>
- 
- #include <mach/hardware.h>
--#include <mach/fb.h>
--#include <mach/ep93xx_keypad.h>
--#include <mach/ep93xx_spi.h>
-+#include <linux/platform_data/video-ep93xx.h>
-+#include <linux/platform_data/keypad-ep93xx.h>
-+#include <linux/platform_data/spi-ep93xx.h>
- #include <mach/gpio-ep93xx.h>
- 
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-ep93xx/dma.c b/arch/arm/mach-ep93xx/dma.c
-index 16976d7..d8bfd02 100644
---- a/arch/arm/mach-ep93xx/dma.c
-+++ b/arch/arm/mach-ep93xx/dma.c
-@@ -25,7 +25,7 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- 
--#include <mach/dma.h>
-+#include <linux/platform_data/dma-ep93xx.h>
- #include <mach/hardware.h>
- 
- #include "soc.h"
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 337ab7c..b8f53d5 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -35,8 +35,8 @@
- #include <sound/cs4271.h>
- 
- #include <mach/hardware.h>
--#include <mach/fb.h>
--#include <mach/ep93xx_spi.h>
-+#include <linux/platform_data/video-ep93xx.h>
-+#include <linux/platform_data/spi-ep93xx.h>
- #include <mach/gpio-ep93xx.h>
- 
- #include <asm/hardware/vic.h>
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index 33dc079..0eb3f17 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -22,7 +22,7 @@
- #include <linux/i2c-gpio.h>
- 
- #include <mach/hardware.h>
--#include <mach/fb.h>
-+#include <linux/platform_data/video-ep93xx.h>
- #include <mach/gpio-ep93xx.h>
- 
- #include <asm/hardware/vic.h>
-diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
-index 01abd35..50043ee 100644
---- a/arch/arm/mach-ep93xx/snappercl15.c
-+++ b/arch/arm/mach-ep93xx/snappercl15.c
-@@ -28,7 +28,7 @@
- #include <linux/mtd/nand.h>
- 
- #include <mach/hardware.h>
--#include <mach/fb.h>
-+#include <linux/platform_data/video-ep93xx.h>
- #include <mach/gpio-ep93xx.h>
- 
- #include <asm/hardware/vic.h>
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index 2905a49..ba92e25 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -30,8 +30,8 @@
- #include <linux/mmc/host.h>
- 
- #include <mach/hardware.h>
--#include <mach/fb.h>
--#include <mach/ep93xx_spi.h>
-+#include <linux/platform_data/video-ep93xx.h>
-+#include <linux/platform_data/spi-ep93xx.h>
- #include <mach/gpio-ep93xx.h>
- 
- #include <asm/hardware/vic.h>
-diff --git a/drivers/ata/pata_ep93xx.c b/drivers/ata/pata_ep93xx.c
-index 6ef2e37..e056406 100644
---- a/drivers/ata/pata_ep93xx.c
-+++ b/drivers/ata/pata_ep93xx.c
+ #include "cpu-8815.h"
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index 03acf18..62adfe7 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
 @@ -43,7 +43,7 @@
- #include <linux/dmaengine.h>
- #include <linux/ktime.h>
- 
--#include <mach/dma.h>
-+#include <linux/platform_data/dma-ep93xx.h>
- #include <mach/platform.h>
- 
- #define DRV_NAME	"ep93xx-ide"
-diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-index c64917e..4aeaea7 100644
---- a/drivers/dma/ep93xx_dma.c
-+++ b/drivers/dma/ep93xx_dma.c
-@@ -26,7 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
--#include <mach/dma.h>
-+#include <linux/platform_data/dma-ep93xx.h>
- 
- #include "dmaengine.h"
- 
-diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
-index c46fc81..7363402 100644
---- a/drivers/input/keyboard/ep93xx_keypad.c
-+++ b/drivers/input/keyboard/ep93xx_keypad.c
-@@ -29,7 +29,7 @@
- #include <linux/slab.h>
- 
  #include <mach/hardware.h>
--#include <mach/ep93xx_keypad.h>
-+#include <linux/platform_data/keypad-ep93xx.h>
+ #include <mach/syscon.h>
+ #include <mach/dma_channels.h>
+-#include <mach/gpio-u300.h>
++#include <linux/platform_data/pinctrl-coh901.h>
  
- /*
-  * Keypad Interface Register offsets
-diff --git a/drivers/spi/spi-ep93xx.c b/drivers/spi/spi-ep93xx.c
-index f97f1d2..3a21959 100644
---- a/drivers/spi/spi-ep93xx.c
-+++ b/drivers/spi/spi-ep93xx.c
-@@ -31,8 +31,8 @@
- #include <linux/scatterlist.h>
- #include <linux/spi/spi.h>
+ #include "spi.h"
+ #include "i2c.h"
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 8674a89..38854d4 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -48,7 +48,7 @@
+ #include <mach/setup.h>
+ #include <mach/devices.h>
+ #include <mach/irqs.h>
+-#include <mach/crypto-ux500.h>
++#include <linux/platform_data/crypto-ux500.h>
  
--#include <mach/dma.h>
--#include <mach/ep93xx_spi.h>
-+#include <linux/platform_data/dma-ep93xx.h>
-+#include <linux/platform_data/spi-ep93xx.h>
- 
- #define SSPCR0			0x0000
- #define SSPCR0_MODE_SHIFT	6
-diff --git a/drivers/video/ep93xx-fb.c b/drivers/video/ep93xx-fb.c
-index 345d962..f2c092da 100644
---- a/drivers/video/ep93xx-fb.c
-+++ b/drivers/video/ep93xx-fb.c
+ #include "ste-dma40-db8500.h"
+ #include "devices-db8500.h"
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index db3c52d..1bef4c3 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
 @@ -24,7 +24,7 @@
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+ #include <mach/devices.h>
+-#include <mach/usb.h>
++#include <linux/platform_data/usb-musb-ux500.h>
+ #include <mach/db8500-regs.h>
+ 
+ #include "devices-db8500.h"
+diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
+index ecdd838..7fbf0ba 100644
+--- a/arch/arm/mach-ux500/devices-common.h
++++ b/arch/arm/mach-ux500/devices-common.h
+@@ -13,7 +13,7 @@
+ #include <linux/sys_soc.h>
+ #include <linux/amba/bus.h>
+ #include <linux/platform_data/i2c-nomadik.h>
+-#include <mach/crypto-ux500.h>
++#include <linux/platform_data/crypto-ux500.h>
+ 
+ struct spi_master_cntlr;
+ 
+diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+index a74af38..145482e 100644
+--- a/arch/arm/mach-ux500/usb.c
++++ b/arch/arm/mach-ux500/usb.c
+@@ -10,7 +10,7 @@
+ 
+ #include <plat/ste_dma40.h>
+ #include <mach/hardware.h>
+-#include <mach/usb.h>
++#include <linux/platform_data/usb-musb-ux500.h>
+ 
+ #define MUSB_DMA40_RX_CH { \
+ 		.mode = STEDMA40_MODE_LOGICAL, \
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index 1c307e1..ef17e38 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -32,7 +32,7 @@
+ 
+ #include <plat/ste_dma40.h>
+ 
+-#include <mach/crypto-ux500.h>
++#include <linux/platform_data/crypto-ux500.h>
+ #include <mach/hardware.h>
+ 
+ #include "cryp_p.h"
+diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+index 08d5032..0876507 100644
+--- a/drivers/crypto/ux500/hash/hash_core.c
++++ b/drivers/crypto/ux500/hash/hash_core.c
+@@ -31,7 +31,7 @@
+ #include <crypto/scatterwalk.h>
+ #include <crypto/algapi.h>
+ 
+-#include <mach/crypto-ux500.h>
++#include <linux/platform_data/crypto-ux500.h>
+ #include <mach/hardware.h>
+ 
+ #include "hash_alg.h"
+diff --git a/drivers/input/keyboard/nomadik-ske-keypad.c b/drivers/input/keyboard/nomadik-ske-keypad.c
+index a880e74..49f5fa6 100644
+--- a/drivers/input/keyboard/nomadik-ske-keypad.c
++++ b/drivers/input/keyboard/nomadik-ske-keypad.c
+@@ -20,7 +20,7 @@
  #include <linux/clk.h>
- #include <linux/fb.h>
+ #include <linux/module.h>
  
--#include <mach/fb.h>
-+#include <linux/platform_data/video-ep93xx.h>
+-#include <plat/ske.h>
++#include <linux/platform_data/keypad-nomadik-ske.h>
  
- /* Vertical Frame Timing Registers */
- #define EP93XXFB_VLINES_TOTAL			0x0000	/* SW locked */
-diff --git a/arch/arm/mach-ep93xx/include/mach/dma.h b/include/linux/platform_data/dma-ep93xx.h
-similarity index 100%
-rename from arch/arm/mach-ep93xx/include/mach/dma.h
-rename to include/linux/platform_data/dma-ep93xx.h
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h b/include/linux/platform_data/keypad-ep93xx.h
-similarity index 100%
-rename from arch/arm/mach-ep93xx/include/mach/ep93xx_keypad.h
-rename to include/linux/platform_data/keypad-ep93xx.h
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h b/include/linux/platform_data/spi-ep93xx.h
-similarity index 100%
-rename from arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h
-rename to include/linux/platform_data/spi-ep93xx.h
-diff --git a/arch/arm/mach-ep93xx/include/mach/fb.h b/include/linux/platform_data/video-ep93xx.h
-similarity index 100%
-rename from arch/arm/mach-ep93xx/include/mach/fb.h
-rename to include/linux/platform_data/video-ep93xx.h
-diff --git a/sound/soc/ep93xx/ep93xx-ac97.c b/sound/soc/ep93xx/ep93xx-ac97.c
-index bdffab3..c352165 100644
---- a/sound/soc/ep93xx/ep93xx-ac97.c
-+++ b/sound/soc/ep93xx/ep93xx-ac97.c
-@@ -21,7 +21,7 @@
- #include <sound/ac97_codec.h>
- #include <sound/soc.h>
+ /* SKE_CR bits */
+ #define SKE_KPMLT	(0x1 << 6)
+diff --git a/drivers/mtd/nand/nomadik_nand.c b/drivers/mtd/nand/nomadik_nand.c
+index a86aa81..9ee0c4e 100644
+--- a/drivers/mtd/nand/nomadik_nand.c
++++ b/drivers/mtd/nand/nomadik_nand.c
+@@ -31,7 +31,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+-#include <mach/nand.h>
++#include <linux/platform_data/mtd-nomadik-nand.h>
+ #include <mach/fsmc.h>
  
--#include <mach/dma.h>
-+#include <linux/platform_data/dma-ep93xx.h>
- #include "ep93xx-pcm.h"
+ #include <mtd/mtd-abi.h>
+diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+index cc0f00d..b7f41e9 100644
+--- a/drivers/pinctrl/pinctrl-coh901.c
++++ b/drivers/pinctrl/pinctrl-coh901.c
+@@ -24,7 +24,7 @@
+ #include <linux/slab.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/pinctrl/pinconf-generic.h>
+-#include <mach/gpio-u300.h>
++#include <linux/platform_data/pinctrl-coh901.h>
+ #include "pinctrl-coh901.h"
  
  /*
-diff --git a/sound/soc/ep93xx/ep93xx-i2s.c b/sound/soc/ep93xx/ep93xx-i2s.c
-index 8df8f6d..ac4a751 100644
---- a/sound/soc/ep93xx/ep93xx-i2s.c
-+++ b/sound/soc/ep93xx/ep93xx-i2s.c
-@@ -28,7 +28,7 @@
+diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
+index d05c7fb..f82246d 100644
+--- a/drivers/usb/musb/ux500_dma.c
++++ b/drivers/usb/musb/ux500_dma.c
+@@ -30,7 +30,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ #include <linux/pfn.h>
+-#include <mach/usb.h>
++#include <linux/platform_data/usb-musb-ux500.h>
+ #include "musb_core.h"
  
- #include <mach/hardware.h>
- #include <mach/ep93xx-regs.h>
--#include <mach/dma.h>
-+#include <linux/platform_data/dma-ep93xx.h>
- 
- #include "ep93xx-pcm.h"
- 
-diff --git a/sound/soc/ep93xx/ep93xx-pcm.c b/sound/soc/ep93xx/ep93xx-pcm.c
-index 4eea98b..665d9c9 100644
---- a/sound/soc/ep93xx/ep93xx-pcm.c
-+++ b/sound/soc/ep93xx/ep93xx-pcm.c
-@@ -25,7 +25,7 @@
- #include <sound/soc.h>
- #include <sound/dmaengine_pcm.h>
- 
--#include <mach/dma.h>
-+#include <linux/platform_data/dma-ep93xx.h>
- #include <mach/hardware.h>
- #include <mach/ep93xx-regs.h>
- 
+ struct ux500_dma_channel {
+diff --git a/arch/arm/mach-ux500/include/mach/crypto-ux500.h b/include/linux/platform_data/crypto-ux500.h
+similarity index 100%
+rename from arch/arm/mach-ux500/include/mach/crypto-ux500.h
+rename to include/linux/platform_data/crypto-ux500.h
+diff --git a/arch/arm/plat-nomadik/include/plat/ske.h b/include/linux/platform_data/keypad-nomadik-ske.h
+similarity index 100%
+rename from arch/arm/plat-nomadik/include/plat/ske.h
+rename to include/linux/platform_data/keypad-nomadik-ske.h
+diff --git a/arch/arm/mach-nomadik/include/mach/nand.h b/include/linux/platform_data/mtd-nomadik-nand.h
+similarity index 100%
+rename from arch/arm/mach-nomadik/include/mach/nand.h
+rename to include/linux/platform_data/mtd-nomadik-nand.h
+diff --git a/arch/arm/mach-u300/include/mach/gpio-u300.h b/include/linux/platform_data/pinctrl-coh901.h
+similarity index 100%
+rename from arch/arm/mach-u300/include/mach/gpio-u300.h
+rename to include/linux/platform_data/pinctrl-coh901.h
+diff --git a/arch/arm/mach-ux500/include/mach/usb.h b/include/linux/platform_data/usb-musb-ux500.h
+similarity index 100%
+rename from arch/arm/mach-ux500/include/mach/usb.h
+rename to include/linux/platform_data/usb-musb-ux500.h
 -- 
 1.7.10
