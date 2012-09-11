@@ -1,49 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Sep 2012 13:17:38 +0200
-Subject: [PATCH v2] ARM : i.MX27 : split code for allocation of
- ressources of camera and eMMA
-In-Reply-To: <CACKLOr11UbRF3cyKZ5p_9K81=KS=AQxQNZv1YmxtC0kJeoz1+g@mail.gmail.com>
-References: <1346843175-4166-1-git-send-email-gcembed@gmail.com>
- <20120911094748.GS18243@pengutronix.de>
- <CACKLOr11UbRF3cyKZ5p_9K81=KS=AQxQNZv1YmxtC0kJeoz1+g@mail.gmail.com>
-Message-ID: <20120911111738.GU18243@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Sep 2012 11:22:08 +0000
+Subject: mfd: Implement devicetree support for AB8500 Btemp
+In-Reply-To: <504EFA0F.2090102@stericsson.com>
+References: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
+ <201209101401.06859.arnd@arndb.de> <504EFA0F.2090102@stericsson.com>
+Message-ID: <201209111122.08713.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 01:13:03PM +0200, javier Martin wrote:
-> Hi,
-> 
-> On 11 September 2012 11:47, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > Hi Javier,
+On Tuesday 11 September 2012, Rajanikanth HV wrote:
+> >> +Supplied-to:
+> >> +     This shall be power supply class dependency where in the
+> runtime battery
+> >> +     properties will be shared across fuel guage and charging
+> algorithm driver.
 > >
-> > Since you worked in this area recently, can I have your Ack on this?
+> > I probably don't understand enough of this, but shouldn't the other
+> devices
+> > that are supplied by this have a reference to this node rather than doing
+> > it this way around? Why use strings here instead of phandles?
 > 
-> Acked-by: Javier Martin <javier.martin@vista-silicon.com>
-
-Thanks
-
+> This is a logical binding w.r.t power supply event change
+> across energy-management-module drivers where in runtime battery
+> properties are shared along with uevent notification.
+> ref: di->btemp_psy.external_power_
+> changed =
+>      ab8500_btemp_external_power_changed;
+>      ref: ab8500_btemp.c
 > 
-> > As a side note: Please be prepared that all this should be removed in
-> > the not-so-far future. It would be good if you start converting your
-> > boards to devicetree soon. You may be doing so internally already, I
-> > don't know.
+> Need for this property:
+>  btemp, fg and charger updates power-supply properties
+>  based on the events listed above.
+>  Event handler invokes power supply change notifier
+>  which in-turn invokes registered power supply class call-back
+>  based on the 'supplied_to' string.
+>  ref:
+>    power_supply_changed_work(..) ./drivers/power/power_supply_core.c
 > 
-> We made some tests regarding devicetree this summer but we found that
-> there are some things missing yet:
-> - pinctrl
-> - soc-camera and video sensor
+> In this case how to approach through phandle?
+> ============================
 > 
-> I don't know if people from Linaro is planning to deal with pinctrl
-> for i.MX27 or not.
 
-I don't think Linaro will do anything for the older i.MX like the
-i.MX27. With soc-camera I'm optimistic that someone will come up
-with patches soon.
+Sorry, I really tried, but I cannot make sense of what you wrote
+there. Can you try again and describe in full English sentences
+how the hardware blocks are connected and what their purpose is?
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
