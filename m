@@ -1,201 +1,168 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 11 Sep 2012 11:47:48 +0200
-Subject: [PATCH v2] ARM : i.MX27 : split code for allocation of
- ressources of camera and eMMA
-In-Reply-To: <1346843175-4166-1-git-send-email-gcembed@gmail.com>
-References: <1346843175-4166-1-git-send-email-gcembed@gmail.com>
-Message-ID: <20120911094748.GS18243@pengutronix.de>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 11 Sep 2012 15:23:55 +0530
+Subject: [PATCH v2 3/3] usb: musb: omap: Add device tree support for omap
+ musb glue
+In-Reply-To: <1347354580-5895-4-git-send-email-kishon@ti.com>
+References: <1347354580-5895-1-git-send-email-kishon@ti.com>
+ <1347354580-5895-4-git-send-email-kishon@ti.com>
+Message-ID: <504F0A33.9060606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
 
-Since you worked in this area recently, can I have your Ack on this?
 
-As a side note: Please be prepared that all this should be removed in
-the not-so-far future. It would be good if you start converting your
-boards to devicetree soon. You may be doing so internally already, I
-don't know.
-
-Thanks
- Sascha
-
-On Wed, Sep 05, 2012 at 01:06:15PM +0200, Ga?tan Carlier wrote:
-> Hi,
-> This is to prepare addition of m2m-emmapp driver otherwise
->  IMX_HAVE_PLATFORM_MX2_CAMERA must be declared even if only Post-Processor
-> is needed.
+On 9/11/2012 2:39 PM, Kishon Vijay Abraham I wrote:
+> Added device tree support for omap musb driver and updated the
+> Documentation with device tree binding information.
 > 
-> IMX_HAVE_PLATFORM_MX2_EMMA define has been added.
-> 
-> Changes since v1:
->  - Add "select IMX_HAVE_PLATFORM_MX2_EMMA" for MACH_IMX27_VISSTRIM_M10 platform
->    due to pending patch in linux-media tree that will call
->    imx27_add_mx2_emmaprp().
-> 
-> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  arch/arm/mach-imx/Kconfig                       |    1 +
->  arch/arm/mach-imx/devices-imx27.h               |    4 ++-
->  arch/arm/plat-mxc/devices/Kconfig               |    3 ++
->  arch/arm/plat-mxc/devices/Makefile              |    1 +
->  arch/arm/plat-mxc/devices/platform-mx2-camera.c |   17 ---------
->  arch/arm/plat-mxc/devices/platform-mx2-emma.c   |   41 +++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/devices-common.h |    9 ++++-
->  7 files changed, 57 insertions(+), 19 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/devices/platform-mx2-emma.c
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |   33 ++++++++++++
+>  drivers/usb/musb/omap2430.c                        |   54 ++++++++++++++++++++
+>  2 files changed, 87 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/omap-usb.txt
 > 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index afd542a..c2984d7 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -322,6 +322,7 @@ config MACH_IMX27_VISSTRIM_M10
->  	select IMX_HAVE_PLATFORM_IMX_SSI
->  	select IMX_HAVE_PLATFORM_IMX_UART
->  	select IMX_HAVE_PLATFORM_MX2_CAMERA
-> +	select IMX_HAVE_PLATFORM_MX2_EMMA
->  	select IMX_HAVE_PLATFORM_MXC_EHCI
->  	select IMX_HAVE_PLATFORM_MXC_MMC
->  	select LEDS_GPIO_REGISTER
-> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-> index 0482293..d8eb4a0 100644
-> --- a/arch/arm/mach-imx/devices-imx27.h
-> +++ b/arch/arm/mach-imx/devices-imx27.h
-> @@ -54,8 +54,10 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
->  extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
->  #define imx27_add_mx2_camera(pdata)	\
->  	imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
-> +
-> +extern const struct imx_mx2_emma_data imx27_mx2_emmaprp_data;
->  #define imx27_add_mx2_emmaprp()	\
-> -	imx_add_mx2_emmaprp(&imx27_mx2_camera_data)
-> +	imx_add_mx2_emmaprp(&imx27_mx2_emmaprp_data)
->  
->  extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
->  #define imx27_add_mxc_ehci_otg(pdata)	\
-> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-> index 6b46cee..96feef7 100644
-> --- a/arch/arm/plat-mxc/devices/Kconfig
-> +++ b/arch/arm/plat-mxc/devices/Kconfig
-> @@ -56,6 +56,9 @@ config IMX_HAVE_PLATFORM_MX1_CAMERA
->  config IMX_HAVE_PLATFORM_MX2_CAMERA
->  	bool
->  
-> +config IMX_HAVE_PLATFORM_MX2_EMMA
-> +	bool
-> +
->  config IMX_HAVE_PLATFORM_MXC_EHCI
->  	bool
->  
-> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-> index 76f3195..7292c1f 100644
-> --- a/arch/arm/plat-mxc/devices/Makefile
-> +++ b/arch/arm/plat-mxc/devices/Makefile
-> @@ -28,3 +28,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
->  obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
->  obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
->  obj-$(CONFIG_IMX_HAVE_PLATFORM_AHCI) +=  platform-ahci-imx.o
-> +obj-$(CONFIG_IMX_HAVE_PLATFORM_MX2_EMMA) += platform-mx2-emma.o
-> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> index 11eace9..11c688f 100644
-> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> @@ -63,20 +63,3 @@ struct platform_device *__init imx_add_mx2_camera(
->  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
->  }
->  
-> -struct platform_device *__init imx_add_mx2_emmaprp(
-> -		const struct imx_mx2_camera_data *data)
-> -{
-> -	struct resource res[] = {
-> -		{
-> -			.start = data->iobaseemmaprp,
-> -			.end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
-> -			.flags = IORESOURCE_MEM,
-> -		}, {
-> -			.start = data->irqemmaprp,
-> -			.end = data->irqemmaprp,
-> -			.flags = IORESOURCE_IRQ,
-> -		},
-> -	};
-> -	return imx_add_platform_device_dmamask("m2m-emmaprp", 0,
-> -			res, 2, NULL, 0, DMA_BIT_MASK(32));
-> -}
-> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-emma.c b/arch/arm/plat-mxc/devices/platform-mx2-emma.c
+> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
 > new file mode 100644
-> index 0000000..a51749a
+> index 0000000..29a043e
 > --- /dev/null
-> +++ b/arch/arm/plat-mxc/devices/platform-mx2-emma.c
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Copyright (C) 2010 Pengutronix
-> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +#include <mach/hardware.h>
-> +#include <mach/devices-common.h>
+> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+> @@ -0,0 +1,33 @@
+> +OMAP GLUE
 > +
-> +#define imx_mx2_emmaprp_data_entry_single(soc)				\
-> +	{								\
-> +		.iobase = soc ## _EMMAPRP_BASE_ADDR,			\
-> +		.iosize = SZ_32,					\
-> +		.irq = soc ## _INT_EMMAPRP,				\
+> +OMAP MUSB GLUE
+> + - compatible : Should be "ti,omap4-musb" or "ti,omap3-musb"
+> + - ti,hwmods : must be "usb_otg_hs"
+> + - multipoint : Should be "1" indicating the musb controller supports
+> +   multipoint. This is a MUSB configuration-specific setting.
+> + - num_eps : Specifies the number of endpoints. This is also a
+> +   MUSB configuration-specific setting. Should be set to "16"
+> + - ram_bits : Specifies the ram address size. Should be set to "12"
+> + - interface_type : This is a board specific setting to describe the type of
+> +   interface between the controller and the phy. It should be "0" or "1"
+> +   specifying ULPI and UTMI respectively.
+> + - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
+> +   represents PERIPHERAL.
+> + - power : Should be "50". This signifies the controller can supply upto
+> +   100mA when operating in host mode.
+> +
+> +SOC specific device node entry
+> +usb_otg_hs: usb_otg_hs at 4a0ab000 {
+> +	compatible = "ti,omap4-musb";
+> +	ti,hwmods = "usb_otg_hs";
+> +	multipoint = <1>;
+> +	num_eps = <16>;
+> +	ram_bits = <12>;
+> +};
+
+
+reg and interrupt properties are missing here.
+
+I would encourage to specify "reg" and "interrupt" properties in every
+node getting newly added to the OMAP DTS files.
+
+
+Thanks,
+Vaibhav
+> +
+> +Board specific device node entry
+> +&usb_otg_hs {
+> +	interface_type = <1>;
+> +	mode = <3>;
+> +	power = <50>;
+> +};
+> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+> index f4d9503..d96873b 100644
+> --- a/drivers/usb/musb/omap2430.c
+> +++ b/drivers/usb/musb/omap2430.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/init.h>
+>  #include <linux/list.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/pm_runtime.h>
+> @@ -470,8 +471,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+>  static int __devinit omap2430_probe(struct platform_device *pdev)
+>  {
+>  	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
+> +	struct omap_musb_board_data	*data;
+>  	struct platform_device		*musb;
+>  	struct omap2430_glue		*glue;
+> +	struct device_node		*np = pdev->dev.of_node;
+> +	struct musb_hdrc_config		*config;
+>  	struct resource			*res;
+>  	int				ret = -ENOMEM;
+>  
+> @@ -501,6 +505,42 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
+>  	if (glue->control_otghs == NULL)
+>  		dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
+>  
+> +	if (np) {
+> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +		if (!pdata) {
+> +			dev_err(&pdev->dev,
+> +				"failed to allocate musb platfrom data\n");
+> +			ret = -ENOMEM;
+> +			goto err1;
+> +		}
+> +
+> +		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +		if (!data) {
+> +			dev_err(&pdev->dev,
+> +					"failed to allocate musb board data\n");
+> +			ret = -ENOMEM;
+> +			goto err1;
+> +		}
+> +
+> +		config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
+> +		if (!data) {
+> +			dev_err(&pdev->dev,
+> +				"failed to allocate musb hdrc config\n");
+> +			goto err1;
+> +		}
+> +
+> +		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
+> +		of_property_read_u32(np, "interface_type",
+> +						(u32 *)&data->interface_type);
+> +		of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
+> +		of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
+> +		of_property_read_u32(np, "power", (u32 *)&pdata->power);
+> +		config->multipoint = of_property_read_bool(np, "multipoint");
+> +
+> +		pdata->board_data	= data;
+> +		pdata->config		= config;
 > +	}
 > +
-> +#ifdef CONFIG_SOC_IMX27
-> +const struct imx_mx2_emma_data imx27_mx2_emmaprp_data __initconst =
-> +	imx_mx2_emmaprp_data_entry_single(MX27);
-> +#endif /* ifdef CONFIG_SOC_IMX27 */
-> +
-> +struct platform_device *__init imx_add_mx2_emmaprp(
-> +		const struct imx_mx2_emma_data *data)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobase,
-> +			.end = data->iobase + data->iosize - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->irq,
-> +			.end = data->irq,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +	return imx_add_platform_device_dmamask("m2m-emmaprp", 0,
-> +			res, 2, NULL, 0, DMA_BIT_MASK(32));
-> +}
-> +
-> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-> index 762780c..2117072 100644
-> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
-> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-> @@ -229,8 +229,15 @@ struct imx_mx2_camera_data {
->  struct platform_device *__init imx_add_mx2_camera(
->  		const struct imx_mx2_camera_data *data,
->  		const struct mx2_camera_platform_data *pdata);
-> +
-> +
-> +struct imx_mx2_emma_data {
-> +	resource_size_t iobase;
-> +	resource_size_t iosize;
-> +	resource_size_t irq;
-> +};
->  struct platform_device *__init imx_add_mx2_emmaprp(
-> -		const struct imx_mx2_camera_data *data);
-> +		const struct imx_mx2_emma_data *data);
+>  	pdata->platform_ops		= &omap2430_ops;
 >  
->  #include <mach/mxc_ehci.h>
->  struct imx_mxc_ehci_data {
-> -- 
-> 1.7.7.4
+>  	platform_set_drvdata(pdev, glue);
+> @@ -597,12 +637,26 @@ static struct dev_pm_ops omap2430_pm_ops = {
+>  #define DEV_PM_OPS	NULL
+>  #endif
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id omap2430_id_table[] = {
+> +	{
+> +		.compatible = "ti,omap4-musb"
+> +	},
+> +	{
+> +		.compatible = "ti,omap3-musb"
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, omap2430_id_table);
+> +#endif
+> +
+>  static struct platform_driver omap2430_driver = {
+>  	.probe		= omap2430_probe,
+>  	.remove		= __devexit_p(omap2430_remove),
+>  	.driver		= {
+>  		.name	= "musb-omap2430",
+>  		.pm	= DEV_PM_OPS,
+> +		.of_match_table = of_match_ptr(omap2430_id_table),
+>  	},
+>  };
+>  
 > 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
