@@ -1,43 +1,45 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 11 Sep 2012 11:49:26 +0530
-Subject: [PATCH 1/2] ARM: tegra: fix overflow in
- tegra20_pll_clk_round_rate()
-In-Reply-To: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <504ED7EE.5050103@nvidia.com>
+From: prabhakar.lad@ti.com (Prabhakar Lad)
+Date: Tue, 11 Sep 2012 11:55:07 +0530
+Subject: [PATCH v3 0/2] ARM: davinci: da850/omap-l138: add support for VPIF
+ driver
+Message-ID: <1347344709-6180-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 September 2012 04:42 AM, Stephen Warren wrote:
-> From: Stephen Warren<swarren@nvidia.com>
->
-> 32-bit math isn't enough when e.g. *prate=12000000, and sel->n=1000.
-> Use 64-bit math to prevent this.
+This patch series adds support for VPIF
+capture and display driver on da850/omap-l138.
+Enables SD capture and display.
 
-Thanks Stephen!!
+This patch series is dependent on the following patch:
+https://patchwork.kernel.org/patch/1332311/
 
-> Cc: Prashant Gaikwad<pgaikwad@nvidia.com>
-> Signed-off-by: Stephen Warren<swarren@nvidia.com>
-> ---
-> Prashant, can you please audit all of the Tegra clock driver to see if
-> there are any other instances of the same issue? Thanks.
+Changes for v3:
+1: Clubbed the code for DA850_UI_SD_VIDEO_PORT config
+   as pointed by Sekhar.
+2: Define  the resource structure outside the function as pointed
+   by Sekhar.
 
-Sure.
+Changes for v2:
+1: Avoid breaking of print messages.
+2: Removed the handlers which just returned zero (which did nothing).
+3: Clubbed the code where ever possible for DA850_UI_SD_VIDEO_PORT
+   config option.
+4: Removed the dma_declare_coherent_memory() calls and used
+   global CMA.
+5: Added the base address in increasing order.
 
-> ---
->   arch/arm/mach-tegra/tegra20_clocks.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
-> index ee6922b..e2a43e4 100644
-> --- a/arch/arm/mach-tegra/tegra20_clocks.c
-> +++ b/arch/arm/mach-tegra/tegra20_clocks.c
-> @@ -798,7 +798,7 @@ static long tegra20_pll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
->   	struct clk_tegra *c = to_clk_tegra(hw);
->   	const struct clk_pll_freq_table *sel;
->   	unsigned long input_rate = *prate;
-> -	unsigned long output_rate = *prate;
-> +	u64 output_rate = *prate;
->   	int mul;
->   	int div;
->
+Manjunath Hadli (2):
+  ARM: da850/omap-l138: Add SoC related definitions for VPIF
+  ARM: da850/omap-l138: Add EVM specific code for VPIF to work
+
+Manjunath Hadli (2):
+  ARM: da850/omap-l138: Add SoC related definitions for VPIF
+  ARM: da850/omap-l138: Add EVM specific code for VPIF to work
+
+ arch/arm/mach-davinci/Kconfig              |    7 ++
+ arch/arm/mach-davinci/board-da850-evm.c    |  156 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da850.c              |  152 +++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |   11 ++
+ arch/arm/mach-davinci/include/mach/mux.h   |   42 ++++++++
+ arch/arm/mach-davinci/include/mach/psc.h   |    1 +
+ 6 files changed, 369 insertions(+), 0 deletions(-)
