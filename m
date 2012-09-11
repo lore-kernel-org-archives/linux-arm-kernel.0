@@ -1,61 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 12:15:10 -0600
-Subject: [PATCH] ARM: tegra: config: enable RTC for Cardhu and Whistler
-Message-ID: <1347387310-13087-1-git-send-email-swarren@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Sep 2012 19:16:58 +0100
+Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
+In-Reply-To: <20120911180100.GS13739@n2100.arm.linux.org.uk>
+References: <1347380341-28145-1-git-send-email-cyril@ti.com>
+ <20120911180100.GS13739@n2100.arm.linux.org.uk>
+Message-ID: <20120911181658.GJ32234@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Tue, Sep 11, 2012 at 07:01:00PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 11, 2012 at 12:19:00PM -0400, Cyril Chemparathy wrote:
+> > With the inclusion of asm-generic/timex.h, the ARM arch timer implementation
+> > breaks on build.  This is because asm/arch_timer.h now defines
+> > ARCH_HAS_READ_CURRENT_TIMER, only to have this macro undefined by the
+> > subsequent inclusion of asm-generic/timex.h.
+> > 
+> > This patch fixes the problem in asm/timex.h by including asm-generic/timex.h
+> > early, and by defining get_cycles even earlier.
+> > 
+> > This patch has been tested against linux-next-20120910, both with and without
+> > arch timer support.
+> 
+> Given the complexity this introduces, just for the sake of using one
+> thing from asm-generic/timex.h:
+> 
+> typedef unsigned long cycles_t;
+> 
+> it seems utterly pointless to use the asm-generic version at all,
+> especially if we have to play games to work around what it's doing.
+> What this means is one of two things.  Either we should not be using
+> asm-generic/timex.h, or asm-generic/timex.h as currently exists is
+> broken.
 
-Enable CONFIG_RTC_DRV_TPS65910, CONFIG_RTC_DRV_MAX8907, and some RTC
-options that Kconfig help implies should typically be enabled;
-RTC_INTF_SYSFS, INTF_PROC, RTC_INTF_DEV.
+Given that we have to have our own asm/timex.h anyway, I'd be happier not
+using the generic version for ARM. That said, it's sitting in your for-next
+tree so I thought I'd better work with it.
 
-While rebuilding defconfig:
+If you drop the change, then 7530/1 (the original patch) should be fine,
+otherwise 7533/1 caters for the generic code.
 
-* Removed entry for HOTPLUG_CPU since it is now implied by PM_SLEEP_SMP.
-* Enabled MEDIA_USB_SUPPORT, which is a requirement to keep
-  USB_VIDEO_CLASS=m.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/configs/tegra_defconfig |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index ef2c679..adcf3c2 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -31,7 +31,6 @@ CONFIG_TEGRA_PCI=y
- CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_SMP=y
--CONFIG_HOTPLUG_CPU=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
-@@ -137,9 +136,8 @@ CONFIG_REGULATOR_TPS6586X=y
- CONFIG_REGULATOR_TPS65910=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
--# CONFIG_USB_VIDEO_CLASS_INPUT_EVDEV is not set
--# CONFIG_USB_GSPCA is not set
- CONFIG_SOUND=y
- CONFIG_SND=y
- # CONFIG_SND_SUPPORT_OLD_API is not set
-@@ -170,7 +168,11 @@ CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_INTF_SYSFS=y
-+CONFIG_RTC_INTF_PROC=y
-+CONFIG_RTC_INTF_DEV=y
- CONFIG_RTC_DRV_MAX8907=y
-+CONFIG_RTC_DRV_TPS65910=y
- CONFIG_RTC_DRV_EM3027=y
- CONFIG_RTC_DRV_TEGRA=y
- CONFIG_STAGING=y
--- 
-1.7.0.4
+Will
