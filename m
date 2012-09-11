@@ -1,67 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Sep 2012 09:40:23 -0700
-Subject: [PATCH 09/17] serial/8250: Limit the omap workarounds to omap1
-In-Reply-To: <20120911174234.45919fd3@bob.linux.org.uk>
-References: <20120911052934.29637.9190.stgit@muffinssi.local>
- <20120911053104.29637.95283.stgit@muffinssi.local>
- <20120911174234.45919fd3@bob.linux.org.uk>
-Message-ID: <20120911164023.GE23092@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Sep 2012 10:42:36 -0600
+Subject: [PATCH V2] ARM: tegra: remove useless includes of <mach/*.h>
+Message-ID: <1347381756-28714-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Cox <alan@linux.intel.com> [120911 09:25]:
-> On Mon, 10 Sep 2012 22:31:04 -0700
-> Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > These workarounds do not apply for CONFIG_ARCH_OMAP2PLUS at all,
-> > so let's make it just CONFIG_ARCH_OMAP1.
-> > 
-> > This is needed to for ARM common zImage changes for
-> > omap2+ to avoid including plat and mach headers.
-> > 
-> > Cc: Alan Cox <alan@linux.intel.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-serial at vger.kernel.org
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  drivers/tty/serial/8250/8250.c |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/8250/8250.c
-> > b/drivers/tty/serial/8250/8250.c index 8123f78..5b3f2fe 100644
-> > --- a/drivers/tty/serial/8250/8250.c
-> > +++ b/drivers/tty/serial/8250/8250.c
-> > @@ -2336,7 +2336,7 @@ serial8250_do_set_termios(struct uart_port
-> > *port, struct ktermios *termios, serial_port_out(port, UART_EFR, efr);
-> >  	}
-> >  
-> > -#ifdef CONFIG_ARCH_OMAP
-> > +#ifdef CONFIG_ARCH_OMAP1
-> >  	/* Workaround to enable 115200 baud on OMAP1510 internal
-> > ports */ if (cpu_is_omap1510() && is_omap_port(up)) {
-> >  		if (baud == 115200) {
-> > @@ -2426,7 +2426,7 @@ static unsigned int serial8250_port_size(struct
-> > uart_8250_port *pt) {
-> >  	if (pt->port.iotype == UPIO_AU)
-> >  		return 0x1000;
-> > -#ifdef CONFIG_ARCH_OMAP
-> > +#ifdef CONFIG_ARCH_OMAP1
-> >  	if (is_omap_port(pt))
-> >  		return 0x16 << pt->port.regshift;
-> >  #endif
-> > 
-> 
-> Acked-by: Alan Cox <alan@linux.intel.com>
+From: Stephen Warren <swarren@nvidia.com>
 
-Thanks.
+Nothing from these files is needed, so remove the includes. This helps
+single zImage work by reducing use of the mach-tegra/include/mach/
+directory.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2: Also remove 4 includes of <mach/suspend.h>
+---
+ arch/arm/mach-tegra/dma.c                 |    1 -
+ arch/arm/mach-tegra/tegra20_clocks.c      |    1 -
+ arch/arm/mach-tegra/tegra20_clocks_data.c |    1 -
+ arch/arm/mach-tegra/timer.c               |    1 -
+ arch/arm/mach-tegra/usb_phy.c             |    1 -
+ 5 files changed, 0 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+index 29c5114..7f27320 100644
+--- a/arch/arm/mach-tegra/dma.c
++++ b/arch/arm/mach-tegra/dma.c
+@@ -31,7 +31,6 @@
+ #include <mach/dma.h>
+ #include <mach/irqs.h>
+ #include <mach/iomap.h>
+-#include <mach/suspend.h>
  
-> Even better would be if for other cases is_omap_port and friends
-> returned 0...
-
-Yes it seems that those macros could be moved from plat-omap/serial.h
-to live in drivers/tty/serial/8250/8250.h? Or do you have some better
-place in mind?
-
-Regards,
-
-Tony
+ #include "apbio.h"
+ 
+diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
+index e2a43e4..a4561da 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks.c
++++ b/arch/arm/mach-tegra/tegra20_clocks.c
+@@ -28,7 +28,6 @@
+ #include <linux/clk.h>
+ 
+ #include <mach/iomap.h>
+-#include <mach/suspend.h>
+ 
+ #include "clock.h"
+ #include "fuse.h"
+diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
+index be57764..0e8ed37 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks_data.c
++++ b/arch/arm/mach-tegra/tegra20_clocks_data.c
+@@ -28,7 +28,6 @@
+ #include <linux/clk.h>
+ 
+ #include <mach/iomap.h>
+-#include <mach/suspend.h>
+ 
+ #include "clock.h"
+ #include "fuse.h"
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index 57b5bdc..eccdce9 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -33,7 +33,6 @@
+ 
+ #include <mach/iomap.h>
+ #include <mach/irqs.h>
+-#include <mach/suspend.h>
+ 
+ #include "board.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-tegra/usb_phy.c b/arch/arm/mach-tegra/usb_phy.c
+index 022b33a..34ffebb 100644
+--- a/arch/arm/mach-tegra/usb_phy.c
++++ b/arch/arm/mach-tegra/usb_phy.c
+@@ -30,7 +30,6 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ #include <asm/mach-types.h>
+-#include <mach/gpio-tegra.h>
+ #include <mach/usb_phy.h>
+ #include <mach/iomap.h>
+ 
+-- 
+1.7.0.4
