@@ -1,53 +1,34 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 11 Sep 2012 14:07:26 -0700
-Subject: [PATCH 05/16] ARM: msm: move platform_data definitions
-In-Reply-To: <1347368390-31252-5-git-send-email-arnd@arndb.de>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-5-git-send-email-arnd@arndb.de>
-Message-ID: <20120911210726.GA17002@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Sep 2012 23:51:04 +0200
+Subject: [PATCH 1/3] gpio: 74x164: Add support for the daisy-chaining
+In-Reply-To: <CACRpkdbo1sj6gbucoF3WVLbHzFXtddZiUQ-=h9gn-+A4Z7qBnQ@mail.gmail.com>
+References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1347309341-15447-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdbo1sj6gbucoF3WVLbHzFXtddZiUQ-=h9gn-+A4Z7qBnQ@mail.gmail.com>
+Message-ID: <CACRpkdZ6umqe0Td=OkF-5yYU624M2AAakVjt17rOjejcNdawzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 02:59:39PM +0200, Arnd Bergmann wrote:
-> Platform data for device drivers should be defined in
-> include/linux/platform_data/*.h, not in the architecture
-> and platform specific directories.
-> 
-> This moves such data out of the msm include directories
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> Cc: linux-arm-msm at vger.kernel.org
-> ---
->  arch/arm/mach-msm/board-qsd8x50.c                                    |    2 +-
->  arch/arm/mach-msm/board-trout-mmc.c                                  |    2 +-
->  arch/arm/mach-msm/board-trout-panel.c                                |    2 +-
->  arch/arm/mach-msm/devices-msm7x00.c                                  |    2 +-
->  arch/arm/mach-msm/devices-msm7x30.c                                  |    2 +-
->  arch/arm/mach-msm/devices-qsd8x50.c                                  |    2 +-
->  arch/arm/mach-msm/include/mach/board.h                               |    2 +-
->  drivers/mmc/host/msm_sdcc.c                                          |    2 +-
->  drivers/video/msm/mddi.c                                             |    2 +-
->  drivers/video/msm/mddi_client_dummy.c                                |    2 +-
->  drivers/video/msm/mddi_client_nt35399.c                              |    2 +-
->  drivers/video/msm/mddi_client_toshiba.c                              |    2 +-
->  drivers/video/msm/mdp.c                                              |    2 +-
->  drivers/video/msm/mdp_hw.h                                           |    2 +-
->  drivers/video/msm/mdp_ppp.c                                          |    2 +-
->  drivers/video/msm/msm_fb.c                                           |    2 +-
->  .../include/mach/mmc.h => include/linux/platform_data/mmc-msm_sdcc.h |    0
->  .../mach/msm_fb.h => include/linux/platform_data/video-msm_fb.h      |    0
->  18 files changed, 16 insertions(+), 16 deletions(-)
->  rename arch/arm/mach-msm/include/mach/mmc.h => include/linux/platform_data/mmc-msm_sdcc.h (100%)
->  rename arch/arm/mach-msm/include/mach/msm_fb.h => include/linux/platform_data/video-msm_fb.h (100%)
+On Tue, Sep 11, 2012 at 7:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Sep 10, 2012 at 10:35 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>
+>> The shift registers have an output pin that, when enabled, propagates
+>> the values of its internal register to the pins. If another value comes
+>> to the register while the output pin is disabled, this new value will
+>> makae the older shift into the next register in the chain.
+>>
+>> This patch adds support for daisy-chaining the registers, using the
+>> regular SPI chip select mechanism to manage the output pin, and the
+>> registers-number dt property to set the number of chained registers.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> OK cool, but I just realized that this driver was added just two
+> years ago by Gabor and Miguel, so I'd like to get their feedback
+> before continuing.
 
-Acked-by: David Brown <davidb@codeaurora.org>
+Tentatively applied waiting for feedback from Miguel...
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks!
+Linus Walleij
