@@ -1,41 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Sep 2012 16:20:04 +0200
-Subject: [PATCH 2/2] pinctrl: mvebu: remove dead code
-In-Reply-To: <1347373204-17883-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347373204-17883-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1347373204-17883-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 11 Sep 2012 19:54:00 +0530
+Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
+In-Reply-To: <201209111417.42879.arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368559-31329-1-git-send-email-arnd@arndb.de>
+ <CAMQu2gwLoccyjGwjjgndiW2aR--_S=UhCCTdcav6LicvYWe5SQ@mail.gmail.com>
+ <201209111417.42879.arnd@arndb.de>
+Message-ID: <CAMQu2gz8F2FcgRuok3x1uJ4pP8=0E2-9jhYGchzU9AUtUHjYhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pinctrl/pinctrl-mvebu.c |   13 -------------
- 1 file changed, 13 deletions(-)
+On Tue, Sep 11, 2012 at 7:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
+>> Just curious to know how you came with some of the above header names ?
+>>
+>> plat/mcbsp ---> dsp-mcbsp.h
+>> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
+>> better name.
+>
+> This one was a mistake on my side, as Tony and  Peter already pointed out.
+> How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
+>
+After re-reading the cover-letter and your below response,
+'asoc-omap-mcbsp.h' seems to be fine.
 
-diff --git a/drivers/pinctrl/pinctrl-mvebu.c b/drivers/pinctrl/pinctrl-mvebu.c
-index ed1fc3b..720e547 100644
---- a/drivers/pinctrl/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/pinctrl-mvebu.c
-@@ -128,19 +128,6 @@ static struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_gpio_setting(
- 	return NULL;
- }
- 
--#if 0
--struct mvebu_pinctrl_function *mvebu_pinctrl_find_function_by_name(
--	struct mvebu_pinctrl *pctl, const char *name)
--{
--	unsigned n;
--	for (n = 0; n < pctl->num_functions; n++) {
--		if (strcmp(name, pctl->functions[n].name) == 0)
--			return &pctl->functions[n];
--	}
--	return NULL;
--}
--#endif
--
- /*
-  * Common mpp pin configuration registers on MVEBU are
-  * registers of eight 4-bit values for each mpp setting.
--- 
-1.7.9.5
+>> plat/nand.h --> /mtd-nand-omap2.h
+>> plat/onenand.h --> /mtd-onenand-omap2.h
+>> May be "omap-nand.h" and "omap-onenand.h"
+>>
+>> plat/mcspi.h-->spi-omap2-mcspi.h
+>> May be "omap-spi.h"
+>>
+>
+> As I wrote in the introductory mail, I tried to always prefix the file
+> names with the subsystem, followed by the name of the driver, in order
+> to standardize on just one set of rules.
+>
+Just read that now.
+
+> The drivers implementing the three headers above are:
+>
+> drivers/mtd/nand/omap2.c
+> drivers/mtd/onenand/omap2.c
+> drivers/spi/spi-omap2-mcspi.c
+>
+> so these all seem appropriate.
+>
+Sorry I missed the subsystem prefix point.
+These names seems to be fine then.
+
+Regards
+Santosh
