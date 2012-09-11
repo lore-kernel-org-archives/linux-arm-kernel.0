@@ -1,55 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 16:18:34 -0600
-Subject: [PATCH v3 2/9] pinctrl: mvebu: dove pinctrl driver
-In-Reply-To: <1347266386-16229-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Tue, 11 Sep 2012 16:23:19 -0600
+Subject: [PATCH v3 6/9] ARM: mvebu: add pinctrl device in DT for Armada
+ 370/XP SoCs
+In-Reply-To: <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <504FB8BA.1010703@wwwdotorg.org>
+ <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <504FB9D7.3030205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/10/2012 02:39 AM, Sebastian Hesselbarth wrote:
-> This patch adds a SoC specific pinctrl driver for Marvell Dove SoCs
-> plus DT binding documentation. This driver will use the mvebu pinctrl
-> driver core.
+> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> 
+> The Armada 370 and XP SoCs have configurable muxing for a certain
+> number of their pins, controlled through a pinctrl driver.
 
-> diff --git a/drivers/pinctrl/pinctrl-dove.c b/drivers/pinctrl/pinctrl-dove.c
+Hmmm. I'd be tempted just to put the entire node definition there;
+putting in a .dtsi file just to share the reg property doesn't seem
+especially useful.
 
-> +static int dove_mpp4_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
-> +			      unsigned long *config)
-> +{
-> +	unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> +	unsigned long mask;
-> +
-> +	switch (ctrl->pid) {
-> +	case 24: /* mpp_camera */
-> +		mask = DOVE_CAM_GPIO_SEL;
-> +		break;
-> +	case 40: /* mpp_sdio0 */
-> +		mask = DOVE_SD0_GPIO_SEL;
-> +		break;
-> +	case 46: /* mpp_sdio1 */
-> +		mask = DOVE_SD1_GPIO_SEL;
-> +		break;
-> +	case 58: /* mpp_spi0 */
-> +		mask = DOVE_SPI_GPIO_SEL;
-> +		break;
-> +	case 62: /* mpp_uart1 */
-> +		mask = DOVE_UART1_GPIO_SEL;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
+> The 'compatible' property is defined in the SoC-specific .dtsi files,
+> since the compatible string identifies the number of pins and other
+> SoC-specific properties.
 
-Wouldn't it be better to use #defines instead of the constants in the
-case statements, and also share those #defines with:
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
 
+> +		pinctrl at d0018000 {
 
-> +static struct mvebu_mpp_ctrl dove_mpp_controls[] = {
-> +	MPP_FUNC_CTRL(0, 0, "mpp0", dove_pmu_mpp_ctrl),
-                      ^^^^
+If this is the only pinctrl instance, you'd typically name the node just
+"pinctrl", since the "@d0018000" isn't needed to get unique node names.
 
-> +static struct mvebu_mpp_mode dove_mpp_modes[] = {
-> +	MPP_MODE(0,
-                 ^^
+> +			reg = <0xd0018000 0x38>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+
+What is "ranges" for; this isn't a memory-mapped bus, right?
+
+> +		};
+>  	};
+>  };
