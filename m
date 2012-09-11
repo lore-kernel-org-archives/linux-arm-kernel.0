@@ -1,84 +1,76 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Tue, 11 Sep 2012 15:09:01 +0530
-Subject: [PATCH v2 1/3] arm/dts: Add twl6030-usb data
-In-Reply-To: <504F03D4.5080800@ti.com>
-References: <1347345381-4390-1-git-send-email-kishon@ti.com>
- <1347345381-4390-2-git-send-email-kishon@ti.com>
- <504F03D4.5080800@ti.com>
-Message-ID: <CAAe_U6KQX6LPT3p108stdBVkj_KnK0Q1Gxumy4Jn4ah38q0LwQ@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 11 Sep 2012 15:11:55 +0530
+Subject: [PATCHv7 00/23]I2C big cleanup
+Message-ID: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Changes since v1:
+       - removed tabification on patch 6/17
+       - removed dev_err() which was introduced on patch 09/17
+Changes since v2:
+        - do not set full fifo depth in the RDR interrupt.
+        - some changelog updates.
+        - rebase to the Wolfram's tree.
+Changes since v3:
+        - Remove a redundant read of status register
+        - Read the dev->buf_len variable instead of the register
+        as the information of the remaining bytes is there.
+Changes since v4:
+        - Ack the arbitration lost.
+        - Rebase to the i2c-embedded/for-next branch.
+Changes since v5:
+        - Rebase to latest mainline
+        - Added some more cleanup patches so as have a consolidated series.
+Changes since v6:
+        - Fix comments on setting the pdev to NULL.
+        - Trivial changelog update
 
-On Tue, Sep 11, 2012 at 2:56 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
->> Add twl6030-usb data node in twl6030 device tree file
->>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  arch/arm/boot/dts/omap4-panda.dts |    4 ++++
->>  arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
->>  arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
->>  3 files changed, 13 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
->> index 9880c12..2999eba 100644
->> --- a/arch/arm/boot/dts/omap4-panda.dts
->> +++ b/arch/arm/boot/dts/omap4-panda.dts
->> @@ -126,3 +126,7 @@
->>       ti,non-removable;
->>       bus-width = <4>;
->>  };
->> +
->> +&twlusb {
->> +     usb-supply = <&vusb>;
->> +};
->> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
->> index 72216e9..d8290c0 100644
->> --- a/arch/arm/boot/dts/omap4-sdp.dts
->> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->> @@ -226,3 +226,7 @@
->>       bus-width = <4>;
->>       ti,non-removable;
->>  };
->> +
->> +&twlusb {
->> +     usb-supply = <&vusb>;
->> +};
->> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
->> index 3b2f351..8e3aac9 100644
->> --- a/arch/arm/boot/dts/twl6030.dtsi
->> +++ b/arch/arm/boot/dts/twl6030.dtsi
->> @@ -83,4 +83,9 @@
->>       clk32kg: regulator at 12 {
->>               compatible = "ti,twl6030-clk32kg";
->>       };
->> +
->> +     twlusb: twl6030-usb {
->
-> That name should be a generic device class name is possible.
-> What is twl6030-usb exactly? an USB PHY?
+Previous discussions can be found here 
+http://www.spinics.net/lists/linux-i2c/msg09482.html
 
-Of late we are calling it the comparator as it's used only to detect
-VBUS/ID events.
-Should it be like usb-comparator? What should be the label?
->
->> +             compatible = "ti,twl6030-usb";
->> +             interrupts = < 4 10 >;
->
-> If this is for two interrupts, you'd better split them to avoid
-> confusion with irq specifiers that requires several attributes like for
-> the GIC.
+This is the cleanup only series.
+  
+Tested on omap4sdp and 3430sdp.
 
-yeah. Thats for 2 interrupts.
->
-> +               interrupts = <4>, <10>; /* IRQ1 blabla, IRQ2 blabla*/
->
-> The comments are not mandatory assuming the binding is documented.
+The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
 
-It's documented *usb: twl6030: Add dt support for twl6030 usb*
+  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
 
-Thanks
-Kishon
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git for_3.7/i2c/big_cleanup
+
+
+
+Felipe Balbi (22):
+  i2c: omap: switch to devm_* API
+  i2c: omap: simplify num_bytes handling
+  i2c: omap: decrease indentation level on data handling
+  i2c: omap: add blank lines
+  i2c: omap: simplify omap_i2c_ack_stat()
+  i2c: omap: split out [XR]DR and [XR]RDY
+  i2c: omap: improve i462 errata handling
+  i2c: omap: re-factor receive/transmit data loop
+  i2c: omap: switch over to do {} while loop
+  i2c: omap: ack IRQ in parts
+  i2c: omap: switch to platform_get_irq()
+  i2c: omap: bus: add a receiver flag
+  i2c: omap: simplify errata check
+  i2c: omap: always return IRQ_HANDLED
+  i2c: omap: simplify IRQ exit path
+  i2c: omap: resize fifos before each message
+  i2c: omap: get rid of the "complete" label
+  i2c: omap: always return IRQ_HANDLED
+  i2c: omap: switch to threaded IRQ support
+  i2c: omap: remove unnecessary pm_runtime_suspended check
+  i2c: omap: switch over to autosuspend API
+  i2c: omap: sanitize exit path
+
+Shubhrajyoti D (1):
+  i2c: omap: remove redundant status read
+
+ drivers/i2c/busses/i2c-omap.c |  442 +++++++++++++++++++++++++----------------
+ 1 files changed, 271 insertions(+), 171 deletions(-)
+
+-- 
+1.7.5.4
