@@ -1,41 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 11 Sep 2012 14:15:18 +0200
-Subject: [PATCH] ASoC: atmel-ssc: include linux/io.h for raw io
-In-Reply-To: <503B2951.3010508@atmel.com>
-References: <20120823152324.GI7995@opensource.wolfsonmicro.com>
- <1345738494-4014-1-git-send-email-nicolas.ferre@atmel.com>
- <20120825202515.GF6520@opensource.wolfsonmicro.com>
- <503B2951.3010508@atmel.com>
-Message-ID: <504F2B56.6020809@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Sep 2012 20:18:01 +0800
+Subject: [PATCH] i.MX: remove legacy clock support
+In-Reply-To: <1347346396-27669-1-git-send-email-s.hauer@pengutronix.de>
+References: <1347346396-27669-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120911121757.GA4513@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2012 10:01 AM, Nicolas Ferre :
-> On 08/25/2012 10:25 PM, Mark Brown :
->> On Thu, Aug 23, 2012 at 06:14:54PM +0200, Nicolas Ferre wrote:
->>> From: Joachim Eastwood <manabian@gmail.com>
->>>
->>> Include linux/io.h for raw io operations in atmel-scc header.
->>>
->>> This fixes the following build error:
->>>   CC [M]  sound/soc/atmel/atmel_ssc_dai.o
->>> sound/soc/atmel/atmel_ssc_dai.c: In function 'atmel_ssc_interrupt':
->>> sound/soc/atmel/atmel_ssc_dai.c:171: error: implicit declaration of function '__raw_readl'
->>> sound/soc/atmel/atmel_ssc_dai.c: In function 'atmel_ssc_shutdown':
->>> sound/soc/atmel/atmel_ssc_dai.c:249: error: implicit declaration of function '__raw_writel'
->>
->> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->>
->> but why not just apply it to the ASoC tree?
+On Tue, Sep 11, 2012 at 08:53:14AM +0200, Sascha Hauer wrote:
+> This removes the last leftovers from the i.MX legacy clock support.
+> As a bonus we get rid of mach/clock.h
 > 
-> Fine by me then: so Mark, can you take it for a 3.6 fixes branch?
+> ----------------------------------------------------------------
+> Sascha Hauer (2):
+>       ARM: i.MX clk pllv1: move mxc_decode_pll code to its user
+>       ARM: i.MX remove last leftovers from legacy clock support
 > 
-> (I remove it from my at91-fixes branch that will go through arm-soc tree).
+Both:
 
-Hi Mark,
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Ping?
-
-Best regards,
--- 
-Nicolas Ferre
+>  arch/arm/mach-imx/Makefile             |    2 +-
+>  arch/arm/mach-imx/clk-pllv1.c          |   49 +++++-
+>  arch/arm/mach-imx/clk.c                |    3 +
+>  arch/arm/mach-imx/clk.h                |    3 +-
+>  arch/arm/mach-imx/mach-kzm_arm11_01.c  |    1 -
+>  arch/arm/plat-mxc/Makefile             |    2 +-
+>  arch/arm/plat-mxc/clock.c              |  257 --------------------------------
+>  arch/arm/plat-mxc/cpufreq.c            |    1 -
+>  arch/arm/plat-mxc/include/mach/clock.h |   70 ---------
+>  9 files changed, 54 insertions(+), 334 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/clk.c
+>  delete mode 100644 arch/arm/plat-mxc/clock.c
+>  delete mode 100644 arch/arm/plat-mxc/include/mach/clock.h
+> 
