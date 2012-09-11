@@ -1,46 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Sep 2012 10:55:33 -0700
-Subject: [GIT PULL 5/7] omap sparse irq and local hardware.h cleanup
- for v3.7 merge window
-In-Reply-To: <E1TCLkq-0006f8-Qp@merlin.infradead.org>
-References: <pull-1347590052-683636> <E1TCLkq-0006f8-Qp@merlin.infradead.org>
-Message-ID: <20120914175533.GG4521@atomide.com>
+From: jgutierrez@ti.com (Gutierrez, Juan)
+Date: Tue, 11 Sep 2012 09:47:40 -0500
+Subject: [PATCH] omap: remoteproc: set bootaddr support
+In-Reply-To: <CAK=Wgbb6EKS1YqR89y08stkwz3zFw786J3an2iDT+rKFWyo+5A@mail.gmail.com>
+References: <1345044348-19898-1-git-send-email-jgutierrez@ti.com>
+ <CAK=Wgbb6EKS1YqR89y08stkwz3zFw786J3an2iDT+rKFWyo+5A@mail.gmail.com>
+Message-ID: <CADVn9RHC7ikoxWkuTxEc56nP5CPvSp5KZtY_24NjwqtibCVDiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120914 08:28]:
-> The following changes since commit a1e01703bacbadd22eb4aaca0bbba59bcba7d3b3:
-> 
->   Merge tags 'omap-devel-gpmc-fixed-for-v3.7' and 'cleanup-omap-tags-for-v3.7' into cleanup-sparseirq (2012-09-12 18:05:19 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-sparseirq-for-v3.7
-> 
-> for you to fetch changes up to 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
-> 
->   ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
-> 
-> ----------------------------------------------------------------
-> This branch contains changes needed to make omap2+
-> work properly with sparse IRQ. It also removes
-> dependencies to mach/hardware.h. These help moving
-> things towards ARM single zImage support.
-> 
-> This branch is based on a commit in tty-next
-> branch with omap-devel-gpmc-fixed-for-v3.7 and
-> cleanup-omap-tags-for-v3.7 merged in to keep things
-> compiling and sort out some merge conflicts.
+Cool. Thanks Ohad
 
-This will need some manual merging with what's in
-testing/platform-data, so please let me know if
-you need help with that. But basically it's mostly:
+On Tue, Sep 11, 2012 at 7:30 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
 
-remove #include <plat/board.h> for both mach-omap1 & mach-omap2
-remove #include <mach/hardware.h> for mach-omap2
-remove #include <mach/irqs.h> for mach-omap2
+> Hi Juan,
+>
+> On Wed, Aug 15, 2012 at 6:25 PM, Juan Gutierrez <jgutierrez@ti.com> wrote:
+> > Some remote processors (like Omap4's DSP) need to explicitly
+> > set a boot address from which they start executing code when
+> > taken out of reset.
+> >
+> > Support for this has been added to remoteproc code through
+> > a set_bootaddr function in the platform data which, if needed,
+> > must be set according to the backend rproc.
+> >
+> > For omap4's dsp we can use the next control funtion:
+> >
+> >   .set_bootaddr  = omap_ctrl_write_dsp_boot_addr
+> >
+> > Signed-off-by: Juan Gutierrez <jgutierrez@ti.com>
+>
+> Applied with slight changes to the commit log. Thanks!
+>
+> Ohad.
+>
 
-Regards,
 
-Tony
+
+-- 
+Thanks
+
+juan gutierrez
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/c9be81c6/attachment-0001.html>
