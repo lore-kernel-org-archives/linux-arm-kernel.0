@@ -1,53 +1,47 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 15:41:41 -0400
-Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
-In-Reply-To: <20120911192820.GT13739@n2100.arm.linux.org.uk>
-References: <1347380341-28145-1-git-send-email-cyril@ti.com>
- <20120911162522.GE32234@mudshark.cambridge.arm.com> <504F6DFB.5030208@ti.com>
- <20120911172018.GG32234@mudshark.cambridge.arm.com> <504F74C5.2020805@ti.com>
- <20120911175332.GI32234@mudshark.cambridge.arm.com> <504F836D.6050302@ti.com>
- <20120911192820.GT13739@n2100.arm.linux.org.uk>
-Message-ID: <504F93F5.3070702@ti.com>
+From: juhosg@openwrt.org (Gabor Juhos)
+Date: Tue, 11 Sep 2012 21:35:45 +0200
+Subject: [PATCH 1/3] gpio: 74x164: Add support for the daisy-chaining
+In-Reply-To: <CACRpkdbo1sj6gbucoF3WVLbHzFXtddZiUQ-=h9gn-+A4Z7qBnQ@mail.gmail.com>
+References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1347309341-15447-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdbo1sj6gbucoF3WVLbHzFXtddZiUQ-=h9gn-+A4Z7qBnQ@mail.gmail.com>
+Message-ID: <504F9291.9060609@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/11/2012 3:28 PM, Russell King - ARM Linux wrote:
-> On Tue, Sep 11, 2012 at 02:31:09PM -0400, Cyril Chemparathy wrote:
->> On 9/11/2012 1:53 PM, Will Deacon wrote:
->>> On Tue, Sep 11, 2012 at 06:28:37PM +0100, Cyril Chemparathy wrote:
->>>> I can re-verify with the respun 7530/1 if you'd like.
->>>
->>> Sure, submitted as 7533/1:
->>>
->>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7533/1
->>>
+2012.09.11. 19:05 keltez?ssel, Linus Walleij ?rta:
+> On Mon, Sep 10, 2012 at 10:35 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> 
+>> The shift registers have an output pin that, when enabled, propagates
+>> the values of its internal register to the pins. If another value comes
+>> to the register while the output pin is disabled, this new value will
+>> makae the older shift into the next register in the chain.
 >>
->> Works great.
->
-> Cyril, I notice you're trying repeatedly to get a new password out of
-> the system.
->
-> TI's mail system is known to silently drop the password reminders.
->
-> Please bug your IT provider about this, there's nothing I can do about
-> it at my end - (and as such you won't receive a password reminder until
-> something can be done about this.)
->
+>> This patch adds support for daisy-chaining the registers, using the
+>> regular SPI chip select mechanism to manage the output pin, and the
+>> registers-number dt property to set the number of chained registers.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> OK cool, but I just realized that this driver was added just two
+> years ago by Gabor and Miguel, so I'd like to get their feedback
+> before continuing.
+> 
+> I know I already merged the DT support and stuff, but better
+> late than never.
+> 
+> Please include them on future postings of patches to this
+> driver... (See To: line)
+> 
+> Miguel, Gabor: please look at this, I hope you can get hold
+> of the patches. Please also check the stuff I've already merged
+> here:
+> http://git.kernel.org/?p=linux/kernel/git/linusw/linux-gpio.git;a=shortlog;h=refs/heads/devel
 
-*Sigh*
+The merged patches look good in general. The merged patches look good in
+general. However I don't know anything about the 74x164 chip. The driver contain
+my copyright only because it was based on another driver which I wrote for a
+different chip.
 
-Thanks Russell.  I'll try to poke folks to see if this can be fixed.
-
-> 2012-09-11 19:45:53 1TBVT2-0008P4-2U => cyril at ti.com R=verp_domain_dnslookup T=verp_domain_smtp S=1041 H=ti.com.s9a1.psmtp.com [74.125.148.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
-> 2012-09-11 20:14:27 1TBVuf-0008S4-EC => cyril at ti.com R=verp_domain_dnslookup T=verp_domain_smtp S=1041 H=ti.com.s9a1.psmtp.com [74.125.148.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
->
-> (Note that *.psmtp.com seems to actually be more trouble than its
-> worth... previous history has shown it to be quite broken, silently
-> dropping _real_ emails as well.  I'd call it an anti-HAM service rather
-> than an anti-SPAM service.  The more people complain to Google about it
-> the better chance it will get fixed.)
->
-
--- 
-Thanks
-- Cyril
+-Gabor
