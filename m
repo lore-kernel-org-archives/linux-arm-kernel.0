@@ -1,46 +1,74 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 12:19:07 +0200
-Subject: [PATCH v2 0/3] arm/dts: omap: add dt data for MUSB
-In-Reply-To: <1347345381-4390-1-git-send-email-kishon@ti.com>
-References: <1347345381-4390-1-git-send-email-kishon@ti.com>
-Message-ID: <504F101B.2020804@ti.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 11 Sep 2012 18:14:19 +0800
+Subject: [PATCH v3] input: qt1070: Add device tree support
+Message-ID: <1347358459-11598-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Add qt1070 device tree support
+Using device node to parse irq
 
-Beside minor comments and the lack of explicit changelog to explain what
-part of the HW you are addressing, this series looks good.
+Test this on at91sam9x5ek board
 
-I guess that series should be rebased on top of lo/devel-dt without much
-trouble.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+change since v2
+  Using device node to parse irq,
+  Remove gpio relative stuff
 
-On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
-> No major change from the previous version. Just removed the
-> omap-usb2 dt data and sent that as a separate patch.
+change since v1
+  Add gpio relative stuff, gpio_is_valid, gpio_request
+---
+ .../devicetree/bindings/input/atmel-qt1070.txt     |   16 ++++++++++++++++
+ drivers/input/keyboard/qt1070.c                    |    9 +++++++++
+ 2 files changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/atmel-qt1070.txt
 
-Indeed that one will be trickier to merge properly, so my second thought
-is it is better to have it separated.
-
-Regards,
-Benoit
-
-> 
-> Rebased on
-> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git musb
-> 
-> Kishon Vijay Abraham I (3):
->   arm/dts: Add twl6030-usb data
->   arm/dts: Add twl4030-usb data
->   arm/dts: omap: Add usb_otg and glue data
-> 
->  arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
->  arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
->  arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
->  arch/arm/boot/dts/omap4-panda.dts  |   10 ++++++++++
->  arch/arm/boot/dts/omap4-sdp.dts    |   10 ++++++++++
->  arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
->  arch/arm/boot/dts/twl4030.dtsi     |   21 +++++++++++++++++++++
->  arch/arm/boot/dts/twl6030.dtsi     |    5 +++++
->  8 files changed, 74 insertions(+)
-> 
+diff --git a/Documentation/devicetree/bindings/input/atmel-qt1070.txt b/Documentation/devicetree/bindings/input/atmel-qt1070.txt
+new file mode 100644
+index 0000000..e1fc09e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/atmel-qt1070.txt
+@@ -0,0 +1,16 @@
++Atmel qt1070 keyboard interface
++
++Required Properties:
++- compatible: Should be "atmel,qt1070"
++- reg: I2C slave address
++- interrupt-parent: Depends on SoC
++- interrupts: The interrupt pin number to the cpu, and trigger mode.
++
++Example:
++
++	qt1070 at 1b {
++		compatible = "atmel,qt1070";
++		reg = <0x1b>;
++		interrupt-parent = <&pioA>;
++		interrupts = <7 0x0>;
++	};
+diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
+index ca68f29..60457dc 100644
+--- a/drivers/input/keyboard/qt1070.c
++++ b/drivers/input/keyboard/qt1070.c
+@@ -249,10 +249,19 @@ static const struct i2c_device_id qt1070_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, qt1070_id);
+ 
++#ifdef CONFIG_OF
++static struct of_device_id atmel_qt1070_of_match[] = {
++	{ .compatible = "atmel,qt1070" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, atmel_qt1070_of_match);
++#endif
++
+ static struct i2c_driver qt1070_driver = {
+ 	.driver	= {
+ 		.name	= "qt1070",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(atmel_qt1070_of_match),
+ 	},
+ 	.id_table	= qt1070_id,
+ 	.probe		= qt1070_probe,
+-- 
+1.7.9.5
