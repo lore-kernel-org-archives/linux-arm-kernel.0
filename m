@@ -1,37 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2012 13:10:00 +0000
-Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
-In-Reply-To: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201209111310.00347.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Sep 2012 15:11:05 +0200
+Subject: [PATCH 14/16] ARM: orion: move platform_data definitions
+In-Reply-To: <1347368559-31329-2-git-send-email-arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368559-31329-1-git-send-email-arnd@arndb.de>
+ <1347368559-31329-2-git-send-email-arnd@arndb.de>
+Message-ID: <20120911151105.2178cde9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 September 2012, Thomas Petazzoni wrote:
-> Andrew, Jason, Gr?gory,
+Hello Arnd,
+
+Le Tue, 11 Sep 2012 15:02:37 +0200,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
+
+> Platform data for device drivers should be defined in
+> include/linux/platform_data/*.h, not in the architecture
+> and platform specific directories.
 > 
-> Here is a patch set that introduces basic support for address decoding
-> on Armada 370 and Armada XP. The aim of this basic support is
-> essentially to be able to configure a window to remap the BootROM,
-> which is needed to startup the secondary CPUs for the SMP support.
-> 
-> As we had discussed already, the address decoding configuration is not
-> described in the Device Tree, it is for now hardcoded on a per-SoC
-> basis. We might later discuss how to extend this to the Device Tree.
-> 
-> The patch set is relatively long, as it refactors some existing
-> Dove/Kirkwood/MV78xx0/Orion code to use void __iomem pointers instead
-> of unsigned long, as per the request of Arnd Bergmann and Olof
-> Johansson.
+> This moves such data out of the orion include directories
 
-Excellent!
+I have already posted patches for this during the ARM summit, see:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/116380.html.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+They have been applied by the Marvell maintainer Jason Cooper and are
+scheduled for 3.7, see
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/116432.html.
 
-Just one small comment for the very last patch:
+Best regards,
 
->  (7) Patch 17 adds the necessary DT code to instantiate the address
->      decoding "controller".
-> 
-
-This one seems to lack a device tree binding document.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
