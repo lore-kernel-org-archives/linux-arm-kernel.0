@@ -1,113 +1,46 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Tue, 11 Sep 2012 15:48:34 +0530
-Subject: [PATCHv7 00/23]I2C big cleanup
-In-Reply-To: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <504F0FFA.2010200@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 11 Sep 2012 12:19:07 +0200
+Subject: [PATCH v2 0/3] arm/dts: omap: add dt data for MUSB
+In-Reply-To: <1347345381-4390-1-git-send-email-kishon@ti.com>
+References: <1347345381-4390-1-git-send-email-kishon@ti.com>
+Message-ID: <504F101B.2020804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 September 2012 03:11 PM, Shubhrajyoti D wrote:
-> Changes since v1:
->        - removed tabification on patch 6/17
->        - removed dev_err() which was introduced on patch 09/17
-> Changes since v2:
->         - do not set full fifo depth in the RDR interrupt.
->         - some changelog updates.
->         - rebase to the Wolfram's tree.
-> Changes since v3:
->         - Remove a redundant read of status register
->         - Read the dev->buf_len variable instead of the register
->         as the information of the remaining bytes is there.
-> Changes since v4:
->         - Ack the arbitration lost.
->         - Rebase to the i2c-embedded/for-next branch.
-> Changes since v5:
->         - Rebase to latest mainline
->         - Added some more cleanup patches so as have a consolidated series.
-> Changes since v6:
->         - Fix comments on setting the pdev to NULL.
->         - Trivial changelog update
->
-> Previous discussions can be found here 
-> http://www.spinics.net/lists/linux-i2c/msg09482.html
-Also this gives better performance
-With the patches:
+Hi Kishon,
 
- Performance counter stats for '/build/i2c/bin/i2cdump -y -f 1 0x48
-b':        
-                                                                               
+Beside minor comments and the lack of explicit changelog to explain what
+part of the HW you are addressing, this series looks good.
 
-         78.796376 task-clock                #    0.453 CPUs
-utilized          
-               516 context-switches          #    0.007
-M/sec                  
-                 0 CPU-migrations            #    0.000
-K/sec                  
-               114 page-faults               #    0.001 M/sec  
+I guess that series should be rebased on top of lo/devel-dt without much
+trouble.
 
-      0.174011183 seconds time elapsed  
+On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
+> No major change from the previous version. Just removed the
+> omap-usb2 dt data and sent that as a separate patch.
 
-Without the patches
- Performance counter stats for '/build/i2c/bin/i2cdump -y -f 1 0x48
-b':        
-                                                                               
+Indeed that one will be trickier to merge properly, so my second thought
+is it is better to have it separated.
 
-        123.504640 task-clock                #    0.049 CPUs
-utilized          
-               337 context-switches          #    0.003
-M/sec                  
-                 0 CPU-migrations            #    0.000
-K/sec                  
-               144 page-faults               #    0.001
-M/sec                  
-                              
-                                                                               
+Regards,
+Benoit
 
-       2.534424040 seconds time elapsed 
-
-The auto suspend is probably the one  :-)
-
-> This is the cleanup only series.
->   
-> Tested on omap4sdp and 3430sdp.
->
-> The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
->
->   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
->
-> are available in the git repository at:
->   git://gitorious.org/linus-tree/linus-tree.git for_3.7/i2c/big_cleanup
->
->
->
-> Felipe Balbi (22):
->   i2c: omap: switch to devm_* API
->   i2c: omap: simplify num_bytes handling
->   i2c: omap: decrease indentation level on data handling
->   i2c: omap: add blank lines
->   i2c: omap: simplify omap_i2c_ack_stat()
->   i2c: omap: split out [XR]DR and [XR]RDY
->   i2c: omap: improve i462 errata handling
->   i2c: omap: re-factor receive/transmit data loop
->   i2c: omap: switch over to do {} while loop
->   i2c: omap: ack IRQ in parts
->   i2c: omap: switch to platform_get_irq()
->   i2c: omap: bus: add a receiver flag
->   i2c: omap: simplify errata check
->   i2c: omap: always return IRQ_HANDLED
->   i2c: omap: simplify IRQ exit path
->   i2c: omap: resize fifos before each message
->   i2c: omap: get rid of the "complete" label
->   i2c: omap: always return IRQ_HANDLED
->   i2c: omap: switch to threaded IRQ support
->   i2c: omap: remove unnecessary pm_runtime_suspended check
->   i2c: omap: switch over to autosuspend API
->   i2c: omap: sanitize exit path
->
-> Shubhrajyoti D (1):
->   i2c: omap: remove redundant status read
->
->  drivers/i2c/busses/i2c-omap.c |  442 +++++++++++++++++++++++++----------------
->  1 files changed, 271 insertions(+), 171 deletions(-)
->
+> 
+> Rebased on
+> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git musb
+> 
+> Kishon Vijay Abraham I (3):
+>   arm/dts: Add twl6030-usb data
+>   arm/dts: Add twl4030-usb data
+>   arm/dts: omap: Add usb_otg and glue data
+> 
+>  arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+>  arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+>  arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+>  arch/arm/boot/dts/omap4-panda.dts  |   10 ++++++++++
+>  arch/arm/boot/dts/omap4-sdp.dts    |   10 ++++++++++
+>  arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+>  arch/arm/boot/dts/twl4030.dtsi     |   21 +++++++++++++++++++++
+>  arch/arm/boot/dts/twl6030.dtsi     |    5 +++++
+>  8 files changed, 74 insertions(+)
+> 
