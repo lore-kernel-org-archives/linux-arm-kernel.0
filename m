@@ -1,63 +1,36 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 13:57:30 +0200
-Subject: [PATCH] arm/dts: Add omap3-beagle.dts
-In-Reply-To: <504F208C.8030507@ti.com>
-References: <1347317870-13419-1-git-send-email-jon-hunter@ti.com>
- <504F208C.8030507@ti.com>
-Message-ID: <504F272A.7010402@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 11 Sep 2012 14:54:50 +0300
+Subject: [PATCH v4 00/21] OMAP UART Patches
+In-Reply-To: <504F20FA.7020003@ti.com>
+References: <20120906122948.GC29202@arwen.pp.htv.fi>
+ <1346935540-1792-1-git-send-email-balbi@ti.com>
+ <87harahiv6.fsf@deeprootsystems.com>
+ <20120907054932.GB3136@arwen.pp.htv.fi>
+ <87oblhmu6g.fsf@deeprootsystems.com>
+ <20120908190423.GA14771@arwen.pp.htv.fi> <504F20FA.7020003@ti.com>
+Message-ID: <20120911115449.GH18907@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 01:29 PM, Benoit Cousson wrote:
-> Hi Jon,
-> 
-> On 09/11/2012 12:57 AM, Jon Hunter wrote:
->> Add a minimal dts for original OMAP3430/3530 version of the Beagle board. This
->> version of the Beagle board has 256MB of DDR and features the same TWL4030
->> power management IC (PMIC) as the Beagle board XM.
-> 
-> Thanks for the patch.
-> 
->> Given that the Beagle and Beagle-XM boards use the same PMIC, move the
->> definition of the VSIM regulator into the TWL4030.dtsi file so that we do not
->> need to duplicate in the Beagle board dts file.
-> 
-> Good, catch, regulator definition has indeed nothing to do outside the
-> twl4030.dtsi.
-> 
->> This has been boot tested on an OMAP3530 Beagle board and verifing that the
->> SD/MMC interface is working with a SD card.
->>
->> This patch is generated on top of Tony's patch for adding the Beagle board XM
->> dts file [1].
-> 
-> Tony has just updated his devel-dt with the DTS series I pushed plus the
-> beagle-xm introduction, so I'm gonna put this one on top and built a
-> for_3.7/dts_part2 branch sinec there are a couplf of USB / AM33xx pending.
+On Tue, Sep 11, 2012 at 05:01:06PM +0530, Shubhrajyoti wrote:
+> On Sunday 09 September 2012 12:34 AM, Felipe Balbi wrote:
+> >> In addition, IMO, if this was only tested on Panda (as suggested by
+> >> > earlier cover letters), it really should not have been merged until it
+> >> > got some broader testing.
+> > Shubhro's got his Tested-by tag. I believe he tested on beagleboard and
+> > omap4sdp. Shubhro, can you confirm which platforms you tested the UART
+> > patches ? cheers
+> Felipe I had boot tested on omap3sdp and onap4 sdp and did pm testing
+> on both with omap3 hitting off.
 
-OK, so in fact, it does not apply very well due to all the changes I
-introduced in my for_3.7/dts pull and then the beagle is now missing all
-the LEDs support recently added.
+Thanks ;-)
 
-So you should refresh that patch taking the latest devel-dt branch as a
-base and copying the latest beagle-xm.dts file.
-
->> diff --git a/arch/arm/mach-omap2/Makefile.boot b/arch/arm/mach-omap2/Makefile.boot
->> index 0e602b7..a469a55 100644
->> --- a/arch/arm/mach-omap2/Makefile.boot
->> +++ b/arch/arm/mach-omap2/Makefile.boot
->> @@ -3,7 +3,8 @@ params_phys-y		:= 0x80000100
->>  initrd_phys-y		:= 0x80800000
->>  
->>  dtb-$(CONFIG_SOC_OMAP2420)	+= omap2420-h4.dtb
->> -dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle-xm.dtb omap3-evm.dtb
->> +dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle.dtb omap3-beagle-xm.dtb \
->> +				   omap3-evm.dtb
-
-You'd better duplicate the whole line like it is done for OMAP4 instead
-of using the "\"
-
-+dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-evm.dtb
-
-Regards,
-Benoit
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/2634fe24/attachment.sig>
