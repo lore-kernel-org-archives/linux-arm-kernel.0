@@ -1,87 +1,50 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 13:39:15 -0400
-Subject: [PATCH v3 17/17] ARM: mm: clean up membank size limit checks
+Date: Tue, 11 Sep 2012 13:39:06 -0400
+Subject: [PATCH v3 08/17] ARM: LPAE: use phys_addr_t in free_memmap()
 In-Reply-To: <1347385155-11643-1-git-send-email-cyril@ti.com>
 References: <1347385155-11643-1-git-send-email-cyril@ti.com>
-Message-ID: <1347385155-11643-18-git-send-email-cyril@ti.com>
+Message-ID: <1347385155-11643-9-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the highmem sanity check code by simplifying the range
-checks with a pre-calculated size_limit.  This patch should otherwise have no
-functional impact on behavior.
+From: Vitaly Andrianov <vitalya@ti.com>
 
-This patch also removes a redundant (bank->start < vmalloc_limit) check, since
-this is already covered by the !highmem condition.
+The free_memmap() was mistakenly using unsigned long type to represent
+physical addresses.  This breaks on PAE systems where memory could be placed
+above the 32-bit addressible limit.
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+This patch fixes this function to properly use phys_addr_t instead.
+
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mm/mmu.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ arch/arm/mm/init.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 6c35483..50d9df5 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -917,10 +917,15 @@ void __init sanity_check_meminfo(void)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index ad722f1..1c5151a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -457,7 +457,7 @@ static inline void
+ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+ {
+ 	struct page *start_pg, *end_pg;
+-	unsigned long pg, pgend;
++	phys_addr_t pg, pgend;
  
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
-+		phys_addr_t size_limit;
-+
- 		*bank = meminfo.bank[i];
-+		size_limit = bank->size;
+ 	/*
+ 	 * Convert start_pfn/end_pfn to a struct page pointer.
+@@ -469,8 +469,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+ 	 * Convert to physical addresses, and
+ 	 * round start upwards and end downwards.
+ 	 */
+-	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
+-	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
++	pg = PAGE_ALIGN(__pa(start_pg));
++	pgend = __pa(end_pg) & PAGE_MASK;
  
- 		if (bank->start >= vmalloc_limit)
- 			highmem = 1;
-+		else
-+			size_limit = vmalloc_limit - bank->start;
- 
- 		bank->highmem = highmem;
- 
-@@ -929,8 +934,7 @@ void __init sanity_check_meminfo(void)
- 		 * Split those memory banks which are partially overlapping
- 		 * the vmalloc area greatly simplifying things later.
- 		 */
--		if (!highmem && bank->start < vmalloc_limit &&
--		    bank->size > vmalloc_limit - bank->start) {
-+		if (!highmem && bank->size > size_limit) {
- 			if (meminfo.nr_banks >= NR_BANKS) {
- 				printk(KERN_CRIT "NR_BANKS too low, "
- 						 "ignoring high memory\n");
-@@ -939,12 +943,12 @@ void __init sanity_check_meminfo(void)
- 					(meminfo.nr_banks - i) * sizeof(*bank));
- 				meminfo.nr_banks++;
- 				i++;
--				bank[1].size -= vmalloc_limit - bank->start;
-+				bank[1].size -= size_limit;
- 				bank[1].start = vmalloc_limit;
- 				bank[1].highmem = highmem = 1;
- 				j++;
- 			}
--			bank->size = vmalloc_limit - bank->start;
-+			bank->size = size_limit;
- 		}
- #else
- 		/*
-@@ -962,14 +966,13 @@ void __init sanity_check_meminfo(void)
- 		 * Check whether this memory bank would partially overlap
- 		 * the vmalloc area.
- 		 */
--		if (bank->start + bank->size > vmalloc_limit)
--			unsigned long newsize = vmalloc_limit - bank->start;
-+		if (bank->size > size_limit) {
- 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
- 			       "to -%.8llx (vmalloc region overlap).\n",
- 			       (unsigned long long)bank->start,
- 			       (unsigned long long)bank->start + bank->size - 1,
--			       (unsigned long long)bank->start + newsize - 1);
--			bank->size = newsize;
-+			       (unsigned long long)bank->start + size_limit - 1);
-+			bank->size = size_limit;
- 		}
- #endif
- 		if (!bank->highmem && bank->start + bank->size > arm_lowmem_limit)
+ 	/*
+ 	 * If there are free pages between these,
 -- 
 1.7.9.5
