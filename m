@@ -1,69 +1,29 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 12:09:34 +0200
-Subject: [PATCH v2 2/3] arm/dts: Add twl4030-usb data
-In-Reply-To: <1347345381-4390-3-git-send-email-kishon@ti.com>
-References: <1347345381-4390-1-git-send-email-kishon@ti.com>
- <1347345381-4390-3-git-send-email-kishon@ti.com>
-Message-ID: <504F0DDE.308@ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 11 Sep 2012 10:16:56 +0000
+Subject: [PATCH v8 2/3] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <5047AE2B.30807@ti.com>
+References: <cover.1346846464.git.afzal@ti.com>
+ <c14607ff57fca419dc9d7e0beaea197e001f4e25.1346846464.git.afzal@ti.com>
+ <5047AE2B.30807@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E1D2C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
-> Add twl4030-usb data node in twl4030 device tree file.
+Hi Jon,
 
-IIRC, the usb part on twl4030 was doing more than it does on twl6030.
+On Thu, Sep 06, 2012 at 01:25:23, Hunter, Jon wrote:
 
-Could you describe what part of the USB is really done by the TWL in
-that case?
-
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/twl4030.dtsi |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+> Nit-pick, I see some devices writing the above as ...
 > 
-> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-> index 22f4d13..761a5a5 100644
-> --- a/arch/arm/boot/dts/twl4030.dtsi
-> +++ b/arch/arm/boot/dts/twl4030.dtsi
-> @@ -37,6 +37,18 @@
->  		regulator-max-microvolt = <3150000>;
->  	};
->  
-> +	vusb1v5: regulator-vusb1v5 {
-> +		compatible = "ti,twl4030-vusb1v5";
-> +	};
-> +
-> +	vusb1v8: regulator-vusb1v8 {
-> +		compatible = "ti,twl4030-vusb1v8";
-> +	};
-> +
-> +	vusb3v1: regulator-vusb3v1 {
-> +		compatible = "ti,twl4030-vusb3v1";
-> +	};
-> +
->  	twl_gpio: gpio {
->  		compatible = "ti,twl4030-gpio";
->  		gpio-controller;
-> @@ -44,4 +56,13 @@
->  		interrupt-controller;
->  		#interrupt-cells = <1>;
->  	};
-> +
-> +	twl4030-usb {
+> 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+> 
+>  	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
 
-Same comment than before about the name. Is it the usb-comparator as well?
+> Otherwise ...
+> 
+> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-> +		compatible = "ti,twl4030-usb";
-> +		interrupts = < 10 4 >;
-> +		usb1v5-supply = <&vusb1v5>;
-> +		usb1v8-supply = <&vusb1v8>;
-> +		usb3v1-supply = <&vusb3v1>;
-> +		usb_mode = <1>;
+Thanks for your reviews, updated series has been posted
 
-Is this a TI only attribute or something generic?
-
-If this is TI only, it should be prefix with "ti," otherwise, it is fine.
-
-Regards,
-Benoit
+Regards
+Afzal
