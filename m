@@ -1,56 +1,97 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 11 Sep 2012 07:09:22 +0200
-Subject: [PATCH] ARM: kirkwood: Trim excess #includes in board-dnskw.c
-In-Reply-To: <1347287753-2805-1-git-send-email-jm@lentin.co.uk>
-References: <1347287753-2805-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <20120911050922.GA6836@lunn.ch>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Sep 2012 14:18:38 +0900
+Subject: Booting DT kernel on a non-DT bootloader
+In-Reply-To: <20120903085428.GA18323@verge.net.au>
+References: <20120903085428.GA18323@verge.net.au>
+Message-ID: <20120911051838.GH23356@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 03:35:53PM +0100, Jamie Lentin wrote:
-> Lots of code has now moved into the devicetree, leaving a collection of
-> useless header files. Tidy them up.
+On Mon, Sep 03, 2012 at 05:54:29PM +0900, Simon Horman wrote:
+> Hi,
 > 
-> This applies cleanly atop of my previous patch, "[PATCH V2 2/2] ARM:
-> kirkwood: Use devicetree to define DNS-32[05] fan", which also removes
-> gpio-fan.h
+> it has come to pass that for some of the boards under mach-shmobile
+> we are in the following situation:
 > 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> ---
->  arch/arm/mach-kirkwood/board-dnskw.c |    9 ---------
->  1 file changed, 9 deletions(-)
+> * The kernel requires a device tree for booting
+> * The default boot loader for the board does not support device tree;
+>   and in general it is not practical for developers to upload the
+>   boot-loader.
 > 
-> diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-> index 6ac7a8d..43d16d6 100644
-> --- a/arch/arm/mach-kirkwood/board-dnskw.c
-> +++ b/arch/arm/mach-kirkwood/board-dnskw.c
-> @@ -14,17 +14,8 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
-> -#include <linux/ata_platform.h>
->  #include <linux/mv643xx_eth.h>
-> -#include <linux/of.h>
->  #include <linux/gpio.h>
-> -#include <linux/input.h>
-> -#include <linux/leds.h>
-> -#include <asm/mach-types.h>
-> -#include <asm/mach/arch.h>
-> -#include <asm/mach/map.h>
-> -#include <mach/kirkwood.h>
-> -#include <mach/bridge-regs.h>
->  #include "common.h"
->  #include "mpp.h"
+> Fortunately there is a solution, which is to append a device tree to
+> the kernel image and boot that by the normal means supported by the
+> boot loader.
+> 
+> Here is how to achieve that:
+> 
+> 1. Make sure you have CONFIG_ARM_APPENDED_DTB=y in your .config
+> 
+> 2. Create original zImage
+> 
+>     ARCH=arm make zImage
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+      If you intend to create a uImage (step 5) then you should run
 
-Hi Jamie
+      ARCH=arm make uImage
 
-A minor point. I personally would of based this patch on top of a
-plain -rc tag and not on top of the gpio-fan code. The gpio-fan code
-might need more revisions before its acceptable, where as this change
-is very likely to be accepted first time and is not controversial in
-any way. So Jason is likely to apply this now, before the gpio-fan
-code hits.
+      This ensures that arch/arm/boot/.uImage.cmd is up to date
 
-     Andrew
+> 3. Create flattened device tree (run this in kernel tree)
+> 
+>    i) There is code in the next branch of my renesas tree to allow
+>       this to be achieved using
+> 
+>       # make dtbs
+> 
+>       This will create the device tree for the prevaling kernel config,
+>       if one exists.
+> 
+>       e.g For Armadillo 800 EVA
+> 
+>       # make dtbs
+>       scripts/kconfig/conf --silentoldconfig Kconfig
+>         DTC     arch/arm/boot/r8a7740-armadillo800eva.dtb
+>       DTC: dts->dtb  on file "arch/arm/boot/dts/r8a7740-armadillo800eva.dts"
+> 
+>       Else it will do nothing
+>       # make dtbs
+>       scripts/kconfig/conf --silentoldconfig Kconfig
+>       make[1]: Nothing to be done for `arch/arm/boot/dtbs'.
+> 
+> 
+>    ii) If you are running a current or other kernel, which does not
+>        support "make dtbs" for mach-shmobile boards, then the dtb
+>        may manually be compiled using dtc.
+> 
+>        e.g. For the Armadillo 800 EVA
+> 
+>        dtc -I dts -O dtb arch/arm/boot/dts/r8a7740-armadillo800eva.dts \
+>            -o arch/arm/boot/dts/r8a7740-armadillo800eva.dtb
+> 
+>     Note: Please make sure you have a recent version of dtc.
+>           I have verified that the above works with DTC 1.3.0 from
+> 	  the Debian device-tree-compiler 1.3.0-2 package.
+> 	  I have had reports that it fails using DTC 1.2.0.
+> 
+> 4. Append device tree to zImage (very high-tech!)
+> 
+>    cat arch/arm/boot/zImage \
+> 	arch/arm/boot/dts/r8a7740-armadillo800eva.dtb >
+> 	arch/arm/boot/zImage.dtb
+> 
+> 5. Create uImage (optional)
+> 
+>    If you need to create a uImage then this may be done using
+>    the new zImage + dtb as follows:
+> 
+>    # cp arch/arm/boot/zImage.dtb arch/arm/boot/zImage
+>    # $(cut -f 3- -d ' ' < arch/arm/boot/.uImage.cmd)
+> 
+> 6. You should now be able to either boot the resulting zImage.dtb
+>    or uImage, use whichever suits the needs of the bootloader in use.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
