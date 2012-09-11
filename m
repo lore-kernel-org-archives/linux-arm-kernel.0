@@ -1,44 +1,41 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 12 Sep 2012 00:00:48 +0200
-Subject: [PATCHv7 00/23]I2C big cleanup
-In-Reply-To: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120911220048.GD27031@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 11 Sep 2012 22:02:48 +0000 (UTC)
+Subject: [PATCH v4 00/21] OMAP UART Patches
+In-Reply-To: <alpine.DEB.2.00.1209062137000.11516@utopia.booyaka.com>
+References: <20120906122948.GC29202@arwen.pp.htv.fi>
+ <1346935540-1792-1-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.00.1209062137000.11516@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1209112141220.9444@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 03:11:55PM +0530, Shubhrajyoti D wrote:
-> Changes since v1:
->        - removed tabification on patch 6/17
->        - removed dev_err() which was introduced on patch 09/17
-> Changes since v2:
->         - do not set full fifo depth in the RDR interrupt.
->         - some changelog updates.
->         - rebase to the Wolfram's tree.
-> Changes since v3:
->         - Remove a redundant read of status register
->         - Read the dev->buf_len variable instead of the register
->         as the information of the remaining bytes is there.
-> Changes since v4:
->         - Ack the arbitration lost.
->         - Rebase to the i2c-embedded/for-next branch.
-> Changes since v5:
->         - Rebase to latest mainline
->         - Added some more cleanup patches so as have a consolidated series.
-> Changes since v6:
->         - Fix comments on setting the pdev to NULL.
->         - Trivial changelog update
 
-Looks mostly good, thanks. Only a few comments. Oh, and I still get
-reports about a section mismatch ;)
+Hi Felipe
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/b9d6e8b1/attachment.sig>
+Just tested these OMAP serial changes at commit 
+e36851d0fa94b0f7802b3cc80406dbd3ef4f2f16 ("serial: omap: fix compile 
+breakage").  There's good news and bad news...
+
+The good news is that after applying this series, the 'OMAP4 UART garbage 
+on long transmit buffers when PM is enabled' bug:
+
+http://www.pwsan.com/omap/testlogs/test_v3.6-rc5/20120908202511/pm/4430es2panda/4430es2panda_log.txt
+
+... goes away.  (Unclear if it's because the underlying bug was fixed, or 
+if unrelated changes are masking it.)  Not sure what caused the problem to 
+go away exactly, but it's one of the changes between d37c6ceb and bf63a08.  
+So that's good!
+
+The bad news is that N800 no longer boots -- or the UART dies during 
+serial init:
+
+http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/boot/2420n800/2420n800_log.txt
+
+The problem doesn't seem to affect the 2430SDP.
+
+Could you put together a patch to fix N800?
+
+
+regards
+
+- Paul
