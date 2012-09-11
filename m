@@ -1,36 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 11 Sep 2012 14:54:50 +0300
-Subject: [PATCH v4 00/21] OMAP UART Patches
-In-Reply-To: <504F20FA.7020003@ti.com>
-References: <20120906122948.GC29202@arwen.pp.htv.fi>
- <1346935540-1792-1-git-send-email-balbi@ti.com>
- <87harahiv6.fsf@deeprootsystems.com>
- <20120907054932.GB3136@arwen.pp.htv.fi>
- <87oblhmu6g.fsf@deeprootsystems.com>
- <20120908190423.GA14771@arwen.pp.htv.fi> <504F20FA.7020003@ti.com>
-Message-ID: <20120911115449.GH18907@arwen.pp.htv.fi>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 11 Sep 2012 17:29:05 +0530
+Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <504E20BE.8050107@wwwdotorg.org>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+ <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
+ <5049252D.9000802@wwwdotorg.org>
+ <20120907025847.GI26709@S2101-09.ap.freescale.net>
+ <504A26E4.4070600@wwwdotorg.org>
+ <20120910011741.GP26709@S2101-09.ap.freescale.net>
+ <504E20BE.8050107@wwwdotorg.org>
+Message-ID: <504F2789.1070006@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 05:01:06PM +0530, Shubhrajyoti wrote:
-> On Sunday 09 September 2012 12:34 AM, Felipe Balbi wrote:
-> >> In addition, IMO, if this was only tested on Panda (as suggested by
-> >> > earlier cover letters), it really should not have been merged until it
-> >> > got some broader testing.
-> > Shubhro's got his Tested-by tag. I believe he tested on beagleboard and
-> > omap4sdp. Shubhro, can you confirm which platforms you tested the UART
-> > patches ? cheers
-> Felipe I had boot tested on omap3sdp and onap4 sdp and did pm testing
-> on both with omap3 hitting off.
+On Monday 10 September 2012 10:47 PM, Stephen Warren wrote:
+> On 09/09/2012 07:17 PM, Shawn Guo wrote:
+>> On Fri, Sep 07, 2012 at 10:55:00AM -0600, Stephen Warren wrote:
+>>> Yes, that does solve the problem (well, with s/late_init/late_initcall/).
+>>>
+>>> As you imply, that change wouldn't help if cpu-tegra.c was built as a
+>>> module.
+>> I doubt that.  Have you confirmed it with testing?  When you install
+>> module cpu-tegra, the pcie initialization has been done, right?
+> Never mind, the code can't be built as a module anyway.
+>
+> Aside from that, I misinterpreted your test patch, and thought that it
+> was moving the Tegra cpufreq driver initialization earlier, but it's
+> actually moving it later, and in fact by chance after PCIe
+> initialization, which explains why it solves the issue.
+>
+> I think the root of the problem is that cpufreq is lowering the CPU
+> frequency, yet the patch which converted Tegra to the common clock
+> framework removed the code that actually changes the CPU clock rate. So,
+> cpufreq thinks the CPU is running at e.g. 216MHz, but it's actually
+> still running at 1.0GHz, and hence re-calculating the delay loops breaks
+> things, since delays aren't as long as the system thinks they are. The
+> variability is due to whether lowering the CPU frequency just happens to
+> occur before or after the PCIe controller is initialized.
+>
+> Prashant, are you able to fix the clock driver deficiency within the
+> next 2-3 days or so (so I can include the fix in the pull requests I
+> send for 3.7, which need to be sent before the end of the week)? Or, do
+> we need to disable cpufreq for Tegra because of this?
 
-Thanks ;-)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/2634fe24/attachment.sig>
+Your fix looks good to me except the concern I have mentioned in reply to that patch.
