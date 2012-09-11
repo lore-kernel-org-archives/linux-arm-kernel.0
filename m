@@ -1,609 +1,302 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Sep 2012 22:31:13 -0700
-Subject: [PATCH 13/17] ARM: OMAP1: Move plat/irqs.h to mach/irqs.h
+Date: Mon, 10 Sep 2012 22:31:22 -0700
+Subject: [PATCH 16/17] ARM: OMAP2+ Move SoC specific headers to be local to
+ mach-omap2
 In-Reply-To: <20120911052934.29637.9190.stgit@muffinssi.local>
 References: <20120911052934.29637.9190.stgit@muffinssi.local>
-Message-ID: <20120911053113.29637.62955.stgit@muffinssi.local>
+Message-ID: <20120911053122.29637.73237.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is now omap1 specific files.
+These can now be moved to be local headers in mach-omap2.
+
+Note that this patch removes arch/arm/plat-omap/devices.c as it
+will get removed anyways with Paul Walmsley's patch
+"ARM: OMAP: split OMAP1, OMAP2+ RNG device registration".
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/ams-delta-fiq-handler.S      |    1 
- arch/arm/mach-omap1/dma.c                        |    3 
- arch/arm/mach-omap1/include/mach/ams-delta-fiq.h |    2 
- arch/arm/mach-omap1/include/mach/irqs.h          |  267 ++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/irqs.h           |  268 ----------------------
- 5 files changed, 268 insertions(+), 273 deletions(-)
- delete mode 100644 arch/arm/plat-omap/include/plat/irqs.h
+ arch/arm/mach-omap2/am33xx.h               |    0 
+ arch/arm/mach-omap2/clock33xx_data.c       |    2 -
+ arch/arm/mach-omap2/control.h              |    2 -
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c  |    3 -
+ arch/arm/mach-omap2/omap24xx.h             |    2 -
+ arch/arm/mach-omap2/omap34xx.h             |    2 -
+ arch/arm/mach-omap2/omap44xx.h             |    0 
+ arch/arm/mach-omap2/omap54xx.h             |    0 
+ arch/arm/mach-omap2/sleep24xx.S            |    3 -
+ arch/arm/mach-omap2/sleep34xx.S            |    2 -
+ arch/arm/mach-omap2/sleep44xx.S            |    2 -
+ arch/arm/mach-omap2/soc.h                  |   12 ++--
+ arch/arm/mach-omap2/ti81xx.h               |    0 
+ arch/arm/plat-omap/Makefile                |    3 -
+ arch/arm/plat-omap/devices.c               |   91 ----------------------------
+ 15 files changed, 13 insertions(+), 111 deletions(-)
+ rename arch/arm/{plat-omap/include/plat/am33xx.h => mach-omap2/am33xx.h} (100%)
+ rename arch/arm/{plat-omap/include/plat/omap24xx.h => mach-omap2/omap24xx.h} (98%)
+ rename arch/arm/{plat-omap/include/plat/omap34xx.h => mach-omap2/omap34xx.h} (98%)
+ rename arch/arm/{plat-omap/include/plat/omap44xx.h => mach-omap2/omap44xx.h} (100%)
+ rename arch/arm/{plat-omap/include/plat/omap54xx.h => mach-omap2/omap54xx.h} (100%)
+ rename arch/arm/{plat-omap/include/plat/ti81xx.h => mach-omap2/ti81xx.h} (100%)
+ delete mode 100644 arch/arm/plat-omap/devices.c
 
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq-handler.S b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-index a051cb8..d2b6acc 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-+++ b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-@@ -18,6 +18,7 @@
+diff --git a/arch/arm/plat-omap/include/plat/am33xx.h b/arch/arm/mach-omap2/am33xx.h
+similarity index 100%
+rename from arch/arm/plat-omap/include/plat/am33xx.h
+rename to arch/arm/mach-omap2/am33xx.h
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index 25bbcc7..7aa5eca 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -18,8 +18,8 @@
+ #include <linux/list.h>
+ #include <linux/clk.h>
+ #include <plat/clkdev_omap.h>
+-#include <plat/am33xx.h>
  
- #include <plat/board-ams-delta.h>
- 
-+#include <mach/irqs.h>
- #include <mach/ams-delta-fiq.h>
- 
++#include "am33xx.h"
  #include "iomap.h"
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index 3ef7d52..b0b0f0f 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -27,7 +27,8 @@
+ #include "control.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index b8cdc85..c1a5cab 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -21,7 +21,7 @@
+ #include <mach/ctrl_module_pad_core_44xx.h>
+ #include <mach/ctrl_module_pad_wkup_44xx.h>
  
- #include <plat/dma.h>
- #include <plat/tc.h>
--#include <plat/irqs.h>
-+
-+#include <mach/irqs.h>
+-#include <plat/am33xx.h>
++#include "am33xx.h"
  
- #define OMAP1_DMA_BASE			(0xfffed800)
- #define OMAP1_LOGICAL_DMA_CH_COUNT	17
-diff --git a/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h b/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h
-index 23eed00..adb5e76 100644
---- a/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h
-+++ b/arch/arm/mach-omap1/include/mach/ams-delta-fiq.h
-@@ -14,8 +14,6 @@
- #ifndef __AMS_DELTA_FIQ_H
- #define __AMS_DELTA_FIQ_H
+ #ifndef __ASSEMBLY__
+ #define OMAP242X_CTRL_REGADDR(reg)					\
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 637a1bd..ff4e6a0 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -50,9 +50,8 @@
+ #include <asm/suspend.h>
+ #include <asm/hardware/cache-l2x0.h>
  
--#include <plat/irqs.h>
+-#include <plat/omap44xx.h>
 -
+ #include "common.h"
++#include "omap44xx.h"
+ #include "omap4-sar-layout.h"
+ #include "pm.h"
+ #include "prcm_mpu44xx.h"
+diff --git a/arch/arm/plat-omap/include/plat/omap24xx.h b/arch/arm/mach-omap2/omap24xx.h
+similarity index 98%
+rename from arch/arm/plat-omap/include/plat/omap24xx.h
+rename to arch/arm/mach-omap2/omap24xx.h
+index 92df9e2..641a2c8 100644
+--- a/arch/arm/plat-omap/include/plat/omap24xx.h
++++ b/arch/arm/mach-omap2/omap24xx.h
+@@ -1,6 +1,4 @@
  /*
-  * Interrupt number used for passing control from FIQ to IRQ.
-  * IRQ12, described as reserved, has been selected.
-diff --git a/arch/arm/mach-omap1/include/mach/irqs.h b/arch/arm/mach-omap1/include/mach/irqs.h
-index 9292fdc..729992d 100644
---- a/arch/arm/mach-omap1/include/mach/irqs.h
-+++ b/arch/arm/mach-omap1/include/mach/irqs.h
-@@ -1,5 +1,268 @@
+- * arch/arm/plat-omap/include/mach/omap24xx.h
+- *
+  * This file contains the processor specific definitions
+  * of the TI OMAP24XX.
+  *
+diff --git a/arch/arm/plat-omap/include/plat/omap34xx.h b/arch/arm/mach-omap2/omap34xx.h
+similarity index 98%
+rename from arch/arm/plat-omap/include/plat/omap34xx.h
+rename to arch/arm/mach-omap2/omap34xx.h
+index 0d818ac..c0d1b4b 100644
+--- a/arch/arm/plat-omap/include/plat/omap34xx.h
++++ b/arch/arm/mach-omap2/omap34xx.h
+@@ -1,6 +1,4 @@
  /*
-- * arch/arm/mach-omap1/include/mach/irqs.h
-+ *  arch/arm/plat-omap/include/mach/irqs.h
-+ *
-+ *  Copyright (C) Greg Lonnon 2001
-+ *  Updated for OMAP-1610 by Tony Lindgren <tony@atomide.com>
-+ *
-+ * Copyright (C) 2009 Texas Instruments
-+ * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ *
-+ * NOTE: The interrupt vectors for the OMAP-1509, OMAP-1510, and OMAP-1610
-+ *	 are different.
-  */
+- * arch/arm/plat-omap/include/mach/omap34xx.h
+- *
+  * This file contains the processor specific definitions of the TI OMAP34XX.
+  *
+  * Copyright (C) 2007 Texas Instruments.
+diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/mach-omap2/omap44xx.h
+similarity index 100%
+rename from arch/arm/plat-omap/include/plat/omap44xx.h
+rename to arch/arm/mach-omap2/omap44xx.h
+diff --git a/arch/arm/plat-omap/include/plat/omap54xx.h b/arch/arm/mach-omap2/omap54xx.h
+similarity index 100%
+rename from arch/arm/plat-omap/include/plat/omap54xx.h
+rename to arch/arm/mach-omap2/omap54xx.h
+diff --git a/arch/arm/mach-omap2/sleep24xx.S b/arch/arm/mach-omap2/sleep24xx.S
+index d4bf904..ce0ccd2 100644
+--- a/arch/arm/mach-omap2/sleep24xx.S
++++ b/arch/arm/mach-omap2/sleep24xx.S
+@@ -28,8 +28,7 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
  
--#include <plat/irqs.h>
-+#ifndef __ASM_ARCH_OMAP15XX_IRQS_H
-+#define __ASM_ARCH_OMAP15XX_IRQS_H
-+
-+/*
-+ * IRQ numbers for interrupt handler 1
-+ *
-+ * NOTE: See also the OMAP-1510 and 1610 specific IRQ numbers below
-+ *
-+ */
-+#define INT_CAMERA		1
-+#define INT_FIQ			3
-+#define INT_RTDX		6
-+#define INT_DSP_MMU_ABORT	7
-+#define INT_HOST		8
-+#define INT_ABORT		9
-+#define INT_BRIDGE_PRIV		13
-+#define INT_GPIO_BANK1		14
-+#define INT_UART3		15
-+#define INT_TIMER3		16
-+#define INT_DMA_CH0_6		19
-+#define INT_DMA_CH1_7		20
-+#define INT_DMA_CH2_8		21
-+#define INT_DMA_CH3		22
-+#define INT_DMA_CH4		23
-+#define INT_DMA_CH5		24
-+#define INT_TIMER1		26
-+#define INT_WD_TIMER		27
-+#define INT_BRIDGE_PUB		28
-+#define INT_TIMER2		30
-+#define INT_LCD_CTRL		31
-+
-+/*
-+ * OMAP-1510 specific IRQ numbers for interrupt handler 1
-+ */
-+#define INT_1510_IH2_IRQ	0
-+#define INT_1510_RES2		2
-+#define INT_1510_SPI_TX		4
-+#define INT_1510_SPI_RX		5
-+#define INT_1510_DSP_MAILBOX1	10
-+#define INT_1510_DSP_MAILBOX2	11
-+#define INT_1510_RES12		12
-+#define INT_1510_LB_MMU		17
-+#define INT_1510_RES18		18
-+#define INT_1510_LOCAL_BUS	29
-+
-+/*
-+ * OMAP-1610 specific IRQ numbers for interrupt handler 1
-+ */
-+#define INT_1610_IH2_IRQ	INT_1510_IH2_IRQ
-+#define INT_1610_IH2_FIQ	2
-+#define INT_1610_McBSP2_TX	4
-+#define INT_1610_McBSP2_RX	5
-+#define INT_1610_DSP_MAILBOX1	10
-+#define INT_1610_DSP_MAILBOX2	11
-+#define INT_1610_LCD_LINE	12
-+#define INT_1610_GPTIMER1	17
-+#define INT_1610_GPTIMER2	18
-+#define INT_1610_SSR_FIFO_0	29
-+
-+/*
-+ * OMAP-7xx specific IRQ numbers for interrupt handler 1
-+ */
-+#define INT_7XX_IH2_FIQ		0
-+#define INT_7XX_IH2_IRQ		1
-+#define INT_7XX_USB_NON_ISO	2
-+#define INT_7XX_USB_ISO		3
-+#define INT_7XX_ICR		4
-+#define INT_7XX_EAC		5
-+#define INT_7XX_GPIO_BANK1	6
-+#define INT_7XX_GPIO_BANK2	7
-+#define INT_7XX_GPIO_BANK3	8
-+#define INT_7XX_McBSP2TX	10
-+#define INT_7XX_McBSP2RX	11
-+#define INT_7XX_McBSP2RX_OVF	12
-+#define INT_7XX_LCD_LINE	14
-+#define INT_7XX_GSM_PROTECT	15
-+#define INT_7XX_TIMER3		16
-+#define INT_7XX_GPIO_BANK5	17
-+#define INT_7XX_GPIO_BANK6	18
-+#define INT_7XX_SPGIO_WR	29
-+
-+/*
-+ * IRQ numbers for interrupt handler 2
-+ *
-+ * NOTE: See also the OMAP-1510 and 1610 specific IRQ numbers below
-+ */
-+#define IH2_BASE		32
-+
-+#define INT_KEYBOARD		(1 + IH2_BASE)
-+#define INT_uWireTX		(2 + IH2_BASE)
-+#define INT_uWireRX		(3 + IH2_BASE)
-+#define INT_I2C			(4 + IH2_BASE)
-+#define INT_MPUIO		(5 + IH2_BASE)
-+#define INT_USB_HHC_1		(6 + IH2_BASE)
-+#define INT_McBSP3TX		(10 + IH2_BASE)
-+#define INT_McBSP3RX		(11 + IH2_BASE)
-+#define INT_McBSP1TX		(12 + IH2_BASE)
-+#define INT_McBSP1RX		(13 + IH2_BASE)
-+#define INT_UART1		(14 + IH2_BASE)
-+#define INT_UART2		(15 + IH2_BASE)
-+#define INT_BT_MCSI1TX		(16 + IH2_BASE)
-+#define INT_BT_MCSI1RX		(17 + IH2_BASE)
-+#define INT_SOSSI_MATCH		(19 + IH2_BASE)
-+#define INT_USB_W2FC		(20 + IH2_BASE)
-+#define INT_1WIRE		(21 + IH2_BASE)
-+#define INT_OS_TIMER		(22 + IH2_BASE)
-+#define INT_MMC			(23 + IH2_BASE)
-+#define INT_GAUGE_32K		(24 + IH2_BASE)
-+#define INT_RTC_TIMER		(25 + IH2_BASE)
-+#define INT_RTC_ALARM		(26 + IH2_BASE)
-+#define INT_MEM_STICK		(27 + IH2_BASE)
-+
-+/*
-+ * OMAP-1510 specific IRQ numbers for interrupt handler 2
-+ */
-+#define INT_1510_DSP_MMU	(28 + IH2_BASE)
-+#define INT_1510_COM_SPI_RO	(31 + IH2_BASE)
-+
-+/*
-+ * OMAP-1610 specific IRQ numbers for interrupt handler 2
-+ */
-+#define INT_1610_FAC		(0 + IH2_BASE)
-+#define INT_1610_USB_HHC_2	(7 + IH2_BASE)
-+#define INT_1610_USB_OTG	(8 + IH2_BASE)
-+#define INT_1610_SoSSI		(9 + IH2_BASE)
-+#define INT_1610_SoSSI_MATCH	(19 + IH2_BASE)
-+#define INT_1610_DSP_MMU	(28 + IH2_BASE)
-+#define INT_1610_McBSP2RX_OF	(31 + IH2_BASE)
-+#define INT_1610_STI		(32 + IH2_BASE)
-+#define INT_1610_STI_WAKEUP	(33 + IH2_BASE)
-+#define INT_1610_GPTIMER3	(34 + IH2_BASE)
-+#define INT_1610_GPTIMER4	(35 + IH2_BASE)
-+#define INT_1610_GPTIMER5	(36 + IH2_BASE)
-+#define INT_1610_GPTIMER6	(37 + IH2_BASE)
-+#define INT_1610_GPTIMER7	(38 + IH2_BASE)
-+#define INT_1610_GPTIMER8	(39 + IH2_BASE)
-+#define INT_1610_GPIO_BANK2	(40 + IH2_BASE)
-+#define INT_1610_GPIO_BANK3	(41 + IH2_BASE)
-+#define INT_1610_MMC2		(42 + IH2_BASE)
-+#define INT_1610_CF		(43 + IH2_BASE)
-+#define INT_1610_WAKE_UP_REQ	(46 + IH2_BASE)
-+#define INT_1610_GPIO_BANK4	(48 + IH2_BASE)
-+#define INT_1610_SPI		(49 + IH2_BASE)
-+#define INT_1610_DMA_CH6	(53 + IH2_BASE)
-+#define INT_1610_DMA_CH7	(54 + IH2_BASE)
-+#define INT_1610_DMA_CH8	(55 + IH2_BASE)
-+#define INT_1610_DMA_CH9	(56 + IH2_BASE)
-+#define INT_1610_DMA_CH10	(57 + IH2_BASE)
-+#define INT_1610_DMA_CH11	(58 + IH2_BASE)
-+#define INT_1610_DMA_CH12	(59 + IH2_BASE)
-+#define INT_1610_DMA_CH13	(60 + IH2_BASE)
-+#define INT_1610_DMA_CH14	(61 + IH2_BASE)
-+#define INT_1610_DMA_CH15	(62 + IH2_BASE)
-+#define INT_1610_NAND		(63 + IH2_BASE)
-+#define INT_1610_SHA1MD5	(91 + IH2_BASE)
-+
-+/*
-+ * OMAP-7xx specific IRQ numbers for interrupt handler 2
-+ */
-+#define INT_7XX_HW_ERRORS	(0 + IH2_BASE)
-+#define INT_7XX_NFIQ_PWR_FAIL	(1 + IH2_BASE)
-+#define INT_7XX_CFCD		(2 + IH2_BASE)
-+#define INT_7XX_CFIREQ		(3 + IH2_BASE)
-+#define INT_7XX_I2C		(4 + IH2_BASE)
-+#define INT_7XX_PCC		(5 + IH2_BASE)
-+#define INT_7XX_MPU_EXT_NIRQ	(6 + IH2_BASE)
-+#define INT_7XX_SPI_100K_1	(7 + IH2_BASE)
-+#define INT_7XX_SYREN_SPI	(8 + IH2_BASE)
-+#define INT_7XX_VLYNQ		(9 + IH2_BASE)
-+#define INT_7XX_GPIO_BANK4	(10 + IH2_BASE)
-+#define INT_7XX_McBSP1TX	(11 + IH2_BASE)
-+#define INT_7XX_McBSP1RX	(12 + IH2_BASE)
-+#define INT_7XX_McBSP1RX_OF	(13 + IH2_BASE)
-+#define INT_7XX_UART_MODEM_IRDA_2 (14 + IH2_BASE)
-+#define INT_7XX_UART_MODEM_1	(15 + IH2_BASE)
-+#define INT_7XX_MCSI		(16 + IH2_BASE)
-+#define INT_7XX_uWireTX		(17 + IH2_BASE)
-+#define INT_7XX_uWireRX		(18 + IH2_BASE)
-+#define INT_7XX_SMC_CD		(19 + IH2_BASE)
-+#define INT_7XX_SMC_IREQ	(20 + IH2_BASE)
-+#define INT_7XX_HDQ_1WIRE	(21 + IH2_BASE)
-+#define INT_7XX_TIMER32K	(22 + IH2_BASE)
-+#define INT_7XX_MMC_SDIO	(23 + IH2_BASE)
-+#define INT_7XX_UPLD		(24 + IH2_BASE)
-+#define INT_7XX_USB_HHC_1	(27 + IH2_BASE)
-+#define INT_7XX_USB_HHC_2	(28 + IH2_BASE)
-+#define INT_7XX_USB_GENI	(29 + IH2_BASE)
-+#define INT_7XX_USB_OTG		(30 + IH2_BASE)
-+#define INT_7XX_CAMERA_IF	(31 + IH2_BASE)
-+#define INT_7XX_RNG		(32 + IH2_BASE)
-+#define INT_7XX_DUAL_MODE_TIMER (33 + IH2_BASE)
-+#define INT_7XX_DBB_RF_EN	(34 + IH2_BASE)
-+#define INT_7XX_MPUIO_KEYPAD	(35 + IH2_BASE)
-+#define INT_7XX_SHA1_MD5	(36 + IH2_BASE)
-+#define INT_7XX_SPI_100K_2	(37 + IH2_BASE)
-+#define INT_7XX_RNG_IDLE	(38 + IH2_BASE)
-+#define INT_7XX_MPUIO		(39 + IH2_BASE)
-+#define INT_7XX_LLPC_LCD_CTRL_CAN_BE_OFF	(40 + IH2_BASE)
-+#define INT_7XX_LLPC_OE_FALLING (41 + IH2_BASE)
-+#define INT_7XX_LLPC_OE_RISING	(42 + IH2_BASE)
-+#define INT_7XX_LLPC_VSYNC	(43 + IH2_BASE)
-+#define INT_7XX_WAKE_UP_REQ	(46 + IH2_BASE)
-+#define INT_7XX_DMA_CH6		(53 + IH2_BASE)
-+#define INT_7XX_DMA_CH7		(54 + IH2_BASE)
-+#define INT_7XX_DMA_CH8		(55 + IH2_BASE)
-+#define INT_7XX_DMA_CH9		(56 + IH2_BASE)
-+#define INT_7XX_DMA_CH10	(57 + IH2_BASE)
-+#define INT_7XX_DMA_CH11	(58 + IH2_BASE)
-+#define INT_7XX_DMA_CH12	(59 + IH2_BASE)
-+#define INT_7XX_DMA_CH13	(60 + IH2_BASE)
-+#define INT_7XX_DMA_CH14	(61 + IH2_BASE)
-+#define INT_7XX_DMA_CH15	(62 + IH2_BASE)
-+#define INT_7XX_NAND		(63 + IH2_BASE)
-+
-+/* Max. 128 level 2 IRQs (OMAP1610), 192 GPIOs (OMAP730/850) and
-+ * 16 MPUIO lines */
-+#define OMAP_MAX_GPIO_LINES	192
-+#define IH_GPIO_BASE		(128 + IH2_BASE)
-+#define IH_MPUIO_BASE		(OMAP_MAX_GPIO_LINES + IH_GPIO_BASE)
-+#define OMAP_IRQ_END		(IH_MPUIO_BASE + 16)
-+
-+/* External FPGA handles interrupts on Innovator boards */
-+#define	OMAP_FPGA_IRQ_BASE	(OMAP_IRQ_END)
-+#ifdef	CONFIG_MACH_OMAP_INNOVATOR
-+#define OMAP_FPGA_NR_IRQS	24
-+#else
-+#define OMAP_FPGA_NR_IRQS	0
-+#endif
-+#define OMAP_FPGA_IRQ_END	(OMAP_FPGA_IRQ_BASE + OMAP_FPGA_NR_IRQS)
-+
-+#define NR_IRQS			OMAP_FPGA_IRQ_END
-+
-+#define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
-+
-+#include <mach/hardware.h>
-+
-+#ifdef CONFIG_FIQ
-+#define FIQ_START		1024
-+#endif
-+
-+#endif
-diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+-#include <plat/omap24xx.h>
+-
++#include "omap24xx.h"
+ #include "sdrc.h"
+ 
+ /* First address of reserved address space?  apparently valid for OMAP2 & 3 */
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 3fbe496..5069879 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -26,9 +26,9 @@
+ 
+ #include <asm/assembler.h>
+ 
+-#include <plat/omap34xx.h>
+ #include <plat/sram.h>
+ 
++#include "omap34xx.h"
+ #include "iomap.h"
+ #include "cm2xxx_3xxx.h"
+ #include "prm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
+index 91e71d8..b7d8ead 100644
+--- a/arch/arm/mach-omap2/sleep44xx.S
++++ b/arch/arm/mach-omap2/sleep44xx.S
+@@ -14,10 +14,10 @@
+ #include <asm/memory.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
+-#include <plat/omap44xx.h>
+ #include <mach/omap-secure.h>
+ 
+ #include "common.h"
++#include "omap44xx.h"
+ #include "omap4-sar-layout.h"
+ 
+ #if defined(CONFIG_SMP) && defined(CONFIG_PM)
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 93c08de..fc9b96d 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -1,7 +1,7 @@
+ #include <plat/cpu.h>
+-#include <plat/omap24xx.h>
+-#include <plat/omap34xx.h>
+-#include <plat/omap44xx.h>
+-#include <plat/ti81xx.h>
+-#include <plat/am33xx.h>
+-#include <plat/omap54xx.h>
++#include "omap24xx.h"
++#include "omap34xx.h"
++#include "omap44xx.h"
++#include "ti81xx.h"
++#include "am33xx.h"
++#include "omap54xx.h"
+diff --git a/arch/arm/plat-omap/include/plat/ti81xx.h b/arch/arm/mach-omap2/ti81xx.h
+similarity index 100%
+rename from arch/arm/plat-omap/include/plat/ti81xx.h
+rename to arch/arm/mach-omap2/ti81xx.h
+diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+index 961bf85..a017e99 100644
+--- a/arch/arm/plat-omap/Makefile
++++ b/arch/arm/plat-omap/Makefile
+@@ -3,8 +3,7 @@
+ #
+ 
+ # Common support
+-obj-y := common.o sram.o clock.o devices.o dma.o mux.o \
+-	 fb.o counter_32k.o
++obj-y := common.o sram.o clock.o dma.o mux.o fb.o counter_32k.o
+ obj-m :=
+ obj-n :=
+ obj-  :=
+diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
 deleted file mode 100644
-index 729992d..0000000
---- a/arch/arm/plat-omap/include/plat/irqs.h
+index 287ac37..0000000
+--- a/arch/arm/plat-omap/devices.c
 +++ /dev/null
-@@ -1,268 +0,0 @@
+@@ -1,91 +0,0 @@
 -/*
-- *  arch/arm/plat-omap/include/mach/irqs.h
+- * linux/arch/arm/plat-omap/devices.c
 - *
-- *  Copyright (C) Greg Lonnon 2001
-- *  Updated for OMAP-1610 by Tony Lindgren <tony@atomide.com>
-- *
-- * Copyright (C) 2009 Texas Instruments
-- * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
+- * Common platform device setup/initialization for OMAP1 and OMAP2
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
 - * the Free Software Foundation; either version 2 of the License, or
 - * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-- *
-- * NOTE: The interrupt vectors for the OMAP-1509, OMAP-1510, and OMAP-1610
-- *	 are different.
 - */
--
--#ifndef __ASM_ARCH_OMAP15XX_IRQS_H
--#define __ASM_ARCH_OMAP15XX_IRQS_H
--
--/*
-- * IRQ numbers for interrupt handler 1
-- *
-- * NOTE: See also the OMAP-1510 and 1610 specific IRQ numbers below
-- *
-- */
--#define INT_CAMERA		1
--#define INT_FIQ			3
--#define INT_RTDX		6
--#define INT_DSP_MMU_ABORT	7
--#define INT_HOST		8
--#define INT_ABORT		9
--#define INT_BRIDGE_PRIV		13
--#define INT_GPIO_BANK1		14
--#define INT_UART3		15
--#define INT_TIMER3		16
--#define INT_DMA_CH0_6		19
--#define INT_DMA_CH1_7		20
--#define INT_DMA_CH2_8		21
--#define INT_DMA_CH3		22
--#define INT_DMA_CH4		23
--#define INT_DMA_CH5		24
--#define INT_TIMER1		26
--#define INT_WD_TIMER		27
--#define INT_BRIDGE_PUB		28
--#define INT_TIMER2		30
--#define INT_LCD_CTRL		31
--
--/*
-- * OMAP-1510 specific IRQ numbers for interrupt handler 1
-- */
--#define INT_1510_IH2_IRQ	0
--#define INT_1510_RES2		2
--#define INT_1510_SPI_TX		4
--#define INT_1510_SPI_RX		5
--#define INT_1510_DSP_MAILBOX1	10
--#define INT_1510_DSP_MAILBOX2	11
--#define INT_1510_RES12		12
--#define INT_1510_LB_MMU		17
--#define INT_1510_RES18		18
--#define INT_1510_LOCAL_BUS	29
--
--/*
-- * OMAP-1610 specific IRQ numbers for interrupt handler 1
-- */
--#define INT_1610_IH2_IRQ	INT_1510_IH2_IRQ
--#define INT_1610_IH2_FIQ	2
--#define INT_1610_McBSP2_TX	4
--#define INT_1610_McBSP2_RX	5
--#define INT_1610_DSP_MAILBOX1	10
--#define INT_1610_DSP_MAILBOX2	11
--#define INT_1610_LCD_LINE	12
--#define INT_1610_GPTIMER1	17
--#define INT_1610_GPTIMER2	18
--#define INT_1610_SSR_FIFO_0	29
--
--/*
-- * OMAP-7xx specific IRQ numbers for interrupt handler 1
-- */
--#define INT_7XX_IH2_FIQ		0
--#define INT_7XX_IH2_IRQ		1
--#define INT_7XX_USB_NON_ISO	2
--#define INT_7XX_USB_ISO		3
--#define INT_7XX_ICR		4
--#define INT_7XX_EAC		5
--#define INT_7XX_GPIO_BANK1	6
--#define INT_7XX_GPIO_BANK2	7
--#define INT_7XX_GPIO_BANK3	8
--#define INT_7XX_McBSP2TX	10
--#define INT_7XX_McBSP2RX	11
--#define INT_7XX_McBSP2RX_OVF	12
--#define INT_7XX_LCD_LINE	14
--#define INT_7XX_GSM_PROTECT	15
--#define INT_7XX_TIMER3		16
--#define INT_7XX_GPIO_BANK5	17
--#define INT_7XX_GPIO_BANK6	18
--#define INT_7XX_SPGIO_WR	29
--
--/*
-- * IRQ numbers for interrupt handler 2
-- *
-- * NOTE: See also the OMAP-1510 and 1610 specific IRQ numbers below
-- */
--#define IH2_BASE		32
--
--#define INT_KEYBOARD		(1 + IH2_BASE)
--#define INT_uWireTX		(2 + IH2_BASE)
--#define INT_uWireRX		(3 + IH2_BASE)
--#define INT_I2C			(4 + IH2_BASE)
--#define INT_MPUIO		(5 + IH2_BASE)
--#define INT_USB_HHC_1		(6 + IH2_BASE)
--#define INT_McBSP3TX		(10 + IH2_BASE)
--#define INT_McBSP3RX		(11 + IH2_BASE)
--#define INT_McBSP1TX		(12 + IH2_BASE)
--#define INT_McBSP1RX		(13 + IH2_BASE)
--#define INT_UART1		(14 + IH2_BASE)
--#define INT_UART2		(15 + IH2_BASE)
--#define INT_BT_MCSI1TX		(16 + IH2_BASE)
--#define INT_BT_MCSI1RX		(17 + IH2_BASE)
--#define INT_SOSSI_MATCH		(19 + IH2_BASE)
--#define INT_USB_W2FC		(20 + IH2_BASE)
--#define INT_1WIRE		(21 + IH2_BASE)
--#define INT_OS_TIMER		(22 + IH2_BASE)
--#define INT_MMC			(23 + IH2_BASE)
--#define INT_GAUGE_32K		(24 + IH2_BASE)
--#define INT_RTC_TIMER		(25 + IH2_BASE)
--#define INT_RTC_ALARM		(26 + IH2_BASE)
--#define INT_MEM_STICK		(27 + IH2_BASE)
--
--/*
-- * OMAP-1510 specific IRQ numbers for interrupt handler 2
-- */
--#define INT_1510_DSP_MMU	(28 + IH2_BASE)
--#define INT_1510_COM_SPI_RO	(31 + IH2_BASE)
--
--/*
-- * OMAP-1610 specific IRQ numbers for interrupt handler 2
-- */
--#define INT_1610_FAC		(0 + IH2_BASE)
--#define INT_1610_USB_HHC_2	(7 + IH2_BASE)
--#define INT_1610_USB_OTG	(8 + IH2_BASE)
--#define INT_1610_SoSSI		(9 + IH2_BASE)
--#define INT_1610_SoSSI_MATCH	(19 + IH2_BASE)
--#define INT_1610_DSP_MMU	(28 + IH2_BASE)
--#define INT_1610_McBSP2RX_OF	(31 + IH2_BASE)
--#define INT_1610_STI		(32 + IH2_BASE)
--#define INT_1610_STI_WAKEUP	(33 + IH2_BASE)
--#define INT_1610_GPTIMER3	(34 + IH2_BASE)
--#define INT_1610_GPTIMER4	(35 + IH2_BASE)
--#define INT_1610_GPTIMER5	(36 + IH2_BASE)
--#define INT_1610_GPTIMER6	(37 + IH2_BASE)
--#define INT_1610_GPTIMER7	(38 + IH2_BASE)
--#define INT_1610_GPTIMER8	(39 + IH2_BASE)
--#define INT_1610_GPIO_BANK2	(40 + IH2_BASE)
--#define INT_1610_GPIO_BANK3	(41 + IH2_BASE)
--#define INT_1610_MMC2		(42 + IH2_BASE)
--#define INT_1610_CF		(43 + IH2_BASE)
--#define INT_1610_WAKE_UP_REQ	(46 + IH2_BASE)
--#define INT_1610_GPIO_BANK4	(48 + IH2_BASE)
--#define INT_1610_SPI		(49 + IH2_BASE)
--#define INT_1610_DMA_CH6	(53 + IH2_BASE)
--#define INT_1610_DMA_CH7	(54 + IH2_BASE)
--#define INT_1610_DMA_CH8	(55 + IH2_BASE)
--#define INT_1610_DMA_CH9	(56 + IH2_BASE)
--#define INT_1610_DMA_CH10	(57 + IH2_BASE)
--#define INT_1610_DMA_CH11	(58 + IH2_BASE)
--#define INT_1610_DMA_CH12	(59 + IH2_BASE)
--#define INT_1610_DMA_CH13	(60 + IH2_BASE)
--#define INT_1610_DMA_CH14	(61 + IH2_BASE)
--#define INT_1610_DMA_CH15	(62 + IH2_BASE)
--#define INT_1610_NAND		(63 + IH2_BASE)
--#define INT_1610_SHA1MD5	(91 + IH2_BASE)
--
--/*
-- * OMAP-7xx specific IRQ numbers for interrupt handler 2
-- */
--#define INT_7XX_HW_ERRORS	(0 + IH2_BASE)
--#define INT_7XX_NFIQ_PWR_FAIL	(1 + IH2_BASE)
--#define INT_7XX_CFCD		(2 + IH2_BASE)
--#define INT_7XX_CFIREQ		(3 + IH2_BASE)
--#define INT_7XX_I2C		(4 + IH2_BASE)
--#define INT_7XX_PCC		(5 + IH2_BASE)
--#define INT_7XX_MPU_EXT_NIRQ	(6 + IH2_BASE)
--#define INT_7XX_SPI_100K_1	(7 + IH2_BASE)
--#define INT_7XX_SYREN_SPI	(8 + IH2_BASE)
--#define INT_7XX_VLYNQ		(9 + IH2_BASE)
--#define INT_7XX_GPIO_BANK4	(10 + IH2_BASE)
--#define INT_7XX_McBSP1TX	(11 + IH2_BASE)
--#define INT_7XX_McBSP1RX	(12 + IH2_BASE)
--#define INT_7XX_McBSP1RX_OF	(13 + IH2_BASE)
--#define INT_7XX_UART_MODEM_IRDA_2 (14 + IH2_BASE)
--#define INT_7XX_UART_MODEM_1	(15 + IH2_BASE)
--#define INT_7XX_MCSI		(16 + IH2_BASE)
--#define INT_7XX_uWireTX		(17 + IH2_BASE)
--#define INT_7XX_uWireRX		(18 + IH2_BASE)
--#define INT_7XX_SMC_CD		(19 + IH2_BASE)
--#define INT_7XX_SMC_IREQ	(20 + IH2_BASE)
--#define INT_7XX_HDQ_1WIRE	(21 + IH2_BASE)
--#define INT_7XX_TIMER32K	(22 + IH2_BASE)
--#define INT_7XX_MMC_SDIO	(23 + IH2_BASE)
--#define INT_7XX_UPLD		(24 + IH2_BASE)
--#define INT_7XX_USB_HHC_1	(27 + IH2_BASE)
--#define INT_7XX_USB_HHC_2	(28 + IH2_BASE)
--#define INT_7XX_USB_GENI	(29 + IH2_BASE)
--#define INT_7XX_USB_OTG		(30 + IH2_BASE)
--#define INT_7XX_CAMERA_IF	(31 + IH2_BASE)
--#define INT_7XX_RNG		(32 + IH2_BASE)
--#define INT_7XX_DUAL_MODE_TIMER (33 + IH2_BASE)
--#define INT_7XX_DBB_RF_EN	(34 + IH2_BASE)
--#define INT_7XX_MPUIO_KEYPAD	(35 + IH2_BASE)
--#define INT_7XX_SHA1_MD5	(36 + IH2_BASE)
--#define INT_7XX_SPI_100K_2	(37 + IH2_BASE)
--#define INT_7XX_RNG_IDLE	(38 + IH2_BASE)
--#define INT_7XX_MPUIO		(39 + IH2_BASE)
--#define INT_7XX_LLPC_LCD_CTRL_CAN_BE_OFF	(40 + IH2_BASE)
--#define INT_7XX_LLPC_OE_FALLING (41 + IH2_BASE)
--#define INT_7XX_LLPC_OE_RISING	(42 + IH2_BASE)
--#define INT_7XX_LLPC_VSYNC	(43 + IH2_BASE)
--#define INT_7XX_WAKE_UP_REQ	(46 + IH2_BASE)
--#define INT_7XX_DMA_CH6		(53 + IH2_BASE)
--#define INT_7XX_DMA_CH7		(54 + IH2_BASE)
--#define INT_7XX_DMA_CH8		(55 + IH2_BASE)
--#define INT_7XX_DMA_CH9		(56 + IH2_BASE)
--#define INT_7XX_DMA_CH10	(57 + IH2_BASE)
--#define INT_7XX_DMA_CH11	(58 + IH2_BASE)
--#define INT_7XX_DMA_CH12	(59 + IH2_BASE)
--#define INT_7XX_DMA_CH13	(60 + IH2_BASE)
--#define INT_7XX_DMA_CH14	(61 + IH2_BASE)
--#define INT_7XX_DMA_CH15	(62 + IH2_BASE)
--#define INT_7XX_NAND		(63 + IH2_BASE)
--
--/* Max. 128 level 2 IRQs (OMAP1610), 192 GPIOs (OMAP730/850) and
-- * 16 MPUIO lines */
--#define OMAP_MAX_GPIO_LINES	192
--#define IH_GPIO_BASE		(128 + IH2_BASE)
--#define IH_MPUIO_BASE		(OMAP_MAX_GPIO_LINES + IH_GPIO_BASE)
--#define OMAP_IRQ_END		(IH_MPUIO_BASE + 16)
--
--/* External FPGA handles interrupts on Innovator boards */
--#define	OMAP_FPGA_IRQ_BASE	(OMAP_IRQ_END)
--#ifdef	CONFIG_MACH_OMAP_INNOVATOR
--#define OMAP_FPGA_NR_IRQS	24
--#else
--#define OMAP_FPGA_NR_IRQS	0
--#endif
--#define OMAP_FPGA_IRQ_END	(OMAP_FPGA_IRQ_BASE + OMAP_FPGA_NR_IRQS)
--
--#define NR_IRQS			OMAP_FPGA_IRQ_END
--
--#define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
+-#include <linux/gpio.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/io.h>
+-#include <linux/slab.h>
+-#include <linux/memblock.h>
 -
 -#include <mach/hardware.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/map.h>
+-#include <asm/memblock.h>
 -
--#ifdef CONFIG_FIQ
--#define FIQ_START		1024
+-#include <plat/tc.h>
+-#include <plat/mmc.h>
+-#include <plat/menelaus.h>
+-#include <plat/omap44xx.h>
+-
+-/*-------------------------------------------------------------------------*/
+-
+-#if defined(CONFIG_HW_RANDOM_OMAP) || defined(CONFIG_HW_RANDOM_OMAP_MODULE)
+-
+-#ifdef CONFIG_ARCH_OMAP2
+-#define	OMAP_RNG_BASE		0x480A0000
+-#else
+-#define	OMAP_RNG_BASE		0xfffe5000
 -#endif
 -
+-static struct resource rng_resources[] = {
+-	{
+-		.start		= OMAP_RNG_BASE,
+-		.end		= OMAP_RNG_BASE + 0x4f,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-};
+-
+-static struct platform_device omap_rng_device = {
+-	.name		= "omap_rng",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(rng_resources),
+-	.resource	= rng_resources,
+-};
+-
+-static void omap_init_rng(void)
+-{
+-	(void) platform_device_register(&omap_rng_device);
+-}
+-#else
+-static inline void omap_init_rng(void) {}
 -#endif
+-
+-/*
+- * This gets called after board-specific INIT_MACHINE, and initializes most
+- * on-chip peripherals accessible on this board (except for few like USB):
+- *
+- *  (a) Does any "standard config" pin muxing needed.  Board-specific
+- *	code will have muxed GPIO pins and done "nonstandard" setup;
+- *	that code could live in the boot loader.
+- *  (b) Populating board-specific platform_data with the data drivers
+- *	rely on to handle wiring variations.
+- *  (c) Creating platform devices as meaningful on this board and
+- *	with this kernel configuration.
+- *
+- * Claiming GPIOs, and setting their direction and initial values, is the
+- * responsibility of the device drivers.  So is responding to probe().
+- *
+- * Board-specific knowledge like creating devices or pin setup is to be
+- * kept out of drivers as much as possible.  In particular, pin setup
+- * may be handled by the boot loader, and drivers should expect it will
+- * normally have been done by the time they're probed.
+- */
+-static int __init omap_init_devices(void)
+-{
+-	/* please keep these calls, and their implementations above,
+-	 * in alphabetical order so they're easier to sort through.
+-	 */
+-	omap_init_rng();
+-	return 0;
+-}
+-arch_initcall(omap_init_devices);
