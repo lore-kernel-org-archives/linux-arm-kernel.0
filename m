@@ -1,48 +1,89 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Sep 2012 13:51:52 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: SoC for 3.7
-In-Reply-To: <20120908001024.GA28510@verge.net.au>
-References: <1346896928-5750-1-git-send-email-horms@verge.net.au>
- <20120907214951.GA2766@quad.lixom.net>
- <20120908001024.GA28510@verge.net.au>
-Message-ID: <20120911045152.GG23356@verge.net.au>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 11 Sep 2012 06:49:07 +0200
+Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
+In-Reply-To: <504E28B0.5040404@gmail.com>
+References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
+ <1346962375-26163-8-git-send-email-robherring2@gmail.com>
+ <20120910155224.GE31430@game.jcrosoft.org>
+ <504E28B0.5040404@gmail.com>
+Message-ID: <20120911044907.GF31430@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 08, 2012 at 09:10:26AM +0900, Simon Horman wrote:
-> On Fri, Sep 07, 2012 at 02:49:51PM -0700, Olof Johansson wrote:
-> > Hi,
+On 12:51 Mon 10 Sep     , Rob Herring wrote:
+> On 09/10/2012 10:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 15:12 Thu 06 Sep     , Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> In preparation to support multi-platform kernels, move all the dtb targets
+> >> out of the mach Makefile.boot and into the arch/arm/boot/dts/Makefile
+> >> which is closer to the sources.
+> >>
+> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Andrew Victor <linux@maxim.org.za>
+> >> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> >> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >> Cc: Sascha Hauer <kernel@pengutronix.de>
+> >> Cc: Jason Cooper <jason@lakedaemon.net>
+> >> Cc: Andrew Lunn <andrew@lunn.ch>
+> >> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> >> Cc: Shawn Guo <shawn.guo@linaro.org>
+> >> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> >> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> >> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> >> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> >> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> >> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >>  arch/arm/boot/Makefile                |    2 ++
+> >>  arch/arm/boot/dts/Makefile            |   41 +++++++++++++++++++++++++++++++++
+> >>  arch/arm/mach-at91/Makefile.boot      |   24 -------------------
+> >>  arch/arm/mach-exynos/Makefile.boot    |    3 ---
+> >>  arch/arm/mach-imx/Makefile.boot       |    7 ------
+> >>  arch/arm/mach-kirkwood/Makefile.boot  |   11 ---------
+> >>  arch/arm/mach-lpc32xx/Makefile.boot   |    2 --
+> >>  arch/arm/mach-mvebu/Makefile.boot     |    2 --
+> >>  arch/arm/mach-mxs/Makefile.boot       |    9 --------
+> >>  arch/arm/mach-spear13xx/Makefile.boot |    3 ---
+> >>  arch/arm/mach-spear3xx/Makefile.boot  |    4 ----
+> >>  arch/arm/mach-spear6xx/Makefile.boot  |    2 --
+> >>  arch/arm/mach-tegra/Makefile.boot     |    8 -------
+> >>  arch/arm/mach-ux500/Makefile.boot     |    2 --
+> >>  arch/arm/mach-vexpress/Makefile.boot  |    5 ----
+> >>  15 files changed, 43 insertions(+), 82 deletions(-)
+> >>  create mode 100644 arch/arm/boot/dts/Makefile
+> >>
+> >> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> >> index c877087..3fdab01 100644
+> >> --- a/arch/arm/boot/Makefile
+> >> +++ b/arch/arm/boot/Makefile
+> >> @@ -15,6 +15,8 @@ ifneq ($(MACHINE),)
+> >>  include $(srctree)/$(MACHINE)/Makefile.boot
+> >>  endif
+> >>  
+> >> +include $(srctree)/arch/arm/boot/dts/Makefile
+> >> +
+> >>  # Note: the following conditions must always be true:
+> >>  #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
+> >>  #   PARAMS_PHYS must be within 4MB of ZRELADDR
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> new file mode 100644
+> >> index 0000000..e59586b
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -0,0 +1,41 @@
+> >> +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+> > sorry I see no need of the dtb-y
 > > 
-> > On Thu, Sep 06, 2012 at 11:02:07AM +0900, Simon Horman wrote:
-> > > Hi Olof, Hi Arnd,
-> > > 
-> > > please consider the following SoC enhancement from
-> > > Phil Edworthy for inclusion in 3.7.
-> > > 
-> > > ----------------------------------------------------------------
-> > > The following changes since commit 7952717adb69efc1d2443a1858f96d23c2fb93e0:
-> > > 
-> > >   ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-> > 
-> > The above is based on the previous branch we pulled from you (kzm9g), and
-> > contains a patch to support rebooting of a board. I would have expected that to
-> > be the base for your board branch but not the SoC branch.
-> > 
-> > Did you mean to base them like this for some other reason that I didn't
-> > realize, or would you mind switching the two branches so that the board
-> > one includes the restart change but not the other way around?
+> > just do all the time
 > 
-> Sorry about that, I'll switch things around.
+> That's not how it works today. dtb's only for all enabled platforms are
+> built. Changing the behavior should be a different patch.
+no I see no point to check if the platform is enable or not just build all
 
-Hi Olof,
+This will allow to check them
 
-I was going to switch things around as you suggest, but I noticed
-that the reason that I did things this way is that my kzm9g branch
-was pulled into the next/soc branch of the arm-soc tree (commit
-301fd5c13257862df66c81c48d963d474e63e0ef).
-
-With that in mind, do you want to take this pull-request as is?
+Best Regards,
+J.
