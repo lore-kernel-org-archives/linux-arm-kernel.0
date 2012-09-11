@@ -1,45 +1,371 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Sep 2012 22:30:47 -0700
-Subject: [PATCH 03/17] ARM: OMAP2+: Make INTCPS_NR_IRQS local for
- mach-omap2/irq.c
+Date: Mon, 10 Sep 2012 22:30:53 -0700
+Subject: [PATCH 05/17] ARM: OMAP2+: Remove hardcoded twl4030 gpio_base,
+ irq_base and irq_end
 In-Reply-To: <20120911052934.29637.9190.stgit@muffinssi.local>
 References: <20120911052934.29637.9190.stgit@muffinssi.local>
-Message-ID: <20120911053047.29637.77771.stgit@muffinssi.local>
+Message-ID: <20120911053052.29637.74323.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make INTCPS_NR_IRQS local for mach-omap2/irq.c
+We can't use hardcoded interrupts for SPARSE_IRQ, and can replace
+the hardcoded gpio_base with twl_gpiochip.base after it's been
+allocated.
 
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/irq.c              |    2 ++
- arch/arm/plat-omap/include/plat/irqs.h |    3 ---
- 2 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/board-2430sdp.c          |    3 ---
+ arch/arm/mach-omap2/board-3430sdp.c          |    3 ---
+ arch/arm/mach-omap2/board-4430sdp.c          |    1 -
+ arch/arm/mach-omap2/board-cm-t35.c           |    3 ---
+ arch/arm/mach-omap2/board-devkit8000.c       |    3 ---
+ arch/arm/mach-omap2/board-igep0020.c         |    3 ---
+ arch/arm/mach-omap2/board-ldp.c              |    3 ---
+ arch/arm/mach-omap2/board-omap3beagle.c      |    3 ---
+ arch/arm/mach-omap2/board-omap3evm.c         |    3 ---
+ arch/arm/mach-omap2/board-omap3logic.c       |    3 ---
+ arch/arm/mach-omap2/board-omap3pandora.c     |    3 ---
+ arch/arm/mach-omap2/board-omap3stalker.c     |    3 ---
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    3 ---
+ arch/arm/mach-omap2/board-omap4panda.c       |    1 -
+ arch/arm/mach-omap2/board-overo.c            |    3 ---
+ arch/arm/mach-omap2/board-rm680.c            |    3 ---
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    3 ---
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    3 ---
+ drivers/gpio/gpio-twl4030.c                  |   15 ++++++++++-----
+ include/linux/i2c/twl.h                      |    3 ---
+ include/linux/mfd/twl6040.h                  |    1 -
+ 21 files changed, 10 insertions(+), 59 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index bcd83db..ac59f96 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -49,6 +49,8 @@
- #define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
- #define INTCPS_SIR_IRQ_OFFSET	0x0040	/* omap2/3 active interrupt offset */
- #define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
-+#define INTCPS_NR_MIR_REGS	3
-+#define INTCPS_NR_IRQS		96
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index 36eee4b..cacc498 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -211,9 +211,6 @@ static struct regulator_init_data sdp2430_vmmc1 = {
+ };
  
- /*
-  * OMAP2 has a number of different interrupt controllers, each interrupt
-diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
-index 15f497c..fc3959c 100644
---- a/arch/arm/plat-omap/include/plat/irqs.h
-+++ b/arch/arm/plat-omap/include/plat/irqs.h
-@@ -440,9 +440,6 @@
+ static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ };
  
- #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
+ static struct twl4030_platform_data sdp2430_twldata = {
+diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+index 0f78cdb..c843d01 100644
+--- a/arch/arm/mach-omap2/board-3430sdp.c
++++ b/arch/arm/mach-omap2/board-3430sdp.c
+@@ -229,9 +229,6 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
+ }
  
--#define INTCPS_NR_MIR_REGS	3
--#define INTCPS_NR_IRQS		96
+ static struct twl4030_gpio_platform_data sdp3430_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.pulldowns	= BIT(2) | BIT(6) | BIT(8) | BIT(13)
+ 				| BIT(16) | BIT(17),
+ 	.setup		= sdp3430_twl_gpio_setup,
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 04e8574..ee82604 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -543,7 +543,6 @@ static struct twl6040_platform_data twl6040_data = {
+ 	.codec		= &twl6040_codec,
+ 	.vibra		= &twl6040_vibra,
+ 	.audpwron_gpio	= 127,
+-	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+ };
+ 
+ static struct twl4030_platform_data sdp4430_twldata = {
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index d94a640..ea34109 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -469,9 +469,6 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
+ }
+ 
+ static struct twl4030_gpio_platform_data cm_t35_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.setup          = cm_t35_twl_gpio_setup,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 870a2a5..9032807 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -235,9 +235,6 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data devkit8000_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.pulldowns	= BIT(1) | BIT(2) | BIT(6) | BIT(8) | BIT(13)
+ 				| BIT(15) | BIT(16) | BIT(17),
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 01103b3..5775549 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -424,9 +424,6 @@ static int igep_twl_gpio_setup(struct device *dev,
+ };
+ 
+ static struct twl4030_gpio_platform_data igep_twl4030_gpio_pdata = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.setup		= igep_twl_gpio_setup,
+ };
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index c37c2a1..bea2e3a 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -274,9 +274,6 @@ static int ldp_twl_gpio_setup(struct device *dev, unsigned gpio, unsigned ngpio)
+ }
+ 
+ static struct twl4030_gpio_platform_data ldp_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.setup		= ldp_twl_gpio_setup,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 293e3b2..9d9b2ab 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -296,9 +296,6 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data beagle_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.pullups	= BIT(1),
+ 	.pulldowns	= BIT(2) | BIT(6) | BIT(7) | BIT(8) | BIT(13)
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index 851aec6..493bd96 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -388,9 +388,6 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data omap3evm_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.setup		= omap3evm_twl_gpio_setup,
+ };
+diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+index a63a49d..8fe7f0c 100644
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -77,9 +77,6 @@ static struct regulator_init_data omap3logic_vmmc1 = {
+ };
+ 
+ static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.pullups	= BIT(1),
+ 	.pulldowns	= BIT(2)  | BIT(6)  | BIT(7)  | BIT(8)
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 633c445..38521d4 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -320,9 +320,6 @@ static int omap3pandora_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data omap3pandora_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.setup		= omap3pandora_twl_gpio_setup,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+index 421fb8e..87aa5b1 100644
+--- a/arch/arm/mach-omap2/board-omap3stalker.c
++++ b/arch/arm/mach-omap2/board-omap3stalker.c
+@@ -278,9 +278,6 @@ omap3stalker_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data omap3stalker_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.setup		= omap3stalker_twl_gpio_setup,
+ };
+diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
+index d3556c9..88dc913 100644
+--- a/arch/arm/mach-omap2/board-omap3touchbook.c
++++ b/arch/arm/mach-omap2/board-omap3touchbook.c
+@@ -138,9 +138,6 @@ static int touchbook_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data touchbook_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.pullups	= BIT(1),
+ 	.pulldowns	= BIT(2) | BIT(6) | BIT(7) | BIT(8) | BIT(13)
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 3911c13..e37ee67 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -262,7 +262,6 @@ static struct twl6040_codec_data twl6040_codec = {
+ static struct twl6040_platform_data twl6040_data = {
+ 	.codec		= &twl6040_codec,
+ 	.audpwron_gpio	= 127,
+-	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+ };
+ 
+ /* Panda board uses the common PMIC configuration */
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 193d160..4754f05 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -398,9 +398,6 @@ static int overo_twl_gpio_setup(struct device *dev,
+ }
+ 
+ static struct twl4030_gpio_platform_data overo_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+ 	.setup		= overo_twl_gpio_setup,
+ };
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index 0ad1bb3b..12411b9 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -72,9 +72,6 @@ static struct platform_device *rm680_peripherals_devices[] __initdata = {
+ 
+ /* TWL */
+ static struct twl4030_gpio_platform_data rm680_gpio_data = {
+-	.gpio_base		= OMAP_MAX_GPIO_LINES,
+-	.irq_base		= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end		= TWL4030_GPIO_IRQ_END,
+ 	.pullups		= BIT(0),
+ 	.pulldowns		= BIT(1) | BIT(2) | BIT(8) | BIT(15),
+ };
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index 3b9fc61..e8b6dda 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -773,9 +773,6 @@ static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
+ }
+ 
+ static struct twl4030_gpio_platform_data rx51_gpio_data = {
+-	.gpio_base		= OMAP_MAX_GPIO_LINES,
+-	.irq_base		= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end		= TWL4030_GPIO_IRQ_END,
+ 	.pulldowns		= BIT(0) | BIT(1) | BIT(2) | BIT(3)
+ 				| BIT(4) | BIT(5)
+ 				| BIT(8) | BIT(9) | BIT(10) | BIT(11)
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index b797cb2..00f73b7 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -251,9 +251,6 @@ static void zoom2_set_hs_extmute(int mute)
+ }
+ 
+ static struct twl4030_gpio_platform_data zoom_gpio_data = {
+-	.gpio_base	= OMAP_MAX_GPIO_LINES,
+-	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+-	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.setup		= zoom_twl_gpio_setup,
+ };
+ 
+diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+index 94256fe..f030880 100644
+--- a/drivers/gpio/gpio-twl4030.c
++++ b/drivers/gpio/gpio-twl4030.c
+@@ -51,6 +51,7 @@
+ 
+ 
+ static struct gpio_chip twl_gpiochip;
++static int twl4030_gpio_base;
+ static int twl4030_gpio_irq_base;
+ 
+ /* genirq interfaces are not available to modules */
+@@ -428,8 +429,6 @@ no_irqs:
+ 	twl_gpiochip.dev = &pdev->dev;
+ 
+ 	if (pdata) {
+-		twl_gpiochip.base = pdata->gpio_base;
 -
- #include <mach/hardware.h>
+ 		/*
+ 		 * NOTE:  boards may waste power if they don't set pullups
+ 		 * and pulldowns correctly ... default for non-ULPI pins is
+@@ -461,15 +460,21 @@ no_irqs:
+ 		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
+ 		twl_gpiochip.ngpio = 0;
+ 		gpio_twl4030_remove(pdev);
+-	} else if (pdata && pdata->setup) {
++		goto out;
++	}
++
++	twl4030_gpio_base = twl_gpiochip.base;
++
++	if (pdata && pdata->setup) {
+ 		int status;
  
- #ifdef CONFIG_FIQ
+ 		status = pdata->setup(&pdev->dev,
+-				pdata->gpio_base, TWL4030_GPIO_MAX);
++				twl4030_gpio_base, TWL4030_GPIO_MAX);
+ 		if (status)
+ 			dev_dbg(&pdev->dev, "setup --> %d\n", status);
+ 	}
+ 
++out:
+ 	return ret;
+ }
+ 
+@@ -481,7 +486,7 @@ static int gpio_twl4030_remove(struct platform_device *pdev)
+ 
+ 	if (pdata && pdata->teardown) {
+ 		status = pdata->teardown(&pdev->dev,
+-				pdata->gpio_base, TWL4030_GPIO_MAX);
++				twl4030_gpio_base, TWL4030_GPIO_MAX);
+ 		if (status) {
+ 			dev_dbg(&pdev->dev, "teardown --> %d\n", status);
+ 			return status;
+diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+index 7ea898c..a12a381 100644
+--- a/include/linux/i2c/twl.h
++++ b/include/linux/i2c/twl.h
+@@ -561,9 +561,6 @@ struct twl4030_bci_platform_data {
+ 
+ /* TWL4030_GPIO_MAX (18) GPIOs, with interrupts */
+ struct twl4030_gpio_platform_data {
+-	int		gpio_base;
+-	unsigned	irq_base, irq_end;
+-
+ 	/* package the two LED signals as output-only GPIOs? */
+ 	bool		use_leds;
+ 
+diff --git a/include/linux/mfd/twl6040.h b/include/linux/mfd/twl6040.h
+index eaad49f..ba43d48 100644
+--- a/include/linux/mfd/twl6040.h
++++ b/include/linux/mfd/twl6040.h
+@@ -194,7 +194,6 @@ struct twl6040_vibra_data {
+ 
+ struct twl6040_platform_data {
+ 	int audpwron_gpio;	/* audio power-on gpio */
+-	unsigned int irq_base;
+ 
+ 	struct twl6040_codec_data *codec;
+ 	struct twl6040_vibra_data *vibra;
