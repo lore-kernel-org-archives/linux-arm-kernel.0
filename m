@@ -1,19 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Sep 2012 19:25:36 +0200
-Subject: [GIT PULL] GPIO: KZM-A9-GT for 3.7
-In-Reply-To: <1347341165-15573-1-git-send-email-horms@verge.net.au>
+Date: Tue, 11 Sep 2012 19:27:54 +0200
+Subject: [PATCH] ARM: shmobile: kzm9g: use gpio-keys instead of
+ gpio-keys-polled
+In-Reply-To: <1347341165-15573-2-git-send-email-horms@verge.net.au>
 References: <1347341165-15573-1-git-send-email-horms@verge.net.au>
-Message-ID: <CACRpkdbhzvuUZVQoQVjZxebm_7Lamp5npTUjw2ZjtXJw7RCqDg@mail.gmail.com>
+ <1347341165-15573-2-git-send-email-horms@verge.net.au>
+Message-ID: <CACRpkdZw8+q3QW6ThSdSoXfyAPoF-H=pCR2eGptTRWcG3eQaGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Sep 11, 2012 at 7:26 AM, Simon Horman <horms@verge.net.au> wrote:
 
-> please consider the following GPIO enhancement for the kzm9g board
-> for 3.7. As discussed previously it depends on changes in devel tree
-> and thus seems to be appropriate to merge there.
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> 6e20a0a429bd4dc07d6de16d9c247270e04e4aa0
+> (gpio: pcf857x: enable gpio_to_irq() support) supports
+> gpio_to_irq() on pcf857x driver.
+> Now, we can use gpio-keys driver instead of gpio-keys-polled.
+>
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
 
-I'll rather apply the raw patch, I'll comment on that one...
+Paul, Magnus - Simon wants me to merge this through the
+GPIO tree, can I have and ACK from one of the shmobile
+maintainers on that?
 
 Yours,
 Linus Walleij
