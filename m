@@ -1,67 +1,55 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 11 Sep 2012 12:19:00 -0400
-Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
-Message-ID: <1347380341-28145-1-git-send-email-cyril@ti.com>
+From: alan@linux.intel.com (Alan Cox)
+Date: Tue, 11 Sep 2012 17:42:34 +0100
+Subject: [PATCH 09/17] serial/8250: Limit the omap workarounds to omap1
+In-Reply-To: <20120911053104.29637.95283.stgit@muffinssi.local>
+References: <20120911052934.29637.9190.stgit@muffinssi.local>
+ <20120911053104.29637.95283.stgit@muffinssi.local>
+Message-ID: <20120911174234.45919fd3@bob.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the inclusion of asm-generic/timex.h, the ARM arch timer implementation
-breaks on build.  This is because asm/arch_timer.h now defines
-ARCH_HAS_READ_CURRENT_TIMER, only to have this macro undefined by the
-subsequent inclusion of asm-generic/timex.h.
+On Mon, 10 Sep 2012 22:31:04 -0700
+Tony Lindgren <tony@atomide.com> wrote:
 
-This patch fixes the problem in asm/timex.h by including asm-generic/timex.h
-early, and by defining get_cycles even earlier.
+> These workarounds do not apply for CONFIG_ARCH_OMAP2PLUS at all,
+> so let's make it just CONFIG_ARCH_OMAP1.
+> 
+> This is needed to for ARM common zImage changes for
+> omap2+ to avoid including plat and mach headers.
+> 
+> Cc: Alan Cox <alan@linux.intel.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-serial at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  drivers/tty/serial/8250/8250.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250.c
+> b/drivers/tty/serial/8250/8250.c index 8123f78..5b3f2fe 100644
+> --- a/drivers/tty/serial/8250/8250.c
+> +++ b/drivers/tty/serial/8250/8250.c
+> @@ -2336,7 +2336,7 @@ serial8250_do_set_termios(struct uart_port
+> *port, struct ktermios *termios, serial_port_out(port, UART_EFR, efr);
+>  	}
+>  
+> -#ifdef CONFIG_ARCH_OMAP
+> +#ifdef CONFIG_ARCH_OMAP1
+>  	/* Workaround to enable 115200 baud on OMAP1510 internal
+> ports */ if (cpu_is_omap1510() && is_omap_port(up)) {
+>  		if (baud == 115200) {
+> @@ -2426,7 +2426,7 @@ static unsigned int serial8250_port_size(struct
+> uart_8250_port *pt) {
+>  	if (pt->port.iotype == UPIO_AU)
+>  		return 0x1000;
+> -#ifdef CONFIG_ARCH_OMAP
+> +#ifdef CONFIG_ARCH_OMAP1
+>  	if (is_omap_port(pt))
+>  		return 0x16 << pt->port.regshift;
+>  #endif
+> 
 
-This patch has been tested against linux-next-20120910, both with and without
-arch timer support.
+Acked-by: Alan Cox <alan@linux.intel.com>
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
----
- arch/arm/include/asm/arch_timer.h |    1 +
- arch/arm/include/asm/timex.h      |   14 +++++++++++---
- 2 files changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 62e7547..6beb06a 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -7,6 +7,7 @@
- #define ARCH_HAS_READ_CURRENT_TIMER
- int arch_timer_of_register(void);
- int arch_timer_sched_clock_init(void);
-+int read_current_timer(cycles_t *c);
- #else
- static inline int arch_timer_of_register(void)
- {
-diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
-index 5e71172..76f4217 100644
---- a/arch/arm/include/asm/timex.h
-+++ b/arch/arm/include/asm/timex.h
-@@ -12,13 +12,21 @@
- #ifndef _ASMARM_TIMEX_H
- #define _ASMARM_TIMEX_H
- 
-+#define get_cycles get_cycles
-+
-+#include <asm-generic/timex.h>
- #include <asm/arch_timer.h>
- #include <mach/timex.h>
- 
-+static inline cycles_t get_cycles(void)
-+{
- #ifdef ARCH_HAS_READ_CURRENT_TIMER
--#define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
--#endif
-+	cycles_t c;
- 
--#include <asm-generic/timex.h>
-+	if (!read_current_timer(&c))
-+		return c;
-+#endif
-+	return 0;
-+}
- 
- #endif
--- 
-1.7.9.5
+Even better would be if for other cases is_omap_port and friends
+returned 0...
