@@ -1,95 +1,69 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 11 Sep 2012 12:05:11 +0200
-Subject: [PATCH v2 1/3] arm/dts: Add twl6030-usb data
-In-Reply-To: <CAAe_U6KQX6LPT3p108stdBVkj_KnK0Q1Gxumy4Jn4ah38q0LwQ@mail.gmail.com>
+Date: Tue, 11 Sep 2012 12:09:34 +0200
+Subject: [PATCH v2 2/3] arm/dts: Add twl4030-usb data
+In-Reply-To: <1347345381-4390-3-git-send-email-kishon@ti.com>
 References: <1347345381-4390-1-git-send-email-kishon@ti.com>
- <1347345381-4390-2-git-send-email-kishon@ti.com> <504F03D4.5080800@ti.com>
- <CAAe_U6KQX6LPT3p108stdBVkj_KnK0Q1Gxumy4Jn4ah38q0LwQ@mail.gmail.com>
-Message-ID: <504F0CD7.1090302@ti.com>
+ <1347345381-4390-3-git-send-email-kishon@ti.com>
+Message-ID: <504F0DDE.308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2012 11:39 AM, ABRAHAM, KISHON VIJAY wrote:
-> Hi,
-> 
-> On Tue, Sep 11, 2012 at 2:56 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->> On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
->>> Add twl6030-usb data node in twl6030 device tree file
->>>
->>> Acked-by: Felipe Balbi <balbi@ti.com>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap4-panda.dts |    4 ++++
->>>  arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
->>>  arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
->>>  3 files changed, 13 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
->>> index 9880c12..2999eba 100644
->>> --- a/arch/arm/boot/dts/omap4-panda.dts
->>> +++ b/arch/arm/boot/dts/omap4-panda.dts
->>> @@ -126,3 +126,7 @@
->>>       ti,non-removable;
->>>       bus-width = <4>;
->>>  };
->>> +
->>> +&twlusb {
->>> +     usb-supply = <&vusb>;
->>> +};
->>> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
->>> index 72216e9..d8290c0 100644
->>> --- a/arch/arm/boot/dts/omap4-sdp.dts
->>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->>> @@ -226,3 +226,7 @@
->>>       bus-width = <4>;
->>>       ti,non-removable;
->>>  };
->>> +
->>> +&twlusb {
->>> +     usb-supply = <&vusb>;
->>> +};
->>> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
->>> index 3b2f351..8e3aac9 100644
->>> --- a/arch/arm/boot/dts/twl6030.dtsi
->>> +++ b/arch/arm/boot/dts/twl6030.dtsi
->>> @@ -83,4 +83,9 @@
->>>       clk32kg: regulator at 12 {
->>>               compatible = "ti,twl6030-clk32kg";
->>>       };
->>> +
->>> +     twlusb: twl6030-usb {
->>
->> That name should be a generic device class name is possible.
->> What is twl6030-usb exactly? an USB PHY?
-> 
-> Of late we are calling it the comparator as it's used only to detect
-> VBUS/ID events.
-> Should it be like usb-comparator? What should be the label?
+On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
+> Add twl4030-usb data node in twl4030 device tree file.
 
-usb-comparator looks good and generic enough.
+IIRC, the usb part on twl4030 was doing more than it does on twl6030.
 
-The label is useless until you reference it somewhere else. But in the
-case of the label, it can be more specific.
-But you can just use "twl-usb-comparator" for example.
+Could you describe what part of the USB is really done by the TWL in
+that case?
 
->>
->>> +             compatible = "ti,twl6030-usb";
->>> +             interrupts = < 4 10 >;
->>
->> If this is for two interrupts, you'd better split them to avoid
->> confusion with irq specifiers that requires several attributes like for
->> the GIC.
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/twl4030.dtsi |   21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 > 
-> yeah. Thats for 2 interrupts.
->>
->> +               interrupts = <4>, <10>; /* IRQ1 blabla, IRQ2 blabla*/
->>
->> The comments are not mandatory assuming the binding is documented.
-> 
-> It's documented *usb: twl6030: Add dt support for twl6030 usb*
+> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+> index 22f4d13..761a5a5 100644
+> --- a/arch/arm/boot/dts/twl4030.dtsi
+> +++ b/arch/arm/boot/dts/twl4030.dtsi
+> @@ -37,6 +37,18 @@
+>  		regulator-max-microvolt = <3150000>;
+>  	};
+>  
+> +	vusb1v5: regulator-vusb1v5 {
+> +		compatible = "ti,twl4030-vusb1v5";
+> +	};
+> +
+> +	vusb1v8: regulator-vusb1v8 {
+> +		compatible = "ti,twl4030-vusb1v8";
+> +	};
+> +
+> +	vusb3v1: regulator-vusb3v1 {
+> +		compatible = "ti,twl4030-vusb3v1";
+> +	};
+> +
+>  	twl_gpio: gpio {
+>  		compatible = "ti,twl4030-gpio";
+>  		gpio-controller;
+> @@ -44,4 +56,13 @@
+>  		interrupt-controller;
+>  		#interrupt-cells = <1>;
+>  	};
+> +
+> +	twl4030-usb {
 
-Yeah, sorry for that, but it is indeed very confusing to review the DTS
-without having the binding documentation already merged :-(
+Same comment than before about the name. Is it the usb-comparator as well?
+
+> +		compatible = "ti,twl4030-usb";
+> +		interrupts = < 10 4 >;
+> +		usb1v5-supply = <&vusb1v5>;
+> +		usb1v8-supply = <&vusb1v8>;
+> +		usb3v1-supply = <&vusb3v1>;
+> +		usb_mode = <1>;
+
+Is this a TI only attribute or something generic?
+
+If this is TI only, it should be prefix with "ti," otherwise, it is fine.
 
 Regards,
 Benoit
