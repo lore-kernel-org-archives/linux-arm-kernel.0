@@ -1,42 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2012 14:17:42 +0000
-Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
-In-Reply-To: <CAMQu2gwLoccyjGwjjgndiW2aR--_S=UhCCTdcav6LicvYWe5SQ@mail.gmail.com>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368559-31329-1-git-send-email-arnd@arndb.de>
- <CAMQu2gwLoccyjGwjjgndiW2aR--_S=UhCCTdcav6LicvYWe5SQ@mail.gmail.com>
-Message-ID: <201209111417.42879.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Sep 2012 16:20:03 +0200
+Subject: [PATCH 1/2] pinctrl: mvebu: mark internal functions as static
+In-Reply-To: <1347373204-17883-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347373204-17883-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1347373204-17883-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
-> Just curious to know how you came with some of the above header names ?
-> 
-> plat/mcbsp ---> dsp-mcbsp.h
-> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
-> better name.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-mvebu.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-This one was a mistake on my side, as Tony and  Peter already pointed out.
-How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
-
-> plat/nand.h --> /mtd-nand-omap2.h
-> plat/onenand.h --> /mtd-onenand-omap2.h
-> May be "omap-nand.h" and "omap-onenand.h"
-> 
-> plat/mcspi.h-->spi-omap2-mcspi.h
-> May be "omap-spi.h"
-> 
-
-As I wrote in the introductory mail, I tried to always prefix the file
-names with the subsystem, followed by the name of the driver, in order
-to standardize on just one set of rules.
-
-The drivers implementing the three headers above are:
-
-drivers/mtd/nand/omap2.c
-drivers/mtd/onenand/omap2.c
-drivers/spi/spi-omap2-mcspi.c
-
-so these all seem appropriate.
-
-	Arnd
+diff --git a/drivers/pinctrl/pinctrl-mvebu.c b/drivers/pinctrl/pinctrl-mvebu.c
+index 52b1da1..ed1fc3b 100644
+--- a/drivers/pinctrl/pinctrl-mvebu.c
++++ b/drivers/pinctrl/pinctrl-mvebu.c
+@@ -59,7 +59,7 @@ struct mvebu_pinctrl {
+ 	u8 variant;
+ };
+ 
+-struct mvebu_pinctrl_group *mvebu_pinctrl_find_group_by_pid(
++static struct mvebu_pinctrl_group *mvebu_pinctrl_find_group_by_pid(
+ 	struct mvebu_pinctrl *pctl, unsigned pid)
+ {
+ 	unsigned n;
+@@ -72,7 +72,7 @@ struct mvebu_pinctrl_group *mvebu_pinctrl_find_group_by_pid(
+ 	return NULL;
+ }
+ 
+-struct mvebu_pinctrl_group *mvebu_pinctrl_find_group_by_name(
++static struct mvebu_pinctrl_group *mvebu_pinctrl_find_group_by_name(
+ 	struct mvebu_pinctrl *pctl, const char *name)
+ {
+ 	unsigned n;
+@@ -83,7 +83,7 @@ struct mvebu_pinctrl_group *mvebu_pinctrl_find_group_by_name(
+ 	return NULL;
+ }
+ 
+-struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_setting_by_val(
++static struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_setting_by_val(
+ 	struct mvebu_pinctrl *pctl, struct mvebu_pinctrl_group *grp,
+ 	unsigned long config)
+ {
+@@ -98,7 +98,7 @@ struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_setting_by_val(
+ 	return NULL;
+ }
+ 
+-struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_setting_by_name(
++static struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_setting_by_name(
+ 	struct mvebu_pinctrl *pctl, struct mvebu_pinctrl_group *grp,
+ 	const char *name)
+ {
+@@ -113,7 +113,7 @@ struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_setting_by_name(
+ 	return NULL;
+ }
+ 
+-struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_gpio_setting(
++static struct mvebu_mpp_ctrl_setting *mvebu_pinctrl_find_gpio_setting(
+ 	struct mvebu_pinctrl *pctl, struct mvebu_pinctrl_group *grp)
+ {
+ 	unsigned n;
+-- 
+1.7.9.5
