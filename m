@@ -1,118 +1,90 @@
-From: david.jander@protonic.nl (David Jander)
-Date: Tue, 11 Sep 2012 12:42:26 +0200
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20120911102905.GC14994@pengutronix.de>
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
- <20120911084853.GT24458@pengutronix.de>
- <20120911113139.3b7b879f@archvile>
- <20120911102905.GC14994@pengutronix.de>
-Message-ID: <20120911124226.27fa248b@archvile>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 11 Sep 2012 13:42:01 +0300
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120904141050.GB19897@richard-laptop>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829081020.GX26594@pengutronix.de>
+ <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829110137.GA26594@pengutronix.de> <503E74E0.6040503@pengutronix.de>
+ <20120904141050.GB19897@richard-laptop>
+Message-ID: <87fw6orgcm.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012 12:29:05 +0200
-Michael Olbrich <mol@pengutronix.de> wrote:
+Richard Zhao <linuxzsc@gmail.com> writes:
 
-> On Tue, Sep 11, 2012 at 11:31:39AM +0200, David Jander wrote:
-> > On Tue, 11 Sep 2012 10:48:53 +0200
-> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > 
-> > > On Tue, Sep 11, 2012 at 09:27:53AM +0200, David Jander wrote:
-> > > > 
-> > > > Hi Matt,
-> > > > 
-> > > > >         @ Function supports interworking.
-> > > > >         @ args = 0, pretend = 0, frame = 0
-> > > > >         @ frame_needed = 0, uses_anonymous_args = 0
-> > > > >         @ link register save eliminated.
-> > > > >         cmp     r0, #9
-> > > > >         mov     r3, #0
-> > > > >         str     r3, [r1, #0]
-> > > > >         mov     r0, #0
-> > > > >         strgt   r3, [r1, #4]
-> > > > >         bx      lr
-> > > > >         .size   flexcan_chip_start, .-flexcan_chip_start
-> > > > >         .ident  "GCC: (GNU) 4.3.3"
-> > > > >         .section        .note.GNU-stack,"",%progbits
-> > > > > 
-> > > > > I think this looks correct. Perhaps you could try the angstrom arm5te
-> > > > > toolchain and see if it's a toolchain issue?
-> > > > 
-> > > > Yes, this looks a lot better, and is exactly what I get when I compile this
-> > > > code with CodeSourcery GCC-4.4.1
-> > > > 
-> > > > I have tries building gcc-4.6.3 also with OSELAS/PTXdist, and it gives the
-> > > > same (wrong) result as with gcc-4.6.2
-> > > 
-> > > AFAIK our OSELAS/PTXdist Toolchains use Linaro patches, this would
-> > > explain why both have the same result.
-> 
-> No, OSELAS Toolchains only uses the Linaro GCC for Cortex-A8/-A9
-> 
-> > It would indeed, if I had just used OSELAS as-is, but I didn't ;-)
-> > I made a copy of
-> > arm-v5te-linux-gnueabi_gcc-4.6.2_glibc-2.14.1_binutils-2.21.1a_kernel-2.6.39-sanitized.ptxconfig
-> > and replaced the version string 4.6.2 with 4.6.3. AFAIK, this way PTXdist will
-> > download pristine gcc-4.6.3 sources and not apply any patches, since there is
-> > no directory named patches/gcc-4.6.3, right? Can I assume that I have an
-> > unpatched version of gcc-4.6.3 then?
-> 
-> Correct. This way you'll get gcc-4.6.3 without any patches.
-> 
-> > Btw, Here's what I get from it:
-> > 
-> > flexcan_chip_start:
-> >         @ args = 0, pretend = 0, frame = 0
-> >         @ frame_needed = 0, uses_anonymous_args = 0
-> >         @ link register save eliminated.
-> >         mov     r3, #0
-> >         cmp     r0, #9
-> >         str     r3, [r1, #0]
-> >         ldrle   r3, [r1, #4]
-> >         mov     r0, #0
-> >         str     r3, [r1, #4]
-> >         bx      lr
-> >         .size   flexcan_chip_start, .-flexcan_chip_start
-> >         .ident  "GCC: (OSELAS.Toolchain-2011.11.1) 4.6.3"
-> >         .section        .note.GNU-stack,"",%progbits
-> 
-> How can I reproduce this output? I'd like to test this with different
-> toolchain versions.
+> On Wed, Aug 29, 2012 at 10:00:32PM +0200, Marc Kleine-Budde wrote:
+>> On 08/29/2012 01:01 PM, Sascha Hauer wrote:
+>> > On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
+>> >> Sascha Hauer <s.hauer@pengutronix.de> writes:
+>> >>
+>> >>> On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
+>> >>>> Richard Zhao <richard.zhao@freescale.com> writes:
+>> >>>>
+>> >>>>> i.MX usb controllers shares non-core registers, which may include
+>> >>>>> SoC specific controls. We take it as a usbmisc device and usbmisc
+>> >>>>> driver set operations needed by ci13xxx_imx driver.
+>> >>>>>
+>> >>>>> For example, Sabrelite board has bad over-current design, we can
+>> >>>>> usbmisc to disable over-current detect.
+>> >>>>
+>> >>>> Why does this have to be part of the usb driver instead of SoC specific
+>> >>>> code? It looks like you've created a whole new device/driver
+>> >>>> infrastructure just to disable overcurrent for a specific board.
+>> >>>
+>> >>> Richards code indeed only handles overcurrent for a specific board, but
+>> >>> there are more bits to configure in the longer run: power pin
+>> >>> polarities, ULPI/serial mode select and some more.
+>> 
+>> We already have a patch adding a usbmisc_imx53_init() function to that
+>> driver.
+>> 
+>> >> Sounds to me like these things that should be taken care of by the phy
+>> >> driver, which will likely be simpler from both driver's and devicetree's
+>> >> perspective.
+>> > 
+>> > Most i.MX SoCs have three instances of the chipidea core. These cores
+>> > share a single register space for controlling the mentioned bits (the
+>> > usbmisc register space). The usbmisc looks different on the different
+>> > SoCs.
+>> > Indeed they control some phy specific aspects, but the phy itself may
+>> > also be an external ULPI or UTMI phy with a separate driver. So if we
+>> > integrate the usbmisc into the phy wouldn't that mean that it has to
+>> > be integrated into all possible phy drivers?
+>> > 
+>> > From a devicetrees perspective it makes sense to integrate the flags
+>> > into the chipidea nodes, because there is one node per chipidea core,
+>> > but only one usbmisc unit for all ports on the SoC. So we can do a:
+>> > 
+>> > 	chipidea at ofs {
+>> > 		disable-overcurrent = <1>;
+>> > 	};
+>> > 
+>> > instead of
+>> > 
+>> > 	usbmisc at ofs {
+>> > 		disable-overcurrent-port0 = <1>;
+>> > 		disable-overcurrent-port1 = <0>;
+>> > 		...
+>> > 	};
+>> 
+>> +1
+>> 
+>> IMHO looks much cleaner.
+> So, Marc agree on the patch too. Maybe you can give a reviewed-by? :)
+>
+> Hi Alex,
+>
+> What do you think?
 
-I basically do this:
+Weeell, as long as this is contained in platform specific code and arm
+bits, I can tolerate it.
 
-$ /opt/OSELAS.Toolchain-2011.11.1/arm-v5te-linux-gnueabi/gcc-4.6.3-glibc-2.14.1-binutils-2.21.1a-kernel-2.6.39-sanitized/bin/arm-v5te-linux-gnueabi-gcc-4.6.3 -Os -S -o - -x c -
+What about the other two patches? I guess they can go through arm tree
+so we don't have to send it through Greg, right?
 
-struct flexcan_regs {
-        unsigned int mcr;
-        unsigned int rxfgmask;
-};
-
-#define flexcan_read(a) (*(volatile unsigned int *)(a))
-#define flexcan_write(v,a)      (*(volatile unsigned int *)(a) = (v))
-
-int flexcan_chip_start(int ver, struct flexcan_regs *regs)
-{
-        flexcan_write(0, &regs->mcr);
-
-        if (ver >= 10)
-                flexcan_write(0, &regs->rxfgmask);
-
-        return 0;
-}
-
-> > Wrong code.
-> > See the version string? It is clearly not an existing OSELAS version.
-> 
-> Hmmm, so far it seems all tested gcc-4.6.x versions produce wrong code,
-> correct?
-
-Looks like that, yes.
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+Regards,
+--
+Alex
