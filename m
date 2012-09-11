@@ -1,60 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Sep 2012 11:00:41 -0700
-Subject: [PATCH 1/2] spi: omap2-mcspi: add pinctrl support
-In-Reply-To: <1347385599-27558-2-git-send-email-mporter@ti.com>
-References: <1347385599-27558-1-git-send-email-mporter@ti.com>
- <1347385599-27558-2-git-send-email-mporter@ti.com>
-Message-ID: <20120911180041.GH23092@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 Sep 2012 19:01:00 +0100
+Subject: [PATCH] ARM: avoid undef on ARCH_HAS_READ_CURRENT_TIMER
+In-Reply-To: <1347380341-28145-1-git-send-email-cyril@ti.com>
+References: <1347380341-28145-1-git-send-email-cyril@ti.com>
+Message-ID: <20120911180100.GS13739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [120911 10:46]:
-> Adds pinctrl support to support OMAP platforms that boot from DT
-> and rely on pinctrl support to set pinmuxes.
+On Tue, Sep 11, 2012 at 12:19:00PM -0400, Cyril Chemparathy wrote:
+> With the inclusion of asm-generic/timex.h, the ARM arch timer implementation
+> breaks on build.  This is because asm/arch_timer.h now defines
+> ARCH_HAS_READ_CURRENT_TIMER, only to have this macro undefined by the
+> subsequent inclusion of asm-generic/timex.h.
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  drivers/spi/spi-omap2-mcspi.c |    9 +++++++++
->  1 file changed, 9 insertions(+)
+> This patch fixes the problem in asm/timex.h by including asm-generic/timex.h
+> early, and by defining get_cycles even earlier.
 > 
-> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-> index b2fb141..6c67cdb 100644
-> --- a/drivers/spi/spi-omap2-mcspi.c
-> +++ b/drivers/spi/spi-omap2-mcspi.c
-> @@ -38,6 +38,8 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/pinctrl/consumer.h>
-> +#include <linux/err.h>
->  
->  #include <linux/spi/spi.h>
->  
-> @@ -1124,6 +1126,7 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
->  	static int		bus_num = 1;
->  	struct device_node	*node = pdev->dev.of_node;
->  	const struct of_device_id *match;
-> +	struct pinctrl *pinctrl;
->  
->  	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
->  	if (master == NULL) {
-> @@ -1219,6 +1222,12 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
->  	if (status < 0)
->  		goto dma_chnl_free;
->  
-> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(pinctrl)) {
-> +		status = PTR_ERR(pinctrl);
-> +		goto dma_chnl_free;
-> +	}
-> +
->  	pm_runtime_use_autosuspend(&pdev->dev);
->  	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
->  	pm_runtime_enable(&pdev->dev);
+> This patch has been tested against linux-next-20120910, both with and without
+> arch timer support.
 
-You should just print out a warning here as most boards don't
-have pinctrl implemented at this point, or may never have.
+Given the complexity this introduces, just for the sake of using one
+thing from asm-generic/timex.h:
 
-Regards,
+typedef unsigned long cycles_t;
 
-Tony
+it seems utterly pointless to use the asm-generic version at all,
+especially if we have to play games to work around what it's doing.
+What this means is one of two things.  Either we should not be using
+asm-generic/timex.h, or asm-generic/timex.h as currently exists is
+broken.
