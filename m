@@ -1,35 +1,22 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Sep 2012 17:05:25 +0900
-Subject: [GIT] Renesas ARM-based SoC: pmu/cleanup for 3.7
-Message-ID: <1347350727-11962-1-git-send-email-horms@verge.net.au>
+Date: Tue, 11 Sep 2012 17:10:52 +0900
+Subject: [PATCH v3 0/2] ARM: shmobile: enable PMU(Performance Monitoring
+ Unit)
+In-Reply-To: <1346930047-9541-1-git-send-email-koba@kmckk.co.jp>
+References: <50487370.6000409@kmckk.co.jp>
+ <1346930047-9541-1-git-send-email-koba@kmckk.co.jp>
+Message-ID: <20120911081052.GA13563@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, Sep 06, 2012 at 08:14:05PM +0900, Tetsuyuki Kobayshi wrote:
+> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+> 
+> Hello, Will
+> 
+> Could you apply this patch set to your pmu/cleanup branch on arm-soc?
+> 
+> The follewing patches enables PMU(Performance Monitoring Unit) for sh73a0 and emev2 SoCs. I tested these patches on kzm9g board and kzm9d board.
 
-please consider the following changes from Kobayashi-san
-for the pmu/cleanup branch.
-
-----------------------------------------------------------------
-The following changes since commit 051f1b13144dd8553d5a5104dde94c7263ae3ba7:
-
-  ARM: perf: move irq registration into pmu implementation (2012-08-23 11:35:52 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git pmu/cleanup
-
-for you to fetch changes up to e433d4440bf7dd5955a4616cfb9bffd1ec6ab839:
-
-  ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit) (2012-09-11 16:27:41 +0900)
-
-----------------------------------------------------------------
-Tetsuyuki Kobayashi (2):
-      ARM: shmobile: sh73a0: enable PMU(Performance Monitoring Unit)
-      ARM: shmobile: emev2: enable PMU(Performance Monitoring Unit)
-
- arch/arm/configs/kzm9d_defconfig      |    1 +
- arch/arm/configs/kzm9g_defconfig      |    1 +
- arch/arm/mach-shmobile/setup-emev2.c  |   21 +++++++++++++++++++++
- arch/arm/mach-shmobile/setup-sh73a0.c |   21 +++++++++++++++++++++
- 4 files changed, 44 insertions(+)
+Thanks, I have pushed this to the pmu/cleanup branch of my renesas tree
+and sent a pull-request to Will.
