@@ -1,59 +1,33 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 11 Sep 2012 12:06:19 +0530
-Subject: [PATCH v2 1/3] arm/dts: Add twl6030-usb data
-In-Reply-To: <1347345381-4390-1-git-send-email-kishon@ti.com>
-References: <1347345381-4390-1-git-send-email-kishon@ti.com>
-Message-ID: <1347345381-4390-2-git-send-email-kishon@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 11 Sep 2012 06:37:01 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT*
+ read/write
+In-Reply-To: <CAMQu2gxUES=s8fMpwJ77tnY1wz4b_T=yustj+C+WNkEMmEOx4w@mail.gmail.com>
+References: <alpine.DEB.2.00.1209052333410.11516@utopia.booyaka.com>
+ <CAMQu2gzCz+bS7U1ypFWzcp3zTpkfHdPzZfFtJ8Cd4ap8FSzJQg@mail.gmail.com>
+ <CAMQu2gw-KPQzYKtjJUxZjEX+_HKLL9WTxXXA35_ki8KbN+WDYg@mail.gmail.com>
+ <20120910185535.GC1303@atomide.com>
+ <CAMQu2gxUES=s8fMpwJ77tnY1wz4b_T=yustj+C+WNkEMmEOx4w@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1209110636310.23042@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add twl6030-usb data node in twl6030 device tree file
+On Tue, 11 Sep 2012, Shilimkar, Santosh wrote:
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap4-panda.dts |    4 ++++
- arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
- arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
- 3 files changed, 13 insertions(+)
+> On Tue, Sep 11, 2012 at 12:25 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120908 01:20]:
+> >>
+> >> Will you able to pick up these couple of wakeupgen fixes from  here or
+> >> do you want me to send you a pull request for 3.6-rc5/6
+> >
+> > I can pick them into fixes-noncritical. But if the second one is
+> > a major bug for the -rc series, the patch should be describe what
+> > breaks (regression? oops?).
+> >
+> Fixes non critical is fine. No major issue without these patches.
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 9880c12..2999eba 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -126,3 +126,7 @@
- 	ti,non-removable;
- 	bus-width = <4>;
- };
-+
-+&twlusb {
-+	usb-supply = <&vusb>;
-+};
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 72216e9..d8290c0 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -226,3 +226,7 @@
- 	bus-width = <4>;
- 	ti,non-removable;
- };
-+
-+&twlusb {
-+	usb-supply = <&vusb>;
-+};
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-index 3b2f351..8e3aac9 100644
---- a/arch/arm/boot/dts/twl6030.dtsi
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -83,4 +83,9 @@
- 	clk32kg: regulator at 12 {
- 		compatible = "ti,twl6030-clk32kg";
- 	};
-+
-+	twlusb: twl6030-usb {
-+		compatible = "ti,twl6030-usb";
-+		interrupts = < 4 10 >;
-+	};
- };
--- 
-1.7.9.5
+There's an ordering constraint though: Santosh's patch needs to go in 
+first, then mine.
+
+
+- Paul
