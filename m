@@ -1,169 +1,487 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 11 Sep 2012 08:57:13 +0300
-Subject: [PATCH 07/17] Input: omap-keypad: Remove dependencies to mach
- includes
-In-Reply-To: <20120911053059.29637.22108.stgit@muffinssi.local>
+Date: Tue, 11 Sep 2012 08:59:02 +0300
+Subject: [PATCH 12/17] ARM: OMAP2+: Remove hardcoded IRQs and enable
+ SPARSE_IRQ
+In-Reply-To: <20120911053111.29637.41171.stgit@muffinssi.local>
 References: <20120911052934.29637.9190.stgit@muffinssi.local>
- <20120911053059.29637.22108.stgit@muffinssi.local>
-Message-ID: <20120911055709.GB17865@arwen.pp.htv.fi>
+ <20120911053111.29637.41171.stgit@muffinssi.local>
+Message-ID: <20120911055900.GC17865@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Sep 10, 2012 at 10:30:59PM -0700, Tony Lindgren wrote:
-> We can't build CONFIG_ARCH_OMAP1 set with ARCH_OMAP2PLUS because
-> of different compiler flags needed, so we can define omap_kp_24xx()
-> instead of using cpu_is_omap24xx(). This way we can remove
-> depency to plat and mach headers which is needed for ARM common
-> zImage support.
+On Mon, Sep 10, 2012 at 10:31:11PM -0700, Tony Lindgren wrote:
+> Remove hardcoded IRQs in irqs.h and related files as these
+> are no longer needed.
 > 
-> Also remove INT_KEYBOARD by using omap_kp->irq.
-> 
-> Note that this patch depends on an earlier patch
-> "ARM: OMAP: Move gpio.h to include/linux/platform_data".
-> 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
 > Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Finally, great work Tony :-)
+
+FWIW: Reviewed-by: Felipe Balbi <balbi@ti.com>
+
 > ---
->  drivers/input/keyboard/omap-keypad.c |   34 ++++++++++++++++++----------------
->  1 file changed, 18 insertions(+), 16 deletions(-)
+>  arch/arm/mach-omap2/common.h                |    3 
+>  arch/arm/mach-omap2/include/mach/irqs.h     |    2 
+>  arch/arm/plat-omap/Kconfig                  |    1 
+>  arch/arm/plat-omap/include/plat/irqs-44xx.h |  144 ---------------------
+>  arch/arm/plat-omap/include/plat/irqs.h      |  183 ---------------------------
+>  drivers/media/video/omap/omap_vout.c        |    1 
+>  drivers/media/video/omap3isp/isp.c          |    2 
+>  drivers/power/avs/smartreflex.c             |    2 
+>  drivers/staging/tidspbridge/core/wdt.c      |    2 
+>  9 files changed, 10 insertions(+), 330 deletions(-)
+>  delete mode 100644 arch/arm/plat-omap/include/plat/irqs-44xx.h
 > 
-> diff --git a/drivers/input/keyboard/omap-keypad.c b/drivers/input/keyboard/omap-keypad.c
-> index a0222db..171d739 100644
-> --- a/drivers/input/keyboard/omap-keypad.c
-> +++ b/drivers/input/keyboard/omap-keypad.c
-> @@ -35,16 +35,19 @@
->  #include <linux/mutex.h>
->  #include <linux/errno.h>
->  #include <linux/slab.h>
-> -#include <asm/gpio.h>
-> +#include <linux/gpio.h>
-> +#include <linux/platform_data/gpio-omap.h>
->  #include <plat/keypad.h>
-> -#include <plat/menelaus.h>
-> -#include <asm/irq.h>
-> -#include <mach/hardware.h>
-> -#include <asm/io.h>
-> -#include <plat/mux.h>
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index 7e60a69..4cdb08c 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -26,12 +26,13 @@
+>  #define __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H
+>  #ifndef __ASSEMBLER__
 >  
->  #undef NEW_BOARD_LEARNING_MODE
+> +#include <linux/irq.h>
+>  #include <linux/delay.h>
+>  #include <linux/i2c/twl.h>
+>  #include <plat/common.h>
+>  #include <asm/proc-fns.h>
 >  
-> +#ifdef CONFIG_ARCH_OMAP1
-> +#define omap_kp_24xx()		0
-> +#else
-> +#define omap_kp_24xx()		1
-> +#endif
-
-I would rather use revision detection or different driver names (if
-revision register is broken).
-
-> +static struct omap_kp *omap_kp;
-
-please don't. This will prevent multiple instances of this driver. Even
-though I don't think we will ever have an omap with multiple keypad
-instances, it's still not a good practice IMHO.
-
-Also, this ends up being "hidden" (if you have a better work let me
-know) in most functions since they either pass omap_kp as argument or
-define a local omap_kp variable.
-
-Sourav, is the revision register on this IP working fine across multiple
-OMAPs ?
-
->  static void omap_kp_tasklet(unsigned long);
->  static void omap_kp_timer(unsigned long);
+> -#define OMAP_INTC_START		0
+> +#define OMAP_INTC_START		NR_IRQS
 >  
-> @@ -99,7 +102,7 @@ static irqreturn_t omap_kp_interrupt(int irq, void *dev_id)
->  	struct omap_kp *omap_kp = dev_id;
+>  #ifdef CONFIG_SOC_OMAP2420
+>  extern void omap242x_map_common_io(void);
+> diff --git a/arch/arm/mach-omap2/include/mach/irqs.h b/arch/arm/mach-omap2/include/mach/irqs.h
+> index 44dab77..ba5282c 100644
+> --- a/arch/arm/mach-omap2/include/mach/irqs.h
+> +++ b/arch/arm/mach-omap2/include/mach/irqs.h
+> @@ -1,5 +1,3 @@
+>  /*
+>   * arch/arm/mach-omap2/include/mach/irqs.h
+>   */
+> -
+> -#include <plat/irqs.h>
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index dd36eba..d15a4a6 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -25,6 +25,7 @@ config ARCH_OMAP2PLUS
+>  	bool "TI OMAP2/3/4"
+>  	select CLKDEV_LOOKUP
+>  	select GENERIC_IRQ_CHIP
+> +	select SPARSE_IRQ
+>  	select OMAP_DM_TIMER
+>  	select USE_OF
+>  	select PROC_DEVICETREE if PROC_FS
+> diff --git a/arch/arm/plat-omap/include/plat/irqs-44xx.h b/arch/arm/plat-omap/include/plat/irqs-44xx.h
+> deleted file mode 100644
+> index 518322c..0000000
+> --- a/arch/arm/plat-omap/include/plat/irqs-44xx.h
+> +++ /dev/null
+> @@ -1,144 +0,0 @@
+> -/*
+> - * OMAP4 Interrupt lines definitions
+> - *
+> - * Copyright (C) 2009-2010 Texas Instruments, Inc.
+> - *
+> - * Santosh Shilimkar (santosh.shilimkar at ti.com)
+> - * Benoit Cousson (b-cousson at ti.com)
+> - *
+> - * This file is automatically generated from the OMAP hardware databases.
+> - * We respectfully ask that any modifications to this file be coordinated
+> - * with the public linux-omap at vger.kernel.org mailing list and the
+> - * authors above to ensure that the autogeneration scripts are kept
+> - * up-to-date with the file contents.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef __ARCH_ARM_MACH_OMAP2_OMAP44XX_IRQS_H
+> -#define __ARCH_ARM_MACH_OMAP2_OMAP44XX_IRQS_H
+> -
+> -/* OMAP44XX IRQs numbers definitions */
+> -#define OMAP44XX_IRQ_LOCALTIMER			29
+> -#define OMAP44XX_IRQ_LOCALWDT			30
+> -
+> -#define OMAP44XX_IRQ_GIC_START			32
+> -
+> -#define OMAP44XX_IRQ_PL310			(0 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_CTI0			(1 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_CTI1			(2 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_ELM			(4 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SYS_1N			(7 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SECURITY_EVENTS		(8 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_L3_DBG			(9 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_L3_APP			(10 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_PRCM			(11 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SDMA_0			(12 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SDMA_1			(13 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SDMA_2			(14 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SDMA_3			(15 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCBSP4			(16 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCBSP1			(17 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SR_MCU			(18 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SR_CORE			(19 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPMC			(20 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GFX			(21 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCBSP2			(22 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCBSP3			(23 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_ISS_5			(24 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DSS_DISPC			(25 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MAIL_U0			(26 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_C2C_SSCM_0			(27 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_TESLA_MMU			(28 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPIO1			(29 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPIO2			(30 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPIO3			(31 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPIO4			(32 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPIO5			(33 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPIO6			(34 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_USIM			(35 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_WDT3			(36 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT1			(37 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT2			(38 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT3			(39 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT4			(40 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT5			(41 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT6			(42 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT7			(43 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT8			(44 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT9			(45 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT10			(46 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT11			(47 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SPI4			(48 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SHA1_S			(49 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_FPKA_SINTREQUEST_S		(50 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SHA1_P			(51 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_RNG			(52 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DSS_DSI1			(53 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_I2C1			(56 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_I2C2			(57 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_HDQ			(58 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MMC5			(59 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_I2C3			(61 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_I2C4			(62 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_AES2_S			(63 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_AES2_P			(64 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SPI1			(65 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SPI2			(66 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_HSI_P1			(67 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_HSI_P2			(68 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_FDIF_3			(69 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_UART4			(70 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_HSI_DMA			(71 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_UART1			(72 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_UART2			(73 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_UART3			(74 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_PBIAS			(75 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_OHCI			(76 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_EHCI			(77 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_TLL			(78 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_AES1_S			(79 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_WDT2			(80 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DES_S			(81 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DES_P			(82 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MMC1			(83 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DSS_DSI2			(84 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_AES1_P			(85 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MMC2			(86 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MPU_ICR			(87 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_C2C_SSCM_1			(88 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_FSUSB			(89 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_FSUSB_SMI			(90 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SPI3			(91 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_HS_USB_MC_N		(92 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_HS_USB_DMA_N		(93 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MMC3			(94 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_GPT12			(95 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MMC4			(96 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SLIMBUS1			(97 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SLIMBUS2			(98 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_ABE			(99 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DUCATI_MMU			(100 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DSS_HDMI			(101 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SR_IVA			(102 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_IVA_HD_POSYNCITRPEND_1	(103 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_IVA_HD_POSYNCITRPEND_0	(104 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_IVA_HD_POMBINTRPEND_0	(107 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCASP1_AR			(108 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCASP1_AX			(109 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_EMIF4_1			(110 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_EMIF4_2			(111 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_MCPDM			(112 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DMM			(113 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_DMIC			(114 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_CDMA_0			(115 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_CDMA_1			(116 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_CDMA_2			(117 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_CDMA_3			(118 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_SYS_2N			(119 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_KBD_CTL			(120 + OMAP44XX_IRQ_GIC_START)
+> -#define OMAP44XX_IRQ_UNIPRO1			(124 + OMAP44XX_IRQ_GIC_START)
+> -
+> -#endif
+> diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+> index fc3959c..729992d 100644
+> --- a/arch/arm/plat-omap/include/plat/irqs.h
+> +++ b/arch/arm/plat-omap/include/plat/irqs.h
+> @@ -28,9 +28,6 @@
+>  #ifndef __ASM_ARCH_OMAP15XX_IRQS_H
+>  #define __ASM_ARCH_OMAP15XX_IRQS_H
 >  
->  	/* disable keyboard interrupt and schedule for handling */
-> -	if (cpu_is_omap24xx()) {
-> +	if (omap_kp_24xx()) {
->  		int i;
+> -/* All OMAP4 specific defines are moved to irqs-44xx.h */
+> -#include "irqs-44xx.h"
+> -
+>  /*
+>   * IRQ numbers for interrupt handler 1
+>   *
+> @@ -242,125 +239,6 @@
+>  #define INT_7XX_DMA_CH15	(62 + IH2_BASE)
+>  #define INT_7XX_NAND		(63 + IH2_BASE)
 >  
->  		for (i = 0; i < omap_kp->rows; i++) {
-> @@ -134,7 +137,7 @@ static void omap_kp_scan_keypad(struct omap_kp *omap_kp, unsigned char *state)
->  	int col = 0;
+> -#define INT_24XX_SYS_NIRQ	7
+> -#define INT_24XX_SDMA_IRQ0	12
+> -#define INT_24XX_SDMA_IRQ1	13
+> -#define INT_24XX_SDMA_IRQ2	14
+> -#define INT_24XX_SDMA_IRQ3	15
+> -#define INT_24XX_CAM_IRQ	24
+> -#define INT_24XX_DSS_IRQ	25
+> -#define INT_24XX_MAIL_U0_MPU	26
+> -#define INT_24XX_DSP_UMA	27
+> -#define INT_24XX_DSP_MMU	28
+> -#define INT_24XX_GPIO_BANK1	29
+> -#define INT_24XX_GPIO_BANK2	30
+> -#define INT_24XX_GPIO_BANK3	31
+> -#define INT_24XX_GPIO_BANK4	32
+> -#define INT_24XX_GPIO_BANK5	33
+> -#define INT_24XX_MAIL_U3_MPU	34
+> -#define INT_24XX_GPTIMER1	37
+> -#define INT_24XX_GPTIMER2	38
+> -#define INT_24XX_GPTIMER3	39
+> -#define INT_24XX_GPTIMER4	40
+> -#define INT_24XX_GPTIMER5	41
+> -#define INT_24XX_GPTIMER6	42
+> -#define INT_24XX_GPTIMER7	43
+> -#define INT_24XX_GPTIMER8	44
+> -#define INT_24XX_GPTIMER9	45
+> -#define INT_24XX_GPTIMER10	46
+> -#define INT_24XX_GPTIMER11	47
+> -#define INT_24XX_GPTIMER12	48
+> -#define INT_24XX_SHA1MD5	51
+> -#define INT_24XX_MCBSP4_IRQ_TX	54
+> -#define INT_24XX_MCBSP4_IRQ_RX	55
+> -#define INT_24XX_I2C1_IRQ	56
+> -#define INT_24XX_I2C2_IRQ	57
+> -#define INT_24XX_HDQ_IRQ	58
+> -#define INT_24XX_MCBSP1_IRQ_TX	59
+> -#define INT_24XX_MCBSP1_IRQ_RX	60
+> -#define INT_24XX_MCBSP2_IRQ_TX	62
+> -#define INT_24XX_MCBSP2_IRQ_RX	63
+> -#define INT_24XX_SPI1_IRQ	65
+> -#define INT_24XX_SPI2_IRQ	66
+> -#define INT_24XX_UART1_IRQ	72
+> -#define INT_24XX_UART2_IRQ	73
+> -#define INT_24XX_UART3_IRQ	74
+> -#define INT_24XX_USB_IRQ_GEN	75
+> -#define INT_24XX_USB_IRQ_NISO	76
+> -#define INT_24XX_USB_IRQ_ISO	77
+> -#define INT_24XX_USB_IRQ_HGEN	78
+> -#define INT_24XX_USB_IRQ_HSOF	79
+> -#define INT_24XX_USB_IRQ_OTG	80
+> -#define INT_24XX_MCBSP5_IRQ_TX	81
+> -#define INT_24XX_MCBSP5_IRQ_RX	82
+> -#define INT_24XX_MMC_IRQ	83
+> -#define INT_24XX_MMC2_IRQ	86
+> -#define INT_24XX_MCBSP3_IRQ_TX	89
+> -#define INT_24XX_MCBSP3_IRQ_RX	90
+> -#define INT_24XX_SPI3_IRQ	91
+> -
+> -#define INT_243X_MCBSP2_IRQ	16
+> -#define INT_243X_MCBSP3_IRQ	17
+> -#define INT_243X_MCBSP4_IRQ	18
+> -#define INT_243X_MCBSP5_IRQ	19
+> -#define INT_243X_MCBSP1_IRQ	64
+> -#define INT_243X_HS_USB_MC	92
+> -#define INT_243X_HS_USB_DMA	93
+> -#define INT_243X_CARKIT_IRQ	94
+> -
+> -#define INT_34XX_BENCH_MPU_EMUL	3
+> -#define INT_34XX_ST_MCBSP2_IRQ	4
+> -#define INT_34XX_ST_MCBSP3_IRQ	5
+> -#define INT_34XX_SSM_ABORT_IRQ	6
+> -#define INT_34XX_SYS_NIRQ	7
+> -#define INT_34XX_D2D_FW_IRQ	8
+> -#define INT_34XX_L3_DBG_IRQ     9
+> -#define INT_34XX_L3_APP_IRQ     10
+> -#define INT_34XX_PRCM_MPU_IRQ	11
+> -#define INT_34XX_MCBSP1_IRQ	16
+> -#define INT_34XX_MCBSP2_IRQ	17
+> -#define INT_34XX_GPMC_IRQ	20
+> -#define INT_34XX_MCBSP3_IRQ	22
+> -#define INT_34XX_MCBSP4_IRQ	23
+> -#define INT_34XX_CAM_IRQ	24
+> -#define INT_34XX_MCBSP5_IRQ	27
+> -#define INT_34XX_GPIO_BANK1	29
+> -#define INT_34XX_GPIO_BANK2	30
+> -#define INT_34XX_GPIO_BANK3	31
+> -#define INT_34XX_GPIO_BANK4	32
+> -#define INT_34XX_GPIO_BANK5	33
+> -#define INT_34XX_GPIO_BANK6	34
+> -#define INT_34XX_USIM_IRQ	35
+> -#define INT_34XX_WDT3_IRQ	36
+> -#define INT_34XX_SPI4_IRQ	48
+> -#define INT_34XX_SHA1MD52_IRQ	49
+> -#define INT_34XX_FPKA_READY_IRQ	50
+> -#define INT_34XX_SHA1MD51_IRQ	51
+> -#define INT_34XX_RNG_IRQ	52
+> -#define INT_34XX_I2C3_IRQ	61
+> -#define INT_34XX_FPKA_ERROR_IRQ	64
+> -#define INT_34XX_PBIAS_IRQ	75
+> -#define INT_34XX_OHCI_IRQ	76
+> -#define INT_34XX_EHCI_IRQ	77
+> -#define INT_34XX_TLL_IRQ	78
+> -#define INT_34XX_PARTHASH_IRQ	79
+> -#define INT_34XX_MMC3_IRQ	94
+> -#define INT_34XX_GPT12_IRQ	95
+> -
+> -#define INT_36XX_UART4_IRQ	80
+> -
+> -#define INT_35XX_HECC0_IRQ		24
+> -#define INT_35XX_HECC1_IRQ		28
+> -#define INT_35XX_EMAC_C0_RXTHRESH_IRQ	67
+> -#define INT_35XX_EMAC_C0_RX_PULSE_IRQ	68
+> -#define INT_35XX_EMAC_C0_TX_PULSE_IRQ	69
+> -#define INT_35XX_EMAC_C0_MISC_PULSE_IRQ	70
+> -#define INT_35XX_USBOTG_IRQ		71
+> -#define INT_35XX_UART4_IRQ		84
+> -#define INT_35XX_CCDC_VD0_IRQ		88
+> -#define INT_35XX_CCDC_VD1_IRQ		92
+> -#define INT_35XX_CCDC_VD2_IRQ		93
+> -
+>  /* Max. 128 level 2 IRQs (OMAP1610), 192 GPIOs (OMAP730/850) and
+>   * 16 MPUIO lines */
+>  #define OMAP_MAX_GPIO_LINES	192
+> @@ -377,66 +255,7 @@
+>  #endif
+>  #define OMAP_FPGA_IRQ_END	(OMAP_FPGA_IRQ_BASE + OMAP_FPGA_NR_IRQS)
 >  
->  	/* read the keypad status */
-> -	if (cpu_is_omap24xx()) {
-> +	if (omap_kp_24xx()) {
->  		/* read the keypad status */
->  		for (col = 0; col < omap_kp->cols; col++) {
->  			set_col_gpio_val(omap_kp, ~(1 << col));
-> @@ -222,7 +225,7 @@ static void omap_kp_tasklet(unsigned long data)
->  		mod_timer(&omap_kp_data->timer, jiffies + delay);
->  	} else {
->  		/* enable interrupts */
-> -		if (cpu_is_omap24xx()) {
-> +		if (omap_kp_24xx()) {
->  			int i;
->  			for (i = 0; i < omap_kp_data->rows; i++)
->  				enable_irq(gpio_to_irq(row_gpios[i]));
-> @@ -253,9 +256,9 @@ static ssize_t omap_kp_enable_store(struct device *dev, struct device_attribute
->  	mutex_lock(&kp_enable_mutex);
->  	if (state != kp_enable) {
->  		if (state)
-> -			enable_irq(INT_KEYBOARD);
-> +			enable_irq(omap_kp->irq);
->  		else
-> -			disable_irq(INT_KEYBOARD);
-> +			disable_irq(omap_kp->irq);
-
-GREAT!! :-)
-
->  		kp_enable = state;
->  	}
->  	mutex_unlock(&kp_enable_mutex);
-> @@ -286,7 +289,6 @@ static int omap_kp_resume(struct platform_device *dev)
+> -/* External TWL4030 can handle interrupts on 2430 and 34xx boards */
+> -#define	TWL4030_IRQ_BASE	(OMAP_FPGA_IRQ_END)
+> -#ifdef	CONFIG_TWL4030_CORE
+> -#define	TWL4030_BASE_NR_IRQS	8
+> -#define	TWL4030_PWR_NR_IRQS	8
+> -#else
+> -#define	TWL4030_BASE_NR_IRQS	0
+> -#define	TWL4030_PWR_NR_IRQS	0
+> -#endif
+> -#define TWL4030_IRQ_END		(TWL4030_IRQ_BASE + TWL4030_BASE_NR_IRQS)
+> -#define TWL4030_PWR_IRQ_BASE	TWL4030_IRQ_END
+> -#define	TWL4030_PWR_IRQ_END	(TWL4030_PWR_IRQ_BASE + TWL4030_PWR_NR_IRQS)
+> -
+> -/* External TWL4030 gpio interrupts are optional */
+> -#define TWL4030_GPIO_IRQ_BASE	TWL4030_PWR_IRQ_END
+> -#ifdef	CONFIG_GPIO_TWL4030
+> -#define TWL4030_GPIO_NR_IRQS	18
+> -#else
+> -#define	TWL4030_GPIO_NR_IRQS	0
+> -#endif
+> -#define TWL4030_GPIO_IRQ_END	(TWL4030_GPIO_IRQ_BASE + TWL4030_GPIO_NR_IRQS)
+> -
+> -#define	TWL6030_IRQ_BASE	(OMAP_FPGA_IRQ_END)
+> -#ifdef CONFIG_TWL4030_CORE
+> -#define	TWL6030_BASE_NR_IRQS	20
+> -#else
+> -#define	TWL6030_BASE_NR_IRQS	0
+> -#endif
+> -#define TWL6030_IRQ_END		(TWL6030_IRQ_BASE + TWL6030_BASE_NR_IRQS)
+> -
+> -#define TWL6040_CODEC_IRQ_BASE	TWL6030_IRQ_END
+> -#ifdef CONFIG_TWL6040_CODEC
+> -#define TWL6040_CODEC_NR_IRQS	6
+> -#else
+> -#define TWL6040_CODEC_NR_IRQS	0
+> -#endif
+> -#define TWL6040_CODEC_IRQ_END	(TWL6040_CODEC_IRQ_BASE + TWL6040_CODEC_NR_IRQS)
+> -
+> -/* Total number of interrupts depends on the enabled blocks above */
+> -#if (TWL4030_GPIO_IRQ_END > TWL6040_CODEC_IRQ_END)
+> -#define TWL_IRQ_END 		TWL4030_GPIO_IRQ_END
+> -#else
+> -#define TWL_IRQ_END		TWL6040_CODEC_IRQ_END
+> -#endif
+> -
+> -/* GPMC related */
+> -#define OMAP_GPMC_IRQ_BASE	(TWL_IRQ_END)
+> -#define OMAP_GPMC_NR_IRQS	8
+> -#define OMAP_GPMC_IRQ_END	(OMAP_GPMC_IRQ_BASE + OMAP_GPMC_NR_IRQS)
+> -
+> -/* PRCM IRQ handler */
+> -#ifdef CONFIG_ARCH_OMAP2PLUS
+> -#define OMAP_PRCM_IRQ_BASE	(OMAP_GPMC_IRQ_END)
+> -#define OMAP_PRCM_NR_IRQS	64
+> -#define OMAP_PRCM_IRQ_END	(OMAP_PRCM_IRQ_BASE + OMAP_PRCM_NR_IRQS)
+> -#else
+> -#define OMAP_PRCM_IRQ_END	OMAP_GPMC_IRQ_END
+> -#endif
+> -
+> -#define NR_IRQS			OMAP_PRCM_IRQ_END
+> +#define NR_IRQS			OMAP_FPGA_IRQ_END
 >  
->  static int __devinit omap_kp_probe(struct platform_device *pdev)
->  {
-> -	struct omap_kp *omap_kp;
-
-???? I don't see the point for that global omap_kp, actually ...
-
->  	struct input_dev *input_dev;
->  	struct omap_kp_platform_data *pdata =  pdev->dev.platform_data;
->  	int i, col_idx, row_idx, irq_idx, ret;
-> @@ -314,7 +316,7 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
->  	omap_kp->input = input_dev;
+>  #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
 >  
->  	/* Disable the interrupt for the MPUIO keyboard */
-> -	if (!cpu_is_omap24xx())
-> +	if (!omap_kp_24xx())
->  		omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+> diff --git a/drivers/media/video/omap/omap_vout.c b/drivers/media/video/omap/omap_vout.c
+> index 88cf9d9..409da0f 100644
+> --- a/drivers/media/video/omap/omap_vout.c
+> +++ b/drivers/media/video/omap/omap_vout.c
+> @@ -44,6 +44,7 @@
+>  #include <media/v4l2-device.h>
+>  #include <media/v4l2-ioctl.h>
 >  
->  	if (pdata->delay)
-> @@ -328,7 +330,7 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
->  	omap_kp->rows = pdata->rows;
->  	omap_kp->cols = pdata->cols;
+> +#include <plat/cpu.h>
+>  #include <plat/dma.h>
+>  #include <plat/vrfb.h>
+>  #include <video/omapdss.h>
+> diff --git a/drivers/media/video/omap3isp/isp.c b/drivers/media/video/omap3isp/isp.c
+> index 1c34763..43e61fe 100644
+> --- a/drivers/media/video/omap3isp/isp.c
+> +++ b/drivers/media/video/omap3isp/isp.c
+> @@ -70,6 +70,8 @@
+>  #include <media/v4l2-common.h>
+>  #include <media/v4l2-device.h>
 >  
-> -	if (cpu_is_omap24xx()) {
-> +	if (omap_kp_24xx()) {
->  		/* Cols: outputs */
->  		for (col_idx = 0; col_idx < omap_kp->cols; col_idx++) {
->  			if (gpio_request(col_gpios[col_idx], "omap_kp_col") < 0) {
-> @@ -394,7 +396,7 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
+> +#include <plat/cpu.h>
+> +
+>  #include "isp.h"
+>  #include "ispreg.h"
+>  #include "ispccdc.h"
+> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
+> index 44efc6e..d4957b4 100644
+> --- a/drivers/power/avs/smartreflex.c
+> +++ b/drivers/power/avs/smartreflex.c
+> @@ -27,6 +27,8 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/power/smartreflex.h>
 >  
->  	/* scan current status and enable interrupt */
->  	omap_kp_scan_keypad(omap_kp, keypad_state);
-> -	if (!cpu_is_omap24xx()) {
-> +	if (!omap_kp_24xx()) {
->  		omap_kp->irq = platform_get_irq(pdev, 0);
->  		if (omap_kp->irq >= 0) {
->  			if (request_irq(omap_kp->irq, omap_kp_interrupt, 0,
-> @@ -439,7 +441,7 @@ static int __devexit omap_kp_remove(struct platform_device *pdev)
+> +#include <plat/cpu.h>
+> +
+>  #define SMARTREFLEX_NAME_LEN	16
+>  #define NVALUE_NAME_LEN		40
+>  #define SR_DISABLE_TIMEOUT	200
+> diff --git a/drivers/staging/tidspbridge/core/wdt.c b/drivers/staging/tidspbridge/core/wdt.c
+> index 1ed1474..7a6470f 100644
+> --- a/drivers/staging/tidspbridge/core/wdt.c
+> +++ b/drivers/staging/tidspbridge/core/wdt.c
+> @@ -26,7 +26,7 @@
 >  
->  	/* disable keypad interrupt handling */
->  	tasklet_disable(&kp_tasklet);
-> -	if (cpu_is_omap24xx()) {
-> +	if (omap_kp_24xx()) {
->  		int i;
->  		for (i = 0; i < omap_kp->cols; i++)
->  			gpio_free(col_gpios[i]);
+>  
+>  #define OMAP34XX_WDT3_BASE 		(0x49000000 + 0x30000)
+> -#define INT_34XX_WDT3_IRQ 		36
+> +#define INT_34XX_WDT3_IRQ 		(36 + NR_IRQS)
+>  
+>  static struct dsp_wdt_setting dsp_wdt;
+>  
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
@@ -178,4 +496,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/206586f7/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120911/5336cd21/attachment.sig>
