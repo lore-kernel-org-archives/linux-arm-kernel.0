@@ -1,49 +1,32 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 11 Sep 2012 19:36:30 +0530
-Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
-In-Reply-To: <1347368559-31329-1-git-send-email-arnd@arndb.de>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368559-31329-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAMQu2gwLoccyjGwjjgndiW2aR--_S=UhCCTdcav6LicvYWe5SQ@mail.gmail.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 11 Sep 2012 15:14:20 +0100
+Subject: [PATCH 08/12] tty/serial: Add kgdb_nmi driver
+In-Reply-To: <1347356106-25368-8-git-send-email-anton.vorontsov@linaro.org>
+References: <20120911093042.GA12471@lizard>
+ <1347356106-25368-8-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <20120911151420.14a29485@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+> +struct kgdb_nmi_tty_priv {
+> +	struct tty_port port;
+> +	int opened;
+> +	struct tasklet_struct tlet;
+> +	STRUCT_KFIFO(char, KGDB_NMI_FIFO_SIZE) fifo;
 
-On Tue, Sep 11, 2012 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Platform data for device drivers should be defined in
-> include/linux/platform_data/*.h, not in the architecture
-> and platform specific directories.
->
-> This moves such data out of the omap include directories
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+I don't see where "opened" is used.
 
-[...]
 
->  81 files changed, 87 insertions(+), 87 deletions(-)
->  rename arch/arm/plat-omap/include/plat/mcbsp.h => include/linux/platform_data/dsp-mcbsp.h (100%)
->  rename arch/arm/plat-omap/include/plat/dsp.h => include/linux/platform_data/dsp-omap.h (100%)
->  rename arch/arm/plat-omap/include/plat/keypad.h => include/linux/platform_data/keypad-omap.h (100%)
->  rename arch/arm/plat-omap/include/plat/lcd_mipid.h => include/linux/platform_data/lcd-mipid.h (100%)
->  rename arch/arm/plat-omap/include/plat/nand.h => include/linux/platform_data/mtd-nand-omap2.h (100%)
->  rename arch/arm/plat-omap/include/plat/onenand.h => include/linux/platform_data/mtd-onenand-omap2.h (100%)
->  rename arch/arm/plat-omap/include/plat/remoteproc.h => include/linux/platform_data/remoteproc-omap.h (100%)
->  rename arch/arm/plat-omap/include/plat/voltage.h => include/linux/platform_data/smartreflex-omap.h (100%)
->  rename arch/arm/plat-omap/include/plat/mcspi.h => include/linux/platform_data/spi-omap2-mcspi.h (100%)
->
-Just curious to know how you came with some of the above header names ?
+> +static const struct tty_operations kgdb_nmi_tty_ops = {
+> +	.open		= kgdb_nmi_tty_open,
+> +	.close		= kgdb_nmi_tty_close,
+> +	.install	= kgdb_nmi_tty_install,
+> +	.cleanup	= kgdb_nmi_tty_cleanup,
+> +	.write_room	= kgdb_nmi_tty_write_room,
+> +	.write		= kgdb_nmi_tty_write,
 
-plat/mcbsp ---> dsp-mcbsp.h
-There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
-better name.
+And a hangup method (just using tty_port helpers will do the job - it's
+needed so vhangup() works as expected on a port)
 
-plat/nand.h --> /mtd-nand-omap2.h
-plat/onenand.h --> /mtd-onenand-omap2.h
-May be "omap-nand.h" and "omap-onenand.h"
 
-plat/mcspi.h-->spi-omap2-mcspi.h
-May be "omap-spi.h"
-
-Regards,
-Santosh
+Alan
