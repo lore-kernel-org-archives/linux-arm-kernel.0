@@ -1,63 +1,72 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Tue, 11 Sep 2012 14:49:54 +0530
-Subject: [PATCH] ARM: EXYNOS5: Add bus clock and set parent clock for FIMD
-In-Reply-To: <000101cd8fb3$90d10db0$b2732910$%han@samsung.com>
-References: <1347307866-30641-1-git-send-email-l.krishna@samsung.com>
- <000101cd8fb3$90d10db0$b2732910$%han@samsung.com>
-Message-ID: <CAL1wa8f1=hVMYrw2qdnQK5wFh8CtLxjP79+8POOG7HHqOBU5yA@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 11 Sep 2012 11:26:44 +0200
+Subject: [PATCH v2 1/3] arm/dts: Add twl6030-usb data
+In-Reply-To: <1347345381-4390-2-git-send-email-kishon@ti.com>
+References: <1347345381-4390-1-git-send-email-kishon@ti.com>
+ <1347345381-4390-2-git-send-email-kishon@ti.com>
+Message-ID: <504F03D4.5080800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jingoo Han,
+On 09/11/2012 08:36 AM, Kishon Vijay Abraham I wrote:
+> Add twl6030-usb data node in twl6030 device tree file
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4-panda.dts |    4 ++++
+>  arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
+>  arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
+>  3 files changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index 9880c12..2999eba 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -126,3 +126,7 @@
+>  	ti,non-removable;
+>  	bus-width = <4>;
+>  };
+> +
+> +&twlusb {
+> +	usb-supply = <&vusb>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 72216e9..d8290c0 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -226,3 +226,7 @@
+>  	bus-width = <4>;
+>  	ti,non-removable;
+>  };
+> +
+> +&twlusb {
+> +	usb-supply = <&vusb>;
+> +};
+> diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+> index 3b2f351..8e3aac9 100644
+> --- a/arch/arm/boot/dts/twl6030.dtsi
+> +++ b/arch/arm/boot/dts/twl6030.dtsi
+> @@ -83,4 +83,9 @@
+>  	clk32kg: regulator at 12 {
+>  		compatible = "ti,twl6030-clk32kg";
+>  	};
+> +
+> +	twlusb: twl6030-usb {
 
-On Tue, Sep 11, 2012 at 5:52 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Tuesday, September 11, 2012 5:11 AM Leela Krishna Amudala wrote
->>
->> This patch adds the bus clock for FIMD and changes the device name for lcd clock
->> also sets mout_mpll_user as parent clock to fimd
->>
->> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
->> ---
->>  arch/arm/mach-exynos/clock-exynos5.c       |   34 +++++++++++++++++++--------
->>  arch/arm/plat-samsung/include/plat/clock.h |    2 +
->>  2 files changed, 26 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
->> index 774533c..f1281cf 100644
->> --- a/arch/arm/mach-exynos/clock-exynos5.c
->> +++ b/arch/arm/mach-exynos/clock-exynos5.c
->> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
->>       .ctrlbit        = (1 << 4),
->>  };
->>
->> +static struct clk exynos5_clk_fimd = {
->> +     .name           = "fimd",
->> +     .devname        = "exynos5-fb",
->
->
-> Replace 'exynos5-fb' with 'exynos5-fb.1', as exynos4 fimd uses exynos4-fb.0
-> as devname. Exynos5 can use fimd0 or fimd1. Also, Exynos5250 uses fimd1.
->
->
-Currently s3c-fb driver using "exynos5-fb" as device name, hence used
-the same name in the clock.
-This code is tested with both drm-fimd and s3c-fb fimd and it is
-working fine showing the display on LCD.
-If I change the device name in clock file then I have to change it in
-s3c-fb driver also.
-So I feel it is better to keep the name as "exynos5-fb" in clock file
-instead of changing in the driver.
+That name should be a generic device class name is possible.
+What is twl6030-usb exactly? an USB PHY?
 
-Thanks,
-Leela Krishna Amudala.
+> +		compatible = "ti,twl6030-usb";
+> +		interrupts = < 4 10 >;
 
->> +     .enable         = exynos5_clk_ip_disp1_ctrl,
->> +     .ctrlbit        = (1 << 0),
->> +};
->> +
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+If this is for two interrupts, you'd better split them to avoid
+confusion with irq specifiers that requires several attributes like for
+the GIC.
+
++		interrupts = <4>, <10>; /* IRQ1 blabla, IRQ2 blabla*/
+
+The comments are not mandatory assuming the binding is documented.
+
+Regards,
+Benoit
