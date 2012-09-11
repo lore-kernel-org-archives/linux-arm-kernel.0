@@ -1,30 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2012 14:10:05 +0000
-Subject: [PATCH 04/16] ARM: imx: move platform_data definitions
-In-Reply-To: <Pine.LNX.4.64.1209111538000.22084@axis700.grange>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-4-git-send-email-arnd@arndb.de>
- <Pine.LNX.4.64.1209111538000.22084@axis700.grange>
-Message-ID: <201209111410.05698.arnd@arndb.de>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 11 Sep 2012 15:15:40 +0100
+Subject: [PATCH 06/12] tty/serial/kgdboc: Add and wire up clear_irqs
+ callback
+In-Reply-To: <1347356106-25368-6-git-send-email-anton.vorontsov@linaro.org>
+References: <20120911093042.GA12471@lizard>
+ <1347356106-25368-6-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <20120911151540.362001c6@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 September 2012, Guennadi Liakhovetski wrote:
-> Hi Arnd
-> 
-> It probably wouldn't be very difficult to also include 
-> arch/arm/plat-mxc/include/mach/ipu.h in this your patch, but you can also 
-> leave it for later. Just to make sure it's not something that would make 
-> your future patching more complicated.
-> 
+On Tue, 11 Sep 2012 02:35:00 -0700
+Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
 
-For now, I've done only the straight renames but left the ones that looked
-like they need more complex changes of any sort. Looking at ipu.h, it seems
-that this header file defines data that is used inside of the driver but not
-in the platform device definition, so we'd need to split it up and move
-the part that is only used inside of the driver into a different place.
+> This patch implements a new callback: clear_irqs. It is used for the
 
-Of course, I could alo be mistaken and not have realized that actually all
-of this file is platform data.
 
-	Arnd
+This bit I still really don't like. I would like to know what the generic
+IRQ folks thing about it and if Thomas Gleixner has any brilliant ideas
+here. I don't think its a show stopper it would just be nice if there was
+a better solution first.
+
+Alan
