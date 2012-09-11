@@ -1,56 +1,66 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 11 Sep 2012 15:12:07 +0530
-Subject: [PATCHv7 12/23] i2c: omap: bus: add a receiver flag
+Date: Tue, 11 Sep 2012 15:12:17 +0530
+Subject: [PATCHv7 22/23] i2c: omap: switch over to autosuspend API
 In-Reply-To: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
 References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347356538-23835-13-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1347356538-23835-23-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-that way we can ignore TX IRQs while in receiver
-mode and ignore RX IRQs while in transmitter mode.
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message starting soon.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-[Remove unnecessary braces]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 0da8169..3be147a 100644
+index 6d38a57..122f517 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -199,6 +199,7 @@ struct omap_i2c_dev {
- 						 */
- 	u8			rev;
- 	unsigned		b_hw:1;		/* bad h/w fixes */
-+	unsigned		receiver:1;	/* true when we're in receiver mode */
- 	u16			iestate;	/* Saved interrupt register */
- 	u16			pscstate;
- 	u16			scllstate;
-@@ -492,6 +493,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+@@ -55,6 +55,9 @@
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
  
- 	INIT_COMPLETION(dev->cmd_complete);
- 	dev->cmd_err = 0;
-+	dev->receiver = !!(msg->flags & I2C_M_RD);
- 
- 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
- 
-@@ -837,6 +839,12 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
- 		stat &= bits;
- 
-+		/* If we're in receiver mode, ignore XDR/XRDY */
-+		if (dev->receiver)
-+			stat &= ~(OMAP_I2C_STAT_XDR | OMAP_I2C_STAT_XRDY);
-+		else
-+			stat &= ~(OMAP_I2C_STAT_RDR | OMAP_I2C_STAT_RRDY);
++/* timeout for pm runtime autosuspend */
++#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
 +
- 		if (!stat) {
- 			/* my work here is done */
- 			return IRQ_HANDLED;
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
+ 
+@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
+ 
 -- 
 1.7.5.4
