@@ -1,43 +1,49 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 11 Sep 2012 16:03:31 +1000
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <201209101422.13875.arnd@arndb.de>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <5028D040.60604@codethink.co.uk> <502D201E.9030304@codethink.co.uk>
- <201209101422.13875.arnd@arndb.de>
-Message-ID: <1347343411.2603.42.camel@pasglop>
+From: hdk@igel.co.jp (Hideki EIRAKU)
+Date: Tue, 11 Sep 2012 15:10:12 +0900
+Subject: [PATCH v3 0/2] Renesas IPMMU driver for sh7372
+Message-ID: <1347343814-32299-1-git-send-email-hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-09-10 at 14:22 +0000, Arnd Bergmann wrote:
-> Following up on the old discussion, I talked briefly about this
-> issue with BenH at the kernel summit. The outcome basically is that
-> it's a bit sad to have incompatible bindings, but it's not the end
-> of the world,and it's more important to do it right this time.
-> 
-> Just make sure that you use different values for the 'compatible'
-> strings and then do what you need to get the ARM hardware working.
-> 
-> Ideally, the new binding should be written in a way that powerpc
-> machines can use the same one, but the existing ones all use
-> an version of Open Firmware that is not going to get updated
-> and it's also not too likely that we are going to see new
-> powerpc machines based on this chip.
+This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
+device support for sh7372 (AP4EVB and Mackerel).
 
-Right, mostly these machines where the Pegasos. Those came with a fairly
-busted variant of Open Firmware which generated a pretty gross
-device-tree.
+The IPMMU module supports the MMU function and the PMB function.  The
+MMU function provides address translation by pagetable compatible with
+ARMv6.  The PMB function provides address translation including
+tile-linear translation.  This is implementation of the MMU function.
 
-For some reason, the manufacturer of those things was never willing to
-fix anything in their firmware (despite the distributor providing
-patches etc...), seemingly on the assumption that whatever they were
-doing was perfect and operating system people like us didn't matter one
-little bit :-)
+v3:
+- Rebased on 3.6-rc5.
+- Simplify configs.  SHMOBILE_IPMMU is now selected by setting
+  SHMOBILE_IOMMU.
+- Remove weak symbols.
+- Use drvdata to store private driver data.
+- Make a function for writing to a register of IPMMU.
+- Add a lock to accessing the tlb_enabled member.
+- Make unmap work correctly with size larger than map size.
+- Free L2 page table when 1MiB page is mapped or unmapped.
+- Add VEU devices as IP blocks on the ICB.
+v2:
+- Rebased on v3.6-rc1.
+- Make variable names clear.
+- Page table size can now be selected by config.
 
-So I don't care much about it. It would be nice to keep them working
-since people in the community still have them but if it goes through
-some "compat" code that detects old/broken device-trees and eventually
-disappears when we finally drop support, then so be it.
+Hideki EIRAKU (2):
+  iommu/shmobile: Add iommu driver for Renesas IPMMU modules
+  ARM: mach-shmobile: sh7372: Add IPMMU device
 
-Cheers,
-Ben.
+ arch/arm/mach-shmobile/Kconfig              |    6 +
+ arch/arm/mach-shmobile/Makefile             |    3 +
+ arch/arm/mach-shmobile/board-ap4evb.c       |    5 +
+ arch/arm/mach-shmobile/board-mackerel.c     |    5 +
+ arch/arm/mach-shmobile/include/mach/ipmmu.h |   16 ++
+ arch/arm/mach-shmobile/ipmmu.c              |  150 +++++++++++
+ arch/arm/mach-shmobile/setup-sh7372.c       |   26 ++
+ drivers/iommu/Kconfig                       |   36 +++
+ drivers/iommu/Makefile                      |    1 +
+ drivers/iommu/shmobile-iommu.c              |  372 +++++++++++++++++++++++++++
+ 10 files changed, 620 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
+ create mode 100644 arch/arm/mach-shmobile/ipmmu.c
+ create mode 100644 drivers/iommu/shmobile-iommu.c
