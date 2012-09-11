@@ -1,36 +1,61 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Tue, 11 Sep 2012 13:35:40 +0200
-Subject: GCC 4.6.x miscompiling arm-linux?
-In-Reply-To: <20120911123743.29e0ed40@archvile>
-References: <20120910171654.1d4972b2@archvile>
- <w51bohddcqw.fsf@mail.mattleach.net>
- <20120911092753.7b8315d4@archvile>
- <20558.61974.299424.536837@pilspetsen.it.uu.se>
- <20120911104925.3461603e@archvile>
- <20559.1844.786507.216580@pilspetsen.it.uu.se>
- <20120911123743.29e0ed40@archvile>
-Message-ID: <20559.8716.124212.451155@pilspetsen.it.uu.se>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 11 Sep 2012 11:42:58 +0000
+Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
+ and OMAP2430 SoC
+In-Reply-To: <5048B63F.5030309@ti.com>
+References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+ <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
+ <5044C2DD.5000705@ti.com> <504578B3.3090804@ti.com> <5045D557.30404@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA7C99@DBDE01.ent.ti.com>
+ <50470C1E.7090300@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA8014@DBDE01.ent.ti.com>
+ <5047544B.60105@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA8779@DBDE01.ent.ti.com>
+ <5048B63F.5030309@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAB0E4D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Jander writes:
- > > I can make the patches available if there's confirmation that a vanilla
- > > upstream gcc-4.6.3 doesn't work.
- > 
- > I am pretty sure this is the case... do you have a patch series that you can
- > easily tar and mail to me? I'd like to try those patches with OSELAS, to see
- > if I can indeed build a gcc-4.6.3 toolchain that generates correct code.... I
- > already know that I can generate one that doesn't ;-)
- > 
-...
- > > If you're sure no add-on patches were applied, then yes please do.
- > 
- > Pretty sure, but not 100%, so I'd like to try your patches first if you don't
- > mind....
++ Andrew,
 
-And I'd like to confirm first. Please tell us the following:
+On Thu, Sep 06, 2012 at 20:12:07, Cousson, Benoit wrote:
+> 
+> On 09/05/2012 04:41 PM, Hiremath, Vaibhav wrote:
+> ...
+> > There are other patches which are pending,
+> > 
+> > arm/dts: AM33XX: Convert all hex numbers to lower-case
+> > https://patchwork.kernel.org/patch/1377351/
+> > arm/dts: AM33XX: Specify reg and interrupt property for all nodes
+> > https://patchwork.kernel.org/patch/1377361/
+> 
+> OK, so these ones are fine, you should just rebase them because theyu
+> are conflicting with patches already inside lo/devel-dt
+> 
+> > Probably your Ack is required for,
+> > 
+> > ARM: AM33XX: clock: Add dcan clock aliases for device-tree
+> > https://patchwork.kernel.org/patch/1377061/
+> 
+> Paul already queued this one so it is fine.
+> 
+> > RTC:
+> > I am not sure how to deal with RTC DT support, as I understand the list is very unresponsive there.
+> 
+> OK, so I did have the same issue for TWL RTC since the maintainer is no
+> longer very active. In that case you should go through Andrew Morton.
+> 
 
- > >  > > 2: include the output of gcc -v which tells how that gcc was configured,
- > >  > > 3: give the exact set of gcc options used then compiling the test case.
+Andrew,
+Can you please merge these omap-rtc patches, there are no review comments so 
+far and I believe it should be safe now to merge.
 
-and I'll check if vanilla upstream gcc is broken or not.
+Thanks,
+Vaiibhav
+
+> Regards,
+> Benoit
+> 
+> > http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg23253.html
+> 
+> 
