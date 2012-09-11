@@ -1,38 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Sep 2012 17:35:38 +0200
-Subject: pinctrl: mvebu: minor fixes
-In-Reply-To: <CABJ1b_Se0w2W+LHhknUqYOBQurCdmYbWnkxX8hJhOFkXAo30xg@mail.gmail.com>
+Date: Tue, 11 Sep 2012 17:37:14 +0200
+Subject: [PATCH 2/2] arm: mvebu: select the pinctrl drivers for Armada 370 and
+ Armada XP platforms
+In-Reply-To: <1347377834-19402-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347373204-17883-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CABJ1b_Se0w2W+LHhknUqYOBQurCdmYbWnkxX8hJhOFkXAo30xg@mail.gmail.com>
-Message-ID: <20120911173538.7e7d9fe7@skate>
+ <1347377834-19402-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1347377834-19402-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 11 Sep 2012 17:31:56 +0200,
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-> thanks for this one! After reviewing the offending code, I realized
-> that it must
-> be an old(er) version of the pinctrl core. I ll dig out the correct
-> version and report
-> on list accordingly.
-
-Ok, great. The version you had sent looked really strange/unfinished to
-me, so happy to know there's a more finalized version somewhere :-)
-
-I'll test it as soon as you post it, to validate that it works OK on
-Armada 370/XP.
-
-That said, I'm still interested by a short human-readable summary of
-the changes you've done in terms of how the 'functions' are handled
-compared to the original version of the driver.
-
-Thanks!
-
-Thomas
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index b0924b1..0da722e 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -10,6 +10,7 @@ config MACH_ARMADA_370_XP
+ config MACH_ARMADA_370
+ 	bool "Marvell Armada 370 boads"
+ 	select MACH_ARMADA_370_XP
++	select PINCTRL_ARMADA_370
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada XP SoC with device tree.
+@@ -17,6 +18,7 @@ config MACH_ARMADA_370
+ config MACH_ARMADA_XP
+ 	bool "Marvell Armada XP boards"
+ 	select MACH_ARMADA_370_XP
++	select PINCTRL_ARMADA_XP
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada XP SoC with device tree.
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
