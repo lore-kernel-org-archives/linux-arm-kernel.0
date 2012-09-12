@@ -1,28 +1,35 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 12 Sep 2012 11:28:22 +0530
-Subject: [PATCH] ARM: OMAP2+: TEMP: Round of the carve out memory
- requested to section_size
-In-Reply-To: <1347429117-10919-1-git-send-email-r.sricharan@ti.com>
-References: <1347429117-10919-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <CAMQu2gxaamzm8i=ZcCU+99NnA6dDgi6H0GJwVtSmYWjPcyk5WQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Sep 2012 08:04:57 +0200
+Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <504FB869.60201@wwwdotorg.org>
+References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
+Message-ID: <CACRpkdZf7YO4+aY42JK4OhhTSDCxN+hNjG+xVeyJ7QHsuaqh5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 11:21 AM, R Sricharan <r.sricharan@ti.com> wrote:
-> memblock_steal tries to reserve physical memory during boot.
-> When the requested size is not aligned on the section size
-> then, the remaining memory available for lowmem becomes
-> unaligned on the section boundary. There is a issue with this,
-> which is discussed in the thread below.
->
-> https://lkml.org/lkml/2012/6/28/112
->
-> The final conclusion from the thread seems to
-> be align the memblock_steal calls on the SECTION boundary.
->
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Why is the TEMP in the subject line. From patch it doesn't be
-temporary version. Can you please clarify that ?
+On Wed, Sep 12, 2012 at 12:17 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-Regards
-Santosh
+> the drivers in this patch seem to invert the data-structures a
+> little - in other words, instead of defining a global list of functions,
+> they define a list of groups, and for each group, list the functions
+> that can be selected on to it.
+>
+> In turn, that probably requires the core mvebu driver to invert these
+> data-structures at run-time in order to provide the data the pinctrl
+> core needs. I think it'd be better to just have each SoC-specific driver
+> store the data tables in the same format that the pinctrl core needs it,
+> so that the mvebu pinctrl core won't have to process the data-structures
+> at all.
+
+I sort of agree, not a blocker from my side but it'll surely make the
+code easier to maintain.
+
+Else I think the culprit function needs some commenting to be
+readable, and writing in plaintext what can be explained by
+simpler code is not good...
+
+Yours,
+Linus Walleij
