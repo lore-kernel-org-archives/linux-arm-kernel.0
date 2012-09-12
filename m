@@ -1,52 +1,64 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Wed, 12 Sep 2012 16:05:52 +0200
-Subject: [alsa-devel] [PATCH 11/11] ASoC: omap-pcm: Convert to
- use	dmaengine
-In-Reply-To: <20120912120028.GC28448@n2100.arm.linux.org.uk>
-References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
- <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
- <20120912120028.GC28448@n2100.arm.linux.org.uk>
-Message-ID: <s5hwqzznxof.wl%tiwai@suse.de>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Wed, 12 Sep 2012 17:06:39 +0300
+Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
+In-Reply-To: <CAKGA1bm990BXJuZ=sQFgaciJxeP_ytPV2tfm1rHi=s=w7b-OYg@mail.gmail.com>
+References: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20120910060840.GT26709@S2101-09.ap.freescale.net>
+ <504DBB10.9030702@bluegiga.com>
+ <CAKGA1bm990BXJuZ=sQFgaciJxeP_ytPV2tfm1rHi=s=w7b-OYg@mail.gmail.com>
+Message-ID: <505096EF.8060208@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Wed, 12 Sep 2012 13:00:28 +0100,
-Russell King - ARM Linux wrote:
-> 
-> On Wed, Sep 12, 2012 at 02:47:07PM +0300, Peter Ujfalusi wrote:
-> > 2. Pause/Resume
-> >    OMAP DMA engine backend does not support pausing and resuming
-> >    an in-progress transfer.  It is unclear from the specs what
-> >    effect clearing the enable bit has on the DMA position of a
-> >    destination synchronized transfer, and whether the transfer
-> >    can be restarted from the exact point that it was paused (or
-> >    whether the data in the FIFO read from memory is simply
-> >    discarded.)
-> 
-> It's worth noting that this comment (which was in my original patch)
-> is there to spark _comment_ and _discussion_ and should not make its
-> way into the final version of these patches.
+Hi,
 
-I agree this can be regarded as a sort of regression...
+On 09/10/2012 05:58 PM, Matt Sealey wrote:
+> I think this describes three use cases which are different, as Shawn
+> said we have here;
+>
+> * missing card detect support (card detect is not wired so it's
+> impossible to tell, and the controller doesn't support the SD standard
+> card detection)
+> * non-removable device
+> * broken card detect support
+>
+> The third one is what the property sounds like it describes, but this
+> is not the use case you are describing at all. This kind of property
+> naming is more like describing "card detect doesn't operate reliably"
+> which is true of i.MX devices with certain versions of the eSDHC and
+> uSDHC controllers, where non-GPIO card detection interferes with SDIO
+> interrupts, but in this case a board designer should add a real card
+> detect pin to the board (most more expensive push-push SD card slots
+> come with a pin you can wire for CD). In cases where errata is
+> published after boards are shipped, broken-cd is a meaningful
+> description when described in the absense of a gpio cd description, or
+> presence of some cd-handled-internally style property (forgive me for
+> not cross-referencing the FSL definition for this property, we don't
+> use it here at Genesi since all our boards have GPIO CD)
+>
+> It seems your device is a combination of the top two in the list, it
+> is not down to a broken feature at all, but one that should be
+> possible to not implement for devices which are permanently connected.
+> A non-removable device should be able to be powered down, at least
+> using runtime PM or clock gating (if this works, remember to whitelist
+> the card for clock gating!) but card detect shouldn't be used in this
+> case to detect if the card is powered or not (this is a problem for
+> your card controller and card driver state tracker. The MMC subsystem
+> already tracks this state fairly well for power management).
 
-> Given that suspend/resume is important on OMAP platforms, it's something
-> that needs to be resolved - in a way that complies with what ALSA expects.
-> I do not believe that the way the existing drivers do this is compliant
-> as the manuals imply that stopping memory->peripheral transfers results
-> in data being discarded from the DMA's FIFOs.  As I understand it, ALSA
-> requires no data to be discarded.
+Do you mean the polling mode shouldn't been used to detect if the device 
+is powered?
 
-... but in general you don't need to implement the full PAUSE and
-RESUME operations for PCM.  For example, when SNDRV_PCM_INFO_RESUME
-bit isn't set, user-space is supposed to do a clean restart of the
-stream at wake up.  So, it shouldn't break the apps severely in
-theory (but in practice, who knows :)
+Is there any examples how PM support could be implemented? I'm not 
+familiar with PM subsystem. How is it done in practice? Should I play 
+with fixed regulators?
 
-> As we have no way to know how much data may be discarded from the DMA
-> FIFO...
-
-Yeah, the FIFO and the amount of other on flight data can be better
-managed.
+BR,
+Lauri
 
 
-Takashi
+> I would refrain from calling a feature "broken card detect" if there
+> is actually no breakage involved especially if it would be more
+> prudent instead look into how to figure out how to track power
+> management state properly without cluttering the device tree.
+>
