@@ -1,41 +1,43 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 11 Sep 2012 22:31:28 -0700 (PDT)
-Subject: [PATCH] ARM: shmobile: r8a7779: remove USB phy initializer
-In-Reply-To: <20120912051614.GA5718@verge.net.au>
-References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
- <1346376502-12114-6-git-send-email-horms@verge.net.au>
- <201209032138.41485.arnd@arndb.de>
- <87k3wafxj4.wl%kuninori.morimoto.gx@renesas.com>
- <20120904003402.GE6095@verge.net.au>
- <87ehmifl3b.wl%kuninori.morimoto.gx@renesas.com>
- <20120905012056.GC4232@verge.net.au>
- <20120905012337.GD4232@verge.net.au>
- <w3p4nndz0st.wl%kuninori.morimoto.gx@renesas.com>
- <20120905081319.GD11575@verge.net.au>
- <20120912051614.GA5718@verge.net.au>
-Message-ID: <87d31rn6xe.wl%kuninori.morimoto.gx@renesas.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Sep 2012 22:41:17 -0700
+Subject: [PATCH] watchdog: ks8695: sink registers into driver
+In-Reply-To: <CACRpkdafmJ+CbaK=PtVwd6pGyBH8U8w-OV+QLWop=_NgyTCisw@mail.gmail.com>
+References: <1347342495-6990-1-git-send-email-linus.walleij@linaro.org>
+ <20120911104959.GF27604@spo001.leaseweb.com>
+ <CACRpkdafmJ+CbaK=PtVwd6pGyBH8U8w-OV+QLWop=_NgyTCisw@mail.gmail.com>
+Message-ID: <CAOesGMgpgdG5YR2NAqO4vrc+Eo1HX2b+Gf=PpAdD20uB2_Pryg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 11, 2012 at 10:52 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Sep 11, 2012 at 12:49 PM, Wim Van Sebroeck <wim@iguana.be> wrote:
+>
+>> Hi Linus,
+>>> Commit 70adc3f32adc2fb90b0107c020678588e4cf9f51
+>>> "ARM: ks8695: merge the timer header into the timer driver"
+>>> accidentally broke the ks8695 watchdog since it was using
+>>> the timer registers in watchdog mode.
+>>>
+>>> Perform the same operation here: push the registers down
+>>> into the driver, so it is self-contained, and we can keep
+>>> depopulating the <mach/*> namespace.
+>>>
+>>> Reported-by: Olof Johansson <olof@lixom.net>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>> Requesting an ACK from the watchdog maintainer so we can
+>>> merge this through the ARM SoC tree where the regression
+>>> was introduced.
+>>>
+>>> And yes, the drive needs to take resources and ioremap(),
+>>> but that is another patch.
+>>
+>> Acked-by: Wim Van Sebroeck <wim@iguana.be>
+>
+> Thanks, Olof/Arnd: can you pick this single patch to the
+> ks8695/timer branch?
 
-Hi Simon, Felipe
+Done, thanks for the follow-up.
 
-Thank you for your reply
-
-> I realise you are busy at the moment, but when you get a chance
-> could you let me know what the status of the above changes is?
-> 
-> I believe that I am waiting for fresh "use usb phy driver" patches.
-> But perhaps these depend on "add usb phy driver" patches being
-> accepted into the USB tree first?
-
-Yes.
-I sent "usb: phy: add R-Car USB phy driver" patch to USB ML few days ago.
-
->> Felipe
-
-Please let us know current status of this patch ?
-
-Best regards
----
-Kuninori Morimoto
+-Olof
