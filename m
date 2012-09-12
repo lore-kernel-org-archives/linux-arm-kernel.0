@@ -1,54 +1,199 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Sep 2012 14:54:15 -0700
-Subject: [PATCH 1/2] ARM: AM33XX: hwmod: Remove platform specific
- header files
-In-Reply-To: <1347484551-11775-2-git-send-email-hvaibhav@ti.com>
-References: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
- <1347484551-11775-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120912215415.GF5997@atomide.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 12 Sep 2012 23:55:54 +0200
+Subject: [PATCH v3 09/31] arm64: Cache maintenance routines
+In-Reply-To: <20120912092954.GA21823@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-10-git-send-email-catalin.marinas@arm.com>
+ <20120907193542.GA22806@schnuecks.de>
+ <20120912092954.GA21823@arm.com>
+Message-ID: <20120912215553.GA17393@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120912 14:16]:
-> With recent mainline changes on gpio and mcspi drivers, the
-> platform specific header files (plat/gpio.h and plat/mcspi.h)
-> have been removed, which results into build failure on
-> AM33XX hwmod data, which was still using these headers.
+Hi Catalin,
+
+On Wed, Sep 12, 2012 at 10:29:54AM +0100, Catalin Marinas wrote:
 > 
-> This patch removes such both gpio and spi header file entry
-> from omap_hwmod_33xx_data.c.
+> > > +void __flush_dcache_page(struct address_space *mapping, struct page *page)
+> > > +{
+> > > +     __flush_dcache_area(page_address(page), PAGE_SIZE);
+> > > +}
+> > > +
+> > > +void __sync_icache_dcache(pte_t pte)
+> > > +{
+> > > +     unsigned long pfn;
+> > > +     struct page *page;
+> > > +
+> > > +     pfn = pte_pfn(pte);
+> > > +     if (!pfn_valid(pfn))
+> > > +             return;
+> > > +
+> > > +     page = pfn_to_page(pfn);
+> > > +     if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+> > > +             __flush_dcache_page(NULL, page);
+> > > +     __flush_icache_all();
+> > > +}
+> > > +
+> > > +/*
+> > > + * Ensure cache coherency between kernel mapping and userspace mapping of this
+> > > + * page.
+> > > + */
+> > > +void flush_dcache_page(struct page *page)
+> > > +{
+> > > +     struct address_space *mapping;
+> > > +
+> > > +     /*
+> > > +      * The zero page is never written to, so never has any dirty cache
+> > > +      * lines, and therefore never needs to be flushed.
+> > > +      */
+> > > +     if (page == ZERO_PAGE(0))
+> > > +             return;
+> > > +
+> > > +     mapping = page_mapping(page);
+> > > +
+> > > +     if (mapping && !mapping_mapped(mapping))
+> > > +             clear_bit(PG_dcache_clean, &page->flags);
+> > > +     else {
+> > > +             __flush_dcache_page(mapping, page);
+> > > +             if (mapping)
+> > > +                     __flush_icache_all();
+> > 
+> > 
+> > Is this necessary to ensure I/D coherency? Then, I would have
+> > expected
+> > 
+> >                 if (mapping) {
+> >                         __flush_dcache_page(mapping, page);
+> >                         __flush_icache_all();
+> >                 }
+> > 
+> > similar to __sync_icache_dcache() above.
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
+> We don't want to do additional flushing if !mapping_mapped() as the page
+> isn't mapped in user space. In this case we defer the flushing until
+> __sync_icache_dcache().
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index de7a3ab..7b7ed08 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -14,12 +14,14 @@
->   * GNU General Public License for more details.
->   */
->  
-> +#include <linux/io.h>
-> +#include <linux/platform_data/gpio-omap.h>
-> +#include <linux/platform_data/spi-omap2-mcspi.h>
+> The other case is for anonymous pages where mapping == NULL. Here we
+> don't defer the D-cache flush and do it directly. The I-cache, if
+> needed, is handled later in __sync_icache_dcache(). This was based on
+> the idea that this case is mainly for the args/env page which is mapped
+> shortly after anyway, so not worth deferring. On AArch64, I don't think
+> it makes any difference. Maybe a slight improvement (at least in
+> clarity) in flush_dcache_page():
+> 
+> 	if (mapping && mapping_mapped(mapping)) {
+> 		__flush_dcache_page(page);
+> 		__flush_icache_all();
+> 		set_bit(PG_dcache_clean, &page->flags);
+> 	} else {
+> 		clear_bit(PG_dcache_clean, &page->flags);
+> 	}
+> 
+> In this case the anonymous page flushing is deferred to
+> __sync_icache_dcache().
+
+Yes, I think this is much clearer. It makes clear that the D-cache
+flush is done to avoid I/D incoherencies.  Previously, the obvious
+question was "Why do we flush only the D-cache in some situations
+given that it essentially behaves like a PIPT cache?" (the motivation
+for this became only clear to me after your explanation.)
+
+However, the reason why this was an obvious question for me is
+interesting: I think the main use case you had in mind does not
+happen since about five years (since commit b6a2fe, "mm: variable
+length argument support").  And I had a completely different main use
+case in mind.
+
+I reckon that the use case you refer to is the use in fs/exec.c? 
+Copying arg/env was changed in the commit mentioned above.  This also
+changed the use of flush_dcache_page() (which is not supposed to
+handle anon pages) into flush_kernel_dcache_page() (which is supposed
+to handle kernel modified user pages, i.e.  also anon pages).
+
+Nevertheless, the __flush_dcache_page(mapping, page) in the
+mapping==NULL case is absoluty necessary for aliasing D-caches on arm
+for the use case I had in mind (which does not apply to arm64 and
+thus my question).
+
+In case of direct I/O (and probably also in other cases like SG_IO)
+the block layer will see pages from get_user_pages() directly, i.e.
+also anonymous pages. Many drivers (especially emulated storage
+drivers like dm-crypt) use flush_dcache_page() after modifying a
+page. Although flush_dcache_page() is not even supposed to handle
+anonymous pages, it flushes the kernel mapping of the page because of
+this code line and everything is well on aliasing D-caches.
+
+Ironically, flush_kernel_dcache_page(), which is specifically
+designed to handle this case, does not on arm.  Thus, those few parts
+of the kernel which use flush_kernel_dcache_page() may fail horribly
+(for example the scatterlist memory iterator API, see [1]).
+
+Back to arm64 (and possibly to arm with non-aliasing D-caches?), this
+also means that the saved D-cache flush in the anonymous page case is
+not only a slight improvement on clarity, but may avoid a
+considerable number of D-cache flushes in some I/O situations.  (If
+it is still correct that there are no problems with the I-cache for
+this use case.)
+
+If now we could additionally avoid to flush the entire I-cache for
+every page in direct I/O operations with user mapped page cache
+pages (e.g. direct I/O read into an mmap region)...
+
+ 
+> > What is the reason why the D-cache flush is done in different
+> > cases than the following I-cache flush?
+> 
+> For __sync_icache_dcache(), we need to handle the situation where the
+> page mapped into user space has been cleaned (D-cache) but there may be
+> stale data in the I-cache. I think this can only happen with an
+> ASID-tagged VIVT I-cache configuration (which is allowed on AArch64) if
+> an existing page has been unmapped and the same virtual address remapped
+> (withing the same mm context) to a different page that had been cleaned
+> previously. We could optimise the __sync_icache_dcache() as below:
+> 
+> 	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
+> 		__flush_dcache_page(page);
+> 		__flush_icache_all();
+> 	} else if (icache_is_aivivt()) {
+> 		__flush_icache_all();
+> 	}
+
+Sorry, this is out of my depth. I think I don't really understand the
+cases leading to I/D incoherency.
+
+
+- Simon
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/111393.html
+
+PS: You did not mention the following comment from my mail. It was
+easy to overlook. Just to make sure you did not miss it:
+
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> new file mode 100644
+> index 0000000..3df0aa7
+> --- /dev/null
+> +++ b/arch/arm64/mm/cache.S
+
+...
+> +/*
+> + *	__flush_kern_dcache_page(kaddr)
+
+
+Should be:  __flush_dcache_area(kaddr,size)
+
+> + *
+> + *	Ensure that the data held in the page kaddr is written back
+> to the
+> + *	page in question.
+
+s/page/area
+
+> + *
+> + *	- kaddr   - kernel address
+> + *	- size    - size in question
+> + */
+> +ENTRY(__flush_dcache_area)
+> +	dcache_line_size x2, x3
+> +	add	x1, x0, x1
 > +
->  #include <plat/omap_hwmod.h>
->  #include <plat/cpu.h>
-> -#include <plat/gpio.h>
->  #include <plat/dma.h>
->  #include <plat/mmc.h>
-> -#include <plat/mcspi.h>
->  #include <plat/i2c.h>
->  
->  #include "omap_hwmod_common_data.h"
-
-This I can fix up when merging Paul's stuff with
-sparseirq changes.
-
-Regards,
-
-Tony
