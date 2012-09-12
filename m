@@ -1,46 +1,38 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 13 Sep 2012 02:45:50 +0530
-Subject: [PATCH 1/2] ARM: AM33XX: hwmod: Remove platform specific header files
-In-Reply-To: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
-References: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1347484551-11775-2-git-send-email-hvaibhav@ti.com>
+Date: Thu, 13 Sep 2012 02:45:49 +0530
+Subject: [PATCH 0/2] ARM: AM33XX: hwmod: Minor fixes for v3.7
+Message-ID: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent mainline changes on gpio and mcspi drivers, the
-platform specific header files (plat/gpio.h and plat/mcspi.h)
-have been removed, which results into build failure on
-AM33XX hwmod data, which was still using these headers.
+Today Paul had given pull request for AM33XX hwmod data and related
+patches, and I wanted to make sure that things are working fine
+irrespective of merge window changes coming in. I without adding any
+further delay I tried the pull request on linux-next/master (-rc6)
+linux-omap/master (-rc4 + omap merges) and found that hwmod needs
+minor changes required for both, build and to boot.
 
-This patch removes such both gpio and spi header file entry
-from omap_hwmod_33xx_data.c.
+[1/2]: With recent mainline changes on gpio and mcspi drivers,
+       platform specific header files (plat/gpio.h and plat/mcspi.h)
+       have been removed, which results into build failure.
+       Observed on linux-next/master checkout.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+[2/2]: With recent migration of omap architectures to SPARSE_IRQ
+       framework, it is important to add OMAP_INTC_START to all interrupt
+       numbers which will be eventually requested by drivers.
+       Observed on linux-omap/master checkout.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index de7a3ab..7b7ed08 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -14,12 +14,14 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/io.h>
-+#include <linux/platform_data/gpio-omap.h>
-+#include <linux/platform_data/spi-omap2-mcspi.h>
-+
- #include <plat/omap_hwmod.h>
- #include <plat/cpu.h>
--#include <plat/gpio.h>
- #include <plat/dma.h>
- #include <plat/mmc.h>
--#include <plat/mcspi.h>
- #include <plat/i2c.h>
- 
- #include "omap_hwmod_common_data.h"
--- 
-1.7.0.4
+Both the patches have been varified for,
+     - Build Test (omap2plus_defconfig)
+     - Boot tested on Bone
+     - Sparse check pass
+
+Paul,
+Request to review these patches and give another pull request for this.
+
+Vaibhav Hiremath (2):
+  ARM: AM33XX: hwmod: Remove platform specific header files
+  ARM: AM33XX: hwmod: Add OMAP_INTC_START offset to all module int nos
+
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  174 ++++++++++++++--------------
+ 1 files changed, 88 insertions(+), 86 deletions(-)
