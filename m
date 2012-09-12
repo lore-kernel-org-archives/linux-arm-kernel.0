@@ -1,41 +1,50 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 12 Sep 2012 20:07:04 +0530
-Subject: [PATCH] ARM: OMAP: rx51: Fix a section mismatch warn
-Message-ID: <1347460624-25259-1-git-send-email-shubhrajyoti@ti.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Wed, 12 Sep 2012 20:10:29 +0530
+Subject: [PATCHv7 00/23]I2C big cleanup
+In-Reply-To: <20120912134427.GC16547@pengutronix.de>
+References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
+ <20120911220048.GD27031@pengutronix.de> <50505FDC.4090500@ti.com>
+ <20120912101850.GB2624@pengutronix.de>
+ <20120912134427.GC16547@pengutronix.de>
+Message-ID: <CAM=Q2ctPo2hLNfPbjEbB1KG8hDyVJ=5aW_C4d6GW1C_kHN0mTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rx51_si4713_dev is referenced only from rx51_init_si4713.
-So the memory for rx51_si4713_dev can be safely freed after init.
-Also it references rx51_si4713_board_info which is __initdata_or_module.
+On Wed, Sep 12, 2012 at 7:14 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Wed, Sep 12, 2012 at 12:18:50PM +0200, Wolfram Sang wrote:
+>>
+>> > I donot see the warning. Am I missing something?
+>>
+>> I deleted my logfiles already. Ignore it for now, if it comes up again
+>> with your new series, I will give a more detailed pointer.
+>
+> Sorry, the section mismatch was not related to I2C it seems:
 
-fixes the below warning.
+Thanks for the report just sent a patch fixing that.
 
-WARNING: vmlinux.o(.data+0x30958): Section mismatch in reference from the variable rx51_si4713_dev to the (unknown reference) .init.data:(unknown)
-The variable rx51_si4713_dev references
-the (unknown reference) __initdata (unknown)
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the variable:
-*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-
-Reported-by: Wolfram Sang <w.sang@pengutronix.de>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index df2534d..e2e1148 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -743,7 +743,7 @@ static struct radio_si4713_platform_data rx51_si4713_data __initdata_or_module =
- 	.subdev_board_info = &rx51_si4713_board_info,
- };
- 
--static struct platform_device rx51_si4713_dev = {
-+static struct platform_device rx51_si4713_dev __initdata_or_module = {
- 	.name	= "radio-si4713",
- 	.id	= -1,
- 	.dev	= {
--- 
-1.7.5.4
+>
+> WARNING: vmlinux.o(.data+0x30958): Section mismatch in reference from the variable rx51_si4713_dev to the (unknown reference) .init.data:(unknown)
+> The variable rx51_si4713_dev references
+> the (unknown reference) __initdata (unknown)
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+>
+> Got it with an "allnoconfig" and then selecting MMU and OMAP.
+>
+> Regards,
+>
+>    Wolfram
+>
+> --
+> Pengutronix e.K.                           | Wolfram Sang                |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.10 (GNU/Linux)
+>
+> iEYEARECAAYFAlBQkbsACgkQD27XaX1/VRtbuACgkBa0lOIN551eec9TSetVPsCE
+> Ew0AoKizKon3DIILpERWJIwzAXdgRVDc
+> =T4Yq
+> -----END PGP SIGNATURE-----
+>
