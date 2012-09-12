@@ -1,27 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Sep 2012 16:05:04 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod: some fixes for 3.6-rc
-In-Reply-To: <50498170.3010600@ti.com>
-References: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
- <50498170.3010600@ti.com>
-Message-ID: <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Sep 2012 18:05:22 +0200
+Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
+In-Reply-To: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdamYMhduj42-reu6QjQiso65=Wy_bNF37gENDBrBbQ5=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Sep 2012, Vaibhav Hiremath wrote:
+On Fri, Sep 7, 2012 at 10:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> Isn't below patch good for -rc candidate (so as part of this 'fixes')?
-> 
-> ARM: OMAP2+: dpll: Add missing soc_is_am33xx() check for common functions
-> 
-> https://patchwork.kernel.org/patch/1371611/
+> -static struct notifier_block twd_cpufreq_nb = {
+> -       .notifier_call = twd_cpufreq_transition,
+> +static struct notifier_block twd_clk_nb = {
+> +       .notifier_call = twd_rate_change,
 
-It was queued for 3.7 because it didn't seem critical, since mainline 
-wasn't booting anyway on AM33xx without the hwmod data.  Just sent the 
-pull request for it:
+But what happens if there is a platform which is now using this through
+cpufreq and has not yet switched to the common clock? It regresses
+right, because no notifications arrive anymore? Does it even compile?
 
-http://marc.info/?l=linux-omap&m=134746561028888&w=2
+These in linux-next look like they could be in trouble:
 
+cd arch/arm
+grep -r smp_twd .
+./arch/arm/mach-imx/clk-imx6q.c:	clk_register_clkdev(clk[twd], NULL, "smp_twd");
+./arch/arm/mach-tegra/tegra30_clocks_data.c:	CLK_DUPLICATE("twd",
+"smp_twd", NULL),
 
+Tegra seems to be a common clk implementation, but imx6 looks like
+it's in trouble right?
 
-- Paul
+Yours,
+Linus Walleij
