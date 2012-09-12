@@ -1,34 +1,92 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 12 Sep 2012 14:58:55 +0200
-Subject: [PATCH v3 0/8] i2c: at91: cleanup and dt support
-In-Reply-To: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120912125855.GA16547@pengutronix.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 12 Sep 2012 15:02:53 +0200
+Subject: [PATCH 4/4] can: c_can: Add d_can suspend resume support
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2D7FA@DBDE01.ent.ti.com>
+References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
+ <1346673139-14540-5-git-send-email-anilkumar@ti.com>
+ <50450C9F.6010203@pengutronix.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA26300@DBDE01.ent.ti.com>
+ <5045AD56.2050400@pengutronix.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2D7FA@DBDE01.ent.ti.com>
+Message-ID: <505087FD.7000907@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 08:42:09AM +0200, ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 09/12/2012 02:48 PM, AnilKumar, Chimata wrote:
+> Hi Marc,
 > 
-> Hi,
+> On Tue, Sep 04, 2012 at 12:57:18, Marc Kleine-Budde wrote:
+>> On 09/04/2012 08:14 AM, AnilKumar, Chimata wrote:
+>>> Marc,
+>>>
+>>> Thanks for the comments,
+>>>
+>>> On Tue, Sep 04, 2012 at 01:31:35, Marc Kleine-Budde wrote:
+>>>> On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
+>>>>> Adds suspend resume support to DCAN driver which enables
+>>>>> DCAN power down mode bit (PDR). Then DCAN will ack the local
+>>>>> power-down mode by setting PDA bit in STATUS register.
+>>>>>
+>>>>> Also adds a status flag to know the status of DCAN module,
+>>>>> whether it is opened or not.
+>>>>
+>>>> Use "ndev->flags & IFF_UP" for that. Have a look at the at91_can driver
+>>>> [1]. I'm not sure if you need locking here.
+>>>>
+>>>
+>>> Then I can use this to check the status, lock is not
+>>> required.
+>>>
+>>>> [1] http://lxr.free-electrons.com/source/drivers/net/can/at91_can.c#L1198
+>>>>
+>>>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>>>>> ---
+>>>>>  drivers/net/can/c_can/c_can.c          |   78 ++++++++++++++++++++++++++++++++
+>>>>>  drivers/net/can/c_can/c_can.h          |    5 ++
+>>>>>  drivers/net/can/c_can/c_can_platform.c |   70 ++++++++++++++++++++++++++--
+>>>>>  3 files changed, 150 insertions(+), 3 deletions(-)
 > 
-> This set of patches is based on Nikolaus at91_i2c driver.
+> [snip]
+> 
+>>>>> +#ifdef CONFIG_PM
+>>>>> +int c_can_power_down(struct net_device *dev)
+>>>>> +{
+>>>>> +	unsigned long time_out;
+>>>>> +	struct c_can_priv *priv = netdev_priv(dev);
+>>>>> +
+>>>>> +	if (!priv->is_opened)
+>>>>> +		return 0;
+>>>>
+>>>> Should we add a BUG_ON(id->driver_data != BOSCH_D_CAN)?
+>>>
+>>> These APIs are called from platform driver where device type
+>>> device type is verified. I think we have to add BUG_ON() in
+>>> platform driver.
+>>
+>> The platform driver returns if not on D_CAN and will not call this
+>> function. But this functions are exported, so can be called by someone
+>> else. So if the caller is not D_CAN, it's a bug.
+>>
+> 
+> I agree with you, but I have some concern here.
+> I think we should do "return 0;" instead of BUG_ON(). With
+> BUG_ON() system will hang and ultimately user lost his/her
+> contents.
 
-Pushed both series with the discussed squashing to:
+Good point, better safe then sorry.
+But this should not happen. What about WARN_ON()?
 
-	git://git.pengutronix.de/git/wsa/linux.git i2c-embedded/for-next
-
-You might want to have a look if everything looks good to you.
-
-Thanks to everyone involved!
-
+Marc
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/a4fa181e/attachment.sig>
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/684e24fd/attachment.sig>
