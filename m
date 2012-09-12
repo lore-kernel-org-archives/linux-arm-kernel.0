@@ -1,64 +1,65 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Wed, 12 Sep 2012 17:06:39 +0300
-Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
-In-Reply-To: <CAKGA1bm990BXJuZ=sQFgaciJxeP_ytPV2tfm1rHi=s=w7b-OYg@mail.gmail.com>
-References: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20120910060840.GT26709@S2101-09.ap.freescale.net>
- <504DBB10.9030702@bluegiga.com>
- <CAKGA1bm990BXJuZ=sQFgaciJxeP_ytPV2tfm1rHi=s=w7b-OYg@mail.gmail.com>
-Message-ID: <505096EF.8060208@bluegiga.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Sep 2012 16:29:20 +0200
+Subject: [PATCH 0/3] Add clock framework for armada 370/XP
+Message-ID: <1347460163-11946-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On 09/10/2012 05:58 PM, Matt Sealey wrote:
-> I think this describes three use cases which are different, as Shawn
-> said we have here;
->
-> * missing card detect support (card detect is not wired so it's
-> impossible to tell, and the controller doesn't support the SD standard
-> card detection)
-> * non-removable device
-> * broken card detect support
->
-> The third one is what the property sounds like it describes, but this
-> is not the use case you are describing at all. This kind of property
-> naming is more like describing "card detect doesn't operate reliably"
-> which is true of i.MX devices with certain versions of the eSDHC and
-> uSDHC controllers, where non-GPIO card detection interferes with SDIO
-> interrupts, but in this case a board designer should add a real card
-> detect pin to the board (most more expensive push-push SD card slots
-> come with a pin you can wire for CD). In cases where errata is
-> published after boards are shipped, broken-cd is a meaningful
-> description when described in the absense of a gpio cd description, or
-> presence of some cd-handled-internally style property (forgive me for
-> not cross-referencing the FSL definition for this property, we don't
-> use it here at Genesi since all our boards have GPIO CD)
->
-> It seems your device is a combination of the top two in the list, it
-> is not down to a broken feature at all, but one that should be
-> possible to not implement for devices which are permanently connected.
-> A non-removable device should be able to be powered down, at least
-> using runtime PM or clock gating (if this works, remember to whitelist
-> the card for clock gating!) but card detect shouldn't be used in this
-> case to detect if the card is powered or not (this is a problem for
-> your card controller and card driver state tracker. The MMC subsystem
-> already tracks this state fairly well for power management).
+The purpose of this patch set is to add support for clock framework
+for Armada 370 and Armada XP SoCs. All the support is done under the
+directory drivers/clk/mvebu/ as the support for other mvebu SoCs was
+in mind during the writing of the code.
 
-Do you mean the polling mode shouldn't been used to detect if the device 
-is powered?
+Two kinds of clocks are added:
 
-Is there any examples how PM support could be implemented? I'm not 
-familiar with PM subsystem. How is it done in practice? Should I play 
-with fixed regulators?
+- The CPU clocks are only for Armada XP (which si multi-core)
 
-BR,
-Lauri
+- The core clocks are clocks which have their rate fixed during
+  reset.
 
+This patch set is based on the clk-3.7 branch of Mike Turquette as it
+use the patch "clk: add of_clk_src_onecell_get() support" from Shawn
+Guo.
 
-> I would refrain from calling a feature "broken card detect" if there
-> is actually no breakage involved especially if it would be more
-> prudent instead look into how to figure out how to track power
-> management state properly without cluttering the device tree.
->
+Many thanks to Thomas Petazzoni and Sebastian Hesselbarth for their
+review and feedback. The device tree bindings were really improved
+with the advices of Sebastian.
+
+Regards,
+
+Gregory CLEMENT (3):
+  clk: mvebu: add armada-370-xp specific clocks
+  clk: armada-370-xp: add support for clock framework
+  clocksource: time-armada-370-xp converted to clk framework
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   41 +++
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 ++
+ arch/arm/boot/dts/armada-370-db.dts                |    4 -
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+ arch/arm/boot/dts/armada-370.dtsi                  |   13 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   49 +++
+ arch/arm/mach-mvebu/Kconfig                        |    5 +
+ arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
+ arch/arm/mach-mvebu/common.h                       |    1 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/mvebu/Makefile                         |    2 +
+ drivers/clk/mvebu/clk-core.c                       |  312 ++++++++++++++++++++
+ drivers/clk/mvebu/clk-core.h                       |   19 ++
+ drivers/clk/mvebu/clk-cpu.c                        |  144 +++++++++
+ drivers/clk/mvebu/clk-cpu.h                        |   19 ++
+ drivers/clk/mvebu/clk.c                            |   36 +++
+ drivers/clocksource/time-armada-370-xp.c           |   11 +-
+ 17 files changed, 678 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+ create mode 100644 drivers/clk/mvebu/Makefile
+ create mode 100644 drivers/clk/mvebu/clk-core.c
+ create mode 100644 drivers/clk/mvebu/clk-core.h
+ create mode 100644 drivers/clk/mvebu/clk-cpu.c
+ create mode 100644 drivers/clk/mvebu/clk-cpu.h
+ create mode 100644 drivers/clk/mvebu/clk.c
+
+--
+1.7.9.5
