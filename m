@@ -1,36 +1,42 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Wed, 12 Sep 2012 11:43:32 -0400
-Subject: [PATCH] ARM: fix type of PHYS_PFN_OFFSET to unsigned long
-Message-ID: <1347464612-22727-1-git-send-email-cyril@ti.com>
+Date: Wed, 12 Sep 2012 11:46:04 -0400
+Subject: [PATCH] ARM: fix warning on uninitialized offset.un
+Message-ID: <1347464765-24167-1-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On LPAE machines, PHYS_OFFSET evaluates to a phys_addr_t and this type is
-inherited by the PHYS_PFN_OFFSET definition as well.  Consequently, the kernel
-build emits warnings of the form:
+This patch fixes the following warning:
 
-init/main.c: In function 'start_kernel':
-init/main.c:588:7: warning: format '%lx' expects argument of type 'long unsigned int', but argument 2 has type 'phys_addr_t' [-Wformat]
+arch/arm/mm/alignment.c: In function 'do_alignment':
+arch/arm/mm/alignment.c:327:15: warning: 'offset.un' may be used uninitialized in this function [-Wmaybe-uninitialized]
+arch/arm/mm/alignment.c:749:21: note: 'offset.un' was declared here
 
-This patch fixes this warning by pinning down the PFN type to unsigned long.
+The fix is to promote the initialization of offset into do_alignment().
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/include/asm/memory.h |    2 +-
+ arch/arm/mm/alignment.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 73cf03a..632dc23 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -207,7 +207,7 @@ static inline unsigned long __phys_to_virt(unsigned long x)
-  * direct-mapped view.  We assume this is the first page
-  * of RAM in the mem_map as well.
-  */
--#define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
-+#define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 9107231..d15877c 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -699,7 +699,6 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
+ 	unsigned long instr = *pinstr;
+ 	u16 tinst1 = (instr >> 16) & 0xffff;
+ 	u16 tinst2 = instr & 0xffff;
+-	poffset->un = 0;
  
- /*
-  * These are *only* valid on the kernel direct mapped RAM memory.
+ 	switch (tinst1 & 0xffe0) {
+ 	/* A6.3.5 Load/Store multiple */
+@@ -795,6 +794,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+  fixup:
+ 
+ 	regs->ARM_pc += isize;
++	offset.un = 0;
+ 
+ 	switch (CODING_BITS(instr)) {
+ 	case 0x00000000:	/* 3.13.4 load/store instruction extensions */
 -- 
 1.7.9.5
