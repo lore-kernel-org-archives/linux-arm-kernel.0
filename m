@@ -1,42 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Sep 2012 17:41:21 +0100
-Subject: [PATCH v5 2/2] OMAP:IOMMU:flush L1 and L2 caches
-In-Reply-To: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
-References: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
-Message-ID: <20120912164121.GF28448@n2100.arm.linux.org.uk>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Wed, 12 Sep 2012 16:42:31 +0000
+Subject: [PATCH 09/16] ARM: tegra: move platform_data definitions
+In-Reply-To: <201209111705.37490.arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-9-git-send-email-arnd@arndb.de>
+ <871ui8y3at.fsf@octavius.laptop.org> <201209111705.37490.arnd@arndb.de>
+Message-ID: <4EE5B48738DDED408878C97C8E050A8B0FAF5C@SJEXCHMB05.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 08:49:16PM +0530, Gupta, Ramesh wrote:
-> Thanks to the RMK's suggestions.
+You'll want to check that you don't have any cases where two files use the same guard, I'd think.
 
-I should've made clear the distinction between _range and _area.
-A _range function takes start and end.  An _area function takes a start
-and size.  So...
+Chris
 
-> -static void flush_iopgd_range(u32 *first, u32 *last)
-> +static void flush_iopgd_range(u32 *first, size_t size)
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Arnd Bergmann
+Sent: September 11, 2012 10:06 AM
+To: Chris Ball
+Cc: Mark Brown; Russell King; Stephen Warren; Dmitry Torokhov; linux-kernel at vger.kernel.org; linux-tegra at vger.kernel.org; Colin Cross; Olof Johansson; Liam Girdwood; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 09/16] ARM: tegra: move platform_data definitions
 
-This should change to flush_iopgd_area().
-
->  {
-> -	/* FIXME: L2 cache should be taken care of if it exists */
-> -	do {
-> -		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
-> -		    : : "r" (first));
-> -		first += L1_CACHE_BYTES / sizeof(*first);
-> -	} while (first <= last);
-> +	phys_addr_t phys = virt_to_phys(first);
-> +
-> +	iommu_flush_area(first, size);
-> +	outer_flush_range(phys, phys + size);
->  }
+On Tuesday 11 September 2012, Chris Ball wrote:
+> On Tue, Sep 11 2012, Arnd Bergmann wrote:
+> > diff --git a/arch/arm/mach-tegra/include/mach/sdhci.h
+> > b/include/linux/platform_data/mmc-sdhci-tegra.h
+> > similarity index 100%
+> > rename from arch/arm/mach-tegra/include/mach/sdhci.h
+> > rename to include/linux/platform_data/mmc-sdhci-tegra.h
 > 
-> -static void flush_iopte_range(u32 *first, u32 *last)
-> +static void flush_iopte_range(u32 *first, size_t size)
-> +
+> Looks like you aren't renaming the idempotency guards, so e.g.
+> include/linux/platform_data/mmc-sdhci-tegra.h will contain:
+> 
+> #ifndef __ASM_ARM_ARCH_TEGRA_SDHCI_H
+> #define __ASM_ARM_ARCH_TEGRA_SDHCI_H
+> 
+> Is that intentional?  Thanks,
+> 
 
-flush_iopte_area().  (And there shouldn't be a blank line between this
-and the open curley.)
+No, it's not intentional. We actually have a lot of instances that
+are already wrong. Do we care enough to change the ones I'm moving here?
 
-Otherwise, looks fine.
+	Arnd
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
