@@ -1,44 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Sep 2012 18:52:22 +0200
-Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
-In-Reply-To: <201209061419.07325.arnd@arndb.de>
-References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <5048A31E.2090704@gmail.com>
- <CACRpkdYy2CZXXA+kkEaOTznaucxXEwiwSn-5ux0ByHjXrsm-2A@mail.gmail.com>
- <201209061419.07325.arnd@arndb.de>
-Message-ID: <CACRpkdbH1CqDOYGLHu=GdCuHQN67=ZE7RXUx1o+nzp3YydpKHQ@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 12 Sep 2012 17:56:38 +0100
+Subject: [PATCH 05/11] clk: Versatile Express clock generators ("osc")
+ driver
+In-Reply-To: <CACRpkdZcUuyKpb3EBrdENGnGgZQjbi15Q+21NkF-pVX_Lw_HFg@mail.gmail.com>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
+ <20120910191420.20289.1923@nucleus>	<1347379848.2497.13.camel@hornet>
+ <CACRpkdZcUuyKpb3EBrdENGnGgZQjbi15Q+21NkF-pVX_Lw_HFg@mail.gmail.com>
+Message-ID: <1347468998.2497.17.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 06 September 2012, Linus Walleij wrote:
->> On Thu, Sep 6, 2012 at 3:20 PM, Rob Herring <robherring2@gmail.com> wrote:
->> > [Me]
->> >> I can of course skip the aliases and go for the timer nodes
->> >> I want directly, but that isn't any helpful for people reading the
->> >> device tree, is it?
->> >
->> > Well, the dts doesn't really need to describe how Linux is using things.
->>
->> The arm,integrator-clocksource and arm,integrator-clockevent
->> are renamed arm,timer-primary and arm,timer-secondary in the
->> last patch set.
->>
->> Are you OK with this for now, going forward? I'd be happy to
->> take a round refactoring it for the next cycle as outlined
->> below.
+On Tue, 2012-09-11 at 19:00 +0100, Linus Walleij wrote:
+> >> > +       osc = kzalloc(sizeof(*osc), GFP_KERNEL);
 >
-> If the timers are really free for use by anything and you want to
-> encode how Linux uses them, I would suggest naming the aliases
-> "linux.clocksource" and "linux,clockevent" to make it clear that
-> you are not describing the hardware here but rather picking
-> a configuration.
+> Can't you just use devm_kzalloc(&vecdev->dev, ...) and be done with it?
 
-So the renaming of the aliases to arm,timer-primary and
-arm-timer-secondary is to be taken as a hint to the OS to use
-these two as primary and secondary respectively.
+Eh. It was devm_kzalloc() initially, then the driver became an "early"
+one and I could use devm_*(). I actually made it devm_kzalloc() again,
+hope it will survive like this to v2.
 
-linux.foo seems bad in comparison, but if you insist...
-
-Yours,
-Linus Walleij
+Pawe?
