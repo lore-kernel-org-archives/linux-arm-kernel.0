@@ -1,82 +1,714 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Sep 2012 10:03:59 +0200
-Subject: [PATCH v3 0/8] i2c: at91: cleanup and dt support
-In-Reply-To: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <505041EF.5060204@atmel.com>
+From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
+Date: Wed, 12 Sep 2012 17:07:00 +0900
+Subject: [PATCH v3 1/2] iommu/shmobile: Add iommu driver for Renesas IPMMU
+ modules
+In-Reply-To: <1347343814-32299-2-git-send-email-hdk@igel.co.jp>
+References: <1347343814-32299-1-git-send-email-hdk@igel.co.jp>
+ <1347343814-32299-2-git-send-email-hdk@igel.co.jp>
+Message-ID: <CABMQnVKiZyKMy_T7iAArc48zKnwzHpEUZY9+iqTRzCf9v9tJ0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 08:42 AM, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Hi,
-> 
-> This set of patches is based on Nikolaus at91_i2c driver.
-> 
-> Changes:
-> v3:
->   - only put multi-drive lines in the if...else statement (suggested
->   by Warner Losh)
+Hi,
 
-Hi Wolfram,
+On Tue, Sep 11, 2012 at 3:10 PM, Hideki EIRAKU <hdk@igel.co.jp> wrote:
+> This is the Renesas IPMMU driver and IOMMU API implementation.
+>
+> The IPMMU module supports the MMU function and the PMB function.  The
+> MMU function provides address translation by pagetable compatible with
+> ARMv6.  The PMB function provides address translation including
+> tile-linear translation.  This patch implements the MMU function.
+>
+> The iommu driver does not register a platform driver directly because:
+> - the register space of the MMU function and the PMB function
+>   have a common register (used for settings flush), so they should ideally
+>   have a way to appropriately share this register.
+> - the MMU function uses the IOMMU API while the PMB function does not.
+> - the two functions may be used independently.
+>
+> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+> Tested-by: Damian Hobson-Garcia <dhobsong@igel.co.jp>
+> ---
+>  arch/arm/mach-shmobile/Kconfig              |    6 +
+>  arch/arm/mach-shmobile/Makefile             |    3 +
+>  arch/arm/mach-shmobile/include/mach/ipmmu.h |   16 ++
+>  arch/arm/mach-shmobile/ipmmu.c              |  150 +++++++++++
+>  drivers/iommu/Kconfig                       |   36 +++
+>  drivers/iommu/Makefile                      |    1 +
+>  drivers/iommu/shmobile-iommu.c              |  372 +++++++++++++++++++++++++++
+>  7 files changed, 584 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
+>  create mode 100644 arch/arm/mach-shmobile/ipmmu.c
+>  create mode 100644 drivers/iommu/shmobile-iommu.c
+>
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index 4cacc2d..86adcf0 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -210,6 +210,12 @@ endmenu
+>  config SH_CLK_CPG
+>         bool
+>
+> +config SHMOBILE_IPMMU
+> +       bool
+> +
+> +config SHMOBILE_IPMMU_TLB
+> +       bool
+> +
+>  source "drivers/sh/Kconfig"
+>
+>  endif
+> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+> index 0df5ae6..1e72199 100644
+> --- a/arch/arm/mach-shmobile/Makefile
+> +++ b/arch/arm/mach-shmobile/Makefile
+> @@ -60,3 +60,6 @@ obj-$(CONFIG_MACH_KZM9G)      += board-kzm9g.o
+>  # Framework support
+>  obj-$(CONFIG_SMP)              += $(smp-y)
+>  obj-$(CONFIG_GENERIC_GPIO)     += $(pfc-y)
+> +
+> +# IPMMU/IPMMUI
+> +obj-$(CONFIG_SHMOBILE_IPMMU)   += ipmmu.o
+> diff --git a/arch/arm/mach-shmobile/include/mach/ipmmu.h b/arch/arm/mach-shmobile/include/mach/ipmmu.h
+> new file mode 100644
+> index 0000000..ede2f0b
+> --- /dev/null
+> +++ b/arch/arm/mach-shmobile/include/mach/ipmmu.h
+> @@ -0,0 +1,16 @@
+> +#ifdef CONFIG_SHMOBILE_IPMMU_TLB
+> +void ipmmu_tlb_flush(struct device *ipmmu_dev);
+> +void ipmmu_tlb_set(struct device *ipmmu_dev, unsigned long phys, int size,
+> +                  int asid);
+> +void ipmmu_add_device(struct device *dev);
+> +int ipmmu_iommu_init(struct device *dev);
+> +#else
+> +static inline void ipmmu_add_device(struct device *dev)
+> +{
+> +}
 
-As said by Ludovic, this series goes on top of Nikolaus' one.
-My Acked-by is already set on this one, so I think that I have nothing
-more to do ;-)
+Please use 'do { } while (0)'.
 
-BTW, in case you need help to sort all this, do not hesitate to contact
-us... we can setup a git tree for this...
+> +
+> +static int ipmmu_iommu_init(struct device *dev)
+> +{
+> +       return -EINVAL;
+> +}
+> +#endif
+> diff --git a/arch/arm/mach-shmobile/ipmmu.c b/arch/arm/mach-shmobile/ipmmu.c
+> new file mode 100644
+> index 0000000..72cacb9
+> --- /dev/null
+> +++ b/arch/arm/mach-shmobile/ipmmu.c
+> @@ -0,0 +1,150 @@
+> +/*
+> + * IPMMU/IPMMUI
+> + * Copyright (C) 2012  Hideki EIRAKU
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+> + *
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/err.h>
+> +#include <linux/export.h>
+> +#include <linux/slab.h>
+> +#include <mach/ipmmu.h>
+> +
+> +#define IMCTR1 0x000
+> +#define IMCTR2 0x004
+> +#define IMASID 0x010
+> +#define IMTTBR 0x014
+> +#define IMTTBCR 0x018
+> +
+> +#define IMCTR1_TLBEN (1 << 0)
+> +#define IMCTR1_FLUSH (1 << 1)
+> +
+> +struct ipmmu_priv {
+> +       void __iomem *ipmmu_base;
+> +       int tlb_enabled;
+> +       struct mutex flush_lock;
+> +};
+> +
+> +static void ipmmu_reg_write(struct ipmmu_priv *priv, unsigned long reg_off,
+> +                           unsigned long data)
+> +{
+> +       iowrite32(data, priv->ipmmu_base + reg_off);
+> +}
+> +
+> +void ipmmu_tlb_flush(struct device *dev)
+> +{
+> +       struct ipmmu_priv *priv;
+> +
+> +       if (!dev)
+> +               return;
+> +       priv = dev_get_drvdata(dev);
+> +       mutex_lock(&priv->flush_lock);
+> +       if (priv->tlb_enabled)
+> +               ipmmu_reg_write(priv, IMCTR1, IMCTR1_FLUSH | IMCTR1_TLBEN);
+> +       else
+> +               ipmmu_reg_write(priv, IMCTR1, IMCTR1_FLUSH);
+> +       mutex_unlock(&priv->flush_lock);
+> +}
+> +
+> +void ipmmu_tlb_set(struct device *dev, unsigned long phys, int size, int asid)
+> +{
+> +       struct ipmmu_priv *priv;
+> +
+> +       if (!dev)
+> +               return;
+> +       priv = dev_get_drvdata(dev);
+> +       mutex_lock(&priv->flush_lock);
+> +       switch (size) {
+> +       default:
+> +               priv->tlb_enabled = 0;
+> +               break;
+> +       case 0x2000:
+> +               ipmmu_reg_write(priv, IMTTBCR, 1);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       case 0x1000:
+> +               ipmmu_reg_write(priv, IMTTBCR, 2);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       case 0x800:
+> +               ipmmu_reg_write(priv, IMTTBCR, 3);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       case 0x400:
+> +               ipmmu_reg_write(priv, IMTTBCR, 4);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       case 0x200:
+> +               ipmmu_reg_write(priv, IMTTBCR, 5);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       case 0x100:
+> +               ipmmu_reg_write(priv, IMTTBCR, 6);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       case 0x80:
+> +               ipmmu_reg_write(priv, IMTTBCR, 7);
+> +               priv->tlb_enabled = 1;
+> +               break;
+> +       }
 
-Bye,
+I thought that you could describe more briefly if ffs() is used.
 
+> +       ipmmu_reg_write(priv, IMTTBR, phys);
+> +       ipmmu_reg_write(priv, IMASID, asid);
+> +       mutex_unlock(&priv->flush_lock);
+> +}
+> +
+> +static int __devinit ipmmu_probe(struct platform_device *pdev)
+> +{
+> +       struct resource *res;
+> +       struct ipmmu_priv *priv;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!res) {
+> +               dev_err(&pdev->dev, "cannot get platform resources\n");
+> +               return -ENOENT;
+> +       }
+> +       priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+> +       if (!priv) {
+> +               dev_err(&pdev->dev, "cannot allocate device data\n");
+> +               return -ENOMEM;
+> +       }
+> +       mutex_init(&priv->flush_lock);
+> +       priv->ipmmu_base = ioremap_nocache(res->start, resource_size(res));
+> +       if (!priv->ipmmu_base) {
+> +               dev_err(&pdev->dev, "ioremap_nocache failed\n");
+> +               kfree(priv);
+> +               return -ENOMEM;
+> +       }
+> +       platform_set_drvdata(pdev, priv);
+> +       ipmmu_reg_write(priv, IMCTR1, 0x0); /* disable TLB */
+> +       ipmmu_reg_write(priv, IMCTR2, 0x0); /* disable PMB */
+> +       ipmmu_iommu_init(&pdev->dev);
+> +       return 0;
+> +}
+> +
+> +static struct platform_driver ipmmu_driver = {
+> +       .probe = ipmmu_probe,
+> +       .driver = {
+> +               .owner = THIS_MODULE,
+> +               .name = "ipmmu",
+> +       },
+> +};
+> +
+> +static int __init ipmmu_init(void)
+> +{
+> +       return platform_driver_register(&ipmmu_driver);
+> +}
+> +subsys_initcall(ipmmu_init);
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 9f69b56..0ed44d0 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -187,4 +187,40 @@ config EXYNOS_IOMMU_DEBUG
+>
+>           Say N unless you need kernel log message for IOMMU debugging
+>
+> +config SHMOBILE_IOMMU
+> +       bool "IOMMU for Renesas IPMMU/IPMMUI"
+> +       default n
+> +       select IOMMU_API
+> +       select ARM_DMA_USE_IOMMU
+> +       select SHMOBILE_IPMMU
+> +       select SHMOBILE_IPMMU_TLB
+> +
+> +choice
+> +       prompt "IPMMU/IPMMUI 1st level page table size"
+> +       default SHMOBILE_IOMMU_L1SIZE_8192
+> +       depends on SHMOBILE_IOMMU
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_8192
+> +               bool "8192 bytes (2 GiB address space)"
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_4096
+> +               bool "4096 bytes (1 GiB address space)"
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_2048
+> +               bool "2048 bytes (512 MiB address space)"
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_1024
+> +               bool "1024 bytes (256 MiB address space)"
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_512
+> +               bool "512 bytes (128 MiB address space)"
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_256
+> +               bool "256 bytes (64 MiB address space)"
+> +
+> +       config SHMOBILE_IOMMU_L1SIZE_128
+> +               bool "128 bytes (32 MiB address space)"
+> +
+> +endchoice
+> +
+>  endif # IOMMU_SUPPORT
+> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+> index 14a4d5f..62cf917 100644
+> --- a/drivers/iommu/Makefile
+> +++ b/drivers/iommu/Makefile
+> @@ -12,3 +12,4 @@ obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
+>  obj-$(CONFIG_TEGRA_IOMMU_GART) += tegra-gart.o
+>  obj-$(CONFIG_TEGRA_IOMMU_SMMU) += tegra-smmu.o
+>  obj-$(CONFIG_EXYNOS_IOMMU) += exynos-iommu.o
+> +obj-$(CONFIG_SHMOBILE_IOMMU) += shmobile-iommu.o
+> diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
+> new file mode 100644
+> index 0000000..3285b3b
+> --- /dev/null
+> +++ b/drivers/iommu/shmobile-iommu.c
+> @@ -0,0 +1,372 @@
+> +/*
+> + * IOMMU for IPMMU/IPMMUI
+> + * Copyright (C) 2012  Hideki EIRAKU
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+> + *
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/dmapool.h>
+> +#include <linux/slab.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/iommu.h>
+> +#include <linux/dma-mapping.h>
+> +#include <mach/ipmmu.h>
+> +#include <asm/dma-iommu.h>
+> +
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_8192
+> +#define L1_SIZE 8192
+> +#endif
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_4096
+> +#define L1_SIZE 4096
+> +#endif
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_2048
+> +#define L1_SIZE 2048
+> +#endif
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_1024
+> +#define L1_SIZE 1024
+> +#endif
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_512
+> +#define L1_SIZE 512
+> +#endif
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_256
+> +#define L1_SIZE 256
+> +#endif
+> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_128
+> +#define L1_SIZE 128
+> +#endif
 
-> v2:
->   - change driver name from xxx_i2c to i2c-xxx
->   - keep i2c-gpio nodes in dtsi files
->   - don't enable TWI on boards whose TWI IP doesn't support clock
->   stretching in tranmission mode
-> 
-> Ludovic Desroches (8):
->   i2c: at91: use managed resources
->   i2c: at91: add warning about transmission issues for some devices
->   i2c: at91: use an id table for SoC dependent parameters
->   ARM: at91: do not configure at91sam9g10 twi pio as open-drain
->   i2c: at91: add dt support to i2c-at91
->   ARM: at91: add clocks for I2C DT entries
->   ARM: dts: add twi nodes for atmel SoCs
->   ARM: dts: add twi nodes for atmel boards
-> 
->  .../devicetree/bindings/i2c/atmel-i2c.txt          |  30 +++
->  arch/arm/boot/dts/at91sam9260.dtsi                 |  10 +
->  arch/arm/boot/dts/at91sam9263.dtsi                 |  10 +
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |   4 +
->  arch/arm/boot/dts/at91sam9g25ek.dts                |  12 ++
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |  20 ++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts             |   8 +
->  arch/arm/boot/dts/at91sam9n12.dtsi                 |  20 ++
->  arch/arm/boot/dts/at91sam9n12ek.dts                |   8 +
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |  30 +++
->  arch/arm/mach-at91/at91rm9200.c                    |   2 +-
->  arch/arm/mach-at91/at91rm9200_devices.c            |  11 +-
->  arch/arm/mach-at91/at91sam9260.c                   |   4 +-
->  arch/arm/mach-at91/at91sam9260_devices.c           |   8 +-
->  arch/arm/mach-at91/at91sam9261.c                   |   3 +-
->  arch/arm/mach-at91/at91sam9261_devices.c           |  23 +--
->  arch/arm/mach-at91/at91sam9263.c                   |   3 +-
->  arch/arm/mach-at91/at91sam9263_devices.c           |   2 +-
->  arch/arm/mach-at91/at91sam9g45.c                   |   6 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c           |   4 +-
->  arch/arm/mach-at91/at91sam9n12.c                   |   2 +
->  arch/arm/mach-at91/at91sam9rl.c                    |   4 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c            |   2 +-
->  arch/arm/mach-at91/at91sam9x5.c                    |   6 +-
->  drivers/i2c/busses/Kconfig                         |   6 +
->  drivers/i2c/busses/i2c-at91.c                      | 217 +++++++++++++--------
->  26 files changed, 338 insertions(+), 117 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/i2c/atmel-i2c.txt
-> 
+I think that it was better to define by kconfig.
+For example, following codes.
 
++config SHMOBILE_IOMMU_L1SIZE
++       hex
++       default "0x00002000" if SHMOBILE_IOMMU_L1SIZE_8192
++       default "0x00001000" if SHMOBILE_IOMMU_L1SIZE_4096
++       default "0x00000800" if SHMOBILE_IOMMU_L1SIZE_2048
++       default "0x00000400" if SHMOBILE_IOMMU_L1SIZE_1024
++       default "0x00000200" if SHMOBILE_IOMMU_L1SIZE_512
++       default "0x00000100" if SHMOBILE_IOMMU_L1SIZE_256
++       default "0x00000080" if SHMOBILE_IOMMU_L1SIZE_128
+
+> +#define L1_LEN (L1_SIZE / 4)
+> +#define L1_ALIGN L1_SIZE
+> +#define L2_SIZE 0x400
+> +#define L2_LEN (L2_SIZE / 4)
+> +#define L2_ALIGN L2_SIZE
+> +
+> +struct shmobile_iommu_priv_pgtable {
+> +       uint32_t *pgtable;
+> +       dma_addr_t handle;
+> +};
+> +
+> +struct shmobile_iommu_priv {
+> +       struct shmobile_iommu_priv_pgtable l1, l2[L1_LEN];
+> +       spinlock_t map_lock;
+> +       atomic_t active;
+> +};
+> +
+> +static struct dma_iommu_mapping *iommu_mapping;
+> +static struct device *ipmmu_devices;
+> +static struct dma_pool *l1pool, *l2pool;
+> +static spinlock_t lock;
+> +static DEFINE_SPINLOCK(lock_add);
+> +static struct shmobile_iommu_priv *attached;
+> +static int num_attached_devices;
+> +static struct device *ipmmu_access_device;
+> +
+> +static int shmobile_iommu_domain_init(struct iommu_domain *domain)
+> +{
+> +       struct shmobile_iommu_priv *priv;
+> +       int i;
+> +
+> +       priv = kmalloc(sizeof(*priv), GFP_KERNEL);
+> +       if (!priv)
+> +               return -ENOMEM;
+> +       priv->l1.pgtable = dma_pool_alloc(l1pool, GFP_KERNEL,
+> +                                         &priv->l1.handle);
+> +       if (!priv->l1.pgtable) {
+> +               kfree(priv);
+> +               return -ENOMEM;
+> +       }
+> +       for (i = 0; i < L1_LEN; i++)
+> +               priv->l2[i].pgtable = NULL;
+> +       memset(priv->l1.pgtable, 0, L1_SIZE);
+> +       spin_lock_init(&priv->map_lock);
+> +       atomic_set(&priv->active, 0);
+> +       domain->priv = priv;
+> +       return 0;
+> +}
+> +
+> +static void shmobile_iommu_domain_destroy(struct iommu_domain *domain)
+> +{
+> +       struct shmobile_iommu_priv *priv = domain->priv;
+> +       int i;
+> +
+> +       for (i = 0; i < L1_LEN; i++) {
+> +               if (priv->l2[i].pgtable)
+> +                       dma_pool_free(l2pool, priv->l2[i].pgtable,
+> +                                     priv->l2[i].handle);
+> +       }
+> +       dma_pool_free(l1pool, priv->l1.pgtable, priv->l1.handle);
+> +       kfree(priv);
+> +       domain->priv = NULL;
+> +}
+> +
+> +static int shmobile_iommu_attach_device(struct iommu_domain *domain,
+> +                                       struct device *dev)
+> +{
+> +       struct shmobile_iommu_priv *priv = domain->priv;
+> +       int ret = -EBUSY;
+> +
+> +       spin_lock(&lock);
+> +       if (attached != priv) {
+> +               if (attached)
+> +                       goto err;
+> +               atomic_set(&priv->active, 1);
+> +               ipmmu_tlb_set(ipmmu_access_device, priv->l1.handle, L1_SIZE,
+> +                             0);
+> +               wmb();
+> +               ipmmu_tlb_flush(ipmmu_access_device);
+> +               attached = priv;
+> +               num_attached_devices = 0;
+> +       }
+> +       num_attached_devices++;
+> +       ret = 0;
+> +err:
+> +       spin_unlock(&lock);
+> +       return ret;
+> +}
+> +
+> +static void shmobile_iommu_detach_device(struct iommu_domain *domain,
+> +                                        struct device *dev)
+> +{
+> +       struct shmobile_iommu_priv *priv = domain->priv;
+> +
+> +       spin_lock(&lock);
+> +       atomic_set(&priv->active, 0);
+> +       num_attached_devices--;
+> +       if (!num_attached_devices) {
+> +               ipmmu_tlb_set(ipmmu_access_device, 0, 0, 0);
+> +               ipmmu_tlb_flush(ipmmu_access_device);
+> +               attached = NULL;
+> +       }
+> +       spin_unlock(&lock);
+> +}
+> +
+> +static int
+> +l2alloc(struct shmobile_iommu_priv *priv, unsigned int l1index)
+> +{
+> +       if (!priv->l2[l1index].pgtable) {
+> +               priv->l2[l1index].pgtable = dma_pool_alloc(l2pool, GFP_KERNEL,
+> +                                               &priv->l2[l1index].handle);
+> +               if (!priv->l2[l1index].pgtable)
+> +                       return -ENOMEM;
+> +               memset(priv->l2[l1index].pgtable, 0, L2_SIZE);
+> +       }
+> +       priv->l1.pgtable[l1index] = priv->l2[l1index].handle | 0x1;
+> +       return 0;
+> +}
+> +
+> +static void
+> +l2realfree(struct shmobile_iommu_priv_pgtable *l2)
+> +{
+> +       if (l2->pgtable)
+> +               dma_pool_free(l2pool, l2->pgtable, l2->handle);
+> +}
+> +
+> +static int
+> +l2free(struct shmobile_iommu_priv *priv, unsigned int l1index,
+> +       struct shmobile_iommu_priv_pgtable *l2)
+> +{
+> +       priv->l1.pgtable[l1index] = 0;
+> +       if (priv->l2[l1index].pgtable) {
+> +               *l2 = priv->l2[l1index];
+> +               priv->l2[l1index].pgtable = NULL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static int shmobile_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> +                             phys_addr_t paddr, size_t size, int prot)
+> +{
+> +       struct shmobile_iommu_priv_pgtable l2 = { .pgtable = NULL };
+> +       struct shmobile_iommu_priv *priv = domain->priv;
+> +       unsigned int l1index, l2index, i;
+> +       int ret;
+> +
+> +       l1index = iova >> 20;
+> +       switch (size) {
+> +       case 0x1000:
+> +               l2index = (iova >> 12) & 0xff;
+> +               spin_lock(&priv->map_lock);
+> +               ret = l2alloc(priv, l1index);
+> +               if (!ret)
+> +                       priv->l2[l1index].pgtable[l2index] = paddr | 0xff2;
+> +               spin_unlock(&priv->map_lock);
+> +               break;
+> +       case 0x10000:
+> +               l2index = (iova >> 12) & 0xf0;
+> +               spin_lock(&priv->map_lock);
+> +               ret = l2alloc(priv, l1index);
+> +               if (!ret) {
+> +                       for (i = 0; i < 0x10; i++)
+> +                               priv->l2[l1index].pgtable[l2index + i] =
+> +                                       paddr | 0xff1;
+> +               }
+> +               spin_unlock(&priv->map_lock);
+> +               break;
+> +       case 0x100000:
+> +               spin_lock(&priv->map_lock);
+> +               l2free(priv, l1index, &l2);
+> +               priv->l1.pgtable[l1index] = paddr | 0xc02;
+> +               spin_unlock(&priv->map_lock);
+> +               ret = 0;
+> +               break;
+> +       default:
+> +               ret = -EINVAL;
+> +       }
+> +       if (!ret && atomic_read(&priv->active)) {
+> +               wmb();
+> +               ipmmu_tlb_flush(ipmmu_access_device);
+> +               l2realfree(&l2);
+> +       }
+> +       return ret;
+> +}
+> +
+> +static size_t shmobile_iommu_unmap(struct iommu_domain *domain,
+> +                                  unsigned long iova, size_t size)
+> +{
+> +       struct shmobile_iommu_priv_pgtable l2 = { .pgtable = NULL };
+> +       struct shmobile_iommu_priv *priv = domain->priv;
+> +       unsigned int l1index, l2index, i;
+> +       uint32_t l2entry = 0;
+> +       size_t ret = 0;
+> +
+> +       l1index = iova >> 20;
+> +       if (!(iova & 0xFFFFF) && size >= 0x100000) {
+> +               spin_lock(&priv->map_lock);
+> +               l2free(priv, l1index, &l2);
+> +               spin_unlock(&priv->map_lock);
+> +               ret = 0x100000;
+> +               goto done;
+> +       }
+> +       l2index = (iova >> 12) & 0xff;
+> +       spin_lock(&priv->map_lock);
+> +       if (priv->l2[l1index].pgtable)
+> +               l2entry = priv->l2[l1index].pgtable[l2index];
+> +       switch (l2entry & 3) {
+> +       case 1:
+> +               if (l2index & 0xf)
+> +                       break;
+> +               for (i = 0; i < 0x10; i++)
+> +                       priv->l2[l1index].pgtable[l2index + i] = 0;
+> +               ret = 0x10000;
+> +               break;
+> +       case 2:
+> +               priv->l2[l1index].pgtable[l2index] = 0;
+> +               ret = 0x1000;
+> +               break;
+> +       }
+> +       spin_unlock(&priv->map_lock);
+> +done:
+> +       if (ret && atomic_read(&priv->active)) {
+> +               wmb();
+> +               ipmmu_tlb_flush(ipmmu_access_device);
+> +               l2realfree(&l2);
+> +       }
+> +       return ret;
+> +}
+> +
+> +static phys_addr_t shmobile_iommu_iova_to_phys(struct iommu_domain *domain,
+> +                                              unsigned long iova)
+> +{
+> +       struct shmobile_iommu_priv *priv = domain->priv;
+> +       uint32_t l1entry = 0, l2entry = 0;
+> +       unsigned int l1index, l2index;
+> +
+> +       l1index = iova >> 20;
+> +       l2index = (iova >> 12) & 0xff;
+> +       spin_lock(&priv->map_lock);
+> +       if (priv->l2[l1index].pgtable)
+> +               l2entry = priv->l2[l1index].pgtable[l2index];
+> +       else
+> +               l1entry = priv->l1.pgtable[l1index];
+> +       spin_unlock(&priv->map_lock);
+> +       switch (l2entry & 3) {
+> +       case 1:
+> +               return (l2entry & ~0xffff) | (iova & 0xffff);
+> +       case 2:
+> +               return (l2entry & ~0xfff) | (iova & 0xfff);
+> +       default:
+> +               if ((l1entry & 3) == 2)
+> +                       return (l1entry & ~0xfffff) | (iova & 0xfffff);
+> +               return 0;
+> +       }
+> +}
+> +
+> +static struct iommu_ops shmobile_iommu_ops = {
+> +       .domain_init = shmobile_iommu_domain_init,
+> +       .domain_destroy = shmobile_iommu_domain_destroy,
+> +       .attach_dev = shmobile_iommu_attach_device,
+> +       .detach_dev = shmobile_iommu_detach_device,
+> +       .map = shmobile_iommu_map,
+> +       .unmap = shmobile_iommu_unmap,
+> +       .iova_to_phys = shmobile_iommu_iova_to_phys,
+> +       .pgsize_bitmap = 0x111000,
+> +};
+> +
+> +static int shmobile_iommu_attach_all_devices(void)
+> +{
+> +       struct device *dev;
+> +       int ret = 0;
+> +
+> +       spin_lock(&lock_add);
+> +       iommu_mapping = arm_iommu_create_mapping(&platform_bus_type, 0x0,
+> +                                                L1_LEN << 20, 0);
+> +       if (IS_ERR_OR_NULL(iommu_mapping)) {
+> +               ret = PTR_ERR(iommu_mapping);
+> +               goto err;
+> +       }
+> +       for (dev = ipmmu_devices; dev; dev = dev->archdata.iommu) {
+> +               if (arm_iommu_attach_device(dev, iommu_mapping))
+> +                       pr_err("arm_iommu_attach_device failed\n");
+> +       }
+> +err:
+> +       spin_unlock(&lock_add);
+> +       return 0;
+> +}
+> +
+> +void ipmmu_add_device(struct device *dev)
+> +{
+> +       spin_lock(&lock_add);
+> +       dev->archdata.iommu = ipmmu_devices;
+> +       ipmmu_devices = dev;
+> +       if (!IS_ERR_OR_NULL(iommu_mapping)) {
+> +               if (arm_iommu_attach_device(dev, iommu_mapping))
+> +                       pr_err("arm_iommu_attach_device failed\n");
+> +       }
+> +       spin_unlock(&lock_add);
+> +}
+> +
+> +int ipmmu_iommu_init(struct device *dev)
+> +{
+> +       dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+> +       l1pool = dma_pool_create("shmobile-iommu-pgtable1", dev,
+> +                                L1_SIZE, L1_ALIGN, 0);
+> +       if (!l1pool)
+> +               goto nomem_pool1;
+> +       l2pool = dma_pool_create("shmobile-iommu-pgtable2", dev,
+> +                                L2_SIZE, L2_ALIGN, 0);
+> +       if (!l2pool)
+> +               goto nomem_pool2;
+> +       spin_lock_init(&lock);
+> +       attached = NULL;
+> +       ipmmu_access_device = dev;
+> +       bus_set_iommu(&platform_bus_type, &shmobile_iommu_ops);
+> +       if (shmobile_iommu_attach_all_devices())
+> +               pr_err("shmobile_iommu_attach_all_devices failed\n");
+> +       return 0;
+> +nomem_pool2:
+> +       dma_pool_destroy(l1pool);
+> +nomem_pool1:
+> +       return -ENOMEM;
+> +}
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Best regards,
+ Nobuhiro
 
 -- 
-Nicolas Ferre
+Nobuhiro Iwamatsu
