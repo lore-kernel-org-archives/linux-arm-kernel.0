@@ -1,69 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Sep 2012 16:20:30 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: SoC for 3.7
-In-Reply-To: <CAOesGMgCK=1f4NnJab+uDcGtKtbwuESK0SEPeJefHteuprMB-A@mail.gmail.com>
-References: <1346896928-5750-1-git-send-email-horms@verge.net.au>
- <20120907214951.GA2766@quad.lixom.net>
- <20120908001024.GA28510@verge.net.au>
- <20120911045152.GG23356@verge.net.au>
- <CAOesGMgCK=1f4NnJab+uDcGtKtbwuESK0SEPeJefHteuprMB-A@mail.gmail.com>
-Message-ID: <20120912072030.GD8435@verge.net.au>
+From: miguel.gaio@efixo.com (Miguel GAIO)
+Date: Wed, 12 Sep 2012 09:23:35 +0200
+Subject: [PATCH 1/3] gpio: 74x164: Add support for the daisy-chaining
+In-Reply-To: <CACRpkdZ6umqe0Td=OkF-5yYU624M2AAakVjt17rOjejcNdawzg@mail.gmail.com>
+References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1347309341-15447-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdbo1sj6gbucoF3WVLbHzFXtddZiUQ-=h9gn-+A4Z7qBnQ@mail.gmail.com>
+ <CACRpkdZ6umqe0Td=OkF-5yYU624M2AAakVjt17rOjejcNdawzg@mail.gmail.com>
+Message-ID: <1347434615.10232.1.camel@mgo-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 10:55:47PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Sep 10, 2012 at 9:51 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Sat, Sep 08, 2012 at 09:10:26AM +0900, Simon Horman wrote:
-> >> On Fri, Sep 07, 2012 at 02:49:51PM -0700, Olof Johansson wrote:
-> >> > Hi,
-> >> >
-> >> > On Thu, Sep 06, 2012 at 11:02:07AM +0900, Simon Horman wrote:
-> >> > > Hi Olof, Hi Arnd,
-> >> > >
-> >> > > please consider the following SoC enhancement from
-> >> > > Phil Edworthy for inclusion in 3.7.
-> >> > >
-> >> > > ----------------------------------------------------------------
-> >> > > The following changes since commit 7952717adb69efc1d2443a1858f96d23c2fb93e0:
-> >> > >
-> >> > >   ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
-> >> > >
-> >> > > are available in the git repository at:
-> >> > >
-> >> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-> >> >
-> >> > The above is based on the previous branch we pulled from you (kzm9g), and
-> >> > contains a patch to support rebooting of a board. I would have expected that to
-> >> > be the base for your board branch but not the SoC branch.
-> >> >
-> >> > Did you mean to base them like this for some other reason that I didn't
-> >> > realize, or would you mind switching the two branches so that the board
-> >> > one includes the restart change but not the other way around?
+On Tue, 2012-09-11 at 23:51 +0200, Linus Walleij wrote:
+> On Tue, Sep 11, 2012 at 7:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Mon, Sep 10, 2012 at 10:35 PM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> >
+> >> The shift registers have an output pin that, when enabled, propagates
+> >> the values of its internal register to the pins. If another value comes
+> >> to the register while the output pin is disabled, this new value will
+> >> makae the older shift into the next register in the chain.
 > >>
-> >> Sorry about that, I'll switch things around.
+> >> This patch adds support for daisy-chaining the registers, using the
+> >> regular SPI chip select mechanism to manage the output pin, and the
+> >> registers-number dt property to set the number of chained registers.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > >
-> > Hi Olof,
-> >
-> > I was going to switch things around as you suggest, but I noticed
-> > that the reason that I did things this way is that my kzm9g branch
-> > was pulled into the next/soc branch of the arm-soc tree (commit
-> > 301fd5c13257862df66c81c48d963d474e63e0ef).
+> > OK cool, but I just realized that this driver was added just two
+> > years ago by Gabor and Miguel, so I'd like to get their feedback
+> > before continuing.
 > 
-> Ah, gotcha, and also noticing my own slight confusion here.
-> 
-> First, since there's no overlap with the old and the new branch,
-> there's no need to base them on each other (since they won't cause
-> merge conflicts, and order of merging them in doesn't have other
-> dependencies either).
-> 
-> But it also makes sense from your development point of view to stack
-> them, since that's how you'll end up building up the branches anyway.
-> So:
-> 
-> > With that in mind, do you want to take this pull-request as is?
-> 
-> Nah, no need, sorry for the confusion. I'll pull it in as it is into next/soc.
+> Tentatively applied waiting for feedback from Miguel...
 
-Thanks!
+All is ok for me.
+
+Miguel
+
+
+> 
+> Thanks!
+> Linus Walleij
