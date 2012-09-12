@@ -1,52 +1,102 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Wed, 12 Sep 2012 19:45:57 -0400
-Subject: [PATCH] of: specify initrd location using 64-bit
-In-Reply-To: <5050EF3F.6030003@gmail.com>
-References: <1347465937-7056-1-git-send-email-cyril@ti.com>
- <5050EF3F.6030003@gmail.com>
-Message-ID: <50511EB5.800@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 12 Sep 2012 16:47:37 -0700
+Subject: [PATCH 5/7] ARM: OMAP2+: PM debug: trace the functional power
+ domains states
+In-Reply-To: <1347443732-7411-6-git-send-email-j-pihet@ti.com> (Jean Pihet's
+ message of "Wed, 12 Sep 2012 11:55:30 +0200")
+References: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
+ <1347443732-7411-6-git-send-email-j-pihet@ti.com>
+Message-ID: <874nn2st0m.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/12/2012 4:23 PM, Rob Herring wrote:
-> On 09/12/2012 11:05 AM, Cyril Chemparathy wrote:
->> On some PAE architectures, the entire range of physical memory could reside
->> outside the 32-bit limit.  These systems need the ability to specify the
->> initrd location using 64-bit numbers.
->>
->> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
->> use 64-bit numbers instead of the current unsigned long.
+Jean Pihet <jean.pihet@newoldbits.com> writes:
+
+> Trace the power domain transitions using the functional power states,
+> which include the power and logic states.
+
+Just to be clear, this means that a trace will only contain functional
+power state changes, not logical ones, correct?
+
+> While at it, fix the trace in the case a power domain did not hit
+> the desired state, as reported by Paul Walmsley.
+
+What was broken here?  needs a bit more description.  To me it sounds
+like a fix that should be a separate patch.
+
+> Reported-by: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> ---
+>  arch/arm/mach-omap2/powerdomain.c |   23 +++++++++++++----------
+>  1 files changed, 13 insertions(+), 10 deletions(-)
 >
-> S-o-B?
->
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 267241f..2277ad3 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -144,7 +144,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
+>  static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+>  {
+>  
+> -	int prev, state, trace_state = 0;
+> +	int prev, next, state, trace_state;
+>  
+>  	if (pwrdm == NULL)
+>  		return -EINVAL;
+> @@ -165,10 +165,10 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+>  		 * If the power domain did not hit the desired state,
+>  		 * generate a trace event with both the desired and hit states
+>  		 */
+> -		if (state != prev) {
+> +		next = pwrdm_read_next_fpwrst(pwrdm);
+> +		if (next != prev) {
+>  			trace_state = (PWRDM_TRACE_STATES_FLAG |
+> -				       ((state & OMAP_POWERSTATE_MASK) << 8) |
+> -				       ((prev & OMAP_POWERSTATE_MASK) << 0));
+> +				       (next << 8) | (prev << 0));
+>  			trace_power_domain_target(pwrdm->name, trace_state,
+>  						  smp_processor_id());
+>  		}
+> @@ -723,6 +723,10 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
+>  		}
+>  	}
+>  
+> +	/* Trace the pwrdm desired target state */
+> +	trace_power_domain_target(pwrdm->name, next_fpwrst,
+> +				  smp_processor_id());
 
-Sorry about that, will include in v2.
+Use of smp_processor_id() here will require the same care as pointed out
+by Roger Quadros in [PATCH] perf: Use raw_smp_processor_id insted of
+smp_processor_id.
 
-[...]
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -76,7 +76,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
->>   __tagtable(ATAG_INITRD2, parse_tag_initrd2);
->>
->>   #ifdef CONFIG_OF_FLATTREE
->> -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
->> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
->
-> phys_initrd_start/size need to change too. Not sure about similar things
-> on other arches.
->
+Kevin
 
-I've fixed phys_initrd_start (not size) in another patch, please see [1].
-
-> Does u-boot need similar fixes?
->
-
-We aren't there yet :-)  We are currently running this platform without 
-u-boot.
-
-
-[1] http://permalink.gmane.org/gmane.linux.kernel/1356713
-
--- 
-Thanks
-- Cyril
+>  	if (logic != pwrdm_read_logic_retst(pwrdm))
+>  		pwrdm_set_logic_retst(pwrdm, logic);
+>  
+> @@ -776,6 +780,10 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
+>  
+>  	spin_lock_irqsave(&pwrdm->lock, flags);
+>  
+> +	/* Trace the pwrdm desired target state */
+> +	trace_power_domain_target(pwrdm->name, fpwrst,
+> +				  smp_processor_id());
+> +
+>  	ret = pwrdm_set_logic_retst(pwrdm, logic);
+>  	if (ret)
+>  		pr_err("%s: unable to set logic state %0x of powerdomain: %s\n",
+> @@ -821,13 +829,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+>  	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
+>  		 pwrdm->name, pwrst);
+>  
+> -	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+> -		/* Trace the pwrdm desired target state */
+> -		trace_power_domain_target(pwrdm->name, pwrst,
+> -					  smp_processor_id());
+> -		/* Program the pwrdm desired target state */
+> +	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
+>  		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+> -	}
+>  
+>  	return ret;
+>  }
