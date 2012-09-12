@@ -1,62 +1,34 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 12 Sep 2012 15:27:16 +0530
-Subject: [PATCH] ARM: suspend: use flush range instead of flush all
-In-Reply-To: <20120912094648.GX13739@n2100.arm.linux.org.uk>
-References: <1347434328-7207-1-git-send-email-wzch@marvell.com>
- <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
- <20120912085445.GW13739@n2100.arm.linux.org.uk>
- <CAMQu2gx_Wk259F2PNY-T5H1N04i-JwseO5mPNw7xZ__tjonw1A@mail.gmail.com>
- <20120912094648.GX13739@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gwN6XFfuuRnZgyaETx1qi6KSHVL+0gHHLgWL-s3kxJ4-Q@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 12 Sep 2012 11:58:59 +0200
+Subject: [PATCH] ARM i.MX53 clk: Fix ldb parent clocks
+Message-ID: <1347443939-23677-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 3:16 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Sep 12, 2012 at 02:40:45PM +0530, Shilimkar, Santosh wrote:
->> On Wed, Sep 12, 2012 at 2:24 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Wed, Sep 12, 2012 at 01:13:33PM +0530, Shilimkar, Santosh wrote:
->> >> On Wed, Sep 12, 2012 at 12:48 PM, wzch <wzch@marvell.com> wrote:
->> >> >  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
->> >> >  {
->> >> > +       u32 *ptr_orig = ptr;
->> >> >         *save_ptr = virt_to_phys(ptr);
->> >> >
->> >> >         /* This must correspond to the LDM in cpu_resume() assembly */
->> >> > @@ -26,7 +27,8 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
->> >> >
->> >> >         cpu_do_suspend(ptr);
->> >> >
->> >> > -       flush_cache_all();
->> >> Lorenzo's patch was limiting above flush to local cache (LOUs) instead
->> >> of dropping it completely.
->> >
->> > Err, that is wrong.  Normally, when CPUs go into suspend, the L1 cache is
->> > lost entirely.  This is the only flush which many CPUs see of the L1
->> > cache.
->> >
->> > So removing this flush _will_ break suspend to RAM on existing CPUs.
->>
->> As mentioned, keeping that flush till inner shareability domain(L1) should be
->> enough. In fact if that part gets pushed down to the finisher() which any
->> way needs to take care of the cache maintenance, we can get rid of completely.
->
-> It is difficult to call the cache maintenance functions from assembly.
-> Why not have the generic code do the inner shareability flush, and then
-> leave the responsibility for any further cache maintenance caused by the
-> actions of the finisher to the finisher to deal with - as it is now.
->
-> That way we end up with more generic code, and don't go back to the
-> rediculous situation where we had everyone implementing this crap in
-> their own broken way time and time again in their platform code.
+The ipu_di0 and ipu_di1 muxes referenced to nonexisting clocks. Use
+ldb_di0_gate and ldb_di1_gate instead.
 
-Fully agree with you.
-Leaving the local cache flush should be better choice and that
-is the additional bit Lorenzo's patch(yet to be posted) is doing on top
-of the $subject patch. If the platform has special need like secure
-cache maintenance, they can take care of that additionally in the
-finisher.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Regards
-Santosh
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index f608669..df1b551 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -39,10 +39,10 @@ static const char *ssi_ext2_com_sels[] = { "ssi_ext2_podf", "ssi2_root_gate", };
+ static const char *emi_slow_sel[] = { "main_bus", "ahb", };
+ static const char *usb_phy_sel_str[] = { "osc", "usb_phy_podf", };
+ static const char *mx51_ipu_di0_sel[] = { "di_pred", "osc", "ckih1", "tve_di", };
+-static const char *mx53_ipu_di0_sel[] = { "di_pred", "osc", "ckih1", "di_pll4_podf", "dummy", "ldb_di0", };
++static const char *mx53_ipu_di0_sel[] = { "di_pred", "osc", "ckih1", "di_pll4_podf", "dummy", "ldb_di0_gate", };
+ static const char *mx53_ldb_di0_sel[] = { "pll3_sw", "pll4_sw", };
+ static const char *mx51_ipu_di1_sel[] = { "di_pred", "osc", "ckih1", "tve_di", "ipp_di1", };
+-static const char *mx53_ipu_di1_sel[] = { "di_pred", "osc", "ckih1", "tve_di", "ipp_di1", "ldb_di1", };
++static const char *mx53_ipu_di1_sel[] = { "di_pred", "osc", "ckih1", "tve_di", "ipp_di1", "ldb_di1_gate", };
+ static const char *mx53_ldb_di1_sel[] = { "pll3_sw", "pll4_sw", };
+ static const char *mx51_tve_ext_sel[] = { "osc", "ckih1", };
+ static const char *mx53_tve_ext_sel[] = { "pll4_sw", "ckih1", };
+-- 
+1.7.10.4
