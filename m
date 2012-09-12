@@ -1,53 +1,41 @@
 From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 12 Sep 2012 03:53:25 +0000
-Subject: [PATCH 00/29] Move OMAP2+ over to use COMMON clock
-In-Reply-To: <alpine.DEB.2.00.1209112307170.9444@utopia.booyaka.com>
-References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
- <504F0877.4030907@ti.com>
- <alpine.DEB.2.00.1209112307170.9444@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB18F8@DBDE01.ent.ti.com>
+Date: Wed, 12 Sep 2012 03:53:45 +0000
+Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
+In-Reply-To: <201209111704.16708.arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <CAMQu2gz8F2FcgRuok3x1uJ4pP8=0E2-9jhYGchzU9AUtUHjYhg@mail.gmail.com>
+ <504F6249.2090501@ti.com> <201209111704.16708.arnd@arndb.de>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAB18FD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 04:40:51, Paul Walmsley wrote:
-> On Tue, 11 Sep 2012, Vaibhav Hiremath wrote:
+On Tue, Sep 11, 2012 at 22:34:16, Arnd Bergmann wrote:
+> On Tuesday 11 September 2012, Vaibhav Hiremath wrote:
+> > On 9/11/2012 7:54 PM, Shilimkar, Santosh wrote:
+> > > On Tue, Sep 11, 2012 at 7:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >> On Tuesday 11 September 2012, Shilimkar, Santosh wrote:
+> > >>> Just curious to know how you came with some of the above header names ?
+> > >>>
+> > >>> plat/mcbsp ---> dsp-mcbsp.h
+> > >>> There is no connection of DSP with McBSP. "omap-mcbsp.h" would been a
+> > >>> better name.
+> > >>
+> > >> This one was a mistake on my side, as Tony and  Peter already pointed out.
+> > >> How about asoc-mcbsp.h or asoc-omap-mcbsp.h?
+> > >>
+> > > After re-reading the cover-letter and your below response,
+> > > 'asoc-omap-mcbsp.h' seems to be fine.
+> > > 
+> > 
+> > Note that mcbsp is also applicable to Davinci family of devices.
 > 
-> > I tried this branch on BeagleBone platform and needs one small typo
-> > correction in hwmod data patch (submitted earlier, which you are going
-> > to queue it)
-> > 
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > index de7a3ab..767a77d 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > @@ -1441,7 +1441,7 @@ static struct omap_hwmod am33xx_mmc2_hwmod = {
-> >         .clkdm_name     = "l3s_clkdm",
-> >         .mpu_irqs       = am33xx_mmc2_irqs,
-> >         .sdma_reqs      = am33xx_mmc2_edma_reqs,
-> > -       .main_clk       = "mmc2_fck",
-> > +       .main_clk       = "mmc_clk",
-> >         .prcm           = {
-> >                 .omap4  = {
-> >                       .clkctrl_offs = AM33XX_CM_PER_MMC2_CLKCTRL_OFFSET,
-> > 
-> > 
-> > With above change I boot tested it on BeagleBone platform and also
-> > verified the clock rates getting printed in debugfs.
-> 
-> So does this mean we need to put together a patch to remove the existing 
-> mmc2_fck first from the OMAP clock data file?  Looks like that would be 
-> the right thing to do, based on the AM33x PRCM data.
+> asoc-ti-mcbsp.h then?
 > 
 
-Yes, that's correct and it has been already removed from clock data file 
-while migrating to common clock framework.
+Looks ok to me.
 
 Thanks,
 Vaibhav
 
-> 
-> - Paul
+> 	Arnd
 > 
