@@ -1,45 +1,159 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 12 Sep 2012 20:34:46 +0530
-Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
-In-Reply-To: <87bohbxs16.fsf@deeprootsystems.com>
-References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
- <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
- <87bohbxs16.fsf@deeprootsystems.com>
-Message-ID: <CAMQu2gwpD6qOEV7sPg9zfMf1Zedq29OJeZ4MwEqUduZh8fJzhQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 12 Sep 2012 23:06:45 +0800
+Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
+In-Reply-To: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120912150639.GA2725@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 7:27 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
->
->> On Wed, Sep 12, 2012 at 6:02 AM, Paul Walmsley <paul@pwsan.com> wrote:
->>>
->>> Remove some unnecessary plat/ includes that are interfering with multi-subarch
->>> ARM kernels.
->>>
->>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
->>> Cc: Kevin Hilman <khilman@ti.com>
->>> Cc: Rafael J. Wysocki <rjw@sisk.pl>
->>> Acked-by: Kevin Hilman <khilman@ti.com>
->>> ---
->>>
->>> Still awaiting some final testing here.  Rafael, was wondering if you
->>> would be willing to ack this so we can merge it via the OMAP tree?
->>> Otherwise the patch can be split into an OMAP part and a CPUFreq part that
->>> can go in across two merge windows.
->>>
->> Hmm.
->> I did similar change[1] a while back. Kevin didn't like idea though
->> that point of time.
->
-> I was wrong.
->
-> At the time, we were thinking about how to get rid of clkdev nodes
-> instead of add more.  Now, we need to clean up these drivers and this is
-> the only way to do it, so I retract my objection.
->
-Thanks for clarifying.
+Any comment?  Otherwise, I will submit it to patch tracker system
+tomorrow.
 
-For patch itself,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Regards,
+Shawn
+
+On Fri, Sep 07, 2012 at 04:19:27PM +0800, Shawn Guo wrote:
+> From: Mike Turquette <mturquette@linaro.org>
+> 
+> Running cpufreq driver on imx6q, the following warning is seen.
+> 
+> $ BUG: sleeping function called from invalid context at kernel/mutex.c:269
+> 
+> <snip>
+> 
+> stack backtrace:
+> Backtrace:
+> [<80011d64>] (dump_backtrace+0x0/0x10c) from [<803fc164>] (dump_stack+0x18/0x1c)
+>  r6:bf8142e0 r5:bf814000 r4:806ac794 r3:bf814000
+> [<803fc14c>] (dump_stack+0x0/0x1c) from [<803fd444>] (print_usage_bug+0x250/0x2b
+> 8)
+> [<803fd1f4>] (print_usage_bug+0x0/0x2b8) from [<80060f90>] (mark_lock+0x56c/0x67
+> 0)
+> [<80060a24>] (mark_lock+0x0/0x670) from [<80061a20>] (__lock_acquire+0x98c/0x19b
+> 4)
+> [<80061094>] (__lock_acquire+0x0/0x19b4) from [<80062f14>] (lock_acquire+0x68/0x
+> 7c)
+> [<80062eac>] (lock_acquire+0x0/0x7c) from [<80400f28>] (mutex_lock_nested+0x78/0
+> x344)
+>  r7:00000000 r6:bf872000 r5:805cc858 r4:805c2a04
+> [<80400eb0>] (mutex_lock_nested+0x0/0x344) from [<803089ac>] (clk_get_rate+0x1c/
+> 0x58)
+> [<80308990>] (clk_get_rate+0x0/0x58) from [<80013c48>] (twd_update_frequency+0x1
+> 8/0x50)
+>  r5:bf253d04 r4:805cadf4
+> [<80013c30>] (twd_update_frequency+0x0/0x50) from [<80068e20>] (generic_smp_call
+> _function_single_interrupt+0xd4/0x13c)
+>  r4:bf873ee0 r3:80013c30
+> [<80068d4c>] (generic_smp_call_function_single_interrupt+0x0/0x13c) from [<80013
+> 34c>] (handle_IPI+0xc0/0x194)
+>  r8:00000001 r7:00000000 r6:80574e48 r5:bf872000 r4:80593958
+> [<8001328c>] (handle_IPI+0x0/0x194) from [<800084e8>] (gic_handle_irq+0x58/0x60)
+>  r8:00000000 r7:bf873f8c r6:bf873f58 r5:80593070 r4:f4000100
+> r3:00000005
+> [<80008490>] (gic_handle_irq+0x0/0x60) from [<8000e124>] (__irq_svc+0x44/0x60)
+> Exception stack(0xbf873f58 to 0xbf873fa0)
+> 3f40:                                                       00000001 00000001
+> 3f60: 00000000 bf814000 bf872000 805cab48 80405aa4 80597648 00000000 412fc09a
+> 3f80: bf872000 bf873fac bf873f70 bf873fa0 80063844 8000f1f8 20000013 ffffffff
+>  r6:ffffffff r5:20000013 r4:8000f1f8 r3:bf814000
+> [<8000f1b8>] (default_idle+0x0/0x4c) from [<8000f428>] (cpu_idle+0x98/0x114)
+> [<8000f390>] (cpu_idle+0x0/0x114) from [<803f9834>] (secondary_start_kernel+0x11
+> c/0x140)
+> [<803f9718>] (secondary_start_kernel+0x0/0x140) from [<103f9234>] (0x103f9234)
+>  r6:10c03c7d r5:0000001f r4:4f86806a r3:803f921c
+> 
+> It looks that the warning is caused by that twd_update_frequency() gets
+> called from an atomic context while it calls clk_get_rate() where
+> a mutex gets held.
+> 
+> To fix the warning, let's convert the existing code to use clk notifiers
+> in place of CPUfreq notifiers.  This works out nicely for Cortex-A9
+> MPcore designs that scale all CPUs at the same frequency.
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/kernel/smp_twd.c |   32 +++++++++++++-------------------
+>  1 files changed, 13 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index fef42b2..635e3ea 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -11,7 +11,6 @@
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/clk.h>
+> -#include <linux/cpufreq.h>
+>  #include <linux/delay.h>
+>  #include <linux/device.h>
+>  #include <linux/err.h>
+> @@ -96,51 +95,46 @@ static void twd_timer_stop(struct clock_event_device *clk)
+>  	disable_percpu_irq(clk->irq);
+>  }
+>  
+> -#ifdef CONFIG_CPU_FREQ
+> -
+>  /*
+>   * Updates clockevent frequency when the cpu frequency changes.
+>   * Called on the cpu that is changing frequency with interrupts disabled.
+>   */
+> -static void twd_update_frequency(void *data)
+> +static void twd_update_frequency(void *new_rate)
+>  {
+> -	twd_timer_rate = clk_get_rate(twd_clk);
+> +	twd_timer_rate = *((unsigned long *) new_rate);
+>  
+>  	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
+>  }
+>  
+> -static int twd_cpufreq_transition(struct notifier_block *nb,
+> -	unsigned long state, void *data)
+> +static int twd_rate_change(struct notifier_block *nb,
+> +	unsigned long flags, void *data)
+>  {
+> -	struct cpufreq_freqs *freqs = data;
+> +	struct clk_notifier_data *cnd = data;
+>  
+>  	/*
+>  	 * The twd clock events must be reprogrammed to account for the new
+>  	 * frequency.  The timer is local to a cpu, so cross-call to the
+>  	 * changing cpu.
+>  	 */
+> -	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
+> -		smp_call_function_single(freqs->cpu, twd_update_frequency,
+> -			NULL, 1);
+> +	if (flags == POST_RATE_CHANGE)
+> +		smp_call_function(twd_update_frequency,
+> +				  (void *)&cnd->new_rate, 1);
+>  
+>  	return NOTIFY_OK;
+>  }
+>  
+> -static struct notifier_block twd_cpufreq_nb = {
+> -	.notifier_call = twd_cpufreq_transition,
+> +static struct notifier_block twd_clk_nb = {
+> +	.notifier_call = twd_rate_change,
+>  };
+>  
+> -static int twd_cpufreq_init(void)
+> +static int twd_clk_init(void)
+>  {
+>  	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
+> -		return cpufreq_register_notifier(&twd_cpufreq_nb,
+> -			CPUFREQ_TRANSITION_NOTIFIER);
+> +		return clk_notifier_register(twd_clk, &twd_clk_nb);
+>  
+>  	return 0;
+>  }
+> -core_initcall(twd_cpufreq_init);
+> -
+> -#endif
+> +core_initcall(twd_clk_init);
+>  
+>  static void __cpuinit twd_calibrate_rate(void)
+>  {
+> -- 
+> 1.7.5.4
+> 
