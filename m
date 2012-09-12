@@ -1,27 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Sep 2012 11:29:54 -0600
-Subject: [PATCH 09/16] ARM: tegra: move platform_data definitions
-In-Reply-To: <201209121621.16019.arnd@arndb.de>
+From: j-pihet@ti.com (Pihet-XID, Jean)
+Date: Wed, 12 Sep 2012 19:40:56 +0200
+Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
+In-Reply-To: <201209121715.58621.arnd@arndb.de>
 References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-9-git-send-email-arnd@arndb.de>
- <504F5A51.9000506@wwwdotorg.org> <201209121621.16019.arnd@arndb.de>
-Message-ID: <5050C692.1070503@wwwdotorg.org>
+ <1347368390-31252-13-git-send-email-arnd@arndb.de>
+ <CAN5iSWqnyA0VNDkaCb7bcZOhQxOxJ8xUy4RXWgt+xukSUmHnAA@mail.gmail.com>
+ <201209121715.58621.arnd@arndb.de>
+Message-ID: <CAN5iSWr6FOBZYPD4FaZU0u6vOvk=6AoE4UmZ5c3guEg8mAU+8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 10:21 AM, Arnd Bergmann wrote:
-> On Tuesday 11 September 2012, Stephen Warren wrote:
-> 
->>>  .../mach/sdhci.h => include/linux/platform_data/mmc-sdhci-tegra.h  |    0
->>
->> I have a not-yet-applied (but ack'd by Chris Ball) patch to move this to
->> include/linux/mmc/tegra_sdhci.h. I believe all the dependencies are
->> staged in the Tegra tree now, so I can apply it if you want. I'm fine
->> with you apply this patch though; just let me know. If you want to take
->> your patch, then this part:
->>
->> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> 
-> I've redone my patch now, the version below is what I have now.
+On Wed, Sep 12, 2012 at 7:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 12 September 2012, Pihet-XID, Jean wrote:
+>> > diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/include/linux/platform_data/smartreflex-omap.h
+>> > similarity index 100%
+>> > rename from arch/arm/plat-omap/include/plat/voltage.h
+>> > rename to include/linux/platform_data/smartreflex-omap.h
+>> The filename should be voltage-omap.h. The header file is for a
+>> voltage layer which is used by other layers, one of them is the
+>> smartreflex driver code (in drivers/power/avs).
+>> The header file for the smartreflex driver is in
+>> include/linux/power/smartreflex.h.
+>
+> Ok, makes sense. Changed now.
+Great, thanks!
 
-OK, that looks fine.
+Jean
+>
+>         Arnd
