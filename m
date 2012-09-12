@@ -1,154 +1,63 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 12 Sep 2012 15:44:55 -0700
-Subject: [PATCH v2] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <20120912203223.3094.5354@nucleus>
-References: <20120912203223.3094.5354@nucleus>
-Message-ID: <1347489895-16384-1-git-send-email-mturquette@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 12 Sep 2012 22:51:30 +0000 (UTC)
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+Message-ID: <alpine.DEB.2.00.1209122237080.7275@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running cpufreq driver on imx6q, the following warning is seen.
 
-$ BUG: sleeping function called from invalid context at kernel/mutex.c:269
+Hi Paul
 
-<snip>
+Recently several of us have been seeing "INFO: rcu_sched self-detected
+stall on CPU { 0} (t=20611 jiffies)" stack tracebacks on various OMAP3
+and 4 board.
 
-stack backtrace:
-Backtrace:
-[<80011d64>] (dump_backtrace+0x0/0x10c) from [<803fc164>] (dump_stack+0x18/0x1c)
- r6:bf8142e0 r5:bf814000 r4:806ac794 r3:bf814000
-[<803fc14c>] (dump_stack+0x0/0x1c) from [<803fd444>] (print_usage_bug+0x250/0x2b
-8)
-[<803fd1f4>] (print_usage_bug+0x0/0x2b8) from [<80060f90>] (mark_lock+0x56c/0x67
-0)
-[<80060a24>] (mark_lock+0x0/0x670) from [<80061a20>] (__lock_acquire+0x98c/0x19b
-4)
-[<80061094>] (__lock_acquire+0x0/0x19b4) from [<80062f14>] (lock_acquire+0x68/0x
-7c)
-[<80062eac>] (lock_acquire+0x0/0x7c) from [<80400f28>] (mutex_lock_nested+0x78/0
-x344)
- r7:00000000 r6:bf872000 r5:805cc858 r4:805c2a04
-[<80400eb0>] (mutex_lock_nested+0x0/0x344) from [<803089ac>] (clk_get_rate+0x1c/
-0x58)
-[<80308990>] (clk_get_rate+0x0/0x58) from [<80013c48>] (twd_update_frequency+0x1
-8/0x50)
- r5:bf253d04 r4:805cadf4
-[<80013c30>] (twd_update_frequency+0x0/0x50) from [<80068e20>] (generic_smp_call
-_function_single_interrupt+0xd4/0x13c)
- r4:bf873ee0 r3:80013c30
-[<80068d4c>] (generic_smp_call_function_single_interrupt+0x0/0x13c) from [<80013
-34c>] (handle_IPI+0xc0/0x194)
- r8:00000001 r7:00000000 r6:80574e48 r5:bf872000 r4:80593958
-[<8001328c>] (handle_IPI+0x0/0x194) from [<800084e8>] (gic_handle_irq+0x58/0x60)
- r8:00000000 r7:bf873f8c r6:bf873f58 r5:80593070 r4:f4000100
-r3:00000005
-[<80008490>] (gic_handle_irq+0x0/0x60) from [<8000e124>] (__irq_svc+0x44/0x60)
-Exception stack(0xbf873f58 to 0xbf873fa0)
-3f40:                                                       00000001 00000001
-3f60: 00000000 bf814000 bf872000 805cab48 80405aa4 80597648 00000000 412fc09a
-3f80: bf872000 bf873fac bf873f70 bf873fa0 80063844 8000f1f8 20000013 ffffffff
- r6:ffffffff r5:20000013 r4:8000f1f8 r3:bf814000
-[<8000f1b8>] (default_idle+0x0/0x4c) from [<8000f428>] (cpu_idle+0x98/0x114)
-[<8000f390>] (cpu_idle+0x0/0x114) from [<803f9834>] (secondary_start_kernel+0x11
-c/0x140)
-[<803f9718>] (secondary_start_kernel+0x0/0x140) from [<103f9234>] (0x103f9234)
- r6:10c03c7d r5:0000001f r4:4f86806a r3:803f921c
+I only noticed it during v3.6-rc3, but I suspect it's been happening 
+for users at least since May:
 
-It looks that the warning is caused by that twd_update_frequency() gets
-called from an atomic context while it calls clk_get_rate() where a
-mutex gets held.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg68942.html
 
-To fix the warning, let's convert common clk users over to clk notifiers
-in place of CPUfreq notifiers.  This works out nicely for Cortex-A9
-MPcore designs that scale all CPUs at the same frequency.
 
-Platforms that have not been converted to the common clk framework and
-support CPUfreq will rely on the old mechanism.  Once these platforms
-are converted over fully then we can remove the CPUfreq-specific bits
-for good.
+The only quasi-reproducible test case that I've found so far 
+is to boot the board with serial console enabled to a login prompt, then 
+wait for a few minutes, then send a keypress to the board via serial.
+The tracebacks I get look like this:
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes in v2:
- * Kept the original CPUfreq notifier scheme in place for platforms that
-   have not adapted to the common clk framework yet
+[  467.480712] INFO: rcu_sched self-detected stall on CPU { 0}  (t=20611 jiffies)
+[  467.484741] [<c001b7cc>] (unwind_backtrace+0x0/0xf0) from [<c00acc94>] (rcu_check_callbacks+0x180/0x630)
+[  467.489929] [<c00acc94>] (rcu_check_callbacks+0x180/0x630) from [<c0052b18>] (update_process_times+0x38/0x68)
+[  467.495361] [<c0052b18>] (update_process_times+0x38/0x68) from [<c008c04c>] (tick_sched_timer+0x80/0xec)
+[  467.500518] [<c008c04c>] (tick_sched_timer+0x80/0xec) from [<c0068544>] (__run_hrtimer+0x7c/0x1e0)
+[  467.505401] [<c0068544>] (__run_hrtimer+0x7c/0x1e0) from [<c0069328>] (hrtimer_interrupt+0x11c/0x2d0)
+[  467.510437] [<c0069328>] (hrtimer_interrupt+0x11c/0x2d0) from [<c001a04c>] (twd_handler+0x30/0x44)
+[  467.515350] [<c001a04c>] (twd_handler+0x30/0x44) from [<c00a71a0>] (handle_percpu_devid_irq+0x90/0x13c)
+[  467.520477] [<c00a71a0>] (handle_percpu_devid_irq+0x90/0x13c) from [<c00a3914>] (generic_handle_irq+0x30/0x48)
+[  467.525939] [<c00a3914>] (generic_handle_irq+0x30/0x48) from [<c0014c58>] (handle_IRQ+0x4c/0xac)
+[  467.530731] [<c0014c58>] (handle_IRQ+0x4c/0xac) from [<c0008478>] (gic_handle_irq+0x28/0x5c)
+[  467.535339] [<c0008478>] (gic_handle_irq+0x28/0x5c) from [<c04f8ce4>] (__irq_svc+0x44/0x5c)
+[  467.539886] Exception stack(0xc0729f58 to 0xc0729fa0)
+[  467.542663] 9f40:                                                       00047f2a 00000001
+[  467.547119] 9f60: 00000000 c074a940 c0728000 c07c4b08 c05045a0 c074be20 00000000 411fc092
+[  467.551574] 9f80: c074c040 00000000 00000001 c0729fa0 00047f2b c0014f50 20000113 ffffffff
+[  467.556030] [<c04f8ce4>] (__irq_svc+0x44/0x5c) from [<c0014f50>] (default_idle+0x20/0x44)
+[  467.560485] [<c0014f50>] (default_idle+0x20/0x44) from [<c001517c>] (cpu_idle+0x9c/0x114)
+[  467.564971] [<c001517c>] (cpu_idle+0x9c/0x114) from [<c06d77b0>] (start_kernel+0x2b4/0x304)
 
-Testing notes:
- * Tested on OMAP4430 Panda against v3.6-rc5 with legacy clk framework
-   and with local common clk patches, thus both code paths are validated
- * CPUfreq userspace governor @ 300MHz, 600MHz and 1008MHz
- * Ran "date; sleep 30; date" and compared with a stopwatch to verify
-   correct timekeeping
+Looks like this message was added as of commit
+a858af2875fb291d0f4b0a4419fefbf03c2379c0 ("rcu: Print scheduling-clock
+information on RCU CPU stall-warning messages").
 
- arch/arm/kernel/smp_twd.c |   48 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 46 insertions(+), 2 deletions(-)
+Do you have any suggestions for how we can determine what is causing
+this?
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index fef42b2..e1f9069 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -11,7 +11,6 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
--#include <linux/cpufreq.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -96,7 +95,52 @@ static void twd_timer_stop(struct clock_event_device *clk)
- 	disable_percpu_irq(clk->irq);
- }
- 
--#ifdef CONFIG_CPU_FREQ
-+#ifdef CONFIG_COMMON_CLK
-+
-+/*
-+ * Updates clockevent frequency when the cpu frequency changes.
-+ * Called on the cpu that is changing frequency with interrupts disabled.
-+ */
-+static void twd_update_frequency(void *new_rate)
-+{
-+	twd_timer_rate = *((unsigned long *) new_rate);
-+
-+	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-+}
-+
-+static int twd_rate_change(struct notifier_block *nb,
-+	unsigned long flags, void *data)
-+{
-+	struct clk_notifier_data *cnd = data;
-+
-+	/*
-+	 * The twd clock events must be reprogrammed to account for the new
-+	 * frequency.  The timer is local to a cpu, so cross-call to the
-+	 * changing cpu.
-+	 */
-+	if (flags == POST_RATE_CHANGE)
-+		smp_call_function(twd_update_frequency,
-+				  (void *)&cnd->new_rate, 1);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block twd_clk_nb = {
-+	.notifier_call = twd_rate_change,
-+};
-+
-+static int twd_clk_init(void)
-+{
-+	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-+		return clk_notifier_register(twd_clk, &twd_clk_nb);
-+
-+	return 0;
-+}
-+core_initcall(twd_clk_init);
-+
-+#elif defined (CONFIG_CPU_FREQ)
-+
-+#include <linux/cpufreq.h>
- 
- /*
-  * Updates clockevent frequency when the cpu frequency changes.
--- 
-1.7.9.5
+Here's an example of a kernel config that we use:
+
+http://www.pwsan.com/omap/testlogs/am33xx_hwmod_clock_devel_3.7/20120912092510/build/omap2plus_defconfig/Kconfig
+
+A few observations that may or may not be relevant: we use NO_HZ, and 
+we also have a clockevents timer that is relatively slow to program.
+
+
+regards,
+
+- Paul
