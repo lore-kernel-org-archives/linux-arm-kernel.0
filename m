@@ -1,52 +1,35 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 12 Sep 2012 16:08:20 -0700
-Subject: [PATCHv8 00/23]I2C big cleanup
-In-Reply-To: <87pq5quaqr.fsf@deeprootsystems.com> (Kevin Hilman's message of
- "Wed, 12 Sep 2012 15:39:24 -0700")
-References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
- <20120912131615.GB16547@pengutronix.de>
- <87pq5quaqr.fsf@deeprootsystems.com>
-Message-ID: <87wqzysuu3.fsf@deeprootsystems.com>
+Date: Wed, 12 Sep 2012 16:11:37 -0700
+Subject: [PATCHv7 07/12] ARM: OMAP4: PM: put all domains to OSWR during
+ suspend
+In-Reply-To: <alpine.DEB.2.00.1207191726090.14390@utopia.booyaka.com> (Paul
+ Walmsley's message of "Thu, 19 Jul 2012 17:30:12 -0600 (MDT)")
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+ <1342704392-23657-8-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1207190842310.432@utopia.booyaka.com>
+ <1342711907.4672.153.camel@sokoban>
+ <alpine.DEB.2.00.1207191726090.14390@utopia.booyaka.com>
+Message-ID: <87sjamsuom.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@deeprootsystems.com> writes:
+Paul Walmsley <paul@pwsan.com> writes:
 
-> Wolfram Sang <w.sang@pengutronix.de> writes:
->
->> On Wed, Sep 12, 2012 at 04:27:54PM +0530, Shubhrajyoti D wrote:
->
-> [...]
->
->>> This is the cleanup only series.
->>>   
->>> Tested on omap4sdp and 3430sdp.
->>> 
->>> The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
->>> 
->>>   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
->>> 
->>> are available in the git repository at:
->>>   git://gitorious.org/linus-tree/linus-tree.git for_3.7/i2c/big_cleanups
->>
->> Pushed to -next. Thanks to all involved!
->
-> Sorry to be late to the party (again), but still catching up after some
-> time off.
->
-> Unfortunately, this series causes PM regressions on several OMAP
-> platforms.  I hope we can hold off on this until those issues are
-> addressed.
+[...]
 
-I tracked the regression down to [PATCHv8 21/22] (see reply there.)
+>
+> It kind of looks to me like there are two or three separate sets within 
+> the series.  My feeling is that Kevin should take the first two, then I 
+> should take the rest other than 6 and 7.  Then once those are queued, 
+> we can pull in 6 and 7.  Does that make sense to you?
+>
 
-Since this series is already merged, I suggest that the problem patch be
-reverted, at least for v3.7 and until the problem is better understood
-and tested.
+Looks like 1, 2 & 7 are needed for OSWR, and the rest can go now via
+Paul.
 
-With that patch reverted, all my PM tests are passing.  Feel free to
-add:
+Tero, can create a new OSWR series including 1, 2 & 7?  Can you also
+refresh it against Jean's latest functional power state series (v6)?
 
-Tested-by: Kevin Hilman <khilman@ti.com>
+Thanks,
 
 Kevin
