@@ -1,38 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Sep 2012 12:10:08 +0800
-Subject: [PATCH 2/2] ARM: tegra: cpu-tegra: explicitly manage re-parenting
-In-Reply-To: <20120911044530.20289.8165@nucleus>
-References: <1347318758-7954-1-git-send-email-swarren@wwwdotorg.org>
- <1347318758-7954-2-git-send-email-swarren@wwwdotorg.org>
- <20120911044530.20289.8165@nucleus>
-Message-ID: <20120912041001.GB3402@S2100-06.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 12 Sep 2012 03:53:25 +0000
+Subject: [PATCH 00/29] Move OMAP2+ over to use COMMON clock
+In-Reply-To: <alpine.DEB.2.00.1209112307170.9444@utopia.booyaka.com>
+References: <1339678038-23082-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1209110403130.23042@utopia.booyaka.com>
+ <504F0877.4030907@ti.com>
+ <alpine.DEB.2.00.1209112307170.9444@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAB18F8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 09:45:30PM -0700, Mike Turquette wrote:
-> > To solve this, have the Tegra cpufreq driver explicitly perform the
-> > reparenting operations itself. This is probably reasonable anyway,
-> > since such reparenting is somewhat a matter of policy (e.g. which
-> > alternate clock source to use, whether to leave the CPU clock a child
-> > of the alternate clock source if it's running at the desired rate),
-> > and hence is something more appropriate for the cpufreq driver than
-> > the core clock driver anyway.
+On Wed, Sep 12, 2012 at 04:40:51, Paul Walmsley wrote:
+> On Tue, 11 Sep 2012, Vaibhav Hiremath wrote:
+> 
+> > I tried this branch on BeagleBone platform and needs one small typo
+> > correction in hwmod data patch (submitted earlier, which you are going
+> > to queue it)
 > > 
+> > 
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > index de7a3ab..767a77d 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> > @@ -1441,7 +1441,7 @@ static struct omap_hwmod am33xx_mmc2_hwmod = {
+> >         .clkdm_name     = "l3s_clkdm",
+> >         .mpu_irqs       = am33xx_mmc2_irqs,
+> >         .sdma_reqs      = am33xx_mmc2_edma_reqs,
+> > -       .main_clk       = "mmc2_fck",
+> > +       .main_clk       = "mmc_clk",
+> >         .prcm           = {
+> >                 .omap4  = {
+> >                       .clkctrl_offs = AM33XX_CM_PER_MMC2_CLKCTRL_OFFSET,
+> > 
+> > 
+> > With above change I boot tested it on BeagleBone platform and also
+> > verified the clock rates getting printed in debugfs.
 > 
-> I definitely agree about the policy.  Just FYI I'm hacking on an RFC to
-> make reparenting clocks from a call to clk_set_rate even easier, but
-> perhaps in your case it is better the cpufreq driver knows the clock
-> tree topology details.
+> So does this mean we need to put together a patch to remove the existing 
+> mmc2_fck first from the OMAP clock data file?  Looks like that would be 
+> the right thing to do, based on the AM33x PRCM data.
 > 
-I disagree.  The whole point of clock framework is to hide clock details
-like tree topology behind clock API, so that we do not need every single
-clock client driver to handle those details on their own.  It's
-definitely desired to have clk_set_rate call handle reparenting nicely.
 
->From what I see, if tegra clock driver can handle the dependency between
-cpu_clk and emc_clk that is currently handled in cpufreq driver.  It's
-likely that the generic cpufreq driver (cpufreq-cpu0) would work for
-tegra.  But with this patch, the driver moves to the opposite direction.
+Yes, that's correct and it has been already removed from clock data file 
+while migrating to common clock framework.
 
-Regards,
-Shawn
+Thanks,
+Vaibhav
+
+> 
+> - Paul
+> 
