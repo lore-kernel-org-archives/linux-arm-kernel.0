@@ -1,168 +1,88 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 12 Sep 2012 11:55:27 +0200
-Subject: [PATCH 2/7] ARM: OMAP2+: PM: add a lock to protect the powerdomains
- next state
+Date: Wed, 12 Sep 2012 11:55:30 +0200
+Subject: [PATCH 5/7] ARM: OMAP2+: PM debug: trace the functional power domains
+ states
 In-Reply-To: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
 References: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1347443732-7411-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1347443732-7411-6-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwrdm_set_fpwrst, pwrdm_set_next_fpwrst and pwrdm_read_next_fpwrst
-are intented to be the only API to program and request the next
-state of a power domain.
-This patch protects the power domain next state settings and structs
-from concurrent accesses by the use of a lock.
+Trace the power domain transitions using the functional power states,
+which include the power and logic states.
 
-A spinlock is used since the API functions can be called from
-atomic context (.i.e) either from cpuidle path or suspend path.
+While at it, fix the trace in the case a power domain did not hit
+the desired state, as reported by Paul Walmsley.
 
-[ambresh at ti.com: reported the atomic context issue and suggested
-to replace the initial mutex with a spinlock]
-
+Reported-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Reported-by: Ambresh K <ambresh@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   40 ++++++++++++++++++++++++++++++++----
- arch/arm/mach-omap2/powerdomain.h |    3 ++
- 2 files changed, 38 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |   23 +++++++++++++----------
+ 1 files changed, 13 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 18c21fa..f4b219f 100644
+index 267241f..2277ad3 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -102,6 +102,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	INIT_LIST_HEAD(&pwrdm->voltdm_node);
- 	voltdm_add_pwrdm(voltdm, pwrdm);
+@@ -144,7 +144,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
+ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ {
  
-+	spin_lock_init(&pwrdm->lock);
- 	list_add(&pwrdm->node, &pwrdm_list);
+-	int prev, state, trace_state = 0;
++	int prev, next, state, trace_state;
  
- 	/* Initialize the powerdomain's state counter */
-@@ -394,6 +395,22 @@ static int _pwrdm_pwrst_to_fpwrst(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
- }
- 
- 
-+/**
-+ * _pwrdm_read_next_fpwrst - get next powerdomain functional power state
-+ * @pwrdm: struct powerdomain * to get power state
-+ *
-+ * Return the powerdomain @pwrdm's next functional power state.
-+ * Returns -EINVAL if the powerdomain pointer is null or returns
-+ * the next power state upon success.
-+ */
-+static int _pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
-+{
-+	int next_pwrst = pwrdm_read_next_pwrst(pwrdm);
-+	int next_logic = pwrdm_read_logic_retst(pwrdm);
-+
-+	return _pwrdm_pwrst_to_fpwrst(pwrdm, next_pwrst, next_logic);
-+}
-+
- /* Public functions */
- 
- /**
-@@ -677,6 +694,7 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
- 	int pwrst = _pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst);
- 	int logic = _pwrdm_fpwrst_to_logic_pwrst(pwrdm, fpwrst);
- 	int sleep_switch = -1, ret = 0, hwsup = 0;
-+	unsigned long flags;
- 
- 	if (!pwrdm || IS_ERR(pwrdm) || (pwrst < 0) || (logic < 0)) {
- 		pr_debug("%s: invalid params: pwrdm=%p, fpwrst=%0x\n",
-@@ -687,9 +705,11 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
- 	pr_debug("%s: set fpwrst %0x to pwrdm %s\n",
- 		 __func__, fpwrst, pwrdm->name);
- 
--	next_fpwrst = pwrdm_read_next_fpwrst(pwrdm);
-+	spin_lock_irqsave(&pwrdm->lock, flags);
-+
-+	next_fpwrst = _pwrdm_read_next_fpwrst(pwrdm);
- 	if (next_fpwrst == fpwrst)
--		return ret;
-+		goto out;
- 
- 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
- 	if (curr_pwrst < PWRDM_POWER_ON) {
-@@ -725,6 +745,8 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
- 		break;
+ 	if (pwrdm == NULL)
+ 		return -EINVAL;
+@@ -165,10 +165,10 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 		 * If the power domain did not hit the desired state,
+ 		 * generate a trace event with both the desired and hit states
+ 		 */
+-		if (state != prev) {
++		next = pwrdm_read_next_fpwrst(pwrdm);
++		if (next != prev) {
+ 			trace_state = (PWRDM_TRACE_STATES_FLAG |
+-				       ((state & OMAP_POWERSTATE_MASK) << 8) |
+-				       ((prev & OMAP_POWERSTATE_MASK) << 0));
++				       (next << 8) | (prev << 0));
+ 			trace_power_domain_target(pwrdm->name, trace_state,
+ 						  smp_processor_id());
+ 		}
+@@ -723,6 +723,10 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
+ 		}
  	}
  
-+out:
-+	spin_unlock_irqrestore(&pwrdm->lock, flags);
- 	return ret;
- }
++	/* Trace the pwrdm desired target state */
++	trace_power_domain_target(pwrdm->name, next_fpwrst,
++				  smp_processor_id());
++
+ 	if (logic != pwrdm_read_logic_retst(pwrdm))
+ 		pwrdm_set_logic_retst(pwrdm, logic);
  
-@@ -741,6 +763,7 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
- 	int pwrst = _pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst);
- 	int logic = _pwrdm_fpwrst_to_logic_pwrst(pwrdm, fpwrst);
- 	int ret = 0;
-+	unsigned long flags;
+@@ -776,6 +780,10 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
  
- 	if (!pwrdm || IS_ERR(pwrdm) || (pwrst < 0) || (logic < 0)) {
- 		pr_debug("%s: invalid params: pwrdm=%p, fpwrst=%0x\n",
-@@ -751,6 +774,8 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
- 	pr_debug("%s: set fpwrst %0x to pwrdm %s\n",
- 		 __func__, fpwrst, pwrdm->name);
+ 	spin_lock_irqsave(&pwrdm->lock, flags);
  
-+	spin_lock_irqsave(&pwrdm->lock, flags);
++	/* Trace the pwrdm desired target state */
++	trace_power_domain_target(pwrdm->name, fpwrst,
++				  smp_processor_id());
 +
  	ret = pwrdm_set_logic_retst(pwrdm, logic);
  	if (ret)
  		pr_err("%s: unable to set logic state %0x of powerdomain: %s\n",
-@@ -761,6 +786,7 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
- 		pr_err("%s: unable to set power state %0x of powerdomain: %s\n",
- 		       __func__, pwrst, pwrdm->name);
+@@ -821,13 +829,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
+ 		 pwrdm->name, pwrst);
  
-+	spin_unlock_irqrestore(&pwrdm->lock, flags);
+-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+-		/* Trace the pwrdm desired target state */
+-		trace_power_domain_target(pwrdm->name, pwrst,
+-					  smp_processor_id());
+-		/* Program the pwrdm desired target state */
++	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+-	}
+ 
  	return ret;
- };
- 
-@@ -837,10 +863,14 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-  */
- int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
- {
--	int next_pwrst = pwrdm_read_next_pwrst(pwrdm);
--	int next_logic = pwrdm_read_logic_retst(pwrdm);
-+	int ret;
-+	unsigned long flags;
- 
--	return _pwrdm_pwrst_to_fpwrst(pwrdm, next_pwrst, next_logic);
-+	spin_lock_irqsave(&pwrdm->lock, flags);
-+	ret = _pwrdm_read_next_fpwrst(pwrdm);
-+	spin_unlock_irqrestore(&pwrdm->lock, flags);
-+
-+	return ret;
  }
- 
- /**
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index aa5de4f..c3dc363 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -17,6 +17,7 @@
- #include <linux/types.h>
- #include <linux/list.h>
- 
-+#include <linux/spinlock.h>
- #include <linux/atomic.h>
- 
- #include <plat/cpu.h>
-@@ -109,6 +110,7 @@ struct powerdomain;
-  * @pwrdm_clkdms: Clockdomains in this powerdomain
-  * @node: list_head linking all powerdomains
-  * @voltdm_node: list_head linking all powerdomains in a voltagedomain
-+ * @lock: powerdomain next state registers protection lock
-  * @pwrstctrl_offs: (AM33XX only) XXX_PWRSTCTRL reg offset from prcm_offs
-  * @pwrstst_offs: (AM33XX only) XXX_PWRSTST reg offset from prcm_offs
-  * @logicretstate_mask: (AM33XX only) mask for logic retention bitfield
-@@ -142,6 +144,7 @@ struct powerdomain {
- 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
- 	struct list_head node;
- 	struct list_head voltdm_node;
-+	spinlock_t lock;
- 	int state;
- 	unsigned state_counter[PWRDM_MAX_PWRSTS];
- 	unsigned ret_logic_off_counter;
 -- 
 1.7.7.6
