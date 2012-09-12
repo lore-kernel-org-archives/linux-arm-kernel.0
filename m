@@ -1,60 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 12 Sep 2012 22:02:03 +0000
-Subject: [PATCH 2/2] ARM: AM33XX: hwmod: Add OMAP_INTC_START offset to
- all module int nos
-In-Reply-To: <20120912215232.GE5997@atomide.com>
-References: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
- <1347484551-11775-3-git-send-email-hvaibhav@ti.com>
- <20120912215232.GE5997@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB2BB0@DBDE01.ent.ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Sep 2012 17:08:31 -0500
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <5050E965.5080405@linutronix.de>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+ <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
+ <5050CE33.9060909@ti.com> <5050E965.5080405@linutronix.de>
+Message-ID: <505107DF.5020105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 03:22:32, Tony Lindgren wrote:
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120912 14:17]:
-> > With recent migration of omap architectures to SPARSE_IRQ framework,
-> > it is important to add OMAP_INTC_START to all interrupt numbers
-> > which will be eventually requested by drivers.
-> > 
-> > This is required in order to get AM33XX boot functionality.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  168 ++++++++++++++--------------
-> >  1 files changed, 84 insertions(+), 84 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > index 7b7ed08..3c320f4 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+On 09/12/2012 02:58 PM, Sebastian Andrzej Siewior wrote:
+> On 09/12/2012 08:02 PM, Cyril Chemparathy wrote:
+>>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start,
+>>>> unsigned long end)
+>>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>>>
+>>> Why not phys_addr_t?
+>>>
+>>
+>> The rest of the memory specific bits of the device-tree code use u64 for
+>> addresses, and I kept it the same for consistency.
 > 
-> You should just have on top of this file:
-> 
-> #define OMAP_INTC_START		0
-> 
-> Then Paul can apply this, and while merging with the sparseirq
-> changes, the above can be removed.
-> 
+> Geert is right here. If it is a physical address, it should be
+> phys_addr_t.
 
-Ok, I will add this at the top of the file and resend this patch.
+While generally true, for the DT specific code I think it should be a
+fixed u64. The size of the address is defined by the FDT, not the
+kernel. It is very likely we could have a FDT that specifies addresses
+in 64-bit values, but then we boot a kernel is compiled for !LPAE.
+phys_addr_t is currently sized based on LPAE setting.
 
+Also, this is how the memory and reserved nodes are handled currently,
+so we should be consistent.
 
-> > @@ -72,7 +72,7 @@ static struct omap_hwmod_class am33xx_emif_hwmod_class = {
-> >  };
-> >  
-> >  static struct omap_hwmod_irq_info am33xx_emif_irqs[] = {
-> > -	{ .name = "ddrerr0", .irq = 101 },
-> > +	{ .name = "ddrerr0", .irq = 101 + OMAP_INTC_START },
-> >  	{ .irq = -1 }
-> >  };
-> >  
-> 
-> Then these should be fixed up to have trailing commas
-> as requested by Russell earlier on several occasions.
-> 
-
-Ok, I will fix this and all other places as well and resend.
-
-Thanks,
-Vaibhav
+Rob
