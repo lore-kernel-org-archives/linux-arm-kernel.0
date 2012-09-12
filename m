@@ -1,146 +1,231 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:23 +0200
-Subject: [PATCH v9 10/13] ARM: SoC: convert imx6q to SoC descriptor
+Date: Wed, 12 Sep 2012 16:58:26 +0200
+Subject: [PATCH v9 13/13] ARM: consolidate pen_release instead of having per
+ platform definitions
 In-Reply-To: <1347461906-13527-1-git-send-email-arnd@arndb.de>
 References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347461906-13527-11-git-send-email-arnd@arndb.de>
+Message-ID: <1347461906-13527-14-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Convert the imx6q platform to use the SoC descriptor to provide
-its SMP and CPU hotplug operations.
+Almost each SMP platform defines pen_release to manage booting secondary
+CPUs. This of course clashes with the single zImage effort.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Add the pen_release definition to the ARM SMP code, and remove all others.
+This should only be used by platforms which lack any kind of CPU power
+management...
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-imx/hotplug.c             |   16 +---------------
- arch/arm/mach-imx/mach-imx6q.c          |    1 +
- arch/arm/mach-imx/platsmp.c             |   18 ++++++++++++++----
- arch/arm/plat-mxc/include/mach/common.h |    4 ++++
- 4 files changed, 20 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/smp.h        |    1 +
+ arch/arm/kernel/smp.c             |    6 ++++++
+ arch/arm/mach-exynos/hotplug.c    |    2 --
+ arch/arm/mach-exynos/platsmp.c    |    7 -------
+ arch/arm/mach-msm/hotplug.c       |    2 --
+ arch/arm/mach-msm/platsmp.c       |    5 -----
+ arch/arm/mach-realview/hotplug.c  |    2 --
+ arch/arm/mach-spear13xx/hotplug.c |    2 --
+ arch/arm/mach-spear13xx/platsmp.c |    5 -----
+ arch/arm/mach-ux500/hotplug.c     |    2 --
+ arch/arm/mach-ux500/platsmp.c     |    6 ------
+ arch/arm/mach-vexpress/hotplug.c  |    2 --
+ arch/arm/plat-versatile/platsmp.c |    6 ------
+ 13 files changed, 7 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
-index f8f7437..b07b778 100644
---- a/arch/arm/mach-imx/hotplug.c
-+++ b/arch/arm/mach-imx/hotplug.c
-@@ -15,11 +15,6 @@
- #include <asm/cp15.h>
- #include <mach/common.h>
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 3a8cfee..2e3be16 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -70,6 +70,7 @@ struct secondary_data {
+ 	void *stack;
+ };
+ extern struct secondary_data secondary_data;
++extern volatile int pen_release;
  
--int platform_cpu_kill(unsigned int cpu)
--{
--	return 1;
--}
+ extern int __cpu_disable(void);
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ac3ce02..aa4ffe6 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -51,6 +51,12 @@
+  */
+ struct secondary_data secondary_data;
+ 
++/*
++ * control for which core is the next to come out of the secondary
++ * boot "holding pen"
++ */
++volatile int __cpuinitdata pen_release = -1;
++
+ enum ipi_msg_type {
+ 	IPI_TIMER = 2,
+ 	IPI_RESCHEDULE,
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index d0a5a70..f1461ce 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -23,8 +23,6 @@
+ 
+ #include "common.h"
+ 
+-extern volatile int pen_release;
 -
  static inline void cpu_enter_lowpower(void)
  {
  	unsigned int v;
-@@ -47,7 +42,7 @@ static inline void cpu_enter_lowpower(void)
-  *
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void imx_cpu_die(unsigned int cpu)
- {
- 	cpu_enter_lowpower();
- 	imx_enable_cpu(cpu, false);
-@@ -56,12 +51,3 @@ void platform_cpu_die(unsigned int cpu)
- 	while (1)
- 		;
- }
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 3fad8ad..8d57e42 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -40,13 +40,6 @@ extern void exynos4_secondary_startup(void);
+ 				S5P_INFORM5 : S5P_VA_SYSRAM)
+ 
+ /*
+- * control for which core is the next to come out of the secondary
+- * boot "holding pen"
+- */
 -
--int platform_cpu_disable(unsigned int cpu)
--{
--	/*
--	 * we don't allow CPU 0 to be shutdown (it is still too special
--	 * e.g. clock tick interrupts)
--	 */
--	return cpu == 0 ? -EPERM : 0;
--}
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 045b3f6..ef0b52f 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -226,6 +226,7 @@ static const char *imx6q_dt_compat[] __initdata = {
- };
+-volatile int __cpuinitdata pen_release = -1;
+-
+-/*
+  * Write pen_release in a way that is guaranteed to be visible to all
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index d0f79e8..927a8d2 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -15,8 +15,6 @@
  
- DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
-+	.smp		= smp_ops(imx6q_soc_desc),
- 	.map_io		= imx6q_map_io,
- 	.init_irq	= imx6q_init_irq,
- 	.handle_irq	= imx6q_handle_irq,
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index ab98c6f..2ac43e1 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -41,7 +41,7 @@ void __init imx_scu_map_io(void)
- 	scu_base = IMX_IO_ADDRESS(base);
- }
+ #include "core.h"
  
--void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit imx_secondary_init(unsigned int cpu)
+-extern volatile int pen_release;
+-
+ static inline void cpu_enter_lowpower(void)
  {
- 	/*
- 	 * if any interrupts are already enabled for the primary
-@@ -51,7 +51,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	gic_secondary_init(0);
- }
+ 	/* Just flush the cache. Changing the coherency is not yet
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index ba3c4b0..57af32e 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -35,11 +35,6 @@
+ #define GIC_PPI_EDGE_MASK 0xFFFFD7FF
  
--int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ extern void msm_secondary_startup(void);
+-/*
+- * control for which core is the next to come out of the secondary
+- * boot "holding pen".
+- */
+-volatile int pen_release = -1;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index 81a2a58..a5a02c2 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -16,8 +16,6 @@
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ 
+-extern volatile int pen_release;
+-
+ static inline void cpu_enter_lowpower(void)
  {
- 	imx_set_cpu_jump(cpu, v7_secondary_startup);
- 	imx_enable_cpu(cpu, true);
-@@ -62,7 +62,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
--void __init smp_init_cpus(void)
-+static void __init imx_smp_init_cpus(void)
+ 	unsigned int v;
+diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
+index 22e99b0..9b17e1e 100644
+--- a/arch/arm/mach-spear13xx/hotplug.c
++++ b/arch/arm/mach-spear13xx/hotplug.c
+@@ -17,8 +17,6 @@
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ 
+-extern volatile int pen_release;
+-
+ static inline void cpu_enter_lowpower(void)
  {
- 	int i, ncores;
+ 	unsigned int v;
+diff --git a/arch/arm/mach-spear13xx/platsmp.c b/arch/arm/mach-spear13xx/platsmp.c
+index 806343c..2eaa3fa 100644
+--- a/arch/arm/mach-spear13xx/platsmp.c
++++ b/arch/arm/mach-spear13xx/platsmp.c
+@@ -21,11 +21,6 @@
+ #include <mach/spear.h>
+ #include <mach/generic.h>
  
-@@ -79,7 +79,17 @@ void imx_smp_prepare(void)
- 	scu_enable(scu_base);
- }
+-/*
+- * control for which core is the next to come out of the secondary
+- * boot "holding pen"
+- */
+-volatile int __cpuinitdata pen_release = -1;
+ static DEFINE_SPINLOCK(boot_lock);
  
--void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
+ static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
+diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+index 17b9a15..4f6b2e1 100644
+--- a/arch/arm/mach-ux500/hotplug.c
++++ b/arch/arm/mach-ux500/hotplug.c
+@@ -17,8 +17,6 @@
+ 
+ #include <mach/setup.h>
+ 
+-extern volatile int pen_release;
+-
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index b6f4e0e..d60873e 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -28,12 +28,6 @@
+ extern void u8500_secondary_startup(void);
+ 
+ /*
+- * control for which core is the next to come out of the secondary
+- * boot "holding pen"
+- */
+-volatile int pen_release = -1;
+-
+-/*
+  * Write pen_release in a way that is guaranteed to be visible to all
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+index e2a960f..b36a749 100644
+--- a/arch/arm/mach-vexpress/hotplug.c
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -16,8 +16,6 @@
+ #include <asm/smp_plat.h>
+ #include <asm/cp15.h>
+ 
+-extern volatile int pen_release;
+-
+ static inline void cpu_enter_lowpower(void)
  {
- 	imx_smp_prepare();
- }
-+
-+struct smp_operations  imx_smp_ops __initdata = {
-+	.smp_init_cpus		= imx_smp_init_cpus,
-+	.smp_prepare_cpus	= imx_smp_prepare_cpus,
-+	.smp_secondary_init	= imx_secondary_init,
-+	.smp_boot_secondary	= imx_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= imx_cpu_die,
-+#endif
-+};
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 7128e97..e8b5150 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -145,6 +145,8 @@ extern void imx53_smd_common_init(void);
- extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
- extern void imx6q_clock_map_io(void);
+ 	unsigned int v;
+diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
+index 39e60ac..04ca493 100644
+--- a/arch/arm/plat-versatile/platsmp.c
++++ b/arch/arm/plat-versatile/platsmp.c
+@@ -20,12 +20,6 @@
+ #include <asm/hardware/gic.h>
  
-+extern void imx_cpu_die(unsigned int cpu);
-+
- #ifdef CONFIG_PM
- extern void imx6q_pm_init(void);
- extern void imx51_pm_init(void);
-@@ -161,4 +163,6 @@ extern int mx51_neon_fixup(void);
- static inline int mx51_neon_fixup(void) { return 0; }
- #endif
- 
-+extern struct smp_operations imx_smp_ops;
-+
- #endif
+ /*
+- * control for which core is the next to come out of the secondary
+- * boot "holding pen"
+- */
+-volatile int __cpuinitdata pen_release = -1;
+-
+-/*
+  * Write pen_release in a way that is guaranteed to be visible to all
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
 -- 
 1.7.10
