@@ -1,104 +1,183 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Sep 2012 16:59:59 -0600
-Subject: [PATCH] media: add V4L2 DT binding documentation
-In-Reply-To: <Pine.LNX.4.64.1209122302410.28968@axis700.grange>
-References: <Pine.LNX.4.64.1209111746420.22084@axis700.grange>
- <5050DA40.8050105@wwwdotorg.org>
- <Pine.LNX.4.64.1209122111100.28968@axis700.grange>
- <5050F653.5070404@wwwdotorg.org>
- <Pine.LNX.4.64.1209122302410.28968@axis700.grange>
-Message-ID: <505113EF.5010303@wwwdotorg.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 12 Sep 2012 16:01:39 -0700
+Subject: [PATCH 1/2] ARM: SoC: convert MSM SMP to SoC descriptor
+In-Reply-To: <1347461906-13527-7-git-send-email-arnd@arndb.de>
+References: <1347461906-13527-7-git-send-email-arnd@arndb.de>
+Message-ID: <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 03:17 PM, Guennadi Liakhovetski wrote:
-> On Wed, 12 Sep 2012, Stephen Warren wrote:
-> 
->> On 09/12/2012 01:28 PM, Guennadi Liakhovetski wrote:
->>> Hi Stephen
->>>
->>> On Wed, 12 Sep 2012, Stephen Warren wrote:
->>>
->>>> On 09/11/2012 09:51 AM, Guennadi Liakhovetski wrote:
->>>>> This patch adds a document, describing common V4L2 device tree bindings.
->>>>>
->>>>> Co-authored-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>>>> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->>>>
->>>> Overall, I think this looks pretty reasonable, so:
->> ...
->>>>
->>>>> +			clock-frequency = <50000000>;	/* max clock frequency */
->>>>> +			clock-output-names = "mclk";
->>>>> +		};
->>>>> +
->>>>> +		port {
->>>> ...
->>>>> +			ceu0_0: link at 0 {
->>>>> +				reg = <0>;
->>>>> +				remote = <&csi2_2>;
->>>>> +				immutable;
->>>>
->>>> Did we decide "immutable" was actually needed? Presumably the driver for
->>>> the HW in question knows the HW isn't configurable, and would simply not
->>>> attempt to apply any configuration even if the .dts author erroneously
->>>> provided some?
->>>
->>> Well, I've been thinking about this today. I think, bridge drivers will 
->>
->> Sorry, I'm not sure what a "bridge" driver is; is it any v4l2 device?
-> 
-> Right, sorry for not explaining. We call a bridge a device, that's sitting 
-> on a bus like USB, PCI or - as in the SoC case - on an internal one and 
-> interfacing to, say, a video sensor or a TV decoder or encoder. In the SoC 
-> case most primitive bridges just take data from video sensors attached 
-> over, say, an 8-bit parallel bus and DMA it into RAM buffers. Some bridges 
-> can also perform some data processing.
-> 
->>> call centrally provided helper functions to enumerate links inside ports. 
->>
->> Presumably a given driver would only parse the ports/links of its own DT
->> node, and hence would be able to provide a parameter to any helper
->> function that indicated the same information that "immutable" would?
-> 
-> Well, let's drop "immutable" for now, since we don't have a good idea 
-> whether we need it or not. If we do need it, we'll add it later, removing 
-> a part of a standart is more difficult.
-> 
->>> While doing that they will want to differentiate between links to external 
->>> devices with explicit configuration, and links to internal devices, whose 
->>> configuration drivers might be able to figure out themselves. How should a 
->>> driver find out what device this link is pointing to? Should it follow the 
->>> "remote" phandle and then check the "compatible" property? The word 
->>> "immutable" is a hint, that this is a link to an internal device, but it 
->>> might either be unneeded or be transformed into something more 
->>> informative.
->>
->> I would imagine that a given driver would only ever parse its own DT
->> node; the far end of any link is purely the domain of the other driver.
->> I thought that each link node would contain whatever hsync-active,
->> data-lanes, ... properties that were needed to configure the local device?
-> 
-> I think, information needed to configure a bridge device to connect to a 
-> camera sensor, like sync polarities etc., might not be sufficient to 
-> configure it to interface to an SoC internal unit, like a MIPI CSI-2 
-> interface. I can see 2 possibilities to recognise, that this link is going 
-> to an internal device: (1) follow the remote phandle, (2) use a 
-> vendor-specific property to specify the remote device type. I guess, you'd 
-> prefer the latter?
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-I guess I'm still not exactly clear on what/why the bridge device needs
-to know; a concrete example might help.
+Convert MSM SMP platforms to use the SoC descriptor to provide
+their SMP and CPU hotplug operations.
 
-Either way though, (2) sounds like it's probably best; all information
-required to configure a given device is within that device's node.
+Cc: David Brown <davidb@codeaurora.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+This is an adaptation of this change on top of the msm-for-3.7 tree I
+recently sent out a pull request for.  The only real change is to
+resolve the conflicts with the simplified board files.
 
-Being pedantic, I'm not sure precisely what you mean by vendor-specific.
-If you mean the DT property name would include a vendor prefix, then
-yes, I imagine that's quite possible, although it'd be good to try and
-create standardized properties that multiple vendors and devices can use
-if it makes sense. If you mean something more than that, then I'd argue
-that those properties aren't just vendor-specific, but rather specific
-to the individual binding for the individual device (which does imply
-the vendor prefix, but not the general applicability of the property to
-all of a vendor's devices).
+ arch/arm/mach-msm/board-dt-8660.c |  2 ++
+ arch/arm/mach-msm/board-dt-8960.c |  2 ++
+ arch/arm/mach-msm/core.h          |  2 ++
+ arch/arm/mach-msm/hotplug.c       | 18 +++---------------
+ arch/arm/mach-msm/platsmp.c       | 19 +++++++++++++++----
+ 5 files changed, 24 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-msm/core.h
+
+diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
+index f77f57f..e5643f6 100644
+--- a/arch/arm/mach-msm/board-dt-8660.c
++++ b/arch/arm/mach-msm/board-dt-8660.c
+@@ -20,6 +20,7 @@
+ 
+ #include <mach/board.h>
+ #include "common.h"
++#include "core.h"
+ 
+ static const struct of_device_id msm_dt_gic_match[] __initconst = {
+ 	{ .compatible = "qcom,msm-8660-qgic", .data = gic_of_init },
+@@ -53,6 +54,7 @@ static const char *msm8x60_fluid_match[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = msm_map_msm8x60_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.handle_irq = gic_handle_irq,
+diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
+index 8df99b8..139d61b 100644
+--- a/arch/arm/mach-msm/board-dt-8960.c
++++ b/arch/arm/mach-msm/board-dt-8960.c
+@@ -18,6 +18,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
++#include "core.h"
+ 
+ static const struct of_device_id msm_dt_gic_match[] __initconst = {
+ 	{ .compatible = "qcom,msm-qgic2", .data = gic_of_init },
+@@ -40,6 +41,7 @@ static const char * const msm8960_dt_match[] __initconst = {
+ };
+ 
+ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = msm_map_msm8960_io,
+ 	.init_irq = msm_dt_init_irq,
+ 	.timer = &msm_dt_timer,
+diff --git a/arch/arm/mach-msm/core.h b/arch/arm/mach-msm/core.h
+new file mode 100644
+index 0000000..a9bab53
+--- /dev/null
++++ b/arch/arm/mach-msm/core.h
+@@ -0,0 +1,2 @@
++extern struct smp_operations msm_smp_ops;
++extern void msm_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index a446fc1..d0f79e8 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -13,6 +13,8 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
++#include "core.h"
++
+ extern volatile int pen_release;
+ 
+ static inline void cpu_enter_lowpower(void)
+@@ -57,17 +59,12 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 	}
+ }
+ 
+-int platform_cpu_kill(unsigned int cpu)
+-{
+-	return 1;
+-}
+-
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+  * Called with IRQs disabled
+  */
+-void platform_cpu_die(unsigned int cpu)
++void msm_cpu_die(unsigned int cpu)
+ {
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+@@ -81,12 +78,3 @@ void platform_cpu_die(unsigned int cpu)
+ 	 */
+ 	cpu_leave_lowpower();
+ }
+-
+-int platform_cpu_disable(unsigned int cpu)
+-{
+-	/*
+-	 * we don't allow CPU 0 to be shutdown (it is still too special
+-	 * e.g. clock tick interrupts)
+-	 */
+-	return cpu == 0 ? -EPERM : 0;
+-}
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index b119f99..313bd7d 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -23,6 +23,7 @@
+ #include <asm/smp_plat.h>
+ 
+ #include "scm-boot.h"
++#include "core.h"
+ 
+ #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
+ #define SCSS_CPU1CORE_RESET 0xD80
+@@ -43,7 +44,7 @@ static inline int get_core_count(void)
+ 	return ((read_cpuid_id() >> 4) & 3) + 1;
+ }
+ 
+-void __cpuinit platform_secondary_init(unsigned int cpu)
++static void __cpuinit msm_secondary_init(unsigned int cpu)
+ {
+ 	/*
+ 	 * if any interrupts are already enabled for the primary
+@@ -85,7 +86,7 @@ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
+ 				  "address\n");
+ }
+ 
+-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+ 	static int cold_boot_done;
+@@ -145,7 +146,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  * does not support the ARM SCU, so just set the possible cpu mask to
+  * NR_CPUS.
+  */
+-void __init smp_init_cpus(void)
++static void __init msm_smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores = get_core_count();
+ 
+@@ -161,6 +162,16 @@ void __init smp_init_cpus(void)
+         set_smp_cross_call(gic_raise_softirq);
+ }
+ 
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ }
++
++struct smp_operations msm_smp_ops __initdata = {
++	.smp_init_cpus		= msm_smp_init_cpus,
++	.smp_prepare_cpus	= msm_smp_prepare_cpus,
++	.smp_secondary_init	= msm_secondary_init,
++	.smp_boot_secondary	= msm_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= msm_cpu_die,
++#endif
++};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
