@@ -1,64 +1,14 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Wed, 12 Sep 2012 12:44:41 +0530
-Subject: [PATCH V2] ARM: OMAP: counter: add locking to read_persistent_clock
-Message-ID: <1347434081-11469-1-git-send-email-r.sricharan@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Sep 2012 16:14:55 +0900
+Subject: [PATCH 0/2] ARM ERRATA 775420 and 782773 workarounds
+Message-ID: <1347434097-7924-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+Hi Russell,
 
-read_persistent_clock uses a global variable, use a spinlock to
-ensure non-atomic updates to the variable don't overlap and cause
-time to move backwards.
+I would like to request review of this series which is
+comprised of the following two patches.
 
-Signed-off-by: Colin Cross <ccross@android.com>
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
----
- [V2] Added signed-off-by and looped in "linux-arm-kernel" list
-
- arch/arm/plat-omap/counter_32k.c |   21 ++++++++++++++-------
- 1 file changed, 14 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index dbf1e03..2bc51fb 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -55,22 +55,29 @@ static u32 notrace omap_32k_read_sched_clock(void)
-  * nsecs and adds to a monotonically increasing timespec.
-  */
- static struct timespec persistent_ts;
--static cycles_t cycles, last_cycles;
-+static cycles_t cycles;
- static unsigned int persistent_mult, persistent_shift;
-+static DEFINE_SPINLOCK(read_persistent_clock_lock);
-+
- static void omap_read_persistent_clock(struct timespec *ts)
- {
- 	unsigned long long nsecs;
--	cycles_t delta;
--	struct timespec *tsp = &persistent_ts;
-+	cycles_t last_cycles;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&read_persistent_clock_lock, flags);
- 
- 	last_cycles = cycles;
- 	cycles = sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
--	delta = cycles - last_cycles;
- 
--	nsecs = clocksource_cyc2ns(delta, persistent_mult, persistent_shift);
-+	nsecs = clocksource_cyc2ns(cycles - last_cycles,
-+					persistent_mult, persistent_shift);
-+
-+	timespec_add_ns(&persistent_ts, nsecs);
-+
-+	*ts = persistent_ts;
- 
--	timespec_add_ns(tsp, nsecs);
--	*ts = *tsp;
-+	spin_unlock_irqrestore(&read_persistent_clock_lock, flags);
- }
- 
- /**
--- 
-1.7.9.5
+[PATCH 1/2] arm: Add ARM ERRATA 775420 workaround
+[PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
