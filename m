@@ -1,101 +1,55 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 12 Sep 2012 16:01:40 -0700
-Subject: [PATCH 2/2] ARM: msm: Move core.h contents into common.h
-In-Reply-To: <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
-References: <1347461906-13527-7-git-send-email-arnd@arndb.de>
- <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1347490900-8409-2-git-send-email-davidb@codeaurora.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 12 Sep 2012 16:03:35 -0700
+Subject: [PATCHv8 21/22] i2c: omap: switch over to autosuspend API
+In-Reply-To: <1347447496-16793-22-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Wed, 12 Sep 2012 16:28:15 +0530")
+References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
+ <1347447496-16793-22-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87627iu9mg.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No real need to have a separate core.h from the common.h file.  Fold
-these two prototypes into the common header file.
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
-This is Stephen Boyd's suggestion to not have a separate core.h.  It
-is probably best to just fold this into the previous patch.
+> From: Felipe Balbi <balbi@ti.com>
+>
+> this helps us reduce unnecessary pm transitions
+> in case we have another i2c message starting soon.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
- arch/arm/mach-msm/board-dt-8660.c | 1 -
- arch/arm/mach-msm/board-dt-8960.c | 1 -
- arch/arm/mach-msm/common.h        | 2 ++
- arch/arm/mach-msm/core.h          | 2 --
- arch/arm/mach-msm/hotplug.c       | 2 +-
- arch/arm/mach-msm/platsmp.c       | 2 +-
- 6 files changed, 4 insertions(+), 6 deletions(-)
- delete mode 100644 arch/arm/mach-msm/core.h
+I tracked the PM regression down to this patch.
 
-diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
-index e5643f6..b5b4de2 100644
---- a/arch/arm/mach-msm/board-dt-8660.c
-+++ b/arch/arm/mach-msm/board-dt-8660.c
-@@ -20,7 +20,6 @@
- 
- #include <mach/board.h>
- #include "common.h"
--#include "core.h"
- 
- static const struct of_device_id msm_dt_gic_match[] __initconst = {
- 	{ .compatible = "qcom,msm-8660-qgic", .data = gic_of_init },
-diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
-index 139d61b..4490edb 100644
---- a/arch/arm/mach-msm/board-dt-8960.c
-+++ b/arch/arm/mach-msm/board-dt-8960.c
-@@ -18,7 +18,6 @@
- #include <asm/mach/arch.h>
- 
- #include "common.h"
--#include "core.h"
- 
- static const struct of_device_id msm_dt_gic_match[] __initconst = {
- 	{ .compatible = "qcom,msm-qgic2", .data = gic_of_init },
-diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
-index d68e5d7..633a7159 100644
---- a/arch/arm/mach-msm/common.h
-+++ b/arch/arm/mach-msm/common.h
-@@ -26,5 +26,7 @@ extern void msm_map_qsd8x50_io(void);
- extern void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
- 					  unsigned int mtype, void *caller);
- 
-+extern struct smp_operations msm_smp_ops;
-+extern void msm_cpu_die(unsigned int cpu);
- 
- #endif
-diff --git a/arch/arm/mach-msm/core.h b/arch/arm/mach-msm/core.h
-deleted file mode 100644
-index a9bab53..0000000
---- a/arch/arm/mach-msm/core.h
-+++ /dev/null
-@@ -1,2 +0,0 @@
--extern struct smp_operations msm_smp_ops;
--extern void msm_cpu_die(unsigned int cpu);
-diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
-index d0f79e8..3f87911 100644
---- a/arch/arm/mach-msm/hotplug.c
-+++ b/arch/arm/mach-msm/hotplug.c
-@@ -13,7 +13,7 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- 
--#include "core.h"
-+#include "common.h"
- 
- extern volatile int pen_release;
- 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 313bd7d..948f970 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -23,7 +23,7 @@
- #include <asm/smp_plat.h>
- 
- #include "scm-boot.h"
--#include "core.h"
-+#include "common.h"
- 
- #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
- #define SCSS_CPU1CORE_RESET 0xD80
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
+>  1 files changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 6d38a57..122f517 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -55,6 +55,9 @@
+>  /* timeout waiting for the controller to respond */
+>  #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+>  
+> +/* timeout for pm runtime autosuspend */
+> +#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
+> +
+>  /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+>  enum {
+>  	OMAP_I2C_REV_REG = 0,
+> @@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  
+>  	omap_i2c_wait_for_bb(dev);
+>  out:
+> -	pm_runtime_put(dev->dev);
+> +	pm_runtime_mark_last_busy(dev->dev);
+> +	pm_runtime_put_autosuspend(dev->dev);
+
+Reverting this change allows CORE to hit retention again.
+
+I didn't debug this any further, so I'm not sure exactly why the async
+suspend works but not the autosuspend.
+
+Kevin
