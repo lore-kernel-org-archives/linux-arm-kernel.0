@@ -1,74 +1,47 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Wed, 12 Sep 2012 00:01:54 -0700
-Subject: [RFC] tty/serial/kgdboc: Add and wire up clear_irqs callback
-In-Reply-To: <CAMbhsRT+JR9-qzADiPXo9e59oHFCY4g6HNObKNMeciC5Xj6m6g@mail.gmail.com>
-References: <20120911093042.GA12471@lizard>
- <1347356106-25368-6-git-send-email-anton.vorontsov@linaro.org>
- <20120911151540.362001c6@pyramind.ukuu.org.uk>
- <20120912033209.GA32156@lizard>
- <CAMbhsRTmZyxFE-vAa-UvNE8KJ2f0cfXP7mncXKcpUiNF6C9PUQ@mail.gmail.com>
- <20120912040657.GA3880@lizard>
- <CAMbhsRT+JR9-qzADiPXo9e59oHFCY4g6HNObKNMeciC5Xj6m6g@mail.gmail.com>
-Message-ID: <20120912070154.GA8932@lizard>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Wed, 12 Sep 2012 12:44:13 +0530
+Subject: [PATCH V2] ARM: OMAP2+: Round of the carve out memory requested to
+ section_size
+Message-ID: <1347434053-11431-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 09:40:35PM -0700, Colin Cross wrote:
-[..]
-> >> the polling rx function should clear the interrupt
-> >> for you.
-> >
-> > Yes, that's an option. But that way we add a new semantic for the
-> > polling routines, and effecitvely we just merge the two callbacks.
-> >
-> > Of course, if Alan is OK with this, I'm more than OK too. :-)
-> >
-> > (But the polling routines would need to clear all interrupts, not
-> > just rx/tx. For example, if the controller indicated some error, and
-> > nobody clears it, then we'll start reentering infinitely.)
-> 
-> For exynos5, the only non-8250 based serial port I've come across, we
-> clear all interrupts in the rx poll function (see
-> https://android.googlesource.com/kernel/exynos/+/ef427aafffb7153dde59745e440fd7ec41ea969d/arch/arm/mach-exynos/exynos_fiq_debugger.c).
+memblock_steal tries to reserve physical memory during boot.
+When the requested size is not aligned on the section size
+then, the remaining memory available for lowmem becomes
+unaligned on the section boundary. There is a issue with this,
+which is discussed in the thread below.
 
-Yes, but if you'd like to merge your code, some might ask you: why?
+https://lkml.org/lkml/2012/6/28/112
 
-You'd answer that you need to clear the interrupts, otherwise you'll
-keep reentering NMI. The next that you might get is this: "this does
-not belong to the getc callback, it's better to factor it out". :-) And
-here comes clear_irq() (or alike, see below).
+The final conclusion from the thread seems to
+be align the memblock_steal calls on the SECTION boundary.
+The issue comes out when LPAE is enabled, where the
+section size is 2MB.
 
-> >> If you use a clear_irqs callback, you can drop characters if
-> >> one arrives between the last character buffer read and calling
-> >> clear_irqs.
-> >
-> > Only if we call clear_irqs() after reading the characters, but we do
-> > it before. So if new characters are available, we will reenter NMI,
-> > which is OK.
-> >
-> > But if used incorrectly, it truly can cause dropping (or staling) of
-> > characters, so I'd better add some comments about this.
-> 
-> What does clear_irqs() mean for a status or tx interrupt?  The tx
-> interrupt will generally re-assert as long as the tx fifo is empty,
-> which would require disabling it.
+Boot tested this on OMAP5 evm with and without LPAE.
 
-Yup, and that's exactly what we do: http://lkml.org/lkml/2012/9/11/119
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+---
+ [V2] Corrected the subject and added one more description line.
 
-Your words made me think that clear_irq() might be indeed a somewhat
-inappropriate name. We have to be even stricter on its definition and
-behaviour.
+ arch/arm/mach-omap2/omap-secure.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-So, returning to your question "What does clear_irqs() mean", I'd
-answer that: the function must do whatever needed to lower the IRQ
-line, plus the function must leave the port in the state that it's
-still able to throw RX interrupts after the call.
-
-So, the 100% proper name for this function would be this:
-
-	quiesce_irqs_but_rx()
-
-It's a bit long, but does exactly what the name states.
-
-Thanks!
-Anton.
+diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
+index d9ae4a5..26edfec 100644
+--- a/arch/arm/mach-omap2/omap-secure.c
++++ b/arch/arm/mach-omap2/omap-secure.c
+@@ -61,8 +61,8 @@ int __init omap_secure_ram_reserve_memblock(void)
+ {
+ 	u32 size = OMAP_SECURE_RAM_STORAGE;
+ 
+-	size = ALIGN(size, SZ_1M);
+-	omap_secure_memblock_base = arm_memblock_steal(size, SZ_1M);
++	size = ALIGN(size, SECTION_SIZE);
++	omap_secure_memblock_base = arm_memblock_steal(size, SECTION_SIZE);
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.5
