@@ -1,23 +1,33 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 12 Sep 2012 17:56:38 +0100
-Subject: [PATCH 05/11] clk: Versatile Express clock generators ("osc")
- driver
-In-Reply-To: <CACRpkdZcUuyKpb3EBrdENGnGgZQjbi15Q+21NkF-pVX_Lw_HFg@mail.gmail.com>
-References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
- <1346689531-7212-6-git-send-email-pawel.moll@arm.com>
- <20120910191420.20289.1923@nucleus>	<1347379848.2497.13.camel@hornet>
- <CACRpkdZcUuyKpb3EBrdENGnGgZQjbi15Q+21NkF-pVX_Lw_HFg@mail.gmail.com>
-Message-ID: <1347468998.2497.17.camel@hornet>
+From: peter.senna@gmail.com (Peter Senna Tschudin)
+Date: Wed, 12 Sep 2012 19:03:16 +0200
+Subject: [PATCH 9/15] arch/arm/mach-s3c24xx/mach-h1940.c: removes unnecessary
+ semicolon
+Message-ID: <1347469402-27557-9-git-send-email-peter.senna@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-11 at 19:00 +0100, Linus Walleij wrote:
-> >> > +       osc = kzalloc(sizeof(*osc), GFP_KERNEL);
->
-> Can't you just use devm_kzalloc(&vecdev->dev, ...) and be done with it?
+From: Peter Senna Tschudin <peter.senna@gmail.com>
 
-Eh. It was devm_kzalloc() initially, then the driver became an "early"
-one and I could use devm_*(). I actually made it devm_kzalloc() again,
-hope it will survive like this to v2.
+removes unnecessary semicolon
 
-Pawe?
+Found by Coccinelle: http://coccinelle.lip6.fr/
+
+Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
+
+---
+ arch/arm/mach-s3c24xx/mach-h1940.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
+index bb8d008..02ef7d5 100644
+--- a/arch/arm/mach-s3c24xx/mach-h1940.c
++++ b/arch/arm/mach-s3c24xx/mach-h1940.c
+@@ -460,7 +460,7 @@ static void h1940_set_mmc_power(unsigned char power_mode, unsigned short vdd)
+ 		break;
+ 	default:
+ 		break;
+-	};
++	}
+ }
+ 
+ static struct s3c24xx_mci_pdata h1940_mmc_cfg __initdata = {
