@@ -1,57 +1,68 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 12 Sep 2012 15:41:40 +0530
-Subject: [PATCHv7 00/23]I2C big cleanup
-In-Reply-To: <20120911220048.GD27031@pengutronix.de>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
- <20120911220048.GD27031@pengutronix.de>
-Message-ID: <50505FDC.4090500@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 12 Sep 2012 12:16:07 +0200
+Subject: [PATCH v3 0/8] i2c: at91: cleanup and dt support
+In-Reply-To: <505041EF.5060204@atmel.com>
+References: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
+ <505041EF.5060204@atmel.com>
+Message-ID: <20120912101607.GA2624@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 September 2012 03:30 AM, Wolfram Sang wrote:
->> Changes since v6:
->> >         - Fix comments on setting the pdev to NULL.
->> >         - Trivial changelog update
-> Looks mostly good, thanks. Only a few comments. Oh, and I still get
-> reports about a section mismatch ;)
-I am using omap2plus_defconfig
- $ make --ver
-GNU Make 3.81
-Copyright (C) 2006  Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.
-There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE.
+On Wed, Sep 12, 2012 at 10:03:59AM +0200, Nicolas Ferre wrote:
+> On 09/12/2012 08:42 AM, ludovic.desroches at atmel.com :
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
+> > Hi,
+> > 
+> > This set of patches is based on Nikolaus at91_i2c driver.
+> > 
+> > Changes:
+> > v3:
+> >   - only put multi-drive lines in the if...else statement (suggested
+> >   by Warner Losh)
+> 
+> Hi Wolfram,
+> 
+> As said by Ludovic, this series goes on top of Nikolaus' one.
+> My Acked-by is already set on this one, so I think that I have nothing
+> more to do ;-)
+> 
+> BTW, in case you need help to sort all this, do not hesitate to contact
+> us... we can setup a git tree for this...
 
-$ make CONFIG_DEBUG_SECTION_MISMATCH=y uImage
-....
-  LD      vmlinux.o
-  MODPOST vmlinux.o
-  GEN     .version
-  CHK     include/generated/compile.h
-  UPD     include/generated/compile.h
-  CC      init/version.o
-  LD      init/built-in.o
-  KSYM    .tmp_kallsyms1.o
-  KSYM    .tmp_kallsyms2.o
-  LD      vmlinux
-  SYSMAP  System.map
-  OBJCOPY arch/arm/boot/Image
-  Kernel: arch/arm/boot/Image is ready
-  GZIP    arch/arm/boot/compressed/piggy.gzip
-  CC      arch/arm/boot/compressed/misc.o
-  CC      arch/arm/boot/compressed/decompress.o
-  CC      arch/arm/boot/compressed/string.o
-  AS      arch/arm/boot/compressed/piggy.gzip.o
-  LD      arch/arm/boot/compressed/vmlinux
-  OBJCOPY arch/arm/boot/zImage
-  Kernel: arch/arm/boot/zImage is ready
-  UIMAGE  arch/arm/boot/uImage
-Image Name:   Linux-3.6.0-rc5-00022-g49fb6db
-Created:      Wed Sep 12 15:24:21 2012
-Image Type:   ARM Linux Kernel Image (uncompressed)
-Data Size:    4074688 Bytes = 3979.19 kB = 3.89 MB
-Load Address: 80008000
-Entry Point:  80008000
-  Image arch/arm/boot/uImage is ready
+I think I am fine. Patches look good. I wondered a bit about first
+removing the old driver, then adding the new one with regard to
+bisectability. But as the old driver depends on BROKEN, I think this is
+OK to do.
 
-I donot see the warning. Am I missing something?
+One thing I'd like to make, though. I'd like to squash the following
+patches into one:
+
+	drivers/i2c/busses/i2c-at91.c: add new driver
+	i2c: at91: use managed resources
+	i2c: at91: add warning about transmission issues for some devices
+	i2c: at91: use an id table for SoC dependent parameters
+
+It is especially the last patch I am mostly interested in. The id_table
+approach is what I like, while the original id_entry mechanism looks
+fishy. I'd was good for reviewing to have the patches split like this;
+yet for hitting mainline, I'd prefer to have the driver proper on first
+occasion. I already did the squashing in a test-branch and the result
+looks good to me.
+
+Nikolaus, Ludovic: Are you fine with this?
+
+Thanks,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/f3eb127a/attachment.sig>
