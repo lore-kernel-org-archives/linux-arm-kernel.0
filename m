@@ -1,94 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Sep 2012 14:49:16 +0100
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120912120858.GI31430@game.jcrosoft.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org>
- <20120910161159.GH27042@arm.com>
- <20120912120858.GI31430@game.jcrosoft.org>
-Message-ID: <20120912134916.GF21823@arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 12 Sep 2012 06:57:41 -0700
+Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
+In-Reply-To: <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
+ (Santosh Shilimkar's message of "Wed, 12 Sep 2012 12:58:28 +0530")
+References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
+ <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
+Message-ID: <87bohbxs16.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 01:08:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
-> > On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
-> > > > +Before jumping into the kernel, the following conditions must be met:
-> > > > +
-> > > > +- Quiesce all DMA capable devices so that memory does not get
-> > > > +  corrupted by bogus network packets or disk data.  This will save
-> > > > +  you many hours of debug.
-> > > > +
-> > > > +- Primary CPU general-purpose register settings
-> > > > +  x0 = physical address of device tree blob (dtb) in system RAM.
-> > > > +  x1 = 0 (reserved for future use)
-> > > > +  x2 = 0 (reserved for future use)
-> > > > +  x3 = 0 (reserved for future use)
-> > > > +
-> > > > +- CPU mode
-> > > > +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
-> > > > +  IRQ and FIQ).
-> > > > +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
-> > > > +  the virtualisation extensions) or non-secure EL1.
-> > > > +
-> > > > +- Caches, MMUs
-> > > > +  The MMU must be off.
-> > > > +  Instruction cache may be on or off.
-> > > > +  Data cache must be off and invalidated.
-> > > > +  External caches (if present) must be configured and disabled.
-> > > > +
-> > > > +- Architected timers
-> > > > +  CNTFRQ must be programmed with the timer frequency.
-> > > > +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
-> > > > +  set where available.
-> > > can you explain why?
-> > 
-> > Otherwise the kernel cannot access the generic timer registers (it is
-> > described in the AArch64 exception model which isn't public yet).
-> I do not like the idea to do too much in the boot loader
-> 
-> can we drop it and do it the head.S or find an other way
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-No. The kernel expects some sane setup before it can start. That's the
-case already on AArch32. With AArch64 we also mandate single Image from
-start. You can have a look at an example boot wrapper that creates an
-environment for the AArch64 kernel:
+> On Wed, Sep 12, 2012 at 6:02 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>>
+>> Remove some unnecessary plat/ includes that are interfering with multi-subarch
+>> ARM kernels.
+>>
+>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+>> Acked-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>
+>> Still awaiting some final testing here.  Rafael, was wondering if you
+>> would be willing to ack this so we can merge it via the OMAP tree?
+>> Otherwise the patch can be split into an OMAP part and a CPUFreq part that
+>> can go in across two merge windows.
+>>
+> Hmm.
+> I did similar change[1] a while back. Kevin didn't like idea though
+> that point of time.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/boot-wrapper-aarch64.git
+I was wrong.
 
-> > > > +- The primary CPU must jump directly to the first instruction of the
-> > > > +  kernel image.  The device tree blob passed by this CPU must contain
-> > > > +  for each CPU node:
-> > > > +
-> > > > +    1. An 'enable-method' property. Currently, the only supported value
-> > > > +       for this field is the string "spin-table".
-> > > > +
-> > > > +    2. A 'cpu-release-addr' property identifying a 64-bit,
-> > > > +       zero-initialised memory location.
-> > > > +
-> > > > +  It is expected that the bootloader will generate these device tree
-> > > > +  properties and insert them into the blob prior to kernel entry.
-> > > > +
-> > > > +- Any secondary CPUs must spin outside of the kernel in a reserved area
-> > > > +  of memory (communicated to the kernel by a /memreserve/ region in the
-> > > > +  device tree) polling their cpu-release-addr location, which must be
-> > > > +  contained in the reserved region.  A wfe instruction may be inserted
-> > > > +  to reduce the overhead of the busy-loop and a sev will be issued by
-> > > > +  the primary CPU.  When a read of the location pointed to by the
-> > > > +  cpu-release-addr returns a non-zero value, the CPU must jump directly
-> > > > +  to this value.
-> > > do you plan AMP boot?
-> > 
-> > What do you mean by AMP?
-> > 
-> > If you only want to use 3 CPUs out of 4 for example, you change the FDT
-> > information that gets passed to the kernel accordingly. So the kernel
-> > wouldn't touch the 4th one.
-> I mean boot a  different kernel in each core as example
+At the time, we were thinking about how to get rid of clkdev nodes
+instead of add more.  Now, we need to clean up these drivers and this is
+the only way to do it, so I retract my objection.
 
-That's not on my plan. It may be doable but I don't see any need for it.
-
--- 
-Catalin
+Kevin
