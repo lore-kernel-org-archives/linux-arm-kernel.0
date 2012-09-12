@@ -1,68 +1,44 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 12 Sep 2012 13:12:23 +0200
-Subject: [PATCH v3 0/8] i2c: at91: cleanup and dt support
-In-Reply-To: <20120912101607.GA2624@pengutronix.de>
-References: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
- <505041EF.5060204@atmel.com> <20120912101607.GA2624@pengutronix.de>
-Message-ID: <50506E17.1080904@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Sep 2012 11:27:37 +0000
+Subject: [PATCH V3 4/5] ARM: bcm2708: add stub clock driver
+In-Reply-To: <1347423509-30647-4-git-send-email-swarren@wwwdotorg.org>
+References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+ <1347423509-30647-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201209121127.37495.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Wednesday 12 September 2012, Stephen Warren wrote:
+> From: Simon Arlott <simon@fire.lp0.eu>
+> 
+> This patch adds a minimal stub clock driver for the BCM2708. Its sole
+> purpose is to allow the PL011 AMBA clk_get() API calls to provide
+> something that looks enough like a clock that the driver probes and
+> operates correctly.
+> 
+> This patch was extracted from git://github.com/lp0/linux.git branch
+> rpi-split as of 2012/09/08, and modified as follows:
+> 
+> * Modified .dev_id for UART clocks to match UART DT node names.
+> 
+> Signed-off-by: Chris Boot <bootc@bootc.net>
+> Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
+> Signed-off-by: Dom Cobley <popcornmix@gmail.com>
+> Signed-off-by: Dom Cobley <dc4@broadcom.com>
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> --
+> v3: New patch.
+> ---
+>  arch/arm/mach-bcm2708/Makefile  |    1 +
+>  arch/arm/mach-bcm2708/bcm2708.c |    3 +++
+>  arch/arm/mach-bcm2708/clock.c   |   53 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-bcm2708/clock.h   |   24 ++++++++++++++++++
+>  4 files changed, 81 insertions(+)
+>  create mode 100644 arch/arm/mach-bcm2708/clock.c
+>  create mode 100644 arch/arm/mach-bcm2708/clock.h
 
-Le 09/12/2012 12:16 PM, Wolfram Sang a ?crit :
-> On Wed, Sep 12, 2012 at 10:03:59AM +0200, Nicolas Ferre wrote:
->> On 09/12/2012 08:42 AM, ludovic.desroches at atmel.com :
->>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> Hi,
->>>
->>> This set of patches is based on Nikolaus at91_i2c driver.
->>>
->>> Changes:
->>> v3:
->>>    - only put multi-drive lines in the if...else statement (suggested
->>>    by Warner Losh)
->>
->> Hi Wolfram,
->>
->> As said by Ludovic, this series goes on top of Nikolaus' one.
->> My Acked-by is already set on this one, so I think that I have nothing
->> more to do ;-)
->>
->> BTW, in case you need help to sort all this, do not hesitate to contact
->> us... we can setup a git tree for this...
->
-> I think I am fine. Patches look good. I wondered a bit about first
-> removing the old driver, then adding the new one with regard to
-> bisectability. But as the old driver depends on BROKEN, I think this is
-> OK to do.
->
-> One thing I'd like to make, though. I'd like to squash the following
-> patches into one:
->
-> 	drivers/i2c/busses/i2c-at91.c: add new driver
-> 	i2c: at91: use managed resources
-> 	i2c: at91: add warning about transmission issues for some devices
-> 	i2c: at91: use an id table for SoC dependent parameters
->
-> It is especially the last patch I am mostly interested in. The id_table
-> approach is what I like, while the original id_entry mechanism looks
-> fishy. I'd was good for reviewing to have the patches split like this;
-> yet for hitting mainline, I'd prefer to have the driver proper on first
-> occasion. I already did the squashing in a test-branch and the result
-> looks good to me.
->
-> Nikolaus, Ludovic: Are you fine with this?
->
+I think you should keep Mike on Cc for clock related patches. I also wonder
+whether this file should go into drivers/clk right away, since that is where
+it would end up when it grows into a full clock driver.
 
-No problem on my side.
-
-Regards
-
-Ludovic
-
-> Thanks,
->
->     Wolfram
->
+	Arnd
