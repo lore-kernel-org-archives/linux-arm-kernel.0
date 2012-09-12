@@ -1,83 +1,111 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Sep 2012 16:29:23 +0200
-Subject: [PATCH 3/3] clocksource: time-armada-370-xp converted to clk framework
-In-Reply-To: <1347460163-11946-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1347460163-11946-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1347460163-11946-4-git-send-email-gregory.clement@free-electrons.com>
+From: rajanikanth.hv@stericsson.com (Rajanikanth HV)
+Date: Wed, 12 Sep 2012 20:03:00 +0530
+Subject: Implement devicetree support for AB8500 Btemp
+In-Reply-To: <201209111122.08713.arnd@arndb.de>
+References: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
+ <201209101401.06859.arnd@arndb.de> <504EFA0F.2090102@stericsson.com>
+ <201209111122.08713.arnd@arndb.de>
+Message-ID: <50509D1C.9060206@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-db.dts      |    4 ----
- arch/arm/boot/dts/armada-370-xp.dtsi     |    1 +
- drivers/clocksource/time-armada-370-xp.c |   11 ++++++-----
- 3 files changed, 7 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index fffd5c2..4a31b03 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -34,9 +34,5 @@
- 			clock-frequency = <200000000>;
- 			status = "okay";
- 		};
--		timer at d0020300 {
--			clock-frequency = <600000000>;
--			status = "okay";
--		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 6b6b932..e62f478 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -62,6 +62,7 @@
- 			       compatible = "marvell,armada-370-xp-timer";
- 			       reg = <0xd0020300 0x30>;
- 			       interrupts = <37>, <38>, <39>, <40>;
-+			       clocks = <&coreclk 2>;
- 		};
- 	};
- };
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 4674f94..a4605fd 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -18,6 +18,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/kernel.h>
-+#include <linux/clk.h>
- #include <linux/timer.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
-@@ -167,7 +168,6 @@ void __init armada_370_xp_timer_init(void)
- 	u32 u;
- 	struct device_node *np;
- 	unsigned int timer_clk;
--	int ret;
- 	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
- 	timer_base = of_iomap(np, 0);
- 	WARN_ON(!timer_base);
-@@ -179,13 +179,14 @@ void __init armada_370_xp_timer_init(void)
- 		       timer_base + TIMER_CTRL_OFF);
- 		timer_clk = 25000000;
- 	} else {
--		u32 clk = 0;
--		ret = of_property_read_u32(np, "clock-frequency", &clk);
--		WARN_ON(!clk || ret < 0);
-+		unsigned long rate = 0;
-+		struct clk *clk = of_clk_get(np, 0);
-+		WARN_ON(IS_ERR(clk));
-+		rate =  clk_get_rate(clk);
- 		u = readl(timer_base + TIMER_CTRL_OFF);
- 		writel(u & ~(TIMER0_25MHZ | TIMER1_25MHZ),
- 		       timer_base + TIMER_CTRL_OFF);
--		timer_clk = clk / TIMER_DIVIDER;
-+		timer_clk = rate / TIMER_DIVIDER;
- 	}
- 
- 	/* We use timer 0 as clocksource, and timer 1 for
--- 
-1.7.9.5
+
+On Tuesday 11 September 2012 04:52 PM, Arnd Bergmann wrote:
+> On Tuesday 11 September 2012, Rajanikanth HV wrote:
+>>>> +Supplied-to:
+>>>> +     This shall be power supply class dependency where in the
+>> runtime battery
+>>>> +     properties will be shared across fuel guage and charging
+>> algorithm driver.
+>>>
+>>> I probably don't understand enough of this, but shouldn't the other
+>> devices
+>>> that are supplied by this have a reference to this node rather than doing
+>>> it this way around? Why use strings here instead of phandles?
+>>
+>> This is a logical binding w.r.t power supply event change
+>> across energy-management-module drivers where in runtime battery
+>> properties are shared along with uevent notification.
+>> ref: di->btemp_psy.external_power_
+>> changed =
+>>      ab8500_btemp_external_power_changed;
+>>      ref: ab8500_btemp.c
+>>
+>> Need for this property:
+>>  btemp, fg and charger updates power-supply properties
+>>  based on the events listed above.
+>>  Event handler invokes power supply change notifier
+>>  which in-turn invokes registered power supply class call-back
+>>  based on the 'supplied_to' string.
+>>  ref:
+>>    power_supply_changed_work(..) ./drivers/power/power_supply_core.c
+>>
+>> In this case how to approach through phandle?
+>> ============================
+>>
+> 
+> Sorry, I really tried, but I cannot make sense of what you wrote
+> there. Can you try again and describe in full English sentences
+> how the hardware blocks are connected
+Consider: USB charging:
+            ______________________
+           |                      |
+--(Vbus)-->|   USB Charger with   |
+           |  Charger FSM (h/w)   |
+           |______________________|
+                |    |
+                |    |(Vbat and other signals)
+                |  __|_____
+        to      | |        |(GaugeSense
+     Charger FSM| | LION   | Signal)     _____________
+                | |Battery |----------->|FuelGauge blk|
+                | |________|            |{Coulomb Ctr}|
+                |       |                -------------
+                |   <Thermistor>
+                |       |
+                |       | (BatCtrl Signal)
+                |_______|---------->[Btemp blk]
+                        |               |
+                      [ADC]             |__Btemp_Low
+                                        |__Btemp_Med
+                                        |__Btemp_High
+
+Note: Charging algorithm is a logical entity.
+
+ and what their purpose is?
+a) Coulomb counter comprises '12bit adc' and an 'N sample
+average/accumulation' logic helps to measure battery capacity
+Note: The charge and the discharge current of the battery is
+        converted to voltage by an external resistor connected
+        between GaugeSenseP and GaugeSenseN pins.
+
+b) Battery temperature monitoring comprises a comparator which is
+   enabled only by HW (charger state machine) helps to measure
+   the thermal threshold
+Note: The accuracy of the battery temperature measurement depends
+        of the accuracy of the thermistor used.
+
+c) Charger provides 'Constant Current Constant Voltage' USB and
+   Main(Wall) Charging support, it embeds: voltage detection,
+   thermal protection, Constant voltage charging with programmable level,
+   clock dithering and battery voltage monitoring
+
+e.g. Correlation between charger and Btemp
+- if the battery temperature is higher than ?MaxTemp ?C,
+  the charger does not start, but is enabled
+
+- if the battery temperature is between 0?C and ?MaxTemp? ?C
+  charging is done in AB8500 Hardware control mode
+
+- charging is done in DB8500 Software control mode, if the battery:
+  has a voltage higher than the ?BattOK Threshold
+
+- If the battery temperature is between -10?C and 0?C:
+  charging is done in AB8500 Hardware control mode
+
+- If the battery temperature is below -10?C, charging is
+  done in AB8500 Hardware control mode
+> 
+> 	Arnd
+> 
