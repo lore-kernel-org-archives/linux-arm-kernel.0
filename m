@@ -1,85 +1,117 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 12 Sep 2012 08:42:17 +0200
-Subject: [PATCH v3 8/8] ARM: dts: add twi nodes for atmel boards
-In-Reply-To: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1347432137-25058-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1347432137-25058-9-git-send-email-ludovic.desroches@atmel.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 12 Sep 2012 17:18:56 +0530
+Subject: [PATCH V2] ARM: EXYNOS5: Add bus clock and set parent clock for FIMD
+Message-ID: <1347450536-21843-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+This patch adds the bus clock for FIMD and changes the device name for lcd clock
+also sets mout_mpll_user as parent clock to fimd
 
-Still use i2c-gpio on boards which have a SoC with a TWI IP which
-doesn't have clock stretching in transmission mode.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 ---
- arch/arm/boot/dts/at91sam9g25ek.dts    | 12 ++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts |  8 ++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts    |  8 ++++++++
- 3 files changed, 28 insertions(+)
+ arch/arm/mach-exynos/clock-exynos5.c       |   34 +++++++++++++++++++--------
+ arch/arm/plat-samsung/include/plat/clock.h |    2 +
+ 2 files changed, 26 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 96514c1..877c08f 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -32,6 +32,18 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
-+
-+			i2c2: i2c at f8018000 {
-+				status = "okay";
-+			};
- 		};
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index 774533c..205d19f 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+ 	.ctrlbit	= (1 << 4),
+ };
  
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..15e1dd4 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -46,6 +46,14 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
++static struct clk exynos5_clk_fimd1 = {
++	.name		= "fimd",
++	.devname	= "exynos5-fb.1",
++	.enable		= exynos5_clk_ip_disp1_ctrl,
++	.ctrlbit	= (1 << 0),
++};
 +
-+			i2c0: i2c at fff84000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at fff88000 {
-+				status = "okay";
-+			};
- 		};
+ struct clk *exynos5_clkset_group_list[] = {
+ 	[0] = &clk_ext_xtal_mux,
+ 	[1] = NULL,
+@@ -1120,6 +1127,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
+ 	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
+ };
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index f4e43e3..912b2c2 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -37,6 +37,14 @@
- 			dbgu: serial at fffff200 {
- 				status = "okay";
- 			};
++struct clksrc_clk exynos5_clk_sclk_fimd = {
++	.clk	= {
++		.name	        = "sclk_fimd",
++		.devname        = "exynos5-fb.1",
++		.enable         = exynos5_clksrc_mask_disp1_0_ctrl,
++		.ctrlbit        = (1 << 0),
++	},
++	.sources = &exynos5_clkset_group,
++	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
++	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
++};
 +
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
- 		};
+ static struct clksrc_clk exynos5_clksrcs[] = {
+ 	{
+ 		.clk	= {
+@@ -1131,16 +1150,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+ 		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+ 	}, {
+ 		.clk	= {
+-			.name		= "sclk_fimd",
+-			.devname	= "s3cfb.1",
+-			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+-			.ctrlbit	= (1 << 0),
+-		},
+-		.sources = &exynos5_clkset_group,
+-		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+-		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+-	}, {
+-		.clk	= {
+ 			.name		= "aclk_266_gscl",
+ 		},
+ 		.sources = &clk_src_gscl_266,
+@@ -1240,12 +1249,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
+ 	&exynos5_clk_mdout_spi0,
+ 	&exynos5_clk_mdout_spi1,
+ 	&exynos5_clk_mdout_spi2,
++	&exynos5_clk_sclk_fimd,
+ };
  
- 		nand0: nand at 40000000 {
+ static struct clk *exynos5_clk_cdev[] = {
+ 	&exynos5_clk_pdma0,
+ 	&exynos5_clk_pdma1,
+ 	&exynos5_clk_mdma1,
++	&exynos5_clk_fimd1,
+ };
+ 
+ static struct clksrc_clk *exynos5_clksrc_cdev[] = {
+@@ -1274,6 +1285,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
+ 	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
+ 	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
+ 	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
++	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
+ };
+ 
+ static unsigned long exynos5_epll_get_rate(struct clk *clk)
+@@ -1492,6 +1504,8 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
+ 
+ 	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
+ 	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
++	clk_set_parent(&exynos5_clk_sclk_fimd.clk,
++			&exynos5_clk_mout_mpll_user.clk);
+ 
+ 	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
+ 		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index a62753d..3d27783 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -83,6 +83,8 @@ extern struct clk clk_ext;
+ extern struct clksrc_clk clk_epllref;
+ extern struct clksrc_clk clk_esysclk;
+ 
++extern struct clksrc_clk exynos5_clk_sclk_fimd;
++
+ /* S3C64XX specific clocks */
+ extern struct clk clk_h2;
+ extern struct clk clk_27m;
 -- 
-1.7.11.3
+1.7.0.4
