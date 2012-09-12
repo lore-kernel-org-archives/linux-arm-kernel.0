@@ -1,92 +1,37 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 12 Sep 2012 15:02:53 +0200
-Subject: [PATCH 4/4] can: c_can: Add d_can suspend resume support
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2D7FA@DBDE01.ent.ti.com>
-References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
- <1346673139-14540-5-git-send-email-anilkumar@ti.com>
- <50450C9F.6010203@pengutronix.de>
- <331ABD5ECB02734CA317220B2BBEABC13EA26300@DBDE01.ent.ti.com>
- <5045AD56.2050400@pengutronix.de>
- <331ABD5ECB02734CA317220B2BBEABC13EA2D7FA@DBDE01.ent.ti.com>
-Message-ID: <505087FD.7000907@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Sep 2012 15:04:47 +0200
+Subject: [PATCH 18/19] gpio: Provide the tc3589x GPIO expander driver with
+ an IRQ domain
+In-Reply-To: <CACRpkdYbWEq5mhTcewmxEpcivXkVyQS_56QRU67G40zcRXnUCA@mail.gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-19-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYbWEq5mhTcewmxEpcivXkVyQS_56QRU67G40zcRXnUCA@mail.gmail.com>
+Message-ID: <CACRpkdaQHdxRZLMPZF6Ub4hcPhUc1ZK5goyGpBEWU2LqTGStaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 02:48 PM, AnilKumar, Chimata wrote:
-> Hi Marc,
-> 
-> On Tue, Sep 04, 2012 at 12:57:18, Marc Kleine-Budde wrote:
->> On 09/04/2012 08:14 AM, AnilKumar, Chimata wrote:
->>> Marc,
->>>
->>> Thanks for the comments,
->>>
->>> On Tue, Sep 04, 2012 at 01:31:35, Marc Kleine-Budde wrote:
->>>> On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
->>>>> Adds suspend resume support to DCAN driver which enables
->>>>> DCAN power down mode bit (PDR). Then DCAN will ack the local
->>>>> power-down mode by setting PDA bit in STATUS register.
->>>>>
->>>>> Also adds a status flag to know the status of DCAN module,
->>>>> whether it is opened or not.
->>>>
->>>> Use "ndev->flags & IFF_UP" for that. Have a look at the at91_can driver
->>>> [1]. I'm not sure if you need locking here.
->>>>
->>>
->>> Then I can use this to check the status, lock is not
->>> required.
->>>
->>>> [1] http://lxr.free-electrons.com/source/drivers/net/can/at91_can.c#L1198
->>>>
->>>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->>>>> ---
->>>>>  drivers/net/can/c_can/c_can.c          |   78 ++++++++++++++++++++++++++++++++
->>>>>  drivers/net/can/c_can/c_can.h          |    5 ++
->>>>>  drivers/net/can/c_can/c_can_platform.c |   70 ++++++++++++++++++++++++++--
->>>>>  3 files changed, 150 insertions(+), 3 deletions(-)
-> 
-> [snip]
-> 
->>>>> +#ifdef CONFIG_PM
->>>>> +int c_can_power_down(struct net_device *dev)
->>>>> +{
->>>>> +	unsigned long time_out;
->>>>> +	struct c_can_priv *priv = netdev_priv(dev);
->>>>> +
->>>>> +	if (!priv->is_opened)
->>>>> +		return 0;
->>>>
->>>> Should we add a BUG_ON(id->driver_data != BOSCH_D_CAN)?
->>>
->>> These APIs are called from platform driver where device type
->>> device type is verified. I think we have to add BUG_ON() in
->>> platform driver.
+On Mon, Sep 10, 2012 at 3:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+>> In preparation for Device Tree enablement all IRQ controllers
+>> should control their own IRQ domain. This patch provides just
+>> that for the tc3589x GPIO expander.
 >>
->> The platform driver returns if not on D_CAN and will not call this
->> function. But this functions are exported, so can be called by someone
->> else. So if the caller is not D_CAN, it's a bug.
->>
-> 
-> I agree with you, but I have some concern here.
-> I think we should do "return 0;" instead of BUG_ON(). With
-> BUG_ON() system will hang and ultimately user lost his/her
-> contents.
+>> CC: Grant Likely <grant.likely@secretlab.ca>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Looks very good again,
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I presume you will want to push the whole shebang through
+> ARM SoC, but if that doesn't work out I am very tempted to
+> apply this patch to the GPIO tree immediately so it lands
+> in v3.7.
 
-Good point, better safe then sorry.
-But this should not happen. What about WARN_ON()?
+If I hear nothing I will probably apply this to the GPIO tree
+tonight since it's a real nice patch and we really need irqdomain
+conversion to happen all over the place... this driver has
+many users so I want some rotation in linux-next for it.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/684e24fd/attachment.sig>
+Yours,
+Linus Walleij
