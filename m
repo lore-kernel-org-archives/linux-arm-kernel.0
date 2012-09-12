@@ -1,64 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Sep 2012 14:53:39 -0600
-Subject: [PATCH] media: add V4L2 DT binding documentation
-In-Reply-To: <Pine.LNX.4.64.1209122111100.28968@axis700.grange>
-References: <Pine.LNX.4.64.1209111746420.22084@axis700.grange>
- <5050DA40.8050105@wwwdotorg.org>
- <Pine.LNX.4.64.1209122111100.28968@axis700.grange>
-Message-ID: <5050F653.5070404@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Sep 2012 15:56:24 -0500
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <alpine.LFD.2.02.1209121629260.28681@xanadu.home>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+ <5050EF3F.6030003@gmail.com>
+ <alpine.LFD.2.02.1209121629260.28681@xanadu.home>
+Message-ID: <5050F6F8.6000008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 01:28 PM, Guennadi Liakhovetski wrote:
-> Hi Stephen
+On 09/12/2012 03:31 PM, Nicolas Pitre wrote:
+> On Wed, 12 Sep 2012, Rob Herring wrote:
 > 
-> On Wed, 12 Sep 2012, Stephen Warren wrote:
-> 
->> On 09/11/2012 09:51 AM, Guennadi Liakhovetski wrote:
->>> This patch adds a document, describing common V4L2 device tree bindings.
+>> On 09/12/2012 11:05 AM, Cyril Chemparathy wrote:
+>>> On some PAE architectures, the entire range of physical memory could reside
+>>> outside the 32-bit limit.  These systems need the ability to specify the
+>>> initrd location using 64-bit numbers.
 >>>
->>> Co-authored-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>>> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+>>> use 64-bit numbers instead of the current unsigned long.
 >>
->> Overall, I think this looks pretty reasonable, so:
-...
+>> S-o-B?
 >>
->>> +			clock-frequency = <50000000>;	/* max clock frequency */
->>> +			clock-output-names = "mclk";
->>> +		};
->>> +
->>> +		port {
->> ...
->>> +			ceu0_0: link at 0 {
->>> +				reg = <0>;
->>> +				remote = <&csi2_2>;
->>> +				immutable;
+>>> ---
+>>>  arch/arm/mm/init.c            |    2 +-
+>>>  arch/c6x/kernel/devicetree.c  |    3 +--
+>>>  arch/microblaze/kernel/prom.c |    3 +--
+>>>  arch/mips/kernel/prom.c       |    3 +--
+>>>  arch/openrisc/kernel/prom.c   |    3 +--
+>>>  arch/powerpc/kernel/prom.c    |    3 +--
+>>>  arch/x86/kernel/devicetree.c  |    3 +--
+>>>  drivers/of/fdt.c              |   10 ++++++----
+>>>  include/linux/of_fdt.h        |    3 +--
+>>>  9 files changed, 14 insertions(+), 19 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>>> index ad722f1..579792c 100644
+>>> --- a/arch/arm/mm/init.c
+>>> +++ b/arch/arm/mm/init.c
+>>> @@ -76,7 +76,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
+>>>  __tagtable(ATAG_INITRD2, parse_tag_initrd2);
+>>>  
+>>>  #ifdef CONFIG_OF_FLATTREE
+>>> -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
+>>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
 >>
->> Did we decide "immutable" was actually needed? Presumably the driver for
->> the HW in question knows the HW isn't configurable, and would simply not
->> attempt to apply any configuration even if the .dts author erroneously
->> provided some?
+>> phys_initrd_start/size need to change too. Not sure about similar things
+>> on other arches.
 > 
-> Well, I've been thinking about this today. I think, bridge drivers will 
+> size ?
 
-Sorry, I'm not sure what a "bridge" driver is; is it any v4l2 device?
+phys_initrd_size. Arguably, we'll never have a >4GB initrd with a PAE
+system or perhaps run into other issues first (like space to decompress
+it), but technically the DTS could specify one.
 
-> call centrally provided helper functions to enumerate links inside ports. 
-
-Presumably a given driver would only parse the ports/links of its own DT
-node, and hence would be able to provide a parameter to any helper
-function that indicated the same information that "immutable" would?
-
-> While doing that they will want to differentiate between links to external 
-> devices with explicit configuration, and links to internal devices, whose 
-> configuration drivers might be able to figure out themselves. How should a 
-> driver find out what device this link is pointing to? Should it follow the 
-> "remote" phandle and then check the "compatible" property? The word 
-> "immutable" is a hint, that this is a link to an internal device, but it 
-> might either be unneeded or be transformed into something more 
-> informative.
-
-I would imagine that a given driver would only ever parse its own DT
-node; the far end of any link is purely the domain of the other driver.
-I thought that each link node would contain whatever hsync-active,
-data-lanes, ... properties that were needed to configure the local device?
+Rob
