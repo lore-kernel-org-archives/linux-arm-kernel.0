@@ -1,30 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 11:54:20 +0000
-Subject: [PATCH v3 00/31] AArch64 Linux kernel port
-In-Reply-To: <504E4C0E.9030402@jonmasters.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <504E4C0E.9030402@jonmasters.org>
-Message-ID: <201209121154.20474.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Sep 2012 13:00:28 +0100
+Subject: [PATCH 11/11] ASoC: omap-pcm: Convert to use dmaengine
+In-Reply-To: <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
+References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120912120028.GC28448@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 September 2012, Jon Masters wrote:
-> On 09/07/2012 12:26 PM, Catalin Marinas wrote:
-> > This is the 3rd version of patches implementing Linux kernel support for
-> > the 64-bit ARM architecture.
-> <snip>
-> 
-> > ...but the main goal was to freeze the user ABI.
-> 
-> Is the consensus now that we're good from an ABI viewpoint?
-> 
+On Wed, Sep 12, 2012 at 02:47:07PM +0300, Peter Ujfalusi wrote:
+> 2. Pause/Resume
+>    OMAP DMA engine backend does not support pausing and resuming
+>    an in-progress transfer.  It is unclear from the specs what
+>    effect clearing the enable bit has on the DMA position of a
+>    destination synchronized transfer, and whether the transfer
+>    can be restarted from the exact point that it was paused (or
+>    whether the data in the FIFO read from memory is simply
+>    discarded.)
 
->From my point of view, no more changes are needed. I would not give any
-guarantees until we have a first kernel release including this code, but
-I think we can agree that we would consult you about ABI changes if they
-seem necessary before then.
+It's worth noting that this comment (which was in my original patch)
+is there to spark _comment_ and _discussion_ and should not make its
+way into the final version of these patches.
 
-If you start (re)building the Fedora packages based on these kernel
-headers, the changes are pretty good that this will keep working.
+Given that suspend/resume is important on OMAP platforms, it's something
+that needs to be resolved - in a way that complies with what ALSA expects.
+I do not believe that the way the existing drivers do this is compliant
+as the manuals imply that stopping memory->peripheral transfers results
+in data being discarded from the DMA's FIFOs.  As I understand it, ALSA
+requires no data to be discarded.
 
-	Arnd
+As we have no way to know how much data may be discarded from the DMA
+FIFO...
