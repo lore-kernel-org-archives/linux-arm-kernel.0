@@ -1,151 +1,143 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Wed, 12 Sep 2012 20:49:16 +0530
-Subject: [PATCH v5 2/2] OMAP:IOMMU:flush L1 and L2 caches
-Message-ID: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Sep 2012 10:23:37 -0500
+Subject: [PATCH v9 09/13] ARM: SoC: convert highbank to SoC descriptor
+In-Reply-To: <1347461906-13527-10-git-send-email-arnd@arndb.de>
+References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
+ <1347461906-13527-10-git-send-email-arnd@arndb.de>
+Message-ID: <5050A8F9.1060503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From d78ddb5b0dffed3fd77e6e010735e869ea41b02f Mon Sep 17 00:00:00 2001
-From: Ramesh Gupta G <grgupta@ti.com>
-Date: Wed, 12 Sep 2012 19:05:29 +0530
-Subject: [PATCH v5 2/2] OMAP:IOMMU:flush L1 and L2 caches
+On 09/12/2012 09:58 AM, Arnd Bergmann wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Convert the highbank platform to use the SoC descriptor to provide
+> its SMP and CPU hotplug operations.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
 
-OMAP IOMMU need to make sure that data in the L1 and L2 caches
-is visible to the MMU hardware whenever the pagetables are
-updated. The current code only takes care of L1 cache using
-assembly. Added code to handle this using a new L1 cache
-maintenance function and the outer cache function.
-Thanks to the RMK's suggestions.
+Thanks for picking this up.
 
-Signed-off-by: Ramesh Gupta G <grgupta@ti.com>
----
- drivers/iommu/omap-iommu.c |   41 +++++++++++++++++++----------------------
- 1 files changed, 19 insertions(+), 22 deletions(-)
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index d0b1234..8f61ef9 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -469,24 +469,21 @@ EXPORT_SYMBOL_GPL(omap_foreach_iommu_device);
- /*
-  *	H/W pagetable operations
-  */
--static void flush_iopgd_range(u32 *first, u32 *last)
-+static void flush_iopgd_range(u32 *first, size_t size)
- {
--	/* FIXME: L2 cache should be taken care of if it exists */
--	do {
--		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
--		    : : "r" (first));
--		first += L1_CACHE_BYTES / sizeof(*first);
--	} while (first <= last);
-+	phys_addr_t phys = virt_to_phys(first);
-+
-+	iommu_flush_area(first, size);
-+	outer_flush_range(phys, phys + size);
- }
+Rob
 
--static void flush_iopte_range(u32 *first, u32 *last)
-+static void flush_iopte_range(u32 *first, size_t size)
-+
- {
--	/* FIXME: L2 cache should be taken care of if it exists */
--	do {
--		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pte"
--		    : : "r" (first));
--		first += L1_CACHE_BYTES / sizeof(*first);
--	} while (first <= last);
-+	phys_addr_t phys = virt_to_phys(first);
-+
-+	iommu_flush_area(first, size);
-+	outer_flush_range(phys, phys + size);
- }
-
- static void iopte_free(u32 *iopte)
-@@ -515,7 +512,7 @@ static u32 *iopte_alloc(struct omap_iommu *obj,
-u32 *iopgd, u32 da)
- 			return ERR_PTR(-ENOMEM);
-
- 		*iopgd = virt_to_phys(iopte) | IOPGD_TABLE;
--		flush_iopgd_range(iopgd, iopgd);
-+		flush_iopgd_range(iopgd, sizeof(*iopgd));
-
- 		dev_vdbg(obj->dev, "%s: a new pte:%p\n", __func__, iopte);
- 	} else {
-@@ -544,7 +541,7 @@ static int iopgd_alloc_section(struct omap_iommu
-*obj, u32 da, u32 pa, u32 prot)
- 	}
-
- 	*iopgd = (pa & IOSECTION_MASK) | prot | IOPGD_SECTION;
--	flush_iopgd_range(iopgd, iopgd);
-+	flush_iopgd_range(iopgd, sizeof(*iopgd));
- 	return 0;
- }
-
-@@ -561,7 +558,7 @@ static int iopgd_alloc_super(struct omap_iommu
-*obj, u32 da, u32 pa, u32 prot)
-
- 	for (i = 0; i < 16; i++)
- 		*(iopgd + i) = (pa & IOSUPER_MASK) | prot | IOPGD_SUPER;
--	flush_iopgd_range(iopgd, iopgd + 15);
-+	flush_iopgd_range(iopgd, sizeof(*iopgd) * 16);
- 	return 0;
- }
-
-@@ -574,7 +571,7 @@ static int iopte_alloc_page(struct omap_iommu
-*obj, u32 da, u32 pa, u32 prot)
- 		return PTR_ERR(iopte);
-
- 	*iopte = (pa & IOPAGE_MASK) | prot | IOPTE_SMALL;
--	flush_iopte_range(iopte, iopte);
-+	flush_iopte_range(iopte, sizeof(*iopte));
-
- 	dev_vdbg(obj->dev, "%s: da:%08x pa:%08x pte:%p *pte:%08x\n",
- 		 __func__, da, pa, iopte, *iopte);
-@@ -599,7 +596,7 @@ static int iopte_alloc_large(struct omap_iommu
-*obj, u32 da, u32 pa, u32 prot)
-
- 	for (i = 0; i < 16; i++)
- 		*(iopte + i) = (pa & IOLARGE_MASK) | prot | IOPTE_LARGE;
--	flush_iopte_range(iopte, iopte + 15);
-+	flush_iopte_range(iopte, sizeof(*iopte) * 16);
- 	return 0;
- }
-
-@@ -702,7 +699,7 @@ static size_t iopgtable_clear_entry_core(struct
-omap_iommu *obj, u32 da)
- 		}
- 		bytes *= nent;
- 		memset(iopte, 0, nent * sizeof(*iopte));
--		flush_iopte_range(iopte, iopte + (nent - 1) * sizeof(*iopte));
-+		flush_iopte_range(iopte, iopte + (nent) * sizeof(*iopte));
-
- 		/*
- 		 * do table walk to check if this table is necessary or not
-@@ -724,7 +721,7 @@ static size_t iopgtable_clear_entry_core(struct
-omap_iommu *obj, u32 da)
- 		bytes *= nent;
- 	}
- 	memset(iopgd, 0, nent * sizeof(*iopgd));
--	flush_iopgd_range(iopgd, iopgd + (nent - 1) * sizeof(*iopgd));
-+	flush_iopgd_range(iopgd, iopgd + (nent) * sizeof(*iopgd));
- out:
- 	return bytes;
- }
-@@ -768,7 +765,7 @@ static void iopgtable_clear_entry_all(struct
-omap_iommu *obj)
- 			iopte_free(iopte_offset(iopgd, 0));
-
- 		*iopgd = 0;
--		flush_iopgd_range(iopgd, iopgd);
-+		flush_iopgd_range(iopgd, sizeof(*iopgd));
- 	}
-
- 	flush_iotlb_all(obj);
--- 
-1.7.0.4
-
-
--- 
-regards
-Ramesh Gupta G
+>  arch/arm/mach-highbank/core.h     |    3 +++
+>  arch/arm/mach-highbank/highbank.c |    1 +
+>  arch/arm/mach-highbank/hotplug.c  |   16 +---------------
+>  arch/arm/mach-highbank/platsmp.c  |   18 ++++++++++++++----
+>  4 files changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+> index 141ed51..598ee78 100644
+> --- a/arch/arm/mach-highbank/core.h
+> +++ b/arch/arm/mach-highbank/core.h
+> @@ -9,3 +9,6 @@ static inline void highbank_lluart_map_io(void) {}
+>  #endif
+>  
+>  extern void highbank_smc1(int fn, int arg);
+> +extern void highbank_cpu_die(unsigned int cpu);
+> +
+> +extern struct smp_operations highbank_smp_ops;
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index d75b0a7..709bd72 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -162,6 +162,7 @@ static const char *highbank_match[] __initconst = {
+>  };
+>  
+>  DT_MACHINE_START(HIGHBANK, "Highbank")
+> +	.smp		= smp_ops(highbank_smp_ops),
+>  	.map_io		= highbank_map_io,
+>  	.init_irq	= highbank_init_irq,
+>  	.timer		= &highbank_timer,
+> diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+> index 977cebb..1277da3 100644
+> --- a/arch/arm/mach-highbank/hotplug.c
+> +++ b/arch/arm/mach-highbank/hotplug.c
+> @@ -24,16 +24,11 @@
+>  
+>  extern void secondary_startup(void);
+>  
+> -int platform_cpu_kill(unsigned int cpu)
+> -{
+> -	return 1;
+> -}
+> -
+>  /*
+>   * platform-specific code to shutdown a CPU
+>   *
+>   */
+> -void platform_cpu_die(unsigned int cpu)
+> +void highbank_cpu_die(unsigned int cpu)
+>  {
+>  	flush_cache_all();
+>  
+> @@ -45,12 +40,3 @@ void platform_cpu_die(unsigned int cpu)
+>  	/* We should never return from idle */
+>  	panic("highbank: cpu %d unexpectedly exit from shutdown\n", cpu);
+>  }
+> -
+> -int platform_cpu_disable(unsigned int cpu)
+> -{
+> -	/*
+> -	 * CPU0 should not be shut down via hotplug.  cpu_idle can WFI
+> -	 * or a proper shutdown or hibernate should be used.
+> -	 */
+> -	return cpu == 0 ? -EPERM : 0;
+> -}
+> diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+> index d01364c..fa9560e 100644
+> --- a/arch/arm/mach-highbank/platsmp.c
+> +++ b/arch/arm/mach-highbank/platsmp.c
+> @@ -25,12 +25,12 @@
+>  
+>  extern void secondary_startup(void);
+>  
+> -void __cpuinit platform_secondary_init(unsigned int cpu)
+> +static void __cpuinit highbank_secondary_init(unsigned int cpu)
+>  {
+>  	gic_secondary_init(0);
+>  }
+>  
+> -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+>  	gic_raise_softirq(cpumask_of(cpu), 0);
+>  	return 0;
+> @@ -40,7 +40,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+>   * Initialise the CPU possible map early - this describes the CPUs
+>   * which may be present or become present in the system.
+>   */
+> -void __init smp_init_cpus(void)
+> +static void __init highbank_smp_init_cpus(void)
+>  {
+>  	unsigned int i, ncores;
+>  
+> @@ -61,7 +61,7 @@ void __init smp_init_cpus(void)
+>  	set_smp_cross_call(gic_raise_softirq);
+>  }
+>  
+> -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+> +static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	int i;
+>  
+> @@ -76,3 +76,13 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>  	for (i = 1; i < max_cpus; i++)
+>  		highbank_set_cpu_jump(i, secondary_startup);
+>  }
+> +
+> +struct smp_operations highbank_smp_ops __initdata = {
+> +	.smp_init_cpus		= highbank_smp_init_cpus,
+> +	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
+> +	.smp_secondary_init	= highbank_secondary_init,
+> +	.smp_boot_secondary	= highbank_boot_secondary,
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	.cpu_die		= highbank_cpu_die,
+> +#endif
+> +};
+> 
