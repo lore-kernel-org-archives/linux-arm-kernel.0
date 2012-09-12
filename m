@@ -1,28 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Sep 2012 23:23:30 -0700
-Subject: [GIT PULL] Renesas ARM-based SoC: Boards for 3.7
-In-Reply-To: <1346897074-6276-1-git-send-email-horms@verge.net.au>
-References: <1346897074-6276-1-git-send-email-horms@verge.net.au>
-Message-ID: <CAOesGMi9pqNEm2RTFCb-UVXmb1nEv6HNzJh1u-y8P0U11KCL+A@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 12 Sep 2012 11:55:39 +0530
+Subject: [PATCHv7 20/23] i2c: omap: switch to threaded IRQ support
+In-Reply-To: <20120911215112.GA27031@pengutronix.de>
+References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
+ <1347356538-23835-21-git-send-email-shubhrajyoti@ti.com>
+ <20120911215112.GA27031@pengutronix.de>
+Message-ID: <50502AE3.7040300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2012 at 7:04 PM, Simon Horman <horms@verge.net.au> wrote:
-> Hi Olof, Hi Arnd,
->
-> please consider the following board enhancement from
-> Phil Edworthy and Morimoto-san for inclusion in 3.7.
->
-> ----------------------------------------------------------------
-> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
->
->   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
-
-Thanks, pulled!
-
-
--Olof
+On Wednesday 12 September 2012 03:21 AM, Wolfram Sang wrote:
+>> -omap_i2c_isr(int this_irq, void *dev_id)
+>> > +omap_i2c_isr(int irq, void *dev_id)
+>> >  {
+>> >  	struct omap_i2c_dev *dev = dev_id;
+>> > +	irqreturn_t ret = IRQ_HANDLED;
+> Shouldn't that be IRQ_NONE?
+Actually we are processing it so I thought it to be ok.
+Also a similar discussion.
+ 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104422.html
