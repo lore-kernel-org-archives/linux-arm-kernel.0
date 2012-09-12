@@ -1,42 +1,33 @@
-From: miguel.gaio@efixo.com (Miguel GAIO)
-Date: Wed, 12 Sep 2012 09:23:35 +0200
-Subject: [PATCH 1/3] gpio: 74x164: Add support for the daisy-chaining
-In-Reply-To: <CACRpkdZ6umqe0Td=OkF-5yYU624M2AAakVjt17rOjejcNdawzg@mail.gmail.com>
-References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
- <1347309341-15447-2-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdbo1sj6gbucoF3WVLbHzFXtddZiUQ-=h9gn-+A4Z7qBnQ@mail.gmail.com>
- <CACRpkdZ6umqe0Td=OkF-5yYU624M2AAakVjt17rOjejcNdawzg@mail.gmail.com>
-Message-ID: <1347434615.10232.1.camel@mgo-thinkpad>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 12 Sep 2012 12:58:28 +0530
+Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
+In-Reply-To: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
+Message-ID: <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-11 at 23:51 +0200, Linus Walleij wrote:
-> On Tue, Sep 11, 2012 at 7:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Mon, Sep 10, 2012 at 10:35 PM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> >
-> >> The shift registers have an output pin that, when enabled, propagates
-> >> the values of its internal register to the pins. If another value comes
-> >> to the register while the output pin is disabled, this new value will
-> >> makae the older shift into the next register in the chain.
-> >>
-> >> This patch adds support for daisy-chaining the registers, using the
-> >> regular SPI chip select mechanism to manage the output pin, and the
-> >> registers-number dt property to set the number of chained registers.
-> >>
-> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >
-> > OK cool, but I just realized that this driver was added just two
-> > years ago by Gabor and Miguel, so I'd like to get their feedback
-> > before continuing.
-> 
-> Tentatively applied waiting for feedback from Miguel...
+On Wed, Sep 12, 2012 at 6:02 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Remove some unnecessary plat/ includes that are interfering with multi-subarch
+> ARM kernels.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> ---
+>
+> Still awaiting some final testing here.  Rafael, was wondering if you
+> would be willing to ack this so we can merge it via the OMAP tree?
+> Otherwise the patch can be split into an OMAP part and a CPUFreq part that
+> can go in across two merge windows.
+>
+Hmm.
+I did similar change[1] a while back. Kevin didn't like idea though
+that point of time.
 
-All is ok for me.
+Regards,
+Santosh
 
-Miguel
-
-
-> 
-> Thanks!
-> Linus Walleij
+[1] http://www.spinics.net/lists/linux-omap/msg48382.html
