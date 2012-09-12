@@ -1,33 +1,20 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Wed, 12 Sep 2012 14:14:02 -0400
-Subject: [PATCH] davinci: check for presence of channel controller on slot
- alloc
-Message-ID: <1347473642-9948-1-git-send-email-cyril@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 12 Sep 2012 11:15:03 -0700
+Subject: [PATCH v2] /dev/mem: use phys_addr_t for physical addresses
+In-Reply-To: <1347473158-7219-1-git-send-email-cyril@ti.com>
+References: <1347473158-7219-1-git-send-email-cyril@ti.com>
+Message-ID: <20120912181503.GB12840@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a check for the presence of the channel controller when
-trying to allocate a slot.  Without this fix, the kernel panics with a NULL
-pointer dereference when the dma-engine drivers are probed.
+On Wed, Sep 12, 2012 at 02:05:58PM -0400, Cyril Chemparathy wrote:
+> This patch fixes the /dev/mem driver to use phys_addr_t for physical
+> addresses.  This is required on PAE systems, especially those that run
+> entirely out of >4G physical memory space.
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
----
- arch/arm/mach-davinci/dma.c |    3 +++
- 1 file changed, 3 insertions(+)
+What is the symptom if this patch is not applied?  Does it need to be
+backported to older kernels?  If so, which ones?
 
-diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index a685e97..2fee31e 100644
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -743,6 +743,9 @@ EXPORT_SYMBOL(edma_free_channel);
-  */
- int edma_alloc_slot(unsigned ctlr, int slot)
- {
-+	if (!edma_cc[ctlr])
-+		return -ENODEV;
-+
- 	if (slot >= 0)
- 		slot = EDMA_CHAN_SLOT(slot);
- 
--- 
-1.7.9.5
+thanks,
+
+greg k-h
