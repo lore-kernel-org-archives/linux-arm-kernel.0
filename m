@@ -1,44 +1,52 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Wed, 12 Sep 2012 14:45:45 -0500
-Subject: [PATCH v2 2/9] ARM: OMAP3: hwmod data: add mmu data for iva and isp
+Date: Wed, 12 Sep 2012 14:45:46 -0500
+Subject: [PATCH v2 3/9] ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
 In-Reply-To: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
 References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1347479152-588-3-git-send-email-omar.luna@linaro.org>
+Message-ID: <1347479152-588-4-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mmu hwmod data for iva and isp.
-
-Due to compatibility an ifdef CONFIG_OMAP_IOMMU_IVA2 needs to be
-propagated (previously on iommu resource info) to hwmod data in OMAP3,
-so users of iommu and tidspbridge can avoid issues of two modules
-managing mmu data/irqs/resets; this until tidspbridge can be migrated
-to iommu framework.
+Add mmu hwmod data for ipu and dsp.
 
 Cc: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  121 ++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/iommu.h    |   13 +++
- 2 files changed, 134 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  136 +++++++++++++++++++++++++++-
+ 1 file changed, 134 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index c9e3820..70f14f9 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -29,6 +29,7 @@
- #include <plat/mcbsp.h>
- #include <plat/mcspi.h>
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 242aee4..c2cf25a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -31,6 +31,7 @@
+ #include <plat/mmc.h>
  #include <plat/dmtimer.h>
+ #include <plat/common.h>
 +#include <plat/iommu.h>
  
  #include "omap_hwmod_common_data.h"
- #include "prm-regbits-34xx.h"
-@@ -2814,6 +2815,122 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_per__gpio3 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ #include "cm1_44xx.h"
+@@ -612,7 +613,6 @@ static struct omap_hwmod_irq_info omap44xx_dsp_irqs[] = {
+ 
+ static struct omap_hwmod_rst_info omap44xx_dsp_resets[] = {
+ 	{ .name = "dsp", .rst_shift = 0 },
+-	{ .name = "mmu_cache", .rst_shift = 1 },
  };
  
-+/*
+ static struct omap_hwmod omap44xx_dsp_hwmod = {
+@@ -1632,7 +1632,6 @@ static struct omap_hwmod_irq_info omap44xx_ipu_irqs[] = {
+ static struct omap_hwmod_rst_info omap44xx_ipu_resets[] = {
+ 	{ .name = "cpu0", .rst_shift = 0 },
+ 	{ .name = "cpu1", .rst_shift = 1 },
+-	{ .name = "mmu_cache", .rst_shift = 2 },
+ };
+ 
+ static struct omap_hwmod omap44xx_ipu_hwmod = {
+@@ -2439,6 +2438,137 @@ static struct omap_hwmod omap44xx_mmc5_hwmod = {
+ };
+ 
+ /*
 + * 'mmu' class
 + * The memory management unit performs virtual to physical address translation
 + * for its requestors.
@@ -54,143 +62,133 @@ index c9e3820..70f14f9 100644
 +	.sysc_fields	= &omap_hwmod_sysc_type1,
 +};
 +
-+static struct omap_hwmod_class omap3xxx_mmu_hwmod_class = {
++static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
 +	.name = "mmu",
 +	.sysc = &mmu_sysc,
 +};
 +
-+/* mmu isp */
++/* mmu ipu */
 +
-+static struct omap_mmu_dev_attr mmu_isp_dev_attr = {
++static struct omap_mmu_dev_attr mmu_ipu_dev_attr = {
 +	.da_start = 0x0,
-+	.da_end = 0xfffff000,
-+	.nr_tlb_entries = 8,
-+};
-+
-+static struct omap_hwmod omap3xxx_mmu_isp_hwmod;
-+static struct omap_hwmod_irq_info omap3xxx_mmu_isp_irqs[] = {
-+	{ .irq = 24 },
-+	{ .irq = -1 }
-+};
-+
-+static struct omap_hwmod_addr_space omap3xxx_mmu_isp_addrs[] = {
-+	{
-+		.pa_start	= 0x480bd400,
-+		.pa_end		= 0x480bd47f,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+	{ }
-+};
-+
-+/* l4_core -> mmu isp */
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmu_isp = {
-+	.master		= &omap3xxx_l4_core_hwmod,
-+	.slave		= &omap3xxx_mmu_isp_hwmod,
-+	.addr		= omap3xxx_mmu_isp_addrs,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod omap3xxx_mmu_isp_hwmod = {
-+	.name		= "mmu_isp",
-+	.class		= &omap3xxx_mmu_hwmod_class,
-+	.mpu_irqs	= omap3xxx_mmu_isp_irqs,
-+	.main_clk	= "cam_ick",
-+	.dev_attr	= &mmu_isp_dev_attr,
-+	.flags		= HWMOD_NO_IDLEST,
-+};
-+
-+#ifdef CONFIG_OMAP_IOMMU_IVA2
-+
-+/* mmu iva */
-+
-+static struct omap_mmu_dev_attr mmu_iva_dev_attr = {
-+	.da_start = 0x11000000,
 +	.da_end = 0xfffff000,
 +	.nr_tlb_entries = 32,
 +};
 +
-+static struct omap_hwmod omap3xxx_mmu_iva_hwmod;
-+static struct omap_hwmod_irq_info omap3xxx_mmu_iva_irqs[] = {
-+	{ .irq = 28 },
++static struct omap_hwmod omap44xx_mmu_ipu_hwmod;
++static struct omap_hwmod_irq_info omap44xx_mmu_ipu_irqs[] = {
++	{ .irq = 100 + OMAP44XX_IRQ_GIC_START, },
 +	{ .irq = -1 }
 +};
 +
-+static struct omap_hwmod_rst_info omap3xxx_mmu_iva_resets[] = {
-+	{ .name = "mmu", .rst_shift = 1, .st_shift = 9 },
++static struct omap_hwmod_rst_info omap44xx_mmu_ipu_resets[] = {
++	{ .name = "mmu_cache", .rst_shift = 2 },
 +};
 +
-+static struct omap_hwmod_addr_space omap3xxx_mmu_iva_addrs[] = {
++static struct omap_hwmod_addr_space omap44xx_mmu_ipu_addrs[] = {
 +	{
-+		.pa_start	= 0x5d000000,
-+		.pa_end		= 0x5d00007f,
++		.pa_start	= 0x55082000,
++		.pa_end		= 0x550820ff,
 +		.flags		= ADDR_TYPE_RT,
 +	},
 +	{ }
 +};
 +
-+/* l3_main -> iva mmu */
-+static struct omap_hwmod_ocp_if omap3xxx_l3_main__mmu_iva = {
-+	.master		= &omap3xxx_l3_main_hwmod,
-+	.slave		= &omap3xxx_mmu_iva_hwmod,
-+	.addr		= omap3xxx_mmu_iva_addrs,
++/* l3_main_2 -> mmu_ipu */
++static struct omap_hwmod_ocp_if omap44xx_l3_main_2__mmu_ipu = {
++	.master		= &omap44xx_l3_main_2_hwmod,
++	.slave		= &omap44xx_mmu_ipu_hwmod,
++	.clk		= "l3_div_ck",
++	.addr		= omap44xx_mmu_ipu_addrs,
 +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
-+static struct omap_hwmod omap3xxx_mmu_iva_hwmod = {
-+	.name		= "mmu_iva",
-+	.class		= &omap3xxx_mmu_hwmod_class,
-+	.mpu_irqs	= omap3xxx_mmu_iva_irqs,
-+	.rst_lines	= omap3xxx_mmu_iva_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(omap3xxx_mmu_iva_resets),
-+	.main_clk	= "iva2_ck",
++static struct omap_hwmod omap44xx_mmu_ipu_hwmod = {
++	.name		= "mmu_ipu",
++	.class		= &omap44xx_mmu_hwmod_class,
++	.clkdm_name	= "ducati_clkdm",
++	.mpu_irqs	= omap44xx_mmu_ipu_irqs,
++	.rst_lines	= omap44xx_mmu_ipu_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_mmu_ipu_resets),
++	.main_clk	= "ducati_clk_mux_ck",
 +	.prcm = {
-+		.omap2 = {
-+			.module_offs = OMAP3430_IVA2_MOD,
++		.omap4 = {
++			.clkctrl_offs = OMAP4_CM_DUCATI_DUCATI_CLKCTRL_OFFSET,
++			.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
++			.context_offs = OMAP4_RM_DUCATI_DUCATI_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
 +		},
 +	},
-+	.dev_attr	= &mmu_iva_dev_attr,
-+	.flags		= HWMOD_NO_IDLEST,
++	.dev_attr	= &mmu_ipu_dev_attr,
 +};
 +
-+#endif
++/* mmu dsp */
 +
- /* l4_per -> gpio4 */
- static struct omap_hwmod_addr_space omap3xxx_gpio4_addrs[] = {
- 	{
-@@ -3312,6 +3429,10 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
- 	&omap34xx_l4_core__mcspi2,
- 	&omap34xx_l4_core__mcspi3,
- 	&omap34xx_l4_core__mcspi4,
-+	&omap3xxx_l4_core__mmu_isp,
-+#ifdef CONFIG_OMAP_IOMMU_IVA2
-+	&omap3xxx_l3_main__mmu_iva,
-+#endif
- 	&omap3xxx_l4_wkup__counter_32k,
- 	NULL,
- };
-diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-index e58d571..44518cc 100644
---- a/arch/arm/plat-omap/include/plat/iommu.h
-+++ b/arch/arm/plat-omap/include/plat/iommu.h
-@@ -103,6 +103,19 @@ struct iommu_functions {
- 	ssize_t (*dump_ctx)(struct omap_iommu *obj, char *buf, ssize_t len);
- };
- 
-+/**
-+ * omap_mmu_dev_attr - OMAP mmu device attributes for omap_hwmod
-+ * @da_start:		device address where the va space starts.
-+ * @da_end:		device address where the va space ends.
-+ * @nr_tlb_entries:	number of entries supported by the translation
-+ *			look-aside buffer (TLB).
-+ */
-+struct omap_mmu_dev_attr {
-+	u32 da_start;
-+	u32 da_end;
-+	int nr_tlb_entries;
++static struct omap_mmu_dev_attr mmu_dsp_dev_attr = {
++	.da_start = 0x0,
++	.da_end = 0xfffff000,
++	.nr_tlb_entries = 32,
 +};
 +
- struct iommu_platform_data {
- 	const char *name;
- 	const char *clk_name;
++static struct omap_hwmod omap44xx_mmu_dsp_hwmod;
++static struct omap_hwmod_irq_info omap44xx_mmu_dsp_irqs[] = {
++	{ .irq = 28 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_rst_info omap44xx_mmu_dsp_resets[] = {
++	{ .name = "mmu_cache", .rst_shift = 1 },
++};
++
++static struct omap_hwmod_addr_space omap44xx_mmu_dsp_addrs[] = {
++	{
++		.pa_start	= 0x4a066000,
++		.pa_end		= 0x4a0660ff,
++		.flags		= ADDR_TYPE_RT,
++	},
++	{ }
++};
++
++/* l4_cfg -> dsp */
++static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mmu_dsp = {
++	.master		= &omap44xx_l4_cfg_hwmod,
++	.slave		= &omap44xx_mmu_dsp_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_mmu_dsp_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod omap44xx_mmu_dsp_hwmod = {
++	.name		= "mmu_dsp",
++	.class		= &omap44xx_mmu_hwmod_class,
++	.clkdm_name	= "tesla_clkdm",
++	.mpu_irqs	= omap44xx_mmu_dsp_irqs,
++	.rst_lines	= omap44xx_mmu_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_mmu_dsp_resets),
++	.main_clk	= "dpll_iva_m4x2_ck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP4_CM_TESLA_TESLA_CLKCTRL_OFFSET,
++			.rstctrl_offs = OMAP4_RM_TESLA_RSTCTRL_OFFSET,
++			.context_offs = OMAP4_RM_TESLA_TESLA_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++	.dev_attr	= &mmu_dsp_dev_attr,
++};
++
++/*
+  * 'mpu' class
+  * mpu sub-system
+  */
+@@ -6092,6 +6222,8 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_l4_per__mmc3,
+ 	&omap44xx_l4_per__mmc4,
+ 	&omap44xx_l4_per__mmc5,
++	&omap44xx_l3_main_2__mmu_ipu,
++	&omap44xx_l4_cfg__mmu_dsp,
+ 	&omap44xx_l3_main_2__ocmc_ram,
+ 	&omap44xx_l4_cfg__ocp2scp_usb_phy,
+ 	&omap44xx_mpu_private__prcm_mpu,
 -- 
 1.7.9.5
