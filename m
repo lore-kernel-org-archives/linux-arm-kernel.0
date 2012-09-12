@@ -1,53 +1,52 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Sep 2012 23:38:42 +0000 (UTC)
-Subject: [PATCH 2/2] ARM: AM33XX: hwmod: Add OMAP_INTC_START offset to
- all module int nos
-In-Reply-To: <20120912215232.GE5997@atomide.com>
-References: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
- <1347484551-11775-3-git-send-email-hvaibhav@ti.com>
- <20120912215232.GE5997@atomide.com>
-Message-ID: <alpine.DEB.2.00.1209122330580.7275@utopia.booyaka.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 12 Sep 2012 19:45:57 -0400
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <5050EF3F.6030003@gmail.com>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+ <5050EF3F.6030003@gmail.com>
+Message-ID: <50511EB5.800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 9/12/2012 4:23 PM, Rob Herring wrote:
+> On 09/12/2012 11:05 AM, Cyril Chemparathy wrote:
+>> On some PAE architectures, the entire range of physical memory could reside
+>> outside the 32-bit limit.  These systems need the ability to specify the
+>> initrd location using 64-bit numbers.
+>>
+>> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+>> use 64-bit numbers instead of the current unsigned long.
+>
+> S-o-B?
+>
 
-On Wed, 12 Sep 2012, Tony Lindgren wrote:
+Sorry about that, will include in v2.
 
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120912 14:17]:
-> > With recent migration of omap architectures to SPARSE_IRQ framework,
-> > it is important to add OMAP_INTC_START to all interrupt numbers
-> > which will be eventually requested by drivers.
-> > 
-> > This is required in order to get AM33XX boot functionality.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  168 ++++++++++++++--------------
-> >  1 files changed, 84 insertions(+), 84 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > index 7b7ed08..3c320f4 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> 
-> You should just have on top of this file:
-> 
-> #define OMAP_INTC_START		0
-> 
-> Then Paul can apply this, and while merging with the sparseirq
-> changes, the above can be removed.
+[...]
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+>> @@ -76,7 +76,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
+>>   __tagtable(ATAG_INITRD2, parse_tag_initrd2);
+>>
+>>   #ifdef CONFIG_OF_FLATTREE
+>> -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
+>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>
+> phys_initrd_start/size need to change too. Not sure about similar things
+> on other arches.
+>
 
-This change has been made.
+I've fixed phys_initrd_start (not size) in another patch, please see [1].
 
-> Then these should be fixed up to have trailing commas
-> as requested by Russell earlier on several occasions.
+> Does u-boot need similar fixes?
+>
 
-I've taken the script you sent and run it on the data file - thanks for 
-the script - and will send the updated pull request shortly.  Sounds like 
-Russell should send patches for Documentation/CodingStyle and 
-scripts/checkpatch.pl so it can be agreed as a kernel-wide policy.
+We aren't there yet :-)  We are currently running this platform without 
+u-boot.
 
 
-- Paul
+[1] http://permalink.gmane.org/gmane.linux.kernel/1356713
+
+-- 
+Thanks
+- Cyril
