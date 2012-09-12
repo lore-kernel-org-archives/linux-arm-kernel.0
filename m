@@ -1,38 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Sep 2012 16:34:16 +0000 (UTC)
-Subject: [PATCH v9 3/3] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <35901c3137e42170066f3efb5026b0749ccdcbb5.1347355380.git.afzal@ti.com>
-References: <cover.1347355380.git.afzal@ti.com>
- <35901c3137e42170066f3efb5026b0749ccdcbb5.1347355380.git.afzal@ti.com>
-Message-ID: <alpine.DEB.2.00.1209121631440.17903@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Sep 2012 17:41:21 +0100
+Subject: [PATCH v5 2/2] OMAP:IOMMU:flush L1 and L2 caches
+In-Reply-To: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
+References: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
+Message-ID: <20120912164121.GF28448@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Wed, Sep 12, 2012 at 08:49:16PM +0530, Gupta, Ramesh wrote:
+> Thanks to the RMK's suggestions.
 
-On Tue, 11 Sep 2012, Afzal Mohammed wrote:
+I should've made clear the distinction between _range and _area.
+A _range function takes start and end.  An _area function takes a start
+and size.  So...
 
-> Create a minimal driver out of gpmc code.
-> Responsibilities handled by earlier gpmc
-> initialization is now achieved in probe.
+> -static void flush_iopgd_range(u32 *first, u32 *last)
+> +static void flush_iopgd_range(u32 *first, size_t size)
+
+This should change to flush_iopgd_area().
+
+>  {
+> -	/* FIXME: L2 cache should be taken care of if it exists */
+> -	do {
+> -		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
+> -		    : : "r" (first));
+> -		first += L1_CACHE_BYTES / sizeof(*first);
+> -	} while (first <= last);
+> +	phys_addr_t phys = virt_to_phys(first);
+> +
+> +	iommu_flush_area(first, size);
+> +	outer_flush_range(phys, phys + size);
+>  }
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+> -static void flush_iopte_range(u32 *first, u32 *last)
+> +static void flush_iopte_range(u32 *first, size_t size)
+> +
 
-Two checkpatch warnings are added by this patch:
+flush_iopte_area().  (And there shouldn't be a blank line between this
+and the open curley.)
 
-CHECK: multiple assignments should be avoided
-#77: FILE: arch/arm/mach-omap2/gpmc.c:454:
-+	res->start = res->end = 0;
-
-CHECK: Alignment should match open parenthesis
-#216: FILE: arch/arm/mach-omap2/gpmc.c:936:
-+	dev_info(gpmc_dev, "GPMC revision %d.%d\n",
-+				GPMC_REVISION_MAJOR(l), GPMC_REVISION_MINOR(l));
-
-I've fixed them here in the obvious way.  But please make sure that all 
-your patches are clean with 'checkpatch.pl --strict'; saves us time and 
-frustration...
-
-
-- Paul
+Otherwise, looks fine.
