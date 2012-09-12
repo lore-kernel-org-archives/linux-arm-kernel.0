@@ -1,135 +1,146 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:22 +0200
-Subject: [PATCH v9 09/13] ARM: SoC: convert highbank to SoC descriptor
+Date: Wed, 12 Sep 2012 16:58:23 +0200
+Subject: [PATCH v9 10/13] ARM: SoC: convert imx6q to SoC descriptor
 In-Reply-To: <1347461906-13527-1-git-send-email-arnd@arndb.de>
 References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347461906-13527-10-git-send-email-arnd@arndb.de>
+Message-ID: <1347461906-13527-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Convert the highbank platform to use the SoC descriptor to provide
+Convert the imx6q platform to use the SoC descriptor to provide
 its SMP and CPU hotplug operations.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-highbank/core.h     |    3 +++
- arch/arm/mach-highbank/highbank.c |    1 +
- arch/arm/mach-highbank/hotplug.c  |   16 +---------------
- arch/arm/mach-highbank/platsmp.c  |   18 ++++++++++++++----
- 4 files changed, 19 insertions(+), 19 deletions(-)
+ arch/arm/mach-imx/hotplug.c             |   16 +---------------
+ arch/arm/mach-imx/mach-imx6q.c          |    1 +
+ arch/arm/mach-imx/platsmp.c             |   18 ++++++++++++++----
+ arch/arm/plat-mxc/include/mach/common.h |    4 ++++
+ 4 files changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-index 141ed51..598ee78 100644
---- a/arch/arm/mach-highbank/core.h
-+++ b/arch/arm/mach-highbank/core.h
-@@ -9,3 +9,6 @@ static inline void highbank_lluart_map_io(void) {}
- #endif
- 
- extern void highbank_smc1(int fn, int arg);
-+extern void highbank_cpu_die(unsigned int cpu);
-+
-+extern struct smp_operations highbank_smp_ops;
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index d75b0a7..709bd72 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -162,6 +162,7 @@ static const char *highbank_match[] __initconst = {
- };
- 
- DT_MACHINE_START(HIGHBANK, "Highbank")
-+	.smp		= smp_ops(highbank_smp_ops),
- 	.map_io		= highbank_map_io,
- 	.init_irq	= highbank_init_irq,
- 	.timer		= &highbank_timer,
-diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
-index 977cebb..1277da3 100644
---- a/arch/arm/mach-highbank/hotplug.c
-+++ b/arch/arm/mach-highbank/hotplug.c
-@@ -24,16 +24,11 @@
- 
- extern void secondary_startup(void);
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index f8f7437..b07b778 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -15,11 +15,6 @@
+ #include <asm/cp15.h>
+ #include <mach/common.h>
  
 -int platform_cpu_kill(unsigned int cpu)
 -{
 -	return 1;
 -}
 -
- /*
-  * platform-specific code to shutdown a CPU
+ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+@@ -47,7 +42,7 @@ static inline void cpu_enter_lowpower(void)
   *
+  * Called with IRQs disabled
   */
 -void platform_cpu_die(unsigned int cpu)
-+void highbank_cpu_die(unsigned int cpu)
++void imx_cpu_die(unsigned int cpu)
  {
- 	flush_cache_all();
- 
-@@ -45,12 +40,3 @@ void platform_cpu_die(unsigned int cpu)
- 	/* We should never return from idle */
- 	panic("highbank: cpu %d unexpectedly exit from shutdown\n", cpu);
+ 	cpu_enter_lowpower();
+ 	imx_enable_cpu(cpu, false);
+@@ -56,12 +51,3 @@ void platform_cpu_die(unsigned int cpu)
+ 	while (1)
+ 		;
  }
 -
 -int platform_cpu_disable(unsigned int cpu)
 -{
 -	/*
--	 * CPU0 should not be shut down via hotplug.  cpu_idle can WFI
--	 * or a proper shutdown or hibernate should be used.
+-	 * we don't allow CPU 0 to be shutdown (it is still too special
+-	 * e.g. clock tick interrupts)
 -	 */
 -	return cpu == 0 ? -EPERM : 0;
 -}
-diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
-index d01364c..fa9560e 100644
---- a/arch/arm/mach-highbank/platsmp.c
-+++ b/arch/arm/mach-highbank/platsmp.c
-@@ -25,12 +25,12 @@
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 045b3f6..ef0b52f 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -226,6 +226,7 @@ static const char *imx6q_dt_compat[] __initdata = {
+ };
  
- extern void secondary_startup(void);
+ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
++	.smp		= smp_ops(imx6q_soc_desc),
+ 	.map_io		= imx6q_map_io,
+ 	.init_irq	= imx6q_init_irq,
+ 	.handle_irq	= imx6q_handle_irq,
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index ab98c6f..2ac43e1 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -41,7 +41,7 @@ void __init imx_scu_map_io(void)
+ 	scu_base = IMX_IO_ADDRESS(base);
+ }
  
 -void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit highbank_secondary_init(unsigned int cpu)
++static void __cpuinit imx_secondary_init(unsigned int cpu)
  {
+ 	/*
+ 	 * if any interrupts are already enabled for the primary
+@@ -51,7 +51,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
  	gic_secondary_init(0);
  }
  
 -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	gic_raise_softirq(cpumask_of(cpu), 0);
- 	return 0;
-@@ -40,7 +40,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	imx_set_cpu_jump(cpu, v7_secondary_startup);
+ 	imx_enable_cpu(cpu, true);
+@@ -62,7 +62,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
   * Initialise the CPU possible map early - this describes the CPUs
   * which may be present or become present in the system.
   */
 -void __init smp_init_cpus(void)
-+static void __init highbank_smp_init_cpus(void)
++static void __init imx_smp_init_cpus(void)
  {
- 	unsigned int i, ncores;
+ 	int i, ncores;
  
-@@ -61,7 +61,7 @@ void __init smp_init_cpus(void)
- 	set_smp_cross_call(gic_raise_softirq);
+@@ -79,7 +79,17 @@ void imx_smp_prepare(void)
+ 	scu_enable(scu_base);
  }
  
 -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
++static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	int i;
- 
-@@ -76,3 +76,13 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	for (i = 1; i < max_cpus; i++)
- 		highbank_set_cpu_jump(i, secondary_startup);
+ 	imx_smp_prepare();
  }
 +
-+struct smp_operations highbank_smp_ops __initdata = {
-+	.smp_init_cpus		= highbank_smp_init_cpus,
-+	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
-+	.smp_secondary_init	= highbank_secondary_init,
-+	.smp_boot_secondary	= highbank_boot_secondary,
++struct smp_operations  imx_smp_ops __initdata = {
++	.smp_init_cpus		= imx_smp_init_cpus,
++	.smp_prepare_cpus	= imx_smp_prepare_cpus,
++	.smp_secondary_init	= imx_secondary_init,
++	.smp_boot_secondary	= imx_boot_secondary,
 +#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= highbank_cpu_die,
++	.cpu_die		= imx_cpu_die,
 +#endif
 +};
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 7128e97..e8b5150 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -145,6 +145,8 @@ extern void imx53_smd_common_init(void);
+ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+ extern void imx6q_clock_map_io(void);
+ 
++extern void imx_cpu_die(unsigned int cpu);
++
+ #ifdef CONFIG_PM
+ extern void imx6q_pm_init(void);
+ extern void imx51_pm_init(void);
+@@ -161,4 +163,6 @@ extern int mx51_neon_fixup(void);
+ static inline int mx51_neon_fixup(void) { return 0; }
+ #endif
+ 
++extern struct smp_operations imx_smp_ops;
++
+ #endif
 -- 
 1.7.10
