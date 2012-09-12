@@ -1,55 +1,52 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 12 Sep 2012 16:03:35 -0700
-Subject: [PATCHv8 21/22] i2c: omap: switch over to autosuspend API
-In-Reply-To: <1347447496-16793-22-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Wed, 12 Sep 2012 16:28:15 +0530")
+Date: Wed, 12 Sep 2012 16:08:20 -0700
+Subject: [PATCHv8 00/23]I2C big cleanup
+In-Reply-To: <87pq5quaqr.fsf@deeprootsystems.com> (Kevin Hilman's message of
+ "Wed, 12 Sep 2012 15:39:24 -0700")
 References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
- <1347447496-16793-22-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87627iu9mg.fsf@deeprootsystems.com>
+ <20120912131615.GB16547@pengutronix.de>
+ <87pq5quaqr.fsf@deeprootsystems.com>
+Message-ID: <87wqzysuu3.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-> From: Felipe Balbi <balbi@ti.com>
+> Wolfram Sang <w.sang@pengutronix.de> writes:
 >
-> this helps us reduce unnecessary pm transitions
-> in case we have another i2c message starting soon.
+>> On Wed, Sep 12, 2012 at 04:27:54PM +0530, Shubhrajyoti D wrote:
 >
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-
-I tracked the PM regression down to this patch.
-
-> ---
->  drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
->  1 files changed, 10 insertions(+), 2 deletions(-)
+> [...]
 >
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 6d38a57..122f517 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -55,6 +55,9 @@
->  /* timeout waiting for the controller to respond */
->  #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
->  
-> +/* timeout for pm runtime autosuspend */
-> +#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
-> +
->  /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
->  enum {
->  	OMAP_I2C_REV_REG = 0,
-> @@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  
->  	omap_i2c_wait_for_bb(dev);
->  out:
-> -	pm_runtime_put(dev->dev);
-> +	pm_runtime_mark_last_busy(dev->dev);
-> +	pm_runtime_put_autosuspend(dev->dev);
+>>> This is the cleanup only series.
+>>>   
+>>> Tested on omap4sdp and 3430sdp.
+>>> 
+>>> The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+>>> 
+>>>   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+>>> 
+>>> are available in the git repository at:
+>>>   git://gitorious.org/linus-tree/linus-tree.git for_3.7/i2c/big_cleanups
+>>
+>> Pushed to -next. Thanks to all involved!
+>
+> Sorry to be late to the party (again), but still catching up after some
+> time off.
+>
+> Unfortunately, this series causes PM regressions on several OMAP
+> platforms.  I hope we can hold off on this until those issues are
+> addressed.
 
-Reverting this change allows CORE to hit retention again.
+I tracked the regression down to [PATCHv8 21/22] (see reply there.)
 
-I didn't debug this any further, so I'm not sure exactly why the async
-suspend works but not the autosuspend.
+Since this series is already merged, I suggest that the problem patch be
+reverted, at least for v3.7 and until the problem is better understood
+and tested.
+
+With that patch reverted, all my PM tests are passing.  Feel free to
+add:
+
+Tested-by: Kevin Hilman <khilman@ti.com>
 
 Kevin
