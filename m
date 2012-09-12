@@ -1,67 +1,36 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 12 Sep 2012 14:46:56 +0300
-Subject: [PATCH 00/11] ASoC: OMAP: Convert to use dmaengine
-Message-ID: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Wed, 12 Sep 2012 14:46:57 +0300
+Subject: [PATCH 01/11] dmaengine: omap: Support for element mode in cyclic DMA
+In-Reply-To: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1347450427-27627-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When src_maxburst/dst_maxburst is set to 0 by the users of cyclic DMA
+(mostly audio) indicates that we should configure the omap DMA to element
+sync mode instead of packet mode.
 
-This series will switch the OMAP audio to use dmaengine.
-The final patch which does the switch was based on Russell King's earlier patch.
-
-The first 10 patch is to prepare the OMAP audio drivers for a smooth change to
-dmaengine:
-- sDMA FRAME sync mode is removed and replaced with PACKET mode
-- dai drivers no longer need to configure sDMA sync mode
-- dai drivers does not need to specify the DMA word length - with the exception
-  of the omap-hdmi driver which requires 32bit word length regardless of the
-  audio format in use
-- the McPDM driver used (to my surprise) hackish way of getting the DMA channel
-  and address - via defines from some header files
-
-I have tested the series on:
-- BeagleBoard (audio via McBSP) with aplay/arecord. In element mode and in
-  threshold mode with different period sizes
-- OMAP4 Blaze (audio via McPDM and DMIC)
-
-With this conversion the NO_PERIOD_WAKEUP is not supported at the moment. I'll
-be looking at the dmaengine core and omap parts to add this feature back.
-
-The patches has been generated against:
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
-
-Janusz: Can you retest this series on OMAP1 to be sure I have not broken it?
-Ricardo: Can you test the omap-hmdi if it is still working?
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (11):
-  dmaengine: omap: Support for element mode in cyclic DMA
-  ASoC: omap-mcbsp: Use sDMA packet mode instead of frame mode
-  ASoC: omap-pcm: Select sDMA synchronization based on packet_size
-  ASoC: OMAP: Remove sync_mode from omap_pcm_dma_data struct
-  ASoC: omap-pcm: Prepare to configure the DMA data_type based on
-    stream properties
-  ARM: OMAP4: hwmod_data: Add resource names to McPDM memory ranges
-  ASoC: omap-mcpdm: Use platform_get_resource_* to get resources
-  ASoC: OMAP: mcbsp, mcpdm, dmic: Let omap-pcm to pick the dma_type
-  ASoC: omap-pcm, omap-hdmi: Change the use of
-    omap_pcm_dma_data->data_type
-  ASoC: OMAP: mcbsp, mcpdm, dmic, hdmi: Set dma_data at startup time
-  ASoC: omap-pcm: Convert to use dmaengine
+ drivers/dma/omap-dma.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +
- drivers/dma/omap-dma.c                     |   5 +-
- sound/soc/omap/Kconfig                     |   3 +-
- sound/soc/omap/omap-dmic.c                 |   9 +-
- sound/soc/omap/omap-hdmi.c                 |  17 +-
- sound/soc/omap/omap-mcbsp.c                |  60 +++----
- sound/soc/omap/omap-mcpdm.c                |  41 +++--
- sound/soc/omap/omap-pcm.c                  | 246 ++++++++---------------------
- sound/soc/omap/omap-pcm.h                  |   4 +-
- 9 files changed, 136 insertions(+), 251 deletions(-)
-
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index ae05618..b77a40d 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -413,7 +413,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
+ 	d->dev_addr = dev_addr;
+ 	d->fi = burst;
+ 	d->es = es;
+-	d->sync_mode = OMAP_DMA_SYNC_PACKET;
++	if (burst)
++		d->sync_mode = OMAP_DMA_SYNC_PACKET;
++	else
++		d->sync_mode = OMAP_DMA_SYNC_ELEMENT;
+ 	d->sync_type = sync_type;
+ 	d->periph_port = OMAP_DMA_PORT_MPUI;
+ 	d->sg[0].addr = buf_addr;
 -- 
 1.7.12
