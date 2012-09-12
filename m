@@ -1,30 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Sep 2012 17:50:48 +0200
-Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <20120912085423.21af58d5@skate>
-References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
- <20120912085423.21af58d5@skate>
-Message-ID: <CACRpkdYVMTbfA++eqRrq6JM0phjN-X-f3N==oXbyVxCyYUVOOA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Sep 2012 15:52:25 +0000
+Subject: [PATCH 04/16] ARM: imx: move platform_data definitions
+In-Reply-To: <Pine.LNX.4.64.1209111624240.22084@axis700.grange>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <201209111410.05698.arnd@arndb.de>
+ <Pine.LNX.4.64.1209111624240.22084@axis700.grange>
+Message-ID: <201209121552.26004.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 8:54 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Tuesday 11 September 2012, Guennadi Liakhovetski wrote:
+> ipu.h is used by the dmaengine and IRQ driver under drivers/dma/ipu/, and 
+> by its users drivers/media/platform/soc_camera/mx3_camera.c and 
+> drivers/video/mx3fb.c. It has been placed under arch/arm/... because it's 
+> arch-specific, but in principle I don't see any reason why it cannot 
+> happily live anywhere under include/...
 
-> This data structure really reflects what the datasheet says. Typically,
-> for SoCs where each pin is independently muxable (AT91, i.MX23/28,
-> Marvell, and probably many more), the datasheet has a big array, with
-> one line per pin, and then several columns which tell for a given pin,
-> what is "function 0", "function 1", "function 2", "function 3", etc.
+Right. We can do that as the next step, after the pure platform data is
+out of the way.
 
-This is a valid reason to keep it as is in my book.
-Readability along with a datasheet is important, most important
-is that it has a good structure for those maintaining the driver.
-
-Is this datasheet available so I can get the picture?
-
-Yours,
-Linus Walleij
+	Arnd
