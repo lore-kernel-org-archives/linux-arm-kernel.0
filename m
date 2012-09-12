@@ -1,110 +1,154 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:20 +0200
-Subject: [PATCH v9 07/13] ARM: SoC: convert ux500 to SoC descriptor
+Date: Wed, 12 Sep 2012 16:58:19 +0200
+Subject: [PATCH v9 06/13] ARM: SoC: convert MSM SMP to SoC descriptor
 In-Reply-To: <1347461906-13527-1-git-send-email-arnd@arndb.de>
 References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347461906-13527-8-git-send-email-arnd@arndb.de>
+Message-ID: <1347461906-13527-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Convert ux500 platforms to use the SoC descriptor to provide
+Convert MSM SMP platforms to use the SoC descriptor to provide
 their SMP and CPU hotplug operations.
 
-Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ux500/board-mop500.c       |    4 ++++
- arch/arm/mach-ux500/hotplug.c            |   36 ++++++++----------------------
- arch/arm/mach-ux500/include/mach/setup.h |    3 +++
- arch/arm/mach-ux500/platsmp.c            |   18 +++++++++++----
- 4 files changed, 30 insertions(+), 31 deletions(-)
+ arch/arm/mach-msm/board-msm8960.c |    3 +++
+ arch/arm/mach-msm/board-msm8x60.c |    7 +++++++
+ arch/arm/mach-msm/core.h          |    2 ++
+ arch/arm/mach-msm/hotplug.c       |   18 +++---------------
+ arch/arm/mach-msm/platsmp.c       |   19 +++++++++++++++----
+ 5 files changed, 30 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-msm/core.h
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index a534d88..1c6f74b 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -694,6 +694,7 @@ static void __init hrefv60_init_machine(void)
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- 	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
- 	.atag_offset	= 0x100,
-+	.smp		= smp_ops(ux500_smp_ops),
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
-@@ -705,6 +706,7 @@ MACHINE_END
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index 65f4a1d..a156968 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -30,6 +30,7 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
  
- MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
- 	.atag_offset	= 0x100,
-+	.smp		= smp_ops(ux500_smp_ops),
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	.timer		= &ux500_timer,
-@@ -715,6 +717,7 @@ MACHINE_END
++#include "core.h"
+ #include "devices.h"
  
- MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
- 	.atag_offset	= 0x100,
-+	.smp		= smp_ops(ux500_smp_ops),
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
-@@ -844,6 +847,7 @@ static const char * u8500_dt_board_compat[] = {
+ static void __init msm8960_fixup(struct tag *tag, char **cmdline,
+@@ -99,6 +100,7 @@ static void __init msm8960_init_late(void)
+ }
  
+ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
++	.smp = smp_ops(msm_smp_ops),
+ 	.fixup = msm8960_fixup,
+ 	.reserve = msm8960_reserve,
+ 	.map_io = msm8960_map_io,
+@@ -110,6 +112,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+ MACHINE_END
  
- DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
-+	.smp		= smp_ops(ux500_smp_ops),
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-index c76f0f4..17b9a15 100644
---- a/arch/arm/mach-ux500/hotplug.c
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -15,13 +15,20 @@
+ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
++	.smp = smp_ops(msm_smp_ops),
+ 	.fixup = msm8960_fixup,
+ 	.reserve = msm8960_reserve,
+ 	.map_io = msm8960_map_io,
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index e37a724..dc2abd3 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -29,6 +29,8 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
+ 
++#include "core.h"
++
+ static void __init msm8x60_fixup(struct tag *tag, char **cmdline,
+ 		struct meminfo *mi)
+ {
+@@ -110,6 +112,7 @@ static const char *msm8x60_fluid_match[] __initdata = {
+ #endif /* CONFIG_OF */
+ 
+ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
++	.smp = smp_ops(msm_smp_ops),
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -121,6 +124,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
++	.smp = smp_ops(msm_smp_ops),
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -132,6 +136,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
++	.smp = smp_ops(msm_smp_ops),
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -143,6 +148,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
++	.smp = smp_ops(msm_smp_ops),
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -156,6 +162,7 @@ MACHINE_END
+ #ifdef CONFIG_OF
+ /* TODO: General device tree support for all MSM. */
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.init_machine = msm8x60_dt_init,
+diff --git a/arch/arm/mach-msm/core.h b/arch/arm/mach-msm/core.h
+new file mode 100644
+index 0000000..a9bab53
+--- /dev/null
++++ b/arch/arm/mach-msm/core.h
+@@ -0,0 +1,2 @@
++extern struct smp_operations msm_smp_ops;
++extern void msm_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index a446fc1..d0f79e8 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -13,6 +13,8 @@
  #include <asm/cacheflush.h>
  #include <asm/smp_plat.h>
  
-+#include <mach/setup.h>
++#include "core.h"
 +
  extern volatile int pen_release;
  
--static inline void platform_do_lowpower(unsigned int cpu)
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void ux500_cpu_die(unsigned int cpu)
- {
- 	flush_cache_all();
- 
--	/* we put the platform to just WFI */
-+	/* directly enter low power state, skipping secure registers */
- 	for (;;) {
- 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
- 				: : : "memory");
-@@ -33,28 +40,3 @@ static inline void platform_do_lowpower(unsigned int cpu)
- 		}
+ static inline void cpu_enter_lowpower(void)
+@@ -57,17 +59,12 @@ static inline void platform_do_lowpower(unsigned int cpu)
  	}
  }
--
+ 
 -int platform_cpu_kill(unsigned int cpu)
 -{
 -	return 1;
 -}
 -
--/*
-- * platform-specific code to shutdown a CPU
-- *
-- * Called with IRQs disabled
-- */
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+  * Called with IRQs disabled
+  */
 -void platform_cpu_die(unsigned int cpu)
--{
--	/* directly enter low power state, skipping secure registers */
--	platform_do_lowpower(cpu);
--}
++void msm_cpu_die(unsigned int cpu)
+ {
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+@@ -81,12 +78,3 @@ void platform_cpu_die(unsigned int cpu)
+ 	 */
+ 	cpu_leave_lowpower();
+ }
 -
 -int platform_cpu_disable(unsigned int cpu)
 -{
@@ -114,68 +158,61 @@ index c76f0f4..17b9a15 100644
 -	 */
 -	return cpu == 0 ? -EPERM : 0;
 -}
-diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
-index 7914e5e..6be4c4d 100644
---- a/arch/arm/mach-ux500/include/mach/setup.h
-+++ b/arch/arm/mach-ux500/include/mach/setup.h
-@@ -45,4 +45,7 @@ extern struct sys_timer ux500_timer;
- 	.type		= MT_MEMORY,		\
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index e012dc8..ba3c4b0 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -25,6 +25,7 @@
+ #include <mach/msm_iomap.h>
+ 
+ #include "scm-boot.h"
++#include "core.h"
+ 
+ #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
+ #define SCSS_CPU1CORE_RESET 0xD80
+@@ -48,7 +49,7 @@ static inline int get_core_count(void)
+ 	return ((read_cpuid_id() >> 4) & 3) + 1;
  }
  
-+extern struct smp_operations ux500_smp_ops;
-+extern void ux500_cpu_die(unsigned int cpu);
-+
- #endif /*  __ASM_ARCH_SETUP_H */
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index da1d5ad..b6f4e0e 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -58,7 +58,7 @@ static void __iomem *scu_base_addr(void)
- 
- static DEFINE_SPINLOCK(boot_lock);
- 
 -void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit ux500_secondary_init(unsigned int cpu)
++static void __cpuinit msm_secondary_init(unsigned int cpu)
  {
- 	/*
- 	 * if any interrupts are already enabled for the primary
-@@ -80,7 +80,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
+ 	/* Configure edge-triggered PPIs */
+ 	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+@@ -93,7 +94,7 @@ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
+ 				  "address\n");
  }
  
 -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
  	unsigned long timeout;
- 
-@@ -145,7 +145,7 @@ static void __init wakeup_secondary(void)
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
+ 	static int cold_boot_done;
+@@ -153,7 +154,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  * does not support the ARM SCU, so just set the possible cpu mask to
+  * NR_CPUS.
   */
 -void __init smp_init_cpus(void)
-+static void __init ux500_smp_init_cpus(void)
++static void __init msm_smp_init_cpus(void)
  {
- 	void __iomem *scu_base = scu_base_addr();
- 	unsigned int i, ncores;
-@@ -165,9 +165,19 @@ void __init smp_init_cpus(void)
- 	set_smp_cross_call(gic_raise_softirq);
+ 	unsigned int i, ncores = get_core_count();
+ 
+@@ -169,6 +170,16 @@ void __init smp_init_cpus(void)
+         set_smp_cross_call(gic_raise_softirq);
  }
  
 -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
++static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
  {
- 
- 	scu_enable(scu_base_addr());
- 	wakeup_secondary();
  }
 +
-+struct smp_operations ux500_smp_ops __initdata = {
-+	.smp_init_cpus		= ux500_smp_init_cpus,
-+	.smp_prepare_cpus	= ux500_smp_prepare_cpus,
-+	.smp_secondary_init	= ux500_secondary_init,
-+	.smp_boot_secondary	= ux500_boot_secondary,
++struct smp_operations msm_smp_ops __initdata = {
++	.smp_init_cpus		= msm_smp_init_cpus,
++	.smp_prepare_cpus	= msm_smp_prepare_cpus,
++	.smp_secondary_init	= msm_secondary_init,
++	.smp_boot_secondary	= msm_boot_secondary,
 +#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= ux500_cpu_die,
++	.cpu_die		= msm_cpu_die,
 +#endif
 +};
 -- 
