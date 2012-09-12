@@ -1,51 +1,53 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Sep 2012 14:52:32 -0700
-Subject: [PATCH 2/2] ARM: AM33XX: hwmod: Add OMAP_INTC_START offset to
- all module int nos
-In-Reply-To: <1347484551-11775-3-git-send-email-hvaibhav@ti.com>
+Date: Wed, 12 Sep 2012 14:54:15 -0700
+Subject: [PATCH 1/2] ARM: AM33XX: hwmod: Remove platform specific
+ header files
+In-Reply-To: <1347484551-11775-2-git-send-email-hvaibhav@ti.com>
 References: <1347484551-11775-1-git-send-email-hvaibhav@ti.com>
- <1347484551-11775-3-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120912215232.GE5997@atomide.com>
+ <1347484551-11775-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <20120912215415.GF5997@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120912 14:17]:
-> With recent migration of omap architectures to SPARSE_IRQ framework,
-> it is important to add OMAP_INTC_START to all interrupt numbers
-> which will be eventually requested by drivers.
+* Vaibhav Hiremath <hvaibhav@ti.com> [120912 14:16]:
+> With recent mainline changes on gpio and mcspi drivers, the
+> platform specific header files (plat/gpio.h and plat/mcspi.h)
+> have been removed, which results into build failure on
+> AM33XX hwmod data, which was still using these headers.
 > 
-> This is required in order to get AM33XX boot functionality.
+> This patch removes such both gpio and spi header file entry
+> from omap_hwmod_33xx_data.c.
 > 
 > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 > Cc: Paul Walmsley <paul@pwsan.com>
 > ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  168 ++++++++++++++--------------
->  1 files changed, 84 insertions(+), 84 deletions(-)
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
 > 
 > diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index 7b7ed08..3c320f4 100644
+> index de7a3ab..7b7ed08 100644
 > --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
 > +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-
-You should just have on top of this file:
-
-#define OMAP_INTC_START		0
-
-Then Paul can apply this, and while merging with the sparseirq
-changes, the above can be removed.
-
-> @@ -72,7 +72,7 @@ static struct omap_hwmod_class am33xx_emif_hwmod_class = {
->  };
+> @@ -14,12 +14,14 @@
+>   * GNU General Public License for more details.
+>   */
 >  
->  static struct omap_hwmod_irq_info am33xx_emif_irqs[] = {
-> -	{ .name = "ddrerr0", .irq = 101 },
-> +	{ .name = "ddrerr0", .irq = 101 + OMAP_INTC_START },
->  	{ .irq = -1 }
->  };
+> +#include <linux/io.h>
+> +#include <linux/platform_data/gpio-omap.h>
+> +#include <linux/platform_data/spi-omap2-mcspi.h>
+> +
+>  #include <plat/omap_hwmod.h>
+>  #include <plat/cpu.h>
+> -#include <plat/gpio.h>
+>  #include <plat/dma.h>
+>  #include <plat/mmc.h>
+> -#include <plat/mcspi.h>
+>  #include <plat/i2c.h>
 >  
+>  #include "omap_hwmod_common_data.h"
 
-Then these should be fixed up to have trailing commas
-as requested by Russell earlier on several occasions.
+This I can fix up when merging Paul's stuff with
+sparseirq changes.
 
 Regards,
 
