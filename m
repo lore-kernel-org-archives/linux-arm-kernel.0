@@ -1,36 +1,24 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 12 Sep 2012 09:26:52 -0700
-Subject: [PATCH v9 06/13] ARM: SoC: convert MSM SMP to SoC descriptor
-In-Reply-To: <1347461906-13527-7-git-send-email-arnd@arndb.de>
-References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
- <1347461906-13527-7-git-send-email-arnd@arndb.de>
-Message-ID: <20120912162651.GA22904@codeaurora.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 12 Sep 2012 09:30:24 -0700
+Subject: [PATCH] hwmon: (sht15) move header to linux/platform_data/
+In-Reply-To: <1347467024-3231-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+References: <1347467024-3231-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+Message-ID: <20120912163024.GA23096@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 04:58:19PM +0200, Arnd Bergmann wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, Sep 12, 2012 at 12:23:44PM -0400, Vivien Didelot wrote:
+> This patch moves the sht15.h header from include/linux to
+> include/linux/platform_data, and update existing support (stargate2
+> platform) accordingly.
 > 
-> Convert MSM SMP platforms to use the SoC descriptor to provide
-> their SMP and CPU hotplug operations.
-> 
-> Cc: David Brown <davidb@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-msm/board-msm8960.c |    3 +++
->  arch/arm/mach-msm/board-msm8x60.c |    7 +++++++
+> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
 
-Stephen Boyd recently sent out a patch series that remove the non-DT
-support for these two targets, which naturally generates a bunch of
-conflicts.
+Applied to -next, and fixed:
 
-I'm about to send out a pull request including these changes, and
-after that, I'll rework this patch for the new board files, and give
-it a try.
+/home/groeck/src/linux-staging/.git/rebase-apply/patch:80: new blank line at
+EOF.
++
+warning: 1 line adds whitespace errors.
 
-David Brown
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Guenter
