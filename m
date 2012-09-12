@@ -1,40 +1,30 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 12 Sep 2012 13:51:43 +0200
-Subject: [PATCHv7 20/23] i2c: omap: switch to threaded IRQ support
-In-Reply-To: <50502AE3.7040300@ti.com>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
- <1347356538-23835-21-git-send-email-shubhrajyoti@ti.com>
- <20120911215112.GA27031@pengutronix.de> <50502AE3.7040300@ti.com>
-Message-ID: <20120912115143.GE2624@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Sep 2012 11:54:20 +0000
+Subject: [PATCH v3 00/31] AArch64 Linux kernel port
+In-Reply-To: <504E4C0E.9030402@jonmasters.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <504E4C0E.9030402@jonmasters.org>
+Message-ID: <201209121154.20474.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 11:55:39AM +0530, Shubhrajyoti wrote:
-> On Wednesday 12 September 2012 03:21 AM, Wolfram Sang wrote:
-> >> -omap_i2c_isr(int this_irq, void *dev_id)
-> >> > +omap_i2c_isr(int irq, void *dev_id)
-> >> >  {
-> >> >  	struct omap_i2c_dev *dev = dev_id;
-> >> > +	irqreturn_t ret = IRQ_HANDLED;
-> > Shouldn't that be IRQ_NONE?
-> Actually we are processing it so I thought it to be ok.
+On Monday 10 September 2012, Jon Masters wrote:
+> On 09/07/2012 12:26 PM, Catalin Marinas wrote:
+> > This is the 3rd version of patches implementing Linux kernel support for
+> > the 64-bit ARM architecture.
+> <snip>
+> 
+> > ...but the main goal was to freeze the user ABI.
+> 
+> Is the consensus now that we're good from an ABI viewpoint?
+> 
 
-Are we processing it? There is nothing acknowledged AFAICS. Anyway, we
-can fix that with a later patch.
+>From my point of view, no more changes are needed. I would not give any
+guarantees until we have a first kernel release including this code, but
+I think we can agree that we would consult you about ABI changes if they
+seem necessary before then.
 
-> Also a similar discussion.
->  
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104422.html
+If you start (re)building the Fedora packages based on these kernel
+headers, the changes are pretty good that this will keep working.
 
-I totally agree to the things said there.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/12939203/attachment-0001.sig>
+	Arnd
