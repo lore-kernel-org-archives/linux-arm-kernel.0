@@ -1,66 +1,37 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 12 Sep 2012 16:28:15 +0530
-Subject: [PATCHv8 21/22] i2c: omap: switch over to autosuspend API
+Date: Wed, 12 Sep 2012 16:28:07 +0530
+Subject: [PATCHv8 13/22] i2c: omap: simplify errata check
 In-Reply-To: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
 References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347447496-16793-22-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1347447496-16793-14-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-this helps us reduce unnecessary pm transitions
-in case we have another i2c message starting soon.
+omap_i2c_dev is allocated with kzalloc(),
+so we need not initialize b_hw to zero.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6d38a57..122f517 100644
+index 3be147a..7918e48 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -55,6 +55,9 @@
- /* timeout waiting for the controller to respond */
- #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+@@ -1095,9 +1095,7 @@ omap_i2c_probe(struct platform_device *pdev)
  
-+/* timeout for pm runtime autosuspend */
-+#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
-+
- /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
- enum {
- 	OMAP_I2C_REV_REG = 0,
-@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 		dev->fifo_size = (dev->fifo_size / 2);
  
- 	omap_i2c_wait_for_bb(dev);
- out:
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 	return r;
- }
+-		if (dev->rev >= OMAP_I2C_REV_ON_3630_4430)
+-			dev->b_hw = 0; /* Disable hardware fixes */
+-		else
++		if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
+ 			dev->b_hw = 1; /* Enable hardware fixes */
  
-@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 
- 	pm_runtime_enable(dev->dev);
-+	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
-+	pm_runtime_use_autosuspend(dev->dev);
-+
- 	r = pm_runtime_get_sync(dev->dev);
- 	if (IS_ERR_VALUE(r))
- 		goto err_free_mem;
-@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	of_i2c_register_devices(adap);
- 
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 
- 	return 0;
- 
+ 		/* calculate wakeup latency constraint for MPU */
 -- 
 1.7.5.4
