@@ -1,78 +1,66 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 12 Sep 2012 16:28:04 +0530
-Subject: [PATCHv8 10/22] i2c: omap: ack IRQ in parts
+Date: Wed, 12 Sep 2012 16:28:15 +0530
+Subject: [PATCHv8 21/22] i2c: omap: switch over to autosuspend API
 In-Reply-To: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
 References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347447496-16793-11-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1347447496-16793-22-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-According to flow diagrams on OMAP TRMs,
-we should ACK the IRQ as they happen.
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message starting soon.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-[Ack the stat OMAP_I2C_STAT_AL in case of arbitration lost]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++------------
- 1 files changed, 16 insertions(+), 12 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 4045134..bac1f11 100644
+index 6d38a57..122f517 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -850,21 +850,19 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 		}
+@@ -55,6 +55,9 @@
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
  
- complete:
--		/*
--		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
--		 * acked after the data operation is complete.
--		 * Ref: TRM SWPU114Q Figure 18-31
--		 */
--		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, stat &
--				~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
--				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
--
--		if (stat & OMAP_I2C_STAT_NACK)
-+		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
-+		}
++/* timeout for pm runtime autosuspend */
++#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
++
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
  
- 		if (stat & OMAP_I2C_STAT_AL) {
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
  
- 		/*
-@@ -941,12 +939,18 @@ complete:
+@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
  
- 		if (stat & OMAP_I2C_STAT_ROVR) {
- 			dev_err(dev->dev, "Receive overrun\n");
--			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
-+			err |= OMAP_I2C_STAT_ROVR;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
  
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
--			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
-+			err |= OMAP_I2C_STAT_XUDF;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
- 	} while (stat);
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
  
 -- 
 1.7.5.4
