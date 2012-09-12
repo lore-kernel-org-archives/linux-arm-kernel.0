@@ -1,61 +1,48 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 11 Sep 2012 21:40:35 -0700
-Subject: [RFC] tty/serial/kgdboc: Add and wire up clear_irqs callback
-In-Reply-To: <20120912040657.GA3880@lizard>
-References: <20120911093042.GA12471@lizard>
- <1347356106-25368-6-git-send-email-anton.vorontsov@linaro.org>
- <20120911151540.362001c6@pyramind.ukuu.org.uk>
- <20120912033209.GA32156@lizard>
- <CAMbhsRTmZyxFE-vAa-UvNE8KJ2f0cfXP7mncXKcpUiNF6C9PUQ@mail.gmail.com>
- <20120912040657.GA3880@lizard>
-Message-ID: <CAMbhsRT+JR9-qzADiPXo9e59oHFCY4g6HNObKNMeciC5Xj6m6g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Sep 2012 14:16:15 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: remove USB phy initializer
+In-Reply-To: <20120905081319.GD11575@verge.net.au>
+References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
+ <1346376502-12114-6-git-send-email-horms@verge.net.au>
+ <201209032138.41485.arnd@arndb.de>
+ <87k3wafxj4.wl%kuninori.morimoto.gx@renesas.com>
+ <20120904003402.GE6095@verge.net.au>
+ <87ehmifl3b.wl%kuninori.morimoto.gx@renesas.com>
+ <20120905012056.GC4232@verge.net.au>
+ <20120905012337.GD4232@verge.net.au>
+ <w3p4nndz0st.wl%kuninori.morimoto.gx@renesas.com>
+ <20120905081319.GD11575@verge.net.au>
+Message-ID: <20120912051614.GA5718@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 9:06 PM, Anton Vorontsov
-<anton.vorontsov@linaro.org> wrote:
-> On Tue, Sep 11, 2012 at 08:42:46PM -0700, Colin Cross wrote:
-> [...]
->> > The "problem" is in the last step. If we exit NMI without making UART
->> > know that we're done with the interrupt, we will reenter the NMI
->> > immediately, even without any new characters from the UART.
->>
->> The UART irq line should go low when you read the character out of the
->
-> Probably some controllers may lower the line by themselves, but not
-> all, and probably most of them need an explicit clear.
+On Wed, Sep 05, 2012 at 05:13:20PM +0900, Simon Horman wrote:
+> On Wed, Sep 05, 2012 at 11:00:22AM +0900, Kuninori Morimoto wrote:
+> > 
+> > Hi Simon
+> > 
+> > > > my preferred approach is to drop the following patches from the marzen
+> > > > branch and get the remaining changes merged (hopefully). Then look at
+> > > > USB once again.
+> > > > 
+> > > > f58f278 ARM: shmobile: marzen: add USB EHCI driver support
+> > > > 4150c1d ARM: shmobile: r8a7779: add USB OHCI clock support
+> > > > 535b372c ARM: shmobile: r8a7779: add USB EHCI clock support
+> > > > f9929ab ARM: shmobile: r8a7779: add USB common phy initializer
+> > > 
+> > > and
+> > > 
+> > > 3553395 ARM: shmobile: marzen: add USB OHCI driver support
+> > 
+> > Thank you for your help
+> 
+> Thanks, I have pushed a rebased marzen tree accordingly.
 
-Anything 8250-based will clear the interrupt automatically, assuming
-you read the status registers as well as the character register.
+Hi Morimoto-san,
 
->> receive buffer, or the polling rx function should clear the interrupt
->> for you.
->
-> Yes, that's an option. But that way we add a new semantic for the
-> polling routines, and effecitvely we just merge the two callbacks.
->
-> Of course, if Alan is OK with this, I'm more than OK too. :-)
->
-> (But the polling routines would need to clear all interrupts, not
-> just rx/tx. For example, if the controller indicated some error, and
-> nobody clears it, then we'll start reentering infinitely.)
+I realise you are busy at the moment, but when you get a chance
+could you let me know what the status of the above changes is?
 
-For exynos5, the only non-8250 based serial port I've come across, we
-clear all interrupts in the rx poll function (see
-https://android.googlesource.com/kernel/exynos/+/ef427aafffb7153dde59745e440fd7ec41ea969d/arch/arm/mach-exynos/exynos_fiq_debugger.c).
-
->> If you use a clear_irqs callback, you can drop characters if
->> one arrives between the last character buffer read and calling
->> clear_irqs.
->
-> Only if we call clear_irqs() after reading the characters, but we do
-> it before. So if new characters are available, we will reenter NMI,
-> which is OK.
->
-> But if used incorrectly, it truly can cause dropping (or staling) of
-> characters, so I'd better add some comments about this.
-
-What does clear_irqs() mean for a status or tx interrupt?  The tx
-interrupt will generally re-assert as long as the tx fifo is empty,
-which would require disabling it.  On 8250 ports, status interrupts
-will re-assert until the corresponding status register is read.
+I believe that I am waiting for fresh "use usb phy driver" patches.
+But perhaps these depend on "add usb phy driver" patches being
+accepted into the USB tree first?
