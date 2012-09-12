@@ -1,111 +1,132 @@
-From: rajanikanth.hv@stericsson.com (Rajanikanth HV)
-Date: Wed, 12 Sep 2012 20:03:00 +0530
-Subject: Implement devicetree support for AB8500 Btemp
-In-Reply-To: <201209111122.08713.arnd@arndb.de>
-References: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
- <201209101401.06859.arnd@arndb.de> <504EFA0F.2090102@stericsson.com>
- <201209111122.08713.arnd@arndb.de>
-Message-ID: <50509D1C.9060206@stericsson.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 12 Sep 2012 17:35:56 +0300
+Subject: [PATCH 11/11] ASoC: omap-pcm: Convert to use dmaengine
+In-Reply-To: <505085DB.5000407@ti.com>
+References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
+ <20120912120028.GC28448@n2100.arm.linux.org.uk> <505085DB.5000407@ti.com>
+Message-ID: <50509DCC.4000503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/12/2012 03:53 PM, Peter Ujfalusi wrote:
+> I need to look at this, but at first look we do wait for the drain in
+> omap_stop_dma(). We used to use omap_stop_dma/omap_start_dma for pause/resume
+> operations.
+> But sDMA also have a bit: CDPi: PAUSE_LINK_LIST which should do what we are
+> looking for.
+> Need to read the relevant parts of the TRM, but AFAIK we are using normal mode
+> with linked list (self linking).
+> I already have the patch for this, I just need to test it on HW.
+
+We can get the PAUSE/RESUME work either:
+1.
+drivers/dma/omap-dma.c
+static int omap_dma_pause(struct omap_chan *c)
+ {
+-       /* FIXME: not supported by platform private API */
+-       return -EINVAL;
++       /* Only in cyclic mode */
++       if (!c->cyclic)
++               return -EINVAL;
++
++       if (!c->paused) {
++               omap_stop_dma(c->dma_ch);
++               c->paused = true;
++       }
++
++       return 0;
+ }
+
+ static int omap_dma_resume(struct omap_chan *c)
+ {
+-       /* FIXME: not supported by platform private API */
+-       return -EINVAL;
++       /* Only in cyclic mode */
++       if (!c->cyclic)
++               return -EINVAL;
++
++       if (c->paused) {
++               omap_start_dma(c->dma_ch);
++               c->paused = false;
++       }
++
++       return 0;
+ }
 
 
-On Tuesday 11 September 2012 04:52 PM, Arnd Bergmann wrote:
-> On Tuesday 11 September 2012, Rajanikanth HV wrote:
->>>> +Supplied-to:
->>>> +     This shall be power supply class dependency where in the
->> runtime battery
->>>> +     properties will be shared across fuel guage and charging
->> algorithm driver.
->>>
->>> I probably don't understand enough of this, but shouldn't the other
->> devices
->>> that are supplied by this have a reference to this node rather than doing
->>> it this way around? Why use strings here instead of phandles?
->>
->> This is a logical binding w.r.t power supply event change
->> across energy-management-module drivers where in runtime battery
->> properties are shared along with uevent notification.
->> ref: di->btemp_psy.external_power_
->> changed =
->>      ab8500_btemp_external_power_changed;
->>      ref: ab8500_btemp.c
->>
->> Need for this property:
->>  btemp, fg and charger updates power-supply properties
->>  based on the events listed above.
->>  Event handler invokes power supply change notifier
->>  which in-turn invokes registered power supply class call-back
->>  based on the 'supplied_to' string.
->>  ref:
->>    power_supply_changed_work(..) ./drivers/power/power_supply_core.c
->>
->> In this case how to approach through phandle?
->> ============================
->>
-> 
-> Sorry, I really tried, but I cannot make sense of what you wrote
-> there. Can you try again and describe in full English sentences
-> how the hardware blocks are connected
-Consider: USB charging:
-            ______________________
-           |                      |
---(Vbus)-->|   USB Charger with   |
-           |  Charger FSM (h/w)   |
-           |______________________|
-                |    |
-                |    |(Vbat and other signals)
-                |  __|_____
-        to      | |        |(GaugeSense
-     Charger FSM| | LION   | Signal)     _____________
-                | |Battery |----------->|FuelGauge blk|
-                | |________|            |{Coulomb Ctr}|
-                |       |                -------------
-                |   <Thermistor>
-                |       |
-                |       | (BatCtrl Signal)
-                |_______|---------->[Btemp blk]
-                        |               |
-                      [ADC]             |__Btemp_Low
-                                        |__Btemp_Med
-                                        |__Btemp_High
+2.
+arch/arm/plat-omap/dma.c
++void omap_pause_linked_dma(int lch)
++{
++       u32 l;
++       unsigned long flags;
++
++       local_irq_save(flags);
++       l = p->dma_read(CDP, lch);
++       l |= 0x80; /* PAUSE_LINK_LIST */
++       p->dma_write(l, CDP, lch);
++       local_irq_restore(flags);
++}
++EXPORT_SYMBOL(omap_pause_linked_dma);
++
++void omap_resume_linked_dma(int lch)
++{
++       u32 l;
++       unsigned long flags;
++
++       local_irq_save(flags);
++       l = p->dma_read(CDP, lch);
++       l &= (~0x80); /* PAUSE_LINK_LIST */
++       p->dma_write(l, CDP, lch);
++       local_irq_restore(flags);
++}
++EXPORT_SYMBOL(omap_resume_linked_dma);
 
-Note: Charging algorithm is a logical entity.
+drivers/dma/omap-dma.c
+ static int omap_dma_pause(struct omap_chan *c)
+ {
+-       /* FIXME: not supported by platform private API */
+-       return -EINVAL;
++       /* Only in cyclic mode */
++       if (!c->cyclic)
++               return -EINVAL;
++
++       if (!c->paused) {
++               omap_pause_linked_dma(c->dma_ch);
++               c->paused = true;
++       }
++
++       return 0;
+ }
 
- and what their purpose is?
-a) Coulomb counter comprises '12bit adc' and an 'N sample
-average/accumulation' logic helps to measure battery capacity
-Note: The charge and the discharge current of the battery is
-        converted to voltage by an external resistor connected
-        between GaugeSenseP and GaugeSenseN pins.
+ static int omap_dma_resume(struct omap_chan *c)
+ {
+-       /* FIXME: not supported by platform private API */
+-       return -EINVAL;
++       /* Only in cyclic mode */
++       if (!c->cyclic)
++               return -EINVAL;
++
++       if (c->paused) {
++               omap_resume_linked_dma(c->dma_ch);
++               c->paused = false;
++       }
++
++       return 0;
+ }
 
-b) Battery temperature monitoring comprises a comparator which is
-   enabled only by HW (charger state machine) helps to measure
-   the thermal threshold
-Note: The accuracy of the battery temperature measurement depends
-        of the accuracy of the thermistor used.
 
-c) Charger provides 'Constant Current Constant Voltage' USB and
-   Main(Wall) Charging support, it embeds: voltage detection,
-   thermal protection, Constant voltage charging with programmable level,
-   clock dithering and battery voltage monitoring
+Both works fine (have tested it on BeagleBoard with mplayer).
+With [1] we have identical way of dealing with the PAUSE/RESUME as we had
+previously, so it is know to work fine on OMAP1/2/3/4/5
 
-e.g. Correlation between charger and Btemp
-- if the battery temperature is higher than ?MaxTemp ?C,
-  the charger does not start, but is enabled
+We have never used [2] in the past, but I think that is not going to work on
+OMAP1 and OMAP2420. Also we need to add code to arch/arm/plat-omap/dma.c for
+this...
 
-- if the battery temperature is between 0?C and ?MaxTemp? ?C
-  charging is done in AB8500 Hardware control mode
+I can resend the series with either of these to fix this regression caused by
+the dmaengine conversion (after cleanup off course).
 
-- charging is done in DB8500 Software control mode, if the battery:
-  has a voltage higher than the ?BattOK Threshold
-
-- If the battery temperature is between -10?C and 0?C:
-  charging is done in AB8500 Hardware control mode
-
-- If the battery temperature is below -10?C, charging is
-  done in AB8500 Hardware control mode
-> 
-> 	Arnd
-> 
+-- 
+P?ter
