@@ -1,44 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 11:27:37 +0000
-Subject: [PATCH V3 4/5] ARM: bcm2708: add stub clock driver
-In-Reply-To: <1347423509-30647-4-git-send-email-swarren@wwwdotorg.org>
-References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
- <1347423509-30647-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201209121127.37495.arnd@arndb.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 12 Sep 2012 14:46:56 +0300
+Subject: [PATCH 00/11] ASoC: OMAP: Convert to use dmaengine
+Message-ID: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 September 2012, Stephen Warren wrote:
-> From: Simon Arlott <simon@fire.lp0.eu>
-> 
-> This patch adds a minimal stub clock driver for the BCM2708. Its sole
-> purpose is to allow the PL011 AMBA clk_get() API calls to provide
-> something that looks enough like a clock that the driver probes and
-> operates correctly.
-> 
-> This patch was extracted from git://github.com/lp0/linux.git branch
-> rpi-split as of 2012/09/08, and modified as follows:
-> 
-> * Modified .dev_id for UART clocks to match UART DT node names.
-> 
-> Signed-off-by: Chris Boot <bootc@bootc.net>
-> Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
-> Signed-off-by: Dom Cobley <popcornmix@gmail.com>
-> Signed-off-by: Dom Cobley <dc4@broadcom.com>
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> --
-> v3: New patch.
-> ---
->  arch/arm/mach-bcm2708/Makefile  |    1 +
->  arch/arm/mach-bcm2708/bcm2708.c |    3 +++
->  arch/arm/mach-bcm2708/clock.c   |   53 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-bcm2708/clock.h   |   24 ++++++++++++++++++
->  4 files changed, 81 insertions(+)
->  create mode 100644 arch/arm/mach-bcm2708/clock.c
->  create mode 100644 arch/arm/mach-bcm2708/clock.h
+Hello,
 
-I think you should keep Mike on Cc for clock related patches. I also wonder
-whether this file should go into drivers/clk right away, since that is where
-it would end up when it grows into a full clock driver.
+This series will switch the OMAP audio to use dmaengine.
+The final patch which does the switch was based on Russell King's earlier patch.
 
-	Arnd
+The first 10 patch is to prepare the OMAP audio drivers for a smooth change to
+dmaengine:
+- sDMA FRAME sync mode is removed and replaced with PACKET mode
+- dai drivers no longer need to configure sDMA sync mode
+- dai drivers does not need to specify the DMA word length - with the exception
+  of the omap-hdmi driver which requires 32bit word length regardless of the
+  audio format in use
+- the McPDM driver used (to my surprise) hackish way of getting the DMA channel
+  and address - via defines from some header files
+
+I have tested the series on:
+- BeagleBoard (audio via McBSP) with aplay/arecord. In element mode and in
+  threshold mode with different period sizes
+- OMAP4 Blaze (audio via McPDM and DMIC)
+
+With this conversion the NO_PERIOD_WAKEUP is not supported at the moment. I'll
+be looking at the dmaengine core and omap parts to add this feature back.
+
+The patches has been generated against:
+git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
+
+Janusz: Can you retest this series on OMAP1 to be sure I have not broken it?
+Ricardo: Can you test the omap-hmdi if it is still working?
+
+Regards,
+Peter
+---
+Peter Ujfalusi (11):
+  dmaengine: omap: Support for element mode in cyclic DMA
+  ASoC: omap-mcbsp: Use sDMA packet mode instead of frame mode
+  ASoC: omap-pcm: Select sDMA synchronization based on packet_size
+  ASoC: OMAP: Remove sync_mode from omap_pcm_dma_data struct
+  ASoC: omap-pcm: Prepare to configure the DMA data_type based on
+    stream properties
+  ARM: OMAP4: hwmod_data: Add resource names to McPDM memory ranges
+  ASoC: omap-mcpdm: Use platform_get_resource_* to get resources
+  ASoC: OMAP: mcbsp, mcpdm, dmic: Let omap-pcm to pick the dma_type
+  ASoC: omap-pcm, omap-hdmi: Change the use of
+    omap_pcm_dma_data->data_type
+  ASoC: OMAP: mcbsp, mcpdm, dmic, hdmi: Set dma_data at startup time
+  ASoC: omap-pcm: Convert to use dmaengine
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +
+ drivers/dma/omap-dma.c                     |   5 +-
+ sound/soc/omap/Kconfig                     |   3 +-
+ sound/soc/omap/omap-dmic.c                 |   9 +-
+ sound/soc/omap/omap-hdmi.c                 |  17 +-
+ sound/soc/omap/omap-mcbsp.c                |  60 +++----
+ sound/soc/omap/omap-mcpdm.c                |  41 +++--
+ sound/soc/omap/omap-pcm.c                  | 246 ++++++++---------------------
+ sound/soc/omap/omap-pcm.h                  |   4 +-
+ 9 files changed, 136 insertions(+), 251 deletions(-)
+
+-- 
+1.7.12
