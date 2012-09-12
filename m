@@ -1,43 +1,94 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 12 Sep 2012 15:44:27 +0200
-Subject: [PATCHv7 00/23]I2C big cleanup
-In-Reply-To: <20120912101850.GB2624@pengutronix.de>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
- <20120911220048.GD27031@pengutronix.de> <50505FDC.4090500@ti.com>
- <20120912101850.GB2624@pengutronix.de>
-Message-ID: <20120912134427.GC16547@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Sep 2012 14:49:16 +0100
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <20120912120858.GI31430@game.jcrosoft.org>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org>
+ <20120910161159.GH27042@arm.com>
+ <20120912120858.GI31430@game.jcrosoft.org>
+Message-ID: <20120912134916.GF21823@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 12:18:50PM +0200, Wolfram Sang wrote:
+On Wed, Sep 12, 2012 at 01:08:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
+> > On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+> > > > +Before jumping into the kernel, the following conditions must be met:
+> > > > +
+> > > > +- Quiesce all DMA capable devices so that memory does not get
+> > > > +  corrupted by bogus network packets or disk data.  This will save
+> > > > +  you many hours of debug.
+> > > > +
+> > > > +- Primary CPU general-purpose register settings
+> > > > +  x0 = physical address of device tree blob (dtb) in system RAM.
+> > > > +  x1 = 0 (reserved for future use)
+> > > > +  x2 = 0 (reserved for future use)
+> > > > +  x3 = 0 (reserved for future use)
+> > > > +
+> > > > +- CPU mode
+> > > > +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+> > > > +  IRQ and FIQ).
+> > > > +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
+> > > > +  the virtualisation extensions) or non-secure EL1.
+> > > > +
+> > > > +- Caches, MMUs
+> > > > +  The MMU must be off.
+> > > > +  Instruction cache may be on or off.
+> > > > +  Data cache must be off and invalidated.
+> > > > +  External caches (if present) must be configured and disabled.
+> > > > +
+> > > > +- Architected timers
+> > > > +  CNTFRQ must be programmed with the timer frequency.
+> > > > +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
+> > > > +  set where available.
+> > > can you explain why?
+> > 
+> > Otherwise the kernel cannot access the generic timer registers (it is
+> > described in the AArch64 exception model which isn't public yet).
+> I do not like the idea to do too much in the boot loader
 > 
-> > I donot see the warning. Am I missing something?
-> 
-> I deleted my logfiles already. Ignore it for now, if it comes up again
-> with your new series, I will give a more detailed pointer.
+> can we drop it and do it the head.S or find an other way
 
-Sorry, the section mismatch was not related to I2C it seems:
+No. The kernel expects some sane setup before it can start. That's the
+case already on AArch32. With AArch64 we also mandate single Image from
+start. You can have a look at an example boot wrapper that creates an
+environment for the AArch64 kernel:
 
-WARNING: vmlinux.o(.data+0x30958): Section mismatch in reference from the variable rx51_si4713_dev to the (unknown reference) .init.data:(unknown)
-The variable rx51_si4713_dev references
-the (unknown reference) __initdata (unknown)
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the variable:
-*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/boot-wrapper-aarch64.git
 
-Got it with an "allnoconfig" and then selecting MMU and OMAP.
+> > > > +- The primary CPU must jump directly to the first instruction of the
+> > > > +  kernel image.  The device tree blob passed by this CPU must contain
+> > > > +  for each CPU node:
+> > > > +
+> > > > +    1. An 'enable-method' property. Currently, the only supported value
+> > > > +       for this field is the string "spin-table".
+> > > > +
+> > > > +    2. A 'cpu-release-addr' property identifying a 64-bit,
+> > > > +       zero-initialised memory location.
+> > > > +
+> > > > +  It is expected that the bootloader will generate these device tree
+> > > > +  properties and insert them into the blob prior to kernel entry.
+> > > > +
+> > > > +- Any secondary CPUs must spin outside of the kernel in a reserved area
+> > > > +  of memory (communicated to the kernel by a /memreserve/ region in the
+> > > > +  device tree) polling their cpu-release-addr location, which must be
+> > > > +  contained in the reserved region.  A wfe instruction may be inserted
+> > > > +  to reduce the overhead of the busy-loop and a sev will be issued by
+> > > > +  the primary CPU.  When a read of the location pointed to by the
+> > > > +  cpu-release-addr returns a non-zero value, the CPU must jump directly
+> > > > +  to this value.
+> > > do you plan AMP boot?
+> > 
+> > What do you mean by AMP?
+> > 
+> > If you only want to use 3 CPUs out of 4 for example, you change the FDT
+> > information that gets passed to the kernel accordingly. So the kernel
+> > wouldn't touch the 4th one.
+> I mean boot a  different kernel in each core as example
 
-Regards,
-
-   Wolfram
+That's not on my plan. It may be doable but I don't see any need for it.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/bb3a742e/attachment.sig>
+Catalin
