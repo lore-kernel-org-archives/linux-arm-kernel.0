@@ -1,37 +1,58 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Sep 2012 20:14:33 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod: some fixes for 3.6-rc
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EAB25C9@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
- <50498170.3010600@ti.com>
- <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EAB25C9@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1209122011590.17903@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Sep 2012 15:20:49 -0500
+Subject: [PATCH 11/12] ARM: initial multiplatform support
+In-Reply-To: <201209121949.49109.arnd@arndb.de>
+References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
+ <1346962375-26163-12-git-send-email-robherring2@gmail.com>
+ <201209121949.49109.arnd@arndb.de>
+Message-ID: <5050EEA1.5050205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Sep 2012, Hiremath, Vaibhav wrote:
-
-> On Wed, Sep 12, 2012 at 21:35:04, Paul Walmsley wrote:
->  
-> > http://marc.info/?l=linux-omap&m=134746561028888&w=2
+On 09/12/2012 02:49 PM, Arnd Bergmann wrote:
+> On Thursday 06 September 2012, Rob Herring wrote:
 > 
-> Just for my understanding, is this pull request you created based on 
-> l-o/master? Or other baseline?
+>> +machine-$(CONFIG_ARCH_EXYNOS4)         += exynos
+>> +machine-$(CONFIG_ARCH_EXYNOS5)         += exynos
+> 
+>> +machine-$(CONFIG_MACH_SPEAR1310)       += spear13xx
+>> +machine-$(CONFIG_MACH_SPEAR1340)       += spear13xx
+> 
+>> +machine-$(CONFIG_MACH_SPEAR300)                += spear3xx
+>> +machine-$(CONFIG_MACH_SPEAR310)                += spear3xx
+> 
+>> +machine-$(CONFIG_MACH_SPEAR320)                += spear3xx
+>> +machine-$(CONFIG_MACH_SPEAR600)                += spear6xx
+> 
+> I did a little bit of testing and got this message:
+> 
+> /home/arnd/linux-arm/Makefile:774: target `arch/arm/mach-spear13xx' given more than once in the same rule.
+> arch/arm/mach-spear13xx/built-in.o:(.init.data+0x0): multiple definition of `spear13xx_smp_ops'
+> arch/arm/mach-spear13xx/built-in.o:(.init.data+0x0): first defined here
+> 
+> The patch below ensures that each machine is only listed once.
+> Please fold this into your patch.
+> 
+> 	Arnd
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 32a6485..ff5fb29 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -233,7 +233,7 @@ ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+>  MACHINE  :=
+>  endif
+>  
+> -machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
+> +machdirs := $(sort $(patsubst %,arch/arm/mach-%/,$(machine-y)))
+>  platdirs := $(patsubst %,arch/arm/plat-%/,$(plat-y))
+>  
+>  ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
 
-That information is in the pull request message:
+Found this one as well. My fix is to use CONFIG_ARCH_EXYNOS,
+CONFIG_ARCH_SPEAR3XX, etc. instead and remove the multiple lines.
 
---------------
+I want to get this into -next and plan to send you a pull request soon.
+Are you happy with the kconfig parts?
 
-The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
-
-  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
-
---------------
-
-You can also look at the log or shortlog on the kernel.org gitweb:
-
-http://git.kernel.org/?p=linux/kernel/git/pjw/omap-pending.git;a=shortlog;h=refs/tags/omap-devel-a-for-3.7
-
-
-- Paul
+Rob
