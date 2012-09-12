@@ -1,48 +1,48 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Sep 2012 14:16:15 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: remove USB phy initializer
-In-Reply-To: <20120905081319.GD11575@verge.net.au>
-References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
- <1346376502-12114-6-git-send-email-horms@verge.net.au>
- <201209032138.41485.arnd@arndb.de>
- <87k3wafxj4.wl%kuninori.morimoto.gx@renesas.com>
- <20120904003402.GE6095@verge.net.au>
- <87ehmifl3b.wl%kuninori.morimoto.gx@renesas.com>
- <20120905012056.GC4232@verge.net.au>
- <20120905012337.GD4232@verge.net.au>
- <w3p4nndz0st.wl%kuninori.morimoto.gx@renesas.com>
- <20120905081319.GD11575@verge.net.au>
-Message-ID: <20120912051614.GA5718@verge.net.au>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 12 Sep 2012 10:58:04 +0530
+Subject: [PATCH] SPI: OMAP: remove unnecessary includes of plat/clock.h
+In-Reply-To: <alpine.DEB.2.00.1209112330290.9444@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209112330290.9444@utopia.booyaka.com>
+Message-ID: <50501D64.3030707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 05:13:20PM +0900, Simon Horman wrote:
-> On Wed, Sep 05, 2012 at 11:00:22AM +0900, Kuninori Morimoto wrote:
-> > 
-> > Hi Simon
-> > 
-> > > > my preferred approach is to drop the following patches from the marzen
-> > > > branch and get the remaining changes merged (hopefully). Then look at
-> > > > USB once again.
-> > > > 
-> > > > f58f278 ARM: shmobile: marzen: add USB EHCI driver support
-> > > > 4150c1d ARM: shmobile: r8a7779: add USB OHCI clock support
-> > > > 535b372c ARM: shmobile: r8a7779: add USB EHCI clock support
-> > > > f9929ab ARM: shmobile: r8a7779: add USB common phy initializer
-> > > 
-> > > and
-> > > 
-> > > 3553395 ARM: shmobile: marzen: add USB OHCI driver support
-> > 
-> > Thank you for your help
-> 
-> Thanks, I have pushed a rebased marzen tree accordingly.
-
-Hi Morimoto-san,
-
-I realise you are busy at the moment, but when you get a chance
-could you let me know what the status of the above changes is?
-
-I believe that I am waiting for fresh "use usb phy driver" patches.
-But perhaps these depend on "add usb phy driver" patches being
-accepted into the USB tree first?
+On Wednesday 12 September 2012 05:01 AM, Paul Walmsley wrote:
+> Remove unnecessary includes of plat/clock.h from the OMAP SPI
+> controller drivers.  These need to be removed to build multi-subarch
+> ARM kernels which include these drivers.
+Looks good to me
+Acked-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  drivers/spi/spi-omap-100k.c   |    2 --
+>  drivers/spi/spi-omap2-mcspi.c |    1 -
+>  2 files changed, 3 deletions(-)
+>
+> diff --git a/drivers/spi/spi-omap-100k.c b/drivers/spi/spi-omap-100k.c
+> index 9bd1c92..dfb4b7f 100644
+> --- a/drivers/spi/spi-omap-100k.c
+> +++ b/drivers/spi/spi-omap-100k.c
+> @@ -37,8 +37,6 @@
+>  
+>  #include <linux/spi/spi.h>
+>  
+> -#include <plat/clock.h>
+> -
+>  #define OMAP1_SPI100K_MAX_FREQ          48000000
+>  
+>  #define ICR_SPITAS      (OMAP7XX_ICR_BASE + 0x12)
+> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+> index b2fb141..b5d6994 100644
+> --- a/drivers/spi/spi-omap2-mcspi.c
+> +++ b/drivers/spi/spi-omap2-mcspi.c
+> @@ -41,7 +41,6 @@
+>  
+>  #include <linux/spi/spi.h>
+>  
+> -#include <plat/clock.h>
+>  #include <plat/mcspi.h>
+>  
+>  #define OMAP2_MCSPI_MAX_FREQ		48000000
