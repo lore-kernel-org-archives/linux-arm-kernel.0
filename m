@@ -1,73 +1,89 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 12 Sep 2012 09:58:25 +0100
-Subject: [PATCH] ARM: suspend: use flush range instead of flush all
-In-Reply-To: <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
-References: <1347434328-7207-1-git-send-email-wzch@marvell.com>
- <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
-Message-ID: <20120912085825.GA4111@e102568-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 12 Sep 2012 11:04:58 +0200
+Subject: [PATCH 5/7] pwm: i.MX: add devicetree support
+In-Reply-To: <20120911144043.GA3824@avionic-0098.mockup.avionic-design.de>
+References: <1347267577-3296-1-git-send-email-s.hauer@pengutronix.de>
+ <1347267577-3296-6-git-send-email-s.hauer@pengutronix.de>
+ <20120911144043.GA3824@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120912090458.GN6180@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 08:43:33AM +0100, Shilimkar, Santosh wrote:
-> + Lorenzo,
+On Tue, Sep 11, 2012 at 04:40:43PM +0200, Thierry Reding wrote:
+> On Mon, Sep 10, 2012 at 10:59:35AM +0200, Sascha Hauer wrote:
+> > From: Philipp Zabel <p.zabel@pengutronix.de>
+> > 
+> > At the same time remove platform based support. No user for
+> > this driver has made it into mainline so far, so all we break
+> > is out of tree stuff.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+> > Reviewed-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+> [...]
 > 
-> On Wed, Sep 12, 2012 at 12:48 PM, wzch <wzch@marvell.com> wrote:
-> > From: Wenzeng Chen <wzch@marvell.com>
-> >
-> > In cpu suspend function __cpu_suspend_save(), we save cp15 registers,
-> > resume function, sp and suspend_pgd, then flush the data to DDR, but
-> > no need to flush all D cache, only need to flush range.
-> >
-> > Change-Id: I591a1fde929f3f987c69306b601843ed975d3e41
-> You should drop above.
+> I was just doing some build tests on the series and noticed that it
+> fails with this:
 > 
-> > Signed-off-by: Wenzeng Chen <wzch@marvell.com>
-> > ---
-> Lorenzo and myself discussed about the above expensive flush and he
-> is planning to post a similar patch but with small difference.
+> 	  CC [M]  drivers/pwm/pwm-imx.o
+> 	/home/thierry.reding/src/kernel/linux-pwm.git/drivers/pwm/pwm-imx.c: In function 'imx_pwm_config_v2':
+> 	/home/thierry.reding/src/kernel/linux-pwm.git/drivers/pwm/pwm-imx.c:140:2: error: implicit declaration of function 'cpu_is_mx25' [-Werror=implicit-function-declaration]
 > 
-> >  arch/arm/kernel/suspend.c |    4 +++-
-> >  1 files changed, 3 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-> > index 1794cc3..bb582d8 100644
-> > --- a/arch/arm/kernel/suspend.c
-> > +++ b/arch/arm/kernel/suspend.c
-> > @@ -17,6 +17,7 @@ extern void cpu_resume_mmu(void);
-> >   */
-> >  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
-> >  {
-> > +       u32 *ptr_orig = ptr;
-> >         *save_ptr = virt_to_phys(ptr);
-> >
-> >         /* This must correspond to the LDM in cpu_resume() assembly */
-> > @@ -26,7 +27,8 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
-> >
-> >         cpu_do_suspend(ptr);
-> >
-> > -       flush_cache_all();
-> Lorenzo's patch was limiting above flush to local cache (LOUs) instead
-> of dropping
-> it completely.
+> This breaks bisection in the middle of the series. It seems to be
+> related to this change.
+> 
+> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> > index a1e799e..b4e0ad3 100644
+> > --- a/drivers/pwm/pwm-imx.c
+> > +++ b/drivers/pwm/pwm-imx.c
+> > @@ -16,8 +16,7 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/io.h>
+> >  #include <linux/pwm.h>
+> > -#include <mach/hardware.h>
+> 
+> This probably needs to be postponed to the next patch, until the final
+> reference to cpu_is_mx25() is removed.
 
-Because if we remove it completely we have to make sure that every given
-suspend finisher calls flush_cache_all(), hence from my viewpoint this
-patch is incomplete. Either we remove it, and add it to ALL suspend
-finisher (or just make sure it is there) or we leave it but it should use
-the new LoUIS API we are going to add.
+Oops, you are right. I updated the tag accordingly, and did a full
+compile test over this series, so please pull again:
 
-> 
-> > +       __cpuc_flush_dcache_area((void *)ptr_orig, ptrsz);
-> > +       __cpuc_flush_dcache_area((void *)save_ptr, sizeof(*save_ptr));
-> >         outer_clean_range(*save_ptr, *save_ptr + ptrsz);
-> >         outer_clean_range(virt_to_phys(save_ptr),
-> >                           virt_to_phys(save_ptr) + sizeof(*save_ptr));
-> 
-> Just thinking bit more, even in case we drop the flush_cache_all()
-> completely, it should be safe since the suspend_finisher()  takes
-> care of the cache maintenance already.
 
-We already discussed this. Fine by me, but we have to make sure it is
-called on all suspend finishers in the mainline.
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
 
-Lorenzo
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-pwm-oftree
+
+for you to fetch changes up to a1d38ca9e249e670aa9f608e1cc7491fb4ca45af:
+
+  pwm: i.MX: fix clock lookup (2012-09-12 11:00:55 +0200)
+
+----------------------------------------------------------------
+Cleanup i.MX PWM driver and add devicetree support
+
+----------------------------------------------------------------
+Philipp Zabel (2):
+      pwm: i.MX: add devicetree support
+      pwm: i.MX: fix clock lookup
+
+Sascha Hauer (5):
+      pwm: i.MX: factor out SoC specific functions
+      pwm: i.MX: remove unnecessary if in pwm_[en|dis]able
+      pwm: i.MX: add functions to enable/disable pwm.
+      pwm: i.MX: Use module_platform_driver
+      pwm: i.MX: use per clock unconditionally
+
+ Documentation/devicetree/bindings/pwm/imx-pwm.txt |   17 ++
+ drivers/pwm/pwm-imx.c                             |  278 ++++++++++++++-------
+ 2 files changed, 199 insertions(+), 96 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/imx-pwm.txt
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
