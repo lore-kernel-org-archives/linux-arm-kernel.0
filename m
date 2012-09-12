@@ -1,38 +1,151 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Wed, 12 Sep 2012 10:44:20 +0100
-Subject: [RFC] tty/serial/kgdboc: Add and wire up clear_irqs callback
-In-Reply-To: <20120912040657.GA3880@lizard>
-References: <20120911093042.GA12471@lizard>
- <1347356106-25368-6-git-send-email-anton.vorontsov@linaro.org>
- <20120911151540.362001c6@pyramind.ukuu.org.uk>
- <20120912033209.GA32156@lizard>
- <CAMbhsRTmZyxFE-vAa-UvNE8KJ2f0cfXP7mncXKcpUiNF6C9PUQ@mail.gmail.com>
- <20120912040657.GA3880@lizard>
-Message-ID: <20120912104420.06a88957@bob.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Sep 2012 10:29:54 +0100
+Subject: [PATCH v3 09/31] arm64: Cache maintenance routines
+In-Reply-To: <20120907193542.GA22806@schnuecks.de>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-10-git-send-email-catalin.marinas@arm.com>
+ <20120907193542.GA22806@schnuecks.de>
+Message-ID: <20120912092954.GA21823@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Of course, if Alan is OK with this, I'm more than OK too. :-)
+Hi Simon,
 
-It may well be better.
-
-> (But the polling routines would need to clear all interrupts, not
-> just rx/tx. For example, if the controller indicated some error, and
-> nobody clears it, then we'll start reentering infinitely.)
-
-For a lot of devices and platforms you'd probably mask them instead ?
-
+On Fri, Sep 07, 2012 at 08:35:42PM +0100, Simon Baatz wrote:
+> On Fri, Sep 07, 2012 at 05:26:44PM +0100, Catalin Marinas wrote:
+> > +#define ARCH_HAS_FLUSH_ANON_PAGE
+> > +static inline void flush_anon_page(struct vm_area_struct *vma,
+> > +                      struct page *page, unsigned long vmaddr)
+> > +{
+> > +     extern void __flush_anon_page(struct vm_area_struct *vma,
+> > +                             struct page *, unsigned long);
+> > +     if (PageAnon(page))
+> > +             __flush_anon_page(vma, page, vmaddr);
 > 
-> > If you use a clear_irqs callback, you can drop characters if
-> > one arrives between the last character buffer read and calling
-> > clear_irqs.
 > 
-> Only if we call clear_irqs() after reading the characters, but we do
-> it before. So if new characters are available, we will reenter NMI,
-> which is OK.
+> __flush_anon_page() does nothing. Shouldn't this be removed as well?
 
-Recursively or not... again you get platform specific magic in places
-we don't want.
+Yes, good point.
 
-In the driver poll method for most uarts is going to be at least buried
-in what is usually arch specific uarts.
+> > +void __flush_dcache_page(struct address_space *mapping, struct page *page)
+> > +{
+> > +     __flush_dcache_area(page_address(page), PAGE_SIZE);
+> > +}
+> > +
+> > +void __sync_icache_dcache(pte_t pte)
+> > +{
+> > +     unsigned long pfn;
+> > +     struct page *page;
+> > +
+> > +     pfn = pte_pfn(pte);
+> > +     if (!pfn_valid(pfn))
+> > +             return;
+> > +
+> > +     page = pfn_to_page(pfn);
+> > +     if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+> > +             __flush_dcache_page(NULL, page);
+> > +     __flush_icache_all();
+> > +}
+> > +
+> > +/*
+> > + * Ensure cache coherency between kernel mapping and userspace mapping of this
+> > + * page.
+> > + */
+> > +void flush_dcache_page(struct page *page)
+> > +{
+> > +     struct address_space *mapping;
+> > +
+> > +     /*
+> > +      * The zero page is never written to, so never has any dirty cache
+> > +      * lines, and therefore never needs to be flushed.
+> > +      */
+> > +     if (page == ZERO_PAGE(0))
+> > +             return;
+> > +
+> > +     mapping = page_mapping(page);
+> > +
+> > +     if (mapping && !mapping_mapped(mapping))
+> > +             clear_bit(PG_dcache_clean, &page->flags);
+> > +     else {
+> > +             __flush_dcache_page(mapping, page);
+> > +             if (mapping)
+> > +                     __flush_icache_all();
+> 
+> 
+> Is this necessary to ensure I/D coherency? Then, I would have
+> expected
+> 
+>                 if (mapping) {
+>                         __flush_dcache_page(mapping, page);
+>                         __flush_icache_all();
+>                 }
+> 
+> similar to __sync_icache_dcache() above.
+
+We don't want to do additional flushing if !mapping_mapped() as the page
+isn't mapped in user space. In this case we defer the flushing until
+__sync_icache_dcache().
+
+The other case is for anonymous pages where mapping == NULL. Here we
+don't defer the D-cache flush and do it directly. The I-cache, if
+needed, is handled later in __sync_icache_dcache(). This was based on
+the idea that this case is mainly for the args/env page which is mapped
+shortly after anyway, so not worth deferring. On AArch64, I don't think
+it makes any difference. Maybe a slight improvement (at least in
+clarity) in flush_dcache_page():
+
+	if (mapping && mapping_mapped(mapping)) {
+		__flush_dcache_page(page);
+		__flush_icache_all();
+		set_bit(PG_dcache_clean, &page->flags);
+	} else {
+		clear_bit(PG_dcache_clean, &page->flags);
+	}
+
+In this case the anonymous page flushing is deferred to
+__sync_icache_dcache().
+
+> What is the reason why the D-cache flush is done in different
+> cases than the following I-cache flush?
+
+For __sync_icache_dcache(), we need to handle the situation where the
+page mapped into user space has been cleaned (D-cache) but there may be
+stale data in the I-cache. I think this can only happen with an
+ASID-tagged VIVT I-cache configuration (which is allowed on AArch64) if
+an existing page has been unmapped and the same virtual address remapped
+(withing the same mm context) to a different page that had been cleaned
+previously. We could optimise the __sync_icache_dcache() as below:
+
+	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
+		__flush_dcache_page(page);
+		__flush_icache_all();
+	} else if (icache_is_aivivt()) {
+		__flush_icache_all();
+	}
+
+> > +             set_bit(PG_dcache_clean, &page->flags);
+> > +     }
+> > +}
+> > +EXPORT_SYMBOL(flush_dcache_page);
+> > +
+> > +void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned long vmaddr)
+> > +{
+> > +}
+> 
+> Note that the __flush_dcache_page(mapping, page) in
+> flush_dcache_page() above is called when page is an anonymous page
+> (since mapping == NULL in this case).  If the call to
+> __flush_dcache_page() is right above, it should be needed
+> here as well?
+
+flush_anon_page() is called when the kernel needs to access an anonymous
+page. Given that the D-cache behaves like a PIPT, there is no need for
+additional flushing here. The flush_dcache_page() call was based on the
+assumption that such page needs flushing anyway and it's not worth
+deferring. But the code may be easier to understand as I suggested above
+(and slightly more optimal for the VIPT I-cache case).
+
+It looks like any other architecture does something different here.
+
+-- 
+Catalin
