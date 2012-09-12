@@ -1,107 +1,39 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 12 Sep 2012 14:50:10 +0300
-Subject: [PATCH] perf: Use raw_smp_processor_id insted of smp_processor_id
-Message-ID: <1347450610-4342-1-git-send-email-rogerq@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Sep 2012 13:51:23 +0200
+Subject: [PATCH 2/3] gpio: 74x164: dts: Add documentation for the dt
+ binding
+In-Reply-To: <CACRpkdZoqOVgvUegoNRjfppFb+j=urEy-Zb27Vyu+Fr5UQT_5g@mail.gmail.com>
+References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1347309341-15447-3-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdbPdG85iUqWavZyD9bw-73uDaYeGkcuNoXr8oeDJrewow@mail.gmail.com>
+ <CACRpkdZoqOVgvUegoNRjfppFb+j=urEy-Zb27Vyu+Fr5UQT_5g@mail.gmail.com>
+Message-ID: <5050773B.4050209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+Hi Linus,
 
-[   28.832916] debug_smp_processor_id: 18 callbacks suppressed
-[   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
-[   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+Le 11/09/2012 23:52, Linus Walleij a ?crit :
+> On Tue, Sep 11, 2012 at 7:22 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Mon, Sep 10, 2012 at 10:35 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Applied (since I already merged the DT code).
+> 
+> BTW: I don't have patch 3/3 in this series, does it exist? Or
+> can you resend it? 1/3 and 2/3 are applied.
 
-Tested with perf on OMAP4 Panda.
+Hmm, that's odd, but since it was about the CFA-10049 dts, Shawn already
+applied it, so I guess it's fine.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/clock.c       |    6 +++---
- arch/arm/mach-omap2/pm34xx.c      |   11 +++++++----
- arch/arm/mach-omap2/powerdomain.c |    4 ++--
- 3 files changed, 12 insertions(+), 9 deletions(-)
+Thanks,
+Maxime
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index ea3f565..2765acd 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -285,7 +285,7 @@ void omap2_clk_disable(struct clk *clk)
- 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
- 
- 	if (clk->ops && clk->ops->disable) {
--		trace_clock_disable(clk->name, 0, smp_processor_id());
-+		trace_clock_disable(clk->name, 0, raw_smp_processor_id());
- 		clk->ops->disable(clk);
- 	}
- 
-@@ -339,7 +339,7 @@ int omap2_clk_enable(struct clk *clk)
- 	}
- 
- 	if (clk->ops && clk->ops->enable) {
--		trace_clock_enable(clk->name, 1, smp_processor_id());
-+		trace_clock_enable(clk->name, 1, raw_smp_processor_id());
- 		ret = clk->ops->enable(clk);
- 		if (ret) {
- 			WARN(1, "clock: %s: could not enable: %d\n",
-@@ -380,7 +380,7 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
- 
- 	/* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
- 	if (clk->set_rate) {
--		trace_clock_set_rate(clk->name, rate, smp_processor_id());
-+		trace_clock_set_rate(clk->name, rate, raw_smp_processor_id());
- 		ret = clk->set_rate(clk, rate);
- 	}
- 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 05bd8f0..d384068 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -346,18 +346,21 @@ void omap_sram_idle(void)
- 
- static void omap3_pm_idle(void)
- {
-+	int cpu;
-+
- 	local_fiq_disable();
- 
- 	if (omap_irq_pending())
- 		goto out;
- 
--	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
--	trace_cpu_idle(1, smp_processor_id());
-+	cpu = raw_smp_processor_id();
-+	trace_power_start(POWER_CSTATE, 1, cpu);
-+	trace_cpu_idle(1, cpu);
- 
- 	omap_sram_idle();
- 
--	trace_power_end(smp_processor_id());
--	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
-+	trace_power_end(cpu);
-+	trace_cpu_idle(PWR_EVENT_EXIT, cpu);
- 
- out:
- 	local_fiq_enable();
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 69b36e1..f1d0d69 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -169,7 +169,7 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
- 				       ((state & OMAP_POWERSTATE_MASK) << 8) |
- 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
- 			trace_power_domain_target(pwrdm->name, trace_state,
--						  smp_processor_id());
-+						  raw_smp_processor_id());
- 		}
- 		break;
- 	default:
-@@ -491,7 +491,7 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
- 		/* Trace the pwrdm desired target state */
- 		trace_power_domain_target(pwrdm->name, pwrst,
--					  smp_processor_id());
-+					  raw_smp_processor_id());
- 		/* Program the pwrdm desired target state */
- 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
- 	}
+
 -- 
-1.7.4.1
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
