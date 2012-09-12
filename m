@@ -1,42 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:24 +0200
-Subject: [PATCH v9 11/13] ARM: SoC: convert spear13xx to SoC descriptor
+Date: Wed, 12 Sep 2012 16:58:18 +0200
+Subject: [PATCH v9 05/13] ARM: SoC: convert Exynos4 to SoC descriptor
 In-Reply-To: <1347461906-13527-1-git-send-email-arnd@arndb.de>
 References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347461906-13527-12-git-send-email-arnd@arndb.de>
+Message-ID: <1347461906-13527-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the spear13xx platform to use the SoC descriptor to provide
-its SMP and CPU hotplug operations.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: spear-devel at list.st.com
+Convert Exynos4 to use the SoC descriptor to provide its SMP
+and CPU hotplug operations.
+
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-spear13xx/hotplug.c              |   20 +++-----------------
- arch/arm/mach-spear13xx/include/mach/generic.h |    3 +++
- arch/arm/mach-spear13xx/platsmp.c              |   20 +++++++++++++++-----
- arch/arm/mach-spear13xx/spear1310.c            |    1 +
- arch/arm/mach-spear13xx/spear1340.c            |    1 +
- 5 files changed, 23 insertions(+), 22 deletions(-)
+ arch/arm/mach-exynos/common.h              |    5 +++++
+ arch/arm/mach-exynos/hotplug.c             |   18 +++---------------
+ arch/arm/mach-exynos/mach-armlex4210.c     |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c     |    1 +
+ arch/arm/mach-exynos/mach-nuri.c           |    1 +
+ arch/arm/mach-exynos/mach-origen.c         |    1 +
+ arch/arm/mach-exynos/mach-smdk4x12.c       |    2 ++
+ arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
+ arch/arm/mach-exynos/mach-universal_c210.c |    1 +
+ arch/arm/mach-exynos/platsmp.c             |   20 ++++++++++++++++----
+ 10 files changed, 33 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
-index 5c6867b..22e99b0 100644
---- a/arch/arm/mach-spear13xx/hotplug.c
-+++ b/arch/arm/mach-spear13xx/hotplug.c
-@@ -56,7 +56,7 @@ static inline void cpu_leave_lowpower(void)
- 	: "cc");
- }
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index aed2eeb..dac146d 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -14,6 +14,7 @@
  
--static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-+static inline void spear13xx_do_lowpower(unsigned int cpu, int *spurious)
- {
- 	for (;;) {
- 		wfi();
-@@ -79,17 +79,12 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ extern struct sys_timer exynos4_timer;
+ 
++struct map_desc;
+ void exynos_init_io(struct map_desc *mach_desc, int size);
+ void exynos4_init_irq(void);
+ void exynos5_init_irq(void);
+@@ -59,4 +60,8 @@ void exynos4212_register_clocks(void);
+ #define exynos4212_register_clocks()
+ #endif
+ 
++extern struct smp_operations exynos_smp_ops;
++
++extern void exynos_cpu_die(unsigned int cpu);
++
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 9c17a0a..d0a5a70 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -21,6 +21,8 @@
+ 
+ #include <mach/regs-pmu.h>
+ 
++#include "common.h"
++
+ extern volatile int pen_release;
+ 
+ static inline void cpu_enter_lowpower(void)
+@@ -95,17 +97,12 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
  	}
  }
  
@@ -50,21 +77,12 @@ index 5c6867b..22e99b0 100644
   *
   * Called with IRQs disabled
   */
--void __cpuinit platform_cpu_die(unsigned int cpu)
-+void __cpuinit spear13xx_cpu_die(unsigned int cpu)
+-void platform_cpu_die(unsigned int cpu)
++void __cpuinit exynos_cpu_die(unsigned int cpu)
  {
  	int spurious = 0;
  
-@@ -97,7 +92,7 @@ void __cpuinit platform_cpu_die(unsigned int cpu)
- 	 * we're ready for shutdown now, so do it
- 	 */
- 	cpu_enter_lowpower();
--	platform_do_lowpower(cpu, &spurious);
-+	spear13xx_do_lowpower(cpu, &spurious);
- 
- 	/*
- 	 * bring this CPU back into the world of cache
-@@ -108,12 +103,3 @@ void __cpuinit platform_cpu_die(unsigned int cpu)
+@@ -124,12 +121,3 @@ void platform_cpu_die(unsigned int cpu)
  	if (spurious)
  		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
  }
@@ -77,107 +95,168 @@ index 5c6867b..22e99b0 100644
 -	 */
 -	return cpu == 0 ? -EPERM : 0;
 -}
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index dac57fd0c..c33f4d9 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -33,6 +33,9 @@ void __init spear13xx_l2x0_init(void);
- bool dw_dma_filter(struct dma_chan *chan, void *slave);
- void spear_restart(char, const char *);
- void spear13xx_secondary_startup(void);
-+void __cpuinit spear13xx_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+index 5a3daa0..3f37a5e 100644
+--- a/arch/arm/mach-exynos/mach-armlex4210.c
++++ b/arch/arm/mach-exynos/mach-armlex4210.c
+@@ -199,6 +199,7 @@ static void __init armlex4210_machine_init(void)
+ MACHINE_START(ARMLEX4210, "ARMLEX4210")
+ 	/* Maintainer: Alim Akhtar <alim.akhtar@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= armlex4210_map_io,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index ef770bc..8833060 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -79,6 +79,7 @@ static char const *exynos5250_dt_compat[] __initdata = {
+ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	.init_irq	= exynos5_init_irq,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.map_io		= exynos5250_dt_map_io,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= exynos5250_dt_machine_init,
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index ea785fc..ffaa355 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -1383,6 +1383,7 @@ static void __init nuri_machine_init(void)
+ MACHINE_START(NURI, "NURI")
+ 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= nuri_map_io,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+index 4e574c2..abd0e60 100644
+--- a/arch/arm/mach-exynos/mach-origen.c
++++ b/arch/arm/mach-exynos/mach-origen.c
+@@ -806,6 +806,7 @@ static void __init origen_machine_init(void)
+ MACHINE_START(ORIGEN, "ORIGEN")
+ 	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= origen_map_io,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
+index b26beb1..964693b 100644
+--- a/arch/arm/mach-exynos/mach-smdk4x12.c
++++ b/arch/arm/mach-exynos/mach-smdk4x12.c
+@@ -370,6 +370,7 @@ static void __init smdk4x12_machine_init(void)
+ MACHINE_START(SMDK4212, "SMDK4212")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdk4x12_map_io,
+ 	.handle_irq	= gic_handle_irq,
+@@ -383,6 +384,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdk4x12_map_io,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+index 73f2bce..69b858c 100644
+--- a/arch/arm/mach-exynos/mach-smdkv310.c
++++ b/arch/arm/mach-exynos/mach-smdkv310.c
+@@ -417,6 +417,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+ 	.handle_irq	= gic_handle_irq,
+@@ -429,6 +430,7 @@ MACHINE_END
+ MACHINE_START(SMDKC210, "SMDKC210")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+index 4d1f40d..922ca0f 100644
+--- a/arch/arm/mach-exynos/mach-universal_c210.c
++++ b/arch/arm/mach-exynos/mach-universal_c210.c
+@@ -1155,6 +1155,7 @@ static void __init universal_machine_init(void)
+ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= universal_map_io,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 36c3984..3fad8ad 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -32,6 +32,8 @@
+ 
+ #include <plat/cpu.h>
+ 
++#include "common.h"
 +
-+extern struct smp_operations spear13xx_smp_ops;
+ extern void exynos4_secondary_startup(void);
  
- #ifdef CONFIG_MACH_SPEAR1310
- void __init spear1310_clk_init(void);
-diff --git a/arch/arm/mach-spear13xx/platsmp.c b/arch/arm/mach-spear13xx/platsmp.c
-index f5d07f2..806343c 100644
---- a/arch/arm/mach-spear13xx/platsmp.c
-+++ b/arch/arm/mach-spear13xx/platsmp.c
-@@ -19,6 +19,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/smp_scu.h>
- #include <mach/spear.h>
-+#include <mach/generic.h>
+ #define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+@@ -64,7 +66,7 @@ static void __iomem *scu_base_addr(void)
  
- /*
-  * control for which core is the next to come out of the secondary
-@@ -28,9 +29,8 @@ volatile int __cpuinitdata pen_release = -1;
  static DEFINE_SPINLOCK(boot_lock);
  
- static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
--extern void spear13xx_secondary_startup(void);
- 
 -void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit spear13xx_secondary_init(unsigned int cpu)
++static void __cpuinit exynos_secondary_init(unsigned int cpu)
  {
  	/*
  	 * if any interrupts are already enabled for the primary
-@@ -53,7 +53,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -86,7 +88,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
  	spin_unlock(&boot_lock);
  }
  
 -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
  	unsigned long timeout;
  
-@@ -97,7 +97,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-  * Initialise the CPU possible map early - this describes the CPUs
+@@ -161,7 +163,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
   * which may be present or become present in the system.
   */
--void __init smp_init_cpus(void)
-+static void __init spear13xx_smp_init_cpus(void)
- {
- 	unsigned int i, ncores = scu_get_core_count(scu_base);
  
-@@ -113,7 +113,7 @@ void __init smp_init_cpus(void)
+-void __init smp_init_cpus(void)
++static void __init exynos_smp_init_cpus(void)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
+ 	unsigned int i, ncores;
+@@ -184,7 +186,7 @@ void __init smp_init_cpus(void)
  	set_smp_cross_call(gic_raise_softirq);
  }
  
 -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init spear13xx_smp_prepare_cpus(unsigned int max_cpus)
++static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
  {
- 
- 	scu_enable(scu_base);
-@@ -125,3 +125,13 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 */
- 	__raw_writel(virt_to_phys(spear13xx_secondary_startup), SYS_LOCATION);
+ 	if (!soc_is_exynos5250())
+ 		scu_enable(scu_base_addr());
+@@ -198,3 +200,13 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+ 			CPU1_BOOT_REG);
  }
 +
-+struct smp_operations spear13xx_smp_ops __initdata = {
-+       .smp_init_cpus		= spear13xx_smp_init_cpus,
-+       .smp_prepare_cpus	= spear13xx_smp_prepare_cpus,
-+       .smp_secondary_init	= spear13xx_secondary_init,
-+       .smp_boot_secondary	= spear13xx_boot_secondary,
++struct smp_operations exynos_smp_ops __initdata = {
++	.smp_init_cpus		= exynos_smp_init_cpus,
++	.smp_prepare_cpus	= exynos_smp_prepare_cpus,
++	.smp_secondary_init	= exynos_secondary_init,
++	.smp_boot_secondary	= exynos_boot_secondary,
 +#ifdef CONFIG_HOTPLUG_CPU
-+       .cpu_die			= spear13xx_cpu_die,
++	.cpu_die		= exynos_cpu_die,
 +#endif
 +};
-diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
-index 732d29b..9fbbfc5 100644
---- a/arch/arm/mach-spear13xx/spear1310.c
-+++ b/arch/arm/mach-spear13xx/spear1310.c
-@@ -78,6 +78,7 @@ static void __init spear1310_map_io(void)
- }
- 
- DT_MACHINE_START(SPEAR1310_DT, "ST SPEAr1310 SoC with Flattened Device Tree")
-+	.smp		=	smp_ops(spear13xx_smp_ops),
- 	.map_io		=	spear1310_map_io,
- 	.init_irq	=	spear13xx_dt_init_irq,
- 	.handle_irq	=	gic_handle_irq,
-diff --git a/arch/arm/mach-spear13xx/spear1340.c b/arch/arm/mach-spear13xx/spear1340.c
-index 81e4ed7..081014f 100644
---- a/arch/arm/mach-spear13xx/spear1340.c
-+++ b/arch/arm/mach-spear13xx/spear1340.c
-@@ -182,6 +182,7 @@ static const char * const spear1340_dt_board_compat[] = {
- };
- 
- DT_MACHINE_START(SPEAR1340_DT, "ST SPEAr1340 SoC with Flattened Device Tree")
-+	.smp		=	smp_ops(spear13xx_smp_ops),
- 	.map_io		=	spear13xx_map_io,
- 	.init_irq	=	spear13xx_dt_init_irq,
- 	.handle_irq	=	gic_handle_irq,
 -- 
 1.7.10
