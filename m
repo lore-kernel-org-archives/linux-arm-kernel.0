@@ -1,56 +1,40 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 12 Sep 2012 16:28:06 +0530
-Subject: [PATCHv8 12/22] i2c: omap: bus: add a receiver flag
+Date: Wed, 12 Sep 2012 16:28:12 +0530
+Subject: [PATCHv8 18/22] i2c: omap: remove redundant status read
 In-Reply-To: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
 References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1347447496-16793-13-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1347447496-16793-19-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+Currently omap_i2c_ack_stat doesn't use the stat variable.
+After the read of the I2C_STAT_REG it is not used.
+Remove the redundant read of the status register.
 
-that way we can ignore TX IRQs while in receiver
-mode and ignore RX IRQs while in transmitter mode.
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-[Remove unnecessary braces]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 0da8169..3be147a 100644
+index 5d4bad4..498a462 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -199,6 +199,7 @@ struct omap_i2c_dev {
- 						 */
- 	u8			rev;
- 	unsigned		b_hw:1;		/* bad h/w fixes */
-+	unsigned		receiver:1;	/* true when we're in receiver mode */
- 	u16			iestate;	/* Saved interrupt register */
- 	u16			pscstate;
- 	u16			scllstate;
-@@ -492,6 +493,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+@@ -946,7 +946,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 				num_bytes = dev->buf_len;
  
- 	INIT_COMPLETION(dev->cmd_complete);
- 	dev->cmd_err = 0;
-+	dev->receiver = !!(msg->flags & I2C_M_RD);
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
+-			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+ 				goto out;
  
- 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
+@@ -962,7 +961,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 				num_bytes = dev->threshold;
  
-@@ -837,6 +839,12 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
- 		stat &= bits;
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
+-			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+ 				goto out;
  
-+		/* If we're in receiver mode, ignore XDR/XRDY */
-+		if (dev->receiver)
-+			stat &= ~(OMAP_I2C_STAT_XDR | OMAP_I2C_STAT_XRDY);
-+		else
-+			stat &= ~(OMAP_I2C_STAT_RDR | OMAP_I2C_STAT_RRDY);
-+
- 		if (!stat) {
- 			/* my work here is done */
- 			return IRQ_HANDLED;
 -- 
 1.7.5.4
