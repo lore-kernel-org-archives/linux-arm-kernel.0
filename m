@@ -1,48 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Sep 2012 15:14:02 -0500
-Subject: [PATCH v2 5/6] ARM: orion: move custom gpio functions to
- orion-gpio.h
-In-Reply-To: <201209122011.28080.arnd@arndb.de>
-References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1346960563-18689-6-git-send-email-robherring2@gmail.com>
- <201209122011.28080.arnd@arndb.de>
-Message-ID: <5050ED0A.2020100@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 12 Sep 2012 20:14:33 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod: some fixes for 3.6-rc
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EAB25C9@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
+ <50498170.3010600@ti.com>
+ <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EAB25C9@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1209122011590.17903@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 03:11 PM, Arnd Bergmann wrote:
-> On Thursday 06 September 2012, Rob Herring wrote:
->> diff --git a/arch/arm/plat-orion/include/plat/gpio.h b/arch/arm/plat-orion/include/plat/gpio.h
->> deleted file mode 100644
->> index 81c6fc8..0000000
->> --- a/arch/arm/plat-orion/include/plat/gpio.h
->> +++ /dev/null
->> @@ -1,37 +0,0 @@
->> -/*
->> - * arch/arm/plat-orion/include/plat/gpio.h
->> - *
-> 
-> You remove the file here
-> 
->> diff --git a/arch/arm/plat-orion/mpp.c b/arch/arm/plat-orion/mpp.c
->> index 3b1e17b..c140c2f 100644
->> --- a/arch/arm/plat-orion/mpp.c
->> +++ b/arch/arm/plat-orion/mpp.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/io.h>
->>  #include <linux/gpio.h>
->>  #include <mach/hardware.h>
->> +#include <plat/gpio.h>
->>  #include <plat/mpp.h>
->>  
-> 
-> and add a new #include here, to the old name, resulting in 
-> 
-> arch/arm/plat-orion/mpp.c:17:23: fatal error: plat/gpio.h: No such file or directory
-> 
-> A similar problem happens in plat-orion/irq.c, which has grown a new
-> #include of plat/gpio.h in a different branch that is now in arm-soc.
+On Wed, 12 Sep 2012, Hiremath, Vaibhav wrote:
 
-It should be orion-gpio.h instead. I have this fixed in my tree.
+> On Wed, Sep 12, 2012 at 21:35:04, Paul Walmsley wrote:
+>  
+> > http://marc.info/?l=linux-omap&m=134746561028888&w=2
+> 
+> Just for my understanding, is this pull request you created based on 
+> l-o/master? Or other baseline?
 
-Rob
+That information is in the pull request message:
+
+--------------
+
+The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+
+  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+
+--------------
+
+You can also look at the log or shortlog on the kernel.org gitweb:
+
+http://git.kernel.org/?p=linux/kernel/git/pjw/omap-pending.git;a=shortlog;h=refs/tags/omap-devel-a-for-3.7
+
+
+- Paul
