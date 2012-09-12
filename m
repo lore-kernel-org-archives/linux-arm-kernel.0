@@ -1,45 +1,66 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 12 Sep 2012 21:28:55 +0200
-Subject: [PATCH] arch/arm/mach-s3c24xx/mach-h1940.c: delete double assignment
-Message-ID: <1347478135-744-1-git-send-email-Julia.Lawall@lip6.fr>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Wed, 12 Sep 2012 14:45:43 -0500
+Subject: [PATCH v2 0/9] OMAP: iommu: hwmod, reset handling and runtime PM
+Message-ID: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+These patches are needed for remoteproc to work on OMAP4.
 
-Delete successive assignments to the same location.
+Introduced iommu hwmod support for OMAP3 (iva, isp) and
+OMAP4 (ipu, dsp), along with the corresponding runtime PM
+and routines to deassert reset lines, enable/disable clocks
+and configure sysc registers.
 
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
+Due to compatibility an ifdef needs to be propagated (previously
+on iommu resource info) to hwmod data in OMAP3, so users of iommu
+and tidspbridge can avoid issues of two modules managing mmu
+data/irqs/resets; this until tidspbridge can be safely migrated
+to iommu framework.
 
-// <smpl>
-@@
-expression i;
-@@
+Although IOMMU hwmod patches were already submitted in the past,
+this series adds few more changes, like:
+- New reset handling, based on a series that was accepted
+  but *NOT YET* in mainline.
 
-*i = ...;
- i = ...;
-// </smpl>
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg73111.html
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg75105.html
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+- Fix for compile break if IOMMU_API is not selected.
+- Save and restore context code rework.
+- Device tree bindings for OMAP3 and OMAP4.
 
----
-Not compiled, and this may change the behavior of the code.  Without this
-change, check_gpio2 could possibly be used uninitialized later.
+Previous work can be found at:
+[v1]
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70447.html
 
- arch/arm/mach-s3c24xx/mach-h1940.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+[old iteration without reset, save/restore and device tree]
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60133.html
 
-diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-index bb8d008..477778c 100644
---- a/arch/arm/mach-s3c24xx/mach-h1940.c
-+++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-@@ -380,7 +380,7 @@ int h1940_led_blink_set(unsigned gpio, int state,
- 	default:
- 		blink_gpio = S3C2410_GPA(3);
- 		check_gpio1 = S3C2410_GPA(1);
--		check_gpio1 = S3C2410_GPA(7);
-+		check_gpio2 = S3C2410_GPA(7);
- 		break;
- 	}
- 
+Omar Ramirez Luna (9):
+  ARM: OMAP: iommu: fix including iommu.h without IOMMU_API selected
+  ARM: OMAP3: hwmod data: add mmu data for iva and isp
+  ARM: OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+  ARM: OMAP3/4: iommu: migrate to hwmod framework
+  ARM: OMAP3/4: iommu: adapt to runtime pm
+  ARM: OMAP: iommu: pm runtime save and restore context
+  ARM: OMAP: iommu: optimize save and restore routines
+  ARM: OMAP: iommu: add device tree support
+  arm/dts: OMAP3/4: Add iommu nodes
+
+ .../devicetree/bindings/arm/omap/iommu.txt         |   10 ++
+ arch/arm/boot/dts/omap3.dtsi                       |   12 +-
+ arch/arm/boot/dts/omap4.dtsi                       |   17 +-
+ arch/arm/mach-omap2/devices.c                      |    2 +-
+ arch/arm/mach-omap2/iommu2.c                       |   74 +++------
+ arch/arm/mach-omap2/omap-iommu.c                   |  168 +++++---------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  121 ++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  136 +++++++++++++++-
+ arch/arm/plat-omap/include/plat/iommu.h            |   35 +++-
+ arch/arm/plat-omap/include/plat/iommu2.h           |    4 -
+ drivers/iommu/omap-iommu.c                         |  163 +++++++++++++++----
+ 11 files changed, 511 insertions(+), 231 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/iommu.txt
+
+-- 
+1.7.9.5
