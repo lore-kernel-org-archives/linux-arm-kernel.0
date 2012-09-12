@@ -1,32 +1,34 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 12 Sep 2012 14:49:31 +0900
-Subject: [PATCH] ARM: shmobile: kzm9g: use gpio-keys instead of
- gpio-keys-polled
-In-Reply-To: <CACRpkdZw8+q3QW6ThSdSoXfyAPoF-H=pCR2eGptTRWcG3eQaGw@mail.gmail.com>
-References: <1347341165-15573-1-git-send-email-horms@verge.net.au>
- <1347341165-15573-2-git-send-email-horms@verge.net.au>
- <CACRpkdZw8+q3QW6ThSdSoXfyAPoF-H=pCR2eGptTRWcG3eQaGw@mail.gmail.com>
-Message-ID: <20120912054931.GH13568@linux-sh.org>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Wed, 12 Sep 2012 11:20:06 +0530
+Subject: [RFC PATCH] ARM: mm: ADD descriptor string to CONFIG_DMA_ADDR_64BIT_T
+Message-ID: <1347429006-10879-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 07:27:54PM +0200, Linus Walleij wrote:
-> On Tue, Sep 11, 2012 at 7:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> 
-> > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >
-> > 6e20a0a429bd4dc07d6de16d9c247270e04e4aa0
-> > (gpio: pcf857x: enable gpio_to_irq() support) supports
-> > gpio_to_irq() on pcf857x driver.
-> > Now, we can use gpio-keys driver instead of gpio-keys-polled.
-> >
-> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> 
-> Paul, Magnus - Simon wants me to merge this through the
-> GPIO tree, can I have and ACK from one of the shmobile
-> maintainers on that?
-> 
-Looks fine to me.
+Even if CONFIG_DMA_ADDR_64BIT_T is enabled by the defconfig,
+the feature is not getting selected.
+Adding a string description in the Kconfig resolves this.
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+But not sure if this is the right way to fix this.
+
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 101b968..90c5ea4 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -601,7 +601,7 @@ config ARCH_PHYS_ADDR_T_64BIT
+ 	def_bool ARM_LPAE
+ 
+ config ARCH_DMA_ADDR_T_64BIT
+-	bool
++	bool "64bit capable DMA device"
+ 
+ config ARM_THUMB
+ 	bool "Support Thumb user binaries"
+-- 
+1.7.9.5
