@@ -1,89 +1,74 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 12 Sep 2012 14:47:04 +0300
-Subject: [PATCH 08/11] ASoC: OMAP: mcbsp, mcpdm,
- dmic: Let omap-pcm to pick the dma_type
+Date: Wed, 12 Sep 2012 14:47:05 +0300
+Subject: [PATCH 09/11] ASoC: omap-pcm,
+ omap-hdmi: Change the use of omap_pcm_dma_data->data_type
 In-Reply-To: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347450427-27627-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1347450427-27627-10-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap-pcm can figure out the correct dma_type based on the stream's format.
-In this way we can get rid of the plat/dma.h include from these drivers.
+Instead of the OMAP DMA data type definition the data_type will be used to
+specify the number of bits the DMA word should be configured or 0 in case
+when based on the stream's format the omap-pcm can decide the needed DMA
+word size.
+This feature is needed for the omap-hdmi where the sDMA need to be
+configured for 32bit word type regardless of the audio format used.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- sound/soc/omap/omap-dmic.c  | 2 --
- sound/soc/omap/omap-mcbsp.c | 3 ---
- sound/soc/omap/omap-mcpdm.c | 3 ---
- 3 files changed, 8 deletions(-)
+ sound/soc/omap/omap-hdmi.c | 3 +--
+ sound/soc/omap/omap-pcm.c  | 3 ++-
+ sound/soc/omap/omap-pcm.h  | 3 ++-
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/omap/omap-dmic.c b/sound/soc/omap/omap-dmic.c
-index 60b7b8c..df0ff24 100644
---- a/sound/soc/omap/omap-dmic.c
-+++ b/sound/soc/omap/omap-dmic.c
-@@ -33,7 +33,6 @@
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
- #include <linux/of_device.h>
--#include <plat/dma.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -63,7 +62,6 @@ struct omap_dmic {
-  */
- static struct omap_pcm_dma_data omap_dmic_dai_dma_params = {
- 	.name		= "DMIC capture",
--	.data_type	= OMAP_DMA_DATA_TYPE_S32,
- };
- 
- static inline void omap_dmic_write(struct omap_dmic *dmic, u16 reg, u32 val)
-diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
-index 5b3bacc..a230646 100644
---- a/sound/soc/omap/omap-mcbsp.c
-+++ b/sound/soc/omap/omap-mcbsp.c
+diff --git a/sound/soc/omap/omap-hdmi.c b/sound/soc/omap/omap-hdmi.c
+index b194646..0951767 100644
+--- a/sound/soc/omap/omap-hdmi.c
++++ b/sound/soc/omap/omap-hdmi.c
 @@ -34,7 +34,6 @@
- #include <sound/initval.h>
- #include <sound/soc.h>
+ #include <sound/asoundef.h>
+ #include <video/omapdss.h>
  
 -#include <plat/dma.h>
- #include <plat/mcbsp.h>
- #include "mcbsp.h"
- #include "omap-mcbsp.h"
-@@ -234,11 +233,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
- 
- 	switch (params_format(params)) {
- 	case SNDRV_PCM_FORMAT_S16_LE:
--		dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
- 		wlen = 16;
- 		break;
- 	case SNDRV_PCM_FORMAT_S32_LE:
--		dma_data->data_type = OMAP_DMA_DATA_TYPE_S32;
- 		wlen = 32;
- 		break;
- 	default:
-diff --git a/sound/soc/omap/omap-mcpdm.c b/sound/soc/omap/omap-mcpdm.c
-index 36648e0..c1b4935 100644
---- a/sound/soc/omap/omap-mcpdm.c
-+++ b/sound/soc/omap/omap-mcpdm.c
-@@ -40,7 +40,6 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- 
--#include <plat/dma.h>
- #include "omap-mcpdm.h"
  #include "omap-pcm.h"
+ #include "omap-hdmi.h"
  
-@@ -70,11 +69,9 @@ struct omap_mcpdm {
- static struct omap_pcm_dma_data omap_mcpdm_dai_dma_params[] = {
- 	{
- 		.name = "Audio playback",
--		.data_type = OMAP_DMA_DATA_TYPE_S32,
- 	},
- 	{
- 		.name = "Audio capture",
--		.data_type = OMAP_DMA_DATA_TYPE_S32,
- 	},
+@@ -100,7 +99,7 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
+ 		return -EINVAL;
+ 	}
+ 
+-	priv->dma_params.data_type = OMAP_DMA_DATA_TYPE_S32;
++	priv->dma_params.data_type = 32;
+ 
+ 	snd_soc_dai_set_dma_data(dai, substream,
+ 				 &priv->dma_params);
+diff --git a/sound/soc/omap/omap-pcm.c b/sound/soc/omap/omap-pcm.c
+index 4c13a5f..74da4b7 100644
+--- a/sound/soc/omap/omap-pcm.c
++++ b/sound/soc/omap/omap-pcm.c
+@@ -183,7 +183,8 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
+ 	memset(&dma_params, 0, sizeof(dma_params));
+ 
+ 	if (dma_data->data_type)
+-		dma_params.data_type = dma_data->data_type;
++		dma_params.data_type = omap_pcm_get_dma_type(
++				dma_data->data_type);
+ 	else
+ 		dma_params.data_type = omap_pcm_get_dma_type(
+ 				snd_pcm_format_physical_width(runtime->format));
+diff --git a/sound/soc/omap/omap-pcm.h b/sound/soc/omap/omap-pcm.h
+index 1bf47e4..cabe74c 100644
+--- a/sound/soc/omap/omap-pcm.h
++++ b/sound/soc/omap/omap-pcm.h
+@@ -32,7 +32,8 @@ struct omap_pcm_dma_data {
+ 	int		dma_req;	/* DMA request line */
+ 	unsigned long	port_addr;	/* transmit/receive register */
+ 	void (*set_threshold)(struct snd_pcm_substream *substream);
+-	int		data_type;	/* data type 8,16,32 */
++	int		data_type;	/* 8, 16, 32 (bits) or 0 to let omap-pcm
++					 * to decide the sDMA data type */
+ 	int		packet_size;	/* packet size only in PACKET mode */
  };
  
 -- 
