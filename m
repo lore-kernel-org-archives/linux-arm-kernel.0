@@ -1,59 +1,55 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 12 Sep 2012 08:54:23 +0200
-Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <504FB869.60201@wwwdotorg.org>
+Date: Wed, 12 Sep 2012 08:56:52 +0200
+Subject: [PATCH v3 6/9] ARM: mvebu: add pinctrl device in DT for Armada
+ 370/XP SoCs
+In-Reply-To: <504FB9D7.3030205@wwwdotorg.org>
 References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
-Message-ID: <20120912085423.21af58d5@skate>
+ <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <504FB9D7.3030205@wwwdotorg.org>
+Message-ID: <20120912085652.21d3232f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 11 Sep 2012 16:17:13 -0600,
+Le Tue, 11 Sep 2012 16:23:19 -0600,
 Stephen Warren <swarren@wwwdotorg.org> a ?crit :
 
+> On 09/10/2012 02:39 AM, Sebastian Hesselbarth wrote:
+> > From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > 
+> > The Armada 370 and XP SoCs have configurable muxing for a certain
+> > number of their pins, controlled through a pinctrl driver.
 > 
-> +static struct mvebu_mpp_mode dove_mpp_modes[] = {
-> +	MPP_MODE(0,
-> +		MPP_FUNCTION(0x00, "gpio", NULL),
-> +		MPP_FUNCTION(0x02, "uart2", "rts"),
-> +		MPP_FUNCTION(0x03, "sdio0", "cd"),
-> +		MPP_FUNCTION(0x0f, "lcd0", "pwm"),
-> +		MPP_FUNCTION(0x10, "pmu", NULL)),
+> Hmmm. I'd be tempted just to put the entire node definition there;
+> putting in a .dtsi file just to share the reg property doesn't seem
+> especially useful.
+
+When you say "here" you're mentioning the SoC-specific .dtsi files (i.e
+the ones in PATCH 7/9 and PATCH 8/9), correct?
+
+> > The 'compatible' property is defined in the SoC-specific .dtsi files,
+> > since the compatible string identifies the number of pins and other
+> > SoC-specific properties.
 > 
-> it's defining the functions within the context of a particular group
-> ("mode" in the drivers terminology, I think...) rather than defining
-> functions and groups as separate top-level tables.
+> > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> 
+> > +		pinctrl at d0018000 {
+> 
+> If this is the only pinctrl instance, you'd typically name the node just
+> "pinctrl", since the "@d0018000" isn't needed to get unique node names.
 
-This data structure really reflects what the datasheet says. Typically,
-for SoCs where each pin is independently muxable (AT91, i.MX23/28,
-Marvell, and probably many more), the datasheet has a big array, with
-one line per pin, and then several columns which tell for a given pin,
-what is "function 0", "function 1", "function 2", "function 3", etc.
+Ack.
 
-So the data structure that Sebastian has implemented in the mvebu
-driver immediately reflects this. In fact, the pinctrl table code for
-Armada 370 and Armada XP was semi-automatically generated from CSV data
-of the pinmux functions, directly coming from the datasheets. Having to
-create a global list of all possible functions seems useless and
-painful, since the functions only make sense in the context of one
-particular pin.
+> > +			reg = <0xd0018000 0x38>;
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges;
+> 
+> What is "ranges" for; this isn't a memory-mapped bus, right?
 
-Could you be more specific as to what representation you're looking
-after? You're proposing to "define functions and groups as separate
-top-level tables", but then how to you map which functions are
-available for which group, and what is the number of that function is
-this group (which we need to actually configure the mapping). I'd
-really like to see (with a short code example) what is your view of how
-pinmux should be handled for SoCs having independently muxable pins.
+Ack.
 
-I really don't understand how a global list of functions make sense:
-the functions make sense on a per-group basis, and this is how the
-hardwaredatasheet defines them. If we could keep this representation,
-it would really be useful.
-
-Thanks!
+Best regards,
 
 Thomas
 -- 
