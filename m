@@ -1,52 +1,47 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 12 Sep 2012 16:31:29 -0400 (EDT)
-Subject: [PATCH] of: specify initrd location using 64-bit
-In-Reply-To: <5050EF3F.6030003@gmail.com>
-References: <1347465937-7056-1-git-send-email-cyril@ti.com>
- <5050EF3F.6030003@gmail.com>
-Message-ID: <alpine.LFD.2.02.1209121629260.28681@xanadu.home>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 12 Sep 2012 13:32:23 -0700
+Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
+In-Reply-To: <CACRpkda6u7ZL9Rj=6+sMUTMs9zjV10kneUguugTuPziQvS68dQ@mail.gmail.com>
+References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdamYMhduj42-reu6QjQiso65=Wy_bNF37gENDBrBbQ5=Q@mail.gmail.com>
+ <CACRpkda6u7ZL9Rj=6+sMUTMs9zjV10kneUguugTuPziQvS68dQ@mail.gmail.com>
+Message-ID: <20120912203223.3094.5354@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Sep 2012, Rob Herring wrote:
-
-> On 09/12/2012 11:05 AM, Cyril Chemparathy wrote:
-> > On some PAE architectures, the entire range of physical memory could reside
-> > outside the 32-bit limit.  These systems need the ability to specify the
-> > initrd location using 64-bit numbers.
-> > 
-> > This patch globally modifies the early_init_dt_setup_initrd_arch() function to
-> > use 64-bit numbers instead of the current unsigned long.
+Quoting Linus Walleij (2012-09-12 09:07:51)
+> On Wed, Sep 12, 2012 at 6:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Fri, Sep 7, 2012 at 10:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> >
+> >> -static struct notifier_block twd_cpufreq_nb = {
+> >> -       .notifier_call = twd_cpufreq_transition,
+> >> +static struct notifier_block twd_clk_nb = {
+> >> +       .notifier_call = twd_rate_change,
+> >
+> > But what happens if there is a platform which is now using this through
+> > cpufreq and has not yet switched to the common clock? It regresses
+> > right, because no notifications arrive anymore? Does it even compile?
 > 
-> S-o-B?
+> Bah too late in the afternoon :-(
 > 
-> > ---
-> >  arch/arm/mm/init.c            |    2 +-
-> >  arch/c6x/kernel/devicetree.c  |    3 +--
-> >  arch/microblaze/kernel/prom.c |    3 +--
-> >  arch/mips/kernel/prom.c       |    3 +--
-> >  arch/openrisc/kernel/prom.c   |    3 +--
-> >  arch/powerpc/kernel/prom.c    |    3 +--
-> >  arch/x86/kernel/devicetree.c  |    3 +--
-> >  drivers/of/fdt.c              |   10 ++++++----
-> >  include/linux/of_fdt.h        |    3 +--
-> >  9 files changed, 14 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> > index ad722f1..579792c 100644
-> > --- a/arch/arm/mm/init.c
-> > +++ b/arch/arm/mm/init.c
-> > @@ -76,7 +76,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
-> >  __tagtable(ATAG_INITRD2, parse_tag_initrd2);
-> >  
-> >  #ifdef CONFIG_OF_FLATTREE
-> > -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
-> > +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+> So the real question is - are we sure that imx6 is the last platform
+> migrated to common clock of all those using the CPUfreq scaling
+> (this seems to be the last piece) such that
+> we don't break anything....
 > 
-> phys_initrd_start/size need to change too. Not sure about similar things
-> on other arches.
 
-size ?
+OMAP will break.  My original version of this patch had "HACK:" in the
+$subject since it was just a demo of the notifiers.
 
+I'll submit a new version with some #ifdef CONFIG_COMMON_CLK bits ASAP.
 
-Nicolas
+Regards,
+Mike
+
+> Yours,
+> Linus Walleij
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
