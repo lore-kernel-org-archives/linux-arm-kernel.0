@@ -1,216 +1,237 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 12 Sep 2012 19:46:32 +0000 (UTC)
-Subject: [PATCHv7 03/12] ARM: OMAP4: hwmod: flag hwmods/modules not
- supporting module level context status
-In-Reply-To: <1342704392-23657-4-git-send-email-t-kristo@ti.com>
+Date: Wed, 12 Sep 2012 19:48:09 +0000 (UTC)
+Subject: [PATCHv7 04/12] ARM: OMAP: hwmod: Add support for per hwmod/module
+ context lost count
+In-Reply-To: <1342704392-23657-5-git-send-email-t-kristo@ti.com>
 References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
- <1342704392-23657-4-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1209121943390.17903@utopia.booyaka.com>
+ <1342704392-23657-5-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1209121946410.17903@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-
 On Thu, 19 Jul 2012, Tero Kristo wrote:
 
-> On OMAP4 most modules/hwmods support module level context status. On
-> OMAP3 and earlier, we relied on the power domain level context status.
-> Identify all modules that don't support 'context_offs' by marking the
-> offset as USHRT_MAX. Rest have a valid 'context_offs' populated in
-> .prcm structure already.
+> From: Rajendra Nayak <rnayak@ti.com>
 > 
+> OMAP4 has module specific context lost registers which makes it now
+> possible to have module level context loss count, instead of relying
+> on the powerdomain level context count.
+> 
+> Add 2 private hwmod api's to update/clear the hwmod/module specific
+> context lost counters/register.
+> 
+> Update the module specific context_lost_counter and clear the hardware
+> bits just after enabling the module.
+> 
+> omap_hwmod_get_context_loss_count() now returns the hwmod context loss
+> count them on platforms where they exist (OMAP4), else fall back on
+> the pwrdm level counters for older platforms.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> [paul at pwsan.com: added function kerneldoc, fixed structure kerneldoc,
+>  rearranged structure to avoid memory waste, marked fns as OMAP4-specific,
+>  prevent fn entry on non-OMAP4 chips, reduced indentation, merged update
+>  and clear, merged patches]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> [t-kristo at ti.com: added support for arch specific hwmod ops, and changed
+>  the no context offset indicator to USHRT_MAX]
 > Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-This one was changed here to use a separate flag rather than adding a 
-magic value to the context_offs field -- mostly because I've been burnt by 
-missing tests for those kinds of magic values in the past.  It should be 
-possible to roll the .modulemode field into this .flags field in a future 
-patch to eliminate any kernel object size changes.  
-
-The modified patch is below, queued for 3.7.
+This one has been modified to align with the changes on patch 3, and 
+queued for 3.7.
 
 
 - Paul
 
-From: Tero Kristo <t-kristo@ti.com>
-Date: Wed, 12 Sep 2012 11:53:54 -0600
-Subject: [PATCH] ARM: OMAP4: hwmod: flag hwmods/modules not supporting module
- level context status
+From: Rajendra Nayak <rnayak@ti.com>
+Date: Wed, 12 Sep 2012 11:55:55 -0600
+Subject: [PATCH] ARM: OMAP: hwmod: Add support for per hwmod/module context
+ lost count
 
-On OMAP4 most modules/hwmods support module level context status. On
-OMAP3 and earlier, we relied on the power domain level context status.
-Identify all modules that don't support 'context_offs' by adding a
-flag bit, HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT.  Rest have a valid
-'context_offs' populated in .prcm structure already.
+OMAP4 has module specific context lost registers which makes it now
+possible to have module level context loss count, instead of relying
+on the powerdomain level context count.
 
+Add 2 private hwmod api's to update/clear the hwmod/module specific
+context lost counters/register.
+
+Update the module specific context_lost_counter and clear the hardware
+bits just after enabling the module.
+
+omap_hwmod_get_context_loss_count() now returns the hwmod context loss
+count them on platforms where they exist (OMAP4), else fall back on
+the pwrdm level counters for older platforms.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+[paul at pwsan.com: added function kerneldoc, fixed structure kerneldoc,
+ rearranged structure to avoid memory waste, marked fns as OMAP4-specific,
+ prevent fn entry on non-OMAP4 chips, reduced indentation, merged update
+ and clear, merged patches]
+[t-kristo at ti.com: added support for arch specific hwmod ops, and changed
+ the no context offset indicator to USHRT_MAX]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-[paul at pwsan.com: add flag bit rather than overloading .context_offs;
- update changelog message]
+[paul at pwsan.com: use NO_CONTEXT_LOSS_BIT flag rather than USHRT_MAX]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   46 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   12 ++++++-
- 2 files changed, 57 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |   71 ++++++++++++++++++++++++--
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   11 ++--
+ 2 files changed, 74 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 242aee4..e4b0177 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -203,6 +203,7 @@ static struct omap_hwmod omap44xx_l4_abe_hwmod = {
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM1_ABE_L4ABE_CLKCTRL_OFFSET,
-+			.flags	      = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
- 		},
- 	},
- };
-@@ -259,6 +260,11 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
- 	.name		= "mpu_private",
- 	.class		= &omap44xx_mpu_bus_hwmod_class,
- 	.clkdm_name	= "mpuss_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 6ca8e51..16cfbfa 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -195,6 +195,13 @@ static struct omap_hwmod_soc_ops soc_ops;
+ /* omap_hwmod_list contains all registered struct omap_hwmods */
+ static LIST_HEAD(omap_hwmod_list);
  
- /*
-@@ -447,6 +453,11 @@ static struct omap_hwmod omap44xx_ctrl_module_core_hwmod = {
- 	.class		= &omap44xx_ctrl_module_hwmod_class,
- 	.clkdm_name	= "l4_cfg_clkdm",
- 	.mpu_irqs	= omap44xx_ctrl_module_core_irqs,
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
++struct hwmod_ops {
++	void	(*hwmod_update_context_lost)(struct omap_hwmod *oh);
++	int	(*hwmod_get_context_lost)(struct omap_hwmod *oh);
++};
++
++static struct hwmod_ops *arch_hwmod;
++
+ /* mpu_oh: used to add/remove MPU initiator from sleepdep list */
+ static struct omap_hwmod *mpu_oh;
  
- /* ctrl_module_pad_core */
-@@ -454,6 +465,11 @@ static struct omap_hwmod omap44xx_ctrl_module_pad_core_hwmod = {
- 	.name		= "ctrl_module_pad_core",
- 	.class		= &omap44xx_ctrl_module_hwmod_class,
- 	.clkdm_name	= "l4_cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
+@@ -1789,6 +1796,52 @@ static void _reconfigure_io_chain(void)
+ }
  
- /* ctrl_module_wkup */
-@@ -461,6 +477,11 @@ static struct omap_hwmod omap44xx_ctrl_module_wkup_hwmod = {
- 	.name		= "ctrl_module_wkup",
- 	.class		= &omap44xx_ctrl_module_hwmod_class,
- 	.clkdm_name	= "l4_wkup_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
+ /**
++ * _omap4_update_context_lost - increment hwmod context loss counter if
++ * hwmod context was lost, and clear hardware context loss reg
++ * @oh: hwmod to check for context loss
++ *
++ * If the PRCM indicates that the hwmod @oh lost context, increment
++ * our in-memory context loss counter, and clear the RM_*_CONTEXT
++ * bits. No return value.
++ */
++static void _omap4_update_context_lost(struct omap_hwmod *oh)
++{
++	u32 r;
++
++	if (oh->prcm.omap4.flags & HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT)
++		return;
++
++	r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
++					oh->clkdm->pwrdm.ptr->prcm_offs,
++					oh->prcm.omap4.context_offs);
++
++	if (!r)
++		return;
++
++	oh->prcm.omap4.context_lost_counter++;
++
++	omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
++				     oh->clkdm->pwrdm.ptr->prcm_offs,
++				     oh->prcm.omap4.context_offs);
++}
++
++/**
++ * _omap4_get_context_lost - get context loss counter for a hwmod
++ * @oh: hwmod to get context loss counter for
++ *
++ * Returns the in-memory context loss counter for a hwmod.
++ */
++static int _omap4_get_context_lost(struct omap_hwmod *oh)
++{
++	return oh->prcm.omap4.context_lost_counter;
++}
++
++static struct hwmod_ops omap4_hwmod_ops = {
++	.hwmod_update_context_lost	= _omap4_update_context_lost,
++	.hwmod_get_context_lost		= _omap4_get_context_lost,
++};
++
++/**
+  * _enable - enable an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+@@ -1870,6 +1923,9 @@ static int _enable(struct omap_hwmod *oh)
+ 	if (soc_ops.enable_module)
+ 		soc_ops.enable_module(oh);
  
- /* ctrl_module_pad_wkup */
-@@ -468,6 +489,11 @@ static struct omap_hwmod omap44xx_ctrl_module_pad_wkup_hwmod = {
- 	.name		= "ctrl_module_pad_wkup",
- 	.class		= &omap44xx_ctrl_module_hwmod_class,
- 	.clkdm_name	= "l4_wkup_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
++	if (arch_hwmod && arch_hwmod->hwmod_update_context_lost)
++		arch_hwmod->hwmod_update_context_lost(oh);
++
+ 	r = (soc_ops.wait_target_ready) ? soc_ops.wait_target_ready(oh) :
+ 		-EINVAL;
+ 	if (!r) {
+@@ -2903,6 +2959,9 @@ int __init omap_hwmod_setup_one(const char *oh_name)
+  */
+ static int __init omap_hwmod_setup_all(void)
+ {
++	if (cpu_is_omap44xx())
++		arch_hwmod = &omap4_hwmod_ops;
++
+ 	_ensure_mpu_hwmod_is_setup(NULL);
  
- /*
-@@ -2537,18 +2563,33 @@ static struct omap_hwmod omap44xx_prcm_mpu_hwmod = {
- 	.name		= "prcm_mpu",
- 	.class		= &omap44xx_prcm_hwmod_class,
- 	.clkdm_name	= "l4_wkup_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
+ 	omap_hwmod_for_each(_init, NULL);
+@@ -3557,17 +3616,21 @@ ohsps_unlock:
+  * omap_hwmod_get_context_loss_count - get lost context count
+  * @oh: struct omap_hwmod *
+  *
+- * Query the powerdomain of of @oh to get the context loss
+- * count for this device.
++ * Returns the context loss count of associated @oh
++ * upon success, or zero if no context loss data is available.
+  *
+- * Returns the context loss count of the powerdomain assocated with @oh
+- * upon success, or zero if no powerdomain exists for @oh.
++ * On OMAP4, this queries the per-hwmod context loss register,
++ * assuming one exists.  If not, or on OMAP2/3, this queries the
++ * enclosing powerdomain context loss count.
+  */
+ int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
+ {
+ 	struct powerdomain *pwrdm;
+ 	int ret = 0;
  
- /* cm_core_aon */
- static struct omap_hwmod omap44xx_cm_core_aon_hwmod = {
- 	.name		= "cm_core_aon",
- 	.class		= &omap44xx_prcm_hwmod_class,
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
- 
- /* cm_core */
- static struct omap_hwmod omap44xx_cm_core_hwmod = {
- 	.name		= "cm_core",
- 	.class		= &omap44xx_prcm_hwmod_class,
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
- 
- /* prm */
-@@ -2584,6 +2625,11 @@ static struct omap_hwmod omap44xx_scrm_hwmod = {
- 	.name		= "scrm",
- 	.class		= &omap44xx_scrm_hwmod_class,
- 	.clkdm_name	= "l4_wkup_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
-+		},
-+	},
- };
- 
- /*
++	if (arch_hwmod && arch_hwmod->hwmod_get_context_lost)
++		return arch_hwmod->hwmod_get_context_lost(oh);
++
+ 	pwrdm = omap_hwmod_get_pwrdm(oh);
+ 	if (pwrdm)
+ 		ret = pwrdm_get_context_loss_count(pwrdm);
 diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 6132972..fd038be 100644
+index fd038be..ce2c1fe 100644
 --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
 +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
 @@ -2,7 +2,7 @@
   * omap_hwmod macros, structures
   *
   * Copyright (C) 2009-2011 Nokia Corporation
-- * Copyright (C) 2011 Texas Instruments, Inc.
-+ * Copyright (C) 2012 Texas Instruments, Inc.
+- * Copyright (C) 2012 Texas Instruments, Inc.
++ * Copyright (C) 2011-2012 Texas Instruments, Inc.
   * Paul Walmsley
   *
   * Created in collaboration with (alphabetical order): Beno?t Cousson,
-@@ -384,6 +384,14 @@ struct omap_hwmod_omap2_prcm {
- 	u8 idlest_stdby_bit;
- };
- 
-+/*
-+ * Possible values for struct omap_hwmod_omap4_prcm.flags
-+ *
-+ * HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT: Some IP blocks don't have a PRCM
-+ *     module-level context loss register associated with them; this
-+ *     flag bit should be set in those cases
-+ */
-+#define HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT		(1 << 0)
- 
+@@ -392,14 +392,16 @@ struct omap_hwmod_omap2_prcm {
+  *     flag bit should be set in those cases
+  */
+ #define HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT		(1 << 0)
+-
  /**
   * struct omap_hwmod_omap4_prcm - OMAP4-specific PRCM data
-@@ -391,6 +399,7 @@ struct omap_hwmod_omap2_prcm {
-  * @rstctrl_reg: address of the XXX_RSTCTRL register located in the PRM
+- * @clkctrl_reg: PRCM address of the clock control register
+- * @rstctrl_reg: address of the XXX_RSTCTRL register located in the PRM
++ * @clkctrl_offs: offset of the PRCM clock control register
++ * @rstctrl_offs: offset of the XXX_RSTCTRL register located in the PRM
++ * @context_offs: offset of the RM_*_CONTEXT register
   * @rstst_reg: (AM33XX only) address of the XXX_RSTST register in the PRM
   * @submodule_wkdep_bit: bit shift of the WKDEP range
-+ * @flags: PRCM register capabilities for this IP block
+  * @flags: PRCM register capabilities for this IP block
++ * @modulemode: allowable modulemodes
++ * @context_lost_counter: Count of module level context lost
   */
  struct omap_hwmod_omap4_prcm {
  	u16		clkctrl_offs;
-@@ -399,6 +408,7 @@ struct omap_hwmod_omap4_prcm {
- 	u16		context_offs;
+@@ -409,6 +411,7 @@ struct omap_hwmod_omap4_prcm {
  	u8		submodule_wkdep_bit;
  	u8		modulemode;
-+	u8		flags;
+ 	u8		flags;
++	unsigned	context_lost_counter;
  };
  
  
