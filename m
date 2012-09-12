@@ -1,32 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 12 Sep 2012 18:16:09 +0200
-Subject: [PATCH] of: specify initrd location using 64-bit
-In-Reply-To: <1347465937-7056-1-git-send-email-cyril@ti.com>
-References: <1347465937-7056-1-git-send-email-cyril@ti.com>
-Message-ID: <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Sep 2012 18:17:23 +0200
+Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <20120912180154.3e620d18@skate>
+References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
+ <20120912085423.21af58d5@skate>
+ <CACRpkdYVMTbfA++eqRrq6JM0phjN-X-f3N==oXbyVxCyYUVOOA@mail.gmail.com>
+ <20120912180154.3e620d18@skate>
+Message-ID: <CACRpkdaKFNbgure6ZVfBktQobAv4RJAJXd37wBAeTY19jKqtPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 6:05 PM, Cyril Chemparathy <cyril@ti.com> wrote:
-> On some PAE architectures, the entire range of physical memory could reside
-> outside the 32-bit limit.  These systems need the ability to specify the
-> initrd location using 64-bit numbers.
+On Wed, Sep 12, 2012 at 6:01 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+
+> See for example
+> http://www.marvell.com/embedded-processors/kirkwood/assets/HW_88F6281_OpenSource.pdf,
+> which is the hardware datasheet for the 88F6281 Marvell SoC (Kirkwood
+> family). Table 26 on page 53 of the PDF is a good example. It lists all
+> the pins, on per row, and then has columns for each function identifier
+> (from 0x0 to 0x7). Then each cell says when pin X is muxed in function
+> Y, it provides this functionality.
 >
-> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
-> use 64-bit numbers instead of the current unsigned long.
+> So clearly, this representation is a list of pins, and for each pin, a
+> list of possible functions that this pin can take.
 
-> -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
-> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+OK the ux500 datasheet looks more or less the same. What I did was
+to define the groups that made sense for each column (our columns are
+named a,b,c), so you can see the result in
+drivers/pinctrl/pinctrl-nomadik-db8500.c
 
-Why not phys_addr_t?
+In your case I would have defined groups like this:
 
-Gr{oetje,eeting}s,
+#define PIN_MPP18 18
+#define PIN_MPP19 19
+(...)
+static const struct pinctrl_pin_desc nmk_db8500_pins[] = {
+        PINCTRL_PIN(PIN_MPP18, "MPP[18]"),
+        PINCTRL_PIN(PIN_MPP19, "MPP[19]"),
+(...)
+};
+static const unsigned mpp_1_pins[] = { PIN_MPP18, PIN_MPP19);
 
-                        Geert
+Then I'd register this as a group, then map the groups to
+functions.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+But maybe this is just stupid in your case, you'd have to tell.
+(Maybe it's my driver that sucks, I don't know.)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Linus Walleij
+
+Yours,
+Linus Walleij
