@@ -1,39 +1,32 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 12 Sep 2012 16:10:12 +0000
-Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod: some fixes for 3.6-rc
-In-Reply-To: <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
- <50498170.3010600@ti.com>
- <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB25C9@DBDE01.ent.ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 12 Sep 2012 18:16:09 +0200
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <1347465937-7056-1-git-send-email-cyril@ti.com>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+Message-ID: <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 21:35:04, Paul Walmsley wrote:
-> On Fri, 7 Sep 2012, Vaibhav Hiremath wrote:
-> 
-> > Isn't below patch good for -rc candidate (so as part of this 'fixes')?
-> > 
-> > ARM: OMAP2+: dpll: Add missing soc_is_am33xx() check for common functions
-> > 
-> > https://patchwork.kernel.org/patch/1371611/
-> 
-> It was queued for 3.7 because it didn't seem critical, since mainline 
-> wasn't booting anyway on AM33xx without the hwmod data.  Just sent the 
-> pull request for it:
-> 
-> http://marc.info/?l=linux-omap&m=134746561028888&w=2
-> 
+On Wed, Sep 12, 2012 at 6:05 PM, Cyril Chemparathy <cyril@ti.com> wrote:
+> On some PAE architectures, the entire range of physical memory could reside
+> outside the 32-bit limit.  These systems need the ability to specify the
+> initrd location using 64-bit numbers.
+>
+> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+> use 64-bit numbers instead of the current unsigned long.
 
-Thanks Paul, 
-Just for my understanding, is this pull request you created based on 
-l-o/master? Or other baseline?
-Just wanted to be sure that it complete and we do not have any residual 
-issues due to baseline differences.
+> -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
+> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
 
-Thanks,
-Vaibhav
-> 
-> 
-> - Paul
-> 
+Why not phys_addr_t?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
