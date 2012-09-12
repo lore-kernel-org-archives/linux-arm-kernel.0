@@ -1,46 +1,63 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 12 Sep 2012 12:21:49 +0530
-Subject: [PATCHv7 18/23] i2c: omap: remove redundant status read
-In-Reply-To: <20120911215441.GC27031@pengutronix.de>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
- <1347356538-23835-19-git-send-email-shubhrajyoti@ti.com>
- <20120911215441.GC27031@pengutronix.de>
-Message-ID: <50503105.8050100@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Sep 2012 08:54:23 +0200
+Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <504FB869.60201@wwwdotorg.org>
+References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
+Message-ID: <20120912085423.21af58d5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 September 2012 03:24 AM, Wolfram Sang wrote:
-> On Tue, Sep 11, 2012 at 03:12:13PM +0530, Shubhrajyoti D wrote:
->> Remove the redundant read of the status register.
-> Commit message is just repeating the subject.
-> Why was the read there and why can it be removed now?
->
-It is read and it is not read anywhere below.
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->> ---
->>  drivers/i2c/busses/i2c-omap.c |    2 --
->>  1 files changed, 0 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> index 5d4bad4..498a462 100644
->> --- a/drivers/i2c/busses/i2c-omap.c
->> +++ b/drivers/i2c/busses/i2c-omap.c
->> @@ -946,7 +946,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
->>  				num_bytes = dev->buf_len;
->>  
->>  			ret = omap_i2c_transmit_data(dev, num_bytes, true);
->> -			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
->>  			if (ret < 0)
->>  				goto out;
->>  
->> @@ -962,7 +961,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
->>  				num_bytes = dev->threshold;
->>  
->>  			ret = omap_i2c_transmit_data(dev, num_bytes, false);
->> -			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
->>  			if (ret < 0)
->>  				goto out;
->>  
->> -- 
->> 1.7.5.4
->>
+Le Tue, 11 Sep 2012 16:17:13 -0600,
+Stephen Warren <swarren@wwwdotorg.org> a ?crit :
+
+> 
+> +static struct mvebu_mpp_mode dove_mpp_modes[] = {
+> +	MPP_MODE(0,
+> +		MPP_FUNCTION(0x00, "gpio", NULL),
+> +		MPP_FUNCTION(0x02, "uart2", "rts"),
+> +		MPP_FUNCTION(0x03, "sdio0", "cd"),
+> +		MPP_FUNCTION(0x0f, "lcd0", "pwm"),
+> +		MPP_FUNCTION(0x10, "pmu", NULL)),
+> 
+> it's defining the functions within the context of a particular group
+> ("mode" in the drivers terminology, I think...) rather than defining
+> functions and groups as separate top-level tables.
+
+This data structure really reflects what the datasheet says. Typically,
+for SoCs where each pin is independently muxable (AT91, i.MX23/28,
+Marvell, and probably many more), the datasheet has a big array, with
+one line per pin, and then several columns which tell for a given pin,
+what is "function 0", "function 1", "function 2", "function 3", etc.
+
+So the data structure that Sebastian has implemented in the mvebu
+driver immediately reflects this. In fact, the pinctrl table code for
+Armada 370 and Armada XP was semi-automatically generated from CSV data
+of the pinmux functions, directly coming from the datasheets. Having to
+create a global list of all possible functions seems useless and
+painful, since the functions only make sense in the context of one
+particular pin.
+
+Could you be more specific as to what representation you're looking
+after? You're proposing to "define functions and groups as separate
+top-level tables", but then how to you map which functions are
+available for which group, and what is the number of that function is
+this group (which we need to actually configure the mapping). I'd
+really like to see (with a short code example) what is your view of how
+pinmux should be handled for SoCs having independently muxable pins.
+
+I really don't understand how a global list of functions make sense:
+the functions make sense on a per-group basis, and this is how the
+hardwaredatasheet defines them. If we could keep this representation,
+it would really be useful.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
