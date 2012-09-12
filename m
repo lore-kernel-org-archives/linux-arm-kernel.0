@@ -1,25 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Sep 2012 17:47:30 +0200
-Subject: [PATCH] ARM: shmobile: kzm9g: use gpio-keys instead of
- gpio-keys-polled
-In-Reply-To: <1347341165-15573-2-git-send-email-horms@verge.net.au>
-References: <1347341165-15573-1-git-send-email-horms@verge.net.au>
- <1347341165-15573-2-git-send-email-horms@verge.net.au>
-Message-ID: <CACRpkdbP-gw3_RAmBUc=eJaTKwn1Q0eyk-xrpynZrDApYi8Vgg@mail.gmail.com>
+Date: Wed, 12 Sep 2012 17:50:48 +0200
+Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <20120912085423.21af58d5@skate>
+References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
+ <20120912085423.21af58d5@skate>
+Message-ID: <CACRpkdYVMTbfA++eqRrq6JM0phjN-X-f3N==oXbyVxCyYUVOOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 7:26 AM, Simon Horman <horms@verge.net.au> wrote:
+On Wed, Sep 12, 2012 at 8:54 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->
-> 6e20a0a429bd4dc07d6de16d9c247270e04e4aa0
-> (gpio: pcf857x: enable gpio_to_irq() support) supports
-> gpio_to_irq() on pcf857x driver.
-> Now, we can use gpio-keys driver instead of gpio-keys-polled.
->
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
+> This data structure really reflects what the datasheet says. Typically,
+> for SoCs where each pin is independently muxable (AT91, i.MX23/28,
+> Marvell, and probably many more), the datasheet has a big array, with
+> one line per pin, and then several columns which tell for a given pin,
+> what is "function 0", "function 1", "function 2", "function 3", etc.
 
-Applied, thanks!
+This is a valid reason to keep it as is in my book.
+Readability along with a datasheet is important, most important
+is that it has a good structure for those maintaining the driver.
+
+Is this datasheet available so I can get the picture?
+
+Yours,
 Linus Walleij
