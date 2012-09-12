@@ -1,27 +1,59 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Wed, 12 Sep 2012 11:39:20 -0700
-Subject: [PATCH 1/3] ARM: Remove bcmring NAND driver
-In-Reply-To: <5050C56C.8070603@wwwdotorg.org>
-References: <505044E3.3040601@broadcom.com>
- <5050C56C.8070603@wwwdotorg.org>
-Message-ID: <5050D6D8.8090605@broadcom.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Sep 2012 12:53:52 -0600
+Subject: [PATCH] media: add V4L2 DT binding documentation
+In-Reply-To: <Pine.LNX.4.64.1209111746420.22084@axis700.grange>
+References: <Pine.LNX.4.64.1209111746420.22084@axis700.grange>
+Message-ID: <5050DA40.8050105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-09-12 10:25 AM, Stephen Warren wrote:
-> On 09/12/2012 02:16 AM, Christian Daudt wrote:
->> This driver is being removed as part of the cleanup of the bcmring
->> SoC from mainline as it is no longer maintained.
->>   arch/arm/configs/bcmring_defconfig |    2 -
-> Out of curiosity, if you're removing the whole thing, why edit the
-> defconfig at all; just delete it instead in whatever patch removes the
-> arch/arm parts?
->
-I figured it'd be better to remove the config portion on this patch so 
-it is self-contained - just in case the other patch gets held up for 
-some reason then this one can still be applied and no junk would be left 
-around. But agreed - it doesn't really affect things either way.
+On 09/11/2012 09:51 AM, Guennadi Liakhovetski wrote:
+> This patch adds a document, describing common V4L2 device tree bindings.
+> 
+> Co-authored-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
+Overall, I think this looks pretty reasonable, so:
 
-  thanks,
-    Christian.
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+Just a couple comments:
+
+> +++ b/Documentation/devicetree/bindings/media/v4l2.txt
+
+> +	ceu0: ceu at 0xfe910000 {
+
+> +		mclk: master_clock {
+> +			compatible = "renesas,ceu-clock";
+> +			#clock-cells = <1>;
+
+Why 1? If there's only 1 clock output from this provider, I don't see a
+need for any cells, unless there are some configuration flags?
+
+> +			clock-frequency = <50000000>;	/* max clock frequency */
+> +			clock-output-names = "mclk";
+> +		};
+> +
+> +		port {
+...
+> +			ceu0_0: link at 0 {
+> +				reg = <0>;
+> +				remote = <&csi2_2>;
+> +				immutable;
+
+Did we decide "immutable" was actually needed? Presumably the driver for
+the HW in question knows the HW isn't configurable, and would simply not
+attempt to apply any configuration even if the .dts author erroneously
+provided some?
+
+> +			};
+> +		};
+> +	};
+> +
+> +	i2c0: i2c at 0xfff20000 {
+...
+> +		ov772x_1: camera at 0x21 {
+...
+> +			clocks = <&mclk 0>;
+
+So presumably that could just be "clocks = <&mclk>;"?
