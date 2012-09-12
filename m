@@ -1,236 +1,182 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:14 +0200
-Subject: [PATCH v9 01/13] ARM: SoC: add per-platform SMP operations
+Date: Wed, 12 Sep 2012 16:58:20 +0200
+Subject: [PATCH v9 07/13] ARM: SoC: convert ux500 to SoC descriptor
 In-Reply-To: <1347461906-13527-1-git-send-email-arnd@arndb.de>
 References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347461906-13527-2-git-send-email-arnd@arndb.de>
+Message-ID: <1347461906-13527-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-This adds a 'struct smp_operations' to abstract the CPU initialization
-and hot plugging functions on SMP systems, which otherwise conflict
-in a multiplatform kernel. This also helps shmobile and potentially
-others that have more than one method to do these.
+Convert ux500 platforms to use the SoC descriptor to provide
+their SMP and CPU hotplug operations.
 
-To allow the kernel to continue building, the platform hooks are
-defined as weak symbols which are overrided by the platform code.
-Once all platforms are converted, the "weak" attribute will be
-removed and the function made static.
-
-Unlike the original version from Marc, this new version from Arnd
-does not use a generalized abstraction for per-soc data structures
-but only tries to solve the problem for the SMP operations. This
-way, we can collapse the previous four data structures into a
-single struct, which is less systematic but also easier to follow
-as a causal reader.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/include/asm/mach/arch.h |    7 +++++
- arch/arm/include/asm/smp.h       |   33 ++++++++++++++++++++
- arch/arm/kernel/setup.c          |    5 ++-
- arch/arm/kernel/smp.c            |   62 +++++++++++++++++++++++++++++++++++++-
- 4 files changed, 105 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c       |    4 ++++
+ arch/arm/mach-ux500/hotplug.c            |   36 ++++++++----------------------
+ arch/arm/mach-ux500/include/mach/setup.h |    3 +++
+ arch/arm/mach-ux500/platsmp.c            |   18 +++++++++++----
+ 4 files changed, 30 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 0b1c94b..917d4fc 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -14,6 +14,12 @@ struct tag;
- struct meminfo;
- struct sys_timer;
- struct pt_regs;
-+struct smp_operations;
-+#ifdef CONFIG_SMP
-+#define smp_ops(ops) (&(ops))
-+#else
-+#define smp_ops(ops) (struct smp_operations *)NULL
-+#endif
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index a534d88..1c6f74b 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -694,6 +694,7 @@ static void __init hrefv60_init_machine(void)
+ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(ux500_smp_ops),
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+ 	/* we re-use nomadik timer here */
+@@ -705,6 +706,7 @@ MACHINE_END
  
- struct machine_desc {
- 	unsigned int		nr;		/* architecture number	*/
-@@ -35,6 +41,7 @@ struct machine_desc {
- 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
- 	char			restart_mode;	/* default restart mode	*/
-+	struct smp_operations	*smp;		/* SMP operations	*/
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
- 	void			(*reserve)(void);/* reserve mem blocks	*/
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index ae29293..f79a9f5 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -93,4 +93,37 @@ extern void platform_cpu_enable(unsigned int cpu);
- extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(ux500_smp_ops),
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+ 	.timer		= &ux500_timer,
+@@ -715,6 +717,7 @@ MACHINE_END
  
-+struct smp_operations {
-+#ifdef CONFIG_SMP
-+	/*
-+	 * Setup the set of possible CPUs (via set_cpu_possible)
-+	 */
-+	void (*smp_init_cpus)(void);
-+	/*
-+	 * Initialize cpu_possible map, and enable coherency
-+	 */
-+	void (*smp_prepare_cpus)(unsigned int max_cpus);
-+
-+	/*
-+	 * Perform platform specific initialisation of the specified CPU.
-+	 */
-+	void (*smp_secondary_init)(unsigned int cpu);
-+	/*
-+	 * Boot a secondary CPU, and assign it the specified idle task.
-+	 * This also gives us the initial stack to use for this CPU.
-+	 */
-+	int  (*smp_boot_secondary)(unsigned int cpu, struct task_struct *idle);
-+#ifdef CONFIG_HOTPLUG_CPU
-+	int  (*cpu_kill)(unsigned int cpu);
-+	void (*cpu_die)(unsigned int cpu);
-+	int  (*cpu_disable)(unsigned int cpu);
-+#endif
-+#endif
-+};
-+
-+/*
-+ * set platform specific SMP operations
-+ */
-+extern void smp_set_ops(struct smp_operations *);
-+
- #endif /* ifndef __ASM_ARM_SMP_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index a81dcec..0c84cd9 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -144,6 +144,7 @@ static const char *cpu_name;
- static const char *machine_name;
- static char __initdata cmd_line[COMMAND_LINE_SIZE];
- struct machine_desc *machine_desc __initdata;
-+static const struct smp_operations *smp_ops __initdata;
+ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+ 	.atag_offset	= 0x100,
++	.smp		= smp_ops(ux500_smp_ops),
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+ 	/* we re-use nomadik timer here */
+@@ -844,6 +847,7 @@ static const char * u8500_dt_board_compat[] = {
  
- static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
- static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
-@@ -977,8 +978,10 @@ void __init setup_arch(char **cmdline_p)
- 	unflatten_device_tree();
  
- #ifdef CONFIG_SMP
--	if (is_smp())
-+	if (is_smp()) {
-+		smp_set_ops(mdesc->smp);
- 		smp_init_cpus();
-+	}
- #endif
- 	reserve_crashkernel();
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index ebd8ad2..d924188 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -19,7 +19,6 @@
- #include <linux/mm.h>
- #include <linux/err.h>
- #include <linux/cpu.h>
--#include <linux/smp.h>
- #include <linux/seq_file.h>
- #include <linux/irq.h>
- #include <linux/percpu.h>
-@@ -27,6 +26,7 @@
- #include <linux/completion.h>
- 
- #include <linux/atomic.h>
-+#include <asm/smp.h>
+ DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
++	.smp		= smp_ops(ux500_smp_ops),
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+ 	/* we re-use nomadik timer here */
+diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+index c76f0f4..17b9a15 100644
+--- a/arch/arm/mach-ux500/hotplug.c
++++ b/arch/arm/mach-ux500/hotplug.c
+@@ -15,13 +15,20 @@
  #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-@@ -42,6 +42,7 @@
- #include <asm/ptrace.h>
- #include <asm/localtimer.h>
  #include <asm/smp_plat.h>
-+#include <asm/mach/arch.h>
  
- /*
-  * as from 2.5, kernels no longer have an init_tasks structure
-@@ -60,6 +61,14 @@ enum ipi_msg_type {
- 
- static DECLARE_COMPLETION(cpu_running);
- 
-+static struct smp_operations smp_ops;
++#include <mach/setup.h>
 +
-+void __init smp_set_ops(struct smp_operations *ops)
-+{
-+	if (ops)
-+		smp_ops = *ops;
-+};
-+
- int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
+ extern volatile int pen_release;
+ 
+-static inline void platform_do_lowpower(unsigned int cpu)
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void ux500_cpu_die(unsigned int cpu)
  {
- 	int ret;
-@@ -100,9 +109,60 @@ int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
+ 	flush_cache_all();
+ 
+-	/* we put the platform to just WFI */
++	/* directly enter low power state, skipping secure registers */
+ 	for (;;) {
+ 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+ 				: : : "memory");
+@@ -33,28 +40,3 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 		}
+ 	}
+ }
+-
+-int platform_cpu_kill(unsigned int cpu)
+-{
+-	return 1;
+-}
+-
+-/*
+- * platform-specific code to shutdown a CPU
+- *
+- * Called with IRQs disabled
+- */
+-void platform_cpu_die(unsigned int cpu)
+-{
+-	/* directly enter low power state, skipping secure registers */
+-	platform_do_lowpower(cpu);
+-}
+-
+-int platform_cpu_disable(unsigned int cpu)
+-{
+-	/*
+-	 * we don't allow CPU 0 to be shutdown (it is still too special
+-	 * e.g. clock tick interrupts)
+-	 */
+-	return cpu == 0 ? -EPERM : 0;
+-}
+diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
+index 7914e5e..6be4c4d 100644
+--- a/arch/arm/mach-ux500/include/mach/setup.h
++++ b/arch/arm/mach-ux500/include/mach/setup.h
+@@ -45,4 +45,7 @@ extern struct sys_timer ux500_timer;
+ 	.type		= MT_MEMORY,		\
  }
  
-+/* platform specific SMP operations */
-+void __attribute__((weak)) __init smp_init_cpus(void)
-+{
-+	if (smp_ops.smp_init_cpus)
-+		smp_ops.smp_init_cpus();
-+}
++extern struct smp_operations ux500_smp_ops;
++extern void ux500_cpu_die(unsigned int cpu);
 +
-+void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	if (smp_ops.smp_prepare_cpus)
-+		smp_ops.smp_prepare_cpus(max_cpus);
-+}
-+
-+void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
-+{
-+	if (smp_ops.smp_secondary_init)
-+		smp_ops.smp_secondary_init(cpu);
-+}
-+
-+int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (smp_ops.smp_boot_secondary)
-+		return smp_ops.smp_boot_secondary(cpu, idle);
-+	return -ENOSYS;
-+}
-+
- #ifdef CONFIG_HOTPLUG_CPU
- static void percpu_timer_stop(void);
+ #endif /*  __ASM_ARCH_SETUP_H */
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index da1d5ad..b6f4e0e 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -58,7 +58,7 @@ static void __iomem *scu_base_addr(void)
  
-+int __attribute__((weak)) platform_cpu_kill(unsigned int cpu)
-+{
-+	if (smp_ops.cpu_kill)
-+		return smp_ops.cpu_kill(cpu);
-+	return 1;
-+}
-+
-+void __attribute__((weak)) platform_cpu_die(unsigned int cpu)
-+{
-+	if (smp_ops.cpu_die)
-+		smp_ops.cpu_die(cpu);
-+}
-+
-+int __attribute__((weak)) platform_cpu_disable(unsigned int cpu)
-+{
-+	if (smp_ops.cpu_disable)
-+		return smp_ops.cpu_disable(cpu);
-+
-+	/*
-+	 * By default, allow disabling all CPUs except the first one,
-+	 * since this is special on a lot of platforms, e.g. because
-+	 * of clock tick interrupts.
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
- /*
-  * __cpu_disable runs on the processor to be shutdown.
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+-void __cpuinit platform_secondary_init(unsigned int cpu)
++static void __cpuinit ux500_secondary_init(unsigned int cpu)
+ {
+ 	/*
+ 	 * if any interrupts are already enabled for the primary
+@@ -80,7 +80,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	spin_unlock(&boot_lock);
+ }
+ 
+-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+ 
+@@ -145,7 +145,7 @@ static void __init wakeup_secondary(void)
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
   */
+-void __init smp_init_cpus(void)
++static void __init ux500_smp_init_cpus(void)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
+ 	unsigned int i, ncores;
+@@ -165,9 +165,19 @@ void __init smp_init_cpus(void)
+ 	set_smp_cross_call(gic_raise_softirq);
+ }
+ 
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 
+ 	scu_enable(scu_base_addr());
+ 	wakeup_secondary();
+ }
++
++struct smp_operations ux500_smp_ops __initdata = {
++	.smp_init_cpus		= ux500_smp_init_cpus,
++	.smp_prepare_cpus	= ux500_smp_prepare_cpus,
++	.smp_secondary_init	= ux500_secondary_init,
++	.smp_boot_secondary	= ux500_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= ux500_cpu_die,
++#endif
++};
 -- 
 1.7.10
