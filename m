@@ -1,27 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Sep 2012 10:59:35 -0700
-Subject: [PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
-In-Reply-To: <1347434097-7924-3-git-send-email-horms@verge.net.au>
-References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
- <1347434097-7924-3-git-send-email-horms@verge.net.au>
-Message-ID: <5050CD87.4020800@codeaurora.org>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 12 Sep 2012 14:02:27 -0400
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+ <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
+Message-ID: <5050CE33.9060909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/12 00:14, Simon Horman wrote:
-> @@ -1423,6 +1423,15 @@ config ARM_ERRATA_775420
->           deadlock. This workaround puts DSB before executing ISB at the
->           beginning of the abort exception handler.
->  
-> +config ARM_ERRATA_782773
-> +	bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
-> +	depends on CPU_V7
-> +	help
-> +	  This option enables the workaround for the 782773 Cortex-A9 (all r0,
-> +	  ,r2 and r3 revisions) erratum. It might cause MMU exception in case
+On 9/12/2012 12:16 PM, Geert Uytterhoeven wrote:
+> On Wed, Sep 12, 2012 at 6:05 PM, Cyril Chemparathy <cyril@ti.com> wrote:
+>> On some PAE architectures, the entire range of physical memory could reside
+>> outside the 32-bit limit.  These systems need the ability to specify the
+>> initrd location using 64-bit numbers.
+>>
+>> This patch globally modifies the early_init_dt_setup_initrd_arch() function to
+>> use 64-bit numbers instead of the current unsigned long.
+>
+>> -void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
+>> +void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>
+> Why not phys_addr_t?
+>
 
-Seems to be an extra comma here.
+The rest of the memory specific bits of the device-tree code use u64 for 
+addresses, and I kept it the same for consistency.
+
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks
+- Cyril
