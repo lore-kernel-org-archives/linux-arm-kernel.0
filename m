@@ -1,40 +1,81 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 12 Sep 2012 14:47:02 +0300
-Subject: [PATCH 06/11] ARM: OMAP4: hwmod_data: Add resource names to McPDM
- memory ranges
+Date: Wed, 12 Sep 2012 14:47:03 +0300
+Subject: [PATCH 07/11] ASoC: omap-mcpdm: Use platform_get_resource_* to get
+ resources
 In-Reply-To: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347450427-27627-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1347450427-27627-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To help the driver to get the correct memory range to access McPDM
-registers.
+Get the needed resources in a correct way and avoid using defines for them.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 2 ++
- 1 file changed, 2 insertions(+)
+ sound/soc/omap/omap-mcpdm.c | 28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 242aee4..f65251e 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -5059,6 +5059,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__mcbsp4 = {
+diff --git a/sound/soc/omap/omap-mcpdm.c b/sound/soc/omap/omap-mcpdm.c
+index baf92da..36648e0 100644
+--- a/sound/soc/omap/omap-mcpdm.c
++++ b/sound/soc/omap/omap-mcpdm.c
+@@ -41,7 +41,6 @@
+ #include <sound/soc.h>
  
- static struct omap_hwmod_addr_space omap44xx_mcpdm_addrs[] = {
- 	{
-+		.name		= "mpu",
- 		.pa_start	= 0x40132000,
- 		.pa_end		= 0x4013207f,
- 		.flags		= ADDR_TYPE_RT
-@@ -5077,6 +5078,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcpdm = {
+ #include <plat/dma.h>
+-#include <plat/omap_hwmod.h>
+ #include "omap-mcpdm.h"
+ #include "omap-pcm.h"
  
- static struct omap_hwmod_addr_space omap44xx_mcpdm_dma_addrs[] = {
+@@ -71,15 +70,11 @@ struct omap_mcpdm {
+ static struct omap_pcm_dma_data omap_mcpdm_dai_dma_params[] = {
  	{
-+		.name		= "dma",
- 		.pa_start	= 0x49032000,
- 		.pa_end		= 0x4903207f,
- 		.flags		= ADDR_TYPE_RT
+ 		.name = "Audio playback",
+-		.dma_req = OMAP44XX_DMA_MCPDM_DL,
+ 		.data_type = OMAP_DMA_DATA_TYPE_S32,
+-		.port_addr = OMAP44XX_MCPDM_L3_BASE + MCPDM_REG_DN_DATA,
+ 	},
+ 	{
+ 		.name = "Audio capture",
+-		.dma_req = OMAP44XX_DMA_MCPDM_UP,
+ 		.data_type = OMAP_DMA_DATA_TYPE_S32,
+-		.port_addr = OMAP44XX_MCPDM_L3_BASE + MCPDM_REG_UP_DATA,
+ 	},
+ };
+ 
+@@ -452,10 +447,33 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
+ 
+ 	mutex_init(&mcpdm->mutex);
+ 
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dma");
++	if (res == NULL)
++		return -ENOMEM;
++
++	omap_mcpdm_dai_dma_params[0].port_addr = res->start + MCPDM_REG_DN_DATA;
++	omap_mcpdm_dai_dma_params[1].port_addr = res->start + MCPDM_REG_UP_DATA;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (res == NULL)
+ 		return -ENOMEM;
+ 
++	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "dn_link");
++	if (!res)
++		return -ENODEV;
++
++	omap_mcpdm_dai_dma_params[0].dma_req = res->start;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "up_link");
++	if (!res)
++		return -ENODEV;
++
++	omap_mcpdm_dai_dma_params[1].dma_req = res->start;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mpu");
++	if (res == NULL)
++		return -ENOMEM;
++
+ 	if (!devm_request_mem_region(&pdev->dev, res->start,
+ 				     resource_size(res), "McPDM"))
+ 		return -EBUSY;
 -- 
 1.7.12
