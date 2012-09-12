@@ -1,94 +1,45 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 12 Sep 2012 14:08:58 +0200
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120910161159.GH27042@arm.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org>
- <20120910161159.GH27042@arm.com>
-Message-ID: <20120912120858.GI31430@game.jcrosoft.org>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 12 Sep 2012 08:46:18 -0400
+Subject: [RFC PATCH] ARM: mm: ADD descriptor string to
+ CONFIG_DMA_ADDR_64BIT_T
+In-Reply-To: <1347429006-10879-1-git-send-email-r.sricharan@ti.com>
+References: <1347429006-10879-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <5050841A.7030203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
-> On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
-> > > +The device tree blob (dtb) must be no bigger than 2 megabytes in size
-> > > +and placed at a 2-megabyte boundary within the first 512 megabytes from
-> > > +the start of the kernel image. This is to allow the kernel to map the
-> > > +blob using a single section mapping in the initial page tables.
-> > why do you want to restrict the DT to be less tahn 2MiB?
-> 
-> That's a restriction due on the initial memory map. At some point we may
-> add support in head.S to parse the dtb and extract the size information.
-> Not critical at this stage.
-> 
-> > > +Before jumping into the kernel, the following conditions must be met:
-> > > +
-> > > +- Quiesce all DMA capable devices so that memory does not get
-> > > +  corrupted by bogus network packets or disk data.  This will save
-> > > +  you many hours of debug.
-> > > +
-> > > +- Primary CPU general-purpose register settings
-> > > +  x0 = physical address of device tree blob (dtb) in system RAM.
-> > > +  x1 = 0 (reserved for future use)
-> > > +  x2 = 0 (reserved for future use)
-> > > +  x3 = 0 (reserved for future use)
-> > > +
-> > > +- CPU mode
-> > > +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
-> > > +  IRQ and FIQ).
-> > > +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
-> > > +  the virtualisation extensions) or non-secure EL1.
-> > > +
-> > > +- Caches, MMUs
-> > > +  The MMU must be off.
-> > > +  Instruction cache may be on or off.
-> > > +  Data cache must be off and invalidated.
-> > > +  External caches (if present) must be configured and disabled.
-> > > +
-> > > +- Architected timers
-> > > +  CNTFRQ must be programmed with the timer frequency.
-> > > +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
-> > > +  set where available.
-> > can you explain why?
-> 
-> Otherwise the kernel cannot access the generic timer registers (it is
-> described in the AArch64 exception model which isn't public yet).
-I do not like the idea to do too much in the boot loader
+On 9/12/2012 1:50 AM, R Sricharan wrote:
+> Even if CONFIG_DMA_ADDR_64BIT_T is enabled by the defconfig,
+> the feature is not getting selected.
+> Adding a string description in the Kconfig resolves this.
+>
+> But not sure if this is the right way to fix this.
+>
 
-can we drop it and do it the head.S or find an other way
+Shouldn't you be selecting this in your 64-bit dma address capable arch 
+instead?
 
-> 
-> > > +- The primary CPU must jump directly to the first instruction of the
-> > > +  kernel image.  The device tree blob passed by this CPU must contain
-> > > +  for each CPU node:
-> > > +
-> > > +    1. An 'enable-method' property. Currently, the only supported value
-> > > +       for this field is the string "spin-table".
-> > > +
-> > > +    2. A 'cpu-release-addr' property identifying a 64-bit,
-> > > +       zero-initialised memory location.
-> > > +
-> > > +  It is expected that the bootloader will generate these device tree
-> > > +  properties and insert them into the blob prior to kernel entry.
-> > > +
-> > > +- Any secondary CPUs must spin outside of the kernel in a reserved area
-> > > +  of memory (communicated to the kernel by a /memreserve/ region in the
-> > > +  device tree) polling their cpu-release-addr location, which must be
-> > > +  contained in the reserved region.  A wfe instruction may be inserted
-> > > +  to reduce the overhead of the busy-loop and a sev will be issued by
-> > > +  the primary CPU.  When a read of the location pointed to by the
-> > > +  cpu-release-addr returns a non-zero value, the CPU must jump directly
-> > > +  to this value.
-> > do you plan AMP boot?
-> 
-> What do you mean by AMP?
-> 
-> If you only want to use 3 CPUs out of 4 for example, you change the FDT
-> information that gets passed to the kernel accordingly. So the kernel
-> wouldn't touch the 4th one.
-I mean boot a  different kernel in each core as example
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>   arch/arm/mm/Kconfig |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 101b968..90c5ea4 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -601,7 +601,7 @@ config ARCH_PHYS_ADDR_T_64BIT
+>   	def_bool ARM_LPAE
+>
+>   config ARCH_DMA_ADDR_T_64BIT
+> -	bool
+> +	bool "64bit capable DMA device"
+>
+>   config ARM_THUMB
+>   	bool "Support Thumb user binaries"
+>
 
-Best Regards,
-J.
+-- 
+Thanks
+- Cyril
