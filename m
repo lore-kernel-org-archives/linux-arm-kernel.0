@@ -1,35 +1,39 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 12 Sep 2012 09:09:00 -0700
-Subject: [PATCH 8/9] ARM: msm: Add DT support for 8960
-In-Reply-To: <1346873339-10927-9-git-send-email-sboyd@codeaurora.org>
-References: <1346873339-10927-1-git-send-email-sboyd@codeaurora.org>
- <1346873339-10927-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120912160900.GB21878@codeaurora.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 12 Sep 2012 16:10:12 +0000
+Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod: some fixes for 3.6-rc
+In-Reply-To: <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
+ <50498170.3010600@ti.com>
+ <alpine.DEB.2.00.1209121539360.17903@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAB25C9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 12:28:58PM -0700, Stephen Boyd wrote:
+On Wed, Sep 12, 2012 at 21:35:04, Paul Walmsley wrote:
+> On Fri, 7 Sep 2012, Vaibhav Hiremath wrote:
+> 
+> > Isn't below patch good for -rc candidate (so as part of this 'fixes')?
+> > 
+> > ARM: OMAP2+: dpll: Add missing soc_is_am33xx() check for common functions
+> > 
+> > https://patchwork.kernel.org/patch/1371611/
+> 
+> It was queued for 3.7 because it didn't seem critical, since mainline 
+> wasn't booting anyway on AM33xx without the hwmod data.  Just sent the 
+> pull request for it:
+> 
+> http://marc.info/?l=linux-omap&m=134746561028888&w=2
+> 
 
-> diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
-> +
-> +	intc: interrupt-controller at 02000000 {
-> +		compatible = "qcom,msm-qgic2";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = < 0x02000000 0x1000 >,
-> +		      < 0x02002000 0x1000 >;
-> +	};
+Thanks Paul, 
+Just for my understanding, is this pull request you created based on 
+l-o/master? Or other baseline?
+Just wanted to be sure that it complete and we do not have any residual 
+issues due to baseline differences.
 
-> +	timer at 0200a004 {
-	...
-> +	timer at 0200a024 {
-
-Likewise here, the leading zeros need to be removed on the names.  I
-can also take care of this one when I pull it in.
-
-David
-
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+Vaibhav
+> 
+> 
+> - Paul
+> 
