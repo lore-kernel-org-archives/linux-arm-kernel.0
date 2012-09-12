@@ -1,31 +1,31 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 12 Sep 2012 14:12:32 +0530
-Subject: [PATCH] ARM: OMAP2+: TEMP: Round of the carve out memory
- requested to section_size
-In-Reply-To: <CAMQu2gxaamzm8i=ZcCU+99NnA6dDgi6H0GJwVtSmYWjPcyk5WQ@mail.gmail.com>
-References: <1347429117-10919-1-git-send-email-r.sricharan@ti.com>
- <CAMQu2gxaamzm8i=ZcCU+99NnA6dDgi6H0GJwVtSmYWjPcyk5WQ@mail.gmail.com>
-Message-ID: <c524b899151fbbf9dedebe7f796bd59a@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Sep 2012 09:54:45 +0100
+Subject: [PATCH] ARM: suspend: use flush range instead of flush all
+In-Reply-To: <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
+References: <1347434328-7207-1-git-send-email-wzch@marvell.com>
+ <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
+Message-ID: <20120912085445.GW13739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[..]
-> > memblock_steal tries to reserve physical memory during boot.
-> > When the requested size is not aligned on the section size
-> > then, the remaining memory available for lowmem becomes
-> > unaligned on the section boundary. There is a issue with this,
-> > which is discussed in the thread below.
+On Wed, Sep 12, 2012 at 01:13:33PM +0530, Shilimkar, Santosh wrote:
+> On Wed, Sep 12, 2012 at 12:48 PM, wzch <wzch@marvell.com> wrote:
+> >  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+> >  {
+> > +       u32 *ptr_orig = ptr;
+> >         *save_ptr = virt_to_phys(ptr);
 > >
-> > https://lkml.org/lkml/2012/6/28/112
+> >         /* This must correspond to the LDM in cpu_resume() assembly */
+> > @@ -26,7 +27,8 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
 > >
-> > The final conclusion from the thread seems to
-> > be align the memblock_steal calls on the SECTION boundary.
+> >         cpu_do_suspend(ptr);
 > >
-> > Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Why is the TEMP in the subject line. From patch it doesn't be
-> temporary version. Can you please clarify that ?
->
- Oops, that was a mistake. Reposted by correcting it.
+> > -       flush_cache_all();
+> Lorenzo's patch was limiting above flush to local cache (LOUs) instead
+> of dropping it completely.
 
-Thanks,
- Sricharan
+Err, that is wrong.  Normally, when CPUs go into suspend, the L1 cache is
+lost entirely.  This is the only flush which many CPUs see of the L1
+cache.
+
+So removing this flush _will_ break suspend to RAM on existing CPUs.
