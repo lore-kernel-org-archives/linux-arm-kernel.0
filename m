@@ -1,41 +1,31 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 12 Sep 2012 09:07:10 -0700
-Subject: [PATCH 3/9] ARM: msm: Add DT support to msm_timer
-In-Reply-To: <1346873339-10927-4-git-send-email-sboyd@codeaurora.org>
-References: <1346873339-10927-1-git-send-email-sboyd@codeaurora.org>
- <1346873339-10927-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120912160710.GA21878@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Sep 2012 18:07:51 +0200
+Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
+In-Reply-To: <CACRpkdamYMhduj42-reu6QjQiso65=Wy_bNF37gENDBrBbQ5=Q@mail.gmail.com>
+References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdamYMhduj42-reu6QjQiso65=Wy_bNF37gENDBrBbQ5=Q@mail.gmail.com>
+Message-ID: <CACRpkda6u7ZL9Rj=6+sMUTMs9zjV10kneUguugTuPziQvS68dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 12:28:53PM -0700, Stephen Boyd wrote:
+On Wed, Sep 12, 2012 at 6:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Sep 7, 2012 at 10:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> -static struct notifier_block twd_cpufreq_nb = {
+>> -       .notifier_call = twd_cpufreq_transition,
+>> +static struct notifier_block twd_clk_nb = {
+>> +       .notifier_call = twd_rate_change,
+>
+> But what happens if there is a platform which is now using this through
+> cpufreq and has not yet switched to the common clock? It regresses
+> right, because no notifications arrive anymore? Does it even compile?
 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/timer.txt b/Documentation/devicetree/bindings/arm/msm/timer.txt
+Bah too late in the afternoon :-(
 
-> +       timer at 0200a004 {
-> +               compatible = "qcom,msm-gpt", "qcom,msm-timer";
-> +               interrupts = <1 2 0x301>;
-> +               reg = <0x0200a004 0x10>;
-> +               clock-frequency = <32768>;
-> +               cpu-offset = <0x40000>;
-> +       };
-> +
-> +       timer at 0200a024 {
-> +               compatible = "qcom,msm-dgt", "qcom,msm-timer";
-> +               interrupts = <1 3 0x301>;
-> +               reg = <0x0200a024 0x10>,
-> +                     <0x0200a034 0x4>;
-> +               clock-frequency = <6750000>;
-> +               cpu-offset = <0x40000>;
-> +       };
+So the real question is - are we sure that imx6 is the last platform
+migrated to common clock of all those using the CPUfreq scaling
+(this seems to be the last piece) such that
+we don't break anything....
 
-The names should be timer at 200a004 and timer at 200a024, without the
-leading zero.  If there are no other concerns, I can just fix these up
-when I pull the patch in.  No need to resend.
-
-Thanks,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Yours,
+Linus Walleij
