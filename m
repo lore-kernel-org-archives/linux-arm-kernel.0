@@ -1,188 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:13 +0200
-Subject: [PATCH v9 00/13] Per sub-architecture SMP operations
-Message-ID: <1347461906-13527-1-git-send-email-arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 12 Sep 2012 20:34:46 +0530
+Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
+In-Reply-To: <87bohbxs16.fsf@deeprootsystems.com>
+References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
+ <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
+ <87bohbxs16.fsf@deeprootsystems.com>
+Message-ID: <CAMQu2gwpD6qOEV7sPg9zfMf1Zedq29OJeZ4MwEqUduZh8fJzhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As I promised at the ARM mini summit, I've updated Marc's series
-for smp operations according to my complaints. Unfortunately,
-I could not find version 7 of the patches when I started this,
-so I based my work on version 6 and had to redo the same
-changes.
+On Wed, Sep 12, 2012 at 7:27 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+>
+>> On Wed, Sep 12, 2012 at 6:02 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>>>
+>>> Remove some unnecessary plat/ includes that are interfering with multi-subarch
+>>> ARM kernels.
+>>>
+>>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>>> Cc: Kevin Hilman <khilman@ti.com>
+>>> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+>>> Acked-by: Kevin Hilman <khilman@ti.com>
+>>> ---
+>>>
+>>> Still awaiting some final testing here.  Rafael, was wondering if you
+>>> would be willing to ack this so we can merge it via the OMAP tree?
+>>> Otherwise the patch can be split into an OMAP part and a CPUFreq part that
+>>> can go in across two merge windows.
+>>>
+>> Hmm.
+>> I did similar change[1] a while back. Kevin didn't like idea though
+>> that point of time.
+>
+> I was wrong.
+>
+> At the time, we were thinking about how to get rid of clkdev nodes
+> instead of add more.  Now, we need to clean up these drivers and this is
+> the only way to do it, so I retract my objection.
+>
+Thanks for clarifying.
 
-The patches are also available on
-
-git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git testing/smp_ops
-
-	Arnd
-
-Changelog:
->From v8:
-- removed the string concatenating macros
-- consolidated structures into a single smp_operations
-- removed trivial instances of platform_cpu_kill and
-  platform_cpu_disable, now handled by the default case
-- split shmobile_cpu_kill into three separate functions,
-  per soc
-
->From v7:
-- Dropped soc_desc, and focussed only on smp_ops
-- Fixed CONFIG_HOTPLUG_CPU typo (courtesy of Shawn Guo)
-- Marked {realview,vexpress}_cpu_die() as __cpuinit
-- Added support for spear13xx
-- Added pen_release consolidation (based on Arnd Bergman's patch)
-
->From v6:
-- Dropped the dummy_* stuff
-- Support for a number of new platforms
-- Added the soc_hotplug_ops() macro to hide some #ifdef-ery away
-- More exynos[ 45] churn
-- Fixed section mismatches
-
->From v5:
-- Added support for highbank and imx6q
-- Added support for new shmobile SMP platform
-- Add dummy_cpu_kill, dummy_cpu_disable and cpu_lowpower
-
->From v4:
-- Added an SMP registration interface and moved all SMP structures to
-  smp.c. The end result is much cleaner.
-- Cleaned up patch 2 (leftovers from a previous rework)
-- NVIDIA/EXYNOS4 naming cleanup.
-
->From v3:
-- Converted all SMP platforms
-- Added some cleanup as a last patch
-
->From v2:
-- Split the SMP ops between init and runtime operations in order to
-  have separate lifetimes for the different structures. This is not
-  perfect though, as it still allows an __init function to make it to
-  a runtime structure (all smp_*_ops structures are __initdata in
-  order to be able to discard them). Thanks to Nico for pointing this
-  out.
-- Use macros to hide the #ifdef-ery in the SoC descriptor init,
-  courtesy of Arnd.
-
->From v1:
-- Move the SMP ops out of the descriptor, which makes the structure
-  init a bit cleaner (thanks to Arnd).
-- Mark all structures __initdata and keep a copy of the used ones.
-- Keep a global pointer for the SMP ops.
-
-Arnd Bergmann (1):
-  ARM: SoC: convert spear13xx to SoC descriptor
-
-Marc Zyngier (12):
-  ARM: SoC: add per-platform SMP operations
-  ARM: SoC: convert VExpress/RealView to SoC descriptor
-  ARM: SoC: convert OMAP4 to SoC descriptor
-  ARM: SoC: convert Tegra to SoC descriptor
-  ARM: SoC: convert Exynos4 to SoC descriptor
-  ARM: SoC: convert MSM SMP to SoC descriptor
-  ARM: SoC: convert ux500 to SoC descriptor
-  ARM: SoC: convert shmobile SMP to SoC descriptor
-  ARM: SoC: convert highbank to SoC descriptor
-  ARM: SoC: convert imx6q to SoC descriptor
-  ARM: smp: Make SoC descriptor mandatory for SMP platforms
-  ARM: consolidate pen_release instead of having per platform
-    definitions
-
- arch/arm/include/asm/mach/arch.h               |    7 ++
- arch/arm/include/asm/smp.h                     |   48 ++++++++----
- arch/arm/kernel/setup.c                        |    5 +-
- arch/arm/kernel/smp.c                          |   72 +++++++++++++++++-
- arch/arm/mach-exynos/common.h                  |    5 ++
- arch/arm/mach-exynos/hotplug.c                 |   18 +----
- arch/arm/mach-exynos/mach-armlex4210.c         |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c         |    1 +
- arch/arm/mach-exynos/mach-nuri.c               |    1 +
- arch/arm/mach-exynos/mach-origen.c             |    1 +
- arch/arm/mach-exynos/mach-smdk4x12.c           |    2 +
- arch/arm/mach-exynos/mach-smdkv310.c           |    2 +
- arch/arm/mach-exynos/mach-universal_c210.c     |    1 +
- arch/arm/mach-exynos/platsmp.c                 |   27 ++++---
- arch/arm/mach-highbank/core.h                  |    3 +
- arch/arm/mach-highbank/highbank.c              |    1 +
- arch/arm/mach-highbank/hotplug.c               |   16 +---
- arch/arm/mach-highbank/platsmp.c               |   18 ++++-
- arch/arm/mach-imx/hotplug.c                    |   16 +---
- arch/arm/mach-imx/mach-imx6q.c                 |    1 +
- arch/arm/mach-imx/platsmp.c                    |   18 ++++-
- arch/arm/mach-msm/board-msm8960.c              |    3 +
- arch/arm/mach-msm/board-msm8x60.c              |    7 ++
- arch/arm/mach-msm/core.h                       |    2 +
- arch/arm/mach-msm/hotplug.c                    |   18 +----
- arch/arm/mach-msm/platsmp.c                    |   24 +++---
- arch/arm/mach-omap2/board-4430sdp.c            |    1 +
- arch/arm/mach-omap2/board-generic.c            |    2 +
- arch/arm/mach-omap2/board-omap4panda.c         |    1 +
- arch/arm/mach-omap2/common.h                   |    5 ++
- arch/arm/mach-omap2/omap-hotplug.c             |   16 +---
- arch/arm/mach-omap2/omap-smp.c                 |   18 ++++-
- arch/arm/mach-realview/core.h                  |    3 +
- arch/arm/mach-realview/hotplug.c               |   18 +----
- arch/arm/mach-realview/platsmp.c               |   18 ++++-
- arch/arm/mach-realview/realview_pb11mp.c       |    1 +
- arch/arm/mach-realview/realview_pbx.c          |    1 +
- arch/arm/mach-shmobile/board-ag5evm.c          |    1 +
- arch/arm/mach-shmobile/board-kota2.c           |    1 +
- arch/arm/mach-shmobile/board-kzm9d.c           |    1 +
- arch/arm/mach-shmobile/board-kzm9g.c           |    1 +
- arch/arm/mach-shmobile/board-marzen.c          |    1 +
- arch/arm/mach-shmobile/hotplug.c               |   31 +++-----
- arch/arm/mach-shmobile/include/mach/common.h   |   24 +++---
- arch/arm/mach-shmobile/include/mach/emev2.h    |    7 +-
- arch/arm/mach-shmobile/include/mach/r8a7779.h  |    2 +
- arch/arm/mach-shmobile/include/mach/sh73a0.h   |    2 +
- arch/arm/mach-shmobile/platsmp.c               |   96 +-----------------------
- arch/arm/mach-shmobile/setup-emev2.c           |    1 +
- arch/arm/mach-shmobile/smp-emev2.c             |   47 ++++++++++--
- arch/arm/mach-shmobile/smp-r8a7779.c           |   48 ++++++++++--
- arch/arm/mach-shmobile/smp-sh73a0.c            |   48 +++++++++++-
- arch/arm/mach-spear13xx/hotplug.c              |   22 +-----
- arch/arm/mach-spear13xx/include/mach/generic.h |    3 +
- arch/arm/mach-spear13xx/platsmp.c              |   25 +++---
- arch/arm/mach-spear13xx/spear1310.c            |    1 +
- arch/arm/mach-spear13xx/spear1340.c            |    1 +
- arch/arm/mach-tegra/board-dt-tegra20.c         |    2 +
- arch/arm/mach-tegra/board-dt-tegra30.c         |    2 +
- arch/arm/mach-tegra/board-harmony.c            |    2 +
- arch/arm/mach-tegra/board-paz00.c              |    2 +
- arch/arm/mach-tegra/board-trimslice.c          |    2 +
- arch/arm/mach-tegra/common.c                   |    1 +
- arch/arm/mach-tegra/common.h                   |    3 +
- arch/arm/mach-tegra/hotplug.c                  |   16 +---
- arch/arm/mach-tegra/platsmp.c                  |   20 ++++-
- arch/arm/mach-ux500/board-mop500.c             |    4 +
- arch/arm/mach-ux500/hotplug.c                  |   36 ++-------
- arch/arm/mach-ux500/include/mach/setup.h       |    3 +
- arch/arm/mach-ux500/platsmp.c                  |   24 +++---
- arch/arm/mach-vexpress/core.h                  |    4 +
- arch/arm/mach-vexpress/hotplug.c               |   18 +----
- arch/arm/mach-vexpress/platsmp.c               |   18 ++++-
- arch/arm/mach-vexpress/v2m.c                   |    4 +
- arch/arm/plat-mxc/include/mach/common.h        |    4 +
- arch/arm/plat-versatile/include/plat/platsmp.h |   14 ++++
- arch/arm/plat-versatile/platsmp.c              |   10 +--
- 77 files changed, 545 insertions(+), 409 deletions(-)
- create mode 100644 arch/arm/mach-msm/core.h
- create mode 100644 arch/arm/mach-tegra/common.h
- create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
-
-Cc: Colin Cross <ccross@android.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: spear-devel at list.st.com
-
--- 
-1.7.10
+For patch itself,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
