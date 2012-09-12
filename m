@@ -1,46 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Sep 2012 11:24:02 +0100
-Subject: [PATCH v3 11/31] arm64: IRQ handling
-In-Reply-To: <201209071937.19156.arnd@arndb.de>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-12-git-send-email-catalin.marinas@arm.com>
- <201209071937.19156.arnd@arndb.de>
-Message-ID: <20120912102402.GB21823@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 12 Sep 2012 12:31:13 +0200
+Subject: [PATCH 5/6] staging: drm/imx: Add devicetree binding documentation
+In-Reply-To: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 08:37:18PM +0100, Arnd Bergmann wrote:
-> On Friday 07 September 2012, Catalin Marinas wrote:
-> 
-> > +#define __inc_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)++
-> > +#define __get_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)
-> 
-> Isn't this something that the IRQ core code already keeps track of?
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-That's for the IPIs which are handled directly by the arch code. We
-don't even allocate irq descriptors for them.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   41 ++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
 
-> > +#endif /* __ASM_HARDIRQ_H */
-> > diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> > new file mode 100644
-> > index 0000000..a4e1cad
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/irq.h
-> > @@ -0,0 +1,8 @@
-> > +#ifndef __ASM_IRQ_H
-> > +#define __ASM_IRQ_H
-> > +
-> > +#include <asm-generic/irq.h>
-> > +
-> > +extern void (*handle_arch_irq)(struct pt_regs *);
-> > +
-> > +#endif
-> 
-> Is this one still needed?
-
-Yes. It's initialised by the GIC code (called via of_irq_init) and we
-want to allow different GIC versions (GICv2 used by the model currently
-but we would expect GICv3 with hardware).
-
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+new file mode 100644
+index 0000000..07654f0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -0,0 +1,41 @@
++Freescale i.MX IPUv3
++====================
++
++Required properties:
++- compatible: Should be "fsl,<chip>-ipu"
++- reg: should be register base and length as documented in the
++  datasheet
++- interrupts: Should contain sync interrupt and error interrupt,
++  in this order.
++- #crtc-cells: 1, See below
++
++example:
++
++ipu: ipu at 18000000 {
++	#crtc-cells = <1>;
++	compatible = "fsl,imx53-ipu";
++	reg = <0x18000000 0x080000000>;
++	interrupts = <11 10>;
++};
++
++Parallel display support
++========================
++
++Required properties:
++- compatible: Should be "fsl,imx-parallel-display"
++- crtc: the crtc this display is connected to, see below
++Optional properties:
++- interface_pix_fmt: How this display is connected to the
++  crtc. Currently supported types: "rgb24", "rgb565"
++- edid: verbatim EDID data block describing attached display.
++- ddc: phandle describing the i2c bus handling the display data
++  channel
++
++example:
++
++display at di0 {
++	compatible = "fsl,imx-parallel-display";
++	edid = [edid-data];
++	crtc = <&ipu 0>;
++	interface-pix-fmt = "rgb24";
++};
 -- 
-Catalin
+1.7.10.4
