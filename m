@@ -1,134 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 16:58:19 +0200
-Subject: [PATCH v9 06/13] ARM: SoC: convert MSM SMP to SoC descriptor
+Date: Wed, 12 Sep 2012 16:58:22 +0200
+Subject: [PATCH v9 09/13] ARM: SoC: convert highbank to SoC descriptor
 In-Reply-To: <1347461906-13527-1-git-send-email-arnd@arndb.de>
 References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347461906-13527-7-git-send-email-arnd@arndb.de>
+Message-ID: <1347461906-13527-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Convert MSM SMP platforms to use the SoC descriptor to provide
-their SMP and CPU hotplug operations.
+Convert the highbank platform to use the SoC descriptor to provide
+its SMP and CPU hotplug operations.
 
-Cc: David Brown <davidb@codeaurora.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-msm/board-msm8960.c |    3 +++
- arch/arm/mach-msm/board-msm8x60.c |    7 +++++++
- arch/arm/mach-msm/core.h          |    2 ++
- arch/arm/mach-msm/hotplug.c       |   18 +++---------------
- arch/arm/mach-msm/platsmp.c       |   19 +++++++++++++++----
- 5 files changed, 30 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mach-msm/core.h
+ arch/arm/mach-highbank/core.h     |    3 +++
+ arch/arm/mach-highbank/highbank.c |    1 +
+ arch/arm/mach-highbank/hotplug.c  |   16 +---------------
+ arch/arm/mach-highbank/platsmp.c  |   18 ++++++++++++++----
+ 4 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-index 65f4a1d..a156968 100644
---- a/arch/arm/mach-msm/board-msm8960.c
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -30,6 +30,7 @@
- #include <mach/board.h>
- #include <mach/msm_iomap.h>
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index 141ed51..598ee78 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -9,3 +9,6 @@ static inline void highbank_lluart_map_io(void) {}
+ #endif
  
-+#include "core.h"
- #include "devices.h"
- 
- static void __init msm8960_fixup(struct tag *tag, char **cmdline,
-@@ -99,6 +100,7 @@ static void __init msm8960_init_late(void)
- }
- 
- MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
-+	.smp = smp_ops(msm_smp_ops),
- 	.fixup = msm8960_fixup,
- 	.reserve = msm8960_reserve,
- 	.map_io = msm8960_map_io,
-@@ -110,6 +112,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
- MACHINE_END
- 
- MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
-+	.smp = smp_ops(msm_smp_ops),
- 	.fixup = msm8960_fixup,
- 	.reserve = msm8960_reserve,
- 	.map_io = msm8960_map_io,
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index e37a724..dc2abd3 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -29,6 +29,8 @@
- #include <mach/board.h>
- #include <mach/msm_iomap.h>
- 
-+#include "core.h"
+ extern void highbank_smc1(int fn, int arg);
++extern void highbank_cpu_die(unsigned int cpu);
 +
- static void __init msm8x60_fixup(struct tag *tag, char **cmdline,
- 		struct meminfo *mi)
- {
-@@ -110,6 +112,7 @@ static const char *msm8x60_fluid_match[] __initdata = {
- #endif /* CONFIG_OF */
++extern struct smp_operations highbank_smp_ops;
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index d75b0a7..709bd72 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -162,6 +162,7 @@ static const char *highbank_match[] __initconst = {
+ };
  
- MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
-+	.smp = smp_ops(msm_smp_ops),
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -121,6 +124,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
- MACHINE_END
+ DT_MACHINE_START(HIGHBANK, "Highbank")
++	.smp		= smp_ops(highbank_smp_ops),
+ 	.map_io		= highbank_map_io,
+ 	.init_irq	= highbank_init_irq,
+ 	.timer		= &highbank_timer,
+diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+index 977cebb..1277da3 100644
+--- a/arch/arm/mach-highbank/hotplug.c
++++ b/arch/arm/mach-highbank/hotplug.c
+@@ -24,16 +24,11 @@
  
- MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
-+	.smp = smp_ops(msm_smp_ops),
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -132,6 +136,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
- MACHINE_END
- 
- MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
-+	.smp = smp_ops(msm_smp_ops),
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -143,6 +148,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
- MACHINE_END
- 
- MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
-+	.smp = smp_ops(msm_smp_ops),
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -156,6 +162,7 @@ MACHINE_END
- #ifdef CONFIG_OF
- /* TODO: General device tree support for all MSM. */
- DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
-+	.smp = smp_ops(msm_smp_ops),
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
- 	.init_machine = msm8x60_dt_init,
-diff --git a/arch/arm/mach-msm/core.h b/arch/arm/mach-msm/core.h
-new file mode 100644
-index 0000000..a9bab53
---- /dev/null
-+++ b/arch/arm/mach-msm/core.h
-@@ -0,0 +1,2 @@
-+extern struct smp_operations msm_smp_ops;
-+extern void msm_cpu_die(unsigned int cpu);
-diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
-index a446fc1..d0f79e8 100644
---- a/arch/arm/mach-msm/hotplug.c
-+++ b/arch/arm/mach-msm/hotplug.c
-@@ -13,6 +13,8 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- 
-+#include "core.h"
-+
- extern volatile int pen_release;
- 
- static inline void cpu_enter_lowpower(void)
-@@ -57,17 +59,12 @@ static inline void platform_do_lowpower(unsigned int cpu)
- 	}
- }
+ extern void secondary_startup(void);
  
 -int platform_cpu_kill(unsigned int cpu)
 -{
@@ -138,81 +61,74 @@ index a446fc1..d0f79e8 100644
  /*
   * platform-specific code to shutdown a CPU
   *
-  * Called with IRQs disabled
   */
 -void platform_cpu_die(unsigned int cpu)
-+void msm_cpu_die(unsigned int cpu)
++void highbank_cpu_die(unsigned int cpu)
  {
- 	/*
- 	 * we're ready for shutdown now, so do it
-@@ -81,12 +78,3 @@ void platform_cpu_die(unsigned int cpu)
- 	 */
- 	cpu_leave_lowpower();
+ 	flush_cache_all();
+ 
+@@ -45,12 +40,3 @@ void platform_cpu_die(unsigned int cpu)
+ 	/* We should never return from idle */
+ 	panic("highbank: cpu %d unexpectedly exit from shutdown\n", cpu);
  }
 -
 -int platform_cpu_disable(unsigned int cpu)
 -{
 -	/*
--	 * we don't allow CPU 0 to be shutdown (it is still too special
--	 * e.g. clock tick interrupts)
+-	 * CPU0 should not be shut down via hotplug.  cpu_idle can WFI
+-	 * or a proper shutdown or hibernate should be used.
 -	 */
 -	return cpu == 0 ? -EPERM : 0;
 -}
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index e012dc8..ba3c4b0 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -25,6 +25,7 @@
- #include <mach/msm_iomap.h>
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+index d01364c..fa9560e 100644
+--- a/arch/arm/mach-highbank/platsmp.c
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -25,12 +25,12 @@
  
- #include "scm-boot.h"
-+#include "core.h"
- 
- #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
- #define SCSS_CPU1CORE_RESET 0xD80
-@@ -48,7 +49,7 @@ static inline int get_core_count(void)
- 	return ((read_cpuid_id() >> 4) & 3) + 1;
- }
+ extern void secondary_startup(void);
  
 -void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit msm_secondary_init(unsigned int cpu)
++static void __cpuinit highbank_secondary_init(unsigned int cpu)
  {
- 	/* Configure edge-triggered PPIs */
- 	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-@@ -93,7 +94,7 @@ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
- 				  "address\n");
+ 	gic_secondary_init(0);
  }
  
 -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	unsigned long timeout;
- 	static int cold_boot_done;
-@@ -153,7 +154,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-  * does not support the ARM SCU, so just set the possible cpu mask to
-  * NR_CPUS.
+ 	gic_raise_softirq(cpumask_of(cpu), 0);
+ 	return 0;
+@@ -40,7 +40,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
   */
 -void __init smp_init_cpus(void)
-+static void __init msm_smp_init_cpus(void)
++static void __init highbank_smp_init_cpus(void)
  {
- 	unsigned int i, ncores = get_core_count();
+ 	unsigned int i, ncores;
  
-@@ -169,6 +170,16 @@ void __init smp_init_cpus(void)
-         set_smp_cross_call(gic_raise_softirq);
+@@ -61,7 +61,7 @@ void __init smp_init_cpus(void)
+ 	set_smp_cross_call(gic_raise_softirq);
  }
  
 -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
++static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
  {
+ 	int i;
+ 
+@@ -76,3 +76,13 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	for (i = 1; i < max_cpus; i++)
+ 		highbank_set_cpu_jump(i, secondary_startup);
  }
 +
-+struct smp_operations msm_smp_ops __initdata = {
-+	.smp_init_cpus		= msm_smp_init_cpus,
-+	.smp_prepare_cpus	= msm_smp_prepare_cpus,
-+	.smp_secondary_init	= msm_secondary_init,
-+	.smp_boot_secondary	= msm_boot_secondary,
++struct smp_operations highbank_smp_ops __initdata = {
++	.smp_init_cpus		= highbank_smp_init_cpus,
++	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
++	.smp_secondary_init	= highbank_secondary_init,
++	.smp_boot_secondary	= highbank_boot_secondary,
 +#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= msm_cpu_die,
++	.cpu_die		= highbank_cpu_die,
 +#endif
 +};
 -- 
