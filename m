@@ -1,714 +1,1427 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Wed, 12 Sep 2012 17:07:00 +0900
-Subject: [PATCH v3 1/2] iommu/shmobile: Add iommu driver for Renesas IPMMU
- modules
-In-Reply-To: <1347343814-32299-2-git-send-email-hdk@igel.co.jp>
-References: <1347343814-32299-1-git-send-email-hdk@igel.co.jp>
- <1347343814-32299-2-git-send-email-hdk@igel.co.jp>
-Message-ID: <CABMQnVKiZyKMy_T7iAArc48zKnwzHpEUZY9+iqTRzCf9v9tJ0g@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Wed, 12 Sep 2012 01:16:35 -0700
+Subject: [PATCH 1/3] ARM: Remove bcmring NAND driver
+Message-ID: <505044E3.3040601@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This driver is being removed as part of the cleanup of the bcmring
+SoC from mainline as it is no longer maintained.
 
-On Tue, Sep 11, 2012 at 3:10 PM, Hideki EIRAKU <hdk@igel.co.jp> wrote:
-> This is the Renesas IPMMU driver and IOMMU API implementation.
->
-> The IPMMU module supports the MMU function and the PMB function.  The
-> MMU function provides address translation by pagetable compatible with
-> ARMv6.  The PMB function provides address translation including
-> tile-linear translation.  This patch implements the MMU function.
->
-> The iommu driver does not register a platform driver directly because:
-> - the register space of the MMU function and the PMB function
->   have a common register (used for settings flush), so they should ideally
->   have a way to appropriately share this register.
-> - the MMU function uses the IOMMU API while the PMB function does not.
-> - the two functions may be used independently.
->
-> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
-> Tested-by: Damian Hobson-Garcia <dhobsong@igel.co.jp>
-> ---
->  arch/arm/mach-shmobile/Kconfig              |    6 +
->  arch/arm/mach-shmobile/Makefile             |    3 +
->  arch/arm/mach-shmobile/include/mach/ipmmu.h |   16 ++
->  arch/arm/mach-shmobile/ipmmu.c              |  150 +++++++++++
->  drivers/iommu/Kconfig                       |   36 +++
->  drivers/iommu/Makefile                      |    1 +
->  drivers/iommu/shmobile-iommu.c              |  372 +++++++++++++++++++++++++++
->  7 files changed, 584 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
->  create mode 100644 arch/arm/mach-shmobile/ipmmu.c
->  create mode 100644 drivers/iommu/shmobile-iommu.c
->
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 4cacc2d..86adcf0 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -210,6 +210,12 @@ endmenu
->  config SH_CLK_CPG
->         bool
->
-> +config SHMOBILE_IPMMU
-> +       bool
-> +
-> +config SHMOBILE_IPMMU_TLB
-> +       bool
-> +
->  source "drivers/sh/Kconfig"
->
->  endif
-> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-> index 0df5ae6..1e72199 100644
-> --- a/arch/arm/mach-shmobile/Makefile
-> +++ b/arch/arm/mach-shmobile/Makefile
-> @@ -60,3 +60,6 @@ obj-$(CONFIG_MACH_KZM9G)      += board-kzm9g.o
->  # Framework support
->  obj-$(CONFIG_SMP)              += $(smp-y)
->  obj-$(CONFIG_GENERIC_GPIO)     += $(pfc-y)
-> +
-> +# IPMMU/IPMMUI
-> +obj-$(CONFIG_SHMOBILE_IPMMU)   += ipmmu.o
-> diff --git a/arch/arm/mach-shmobile/include/mach/ipmmu.h b/arch/arm/mach-shmobile/include/mach/ipmmu.h
-> new file mode 100644
-> index 0000000..ede2f0b
-> --- /dev/null
-> +++ b/arch/arm/mach-shmobile/include/mach/ipmmu.h
-> @@ -0,0 +1,16 @@
-> +#ifdef CONFIG_SHMOBILE_IPMMU_TLB
-> +void ipmmu_tlb_flush(struct device *ipmmu_dev);
-> +void ipmmu_tlb_set(struct device *ipmmu_dev, unsigned long phys, int size,
-> +                  int asid);
-> +void ipmmu_add_device(struct device *dev);
-> +int ipmmu_iommu_init(struct device *dev);
-> +#else
-> +static inline void ipmmu_add_device(struct device *dev)
-> +{
-> +}
+Signed-off-by: Christian Daudt <csd@broadcom.com>
+Reviewed-by: Jiandong Zheng <jdzheng@broadcom.com>
 
-Please use 'do { } while (0)'.
+---
+  MAINTAINERS                        |    9 -
+  arch/arm/configs/bcmring_defconfig |    2 -
+  drivers/mtd/nand/Kconfig           |   16 -
+  drivers/mtd/nand/Makefile          |    1 -
+  drivers/mtd/nand/bcm_umi_bch.c     |  217 --------------
+  drivers/mtd/nand/bcm_umi_nand.c    |  555 
+------------------------------------
+  drivers/mtd/nand/nand_bcm_umi.c    |  149 ----------
+  drivers/mtd/nand/nand_bcm_umi.h    |  337 ----------------------
+  8 files changed, 0 insertions(+), 1286 deletions(-)
+  delete mode 100644 drivers/mtd/nand/bcm_umi_bch.c
+  delete mode 100644 drivers/mtd/nand/bcm_umi_nand.c
+  delete mode 100644 drivers/mtd/nand/nand_bcm_umi.c
+  delete mode 100644 drivers/mtd/nand/nand_bcm_umi.h
 
-> +
-> +static int ipmmu_iommu_init(struct device *dev)
-> +{
-> +       return -EINVAL;
-> +}
-> +#endif
-> diff --git a/arch/arm/mach-shmobile/ipmmu.c b/arch/arm/mach-shmobile/ipmmu.c
-> new file mode 100644
-> index 0000000..72cacb9
-> --- /dev/null
-> +++ b/arch/arm/mach-shmobile/ipmmu.c
-> @@ -0,0 +1,150 @@
-> +/*
-> + * IPMMU/IPMMUI
-> + * Copyright (C) 2012  Hideki EIRAKU
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-> + *
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/slab.h>
-> +#include <mach/ipmmu.h>
-> +
-> +#define IMCTR1 0x000
-> +#define IMCTR2 0x004
-> +#define IMASID 0x010
-> +#define IMTTBR 0x014
-> +#define IMTTBCR 0x018
-> +
-> +#define IMCTR1_TLBEN (1 << 0)
-> +#define IMCTR1_FLUSH (1 << 1)
-> +
-> +struct ipmmu_priv {
-> +       void __iomem *ipmmu_base;
-> +       int tlb_enabled;
-> +       struct mutex flush_lock;
-> +};
-> +
-> +static void ipmmu_reg_write(struct ipmmu_priv *priv, unsigned long reg_off,
-> +                           unsigned long data)
-> +{
-> +       iowrite32(data, priv->ipmmu_base + reg_off);
-> +}
-> +
-> +void ipmmu_tlb_flush(struct device *dev)
-> +{
-> +       struct ipmmu_priv *priv;
-> +
-> +       if (!dev)
-> +               return;
-> +       priv = dev_get_drvdata(dev);
-> +       mutex_lock(&priv->flush_lock);
-> +       if (priv->tlb_enabled)
-> +               ipmmu_reg_write(priv, IMCTR1, IMCTR1_FLUSH | IMCTR1_TLBEN);
-> +       else
-> +               ipmmu_reg_write(priv, IMCTR1, IMCTR1_FLUSH);
-> +       mutex_unlock(&priv->flush_lock);
-> +}
-> +
-> +void ipmmu_tlb_set(struct device *dev, unsigned long phys, int size, int asid)
-> +{
-> +       struct ipmmu_priv *priv;
-> +
-> +       if (!dev)
-> +               return;
-> +       priv = dev_get_drvdata(dev);
-> +       mutex_lock(&priv->flush_lock);
-> +       switch (size) {
-> +       default:
-> +               priv->tlb_enabled = 0;
-> +               break;
-> +       case 0x2000:
-> +               ipmmu_reg_write(priv, IMTTBCR, 1);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       case 0x1000:
-> +               ipmmu_reg_write(priv, IMTTBCR, 2);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       case 0x800:
-> +               ipmmu_reg_write(priv, IMTTBCR, 3);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       case 0x400:
-> +               ipmmu_reg_write(priv, IMTTBCR, 4);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       case 0x200:
-> +               ipmmu_reg_write(priv, IMTTBCR, 5);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       case 0x100:
-> +               ipmmu_reg_write(priv, IMTTBCR, 6);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       case 0x80:
-> +               ipmmu_reg_write(priv, IMTTBCR, 7);
-> +               priv->tlb_enabled = 1;
-> +               break;
-> +       }
-
-I thought that you could describe more briefly if ffs() is used.
-
-> +       ipmmu_reg_write(priv, IMTTBR, phys);
-> +       ipmmu_reg_write(priv, IMASID, asid);
-> +       mutex_unlock(&priv->flush_lock);
-> +}
-> +
-> +static int __devinit ipmmu_probe(struct platform_device *pdev)
-> +{
-> +       struct resource *res;
-> +       struct ipmmu_priv *priv;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res) {
-> +               dev_err(&pdev->dev, "cannot get platform resources\n");
-> +               return -ENOENT;
-> +       }
-> +       priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> +       if (!priv) {
-> +               dev_err(&pdev->dev, "cannot allocate device data\n");
-> +               return -ENOMEM;
-> +       }
-> +       mutex_init(&priv->flush_lock);
-> +       priv->ipmmu_base = ioremap_nocache(res->start, resource_size(res));
-> +       if (!priv->ipmmu_base) {
-> +               dev_err(&pdev->dev, "ioremap_nocache failed\n");
-> +               kfree(priv);
-> +               return -ENOMEM;
-> +       }
-> +       platform_set_drvdata(pdev, priv);
-> +       ipmmu_reg_write(priv, IMCTR1, 0x0); /* disable TLB */
-> +       ipmmu_reg_write(priv, IMCTR2, 0x0); /* disable PMB */
-> +       ipmmu_iommu_init(&pdev->dev);
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver ipmmu_driver = {
-> +       .probe = ipmmu_probe,
-> +       .driver = {
-> +               .owner = THIS_MODULE,
-> +               .name = "ipmmu",
-> +       },
-> +};
-> +
-> +static int __init ipmmu_init(void)
-> +{
-> +       return platform_driver_register(&ipmmu_driver);
-> +}
-> +subsys_initcall(ipmmu_init);
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index 9f69b56..0ed44d0 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -187,4 +187,40 @@ config EXYNOS_IOMMU_DEBUG
->
->           Say N unless you need kernel log message for IOMMU debugging
->
-> +config SHMOBILE_IOMMU
-> +       bool "IOMMU for Renesas IPMMU/IPMMUI"
-> +       default n
-> +       select IOMMU_API
-> +       select ARM_DMA_USE_IOMMU
-> +       select SHMOBILE_IPMMU
-> +       select SHMOBILE_IPMMU_TLB
-> +
-> +choice
-> +       prompt "IPMMU/IPMMUI 1st level page table size"
-> +       default SHMOBILE_IOMMU_L1SIZE_8192
-> +       depends on SHMOBILE_IOMMU
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_8192
-> +               bool "8192 bytes (2 GiB address space)"
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_4096
-> +               bool "4096 bytes (1 GiB address space)"
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_2048
-> +               bool "2048 bytes (512 MiB address space)"
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_1024
-> +               bool "1024 bytes (256 MiB address space)"
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_512
-> +               bool "512 bytes (128 MiB address space)"
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_256
-> +               bool "256 bytes (64 MiB address space)"
-> +
-> +       config SHMOBILE_IOMMU_L1SIZE_128
-> +               bool "128 bytes (32 MiB address space)"
-> +
-> +endchoice
-> +
->  endif # IOMMU_SUPPORT
-> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-> index 14a4d5f..62cf917 100644
-> --- a/drivers/iommu/Makefile
-> +++ b/drivers/iommu/Makefile
-> @@ -12,3 +12,4 @@ obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
->  obj-$(CONFIG_TEGRA_IOMMU_GART) += tegra-gart.o
->  obj-$(CONFIG_TEGRA_IOMMU_SMMU) += tegra-smmu.o
->  obj-$(CONFIG_EXYNOS_IOMMU) += exynos-iommu.o
-> +obj-$(CONFIG_SHMOBILE_IOMMU) += shmobile-iommu.o
-> diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
-> new file mode 100644
-> index 0000000..3285b3b
-> --- /dev/null
-> +++ b/drivers/iommu/shmobile-iommu.c
-> @@ -0,0 +1,372 @@
-> +/*
-> + * IOMMU for IPMMU/IPMMUI
-> + * Copyright (C) 2012  Hideki EIRAKU
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-> + *
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/dmapool.h>
-> +#include <linux/slab.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/iommu.h>
-> +#include <linux/dma-mapping.h>
-> +#include <mach/ipmmu.h>
-> +#include <asm/dma-iommu.h>
-> +
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_8192
-> +#define L1_SIZE 8192
-> +#endif
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_4096
-> +#define L1_SIZE 4096
-> +#endif
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_2048
-> +#define L1_SIZE 2048
-> +#endif
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_1024
-> +#define L1_SIZE 1024
-> +#endif
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_512
-> +#define L1_SIZE 512
-> +#endif
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_256
-> +#define L1_SIZE 256
-> +#endif
-> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_128
-> +#define L1_SIZE 128
-> +#endif
-
-I think that it was better to define by kconfig.
-For example, following codes.
-
-+config SHMOBILE_IOMMU_L1SIZE
-+       hex
-+       default "0x00002000" if SHMOBILE_IOMMU_L1SIZE_8192
-+       default "0x00001000" if SHMOBILE_IOMMU_L1SIZE_4096
-+       default "0x00000800" if SHMOBILE_IOMMU_L1SIZE_2048
-+       default "0x00000400" if SHMOBILE_IOMMU_L1SIZE_1024
-+       default "0x00000200" if SHMOBILE_IOMMU_L1SIZE_512
-+       default "0x00000100" if SHMOBILE_IOMMU_L1SIZE_256
-+       default "0x00000080" if SHMOBILE_IOMMU_L1SIZE_128
-
-> +#define L1_LEN (L1_SIZE / 4)
-> +#define L1_ALIGN L1_SIZE
-> +#define L2_SIZE 0x400
-> +#define L2_LEN (L2_SIZE / 4)
-> +#define L2_ALIGN L2_SIZE
-> +
-> +struct shmobile_iommu_priv_pgtable {
-> +       uint32_t *pgtable;
-> +       dma_addr_t handle;
-> +};
-> +
-> +struct shmobile_iommu_priv {
-> +       struct shmobile_iommu_priv_pgtable l1, l2[L1_LEN];
-> +       spinlock_t map_lock;
-> +       atomic_t active;
-> +};
-> +
-> +static struct dma_iommu_mapping *iommu_mapping;
-> +static struct device *ipmmu_devices;
-> +static struct dma_pool *l1pool, *l2pool;
-> +static spinlock_t lock;
-> +static DEFINE_SPINLOCK(lock_add);
-> +static struct shmobile_iommu_priv *attached;
-> +static int num_attached_devices;
-> +static struct device *ipmmu_access_device;
-> +
-> +static int shmobile_iommu_domain_init(struct iommu_domain *domain)
-> +{
-> +       struct shmobile_iommu_priv *priv;
-> +       int i;
-> +
-> +       priv = kmalloc(sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +       priv->l1.pgtable = dma_pool_alloc(l1pool, GFP_KERNEL,
-> +                                         &priv->l1.handle);
-> +       if (!priv->l1.pgtable) {
-> +               kfree(priv);
-> +               return -ENOMEM;
-> +       }
-> +       for (i = 0; i < L1_LEN; i++)
-> +               priv->l2[i].pgtable = NULL;
-> +       memset(priv->l1.pgtable, 0, L1_SIZE);
-> +       spin_lock_init(&priv->map_lock);
-> +       atomic_set(&priv->active, 0);
-> +       domain->priv = priv;
-> +       return 0;
-> +}
-> +
-> +static void shmobile_iommu_domain_destroy(struct iommu_domain *domain)
-> +{
-> +       struct shmobile_iommu_priv *priv = domain->priv;
-> +       int i;
-> +
-> +       for (i = 0; i < L1_LEN; i++) {
-> +               if (priv->l2[i].pgtable)
-> +                       dma_pool_free(l2pool, priv->l2[i].pgtable,
-> +                                     priv->l2[i].handle);
-> +       }
-> +       dma_pool_free(l1pool, priv->l1.pgtable, priv->l1.handle);
-> +       kfree(priv);
-> +       domain->priv = NULL;
-> +}
-> +
-> +static int shmobile_iommu_attach_device(struct iommu_domain *domain,
-> +                                       struct device *dev)
-> +{
-> +       struct shmobile_iommu_priv *priv = domain->priv;
-> +       int ret = -EBUSY;
-> +
-> +       spin_lock(&lock);
-> +       if (attached != priv) {
-> +               if (attached)
-> +                       goto err;
-> +               atomic_set(&priv->active, 1);
-> +               ipmmu_tlb_set(ipmmu_access_device, priv->l1.handle, L1_SIZE,
-> +                             0);
-> +               wmb();
-> +               ipmmu_tlb_flush(ipmmu_access_device);
-> +               attached = priv;
-> +               num_attached_devices = 0;
-> +       }
-> +       num_attached_devices++;
-> +       ret = 0;
-> +err:
-> +       spin_unlock(&lock);
-> +       return ret;
-> +}
-> +
-> +static void shmobile_iommu_detach_device(struct iommu_domain *domain,
-> +                                        struct device *dev)
-> +{
-> +       struct shmobile_iommu_priv *priv = domain->priv;
-> +
-> +       spin_lock(&lock);
-> +       atomic_set(&priv->active, 0);
-> +       num_attached_devices--;
-> +       if (!num_attached_devices) {
-> +               ipmmu_tlb_set(ipmmu_access_device, 0, 0, 0);
-> +               ipmmu_tlb_flush(ipmmu_access_device);
-> +               attached = NULL;
-> +       }
-> +       spin_unlock(&lock);
-> +}
-> +
-> +static int
-> +l2alloc(struct shmobile_iommu_priv *priv, unsigned int l1index)
-> +{
-> +       if (!priv->l2[l1index].pgtable) {
-> +               priv->l2[l1index].pgtable = dma_pool_alloc(l2pool, GFP_KERNEL,
-> +                                               &priv->l2[l1index].handle);
-> +               if (!priv->l2[l1index].pgtable)
-> +                       return -ENOMEM;
-> +               memset(priv->l2[l1index].pgtable, 0, L2_SIZE);
-> +       }
-> +       priv->l1.pgtable[l1index] = priv->l2[l1index].handle | 0x1;
-> +       return 0;
-> +}
-> +
-> +static void
-> +l2realfree(struct shmobile_iommu_priv_pgtable *l2)
-> +{
-> +       if (l2->pgtable)
-> +               dma_pool_free(l2pool, l2->pgtable, l2->handle);
-> +}
-> +
-> +static int
-> +l2free(struct shmobile_iommu_priv *priv, unsigned int l1index,
-> +       struct shmobile_iommu_priv_pgtable *l2)
-> +{
-> +       priv->l1.pgtable[l1index] = 0;
-> +       if (priv->l2[l1index].pgtable) {
-> +               *l2 = priv->l2[l1index];
-> +               priv->l2[l1index].pgtable = NULL;
-> +       }
-> +       return 0;
-> +}
-> +
-> +static int shmobile_iommu_map(struct iommu_domain *domain, unsigned long iova,
-> +                             phys_addr_t paddr, size_t size, int prot)
-> +{
-> +       struct shmobile_iommu_priv_pgtable l2 = { .pgtable = NULL };
-> +       struct shmobile_iommu_priv *priv = domain->priv;
-> +       unsigned int l1index, l2index, i;
-> +       int ret;
-> +
-> +       l1index = iova >> 20;
-> +       switch (size) {
-> +       case 0x1000:
-> +               l2index = (iova >> 12) & 0xff;
-> +               spin_lock(&priv->map_lock);
-> +               ret = l2alloc(priv, l1index);
-> +               if (!ret)
-> +                       priv->l2[l1index].pgtable[l2index] = paddr | 0xff2;
-> +               spin_unlock(&priv->map_lock);
-> +               break;
-> +       case 0x10000:
-> +               l2index = (iova >> 12) & 0xf0;
-> +               spin_lock(&priv->map_lock);
-> +               ret = l2alloc(priv, l1index);
-> +               if (!ret) {
-> +                       for (i = 0; i < 0x10; i++)
-> +                               priv->l2[l1index].pgtable[l2index + i] =
-> +                                       paddr | 0xff1;
-> +               }
-> +               spin_unlock(&priv->map_lock);
-> +               break;
-> +       case 0x100000:
-> +               spin_lock(&priv->map_lock);
-> +               l2free(priv, l1index, &l2);
-> +               priv->l1.pgtable[l1index] = paddr | 0xc02;
-> +               spin_unlock(&priv->map_lock);
-> +               ret = 0;
-> +               break;
-> +       default:
-> +               ret = -EINVAL;
-> +       }
-> +       if (!ret && atomic_read(&priv->active)) {
-> +               wmb();
-> +               ipmmu_tlb_flush(ipmmu_access_device);
-> +               l2realfree(&l2);
-> +       }
-> +       return ret;
-> +}
-> +
-> +static size_t shmobile_iommu_unmap(struct iommu_domain *domain,
-> +                                  unsigned long iova, size_t size)
-> +{
-> +       struct shmobile_iommu_priv_pgtable l2 = { .pgtable = NULL };
-> +       struct shmobile_iommu_priv *priv = domain->priv;
-> +       unsigned int l1index, l2index, i;
-> +       uint32_t l2entry = 0;
-> +       size_t ret = 0;
-> +
-> +       l1index = iova >> 20;
-> +       if (!(iova & 0xFFFFF) && size >= 0x100000) {
-> +               spin_lock(&priv->map_lock);
-> +               l2free(priv, l1index, &l2);
-> +               spin_unlock(&priv->map_lock);
-> +               ret = 0x100000;
-> +               goto done;
-> +       }
-> +       l2index = (iova >> 12) & 0xff;
-> +       spin_lock(&priv->map_lock);
-> +       if (priv->l2[l1index].pgtable)
-> +               l2entry = priv->l2[l1index].pgtable[l2index];
-> +       switch (l2entry & 3) {
-> +       case 1:
-> +               if (l2index & 0xf)
-> +                       break;
-> +               for (i = 0; i < 0x10; i++)
-> +                       priv->l2[l1index].pgtable[l2index + i] = 0;
-> +               ret = 0x10000;
-> +               break;
-> +       case 2:
-> +               priv->l2[l1index].pgtable[l2index] = 0;
-> +               ret = 0x1000;
-> +               break;
-> +       }
-> +       spin_unlock(&priv->map_lock);
-> +done:
-> +       if (ret && atomic_read(&priv->active)) {
-> +               wmb();
-> +               ipmmu_tlb_flush(ipmmu_access_device);
-> +               l2realfree(&l2);
-> +       }
-> +       return ret;
-> +}
-> +
-> +static phys_addr_t shmobile_iommu_iova_to_phys(struct iommu_domain *domain,
-> +                                              unsigned long iova)
-> +{
-> +       struct shmobile_iommu_priv *priv = domain->priv;
-> +       uint32_t l1entry = 0, l2entry = 0;
-> +       unsigned int l1index, l2index;
-> +
-> +       l1index = iova >> 20;
-> +       l2index = (iova >> 12) & 0xff;
-> +       spin_lock(&priv->map_lock);
-> +       if (priv->l2[l1index].pgtable)
-> +               l2entry = priv->l2[l1index].pgtable[l2index];
-> +       else
-> +               l1entry = priv->l1.pgtable[l1index];
-> +       spin_unlock(&priv->map_lock);
-> +       switch (l2entry & 3) {
-> +       case 1:
-> +               return (l2entry & ~0xffff) | (iova & 0xffff);
-> +       case 2:
-> +               return (l2entry & ~0xfff) | (iova & 0xfff);
-> +       default:
-> +               if ((l1entry & 3) == 2)
-> +                       return (l1entry & ~0xfffff) | (iova & 0xfffff);
-> +               return 0;
-> +       }
-> +}
-> +
-> +static struct iommu_ops shmobile_iommu_ops = {
-> +       .domain_init = shmobile_iommu_domain_init,
-> +       .domain_destroy = shmobile_iommu_domain_destroy,
-> +       .attach_dev = shmobile_iommu_attach_device,
-> +       .detach_dev = shmobile_iommu_detach_device,
-> +       .map = shmobile_iommu_map,
-> +       .unmap = shmobile_iommu_unmap,
-> +       .iova_to_phys = shmobile_iommu_iova_to_phys,
-> +       .pgsize_bitmap = 0x111000,
-> +};
-> +
-> +static int shmobile_iommu_attach_all_devices(void)
-> +{
-> +       struct device *dev;
-> +       int ret = 0;
-> +
-> +       spin_lock(&lock_add);
-> +       iommu_mapping = arm_iommu_create_mapping(&platform_bus_type, 0x0,
-> +                                                L1_LEN << 20, 0);
-> +       if (IS_ERR_OR_NULL(iommu_mapping)) {
-> +               ret = PTR_ERR(iommu_mapping);
-> +               goto err;
-> +       }
-> +       for (dev = ipmmu_devices; dev; dev = dev->archdata.iommu) {
-> +               if (arm_iommu_attach_device(dev, iommu_mapping))
-> +                       pr_err("arm_iommu_attach_device failed\n");
-> +       }
-> +err:
-> +       spin_unlock(&lock_add);
-> +       return 0;
-> +}
-> +
-> +void ipmmu_add_device(struct device *dev)
-> +{
-> +       spin_lock(&lock_add);
-> +       dev->archdata.iommu = ipmmu_devices;
-> +       ipmmu_devices = dev;
-> +       if (!IS_ERR_OR_NULL(iommu_mapping)) {
-> +               if (arm_iommu_attach_device(dev, iommu_mapping))
-> +                       pr_err("arm_iommu_attach_device failed\n");
-> +       }
-> +       spin_unlock(&lock_add);
-> +}
-> +
-> +int ipmmu_iommu_init(struct device *dev)
-> +{
-> +       dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
-> +       l1pool = dma_pool_create("shmobile-iommu-pgtable1", dev,
-> +                                L1_SIZE, L1_ALIGN, 0);
-> +       if (!l1pool)
-> +               goto nomem_pool1;
-> +       l2pool = dma_pool_create("shmobile-iommu-pgtable2", dev,
-> +                                L2_SIZE, L2_ALIGN, 0);
-> +       if (!l2pool)
-> +               goto nomem_pool2;
-> +       spin_lock_init(&lock);
-> +       attached = NULL;
-> +       ipmmu_access_device = dev;
-> +       bus_set_iommu(&platform_bus_type, &shmobile_iommu_ops);
-> +       if (shmobile_iommu_attach_all_devices())
-> +               pr_err("shmobile_iommu_attach_all_devices failed\n");
-> +       return 0;
-> +nomem_pool2:
-> +       dma_pool_destroy(l1pool);
-> +nomem_pool1:
-> +       return -ENOMEM;
-> +}
-> --
-> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Best regards,
- Nobuhiro
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fdc0119..36da5f9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -665,15 +665,6 @@ L:	linux-arm-kernel at lists.infradead.org (moderated 
+for non-subscribers)
+  S:	Maintained
+  F:	arch/arm/mach-bcmring
+  -ARM/BCMRING MTD NAND DRIVER
+-M:	Jiandong Zheng <jdzheng@broadcom.com>
+-M:	Scott Branden <sbranden@broadcom.com>
+-L:	linux-mtd at lists.infradead.org
+-S:	Maintained
+-F:	drivers/mtd/nand/bcm_umi_nand.c
+-F:	drivers/mtd/nand/bcm_umi_bch.c
+-F:	drivers/mtd/nand/nand_bcm_umi.h
+-
+  ARM/CALXEDA HIGHBANK ARCHITECTURE
+  M:	Rob Herring <rob.herring@calxeda.com>
+  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+diff --git a/arch/arm/configs/bcmring_defconfig 
+b/arch/arm/configs/bcmring_defconfig
+index 9e6a8fe..75fa6c0 100644
+--- a/arch/arm/configs/bcmring_defconfig
++++ b/arch/arm/configs/bcmring_defconfig
+@@ -45,8 +45,6 @@ CONFIG_MTD_CFI_GEOMETRY=y
+  # CONFIG_MTD_CFI_I2 is not set
+  CONFIG_MTD_NAND=y
+  CONFIG_MTD_NAND_VERIFY_WRITE=y
+-CONFIG_MTD_NAND_BCM_UMI=y
+-CONFIG_MTD_NAND_BCM_UMI_HWCS=y
+  # CONFIG_MISC_DEVICES is not set
+  # CONFIG_INPUT_MOUSEDEV is not set
+  # CONFIG_INPUT_KEYBOARD is not set
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 8ca4176..5c60a44 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -267,22 +267,6 @@ config MTD_NAND_S3C2410_CLKSTOP
+  	  when the is NAND chip selected or released, but will save
+  	  approximately 5mA of power when there is nothing happening.
+  -config MTD_NAND_BCM_UMI
+-	tristate "NAND Flash support for BCM Reference Boards"
+-	depends on ARCH_BCMRING
+-	help
+-	  This enables the NAND flash controller on the BCM UMI block.
+-
+-	  No board specific support is done by this driver, each board
+-	  must advertise a platform_device for the driver to attach.
+-
+-config MTD_NAND_BCM_UMI_HWCS
+-	bool "BCM UMI NAND Hardware CS"
+-	depends on MTD_NAND_BCM_UMI
+-	help
+-	  Enable the use of the BCM UMI block's internal CS using NAND.
+-	  This should only be used if you know the external NAND CS can toggle.
+-
+  config MTD_NAND_DISKONCHIP
+  	tristate "DiskOnChip 2000, Millennium and Millennium Plus (NAND 
+reimplementation) (EXPERIMENTAL)"
+  	depends on EXPERIMENTAL
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index d4b4d87..8b2825a 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -46,7 +46,6 @@ obj-$(CONFIG_MTD_NAND_SOCRATES)		+= socrates_nand.o
+  obj-$(CONFIG_MTD_NAND_TXX9NDFMC)	+= txx9ndfmc.o
+  obj-$(CONFIG_MTD_NAND_NUC900)		+= nuc900_nand.o
+  obj-$(CONFIG_MTD_NAND_NOMADIK)		+= nomadik_nand.o
+-obj-$(CONFIG_MTD_NAND_BCM_UMI)		+= bcm_umi_nand.o nand_bcm_umi.o
+  obj-$(CONFIG_MTD_NAND_MPC5121_NFC)	+= mpc5121_nfc.o
+  obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
+  obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
+diff --git a/drivers/mtd/nand/bcm_umi_bch.c b/drivers/mtd/nand/bcm_umi_bch.c
+deleted file mode 100644
+index 5914bb3..0000000
+--- a/drivers/mtd/nand/bcm_umi_bch.c
++++ /dev/null
+@@ -1,217 +0,0 @@
+-/*****************************************************************************
+-* Copyright 2004 - 2009 Broadcom Corporation.  All rights reserved.
+-*
+-* Unless you and Broadcom execute a separate written software license
+-* agreement governing use of this software, this software is licensed 
+to you
+-* under the terms of the GNU General Public License version 2, available at
+-* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
+-*
+-* Notwithstanding the above, under no circumstances may you combine this
+-* software in any way with any other Broadcom software provided under a
+-* license other than the GPL, without Broadcom's express prior written
+-* consent.
+-*****************************************************************************/
+-
+-/* ---- Include Files 
+---------------------------------------------------- */
+-#include "nand_bcm_umi.h"
+-
+-/* ---- External Variable Declarations 
+----------------------------------- */
+-/* ---- External Function Prototypes 
+------------------------------------- */
+-/* ---- Public Variables 
+------------------------------------------------- */
+-/* ---- Private Constants and Types 
+-------------------------------------- */
+-
+-/* ---- Private Function Prototypes 
+-------------------------------------- */
+-static int bcm_umi_bch_read_page_hwecc(struct mtd_info *mtd,
+-	struct nand_chip *chip, uint8_t *buf, int oob_required, int page);
+-static void bcm_umi_bch_write_page_hwecc(struct mtd_info *mtd,
+-	struct nand_chip *chip, const uint8_t *buf, int oob_required);
+-
+-/* ---- Private Variables 
+------------------------------------------------ */
+-
+-/*
+-** nand_hw_eccoob
+-** New oob placement block for use with hardware ecc generation.
+-*/
+-static struct nand_ecclayout nand_hw_eccoob_512 = {
+-	/* Reserve 5 for BI indicator */
+-	.oobfree = {
+-#if (NAND_ECC_NUM_BYTES > 3)
+-		    {.offset = 0, .length = 2}
+-#else
+-		    {.offset = 0, .length = 5},
+-		    {.offset = 6, .length = 7}
+-#endif
+-		    }
+-};
+-
+-/*
+-** We treat the OOB for a 2K page as if it were 4 512 byte oobs,
+-** except the BI is at byte 0.
+-*/
+-static struct nand_ecclayout nand_hw_eccoob_2048 = {
+-	/* Reserve 0 as BI indicator */
+-	.oobfree = {
+-#if (NAND_ECC_NUM_BYTES > 10)
+-		    {.offset = 1, .length = 2},
+-#elif (NAND_ECC_NUM_BYTES > 7)
+-		    {.offset = 1, .length = 5},
+-		    {.offset = 16, .length = 6},
+-		    {.offset = 32, .length = 6},
+-		    {.offset = 48, .length = 6}
+-#else
+-		    {.offset = 1, .length = 8},
+-		    {.offset = 16, .length = 9},
+-		    {.offset = 32, .length = 9},
+-		    {.offset = 48, .length = 9}
+-#endif
+-		    }
+-};
+-
+-/* We treat the OOB for a 4K page as if it were 8 512 byte oobs,
+- * except the BI is at byte 0. */
+-static struct nand_ecclayout nand_hw_eccoob_4096 = {
+-	/* Reserve 0 as BI indicator */
+-	.oobfree = {
+-#if (NAND_ECC_NUM_BYTES > 10)
+-		    {.offset = 1, .length = 2},
+-		    {.offset = 16, .length = 3},
+-		    {.offset = 32, .length = 3},
+-		    {.offset = 48, .length = 3},
+-		    {.offset = 64, .length = 3},
+-		    {.offset = 80, .length = 3},
+-		    {.offset = 96, .length = 3},
+-		    {.offset = 112, .length = 3}
+-#else
+-		    {.offset = 1, .length = 5},
+-		    {.offset = 16, .length = 6},
+-		    {.offset = 32, .length = 6},
+-		    {.offset = 48, .length = 6},
+-		    {.offset = 64, .length = 6},
+-		    {.offset = 80, .length = 6},
+-		    {.offset = 96, .length = 6},
+-		    {.offset = 112, .length = 6}
+-#endif
+-		    }
+-};
+-
+-/* ---- Private Functions 
+------------------------------------------------ */
+-/* ==== Public Functions 
+================================================= */
+-
+-/****************************************************************************
+-*
+-*  bcm_umi_bch_read_page_hwecc - hardware ecc based page read function
+-*  @mtd:	mtd info structure
+-*  @chip:	nand chip info structure
+-*  @buf:	buffer to store read data
+-*  @oob_required:	caller expects OOB data read to chip->oob_poi
+-*
+-***************************************************************************/
+-static int bcm_umi_bch_read_page_hwecc(struct mtd_info *mtd,
+-				       struct nand_chip *chip, uint8_t * buf,
+-				       int oob_required, int page)
+-{
+-	int sectorIdx = 0;
+-	int eccsize = chip->ecc.size;
+-	int eccsteps = chip->ecc.steps;
+-	uint8_t *datap = buf;
+-	uint8_t eccCalc[NAND_ECC_NUM_BYTES];
+-	int sectorOobSize = mtd->oobsize / eccsteps;
+-	int stat;
+-	unsigned int max_bitflips = 0;
+-
+-	for (sectorIdx = 0; sectorIdx < eccsteps;
+-			sectorIdx++, datap += eccsize) {
+-		if (sectorIdx > 0) {
+-			/* Seek to page location within sector */
+-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, sectorIdx * eccsize,
+-				      -1);
+-		}
+-
+-		/* Enable hardware ECC before reading the buf */
+-		nand_bcm_umi_bch_enable_read_hwecc();
+-
+-		/* Read in data */
+-		bcm_umi_nand_read_buf(mtd, datap, eccsize);
+-
+-		/* Pause hardware ECC after reading the buf */
+-		nand_bcm_umi_bch_pause_read_ecc_calc();
+-
+-		/* Read the OOB ECC */
+-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
+-			      mtd->writesize + sectorIdx * sectorOobSize, -1);
+-		nand_bcm_umi_bch_read_oobEcc(mtd->writesize, eccCalc,
+-					     NAND_ECC_NUM_BYTES,
+-					     chip->oob_poi +
+-					     sectorIdx * sectorOobSize);
+-
+-		/* Correct any ECC detected errors */
+-		stat =
+-		    nand_bcm_umi_bch_correct_page(datap, eccCalc,
+-						  NAND_ECC_NUM_BYTES);
+-
+-		/* Update Stats */
+-		if (stat < 0) {
+-#if defined(NAND_BCM_UMI_DEBUG)
+-			printk(KERN_WARNING "%s uncorr_err sectorIdx=%d\n",
+-			       __func__, sectorIdx);
+-			printk(KERN_WARNING
+-			       "%s data %02x %02x %02x %02x "
+-					 "%02x %02x %02x %02x\n",
+-			       __func__, datap[0], datap[1], datap[2], datap[3],
+-			       datap[4], datap[5], datap[6], datap[7]);
+-			printk(KERN_WARNING
+-			       "%s ecc  %02x %02x %02x %02x "
+-					 "%02x %02x %02x %02x %02x %02x "
+-					 "%02x %02x %02x\n",
+-			       __func__, eccCalc[0], eccCalc[1], eccCalc[2],
+-			       eccCalc[3], eccCalc[4], eccCalc[5], eccCalc[6],
+-			       eccCalc[7], eccCalc[8], eccCalc[9], eccCalc[10],
+-			       eccCalc[11], eccCalc[12]);
+-			BUG();
+-#endif
+-			mtd->ecc_stats.failed++;
+-		} else {
+-#if defined(NAND_BCM_UMI_DEBUG)
+-			if (stat > 0) {
+-				printk(KERN_INFO
+-				       "%s %d correctable_errors detected\n",
+-				       __func__, stat);
+-			}
+-#endif
+-			mtd->ecc_stats.corrected += stat;
+-			max_bitflips = max_t(unsigned int, max_bitflips, stat);
+-		}
+-	}
+-	return max_bitflips;
+-}
+-
+-/****************************************************************************
+-*
+-*  bcm_umi_bch_write_page_hwecc - hardware ecc based page write function
+-*  @mtd:	mtd info structure
+-*  @chip:	nand chip info structure
+-*  @buf:	data buffer
+-*  @oob_required:	must write chip->oob_poi to OOB
+-*
+-***************************************************************************/
+-static void bcm_umi_bch_write_page_hwecc(struct mtd_info *mtd,
+-	struct nand_chip *chip, const uint8_t *buf, int oob_required)
+-{
+-	int sectorIdx = 0;
+-	int eccsize = chip->ecc.size;
+-	int eccsteps = chip->ecc.steps;
+-	const uint8_t *datap = buf;
+-	uint8_t *oobp = chip->oob_poi;
+-	int sectorOobSize = mtd->oobsize / eccsteps;
+-
+-	for (sectorIdx = 0; sectorIdx < eccsteps;
+-	     sectorIdx++, datap += eccsize, oobp += sectorOobSize) {
+-		/* Enable hardware ECC before writing the buf */
+-		nand_bcm_umi_bch_enable_write_hwecc();
+-		bcm_umi_nand_write_buf(mtd, datap, eccsize);
+-		nand_bcm_umi_bch_write_oobEcc(mtd->writesize, oobp,
+-					      NAND_ECC_NUM_BYTES);
+-	}
+-
+-	bcm_umi_nand_write_buf(mtd, chip->oob_poi, mtd->oobsize);
+-}
+diff --git a/drivers/mtd/nand/bcm_umi_nand.c 
+b/drivers/mtd/nand/bcm_umi_nand.c
+deleted file mode 100644
+index c855e7c..0000000
+--- a/drivers/mtd/nand/bcm_umi_nand.c
++++ /dev/null
+@@ -1,555 +0,0 @@
+-/*****************************************************************************
+-* Copyright 2004 - 2009 Broadcom Corporation.  All rights reserved.
+-*
+-* Unless you and Broadcom execute a separate written software license
+-* agreement governing use of this software, this software is licensed 
+to you
+-* under the terms of the GNU General Public License version 2, available at
+-* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
+-*
+-* Notwithstanding the above, under no circumstances may you combine this
+-* software in any way with any other Broadcom software provided under a
+-* license other than the GPL, without Broadcom's express prior written
+-* consent.
+-*****************************************************************************/
+-
+-/* ---- Include Files 
+---------------------------------------------------- */
+-#include <linux/module.h>
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/slab.h>
+-#include <linux/string.h>
+-#include <linux/ioport.h>
+-#include <linux/device.h>
+-#include <linux/delay.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/nand.h>
+-#include <linux/mtd/nand_ecc.h>
+-#include <linux/mtd/partitions.h>
+-
+-#include <asm/mach-types.h>
+-
+-#include <mach/reg_nand.h>
+-#include <mach/reg_umi.h>
+-
+-#include "nand_bcm_umi.h"
+-
+-#include <mach/memory_settings.h>
+-
+-#define USE_DMA 1
+-#include <mach/dma.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/completion.h>
+-
+-/* ---- External Variable Declarations 
+----------------------------------- */
+-/* ---- External Function Prototypes 
+------------------------------------- */
+-/* ---- Public Variables 
+------------------------------------------------- */
+-/* ---- Private Constants and Types 
+-------------------------------------- */
+-static const __devinitconst char gBanner[] = KERN_INFO \
+-	"BCM UMI MTD NAND Driver: 1.00\n";
+-
+-#if NAND_ECC_BCH
+-static uint8_t scan_ff_pattern[] = { 0xff };
+-
+-static struct nand_bbt_descr largepage_bbt = {
+-	.options = 0,
+-	.offs = 0,
+-	.len = 1,
+-	.pattern = scan_ff_pattern
+-};
+-#endif
+-
+-/*
+-** Preallocate a buffer to avoid having to do this every dma operation.
+-** This is the size of the preallocated coherent DMA buffer.
+-*/
+-#if USE_DMA
+-#define DMA_MIN_BUFLEN	512
+-#define DMA_MAX_BUFLEN	PAGE_SIZE
+-#define USE_DIRECT_IO(len)	(((len) < DMA_MIN_BUFLEN) || \
+-	((len) > DMA_MAX_BUFLEN))
+-
+-/*
+- * The current NAND data space goes from 0x80001900 to 0x80001FFF,
+- * which is only 0x700 = 1792 bytes long. This is too small for 2K, 4K page
+- * size NAND flash. Need to break the DMA down to multiple 1Ks.
+- *
+- * Need to make sure REG_NAND_DATA_PADDR + DMA_MAX_LEN < 0x80002000
+- */
+-#define DMA_MAX_LEN             1024
+-
+-#else /* !USE_DMA */
+-#define DMA_MIN_BUFLEN          0
+-#define DMA_MAX_BUFLEN          0
+-#define USE_DIRECT_IO(len)      1
+-#endif
+-/* ---- Private Function Prototypes 
+-------------------------------------- */
+-static void bcm_umi_nand_read_buf(struct mtd_info *mtd, u_char * buf, 
+int len);
+-static void bcm_umi_nand_write_buf(struct mtd_info *mtd, const u_char * 
+buf,
+-				   int len);
+-
+-/* ---- Private Variables 
+------------------------------------------------ */
+-static struct mtd_info *board_mtd;
+-static void __iomem *bcm_umi_io_base;
+-static void *virtPtr;
+-static dma_addr_t physPtr;
+-static struct completion nand_comp;
+-
+-/* ---- Private Functions 
+------------------------------------------------ */
+-#if NAND_ECC_BCH
+-#include "bcm_umi_bch.c"
+-#else
+-#include "bcm_umi_hamming.c"
+-#endif
+-
+-#if USE_DMA
+-
+-/* Handler called when the DMA finishes. */
+-static void nand_dma_handler(DMA_Device_t dev, int reason, void *userData)
+-{
+-	complete(&nand_comp);
+-}
+-
+-static int nand_dma_init(void)
+-{
+-	int rc;
+-
+-	rc = dma_set_device_handler(DMA_DEVICE_NAND_MEM_TO_MEM,
+-		nand_dma_handler, NULL);
+-	if (rc != 0) {
+-		printk(KERN_ERR "dma_set_device_handler failed: %d\n", rc);
+-		return rc;
+-	}
+-
+-	virtPtr =
+-	    dma_alloc_coherent(NULL, DMA_MAX_BUFLEN, &physPtr, GFP_KERNEL);
+-	if (virtPtr == NULL) {
+-		printk(KERN_ERR "NAND - Failed to allocate memory for DMA buffer\n");
+-		return -ENOMEM;
+-	}
+-
+-	return 0;
+-}
+-
+-static void nand_dma_term(void)
+-{
+-	if (virtPtr != NULL)
+-		dma_free_coherent(NULL, DMA_MAX_BUFLEN, virtPtr, physPtr);
+-}
+-
+-static void nand_dma_read(void *buf, int len)
+-{
+-	int offset = 0;
+-	int tmp_len = 0;
+-	int len_left = len;
+-	DMA_Handle_t hndl;
+-
+-	if (virtPtr == NULL)
+-		panic("nand_dma_read: virtPtr == NULL\n");
+-
+-	if ((void *)physPtr == NULL)
+-		panic("nand_dma_read: physPtr == NULL\n");
+-
+-	hndl = dma_request_channel(DMA_DEVICE_NAND_MEM_TO_MEM);
+-	if (hndl < 0) {
+-		printk(KERN_ERR
+-		       "nand_dma_read: unable to allocate dma channel: %d\n",
+-		       (int)hndl);
+-		panic("\n");
+-	}
+-
+-	while (len_left > 0) {
+-		if (len_left > DMA_MAX_LEN) {
+-			tmp_len = DMA_MAX_LEN;
+-			len_left -= DMA_MAX_LEN;
+-		} else {
+-			tmp_len = len_left;
+-			len_left = 0;
+-		}
+-
+-		init_completion(&nand_comp);
+-		dma_transfer_mem_to_mem(hndl, REG_NAND_DATA_PADDR,
+-					physPtr + offset, tmp_len);
+-		wait_for_completion(&nand_comp);
+-
+-		offset += tmp_len;
+-	}
+-
+-	dma_free_channel(hndl);
+-
+-	if (buf != NULL)
+-		memcpy(buf, virtPtr, len);
+-}
+-
+-static void nand_dma_write(const void *buf, int len)
+-{
+-	int offset = 0;
+-	int tmp_len = 0;
+-	int len_left = len;
+-	DMA_Handle_t hndl;
+-
+-	if (buf == NULL)
+-		panic("nand_dma_write: buf == NULL\n");
+-
+-	if (virtPtr == NULL)
+-		panic("nand_dma_write: virtPtr == NULL\n");
+-
+-	if ((void *)physPtr == NULL)
+-		panic("nand_dma_write: physPtr == NULL\n");
+-
+-	memcpy(virtPtr, buf, len);
+-
+-
+-	hndl = dma_request_channel(DMA_DEVICE_NAND_MEM_TO_MEM);
+-	if (hndl < 0) {
+-		printk(KERN_ERR
+-		       "nand_dma_write: unable to allocate dma channel: %d\n",
+-		       (int)hndl);
+-		panic("\n");
+-	}
+-
+-	while (len_left > 0) {
+-		if (len_left > DMA_MAX_LEN) {
+-			tmp_len = DMA_MAX_LEN;
+-			len_left -= DMA_MAX_LEN;
+-		} else {
+-			tmp_len = len_left;
+-			len_left = 0;
+-		}
+-
+-		init_completion(&nand_comp);
+-		dma_transfer_mem_to_mem(hndl, physPtr + offset,
+-					REG_NAND_DATA_PADDR, tmp_len);
+-		wait_for_completion(&nand_comp);
+-
+-		offset += tmp_len;
+-	}
+-
+-	dma_free_channel(hndl);
+-}
+-
+-#endif
+-
+-static int nand_dev_ready(struct mtd_info *mtd)
+-{
+-	return nand_bcm_umi_dev_ready();
+-}
+-
+-/****************************************************************************
+-*
+-*  bcm_umi_nand_inithw
+-*
+-*   This routine does the necessary hardware (board-specific)
+-*   initializations.  This includes setting up the timings, etc.
+-*
+-***************************************************************************/
+-int bcm_umi_nand_inithw(void)
+-{
+-	/* Configure nand timing parameters */
+-	REG_UMI_NAND_TCR &= ~0x7ffff;
+-	REG_UMI_NAND_TCR |= HW_CFG_NAND_TCR;
+-
+-#if !defined(CONFIG_MTD_NAND_BCM_UMI_HWCS)
+-	/* enable software control of CS */
+-	REG_UMI_NAND_TCR |= REG_UMI_NAND_TCR_CS_SWCTRL;
+-#endif
+-
+-	/* keep NAND chip select asserted */
+-	REG_UMI_NAND_RCSR |= REG_UMI_NAND_RCSR_CS_ASSERTED;
+-
+-	REG_UMI_NAND_TCR &= ~REG_UMI_NAND_TCR_WORD16;
+-	/* enable writes to flash */
+-	REG_UMI_MMD_ICR |= REG_UMI_MMD_ICR_FLASH_WP;
+-
+-	writel(NAND_CMD_RESET, bcm_umi_io_base + REG_NAND_CMD_OFFSET);
+-	nand_bcm_umi_wait_till_ready();
+-
+-#if NAND_ECC_BCH
+-	nand_bcm_umi_bch_config_ecc(NAND_ECC_NUM_BYTES);
+-#endif
+-
+-	return 0;
+-}
+-
+-/* Used to turn latch the proper register for access. */
+-static void bcm_umi_nand_hwcontrol(struct mtd_info *mtd, int cmd,
+-				   unsigned int ctrl)
+-{
+-	/* send command to hardware */
+-	struct nand_chip *chip = mtd->priv;
+-	if (ctrl & NAND_CTRL_CHANGE) {
+-		if (ctrl & NAND_CLE) {
+-			chip->IO_ADDR_W = bcm_umi_io_base + REG_NAND_CMD_OFFSET;
+-			goto CMD;
+-		}
+-		if (ctrl & NAND_ALE) {
+-			chip->IO_ADDR_W =
+-			    bcm_umi_io_base + REG_NAND_ADDR_OFFSET;
+-			goto CMD;
+-		}
+-		chip->IO_ADDR_W = bcm_umi_io_base + REG_NAND_DATA8_OFFSET;
+-	}
+-
+-CMD:
+-	/* Send command to chip directly */
+-	if (cmd != NAND_CMD_NONE)
+-		writeb(cmd, chip->IO_ADDR_W);
+-}
+-
+-static void bcm_umi_nand_write_buf(struct mtd_info *mtd, const u_char * 
+buf,
+-				   int len)
+-{
+-	if (USE_DIRECT_IO(len)) {
+-		/* Do it the old way if the buffer is small or too large.
+-		 * Probably quicker than starting and checking dma. */
+-		int i;
+-		struct nand_chip *this = mtd->priv;
+-
+-		for (i = 0; i < len; i++)
+-			writeb(buf[i], this->IO_ADDR_W);
+-	}
+-#if USE_DMA
+-	else
+-		nand_dma_write(buf, len);
+-#endif
+-}
+-
+-static void bcm_umi_nand_read_buf(struct mtd_info *mtd, u_char * buf, 
+int len)
+-{
+-	if (USE_DIRECT_IO(len)) {
+-		int i;
+-		struct nand_chip *this = mtd->priv;
+-
+-		for (i = 0; i < len; i++)
+-			buf[i] = readb(this->IO_ADDR_R);
+-	}
+-#if USE_DMA
+-	else
+-		nand_dma_read(buf, len);
+-#endif
+-}
+-
+-static uint8_t readbackbuf[NAND_MAX_PAGESIZE];
+-static int bcm_umi_nand_verify_buf(struct mtd_info *mtd, const u_char * 
+buf,
+-				   int len)
+-{
+-	/*
+-	 * Try to readback page with ECC correction. This is necessary
+-	 * for MLC parts which may have permanently stuck bits.
+-	 */
+-	struct nand_chip *chip = mtd->priv;
+-	int ret = chip->ecc.read_page(mtd, chip, readbackbuf, 0, 0);
+-	if (ret < 0)
+-		return -EFAULT;
+-	else {
+-		if (memcmp(readbackbuf, buf, len) == 0)
+-			return 0;
+-
+-		return -EFAULT;
+-	}
+-	return 0;
+-}
+-
+-static int __devinit bcm_umi_nand_probe(struct platform_device *pdev)
+-{
+-	struct nand_chip *this;
+-	struct resource *r;
+-	int err = 0;
+-
+-	printk(gBanner);
+-
+-	/* Allocate memory for MTD device structure and private data */
+-	board_mtd =
+-	    kmalloc(sizeof(struct mtd_info) + sizeof(struct nand_chip),
+-		    GFP_KERNEL);
+-	if (!board_mtd) {
+-		printk(KERN_WARNING
+-		       "Unable to allocate NAND MTD device structure.\n");
+-		return -ENOMEM;
+-	}
+-
+-	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-
+-	if (!r) {
+-		err = -ENXIO;
+-		goto out_free;
+-	}
+-
+-	/* map physical address */
+-	bcm_umi_io_base = ioremap(r->start, resource_size(r));
+-
+-	if (!bcm_umi_io_base) {
+-		printk(KERN_ERR "ioremap to access BCM UMI NAND chip failed\n");
+-		err = -EIO;
+-		goto out_free;
+-	}
+-
+-	/* Get pointer to private data */
+-	this = (struct nand_chip *)(&board_mtd[1]);
+-
+-	/* Initialize structures */
+-	memset((char *)board_mtd, 0, sizeof(struct mtd_info));
+-	memset((char *)this, 0, sizeof(struct nand_chip));
+-
+-	/* Link the private data with the MTD structure */
+-	board_mtd->priv = this;
+-
+-	/* Initialize the NAND hardware.  */
+-	if (bcm_umi_nand_inithw() < 0) {
+-		printk(KERN_ERR "BCM UMI NAND chip could not be initialized\n");
+-		err = -EIO;
+-		goto out_unmap;
+-	}
+-
+-	/* Set address of NAND IO lines */
+-	this->IO_ADDR_W = bcm_umi_io_base + REG_NAND_DATA8_OFFSET;
+-	this->IO_ADDR_R = bcm_umi_io_base + REG_NAND_DATA8_OFFSET;
+-
+-	/* Set command delay time, see datasheet for correct value */
+-	this->chip_delay = 0;
+-	/* Assign the device ready function, if available */
+-	this->dev_ready = nand_dev_ready;
+-	this->options = 0;
+-
+-	this->write_buf = bcm_umi_nand_write_buf;
+-	this->read_buf = bcm_umi_nand_read_buf;
+-	this->verify_buf = bcm_umi_nand_verify_buf;
+-
+-	this->cmd_ctrl = bcm_umi_nand_hwcontrol;
+-	this->ecc.mode = NAND_ECC_HW;
+-	this->ecc.size = 512;
+-	this->ecc.bytes = NAND_ECC_NUM_BYTES;
+-#if NAND_ECC_BCH
+-	this->ecc.read_page = bcm_umi_bch_read_page_hwecc;
+-	this->ecc.write_page = bcm_umi_bch_write_page_hwecc;
+-#else
+-	this->ecc.correct = nand_correct_data512;
+-	this->ecc.calculate = bcm_umi_hamming_get_hw_ecc;
+-	this->ecc.hwctl = bcm_umi_hamming_enable_hwecc;
+-#endif
+-
+-#if USE_DMA
+-	err = nand_dma_init();
+-	if (err != 0)
+-		goto out_unmap;
+-#endif
+-
+-	/* Figure out the size of the device that we have.
+-	 * We need to do this to figure out which ECC
+-	 * layout we'll be using.
+-	 */
+-
+-	err = nand_scan_ident(board_mtd, 1, NULL);
+-	if (err) {
+-		printk(KERN_ERR "nand_scan failed: %d\n", err);
+-		goto out_unmap;
+-	}
+-
+-	/* Now that we know the nand size, we can setup the ECC layout */
+-
+-	switch (board_mtd->writesize) {	/* writesize is the pagesize */
+-	case 4096:
+-		this->ecc.layout = &nand_hw_eccoob_4096;
+-		break;
+-	case 2048:
+-		this->ecc.layout = &nand_hw_eccoob_2048;
+-		break;
+-	case 512:
+-		this->ecc.layout = &nand_hw_eccoob_512;
+-		break;
+-	default:
+-		{
+-			printk(KERN_ERR "NAND - Unrecognized pagesize: %d\n",
+-					 board_mtd->writesize);
+-			err = -EINVAL;
+-			goto out_unmap;
+-		}
+-	}
+-
+-#if NAND_ECC_BCH
+-	if (board_mtd->writesize > 512) {
+-		if (this->bbt_options & NAND_BBT_USE_FLASH)
+-			largepage_bbt.options = NAND_BBT_SCAN2NDPAGE;
+-		this->badblock_pattern = &largepage_bbt;
+-	}
+-
+-	this->ecc.strength = 8;
+-
+-#endif
+-
+-	/* Now finish off the scan, now that ecc.layout has been initialized. */
+-
+-	err = nand_scan_tail(board_mtd);
+-	if (err) {
+-		printk(KERN_ERR "nand_scan failed: %d\n", err);
+-		goto out_unmap;
+-	}
+-
+-	/* Register the partitions */
+-	board_mtd->name = "bcm_umi-nand";
+-	mtd_device_parse_register(board_mtd, NULL, NULL, NULL, 0);
+-
+-	/* Return happy */
+-	return 0;
+-out_unmap:
+-	iounmap(bcm_umi_io_base);
+-out_free:
+-	kfree(board_mtd);
+-	return err;
+-}
+-
+-static int bcm_umi_nand_remove(struct platform_device *pdev)
+-{
+-#if USE_DMA
+-	nand_dma_term();
+-#endif
+-
+-	/* Release resources, unregister device */
+-	nand_release(board_mtd);
+-
+-	/* unmap physical address */
+-	iounmap(bcm_umi_io_base);
+-
+-	/* Free the MTD device structure */
+-	kfree(board_mtd);
+-
+-	return 0;
+-}
+-
+-#ifdef CONFIG_PM
+-static int bcm_umi_nand_suspend(struct platform_device *pdev,
+-				pm_message_t state)
+-{
+-	printk(KERN_ERR "MTD NAND suspend is being called\n");
+-	return 0;
+-}
+-
+-static int bcm_umi_nand_resume(struct platform_device *pdev)
+-{
+-	printk(KERN_ERR "MTD NAND resume is being called\n");
+-	return 0;
+-}
+-#else
+-#define bcm_umi_nand_suspend   NULL
+-#define bcm_umi_nand_resume    NULL
+-#endif
+-
+-static struct platform_driver nand_driver = {
+-	.driver = {
+-		   .name = "bcm-nand",
+-		   .owner = THIS_MODULE,
+-		   },
+-	.probe = bcm_umi_nand_probe,
+-	.remove = bcm_umi_nand_remove,
+-	.suspend = bcm_umi_nand_suspend,
+-	.resume = bcm_umi_nand_resume,
+-};
+-
+-module_platform_driver(nand_driver);
+-
+-MODULE_LICENSE("GPL");
+-MODULE_AUTHOR("Broadcom");
+-MODULE_DESCRIPTION("BCM UMI MTD NAND driver");
+diff --git a/drivers/mtd/nand/nand_bcm_umi.c 
+b/drivers/mtd/nand/nand_bcm_umi.c
+deleted file mode 100644
+index 46a6bc9..0000000
+--- a/drivers/mtd/nand/nand_bcm_umi.c
++++ /dev/null
+@@ -1,149 +0,0 @@
+-/*****************************************************************************
+-* Copyright 2004 - 2009 Broadcom Corporation.  All rights reserved.
+-*
+-* Unless you and Broadcom execute a separate written software license
+-* agreement governing use of this software, this software is licensed 
+to you
+-* under the terms of the GNU General Public License version 2, available at
+-* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
+-*
+-* Notwithstanding the above, under no circumstances may you combine this
+-* software in any way with any other Broadcom software provided under a
+-* license other than the GPL, without Broadcom's express prior written
+-* consent.
+-*****************************************************************************/
+-
+-/* ---- Include Files 
+---------------------------------------------------- */
+-#include <mach/reg_umi.h>
+-#include "nand_bcm_umi.h"
+-#ifdef BOOT0_BUILD
+-#include <uart.h>
+-#endif
+-
+-/* ---- External Variable Declarations 
+----------------------------------- */
+-/* ---- External Function Prototypes 
+------------------------------------- */
+-/* ---- Public Variables 
+------------------------------------------------- */
+-/* ---- Private Constants and Types 
+-------------------------------------- */
+-/* ---- Private Function Prototypes 
+-------------------------------------- */
+-/* ---- Private Variables 
+------------------------------------------------ */
+-/* ---- Private Functions 
+------------------------------------------------ */
+-
+-#if NAND_ECC_BCH
+-/****************************************************************************
+-*  nand_bch_ecc_flip_bit - Routine to flip an errored bit
+-*
+-*  PURPOSE:
+-*     This is a helper routine that flips the bit (0 -> 1 or 1 -> 0) of the
+-*     errored bit specified
+-*
+-*  PARAMETERS:
+-*     datap - Container that holds the 512 byte data
+-*     errorLocation - Location of the bit that needs to be flipped
+-*
+-*  RETURNS:
+-*     None
+-****************************************************************************/
+-static void nand_bcm_umi_bch_ecc_flip_bit(uint8_t *datap, int 
+errorLocation)
+-{
+-	int locWithinAByte = (errorLocation & REG_UMI_BCH_ERR_LOC_BYTE) >> 0;
+-	int locWithinAWord = (errorLocation & REG_UMI_BCH_ERR_LOC_WORD) >> 3;
+-	int locWithinAPage = (errorLocation & REG_UMI_BCH_ERR_LOC_PAGE) >> 5;
+-
+-	uint8_t errorByte = 0;
+-	uint8_t byteMask = 1 << locWithinAByte;
+-
+-	/* BCH uses big endian, need to change the location
+-	 * bits to little endian */
+-	locWithinAWord = 3 - locWithinAWord;
+-
+-	errorByte = datap[locWithinAPage * sizeof(uint32_t) + locWithinAWord];
+-
+-#ifdef BOOT0_BUILD
+-	puthexs("\nECC Correct Offset: ",
+-		locWithinAPage * sizeof(uint32_t) + locWithinAWord);
+-	puthexs(" errorByte:", errorByte);
+-	puthex8(" Bit: ", locWithinAByte);
+-#endif
+-
+-	if (errorByte & byteMask) {
+-		/* bit needs to be cleared */
+-		errorByte &= ~byteMask;
+-	} else {
+-		/* bit needs to be set */
+-		errorByte |= byteMask;
+-	}
+-
+-	/* write back the value with the fixed bit */
+-	datap[locWithinAPage * sizeof(uint32_t) + locWithinAWord] = errorByte;
+-}
+-
+-/****************************************************************************
+-*  nand_correct_page_bch - Routine to correct bit errors when reading NAND
+-*
+-*  PURPOSE:
+-*     This routine reads the BCH registers to determine if there are 
+any bit
+-*     errors during the read of the last 512 bytes of data + ECC bytes.  If
+-*     errors exists, the routine fixes it.
+-*
+-*  PARAMETERS:
+-*     datap - Container that holds the 512 byte data
+-*
+-*  RETURNS:
+-*     0 or greater = Number of errors corrected
+-*                    (No errors are found or errors have been fixed)
+-*    -1 = Error(s) cannot be fixed
+-****************************************************************************/
+-int nand_bcm_umi_bch_correct_page(uint8_t *datap, uint8_t *readEccData,
+-				  int numEccBytes)
+-{
+-	int numErrors;
+-	int errorLocation;
+-	int idx;
+-	uint32_t regValue;
+-
+-	/* wait for read ECC to be valid */
+-	regValue = nand_bcm_umi_bch_poll_read_ecc_calc();
+-
+-	/*
+-	 * read the control status register to determine if there
+-	 * are error'ed bits
+-	 * see if errors are correctible
+-	 */
+-	if ((regValue & REG_UMI_BCH_CTRL_STATUS_UNCORR_ERR) > 0) {
+-		int i;
+-
+-		for (i = 0; i < numEccBytes; i++) {
+-			if (readEccData[i] != 0xff) {
+-				/* errors cannot be fixed, return -1 */
+-				return -1;
+-			}
+-		}
+-		/* If ECC is unprogrammed then we can't correct,
+-		 * assume everything OK */
+-		return 0;
+-	}
+-
+-	if ((regValue & REG_UMI_BCH_CTRL_STATUS_CORR_ERR) == 0) {
+-		/* no errors */
+-		return 0;
+-	}
+-
+-	/*
+-	 * Fix errored bits by doing the following:
+-	 * 1. Read the number of errors in the control and status register
+-	 * 2. Read the error location registers that corresponds to the number
+-	 *    of errors reported
+-	 * 3. Invert the bit in the data
+-	 */
+-	numErrors = (regValue & REG_UMI_BCH_CTRL_STATUS_NB_CORR_ERROR) >> 20;
+-
+-	for (idx = 0; idx < numErrors; idx++) {
+-		errorLocation =
+-		    REG_UMI_BCH_ERR_LOC_ADDR(idx) & REG_UMI_BCH_ERR_LOC_MASK;
+-
+-		/* Flip bit */
+-		nand_bcm_umi_bch_ecc_flip_bit(datap, errorLocation);
+-	}
+-	/* Errors corrected */
+-	return numErrors;
+-}
+-#endif
+diff --git a/drivers/mtd/nand/nand_bcm_umi.h 
+b/drivers/mtd/nand/nand_bcm_umi.h
+deleted file mode 100644
+index 198b304..0000000
+--- a/drivers/mtd/nand/nand_bcm_umi.h
++++ /dev/null
+@@ -1,337 +0,0 @@
+-/*****************************************************************************
+-* Copyright 2003 - 2009 Broadcom Corporation.  All rights reserved.
+-*
+-* Unless you and Broadcom execute a separate written software license
+-* agreement governing use of this software, this software is licensed 
+to you
+-* under the terms of the GNU General Public License version 2, available at
+-* http://www.broadcom.com/licenses/GPLv2.php (the "GPL").
+-*
+-* Notwithstanding the above, under no circumstances may you combine this
+-* software in any way with any other Broadcom software provided under a
+-* license other than the GPL, without Broadcom's express prior written
+-* consent.
+-*****************************************************************************/
+-#ifndef NAND_BCM_UMI_H
+-#define NAND_BCM_UMI_H
+-
+-/* ---- Include Files 
+---------------------------------------------------- */
+-#include <mach/reg_umi.h>
+-#include <mach/reg_nand.h>
+-#include <cfg_global.h>
+-
+-/* ---- Constants and Types 
+---------------------------------------------- */
+-#if (CFG_GLOBAL_CHIP_FAMILY == CFG_GLOBAL_CHIP_FAMILY_BCMRING)
+-#define NAND_ECC_BCH (CFG_GLOBAL_CHIP_REV > 0xA0)
+-#else
+-#define NAND_ECC_BCH 0
+-#endif
+-
+-#define CFG_GLOBAL_NAND_ECC_BCH_NUM_BYTES	13
+-
+-#if NAND_ECC_BCH
+-#ifdef BOOT0_BUILD
+-#define NAND_ECC_NUM_BYTES 13
+-#else
+-#define NAND_ECC_NUM_BYTES CFG_GLOBAL_NAND_ECC_BCH_NUM_BYTES
+-#endif
+-#else
+-#define NAND_ECC_NUM_BYTES 3
+-#endif
+-
+-#define NAND_DATA_ACCESS_SIZE 512
+-
+-/* ---- Variable Externs ------------------------------------------ */
+-/* ---- Function Prototypes --------------------------------------- */
+-int nand_bcm_umi_bch_correct_page(uint8_t *datap, uint8_t *readEccData,
+-				  int numEccBytes);
+-
+-/* Check in device is ready */
+-static inline int nand_bcm_umi_dev_ready(void)
+-{
+-	return REG_UMI_NAND_RCSR & REG_UMI_NAND_RCSR_RDY;
+-}
+-
+-/* Wait until device is ready */
+-static inline void nand_bcm_umi_wait_till_ready(void)
+-{
+-	while (nand_bcm_umi_dev_ready() == 0)
+-		;
+-}
+-
+-/* Enable Hamming ECC */
+-static inline void nand_bcm_umi_hamming_enable_hwecc(void)
+-{
+-	/* disable and reset ECC, 512 byte page */
+-	REG_UMI_NAND_ECC_CSR &= ~(REG_UMI_NAND_ECC_CSR_ECC_ENABLE |
+-		REG_UMI_NAND_ECC_CSR_256BYTE);
+-	/* enable ECC */
+-	REG_UMI_NAND_ECC_CSR |= REG_UMI_NAND_ECC_CSR_ECC_ENABLE;
+-}
+-
+-#if NAND_ECC_BCH
+-/* BCH ECC specifics */
+-#define ECC_BITS_PER_CORRECTABLE_BIT 13
+-
+-/* Enable BCH Read ECC */
+-static inline void nand_bcm_umi_bch_enable_read_hwecc(void)
+-{
+-	/* disable and reset ECC */
+-	REG_UMI_BCH_CTRL_STATUS = REG_UMI_BCH_CTRL_STATUS_RD_ECC_VALID;
+-	/* Turn on ECC */
+-	REG_UMI_BCH_CTRL_STATUS = REG_UMI_BCH_CTRL_STATUS_ECC_RD_EN;
+-}
+-
+-/* Enable BCH Write ECC */
+-static inline void nand_bcm_umi_bch_enable_write_hwecc(void)
+-{
+-	/* disable and reset ECC */
+-	REG_UMI_BCH_CTRL_STATUS = REG_UMI_BCH_CTRL_STATUS_WR_ECC_VALID;
+-	/* Turn on ECC */
+-	REG_UMI_BCH_CTRL_STATUS = REG_UMI_BCH_CTRL_STATUS_ECC_WR_EN;
+-}
+-
+-/* Config number of BCH ECC bytes */
+-static inline void nand_bcm_umi_bch_config_ecc(uint8_t numEccBytes)
+-{
+-	uint32_t nValue;
+-	uint32_t tValue;
+-	uint32_t kValue;
+-	uint32_t numBits = numEccBytes * 8;
+-
+-	/* disable and reset ECC */
+-	REG_UMI_BCH_CTRL_STATUS =
+-	    REG_UMI_BCH_CTRL_STATUS_WR_ECC_VALID |
+-	    REG_UMI_BCH_CTRL_STATUS_RD_ECC_VALID;
+-
+-	/* Every correctible bit requires 13 ECC bits */
+-	tValue = (uint32_t) (numBits / ECC_BITS_PER_CORRECTABLE_BIT);
+-
+-	/* Total data in number of bits for generating and computing BCH ECC */
+-	nValue = (NAND_DATA_ACCESS_SIZE + numEccBytes) * 8;
+-
+-	/* K parameter is used internally.  K = N - (T * 13) */
+-	kValue = nValue - (tValue * ECC_BITS_PER_CORRECTABLE_BIT);
+-
+-	/* Write the settings */
+-	REG_UMI_BCH_N = nValue;
+-	REG_UMI_BCH_T = tValue;
+-	REG_UMI_BCH_K = kValue;
+-}
+-
+-/* Pause during ECC read calculation to skip bytes in OOB */
+-static inline void nand_bcm_umi_bch_pause_read_ecc_calc(void)
+-{
+-	REG_UMI_BCH_CTRL_STATUS =
+-	    REG_UMI_BCH_CTRL_STATUS_ECC_RD_EN |
+-	    REG_UMI_BCH_CTRL_STATUS_PAUSE_ECC_DEC;
+-}
+-
+-/* Resume during ECC read calculation after skipping bytes in OOB */
+-static inline void nand_bcm_umi_bch_resume_read_ecc_calc(void)
+-{
+-	REG_UMI_BCH_CTRL_STATUS = REG_UMI_BCH_CTRL_STATUS_ECC_RD_EN;
+-}
+-
+-/* Poll read ECC calc to check when hardware completes */
+-static inline uint32_t nand_bcm_umi_bch_poll_read_ecc_calc(void)
+-{
+-	uint32_t regVal;
+-
+-	do {
+-		/* wait for ECC to be valid */
+-		regVal = REG_UMI_BCH_CTRL_STATUS;
+-	} while ((regVal & REG_UMI_BCH_CTRL_STATUS_RD_ECC_VALID) == 0);
+-
+-	return regVal;
+-}
+-
+-/* Poll write ECC calc to check when hardware completes */
+-static inline void nand_bcm_umi_bch_poll_write_ecc_calc(void)
+-{
+-	/* wait for ECC to be valid */
+-	while ((REG_UMI_BCH_CTRL_STATUS & REG_UMI_BCH_CTRL_STATUS_WR_ECC_VALID)
+-	       == 0)
+-		;
+-}
+-
+-/* Read the OOB and ECC, for kernel write OOB to a buffer */
+-#if defined(__KERNEL__) && !defined(STANDALONE)
+-static inline void nand_bcm_umi_bch_read_oobEcc(uint32_t pageSize,
+-	uint8_t *eccCalc, int numEccBytes, uint8_t *oobp)
+-#else
+-static inline void nand_bcm_umi_bch_read_oobEcc(uint32_t pageSize,
+-	uint8_t *eccCalc, int numEccBytes)
+-#endif
+-{
+-	int eccPos = 0;
+-	int numToRead = 16;	/* There are 16 bytes per sector in the OOB */
+-
+-	/* ECC is already paused when this function is called */
+-	if (pageSize != NAND_DATA_ACCESS_SIZE) {
+-		/* skip BI */
+-#if defined(__KERNEL__) && !defined(STANDALONE)
+-		*oobp++ = REG_NAND_DATA8;
+-#else
+-		REG_NAND_DATA8;
+-#endif
+-		numToRead--;
+-	}
+-
+-	while (numToRead > numEccBytes) {
+-		/* skip free oob region */
+-#if defined(__KERNEL__) && !defined(STANDALONE)
+-		*oobp++ = REG_NAND_DATA8;
+-#else
+-		REG_NAND_DATA8;
+-#endif
+-		numToRead--;
+-	}
+-
+-	if (pageSize == NAND_DATA_ACCESS_SIZE) {
+-		/* read ECC bytes before BI */
+-		nand_bcm_umi_bch_resume_read_ecc_calc();
+-
+-		while (numToRead > 11) {
+-#if defined(__KERNEL__) && !defined(STANDALONE)
+-			*oobp = REG_NAND_DATA8;
+-			eccCalc[eccPos++] = *oobp;
+-			oobp++;
+-#else
+-			eccCalc[eccPos++] = REG_NAND_DATA8;
+-#endif
+-			numToRead--;
+-		}
+-
+-		nand_bcm_umi_bch_pause_read_ecc_calc();
+-
+-		if (numToRead == 11) {
+-			/* read BI */
+-#if defined(__KERNEL__) && !defined(STANDALONE)
+-			*oobp++ = REG_NAND_DATA8;
+-#else
+-			REG_NAND_DATA8;
+-#endif
+-			numToRead--;
+-		}
+-
+-	}
+-	/* read ECC bytes */
+-	nand_bcm_umi_bch_resume_read_ecc_calc();
+-	while (numToRead) {
+-#if defined(__KERNEL__) && !defined(STANDALONE)
+-		*oobp = REG_NAND_DATA8;
+-		eccCalc[eccPos++] = *oobp;
+-		oobp++;
+-#else
+-		eccCalc[eccPos++] = REG_NAND_DATA8;
+-#endif
+-		numToRead--;
+-	}
+-}
+-
+-/* Helper function to write ECC */
+-static inline void NAND_BCM_UMI_ECC_WRITE(int numEccBytes, int eccBytePos,
+-					  uint8_t *oobp, uint8_t eccVal)
+-{
+-	if (eccBytePos <= numEccBytes)
+-		*oobp = eccVal;
+-}
+-
+-/* Write OOB with ECC */
+-static inline void nand_bcm_umi_bch_write_oobEcc(uint32_t pageSize,
+-						 uint8_t *oobp, int numEccBytes)
+-{
+-	uint32_t eccVal = 0xffffffff;
+-
+-	/* wait for write ECC to be valid */
+-	nand_bcm_umi_bch_poll_write_ecc_calc();
+-
+-	/*
+-	 ** Get the hardware ecc from the 32-bit result registers.
+-	 ** Read after 512 byte accesses. Format B3B2B1B0
+-	 ** where B3 = ecc3, etc.
+-	 */
+-
+-	if (pageSize == NAND_DATA_ACCESS_SIZE) {
+-		/* Now fill in the ECC bytes */
+-		if (numEccBytes >= 13)
+-			eccVal = REG_UMI_BCH_WR_ECC_3;
+-
+-		/* Usually we skip CM in oob[0,1] */
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 15, &oobp[0],
+-			(eccVal >> 16) & 0xff);
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 14, &oobp[1],
+-			(eccVal >> 8) & 0xff);
+-
+-		/* Write ECC in oob[2,3,4] */
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 13, &oobp[2],
+-			eccVal & 0xff);	/* ECC 12 */
+-
+-		if (numEccBytes >= 9)
+-			eccVal = REG_UMI_BCH_WR_ECC_2;
+-
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 12, &oobp[3],
+-			(eccVal >> 24) & 0xff);	/* ECC11 */
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 11, &oobp[4],
+-			(eccVal >> 16) & 0xff);	/* ECC10 */
+-
+-		/* Always Skip BI in oob[5] */
+-	} else {
+-		/* Always Skip BI in oob[0] */
+-
+-		/* Now fill in the ECC bytes */
+-		if (numEccBytes >= 13)
+-			eccVal = REG_UMI_BCH_WR_ECC_3;
+-
+-		/* Usually skip CM in oob[1,2] */
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 15, &oobp[1],
+-			(eccVal >> 16) & 0xff);
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 14, &oobp[2],
+-			(eccVal >> 8) & 0xff);
+-
+-		/* Write ECC in oob[3-15] */
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 13, &oobp[3],
+-			eccVal & 0xff);	/* ECC12 */
+-
+-		if (numEccBytes >= 9)
+-			eccVal = REG_UMI_BCH_WR_ECC_2;
+-
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 12, &oobp[4],
+-			(eccVal >> 24) & 0xff);	/* ECC11 */
+-		NAND_BCM_UMI_ECC_WRITE(numEccBytes, 11, &oobp[5],
+-			(eccVal >> 16) & 0xff);	/* ECC10 */
+-	}
+-
+-	/* Fill in the remainder of ECC locations */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 10, &oobp[6],
+-		(eccVal >> 8) & 0xff);	/* ECC9 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 9, &oobp[7],
+-		eccVal & 0xff);	/* ECC8 */
+-
+-	if (numEccBytes >= 5)
+-		eccVal = REG_UMI_BCH_WR_ECC_1;
+-
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 8, &oobp[8],
+-		(eccVal >> 24) & 0xff);	/* ECC7 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 7, &oobp[9],
+-		(eccVal >> 16) & 0xff);	/* ECC6 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 6, &oobp[10],
+-		(eccVal >> 8) & 0xff);	/* ECC5 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 5, &oobp[11],
+-		eccVal & 0xff);	/* ECC4 */
+-
+-	if (numEccBytes >= 1)
+-		eccVal = REG_UMI_BCH_WR_ECC_0;
+-
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 4, &oobp[12],
+-		(eccVal >> 24) & 0xff);	/* ECC3 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 3, &oobp[13],
+-		(eccVal >> 16) & 0xff);	/* ECC2 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 2, &oobp[14],
+-		(eccVal >> 8) & 0xff);	/* ECC1 */
+-	NAND_BCM_UMI_ECC_WRITE(numEccBytes, 1, &oobp[15],
+-		eccVal & 0xff);	/* ECC0 */
+-}
+-#endif
+-
+-#endif /* NAND_BCM_UMI_H */
 -- 
-Nobuhiro Iwamatsu
+1.7.1
