@@ -1,39 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Sep 2012 13:51:23 +0200
-Subject: [PATCH 2/3] gpio: 74x164: dts: Add documentation for the dt
- binding
-In-Reply-To: <CACRpkdZoqOVgvUegoNRjfppFb+j=urEy-Zb27Vyu+Fr5UQT_5g@mail.gmail.com>
-References: <1347309341-15447-1-git-send-email-maxime.ripard@free-electrons.com>
- <1347309341-15447-3-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdbPdG85iUqWavZyD9bw-73uDaYeGkcuNoXr8oeDJrewow@mail.gmail.com>
- <CACRpkdZoqOVgvUegoNRjfppFb+j=urEy-Zb27Vyu+Fr5UQT_5g@mail.gmail.com>
-Message-ID: <5050773B.4050209@free-electrons.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 12 Sep 2012 13:51:43 +0200
+Subject: [PATCHv7 20/23] i2c: omap: switch to threaded IRQ support
+In-Reply-To: <50502AE3.7040300@ti.com>
+References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
+ <1347356538-23835-21-git-send-email-shubhrajyoti@ti.com>
+ <20120911215112.GA27031@pengutronix.de> <50502AE3.7040300@ti.com>
+Message-ID: <20120912115143.GE2624@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Sep 12, 2012 at 11:55:39AM +0530, Shubhrajyoti wrote:
+> On Wednesday 12 September 2012 03:21 AM, Wolfram Sang wrote:
+> >> -omap_i2c_isr(int this_irq, void *dev_id)
+> >> > +omap_i2c_isr(int irq, void *dev_id)
+> >> >  {
+> >> >  	struct omap_i2c_dev *dev = dev_id;
+> >> > +	irqreturn_t ret = IRQ_HANDLED;
+> > Shouldn't that be IRQ_NONE?
+> Actually we are processing it so I thought it to be ok.
 
-Le 11/09/2012 23:52, Linus Walleij a ?crit :
-> On Tue, Sep 11, 2012 at 7:22 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, Sep 10, 2012 at 10:35 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>
->> Applied (since I already merged the DT code).
-> 
-> BTW: I don't have patch 3/3 in this series, does it exist? Or
-> can you resend it? 1/3 and 2/3 are applied.
+Are we processing it? There is nothing acknowledged AFAICS. Anyway, we
+can fix that with a later patch.
 
-Hmm, that's odd, but since it was about the CFA-10049 dts, Shawn already
-applied it, so I guess it's fine.
+> Also a similar discussion.
+>  
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104422.html
 
-Thanks,
-Maxime
-
+I totally agree to the things said there.
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120912/12939203/attachment-0001.sig>
