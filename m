@@ -1,291 +1,62 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 12 Sep 2012 11:55:32 +0200
-Subject: [PATCH 7/7] ARM: OMAP2+: PM: reorganize the powerdomain API in public
- and private parts
-In-Reply-To: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
-References: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1347443732-7411-8-git-send-email-j-pihet@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 12 Sep 2012 15:27:16 +0530
+Subject: [PATCH] ARM: suspend: use flush range instead of flush all
+In-Reply-To: <20120912094648.GX13739@n2100.arm.linux.org.uk>
+References: <1347434328-7207-1-git-send-email-wzch@marvell.com>
+ <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
+ <20120912085445.GW13739@n2100.arm.linux.org.uk>
+ <CAMQu2gx_Wk259F2PNY-T5H1N04i-JwseO5mPNw7xZ__tjonw1A@mail.gmail.com>
+ <20120912094648.GX13739@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gwN6XFfuuRnZgyaETx1qi6KSHVL+0gHHLgWL-s3kxJ4-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added code for functional power states re-defines the
-API to query and control the power domains settings.
+On Wed, Sep 12, 2012 at 3:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Sep 12, 2012 at 02:40:45PM +0530, Shilimkar, Santosh wrote:
+>> On Wed, Sep 12, 2012 at 2:24 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Wed, Sep 12, 2012 at 01:13:33PM +0530, Shilimkar, Santosh wrote:
+>> >> On Wed, Sep 12, 2012 at 12:48 PM, wzch <wzch@marvell.com> wrote:
+>> >> >  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>> >> >  {
+>> >> > +       u32 *ptr_orig = ptr;
+>> >> >         *save_ptr = virt_to_phys(ptr);
+>> >> >
+>> >> >         /* This must correspond to the LDM in cpu_resume() assembly */
+>> >> > @@ -26,7 +27,8 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>> >> >
+>> >> >         cpu_do_suspend(ptr);
+>> >> >
+>> >> > -       flush_cache_all();
+>> >> Lorenzo's patch was limiting above flush to local cache (LOUs) instead
+>> >> of dropping it completely.
+>> >
+>> > Err, that is wrong.  Normally, when CPUs go into suspend, the L1 cache is
+>> > lost entirely.  This is the only flush which many CPUs see of the L1
+>> > cache.
+>> >
+>> > So removing this flush _will_ break suspend to RAM on existing CPUs.
+>>
+>> As mentioned, keeping that flush till inner shareability domain(L1) should be
+>> enough. In fact if that part gets pushed down to the finisher() which any
+>> way needs to take care of the cache maintenance, we can get rid of completely.
+>
+> It is difficult to call the cache maintenance functions from assembly.
+> Why not have the generic code do the inner shareability flush, and then
+> leave the responsibility for any further cache maintenance caused by the
+> actions of the finisher to the finisher to deal with - as it is now.
+>
+> That way we end up with more generic code, and don't go back to the
+> rediculous situation where we had everyone implementing this crap in
+> their own broken way time and time again in their platform code.
 
-The API is now split in the following parts in powerdomain.h:
-- the public or external API, to be used by external PM components:
-  cpuidle, suspend, pmxxxx, clock* etc.
-- the private or internal API, to be used by the low level PM code
-  only: powerdomain*, pm-debug, hwmod, voltage, clockdomainxxxx.
+Fully agree with you.
+Leaving the local cache flush should be better choice and that
+is the additional bit Lorenzo's patch(yet to be posted) is doing on top
+of the $subject patch. If the platform has special need like secure
+cache maintenance, they can take care of that additionally in the
+finisher.
 
-The function omap_set_pwrdm_state is not used anymore and so is
-removed.
-
-No functional change is introduced by this patch.
-
-Note: the API reorganization in a public and private header files
-is not part of this patch, this comes as a subsequent clean-up
-patch series.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/pm.c          |   62 --------------------
- arch/arm/mach-omap2/pm.h          |    1 -
- arch/arm/mach-omap2/powerdomain.h |  112 +++++++++++++++++++++----------------
- 3 files changed, 63 insertions(+), 112 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 9cb5ced..dfe702b 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -74,10 +74,6 @@ static void __init omap2_init_processor_devices(void)
- 	}
- }
- 
--/* Types of sleep_switch used in omap_set_pwrdm_state */
--#define FORCEWAKEUP_SWITCH	0
--#define LOWPOWERSTATE_SWITCH	1
--
- int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
- {
- 	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
-@@ -89,64 +85,6 @@ int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
- }
- 
- /*
-- * This sets pwrdm state (other than mpu & core. Currently only ON &
-- * RET are supported.
-- */
--int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
--{
--	u8 curr_pwrst, next_pwrst;
--	int sleep_switch = -1, ret = 0, hwsup = 0;
--
--	if (!pwrdm || IS_ERR(pwrdm))
--		return -EINVAL;
--
--	while (!(pwrdm->pwrsts & (1 << pwrst))) {
--		if (pwrst == PWRDM_POWER_OFF)
--			return ret;
--		pwrst--;
--	}
--
--	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
--	if (next_pwrst == pwrst)
--		return ret;
--
--	curr_pwrst = pwrdm_read_pwrst(pwrdm);
--	if (curr_pwrst < PWRDM_POWER_ON) {
--		if ((curr_pwrst > pwrst) &&
--			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
--			sleep_switch = LOWPOWERSTATE_SWITCH;
--		} else {
--			hwsup = clkdm_in_hwsup(pwrdm->pwrdm_clkdms[0]);
--			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
--			sleep_switch = FORCEWAKEUP_SWITCH;
--		}
--	}
--
--	ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
--	if (ret)
--		pr_err("%s: unable to set power state of powerdomain: %s\n",
--		       __func__, pwrdm->name);
--
--	switch (sleep_switch) {
--	case FORCEWAKEUP_SWITCH:
--		if (hwsup)
--			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
--		else
--			clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
--		break;
--	case LOWPOWERSTATE_SWITCH:
--		pwrdm_set_lowpwrstchange(pwrdm);
--		pwrdm_wait_transition(pwrdm);
--		pwrdm_state_switch(pwrdm);
--		break;
--	}
--
--	return ret;
--}
--
--
--
--/*
-  * This API is to be called during init to set the various voltage
-  * domains to the voltage as per the opp table. Typically we boot up
-  * at the nominal voltage. So this function finds out the rate of
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 686137d..707e9cb 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -33,7 +33,6 @@ static inline int omap4_idle_init(void)
- extern void *omap3_secure_ram_storage;
- extern void omap3_pm_off_mode_enable(int);
- extern void omap_sram_idle(void);
--extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
- extern int (*omap_pm_suspend)(void);
- 
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index a29caec..dcd2315 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -24,6 +24,11 @@
- 
- #include "voltage.h"
- 
-+/***************************************************************
-+ * External API, to be used by external PM components: cpuidle,
-+ * suspend, pmxxxx, clock* etc.
-+ ***************************************************************/
-+
- /* Powerdomain functional power states, used by the external API functions */
- enum pwrdm_func_state {
- 	PWRDM_FUNC_PWRST_OFF		= 0x0,
-@@ -44,6 +49,64 @@ enum pwrdm_logic_mem_state {
- 	PWRDM_MAX_LOGIC_MEM_PWRST	/* Last value, used as the max value */
- };
- 
-+struct clockdomain;
-+struct powerdomain;
-+
-+struct powerdomain *pwrdm_lookup(const char *name);
-+
-+int pwrdm_for_each(int (*fn)(struct powerdomain *pwrdm, void *user),
-+			void *user);
-+int pwrdm_for_each_nolock(int (*fn)(struct powerdomain *pwrdm, void *user),
-+			void *user);
-+
-+int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm);
-+int pwrdm_del_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm);
-+int pwrdm_for_each_clkdm(struct powerdomain *pwrdm,
-+			 int (*fn)(struct powerdomain *pwrdm,
-+				   struct clockdomain *clkdm));
-+struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
-+
-+int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
-+
-+int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst);
-+int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
-+			  enum pwrdm_func_state fpwrst);
-+int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
-+int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
-+int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm);
-+
-+int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
-+
-+int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-+int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-+
-+int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-+int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-+int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
-+
-+int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
-+int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
-+bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm);
-+
-+int pwrdm_state_switch(struct powerdomain *pwrdm);
-+int pwrdm_pre_transition(struct powerdomain *pwrdm);
-+int pwrdm_post_transition(struct powerdomain *pwrdm);
-+
-+int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
-+bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
-+
-+extern void omap242x_powerdomains_init(void);
-+extern void omap243x_powerdomains_init(void);
-+extern void omap3xxx_powerdomains_init(void);
-+extern void am33xx_powerdomains_init(void);
-+extern void omap44xx_powerdomains_init(void);
-+
-+
-+/***************************************************************
-+ * Internal API, to be included by the low level PM code only:
-+ * powerdomain*, pm-debug, hwmod, voltage, clockdomainxxxx
-+ ***************************************************************/
-+
- /* Powerdomain basic power states */
- #define PWRDM_POWER_OFF		0x0
- #define PWRDM_POWER_RET		0x1
-@@ -92,9 +155,6 @@ enum pwrdm_logic_mem_state {
- /* XXX A completely arbitrary number. What is reasonable here? */
- #define PWRDM_TRANSITION_BAILOUT 100000
- 
--struct clockdomain;
--struct powerdomain;
--
- /**
-  * struct powerdomain - OMAP powerdomain
-  * @name: Powerdomain name
-@@ -210,64 +270,19 @@ int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
- int pwrdm_register_pwrdms(struct powerdomain **pwrdm_list);
- int pwrdm_complete_init(void);
- 
--struct powerdomain *pwrdm_lookup(const char *name);
--
--int pwrdm_for_each(int (*fn)(struct powerdomain *pwrdm, void *user),
--			void *user);
--int pwrdm_for_each_nolock(int (*fn)(struct powerdomain *pwrdm, void *user),
--			void *user);
--
--int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm);
--int pwrdm_del_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm);
--int pwrdm_for_each_clkdm(struct powerdomain *pwrdm,
--			 int (*fn)(struct powerdomain *pwrdm,
--				   struct clockdomain *clkdm));
--struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
--
--int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
--
--int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst);
--int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
--			  enum pwrdm_func_state fpwrst);
--int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
--int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
--int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm);
--
- int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst);
- int pwrdm_read_next_pwrst(struct powerdomain *pwrdm);
- int pwrdm_read_pwrst(struct powerdomain *pwrdm);
- int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm);
--int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
- 
- int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
--int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
--int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
- 
- int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
- int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
- int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
--int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
--int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
--int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
--
--int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
--int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
--bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm);
--
- int pwrdm_wait_transition(struct powerdomain *pwrdm);
- 
--int pwrdm_state_switch(struct powerdomain *pwrdm);
--int pwrdm_pre_transition(struct powerdomain *pwrdm);
--int pwrdm_post_transition(struct powerdomain *pwrdm);
- int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
--int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
--bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
--
--extern void omap242x_powerdomains_init(void);
--extern void omap243x_powerdomains_init(void);
--extern void omap3xxx_powerdomains_init(void);
--extern void am33xx_powerdomains_init(void);
--extern void omap44xx_powerdomains_init(void);
- 
- extern struct pwrdm_ops omap2_pwrdm_operations;
- extern struct pwrdm_ops omap3_pwrdm_operations;
-@@ -282,5 +297,4 @@ extern u32 omap2_pwrdm_get_mem_bank_stst_mask(u8 bank);
- extern struct powerdomain wkup_omap2_pwrdm;
- extern struct powerdomain gfx_omap2_pwrdm;
- 
--
- #endif
--- 
-1.7.7.6
+Regards
+Santosh
