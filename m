@@ -1,48 +1,158 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Sep 2012 19:49:48 +0000
-Subject: [PATCH 11/12] ARM: initial multiplatform support
-In-Reply-To: <1346962375-26163-12-git-send-email-robherring2@gmail.com>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-12-git-send-email-robherring2@gmail.com>
-Message-ID: <201209121949.49109.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 12 Sep 2012 19:50:14 +0000 (UTC)
+Subject: [PATCHv7 05/12] ARM: OMAP4: pwrdm: add support for reading prev
+ logic and mem states
+In-Reply-To: <1342704392-23657-6-git-send-email-t-kristo@ti.com>
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+ <1342704392-23657-6-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1209121949140.17903@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 September 2012, Rob Herring wrote:
+On Thu, 19 Jul 2012, Tero Kristo wrote:
 
-> +machine-$(CONFIG_ARCH_EXYNOS4)         += exynos
-> +machine-$(CONFIG_ARCH_EXYNOS5)         += exynos
+> On OMAP4, there is no support to read previous logic state
+> or previous memory state achieved when a power domain transitions
+> to RET. Instead there are module level context registers.
+> 
+> In order to support the powerdomain level logic/mem_off_counters
+> on OMAP4, instead use the previous power state achieved (RET) and
+> the *programmed* logic/mem RET state to derive if a powerdomain lost
+> logic or did not.
+> 
+> If the powerdomain is programmed to enter RET state and lose logic
+> in RET state, knowing that the powerdomain entered RET is good enough
+> to derive that the logic was lost as well, in such cases.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-> +machine-$(CONFIG_MACH_SPEAR1310)       += spear13xx
-> +machine-$(CONFIG_MACH_SPEAR1340)       += spear13xx
+This one was modified to remove this patch's dependency on the functional 
+powerstate series and queued for 3.7.  The modified patch follows.
 
-> +machine-$(CONFIG_MACH_SPEAR300)                += spear3xx
-> +machine-$(CONFIG_MACH_SPEAR310)                += spear3xx
 
-> +machine-$(CONFIG_MACH_SPEAR320)                += spear3xx
-> +machine-$(CONFIG_MACH_SPEAR600)                += spear6xx
+- Paul
 
-I did a little bit of testing and got this message:
+From: Tero Kristo <t-kristo@ti.com>
+Date: Thu, 19 Jul 2012 16:26:25 +0300
+Subject: [PATCH] ARM: OMAP4: powerdomain: add support for reading prev logic
+ and mem states
 
-/home/arnd/linux-arm/Makefile:774: target `arch/arm/mach-spear13xx' given more than once in the same rule.
-arch/arm/mach-spear13xx/built-in.o:(.init.data+0x0): multiple definition of `spear13xx_smp_ops'
-arch/arm/mach-spear13xx/built-in.o:(.init.data+0x0): first defined here
+On OMAP4, there is no support to read previous logic state
+or previous memory state achieved when a power domain transitions
+to RET. Instead there are module level context registers.
 
-The patch below ensures that each machine is only listed once.
-Please fold this into your patch.
+In order to support the powerdomain level logic/mem_off_counters
+on OMAP4, instead use the previous power state achieved (RET) and
+the *programmed* logic/mem RET state to derive if a powerdomain lost
+logic or did not.
 
-	Arnd
+If the powerdomain is programmed to enter RET state and lose logic
+in RET state, knowing that the powerdomain entered RET is good enough
+to derive that the logic was lost as well, in such cases.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 32a6485..ff5fb29 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -233,7 +233,7 @@ ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
- MACHINE  :=
- endif
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+[paul at pwsan.com: removed dependency on functional power state series for now;
+ bumped copyright date]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/powerdomain44xx.c |   61 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 60 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
+index 601325b..e5dfd34 100644
+--- a/arch/arm/mach-omap2/powerdomain44xx.c
++++ b/arch/arm/mach-omap2/powerdomain44xx.c
+@@ -1,7 +1,7 @@
+ /*
+  * OMAP4 powerdomain control
+  *
+- * Copyright (C) 2009-2010 Texas Instruments, Inc.
++ * Copyright (C) 2009-2010, 2012 Texas Instruments, Inc.
+  * Copyright (C) 2007-2009 Nokia Corporation
+  *
+  * Derived from mach-omap2/powerdomain.c written by Paul Walmsley
+@@ -151,6 +151,34 @@ static int omap4_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
+ 	return v;
+ }
  
--machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
-+machdirs := $(sort $(patsubst %,arch/arm/mach-%/,$(machine-y)))
- platdirs := $(patsubst %,arch/arm/plat-%/,$(plat-y))
++/**
++ * omap4_pwrdm_read_prev_logic_pwrst - read the previous logic powerstate
++ * @pwrdm: struct powerdomain * to read the state for
++ *
++ * Reads the previous logic powerstate for a powerdomain. This
++ * function must determine the previous logic powerstate by first
++ * checking the previous powerstate for the domain. If that was OFF,
++ * then logic has been lost. If previous state was RETENTION, the
++ * function reads the setting for the next retention logic state to
++ * see the actual value.  In every other case, the logic is
++ * retained. Returns either PWRDM_POWER_OFF or PWRDM_POWER_RET
++ * depending whether the logic was retained or not.
++ */
++static int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
++{
++	int state;
++
++	state = omap4_pwrdm_read_prev_pwrst(pwrdm);
++
++	if (state == PWRDM_POWER_OFF)
++		return PWRDM_POWER_OFF;
++
++	if (state != PWRDM_POWER_RET)
++		return PWRDM_POWER_RET;
++
++	return omap4_pwrdm_read_logic_retst(pwrdm);
++}
++
+ static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+ {
+ 	u32 m, v;
+@@ -179,6 +207,35 @@ static int omap4_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
+ 	return v;
+ }
  
- ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
++/**
++ * omap4_pwrdm_read_prev_mem_pwrst - reads the previous memory powerstate
++ * @pwrdm: struct powerdomain * to read mem powerstate for
++ * @bank: memory bank index
++ *
++ * Reads the previous memory powerstate for a powerdomain. This
++ * function must determine the previous memory powerstate by first
++ * checking the previous powerstate for the domain. If that was OFF,
++ * then logic has been lost. If previous state was RETENTION, the
++ * function reads the setting for the next memory retention state to
++ * see the actual value.  In every other case, the logic is
++ * retained. Returns either PWRDM_POWER_OFF or PWRDM_POWER_RET
++ * depending whether logic was retained or not.
++ */
++static int omap4_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
++{
++	int state;
++
++	state = omap4_pwrdm_read_prev_pwrst(pwrdm);
++
++	if (state == PWRDM_POWER_OFF)
++		return PWRDM_POWER_OFF;
++
++	if (state != PWRDM_POWER_RET)
++		return PWRDM_POWER_RET;
++
++	return omap4_pwrdm_read_mem_retst(pwrdm, bank);
++}
++
+ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+ {
+ 	u32 c = 0;
+@@ -217,9 +274,11 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+ 	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
+ 	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
+ 	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
++	.pwrdm_read_prev_logic_pwrst	= omap4_pwrdm_read_prev_logic_pwrst,
+ 	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
+ 	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
+ 	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
++	.pwrdm_read_prev_mem_pwrst	= omap4_pwrdm_read_prev_mem_pwrst,
+ 	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+ 	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+ 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
+-- 
+1.7.10.4
