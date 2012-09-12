@@ -1,40 +1,52 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 12 Sep 2012 06:57:41 -0700
-Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
-In-Reply-To: <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
- (Santosh Shilimkar's message of "Wed, 12 Sep 2012 12:58:28 +0530")
-References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
- <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
-Message-ID: <87bohbxs16.fsf@deeprootsystems.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 12 Sep 2012 16:05:52 +0200
+Subject: [alsa-devel] [PATCH 11/11] ASoC: omap-pcm: Convert to
+ use	dmaengine
+In-Reply-To: <20120912120028.GC28448@n2100.arm.linux.org.uk>
+References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
+ <20120912120028.GC28448@n2100.arm.linux.org.uk>
+Message-ID: <s5hwqzznxof.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+At Wed, 12 Sep 2012 13:00:28 +0100,
+Russell King - ARM Linux wrote:
+> 
+> On Wed, Sep 12, 2012 at 02:47:07PM +0300, Peter Ujfalusi wrote:
+> > 2. Pause/Resume
+> >    OMAP DMA engine backend does not support pausing and resuming
+> >    an in-progress transfer.  It is unclear from the specs what
+> >    effect clearing the enable bit has on the DMA position of a
+> >    destination synchronized transfer, and whether the transfer
+> >    can be restarted from the exact point that it was paused (or
+> >    whether the data in the FIFO read from memory is simply
+> >    discarded.)
+> 
+> It's worth noting that this comment (which was in my original patch)
+> is there to spark _comment_ and _discussion_ and should not make its
+> way into the final version of these patches.
 
-> On Wed, Sep 12, 2012 at 6:02 AM, Paul Walmsley <paul@pwsan.com> wrote:
->>
->> Remove some unnecessary plat/ includes that are interfering with multi-subarch
->> ARM kernels.
->>
->> Signed-off-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Rafael J. Wysocki <rjw@sisk.pl>
->> Acked-by: Kevin Hilman <khilman@ti.com>
->> ---
->>
->> Still awaiting some final testing here.  Rafael, was wondering if you
->> would be willing to ack this so we can merge it via the OMAP tree?
->> Otherwise the patch can be split into an OMAP part and a CPUFreq part that
->> can go in across two merge windows.
->>
-> Hmm.
-> I did similar change[1] a while back. Kevin didn't like idea though
-> that point of time.
+I agree this can be regarded as a sort of regression...
 
-I was wrong.
+> Given that suspend/resume is important on OMAP platforms, it's something
+> that needs to be resolved - in a way that complies with what ALSA expects.
+> I do not believe that the way the existing drivers do this is compliant
+> as the manuals imply that stopping memory->peripheral transfers results
+> in data being discarded from the DMA's FIFOs.  As I understand it, ALSA
+> requires no data to be discarded.
 
-At the time, we were thinking about how to get rid of clkdev nodes
-instead of add more.  Now, we need to clean up these drivers and this is
-the only way to do it, so I retract my objection.
+... but in general you don't need to implement the full PAUSE and
+RESUME operations for PCM.  For example, when SNDRV_PCM_INFO_RESUME
+bit isn't set, user-space is supposed to do a clean restart of the
+stream at wake up.  So, it shouldn't break the apps severely in
+theory (but in practice, who knows :)
 
-Kevin
+> As we have no way to know how much data may be discarded from the DMA
+> FIFO...
+
+Yeah, the FIFO and the amount of other on flight data can be better
+managed.
+
+
+Takashi
