@@ -1,35 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Sep 2012 08:04:57 +0200
-Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <504FB869.60201@wwwdotorg.org>
-References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
-Message-ID: <CACRpkdZf7YO4+aY42JK4OhhTSDCxN+hNjG+xVeyJ7QHsuaqh5A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Sep 2012 23:08:10 -0700
+Subject: [GIT] Renesas ARM-based SoC: pmu/cleanup for 3.7
+In-Reply-To: <20120911084914.GB5372@mudshark.cambridge.arm.com>
+References: <1347350727-11962-1-git-send-email-horms@verge.net.au>
+ <20120911084914.GB5372@mudshark.cambridge.arm.com>
+Message-ID: <CAOesGMgNpVHei8Fq+B4o_aZU=dVX04VqQjUiTYB3w5vS5S9G0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 12:17 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-
-> the drivers in this patch seem to invert the data-structures a
-> little - in other words, instead of defining a global list of functions,
-> they define a list of groups, and for each group, list the functions
-> that can be selected on to it.
+On Tue, Sep 11, 2012 at 1:49 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Sep 11, 2012 at 09:05:25AM +0100, Simon Horman wrote:
+>> Hi Will,
 >
-> In turn, that probably requires the core mvebu driver to invert these
-> data-structures at run-time in order to provide the data the pinctrl
-> core needs. I think it'd be better to just have each SoC-specific driver
-> store the data tables in the same format that the pinctrl core needs it,
-> so that the mvebu pinctrl core won't have to process the data-structures
-> at all.
+> Hi Simon,
+>
+>> please consider the following changes from Kobayashi-san
+>> for the pmu/cleanup branch.
+>
+> Thanks for this. It probably makes more sense for the arm-soc guys to pull
+> it in directly, rather than me send it as another pull request.
+>
+> Arnd, Olof -- can you pull this into an shmobile perf branch please?
 
-I sort of agree, not a blocker from my side but it'll surely make the
-code easier to maintain.
 
-Else I think the culprit function needs some commenting to be
-readable, and writing in plaintext what can be explained by
-simpler code is not good...
+Done, pulled in as renesas/pmu, part of next/soc with proper dependencies.
 
-Yours,
-Linus Walleij
+
+Thanks,
+
+-Olof
