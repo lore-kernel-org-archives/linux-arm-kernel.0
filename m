@@ -1,90 +1,45 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 12 Sep 2012 21:28:34 +0200 (CEST)
-Subject: [PATCH] media: add V4L2 DT binding documentation
-In-Reply-To: <5050DA40.8050105@wwwdotorg.org>
-References: <Pine.LNX.4.64.1209111746420.22084@axis700.grange>
- <5050DA40.8050105@wwwdotorg.org>
-Message-ID: <Pine.LNX.4.64.1209122111100.28968@axis700.grange>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Wed, 12 Sep 2012 21:28:55 +0200
+Subject: [PATCH] arch/arm/mach-s3c24xx/mach-h1940.c: delete double assignment
+Message-ID: <1347478135-744-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-On Wed, 12 Sep 2012, Stephen Warren wrote:
+Delete successive assignments to the same location.
 
-> On 09/11/2012 09:51 AM, Guennadi Liakhovetski wrote:
-> > This patch adds a document, describing common V4L2 device tree bindings.
-> > 
-> > Co-authored-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-> Overall, I think this looks pretty reasonable, so:
+A simplified version of the semantic match that finds this problem is as
+follows: (http://coccinelle.lip6.fr/)
 
-Good, thanks!
+// <smpl>
+@@
+expression i;
+@@
 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> 
-> Just a couple comments:
-> 
-> > +++ b/Documentation/devicetree/bindings/media/v4l2.txt
-> 
-> > +	ceu0: ceu at 0xfe910000 {
-> 
-> > +		mclk: master_clock {
-> > +			compatible = "renesas,ceu-clock";
-> > +			#clock-cells = <1>;
-> 
-> Why 1? If there's only 1 clock output from this provider, I don't see a
-> need for any cells, unless there are some configuration flags?
+*i = ...;
+ i = ...;
+// </smpl>
 
-Yes, indeed, that's also what's suggested in the clock bindings 
-documentation, thanks for pointing out.
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-> 
-> > +			clock-frequency = <50000000>;	/* max clock frequency */
-> > +			clock-output-names = "mclk";
-> > +		};
-> > +
-> > +		port {
-> ...
-> > +			ceu0_0: link at 0 {
-> > +				reg = <0>;
-> > +				remote = <&csi2_2>;
-> > +				immutable;
-> 
-> Did we decide "immutable" was actually needed? Presumably the driver for
-> the HW in question knows the HW isn't configurable, and would simply not
-> attempt to apply any configuration even if the .dts author erroneously
-> provided some?
-
-Well, I've been thinking about this today. I think, bridge drivers will 
-call centrally provided helper functions to enumerate links inside ports. 
-While doing that they will want to differentiate between links to external 
-devices with explicit configuration, and links to internal devices, whose 
-configuration drivers might be able to figure out themselves. How should a 
-driver find out what device this link is pointing to? Should it follow the 
-"remote" phandle and then check the "compatible" property? The word 
-"immutable" is a hint, that this is a link to an internal device, but it 
-might either be unneeded or be transformed into something more 
-informative.
-
-> > +			};
-> > +		};
-> > +	};
-> > +
-> > +	i2c0: i2c at 0xfff20000 {
-> ...
-> > +		ov772x_1: camera at 0x21 {
-> ...
-> > +			clocks = <&mclk 0>;
-> 
-> So presumably that could just be "clocks = <&mclk>;"?
-
-Right.
-
-Thanks
-Guennadi
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Not compiled, and this may change the behavior of the code.  Without this
+change, check_gpio2 could possibly be used uninitialized later.
+
+ arch/arm/mach-s3c24xx/mach-h1940.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
+index bb8d008..477778c 100644
+--- a/arch/arm/mach-s3c24xx/mach-h1940.c
++++ b/arch/arm/mach-s3c24xx/mach-h1940.c
+@@ -380,7 +380,7 @@ int h1940_led_blink_set(unsigned gpio, int state,
+ 	default:
+ 		blink_gpio = S3C2410_GPA(3);
+ 		check_gpio1 = S3C2410_GPA(1);
+-		check_gpio1 = S3C2410_GPA(7);
++		check_gpio2 = S3C2410_GPA(7);
+ 		break;
+ 	}
+ 
