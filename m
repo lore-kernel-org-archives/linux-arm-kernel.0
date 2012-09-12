@@ -1,50 +1,38 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Wed, 12 Sep 2012 22:00:54 +0530
-Subject: Fwd: [PATCH v9 07/13] ARM: SoC: convert ux500 to SoC descriptor
-In-Reply-To: <CAE2-_9o5gEpEddGLvRRA=pe=vroTnBXmGmoBO1Ojos-hOJXQAQ@mail.gmail.com>
-References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
- <1347461906-13527-8-git-send-email-arnd@arndb.de>
- <CAE2-_9o5gEpEddGLvRRA=pe=vroTnBXmGmoBO1Ojos-hOJXQAQ@mail.gmail.com>
-Message-ID: <20120912163053.GA10988@bnru02>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 12 Sep 2012 16:34:16 +0000 (UTC)
+Subject: [PATCH v9 3/3] ARM: OMAP2+: gpmc: minimal driver support
+In-Reply-To: <35901c3137e42170066f3efb5026b0749ccdcbb5.1347355380.git.afzal@ti.com>
+References: <cover.1347355380.git.afzal@ti.com>
+ <35901c3137e42170066f3efb5026b0749ccdcbb5.1347355380.git.afzal@ti.com>
+Message-ID: <alpine.DEB.2.00.1209121631440.17903@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi
 
+On Tue, 11 Sep 2012, Afzal Mohammed wrote:
+
+> Create a minimal driver out of gpmc code.
+> Responsibilities handled by earlier gpmc
+> initialization is now achieved in probe.
 > 
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Convert ux500 platforms to use the SoC descriptor to provide
-> their SMP and CPU hotplug operations.
-> 
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-ux500/board-mop500.c       |    4 ++++
->  arch/arm/mach-ux500/hotplug.c            |   36 ++++++++----------------------
->  arch/arm/mach-ux500/include/mach/setup.h |    3 +++
->  arch/arm/mach-ux500/platsmp.c            |   18 +++++++++++----
->  4 files changed, 30 insertions(+), 31 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index a534d88..1c6f74b 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -694,6 +694,7 @@ static void __init hrefv60_init_machine(void)
->  MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->         /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
->         .atag_offset    = 0x100,
-> +       .smp            = smp_ops(ux500_smp_ops),
->         .map_io         = u8500_map_io,
->         .init_irq       = ux500_init_irq,
->         /* we re-use nomadik timer here */
-> @@ -705,6 +706,7 @@ MACHINE_END
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-This looks like mips way doing smp operations.
+Two checkpatch warnings are added by this patch:
 
-I have not tested the patch series, will do later.
+CHECK: multiple assignments should be avoided
+#77: FILE: arch/arm/mach-omap2/gpmc.c:454:
++	res->start = res->end = 0;
 
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+CHECK: Alignment should match open parenthesis
+#216: FILE: arch/arm/mach-omap2/gpmc.c:936:
++	dev_info(gpmc_dev, "GPMC revision %d.%d\n",
++				GPMC_REVISION_MAJOR(l), GPMC_REVISION_MINOR(l));
 
-/srinidhi
+I've fixed them here in the obvious way.  But please make sure that all 
+your patches are clean with 'checkpatch.pl --strict'; saves us time and 
+frustration...
+
+
+- Paul
