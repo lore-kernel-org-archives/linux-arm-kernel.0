@@ -1,33 +1,62 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 12 Sep 2012 12:58:28 +0530
-Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
-In-Reply-To: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
-Message-ID: <CAMQu2gz4mcxqq=EFJzseXcgS_XxzDWGTP1sC5-FbkbxszUiwcw@mail.gmail.com>
+Date: Wed, 12 Sep 2012 13:13:33 +0530
+Subject: [PATCH] ARM: suspend: use flush range instead of flush all
+In-Reply-To: <1347434328-7207-1-git-send-email-wzch@marvell.com>
+References: <1347434328-7207-1-git-send-email-wzch@marvell.com>
+Message-ID: <CAMQu2gwK+TP+7qQG0cET04y7+BYn--5UwkVuffOUu0kuv8Ps6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 6:02 AM, Paul Walmsley <paul@pwsan.com> wrote:
++ Lorenzo,
+
+On Wed, Sep 12, 2012 at 12:48 PM, wzch <wzch@marvell.com> wrote:
+> From: Wenzeng Chen <wzch@marvell.com>
 >
-> Remove some unnecessary plat/ includes that are interfering with multi-subarch
-> ARM kernels.
+> In cpu suspend function __cpu_suspend_save(), we save cp15 registers,
+> resume function, sp and suspend_pgd, then flush the data to DDR, but
+> no need to flush all D cache, only need to flush range.
 >
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Acked-by: Kevin Hilman <khilman@ti.com>
+> Change-Id: I591a1fde929f3f987c69306b601843ed975d3e41
+You should drop above.
+
+> Signed-off-by: Wenzeng Chen <wzch@marvell.com>
 > ---
->
-> Still awaiting some final testing here.  Rafael, was wondering if you
-> would be willing to ack this so we can merge it via the OMAP tree?
-> Otherwise the patch can be split into an OMAP part and a CPUFreq part that
-> can go in across two merge windows.
->
-Hmm.
-I did similar change[1] a while back. Kevin didn't like idea though
-that point of time.
+Lorenzo and myself discussed about the above expensive flush and he
+is planning to post a similar patch but with small difference.
 
-Regards,
+>  arch/arm/kernel/suspend.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> index 1794cc3..bb582d8 100644
+> --- a/arch/arm/kernel/suspend.c
+> +++ b/arch/arm/kernel/suspend.c
+> @@ -17,6 +17,7 @@ extern void cpu_resume_mmu(void);
+>   */
+>  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>  {
+> +       u32 *ptr_orig = ptr;
+>         *save_ptr = virt_to_phys(ptr);
+>
+>         /* This must correspond to the LDM in cpu_resume() assembly */
+> @@ -26,7 +27,8 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>
+>         cpu_do_suspend(ptr);
+>
+> -       flush_cache_all();
+Lorenzo's patch was limiting above flush to local cache (LOUs) instead
+of dropping
+it completely.
+
+> +       __cpuc_flush_dcache_area((void *)ptr_orig, ptrsz);
+> +       __cpuc_flush_dcache_area((void *)save_ptr, sizeof(*save_ptr));
+>         outer_clean_range(*save_ptr, *save_ptr + ptrsz);
+>         outer_clean_range(virt_to_phys(save_ptr),
+>                           virt_to_phys(save_ptr) + sizeof(*save_ptr));
+
+Just thinking bit more, even in case we drop the flush_cache_all()
+completely, it should be safe since the suspend_finisher()  takes
+care of the cache maintenance already.
+
+Regards
 Santosh
-
-[1] http://www.spinics.net/lists/linux-omap/msg48382.html
