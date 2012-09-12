@@ -1,30 +1,96 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Sep 2012 23:05:32 +0200
-Subject: [PATCH v2 6/6] ARM: make mach/gpio.h headers optional
-In-Reply-To: <1346960563-18689-7-git-send-email-robherring2@gmail.com>
-References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1346960563-18689-7-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdb3HtNg8BzpBMmdY=GJSNh=YCZ0DxggUgbnd7-ax=EuMg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Sep 2012 15:10:36 -0600
+Subject: [PATCH v3 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <20120912085423.21af58d5@skate>
+References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347266386-16229-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120911164409.4c030bd8@skate> <504FB869.60201@wwwdotorg.org>
+ <20120912085423.21af58d5@skate>
+Message-ID: <5050FA4C.8040406@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 9:42 PM, Rob Herring <robherring2@gmail.com> wrote:
+On 09/12/2012 12:54 AM, Thomas Petazzoni wrote:
+> Le Tue, 11 Sep 2012 16:17:13 -0600,
+> Stephen Warren <swarren@wwwdotorg.org> a ?crit :
+> 
+>>
+>> +static struct mvebu_mpp_mode dove_mpp_modes[] = {
+>> +	MPP_MODE(0,
+>> +		MPP_FUNCTION(0x00, "gpio", NULL),
+>> +		MPP_FUNCTION(0x02, "uart2", "rts"),
+>> +		MPP_FUNCTION(0x03, "sdio0", "cd"),
+>> +		MPP_FUNCTION(0x0f, "lcd0", "pwm"),
+>> +		MPP_FUNCTION(0x10, "pmu", NULL)),
+>>
+>> it's defining the functions within the context of a particular group
+>> ("mode" in the drivers terminology, I think...) rather than defining
+>> functions and groups as separate top-level tables.
+> 
+> This data structure really reflects what the datasheet says. Typically,
+> for SoCs where each pin is independently muxable (AT91, i.MX23/28,
+> Marvell, and probably many more), the datasheet has a big array, with
+> one line per pin, and then several columns which tell for a given pin,
+> what is "function 0", "function 1", "function 2", "function 3", etc.
+> 
+> So the data structure that Sebastian has implemented in the mvebu
+> driver immediately reflects this. In fact, the pinctrl table code for
+> Armada 370 and Armada XP was semi-automatically generated from CSV data
+> of the pinmux functions, directly coming from the datasheets.
 
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Most platforms don't need mach/gpio.h and it prevents multi-platform
-> kernel images. Add CONFIG_NEED_MACH_GPIO_H and make platforns select it
-> if they need gpio.h. This is platforms that define __GPIOLIB_COMPLEX
-> or have lots of implicit includes pulled in by mach/gpio.h.
->
-> at91 and omap have gpio clean-up pending and can drop
-> CONFIG_NEED_MACH_GPIO_H once that is in.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+OK, that seems like a reasonable explanation.
 
-Didn't I ACK this before? Oh well.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Still, doing data manipulation at run-time when it could easily be done
+by the script that converts your CSV into the driver tables seem
+inefficient at least. I agree with LinusW that it's not a big deal though.
 
-Yours,
-Linus Walleij
+> Having to
+> create a global list of all possible functions seems useless and
+> painful, since the functions only make sense in the context of one
+> particular pin.
+
+Surely some of your functions can be selected onto 1 of n pins? If
+that's true, then the functions don't only exist within the context of a
+single pin.
+
+Note that some pinctrl driver authors have decided to create functions
+based on just the mux register values (e.g. mux0, mux1, mux2, mux3 for a
+2-bit field) rather than semantically (e.g. uart1, uart2, i2c1, i2c2),
+in which case, all functions are global and available on any pin. I
+actually somewhat wonder if I shouldn't have done that for Tegra.
+
+> Could you be more specific as to what representation you're looking
+> after? You're proposing to "define functions and groups as separate
+> top-level tables", but then how to you map which functions are
+> available for which group,
+
+The definition of a function is a function name (struct
+pinmux_ops.get_function_name) and a list of groups onto which it can be
+selected (struct pinmux_ops.get_function_groups).
+
+The pinctrl core leaves it up to individual drivers how to represent how
+to actually program a given group with a given function. ...
+
+> and what is the number of that function is
+> this group (which we need to actually configure the mapping). I'd
+> really like to see (with a short code example) what is your view of how
+> pinmux should be handled for SoCs having independently muxable pins.
+
+ As an example, see drivers/pinctrl/pinctrl-tegra20.c variable
+tegra20_groups[] where each group definition contains additional
+information beyond the basic information that the pinctrl core requires
+(which is just struct pinctrl_ops get_group_name get_group_pins) - i.e.
+the global function ID that is selected by each of the 4 values you can
+write into that pin's/group's register.
+
+Incidentally, I see that tegra20_groups[] is almost exactly equivalent
+to the data-structure we're talking about here; the difference is that
+the Tegra driver additionally has pre-generated arrays like xio_groups[]
+(the list of groups where function xio can be selected) in order to
+short-circuit the run-time calculations that your driver is doing.
+
+(I don't believe any of this discussion is affected by whether the HW
+muxes at a per-pin level or per-pin-group level; Tegra30 muxes per-pin
+and the driver uses the exact same data-structures as Tegra20 which
+muxes per-group).
