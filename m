@@ -1,33 +1,41 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Sep 2012 13:00:28 +0100
-Subject: [PATCH 11/11] ASoC: omap-pcm: Convert to use dmaengine
-In-Reply-To: <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
-References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
- <1347450427-27627-12-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120912120028.GC28448@n2100.arm.linux.org.uk>
+Date: Wed, 12 Sep 2012 13:05:11 +0100
+Subject: [PATCH] perf: Use raw_smp_processor_id insted of smp_processor_id
+In-Reply-To: <1347450610-4342-1-git-send-email-rogerq@ti.com>
+References: <1347450610-4342-1-git-send-email-rogerq@ti.com>
+Message-ID: <20120912120511.GD28448@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 02:47:07PM +0300, Peter Ujfalusi wrote:
-> 2. Pause/Resume
->    OMAP DMA engine backend does not support pausing and resuming
->    an in-progress transfer.  It is unclear from the specs what
->    effect clearing the enable bit has on the DMA position of a
->    destination synchronized transfer, and whether the transfer
->    can be restarted from the exact point that it was paused (or
->    whether the data in the FIFO read from memory is simply
->    discarded.)
+On Wed, Sep 12, 2012 at 02:50:10PM +0300, Roger Quadros wrote:
+> gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+> 
+> [   28.832916] debug_smp_processor_id: 18 callbacks suppressed
+> [   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
+> [   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+> 
+> Tested with perf on OMAP4 Panda.
 
-It's worth noting that this comment (which was in my original patch)
-is there to spark _comment_ and _discussion_ and should not make its
-way into the final version of these patches.
+NAK.  Using a different function which doesn't have the warning isn't a
+subsitute for fixing the problem properly.  What you're doing is papering
+over the bug, making the warning go away without properly understanding
+the problem.
 
-Given that suspend/resume is important on OMAP platforms, it's something
-that needs to be resolved - in a way that complies with what ALSA expects.
-I do not believe that the way the existing drivers do this is compliant
-as the manuals imply that stopping memory->peripheral transfers results
-in data being discarded from the DMA's FIFOs.  As I understand it, ALSA
-requires no data to be discarded.
+The warning is there because something is being done wrong.  What that is
+is exactly what is being said in the warning message.  You're getting a
+CPU number in a context where preemptions can occur - and therefore the
+CPU that you're running on can change.
 
-As we have no way to know how much data may be discarded from the DMA
-FIFO...
+Think about this sequence:
+
+	- cpu = smp_processor_id(); /* returns 0 */
+	- you are preempted
+	- you resume on CPU 1
+	- trace_clock_disable(clk->name, 0, 0);
+
+If trace_clock_disable() uses the CPU number to access per-CPU data
+without locking, that's going to cause corruption.
+
+Please, if you're going to fix a warning, analyse it properly first and
+don't just search for a function which appears to give you the same
+functionality but without the warning message.
