@@ -1,38 +1,35 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 22:18:27 -0600
-Subject: [PATCH V3 3/5] ARM: bcm2708: add system timer
-In-Reply-To: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347423509-30647-3-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 11 Sep 2012 22:18:25 -0600
+Subject: [PATCH V3 1/5] ARM: add infra-structure for BCM2708/BCM2835 and
+ Raspberry Pi
+Message-ID: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Simon Arlott <simon@fire.lp0.eu>
 
-The System Timer peripheral provides four 32-bit timer channels and a
-single 64-bit free running counter. Each channel has an output compare
-register, which is compared against the 32 least significant bits of the
-free running counter values, and generates an interrupt.
+The BCM2708 is an ARM SoC from Broadcom. It is the primary SoC in a
+series which contains the BCM2835 amongst other variants. This patch
+adds very basic support for this series of SoCs, under the BCM2708 name.
 
-Timer 3 is used as the Linux timer.
+http://www.broadcom.com/products/BCM2835
+http://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pd
 
-The BCM2708 also contains an SP804-based timer module. However, it
-apparently has significant differences from the standard SP804 IP block,
-and Broadcom's documentation recommends using the system timer instead.
+Note that the documentation in the latter .pdf assumes the MMU setup
+that's used on the "VideoCore" companion processor, and does not document
+physical peripheral addresses. Subtract 0x5e000000 to obtain the physical
+addresses.
+
+The BCM2835 SoC is used in the Raspberry Pi. This patch also adds a
+minimal device tree for this board; enough to see some very early kernel
+boot messages through earlyprintk. However, this patch does not yet
+provide a useful booting system.
+
+http://www.raspberrypi.org/.
 
 This patch was extracted from git://github.com/lp0/linux.git branch
-rpi-split as of 2012/09/08, and modified as follows:
-
-* Moved struct sys_timer bcm2708_timer into time.c to encapsulate it more.
-* Added DT binding docs.
-* Moved to drivers/clocksource/. This looks like the desired location for
-  such code now.
-* Simplified bcm2708_time_init() to find one matching node and operate on
-  it, rather than looping over all matching nodes. This seems more
-  consistent with other clocksource code.
-* Renamed struct bcm2708_timer.index to match_mask to better represent its
-  purpose.
-* s/printk(PR_INFO/pr_info(/
+rpi-split from 3-4 months ago, and significantly stripped down and
+modified since.
 
 Signed-off-by: Chris Boot <bootc@bootc.net>
 Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
@@ -40,117 +37,423 @@ Signed-off-by: Dom Cobley <popcornmix@gmail.com>
 Signed-off-by: Dom Cobley <dc4@broadcom.com>
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
-v3: New patch.
+This version is enough to get to "Kernel panic - not syncing: No init found."
+I haven't tested yet, but I expect that using an initrd should work.
 
-TODO: Should of_address_to_resource(), ioremap(), request_mem_region()
-in bcm2708_time_init() be collapsed into of_iomap(). This wouldn't request
-the region, but a quick grep implies that's quite common with DT.
+v3:
+* Added DT binding documentation for the SoC itself.
+* Changed patch subject from "support" to "infra-structure", and added
+  to the commit description, to indicate that the patch isn't adding
+  complete support for the SoC/board.
+* Added all S-o-b tags from downstream, now that I have permission to
+  fix them up to be valid.
+* Changed patch author to Simon Arlott, now I have permission to change
+  his email address to something valid.
+* Limited my (c) additions to files I created; the other changes turnd
+  out to be trivial.
+v2:
+* Rename *_BASE to *_PHYS to match Simon's rpi-split branch.
+* Remove #define UART_BAUD since it isn't used.
+* Don't select WATCHDOG from ARCH_BCM2708
+* Remove 8250 and PL010 serial ports from bcm2708_defconfig
+* Remove <mach/hardware.h>
+* Rename common.c back to bcm2708.c; matches downstream and is
+  preferred naming style.
 ---
- .../arm/bcm2708/broadcom,bcm2708-system-timer.txt  |   22 +++
- arch/arm/boot/dts/bcm2835.dtsi                     |    7 +
- arch/arm/mach-bcm2708/bcm2708.c                    |   10 +-
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/bcm2708_timer.c                |  170 ++++++++++++++++++++
- include/linux/bcm2708_timer.h                      |   22 +++
- 6 files changed, 223 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-system-timer.txt
- create mode 100644 drivers/clocksource/bcm2708_timer.c
- create mode 100644 include/linux/bcm2708_timer.h
+ Documentation/devicetree/bindings/arm/bcm2708.txt |   15 ++++
+ arch/arm/Kconfig                                  |   18 ++++
+ arch/arm/Makefile                                 |    1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts               |   12 +++
+ arch/arm/boot/dts/bcm2835.dtsi                    |   10 +++
+ arch/arm/configs/bcm2708_defconfig                |   93 +++++++++++++++++++++
+ arch/arm/mach-bcm2708/Makefile                    |    1 +
+ arch/arm/mach-bcm2708/Makefile.boot               |    5 ++
+ arch/arm/mach-bcm2708/bcm2708.c                   |   77 +++++++++++++++++
+ arch/arm/mach-bcm2708/include/mach/bcm2708_soc.h  |   29 +++++++
+ arch/arm/mach-bcm2708/include/mach/debug-macro.S  |   21 +++++
+ arch/arm/mach-bcm2708/include/mach/timex.h        |   26 ++++++
+ arch/arm/mach-bcm2708/include/mach/uncompress.h   |   45 ++++++++++
+ 13 files changed, 353 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm2708.txt
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-b.dts
+ create mode 100644 arch/arm/boot/dts/bcm2835.dtsi
+ create mode 100644 arch/arm/configs/bcm2708_defconfig
+ create mode 100644 arch/arm/mach-bcm2708/Makefile
+ create mode 100644 arch/arm/mach-bcm2708/Makefile.boot
+ create mode 100644 arch/arm/mach-bcm2708/bcm2708.c
+ create mode 100644 arch/arm/mach-bcm2708/include/mach/bcm2708_soc.h
+ create mode 100644 arch/arm/mach-bcm2708/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-bcm2708/include/mach/timex.h
+ create mode 100644 arch/arm/mach-bcm2708/include/mach/uncompress.h
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-system-timer.txt b/Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-system-timer.txt
+diff --git a/Documentation/devicetree/bindings/arm/bcm2708.txt b/Documentation/devicetree/bindings/arm/bcm2708.txt
 new file mode 100644
-index 0000000..840e18b
+index 0000000..49eec61
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-system-timer.txt
-@@ -0,0 +1,22 @@
-+BCM2708 System Timer
++++ b/Documentation/devicetree/bindings/arm/bcm2708.txt
+@@ -0,0 +1,15 @@
++Broadcom BCM2708 device tree bindings
++-------------------------------------------
 +
-+The System Timer peripheral provides four 32-bit timer channels and a
-+single 64-bit free running counter. Each channel has an output compare
-+register, which is compared against the 32 least significant bits of the
-+free running counter values, and generates an interrupt.
++Boards with the BCM2708 SoC, or another SoC in the BCM2708 family, shall have
++the following properties:
 +
-+Required properties:
++Required root node property:
 +
-+- compatible : should be "broadcom,bcm2708-system-timer.txt"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupts : A list of 4 interrupt sinks; one per timer channel.
-+- clock-frequency : The frequency of the clock that drives the counter, in Hz.
++compatible = "broadcom,bcm2708";
 +
-+Example:
++Boards with BCM2835 SoC shall *additionally* have the following properties:
 +
-+timer {
-+	compatible = "broadcom,bcm2835-system-timer", "broadcom,bcm2708-system-timer";
-+	reg = <0x20003000 0x1000>;
-+	interrupts = <1 0>, <1 1>, <1 2>, <1 3>;
-+	clock-frequency = <1000000>;
++Required root node property:
++
++compatible = "broadcom,bcm2835";
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d0021fe..4dcd0cd 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -349,6 +349,24 @@ config ARCH_AT91
+ 	  This enables support for systems based on Atmel
+ 	  AT91RM9200 and AT91SAM9* processors.
+ 
++config ARCH_BCM2708
++	bool "Broadcom BCM2708 family"
++	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARM_AMBA
++	select ARM_ERRATA_411920
++	select ARM_TIMER_SP804
++	select CLKDEV_LOOKUP
++	select COMMON_CLK
++	select CPU_V6
++	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  This enables support for the Broadcom BCM2708 SoC series. The
++	  BCM2835 is one such SoC in this series. The Raspberry Pi uses
++	  the BCM2835.
++
+ config ARCH_BCMRING
+ 	bool "Broadcom BCMRING"
+ 	depends on MMU
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a812d12..3c4f0b3 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -136,6 +136,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+ machine-$(CONFIG_ARCH_AT91)		:= at91
++machine-$(CONFIG_ARCH_BCM2708)		:= bcm2708
+ machine-$(CONFIG_ARCH_BCMRING)		:= bcmring
+ machine-$(CONFIG_ARCH_CLPS711X)		:= clps711x
+ machine-$(CONFIG_ARCH_CNS3XXX)		:= cns3xxx
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+new file mode 100644
+index 0000000..7e43197
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -0,0 +1,12 @@
++/dts-v1/;
++/memreserve/ 0x0c000000 0x04000000;
++/include/ "bcm2835.dtsi"
++
++/ {
++	model = "Raspberry Pi Model B";
++	compatible = "raspberrypi,model-b", "broadcom,bcm2835", "broadcom,bcm2708";
++
++	memory {
++		reg = <0 0x10000000>;
++	};
 +};
 diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 00eaf2b..3e8ea51 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -9,6 +9,13 @@
- 		bootargs = "earlyprintk";
- 	};
- 
-+	timer {
-+		compatible = "broadcom,bcm2835-system-timer", "broadcom,bcm2708-system-timer";
-+		reg = <0x20003000 0x1000>;
-+		interrupts = <1 0>, <1 1>, <1 2>, <1 3>;
-+		clock-frequency = <1000000>;
-+	};
-+
- 	intc: interrupt-controller {
- 		compatible = "broadcom,bcm2708-armctrl-ic";
- 		reg = <0x2000b200 0x200>;
-diff --git a/arch/arm/mach-bcm2708/bcm2708.c b/arch/arm/mach-bcm2708/bcm2708.c
-index ad6b7f8..8ee11d9 100644
---- a/arch/arm/mach-bcm2708/bcm2708.c
-+++ b/arch/arm/mach-bcm2708/bcm2708.c
-@@ -14,10 +14,10 @@
- 
- #include <linux/init.h>
- #include <linux/of_platform.h>
-+#include <linux/bcm2708_timer.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/mach/time.h>
- #include <asm/exception.h>
- 
- #include <mach/bcm2708_soc.h>
-@@ -48,14 +48,6 @@ void __init bcm2708_init(void)
- 	}
- }
- 
--static void __init bcm2708_timer_init(void)
--{
--}
--
--struct sys_timer bcm2708_timer = {
--	.init = bcm2708_timer_init
--};
--
- static const char * const bcm2708_compat[] = {
- 	"broadcom,bcm2708",
- 	NULL
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 6591990..342b72e 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -14,3 +14,4 @@ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-+obj-$(CONFIG_ARCH_BCM2708)	+= bcm2708_timer.o
-diff --git a/drivers/clocksource/bcm2708_timer.c b/drivers/clocksource/bcm2708_timer.c
 new file mode 100644
-index 0000000..bc41381
+index 0000000..9039482
 --- /dev/null
-+++ b/drivers/clocksource/bcm2708_timer.c
-@@ -0,0 +1,170 @@
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -0,0 +1,10 @@
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "broadcom,bcm2835", "broadcom,bcm2708";
++	model = "BCM2835";
++
++	chosen {
++		bootargs = "earlyprintk";
++	};
++};
+diff --git a/arch/arm/configs/bcm2708_defconfig b/arch/arm/configs/bcm2708_defconfig
+new file mode 100644
+index 0000000..6f741e9
+--- /dev/null
++++ b/arch/arm/configs/bcm2708_defconfig
+@@ -0,0 +1,93 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BSD_PROCESS_ACCT_V3=y
++CONFIG_FHANDLE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=18
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CGROUP_DEVICE=y
++CONFIG_CPUSETS=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_RESOURCE_COUNTERS=y
++CONFIG_CGROUP_PERF=y
++CONFIG_CFS_BANDWIDTH=y
++CONFIG_RT_GROUP_SCHED=y
++CONFIG_NAMESPACES=y
++CONFIG_SCHED_AUTOGROUP=y
++CONFIG_RELAY=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_XZ=y
++CONFIG_RD_LZO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_JUMP_LABEL=y
++# CONFIG_BLOCK is not set
++CONFIG_ARCH_BCM2708=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_COMPACTION=y
++CONFIG_KSM=y
++CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
++CONFIG_CLEANCACHE=y
++CONFIG_SECCOMP=y
++CONFIG_CC_STACKPROTECTOR=y
++CONFIG_KEXEC=y
++CONFIG_CRASH_DUMP=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++# CONFIG_SUSPEND is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_TTY_PRINTK=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_PROC_FS is not set
++# CONFIG_SYSFS is not set
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_UNUSED_SYMBOLS=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_MEMORY_INIT=y
++CONFIG_BOOT_PRINTK_DELAY=y
++CONFIG_SCHED_TRACER=y
++CONFIG_STACK_TRACER=y
++CONFIG_FUNCTION_PROFILER=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_KGDB=y
++CONFIG_KGDB_KDB=y
++CONFIG_TEST_KSTRTOX=y
++CONFIG_STRICT_DEVMEM=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++# CONFIG_XZ_DEC_X86 is not set
++# CONFIG_XZ_DEC_POWERPC is not set
++# CONFIG_XZ_DEC_IA64 is not set
++# CONFIG_XZ_DEC_ARM is not set
++# CONFIG_XZ_DEC_ARMTHUMB is not set
++# CONFIG_XZ_DEC_SPARC is not set
+diff --git a/arch/arm/mach-bcm2708/Makefile b/arch/arm/mach-bcm2708/Makefile
+new file mode 100644
+index 0000000..c382763
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/Makefile
+@@ -0,0 +1 @@
++obj-y += bcm2708.o
+diff --git a/arch/arm/mach-bcm2708/Makefile.boot b/arch/arm/mach-bcm2708/Makefile.boot
+new file mode 100644
+index 0000000..0831fd1
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/Makefile.boot
+@@ -0,0 +1,5 @@
++   zreladdr-y := 0x00008000
++params_phys-y := 0x00000100
++initrd_phys-y := 0x00800000
++
++dtb-y += bcm2835-rpi-b.dtb
+diff --git a/arch/arm/mach-bcm2708/bcm2708.c b/arch/arm/mach-bcm2708/bcm2708.c
+new file mode 100644
+index 0000000..ae6df4f
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/bcm2708.c
+@@ -0,0 +1,77 @@
 +/*
-+ * Copyright 2012 Simon Arlott
++ * Copyright (C) 2010 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/of_platform.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/time.h>
++#include <asm/exception.h>
++
++#include <mach/bcm2708_soc.h>
++
++static struct map_desc io_map __initdata = {
++	.virtual = BCM2708_PERIPH_VIRT,
++	.pfn = __phys_to_pfn(BCM2708_PERIPH_PHYS),
++	.length = BCM2708_PERIPH_SIZE,
++	.type = MT_DEVICE
++};
++
++void __init bcm2708_map_io(void)
++{
++	iotable_init(&io_map, 1);
++}
++
++void __init bcm2708_init_irq(void)
++{
++}
++
++asmlinkage void __exception_irq_entry bcm2708_handle_irq(struct pt_regs *regs)
++{
++}
++
++void __init bcm2708_init(void)
++{
++	int ret;
++
++	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
++				   NULL);
++	if (ret) {
++		pr_err("of_platform_populate failed: %d\n", ret);
++		BUG();
++	}
++}
++
++static void __init bcm2708_timer_init(void)
++{
++}
++
++struct sys_timer bcm2708_timer = {
++	.init = bcm2708_timer_init
++};
++
++static const char * const bcm2708_compat[] = {
++	"broadcom,bcm2708",
++	NULL
++};
++
++DT_MACHINE_START(BCM2708, "BCM2708")
++	.map_io = bcm2708_map_io,
++	.init_irq = bcm2708_init_irq,
++	.handle_irq = bcm2708_handle_irq,
++	.init_machine = bcm2708_init,
++	.timer = &bcm2708_timer,
++	.dt_compat = bcm2708_compat
++MACHINE_END
+diff --git a/arch/arm/mach-bcm2708/include/mach/bcm2708_soc.h b/arch/arm/mach-bcm2708/include/mach/bcm2708_soc.h
+new file mode 100644
+index 0000000..3549699
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/bcm2708_soc.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2012 Stephen Warren
++ *
++ * Derived from code:
++ * Copyright (C) 2010 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MACH_BCM2708_BCM2708_SOC_H__
++#define __MACH_BCM2708_BCM2708_SOC_H__
++
++#include <asm/sizes.h>
++
++#define BCM2708_PERIPH_PHYS	0x20000000
++#define BCM2708_PERIPH_VIRT	0xf0000000
++#define BCM2708_PERIPH_SIZE	SZ_16M
++#define BCM2708_DEBUG_PHYS	0x20201000
++#define BCM2708_DEBUG_VIRT	0xf0201000
++
++#endif
+diff --git a/arch/arm/mach-bcm2708/include/mach/debug-macro.S b/arch/arm/mach-bcm2708/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..132ee0a
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/debug-macro.S
+@@ -0,0 +1,21 @@
++/*
++ * Debugging macro include header
++ *
++ * Copyright (C) 2010 Broadcom
++ * Copyright (C) 1994-1999 Russell King
++ * Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <mach/bcm2708_soc.h>
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =BCM2708_DEBUG_PHYS
++	ldr	\rv, =BCM2708_DEBUG_VIRT
++	.endm
++
++#include <asm/hardware/debug-pl01x.S>
+diff --git a/arch/arm/mach-bcm2708/include/mach/timex.h b/arch/arm/mach-bcm2708/include/mach/timex.h
+new file mode 100644
+index 0000000..ca67219
+--- /dev/null
++++ b/arch/arm/mach-bcm2708/include/mach/timex.h
+@@ -0,0 +1,26 @@
++/*
++ *  BCM2708 system clock frequency
++ *
++ *  Copyright (C) 2010 Broadcom
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -167,166 +470,21 @@ index 0000000..bc41381
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
-+#include <linux/bcm2708_timer.h>
-+#include <linux/bitops.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/interrupt.h>
-+#include <linux/irqreturn.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+#include <linux/string.h>
++#ifndef __ASM_ARCH_TIMEX_H
++#define __ASM_ARCH_TIMEX_H
 +
-+#include <asm/sched_clock.h>
-+#include <asm/irq.h>
++#define CLOCK_TICK_RATE		(1000000)
 +
-+#define REG_CONTROL	0x00
-+#define REG_COUNTER_LO	0x04
-+#define REG_COUNTER_HI	0x08
-+#define REG_COMPARE(n)	(0x0c + (n) * 4)
-+#define MAX_TIMER	3
-+#define DEFAULT_TIMER	3
-+
-+struct bcm2708_timer {
-+	void __iomem *control;
-+	void __iomem *compare;
-+	int match_mask;
-+	struct clock_event_device evt;
-+	struct irqaction act;
-+};
-+
-+static void __iomem *system_clock __read_mostly;
-+
-+static u32 notrace bcm2708_sched_read(void)
-+{
-+	return readl_relaxed(system_clock);
-+}
-+
-+static void bcm2708_time_set_mode(enum clock_event_mode mode,
-+	struct clock_event_device *evt_dev)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	default:
-+		WARN(1, "%s: unhandled event mode %d\n", __func__, mode);
-+		break;
-+	}
-+}
-+
-+static int bcm2708_time_set_next_event(unsigned long event,
-+	struct clock_event_device *evt_dev)
-+{
-+	struct bcm2708_timer *timer = container_of(evt_dev,
-+		struct bcm2708_timer, evt);
-+	writel_relaxed(readl_relaxed(system_clock) + event,
-+		timer->compare);
-+	return 0;
-+}
-+
-+static irqreturn_t bcm2708_time_interrupt(int irq, void *dev_id)
-+{
-+	struct bcm2708_timer *timer = dev_id;
-+	void (*event_handler)(struct clock_event_device *);
-+	if (readl_relaxed(timer->control) & timer->match_mask) {
-+		writel_relaxed(timer->match_mask, timer->control);
-+
-+		event_handler = ACCESS_ONCE(timer->evt.event_handler);
-+		if (event_handler)
-+			event_handler(&timer->evt);
-+		return IRQ_HANDLED;
-+	} else {
-+		return IRQ_NONE;
-+	}
-+}
-+
-+static struct of_device_id bcm2708_time_match[] __initconst = {
-+	{ .compatible = "broadcom,bcm2708-system-timer" },
-+	{}
-+};
-+
-+static void __init bcm2708_time_init(void)
-+{
-+	struct device_node *node;
-+	struct resource res;
-+	void __iomem *base;
-+	u32 freq;
-+	int irq;
-+	struct bcm2708_timer *timer;
-+
-+	node = of_find_matching_node(NULL, bcm2708_time_match);
-+	if (!node)
-+		panic("No bcm2708 timer node");
-+
-+	if (of_address_to_resource(node, 0, &res))
-+		panic("Can't parse address");
-+
-+	if (!request_mem_region(res.start, resource_size(&res),
-+			node->full_name))
-+		panic("Can't request memory region");
-+
-+	base = ioremap(res.start, resource_size(&res));
-+	if (!base)
-+		panic("Can't remap registers");
-+
-+	if (of_property_read_u32(node, "clock-frequency", &freq))
-+		panic("Can't read clock-frequency");
-+
-+	system_clock = base + REG_COUNTER_LO;
-+	setup_sched_clock(bcm2708_sched_read, 32, freq);
-+
-+	clocksource_mmio_init(base + REG_COUNTER_LO, node->name,
-+		freq, 300, 32, clocksource_mmio_readl_up);
-+
-+	irq = irq_of_parse_and_map(node, DEFAULT_TIMER);
-+	if (irq <= 0)
-+		panic("Can't parse IRQ");
-+
-+	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
-+	if (!timer)
-+		panic("Can't allocate timer struct\n");
-+
-+	timer->control = base + REG_CONTROL;
-+	timer->compare = base + REG_COMPARE(DEFAULT_TIMER);
-+	timer->match_mask = BIT(DEFAULT_TIMER);
-+	timer->evt.name = node->name;
-+	timer->evt.rating = 300;
-+	timer->evt.features = CLOCK_EVT_FEAT_ONESHOT;
-+	timer->evt.set_mode = bcm2708_time_set_mode;
-+	timer->evt.set_next_event = bcm2708_time_set_next_event;
-+	timer->evt.cpumask = cpumask_of(0);
-+	timer->act.name = node->name;
-+	timer->act.flags = IRQF_TIMER | IRQF_SHARED;
-+	timer->act.dev_id = timer;
-+	timer->act.handler = bcm2708_time_interrupt;
-+
-+	if (setup_irq(irq, &timer->act))
-+		panic("Can't set up timer IRQ\n");
-+
-+	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
-+
-+	pr_info("bcm2708: system timer at MMIO %#lx (irq = %d)\n",
-+		(unsigned long)res.start, irq);
-+}
-+
-+struct sys_timer bcm2708_timer = {
-+	.init = bcm2708_time_init,
-+};
-diff --git a/include/linux/bcm2708_timer.h b/include/linux/bcm2708_timer.h
++#endif
+diff --git a/arch/arm/mach-bcm2708/include/mach/uncompress.h b/arch/arm/mach-bcm2708/include/mach/uncompress.h
 new file mode 100644
-index 0000000..1a433c1
+index 0000000..df2bf2f
 --- /dev/null
-+++ b/include/linux/bcm2708_timer.h
-@@ -0,0 +1,22 @@
++++ b/arch/arm/mach-bcm2708/include/mach/uncompress.h
+@@ -0,0 +1,45 @@
 +/*
-+ * Copyright 2012 Simon Arlott
++ * Copyright (C) 2010 Broadcom
++ * Copyright (C) 2003 ARM Limited
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -339,13 +497,35 @@ index 0000000..1a433c1
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef __BCM2708_TIMER_H
-+#define __BCM2708_TIMER_H
++#include <linux/io.h>
++#include <linux/amba/serial.h>
++#include <mach/bcm2708_soc.h>
 +
-+#include <asm/mach/time.h>
++#define UART0_BASE BCM2708_DEBUG_PHYS
 +
-+extern struct sys_timer bcm2708_timer;
++#define BCM2708_UART_DR IOMEM(UART0_BASE + UART01x_DR)
++#define BCM2708_UART_FR IOMEM(UART0_BASE + UART01x_FR)
++#define BCM2708_UART_CR IOMEM(UART0_BASE + UART011_CR)
 +
-+#endif
++static inline void putc(int c)
++{
++	while (__raw_readl(BCM2708_UART_FR) & UART01x_FR_TXFF)
++		barrier();
++
++	__raw_writel(c, BCM2708_UART_DR);
++}
++
++static inline void flush(void)
++{
++	int fr;
++
++	do {
++		fr = __raw_readl(BCM2708_UART_FR);
++		barrier();
++	} while ((fr & (UART011_FR_TXFE | UART01x_FR_BUSY)) != UART011_FR_TXFE);
++}
++
++#define arch_decomp_setup()
++#define arch_decomp_wdog()
 -- 
 1.7.9.5
