@@ -1,50 +1,54 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Wed, 12 Sep 2012 20:10:29 +0530
-Subject: [PATCHv7 00/23]I2C big cleanup
-In-Reply-To: <20120912134427.GC16547@pengutronix.de>
-References: <1347356538-23835-1-git-send-email-shubhrajyoti@ti.com>
- <20120911220048.GD27031@pengutronix.de> <50505FDC.4090500@ti.com>
- <20120912101850.GB2624@pengutronix.de>
- <20120912134427.GC16547@pengutronix.de>
-Message-ID: <CAM=Q2ctPo2hLNfPbjEbB1KG8hDyVJ=5aW_C4d6GW1C_kHN0mTw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Sep 2012 15:54:00 +0100
+Subject: [PATCH v3 00/31] AArch64 Linux kernel port
+In-Reply-To: <20120907232537.GA5098@quad.lixom.net>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <20120907232537.GA5098@quad.lixom.net>
+Message-ID: <20120912145400.GJ21823@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 7:14 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Wed, Sep 12, 2012 at 12:18:50PM +0200, Wolfram Sang wrote:
->>
->> > I donot see the warning. Am I missing something?
->>
->> I deleted my logfiles already. Ignore it for now, if it comes up again
->> with your new series, I will give a more detailed pointer.
->
-> Sorry, the section mismatch was not related to I2C it seems:
+On Sat, Sep 08, 2012 at 12:25:37AM +0100, Olof Johansson wrote:
+> On Fri, Sep 07, 2012 at 05:26:35PM +0100, Catalin Marinas wrote:
+> > This is the 3rd version of patches implementing Linux kernel support for
+> > the 64-bit ARM architecture. Most of the review comments for the
+> > previous release have been implemented. There are a few left (like
+> > generic timer dts specification) but the main goal was to freeze the
+> > user ABI.
+> > 
+> > The Linux kernel patches are available on this tree:
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git upstream
+> > 
+> > Main changes since the previous version:
+> > - ptrace interface now using regsets for TLS and hardware debug
+> >   registers.
+> > - sys_personality fixes. PER_LINUX is the default for all tasks (32 or
+> >   64-bit) and there is no compat_sys_personality defined.
+> > - Kconfig clean-up (unused symbols, AARCH32_EMULATION removed in favour
+> >   of COMPAT).
+> > - Clean-up of the __cpuc_* function prefixes.
+> > - CPU information table implemented in C rather than assembly.
+> > - __bad_* function calls replaced with BUILD_BUG.
+> > - Inline get_user/put_user (code cleaner, slightly bigger kernel Image).
+> > - DMA API implementation simplified, defaulting to swiotlb. It will be
+> >   extended as hardware becomes available.
+> > - Arch-specific code in the generic timer patch moved to arch/arm64/.
+> > - Comment fixes and clarifications.
+> 
+> I see that a good amount of the comments I had on v2 have neither been replied
+> to nor addressed.
 
-Thanks for the report just sent a patch fixing that.
+Sorry, as I said above, my main focus was get the user ABI sorted out as
+a code is public and there are people that started using it. There are
+still a few emails marked as "unread" in my inbox that need to be
+addressed but I did not consider them critical for version 3 of the
+series. They are not forgotten, however, I'm working back through those
+emails and either reply or implement the suggestions.
 
->
-> WARNING: vmlinux.o(.data+0x30958): Section mismatch in reference from the variable rx51_si4713_dev to the (unknown reference) .init.data:(unknown)
-> The variable rx51_si4713_dev references
-> the (unknown reference) __initdata (unknown)
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
->
-> Got it with an "allnoconfig" and then selecting MMU and OMAP.
->
-> Regards,
->
->    Wolfram
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
->
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1.4.10 (GNU/Linux)
->
-> iEYEARECAAYFAlBQkbsACgkQD27XaX1/VRtbuACgkBa0lOIN551eec9TSetVPsCE
-> Ew0AoKizKon3DIILpERWJIwzAXdgRVDc
-> =T4Yq
-> -----END PGP SIGNATURE-----
->
+> Acked-by: Olof Johansson <olof@lixom.net>
+
+Thanks.
+
+-- 
+Catalin
