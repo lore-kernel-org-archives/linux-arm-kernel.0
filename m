@@ -1,103 +1,18 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 12 Sep 2012 19:21:55 +0200
-Subject: [PATCH 2/2] arm/dts: AM33XX: Add device tree OPP table
-In-Reply-To: <1346405840-31058-3-git-send-email-anilkumar@ti.com>
-References: <1346405840-31058-1-git-send-email-anilkumar@ti.com>
- <1346405840-31058-3-git-send-email-anilkumar@ti.com>
-Message-ID: <5050C4B3.9040107@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Sep 2012 11:25:00 -0600
+Subject: [PATCH 1/3] ARM: Remove bcmring NAND driver
+In-Reply-To: <505044E3.3040601@broadcom.com>
+References: <505044E3.3040601@broadcom.com>
+Message-ID: <5050C56C.8070603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Paul
+On 09/12/2012 02:16 AM, Christian Daudt wrote:
+> This driver is being removed as part of the cleanup of the bcmring
+> SoC from mainline as it is no longer maintained.
 
-Hi Anil,
+>  arch/arm/configs/bcmring_defconfig |    2 -
 
-On 08/31/2012 11:37 AM, AnilKumar Ch wrote:
-> Add DT OPP table for AM33XX family of devices. This data is
-> decoded by OF with of_init_opp_table() helper function.
-> 
-> Also adds cpu0 supply name to the corresponding dts files.
-> cpu0-supply name is used by cpufreq-cpu0 driver to get the
-> regulator pointer for voltage modifications.
-> 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-
-I've just applied your patch in my for_3.7/dts_part2 branch.
-
-I changed the subject to use "ARM: dts: " prefix seems it seems to be
-the convention nowadays.
-
-I can apply as the well the clock patch if Paul acks it, but it can go
-through Paul as well since there is no strong dependency between them AFAIK.
-
-Thanks,
-Benoit
-
-
-> ---
->  arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
->  arch/arm/boot/dts/am335x-evm.dts  |    6 ++++++
->  arch/arm/boot/dts/am33xx.dtsi     |   15 +++++++++++++++
->  3 files changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index ce486fc..2767b5f 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -13,6 +13,12 @@
->  	model = "TI AM335x BeagleBone";
->  	compatible = "ti,am335x-bone", "ti,am33xx";
->  
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&dcdc2_reg>;
-> +		};
-> +	};
-> +
->  	memory {
->  		device_type = "memory";
->  		reg = <0x80000000 0x10000000>; /* 256 MB */
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index baa3276..54d972c 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -13,6 +13,12 @@
->  	model = "TI AM335x EVM";
->  	compatible = "ti,am335x-evm", "ti,am33xx";
->  
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&vdd1_reg>;
-> +		};
-> +	};
-> +
->  	memory {
->  		device_type = "memory";
->  		reg = <0x80000000 0x10000000>; /* 256 MB */
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index ab744d6..2043b53 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -25,6 +25,21 @@
->  	cpus {
->  		cpu at 0 {
->  			compatible = "arm,cortex-a8";
-> +
-> +			/*
-> +			 * To consider voltage drop between PMIC and SoC,
-> +			 * tolerance value is reduced to 2% from 4% and
-> +			 * voltage value is increased as a precaution.
-> +			 */
-> +			operating-points = <
-> +				/* kHz    uV */
-> +				720000  1285000
-> +				600000  1225000
-> +				500000  1125000
-> +				275000  1125000
-> +			>;
-> +			voltage-tolerance = <2>; /* 2 percentage */
-> +			clock-latency = <300000>; /* From omap-cpufreq driver */
->  		};
->  	};
->  
-> 
+Out of curiosity, if you're removing the whole thing, why edit the
+defconfig at all; just delete it instead in whatever patch removes the
+arch/arm parts?
