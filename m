@@ -1,41 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Sep 2012 13:05:11 +0100
-Subject: [PATCH] perf: Use raw_smp_processor_id insted of smp_processor_id
-In-Reply-To: <1347450610-4342-1-git-send-email-rogerq@ti.com>
-References: <1347450610-4342-1-git-send-email-rogerq@ti.com>
-Message-ID: <20120912120511.GD28448@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 12 Sep 2012 14:08:58 +0200
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <20120910161159.GH27042@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org>
+ <20120910161159.GH27042@arm.com>
+Message-ID: <20120912120858.GI31430@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 02:50:10PM +0300, Roger Quadros wrote:
-> gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
+> On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+> > > +The device tree blob (dtb) must be no bigger than 2 megabytes in size
+> > > +and placed at a 2-megabyte boundary within the first 512 megabytes from
+> > > +the start of the kernel image. This is to allow the kernel to map the
+> > > +blob using a single section mapping in the initial page tables.
+> > why do you want to restrict the DT to be less tahn 2MiB?
 > 
-> [   28.832916] debug_smp_processor_id: 18 callbacks suppressed
-> [   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
-> [   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+> That's a restriction due on the initial memory map. At some point we may
+> add support in head.S to parse the dtb and extract the size information.
+> Not critical at this stage.
 > 
-> Tested with perf on OMAP4 Panda.
+> > > +Before jumping into the kernel, the following conditions must be met:
+> > > +
+> > > +- Quiesce all DMA capable devices so that memory does not get
+> > > +  corrupted by bogus network packets or disk data.  This will save
+> > > +  you many hours of debug.
+> > > +
+> > > +- Primary CPU general-purpose register settings
+> > > +  x0 = physical address of device tree blob (dtb) in system RAM.
+> > > +  x1 = 0 (reserved for future use)
+> > > +  x2 = 0 (reserved for future use)
+> > > +  x3 = 0 (reserved for future use)
+> > > +
+> > > +- CPU mode
+> > > +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+> > > +  IRQ and FIQ).
+> > > +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
+> > > +  the virtualisation extensions) or non-secure EL1.
+> > > +
+> > > +- Caches, MMUs
+> > > +  The MMU must be off.
+> > > +  Instruction cache may be on or off.
+> > > +  Data cache must be off and invalidated.
+> > > +  External caches (if present) must be configured and disabled.
+> > > +
+> > > +- Architected timers
+> > > +  CNTFRQ must be programmed with the timer frequency.
+> > > +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
+> > > +  set where available.
+> > can you explain why?
+> 
+> Otherwise the kernel cannot access the generic timer registers (it is
+> described in the AArch64 exception model which isn't public yet).
+I do not like the idea to do too much in the boot loader
 
-NAK.  Using a different function which doesn't have the warning isn't a
-subsitute for fixing the problem properly.  What you're doing is papering
-over the bug, making the warning go away without properly understanding
-the problem.
+can we drop it and do it the head.S or find an other way
 
-The warning is there because something is being done wrong.  What that is
-is exactly what is being said in the warning message.  You're getting a
-CPU number in a context where preemptions can occur - and therefore the
-CPU that you're running on can change.
+> 
+> > > +- The primary CPU must jump directly to the first instruction of the
+> > > +  kernel image.  The device tree blob passed by this CPU must contain
+> > > +  for each CPU node:
+> > > +
+> > > +    1. An 'enable-method' property. Currently, the only supported value
+> > > +       for this field is the string "spin-table".
+> > > +
+> > > +    2. A 'cpu-release-addr' property identifying a 64-bit,
+> > > +       zero-initialised memory location.
+> > > +
+> > > +  It is expected that the bootloader will generate these device tree
+> > > +  properties and insert them into the blob prior to kernel entry.
+> > > +
+> > > +- Any secondary CPUs must spin outside of the kernel in a reserved area
+> > > +  of memory (communicated to the kernel by a /memreserve/ region in the
+> > > +  device tree) polling their cpu-release-addr location, which must be
+> > > +  contained in the reserved region.  A wfe instruction may be inserted
+> > > +  to reduce the overhead of the busy-loop and a sev will be issued by
+> > > +  the primary CPU.  When a read of the location pointed to by the
+> > > +  cpu-release-addr returns a non-zero value, the CPU must jump directly
+> > > +  to this value.
+> > do you plan AMP boot?
+> 
+> What do you mean by AMP?
+> 
+> If you only want to use 3 CPUs out of 4 for example, you change the FDT
+> information that gets passed to the kernel accordingly. So the kernel
+> wouldn't touch the 4th one.
+I mean boot a  different kernel in each core as example
 
-Think about this sequence:
-
-	- cpu = smp_processor_id(); /* returns 0 */
-	- you are preempted
-	- you resume on CPU 1
-	- trace_clock_disable(clk->name, 0, 0);
-
-If trace_clock_disable() uses the CPU number to access per-CPU data
-without locking, that's going to cause corruption.
-
-Please, if you're going to fix a warning, analyse it properly first and
-don't just search for a function which appears to give you the same
-functionality but without the warning message.
+Best Regards,
+J.
