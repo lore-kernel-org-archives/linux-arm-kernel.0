@@ -1,34 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Sep 2012 14:57:33 -0600
-Subject: [PATCH v3 6/9] ARM: mvebu: add pinctrl device in DT for Armada
- 370/XP SoCs
-In-Reply-To: <20120912085652.21d3232f@skate>
-References: <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347266386-16229-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <504FB9D7.3030205@wwwdotorg.org> <20120912085652.21d3232f@skate>
-Message-ID: <5050F73D.8050701@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Sep 2012 23:05:32 +0200
+Subject: [PATCH v2 6/6] ARM: make mach/gpio.h headers optional
+In-Reply-To: <1346960563-18689-7-git-send-email-robherring2@gmail.com>
+References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
+ <1346960563-18689-7-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdb3HtNg8BzpBMmdY=GJSNh=YCZ0DxggUgbnd7-ax=EuMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2012 12:56 AM, Thomas Petazzoni wrote:
-> Le Tue, 11 Sep 2012 16:23:19 -0600,
-> Stephen Warren <swarren@wwwdotorg.org> a ?crit :
-> 
->> On 09/10/2012 02:39 AM, Sebastian Hesselbarth wrote:
->>> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>
->>> The Armada 370 and XP SoCs have configurable muxing for a certain
->>> number of their pins, controlled through a pinctrl driver.
->>
->> Hmmm. I'd be tempted just to put the entire node definition there;
->> putting in a .dtsi file just to share the reg property doesn't seem
->> especially useful.
-> 
-> When you say "here" you're mentioning the SoC-specific .dtsi files (i.e
+On Thu, Sep 6, 2012 at 9:42 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-(s/here/there I assume).
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Most platforms don't need mach/gpio.h and it prevents multi-platform
+> kernel images. Add CONFIG_NEED_MACH_GPIO_H and make platforns select it
+> if they need gpio.h. This is platforms that define __GPIOLIB_COMPLEX
+> or have lots of implicit includes pulled in by mach/gpio.h.
+>
+> at91 and omap have gpio clean-up pending and can drop
+> CONFIG_NEED_MACH_GPIO_H once that is in.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-> the ones in PATCH 7/9 and PATCH 8/9), correct?
+Didn't I ACK this before? Oh well.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yes, I believe so.
+Yours,
+Linus Walleij
