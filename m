@@ -1,520 +1,333 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Sep 2012 22:18:26 -0600
-Subject: [PATCH V3 2/5] ARM: bcm2708: add interrupt controller driver
-In-Reply-To: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347423509-30647-2-git-send-email-swarren@wwwdotorg.org>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Wed, 12 Sep 2012 10:09:37 +0530
+Subject: [PATCH 07/17] Input: omap-keypad: Remove dependencies to mach
+ includes
+In-Reply-To: <20120911182659.GD10706@arwen.pp.htv.fi>
+References: <20120911052934.29637.9190.stgit@muffinssi.local>
+ <20120911053059.29637.22108.stgit@muffinssi.local>
+ <20120911055709.GB17865@arwen.pp.htv.fi>
+ <20120911061652.GA23092@atomide.com>
+ <20120911175633.GG23092@atomide.com>
+ <20120911182659.GD10706@arwen.pp.htv.fi>
+Message-ID: <CAKdam57+niWtYZgffXzQ64K57fheKv3-yFyoTDcqWUnTzRKfFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Arlott <simon@fire.lp0.eu>
+Hi,
 
-The BCM2708 contains a custom interrupt controller, which supports 72
-interrupt sources using a 2-level register scheme. The interrupt
-controller, or the HW block containing it, is referred to occasionally
-as "armctrl" in the SoC documentation, hence the symbol naming in the
-code.
-
-This patch was extracted from git://github.com/lp0/linux.git branch
-rpi-split as of 2012/09/08, and modified as follows:
-
-* Added devicetree documentation, and hence removed list of IRQs from
-  bcm2835.dtsi.
-* Changed shift in MAKE_HWIRQ() and HWIRQ_BANK() from 8 to 5 to reduce
-  the size of the hwirq space, and pass the total size of the hwirq space
-  to irq_domain_add_linear(), rather than just the number of valid hwirqs;
-  the two are different due to the hwirq space being sparse.
-* Added the interrupt controller DT node to the top-level of the DT,
-  rather than nesting it inside a /axi node. Hence, changed the reg value
-  since /axi had a ranges property. This seems simpler to me, but I'm not
-  sure if everyone will like this change or not.
-* Don't set struct irq_domain_ops.map = irq_domain_simple_map, hence
-  removing the need to patch include/linux/irqdomain.h or
-  kernel/irq/irqdomain.c.
-* Removed unused IS_VALID_BANK()/IS_VALID_IRQ() macros.
-* Renamed armctrl_handle_irq() to prevent possible symbol clashes.
-* Made armctrl_of_init() static.
-* Removed comment "Each bank is registered as a separate interrupt
-  controller" since this is no longer true.
-* Removed FSF address from license header.
-* Added my name to copyright header.
-
-Signed-off-by: Chris Boot <bootc@bootc.net>
-Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
-Signed-off-by: Dom Cobley <popcornmix@gmail.com>
-Signed-off-by: Dom Cobley <dc4@broadcom.com>
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
---
-v3: New patch.
-
-TODO: Should of_address_to_resource(), ioremap(), request_mem_region()
-in armctrl_of_init() be collapsed into of_iomap(). This wouldn't request
-the region, but a quick grep implies that's quite common with DT.
----
- .../arm/bcm2708/broadcom,bcm2708-armctrl-ic.txt    |  110 +++++++++
- arch/arm/boot/dts/bcm2835.dtsi                     |    8 +
- arch/arm/mach-bcm2708/Makefile                     |    1 +
- arch/arm/mach-bcm2708/bcm2708.c                    |   12 +-
- arch/arm/mach-bcm2708/irq.c                        |  234 ++++++++++++++++++++
- arch/arm/mach-bcm2708/irq.h                        |   27 +++
- 6 files changed, 383 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-armctrl-ic.txt
- create mode 100644 arch/arm/mach-bcm2708/irq.c
- create mode 100644 arch/arm/mach-bcm2708/irq.h
-
-diff --git a/Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-armctrl-ic.txt b/Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-armctrl-ic.txt
-new file mode 100644
-index 0000000..d7f7887
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm2708/broadcom,bcm2708-armctrl-ic.txt
-@@ -0,0 +1,110 @@
-+BCM2708 Top-Level ("ARMCTRL") Interrupt Controller
-+
-+The BCM2708 contains a custom top-level interrupt controller, which supports
-+72 interrupt sources using a 2-level register scheme. The interrupt
-+controller, or the HW block containing it, is referred to occasionally
-+as "armctrl" in the SoC documentation, hence naming of this binding.
-+
-+Required properties:
-+
-+- compatible : should be "broadcom,bcm2708-armctrl-ic.txt"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 2.
-+
-+  The 1st cell is the interrupt bank; 0 for interrupts in the "IRQ basic
-+  pending" register, or 1/2 respectively for interrupts in the "IRQ pending
-+  1/2" register.
-+
-+  The 2nd cell contains the interrupt number within the bank. Valid values
-+  are 0..7 for bank 0, and 0..31 for bank 1.
-+
-+The interrupt sources are as follows, for the BCM2835 derivative SoC at least:
-+
-+Bank 0:
-+0: ARM_TIMER
-+1: ARM_MAILBOX
-+2: ARM_DOORBELL_0
-+3: ARM_DOORBELL_1
-+4: VPU0_HALTED
-+5: VPU1_HALTED
-+6: ILLEGAL_TYPE0
-+7: ILLEGAL_TYPE1
-+
-+Bank 1:
-+0: TIMER0
-+1: TIMER1
-+2: TIMER2
-+3: TIMER3
-+4: CODEC0
-+5: CODEC1
-+6: CODEC2
-+7: VC_JPEG
-+8: ISP
-+9: VC_USB
-+10: VC_3D
-+11: TRANSPOSER
-+12: MULTICORESYNC0
-+13: MULTICORESYNC1
-+14: MULTICORESYNC2
-+15: MULTICORESYNC3
-+16: DMA0
-+17: DMA1
-+18: VC_DMA2
-+19: VC_DMA3
-+20: DMA4
-+21: DMA5
-+22: DMA6
-+23: DMA7
-+24: DMA8
-+25: DMA9
-+26: DMA10
-+27: DMA11
-+28: DMA12
-+29: AUX
-+30: ARM
-+31: VPUDMA
-+
-+Bank 2:
-+0: HOSTPORT
-+1: VIDEOSCALER
-+2: CCP2TX
-+3: SDC
-+4: DSI0
-+5: AVE
-+6: CAM0
-+7: CAM1
-+8: HDMI0
-+9: HDMI1
-+10: PIXELVALVE1
-+11: I2CSPISLV
-+12: DSI1
-+13: PWA0
-+14: PWA1
-+15: CPR
-+16: SMI
-+17: GPIO0
-+18: GPIO1
-+19: GPIO2
-+20: GPIO3
-+21: VC_I2C
-+22: VC_SPI
-+23: VC_I2SPCM
-+24: VC_SDIO
-+25: VC_UART
-+26: SLIMBUS
-+27: VEC
-+28: CPG
-+29: RNG
-+30: VC_ARASANSDIO
-+31: AVSPMON
-+
-+Example:
-+
-+intc: interrupt-controller {
-+	compatible = "broadcom,bcm2708-armctrl-ic";
-+	reg = <0x2000b200 0x200>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+};
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 9039482..00eaf2b 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -3,8 +3,16 @@
- / {
- 	compatible = "broadcom,bcm2835", "broadcom,bcm2708";
- 	model = "BCM2835";
-+	interrupt-parent = <&intc>;
- 
- 	chosen {
- 		bootargs = "earlyprintk";
- 	};
-+
-+	intc: interrupt-controller {
-+		compatible = "broadcom,bcm2708-armctrl-ic";
-+		reg = <0x2000b200 0x200>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
- };
-diff --git a/arch/arm/mach-bcm2708/Makefile b/arch/arm/mach-bcm2708/Makefile
-index c382763..597f811 100644
---- a/arch/arm/mach-bcm2708/Makefile
-+++ b/arch/arm/mach-bcm2708/Makefile
-@@ -1 +1,2 @@
- obj-y += bcm2708.o
-+obj-y += irq.o
-diff --git a/arch/arm/mach-bcm2708/bcm2708.c b/arch/arm/mach-bcm2708/bcm2708.c
-index ae6df4f..ad6b7f8 100644
---- a/arch/arm/mach-bcm2708/bcm2708.c
-+++ b/arch/arm/mach-bcm2708/bcm2708.c
-@@ -22,6 +22,8 @@
- 
- #include <mach/bcm2708_soc.h>
- 
-+#include "irq.h"
-+
- static struct map_desc io_map __initdata = {
- 	.virtual = BCM2708_PERIPH_VIRT,
- 	.pfn = __phys_to_pfn(BCM2708_PERIPH_PHYS),
-@@ -34,14 +36,6 @@ void __init bcm2708_map_io(void)
- 	iotable_init(&io_map, 1);
- }
- 
--void __init bcm2708_init_irq(void)
--{
--}
--
--asmlinkage void __exception_irq_entry bcm2708_handle_irq(struct pt_regs *regs)
--{
--}
--
- void __init bcm2708_init(void)
- {
- 	int ret;
-@@ -70,7 +64,7 @@ static const char * const bcm2708_compat[] = {
- DT_MACHINE_START(BCM2708, "BCM2708")
- 	.map_io = bcm2708_map_io,
- 	.init_irq = bcm2708_init_irq,
--	.handle_irq = bcm2708_handle_irq,
-+	.handle_irq = bcm2708_armctrl_handle_irq,
- 	.init_machine = bcm2708_init,
- 	.timer = &bcm2708_timer,
- 	.dt_compat = bcm2708_compat
-diff --git a/arch/arm/mach-bcm2708/irq.c b/arch/arm/mach-bcm2708/irq.c
-new file mode 100644
-index 0000000..81dba4e
---- /dev/null
-+++ b/arch/arm/mach-bcm2708/irq.c
-@@ -0,0 +1,234 @@
-+/*
-+ *  Copyright 2010 Broadcom
-+ *  Copyright 2012 Simon Arlott, Chris Boot, Stephen Warren
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Quirk 1: Shortcut interrupts don't set the bank 1/2 register pending bits
-+ *
-+ * If an interrupt fires on bank 1 that isn't in the shortcuts list, bit 8
-+ * on bank 0 is set to signify that an interrupt in bank 1 has fired, and
-+ * to look in the bank 1 status register for more information.
-+ *
-+ * If an interrupt fires on bank 1 that _is_ in the shortcuts list, its
-+ * shortcut bit in bank 0 is set as well as its interrupt bit in the bank 1
-+ * status register, but bank 0 bit 8 is _not_ set.
-+ *
-+ * Quirk 2: You can't mask the register 1/2 pending interrupts
-+ *
-+ * In a proper cascaded interrupt controller, the interrupt lines with
-+ * cascaded interrupt controllers on them are just normal interrupt lines.
-+ * You can mask the interrupts and get on with things. With this controller
-+ * you can't do that.
-+ *
-+ * Quirk 3: The shortcut interrupts can't be (un)masked in bank 0
-+ *
-+ * Those interrupts that have shortcuts can only be masked/unmasked in
-+ * their respective banks' enable/disable registers. Doing so in the bank 0
-+ * enable/disable registers has no effect.
-+ *
-+ * The FIQ control register:
-+ *  Bits 0-6: IRQ (index in order of interrupts from banks 1, 2, then 0)
-+ *  Bit    7: Enable FIQ generation
-+ *  Bits  8+: Unused
-+ *
-+ * An interrupt must be disabled before configuring it for FIQ generation
-+ * otherwise both handlers will fire at the same time!
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/irqdomain.h>
-+#include <asm/exception.h>
-+
-+#include "irq.h"
-+
-+/* Put the bank and irq (32 bits) into the hwirq */
-+#define MAKE_HWIRQ(b, n)	((b << 5) | (n))
-+#define HWIRQ_BANK(i)		(i >> 5)
-+#define HWIRQ_BIT(i)		BIT(i & 0x1f)
-+
-+#define NR_IRQS_BANK0		8
-+#define BANK0_HWIRQ_MASK	0xff
-+/* Shortcuts can't be disabled so any unknown new ones need to be masked */
-+#define SHORTCUT1_MASK		0x00007c00
-+#define SHORTCUT2_MASK		0x001f8000
-+#define SHORTCUT_SHIFT		10
-+#define BANK1_HWIRQ		BIT(8)
-+#define BANK2_HWIRQ		BIT(9)
-+#define BANK0_VALID_MASK	(BANK0_HWIRQ_MASK | BANK1_HWIRQ | BANK2_HWIRQ \
-+					| SHORTCUT1_MASK | SHORTCUT2_MASK)
-+
-+#define REG_FIQ_CONTROL		0x0c
-+
-+#define NR_BANKS		3
-+#define IRQS_PER_BANK		32
-+
-+static int reg_pending[] __initconst = { 0x00, 0x04, 0x08 };
-+static int reg_enable[] __initconst = { 0x18, 0x10, 0x14 };
-+static int reg_disable[] __initconst = { 0x24, 0x1c, 0x20 };
-+static int bank_irqs[] __initconst = { 8, 32, 32 };
-+
-+static const int shortcuts[] = {
-+	7, 9, 10, 18, 19,		/* Bank 1 */
-+	21, 22, 23, 24, 25, 30		/* Bank 2 */
-+};
-+
-+struct armctrl_ic {
-+	void __iomem *base;
-+	void __iomem *pending[NR_BANKS];
-+	void __iomem *enable[NR_BANKS];
-+	void __iomem *disable[NR_BANKS];
-+	struct irq_domain *domain;
-+};
-+
-+static struct armctrl_ic intc __read_mostly;
-+
-+static void armctrl_mask_irq(struct irq_data *d)
-+{
-+	writel_relaxed(HWIRQ_BIT(d->hwirq), intc.disable[HWIRQ_BANK(d->hwirq)]);
-+}
-+
-+static void armctrl_unmask_irq(struct irq_data *d)
-+{
-+	writel_relaxed(HWIRQ_BIT(d->hwirq), intc.enable[HWIRQ_BANK(d->hwirq)]);
-+}
-+
-+static struct irq_chip armctrl_chip = {
-+	.name = "ARMCTRL-level",
-+	.irq_mask = armctrl_mask_irq,
-+	.irq_unmask = armctrl_unmask_irq
-+};
-+
-+static int armctrl_xlate(struct irq_domain *d, struct device_node *ctrlr,
-+	const u32 *intspec, unsigned int intsize,
-+	unsigned long *out_hwirq, unsigned int *out_type)
-+{
-+	if (WARN_ON(intsize != 2))
-+		return -EINVAL;
-+
-+	if (WARN_ON(intspec[0] >= NR_BANKS))
-+		return -EINVAL;
-+
-+	if (WARN_ON(intspec[1] >= IRQS_PER_BANK))
-+		return -EINVAL;
-+
-+	if (WARN_ON(intspec[0] == 0 && intspec[1] >= NR_IRQS_BANK0))
-+		return -EINVAL;
-+
-+	*out_hwirq = MAKE_HWIRQ(intspec[0], intspec[1]);
-+	*out_type = IRQ_TYPE_NONE;
-+	return 0;
-+}
-+
-+static struct irq_domain_ops armctrl_ops = {
-+	.xlate = armctrl_xlate
-+};
-+
-+static int __init armctrl_of_init(struct device_node *node,
-+	struct device_node *parent)
-+{
-+	struct resource res;
-+	void __iomem *base;
-+	int ret, irq, b, i;
-+
-+	ret = of_address_to_resource(node, 0, &res);
-+	if (ret)
-+		panic("%s: unable to find IC registers\n",
-+			node->full_name);
-+
-+	base = ioremap(res.start, resource_size(&res));
-+	if (!base)
-+		panic("%s: unable to map IC registers\n",
-+			node->full_name);
-+
-+	if (!request_mem_region(res.start, resource_size(&res),
-+			node->full_name))
-+		panic("%s: unable to request resources for IC registers\n",
-+			node->full_name);
-+
-+	intc.domain = irq_domain_add_linear(node, MAKE_HWIRQ(NR_BANKS, 0),
-+			&armctrl_ops, NULL);
-+	if (!intc.domain)
-+		panic("%s: unable to create IRQ domain\n", node->full_name);
-+
-+	for (b = 0; b < NR_BANKS; b++) {
-+		intc.pending[b] = base + reg_pending[b];
-+		intc.enable[b] = base + reg_enable[b];
-+		intc.disable[b] = base + reg_disable[b];
-+
-+		for (i = 0; i < bank_irqs[b]; i++) {
-+			irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i));
-+			BUG_ON(irq <= 0);
-+			irq_set_chip_and_handler(irq, &armctrl_chip,
-+				handle_level_irq);
-+			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+		}
-+	}
-+	return 0;
-+}
-+
-+static struct of_device_id irq_of_match[] __initconst = {
-+	{ .compatible = "broadcom,bcm2708-armctrl-ic", .data = armctrl_of_init }
-+};
-+
-+void __init bcm2708_init_irq(void)
-+{
-+	of_irq_init(irq_of_match);
-+}
-+
-+/*
-+ * Handle each interrupt across the entire interrupt controller.  This reads the
-+ * status register before handling each interrupt, which is necessary given that
-+ * handle_IRQ may briefly re-enable interrupts for soft IRQ handling.
-+ */
-+
-+static void armctrl_handle_bank(int bank, struct pt_regs *regs)
-+{
-+	u32 stat, irq;
-+
-+	while ((stat = readl_relaxed(intc.pending[bank]))) {
-+		irq = MAKE_HWIRQ(bank, ffs(stat) - 1);
-+		handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
-+	}
-+}
-+
-+static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
-+	u32 stat)
-+{
-+	u32 irq = MAKE_HWIRQ(bank, shortcuts[ffs(stat >> SHORTCUT_SHIFT) - 1]);
-+	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
-+}
-+
-+asmlinkage void __exception_irq_entry bcm2708_armctrl_handle_irq(
-+	struct pt_regs *regs)
-+{
-+	u32 stat, irq;
-+
-+	while ((stat = readl_relaxed(intc.pending[0]) & BANK0_VALID_MASK)) {
-+		if (stat & BANK0_HWIRQ_MASK) {
-+			irq = MAKE_HWIRQ(0, ffs(stat & BANK0_HWIRQ_MASK) - 1);
-+			handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
-+		} else if (stat & SHORTCUT1_MASK) {
-+			armctrl_handle_shortcut(1, regs, stat & SHORTCUT1_MASK);
-+		} else if (stat & SHORTCUT2_MASK) {
-+			armctrl_handle_shortcut(2, regs, stat & SHORTCUT2_MASK);
-+		} else if (stat & BANK1_HWIRQ) {
-+			armctrl_handle_bank(1, regs);
-+		} else if (stat & BANK2_HWIRQ) {
-+			armctrl_handle_bank(2, regs);
-+		} else {
-+			BUG();
-+		}
-+	}
-+}
-diff --git a/arch/arm/mach-bcm2708/irq.h b/arch/arm/mach-bcm2708/irq.h
-new file mode 100644
-index 0000000..2cf073b
---- /dev/null
-+++ b/arch/arm/mach-bcm2708/irq.h
-@@ -0,0 +1,27 @@
-+/*
-+ *  Copyright (C) 2010 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#ifndef __BCM2708_IRQ_H
-+#define __BCM2708_IRQ_H
-+
-+extern void bcm2708_init_irq(void);
-+
-+extern asmlinkage void __exception_irq_entry bcm2708_armctrl_handle_irq(
-+	struct pt_regs *regs);
-+
-+#endif
--- 
-1.7.9.5
+On Tue, Sep 11, 2012 at 11:57 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Tue, Sep 11, 2012 at 10:56:34AM -0700, Tony Lindgren wrote:
+>> * Tony Lindgren <tony@atomide.com> [120910 23:17]:
+>> > * Felipe Balbi <balbi@ti.com> [120910 23:02]:
+>> >
+>> > > >  static int __devinit omap_kp_probe(struct platform_device *pdev)
+>> > > >  {
+>> > > > -       struct omap_kp *omap_kp;
+>> > >
+>> > > ???? I don't see the point for that global omap_kp, actually ...
+>> >
+>> > Yes you're right. Will send an updated one tomorrow.
+>>
+>> Here's the updated patch that just removes all omap2+ code,
+>> and does not use the global omap_kp.
+>>
+>> Regards,
+>>
+>> Tony
+>>
+>>
+>> From: Tony Lindgren <tony@atomide.com>
+>> Date: Fri, 7 Sep 2012 13:27:58 -0700
+>> Subject: [PATCH] Input: omap-keypad: Remove dependencies to mach includes
+>>
+>> Remove support for omap2+ as it's no longer needed since
+>> it's using matrix-keypad. This way we can remove depency
+>> to plat and mach headers which is needed for ARM common
+>> zImage support.
+>>
+>> Also remove INT_KEYBOARD by using omap_kp->irq.
+>>
+>> Note that this patch depends on an earlier patch
+>> "ARM: OMAP: Move gpio.h to include/linux/platform_data".
+>>
+>> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> Cc: linux-input at vger.kernel.org
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> This looks ok to me from a code standpoint. Sourav how does this look to
+> you ?
+>
+The patch looks good to me. Makes perfect sense to remove the omap2+
+code from the driver.
+> FWIW:
+>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+>
+>>
+>> --- a/drivers/input/keyboard/Kconfig
+>> +++ b/drivers/input/keyboard/Kconfig
+>> @@ -533,7 +533,7 @@ config KEYBOARD_DAVINCI
+>>
+>>  config KEYBOARD_OMAP
+>>       tristate "TI OMAP keypad support"
+>> -     depends on (ARCH_OMAP1 || ARCH_OMAP2)
+>> +     depends on ARCH_OMAP1
+>>       select INPUT_MATRIXKMAP
+>>       help
+>>         Say Y here if you want to use the OMAP keypad.
+>> diff --git a/drivers/input/keyboard/omap-keypad.c b/drivers/input/keyboard/omap-keypad.c
+>> index a0222db..2bda5f0b 100644
+>> --- a/drivers/input/keyboard/omap-keypad.c
+>> +++ b/drivers/input/keyboard/omap-keypad.c
+>> @@ -35,13 +35,9 @@
+>>  #include <linux/mutex.h>
+>>  #include <linux/errno.h>
+>>  #include <linux/slab.h>
+>> -#include <asm/gpio.h>
+>> +#include <linux/gpio.h>
+>> +#include <linux/platform_data/gpio-omap.h>
+>>  #include <plat/keypad.h>
+>> -#include <plat/menelaus.h>
+>> -#include <asm/irq.h>
+>> -#include <mach/hardware.h>
+>> -#include <asm/io.h>
+>> -#include <plat/mux.h>
+>>
+>>  #undef NEW_BOARD_LEARNING_MODE
+>>
+>> @@ -96,28 +92,8 @@ static u8 get_row_gpio_val(struct omap_kp *omap_kp)
+>>
+>>  static irqreturn_t omap_kp_interrupt(int irq, void *dev_id)
+>>  {
+>> -     struct omap_kp *omap_kp = dev_id;
+>> -
+>>       /* disable keyboard interrupt and schedule for handling */
+>> -     if (cpu_is_omap24xx()) {
+>> -             int i;
+>> -
+>> -             for (i = 0; i < omap_kp->rows; i++) {
+>> -                     int gpio_irq = gpio_to_irq(row_gpios[i]);
+>> -                     /*
+>> -                      * The interrupt which we're currently handling should
+>> -                      * be disabled _nosync() to avoid deadlocks waiting
+>> -                      * for this handler to complete.  All others should
+>> -                      * be disabled the regular way for SMP safety.
+>> -                      */
+>> -                     if (gpio_irq == irq)
+>> -                             disable_irq_nosync(gpio_irq);
+>> -                     else
+>> -                             disable_irq(gpio_irq);
+>> -             }
+>> -     } else
+>> -             /* disable keyboard interrupt and schedule for handling */
+>> -             omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> +     omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>>
+>>       tasklet_schedule(&kp_tasklet);
+>>
+>> @@ -133,33 +109,22 @@ static void omap_kp_scan_keypad(struct omap_kp *omap_kp, unsigned char *state)
+>>  {
+>>       int col = 0;
+>>
+>> -     /* read the keypad status */
+>> -     if (cpu_is_omap24xx()) {
+>> -             /* read the keypad status */
+>> -             for (col = 0; col < omap_kp->cols; col++) {
+>> -                     set_col_gpio_val(omap_kp, ~(1 << col));
+>> -                     state[col] = ~(get_row_gpio_val(omap_kp)) & 0xff;
+>> -             }
+>> -             set_col_gpio_val(omap_kp, 0);
+>> -
+>> -     } else {
+>> -             /* disable keyboard interrupt and schedule for handling */
+>> -             omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> +     /* disable keyboard interrupt and schedule for handling */
+>> +     omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>>
+>> -             /* read the keypad status */
+>> -             omap_writew(0xff, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBC);
+>> -             for (col = 0; col < omap_kp->cols; col++) {
+>> -                     omap_writew(~(1 << col) & 0xff,
+>> -                                 OMAP1_MPUIO_BASE + OMAP_MPUIO_KBC);
+>> +     /* read the keypad status */
+>> +     omap_writew(0xff, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBC);
+>> +     for (col = 0; col < omap_kp->cols; col++) {
+>> +             omap_writew(~(1 << col) & 0xff,
+>> +                         OMAP1_MPUIO_BASE + OMAP_MPUIO_KBC);
+>>
+>> -                     udelay(omap_kp->delay);
+>> +             udelay(omap_kp->delay);
+>>
+>> -                     state[col] = ~omap_readw(OMAP1_MPUIO_BASE +
+>> -                                              OMAP_MPUIO_KBR_LATCH) & 0xff;
+>> -             }
+>> -             omap_writew(0x00, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBC);
+>> -             udelay(2);
+>> +             state[col] = ~omap_readw(OMAP1_MPUIO_BASE +
+>> +                                      OMAP_MPUIO_KBR_LATCH) & 0xff;
+>>       }
+>> +     omap_writew(0x00, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBC);
+>> +     udelay(2);
+>>  }
+>>
+>>  static void omap_kp_tasklet(unsigned long data)
+>> @@ -222,14 +187,8 @@ static void omap_kp_tasklet(unsigned long data)
+>>               mod_timer(&omap_kp_data->timer, jiffies + delay);
+>>       } else {
+>>               /* enable interrupts */
+>> -             if (cpu_is_omap24xx()) {
+>> -                     int i;
+>> -                     for (i = 0; i < omap_kp_data->rows; i++)
+>> -                             enable_irq(gpio_to_irq(row_gpios[i]));
+>> -             } else {
+>> -                     omap_writew(0, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> -                     kp_cur_group = -1;
+>> -             }
+>> +             omap_writew(0, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> +             kp_cur_group = -1;
+>>       }
+>>  }
+>>
+>> @@ -242,6 +201,7 @@ static ssize_t omap_kp_enable_show(struct device *dev,
+>>  static ssize_t omap_kp_enable_store(struct device *dev, struct device_attribute *attr,
+>>                                   const char *buf, size_t count)
+>>  {
+>> +     struct omap_kp *omap_kp = dev_get_drvdata(dev);
+>>       int state;
+>>
+>>       if (sscanf(buf, "%u", &state) != 1)
+>> @@ -253,9 +213,9 @@ static ssize_t omap_kp_enable_store(struct device *dev, struct device_attribute
+>>       mutex_lock(&kp_enable_mutex);
+>>       if (state != kp_enable) {
+>>               if (state)
+>> -                     enable_irq(INT_KEYBOARD);
+>> +                     enable_irq(omap_kp->irq);
+>>               else
+>> -                     disable_irq(INT_KEYBOARD);
+>> +                     disable_irq(omap_kp->irq);
+>>               kp_enable = state;
+>>       }
+>>       mutex_unlock(&kp_enable_mutex);
+>> @@ -289,7 +249,7 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
+>>       struct omap_kp *omap_kp;
+>>       struct input_dev *input_dev;
+>>       struct omap_kp_platform_data *pdata =  pdev->dev.platform_data;
+>> -     int i, col_idx, row_idx, irq_idx, ret;
+>> +     int i, col_idx, row_idx, ret;
+>>       unsigned int row_shift, keycodemax;
+>>
+>>       if (!pdata->rows || !pdata->cols || !pdata->keymap_data) {
+>> @@ -314,8 +274,7 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
+>>       omap_kp->input = input_dev;
+>>
+>>       /* Disable the interrupt for the MPUIO keyboard */
+>> -     if (!cpu_is_omap24xx())
+>> -             omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> +     omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>>
+>>       if (pdata->delay)
+>>               omap_kp->delay = pdata->delay;
+>> @@ -328,31 +287,8 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
+>>       omap_kp->rows = pdata->rows;
+>>       omap_kp->cols = pdata->cols;
+>>
+>> -     if (cpu_is_omap24xx()) {
+>> -             /* Cols: outputs */
+>> -             for (col_idx = 0; col_idx < omap_kp->cols; col_idx++) {
+>> -                     if (gpio_request(col_gpios[col_idx], "omap_kp_col") < 0) {
+>> -                             printk(KERN_ERR "Failed to request"
+>> -                                    "GPIO%d for keypad\n",
+>> -                                    col_gpios[col_idx]);
+>> -                             goto err1;
+>> -                     }
+>> -                     gpio_direction_output(col_gpios[col_idx], 0);
+>> -             }
+>> -             /* Rows: inputs */
+>> -             for (row_idx = 0; row_idx < omap_kp->rows; row_idx++) {
+>> -                     if (gpio_request(row_gpios[row_idx], "omap_kp_row") < 0) {
+>> -                             printk(KERN_ERR "Failed to request"
+>> -                                    "GPIO%d for keypad\n",
+>> -                                    row_gpios[row_idx]);
+>> -                             goto err2;
+>> -                     }
+>> -                     gpio_direction_input(row_gpios[row_idx]);
+>> -             }
+>> -     } else {
+>> -             col_idx = 0;
+>> -             row_idx = 0;
+>> -     }
+>> +     col_idx = 0;
+>> +     row_idx = 0;
+>>
+>>       setup_timer(&omap_kp->timer, omap_kp_timer, (unsigned long)omap_kp);
+>>
+>> @@ -394,27 +330,16 @@ static int __devinit omap_kp_probe(struct platform_device *pdev)
+>>
+>>       /* scan current status and enable interrupt */
+>>       omap_kp_scan_keypad(omap_kp, keypad_state);
+>> -     if (!cpu_is_omap24xx()) {
+>> -             omap_kp->irq = platform_get_irq(pdev, 0);
+>> -             if (omap_kp->irq >= 0) {
+>> -                     if (request_irq(omap_kp->irq, omap_kp_interrupt, 0,
+>> -                                     "omap-keypad", omap_kp) < 0)
+>> -                             goto err4;
+>> -             }
+>> -             omap_writew(0, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> -     } else {
+>> -             for (irq_idx = 0; irq_idx < omap_kp->rows; irq_idx++) {
+>> -                     if (request_irq(gpio_to_irq(row_gpios[irq_idx]),
+>> -                                     omap_kp_interrupt,
+>> -                                     IRQF_TRIGGER_FALLING,
+>> -                                     "omap-keypad", omap_kp) < 0)
+>> -                             goto err5;
+>> -             }
+>> +     omap_kp->irq = platform_get_irq(pdev, 0);
+>> +     if (omap_kp->irq >= 0) {
+>> +             if (request_irq(omap_kp->irq, omap_kp_interrupt, 0,
+>> +                             "omap-keypad", omap_kp) < 0)
+>> +                     goto err4;
+>>       }
+>> +     omap_writew(0, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> +
+>>       return 0;
+>> -err5:
+>> -     for (i = irq_idx - 1; i >=0; i--)
+>> -             free_irq(row_gpios[i], omap_kp);
+>> +
+>>  err4:
+>>       input_unregister_device(omap_kp->input);
+>>       input_dev = NULL;
+>> @@ -423,7 +348,6 @@ err3:
+>>  err2:
+>>       for (i = row_idx - 1; i >=0; i--)
+>>               gpio_free(row_gpios[i]);
+>> -err1:
+>>       for (i = col_idx - 1; i >=0; i--)
+>>               gpio_free(col_gpios[i]);
+>>
+>> @@ -439,18 +363,8 @@ static int __devexit omap_kp_remove(struct platform_device *pdev)
+>>
+>>       /* disable keypad interrupt handling */
+>>       tasklet_disable(&kp_tasklet);
+>> -     if (cpu_is_omap24xx()) {
+>> -             int i;
+>> -             for (i = 0; i < omap_kp->cols; i++)
+>> -                     gpio_free(col_gpios[i]);
+>> -             for (i = 0; i < omap_kp->rows; i++) {
+>> -                     gpio_free(row_gpios[i]);
+>> -                     free_irq(gpio_to_irq(row_gpios[i]), omap_kp);
+>> -             }
+>> -     } else {
+>> -             omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> -             free_irq(omap_kp->irq, omap_kp);
+>> -     }
+>> +     omap_writew(1, OMAP1_MPUIO_BASE + OMAP_MPUIO_KBD_MASKIT);
+>> +     free_irq(omap_kp->irq, omap_kp);
+>>
+>>       del_timer_sync(&omap_kp->timer);
+>>       tasklet_kill(&kp_tasklet);
+>
+> --
+> balbi
