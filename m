@@ -1,50 +1,57 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Tue, 11 Sep 2012 21:06:57 -0700
-Subject: [RFC] tty/serial/kgdboc: Add and wire up clear_irqs callback
-In-Reply-To: <CAMbhsRTmZyxFE-vAa-UvNE8KJ2f0cfXP7mncXKcpUiNF6C9PUQ@mail.gmail.com>
-References: <20120911093042.GA12471@lizard>
- <1347356106-25368-6-git-send-email-anton.vorontsov@linaro.org>
- <20120911151540.362001c6@pyramind.ukuu.org.uk>
- <20120912033209.GA32156@lizard>
- <CAMbhsRTmZyxFE-vAa-UvNE8KJ2f0cfXP7mncXKcpUiNF6C9PUQ@mail.gmail.com>
-Message-ID: <20120912040657.GA3880@lizard>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Sep 2012 22:18:29 -0600
+Subject: [PATCH V3 5/5] ARM: bcm2708: instantiate console UART
+In-Reply-To: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1347423509-30647-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 08:42:46PM -0700, Colin Cross wrote:
-[...]
-> > The "problem" is in the last step. If we exit NMI without making UART
-> > know that we're done with the interrupt, we will reenter the NMI
-> > immediately, even without any new characters from the UART.
-> 
-> The UART irq line should go low when you read the character out of the
+From: Simon Arlott <simon@fire.lp0.eu>
 
-Probably some controllers may lower the line by themselves, but not
-all, and probably most of them need an explicit clear.
+This patch was extracted from git://github.com/lp0/linux.git branch
+rpi-split as of 2012/09/08, and modified as follows:
 
-> receive buffer, or the polling rx function should clear the interrupt
-> for you.
+* Modified UART DT node to use a unit-address to differentiate UART node
+  names, rather than using different base names "uart0" and "uart1".
+  Note that UART 1 (the Broadcom "mini UART") is not yet present, but
+  I'm naming the DT node in anticipation that it will be added.
 
-Yes, that's an option. But that way we add a new semantic for the
-polling routines, and effecitvely we just merge the two callbacks.
+Signed-off-by: Chris Boot <bootc@bootc.net>
+Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
+Signed-off-by: Dom Cobley <popcornmix@gmail.com>
+Signed-off-by: Dom Cobley <dc4@broadcom.com>
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+--
+v3: New patch.
+---
+ arch/arm/boot/dts/bcm2835.dtsi |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Of course, if Alan is OK with this, I'm more than OK too. :-)
-
-(But the polling routines would need to clear all interrupts, not
-just rx/tx. For example, if the controller indicated some error, and
-nobody clears it, then we'll start reentering infinitely.)
-
-> If you use a clear_irqs callback, you can drop characters if
-> one arrives between the last character buffer read and calling
-> clear_irqs.
-
-Only if we call clear_irqs() after reading the characters, but we do
-it before. So if new characters are available, we will reenter NMI,
-which is OK.
-
-But if used incorrectly, it truly can cause dropping (or staling) of
-characters, so I'd better add some comments about this.
-
-Thanks!
-
-Anton.
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 3e8ea51..05b1a37 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -6,7 +6,7 @@
+ 	interrupt-parent = <&intc>;
+ 
+ 	chosen {
+-		bootargs = "earlyprintk";
++		bootargs = "earlyprintk console=ttyAMA0";
+ 	};
+ 
+ 	timer {
+@@ -22,4 +22,11 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
++
++	uart at 20201000 {
++		compatible = "broadcom,bcm2835-pl011", "broadcom,bcm2708-pl011", "arm,pl011", "arm,primecell";
++		reg = <0x20201000 0x1000>;
++		interrupts = <2 25>;
++		clock-frequency = <3000000>;
++	};
+ };
+-- 
+1.7.9.5
