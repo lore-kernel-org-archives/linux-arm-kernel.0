@@ -1,31 +1,92 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Sep 2012 23:08:10 -0700
-Subject: [GIT] Renesas ARM-based SoC: pmu/cleanup for 3.7
-In-Reply-To: <20120911084914.GB5372@mudshark.cambridge.arm.com>
-References: <1347350727-11962-1-git-send-email-horms@verge.net.au>
- <20120911084914.GB5372@mudshark.cambridge.arm.com>
-Message-ID: <CAOesGMgNpVHei8Fq+B4o_aZU=dVX04VqQjUiTYB3w5vS5S9G0Q@mail.gmail.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 12 Sep 2012 11:44:18 +0530
+Subject: [PATCH] ARM: EXYNOS5: Add bus clock and set parent clock for FIMD
+In-Reply-To: <002001cd908a$29540070$7bfc0150$%han@samsung.com>
+References: <1347307866-30641-1-git-send-email-l.krishna@samsung.com>
+ <000101cd8fb3$90d10db0$b2732910$%han@samsung.com>
+ <CAL1wa8f1=hVMYrw2qdnQK5wFh8CtLxjP79+8POOG7HHqOBU5yA@mail.gmail.com>
+ <002001cd908a$29540070$7bfc0150$%han@samsung.com>
+Message-ID: <CAL1wa8dC19Hmsu=+2CFrCA-QDmrHaDm+_cPJ1suUBre_CP9xPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 1:49 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Sep 11, 2012 at 09:05:25AM +0100, Simon Horman wrote:
->> Hi Will,
+Hi Jingoo han,
+
+On Wed, Sep 12, 2012 at 7:28 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Tuesday, September 11, 2012 6:20 PM Leela Krishna Amudala wrote
+>>
+>> Hello Jingoo Han,
+>>
+>> On Tue, Sep 11, 2012 at 5:52 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+>> > On Tuesday, September 11, 2012 5:11 AM Leela Krishna Amudala wrote
+>> >>
+>> >> This patch adds the bus clock for FIMD and changes the device name for lcd clock
+>> >> also sets mout_mpll_user as parent clock to fimd
+>> >>
+>> >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+>> >> ---
+>> >>  arch/arm/mach-exynos/clock-exynos5.c       |   34 +++++++++++++++++++--------
+>> >>  arch/arm/plat-samsung/include/plat/clock.h |    2 +
+>> >>  2 files changed, 26 insertions(+), 10 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+>> >> index 774533c..f1281cf 100644
+>> >> --- a/arch/arm/mach-exynos/clock-exynos5.c
+>> >> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+>> >> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+>> >>       .ctrlbit        = (1 << 4),
+>> >>  };
+>> >>
+>> >> +static struct clk exynos5_clk_fimd = {
+>> >> +     .name           = "fimd",
+>> >> +     .devname        = "exynos5-fb",
+>> >
+>> >
+>> > Replace 'exynos5-fb' with 'exynos5-fb.1', as exynos4 fimd uses exynos4-fb.0
+>> > as devname. Exynos5 can use fimd0 or fimd1. Also, Exynos5250 uses fimd1.
+>> >
+>> >
+>> Currently s3c-fb driver using "exynos5-fb" as device name, hence used
+>> the same name in the clock.
+>> This code is tested with both drm-fimd and s3c-fb fimd and it is
+>> working fine showing the display on LCD.
+>> If I change the device name in clock file then I have to change it in
+>> s3c-fb driver also.
+>> So I feel it is better to keep the name as "exynos5-fb" in clock file
+>> instead of changing in the driver.
 >
-> Hi Simon,
+> No, there is no need to change the device name in s3c-fb driver.
+> Please refer to the patch that I sent 3 months ago.
+>         http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg11002.html
 >
->> please consider the following changes from Kobayashi-san
->> for the pmu/cleanup branch.
+> Now, Exynos5250 has only 1 FIMD IP; however, other Exynos5 SoCs
+> have 2 FIMD IPs. These SoCs have two different clock paths for
+> 2 FIMD IPs. Therefore, we need to consider it.
 >
-> Thanks for this. It probably makes more sense for the arm-soc guys to pull
-> it in directly, rather than me send it as another pull request.
 >
-> Arnd, Olof -- can you pull this into an shmobile perf branch please?
 
+Okay agreed, will change the devname  to "exynos5-fb.1" in clock file.
+Tested with adding DT changes to s3c-fb and with devname
+"exynos5-fb.1" in clock file.
+works fine for both drm-fimd and s3c-fb fimd. will post the next
+version patch soon.
 
-Done, pulled in as renesas/pmu, part of next/soc with proper dependencies.
-
-
-Thanks,
-
--Olof
+>>
+>> Thanks,
+>> Leela Krishna Amudala.
+>>
+>> >> +     .enable         = exynos5_clk_ip_disp1_ctrl,
+>> >> +     .ctrlbit        = (1 << 0),
+>> >> +};
+>> >> +
+>> >
+>> >
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
