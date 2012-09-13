@@ -1,57 +1,62 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 13 Sep 2012 14:57:58 +0800
-Subject: [PATCH v2 7/9] mtd: gpmi: do not set the default values for the extra
- clocks
+Date: Thu, 13 Sep 2012 14:58:00 +0800
+Subject: [PATCH v2 9/9] mtd: gpmi: initialize the timing registers only one
+ time
 In-Reply-To: <1347519480-31106-1-git-send-email-b32955@freescale.com>
 References: <1347519480-31106-1-git-send-email-b32955@freescale.com>
-Message-ID: <1347519480-31106-8-git-send-email-b32955@freescale.com>
+Message-ID: <1347519480-31106-10-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default frequencies of the extra clocks are 200MHz.
-The current code sets the extra clocks to 44.5MHz.
+The current code initializes the timing registers at very time
+we call the gpmi_begin(). This really wastes the cpu cycles.
 
-When i add the EDO feature to gpmi, i have to revert the extra clocks
-to 200MHz.
-
-So it is better that we do not set the default values for the extra
-clocks. The driver runs well even when we do not set the default values for
-extra clocks.
+Add a new flag to let the gpmi driver initializes the timing registers
+only one time.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    8 ++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    1 +
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index c46be6c..cc74ebf 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -513,20 +513,15 @@ static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
- 		r->clock[i] = clk;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index c036e51..3502acc 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -914,6 +914,9 @@ static int enable_edo_mode(struct gpmi_nand_data *this, int mode)
+ 	rate = (mode == 5) ? 100000000 : 80000000;
+ 	clk_set_rate(r->clock[0], rate);
+ 
++	/* Let the gpmi_begin() re-compute the timing again. */
++	this->flags &= ~GPMI_TIMING_INIT_OK;
++
+ 	this->flags |= GPMI_ASYNC_EDO_ENABLED;
+ 	this->timing_mode = mode;
+ 	dev_info(this->dev, "enable the asynchronous EDO mode %d\n", mode);
+@@ -964,6 +967,11 @@ void gpmi_begin(struct gpmi_nand_data *this)
+ 		goto err_out;
  	}
  
--	if (GPMI_IS_MX6Q(this)) {
-+	if (GPMI_IS_MX6Q(this))
- 		/*
--		 * Set the default values for the clocks in mx6q:
--		 *    The main clock(enfc) : 22MHz
--		 *    The others           : 44.5MHz
-+		 * Set the default value for the gpmi clock in mx6q:
- 		 *
--		 * These are just the default values. If you want to use
--		 * the ONFI nand which is in the Synchronous Mode, you should
--		 * change the clocks's frequencies as you need.
-+		 * If you want to use the ONFI nand which is in the
-+		 * Synchronous Mode, you should change the clock as you need.
- 		 */
- 		clk_set_rate(r->clock[0], 22000000);
--		for (i = 1; i < GPMI_CLK_MAX && r->clock[i]; i++)
--			clk_set_rate(r->clock[i], 44500000);
--	}
++	/* Only initialize the timing once */
++	if (this->flags & GPMI_TIMING_INIT_OK)
++		return;
++	this->flags |= GPMI_TIMING_INIT_OK;
 +
- 	return 0;
+ 	if (this->flags & GPMI_ASYNC_EDO_ENABLED)
+ 		gpmi_compute_edo_timing(this, &hw);
+ 	else
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 5b6d546..7ac25c1 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -124,6 +124,7 @@ struct nand_timing {
+ struct gpmi_nand_data {
+ 	/* flags */
+ #define GPMI_ASYNC_EDO_ENABLED	(1 << 0)
++#define GPMI_TIMING_INIT_OK	(1 << 1)
+ 	int			flags;
  
- err_clock:
+ 	/* System Interface */
 -- 
 1.7.0.4
