@@ -1,34 +1,114 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Sep 2012 23:10:47 -0700
-Subject: [GIT PULL 4/4] mxs defconfig update for 3.7
-In-Reply-To: <1347350100-4674-5-git-send-email-shawn.guo@linaro.org>
-References: <1347350100-4674-1-git-send-email-shawn.guo@linaro.org>
- <1347350100-4674-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120913061047.GH24290@quad.lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Sep 2012 15:13:38 +0900
+Subject: [PATCH v2] ARM: shmobile: armadillo800eva: Add support RTC
+In-Reply-To: <1347513011-18316-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+References: <1347513011-18316-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <20120913061338.GA29882@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 03:54:59PM +0800, Shawn Guo wrote:
-> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-> 
->   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-defconfig-3.7
-> 
-> for you to fetch changes up to 8f9d87a0b2ec18416a8ad1a53dd5a97ee4ef7825:
-> 
->   ARM: mxs_defconfig: Add SPI and LRADC support (2012-08-28 08:38:05 +0800)
-> 
-> ----------------------------------------------------------------
-> mxs-defconfig-3.7
-> 
-> A collection of mxs_defconfig updates for 3.7.
+On Thu, Sep 13, 2012 at 02:10:10PM +0900, Nobuhiro Iwamatsu wrote:
+> The armadillo800eva has S35390A which is RTC. This is controlled
+> using I2C of GPIO.
+> This commit supports RTC of armadillo800eva.
 
-Pulled, thanks. In the future feel free to either include this with other
-changes needed to enable the options, or squash them down to one or two
-commits. But this is OK too.
+Thanks, I have applied the following to the boards branch:
 
+commit b22f6bb030ee0c98839fe2445571c57c9f89594e
+Author: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Date:   Thu Sep 13 14:10:10 2012 +0900
 
--Olof
+    ARM: shmobile: armadillo800eva: Add support RTC
+    
+    The armadillo800eva has S35390A which is RTC. This is controlled
+    using I2C of GPIO.
+    This commit supports RTC of armadillo800eva.
+    
+    Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+    Signed-off-by: Simon Horman <horms@verge.net.au>
+
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index 7d87184..05f523d 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -85,6 +85,7 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=8
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
+ CONFIG_I2C_SH_MOBILE=y
+ # CONFIG_HWMON is not set
+ CONFIG_MEDIA_SUPPORT=y
+@@ -120,6 +121,8 @@ CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHI=y
+ CONFIG_MMC_SH_MMCIF=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_S35390A=y
+ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_UIO=y
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index cf10f92..81dfb88 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -37,6 +37,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mmcif.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
++#include <linux/i2c-gpio.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7740.h>
+@@ -876,6 +877,21 @@ static struct platform_device fsi_hdmi_device = {
+ 	},
+ };
+ 
++/* RTC: RTC connects i2c-gpio. */
++static struct i2c_gpio_platform_data i2c_gpio_data = {
++	.sda_pin	= GPIO_PORT208,
++	.scl_pin	= GPIO_PORT91,
++	.udelay		= 5, /* 100 kHz */
++};
++
++static struct platform_device i2c_gpio_device = {
++	.name = "i2c-gpio",
++	.id = 2,
++	.dev = {
++		.platform_data = &i2c_gpio_data,
++	},
++};
++
+ /* I2C */
+ static struct i2c_board_info i2c0_devices[] = {
+ 	{
+@@ -887,6 +903,13 @@ static struct i2c_board_info i2c0_devices[] = {
+ 	},
+ };
+ 
++static struct i2c_board_info i2c2_devices[] = {
++	{
++		I2C_BOARD_INFO("s35390a", 0x30),
++		.type = "s35390a",
++	},
++};
++
+ /*
+  * board devices
+  */
+@@ -903,6 +926,7 @@ static struct platform_device *eva_devices[] __initdata = {
+ 	&fsi_device,
+ 	&fsi_hdmi_device,
+ 	&fsi_wm8978_device,
++	&i2c_gpio_device,
+ };
+ 
+ static void __init eva_clock_init(void)
+@@ -1173,6 +1197,7 @@ static void __init eva_init(void)
+ #endif
+ 
+ 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
++	i2c_register_board_info(2, i2c2_devices, ARRAY_SIZE(i2c2_devices));
+ 
+ 	r8a7740_add_standard_devices();
+ 
