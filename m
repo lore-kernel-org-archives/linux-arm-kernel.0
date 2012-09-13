@@ -1,31 +1,29 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Thu, 13 Sep 2012 10:46:25 +0530
-Subject: [PATCH] arm: tegra: fixing compilation error
-Message-ID: <1347513385-14158-1-git-send-email-vbyravarasu@nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Sep 2012 22:35:34 -0700
+Subject: [GIT PULL][for 3.7] pull request of clk branch in arch-pxa git
+ tree
+In-Reply-To: <CAN1soZzAxZR6245WO8dNHABiKo+frBKW0Tfx1Tk856HCcA0eSA@mail.gmail.com>
+References: <CAN1soZzAxZR6245WO8dNHABiKo+frBKW0Tfx1Tk856HCcA0eSA@mail.gmail.com>
+Message-ID: <20120913053534.GC24290@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As usb_phy.h got moved from mach to include/linux/usb
-and renamed as tegra_usb_phy.h, correcting it in the include
-path.
+On Sun, Sep 09, 2012 at 08:08:11PM +0800, Haojian Zhuang wrote:
+> Hi Arnd & Olof,
+> 
+> Please help to merge patches from clk branch of arch pxa git tree.
+> 
+> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+> 
+>   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hzhuang1/linux.git clk
 
-Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
----
- arch/arm/mach-tegra/board-dt-tegra20.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Thanks, pulled into pxa/clk (next/cleanup).
 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index adc6b98..3308a65 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -41,7 +41,7 @@
- 
- #include <mach/iomap.h>
- #include <mach/irqs.h>
--#include <mach/usb_phy.h>
-+#include <linux/usb/tegra_usb_phy.h>
- 
- #include "board.h"
- #include "clock.h"
--- 
-1.7.1.1
+
+Regards,
+
+-Olof
