@@ -1,34 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 13 Sep 2012 15:34:43 -0500
-Subject: [PATCH v3 2/5] Documentation: add description of DT binding for
- the gpio-mvebu driver
-In-Reply-To: <20120913223059.2d0606b2@skate>
-References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <50524026.20104@gmail.com> <20120913223059.2d0606b2@skate>
-Message-ID: <50524363.9070100@gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 13 Sep 2012 13:45:57 -0700
+Subject: [PATCH] RTC: TWL: ensure all interrupts are disabled during probe
+Message-ID: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2012 03:30 PM, Thomas Petazzoni wrote:
-> Dear Rob Herring,
-> 
-> On Thu, 13 Sep 2012 15:20:54 -0500, Rob Herring wrote:
->> On 09/13/2012 10:54 AM, Thomas Petazzoni wrote:
->>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Linus Walleij <linus.walleij@stericsson.com>
->>> Cc: Andrew Lunn <andrew@lunn.ch>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>> ---
->>
->> Grant is pretty much offline right now.
-> 
-> Yes, I know, but MAINTAINERS does not mention an alternate maintainer
-> for the GPIO subsystem. Who is the interim maintainer that will
-> ultimately have to ack/nack those patches?
+From: Kevin Hilman <khilman@ti.com>
 
-Linus W. is.
+On some platforms, bootloaders are known to do some interesting RTC
+programming.  Without going into the obscurities as to why this may be
+the case, suffice it to say the the driver should not make any
+assumptions about the state of the RTC when the driver loads.  In
+particular, the driver probe should be sure that all interrupts are
+disabled until otherwise programmed.
 
-Rob
+This was discovered when finding bursty I2C traffic every second on
+Overo platforms.  This I2C overhead was keeping the SoC from hitting
+deep power states.  The cause was found to be the RTC firing every
+second on the I2C-connected TWL PMIC.
+
+Special thanks to Felipe Balbi for suggesting to look for a rogue
+driver as the source of the I2C traffic rather than the I2C driver
+itself.
+
+Special thanks to Steve Sakoman for helping track down the source of
+the continuous RTC interrups on the Overo boards.
+
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Steve Sakoman <steve@sakoman.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Patch applies to v3.6-rc5
+
+ drivers/rtc/rtc-twl.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+index c5d06fe..9277d94 100644
+--- a/drivers/rtc/rtc-twl.c
++++ b/drivers/rtc/rtc-twl.c
+@@ -495,6 +495,11 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto out1;
+ 
++	/* ensure interrupts are disabled, bootloaders can be strange */
++	ret = twl_rtc_write_u8(0, REG_RTC_INTERRUPTS_REG);
++	if (ret < 0)
++		dev_warn(&pdev->dev, "unable to disable interrupt\n");
++
+ 	/* init cached IRQ enable bits */
+ 	ret = twl_rtc_read_u8(&rtc_irq_bits, REG_RTC_INTERRUPTS_REG);
+ 	if (ret < 0)
+-- 
+1.7.9.2
