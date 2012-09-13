@@ -1,31 +1,20 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 13 Sep 2012 14:11:11 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: Add support RTC
-In-Reply-To: <20120913040629.GA23861@verge.net.au>
-References: <1347505841-8594-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
- <20120913040629.GA23861@verge.net.au>
-Message-ID: <CABMQnV+qmmP412W1Cd3mOpJynDfgiuzot=fw4O+bYMYOBKRnVQ@mail.gmail.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu, 13 Sep 2012 08:28:22 +0300
+Subject: [PATCH 1/2] serial: mxs-auart: fix the wrong setting order
+In-Reply-To: <50495F6F.4040800@freescale.com>
+References: <1346985521-2248-1-git-send-email-shijie8@gmail.com>
+ <20120907023841.GF26709@S2101-09.ap.freescale.net>
+ <50495F6F.4040800@freescale.com>
+Message-ID: <50516EF6.7070306@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Huang,
 
-On Thu, Sep 13, 2012 at 1:06 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Sep 13, 2012 at 12:10:41PM +0900, Nobuhiro Iwamatsu wrote:
->> The armadillo800eva has S35390A which is RTC. This is controlled
->> using I2C of GPIO.
->> This commit supports RTC of armadillo800eva.
->>
->> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
->
-> Hi Iwamatsu-san,
->
-> could you please either update this patch or provide a follow-up
-> patch to update the defconfig so the S35390A is enabled?
->
-> "make savedefconfig" may be useful for this.
+On 09/07/2012 05:43 AM, Huang Shijie wrote:
+> I found this bug when i tried to add DMA support for MXS-AUART.
 
-OK, I will resend with updated defconfig.
+What is the status of DMA support? We could help you testing your patches.
 
--- 
-Nobuhiro Iwamatsu
+Best regards,
+Lauri Hintsala
