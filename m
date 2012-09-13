@@ -1,48 +1,21 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 13 Sep 2012 14:33:38 -0300
-Subject: [PATCH 1/2] ARM: dts: mx23: Add USB resources
-Message-ID: <1347557619-17793-1-git-send-email-fabio.estevam@freescale.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Sep 2012 11:48:24 -0600
+Subject: [PATCH] ARM: Tegra: Add smp_twd clock for Tegra20
+In-Reply-To: <1347528873-3799-1-git-send-email-pgaikwad@nvidia.com>
+References: <1347528873-3799-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <50521C68.3000704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB resources for mx23.
+On 09/13/2012 03:34 AM, Prashant Gaikwad wrote:
+> Clockevent's frequency is changed upon cpufreq change
+> notification. It fetches local timer's rate to update the
+> clockevent frequency. This patch adds local timer clock
+> for Tegra20.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx23.dtsi |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+Applied to Tegra's for-3.7/common-clk branch. I re-tested that branch,
+and the final re-merge of Tegra's for-next.
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 9d0e803..17904db 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -436,9 +436,11 @@
- 				status = "disabled";
- 			};
- 
--			usbphy at 8007c000 {
-+			usbphy0: usbphy at 8007c000 {
-+				compatible = "fsl,imx23-usbphy";
- 				reg = <0x8007c000 0x2000>;
--				status = "disabled";
-+				clocks = <&clks 41>;
-+				status = "disabled";
- 			};
- 		};
- 	};
-@@ -450,8 +452,12 @@
- 		reg = <0x80080000 0x80000>;
- 		ranges;
- 
--		usbctrl at 80080000 {
-+		usb0: usb at 80080000 {
-+			compatible = "fsl,imx23-usb", "fsl,imx27-usb";
- 			reg = <0x80080000 0x40000>;
-+			interrupts = <11>;
-+			fsl,usbphy = <&usbphy0>;
-+			clocks = <&clks 40>;
- 			status = "disabled";
- 		};
- 	};
--- 
-1.7.9.5
+A nice side-effect of this, is that you can disable CONFIG_CPU_FREQ, and
+still boot (since the CPU clock isn't turned off, since smp_twd is
+clk_get()d which takes a reference to the CPU clock).
