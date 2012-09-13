@@ -1,82 +1,85 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Thu, 13 Sep 2012 21:24:45 +0530
-Subject: [PATCH 2/2] ARM: dts: AM33XX: Add lis331dlh device tree data to
- am335x-evm
-In-Reply-To: <1347551685-19781-1-git-send-email-anilkumar@ti.com>
-References: <1347551685-19781-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1347551685-19781-3-git-send-email-anilkumar@ti.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 13 Sep 2012 11:56:11 -0400
+Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <20120912134916.GF21823@arm.com>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
+ <20120909172046.GB31430@game.jcrosoft.org> <20120910161159.GH27042@arm.com>
+ <20120912120858.GI31430@game.jcrosoft.org> <20120912134916.GF21823@arm.com>
+Message-ID: <5052021B.4050808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add lis331dlh device tree data to am335x-evm.dts. In AM335x EVM
-lis331dlh accelerometer is connected to I2C2 bus. So this patch
-change the status to "okay" to use I2C2 bus. Also added all the
-required platform data to am335x-evm.
+Hi Catalin and Will,
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am335x-evm.dts |   42 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+On 09/12/2012 09:49 AM, Catalin Marinas wrote:
+> On Wed, Sep 12, 2012 at 01:08:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
+>>> On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
+>>>>> +Before jumping into the kernel, the following conditions must be met:
+>>>>> +
+>>>>> +- Quiesce all DMA capable devices so that memory does not get
+>>>>> +  corrupted by bogus network packets or disk data.  This will save
+>>>>> +  you many hours of debug.
+>>>>> +
+>>>>> +- Primary CPU general-purpose register settings
+>>>>> +  x0 = physical address of device tree blob (dtb) in system RAM.
+>>>>> +  x1 = 0 (reserved for future use)
+>>>>> +  x2 = 0 (reserved for future use)
+>>>>> +  x3 = 0 (reserved for future use)
+>>>>> +
+>>>>> +- CPU mode
+>>>>> +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
+>>>>> +  IRQ and FIQ).
+>>>>> +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
+>>>>> +  the virtualisation extensions) or non-secure EL1.
+>>>>> +
+>>>>> +- Caches, MMUs
+>>>>> +  The MMU must be off.
+>>>>> +  Instruction cache may be on or off.
+>>>>> +  Data cache must be off and invalidated.
+>>>>> +  External caches (if present) must be configured and disabled.
+>>>>> +
+>>>>> +- Architected timers
+>>>>> +  CNTFRQ must be programmed with the timer frequency.
+>>>>> +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
+>>>>> +  set where available.
+>>>> can you explain why?
+>>>
+>>> Otherwise the kernel cannot access the generic timer registers (it is
+>>> described in the AArch64 exception model which isn't public yet).
+>> I do not like the idea to do too much in the boot loader
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9fb59c5..9e5a878 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -47,6 +47,15 @@
- 			};
- 		};
- 
-+		i2c2: i2c at 4802a000 {
-+			status = "okay";
-+			clock-frequency = <400000>;
-+
-+			lis331dlh: lis331dlh at 18 {
-+				reg = <0x18>;
-+			};
-+		};
-+
- 		dcan1: d_can at 481d0000 {
- 			status = "okay";
- 			pinctrl-names = "default";
-@@ -61,6 +70,39 @@
- 		regulator-max-microvolt = <5000000>;
- 		regulator-boot-on;
- 	};
-+
-+	lis3_reg: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lis3_reg";
-+		regulator-boot-on;
-+	};
-+};
-+
-+&lis331dlh {
-+	compatible = "st,lis3lv02d-i2c";
-+	Vdd-supply = <&lis3_reg>;
-+	Vdd_IO-supply = <&lis3_reg>;
-+
-+	st,click-single-x;
-+	st,click-single-y;
-+	st,click-single-z;
-+	st,click-thresh-x = <10>;
-+	st,click-thresh-y = <10>;
-+	st,click-thresh-z = <10>;
-+	st,irq1-click;
-+	st,irq2-click;
-+	st,wakeup-x-lo;
-+	st,wakeup-x-hi;
-+	st,wakeup-y-lo;
-+	st,wakeup-y-hi;
-+	st,wakeup-z-lo;
-+	st,wakeup-z-hi;
-+	st,min-limit-x = <120>;
-+	st,min-limit-y = <120>;
-+	st,min-limit-z = <140>;
-+	st,max-limit-x = <550>;
-+	st,max-limit-y = <550>;
-+	st,max-limit-z = <750>;
- };
- 
- /include/ "tps65910.dtsi"
+I agree that where possible we should minimize the amount of work required of
+bootloaders. I'm not sure that the percentage of work we might be able to trim
+away on hardware would be significant, but on simulators I think we might be
+able to get to the point where, if you can specify the r0 reset value to be
+the dtb pointer, you can just load a devicetree blob and kernel image into
+memory and start executing the kernel, no boot wrapper required.
+
+I don't know if Jean-Christophe was commenting on just the EL1PCTEN bit or
+also the CNTFRQ register, but with regard to the latter, it appears to me that
+the timer code actually reads the frequency primarily from the devicetree and
+only reads CNTFRQ if the "clock-frequency" property is unspecified or
+specified as zero.
+
+I suggest that the kernel calling requirements be modified to communicate this
+fallback, rather than mandatory, status, unless some not-yet-released part of
+the arm64 kernel needs it. If userspace code will need to use CNTFRQ at some
+point then perhaps that should be mentioned in an informational note rather
+than being presented as a kernel booting requirement.
+
+> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/boot-wrapper-aarch64.git
+
+The UART and GIC stuff is board-specific, and I don't currently have any
+suggestions about the multicore initialization, but would you object to the
+kernel eventually being equipped to make the descent from EL3 itself?
+
+Thanks,
+Christopher
+
 -- 
-1.7.9.5
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
