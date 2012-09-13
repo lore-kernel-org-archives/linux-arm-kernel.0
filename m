@@ -1,9 +1,9 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 13 Sep 2012 10:35:35 +0200
-Subject: [GIT PULL 3/5] ARM i.MX defconfig updates
+Date: Thu, 13 Sep 2012 10:35:33 +0200
+Subject: [GIT PULL 1/5] ARM i.MX board updates
 In-Reply-To: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
 References: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1347525337-19115-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1347525337-19115-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,19 +13,19 @@ The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-boards
 
-for you to fetch changes up to 578a5d7a70b8b1b0d4df5868773d057e24a8a8c7:
+for you to fetch changes up to 688b5cbb81c1d5fc4aaaed47cde3f86fbb1472fe:
 
-  ARM: imx_v6_v7_defconfig: Remove CONFIG_DEFAULT_MMAP_MIN_ADDR (2012-08-10 11:05:03 +0200)
-
-----------------------------------------------------------------
-ARM i.MX defconfig updates
+  ARM: mx27pdk: Add audio support (2012-08-03 15:59:29 +0200)
 
 ----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: imx_v6_v7_defconfig: Add Chipidea USB driver support
-      ARM: imx_v6_v7_defconfig: Remove CONFIG_DEFAULT_MMAP_MIN_ADDR
+ARM i.MX board updates
 
- arch/arm/configs/imx_v6_v7_defconfig |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: mx27pdk: Add audio support
+
+ arch/arm/mach-imx/Kconfig         |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c |   21 ++++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
