@@ -1,82 +1,104 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 13 Sep 2012 12:10:41 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: Add support RTC
-Message-ID: <1347505841-8594-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 12 Sep 2012 22:26:47 -0500
+Subject: [PATCH 08/10] ARM: OMAP: Clean-up timer posted mode support
+In-Reply-To: <20120911163400.GD23092@atomide.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-9-git-send-email-jon-hunter@ti.com>
+ <20120907222223.GQ1303@atomide.com> <504E62C8.8030100@ti.com>
+ <20120911005802.GE1303@atomide.com> <504F661F.1020209@ti.com>
+ <20120911163400.GD23092@atomide.com>
+Message-ID: <50515277.9050500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armadillo800eva has S35390A which is RTC. This is controlled
-using I2C of GPIO.
-This commit supports RTC of armadillo800eva.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
----
- arch/arm/mach-shmobile/board-armadillo800eva.c |   25 ++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+On 09/11/2012 11:34 AM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [120911 09:26]:
+>>
+>> On 09/10/2012 07:58 PM, Tony Lindgren wrote:
+>>> * Jon Hunter <jon-hunter@ti.com> [120910 15:00]:
+>>>>
+>>>> On 09/07/2012 05:22 PM, Tony Lindgren wrote:
+>>>>> * Jon Hunter <jon-hunter@ti.com> [120905 12:05]:
+>>>>>> The dmtimer functions to read and write the dmtimer registers are currently
+>>>>>> defined as follows ...
+>>>>>>
+>>>>>> static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
+>>>>>> 						int posted);
+>>>>>> static inline void __omap_dm_timer_write(struct omap_dm_timer *timer,
+>>>>>> 						u32 reg, u32 val, int posted);
+>>>>>>
+>>>>>> The posted variable indicates if the timer is configured to use the posted mode
+>>>>>> when performing register accesses. The posted mode configuration of the dmtimer
+>>>>>> is stored in the omap_dm_timer structure that is also being passed to the above
+>>>>>> functions and therefore we do not need to pass the posted variable separately.
+>>>>>> Therefore, simplify the above functions by removing the posted variable as an
+>>>>>> argument as this is not necessary.
+>>>>>
+>>>>> I believe the reason for passing the posted flag was to optimize out some
+>>>>> functions from the timer code as that's being run all the time.
+>>>>>
+>>>>> Care to check the assembly before and after this patch for the timer
+>>>>> functions with objdump -d to make sure it does not add tons of bloat
+>>>>> there?
+>>>>
+>>>> Hi Tony,
+>>>>
+>>>> Thanks for the details here. I see that makes sense and that the
+>>>> compiler could take advantage of this as the functions are inlined.
+>>>>
+>>>> I have taken a look at the disassembled output using objdump as you
+>>>> mentioned. What I see is ...
+>>>>
+>>>> 1. For dmtimer.c the impact appears negligible, the total number of
+>>>>    lines outputted by objdump only changed by 8 with (1215 lines) and
+>>>>    without (1207 lines) the patch applied.
+>>>>
+>>>> 2. For timer.c the impact is greater. I see that
+>>>>    omap2_gp_timer_set_next_event() increased by 6 instructions from 29
+>>>>    to 35. clocksource_read_cycles() increased by 2 instructions 15 to
+>>>>    17 instructions. dmtimer_read_sched_clock() increased by 2
+>>>>    instructions from 17 to 19. omap2_gp_timer_set_mode() increased by
+>>>>    21 instructions from 102 to 123.
+>>>>
+>>>> I imagine that we are mainly concerned about
+>>>> omap2_gp_timer_set_next_event(), clocksource_read_cycles() and
+>>>> dmtimer_read_sched_clock() as these will be called often. Therefore, I
+>>>> am not sure if you wish to drop this patch.
+>>>
+>>> Well does it at lots of new ldr to the critical code?
+>>
+>> For the omap2_gp_timer_set_next_event() function it adds 3 load
+>> instructions, increasing the number of possible loads from 11 to 14.
+>>
+>> For the clocksource_read_cycles() function it adds 1 load instruction,
+>> increasing the number of possible loads from 7 to 8.
+>>
+>> For the dmtimer_read_sched_clock() function, I don't see any additional
+>> loads, but instructions added are a tst and beq instruction.
+>>
+>>>> By the way, if we do drop this patch, I would then need to fix the
+>>>> setting of the posted variable in mach-omap2/timer.c for clock-source in
+>>>> the case where a dmtimer is used. Today the code assumes that for
+>>>> clock-source and clock-events posted mode is always used. However, with
+>>>> the errata i103/i767 we will disable posted mode for clock-source on
+>>>> omap2/3/4/5/am33xx devices.
+>>>
+>>> Yes I see, I guess that means just adding a new systimer entry?
+>>
+>> Actually, I think we can avoid that by not using posted mode for
+>> clock-source timers at all. Posted mode only benefits the clock-events
+>> timers that are configured often.
+>>
+>> The benefit of not using posted mode for clock-source timers and setting
+>> the "posted" parameter to 0, will really allow the compiler to optimise
+>> the clocksource_read_cycles() and dmtimer_read_sched_clock() quite a
+>> bit. So this could be a nice optimisation.
+> 
+> OK up to you, but maybe run some benchmarks first to figure out what
+> makes most sense? Updating the timer used to be a bottleneck earlier.
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index cf10f92..81dfb88 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -37,6 +37,7 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mmcif.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
-+#include <linux/i2c-gpio.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7740.h>
-@@ -876,6 +877,21 @@ static struct platform_device fsi_hdmi_device = {
- 	},
- };
- 
-+/* RTC: RTC connects i2c-gpio. */
-+static struct i2c_gpio_platform_data i2c_gpio_data = {
-+	.sda_pin	= GPIO_PORT208,
-+	.scl_pin	= GPIO_PORT91,
-+	.udelay		= 5, /* 100 kHz */
-+};
-+
-+static struct platform_device i2c_gpio_device = {
-+	.name = "i2c-gpio",
-+	.id = 2,
-+	.dev = {
-+		.platform_data = &i2c_gpio_data,
-+	},
-+};
-+
- /* I2C */
- static struct i2c_board_info i2c0_devices[] = {
- 	{
-@@ -887,6 +903,13 @@ static struct i2c_board_info i2c0_devices[] = {
- 	},
- };
- 
-+static struct i2c_board_info i2c2_devices[] = {
-+	{
-+		I2C_BOARD_INFO("s35390a", 0x30),
-+		.type = "s35390a",
-+	},
-+};
-+
- /*
-  * board devices
-  */
-@@ -903,6 +926,7 @@ static struct platform_device *eva_devices[] __initdata = {
- 	&fsi_device,
- 	&fsi_hdmi_device,
- 	&fsi_wm8978_device,
-+	&i2c_gpio_device,
- };
- 
- static void __init eva_clock_init(void)
-@@ -1173,6 +1197,7 @@ static void __init eva_init(void)
- #endif
- 
- 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
-+	i2c_register_board_info(2, i2c2_devices, ARRAY_SIZE(i2c2_devices));
- 
- 	r8a7740_add_standard_devices();
- 
--- 
-1.7.10.4
+Ok, let me re-work this. Thanks for the inputs.
+
+Cheers
+Jon
