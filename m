@@ -1,48 +1,24 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 13 Sep 2012 21:51:27 +0200
-Subject: [PATCH V3 1/5] ARM: add infra-structure for BCM2708/BCM2835 and
- Raspberry Pi
-In-Reply-To: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120913195125.GA4240@raptus.dandreoli.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 13 Sep 2012 19:53:14 +0000 (UTC)
+Subject: [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of
+ ocp2scp
+In-Reply-To: <alpine.DEB.2.00.1209131710190.23318@utopia.booyaka.com>
+References: <1347008955-21310-1-git-send-email-kishon@ti.com>
+ <alpine.DEB.2.00.1209112218440.9444@utopia.booyaka.com>
+ <505206E3.7050307@ti.com>
+ <alpine.DEB.2.00.1209131710190.23318@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1209131952430.23318@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thu, 13 Sep 2012, Paul Walmsley wrote:
 
-On Tue, Sep 11, 2012 at 10:18:25PM -0600, Stephen Warren wrote:
-> From: Simon Arlott <simon@fire.lp0.eu>
+> Okay so is this an Acked-by for this patch? :-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm2708.txt b/Documentation/devicetree/bindings/arm/bcm2708.txt
-> new file mode 100644
-> index 0000000..49eec61
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm2708.txt
-> @@ -0,0 +1,15 @@
-> +Broadcom BCM2708 device tree bindings
-> +-------------------------------------------
-> +
-> +Boards with the BCM2708 SoC, or another SoC in the BCM2708 family, shall have
-> +the following properties:
-> +
-> +Required root node property:
-> +
-> +compatible = "broadcom,bcm2708";
-> +
-> +Boards with BCM2835 SoC shall *additionally* have the following properties:
-> +
-> +Required root node property:
-> +
-> +compatible = "broadcom,bcm2835";
+> If so I'll take it.
 
-Please update also the vendor prefixes index at
-Documentation/devicetree/bindings/vendor-prefixes.txt.
+Just realized that's what your reply was, so have queued the patch for 
+3.7.
 
-BTW is it possible to change it to "bcm"?
 
-Regards,
-Domenico 
-
------[ Domenico Andreoli, aka cavok
- --[ http://cavokz.wordpress.com/gpgkey/
-   ---[ 3A0F 2F80 F79C 678A 8936  4FEE 0677 9033 A20E BC50
+- Paul
