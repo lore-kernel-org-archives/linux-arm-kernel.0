@@ -1,31 +1,39 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 13 Sep 2012 08:47:06 +0200
-Subject: [PATCH] of: specify initrd location using 64-bit
-In-Reply-To: <505107DF.5020105@gmail.com>
-References: <1347465937-7056-1-git-send-email-cyril@ti.com>
- <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
- <5050CE33.9060909@ti.com> <5050E965.5080405@linutronix.de>
- <505107DF.5020105@gmail.com>
-Message-ID: <5051816A.3050705@linutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Sep 2012 23:52:18 -0700
+Subject: [PATCH] ARM: add back in KS8695 based SnapGear board entries
+In-Reply-To: <20120910084259.GQ13739@n2100.arm.linux.org.uk>
+References: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
+ <20120910084259.GQ13739@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMhSvxGaKfM7uUm9v1CAHzYi_4XhJPaiYeBm7ZeuXnx=4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2012 12:08 AM, Rob Herring wrote:
->> Geert is right here. If it is a physical address, it should be
->> phys_addr_t.
->
-> While generally true, for the DT specific code I think it should be a
-> fixed u64. The size of the address is defined by the FDT, not the
-> kernel. It is very likely we could have a FDT that specifies addresses
-> in 64-bit values, but then we boot a kernel is compiled for !LPAE.
-> phys_addr_t is currently sized based on LPAE setting.
+Hi,
 
-If your kernel is 32bit without PAE and your DTB address is >32ibt than
-you can't handle it. If you don't notice this in your dt code than you
-remap the wrong memory ioremap().
-
+On Mon, Sep 10, 2012 at 1:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 10, 2012 at 01:30:15PM +1000, gerg at snapgear.com wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> Board support code for the SnapGear boards based on the Micrel KS8695 SoC
+>> will soon appear in mainline kernel. The board IDs had been removed from
+>> the mach-types file, so add them back in.
 >
-> Rob
->
+> Nak.  You must add platform support for these numbers _along_ _side_
+> adding them back to mach-types, otherwise my scripts will simply delete
+> them again.  These entries have been aged out due to lack of merging of
+> the platforms.
 
-Sebastian
+Greg has submitted the new platforms for arm-soc but building of them
+will be broken until this update goes in.
+
+I guess we have the option of picking up the platform patch but not
+enabling it in the ks8695 defconfig until it's buildable (or enable it
+and have build breakage, which isn't awesome). Or, if you're OK with
+it (and give us an acked-by) we can include the mach-types patch in
+the same branch where the platform support gets merged.
+
+Russell, do you have a preference?
+
+
+-Olof
