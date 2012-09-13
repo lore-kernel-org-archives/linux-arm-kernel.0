@@ -1,62 +1,48 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 13 Sep 2012 14:33:39 -0300
-Subject: [PATCH 2/2] ARM: dts: imx23-olinuxino: Add USB host support
-In-Reply-To: <1347557619-17793-1-git-send-email-fabio.estevam@freescale.com>
-References: <1347557619-17793-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1347557619-17793-2-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 13 Sep 2012 14:33:38 -0300
+Subject: [PATCH 1/2] ARM: dts: mx23: Add USB resources
+Message-ID: <1347557619-17793-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB host support.
+Add USB resources for mx23.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx23-olinuxino.dts |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/imx23.dtsi |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-index 711dcf5..daddd1e 100644
---- a/arch/arm/boot/dts/imx23-olinuxino.dts
-+++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-@@ -40,6 +40,7 @@
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						0x2013 /* MX23_PAD_SSP1_DETECT__GPIO_2_1 */
-+						0x0113 /* MX23_PAD_GPMI_ALE__GPIO_0_17 */
- 					>;
- 					fsl,drive-strength = <0>;
- 					fsl,voltage = <1>;
-@@ -60,6 +61,31 @@
- 				pinctrl-0 = <&auart0_2pins_a>;
- 				status = "okay";
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 9d0e803..17904db 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -436,9 +436,11 @@
+ 				status = "disabled";
  			};
-+
+ 
+-			usbphy at 8007c000 {
 +			usbphy0: usbphy at 8007c000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ahb at 80080000 {
-+		usb0: usb at 80080000 {
-+			vbus-supply = <&reg_usb0_vbus>;
-+			status = "okay";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_usb0_vbus: usb0_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb0_vbus";
-+			regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			startup-delay-us = <300>; /* LAN9215 requires a POR of 200us minimum */
-+			gpio = <&gpio0 17 0>;
++				compatible = "fsl,imx23-usbphy";
+ 				reg = <0x8007c000 0x2000>;
+-				status = "disabled";
++				clocks = <&clks 41>;
++				status = "disabled";
+ 			};
  		};
  	};
+@@ -450,8 +452,12 @@
+ 		reg = <0x80080000 0x80000>;
+ 		ranges;
  
+-		usbctrl at 80080000 {
++		usb0: usb at 80080000 {
++			compatible = "fsl,imx23-usb", "fsl,imx27-usb";
+ 			reg = <0x80080000 0x40000>;
++			interrupts = <11>;
++			fsl,usbphy = <&usbphy0>;
++			clocks = <&clks 40>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 1.7.9.5
