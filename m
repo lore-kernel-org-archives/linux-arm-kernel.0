@@ -1,32 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 13 Sep 2012 22:16:51 +0800
-Subject: [PATCH 06/12] ARM: picoxcell: move debug macros to include/debug
-In-Reply-To: <1346962375-26163-7-git-send-email-robherring2@gmail.com>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-7-git-send-email-robherring2@gmail.com>
-Message-ID: <20120913141632.GB1338@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Sep 2012 16:18:02 +0200
+Subject: [PATCH] staging: ste_rmi4: remove gpio.h include
+In-Reply-To: <5051E056.4060304@gmail.com>
+References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
+ <1347541643-30665-1-git-send-email-robherring2@gmail.com>
+ <5051E056.4060304@gmail.com>
+Message-ID: <CACRpkdbtdEvsVmRTYs_hdx6LJ9dh5c2zYJwRzEY1q=TOtZeu1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 03:12:49PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Move picoxcell debug-macro.S over to common debug macro directory.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
-> ---
->  arch/arm/Kconfig.debug                             |    8 ++++++++
->  .../debug-macro.S => include/debug/picoxcell.S}    |    0
->  2 files changed, 8 insertions(+)
->  rename arch/arm/{mach-picoxcell/include/mach/debug-macro.S => include/debug/picoxcell.S} (100%)
-> 
-Can we do that renaming right away?  I still see the following
-inclusions in the file.
+On Thu, Sep 13, 2012 at 3:32 PM, Rob Herring <robherring2@gmail.com> wrote:
+> Adding Greg KH's correct email...
+>
+> On 09/13/2012 08:07 AM, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> gpio.h is not needed and is going to be removed.
+>>
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Greg Kroah-Hartman <gregkh@suse.de>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-#include <mach/hardware.h>
-#include <mach/map.h>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-Regards,
-Shawn
+Yours,
+Linus Walleij
