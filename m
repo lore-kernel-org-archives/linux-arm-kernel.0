@@ -1,32 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 13 Sep 2012 10:35:36 +0200
-Subject: [GIT PULL 4/5] ARM: i.MX: Fix SSI clock associations for i.MX25/i.MX35
-In-Reply-To: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
-References: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1347525337-19115-5-git-send-email-s.hauer@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 13 Sep 2012 11:56:33 -0700
+Subject: [GIT PULL 2/5] msm non-critical fixes
+In-Reply-To: <20120913185342.GA29823@codeaurora.org>
+References: <20120913185342.GA29823@codeaurora.org>
+Message-ID: <20120913185633.GB30032@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
 
-  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+  Linux 3.5 (2012-07-21 13:58:29 -0700)
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-noncrit-for-3.7
 
-for you to fetch changes up to 48540058612786d365602f3324ed97f9071092de:
+for you to fetch changes up to 10717e04d3502cf4a8aa6408d59093e2bbb4645b:
 
-  ARM: clk-imx35: Fix SSI clock registration (2012-09-11 11:52:28 +0200)
-
-----------------------------------------------------------------
-ARM: i.MX: Fix SSI clock associations for i.MX25/i.MX35
+  ARM: msm: Fix early debug uart mapping on some memory configs (2012-09-13 10:48:35 -0700)
 
 ----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: clk-imx25: Fix SSI clock registration
-      ARM: clk-imx35: Fix SSI clock registration
+Some non-critical fixes for msm platforms.  The missing FPGA init call
+fix is necessary to compile the 8660 target.  The iomapping calls are
+needed to prevent duplicate mappings with differing attributes.  And,
+the debug UART change keeps the debug UART working on targets with
+more than 512MB of memory.
 
- arch/arm/mach-imx/clk-imx25.c |    6 ++----
- arch/arm/mach-imx/clk-imx35.c |    6 ++----
- 2 files changed, 4 insertions(+), 8 deletions(-)
+----------------------------------------------------------------
+David Brown (1):
+      ARM: msm: Remove call to missing FPGA init on 8660
+
+Rohit Vaswani (2):
+      ARM: msm: io: Remove 7x30 iomap region from 7x00
+      ARM: msm: io: Change the default static iomappings to be shared
+
+Stephen Boyd (1):
+      ARM: msm: Fix early debug uart mapping on some memory configs
+
+ arch/arm/mach-msm/board-msm8x60.c               |  5 -----
+ arch/arm/mach-msm/include/mach/msm_iomap-8960.h |  2 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |  2 +-
+ arch/arm/mach-msm/io.c                          | 25 +++++++++++++------------
+ 4 files changed, 15 insertions(+), 19 deletions(-)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
