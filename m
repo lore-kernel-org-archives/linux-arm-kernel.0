@@ -1,37 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Sep 2012 21:49:14 +0200
-Subject: [PATCH] pinctrl: use kasprintf() in pinmux_request_gpio()
-Message-ID: <1347565754-9534-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 13 Sep 2012 21:51:27 +0200
+Subject: [PATCH V3 1/5] ARM: add infra-structure for BCM2708/BCM2835 and
+ Raspberry Pi
+In-Reply-To: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120913195125.GA4240@raptus.dandreoli.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using a temporary buffer, snprintf() and kstrdup(), just
-use kasprintf() that does the same thing in just oneline.
+Hi Stephen,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pinctrl/pinmux.c |    5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+On Tue, Sep 11, 2012 at 10:18:25PM -0600, Stephen Warren wrote:
+> From: Simon Arlott <simon@fire.lp0.eu>
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm2708.txt b/Documentation/devicetree/bindings/arm/bcm2708.txt
+> new file mode 100644
+> index 0000000..49eec61
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm2708.txt
+> @@ -0,0 +1,15 @@
+> +Broadcom BCM2708 device tree bindings
+> +-------------------------------------------
+> +
+> +Boards with the BCM2708 SoC, or another SoC in the BCM2708 family, shall have
+> +the following properties:
+> +
+> +Required root node property:
+> +
+> +compatible = "broadcom,bcm2708";
+> +
+> +Boards with BCM2835 SoC shall *additionally* have the following properties:
+> +
+> +Required root node property:
+> +
+> +compatible = "broadcom,bcm2835";
 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 3d5ac73..9301a7a 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -232,14 +232,11 @@ int pinmux_request_gpio(struct pinctrl_dev *pctldev,
- 			struct pinctrl_gpio_range *range,
- 			unsigned pin, unsigned gpio)
- {
--	char gpiostr[16];
- 	const char *owner;
- 	int ret;
- 
- 	/* Conjure some name stating what chip and pin this is taken by */
--	snprintf(gpiostr, 15, "%s:%d", range->name, gpio);
--
--	owner = kstrdup(gpiostr, GFP_KERNEL);
-+	owner = kasprintf(GFP_KERNEL, "%s:%d", range->name, gpio);
- 	if (!owner)
- 		return -EINVAL;
- 
--- 
-1.7.9.5
+Please update also the vendor prefixes index at
+Documentation/devicetree/bindings/vendor-prefixes.txt.
+
+BTW is it possible to change it to "bcm"?
+
+Regards,
+Domenico 
+
+-----[ Domenico Andreoli, aka cavok
+ --[ http://cavokz.wordpress.com/gpgkey/
+   ---[ 3A0F 2F80 F79C 678A 8936  4FEE 0677 9033 A20E BC50
