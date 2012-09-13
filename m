@@ -1,27 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Sep 2012 08:44:17 +0000
-Subject: [PATCH v9 10/13] ARM: SoC: convert imx6q to SoC descriptor
-In-Reply-To: <20120913011742.GB2725@S2101-09.ap.freescale.net>
-References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
- <1347461906-13527-11-git-send-email-arnd@arndb.de>
- <20120913011742.GB2725@S2101-09.ap.freescale.net>
-Message-ID: <201209130844.18667.arnd@arndb.de>
+Date: Thu, 13 Sep 2012 08:47:19 +0000
+Subject: [PATCH 1/2] ARM: SoC: convert MSM SMP to SoC descriptor
+In-Reply-To: <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
+References: <1347461906-13527-7-git-send-email-arnd@arndb.de>
+ <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <201209130847.20087.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 September 2012, Shawn Guo wrote:
-> >  
-> >  DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
-> > +     .smp            = smp_ops(imx6q_soc_desc),
+On Wednesday 12 September 2012, David Brown wrote:
 > 
-> s/imx6q_soc_desc/imx_smp_ops
-
-Yes, just noticed this myself when testing the series together with other patches.
-
-> Otherwise,
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Convert MSM SMP platforms to use the SoC descriptor to provide
+> their SMP and CPU hotplug operations.
+> 
+> Cc: David Brown <davidb@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This is an adaptation of this change on top of the msm-for-3.7 tree I
+> recently sent out a pull request for.  The only real change is to
+> resolve the conflicts with the simplified board files.
 
-Thanks,
+Not sure what I'm supposed to do with this patch, it doesn't apply
+unless I rebase all of the SMP patches on top of your msm-for-3.7 branch,
+which would be rather odd.
+
+I'll make sure the branches merge fine and then apply your patch 2/2
+on top of the merge, ok?
 
 	Arnd
