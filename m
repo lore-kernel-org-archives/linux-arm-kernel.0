@@ -1,35 +1,61 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 13 Sep 2012 14:05:49 -0700
-Subject: [PATCH v2] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <CACRpkdaraGcj10gBVU=aJFQR4ec+0_MrNP7=yBQZavQd0jJauQ@mail.gmail.com>
-References: <20120912203223.3094.5354@nucleus>
- <1347489895-16384-1-git-send-email-mturquette@linaro.org>
- <CACRpkdaraGcj10gBVU=aJFQR4ec+0_MrNP7=yBQZavQd0jJauQ@mail.gmail.com>
-Message-ID: <20120913210549.3094.83615@nucleus>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 13 Sep 2012 14:28:02 -0700
+Subject: [PATCHv8 00/23]I2C big cleanup
+In-Reply-To: <20120913183705.GA17430@arwen.pp.htv.fi> (Felipe Balbi's message
+ of "Thu, 13 Sep 2012 21:37:07 +0300")
+References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
+ <20120912131615.GB16547@pengutronix.de>
+ <87pq5quaqr.fsf@deeprootsystems.com>
+ <87wqzysuu3.fsf@deeprootsystems.com>
+ <87sjaldcjp.fsf@deeprootsystems.com>
+ <20120913183705.GA17430@arwen.pp.htv.fi>
+Message-ID: <87txv1bokd.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2012-09-13 05:51:52)
-> On Thu, Sep 13, 2012 at 12:44 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> 
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > Changes in v2:
-> >  * Kept the original CPUfreq notifier scheme in place for platforms that
-> >    have not adapted to the common clk framework yet
-> 
-> This looks good. We can always delete the cpufreq part
-> (which is a kinda hack anyway) once all OMAPs have
-> notifiers.
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
+Felipe Balbi <balbi@ti.com> writes:
 
-Thanks Linus.  I've added v2 of this patch to Russell's patch tracker
-with your and Ulf's Reviewed-by's.
+> Hi,
+>
+> On Thu, Sep 13, 2012 at 11:04:42AM -0700, Kevin Hilman wrote:
+>> Kevin Hilman <khilman@deeprootsystems.com> writes:
+>> 
+>> > Kevin Hilman <khilman@deeprootsystems.com> writes:
+>> >
+>> [...]
+>> 
+>> >> Sorry to be late to the party (again), but still catching up after some
+>> >> time off.
+>> >>
+>> >> Unfortunately, this series causes PM regressions on several OMAP
+>> >> platforms.  I hope we can hold off on this until those issues are
+>> >> addressed.
+>> >
+>> > I tracked the regression down to [PATCHv8 21/22] (see reply there.)
+>> >
+>> > Since this series is already merged, I suggest that the problem patch be
+>> > reverted, at least for v3.7 and until the problem is better understood
+>> > and tested.
+>> >
+>> > With that patch reverted, all my PM tests are passing.  Feel free to
+>> > add:
+>> 
+>> OK, the i2c series is off the hook.
+>> 
+>> Felipe and I spent a little time tracking this down.  Felipe suggested
+>> that there might be a driver with periodic i2c activity keeping I2C
+>> awake, and thus preventing CORE retention.  He was right.
+>
+> FYI, the original idea came from Shubhro. We agreed that would be the
+> only way i2c would be prevented from idling.
 
-Regards,
-Mike
+Great, thanks Shubhro!
 
-> Yours,
-> Linus Walleij
+Also, FYI, I just submitted a patch to the TWL RTC driver which was the
+source of all the I2C activity since it's on the I2C-connected PMIC.
+
+Thanks for the help and suggestions,
+
+Kevin
+
+[1] https://groups.google.com/forum/#!topic/rtc-linux/sFbYmAzCRLQ
