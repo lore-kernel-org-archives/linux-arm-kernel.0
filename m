@@ -1,137 +1,181 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Sep 2012 18:11:25 +0100
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <5052021B.4050808@codeaurora.org>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org>
- <20120910161159.GH27042@arm.com>
- <20120912120858.GI31430@game.jcrosoft.org>
- <20120912134916.GF21823@arm.com> <5052021B.4050808@codeaurora.org>
-Message-ID: <20120913171125.GD25131@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 13 Sep 2012 18:15:53 +0100
+Subject: [PATCH v3 00/23] Introduce Xen support on ARM
+In-Reply-To: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1209131809290.15568@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 04:56:11PM +0100, Christopher Covington wrote:
-> On 09/12/2012 09:49 AM, Catalin Marinas wrote:
-> > On Wed, Sep 12, 2012 at 01:08:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
-> >>> On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>> On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
-> >>>>> +Before jumping into the kernel, the following conditions must be met:
-> >>>>> +
-> >>>>> +- Quiesce all DMA capable devices so that memory does not get
-> >>>>> +  corrupted by bogus network packets or disk data.  This will save
-> >>>>> +  you many hours of debug.
-> >>>>> +
-> >>>>> +- Primary CPU general-purpose register settings
-> >>>>> +  x0 = physical address of device tree blob (dtb) in system RAM.
-> >>>>> +  x1 = 0 (reserved for future use)
-> >>>>> +  x2 = 0 (reserved for future use)
-> >>>>> +  x3 = 0 (reserved for future use)
-> >>>>> +
-> >>>>> +- CPU mode
-> >>>>> +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
-> >>>>> +  IRQ and FIQ).
-> >>>>> +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
-> >>>>> +  the virtualisation extensions) or non-secure EL1.
-> >>>>> +
-> >>>>> +- Caches, MMUs
-> >>>>> +  The MMU must be off.
-> >>>>> +  Instruction cache may be on or off.
-> >>>>> +  Data cache must be off and invalidated.
-> >>>>> +  External caches (if present) must be configured and disabled.
-> >>>>> +
-> >>>>> +- Architected timers
-> >>>>> +  CNTFRQ must be programmed with the timer frequency.
-> >>>>> +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
-> >>>>> +  set where available.
-> >>>> can you explain why?
-> >>>
-> >>> Otherwise the kernel cannot access the generic timer registers (it is
-> >>> described in the AArch64 exception model which isn't public yet).
-> >> I do not like the idea to do too much in the boot loader
+Russell,
+sorry for not CC'ing you on the entire patch series in the past, I'll do
+it in the next iteration of the series (that TBH is nearly identical to
+this one apart from being 3.6-rc5 based).
+
+Are you happy with it? Given that the changes are entirely contained
+within arch/arm/xen and arch/arm/include/asm/xen (apart from patch #21
+that is a generic ARM fix), should this patch series go through you or
+Arnd?
+
+Thanks,
+
+Stefano
+
+
+
+
+On Thu, 16 Aug 2012, Stefano Stabellini wrote:
+> Hi all,
+> this patch series implements Xen support for ARMv7 with virtualization
+> extensions.  It allows a Linux guest to boot as dom0 and
+> as domU on Xen on ARM. PV console, disk and network frontends and
+> backends are all working correctly.
 > 
-> I agree that where possible we should minimize the amount of work required of
-> bootloaders. I'm not sure that the percentage of work we might be able to trim
-> away on hardware would be significant, but on simulators I think we might be
-> able to get to the point where, if you can specify the r0 reset value to be
-> the dtb pointer, you can just load a devicetree blob and kernel image into
-> memory and start executing the kernel, no boot wrapper required.
-
-The boot wrapper is *only* required on our software model because this
-model does not have any firmware and it simply starts at EL3. We do not
-have this behaviour on real hardware where there is firmware to
-initialise the hardware, memory controller, secure world etc. before a
-normal boot loader can be loaded. Many of the requirements would be part
-of the board firmware rather than boot loader, so the boot loader would
-just need to deal with the usual cache maintenance and turning the MMU
-off.
-
-The conditions above are not really much in addition to what we require
-on 32-bit.
-
-> I don't know if Jean-Christophe was commenting on just the EL1PCTEN bit or
-
-The EL1PCTEN requirement is pretty clearly described above - only if
-Linux is started at EL1 (e.g. guest OS), since the CNTHCTL_EL2 register
-is an EL2 only register and not accessible at EL1.
-
-> also the CNTFRQ register, but with regard to the latter, it appears to me that
-> the timer code actually reads the frequency primarily from the devicetree and
-> only reads CNTFRQ if the "clock-frequency" property is unspecified or
-> specified as zero.
-
-Linus W has a few more suggestions here but I didn't get to implementing
-them.
-
-> I suggest that the kernel calling requirements be modified to communicate this
-> fallback, rather than mandatory, status, unless some not-yet-released part of
-> the arm64 kernel needs it. If userspace code will need to use CNTFRQ at some
-> point then perhaps that should be mentioned in an informational note rather
-> than being presented as a kernel booting requirement.
-
-In general, we would like the firmware to write the correct value into
-the CNTFRQ register, as specified in the generic timers spec, or maybe
-hard-wire the register to the correct value. However, in case some
-firmware gets it wrong or a read-only register is not hard-wired we want
-to override the value with the FDT. A historical reason for this was
-that the software model we use doesn't have any firmware. But primarily
-we should use the hardware value.
-
-So far we don't export the CNTFRQ to user because of the possibility to
-override the value via other means. That's pretty much a read-only or
-EL3 writable only register.
-
-> > git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/boot-wrapper-aarch64.git
+> It has been tested on a Versatile Express Cortex A15 emulator, using the
+> latest Xen ARM developement branch
+> (git://xenbits.xen.org/people/ianc/xen-unstable.git arm-for-4.3) plus
+> the "ARM hypercall ABI: 64 bit ready" patch series
+> (http://marc.info/?l=xen-devel&m=134426267205408), and a simple ad-hoc
+> tool to build guest domains (marc.info/?l=xen-devel&m=134089788016546).
 > 
-> The UART and GIC stuff is board-specific, and I don't currently have any
-> suggestions about the multicore initialization, but would you object to the
-> kernel eventually being equipped to make the descent from EL3 itself?
-
-I'm strongly pushing for single Image support from the beginning and
-this would require a few things to be initialised by the firmware (on a
-case by case basis). The secondary CPU release also needs to be handled
-by the firmware.
-
-For example, in a standard system you would want to run the kernel in
-non-secure mode to make use of the virtualisation extensions. The GIC
-(address depending on the SoC) would need to be configured to enable
-interrupts for the non-secure world and this can only be done in secure
-mode. So even if you start the kernel at EL3 and shortly drop to
-EL2/EL1, for the single Image to work you need such GIC initialisation
-to be done by the firmware.
-
-While the requirement to have some hardware pre-initialisation does not
-necessarily mandate the mode in which Linux is started, I don't see
-value in starting Linux at EL3. You most likely will have some boot
-loader and we don't want to add extra complexity to them for running in
-different modes or having to switch back to the highest mode before
-calling the kernel. The boot loader already needs to handle EL1 and EL2.
-
-ARM is also proposing an SMC API to make secondary startup and a few
-power management things simpler from a Linux perspective. Such code
-would reside at EL3.
-
--- 
-Catalin
+> The patch marked with [HACK] shouldn't be applied and is part of the
+> series only because it is needed to create domUs.
+> 
+> I am also attaching to this email the dts'es that I am currently using
+> for dom0 and domU: vexpress-v2p-ca15-tc1.dts (that includes
+> vexpress-v2m-rs1-rtsm.dtsi) is the dts used for dom0 and it is passed to
+> Linux by Xen, while vexpress-virt.dts is the dts used for other domUs
+> and it is appended in binary form to the guest kernel image. I am not
+> sure where they are supposed to live yet, so I am just attaching them
+> here so that people can actually try out this series if they want to.
+> 
+> Comments are very welcome!
+> 
+> 
+> Changes in v3:
+> - move patches that have been picked up by Konrad at the end of the
+>   series;
+> - improve comments;
+> - add a doc to describe the Xen Device Tree format;
+> - do not use xen_ulong_t for multicalls and apic_physbase;
+> - add a patch at the end of the series to use the new __HVC macro;
+> - add missing pvclock-abi.h include to ia64 header files;
+> - do not use an anonymous union in struct xen_add_to_physmap.
+> 
+> 
+> Changes in v2:
+> - fix up many comments and commit messages;
+> - remove the early_printk patches: rely on the emulated serial for now;
+> - remove the xen_guest_init patch: without any PV early_printk, we don't
+>   need any early call to xen_guest_init, we can rely on core_initcall
+>   alone;
+> - define an HYPERCALL macro for 5 arguments hypercall wrappers, even if
+>   at the moment is unused;
+> - use ldm instead of pop in the hypercall wrappers;
+> - return -ENOSYS rather than -1 from the unimplemented grant_table
+>   functions;
+> - remove the pvclock ifdef in the Xen headers;
+> - remove include linux/types.h from xen/interface/xen.h;
+> - replace pr_info with pr_debug in xen_guest_init;
+> - add a new patch to introduce xen_ulong_t and use it top replace all
+>   the occurences of unsigned long in the public Xen interface;
+> - explicitely size all the pointers to 64 bit on ARM, so that the
+>   hypercall ABI is "64 bit ready";
+> - clean up xenbus_init;
+> - make pci.o depend on CONFIG_PCI and acpi.o depend on CONFIG_ACPI;
+> - mark Xen guest support on ARM as EXPERIMENTAL;
+> - introduce GRANT_TABLE_PHYSADDR;
+> - remove unneeded initialization of boot_max_nr_grant_frames;
+> - add a new patch to clear IRQ_NOAUTOEN and IRQ_NOREQUEST in events.c;
+> - return -EINVAL from xen_remap_domain_mfn_range if
+>   auto_translated_physmap;
+> - retain binary compatibility in xen_add_to_physmap: use a union to
+>   introduce foreign_domid.
+> 
+> 
+> Ian Campbell (1):
+>       [HACK] xen/arm: implement xen_remap_domain_mfn_range
+> 
+> Stefano Stabellini (24):
+>       arm: initial Xen support
+>       xen/arm: hypercalls
+>       xen/arm: page.h definitions
+>       xen/arm: sync_bitops
+>       xen/arm: empty implementation of grant_table arch specific functions
+>       docs: Xen ARM DT bindings
+>       xen/arm: Xen detection and shared_info page mapping
+>       xen/arm: Introduce xen_pfn_t for pfn and mfn types
+>       xen/arm: Introduce xen_ulong_t for unsigned long
+>       xen/arm: compile and run xenbus
+>       xen: do not compile manage, balloon, pci, acpi and cpu_hotplug on ARM
+>       xen/arm: introduce CONFIG_XEN on ARM
+>       xen/arm: get privilege status
+>       xen/arm: initialize grant_table on ARM
+>       xen/arm: receive Xen events on ARM
+>       xen: clear IRQ_NOAUTOEN and IRQ_NOREQUEST
+>       xen/arm: implement alloc/free_xenballooned_pages with alloc_pages/kfree
+>       xen: allow privcmd for HVM guests
+>       xen/arm: compile blkfront and blkback
+>       xen/arm: compile netback
+>       arm/v2m: initialize arch_timers even if v2m_timer is not present
+>       xen/arm: use the __HVC macro
+>       xen: missing includes
+>       xen: update xen_add_to_physmap interface
+> 
+>  Documentation/devicetree/bindings/arm/xen.txt |   22 +++
+>  arch/arm/Kconfig                              |   10 +
+>  arch/arm/Makefile                             |    1 +
+>  arch/arm/include/asm/hypervisor.h             |    6 +
+>  arch/arm/include/asm/sync_bitops.h            |   27 +++
+>  arch/arm/include/asm/xen/events.h             |   18 ++
+>  arch/arm/include/asm/xen/hypercall.h          |   69 +++++++
+>  arch/arm/include/asm/xen/hypervisor.h         |   19 ++
+>  arch/arm/include/asm/xen/interface.h          |   73 ++++++++
+>  arch/arm/include/asm/xen/page.h               |   82 ++++++++
+>  arch/arm/mach-vexpress/v2m.c                  |   11 +-
+>  arch/arm/xen/Makefile                         |    1 +
+>  arch/arm/xen/enlighten.c                      |  245 +++++++++++++++++++++++++
+>  arch/arm/xen/grant-table.c                    |   53 ++++++
+>  arch/arm/xen/hypercall.S                      |  102 ++++++++++
+>  arch/ia64/include/asm/xen/interface.h         |    8 +-
+>  arch/x86/include/asm/xen/interface.h          |    8 +
+>  arch/x86/xen/enlighten.c                      |    1 +
+>  arch/x86/xen/irq.c                            |    1 +
+>  arch/x86/xen/mmu.c                            |    3 +
+>  arch/x86/xen/xen-ops.h                        |    1 -
+>  drivers/block/xen-blkback/blkback.c           |    1 +
+>  drivers/net/xen-netback/netback.c             |    1 +
+>  drivers/net/xen-netfront.c                    |    1 +
+>  drivers/tty/hvc/hvc_xen.c                     |    2 +
+>  drivers/xen/Makefile                          |   11 +-
+>  drivers/xen/events.c                          |   18 ++-
+>  drivers/xen/grant-table.c                     |    1 +
+>  drivers/xen/privcmd.c                         |   20 +-
+>  drivers/xen/xenbus/xenbus_comms.c             |    2 +-
+>  drivers/xen/xenbus/xenbus_probe.c             |   62 +++++--
+>  drivers/xen/xenbus/xenbus_probe_frontend.c    |    1 +
+>  drivers/xen/xenbus/xenbus_xs.c                |    1 +
+>  drivers/xen/xenfs/super.c                     |    7 +
+>  include/xen/events.h                          |    2 +
+>  include/xen/interface/features.h              |    3 +
+>  include/xen/interface/grant_table.h           |    4 +-
+>  include/xen/interface/io/protocols.h          |    3 +
+>  include/xen/interface/memory.h                |   32 ++-
+>  include/xen/interface/physdev.h               |    2 +-
+>  include/xen/interface/platform.h              |    4 +-
+>  include/xen/interface/version.h               |    2 +-
+>  include/xen/interface/xen.h                   |    7 +-
+>  include/xen/privcmd.h                         |    3 +-
+>  include/xen/xen.h                             |    2 +-
+>  45 files changed, 885 insertions(+), 68 deletions(-)
+> 
+> 
+> A branch based on 3.5-rc7 is available here (the __HVC patch is missing
+> from this branch because it depends on "ARM: opcodes: Facilitate custom
+> opcode injection" http://marc.info/?l=linux-arm-kernel&m=134442896128124):
+> 
+> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git 3.5-rc7-arm-3
+> 
+> Cheers,
+> 
+> Stefano
