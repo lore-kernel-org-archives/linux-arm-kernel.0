@@ -1,34 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Sep 2012 00:33:07 -0700
-Subject: [GIT PULL] msm-core changes for v3.7
-In-Reply-To: <20120913073103.GA10231@codeaurora.org>
-References: <1347469140-25069-1-git-send-email-davidb@codeaurora.org>
- <CAOesGMhyQd=p23uy1Lj9iq6PKgS+kJ+xh4Z10e4XbSk50E=U7Q@mail.gmail.com>
- <20120913073103.GA10231@codeaurora.org>
-Message-ID: <CAOesGMjPX=9h0N8f50wf_efxmR9qgH8c3fyKDbePMC7sPprjLg@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 13 Sep 2012 10:40:58 +0300
+Subject: [PATCHv7 07/12] ARM: OMAP4: PM: put all domains to OSWR during
+ suspend
+In-Reply-To: <87sjamsuom.fsf@deeprootsystems.com>
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+ <1342704392-23657-8-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1207190842310.432@utopia.booyaka.com>
+ <1342711907.4672.153.camel@sokoban>
+ <alpine.DEB.2.00.1207191726090.14390@utopia.booyaka.com>
+ <87sjamsuom.fsf@deeprootsystems.com>
+Message-ID: <1347522058.10702.143.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 12:31 AM, David Brown <davidb@codeaurora.org> wrote:
-> On Wed, Sep 12, 2012 at 11:36:28PM -0700, Olof Johansson wrote:
->
->> I think it could be a good idea to split off the cleanups and fixes to
->> a separate branch. For the other patches there seems to be enough for
->> at least a 'dt' branch and either a multi-platform topic branch or a
->> 'boards' topic branch -- probably the former. So see my annotation
->> below for suggested sorting (I didn't check for
->> conflicts/dependencies).
->
-> I'll give a go at splitting things up tomorrow, then.  I'd held off on
-> making separate branches because there are a bunch of changes to
-> similar stuff.  Even if I get them separated, they are unlikely to
-> build without all being applied.
->
-> But, I'll see what I can do.
+On Wed, 2012-09-12 at 16:11 -0700, Kevin Hilman wrote:
+> Paul Walmsley <paul@pwsan.com> writes:
+> 
+> [...]
+> 
+> >
+> > It kind of looks to me like there are two or three separate sets within 
+> > the series.  My feeling is that Kevin should take the first two, then I 
+> > should take the rest other than 6 and 7.  Then once those are queued, 
+> > we can pull in 6 and 7.  Does that make sense to you?
+> >
+> 
+> Looks like 1, 2 & 7 are needed for OSWR, and the rest can go now via
+> Paul.
+> 
+> Tero, can create a new OSWR series including 1, 2 & 7?  Can you also
+> refresh it against Jean's latest functional power state series (v6)?
 
-Ok. If it's too hairy this time around, let us know and we can figure
-something out. Over time hopefully it'll get easier to sort patches in
-buckets.
+Yes, I already have these patches locally available. I'll just refresh
+them against Paul's minor tweaks on rest of the patches and re-post.
 
-
--Olof
+-Tero
