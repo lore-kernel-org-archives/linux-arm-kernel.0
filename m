@@ -1,39 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Sep 2012 23:52:18 -0700
-Subject: [PATCH] ARM: add back in KS8695 based SnapGear board entries
-In-Reply-To: <20120910084259.GQ13739@n2100.arm.linux.org.uk>
-References: <1347247815-6751-1-git-send-email-gerg@snapgear.com>
- <20120910084259.GQ13739@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMhSvxGaKfM7uUm9v1CAHzYi_4XhJPaiYeBm7ZeuXnx=4Q@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Thu, 13 Sep 2012 12:25:27 +0530
+Subject: [PATCHv8 00/23]I2C big cleanup
+In-Reply-To: <50517780.2080002@ti.com>
+References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
+ <874nn2vpv9.fsf@deeprootsystems.com> <50517780.2080002@ti.com>
+Message-ID: <5051835F.3050102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 13 September 2012 11:34 AM, Shubhrajyoti wrote:
+> > At least on 3530/Overo and 3730/Overo, CORE no longer hits retenion (or
+> > off) during idle.  
+I dont have an Overo, anyways will see if I can get one
 
-On Mon, Sep 10, 2012 at 1:42 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Sep 10, 2012 at 01:30:15PM +1000, gerg at snapgear.com wrote:
->> From: Greg Ungerer <gerg@uclinux.org>
->>
->> Board support code for the SnapGear boards based on the Micrel KS8695 SoC
->> will soon appear in mainline kernel. The board IDs had been removed from
->> the mach-types file, so add them back in.
->
-> Nak.  You must add platform support for these numbers _along_ _side_
-> adding them back to mach-types, otherwise my scripts will simply delete
-> them again.  These entries have been aged out due to lack of merging of
-> the platforms.
+However on beagleXm even off count increases
 
-Greg has submitted the new platforms for arm-soc but building of them
-will be broken until this update goes in.
-
-I guess we have the option of picking up the platform patch but not
-enabling it in the ks8695 defconfig until it's buildable (or enable it
-and have build breakage, which isn't awesome). Or, if you're OK with
-it (and give us an acked-by) we can include the mach-types patch in
-the same branch where the platform support gets merged.
-
-Russell, do you have a preference?
-
-
--Olof
+/ # grep "^core_pwrdm" /debug/pm_debug/count
+core_pwrdm
+(ON),OFF:48,RET:856,INA:0,ON:905,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+/ # cat /sys/devices/platform/omap_i2c.*/power/runtime_status
+suspended
+suspended
+/ #
+/ #
+/ # cat /sys/devices/platform/omap_i2c.*/power/autosuspend_delay_ms
+1000
+1000
+/ #
+/ #
+/ # grep "^core_pwrdm" /debug/pm_debug/count
+core_pwrdm
+(ON),OFF:218,RET:856,INA:0,ON:1075,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+/ #
