@@ -1,53 +1,99 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Sep 2012 10:13:33 +0200
-Subject: [PATCH 0/5] ARM: EXYNOS: Add secure firmware support
-Message-ID: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+Date: Thu, 13 Sep 2012 10:13:34 +0200
+Subject: [PATCH 1/5] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+In-Reply-To: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1347524018-19301-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Exynos-based boards are running with secure firmware running in
-TrustZone secure world, which changes the way some things have to be
-initialized.
+On TrustZone-enabled boards the non-secure SYSRAM is used for secondary
+CPU bring-up, so add a mapping for it.
 
-This series adds support for specifying firmware operations, implements
-some firmware operations for Exynos secure firmware and adds a method of
-enabling secure firmware operations on Exynos-based boards through board
-file and device tree.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/common.c                | 34 ++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h      |  3 +++
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  1 +
+ 3 files changed, 38 insertions(+)
 
-This is a continuation of the patch series by Kyungmin Park:
-[PATCH v5 1/2] ARM: Make a compile firmware conditionally
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/183607
-[PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/183608/focus=184109
-
-Tomasz Figa (5):
-  ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
-  ARM: Add interface for registering and calling firmware-specific
-    operations
-  ARM: EXYNOS: Add support for secure monitor calls
-  ARM: EXYNOS: Add support for Exynos secure firmware
-  ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
-
- .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
- arch/arm/common/Makefile                           |  2 +
- arch/arm/common/firmware.c                         | 18 ++++++++
- arch/arm/include/asm/firmware.h                    | 30 +++++++++++++
- arch/arm/mach-exynos/Makefile                      |  6 +++
- arch/arm/mach-exynos/common.c                      | 34 ++++++++++++++
- arch/arm/mach-exynos/common.h                      |  2 +
- arch/arm/mach-exynos/exynos-smc.S                  | 22 +++++++++
- arch/arm/mach-exynos/firmware.c                    | 52 ++++++++++++++++++++++
- arch/arm/mach-exynos/include/mach/map.h            |  3 ++
- arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
- arch/arm/mach-exynos/platsmp.c                     |  8 ++++
- arch/arm/mach-exynos/smc.h                         | 31 +++++++++++++
- arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
- 14 files changed, 218 insertions(+)
- create mode 100644 arch/arm/common/firmware.c
- create mode 100644 arch/arm/include/asm/firmware.h
- create mode 100644 arch/arm/mach-exynos/exynos-smc.S
- create mode 100644 arch/arm/mach-exynos/firmware.c
- create mode 100644 arch/arm/mach-exynos/smc.h
-
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 715b690..b87feac 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -214,6 +214,33 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
+ 	},
+ };
+ 
++static struct map_desc exynos4210_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS4210_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
++static struct map_desc exynos4x12_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS4x12_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
++static struct map_desc exynos5250_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS5250_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
+ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+@@ -321,6 +348,13 @@ static void __init exynos4_map_io(void)
+ 	else
+ 		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
+ 
++	if (soc_is_exynos4210())
++		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
++	if (soc_is_exynos4212() || soc_is_exynos4412())
++		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
++	if (soc_is_exynos5250())
++		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
++
+ 	/* initialize device information early */
+ 	exynos4_default_sdhci0();
+ 	exynos4_default_sdhci1();
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 51943f2..869d8a0 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -26,6 +26,9 @@
+ #define EXYNOS4_PA_SYSRAM0		0x02025000
+ #define EXYNOS4_PA_SYSRAM1		0x02020000
+ #define EXYNOS5_PA_SYSRAM		0x02020000
++#define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
++#define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
++#define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
+ 
+ #define EXYNOS4_PA_FIMC0		0x11800000
+ #define EXYNOS4_PA_FIMC1		0x11810000
+diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+index c2d7bda..c186786 100644
+--- a/arch/arm/plat-samsung/include/plat/map-s5p.h
++++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+@@ -22,6 +22,7 @@
+ #define S5P_VA_GPIO3		S3C_ADDR(0x02280000)
+ 
+ #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
++#define S5P_VA_SYSRAM_NS	S3C_ADDR(0x02410000)
+ #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
+ #define S5P_VA_DMC1		S3C_ADDR(0x02480000)
+ #define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
 -- 
 1.7.12
