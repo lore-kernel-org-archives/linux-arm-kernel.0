@@ -1,26 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Sep 2012 14:51:52 +0200
-Subject: [PATCH v2] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <1347489895-16384-1-git-send-email-mturquette@linaro.org>
-References: <20120912203223.3094.5354@nucleus>
- <1347489895-16384-1-git-send-email-mturquette@linaro.org>
-Message-ID: <CACRpkdaraGcj10gBVU=aJFQR4ec+0_MrNP7=yBQZavQd0jJauQ@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 13 Sep 2012 14:51:59 +0200
+Subject: [PATCH v4 0/5] ARM: topology: set the capacity of each cores for
+ big.LITTLE
+In-Reply-To: <1347538031.15764.126.camel@twins>
+References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
+ <1341919622.3462.124.camel@twins>
+ <CAKfTPtC0BcidJ2ga9c2fdWjrEsfXH48QtSnjv0YOCv7-k3K-Ug@mail.gmail.com>
+ <1341927729.3462.131.camel@twins>
+ <CAKfTPtCpZS=ALAjwqX5Wb0j5HjrMjv87MEefGC2O5_p7ENeY2w@mail.gmail.com>
+ <1347538031.15764.126.camel@twins>
+Message-ID: <CAKfTPtCiwRr+iNi2iQg+NDxwvTyzZ_THk=GhzTdKe2cx4=bTLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 12:44 AM, Mike Turquette <mturquette@linaro.org> wrote:
+On 13 September 2012 14:07, Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
+> On Thu, 2012-09-13 at 11:17 +0200, Vincent Guittot wrote:
+>> On 10 July 2012 15:42, Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
+>> > On Tue, 2012-07-10 at 14:35 +0200, Vincent Guittot wrote:
+>> >>
+>> >> May be the last one which enable ARCH_POWER should also go into tip ?
+>> >>
+>> > OK, I can take it.
+>>
+>> Hi Peter,
+>>
+>> I can't find the patch that enable ARCH_POWER in the tip tree. Have
+>> you take it in your tree ?
+>
+>
+> Uhmmm.... how about I say I have now? Sorry about that.
 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> Changes in v2:
->  * Kept the original CPUfreq notifier scheme in place for platforms that
->    have not adapted to the common clk framework yet
-
-This looks good. We can always delete the cpufreq part
-(which is a kinda hack anyway) once all OMAPs have
-notifiers.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+ok, thanks
