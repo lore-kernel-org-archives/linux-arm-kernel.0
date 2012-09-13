@@ -1,42 +1,27 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Sep 2012 15:28:11 +0100
-Subject: [RFC PATCH 4/6] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <CAMQu2gw0650GoDrsnrNvjYWxpUeo-ywuFBw36m=7tp+mpNUG5w@mail.gmail.com>
-References: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347531651-28218-5-git-send-email-lorenzo.pieralisi@arm.com>
- <20120913125347.GD2470@linaro.org>
- <CAMQu2gw0650GoDrsnrNvjYWxpUeo-ywuFBw36m=7tp+mpNUG5w@mail.gmail.com>
-Message-ID: <20120913142810.GD20420@e102568-lin.cambridge.arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 13 Sep 2012 07:31:03 -0700
+Subject: [PATCHv8 00/23]I2C big cleanup
+In-Reply-To: <20120913053325.GC6504@arwen.pp.htv.fi> (Felipe Balbi's message
+ of "Thu, 13 Sep 2012 08:33:28 +0300")
+References: <1347447496-16793-1-git-send-email-shubhrajyoti@ti.com>
+ <874nn2vpv9.fsf@deeprootsystems.com>
+ <20120913053325.GC6504@arwen.pp.htv.fi>
+Message-ID: <871ui6f108.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 02:01:35PM +0100, Shilimkar, Santosh wrote:
-> On Thu, Sep 13, 2012 at 6:23 PM, Dave Martin <dave.martin@linaro.org> wrote:
+Felipe Balbi <balbi@ti.com> writes:
 
 [...]
 
-> > LoUIS matches the power domain affected by turning a single CPU off
-> > on most (all?) current v7 SoCs where this matters, but only by coincidence.
-> > There is no guarantee of that.
-> >
-> > The _louis() API is useful, because this is exactly what you need to to
-> > I-/D-/TLB synchronisation in an SMP OS.  Using it as preparation for
-> > powering a CPU off feels like misuse, at least in theory.
-> >
-> > For powerdown, we would logically need a separate function,
-> > flush_cache_cpu() or something, whose job is precisely to flush those
-> > levels which will be affected by the power-down if that single CPU.
-> >
-> In the series, there is patch "[PATCH 3/6]" which adds an
-> API which let you operate on a specific level.
+> I just ran same tests on pandaboard and i2c is suspended actually,
+> though no power domain transitions to RET. Do we not have retention
+> while idle on pandaboard ?
 
-Yep, but that's not callable from __cpu_suspend_save in a generic way
-(it is v7 specific and we are not going to add another API/macro for
-that to be usable in generic code, at least for now).
+Not for CORE.  Only CPUx and MPU domains will be transitioning on OMAP4,
+and then, only with CPUidle enabled.
 
-Let's keep that patch in our trees and as Russell suggested we will repost it
-with the PM BSP accordingly to raise the point and take it from there.
+Until we have CORE retention support in mainline (we're almost there)
+OMAP4 is not a useful test platform for device PM.
 
-Thanks,
-Lorenzo
+Kevin
