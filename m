@@ -1,117 +1,63 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 13 Sep 2012 14:57:54 +0800
-Subject: [PATCH v2 3/9] mtd: gpmi: add a new field for HW_GPMI_TIMING1
+Date: Thu, 13 Sep 2012 14:57:57 +0800
+Subject: [PATCH v2 6/9] mtd: gpmi: simplify the setting DLL code
 In-Reply-To: <1347519480-31106-1-git-send-email-b32955@freescale.com>
 References: <1347519480-31106-1-git-send-email-b32955@freescale.com>
-Message-ID: <1347519480-31106-4-git-send-email-b32955@freescale.com>
+Message-ID: <1347519480-31106-7-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpmi_nfc_compute_hardware_timing{} should contains all the
-fields setting for gpmi timing registers. It already contains the fields
-for HW_GPMI_TIMING0 and HW_GPMI_CTRL1.
-
-So it is better to add a new field setting for HW_GPMI_TIMING1 in
-this data structure. This makes the code more clear in logic.
-
-This patch also changes some comments to make the code more readable.
+The setting DLL code is a little mess.
+Just simplify the code and the comments.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   17 +++++++++--------
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   10 ++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    3 +++
- 3 files changed, 22 insertions(+), 8 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c |   22 +++++++++-------------
+ 1 files changed, 9 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 2289cf8..c95dbe8 100644
+index 2d1f77c..010665c 100644
 --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
 +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -728,6 +728,7 @@ return_results:
- 	hw->address_setup_in_cycles = address_setup_in_cycles;
- 	hw->use_half_periods        = dll_use_half_periods;
- 	hw->sample_delay_factor     = sample_delay_factor;
-+	hw->device_busy_timeout     = GPMI_DEFAULT_BUSY_TIMEOUT;
- 
- 	/* Return success. */
- 	return 0;
-@@ -752,26 +753,26 @@ void gpmi_begin(struct gpmi_nand_data *this)
- 		goto err_out;
- 	}
- 
--	/* set ready/busy timeout */
--	writel(0x500 << BP_GPMI_TIMING1_BUSY_TIMEOUT,
--		gpmi_regs + HW_GPMI_TIMING1);
--
- 	/* Get the timing information we need. */
- 	nfc->clock_frequency_in_hz = clk_get_rate(r->clock[0]);
- 	clock_period_in_ns = 1000000000 / nfc->clock_frequency_in_hz;
- 
- 	gpmi_nfc_compute_hardware_timing(this, &hw);
- 
--	/* Set up all the simple timing parameters. */
-+	/* [1] Set HW_GPMI_TIMING0 */
- 	reg = BF_GPMI_TIMING0_ADDRESS_SETUP(hw.address_setup_in_cycles) |
- 		BF_GPMI_TIMING0_DATA_HOLD(hw.data_hold_in_cycles)         |
- 		BF_GPMI_TIMING0_DATA_SETUP(hw.data_setup_in_cycles)       ;
- 
- 	writel(reg, gpmi_regs + HW_GPMI_TIMING0);
- 
--	/*
--	 * DLL_ENABLE must be set to 0 when setting RDN_DELAY or HALF_PERIOD.
--	 */
-+	/* [2] Set HW_GPMI_TIMING1 */
-+	writel(BF_GPMI_TIMING1_BUSY_TIMEOUT(hw.device_busy_timeout),
-+		gpmi_regs + HW_GPMI_TIMING1);
-+
-+	/* [3] The following code is to set the HW_GPMI_CTRL1. */
-+
-+	/* DLL_ENABLE must be set to 0 when setting RDN_DELAY or HALF_PERIOD. */
+@@ -779,30 +779,26 @@ void gpmi_begin(struct gpmi_nand_data *this)
  	writel(BM_GPMI_CTRL1_DLL_ENABLE, gpmi_regs + HW_GPMI_CTRL1_CLR);
  
  	/* Clear out the DLL control fields. */
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 1f61217..c814bdd 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -189,14 +189,24 @@ struct gpmi_nand_data {
-  * @data_setup_in_cycles:      The data setup time, in cycles.
-  * @data_hold_in_cycles:       The data hold time, in cycles.
-  * @address_setup_in_cycles:   The address setup time, in cycles.
-+ * @device_busy_timeout:       The timeout waiting for NAND Ready/Busy,
-+ *                             this value is the number of cycles multiplied
-+ *                             by 4096.
-  * @use_half_periods:          Indicates the clock is running slowly, so the
-  *                             NFC DLL should use half-periods.
-  * @sample_delay_factor:       The sample delay factor.
-  */
- struct gpmi_nfc_hardware_timing {
-+	/* for HW_GPMI_TIMING0 */
- 	uint8_t  data_setup_in_cycles;
- 	uint8_t  data_hold_in_cycles;
- 	uint8_t  address_setup_in_cycles;
-+
-+	/* for HW_GPMI_TIMING1 */
-+	uint16_t device_busy_timeout;
-+#define GPMI_DEFAULT_BUSY_TIMEOUT	0x500 /* default busy timeout value.*/
-+
-+	/* for HW_GPMI_CTRL1 */
- 	bool     use_half_periods;
- 	uint8_t  sample_delay_factor;
- };
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
-index 8343124..8994e20 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
-@@ -154,6 +154,9 @@
+-	writel(BM_GPMI_CTRL1_RDN_DELAY,   gpmi_regs + HW_GPMI_CTRL1_CLR);
+-	writel(BM_GPMI_CTRL1_HALF_PERIOD, gpmi_regs + HW_GPMI_CTRL1_CLR);
++	reg = BM_GPMI_CTRL1_RDN_DELAY | BM_GPMI_CTRL1_HALF_PERIOD;
++	writel(reg, gpmi_regs + HW_GPMI_CTRL1_CLR);
  
- #define HW_GPMI_TIMING1					0x00000080
- #define BP_GPMI_TIMING1_BUSY_TIMEOUT			16
-+#define BM_GPMI_TIMING1_BUSY_TIMEOUT	(0xffff << BP_GPMI_TIMING1_BUSY_TIMEOUT)
-+#define BF_GPMI_TIMING1_BUSY_TIMEOUT(v)		\
-+	(((v) << BP_GPMI_TIMING1_BUSY_TIMEOUT) & BM_GPMI_TIMING1_BUSY_TIMEOUT)
+ 	/* If no sample delay is called for, return immediately. */
+ 	if (!hw.sample_delay_factor)
+ 		return;
  
- #define HW_GPMI_TIMING2					0x00000090
- #define HW_GPMI_DATA					0x000000a0
+-	/* Configure the HALF_PERIOD flag. */
+-	if (hw.use_half_periods)
+-		writel(BM_GPMI_CTRL1_HALF_PERIOD,
+-						gpmi_regs + HW_GPMI_CTRL1_SET);
++	/* Set RDN_DELAY or HALF_PERIOD. */
++	reg = ((hw.use_half_periods) ? BM_GPMI_CTRL1_HALF_PERIOD : 0)
++		| BF_GPMI_CTRL1_RDN_DELAY(hw.sample_delay_factor);
+ 
+-	/* Set the delay factor. */
+-	writel(BF_GPMI_CTRL1_RDN_DELAY(hw.sample_delay_factor),
+-						gpmi_regs + HW_GPMI_CTRL1_SET);
++	writel(reg, gpmi_regs + HW_GPMI_CTRL1_SET);
+ 
+-	/* Enable the DLL. */
++	/* At last, we enable the DLL. */
+ 	writel(BM_GPMI_CTRL1_DLL_ENABLE, gpmi_regs + HW_GPMI_CTRL1_SET);
+ 
+ 	/*
+ 	 * After we enable the GPMI DLL, we have to wait 64 clock cycles before
+-	 * we can use the GPMI.
+-	 *
+-	 * Calculate the amount of time we need to wait, in microseconds.
++	 * we can use the GPMI. Calculate the amount of time we need to wait,
++	 * in microseconds.
+ 	 */
+ 	clock_period_in_ns = NSEC_PER_SEC / clk_get_rate(r->clock[0]);
+ 	dll_wait_time_in_us = (clock_period_in_ns * 64) / 1000;
 -- 
 1.7.0.4
