@@ -1,99 +1,146 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Sep 2012 10:13:34 +0200
-Subject: [PATCH 1/5] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+Date: Thu, 13 Sep 2012 10:13:35 +0200
+Subject: [PATCH 2/5] ARM: Add interface for registering and calling
+ firmware-specific operations
 In-Reply-To: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
 References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1347524018-19301-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1347524018-19301-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On TrustZone-enabled boards the non-secure SYSRAM is used for secondary
-CPU bring-up, so add a mapping for it.
+Some boards are running with secure firmware running in TrustZone secure
+world, which changes the way some things have to be initialized.
 
+This patch adds an interface for platforms to specify available firmware
+operations and call them.
+
+A wrapper macro, call_firmware_op(), checks if the operation is provided
+and calls it if so, otherwise returns 0.
+
+By default no operations are provided.
+
+This is a follow-up on the patch by Kyungmin Park:
+[PATCH v5 1/2] ARM: Make a compile firmware conditionally
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/183607/focus=183988
+
+Example of use:
+
+In code using firmware ops:
+
+	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+		CPU1_BOOT_REG);
+
+	/* Call Exynos specific smc call */
+	do_firmware_op(cpu_boot, cpu);
+
+	gic_raise_softirq(cpumask_of(cpu), 1);
+
+In board-/platform-specific code:
+
+	static int platformX_do_idle(void)
+	{
+		/* tell platformX firmware to enter idle */
+	        return 0;
+	}
+
+	static void platformX_cpu_boot(int i)
+	{
+		/* tell platformX firmware to boot CPU i */
+	}
+
+	static const struct firmware_ops platformX_firmware_ops __initdata = {
+		.do_idle	= exynos_do_idle,
+		.cpu_boot	= exynos_cpu_boot,
+		/* cpu_boot_reg not available on platformX */
+	};
+
+	static void __init board_init_early(void)
+	{
+	????????register_firmware_ops(&platformX_firmware_ops);
+	}
+
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/common.c                | 34 ++++++++++++++++++++++++++++
- arch/arm/mach-exynos/include/mach/map.h      |  3 +++
- arch/arm/plat-samsung/include/plat/map-s5p.h |  1 +
- 3 files changed, 38 insertions(+)
+ arch/arm/common/Makefile        |  2 ++
+ arch/arm/common/firmware.c      | 18 ++++++++++++++++++
+ arch/arm/include/asm/firmware.h | 30 ++++++++++++++++++++++++++++++
+ 3 files changed, 50 insertions(+)
+ create mode 100644 arch/arm/common/firmware.c
+ create mode 100644 arch/arm/include/asm/firmware.h
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 715b690..b87feac 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -214,6 +214,33 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
- 	},
- };
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e8a4e58..55d4182 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -2,6 +2,8 @@
+ # Makefile for the linux kernel.
+ #
  
-+static struct map_desc exynos4210_iodesc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
-+		.pfn		= __phys_to_pfn(EXYNOS4210_PA_SYSRAM_NS),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
++obj-y += firmware.o
++
+ obj-$(CONFIG_ARM_GIC)		+= gic.o
+ obj-$(CONFIG_ARM_VIC)		+= vic.o
+ obj-$(CONFIG_ICST)		+= icst.o
+diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
+new file mode 100644
+index 0000000..27ddccb
+--- /dev/null
++++ b/arch/arm/common/firmware.c
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2012 Samsung Electronics.
++ * Kyungmin Park <kyungmin.park@samsung.com>
++ * Tomasz Figa <t.figa@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++
++#include <asm/firmware.h>
++
++static const struct firmware_ops default_firmware_ops;
++
++const struct firmware_ops *firmware_ops = &default_firmware_ops;
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+new file mode 100644
+index 0000000..ed51b02
+--- /dev/null
++++ b/arch/arm/include/asm/firmware.h
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2012 Samsung Electronics.
++ * Kyungmin Park <kyungmin.park@samsung.com>
++ * Tomasz Figa <t.figa@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARM_FIRMWARE_H
++#define __ASM_ARM_FIRMWARE_H
++
++struct firmware_ops {
++	int (*do_idle)(void);
++	void (*cpu_boot)(int cpu);
++	void __iomem *(*cpu_boot_reg)(int cpu);
 +};
 +
-+static struct map_desc exynos4x12_iodesc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
-+		.pfn		= __phys_to_pfn(EXYNOS4x12_PA_SYSRAM_NS),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
-+};
++extern const struct firmware_ops *firmware_ops;
 +
-+static struct map_desc exynos5250_iodesc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
-+		.pfn		= __phys_to_pfn(EXYNOS5250_PA_SYSRAM_NS),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
-+};
++#define call_firmware_op(op, ...)					\
++	((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : 0)
 +
- static struct map_desc exynos5_iodesc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long)S3C_VA_SYS,
-@@ -321,6 +348,13 @@ static void __init exynos4_map_io(void)
- 	else
- 		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
- 
-+	if (soc_is_exynos4210())
-+		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
-+	if (soc_is_exynos4212() || soc_is_exynos4412())
-+		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
-+	if (soc_is_exynos5250())
-+		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
++static inline void register_firmware_ops(const struct firmware_ops *ops)
++{
++	firmware_ops = ops;
++}
 +
- 	/* initialize device information early */
- 	exynos4_default_sdhci0();
- 	exynos4_default_sdhci1();
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 51943f2..869d8a0 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -26,6 +26,9 @@
- #define EXYNOS4_PA_SYSRAM0		0x02025000
- #define EXYNOS4_PA_SYSRAM1		0x02020000
- #define EXYNOS5_PA_SYSRAM		0x02020000
-+#define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
-+#define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
-+#define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
- 
- #define EXYNOS4_PA_FIMC0		0x11800000
- #define EXYNOS4_PA_FIMC1		0x11810000
-diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
-index c2d7bda..c186786 100644
---- a/arch/arm/plat-samsung/include/plat/map-s5p.h
-+++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
-@@ -22,6 +22,7 @@
- #define S5P_VA_GPIO3		S3C_ADDR(0x02280000)
- 
- #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
-+#define S5P_VA_SYSRAM_NS	S3C_ADDR(0x02410000)
- #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
- #define S5P_VA_DMC1		S3C_ADDR(0x02480000)
- #define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
++#endif
 -- 
 1.7.12
