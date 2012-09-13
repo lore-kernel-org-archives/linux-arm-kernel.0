@@ -1,93 +1,40 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 13 Sep 2012 16:37:56 +0300
-Subject: [PATCH v2 06/15] ASoC: omap-mcbsp: Use sDMA packet mode instead of
- frame mode
+Date: Thu, 13 Sep 2012 16:37:57 +0300
+Subject: [PATCH v2 07/15] ASoC: omap-pcm: Select sDMA synchronization based on
+ packet_size
 In-Reply-To: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347543485-339-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1347543485-339-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When McBSP is configured in threshold mode we can use sDMA packet mode in
-all cases.
+Since we only have element or packet synchronization we can use the
+dma_data->packet_size to select the desired mode:
+if packet_size is 0 we use ELEMENT mode
+if packet_size is not 0 we use PACKET mode for sDMA synchronization.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- sound/soc/omap/omap-mcbsp.c | 47 ++++++++++++++++-----------------------------
- 1 file changed, 17 insertions(+), 30 deletions(-)
+ sound/soc/omap/omap-pcm.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
-index 2e91a86..fe3debc 100644
---- a/sound/soc/omap/omap-mcbsp.c
-+++ b/sound/soc/omap/omap-mcbsp.c
-@@ -81,9 +81,6 @@ static void omap_mcbsp_set_threshold(struct snd_pcm_substream *substream)
- 	 */
- 	if (dma_data->packet_size)
- 		words = dma_data->packet_size;
--	else if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD)
--		words = snd_pcm_lib_period_bytes(substream) /
--						(mcbsp->wlen / 8);
- 	else
- 		words = 1;
- 
-@@ -251,6 +248,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
- 		dma_data->set_threshold = omap_mcbsp_set_threshold;
- 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
- 			int period_words, max_thrsh;
-+			int divider = 0;
- 
- 			period_words = params_period_bytes(params) / (wlen / 8);
- 			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-@@ -258,34 +256,23 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
- 			else
- 				max_thrsh = mcbsp->max_rx_thres;
- 			/*
--			 * If the period contains less or equal number of words,
--			 * we are using the original threshold mode setup:
--			 * McBSP threshold = sDMA frame size = period_size
--			 * Otherwise we switch to sDMA packet mode:
--			 * McBSP threshold = sDMA packet size
--			 * sDMA frame size = period size
-+			 * Use sDMA packet mode if McBSP is in threshold mode:
-+			 * If period words less than the FIFO size the packet
-+			 * size is set to the number of period words, otherwise
-+			 * Look for the biggest threshold value which divides
-+			 * the period size evenly.
- 			 */
--			if (period_words > max_thrsh) {
--				int divider = 0;
--
--				/*
--				 * Look for the biggest threshold value, which
--				 * divides the period size evenly.
--				 */
--				divider = period_words / max_thrsh;
--				if (period_words % max_thrsh)
--					divider++;
--				while (period_words % divider &&
--					divider < period_words)
--					divider++;
--				if (divider == period_words)
--					return -EINVAL;
--
--				pkt_size = period_words / divider;
--				sync_mode = OMAP_DMA_SYNC_PACKET;
--			} else {
--				sync_mode = OMAP_DMA_SYNC_FRAME;
--			}
-+			divider = period_words / max_thrsh;
-+			if (period_words % max_thrsh)
-+				divider++;
-+			while (period_words % divider &&
-+				divider < period_words)
-+				divider++;
-+			if (divider == period_words)
-+				return -EINVAL;
+diff --git a/sound/soc/omap/omap-pcm.c b/sound/soc/omap/omap-pcm.c
+index f0feb06..02eeb2e 100644
+--- a/sound/soc/omap/omap-pcm.c
++++ b/sound/soc/omap/omap-pcm.c
+@@ -165,7 +165,12 @@ static int omap_pcm_prepare(struct snd_pcm_substream *substream)
+ 	memset(&dma_params, 0, sizeof(dma_params));
+ 	dma_params.data_type			= dma_data->data_type;
+ 	dma_params.trigger			= dma_data->dma_req;
+-	dma_params.sync_mode			= dma_data->sync_mode;
 +
-+			pkt_size = period_words / divider;
-+			sync_mode = OMAP_DMA_SYNC_PACKET;
- 		} else if (channels > 1) {
- 			/* Use packet mode for non mono streams */
- 			pkt_size = channels;
++	if (dma_data->packet_size)
++		dma_params.sync_mode = OMAP_DMA_SYNC_PACKET;
++	else
++		dma_params.sync_mode = OMAP_DMA_SYNC_ELEMENT;
++
+ 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 		dma_params.src_amode		= OMAP_DMA_AMODE_POST_INC;
+ 		dma_params.dst_amode		= OMAP_DMA_AMODE_CONSTANT;
 -- 
 1.7.12
