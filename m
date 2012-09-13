@@ -1,20 +1,30 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Thu, 13 Sep 2012 08:28:22 +0300
-Subject: [PATCH 1/2] serial: mxs-auart: fix the wrong setting order
-In-Reply-To: <50495F6F.4040800@freescale.com>
-References: <1346985521-2248-1-git-send-email-shijie8@gmail.com>
- <20120907023841.GF26709@S2101-09.ap.freescale.net>
- <50495F6F.4040800@freescale.com>
-Message-ID: <50516EF6.7070306@bluegiga.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Sep 2012 22:30:45 -0700
+Subject: [GIT PULL V2 1/4] ARM: Kirkwood: DT bindings for v3.7
+In-Reply-To: <20120910054835.GC15277@titan.lakedaemon.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+ <20120910054835.GC15277@titan.lakedaemon.net>
+Message-ID: <20120913053045.GB24290@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+On Mon, Sep 10, 2012 at 01:48:35AM -0400, Jason Cooper wrote:
+> Arnd, Olof,
+> 
+> This branch depends on arm/cache-l2x0 which is going in through rmk's
+> tree.  arm/cache-l2x0 contains the following from Gregory Clement:
+> 
+> 	arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
+> 	arm: cache-l2x0: add an optional register to save/restore
 
-On 09/07/2012 05:43 AM, Huang Shijie wrote:
-> I found this bug when i tried to add DMA support for MXS-AUART.
+Ok, we need to make sure that Russell is happy with the patches and
+is pulling them in (with an agreement to not rebase the merged branch)
+before we can pull in your branch that builds on it.
 
-What is the status of DMA support? We could help you testing your patches.
+Russell, please let us know if/when that's the case so we can merge in the
+dependent code.
 
-Best regards,
-Lauri Hintsala
+Thanks!
+
+
+-Olof
