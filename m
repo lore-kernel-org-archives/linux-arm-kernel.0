@@ -1,40 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 13 Sep 2012 08:56:11 +0200
-Subject: [PATCH 1/6] staging: drm/imx: Add i.MX drm core support
-In-Reply-To: <20120912164929.GA24538@kroah.com>
-References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
- <1347445874-10779-2-git-send-email-s.hauer@pengutronix.de>
- <20120912164929.GA24538@kroah.com>
-Message-ID: <20120913065611.GB6180@pengutronix.de>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 13 Sep 2012 07:00:54 +0000
+Subject: [PATCH 02/16] ARM: davinci: move platform_data definitions
+In-Reply-To: <201209121711.10715.arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-2-git-send-email-arnd@arndb.de>
+ <1BAFE6F6C881BF42822005164F1491C33EA802EC@DBDE01.ent.ti.com>
+ <201209121711.10715.arnd@arndb.de>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA811E3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 09:49:29AM -0700, Greg Kroah-Hartman wrote:
-> On Wed, Sep 12, 2012 at 12:31:09PM +0200, Sascha Hauer wrote:
-> > This patch adds the i.MX glue stuff between i.MX and drm.
+On Wed, Sep 12, 2012 at 22:41:09, Arnd Bergmann wrote:
+> On Wednesday 12 September 2012, Hebbar, Gururaja wrote:
+> > On Tue, Sep 11, 2012 at 18:29:36, Arnd Bergmann wrote:
+> 
+> > >  drivers/usb/musb/da8xx.c                                     |    2 +-
 > > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/staging/Kconfig                |    2 +
-> >  drivers/staging/Makefile               |    1 +
+> > 
+> > >  .../asp.h => include/linux/platform_data/asoc-davinci-evm.h  |    0
+> > 
+> > 
+> > This will clash with patch "ASoC/ARM: Davinci: McASP: split asp header into 
+> > platform and audio specific" queued in ASoC tree by Mark
+> > 
 > 
-> The patch fails at this point when applying it.
+> Ok, I've taken out that hunk, this is the remaining patch. There will
+> still be minor conflicts though, because it changes some adjacent lines.
 > 
-> What tree did you make it against?  Please do so against linux-next or
-> hopefully, the staging-next branch, and resubmit these.
+> 	Arnd
+
+Thanks for the consideration.
+
 > 
-> Also, will this cause build errors if I don't have the needed patchs
-> that are in the DRM tree in my tree?
-
-Yes, the driver won't build without the patches. I'll rebase the IPU
-support on linux-next once the dependency patches are in place.
-
-Thanks
-  Sascha
+> 
+..snip..
+..snip..
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards, 
+Gururaja
