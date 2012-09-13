@@ -1,85 +1,69 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Wed, 12 Sep 2012 19:08:14 -0500
-Subject: [PATCH v2 1/2] OMAP: mailbox: add device tree support
+Date: Wed, 12 Sep 2012 19:08:15 -0500
+Subject: [PATCH v2 2/2] arm/dts: OMAP2+: Add mailbox nodes
 In-Reply-To: <1347494898-16671-1-git-send-email-omar.luna@linaro.org>
 References: <1347494898-16671-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1347494898-16671-2-git-send-email-omar.luna@linaro.org>
+Message-ID: <1347494898-16671-3-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt driver to use DT if provided.
+Add nodes for mailbox DT, to interface with hwmods.
 
 Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+Acked-by: Benoit Cousson <b-cousson@ti.com>
 ---
- .../devicetree/bindings/arm/omap/mailbox.txt       |    9 +++++++++
- arch/arm/mach-omap2/devices.c                      |    3 +++
- arch/arm/mach-omap2/mailbox.c                      |   12 ++++++++++++
- 3 files changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/mailbox.txt
+ arch/arm/boot/dts/omap2.dtsi |    5 +++++
+ arch/arm/boot/dts/omap3.dtsi |    5 +++++
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 3 files changed, 15 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/mailbox.txt b/Documentation/devicetree/bindings/arm/omap/mailbox.txt
-new file mode 100644
-index 0000000..c57c0d5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/omap/mailbox.txt
-@@ -0,0 +1,9 @@
-+OMAP Mailbox module
-+
-+Required properties:
-+ compatible : should be "ti,omap2-mailbox" for OMAP2 mailbox
-+ compatible : should be "ti,omap3-mailbox" for OMAP3 mailbox
-+ compatible : should be "ti,omap4-mailbox" for OMAP4 mailbox
-+
-+Optional properties:
-+ None
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index c00c689..19093fb 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -279,6 +279,9 @@ static inline void __init omap_init_mbox(void)
- 	struct omap_hwmod *oh;
- 	struct platform_device *pdev;
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index 581cb08..372d55a 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -48,6 +48,11 @@
+ 			reg = <0x480FE000 0x1000>;
+ 		};
  
-+	if (of_have_populated_dt())
-+		return;
++		mailbox: mailbox at 48094000 {
++			compatible = "ti,omap2-mailbox";
++			ti,hwmods = "mailbox";
++		};
 +
- 	oh = omap_hwmod_lookup("mailbox");
- 	if (!oh) {
- 		pr_err("%s: unable to find hwmod\n", __func__);
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 6875be8..80beadf 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
-@@ -400,11 +401,22 @@ static int __devexit omap2_mbox_remove(struct platform_device *pdev)
- 	return 0;
- }
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap2-uart";
+ 			ti,hwmods = "uart1";
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 8109471..ce68604 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -168,6 +168,11 @@
+ 			ti,hwmods = "i2c3";
+ 		};
  
-+#if defined(CONFIG_OF)
-+static const struct of_device_id omap_mailbox_of_match[] = {
-+	{ .compatible = "ti,omap2-mailbox" },
-+	{ .compatible = "ti,omap3-mailbox" },
-+	{ .compatible = "ti,omap4-mailbox" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap_mailbox_of_match);
-+#endif
++		mailbox: mailbox at 48094000 {
++			compatible = "ti,omap3-mailbox";
++			ti,hwmods = "mailbox";
++		};
 +
- static struct platform_driver omap2_mbox_driver = {
- 	.probe = omap2_mbox_probe,
- 	.remove = __devexit_p(omap2_mbox_remove),
- 	.driver = {
- 		.name = "omap-mailbox",
-+		.of_match_table = of_match_ptr(omap_mailbox_of_match),
- 	},
- };
+ 		mcspi1: spi at 48098000 {
+ 			compatible = "ti,omap2-mcspi";
+ 			#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 04cbbcb..6677d80 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -210,6 +210,11 @@
+ 			ti,hwmods = "i2c4";
+ 		};
  
++		mailbox: mailbox at 4a0f4000 {
++			compatible = "ti,omap4-mailbox";
++			ti,hwmods = "mailbox";
++		};
++
+ 		mcspi1: spi at 48098000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			#address-cells = <1>;
 -- 
 1.7.9.5
