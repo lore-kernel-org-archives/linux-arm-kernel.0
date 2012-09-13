@@ -1,30 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Sep 2012 22:30:45 -0700
-Subject: [GIT PULL V2 1/4] ARM: Kirkwood: DT bindings for v3.7
-In-Reply-To: <20120910054835.GC15277@titan.lakedaemon.net>
-References: <20120829001129.GO19437@titan.lakedaemon.net>
- <20120910054835.GC15277@titan.lakedaemon.net>
-Message-ID: <20120913053045.GB24290@quad.lixom.net>
+From: vbyravarasu@nvidia.com (Venu Byravarasu)
+Date: Thu, 13 Sep 2012 10:46:25 +0530
+Subject: [PATCH] arm: tegra: fixing compilation error
+Message-ID: <1347513385-14158-1-git-send-email-vbyravarasu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 01:48:35AM -0400, Jason Cooper wrote:
-> Arnd, Olof,
-> 
-> This branch depends on arm/cache-l2x0 which is going in through rmk's
-> tree.  arm/cache-l2x0 contains the following from Gregory Clement:
-> 
-> 	arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
-> 	arm: cache-l2x0: add an optional register to save/restore
+As usb_phy.h got moved from mach to include/linux/usb
+and renamed as tegra_usb_phy.h, correcting it in the include
+path.
 
-Ok, we need to make sure that Russell is happy with the patches and
-is pulling them in (with an agreement to not rebase the merged branch)
-before we can pull in your branch that builds on it.
+Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt-tegra20.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Russell, please let us know if/when that's the case so we can merge in the
-dependent code.
-
-Thanks!
-
-
--Olof
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index adc6b98..3308a65 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -41,7 +41,7 @@
+ 
+ #include <mach/iomap.h>
+ #include <mach/irqs.h>
+-#include <mach/usb_phy.h>
++#include <linux/usb/tegra_usb_phy.h>
+ 
+ #include "board.h"
+ #include "clock.h"
+-- 
+1.7.1.1
