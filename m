@@ -1,42 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Sep 2012 22:05:49 -0700
-Subject: [GIT PULL] ARM: OMAP: omap_device updates for v3.7
-In-Reply-To: <87oblbvvp4.fsf@deeprootsystems.com>
-References: <87oblbvvp4.fsf@deeprootsystems.com>
-Message-ID: <20120913050548.GD4521@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 13 Sep 2012 08:01:37 +0300
+Subject: [PATCH v4 00/21] OMAP UART Patches
+In-Reply-To: <alpine.DEB.2.00.1209122025020.17903@utopia.booyaka.com>
+References: <20120906122948.GC29202@arwen.pp.htv.fi>
+ <1346935540-1792-1-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.00.1209062137000.11516@utopia.booyaka.com>
+ <alpine.DEB.2.00.1209112141220.9444@utopia.booyaka.com>
+ <20120912062259.GC18563@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1209122025020.17903@utopia.booyaka.com>
+Message-ID: <20120913050136.GA6504@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120912 13:22]:
-> Tony,
+On Wed, Sep 12, 2012 at 08:25:30PM +0000, Paul Walmsley wrote:
+> Hi
 > 
-> Please pull the following omap_device changes for v3.7.  This was a
-> collaboration between myself and Paul.
+> On Wed, 12 Sep 2012, Felipe Balbi wrote:
 > 
-> Thanks,
+> > On Tue, Sep 11, 2012 at 10:02:48PM +0000, Paul Walmsley wrote:
+> > 
+> > > The bad news is that N800 no longer boots -- or the UART dies during 
+> > > serial init:
+> > > 
+> > > http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/boot/2420n800/2420n800_log.txt
+> > > 
+> > > The problem doesn't seem to affect the 2430SDP.
+> > > 
+> > > Could you put together a patch to fix N800?
+> > 
+> > I'll see what I can do. BTW, is that log with DEBUG_LL enabled ?
 > 
-> Kevin
+> Yes.  Here's the .config that was used on N800:
 > 
-> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-> 
->   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-omap_device
-> 
-> for you to fetch changes up to 9634c8dd6a729406e89aed4e29470e3ffb3cd060:
-> 
->   ARM: OMAP: omap_device: idle devices with no driver bound (2012-09-12 10:52:03 -0700)
-> 
-> ----------------------------------------------------------------
-> Updates for omap_device layer for v3.7.
-> 
-> Allows omap_device layer to keep track of driver bound status in order
-> to make more intelligent decisions about idling unused devices.
+> http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/build/n800_b_testconfig/Kconfig
 
-Thanks pulling into devel-omap-device.
+Thanks :-)
 
-Regards,
-
-Tony
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120913/8255a1cf/attachment.sig>
