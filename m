@@ -1,67 +1,71 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 13 Sep 2012 12:24:19 +0200
-Subject: triggering an gpio-irq on both edges
-In-Reply-To: <20120913081920.GF19497@pengutronix.de>
-References: <20120913081920.GF19497@pengutronix.de>
-Message-ID: <1347531859.2429.241.camel@pizza.hi.pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 13 Sep 2012 11:26:16 +0100
+Subject: [PATCH v3 06/25] docs: Xen ARM DT bindings
+In-Reply-To: <alpine.DEB.2.02.1209121849200.15568@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
+ <1345131377-14713-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <503BFCD8.5090804@gmail.com>
+ <alpine.DEB.2.02.1208281823270.15568@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1209121849200.15568@kaball.uk.xensource.com>
+Message-ID: <20120913102616.GA2470@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 13.09.2012, 10:19 +0200 schrieb Uwe Kleine-K?nig:
-> Hello,
+On Wed, Sep 12, 2012 at 07:14:58PM +0100, Stefano Stabellini wrote:
+> On Wed, 12 Sep 2012, Stefano Stabellini wrote:
+> > On Tue, 28 Aug 2012, Rob Herring wrote:
+> > > You should look at ePAPR 1.1 which defines hypervisor related bindings.
+> > > While it is a PPC doc, we should reuse or extend what makes sense.
+> > > 
+> > > See section 7.5:
+> > > 
+> > > https://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.1.pdf
+> > 
+> > Thanks for the link, I wasn't aware of ePAPR.
+> > 
+> > The hypervisor node defined by ePAPR is not very different from what I
+> > am proposing. Should I try to be compatible with the hypervisor
+> > specification above (as in compatible = "epapr,hypervisor-1.1")?
+> > Or should I just use it as a reference for my own specification?
+> > 
+> > Personally I would rather avoid full compatibility with ePAPR.
 > 
-> My motivation for this mail is that currently mxs_gpio_set_irq_type
-> doesn't support type=IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING because
-> the hardware doesn't support it.
+> In particular reading section 7.5, these are the required properties of
+> the ePAPR hypervisor node:
 > 
-> The gpio-keys driver on the other hand wants a trigger in both
-> directions.
+> - compatible = "epapr,hypervisor-1.1"
+> compared to what I am proposing, it is laking information about what
+> hypervisor we are talking about (xen, kvm, vmware, etc) and the version
+> of the ABI (xen-4.2).
 > 
-> The mxc-gpio driver implements the missing hardware functionallity in
-> software (gpio_set_irq_type):
-> 
-> 	set_irq_type:
-> 		if (both edges requested)
-> 			if (current value of gpio == 0)
-> 				trigger on rising edge
-> 			else
-> 				trigger on falling edge
-> 
-> 	handle_irq:
-> 		if (both edges requested)
-> 			trigger on other edge
-> 
+> - hcall-instructions
+> potentially interesting, but given that for Xen we are quite happy with
+> HVC, we are not going to add any secondary hypercall mechanisms,
+> therefore at the moment it would just result in a BUG if the specified
+> hcall instruction is != HVC. Besides if somebody else wanted to
+> implemented the Xen hypercall interface in a different way they could
+> just reimplement the hypercall wrappers, that would be easier than
+> trying to do it with this property.
 
-The ASIC3 driver in drivers/mfd/asic3.c does the same in
-asic3_irq_demux, asic3_irq_flip_edge and asic3_gpio_irq_type.
+Some thoughts on this:
 
-> This is racy though: If there is an edge after reading out the gpio
-> value and completion of the edge direction programming, you miss
-> interrupts. Also just switching the direction in the irq handler is
-> also wrong for the same reason.
->
-> I guess there are more machines than mxc and mxs that have the same
-> problem.
-> 
-> In my opinion this calls for a wrapper, something like:
-> 
-> 	int gpio_irq_emulate_both_edges_set_irq_type(struct irq_data *d,
-> 		unsigned int type, int (*set_irq_type)(...),
-> 		int (*get_value)(...), struct something *privdata)
-> 	{
-> 		...
-> 	}
-> 
-> 	int gpio_irq_emulate_both_edges_handler(...)
-> 	{
-> 
-> 	}
-> 
-> Does this sound good and possible? I didn't find something like that
-> already implemented, but maybe I missed it?
-> 
-> Any thoughts (and be it only "The xyz driver is affected, too.") are
-> welcome.
+We decided that embedding machine instructions into the DT is a fairly
+awful idea when discussing how to describe low-level debug UARTs in the
+DT.  I don't think it's a lot better in this case (never mind issues
+like ARM versus Thumb, endianness etc.)
 
-regards
-Philipp
+If we are going to attempt to describe the call interface, we should
+do it symbolically, allowing the hypervisor interface code in the kernel
+to choose (or, if necessary, generate) the right call wrappers.
+
+We will have this issue for descrbing power firmware interfaces for
+example: we already know that this functionality might require an SMC
+or HVC instruction to call it, depending on the platform.
+
+A hypervisor with only one call ABI could leave this to be implicit,
+providing there is a version number property of similar to allow future
+changes to be accommodated.
+
+
+Cheers
+---Dave
