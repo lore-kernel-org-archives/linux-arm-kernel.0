@@ -1,47 +1,285 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 13 Sep 2012 08:01:37 +0300
-Subject: [PATCH v4 00/21] OMAP UART Patches
-In-Reply-To: <alpine.DEB.2.00.1209122025020.17903@utopia.booyaka.com>
-References: <20120906122948.GC29202@arwen.pp.htv.fi>
- <1346935540-1792-1-git-send-email-balbi@ti.com>
- <alpine.DEB.2.00.1209062137000.11516@utopia.booyaka.com>
- <alpine.DEB.2.00.1209112141220.9444@utopia.booyaka.com>
- <20120912062259.GC18563@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1209122025020.17903@utopia.booyaka.com>
-Message-ID: <20120913050136.GA6504@arwen.pp.htv.fi>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 13 Sep 2012 14:10:48 +0900
+Subject: [PATCH v9 05/13] ARM: SoC: convert Exynos4 to SoC descriptor
+In-Reply-To: <1347461906-13527-6-git-send-email-arnd@arndb.de>
+References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
+ <1347461906-13527-6-git-send-email-arnd@arndb.de>
+Message-ID: <CAH9JG2WRSnADm9yg_mdRUAtG_FN17v2kJ_RJoaZHGC9qq9WVhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 08:25:30PM +0000, Paul Walmsley wrote:
-> Hi
-> 
-> On Wed, 12 Sep 2012, Felipe Balbi wrote:
-> 
-> > On Tue, Sep 11, 2012 at 10:02:48PM +0000, Paul Walmsley wrote:
-> > 
-> > > The bad news is that N800 no longer boots -- or the UART dies during 
-> > > serial init:
-> > > 
-> > > http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/boot/2420n800/2420n800_log.txt
-> > > 
-> > > The problem doesn't seem to affect the 2430SDP.
-> > > 
-> > > Could you put together a patch to fix N800?
-> > 
-> > I'll see what I can do. BTW, is that log with DEBUG_LL enabled ?
-> 
-> Yes.  Here's the .config that was used on N800:
-> 
-> http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/build/n800_b_testconfig/Kconfig
-
-Thanks :-)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120913/8255a1cf/attachment.sig>
+On 9/12/12, Arnd Bergmann <arnd@arndb.de> wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+>
+> Convert Exynos4 to use the SoC descriptor to provide its SMP
+> and CPU hotplug operations.
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-exynos/common.h              |    5 +++++
+>  arch/arm/mach-exynos/hotplug.c             |   18 +++---------------
+>  arch/arm/mach-exynos/mach-armlex4210.c     |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c     |    1 +
+>  arch/arm/mach-exynos/mach-nuri.c           |    1 +
+>  arch/arm/mach-exynos/mach-origen.c         |    1 +
+>  arch/arm/mach-exynos/mach-smdk4x12.c       |    2 ++
+>  arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
+>  arch/arm/mach-exynos/mach-universal_c210.c |    1 +
+>  arch/arm/mach-exynos/platsmp.c             |   20 ++++++++++++++++----
+>  10 files changed, 33 insertions(+), 19 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index aed2eeb..dac146d 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -14,6 +14,7 @@
+>
+>  extern struct sys_timer exynos4_timer;
+>
+> +struct map_desc;
+>  void exynos_init_io(struct map_desc *mach_desc, int size);
+>  void exynos4_init_irq(void);
+>  void exynos5_init_irq(void);
+> @@ -59,4 +60,8 @@ void exynos4212_register_clocks(void);
+>  #define exynos4212_register_clocks()
+>  #endif
+>
+> +extern struct smp_operations exynos_smp_ops;
+> +
+> +extern void exynos_cpu_die(unsigned int cpu);
+> +
+>  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+> diff --git a/arch/arm/mach-exynos/hotplug.c
+> b/arch/arm/mach-exynos/hotplug.c
+> index 9c17a0a..d0a5a70 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -21,6 +21,8 @@
+>
+>  #include <mach/regs-pmu.h>
+>
+> +#include "common.h"
+> +
+>  extern volatile int pen_release;
+>
+>  static inline void cpu_enter_lowpower(void)
+> @@ -95,17 +97,12 @@ static inline void platform_do_lowpower(unsigned int
+> cpu, int *spurious)
+>  	}
+>  }
+>
+> -int platform_cpu_kill(unsigned int cpu)
+> -{
+> -	return 1;
+> -}
+> -
+>  /*
+>   * platform-specific code to shutdown a CPU
+>   *
+>   * Called with IRQs disabled
+>   */
+> -void platform_cpu_die(unsigned int cpu)
+> +void __cpuinit exynos_cpu_die(unsigned int cpu)
+>  {
+>  	int spurious = 0;
+>
+> @@ -124,12 +121,3 @@ void platform_cpu_die(unsigned int cpu)
+>  	if (spurious)
+>  		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+>  }
+> -
+> -int platform_cpu_disable(unsigned int cpu)
+> -{
+> -	/*
+> -	 * we don't allow CPU 0 to be shutdown (it is still too special
+> -	 * e.g. clock tick interrupts)
+> -	 */
+> -	return cpu == 0 ? -EPERM : 0;
+> -}
+> diff --git a/arch/arm/mach-exynos/mach-armlex4210.c
+> b/arch/arm/mach-exynos/mach-armlex4210.c
+> index 5a3daa0..3f37a5e 100644
+> --- a/arch/arm/mach-exynos/mach-armlex4210.c
+> +++ b/arch/arm/mach-exynos/mach-armlex4210.c
+> @@ -199,6 +199,7 @@ static void __init armlex4210_machine_init(void)
+>  MACHINE_START(ARMLEX4210, "ARMLEX4210")
+>  	/* Maintainer: Alim Akhtar <alim.akhtar@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= armlex4210_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index ef770bc..8833060 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -79,6 +79,7 @@ static char const *exynos5250_dt_compat[] __initdata = {
+>  DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+>  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+>  	.init_irq	= exynos5_init_irq,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.map_io		= exynos5250_dt_map_io,
+>  	.handle_irq	= gic_handle_irq,
+>  	.init_machine	= exynos5250_dt_machine_init,
+> diff --git a/arch/arm/mach-exynos/mach-nuri.c
+> b/arch/arm/mach-exynos/mach-nuri.c
+> index ea785fc..ffaa355 100644
+> --- a/arch/arm/mach-exynos/mach-nuri.c
+> +++ b/arch/arm/mach-exynos/mach-nuri.c
+> @@ -1383,6 +1383,7 @@ static void __init nuri_machine_init(void)
+>  MACHINE_START(NURI, "NURI")
+>  	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= nuri_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> diff --git a/arch/arm/mach-exynos/mach-origen.c
+> b/arch/arm/mach-exynos/mach-origen.c
+> index 4e574c2..abd0e60 100644
+> --- a/arch/arm/mach-exynos/mach-origen.c
+> +++ b/arch/arm/mach-exynos/mach-origen.c
+> @@ -806,6 +806,7 @@ static void __init origen_machine_init(void)
+>  MACHINE_START(ORIGEN, "ORIGEN")
+>  	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= origen_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c
+> b/arch/arm/mach-exynos/mach-smdk4x12.c
+> index b26beb1..964693b 100644
+> --- a/arch/arm/mach-exynos/mach-smdk4x12.c
+> +++ b/arch/arm/mach-exynos/mach-smdk4x12.c
+> @@ -370,6 +370,7 @@ static void __init smdk4x12_machine_init(void)
+>  MACHINE_START(SMDK4212, "SMDK4212")
+>  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= smdk4x12_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> @@ -383,6 +384,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
+>  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+>  	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= smdk4x12_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> diff --git a/arch/arm/mach-exynos/mach-smdkv310.c
+> b/arch/arm/mach-exynos/mach-smdkv310.c
+> index 73f2bce..69b858c 100644
+> --- a/arch/arm/mach-exynos/mach-smdkv310.c
+> +++ b/arch/arm/mach-exynos/mach-smdkv310.c
+> @@ -417,6 +417,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
+>  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+>  	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= smdkv310_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> @@ -429,6 +430,7 @@ MACHINE_END
+>  MACHINE_START(SMDKC210, "SMDKC210")
+>  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= smdkv310_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
+> b/arch/arm/mach-exynos/mach-universal_c210.c
+> index 4d1f40d..922ca0f 100644
+> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+> @@ -1155,6 +1155,7 @@ static void __init universal_machine_init(void)
+>  MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+>  	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+>  	.atag_offset	= 0x100,
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= universal_map_io,
+>  	.handle_irq	= gic_handle_irq,
+> diff --git a/arch/arm/mach-exynos/platsmp.c
+> b/arch/arm/mach-exynos/platsmp.c
+> index 36c3984..3fad8ad 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -32,6 +32,8 @@
+>
+>  #include <plat/cpu.h>
+>
+> +#include "common.h"
+> +
+>  extern void exynos4_secondary_startup(void);
+>
+>  #define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> @@ -64,7 +66,7 @@ static void __iomem *scu_base_addr(void)
+>
+>  static DEFINE_SPINLOCK(boot_lock);
+>
+> -void __cpuinit platform_secondary_init(unsigned int cpu)
+> +static void __cpuinit exynos_secondary_init(unsigned int cpu)
+>  {
+>  	/*
+>  	 * if any interrupts are already enabled for the primary
+> @@ -86,7 +88,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+>  	spin_unlock(&boot_lock);
+>  }
+>
+> -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct
+> task_struct *idle)
+>  {
+>  	unsigned long timeout;
+>
+> @@ -161,7 +163,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
+> task_struct *idle)
+>   * which may be present or become present in the system.
+>   */
+>
+> -void __init smp_init_cpus(void)
+> +static void __init exynos_smp_init_cpus(void)
+>  {
+>  	void __iomem *scu_base = scu_base_addr();
+>  	unsigned int i, ncores;
+> @@ -184,7 +186,7 @@ void __init smp_init_cpus(void)
+>  	set_smp_cross_call(gic_raise_softirq);
+>  }
+>
+> -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+> +static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	if (!soc_is_exynos5250())
+>  		scu_enable(scu_base_addr());
+> @@ -198,3 +200,13 @@ void __init platform_smp_prepare_cpus(unsigned int
+> max_cpus)
+>  	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+>  			CPU1_BOOT_REG);
+>  }
+> +
+> +struct smp_operations exynos_smp_ops __initdata = {
+> +	.smp_init_cpus		= exynos_smp_init_cpus,
+> +	.smp_prepare_cpus	= exynos_smp_prepare_cpus,
+> +	.smp_secondary_init	= exynos_secondary_init,
+> +	.smp_boot_secondary	= exynos_boot_secondary,
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	.cpu_die		= exynos_cpu_die,
+> +#endif
+> +};
+> --
+> 1.7.10
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
