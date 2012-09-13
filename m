@@ -1,63 +1,154 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Sep 2012 00:42:07 -0700
-Subject: [GIT PULL 2/4] mxs sparse-irq support
-In-Reply-To: <20120913061557.GA3141@S2101-09.ap.freescale.net>
-References: <1347350100-4674-1-git-send-email-shawn.guo@linaro.org>
- <1347350100-4674-3-git-send-email-shawn.guo@linaro.org>
- <20120913055647.GF24290@quad.lixom.net>
- <20120913061557.GA3141@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMgKfRZG07ZBo57Xcjbq4hnfhDYzKF-F58mUsrpDRf3EwQ@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 13 Sep 2012 15:47:15 +0800
+Subject: [V3 1/4] regulator: 88pm860x: add pre-regulator support for
+ 88pm860x regulator
+In-Reply-To: <1341543520-6427-1-git-send-email-jtzhou@marvell.com>
+References: <20120705141541.GO4111@opensource.wolfsonmicro.com>
+ <1341543520-6427-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <CAN1soZx9znejw8msWcY1-7PzqYAjyuym4sn9190-r5B151ah0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 11:16 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Sep 12, 2012 at 10:56:47PM -0700, Olof Johansson wrote:
->> On Tue, Sep 11, 2012 at 03:54:57PM +0800, Shawn Guo wrote:
->> > The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
->> >
->> >   Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-sparse-irq
->> >
->> > for you to fetch changes up to 6608f13fabdb1f9ecbd502763ba33ca2646834c8:
->> >
->> >   ARM: mxs: remove mach/irqs.h (2012-09-03 09:32:17 +0800)
->> >
->> > ----------------------------------------------------------------
->> > mxs-sparse-irq
->> >
->> > The series adds irqdomain support for mach-mxs and then enables
->> > sparse-irq.  It dependes on pull request mxs-dt-3.7.
->>
->> Thanks, pulled in under next/soc2 due to the dt dependency.
->>
->> However, for the future: if you're truly dependent on the dt branch to
->> build/boot, you should use that as a base for this branch. Otherwise you
->> can end up in a state with git bisect where you only have this branch
->> applied but not the other one.
->>
-> Ok.  That's actually a little bit easier for me, since I only need to
-> send you the branch that I tested with.
+On Fri, Jul 6, 2012 at 10:58 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
+> Pre-regulator of 88pm8606 is mainly for support charging based on vbus,
+> it needs to be enabled for charging battery, and will be disabled in
+> some exception condition like over-temp.
+> Add the pre-regulator support for 88pm860x regulator driver.
 >
-> I got an impression that we should try hard to base pull-requests on
-> -rc.  That said, we should only base one branch/pull-request on another
-> when there is a dependency at file content level.  The build/boot level
-> dependency can just be sorted out in arm-soc tree when the branch gets
-> built into for-next or sent to Linus.
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> ---
+>  drivers/regulator/88pm8607.c |   66 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 66 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
+> index c3482b9..3c81fd0 100644
+> --- a/drivers/regulator/88pm8607.c
+> +++ b/drivers/regulator/88pm8607.c
+> @@ -23,6 +23,7 @@ struct pm8607_regulator_info {
+>         struct pm860x_chip      *chip;
+>         struct regulator_dev    *regulator;
+>         struct i2c_client       *i2c;
+> +       struct i2c_client       *i2c_8606;
+>
+>         unsigned int    *vol_table;
+>         unsigned int    *vol_suspend;
+> @@ -242,6 +243,35 @@ static int pm8607_set_voltage_sel(struct regulator_dev *rdev, unsigned selector)
+>         return ret;
+>  }
+>
+> +static int pm8606_preg_enable(struct regulator_dev *rdev)
+> +{
+> +       struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
+> +
+> +       return pm860x_set_bits(info->i2c, rdev->desc->enable_reg,
+> +                              1 << rdev->desc->enable_mask, 0);
+> +}
+> +
+> +static int pm8606_preg_disable(struct regulator_dev *rdev)
+> +{
+> +       struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
+> +
+> +       return pm860x_set_bits(info->i2c, rdev->desc->enable_reg,
+> +                              1 << rdev->desc->enable_mask,
+> +                              1 << rdev->desc->enable_mask);
+> +}
+> +
+> +static int pm8606_preg_is_enabled(struct regulator_dev *rdev)
+> +{
+> +       struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
+> +       int ret;
+> +
+> +       ret = pm860x_reg_read(info->i2c, rdev->desc->enable_reg);
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       return !((unsigned char)ret & (1 << rdev->desc->enable_mask));
+> +}
+> +
+>  static struct regulator_ops pm8607_regulator_ops = {
+>         .list_voltage   = pm8607_list_voltage,
+>         .set_voltage_sel = pm8607_set_voltage_sel,
+> @@ -251,6 +281,25 @@ static struct regulator_ops pm8607_regulator_ops = {
+>         .is_enabled = regulator_is_enabled_regmap,
+>  };
+>regulator git tree kernel.org
+> +static struct regulator_ops pm8606_preg_ops = {
+> +       .enable         = pm8606_preg_enable,
+> +       .disable        = pm8606_preg_disable,
+> +       .is_enabled     = pm8606_preg_is_enabled,regulator git tree kernel.org
+> +};
+> +
+> +#define PM8606_PREG(ereg, ebit)                                                \
+> +{                                                                      \
+> +       .desc   = {                                                     \
+> +               .name   = "PREG",                                       \
+> +               .ops    = &pm8606_preg_ops,                             \
+> +               .type   = REGULATOR_CURRENT,                            \
+> +               .id     = PM8606_ID_PREG,                               \
+> +               .owner  = THIS_MODULE,                                  \
+> +               .enable_reg = PM8606_##ereg,                            \
+> +               .enable_mask = (ebit),                                  \
+> +       },                                                              \
+> +}
+> +
+>  #define PM8607_DVC(vreg, ureg, ubit, ereg, ebit)                       \
+>  {                                                                      \
+>         .desc   = {                                                     \
+> @@ -309,6 +358,8 @@ static struct pm8607_regulator_info pm8607_regulator_info[] = {
+>         PM8607_LDO(12,        LDO12, 0, SUPPLIES_EN12, 5),
+>         PM8607_LDO(13, VIBRATOR_SET, 1, VIBRATOR_SET, 0),
+>         PM8607_LDO(14,        LDO14, 0, SUPPLIES_EN12, 6),
+> +
+> +       PM8606_PREG(PREREGULATORB, 5),
+>  };
+>
+>  static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
+> @@ -336,6 +387,8 @@ static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
+>                 return -EINVAL;
+>         }
+>         info->i2c = (chip->id == CHIP_PM8607) ? chip->client : chip->companion;
+> +       info->i2c_8606 = (chip->id == CHIP_PM8607) ? chip->companion :
+> +                       chip->client;
+>         info->chip = chip;
+>
+>         /* check DVC ramp slope double */
+> @@ -372,6 +425,18 @@ static int __devexit pm8607_regulator_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static struct platform_device_id pm8607_regulator_driveregulator git tree kernel.orgr_ids[] = {
+> +       {
+> +               .name   = "88pm860x-regulator",
+> +               .driver_data    = 0,
+> +       }, {
+> +               .name   = "88pm860x-preg",
+> +               .driver_data    = 0,
+> +       },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(platform, pm8607_regulator_driver_ids);
+> +
+>  static struct platform_driver pm8607_regulator_driver = {regulator git tree kernel.org
+>         .driver         = {
+>                 .name   = "88pm860x-regulator",
+> @@ -379,6 +444,7 @@ static struct platform_driver pm8607_regulator_driver = {
+>         },
+>         .probe          = pm8607_regulator_probe,
+>         .remove         = __devexit_p(pm8607_regulator_remove),
+> +       .id_table       = pm8607_regulator_driver_ids,
+>  };
+>
+>  static int __init pm8607_regulator_init(void)
+> --
+> 1.7.0.4
+>
 
-That was my stance in the past as well but once I got shown how git
-bisect can end up in a state where only the later branch is included,
-and not the prerequisite, it became obvious that for a bisectable
-contents the branches indeed need to be based on each other. See
-http://marc.info/?l=linux-kernel&m=133739202430250&w=2 for more info.
+Hi Samuel,
 
-And that's fine, since if you base (in this case) the dt branch on an
--rc, and then the sparse-irq branch on top of the dt branch, the total
-pull request is still based on an -rc. What we don't want is when
-someone starts a new branch on a random mainline commit between two
--rcs.
+Could you help to merge this patch into your mfd tree also? Although
+it's the patch
+of regulator, it's depend on the previous patch that is merged into
+your mfd tree.
 
-
--Olof
+Best Regards
+Haojian
