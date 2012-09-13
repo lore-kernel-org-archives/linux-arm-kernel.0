@@ -1,137 +1,44 @@
-From: rajanikanth.hv@stericsson.com (Rajanikanth HV)
-Date: Thu, 13 Sep 2012 19:01:23 +0530
-Subject: Implement devicetree support for AB8500 Btemp
-In-Reply-To: <201209121536.56346.arnd@arndb.de>
-References: <CAB4BAktQz5MY_AHHWUAhRp7HtEzC3v8uFbP0enx1b7ibJLoZ4Q@mail.gmail.com>
- <201209111122.08713.arnd@arndb.de> <50509D1C.9060206@stericsson.com>
- <201209121536.56346.arnd@arndb.de>
-Message-ID: <5051E02B.5040703@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Sep 2012 08:32:06 -0500
+Subject: [PATCH] staging: ste_rmi4: remove gpio.h include
+In-Reply-To: <1347541643-30665-1-git-send-email-robherring2@gmail.com>
+References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
+ <1347541643-30665-1-git-send-email-robherring2@gmail.com>
+Message-ID: <5051E056.4060304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Adding Greg KH's correct email...
 
-
-On Wednesday 12 September 2012 09:06 PM, Arnd Bergmann wrote:
-> On Wednesday 12 September 2012, Rajanikanth HV wrote:
->> On Tuesday 11 September 2012 04:52 PM, Arnd Bergmann wrote:
->>> On Tuesday 11 September 2012, Rajanikanth HV wrote:
+On 09/13/2012 08:07 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
->> Consider: USB charging:
->>             ______________________
->>            |                      |
->> --(Vbus)-->|   USB Charger with   |
->>            |  Charger FSM (h/w)   |
->>            |______________________|
->>                 |    |
->>                 |    |(Vbat and other signals)
->>                 |  __|_____
->>         to      | |        |(GaugeSense
->>      Charger FSM| | LION   | Signal)     _____________
->>                 | |Battery |----------->|FuelGauge blk|
->>                 | |________|            |{Coulomb Ctr}|
->>                 |       |                -------------
->>                 |   <Thermistor>
->>                 |       |
->>                 |       | (BatCtrl Signal)
->>                 |_______|---------->[Btemp blk]
->>                         |               |
->>                       [ADC]             |__Btemp_Low
->>                                         |__Btemp_Med
->>                                         |__Btemp_High
->>
->> Note: Charging algorithm is a logical entity.
-> Ok, thanks for the explanation, this is starting to make a lot more
-> sense. So the three blocks (fb, btemp, charger) are all separate
-> mfd cells, each with their own register set in ab8500 and a separate
-> driver in drivers/power, right?
-Correct, You can have a look at ab8500 spec:
-www.stericsson.com/developers/CD00291561_UM1031_AB8500_user_manual-rev5_CTDS_public.pdf
+> gpio.h is not needed and is going to be removed.
 > 
-> Then there is the ab8500-charalg driver which I guess is implementing
-> the Charger FSM you mention above,
-ab8500-charalg does not implements charger FSM, Charger FSM is a
-hardware block for which any functional info is not available in the
-spec. However, ab8500-charalg implements state m/c depicted in the
-figure (9) of spec, implementation can be found in the code:
-abx500_chargalg.c: centered around abx500_chargalg_algorithm(..)
-
-Let me brief out what 'charger(Wall/USB)' and 'chargalg' driver does:
-
-(a) Charger driver implements:
-	- events specific to Wall(a/c) and USB Charger
-	- power supply attributes handling and notification
-	  to power_supply core. Ref: enum power_supply_property
-	  linux/power_supply.h
-	  Note: subset of power_supply_property are handled	
-	- turn on/off charging led, AC and USB charging
-	- Regulating Voltage and Current values for charging
-	- voltage threshold check
-	- Charging regulation based on btemp
-all this functionality has register dependency
-
-(b) Charging algorithm:
-	- Starts by collecting power_supply properties across power
-          class devices which are 'bm' devices
-	- Maintains the different charging states across ac and usb
-	  charging process pertaining to 'Vbus, main or Vbat', thermal,
-	  btemp etc.,	
-	- Implements subset of power_suppply_class properties	
-Note: Do not have direct register interface
-
- but it doesn't have any registers
-yes, but make use of power supply properties updated by other bm devs
-while managing charging states.
-> in the ab8500 but rather ties the other drivers together.
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@suse.de>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
 > 
-> If this is true, I don't understand what makes the 'supplied-to'
-> properties you list in the device tree binding board specific. Are
-> they not always done the same way? If so, you could just leave them
-> out.
-Precisely 'supplied-to' is not board specific, it was maintained as
-platform_data which i migrated to dt-node. It is meant to establish
-dependency across bm drivers based on power_supply property and
-runtime battery attributes.
-Basically, 'supplied-to' provides a way of exporting change in
-power_supply_property and runtime batter characteristics so that other
-bm devs shall make use or refer the updated values.
-Ref: external_power_changed(...) call back api.
-Note: all the bm drivers handles subset of power_supply property and
-      battery attributes,
-      ref: include/linux/power_supply.h and get_property(...) call back
-      api across bm drivers.
+> Here's one more trivial fix in preparation of mach/gpio.h removal. I plan
+> to take this thru arm-soc tree.
 > 
-> What does indeed seem to be needed is a place to identify the battery
-> type, but it's not clear if the btemp device is the best place for
-> that (maybe it is). 
-I am not clear whether you are trying to correlate battery-type with
-supplied-to. however, battery type is identified based on the
-resistance value measured at batctrl pin which is expected to be in the
-allowable limit of ab8500 device. This resistance limit varies across
-battery types. This happens in btemp driver.
-
-For this, I would suggest you give a list of
-> possible batteries and require a property such as
+> Rob
 > 
->  st-ericsson,battery-type: A string identifier for the type of battery,
-> 			   which impacts how an operating system interpret
-> 			   the sensor readings. Possible values include:
-> 	* "none"	-- no battery connected
-> 	* "li-ion-9100" -- Type 9100 Li-ION battery
-> 	* <add any others that apply here>
-Can do this, not precisely as "st-ericsson,battery-type", it will be as
-battery-type = [unknown|NiMH|LION|...|]], reason being
-allowable battery type is based on technology, as you can see the
-possible types as:
-POWER_SUPPLY_TECHNOLOGY_UNKNOWN = 0,
-        POWER_SUPPLY_TECHNOLOGY_NiMH,
-        POWER_SUPPLY_TECHNOLOGY_LION,
-        POWER_SUPPLY_TECHNOLOGY_LIPO,
-        POWER_SUPPLY_TECHNOLOGY_LiFe,
-        POWER_SUPPLY_TECHNOLOGY_NiCd,
-        POWER_SUPPLY_TECHNOLOGY_LiMn
-Ref: include/linux/power_supply.h
-Note: doing this will impact my of_probe(...), may slightly bloat the
-code.
+>  .../staging/ste_rmi4/board-mop500-u8500uib-rmi4.c  |    1 -
+>  1 file changed, 1 deletion(-)
 > 
-> 	Arnd
+> diff --git a/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c b/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
+> index a272e48..47439c3 100644
+> --- a/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
+> +++ b/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
+> @@ -5,7 +5,6 @@
+>  #include <linux/i2c.h>
+>  #include <linux/gpio.h>
+>  #include <linux/interrupt.h>
+> -#include <mach/gpio.h>
+>  #include <mach/irqs.h>
+>  #include "synaptics_i2c_rmi4.h"
+>  
 > 
