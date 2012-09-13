@@ -1,130 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Sep 2012 16:50:12 +0100
-Subject: [PATCH v3 21/31] arm64: 32-bit (compat) applications support
-In-Reply-To: <201209131103.27387.arnd@arndb.de>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <201209071947.45313.arnd@arndb.de> <20120913090732.GA25131@arm.com>
- <201209131103.27387.arnd@arndb.de>
-Message-ID: <20120913155012.GC25131@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Sep 2012 17:54:13 +0200
+Subject: [PATCH v4] gpio: mvebu: new gpio driver for mvebu platforms
+Message-ID: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 12:03:27PM +0100, Arnd Bergmann wrote:
-> On Thursday 13 September 2012, Catalin Marinas wrote:
-> > +#ifdef __ARCH_WANT_COMPAT_SYS_SENDFILE
-> > +asmlinkage int compat_sys_sendfile(int out_fd, int in_fd,
-> > +                                  compat_off_t __user *offset, s32 count)
-> > +{
-> > +       mm_segment_t old_fs = get_fs();
-> > +       int ret;
-> > +       off_t of;
-> > +
-> > +       if (offset && get_user(of, offset))
-> > +               return -EFAULT;
-> > +
-> > +       set_fs(KERNEL_DS);
-> > +       ret = sys_sendfile(out_fd, in_fd,
-> > +                          offset ? (off_t __user *)&of : NULL, count);
-> > +       set_fs(old_fs);
-> > +
-> > +       if (offset && put_user(of, offset))
-> > +               return -EFAULT;
-> > +       return ret;
-> > +}
-> > +#endif /* __ARCH_WANT_COMPAT_SYS_SENDFILE */
-> 
-> Looking at this code in detail now, I think it's better to move the functions to
-> fs/read_write.c and get rid of the get_fs/set_fs hack, like
-> 
-> asmlinkage int compat_sys_sendfile(int out_fd, int in_fd,
->                                    compat_off_t __user *offset, s32 count)
-...
+Grant,
 
-It makes sense (copied below, just for compat_sys_sendfile until my
-comments below are clarified). One minor improvement, I think we should
-use compat_size_t for the count, it is a u32 in all cases.
+This patch set adds a new GPIO driver for Marvell EBU SoCs, which aims
+at replacing the existing GPIO driver from plat-orion/gpio.c. The
+driver comes with the necessary DT changes to make it work on Armada
+370 and Armada XP, and it has been tested successfully by Sebastian
+Hesselbarth on Dove.
 
-> This implementation is smaller and more efficient than the common one.
-> 
-> Same for compat_sys_sendfile64, although I don't think there is ever
-> a case where loff_t is defined differently from compat_loff_t, so
-> you can probably just use the native sys_sendfile64 for the compat
-> case.
+It should also work flawlessly on other Marvell EBU SoCs (Kirkwood,
+Orion, Discovery), but this remains to be tested by the relevant
+maintainers. This isn't however a problem, as those older platforms
+need to explictly be converted over to the new pinctrl-mvebu driver
+and the new gpio driver. Until that, they will happily continue to use
+the old, known-working, gpio driver. So this patch set has no chance
+to break any of the existing Marvell platforms. The old gpio driver is
+scheduled to be removed once all Marvell SoCs have switched to the new
+driver.
 
-That's what we do on AArch64, though powerpc and sparc define their own.
-The "count" argument would be different between compat and non-compat
-versions and I'm not sure what assumptions are made on the syscall entry
-path on these architectures (on AArch64 we ensure that the top 32-bit
-part of an X register is always 0 for 32-bit syscalls).
+This new driver reuses a lot of code from the existing
+plat-orion/gpio.c driver, but has a number of advantages:
 
-Another difference is that the "count" argument for
-compat_sys_sendfile64 is s32 on powerpc and u32 on sparc. I can't tell
-whether it would make a difference in practice but if we use
-compat_size_t for the generic version the powerpc wouldn't get the sign
-extension.
+ *) Support for Armada 370 and Armada XP
+ *) It is integrated with the mvebu pinctrl driver so that GPIO pins
+    are properly muxed, and the GPIO driver knows which GPIO pins are
+    output-only or input-only.
+ *) Properly placed in drivers/gpio
+ *) More extensible mechanism to support platform differences. The
+    plat-orion driver uses a simple mask-offset DT property, which
+    works fine for Discovery MV78200 but not for Armada XP. The new
+    driver uses different compatible strings to identify the different
+    variants of the GPIO controllers.
 
-Powerpc has some comment about a need to treat in_fd/out_fd arguments as
-signed ints but I don't fully understand it (well, maybe powerpc needs
-the sign to be fully extended to 64-bit even for int).
+This patch set should be applied on top of the pinctrl-mvebu patch set
+v4 from Sebastian Hesselbarth, as it depends on it.
 
-----------8<-----------------------
+Changes since v2:
+ * Use inline functions for the register accessors, and rename them
+   lower-case since they are functions, as suggested by
+   Jean-Christophe Plagnol-Villard.
+ * Use _relaxed() variants of readl/writel, as suggested by
+   Jean-Christophe Plagnol-Villard.
+ * Use switch() instead of long list of if() conditions in
+   mvebu_gpio_irq_set_type(), as suggested by Jean-Christophe
+   Plagnol-Villard.
+ * Add DT aliases gpio0, gpio1, gpio2, and then use of_alias_get_id()
+   to get the number of GPIO bank, and deduce the GPIO base from
+   it. We don't use automatic allocation because we really want the
+   internal SoC GPIOs to have 0-31, 32-63, 64-... numbers (while
+   automatic allocation allocates 224... for the first bank 202... for
+   the second bank, etc.). This strategy was recommended by Uwe
+   Kleine-Koenig and is already used in gpio-mxs.c.
+ * Use gpio-cells = <2> instead of gpio-cells = <1>, as suggested by
+   Olof Johansson. This allows to re-use the default .xlate()
+   function, and therefore make the GPIO DT binding actually work (it
+   was broken in previous versions of this patch set).
+ * Use dev_name() to fill the gpio_chip->name field, instead of
+   manually computing a name. This allows to get rid of the global
+   variable counting GPIO chips.
+ * Rebase on top of the latest pinctrl work from Sebastian
+   Hesselbarth.
+ * Added the Acked-by from Linus Walleij on the DT binding
+   documentation patch.
 
->From 7c6747fc9f69d20f445e4af69c644acb04a74f45 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Thu, 13 Sep 2012 09:51:10 +0100
-Subject: [PATCH 1/3] Add generic compat_sys_sendfile implementation
+Changes since v1:
+ * Added fixes for Dove from Sebastian Hesselbarth, and his Tested-by
+   on the driver patch.
 
-This function is used by other architectures requiring compat support,
-so just make it generic.
+Thanks,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- fs/read_write.c        |   22 ++++++++++++++++++++++
- include/linux/compat.h |    3 +++
- 2 files changed, 25 insertions(+), 0 deletions(-)
-
-diff --git a/fs/read_write.c b/fs/read_write.c
-index 1adfb69..91b91c4 100644
---- a/fs/read_write.c
-+++ b/fs/read_write.c
-@@ -1007,3 +1007,25 @@ SYSCALL_DEFINE4(sendfile64, int, out_fd, int, in_fd, loff_t __user *, offset, si
- 
- 	return do_sendfile(out_fd, in_fd, NULL, count, 0);
- }
-+
-+#ifdef __ARCH_WANT_COMPAT_SYS_SENDFILE
-+asmlinkage int compat_sys_sendfile(int out_fd, int in_fd,
-+				   compat_off_t __user *offset, compat_size_t count)
-+{
-+	loff_t pos;
-+	off_t off;
-+	ssize_t ret;
-+
-+	if (offset) {
-+		if (unlikely(get_user(off, offset)))
-+			return -EFAULT;
-+		pos = off;
-+		ret = do_sendfile(out_fd, in_fd, &pos, count, MAX_NON_LFS);
-+		if (unlikely(put_user(pos, offset)))
-+			return -EFAULT;
-+		return ret;
-+	}
-+
-+	return do_sendfile(out_fd, in_fd, NULL, count, 0);
-+}
-+#endif /* __ARCH_WANT_COMPAT_SYS_SENDFILE */
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index c4be3f5..f386e82 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -594,6 +594,9 @@ asmlinkage ssize_t compat_sys_process_vm_writev(compat_pid_t pid,
- 		unsigned long liovcnt, const struct compat_iovec __user *rvec,
- 		unsigned long riovcnt, unsigned long flags);
- 
-+asmlinkage int compat_sys_sendfile(int out_fd, int in_fd,
-+				   compat_off_t __user *offset, s32 count);
-+
- #else
- 
- #define is_compat_task() (0)
+Thomas
