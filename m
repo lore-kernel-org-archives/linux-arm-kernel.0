@@ -1,65 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 13 Sep 2012 10:19:20 +0200
-Subject: triggering an gpio-irq on both edges
-Message-ID: <20120913081920.GF19497@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 13 Sep 2012 10:25:19 +0200
+Subject: [PATCH 2/5] ARM: Add interface for registering and calling
+ firmware-specific operations
+In-Reply-To: <1347524018-19301-3-git-send-email-t.figa@samsung.com>
+References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+ <1347524018-19301-3-git-send-email-t.figa@samsung.com>
+Message-ID: <7531144.4Y7oHlfebV@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday 13 of September 2012 10:13:35 Tomasz Figa wrote:
+> In code using firmware ops:
+> 
+> 	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> 		CPU1_BOOT_REG);
+> 
+> 	/* Call Exynos specific smc call */
+> 	do_firmware_op(cpu_boot, cpu);
 
-My motivation for this mail is that currently mxs_gpio_set_irq_type
-doesn't support type=IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING because
-the hardware doesn't support it.
+Typo, s/do_/call_/ .
 
-The gpio-keys driver on the other hand wants a trigger in both
-directions.
-
-The mxc-gpio driver implements the missing hardware functionallity in
-software (gpio_set_irq_type):
-
-	set_irq_type:
-		if (both edges requested)
-			if (current value of gpio == 0)
-				trigger on rising edge
-			else
-				trigger on falling edge
-
-	handle_irq:
-		if (both edges requested)
-			trigger on other edge
-
-
-This is racy though: If there is an edge after reading out the gpio
-value and completion of the edge direction programming, you miss
-interrupts. Also just switching the direction in the irq handler is
-also wrong for the same reason.
-
-I guess there are more machines than mxc and mxs that have the same
-problem.
-
-In my opinion this calls for a wrapper, something like:
-
-	int gpio_irq_emulate_both_edges_set_irq_type(struct irq_data *d,
-		unsigned int type, int (*set_irq_type)(...),
-		int (*get_value)(...), struct something *privdata)
-	{
-		...
-	}
-
-	int gpio_irq_emulate_both_edges_handler(...)
-	{
-
-	}
-
-Does this sound good and possible? I didn't find something like that
-already implemented, but maybe I missed it?
-
-Any thoughts (and be it only "The xyz driver is affected, too.") are
-welcome.
-
-Best regards
-Uwe
-
+Best regards,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tomasz Figa
+Samsung Poland R&D Center
