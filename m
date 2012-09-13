@@ -1,59 +1,30 @@
-From: grgupta@ti.com (Gupta, Ramesh)
-Date: Thu, 13 Sep 2012 10:04:09 +0530
-Subject: [PATCH v5 2/2] OMAP:IOMMU:flush L1 and L2 caches
-In-Reply-To: <20120912164121.GF28448@n2100.arm.linux.org.uk>
-References: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
- <20120912164121.GF28448@n2100.arm.linux.org.uk>
-Message-ID: <CADysL2YgZ4E8ZLDnA4zn-bvXiaF--TrgQvPsTgBpKm7VQnSwuw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Sep 2012 22:03:29 -0700
+Subject: [GIT PULL] i.MX Fixes
+In-Reply-To: <20120911095509.GT18243@pengutronix.de>
+References: <20120911095509.GT18243@pengutronix.de>
+Message-ID: <20120913050329.GA24290@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, Sep 11, 2012 at 11:55:09AM +0200, Sascha Hauer wrote:
+> Hi Arnd, Olof,
+> 
+> Please pull the following i.MX fixes for -rc
+> 
+> Thanks
+>  Sascha
+> 
+> 
+> The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+> 
+>   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes
+
+Pulled, thanks.
 
 
-On Wed, Sep 12, 2012 at 10:11 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Sep 12, 2012 at 08:49:16PM +0530, Gupta, Ramesh wrote:
->> Thanks to the RMK's suggestions.
->
-> I should've made clear the distinction between _range and _area.
-> A _range function takes start and end.  An _area function takes a start
-> and size.  So...
->
->> -static void flush_iopgd_range(u32 *first, u32 *last)
->> +static void flush_iopgd_range(u32 *first, size_t size)
->
-> This should change to flush_iopgd_area().
-
-Looks like I missed this, I will fix and send the updated patch.
-
->
->>  {
->> -     /* FIXME: L2 cache should be taken care of if it exists */
->> -     do {
->> -             asm("mcr        p15, 0, %0, c7, c10, 1 @ flush_pgd"
->> -                 : : "r" (first));
->> -             first += L1_CACHE_BYTES / sizeof(*first);
->> -     } while (first <= last);
->> +     phys_addr_t phys = virt_to_phys(first);
->> +
->> +     iommu_flush_area(first, size);
->> +     outer_flush_range(phys, phys + size);
->>  }
->>
->> -static void flush_iopte_range(u32 *first, u32 *last)
->> +static void flush_iopte_range(u32 *first, size_t size)
->> +
->
-> flush_iopte_area().  (And there shouldn't be a blank line between this
-> and the open curley.)
-
-I will fix it.
-
-> Otherwise, looks fine.
-
-thank you.
-
-
-Best regards
-Ramesh Gupta G
+-Olof
