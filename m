@@ -1,34 +1,26 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 13 Sep 2012 17:41:48 +0200
-Subject: [PATCH v4 06/10] ARM: mvebu: Add pinctrl support to Armada XP SoCs
+Date: Thu, 13 Sep 2012 17:41:49 +0200
+Subject: [PATCH v4 07/10] ARM: mvebu: Add pinctrl support to Armada 370 SoC
 In-Reply-To: <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1347550912-18021-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1347550912-18021-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 This commits adds the necessary device tree information to define the
-compatible property for the pinctrl driver instance of Armada XP SoCs.
-
-Until now, the device tree representation considered the Armada XP as
-a single SoC. But in fact, there are three different SoCs in the
-Armada XP families, with different number of CPU cores, different
-number of Ethernet interfaces... and different number of muxable pins
-or functions. We therefore introduce three armada-xp-mv78xx0.dtsi for
-the three SoCs of the Armada XP family. The current armada-xp-db.dts
-evaluation board uses the MV78460 variant of the SoC.
+compatible property for the pinctrl driver instance of Armada 370 SoC.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 v3:
-- put specific variant into DT "model"
+- cleaned whitespaces
 
 v4:
-- adjust pinctrl DT node of Armada XP SoC
+- adjust pinctrl DT node of Armada 370 SoC
 
 Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
@@ -48,115 +40,23 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |   28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |   28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |   28 ++++++++++++++++++++++++++++
- 3 files changed, 84 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-xp-mv78230.dtsi
- create mode 100644 arch/arm/boot/dts/armada-xp-mv78260.dtsi
- create mode 100644 arch/arm/boot/dts/armada-xp-mv78460.dtsi
+ arch/arm/boot/dts/armada-370.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-new file mode 100644
-index 0000000..38ede3d
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * Device Tree Include file for Marvell Armada XP family SoC
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Contains definitions specific to the Armada XP MV78230 SoC that are not
-+ * common to all Armada XP SoCs.
-+ */
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 3228ccc..2bfb904 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -31,5 +31,10 @@
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0xd0018200 0x100>;
+ 		};
 +
-+/include/ "armada-xp.dtsi"
-+
-+/ {
-+	model = "Marvell Armada XP MV78230 SoC";
-+	compatible = "marvell,armadaxp-mv78230", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	soc {
 +		pinctrl {
-+			compatible = "marvell,mv78230-pinctrl";
++			compatible = "marvell,mv88f6710-pinctrl";
 +			reg = <0xd0018000 0x38>;
 +		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-new file mode 100644
-index 0000000..b2eafcd
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * Device Tree Include file for Marvell Armada XP family SoC
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Contains definitions specific to the Armada XP MV78260 SoC that are not
-+ * common to all Armada XP SoCs.
-+ */
-+
-+/include/ "armada-xp.dtsi"
-+
-+/ {
-+	model = "Marvell Armada XP MV78260 SoC";
-+	compatible = "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	soc {
-+		pinctrl {
-+			compatible = "marvell,mv78260-pinctrl";
-+			reg = <0xd0018000 0x38>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-new file mode 100644
-index 0000000..cf8624d
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * Device Tree Include file for Marvell Armada XP family SoC
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Contains definitions specific to the Armada XP MV78460 SoC that are not
-+ * common to all Armada XP SoCs.
-+ */
-+
-+/include/ "armada-xp.dtsi"
-+
-+/ {
-+	model = "Marvell Armada XP MV78460 SoC";
-+	compatible = "marvell,armadaxp-mv78460", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	soc {
-+		pinctrl {
-+			compatible = "marvell,mv78460-pinctrl";
-+			reg = <0xd0018000 0x38>;
-+		};
-+	};
-+ };
+ 	};
+ };
 -- 
 1.7.10.4
