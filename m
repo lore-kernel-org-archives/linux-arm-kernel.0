@@ -1,285 +1,136 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 13 Sep 2012 14:10:48 +0900
-Subject: [PATCH v9 05/13] ARM: SoC: convert Exynos4 to SoC descriptor
-In-Reply-To: <1347461906-13527-6-git-send-email-arnd@arndb.de>
-References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
- <1347461906-13527-6-git-send-email-arnd@arndb.de>
-Message-ID: <CAH9JG2WRSnADm9yg_mdRUAtG_FN17v2kJ_RJoaZHGC9qq9WVhg@mail.gmail.com>
+From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
+Date: Thu, 13 Sep 2012 14:10:10 +0900
+Subject: [PATCH v2] ARM: shmobile: armadillo800eva: Add support RTC
+Message-ID: <1347513011-18316-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/12/12, Arnd Bergmann <arnd@arndb.de> wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
->
-> Convert Exynos4 to use the SoC descriptor to provide its SMP
-> and CPU hotplug operations.
->
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-exynos/common.h              |    5 +++++
->  arch/arm/mach-exynos/hotplug.c             |   18 +++---------------
->  arch/arm/mach-exynos/mach-armlex4210.c     |    1 +
->  arch/arm/mach-exynos/mach-exynos5-dt.c     |    1 +
->  arch/arm/mach-exynos/mach-nuri.c           |    1 +
->  arch/arm/mach-exynos/mach-origen.c         |    1 +
->  arch/arm/mach-exynos/mach-smdk4x12.c       |    2 ++
->  arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
->  arch/arm/mach-exynos/mach-universal_c210.c |    1 +
->  arch/arm/mach-exynos/platsmp.c             |   20 ++++++++++++++++----
->  10 files changed, 33 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index aed2eeb..dac146d 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -14,6 +14,7 @@
->
->  extern struct sys_timer exynos4_timer;
->
-> +struct map_desc;
->  void exynos_init_io(struct map_desc *mach_desc, int size);
->  void exynos4_init_irq(void);
->  void exynos5_init_irq(void);
-> @@ -59,4 +60,8 @@ void exynos4212_register_clocks(void);
->  #define exynos4212_register_clocks()
->  #endif
->
-> +extern struct smp_operations exynos_smp_ops;
-> +
-> +extern void exynos_cpu_die(unsigned int cpu);
-> +
->  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-> diff --git a/arch/arm/mach-exynos/hotplug.c
-> b/arch/arm/mach-exynos/hotplug.c
-> index 9c17a0a..d0a5a70 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -21,6 +21,8 @@
->
->  #include <mach/regs-pmu.h>
->
-> +#include "common.h"
-> +
->  extern volatile int pen_release;
->
->  static inline void cpu_enter_lowpower(void)
-> @@ -95,17 +97,12 @@ static inline void platform_do_lowpower(unsigned int
-> cpu, int *spurious)
->  	}
->  }
->
-> -int platform_cpu_kill(unsigned int cpu)
-> -{
-> -	return 1;
-> -}
-> -
->  /*
->   * platform-specific code to shutdown a CPU
->   *
->   * Called with IRQs disabled
->   */
-> -void platform_cpu_die(unsigned int cpu)
-> +void __cpuinit exynos_cpu_die(unsigned int cpu)
->  {
->  	int spurious = 0;
->
-> @@ -124,12 +121,3 @@ void platform_cpu_die(unsigned int cpu)
->  	if (spurious)
->  		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
->  }
-> -
-> -int platform_cpu_disable(unsigned int cpu)
-> -{
-> -	/*
-> -	 * we don't allow CPU 0 to be shutdown (it is still too special
-> -	 * e.g. clock tick interrupts)
-> -	 */
-> -	return cpu == 0 ? -EPERM : 0;
-> -}
-> diff --git a/arch/arm/mach-exynos/mach-armlex4210.c
-> b/arch/arm/mach-exynos/mach-armlex4210.c
-> index 5a3daa0..3f37a5e 100644
-> --- a/arch/arm/mach-exynos/mach-armlex4210.c
-> +++ b/arch/arm/mach-exynos/mach-armlex4210.c
-> @@ -199,6 +199,7 @@ static void __init armlex4210_machine_init(void)
->  MACHINE_START(ARMLEX4210, "ARMLEX4210")
->  	/* Maintainer: Alim Akhtar <alim.akhtar@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= armlex4210_map_io,
->  	.handle_irq	= gic_handle_irq,
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index ef770bc..8833060 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -79,6 +79,7 @@ static char const *exynos5250_dt_compat[] __initdata = {
->  DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
->  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
->  	.init_irq	= exynos5_init_irq,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.map_io		= exynos5250_dt_map_io,
->  	.handle_irq	= gic_handle_irq,
->  	.init_machine	= exynos5250_dt_machine_init,
-> diff --git a/arch/arm/mach-exynos/mach-nuri.c
-> b/arch/arm/mach-exynos/mach-nuri.c
-> index ea785fc..ffaa355 100644
-> --- a/arch/arm/mach-exynos/mach-nuri.c
-> +++ b/arch/arm/mach-exynos/mach-nuri.c
-> @@ -1383,6 +1383,7 @@ static void __init nuri_machine_init(void)
->  MACHINE_START(NURI, "NURI")
->  	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= nuri_map_io,
->  	.handle_irq	= gic_handle_irq,
-> diff --git a/arch/arm/mach-exynos/mach-origen.c
-> b/arch/arm/mach-exynos/mach-origen.c
-> index 4e574c2..abd0e60 100644
-> --- a/arch/arm/mach-exynos/mach-origen.c
-> +++ b/arch/arm/mach-exynos/mach-origen.c
-> @@ -806,6 +806,7 @@ static void __init origen_machine_init(void)
->  MACHINE_START(ORIGEN, "ORIGEN")
->  	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= origen_map_io,
->  	.handle_irq	= gic_handle_irq,
-> diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c
-> b/arch/arm/mach-exynos/mach-smdk4x12.c
-> index b26beb1..964693b 100644
-> --- a/arch/arm/mach-exynos/mach-smdk4x12.c
-> +++ b/arch/arm/mach-exynos/mach-smdk4x12.c
-> @@ -370,6 +370,7 @@ static void __init smdk4x12_machine_init(void)
->  MACHINE_START(SMDK4212, "SMDK4212")
->  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= smdk4x12_map_io,
->  	.handle_irq	= gic_handle_irq,
-> @@ -383,6 +384,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
->  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
->  	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= smdk4x12_map_io,
->  	.handle_irq	= gic_handle_irq,
-> diff --git a/arch/arm/mach-exynos/mach-smdkv310.c
-> b/arch/arm/mach-exynos/mach-smdkv310.c
-> index 73f2bce..69b858c 100644
-> --- a/arch/arm/mach-exynos/mach-smdkv310.c
-> +++ b/arch/arm/mach-exynos/mach-smdkv310.c
-> @@ -417,6 +417,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
->  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
->  	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= smdkv310_map_io,
->  	.handle_irq	= gic_handle_irq,
-> @@ -429,6 +430,7 @@ MACHINE_END
->  MACHINE_START(SMDKC210, "SMDKC210")
->  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= smdkv310_map_io,
->  	.handle_irq	= gic_handle_irq,
-> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
-> b/arch/arm/mach-exynos/mach-universal_c210.c
-> index 4d1f40d..922ca0f 100644
-> --- a/arch/arm/mach-exynos/mach-universal_c210.c
-> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
-> @@ -1155,6 +1155,7 @@ static void __init universal_machine_init(void)
->  MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
->  	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
->  	.atag_offset	= 0x100,
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= universal_map_io,
->  	.handle_irq	= gic_handle_irq,
-> diff --git a/arch/arm/mach-exynos/platsmp.c
-> b/arch/arm/mach-exynos/platsmp.c
-> index 36c3984..3fad8ad 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -32,6 +32,8 @@
->
->  #include <plat/cpu.h>
->
-> +#include "common.h"
-> +
->  extern void exynos4_secondary_startup(void);
->
->  #define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-> @@ -64,7 +66,7 @@ static void __iomem *scu_base_addr(void)
->
->  static DEFINE_SPINLOCK(boot_lock);
->
-> -void __cpuinit platform_secondary_init(unsigned int cpu)
-> +static void __cpuinit exynos_secondary_init(unsigned int cpu)
->  {
->  	/*
->  	 * if any interrupts are already enabled for the primary
-> @@ -86,7 +88,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
->  	spin_unlock(&boot_lock);
->  }
->
-> -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct
-> task_struct *idle)
->  {
->  	unsigned long timeout;
->
-> @@ -161,7 +163,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
-> task_struct *idle)
->   * which may be present or become present in the system.
->   */
->
-> -void __init smp_init_cpus(void)
-> +static void __init exynos_smp_init_cpus(void)
->  {
->  	void __iomem *scu_base = scu_base_addr();
->  	unsigned int i, ncores;
-> @@ -184,7 +186,7 @@ void __init smp_init_cpus(void)
->  	set_smp_cross_call(gic_raise_softirq);
->  }
->
-> -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-> +static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->  {
->  	if (!soc_is_exynos5250())
->  		scu_enable(scu_base_addr());
-> @@ -198,3 +200,13 @@ void __init platform_smp_prepare_cpus(unsigned int
-> max_cpus)
->  	__raw_writel(virt_to_phys(exynos4_secondary_startup),
->  			CPU1_BOOT_REG);
->  }
-> +
-> +struct smp_operations exynos_smp_ops __initdata = {
-> +	.smp_init_cpus		= exynos_smp_init_cpus,
-> +	.smp_prepare_cpus	= exynos_smp_prepare_cpus,
-> +	.smp_secondary_init	= exynos_secondary_init,
-> +	.smp_boot_secondary	= exynos_boot_secondary,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_die		= exynos_cpu_die,
-> +#endif
-> +};
-> --
-> 1.7.10
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+The armadillo800eva has S35390A which is RTC. This is controlled
+using I2C of GPIO.
+This commit supports RTC of armadillo800eva.
+
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+---
+ v2: Update and add defconfig for armadillo800eva
+
+ arch/arm/configs/armadillo800eva_defconfig     |   12 +++++-------
+ arch/arm/mach-shmobile/board-armadillo800eva.c |   25 ++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index 7d87184..62861bd 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -18,7 +18,6 @@ CONFIG_ARCH_SHMOBILE=y
+ CONFIG_ARCH_R8A7740=y
+ CONFIG_MACH_ARMADILLO800EVA=y
+ # CONFIG_SH_TIMER_TMU is not set
+-CONFIG_ARM_THUMB=y
+ CONFIG_CPU_BPREDICT_DISABLE=y
+ # CONFIG_CACHE_L2X0 is not set
+ CONFIG_ARM_ERRATA_430973=y
+@@ -85,18 +84,16 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=8
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
+ CONFIG_I2C_SH_MOBILE=y
+ # CONFIG_HWMON is not set
+ CONFIG_MEDIA_SUPPORT=y
+-CONFIG_VIDEO_DEV=y
+-# CONFIG_RC_CORE is not set
+-# CONFIG_VIDEO_HELPER_CHIPS_AUTO is not set
+-# CONFIG_V4L_USB_DRIVERS is not set
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++# CONFIG_USB_GSPCA is not set
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_MT9T112=y
+ CONFIG_VIDEO_SH_MOBILE_CEU=y
+-# CONFIG_RADIO_ADAPTERS is not set
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SH_MOBILE_HDMI=y
+@@ -111,7 +108,6 @@ CONFIG_LOGO=y
+ # CONFIG_SND_DRIVERS is not set
+ # CONFIG_SND_ARM is not set
+ CONFIG_SND_SOC_SH4_FSI=y
+-# CONFIG_HID_SUPPORT is not set
+ CONFIG_USB=y
+ CONFIG_USB_RENESAS_USBHS=y
+ CONFIG_USB_GADGET=y
+@@ -120,6 +116,8 @@ CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHI=y
+ CONFIG_MMC_SH_MMCIF=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_S35390A=y
+ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_UIO=y
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index cf10f92..81dfb88 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -37,6 +37,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mmcif.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
++#include <linux/i2c-gpio.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7740.h>
+@@ -876,6 +877,21 @@ static struct platform_device fsi_hdmi_device = {
+ 	},
+ };
+ 
++/* RTC: RTC connects i2c-gpio. */
++static struct i2c_gpio_platform_data i2c_gpio_data = {
++	.sda_pin	= GPIO_PORT208,
++	.scl_pin	= GPIO_PORT91,
++	.udelay		= 5, /* 100 kHz */
++};
++
++static struct platform_device i2c_gpio_device = {
++	.name = "i2c-gpio",
++	.id = 2,
++	.dev = {
++		.platform_data = &i2c_gpio_data,
++	},
++};
++
+ /* I2C */
+ static struct i2c_board_info i2c0_devices[] = {
+ 	{
+@@ -887,6 +903,13 @@ static struct i2c_board_info i2c0_devices[] = {
+ 	},
+ };
+ 
++static struct i2c_board_info i2c2_devices[] = {
++	{
++		I2C_BOARD_INFO("s35390a", 0x30),
++		.type = "s35390a",
++	},
++};
++
+ /*
+  * board devices
+  */
+@@ -903,6 +926,7 @@ static struct platform_device *eva_devices[] __initdata = {
+ 	&fsi_device,
+ 	&fsi_hdmi_device,
+ 	&fsi_wm8978_device,
++	&i2c_gpio_device,
+ };
+ 
+ static void __init eva_clock_init(void)
+@@ -1173,6 +1197,7 @@ static void __init eva_init(void)
+ #endif
+ 
+ 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
++	i2c_register_board_info(2, i2c2_devices, ARRAY_SIZE(i2c2_devices));
+ 
+ 	r8a7740_add_standard_devices();
+ 
+-- 
+1.7.10.4
