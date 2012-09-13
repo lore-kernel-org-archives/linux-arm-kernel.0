@@ -1,49 +1,31 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 13 Sep 2012 16:41:20 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
- tree
-Message-ID: <20120913164120.cde08ac1517e641386b147d8@canb.auug.org.au>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 13 Sep 2012 08:47:06 +0200
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <505107DF.5020105@gmail.com>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+ <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
+ <5050CE33.9060909@ti.com> <5050E965.5080405@linutronix.de>
+ <505107DF.5020105@gmail.com>
+Message-ID: <5051816A.3050705@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 09/13/2012 12:08 AM, Rob Herring wrote:
+>> Geert is right here. If it is a physical address, it should be
+>> phys_addr_t.
+>
+> While generally true, for the DT specific code I think it should be a
+> fixed u64. The size of the address is defined by the FDT, not the
+> kernel. It is very likely we could have a FDT that specifies addresses
+> in 64-bit values, but then we boot a kernel is compiled for !LPAE.
+> phys_addr_t is currently sized based on LPAE setting.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/i2c/busses/i2c-omap.c between commit d9ebd04d3476 ("i2c: omap:
-switch to devm_* API") from the i2c-embedded tree and commit 07baca6f8fc2
-("i2c/i2c-omap: add a const qualifier") from the arm-soc tree.
+If your kernel is 32bit without PAE and your DTB address is >32ibt than
+you can't handle it. If you don't notice this in your dt code than you
+remap the wrong memory ioremap().
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+>
+> Rob
+>
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/i2c/busses/i2c-omap.c
-index c78431a,a0e49f6..0000000
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@@ -1051,11 -943,12 +1051,12 @@@ omap_i2c_probe(struct platform_device *
-  {
-  	struct omap_i2c_dev	*dev;
-  	struct i2c_adapter	*adap;
- -	struct resource		*mem, *irq, *ioarea;
- +	struct resource		*mem;
-- 	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
-+ 	const struct omap_i2c_bus_platform_data *pdata =
-+ 		pdev->dev.platform_data;
-  	struct device_node	*node = pdev->dev.of_node;
-  	const struct of_device_id *match;
- -	irq_handler_t isr;
- +	int irq;
-  	int r;
-  
-  	/* NOTE: driver uses the static register mapping */
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120913/3d870509/attachment.sig>
+Sebastian
