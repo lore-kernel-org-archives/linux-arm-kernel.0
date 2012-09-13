@@ -1,118 +1,84 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 13 Sep 2012 15:04:33 +0530
-Subject: [PATCH] ARM: Tegra: Add smp_twd clock for Tegra20
-Message-ID: <1347528873-3799-1-git-send-email-pgaikwad@nvidia.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Sep 2012 11:20:45 +0100
+Subject: [RFC PATCH 0/6] ARM: augment cache flushing API
+Message-ID: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clockevent's frequency is changed upon cpufreq change
-notification. It fetches local timer's rate to update the
-clockevent frequency. This patch adds local timer clock
-for Tegra20.
+This patch series provides an update of a previous posting:
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- arch/arm/mach-tegra/tegra20_clocks.c      |   19 ++++++++++++++++++
- arch/arm/mach-tegra/tegra20_clocks.h      |    1 +
- arch/arm/mach-tegra/tegra20_clocks_data.c |   30 +++++++++++++++++++++++++++++
- 3 files changed, 50 insertions(+), 0 deletions(-)
+http://www.spinics.net/lists/arm-kernel/msg169075.html
 
-diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
-index a4561da..deb873f 100644
---- a/arch/arm/mach-tegra/tegra20_clocks.c
-+++ b/arch/arm/mach-tegra/tegra20_clocks.c
-@@ -384,6 +384,25 @@ struct clk_ops tegra_super_ops = {
- 	.recalc_rate = tegra20_super_clk_recalc_rate,
- };
- 
-+static unsigned long tegra20_twd_clk_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	struct clk_tegra *c = to_clk_tegra(hw);
-+	u64 rate = parent_rate;
-+
-+	if (c->mul != 0 && c->div != 0) {
-+		rate *= c->mul;
-+		rate += c->div - 1; /* round up */
-+		do_div(rate, c->div);
-+	}
-+
-+	return rate;
-+}
-+
-+struct clk_ops tegra_twd_ops = {
-+	.recalc_rate = tegra20_twd_clk_recalc_rate,
-+};
-+
- static u8 tegra20_cop_clk_get_parent(struct clk_hw *hw)
- {
- 	return 0;
-diff --git a/arch/arm/mach-tegra/tegra20_clocks.h b/arch/arm/mach-tegra/tegra20_clocks.h
-index 0e42ec0..8bfd31b 100644
---- a/arch/arm/mach-tegra/tegra20_clocks.h
-+++ b/arch/arm/mach-tegra/tegra20_clocks.h
-@@ -28,6 +28,7 @@ extern struct clk_ops tegra_cdev_clk_ops;
- extern struct clk_ops tegra_audio_sync_clk_ops;
- extern struct clk_ops tegra_super_ops;
- extern struct clk_ops tegra_cpu_ops;
-+extern struct clk_ops tegra_twd_ops;
- extern struct clk_ops tegra_cop_ops;
- extern struct clk_ops tegra_bus_ops;
- extern struct clk_ops tegra_blink_clk_ops;
-diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
-index 0e8ed37..dc2ad7d 100644
---- a/arch/arm/mach-tegra/tegra20_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra20_clocks_data.c
-@@ -583,6 +583,34 @@ static struct clk_tegra tegra_cclk_hw = {
- DEFINE_CLK_TEGRA(cclk, 0, &tegra_super_ops, 0, mux_cclk,
- 		mux_cclk_p, NULL);
- 
-+static const char *mux_twd[] = {
-+	"cclk",
-+};
-+
-+static struct clk *mux_twd_p[] = {
-+	&tegra_cclk,
-+};
-+
-+static struct clk tegra_clk_twd;
-+static struct clk_tegra tegra_clk_twd_hw = {
-+	.hw = {
-+		.clk = &tegra_clk_twd,
-+	},
-+	.max_rate = 1000000000,
-+	.mul = 1,
-+	.div = 4,
-+};
-+
-+static struct clk tegra_clk_twd = {
-+	.name = "twd",
-+	.ops = &tegra_twd_ops,
-+	.hw = &tegra_clk_twd_hw.hw,
-+	.parent = &tegra_cclk,
-+	.parent_names = mux_twd,
-+	.parents = mux_twd_p,
-+	.num_parents = ARRAY_SIZE(mux_twd),
-+};
-+
- static struct clk tegra_sclk;
- static struct clk_tegra tegra_sclk_hw = {
- 	.hw = {
-@@ -1023,6 +1051,7 @@ static struct clk_duplicate tegra_clk_duplicates[] = {
- 	CLK_DUPLICATE("pll_p_out3", "tegra-i2c.1", "fast-clk"),
- 	CLK_DUPLICATE("pll_p_out3", "tegra-i2c.2", "fast-clk"),
- 	CLK_DUPLICATE("pll_p_out3", "tegra-i2c.3", "fast-clk"),
-+	CLK_DUPLICATE("twd",	"smp_twd",	NULL),
- };
- 
- #define CLK(dev, con, ck)	\
-@@ -1053,6 +1082,7 @@ static struct clk *tegra_ptr_clks[] = {
- 	&tegra_pll_x,
- 	&tegra_pll_e,
- 	&tegra_cclk,
-+	&tegra_clk_twd,
- 	&tegra_sclk,
- 	&tegra_hclk,
- 	&tegra_pclk,
+Main changes:
+ - Changed the new API to Level of Unification Inner Shareable (LoUIS)
+ - Fixed a pointer bug in __cpu_suspend_save code update
+ - Added patches to update __cpu_disable and __v7_setup to LoUIS API
+ - Changed the v7 dcache level function to make it clean/invalidate a specific
+   level instead of up to a certain level
+
+v7 ARM architecture introduced the concept of cache levels and relative
+control registers to manage them. Cache operations that operate on set/way
+require to define the cache level at which maintenance operations are carried
+out by using coprocessor registers.
+
+Processors like A7/A15 integrates a unified L2 that is part of the cache
+level hierarchy; this implies that cache operations operating on all levels
+also end up cleaning the L2 unified cache which is a very time consuming
+operation and it is not needed for some power-down operations like single CPU
+shutdown.
+
+For v7, flush_kern_all() cleans all the cache levels up to the Level of
+Coherency which includes L2 in it. This is suboptimal for code paths that end
+up shutting-down a single processor like CPU hotplug and CPU idle, where only
+per-CPU cache state (ie L1 integrated cache) has to be cleaned and invalidated.
+
+To fix this performance issue this patchset introduces cache LoUIS (Level of
+Unification Inner Shareable) maintenance operations in the kernel.
+
+A new cache operations pointer is added to cpu_cache_fns
+
+void (*flush_kern_cache_louis)(void);
+
+that allows to clean and invalidate all data cache levels up to the LoUIS and
+invalidate the instruction cache. This new API should provide a sufficiently
+optimized API to be used in generic C code in the kernel for power management
+operations on most v7 systems.
+
+For architecture versions previous to v7, flush_kern_cache_louis() falls back
+to flush_kern_all() leaving the current behaviour unchanged.
+
+In order to allow finer grain operations on cache levels, this series also
+defines an assembly stub for v7 that allows to clean and invalidate a specific
+data cache level and it is provided for completeness.
+
+For A9/A5 processors Level of Unification Inner Shareable and Level of
+Coherency are equivalent hence this patch should not affect current kernel
+behaviour in any way when run on A9/A5 based systems, but should nonetheless
+be thoroughly tested on them.
+
+Tested on:
+  - OMAP4 (S2R, cpuidle and hotplug)
+  - OMAP5 (out of tree code) (S2R, cpuidle and hotplug)
+  - TC2 big.LITTLE testchip (out of tree code) (cpuidle, on both A7 and A15
+    clusters)
+
+Lorenzo Pieralisi (4):
+  ARM: mm: define LoUIS API for cache maintenance ops
+  ARM: mm: add v7 cache LoUIS API implementation
+  ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+  ARM: kernel: update __cpu_disable to use cache LoUIS maintenance API
+
+Santosh Shilimkar (2):
+  ARM: mm: add v7 dcache level API
+  ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API
+
+ arch/arm/include/asm/cacheflush.h | 17 +++++++++++
+ arch/arm/kernel/smp.c             |  5 +++-
+ arch/arm/kernel/suspend.c         | 17 ++++++++++-
+ arch/arm/mm/cache-v7.S            | 62 +++++++++++++++++++++++++++++++++++++--
+ arch/arm/mm/proc-macros.S         |  7 ++++-
+ arch/arm/mm/proc-v7.S             |  2 +-
+ 6 files changed, 103 insertions(+), 7 deletions(-)
+
 -- 
-1.7.4.1
+1.7.12
