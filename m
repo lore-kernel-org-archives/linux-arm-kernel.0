@@ -1,27 +1,33 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 13 Sep 2012 11:17:20 +0200
-Subject: [PATCH v4 0/5] ARM: topology: set the capacity of each cores for
- big.LITTLE
-In-Reply-To: <1341927729.3462.131.camel@twins>
-References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
- <1341919622.3462.124.camel@twins>
- <CAKfTPtC0BcidJ2ga9c2fdWjrEsfXH48QtSnjv0YOCv7-k3K-Ug@mail.gmail.com>
- <1341927729.3462.131.camel@twins>
-Message-ID: <CAKfTPtCpZS=ALAjwqX5Wb0j5HjrMjv87MEefGC2O5_p7ENeY2w@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 13 Sep 2012 12:20:31 +0300
+Subject: [PATCH 00/11] ASoC: OMAP: Convert to use dmaengine
+In-Reply-To: <20120913081141.GD20959@opensource.wolfsonmicro.com>
+References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+ <20120913081141.GD20959@opensource.wolfsonmicro.com>
+Message-ID: <5051A55F.9070902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2012 15:42, Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
-> On Tue, 2012-07-10 at 14:35 +0200, Vincent Guittot wrote:
+On 09/13/2012 11:11 AM, Mark Brown wrote:
+> On Wed, Sep 12, 2012 at 02:46:56PM +0300, Peter Ujfalusi wrote:
+>> Hello,
 >>
->> May be the last one which enable ARCH_POWER should also go into tip ?
->>
-> OK, I can take it.
+>> This series will switch the OMAP audio to use dmaengine.
+>> The final patch which does the switch was based on Russell King's earlier patch.
+> 
+> I'm fine with this from the ASoC side but it sounds like you're going to
+> respin anyway.  Are the earlier bits of the series safe to apply without
+> the last bit, it seems like that's the only bit that really needs a
+> respin so we may as well go ahead and apply the earlier bits now?
 
-Hi Peter,
+Yes, I'm preparing the second series (adding the pause/resume support).
+Patch 2-10 is to prepare the OMAP audio drivers for the dmaengine conversion
+they can be applied earlier IMHO.
+I can in turn can send only dmaengine related patches in v2 (patch 1 and 10
+from this series and additional ones).
+Anyways I need some time to figure out how to add back the support for
+SNDRV_PCM_INFO_NO_PERIOD_WAKEUP.
+Either way is good for me.
 
-I can't find the patch that enable ARCH_POWER in the tip tree. Have
-you take it in your tree ?
-
-Regards,
-Vincent
+-- 
+P?ter
