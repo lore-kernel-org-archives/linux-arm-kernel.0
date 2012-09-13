@@ -1,115 +1,55 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 13 Sep 2012 09:01:26 +0200
-Subject: [PATCH] pinctrl: document semantics vs GPIO
-Message-ID: <1347519686-10170-1-git-send-email-linus.walleij@stericsson.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 13 Sep 2012 09:04:59 +0200
+Subject: [PATCH v6 0/7] ARM: OMAP2+: PM: introduce the power domains
+ functional states
+In-Reply-To: <87har2rc9q.fsf@deeprootsystems.com>
+References: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
+ <87har2rc9q.fsf@deeprootsystems.com>
+Message-ID: <CAORVsuVZ5AnsN9HYoXntMcF2Yc4VM3Mwk2bQBiGnV0=kdpMYfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Sep 13, 2012 at 2:34 AM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>
+>> Here is a re-spin after some comments and suggestions after review
+>> and discussions.
+>>
+>> Implement the functional states for the power domains:
+>> - unify the API to use the functional states. The new API
+>>   consists of the pwrdm_set*_fpwrst and pwrdm_read*_fpwrst
+>>   functions and is the API to use to control the power domains
+>>   power and logic states,
+>> - reorganize the powerdomain API in internal and external parts,
+>>   in powerdomain.h [1]
+>> - protect the power domain state change by a lock in the
+>>   functions that read and set the powerdomains next functional state,
+>> - introduce the functional states for power domains power states and
+>>   logic power states [2], and the conversion functions between the
+>>   functional and internal states. The conversion functions are
+>>   lightweight and generic. The power domains allowed states [3] are
+>>   defined in the pwrsts and pwrsts_logic_ret fields of the struct
+>>   powerdomain,
+>> - program the logic power state of power domains from the functional
+>>   states, in pwrdm_set*_fpwrst
+>> - convert the OMAP2/3/4 PM code to use the updated API,
+>> - provide the power domains statistics by functional states,
+>> - provide ftrace tracepoints with the functional state,
+>> - provide error logs in critical code, which makes the development
+>>   easier.
+>
+> I just gave this series a round of PM testing.  I tested retention
+> and off in idle & suspend, with and without CPUidle on 3430/n900,
+> 3530/Overo, 3730/OveroSTORM, 3730/Beagle-xM and 4430/Panda (though only
+> MPU/CPU ret/off is supported for OMAP4 in mainline.)
+>
+> All PM tests passed with flying colors.  Nice!
+Great!
 
-The semantics of the interactions between GPIO and pinctrl may be
-unclear, e.g. which one do you request first? This amends the
-documentation to make this clear.
+Thanks a lot Kevin for testing
 
-Reported-by: Domenico Andreoli <cavokz@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This is an attempt to write up some of the unclarities that surfaced
-in recent discussions into the documentation proper.
----
- Documentation/pinctrl.txt | 52 +++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 2 deletions(-)
+Jean
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index 1479aca..24c5995 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -289,6 +289,11 @@ Interaction with the GPIO subsystem
- The GPIO drivers may want to perform operations of various types on the same
- physical pins that are also registered as pin controller pins.
- 
-+First and foremost, the two subsystems can be used as completely orthogonal,
-+see the section named "pin control requests from drivers" and
-+"drivers needing both pin control and GPIOs" below for details. But in some
-+situations a cross-subsystem mapping between pins and GPIOs is needed.
-+
- Since the pin controller subsystem have its pinspace local to the pin
- controller we need a mapping so that the pin control subsystem can figure out
- which pin controller handles control of a certain GPIO pin. Since a single
-@@ -359,6 +364,7 @@ will get an pin number into its handled number range. Further it is also passed
- the range ID value, so that the pin controller knows which range it should
- deal with.
- 
-+
- PINMUX interfaces
- =================
- 
-@@ -960,8 +966,8 @@ all get selected, and they all get enabled and disable simultaneously by the
- pinmux core.
- 
- 
--Pinmux requests from drivers
--============================
-+Pin control requests from drivers
-+=================================
- 
- Generally it is discouraged to let individual drivers get and enable pin
- control. So if possible, handle the pin control in platform code or some other
-@@ -969,6 +975,11 @@ place where you have access to all the affected struct device * pointers. In
- some cases where a driver needs to e.g. switch between different mux mappings
- at runtime this is not possible.
- 
-+A typical case is if a driver needs to switch bias of pins from normal
-+operation and going to sleep, moving from the PINCTRL_STATE_DEFAULT to
-+PINCTRL_STATE_SLEEP at runtime, re-biasing or even re-muxing pins to save
-+current in sleep mode.
-+
- A driver may request a certain control state to be activated, usually just the
- default state like this:
- 
-@@ -1058,6 +1069,43 @@ registered. Thus make sure that the error path in your driver gracefully
- cleans up and is ready to retry the probing later in the startup process.
- 
- 
-+Drivers needing both pin control and GPIOs
-+==========================================
-+
-+Again, it is discouraged to let drivers lookup and select pin control states
-+themselves, but again sometimes this is unavoidable.
-+
-+So say that your driver is fetching its resources like this:
-+
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/gpio.h>
-+
-+struct pinctrl *pinctrl;
-+int gpio;
-+
-+pinctrl = devm_pinctrl_get_select_default(&dev);
-+gpio = devm_gpio_request(&dev, 14, "foo");
-+
-+Here we first request a certain pin state and then request GPIO 14 to be
-+used. If you're using the subsystems orthogonally like this, always get
-+your pinctrl handle and select the desired pinctrl state BEFORE requesting
-+the GPIO. This is a semantic convention to avoid situations that can be
-+electrically unpleasant, you will certainly want to mux in and bias pins
-+in a certain way before the GPIO subsystems starts to deal with them.
-+
-+The above can be hidden: using pinctrl hogs, the driver may be setting
-+up the config and muxing for the pins when the pinctrl driver is probing,
-+nevertheless orthogonal to the GPIO subsystem.
-+
-+But there are also situations where it makes sense for the GPIO subsystem
-+to communicate directly with with the pinctrl subsystem, using the latter
-+as a back-end. This is when the GPIO driver may call out to the functions
-+described in the section "Pin control interaction with the GPIO subsystem"
-+above. This only involves per-pin multiplexing, and will be completely
-+hidden behind the gpio_*() function namespace. In this case, the driver
-+need not interact with the pin control subsystem at all.
-+
-+
- System pin control hogging
- ==========================
- 
--- 
-1.7.11.3
+>
+> Kevin
