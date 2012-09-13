@@ -1,85 +1,22 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 13 Sep 2012 11:56:11 -0400
-Subject: [PATCH v3 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120912134916.GF21823@arm.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-3-git-send-email-catalin.marinas@arm.com>
- <20120909172046.GB31430@game.jcrosoft.org> <20120910161159.GH27042@arm.com>
- <20120912120858.GI31430@game.jcrosoft.org> <20120912134916.GF21823@arm.com>
-Message-ID: <5052021B.4050808@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Sep 2012 09:57:51 -0600
+Subject: [PATCH] ARM: Tegra: Add smp_twd clock for Tegra20
+In-Reply-To: <1347528873-3799-1-git-send-email-pgaikwad@nvidia.com>
+References: <1347528873-3799-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <5052027F.1000404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin and Will,
+On 09/13/2012 03:34 AM, Prashant Gaikwad wrote:
+> Clockevent's frequency is changed upon cpufreq change
+> notification. It fetches local timer's rate to update the
+> clockevent frequency. This patch adds local timer clock
+> for Tegra20.
 
-On 09/12/2012 09:49 AM, Catalin Marinas wrote:
-> On Wed, Sep 12, 2012 at 01:08:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 17:11 Mon 10 Sep     , Catalin Marinas wrote:
->>> On Sun, Sep 09, 2012 at 06:20:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>> On 17:26 Fri 07 Sep     , Catalin Marinas wrote:
->>>>> +Before jumping into the kernel, the following conditions must be met:
->>>>> +
->>>>> +- Quiesce all DMA capable devices so that memory does not get
->>>>> +  corrupted by bogus network packets or disk data.  This will save
->>>>> +  you many hours of debug.
->>>>> +
->>>>> +- Primary CPU general-purpose register settings
->>>>> +  x0 = physical address of device tree blob (dtb) in system RAM.
->>>>> +  x1 = 0 (reserved for future use)
->>>>> +  x2 = 0 (reserved for future use)
->>>>> +  x3 = 0 (reserved for future use)
->>>>> +
->>>>> +- CPU mode
->>>>> +  All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
->>>>> +  IRQ and FIQ).
->>>>> +  The CPU must be in either EL2 (RECOMMENDED in order to have access to
->>>>> +  the virtualisation extensions) or non-secure EL1.
->>>>> +
->>>>> +- Caches, MMUs
->>>>> +  The MMU must be off.
->>>>> +  Instruction cache may be on or off.
->>>>> +  Data cache must be off and invalidated.
->>>>> +  External caches (if present) must be configured and disabled.
->>>>> +
->>>>> +- Architected timers
->>>>> +  CNTFRQ must be programmed with the timer frequency.
->>>>> +  If entering the kernel at EL1, CNTHCTL_EL2 must have EL1PCTEN (bit 0)
->>>>> +  set where available.
->>>> can you explain why?
->>>
->>> Otherwise the kernel cannot access the generic timer registers (it is
->>> described in the AArch64 exception model which isn't public yet).
->> I do not like the idea to do too much in the boot loader
+Hmm. Off-list, I'd asked you to check whether this patch, and Mike's
+twd/clk-notifier changes were OK for Tegra, and part of your reponse was:
 
-I agree that where possible we should minimize the amount of work required of
-bootloaders. I'm not sure that the percentage of work we might be able to trim
-away on hardware would be significant, but on simulators I think we might be
-able to get to the point where, if you can specify the r0 reset value to be
-the dtb pointer, you can just load a devicetree blob and kernel image into
-memory and start executing the kernel, no boot wrapper required.
+Tegra20 (Ventana)
+        Tegra's for-next (common clock) + smp_twd : Panic
 
-I don't know if Jean-Christophe was commenting on just the EL1PCTEN bit or
-also the CNTFRQ register, but with regard to the latter, it appears to me that
-the timer code actually reads the frequency primarily from the devicetree and
-only reads CNTFRQ if the "clock-frequency" property is unspecified or
-specified as zero.
-
-I suggest that the kernel calling requirements be modified to communicate this
-fallback, rather than mandatory, status, unless some not-yet-released part of
-the arm64 kernel needs it. If userspace code will need to use CNTFRQ at some
-point then perhaps that should be mentioned in an informational note rather
-than being presented as a kernel booting requirement.
-
-> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/boot-wrapper-aarch64.git
-
-The UART and GIC stuff is board-specific, and I don't currently have any
-suggestions about the multicore initialization, but would you object to the
-kernel eventually being equipped to make the descent from EL3 itself?
-
-Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+Is that true? If so, I can't apply this patch...
