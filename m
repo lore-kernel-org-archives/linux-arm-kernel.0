@@ -1,115 +1,67 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 13 Sep 2012 10:24:56 +0000
-Subject: [PATCH 02/10] ARM: OMAP: Fix timer posted mode support
-In-Reply-To: <5048C8D1.6080806@ti.com>
-References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
- <1346871872-24413-3-git-send-email-jon-hunter@ti.com>
- <50489DBD.5030200@ti.com> <5048B117.7050601@ti.com> <5048C8D1.6080806@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAB7BD3@DBDE01.ent.ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 13 Sep 2012 12:24:19 +0200
+Subject: triggering an gpio-irq on both edges
+In-Reply-To: <20120913081920.GF19497@pengutronix.de>
+References: <20120913081920.GF19497@pengutronix.de>
+Message-ID: <1347531859.2429.241.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 21:31:21, Hunter, Jon wrote:
+Am Donnerstag, den 13.09.2012, 10:19 +0200 schrieb Uwe Kleine-K?nig:
+> Hello,
 > 
-> On 09/06/2012 09:20 AM, Jon Hunter wrote:
-> > 
-> > On 09/06/2012 07:57 AM, Vaibhav Hiremath wrote:
-> >>
-> >>
-> >> On 9/6/2012 12:34 AM, Jon Hunter wrote:
-> >>> Currently the dmtimer posted mode is being enabled when the function
-> >>> __omap_dm_timer_reset() is called. This function is only being called for
-> >>> OMAP1 timers and OMAP2+ timers that are being used as system timers. Hence,
-> >>> for OMAP2+ timers that are NOT being used as a system timer, posted mode is
-> >>> not enabled but the "timer->posted" variable is still set (incorrectly) in
-> >>> the omap_dm_timer_prepare() function.
-> >>>
-> >>> This is a regression introduced by commit 3392cdd3 (ARM: OMAP: dmtimer:
-> >>> switch-over to platform device driver) which changed the code to only call
-> >>> omap_dm_timer_reset() for OMAP1 devices. Although this is a regression from
-> >>> the original code it only impacts performance and so is not needed for stable.
-> >>>
-> >>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> >>> ---
-> >>>  arch/arm/mach-omap2/timer.c               |    3 +--
-> >>>  arch/arm/plat-omap/dmtimer.c              |   14 +++++---------
-> >>>  arch/arm/plat-omap/include/plat/dmtimer.h |    9 ++++++++-
-> >>>  3 files changed, 14 insertions(+), 12 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> >>> index 5471706..e24ee0f 100644
-> >>> --- a/arch/arm/mach-omap2/timer.c
-> >>> +++ b/arch/arm/mach-omap2/timer.c
-> >>> @@ -194,10 +194,9 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
-> >>>  	}
-> >>>  	__omap_dm_timer_init_regs(timer);
-> >>>  	__omap_dm_timer_reset(timer, 1, 1);
-> >>> -	timer->posted = 1;
-> >>> +	__omap_dm_timer_enable_posted(timer);
-> >>>  
-> >>>  	timer->rate = clk_get_rate(timer->fclk);
-> >>> -
-> >>>  	timer->reserved = 1;
-> >>>  
-> >>>  	return res;
-> >>> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> >>> index c34f55b..22790ea 100644
-> >>> --- a/arch/arm/plat-omap/dmtimer.c
-> >>> +++ b/arch/arm/plat-omap/dmtimer.c
-> >>> @@ -122,21 +122,15 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
-> >>>  
-> >>>  static void omap_dm_timer_reset(struct omap_dm_timer *timer)
-> >>>  {
-> >>> -	omap_dm_timer_enable(timer);
-> >>>  	if (timer->pdev->id != 1) {
-> >>>  		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
-> >>>  		omap_dm_timer_wait_for_reset(timer);
-> >>>  	}
-> >>> -
-> >>>  	__omap_dm_timer_reset(timer, 0, 0);
-> >>> -	omap_dm_timer_disable(timer);
-> >>> -	timer->posted = 1;
-> >>>  }
-> >>>  
-> >>>  int omap_dm_timer_prepare(struct omap_dm_timer *timer)
-> >>>  {
-> >>> -	int ret;
-> >>> -
-> >>>  	/*
-> >>>  	 * FIXME: OMAP1 devices do not use the clock framework for dmtimers so
-> >>>  	 * do not call clk_get() for these devices.
-> >>> @@ -150,13 +144,15 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
-> >>>  		}
-> >>>  	}
-> >>>  
-> >>> +	omap_dm_timer_enable(timer);
-> >>> +
-> >>>  	if (timer->capability & OMAP_TIMER_NEEDS_RESET)
-> >>>  		omap_dm_timer_reset(timer);
-> >>>  
-> >>> -	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-> >>> +	__omap_dm_timer_enable_posted(timer);
-> >>> +	omap_dm_timer_disable(timer);
-> >>>  
-> >>> -	timer->posted = 1;
-> >>> -	return ret;
-> >>> +	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-> >>
-> >> May be I am speculating here and I know this is tested and supposed to
-> >> work, but Isn't it safe to set parent keeping module enables.
-> > 
-> > So you would rather change the functional clock while the timer is
-> > enabled/active? So although that we are doing this today, that does not
-> > sound like a good idea to me :-)
+> My motivation for this mail is that currently mxs_gpio_set_irq_type
+> doesn't support type=IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING because
+> the hardware doesn't support it.
 > 
-> Actually, we are not doing this today. If you look at the current code
-> we are only enabling the timer while doing the soft-reset for omap1
-> devices. Hence, even in the current code we set the parent while the
-> timer is not enabled. So there is no actual change here in the sequence.
+> The gpio-keys driver on the other hand wants a trigger in both
+> directions.
+> 
+> The mxc-gpio driver implements the missing hardware functionallity in
+> software (gpio_set_irq_type):
+> 
+> 	set_irq_type:
+> 		if (both edges requested)
+> 			if (current value of gpio == 0)
+> 				trigger on rising edge
+> 			else
+> 				trigger on falling edge
+> 
+> 	handle_irq:
+> 		if (both edges requested)
+> 			trigger on other edge
 > 
 
-Yes, you are absolutely right here. As such there is no change in the 
-sequence.
+The ASIC3 driver in drivers/mfd/asic3.c does the same in
+asic3_irq_demux, asic3_irq_flip_edge and asic3_gpio_irq_type.
 
-Thanks,
-Vaibhav 
+> This is racy though: If there is an edge after reading out the gpio
+> value and completion of the edge direction programming, you miss
+> interrupts. Also just switching the direction in the irq handler is
+> also wrong for the same reason.
+>
+> I guess there are more machines than mxc and mxs that have the same
+> problem.
+> 
+> In my opinion this calls for a wrapper, something like:
+> 
+> 	int gpio_irq_emulate_both_edges_set_irq_type(struct irq_data *d,
+> 		unsigned int type, int (*set_irq_type)(...),
+> 		int (*get_value)(...), struct something *privdata)
+> 	{
+> 		...
+> 	}
+> 
+> 	int gpio_irq_emulate_both_edges_handler(...)
+> 	{
+> 
+> 	}
+> 
+> Does this sound good and possible? I didn't find something like that
+> already implemented, but maybe I missed it?
+> 
+> Any thoughts (and be it only "The xyz driver is affected, too.") are
+> welcome.
+
+regards
+Philipp
