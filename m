@@ -1,154 +1,34 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 13 Sep 2012 15:47:15 +0800
-Subject: [V3 1/4] regulator: 88pm860x: add pre-regulator support for
- 88pm860x regulator
-In-Reply-To: <1341543520-6427-1-git-send-email-jtzhou@marvell.com>
-References: <20120705141541.GO4111@opensource.wolfsonmicro.com>
- <1341543520-6427-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <CAN1soZx9znejw8msWcY1-7PzqYAjyuym4sn9190-r5B151ah0g@mail.gmail.com>
+Date: Thu, 13 Sep 2012 15:48:11 +0800
+Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
+In-Reply-To: <20120823122239.GA29485@lizard>
+References: <20120714081254.GD20018@lizard>
+ <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
+ <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
+ <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
+ <20120823122239.GA29485@lizard>
+Message-ID: <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2012 at 10:58 AM, Jett.Zhou <jtzhou@marvell.com> wrote:
-> Pre-regulator of 88pm8606 is mainly for support charging based on vbus,
-> it needs to be enabled for charging battery, and will be disabled in
-> some exception condition like over-temp.
-> Add the pre-regulator support for 88pm860x regulator driver.
+On Thu, Aug 23, 2012 at 8:22 PM, Anton Vorontsov
+<anton.vorontsov@linaro.org> wrote:
+> On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
+>> Thanks for helping me to amend these patch.  I got many good
+>> suggestions and learn a lot in this process:) BTW, you mean you will
+>> help to amend that several minor warning with battery tree?
 >
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-> ---
->  drivers/regulator/88pm8607.c |   66 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 66 insertions(+), 0 deletions(-)
+> Yup, I have these small fixups locally in my tree already, so if/once
+> Samuel gives me an Ack for the mfd part, I'll merge it into battery git
+> tree.
 >
-> diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
-> index c3482b9..3c81fd0 100644
-> --- a/drivers/regulator/88pm8607.c
-> +++ b/drivers/regulator/88pm8607.c
-> @@ -23,6 +23,7 @@ struct pm8607_regulator_info {
->         struct pm860x_chip      *chip;
->         struct regulator_dev    *regulator;
->         struct i2c_client       *i2c;
-> +       struct i2c_client       *i2c_8606;
+> Thanks,
 >
->         unsigned int    *vol_table;
->         unsigned int    *vol_suspend;
-> @@ -242,6 +243,35 @@ static int pm8607_set_voltage_sel(struct regulator_dev *rdev, unsigned selector)
->         return ret;
->  }
->
-> +static int pm8606_preg_enable(struct regulator_dev *rdev)
-> +{
-> +       struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
-> +
-> +       return pm860x_set_bits(info->i2c, rdev->desc->enable_reg,
-> +                              1 << rdev->desc->enable_mask, 0);
-> +}
-> +
-> +static int pm8606_preg_disable(struct regulator_dev *rdev)
-> +{
-> +       struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
-> +
-> +       return pm860x_set_bits(info->i2c, rdev->desc->enable_reg,
-> +                              1 << rdev->desc->enable_mask,
-> +                              1 << rdev->desc->enable_mask);
-> +}
-> +
-> +static int pm8606_preg_is_enabled(struct regulator_dev *rdev)
-> +{
-> +       struct pm8607_regulator_info *info = rdev_get_drvdata(rdev);
-> +       int ret;
-> +
-> +       ret = pm860x_reg_read(info->i2c, rdev->desc->enable_reg);
-> +       if (ret < 0)
-> +               return ret;
-> +
-> +       return !((unsigned char)ret & (1 << rdev->desc->enable_mask));
-> +}
-> +
->  static struct regulator_ops pm8607_regulator_ops = {
->         .list_voltage   = pm8607_list_voltage,
->         .set_voltage_sel = pm8607_set_voltage_sel,
-> @@ -251,6 +281,25 @@ static struct regulator_ops pm8607_regulator_ops = {
->         .is_enabled = regulator_is_enabled_regmap,
->  };
->regulator git tree kernel.org
-> +static struct regulator_ops pm8606_preg_ops = {
-> +       .enable         = pm8606_preg_enable,
-> +       .disable        = pm8606_preg_disable,
-> +       .is_enabled     = pm8606_preg_is_enabled,regulator git tree kernel.org
-> +};
-> +
-> +#define PM8606_PREG(ereg, ebit)                                                \
-> +{                                                                      \
-> +       .desc   = {                                                     \
-> +               .name   = "PREG",                                       \
-> +               .ops    = &pm8606_preg_ops,                             \
-> +               .type   = REGULATOR_CURRENT,                            \
-> +               .id     = PM8606_ID_PREG,                               \
-> +               .owner  = THIS_MODULE,                                  \
-> +               .enable_reg = PM8606_##ereg,                            \
-> +               .enable_mask = (ebit),                                  \
-> +       },                                                              \
-> +}
-> +
->  #define PM8607_DVC(vreg, ureg, ubit, ereg, ebit)                       \
->  {                                                                      \
->         .desc   = {                                                     \
-> @@ -309,6 +358,8 @@ static struct pm8607_regulator_info pm8607_regulator_info[] = {
->         PM8607_LDO(12,        LDO12, 0, SUPPLIES_EN12, 5),
->         PM8607_LDO(13, VIBRATOR_SET, 1, VIBRATOR_SET, 0),
->         PM8607_LDO(14,        LDO14, 0, SUPPLIES_EN12, 6),
-> +
-> +       PM8606_PREG(PREREGULATORB, 5),
->  };
->
->  static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
-> @@ -336,6 +387,8 @@ static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
->                 return -EINVAL;
->         }
->         info->i2c = (chip->id == CHIP_PM8607) ? chip->client : chip->companion;
-> +       info->i2c_8606 = (chip->id == CHIP_PM8607) ? chip->companion :
-> +                       chip->client;
->         info->chip = chip;
->
->         /* check DVC ramp slope double */
-> @@ -372,6 +425,18 @@ static int __devexit pm8607_regulator_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +static struct platform_device_id pm8607_regulator_driveregulator git tree kernel.orgr_ids[] = {
-> +       {
-> +               .name   = "88pm860x-regulator",
-> +               .driver_data    = 0,
-> +       }, {
-> +               .name   = "88pm860x-preg",
-> +               .driver_data    = 0,
-> +       },
-> +       { },
-> +};
-> +MODULE_DEVICE_TABLE(platform, pm8607_regulator_driver_ids);
-> +
->  static struct platform_driver pm8607_regulator_driver = {regulator git tree kernel.org
->         .driver         = {
->                 .name   = "88pm860x-regulator",
-> @@ -379,6 +444,7 @@ static struct platform_driver pm8607_regulator_driver = {
->         },
->         .probe          = pm8607_regulator_probe,
->         .remove         = __devexit_p(pm8607_regulator_remove),
-> +       .id_table       = pm8607_regulator_driver_ids,
->  };
->
->  static int __init pm8607_regulator_init(void)
-> --
-> 1.7.0.4
->
+> Anton.
 
-Hi Samuel,
+Hi all,
 
-Could you help to merge this patch into your mfd tree also? Although
-it's the patch
-of regulator, it's depend on the previous patch that is merged into
-your mfd tree.
+Any updates?
 
-Best Regards
+Regards
 Haojian
