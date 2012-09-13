@@ -1,29 +1,60 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Thu, 13 Sep 2012 14:07:11 +0200
-Subject: [PATCH v4 0/5] ARM: topology: set the capacity of each cores
- for big.LITTLE
-In-Reply-To: <CAKfTPtCpZS=ALAjwqX5Wb0j5HjrMjv87MEefGC2O5_p7ENeY2w@mail.gmail.com>
-References: <1341826026-6504-1-git-send-email-vincent.guittot@linaro.org>
- <1341919622.3462.124.camel@twins>
- <CAKfTPtC0BcidJ2ga9c2fdWjrEsfXH48QtSnjv0YOCv7-k3K-Ug@mail.gmail.com>
- <1341927729.3462.131.camel@twins>
- <CAKfTPtCpZS=ALAjwqX5Wb0j5HjrMjv87MEefGC2O5_p7ENeY2w@mail.gmail.com>
-Message-ID: <1347538031.15764.126.camel@twins>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Sep 2012 13:36:04 +0100
+Subject: [RFC PATCH 1/6] ARM: mm: define LoUIS API for cache
+ maintenance ops
+In-Reply-To: <1347531651-28218-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347531651-28218-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20120913123604.GH28448@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-13 at 11:17 +0200, Vincent Guittot wrote:
-> On 10 July 2012 15:42, Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
-> > On Tue, 2012-07-10 at 14:35 +0200, Vincent Guittot wrote:
-> >>
-> >> May be the last one which enable ARCH_POWER should also go into tip ?
-> >>
-> > OK, I can take it.
-> 
-> Hi Peter,
-> 
-> I can't find the patch that enable ARCH_POWER in the tip tree. Have
-> you take it in your tree ?
+On Thu, Sep 13, 2012 at 11:20:46AM +0100, Lorenzo Pieralisi wrote:
+> +/*
+> + * Flush caches up to Level of Unification Inner Shareable
+> + */
+> +#ifdef MULTI_CACHE
+> +#define flush_cache_louis()   cpu_cache.flush_kern_cache_louis()
+> +#else
+> +#define flush_cache_louis()   __cpuc_flush_kern_all()
+> +#endif
 
+NAK.  This is broken as you don't seem to understand what MULTI_CACHE
+actually means.  MULTI_CACHE means that we _may_ support more than one
+type of cache, so it not being selected means nothing as far as whether
+to use flush_kern_all() or not.
 
-Uhmmm.... how about I say I have now? Sorry about that.
+Follow the pattern in the rest of the file - that's the _only_ way to do
+this.
+
+Note that ARMv6 only and ARMv7 only kernels will not have MULTI_CACHE
+defined (I mentioned this on Monday in our call, though not explicitly
+by that name.)
+
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index 2d8ff3a..28e91f8 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -293,12 +293,17 @@ ENTRY(\name\()_processor_functions)
+>  	.size	\name\()_processor_functions, . - \name\()_processor_functions
+>  .endm
+>  
+> -.macro define_cache_functions name:req
+> +.macro define_cache_functions name:req, cachelouis=0
+>  	.align 2
+>  	.type	\name\()_cache_fns, #object
+>  ENTRY(\name\()_cache_fns)
+>  	.long	\name\()_flush_icache_all
+>  	.long	\name\()_flush_kern_cache_all
+> +	.if \cachelouis
+> +	.long   \name\()_flush_kern_cache_louis
+> +	.else
+> +	.long   \name\()_flush_kern_cache_all
+> +	.endif
+>  	.long	\name\()_flush_user_cache_all
+>  	.long	\name\()_flush_user_cache_range
+>  	.long	\name\()_coherent_kern_range
+
+And what the above means is that _every_ cache support file must supply a
+XXX_flush_kern_cache_louis function name.  If there is no separate
+implementation, then name it an alias for the XXX_flush_cache_all function.
