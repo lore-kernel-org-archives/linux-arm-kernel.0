@@ -1,31 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Sep 2012 16:38:24 +0100
-Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
- dmaengine_prep_dma_cyclic()
-In-Reply-To: <5051FB4D.3000009@metafoo.de>
-References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
- <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
- <5051FB4D.3000009@metafoo.de>
-Message-ID: <20120913153824.GK28448@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Sep 2012 16:40:46 +0100
+Subject: [PATCH v2] ARM: perf: add guest vs host discrimination
+Message-ID: <1347550846-10158-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 05:27:09PM +0200, Lars-Peter Clausen wrote:
-> Hm... Do you think it would work as well if we implement this by setting the
-> callback for the descriptor to NULL? If the callback is NULL there is
-> nothing to at the end of a transfer/period and the dma engine driver may
-> choose to disable interrupts. This would also benefit non cyclic transfers
-> where the callback is NULL and we do not need add the new parameter to
-> dmaengine_prep_dma_cyclic.
+Add minimal guest support to perf, so it can distinguish whether
+the PMU interrupt was in the host or the guest, as well as collecting
+some very basic information (guest PC, user vs kernel mode).
 
-Actually, there's a way to do that already.  DMA_PREP_INTERRUPT.
-Unfortunately, most DMA engine slave API users don't set it when they
-setup their transfer:
+This is not feature complete though, as it doesn't support backtracing
+in the guest.
 
- * @DMA_PREP_INTERRUPT - trigger an interrupt (callback) upon completion of
- *  this transaction
+Based on the x86 implementation, tested with KVM/ARM.
 
-if we fixed that, then we could use the lack of it to avoid the interrupt.
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+Hi Will,
 
-However, cyclic transfers don't have the flags parameter used to pass this
-bit.  Yet another bit of yucky inconsistent design in DMA engine land...
+This is v2 of this patch, based on your perf/updates branch.
+If you don't have any additional comment, can you please merge it?
+
+Thanks,
+
+	M.
+
+ arch/arm/include/asm/perf_event.h |  5 +++++
+ arch/arm/kernel/perf_event.c      | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index 625cd62..00416ed 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -21,4 +21,9 @@
+ #define C(_x)				PERF_COUNT_HW_CACHE_##_x
+ #define CACHE_OP_UNSUPPORTED		0xFFFF
+ 
++struct pt_regs;
++extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
++extern unsigned long perf_misc_flags(struct pt_regs *regs);
++#define perf_misc_flags(regs)	perf_misc_flags(regs)
++
+ #endif /* __ARM_PERF_EVENT_H__ */
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 93971b1..27413aa 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -572,6 +572,10 @@ perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
+ {
+ 	struct frame_tail __user *tail;
+ 
++	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
++		/* We don't support guest os callchain now */
++		return;
++	}
+ 
+ 	tail = (struct frame_tail __user *)regs->ARM_fp - 1;
+ 
+@@ -599,9 +603,41 @@ perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs)
+ {
+ 	struct stackframe fr;
+ 
++	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
++		/* We don't support guest os callchain now */
++		return;
++	}
++
+ 	fr.fp = regs->ARM_fp;
+ 	fr.sp = regs->ARM_sp;
+ 	fr.lr = regs->ARM_lr;
+ 	fr.pc = regs->ARM_pc;
+ 	walk_stackframe(&fr, callchain_trace, entry);
+ }
++
++unsigned long perf_instruction_pointer(struct pt_regs *regs)
++{
++	if (perf_guest_cbs && perf_guest_cbs->is_in_guest())
++		return perf_guest_cbs->get_guest_ip();
++
++	return instruction_pointer(regs);
++}
++
++unsigned long perf_misc_flags(struct pt_regs *regs)
++{
++	int misc = 0;
++
++	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
++		if (perf_guest_cbs->is_user_mode())
++			misc |= PERF_RECORD_MISC_GUEST_USER;
++		else
++			misc |= PERF_RECORD_MISC_GUEST_KERNEL;
++	} else {
++		if (user_mode(regs))
++			misc |= PERF_RECORD_MISC_USER;
++		else
++			misc |= PERF_RECORD_MISC_KERNEL;
++	}
++
++	return misc;
++}
+-- 
+1.7.12
