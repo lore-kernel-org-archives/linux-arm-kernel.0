@@ -1,65 +1,118 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Sep 2012 11:35:43 +0200
-Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between DT
- and non-DT boots
-In-Reply-To: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
-References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaKa=NAObnjJyifhxyqu3Hcgj7Fxqi=bdNFqbm7V_8cSw@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 13 Sep 2012 15:04:33 +0530
+Subject: [PATCH] ARM: Tegra: Add smp_twd clock for Tegra20
+Message-ID: <1347528873-3799-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 2:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Clockevent's frequency is changed upon cpufreq change
+notification. It fetches local timer's rate to update the
+clockevent frequency. This patch adds local timer clock
+for Tegra20.
 
-> If we're booting with Device Tree enabled, we want the IRQ numbers to
-> be taken and translated from the Device Tree binary. If not, they
-> should be taken from the resource allocation defined in the AB8500 MFD
-> core driver.
->
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+---
+ arch/arm/mach-tegra/tegra20_clocks.c      |   19 ++++++++++++++++++
+ arch/arm/mach-tegra/tegra20_clocks.h      |    1 +
+ arch/arm/mach-tegra/tegra20_clocks_data.c |   30 +++++++++++++++++++++++++++++
+ 3 files changed, 50 insertions(+), 0 deletions(-)
 
-Not having this patch in v3.6-rcN gives the following boot noise (and
-the key does not work):
-
-------------[ cut here ]------------
-WARNING: at /home/elinwal/linux-stericsson/kernel/irq/irqdomain.c:137
-irq_domain_legacy_revmap+0x20/0x48()
-Modules linked in:
-[<c0014710>] (unwind_backtrace+0x0/0xf8) from [<c001d37c>]
-(warn_slowpath_common+0x4c/0x64)
-[<c001d37c>] (warn_slowpath_common+0x4c/0x64) from [<c001d3b0>]
-(warn_slowpath_null+0x1c/0x24)
-[<c001d3b0>] (warn_slowpath_null+0x1c/0x24) from [<c0064200>]
-(irq_domain_legacy_revmap+0x20/0x48)
-[<c0064200>] (irq_domain_legacy_revmap+0x20/0x48) from [<c02cea28>]
-(ab8500_ponkey_probe+0xd0/0x1f8)
-[<c02cea28>] (ab8500_ponkey_probe+0xd0/0x1f8) from [<c01a1e20>]
-(platform_drv_probe+0x14/0x18)
-[<c01a1e20>] (platform_drv_probe+0x14/0x18) from [<c01a0be4>]
-(driver_probe_device+0x78/0x208)
-[<c01a0be4>] (driver_probe_device+0x78/0x208) from [<c01a0e00>]
-(__driver_attach+0x8c/0x90)
-[<c01a0e00>] (__driver_attach+0x8c/0x90) from [<c019f514>]
-(bus_for_each_dev+0x50/0x7c)
-[<c019f514>] (bus_for_each_dev+0x50/0x7c) from [<c01a0424>]
-(bus_add_driver+0x170/0x23c)
-[<c01a0424>] (bus_add_driver+0x170/0x23c) from [<c01a12b4>]
-(driver_register+0x78/0x144)
-[<c01a12b4>] (driver_register+0x78/0x144) from [<c0008598>]
-(do_one_initcall+0x34/0x174)
-[<c0008598>] (do_one_initcall+0x34/0x174) from [<c03df8e8>]
-(kernel_init+0xfc/0x1bc)
-[<c03df8e8>] (kernel_init+0xfc/0x1bc) from [<c000f1d4>]
-(kernel_thread_exit+0x0/0x8)
----[ end trace d77aa0db848f0e28 ]---
-ab8500-core ab8500-core.0: Failed to request dbf IRQ#0: -22
-ab8500-poweron-key: probe of ab8500-poweron-key.0 failed with error -22
-
-So how do we proceed to not release v3.6 with this regression?
-
-Shall all of the MFD IRQdomain stuff be pulled into the -rc series?
-
-(Linux-next seems to be working, so the real fix is in there)
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
+index a4561da..deb873f 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks.c
++++ b/arch/arm/mach-tegra/tegra20_clocks.c
+@@ -384,6 +384,25 @@ struct clk_ops tegra_super_ops = {
+ 	.recalc_rate = tegra20_super_clk_recalc_rate,
+ };
+ 
++static unsigned long tegra20_twd_clk_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u64 rate = parent_rate;
++
++	if (c->mul != 0 && c->div != 0) {
++		rate *= c->mul;
++		rate += c->div - 1; /* round up */
++		do_div(rate, c->div);
++	}
++
++	return rate;
++}
++
++struct clk_ops tegra_twd_ops = {
++	.recalc_rate = tegra20_twd_clk_recalc_rate,
++};
++
+ static u8 tegra20_cop_clk_get_parent(struct clk_hw *hw)
+ {
+ 	return 0;
+diff --git a/arch/arm/mach-tegra/tegra20_clocks.h b/arch/arm/mach-tegra/tegra20_clocks.h
+index 0e42ec0..8bfd31b 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks.h
++++ b/arch/arm/mach-tegra/tegra20_clocks.h
+@@ -28,6 +28,7 @@ extern struct clk_ops tegra_cdev_clk_ops;
+ extern struct clk_ops tegra_audio_sync_clk_ops;
+ extern struct clk_ops tegra_super_ops;
+ extern struct clk_ops tegra_cpu_ops;
++extern struct clk_ops tegra_twd_ops;
+ extern struct clk_ops tegra_cop_ops;
+ extern struct clk_ops tegra_bus_ops;
+ extern struct clk_ops tegra_blink_clk_ops;
+diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
+index 0e8ed37..dc2ad7d 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks_data.c
++++ b/arch/arm/mach-tegra/tegra20_clocks_data.c
+@@ -583,6 +583,34 @@ static struct clk_tegra tegra_cclk_hw = {
+ DEFINE_CLK_TEGRA(cclk, 0, &tegra_super_ops, 0, mux_cclk,
+ 		mux_cclk_p, NULL);
+ 
++static const char *mux_twd[] = {
++	"cclk",
++};
++
++static struct clk *mux_twd_p[] = {
++	&tegra_cclk,
++};
++
++static struct clk tegra_clk_twd;
++static struct clk_tegra tegra_clk_twd_hw = {
++	.hw = {
++		.clk = &tegra_clk_twd,
++	},
++	.max_rate = 1000000000,
++	.mul = 1,
++	.div = 4,
++};
++
++static struct clk tegra_clk_twd = {
++	.name = "twd",
++	.ops = &tegra_twd_ops,
++	.hw = &tegra_clk_twd_hw.hw,
++	.parent = &tegra_cclk,
++	.parent_names = mux_twd,
++	.parents = mux_twd_p,
++	.num_parents = ARRAY_SIZE(mux_twd),
++};
++
+ static struct clk tegra_sclk;
+ static struct clk_tegra tegra_sclk_hw = {
+ 	.hw = {
+@@ -1023,6 +1051,7 @@ static struct clk_duplicate tegra_clk_duplicates[] = {
+ 	CLK_DUPLICATE("pll_p_out3", "tegra-i2c.1", "fast-clk"),
+ 	CLK_DUPLICATE("pll_p_out3", "tegra-i2c.2", "fast-clk"),
+ 	CLK_DUPLICATE("pll_p_out3", "tegra-i2c.3", "fast-clk"),
++	CLK_DUPLICATE("twd",	"smp_twd",	NULL),
+ };
+ 
+ #define CLK(dev, con, ck)	\
+@@ -1053,6 +1082,7 @@ static struct clk *tegra_ptr_clks[] = {
+ 	&tegra_pll_x,
+ 	&tegra_pll_e,
+ 	&tegra_cclk,
++	&tegra_clk_twd,
+ 	&tegra_sclk,
+ 	&tegra_hclk,
+ 	&tegra_pclk,
+-- 
+1.7.4.1
