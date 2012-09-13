@@ -1,55 +1,38 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 13 Sep 2012 13:45:57 -0700
-Subject: [PATCH] RTC: TWL: ensure all interrupts are disabled during probe
-Message-ID: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Sep 2012 16:02:49 -0500
+Subject: [PATCH] of: specify initrd location using 64-bit
+In-Reply-To: <5051816A.3050705@linutronix.de>
+References: <1347465937-7056-1-git-send-email-cyril@ti.com>
+ <CAMuHMdUuQzD0bq8PifBea2-0Pk7RhmPA0-GAFprsk+vMxMGjGw@mail.gmail.com>
+ <5050CE33.9060909@ti.com> <5050E965.5080405@linutronix.de>
+ <505107DF.5020105@gmail.com> <5051816A.3050705@linutronix.de>
+Message-ID: <505249F9.7050201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@ti.com>
+On 09/13/2012 01:47 AM, Sebastian Andrzej Siewior wrote:
+> On 09/13/2012 12:08 AM, Rob Herring wrote:
+>>> Geert is right here. If it is a physical address, it should be
+>>> phys_addr_t.
+>>
+>> While generally true, for the DT specific code I think it should be a
+>> fixed u64. The size of the address is defined by the FDT, not the
+>> kernel. It is very likely we could have a FDT that specifies addresses
+>> in 64-bit values, but then we boot a kernel is compiled for !LPAE.
+>> phys_addr_t is currently sized based on LPAE setting.
+> 
+> If your kernel is 32bit without PAE and your DTB address is >32ibt than
+> you can't handle it. If you don't notice this in your dt code than you
+> remap the wrong memory ioremap().
 
-On some platforms, bootloaders are known to do some interesting RTC
-programming.  Without going into the obscurities as to why this may be
-the case, suffice it to say the the driver should not make any
-assumptions about the state of the RTC when the driver loads.  In
-particular, the driver probe should be sure that all interrupts are
-disabled until otherwise programmed.
+The size of the initrd fields are set by #address-cells properties and
+determined when you create the dtb. The address to load the initrd is
+decided by the bootloader/user and set at that point later in time. The
+dtb should not be tied to the kernel you are booting. Obviously, if you
+want to boot a non-PAE kernel, everything has to be placed at <4GB.
 
-This was discovered when finding bursty I2C traffic every second on
-Overo platforms.  This I2C overhead was keeping the SoC from hitting
-deep power states.  The cause was found to be the RTC firing every
-second on the I2C-connected TWL PMIC.
+I can boot i386 and i386-pae kernels on an i386-pae machines. I expect
+to generally be able to do that on ARM. Perhaps some SOCs like this one
+will not allow that, it is not always true.
 
-Special thanks to Felipe Balbi for suggesting to look for a rogue
-driver as the source of the I2C traffic rather than the I2C driver
-itself.
-
-Special thanks to Steve Sakoman for helping track down the source of
-the continuous RTC interrups on the Overo boards.
-
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Steve Sakoman <steve@sakoman.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Patch applies to v3.6-rc5
-
- drivers/rtc/rtc-twl.c |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-index c5d06fe..9277d94 100644
---- a/drivers/rtc/rtc-twl.c
-+++ b/drivers/rtc/rtc-twl.c
-@@ -495,6 +495,11 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto out1;
- 
-+	/* ensure interrupts are disabled, bootloaders can be strange */
-+	ret = twl_rtc_write_u8(0, REG_RTC_INTERRUPTS_REG);
-+	if (ret < 0)
-+		dev_warn(&pdev->dev, "unable to disable interrupt\n");
-+
- 	/* init cached IRQ enable bits */
- 	ret = twl_rtc_read_u8(&rtc_irq_bits, REG_RTC_INTERRUPTS_REG);
- 	if (ret < 0)
--- 
-1.7.9.2
+Rob
