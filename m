@@ -1,77 +1,74 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Sep 2012 17:54:13 +0200
-Subject: [PATCH v4] gpio: mvebu: new gpio driver for mvebu platforms
-Message-ID: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 13 Sep 2012 17:54:15 +0200
+Subject: [PATCH v3 2/5] Documentation: add description of DT binding for the
+ gpio-mvebu driver
+In-Reply-To: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/gpio/gpio-mvebu.txt        |   45 ++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
 
-This patch set adds a new GPIO driver for Marvell EBU SoCs, which aims
-at replacing the existing GPIO driver from plat-orion/gpio.c. The
-driver comes with the necessary DT changes to make it work on Armada
-370 and Armada XP, and it has been tested successfully by Sebastian
-Hesselbarth on Dove.
-
-It should also work flawlessly on other Marvell EBU SoCs (Kirkwood,
-Orion, Discovery), but this remains to be tested by the relevant
-maintainers. This isn't however a problem, as those older platforms
-need to explictly be converted over to the new pinctrl-mvebu driver
-and the new gpio driver. Until that, they will happily continue to use
-the old, known-working, gpio driver. So this patch set has no chance
-to break any of the existing Marvell platforms. The old gpio driver is
-scheduled to be removed once all Marvell SoCs have switched to the new
-driver.
-
-This new driver reuses a lot of code from the existing
-plat-orion/gpio.c driver, but has a number of advantages:
-
- *) Support for Armada 370 and Armada XP
- *) It is integrated with the mvebu pinctrl driver so that GPIO pins
-    are properly muxed, and the GPIO driver knows which GPIO pins are
-    output-only or input-only.
- *) Properly placed in drivers/gpio
- *) More extensible mechanism to support platform differences. The
-    plat-orion driver uses a simple mask-offset DT property, which
-    works fine for Discovery MV78200 but not for Armada XP. The new
-    driver uses different compatible strings to identify the different
-    variants of the GPIO controllers.
-
-This patch set should be applied on top of the pinctrl-mvebu patch set
-v4 from Sebastian Hesselbarth, as it depends on it.
-
-Changes since v2:
- * Use inline functions for the register accessors, and rename them
-   lower-case since they are functions, as suggested by
-   Jean-Christophe Plagnol-Villard.
- * Use _relaxed() variants of readl/writel, as suggested by
-   Jean-Christophe Plagnol-Villard.
- * Use switch() instead of long list of if() conditions in
-   mvebu_gpio_irq_set_type(), as suggested by Jean-Christophe
-   Plagnol-Villard.
- * Add DT aliases gpio0, gpio1, gpio2, and then use of_alias_get_id()
-   to get the number of GPIO bank, and deduce the GPIO base from
-   it. We don't use automatic allocation because we really want the
-   internal SoC GPIOs to have 0-31, 32-63, 64-... numbers (while
-   automatic allocation allocates 224... for the first bank 202... for
-   the second bank, etc.). This strategy was recommended by Uwe
-   Kleine-Koenig and is already used in gpio-mxs.c.
- * Use gpio-cells = <2> instead of gpio-cells = <1>, as suggested by
-   Olof Johansson. This allows to re-use the default .xlate()
-   function, and therefore make the GPIO DT binding actually work (it
-   was broken in previous versions of this patch set).
- * Use dev_name() to fill the gpio_chip->name field, instead of
-   manually computing a name. This allows to get rid of the global
-   variable counting GPIO chips.
- * Rebase on top of the latest pinctrl work from Sebastian
-   Hesselbarth.
- * Added the Acked-by from Linus Walleij on the DT binding
-   documentation patch.
-
-Changes since v1:
- * Added fixes for Dove from Sebastian Hesselbarth, and his Tested-by
-   on the driver patch.
-
-Thanks,
-
-Thomas
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+new file mode 100644
+index 0000000..595be9e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+@@ -0,0 +1,45 @@
++* Marvell EBU GPIO controller
++
++Required properties:
++
++- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
++  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
++  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
++  370. "marvell,mv78200-gpio" should be used for the Discovery
++  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
++  SoCs (MV78230, MV78260, MV78460).
++
++- reg: Address and length of the register set for the device. Only one
++  entry is expected, except for the "marvell,armadaxp-gpio" variant
++  for which two entries are expected: one for the general registers,
++  one for the per-cpu registers.
++
++- interrupts: The list of interrupts that are used for all the pins
++  managed by this GPIO bank. There can be more than one interrupt
++  (example: 1 interrupt per 8 pins on Armada XP, which means 4
++  interrupts per bank of 32 GPIOs).
++
++- interrupt-controller: identifies the node as an interrupt controller
++
++- #interrupt-cells: specifies the number of celles needed to encode an
++   interrupt source
++
++- gpio-controller: marks the device node as a gpio controller
++
++- ngpios: number of GPIOs this controller has
++
++- #gpio-cells: Should be two. The first is the pin number. The second
++   is reserved for flags, unused at the moment.
++
++Example:
++
++		gpio0: gpio at d0018100 {
++			compatible = "marvell,armadaxp-gpio";
++			reg = <0xd0018100 0x40>,
++			    <0xd0018800 0x30>;
++			ngpios = <32>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			interrupts = <16>, <17>, <18>, <19>;
++		};
+-- 
+1.7.9.5
