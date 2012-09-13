@@ -1,41 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 13 Sep 2012 14:38:30 +0800
-Subject: [GIT PULL 2/2] imx6q clk device tree lookup
-In-Reply-To: <20120913062305.GJ24290@quad.lixom.net>
-References: <1347364968-27496-1-git-send-email-shawn.guo@linaro.org>
- <1347364968-27496-3-git-send-email-shawn.guo@linaro.org>
- <20120913062305.GJ24290@quad.lixom.net>
-Message-ID: <20120913063826.GD3141@S2101-09.ap.freescale.net>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Thu, 13 Sep 2012 16:40:57 +1000
+Subject: [PATCH] ARM: ks8695: add board support for the OpenGear boards
+ based on the KS8695
+In-Reply-To: <CAOesGMiixufaORkZcabnYRyCWHcG6KT4Q0if3+-PZrUUpprCNg@mail.gmail.com>
+References: <1346996139-5692-1-git-send-email-gerg@snapgear.com>
+ <201209071221.56938.arnd@arndb.de>
+ <CAOesGMiixufaORkZcabnYRyCWHcG6KT4Q0if3+-PZrUUpprCNg@mail.gmail.com>
+Message-ID: <50517FF9.9040801@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 11:23:05PM -0700, Olof Johansson wrote:
-> On Tue, Sep 11, 2012 at 08:02:48PM +0800, Shawn Guo wrote:
-> > The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> > 
-> >   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-clk-dt-lookup
-> > 
-> > for you to fetch changes up to 0e87e0436c0cc3954eb62181a96d7217ca955a4f:
-> > 
-> >   ARM: imx6q: replace clk_register_clkdev with clock DT lookup (2012-09-11 19:16:14 +0800)
-> > 
-> > ----------------------------------------------------------------
-> > imx-clk-dt-lookup
-> > 
-> > It replaces the clk_register_clkdev in imx6q clock driver with DT
-> > lookup.  It depends on Mike's clk-3.7 branch.
-> > 
-> > When it gets merged together with imx-dt-3.7, there is a trivial
-> > conflict on arch/arm/boot/dts/imx6q.dtsi.
-> 
-> Pulled into next/dt. Same here, double-check my conflict resolution please.
-> 
-It's all right.
+Hi Olof,
 
--- 
-Regards,
-Shawn
+On 08/09/12 13:20, Olof Johansson wrote:
+> On Fri, Sep 7, 2012 at 5:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Friday 07 September 2012, gerg at snapgear.com wrote:
+>>> From: Greg Ungerer <gerg@uclinux.org>
+>>>
+>>> A number of boards produced by OpenGear and based on the Micrel KS8695 SoC.
+>>> Add board support to the KS8695 kernel code to support them.
+>>>
+>>> The following machine type entries will need to be added back into the
+>>> mach-types file with these in mainline:
+>>>
+>>>      cm4008      MACH_CM4008       CM4008       624
+>>>      cm41xx      MACH_CM41XX       CM41XX       672
+>>>      cm4002      MACH_CM4002       CM4002       876
+>>>      im42xx      MACH_IM42XX       IM42XX       1105
+>>>      im4004      MACH_IM4004       IM4004       1400
+>>>
+>>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+>
+> Both patches applied to a ks8695/boards branch, part of next/boards in arm-soc.
+>
+> Greg, you should submit separate patch to add the machine types to
+> Russell's patch tracker.
+
+I am looking for some guidance here. Russell nacked a separate patch
+that put the board ID's back in. Do you want to drop these patches
+and I roll new ones that include the mach-types update as well?
+Or perhaps do this all some other way?
+
+Regards
+Greg
+
+
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
