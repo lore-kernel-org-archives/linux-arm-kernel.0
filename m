@@ -1,20 +1,14 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Sep 2012 22:03:29 -0700
-Subject: [GIT PULL] i.MX Fixes
-In-Reply-To: <20120911095509.GT18243@pengutronix.de>
-References: <20120911095509.GT18243@pengutronix.de>
-Message-ID: <20120913050329.GA24290@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Sep 2012 22:04:04 -0700
+Subject: [GIT PULL] ARM: OMAP2+: some Makefile cleanup for 3.7
+In-Reply-To: <alpine.DEB.2.00.1209120911110.17903@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209120911110.17903@utopia.booyaka.com>
+Message-ID: <20120913050403.GA4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2012 at 11:55:09AM +0200, Sascha Hauer wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following i.MX fixes for -rc
-> 
-> Thanks
->  Sascha
-> 
+* Paul Walmsley <paul@pwsan.com> [120912 02:13]:
+> Hi Tony,
 > 
 > The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
 > 
@@ -22,9 +16,23 @@ On Tue, Sep 11, 2012 at 11:55:09AM +0200, Sascha Hauer wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.7
+> 
+> for you to fetch changes up to df47adb825c221ff45126fd54e531f01ea490334:
+> 
+>   ARM: OMAP2+: clean up PRCM sections of the Makefile (2012-09-11 19:09:15 -0600)
+> 
+> - Paul
+> 
+> ----------------------------------------------------------------
+> Clean up and standardize several parts of
+> arch/arm/mach-omap2/Makefile.  Beyond readability and diffstat
+> improvements, the series should reduce the risk of conflicts during
+> future cleanups by ensuring related lines are in the same section of the
+> Makefile.
 
-Pulled, thanks.
+Thanks pulling into cleanup-makefile-sparse.
 
+Regards,
 
--Olof
+Tony
