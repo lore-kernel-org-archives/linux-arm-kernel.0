@@ -1,67 +1,169 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Sep 2012 14:03:34 +0100
-Subject: [RFC PATCH 1/6] ARM: mm: define LoUIS API for cache
- maintenance ops
-In-Reply-To: <20120913113949.GC2470@linaro.org>
-References: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347531651-28218-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20120913113949.GC2470@linaro.org>
-Message-ID: <20120913130334.GI28448@n2100.arm.linux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 13 Sep 2012 15:05:44 +0200
+Subject: [PATCH v2] ARM: smp_twd: reprogram twd based on clk notifier
+In-Reply-To: <1347489895-16384-1-git-send-email-mturquette@linaro.org>
+References: <20120912203223.3094.5354@nucleus>
+ <1347489895-16384-1-git-send-email-mturquette@linaro.org>
+Message-ID: <CAPDyKFoE7q5xsZ8hdXXQvXFTo1JEPQ9HxH5K---kzzVn5ACLSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 12:39:49PM +0100, Dave Martin wrote:
-> We could introduce something like CONFIG_ARM_HAVE_CACHEFLUSH_LOUIS, and
-> do:
-> 
-> <asm/glue-cache.h>
-> #ifndef MULTI_CACHE
-> #ifdef CONFIG_HAVE_ARM_CACHEFLUSH_LOUIS
-> #define __cpuc_flush_kern_cache_louis __glue(_CACHE,_flush_kern_cache_louis)
-> #else
-> #define __cpuc_flush_kern_cache_louis __glue(_CACHE,_flush_kern_all)
-> #endif
-> #endif
-> 
-> <asm/cacheflush.h>
-> #ifdef MULTI_CACHE
-> #define flush_cache_louis()   cpu_cache.flush_kern_cache_louis()
-> #else
-> #define flush_cache_louis()   __cpuc_flush_kern_cache_louis()
-> #endif
+On 13 September 2012 00:44, Mike Turquette <mturquette@linaro.org> wrote:
+> Running cpufreq driver on imx6q, the following warning is seen.
+>
+> $ BUG: sleeping function called from invalid context at kernel/mutex.c:269
+>
+> <snip>
+>
+> stack backtrace:
+> Backtrace:
+> [<80011d64>] (dump_backtrace+0x0/0x10c) from [<803fc164>] (dump_stack+0x18/0x1c)
+>  r6:bf8142e0 r5:bf814000 r4:806ac794 r3:bf814000
+> [<803fc14c>] (dump_stack+0x0/0x1c) from [<803fd444>] (print_usage_bug+0x250/0x2b
+> 8)
+> [<803fd1f4>] (print_usage_bug+0x0/0x2b8) from [<80060f90>] (mark_lock+0x56c/0x67
+> 0)
+> [<80060a24>] (mark_lock+0x0/0x670) from [<80061a20>] (__lock_acquire+0x98c/0x19b
+> 4)
+> [<80061094>] (__lock_acquire+0x0/0x19b4) from [<80062f14>] (lock_acquire+0x68/0x
+> 7c)
+> [<80062eac>] (lock_acquire+0x0/0x7c) from [<80400f28>] (mutex_lock_nested+0x78/0
+> x344)
+>  r7:00000000 r6:bf872000 r5:805cc858 r4:805c2a04
+> [<80400eb0>] (mutex_lock_nested+0x0/0x344) from [<803089ac>] (clk_get_rate+0x1c/
+> 0x58)
+> [<80308990>] (clk_get_rate+0x0/0x58) from [<80013c48>] (twd_update_frequency+0x1
+> 8/0x50)
+>  r5:bf253d04 r4:805cadf4
+> [<80013c30>] (twd_update_frequency+0x0/0x50) from [<80068e20>] (generic_smp_call
+> _function_single_interrupt+0xd4/0x13c)
+>  r4:bf873ee0 r3:80013c30
+> [<80068d4c>] (generic_smp_call_function_single_interrupt+0x0/0x13c) from [<80013
+> 34c>] (handle_IPI+0xc0/0x194)
+>  r8:00000001 r7:00000000 r6:80574e48 r5:bf872000 r4:80593958
+> [<8001328c>] (handle_IPI+0x0/0x194) from [<800084e8>] (gic_handle_irq+0x58/0x60)
+>  r8:00000000 r7:bf873f8c r6:bf873f58 r5:80593070 r4:f4000100
+> r3:00000005
+> [<80008490>] (gic_handle_irq+0x0/0x60) from [<8000e124>] (__irq_svc+0x44/0x60)
+> Exception stack(0xbf873f58 to 0xbf873fa0)
+> 3f40:                                                       00000001 00000001
+> 3f60: 00000000 bf814000 bf872000 805cab48 80405aa4 80597648 00000000 412fc09a
+> 3f80: bf872000 bf873fac bf873f70 bf873fa0 80063844 8000f1f8 20000013 ffffffff
+>  r6:ffffffff r5:20000013 r4:8000f1f8 r3:bf814000
+> [<8000f1b8>] (default_idle+0x0/0x4c) from [<8000f428>] (cpu_idle+0x98/0x114)
+> [<8000f390>] (cpu_idle+0x0/0x114) from [<803f9834>] (secondary_start_kernel+0x11
+> c/0x140)
+> [<803f9718>] (secondary_start_kernel+0x0/0x140) from [<103f9234>] (0x103f9234)
+>  r6:10c03c7d r5:0000001f r4:4f86806a r3:803f921c
+>
+> It looks that the warning is caused by that twd_update_frequency() gets
+> called from an atomic context while it calls clk_get_rate() where a
+> mutex gets held.
+>
+> To fix the warning, let's convert common clk users over to clk notifiers
+> in place of CPUfreq notifiers.  This works out nicely for Cortex-A9
+> MPcore designs that scale all CPUs at the same frequency.
+>
+> Platforms that have not been converted to the common clk framework and
+> support CPUfreq will rely on the old mechanism.  Once these platforms
+> are converted over fully then we can remove the CPUfreq-specific bits
+> for good.
+>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Changes in v2:
+>  * Kept the original CPUfreq notifier scheme in place for platforms that
+>    have not adapted to the common clk framework yet
+>
+> Testing notes:
+>  * Tested on OMAP4430 Panda against v3.6-rc5 with legacy clk framework
+>    and with local common clk patches, thus both code paths are validated
+>  * CPUfreq userspace governor @ 300MHz, 600MHz and 1008MHz
+>  * Ran "date; sleep 30; date" and compared with a stopwatch to verify
+>    correct timekeeping
+>
+>  arch/arm/kernel/smp_twd.c |   48 +++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 46 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index fef42b2..e1f9069 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -11,7 +11,6 @@
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/clk.h>
+> -#include <linux/cpufreq.h>
+>  #include <linux/delay.h>
+>  #include <linux/device.h>
+>  #include <linux/err.h>
+> @@ -96,7 +95,52 @@ static void twd_timer_stop(struct clock_event_device *clk)
+>         disable_percpu_irq(clk->irq);
+>  }
+>
+> -#ifdef CONFIG_CPU_FREQ
+> +#ifdef CONFIG_COMMON_CLK
+> +
+> +/*
+> + * Updates clockevent frequency when the cpu frequency changes.
+> + * Called on the cpu that is changing frequency with interrupts disabled.
+> + */
+> +static void twd_update_frequency(void *new_rate)
+> +{
+> +       twd_timer_rate = *((unsigned long *) new_rate);
+> +
+> +       clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
+> +}
+> +
+> +static int twd_rate_change(struct notifier_block *nb,
+> +       unsigned long flags, void *data)
+> +{
+> +       struct clk_notifier_data *cnd = data;
+> +
+> +       /*
+> +        * The twd clock events must be reprogrammed to account for the new
+> +        * frequency.  The timer is local to a cpu, so cross-call to the
+> +        * changing cpu.
+> +        */
+> +       if (flags == POST_RATE_CHANGE)
+> +               smp_call_function(twd_update_frequency,
+> +                                 (void *)&cnd->new_rate, 1);
+> +
+> +       return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block twd_clk_nb = {
+> +       .notifier_call = twd_rate_change,
+> +};
+> +
+> +static int twd_clk_init(void)
+> +{
+> +       if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
+> +               return clk_notifier_register(twd_clk, &twd_clk_nb);
+> +
+> +       return 0;
+> +}
+> +core_initcall(twd_clk_init);
+> +
+> +#elif defined (CONFIG_CPU_FREQ)
+> +
+> +#include <linux/cpufreq.h>
+>
+>  /*
+>   * Updates clockevent frequency when the cpu frequency changes.
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-No, this is stupidly complicated and is fragile.  Just alias the
-functions, like we do in cache-v4wt.S:
+I think this makes good sense! I will adapt ux500 smp_twd clock
+handling accordingly.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-	.globl	v4wt_dma_flush_range
-	.equ	v4wt_dma_flush_range, v4wt_dma_inv_range
-
-except, you'll need:
-
-	.globl	v4wt_flush_kern_cache_louis
-	.equ	v4wt_flush_kern_cache_louis, v4wt_flush_kern_cache_all
-
-You can do it automatically, using the attached sedscript and this bit
-of shell:
-
-$ for f in $(grep -l define_cache_functions arch/arm/mm/*.S ); do
-    sed -if sedscript $f
-    git add $f
-done
-$ git commit -s
-
-Do that first, and then go over those which you need to add a real
-flush_kern_cache_louis function to.
-
--------------- next part --------------
-1,/__INITDATA\|define struct cpu_cache_fns/ {
-	/ENTRY.*flush_kern_cache_all/ {
-        	h
-	        s/.*(\([^_]*\)_.*/\t.globl\t\1_flush_kern_cache_louis\n\t.equ\t\1_flush_kern_cache_louis, \1_flush_kern_cache_all\n/
-        	x
-	}
-	/__INITDATA\|define struct cpu_cache_fns/ {
-        	H
-	        g
-	}
-}
+Kind regards
+Ulf Hansson
