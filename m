@@ -1,22 +1,92 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2012 13:06:31 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: Add support RTC
-In-Reply-To: <1347505841-8594-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1347505841-8594-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <20120913040629.GA23861@verge.net.au>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Thu, 13 Sep 2012 13:29:30 +0900
+Subject: [PATCH] ARM: fix bad applied patch for arch/arm/Kconfig of stable
+ 3.0.y tree.
+Message-ID: <1347510570-9272-1-git-send-email-koba@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 12:10:41PM +0900, Nobuhiro Iwamatsu wrote:
-> The armadillo800eva has S35390A which is RTC. This is controlled
-> using I2C of GPIO.
-> This commit supports RTC of armadillo800eva.
-> 
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+ARM_ERRATA_764369 and PL310_ERRATA_769419 do not appear in config menu in stable 3.0.y tree.
+This is because backported patch for arm/arm/Kconfig applied wrong place.
+This patch solves it.
 
-Hi Iwamatsu-san,
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+---
+Hello, Greg
+This is patch for stable 3.0.y tree. 3.2.y, 3.4.y and 3.5.y do not have this problem. Only 3.0.y.
 
-could you please either update this patch or provide a follow-up
-patch to update the defconfig so the S35390A is enabled?
+ arch/arm/Kconfig |   52 ++++++++++++++++++++++++++--------------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
-"make savedefconfig" may be useful for this.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7692bca..85368ed 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1234,6 +1234,32 @@ config ARM_ERRATA_754327
+ 	  This workaround defines cpu_relax() as smp_mb(), preventing correctly
+ 	  written polling loops from denying visibility of updates to memory.
+ 
++config ARM_ERRATA_764369
++	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
++	depends on CPU_V7 && SMP
++	help
++	  This option enables the workaround for erratum 764369
++	  affecting Cortex-A9 MPCore with two or more processors (all
++	  current revisions). Under certain timing circumstances, a data
++	  cache line maintenance operation by MVA targeting an Inner
++	  Shareable memory region may fail to proceed up to either the
++	  Point of Coherency or to the Point of Unification of the
++	  system. This workaround adds a DSB instruction before the
++	  relevant cache maintenance functions and sets a specific bit
++	  in the diagnostic control register of the SCU.
++
++config PL310_ERRATA_769419
++	bool "PL310 errata: no automatic Store Buffer drain"
++	depends on CACHE_L2X0
++	help
++	  On revisions of the PL310 prior to r3p2, the Store Buffer does
++	  not automatically drain. This can cause normal, non-cacheable
++	  writes to be retained when the memory system is idle, leading
++	  to suboptimal I/O performance for drivers using coherent DMA.
++	  This option adds a write barrier to the cpu_idle loop so that,
++	  on systems with an outer cache, the store buffer is drained
++	  explicitly.
++
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+@@ -1298,32 +1324,6 @@ source "drivers/pci/Kconfig"
+ 
+ source "drivers/pcmcia/Kconfig"
+ 
+-config ARM_ERRATA_764369
+-	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
+-	depends on CPU_V7 && SMP
+-	help
+-	  This option enables the workaround for erratum 764369
+-	  affecting Cortex-A9 MPCore with two or more processors (all
+-	  current revisions). Under certain timing circumstances, a data
+-	  cache line maintenance operation by MVA targeting an Inner
+-	  Shareable memory region may fail to proceed up to either the
+-	  Point of Coherency or to the Point of Unification of the
+-	  system. This workaround adds a DSB instruction before the
+-	  relevant cache maintenance functions and sets a specific bit
+-	  in the diagnostic control register of the SCU.
+-
+-config PL310_ERRATA_769419
+-	bool "PL310 errata: no automatic Store Buffer drain"
+-	depends on CACHE_L2X0
+-	help
+-	  On revisions of the PL310 prior to r3p2, the Store Buffer does
+-	  not automatically drain. This can cause normal, non-cacheable
+-	  writes to be retained when the memory system is idle, leading
+-	  to suboptimal I/O performance for drivers using coherent DMA.
+-	  This option adds a write barrier to the cpu_idle loop so that,
+-	  on systems with an outer cache, the store buffer is drained
+-	  explicitly.
+-
+ endmenu
+ 
+ menu "Kernel Features"
+-- 
+1.7.9.5
