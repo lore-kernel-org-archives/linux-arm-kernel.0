@@ -1,29 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Sep 2012 11:55:16 +0000
-Subject: [GIT PULL] ARM: LPC32xx: core update
-In-Reply-To: <50488FD6.4080402@antcom.de>
-References: <50488FD6.4080402@antcom.de>
-Message-ID: <201209131155.16756.arnd@arndb.de>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Thu, 13 Sep 2012 17:25:33 +0530
+Subject: [RFC] [PATCH 0/2] ARM: EXYNOS4: Add new cpuidle state
+Message-ID: <1347537335-26657-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 September 2012, Roland Stigge wrote:
->       ARM: LPC32xx: Provide DMA filter callbacks via platform data
+This patchset does following:
 
-This patch results in build errors in the for-next branch with lpc32xx_defconfig:
+Patch 1: Segregate and move common code to new function
+Patch 2: Adds C2 idle state
 
-arch/arm/mach-lpc32xx/phy3250.c:40:35: fatal error: linux/mtd/lpc32xx_slc.h: No such file or directory
-arch/arm/mach-lpc32xx/phy3250.c:41:35: fatal error: linux/mtd/lpc32xx_mlc.h: No such file or directory
-arch/arm/mach-lpc32xx/phy3250.c:226:15: error: variable 'lpc32xx_slc_data' has initializer but incomplete type
-arch/arm/mach-lpc32xx/phy3250.c:227:2: error: unknown field 'dma_filter' specified in initializer
-arch/arm/mach-lpc32xx/phy3250.c:227:2: error: excess elements in struct initializer [-Werror]
-arch/arm/mach-lpc32xx/phy3250.c:227:2: error: (near initialization for 'lpc32xx_slc_data') [-Werror]
-arch/arm/mach-lpc32xx/phy3250.c:230:15: error: variable 'lpc32xx_mlc_data' has initializer but incomplete type
-arch/arm/mach-lpc32xx/phy3250.c:231:2: error: unknown field 'dma_filter' specified in initializer
-arch/arm/mach-lpc32xx/phy3250.c:231:2: error: excess elements in struct initializer [-Werror]
-arch/arm/mach-lpc32xx/phy3250.c:231:2: error: (near initialization for 'lpc32xx_mlc_data') [-Werror]
+It has been tested on Kukjin's for-next branch on Origen board.
 
-It seems that we're missing a dependency. Which tree did the patch to add
-these go through? Can we add that to the same branch in arm-soc?
+Chander Kashyap (2):
+  ARM: Exynos4: CPUIDLE: Add generic function for exynos4 cpuidle
+  ARM: EXYNOS4: CPUIDLE: Add C2 state
 
-	Arnd
+ arch/arm/mach-exynos/cpuidle.c |  385 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 373 insertions(+), 12 deletions(-)
+
+-- 
+1.7.9.5
