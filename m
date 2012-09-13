@@ -1,88 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Sep 2012 00:30:40 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.6-rc6
-Message-ID: <CAOesGMhWHQROj_UHisStW_U9PUBgY9W0mvenzuqiwVoTKR-w1Q@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 13 Sep 2012 00:31:03 -0700
+Subject: [GIT PULL] msm-core changes for v3.7
+In-Reply-To: <CAOesGMhyQd=p23uy1Lj9iq6PKgS+kJ+xh4Z10e4XbSk50E=U7Q@mail.gmail.com>
+References: <1347469140-25069-1-git-send-email-davidb@codeaurora.org>
+ <CAOesGMhyQd=p23uy1Lj9iq6PKgS+kJ+xh4Z10e4XbSk50E=U7Q@mail.gmail.com>
+Message-ID: <20120913073103.GA10231@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Sep 12, 2012 at 11:36:28PM -0700, Olof Johansson wrote:
 
-The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+> I think it could be a good idea to split off the cleanups and fixes to
+> a separate branch. For the other patches there seems to be enough for
+> at least a 'dt' branch and either a multi-platform topic branch or a
+> 'boards' topic branch -- probably the former. So see my annotation
+> below for suggested sorting (I didn't check for
+> conflicts/dependencies).
 
-  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+I'll give a go at splitting things up tomorrow, then.  I'd held off on
+making separate branches because there are a bunch of changes to
+similar stuff.  Even if I get them separated, they are unlikely to
+build without all being applied.
 
-are available in the git repository at:
+But, I'll see what I can do.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/fixes-for-linus
+David
 
-for you to fetch changes up to 2bc733e8b443e77db5bb18e1bb8f1c535a92eb8c:
-
-  Merge tag 'imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6
-into fixes (2012-09-12 22:00:07 -0700)
-
-----------------------------------------------------------------
-
-arm-soc: bug fixes for v3.6-rc
-
-- A set of OMAP fixes, about half of them PM/clock related, the rest
-  scattered over the platform code but all small and targeted to real bugs.
-- Two small i.MX fixes for SSI device clock setup.
-
-----------------------------------------------------------------
-Aaro Koskinen (2):
-      ARM: OMAP: sram: fix OMAP4 errata handling
-      ARM: OMAP: sram: skip the first 16K on OMAP3 HS
-
-Fabio Estevam (2):
-      ARM: clk-imx25: Fix SSI clock registration
-      ARM: clk-imx35: Fix SSI clock registration
-
-Igor Grinberg (1):
-      ARM: OMAP: timer: obey the !CONFIG_OMAP_32K_TIMER
-
-Misael Lopez Cruz (1):
-      ARM: OMAP: hwmod code: Disable module when hwmod enable fails
-
-Olof Johansson (2):
-      Merge tag 'omap-fixes-for-v3.6-rc4' of
-git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'imx-fixes' of
-git://git.pengutronix.de/git/imx/linux-2.6 into fixes
-
-Paul Walmsley (2):
-      ARM: OMAP3xxx: clockdomain: fix software supervised wakeup/sleep
-      Merge branches 'clkdev_fixes_3.6rc', 'clkdm_fixes_3.6rc' and
-'hwmod_data_fixes_a_3.6rc' into omap_fixes_a_3.6rc
-
-Radek Pilar (1):
-      ARM: OMAP: Config fix for omap3-touchbook board
-
-Tero Kristo (2):
-      ARM: OMAP3: hwmod data: fix iva2 reset info
-      ARM: OMAP4: hwmod data: temporarily comment out data for the
-sl2if IP block
-
-Tony Lindgren (3):
-      ARM: OMAP4: Fix array size for irq_target_cpu
-      Merge branch 'fixes-wakeupgen' into fixes
-      Merge tag 'omap-fixes-a-for-3.6rc' of
-git://git.kernel.org/.../pjw/omap-pending into fixes
-
-Vaibhav Hiremath (1):
-      ARM: OMAP2+: am33xx: Fix the timer fck clock naming convention
-
- arch/arm/mach-imx/clk-imx25.c              |  6 ++--
- arch/arm/mach-imx/clk-imx35.c              |  6 ++--
- arch/arm/mach-omap2/Kconfig                |  3 +-
- arch/arm/mach-omap2/Makefile               |  2 +-
- arch/arm/mach-omap2/clock33xx_data.c       | 14 ++++-----
- arch/arm/mach-omap2/clockdomain2xxx_3xxx.c | 50 ++++++++++++++++++++++++++++--
- arch/arm/mach-omap2/cm-regbits-34xx.h      |  1 +
- arch/arm/mach-omap2/omap-wakeupgen.c       |  2 +-
- arch/arm/mach-omap2/omap_hwmod.c           |  1 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 15 +++++++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 12 +++----
- arch/arm/mach-omap2/timer.c                |  7 +++++
- arch/arm/plat-omap/sram.c                  | 11 +++++--
- 13 files changed, 98 insertions(+), 32 deletions(-)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
