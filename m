@@ -1,77 +1,70 @@
 From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 13 Sep 2012 08:03:28 -0700
-Subject: [PATCH 04/11] tty/serial/core: Introduce poll_init callback
+Date: Thu, 13 Sep 2012 08:03:30 -0700
+Subject: [PATCH 06/11] tty/serial/amba-pl011: Quiesce interrupts in
+ poll_get_char
 In-Reply-To: <20120913150133.GA16238@lizard>
 References: <20120913150133.GA16238@lizard>
-Message-ID: <1347548615-18227-4-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <1347548615-18227-6-git-send-email-anton.vorontsov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was noticed that polling drivers (like KGDB) are not able to use
-serial ports if the ports were not previously initialized via console.
-I.e.  when booting with console=ttyAMA0 kgdboc=ttyAMA0, everything works
-fine, but with console=ttyFOO kgdboc=ttyAMA0, the kgdboc doesn't work.
+We need to quiesce interrupts in the poll_get_char routine, otherwise,
+if used with KGDB NMI debugger, we'll keep reentering the NMI.
 
-This is because we don't initialize the hardware. Calling ->startup() is
-not an option, because drivers request interrupts there, and drivers
-fail to handle situations when tty isn't opened with interrupts enabled.
-
-So, we have to implement a new callback (actually, tty_ops already have
-a similar callback), which does everything needed to initialize just the
-hardware.
+Quiescing interrupts is pretty straightforward, except for TXIM
+interrupt. The interrupt has "ready to transmit" meaning, so it's
+almost always raised, and the only way to silence it is to mask it. But
+that's OK, ops->start_tx will unmask it.
 
 Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
 ---
- drivers/tty/serial/serial_core.c | 17 +++++++++++++++++
- include/linux/serial_core.h      |  1 +
- 2 files changed, 18 insertions(+)
+ drivers/tty/serial/amba-pl011.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index 046279c..dcb2d5a 100644
---- a/drivers/tty/serial/serial_core.c
-+++ b/drivers/tty/serial/serial_core.c
-@@ -2129,6 +2129,7 @@ static int uart_poll_init(struct tty_driver *driver, int line, char *options)
- 	int bits = 8;
- 	int parity = 'n';
- 	int flow = 'n';
-+	int ret;
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 45137e4..459f8ba 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1284,11 +1284,40 @@ static void pl011_break_ctl(struct uart_port *port, int break_state)
+ }
  
- 	if (!state || !state->uart_port)
- 		return -1;
-@@ -2137,6 +2138,22 @@ static int uart_poll_init(struct tty_driver *driver, int line, char *options)
- 	if (!(port->ops->poll_get_char && port->ops->poll_put_char))
- 		return -1;
- 
-+	if (port->ops->poll_init) {
-+		struct tty_port *tport = &state->port;
-+
-+		ret = 0;
-+		mutex_lock(&tport->mutex);
-+		/*
-+		 * We don't set ASYNCB_INITIALIZED as we only initialized the
-+		 * hw, e.g. state->xmit is still uninitialized.
-+		 */
-+		if (!test_bit(ASYNCB_INITIALIZED, &tport->flags))
-+			ret = port->ops->poll_init(port);
-+		mutex_unlock(&tport->mutex);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	if (options) {
- 		uart_parse_options(options, &baud, &parity, &bits, &flow);
- 		return uart_set_options(port, NULL, baud, parity, bits, flow);
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 7cf0b68..822c887 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -274,6 +274,7 @@ struct uart_ops {
- 	int		(*verify_port)(struct uart_port *, struct serial_struct *);
- 	int		(*ioctl)(struct uart_port *, unsigned int, unsigned long);
  #ifdef CONFIG_CONSOLE_POLL
-+	int		(*poll_init)(struct uart_port *);
- 	void	(*poll_put_char)(struct uart_port *, unsigned char);
- 	int		(*poll_get_char)(struct uart_port *);
- #endif
++
++static void pl011_quiesce_irqs(struct uart_port *port)
++{
++	struct uart_amba_port *uap = (struct uart_amba_port *)port;
++	unsigned char __iomem *regs = uap->port.membase;
++
++	writew(readw(regs + UART011_MIS), regs + UART011_ICR);
++	/*
++	 * There is no way to clear TXIM as this is "ready to transmit IRQ", so
++	 * we simply mask it. start_tx() will unmask it.
++	 *
++	 * Note we can race with start_tx(), and if the race happens, the
++	 * polling user might get another interrupt just after we clear it.
++	 * But it should be OK and can happen even w/o the race, e.g.
++	 * controller immediately got some new data and raised the IRQ.
++	 *
++	 * And whoever uses polling routines assumes that it manages the device
++	 * (including tx queue), so we're also fine with start_tx()'s caller
++	 * side.
++	 */
++	writew(readw(regs + UART011_IMSC) & ~UART011_TXIM, regs + UART011_IMSC);
++}
++
+ static int pl011_get_poll_char(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+ 	unsigned int status;
+ 
++	/*
++	 * The caller might need IRQs lowered, e.g. if used with KDB NMI
++	 * debugger.
++	 */
++	pl011_quiesce_irqs(port);
++
+ 	status = readw(uap->port.membase + UART01x_FR);
+ 	if (status & UART01x_FR_RXFE)
+ 		return NO_POLL_CHAR;
 -- 
 1.7.11.5
