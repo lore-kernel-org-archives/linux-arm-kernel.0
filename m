@@ -1,60 +1,185 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Sep 2012 13:36:04 +0100
-Subject: [RFC PATCH 1/6] ARM: mm: define LoUIS API for cache
- maintenance ops
-In-Reply-To: <1347531651-28218-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347531651-28218-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20120913123604.GH28448@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Sep 2012 13:38:50 +0100
+Subject: [PATCH v3 09/31] arm64: Cache maintenance routines
+In-Reply-To: <20120912215553.GA17393@schnuecks.de>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-10-git-send-email-catalin.marinas@arm.com>
+ <20120907193542.GA22806@schnuecks.de>
+ <20120912092954.GA21823@arm.com>
+ <20120912215553.GA17393@schnuecks.de>
+Message-ID: <20120913123850.GB25131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 11:20:46AM +0100, Lorenzo Pieralisi wrote:
-> +/*
-> + * Flush caches up to Level of Unification Inner Shareable
-> + */
-> +#ifdef MULTI_CACHE
-> +#define flush_cache_louis()   cpu_cache.flush_kern_cache_louis()
-> +#else
-> +#define flush_cache_louis()   __cpuc_flush_kern_all()
-> +#endif
+On Wed, Sep 12, 2012 at 10:55:54PM +0100, Simon Baatz wrote:
+> On Wed, Sep 12, 2012 at 10:29:54AM +0100, Catalin Marinas wrote:
+> > > > +void __flush_dcache_page(struct address_space *mapping, struct page *page)
+> > > > +{
+> > > > +     __flush_dcache_area(page_address(page), PAGE_SIZE);
+> > > > +}
+> > > > +
+> > > > +void __sync_icache_dcache(pte_t pte)
+> > > > +{
+> > > > +     unsigned long pfn;
+> > > > +     struct page *page;
+> > > > +
+> > > > +     pfn = pte_pfn(pte);
+> > > > +     if (!pfn_valid(pfn))
+> > > > +             return;
+> > > > +
+> > > > +     page = pfn_to_page(pfn);
+> > > > +     if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+> > > > +             __flush_dcache_page(NULL, page);
+> > > > +     __flush_icache_all();
+> > > > +}
+> > > > +
+> > > > +/*
+> > > > + * Ensure cache coherency between kernel mapping and userspace mapping of this
+> > > > + * page.
+> > > > + */
+> > > > +void flush_dcache_page(struct page *page)
+> > > > +{
+> > > > +     struct address_space *mapping;
+> > > > +
+> > > > +     /*
+> > > > +      * The zero page is never written to, so never has any dirty cache
+> > > > +      * lines, and therefore never needs to be flushed.
+> > > > +      */
+> > > > +     if (page == ZERO_PAGE(0))
+> > > > +             return;
+> > > > +
+> > > > +     mapping = page_mapping(page);
+> > > > +
+> > > > +     if (mapping && !mapping_mapped(mapping))
+> > > > +             clear_bit(PG_dcache_clean, &page->flags);
+> > > > +     else {
+> > > > +             __flush_dcache_page(mapping, page);
+> > > > +             if (mapping)
+> > > > +                     __flush_icache_all();
+> > > 
+> > > 
+> > > Is this necessary to ensure I/D coherency? Then, I would have
+> > > expected
+> > > 
+> > >                 if (mapping) {
+> > >                         __flush_dcache_page(mapping, page);
+> > >                         __flush_icache_all();
+> > >                 }
+> > > 
+> > > similar to __sync_icache_dcache() above.
+> > 
+> > We don't want to do additional flushing if !mapping_mapped() as the page
+> > isn't mapped in user space. In this case we defer the flushing until
+> > __sync_icache_dcache().
+> > 
+> > The other case is for anonymous pages where mapping == NULL. Here we
+> > don't defer the D-cache flush and do it directly. The I-cache, if
+> > needed, is handled later in __sync_icache_dcache(). This was based on
+> > the idea that this case is mainly for the args/env page which is mapped
+> > shortly after anyway, so not worth deferring. On AArch64, I don't think
+> > it makes any difference. Maybe a slight improvement (at least in
+> > clarity) in flush_dcache_page():
+> > 
+> > 	if (mapping && mapping_mapped(mapping)) {
+> > 		__flush_dcache_page(page);
+> > 		__flush_icache_all();
+> > 		set_bit(PG_dcache_clean, &page->flags);
+> > 	} else {
+> > 		clear_bit(PG_dcache_clean, &page->flags);
+> > 	}
+> > 
+> > In this case the anonymous page flushing is deferred to
+> > __sync_icache_dcache().
+> 
+> Yes, I think this is much clearer. It makes clear that the D-cache
+> flush is done to avoid I/D incoherencies.  Previously, the obvious
+> question was "Why do we flush only the D-cache in some situations
+> given that it essentially behaves like a PIPT cache?" (the motivation
+> for this became only clear to me after your explanation.)
+> 
+> However, the reason why this was an obvious question for me is
+> interesting: I think the main use case you had in mind does not
+> happen since about five years (since commit b6a2fe, "mm: variable
+> length argument support").  And I had a completely different main use
+> case in mind.
+> 
+> I reckon that the use case you refer to is the use in fs/exec.c? 
+> Copying arg/env was changed in the commit mentioned above.  This also
+> changed the use of flush_dcache_page() (which is not supposed to
+> handle anon pages) into flush_kernel_dcache_page() (which is supposed
+> to handle kernel modified user pages, i.e.  also anon pages).
 
-NAK.  This is broken as you don't seem to understand what MULTI_CACHE
-actually means.  MULTI_CACHE means that we _may_ support more than one
-type of cache, so it not being selected means nothing as far as whether
-to use flush_kern_all() or not.
+That's what I was thinking about, thanks for the pointer. I still get a
+flush_dcache_page() call (on the source page) from copy_strings() via
+get_user_page() but with my changes above it doesn't trigger any cache
+flushing (which is correct).
 
-Follow the pattern in the rest of the file - that's the _only_ way to do
-this.
+> In case of direct I/O (and probably also in other cases like SG_IO)
+> the block layer will see pages from get_user_pages() directly, i.e.
+> also anonymous pages. Many drivers (especially emulated storage
+> drivers like dm-crypt) use flush_dcache_page() after modifying a
+> page. Although flush_dcache_page() is not even supposed to handle
+> anonymous pages, it flushes the kernel mapping of the page because of
+> this code line and everything is well on aliasing D-caches.
 
-Note that ARMv6 only and ARMv7 only kernels will not have MULTI_CACHE
-defined (I mentioned this on Monday in our call, though not explicitly
-by that name.)
+According to the cachetlb.txt document (though not sure architecture
+ports follow it entirely), flush_dcache_page() deliberately shouldn't
+follow anonymous pages. But it seems that we do it on ARM (maybe as an
+alternative to flush_kernel_dcache_page()).
 
-> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> index 2d8ff3a..28e91f8 100644
-> --- a/arch/arm/mm/proc-macros.S
-> +++ b/arch/arm/mm/proc-macros.S
-> @@ -293,12 +293,17 @@ ENTRY(\name\()_processor_functions)
->  	.size	\name\()_processor_functions, . - \name\()_processor_functions
->  .endm
->  
-> -.macro define_cache_functions name:req
-> +.macro define_cache_functions name:req, cachelouis=0
->  	.align 2
->  	.type	\name\()_cache_fns, #object
->  ENTRY(\name\()_cache_fns)
->  	.long	\name\()_flush_icache_all
->  	.long	\name\()_flush_kern_cache_all
-> +	.if \cachelouis
-> +	.long   \name\()_flush_kern_cache_louis
-> +	.else
-> +	.long   \name\()_flush_kern_cache_all
-> +	.endif
->  	.long	\name\()_flush_user_cache_all
->  	.long	\name\()_flush_user_cache_range
->  	.long	\name\()_coherent_kern_range
+> Back to arm64 (and possibly to arm with non-aliasing D-caches?), this
+> also means that the saved D-cache flush in the anonymous page case is
+> not only a slight improvement on clarity, but may avoid a
+> considerable number of D-cache flushes in some I/O situations.  (If
+> it is still correct that there are no problems with the I-cache for
+> this use case.)
 
-And what the above means is that _every_ cache support file must supply a
-XXX_flush_kern_cache_louis function name.  If there is no separate
-implementation, then name it an alias for the XXX_flush_cache_all function.
+The I-cache would be needed if the kernel modifies an executable user
+page. But I don't see a case for this yet. So with non-aliasing D-cache
+the flush_kernel_dcache_page() can be a nop.
+
+> If now we could additionally avoid to flush the entire I-cache for
+> every page in direct I/O operations with user mapped page cache
+> pages (e.g. direct I/O read into an mmap region)...
+
+If the page is already mapped, we don't have a later hook to be able to
+flush the caches, so we do it here. We can avoid the I-cache operation
+only if we are sure that the user would not execute code from such page.
+IOW the direct I/O wouldn't write any instructions.
+
+The powerpc implementation of flush_dcache_page() doesn't even check for
+the existence of a mapping, it always marks the page as dirty. We can do
+the same on arm64 (only leave the clear_bit part of the condition) as
+long as we know that the kernel wouldn't write new code into a page that
+is already mapped.
+
+> > > What is the reason why the D-cache flush is done in different
+> > > cases than the following I-cache flush?
+> > 
+> > For __sync_icache_dcache(), we need to handle the situation where the
+> > page mapped into user space has been cleaned (D-cache) but there may be
+> > stale data in the I-cache. I think this can only happen with an
+> > ASID-tagged VIVT I-cache configuration (which is allowed on AArch64) if
+> > an existing page has been unmapped and the same virtual address remapped
+> > (withing the same mm context) to a different page that had been cleaned
+> > previously. We could optimise the __sync_icache_dcache() as below:
+> > 
+> > 	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
+> > 		__flush_dcache_page(page);
+> > 		__flush_icache_all();
+> > 	} else if (icache_is_aivivt()) {
+> > 		__flush_icache_all();
+> > 	}
+> 
+> Sorry, this is out of my depth. I think I don't really understand the
+> cases leading to I/D incoherency.
+
+That's with a VIVT I-cache where a process mapped some file at a virtual
+address, unmapped it and remapped a different file at the same virtual
+address. For the latter file, the page may have already been cleaned by
+a different process but our process has stale I-cache entries from the
+previous mapping. With physically tagged I-cache, this wouldn't be
+necessary.
+
+-- 
+Catalin
