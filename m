@@ -1,32 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 13 Sep 2012 12:19:06 +0100
-Subject: [PATCH v3 06/25] docs: Xen ARM DT bindings
-In-Reply-To: <20120913102938.GB2470@linaro.org>
-References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
- <1345131377-14713-6-git-send-email-stefano.stabellini@eu.citrix.com>
- <503BFCD8.5090804@gmail.com>
- <alpine.DEB.2.02.1208281823270.15568@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1209121849200.15568@kaball.uk.xensource.com>
- <50514634.3080303@gmail.com> <20120913102938.GB2470@linaro.org>
-Message-ID: <alpine.DEB.2.02.1209131215360.15568@kaball.uk.xensource.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 13 Sep 2012 13:23:22 +0200
+Subject: [PATCH] ARM: dts: mxs: Add ethernetX to macX aliases
+Message-ID: <1347535402-17148-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Sep 2012, Dave Martin wrote:
-> Do you think it's feasible to standardise on some interoperable ABI for
-> kvm and Xen?  This sounds pretty optimistic, but I'm not aware of all
-> the technicalities, or what possible third-party hypervisors are out
-> there.
-> 
-> If we could do it, it would be good.  But I have my doubts about the
-> feasibility and the benefits.  If different hypervisors are significantly
-> imcompatible, then having a common low-level ABI doesn't help all that
-> much.
+Add ethernet0 and ethernet1 aliases into the imx28.dtsi file, as
+that is what most bootloaders use to pass MAC address. The bootloader
+seeks for this alias and adds "mac-address" and "local-mac-address"
+properties to the aliased node. This fixes issues with FEC having
+NULL MAC address when update_fec_mac_prop() wasn't called. And
+not all boards call update_fec_mac_prop() .
 
-It is not really possible because each hypervisor offers a different set
-of hypercalls and has a different calling convention, so there is very
-little we can do to unify them.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx28.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-For example many of the current Xen hypercalls are to deal with the grant
-table and event channels, that are Xen specific concepts completely
-missing in KVM.
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 14ea47d..0e78d5b 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -27,6 +27,8 @@
+ 		serial2 = &auart2;
+ 		serial3 = &auart3;
+ 		serial4 = &auart4;
++		ethernet0 = &mac0;
++		ethernet1 = &mac1;
+ 	};
+ 
+ 	cpus {
+-- 
+1.7.10.4
