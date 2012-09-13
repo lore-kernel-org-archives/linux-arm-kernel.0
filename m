@@ -1,34 +1,19 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 13 Sep 2012 15:48:11 +0800
-Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
-In-Reply-To: <20120823122239.GA29485@lizard>
-References: <20120714081254.GD20018@lizard>
- <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
- <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
- <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
- <20120823122239.GA29485@lizard>
-Message-ID: <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 13 Sep 2012 16:11:43 +0800
+Subject: [PATCH 00/11] ASoC: OMAP: Convert to use dmaengine
+In-Reply-To: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1347450427-27627-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120913081141.GD20959@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 8:22 PM, Anton Vorontsov
-<anton.vorontsov@linaro.org> wrote:
-> On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
->> Thanks for helping me to amend these patch.  I got many good
->> suggestions and learn a lot in this process:) BTW, you mean you will
->> help to amend that several minor warning with battery tree?
->
-> Yup, I have these small fixups locally in my tree already, so if/once
-> Samuel gives me an Ack for the mfd part, I'll merge it into battery git
-> tree.
->
-> Thanks,
->
-> Anton.
+On Wed, Sep 12, 2012 at 02:46:56PM +0300, Peter Ujfalusi wrote:
+> Hello,
+> 
+> This series will switch the OMAP audio to use dmaengine.
+> The final patch which does the switch was based on Russell King's earlier patch.
 
-Hi all,
-
-Any updates?
-
-Regards
-Haojian
+I'm fine with this from the ASoC side but it sounds like you're going to
+respin anyway.  Are the earlier bits of the series safe to apply without
+the last bit, it seems like that's the only bit that really needs a
+respin so we may as well go ahead and apply the earlier bits now?
