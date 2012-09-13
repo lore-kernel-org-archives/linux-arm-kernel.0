@@ -1,69 +1,80 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Thu, 13 Sep 2012 22:14:44 +0200
-Subject: [PATCH v3 09/31] arm64: Cache maintenance routines
-In-Reply-To: <20120913123850.GB25131@arm.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-10-git-send-email-catalin.marinas@arm.com>
- <20120907193542.GA22806@schnuecks.de>
- <20120912092954.GA21823@arm.com>
- <20120912215553.GA17393@schnuecks.de>
- <20120913123850.GB25131@arm.com>
-Message-ID: <20120913201444.GA11692@schnuecks.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Sep 2012 15:20:54 -0500
+Subject: [PATCH v3 2/5] Documentation: add description of DT binding for
+ the gpio-mvebu driver
+In-Reply-To: <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <50524026.20104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 01:38:50PM +0100, Catalin Marinas wrote:
-> On Wed, Sep 12, 2012 at 10:55:54PM +0100, Simon Baatz wrote:
-> > On Wed, Sep 12, 2012 at 10:29:54AM +0100, Catalin Marinas wrote:
-> ...
-> 
-> > In case of direct I/O (and probably also in other cases like SG_IO)
-> > the block layer will see pages from get_user_pages() directly, i.e.
-> > also anonymous pages. Many drivers (especially emulated storage
-> > drivers like dm-crypt) use flush_dcache_page() after modifying a
-> > page. Although flush_dcache_page() is not even supposed to handle
-> > anonymous pages, it flushes the kernel mapping of the page because of
-> > this code line and everything is well on aliasing D-caches.
-> 
-> According to the cachetlb.txt document (though not sure architecture
-> ports follow it entirely), flush_dcache_page() deliberately shouldn't
-> follow anonymous pages. But it seems that we do it on ARM (maybe as an
-> alternative to flush_kernel_dcache_page()).
-> 
-> > Back to arm64 (and possibly to arm with non-aliasing D-caches?), this
-> > also means that the saved D-cache flush in the anonymous page case is
-> > not only a slight improvement on clarity, but may avoid a
-> > considerable number of D-cache flushes in some I/O situations.  (If
-> > it is still correct that there are no problems with the I-cache for
-> > this use case.)
-> 
-> The I-cache would be needed if the kernel modifies an executable user
-> page. But I don't see a case for this yet. So with non-aliasing D-cache
-> the flush_kernel_dcache_page() can be a nop.
+On 09/13/2012 10:54 AM, Thomas Petazzoni wrote:
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> ---
 
-Ok, this is true for anon pages. But, if we really need to do the D/I
-flush for user mapped page cache pages in flush_dcache_page() then it
-should also be done by flush_kernel_dcache_page().  In general, both
-flush_dcache_page() and flush_kernel_dcache_page() need to handle the
-case in which the kernel modifies such a page. (This means that in
-effect, both functions should be the same in the arm64 case.)
+Grant is pretty much offline right now.
 
-> > If now we could additionally avoid to flush the entire I-cache for
-> > every page in direct I/O operations with user mapped page cache
-> > pages (e.g. direct I/O read into an mmap region)...
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+>  .../devicetree/bindings/gpio/gpio-mvebu.txt        |   45 ++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
 > 
-> If the page is already mapped, we don't have a later hook to be able to
-> flush the caches, so we do it here. We can avoid the I-cache operation
-> only if we are sure that the user would not execute code from such page.
-> IOW the direct I/O wouldn't write any instructions.
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+> new file mode 100644
+> index 0000000..595be9e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+> @@ -0,0 +1,45 @@
+> +* Marvell EBU GPIO controller
+> +
+> +Required properties:
+> +
+> +- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
+> +  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
+> +  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
+> +  370. "marvell,mv78200-gpio" should be used for the Discovery
+> +  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
+> +  SoCs (MV78230, MV78260, MV78460).
+> +
+> +- reg: Address and length of the register set for the device. Only one
+> +  entry is expected, except for the "marvell,armadaxp-gpio" variant
+> +  for which two entries are expected: one for the general registers,
+> +  one for the per-cpu registers.
+> +
+> +- interrupts: The list of interrupts that are used for all the pins
+> +  managed by this GPIO bank. There can be more than one interrupt
+> +  (example: 1 interrupt per 8 pins on Armada XP, which means 4
+> +  interrupts per bank of 32 GPIOs).
+> +
+> +- interrupt-controller: identifies the node as an interrupt controller
+> +
+> +- #interrupt-cells: specifies the number of celles needed to encode an
+> +   interrupt source
+> +
+> +- gpio-controller: marks the device node as a gpio controller
+> +
+> +- ngpios: number of GPIOs this controller has
+> +
+> +- #gpio-cells: Should be two. The first is the pin number. The second
+> +   is reserved for flags, unused at the moment.
+> +
+> +Example:
+> +
+> +		gpio0: gpio at d0018100 {
+> +			compatible = "marvell,armadaxp-gpio";
+> +			reg = <0xd0018100 0x40>,
+> +			    <0xd0018800 0x30>;
+> +			ngpios = <32>;
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			interrupt-controller;
+> +			interrupts = <16>, <17>, <18>, <19>;
+> +		};
 > 
-> The powerpc implementation of flush_dcache_page() doesn't even check for
-> the existence of a mapping, it always marks the page as dirty. We can do
-> the same on arm64 (only leave the clear_bit part of the condition) as
-> long as we know that the kernel wouldn't write new code into a page that
-> is already mapped.
-
-Yes, but how do we know?
-
-
-- Simon
