@@ -1,105 +1,116 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Sep 2012 16:40:46 +0100
-Subject: [PATCH v2] ARM: perf: add guest vs host discrimination
-Message-ID: <1347550846-10158-1-git-send-email-marc.zyngier@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 13 Sep 2012 17:41:42 +0200
+Subject: [PATCH v4 00/10] pinctrl: mvebu: pinctrl driver
+In-Reply-To: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal guest support to perf, so it can distinguish whether
-the PMU interrupt was in the host or the guest, as well as collecting
-some very basic information (guest PC, user vs kernel mode).
+This patch set adds a core pinctrl driver for Marvell MVEBU SoCs and
+SoC specific stubs for Armada 370, Armada XP, Dove, and Kirkwood.
+The SoC specific stubs use the pinctrl-mvebu core driver that handles
+pinctrl API and register accesses for common pinctrl registers.
 
-This is not feature complete though, as it doesn't support backtracing
-in the guest.
+As especially Dove has some pinctrl registers that do not match the
+common pinctrl register layout the core driver has been extended by
+some callbacks to allow uncommon Dove pinctrl registers.
 
-Based on the x86 implementation, tested with KVM/ARM.
+DT binding documentation is added for all supported SoCs but as
+Dove and Kirkwood are not yet ready for full DT support, the pinctrl
+driver is only activated for Armada 370 and XP.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+The driver of latest patch v4 has been tested on Dove, Armada 370, 
+Armada XP, and 88f6281 variant of Kirkwood.
+
+Changelog:
+v2:
+- rebased on git://git.infradead.org/users/jcooper/linux.git boards-for-3.7
+- removed arch/arm/*/Kconfig patches that enable PINCTRL_ on MACH_MVEBU
+  (those will be sent as a different patch set)
+- reworked patches wrt reviews from Andrew Lunn and Linus Walleij
+
+v3:
+- parse functions from SoC specific pin groups instead of DT node
+- move kirkwood variants to DT match data
+- respect Armada XP variant in DTs
+- cleaned whitespaces in DTs
+- rebased to jcooper/boards-for-v3.7-v2
+
+v4:
+- fix bogus v3 patch set with respect to pinctrl-mvebu, and pinctrl-kirkwood
+  (my deep appologies to all reviewers that wasted their time with reviewing v3)
+- mark internal functions in pinctrl-mvebu as static
+- split up Kconfig of Armada 370 and XP
+- enable pinctrl drivers for Armada 370 and XP
+
+Sebastian Hesselbarth (3):
+  pinctrl: mvebu: pinctrl driver core
+  pinctrl: mvebu: dove pinctrl driver
+  pinctrl: mvebu: kirkwood pinctrl driver
+
+Thomas Petazzoni (7):
+  pinctrl: mvebu: add pinctrl driver for Armada 370
+  pinctrl: mvebu: add pinctrl driver for Armada XP
+  ARM: mvebu: Add pinctrl support to Armada XP SoCs
+  ARM: mvebu: Add pinctrl support to Armada 370 SoC
+  ARM: mvebu: adjust Armada XP evaluation board DTS
+  arm: mvebu: split Kconfig options for Armada 370 and XP
+  arm: mvebu: select the pinctrl drivers for Armada 370 and Armada XP
+    platforms
+
+ .../pinctrl/marvell,armada-370-pinctrl.txt         |   95 +++
+ .../bindings/pinctrl/marvell,armada-xp-pinctrl.txt |  100 +++
+ .../bindings/pinctrl/marvell,dove-pinctrl.txt      |   72 ++
+ .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |  279 ++++++++
+ .../bindings/pinctrl/marvell,mvebu-pinctrl.txt     |   46 ++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/armada-370.dtsi                  |    7 +
+ arch/arm/boot/dts/armada-xp-db.dts                 |    4 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   30 +
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   30 +
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   30 +
+ arch/arm/mach-mvebu/Kconfig                        |   18 +-
+ drivers/pinctrl/Kconfig                            |   22 +
+ drivers/pinctrl/Makefile                           |    5 +
+ drivers/pinctrl/pinctrl-armada-370.c               |  421 +++++++++++
+ drivers/pinctrl/pinctrl-armada-xp.c                |  468 ++++++++++++
+ drivers/pinctrl/pinctrl-dove.c                     |  620 ++++++++++++++++
+ drivers/pinctrl/pinctrl-kirkwood.c                 |  472 ++++++++++++
+ drivers/pinctrl/pinctrl-mvebu.c                    |  754 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-mvebu.h                    |  192 +++++
+ 20 files changed, 3661 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/armada-xp-mv78230.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-mv78260.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-mv78460.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-armada-370.c
+ create mode 100644 drivers/pinctrl/pinctrl-armada-xp.c
+ create mode 100644 drivers/pinctrl/pinctrl-dove.c
+ create mode 100644 drivers/pinctrl/pinctrl-kirkwood.c
+ create mode 100644 drivers/pinctrl/pinctrl-mvebu.c
+ create mode 100644 drivers/pinctrl/pinctrl-mvebu.h
 ---
-Hi Will,
-
-This is v2 of this patch, based on your perf/updates branch.
-If you don't have any additional comment, can you please merge it?
-
-Thanks,
-
-	M.
-
- arch/arm/include/asm/perf_event.h |  5 +++++
- arch/arm/kernel/perf_event.c      | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
-
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-index 625cd62..00416ed 100644
---- a/arch/arm/include/asm/perf_event.h
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -21,4 +21,9 @@
- #define C(_x)				PERF_COUNT_HW_CACHE_##_x
- #define CACHE_OP_UNSUPPORTED		0xFFFF
- 
-+struct pt_regs;
-+extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
-+extern unsigned long perf_misc_flags(struct pt_regs *regs);
-+#define perf_misc_flags(regs)	perf_misc_flags(regs)
-+
- #endif /* __ARM_PERF_EVENT_H__ */
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 93971b1..27413aa 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -572,6 +572,10 @@ perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
- {
- 	struct frame_tail __user *tail;
- 
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		/* We don't support guest os callchain now */
-+		return;
-+	}
- 
- 	tail = (struct frame_tail __user *)regs->ARM_fp - 1;
- 
-@@ -599,9 +603,41 @@ perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs)
- {
- 	struct stackframe fr;
- 
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		/* We don't support guest os callchain now */
-+		return;
-+	}
-+
- 	fr.fp = regs->ARM_fp;
- 	fr.sp = regs->ARM_sp;
- 	fr.lr = regs->ARM_lr;
- 	fr.pc = regs->ARM_pc;
- 	walk_stackframe(&fr, callchain_trace, entry);
- }
-+
-+unsigned long perf_instruction_pointer(struct pt_regs *regs)
-+{
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest())
-+		return perf_guest_cbs->get_guest_ip();
-+
-+	return instruction_pointer(regs);
-+}
-+
-+unsigned long perf_misc_flags(struct pt_regs *regs)
-+{
-+	int misc = 0;
-+
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		if (perf_guest_cbs->is_user_mode())
-+			misc |= PERF_RECORD_MISC_GUEST_USER;
-+		else
-+			misc |= PERF_RECORD_MISC_GUEST_KERNEL;
-+	} else {
-+		if (user_mode(regs))
-+			misc |= PERF_RECORD_MISC_USER;
-+		else
-+			misc |= PERF_RECORD_MISC_KERNEL;
-+	}
-+
-+	return misc;
-+}
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Rob Landley <rob@landley.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 -- 
-1.7.12
+1.7.10.4
