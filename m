@@ -1,26 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Sep 2012 18:20:57 +0100
-Subject: [PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
-In-Reply-To: <20120913010041.GD7622@verge.net.au>
-References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
- <1347434097-7924-3-git-send-email-horms@verge.net.au>
- <5050CD87.4020800@codeaurora.org> <20120913010041.GD7622@verge.net.au>
-Message-ID: <20120913172057.GB13739@n2100.arm.linux.org.uk>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 13 Sep 2012 10:23:26 -0700
+Subject: [GIT PULL 3/4] mxs clk device tree lookup
+In-Reply-To: <20120913060808.GG24290@quad.lixom.net>
+References: <1347350100-4674-1-git-send-email-shawn.guo@linaro.org>
+ <1347350100-4674-4-git-send-email-shawn.guo@linaro.org>
+ <20120913060808.GG24290@quad.lixom.net>
+Message-ID: <CAJOA=zO2RK-TA924LrpHjF1ADv3eg=1-ypJYyes9cjYDM=X79g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 10:00:42AM +0900, Simon Horman wrote:
-> +config ARM_ERRATA_782773
-> +	bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
-> +	depends on CPU_V7
-> +	help
-> +	  This option enables the workaround for the 782773 Cortex-A9 (all r0,
-> +	  r2 and r3 revisions) erratum. It might cause MMU exception in case
-> +	  page table walk happens just after updating the existing
-> +	  with setting page table in L1 data cache.
+On Wed, Sep 12, 2012 at 11:08 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Sep 11, 2012 at 03:54:58PM +0800, Shawn Guo wrote:
+>> The following changes since commit 0a77398b5a68e298f03b1c356c5100fa1decb2e1:
+>>
+>>   Merge tag 'mxs-dt-3.7' into mxs/clk-dt-lookup (2012-09-11 14:15:00 +0800)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-clk-dt-lookup
+>>
+>> for you to fetch changes up to 53f9443da63db38212e784b0aa205881168757aa:
+>>
+>>   clk: mxs: replace imx23 clk_register_clkdev with clock DT lookup (2012-09-11 14:45:46 +0800)
+>>
+>> ----------------------------------------------------------------
+>> mxs-clk-dt-lookup
+>>
+>> It replaces clk_register_clkdev in mxs clock driver with DT lookup.
+>> The series depends on pull request mxs-dt-3.7 and Mike's clk branch
+>> below.
+>
+> Pulled in as mxs/clk-dt-lookup, thanks!
+>
+> I also pulled in Mike's clk-3.7 branch as a dependency. Mike, this
+> assumes that the branch is stable (which you've already mostly promised
+> in the past).
+>
+> Please let us know if it isn't and/or if you prefer to just give us
+> a shorter topic branch with the dependent commit to pull in instead.
+>
 
-What if we're running on a SMP system where the L1 caches are mandated
-to be in write-allocate mode?  This write will immediately cause the
-cache line to be brought back into the cache.
+clk-3.7 is stable.  I might merge the current clk-next into it soon,
+but that's just a fast-forward.
 
-This sounds like a broken work-around to me.
+Regards,
+Mike
+
+>
+> -Olof
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
