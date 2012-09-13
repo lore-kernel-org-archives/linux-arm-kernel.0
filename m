@@ -1,27 +1,23 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 13 Sep 2012 17:41:49 +0200
-Subject: [PATCH v4 07/10] ARM: mvebu: Add pinctrl support to Armada 370 SoC
+Date: Thu, 13 Sep 2012 17:41:50 +0200
+Subject: [PATCH v4 08/10] ARM: mvebu: adjust Armada XP evaluation board DTS
 In-Reply-To: <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1347550912-18021-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1347550912-18021-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-This commits adds the necessary device tree information to define the
-compatible property for the pinctrl driver instance of Armada 370 SoC.
+The Armada XP evaluation board is based on the MV78460 Armava XP
+SoC. Now that we have separate .dtsi files for the three different
+SoCs of the Armada XP family, use the appropriate one as include for
+the Armada XP evaluation board .dts file.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-v3:
-- cleaned whitespaces
-
-v4:
-- adjust pinctrl DT node of Armada 370 SoC
-
 Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
@@ -40,23 +36,26 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/boot/dts/armada-370.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/armada-xp-db.dts |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 3228ccc..2bfb904 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -31,5 +31,10 @@
- 				compatible = "marvell,armada-370-xp-system-controller";
- 				reg = <0xd0018200 0x100>;
- 		};
-+
-+		pinctrl {
-+			compatible = "marvell,mv88f6710-pinctrl";
-+			reg = <0xd0018000 0x38>;
-+		};
- 	};
- };
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index f97040d..b1fc728 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -14,11 +14,11 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "armada-xp.dtsi"
++/include/ "armada-xp-mv78460.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada XP Evaluation Board";
+-	compatible = "marvell,axp-db", "marvell,armadaxp", "marvell,armada-370-xp";
++	compatible = "marvell,axp-db", "marvell,armadaxp-mv78460", "marvell,armadaxp", "marvell,armada-370-xp";
+ 
+ 	chosen {
+ 		bootargs = "console=ttyS0,115200 earlyprintk";
 -- 
 1.7.10.4
