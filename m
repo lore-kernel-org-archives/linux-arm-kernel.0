@@ -1,60 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 13 Sep 2012 17:41:52 +0200
-Subject: [PATCH v4 10/10] arm: mvebu: select the pinctrl drivers for Armada
- 370 and Armada XP platforms
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Sep 2012 17:48:34 +0200
+Subject: [PATCH v4 00/10] pinctrl: mvebu: pinctrl driver
 In-Reply-To: <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1347550912-18021-11-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20120913174834.79727630@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Dear Sebastian Hesselbarth,
 
-This patch actually enables pinctrl drivers for Armada 370 and XP.
+On Thu, 13 Sep 2012 17:41:42 +0200, Sebastian Hesselbarth wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Rob Landley <rob@landley.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-doc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/mach-mvebu/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+> This patch set adds a core pinctrl driver for Marvell MVEBU SoCs and
+> SoC specific stubs for Armada 370, Armada XP, Dove, and Kirkwood.
+> The SoC specific stubs use the pinctrl-mvebu core driver that handles
+> pinctrl API and register accesses for common pinctrl registers.
+> 
+> As especially Dove has some pinctrl registers that do not match the
+> common pinctrl register layout the core driver has been extended by
+> some callbacks to allow uncommon Dove pinctrl registers.
+> 
+> DT binding documentation is added for all supported SoCs but as
+> Dove and Kirkwood are not yet ready for full DT support, the pinctrl
+> driver is only activated for Armada 370 and XP.
+> 
+> The driver of latest patch v4 has been tested on Dove, Armada 370, 
+> Armada XP, and 88f6281 variant of Kirkwood.
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 5540a8b..a601a0b 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -10,6 +10,7 @@ config MACH_ARMADA_370_XP
- config MACH_ARMADA_370
- 	bool "Marvell Armada 370 boards"
- 	select MACH_ARMADA_370_XP
-+	select PINCTRL_ARMADA_370
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 370 SoC with device tree.
-@@ -17,6 +18,7 @@ config MACH_ARMADA_370
- config MACH_ARMADA_XP
- 	bool "Marvell Armada XP boards"
- 	select MACH_ARMADA_370_XP
-+	select PINCTRL_ARMADA_XP
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada XP SoC with device tree.
+I confirm the testing of this v4 of the patch set on Armada 370 and
+Armada XP, so for the whole series:
+
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Thanks!
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
