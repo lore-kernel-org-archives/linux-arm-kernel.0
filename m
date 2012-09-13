@@ -1,33 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Sep 2012 08:47:19 +0000
-Subject: [PATCH 1/2] ARM: SoC: convert MSM SMP to SoC descriptor
-In-Reply-To: <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
-References: <1347461906-13527-7-git-send-email-arnd@arndb.de>
- <1347490900-8409-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <201209130847.20087.arnd@arndb.de>
+Date: Thu, 13 Sep 2012 10:36:29 +0000
+Subject: [PATCH V3 5/5] ARM: bcm2708: instantiate console UART
+In-Reply-To: <505133CB.1060906@wwwdotorg.org>
+References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+ <201209121045.39999.arnd@arndb.de> <505133CB.1060906@wwwdotorg.org>
+Message-ID: <201209131036.29929.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 September 2012, David Brown wrote:
+On Thursday 13 September 2012, Stephen Warren wrote:
+> On 09/12/2012 04:45 AM, Arnd Bergmann wrote:
+> > On Wednesday 12 September 2012, Stephen Warren wrote:
+> >> From: Simon Arlott <simon@fire.lp0.eu>
+> >>
+> >> This patch was extracted from git://github.com/lp0/linux.git branch
+> >> rpi-split as of 2012/09/08, and modified as follows:
+> >>
+> >> * Modified UART DT node to use a unit-address to differentiate UART node
+> >>   names, rather than using different base names "uart0" and "uart1".
+> >>   Note that UART 1 (the Broadcom "mini UART") is not yet present, but
+> >>   I'm naming the DT node in anticipation that it will be added.
+> >>
+> > 
+> > Shouldn't the selection be done using an alias like this?
+> > 
+> >       aliases {
+> >               serial0 = &/uart at 20201000;
+> >       };
 > 
-> From: Marc Zyngier <marc.zyngier@arm.com>
+> The "differentiate" was more "ensure that node names in DT are unique"
+> than anything to do with user-visible selection/identification.
 > 
-> Convert MSM SMP platforms to use the SoC descriptor to provide
-> their SMP and CPU hotplug operations.
-> 
-> Cc: David Brown <davidb@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This is an adaptation of this change on top of the msm-for-3.7 tree I
-> recently sent out a pull request for.  The only real change is to
-> resolve the conflicts with the simplified board files.
+> I can certainly add the alias if you want, but I don't know what benefit
+> it will have, since I've never used aliases before.
 
-Not sure what I'm supposed to do with this patch, it doesn't apply
-unless I rebase all of the SMP patches on top of your msm-for-3.7 branch,
-which would be rather odd.
-
-I'll make sure the branches merge fine and then apply your patch 2/2
-on top of the merge, ok?
+The idea of the aliases is that you can identify which port to use
+if one passes an argument like "console=ttyS0" or opens a specific
+/dev/tty* device node. I believe we don't actually use it that way
+at the moment though.
 
 	Arnd
