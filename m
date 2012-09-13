@@ -1,145 +1,111 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Sep 2012 10:13:35 +0200
-Subject: [PATCH 2/5] ARM: Add interface for registering and calling
- firmware-specific operations
+Date: Thu, 13 Sep 2012 10:13:36 +0200
+Subject: [PATCH 3/5] ARM: EXYNOS: Add support for secure monitor calls
 In-Reply-To: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
 References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1347524018-19301-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1347524018-19301-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards are running with secure firmware running in TrustZone secure
-world, which changes the way some things have to be initialized.
+Some boards use secure monitor calls to communicate with secure
+firmware.
 
-This patch adds an interface for platforms to specify available firmware
-operations and call them.
-
-A wrapper macro, call_firmware_op(), checks if the operation is provided
-and calls it if so, otherwise returns 0.
-
-By default no operations are provided.
+This patch adds exynos_smc function which uses smc assembly instruction
+to do secure monitor calls.
 
 This is a follow-up on the patch by Kyungmin Park:
-[PATCH v5 1/2] ARM: Make a compile firmware conditionally
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/183607/focus=183988
-
-Example of use:
-
-In code using firmware ops:
-
-	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-		CPU1_BOOT_REG);
-
-	/* Call Exynos specific smc call */
-	do_firmware_op(cpu_boot, cpu);
-
-	gic_raise_softirq(cpumask_of(cpu), 1);
-
-In board-/platform-specific code:
-
-	static int platformX_do_idle(void)
-	{
-		/* tell platformX firmware to enter idle */
-	        return 0;
-	}
-
-	static void platformX_cpu_boot(int i)
-	{
-		/* tell platformX firmware to boot CPU i */
-	}
-
-	static const struct firmware_ops platformX_firmware_ops __initdata = {
-		.do_idle	= exynos_do_idle,
-		.cpu_boot	= exynos_cpu_boot,
-		/* cpu_boot_reg not available on platformX */
-	};
-
-	static void __init board_init_early(void)
-	{
-	????????register_firmware_ops(&platformX_firmware_ops);
-	}
+[PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/183608/focus=184109
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/common/Makefile        |  2 ++
- arch/arm/common/firmware.c      | 18 ++++++++++++++++++
- arch/arm/include/asm/firmware.h | 30 ++++++++++++++++++++++++++++++
- 3 files changed, 50 insertions(+)
- create mode 100644 arch/arm/common/firmware.c
- create mode 100644 arch/arm/include/asm/firmware.h
+ arch/arm/mach-exynos/Makefile     |  5 +++++
+ arch/arm/mach-exynos/exynos-smc.S | 22 ++++++++++++++++++++++
+ arch/arm/mach-exynos/smc.h        | 31 +++++++++++++++++++++++++++++++
+ 3 files changed, 58 insertions(+)
+ create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+ create mode 100644 arch/arm/mach-exynos/smc.h
 
-diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index e8a4e58..55d4182 100644
---- a/arch/arm/common/Makefile
-+++ b/arch/arm/common/Makefile
-@@ -2,6 +2,8 @@
- # Makefile for the linux kernel.
- #
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index ee7fde9..997864b 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
  
-+obj-y += firmware.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ 
++obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
 +
- obj-$(CONFIG_ARM_GIC)		+= gic.o
- obj-$(CONFIG_ARM_VIC)		+= vic.o
- obj-$(CONFIG_ICST)		+= icst.o
-diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
++plus_sec := $(call as-instr,.arch_extension sec,+sec)
++AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
++
+ # machine support
+ 
+ obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
+diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
 new file mode 100644
-index 0000000..27ddccb
+index 0000000..2e27aa3
 --- /dev/null
-+++ b/arch/arm/common/firmware.c
-@@ -0,0 +1,18 @@
++++ b/arch/arm/mach-exynos/exynos-smc.S
+@@ -0,0 +1,22 @@
 +/*
 + * Copyright (C) 2012 Samsung Electronics.
-+ * Kyungmin Park <kyungmin.park@samsung.com>
-+ * Tomasz Figa <t.figa@samsung.com>
++ *
++ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
++ *
++ * This program is free software,you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++/*
++ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
++ */
++
++ENTRY(exynos_smc)
++	stmfd	sp!, {r4-r11, lr}
++	dsb
++	smc	#0
++	ldmfd	sp!, {r4-r11, pc}
++ENDPROC(exynos_smc)
+diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
+new file mode 100644
+index 0000000..e972390
+--- /dev/null
++++ b/arch/arm/mach-exynos/smc.h
+@@ -0,0 +1,31 @@
++/*
++ *  Copyright (c) 2012 Samsung Electronics.
++ *
++ * EXYNOS - SMC Call
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
++#ifndef __ASM_ARCH_EXYNOS_SMC_H
++#define __ASM_ARCH_EXYNOS_SMC_H
 +
-+#include <asm/firmware.h>
++#define SMC_CMD_INIT            (-1)
++#define SMC_CMD_INFO            (-2)
++/* For Power Management */
++#define SMC_CMD_SLEEP           (-3)
++#define SMC_CMD_CPU1BOOT        (-4)
++#define SMC_CMD_CPU0AFTR        (-5)
++/* For CP15 Access */
++#define SMC_CMD_C15RESUME       (-11)
++/* For L2 Cache Access */
++#define SMC_CMD_L2X0CTRL        (-21)
++#define SMC_CMD_L2X0SETUP1      (-22)
++#define SMC_CMD_L2X0SETUP2      (-23)
++#define SMC_CMD_L2X0INVALL      (-24)
++#define SMC_CMD_L2X0DEBUG       (-25)
 +
-+static const struct firmware_ops default_firmware_ops;
-+
-+const struct firmware_ops *firmware_ops = &default_firmware_ops;
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-new file mode 100644
-index 0000000..ed51b02
---- /dev/null
-+++ b/arch/arm/include/asm/firmware.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2012 Samsung Electronics.
-+ * Kyungmin Park <kyungmin.park@samsung.com>
-+ * Tomasz Figa <t.figa@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARM_FIRMWARE_H
-+#define __ASM_ARM_FIRMWARE_H
-+
-+struct firmware_ops {
-+	int (*do_idle)(void);
-+	void (*cpu_boot)(int cpu);
-+	void __iomem *(*cpu_boot_reg)(int cpu);
-+};
-+
-+extern const struct firmware_ops *firmware_ops;
-+
-+#define call_firmware_op(op, ...)					\
-+	((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : 0)
-+
-+static inline void register_firmware_ops(const struct firmware_ops *ops)
-+{
-+	firmware_ops = ops;
-+}
++extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
 +
 +#endif
 -- 
