@@ -1,84 +1,47 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Sep 2012 11:20:45 +0100
-Subject: [RFC PATCH 0/6] ARM: augment cache flushing API
-Message-ID: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Thu, 13 Sep 2012 11:20:50 +0100
+Subject: [RFC PATCH 5/6] ARM: kernel: update __cpu_disable to use cache LoUIS
+ maintenance API
+In-Reply-To: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1347531651-28218-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1347531651-28218-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series provides an update of a previous posting:
+When a CPU is hotplugged out caches that reside in its power domain
+lose their contents and so must be cleaned to the next memory level.
 
-http://www.spinics.net/lists/arm-kernel/msg169075.html
+Currently, __cpu_disable calls flush_cache_all() that for new generation
+processor like A15/A7 ends up cleaning and invalidating all cache levels
+up to Level of Coherency, which includes the unified L2.
 
-Main changes:
- - Changed the new API to Level of Unification Inner Shareable (LoUIS)
- - Fixed a pointer bug in __cpu_suspend_save code update
- - Added patches to update __cpu_disable and __v7_setup to LoUIS API
- - Changed the v7 dcache level function to make it clean/invalidate a specific
-   level instead of up to a certain level
+This ends up being a waste of cycles since the L2 cache contents are not
+lost on power down.
 
-v7 ARM architecture introduced the concept of cache levels and relative
-control registers to manage them. Cache operations that operate on set/way
-require to define the cache level at which maintenance operations are carried
-out by using coprocessor registers.
+This patch updates __cpu_disable to use the new LoUIS API cache operations.
 
-Processors like A7/A15 integrates a unified L2 that is part of the cache
-level hierarchy; this implies that cache operations operating on all levels
-also end up cleaning the L2 unified cache which is a very time consuming
-operation and it is not needed for some power-down operations like single CPU
-shutdown.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/kernel/smp.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-For v7, flush_kern_all() cleans all the cache levels up to the Level of
-Coherency which includes L2 in it. This is suboptimal for code paths that end
-up shutting-down a single processor like CPU hotplug and CPU idle, where only
-per-CPU cache state (ie L1 integrated cache) has to be cleaned and invalidated.
-
-To fix this performance issue this patchset introduces cache LoUIS (Level of
-Unification Inner Shareable) maintenance operations in the kernel.
-
-A new cache operations pointer is added to cpu_cache_fns
-
-void (*flush_kern_cache_louis)(void);
-
-that allows to clean and invalidate all data cache levels up to the LoUIS and
-invalidate the instruction cache. This new API should provide a sufficiently
-optimized API to be used in generic C code in the kernel for power management
-operations on most v7 systems.
-
-For architecture versions previous to v7, flush_kern_cache_louis() falls back
-to flush_kern_all() leaving the current behaviour unchanged.
-
-In order to allow finer grain operations on cache levels, this series also
-defines an assembly stub for v7 that allows to clean and invalidate a specific
-data cache level and it is provided for completeness.
-
-For A9/A5 processors Level of Unification Inner Shareable and Level of
-Coherency are equivalent hence this patch should not affect current kernel
-behaviour in any way when run on A9/A5 based systems, but should nonetheless
-be thoroughly tested on them.
-
-Tested on:
-  - OMAP4 (S2R, cpuidle and hotplug)
-  - OMAP5 (out of tree code) (S2R, cpuidle and hotplug)
-  - TC2 big.LITTLE testchip (out of tree code) (cpuidle, on both A7 and A15
-    clusters)
-
-Lorenzo Pieralisi (4):
-  ARM: mm: define LoUIS API for cache maintenance ops
-  ARM: mm: add v7 cache LoUIS API implementation
-  ARM: kernel: update cpu_suspend code to use cache LoUIS operations
-  ARM: kernel: update __cpu_disable to use cache LoUIS maintenance API
-
-Santosh Shilimkar (2):
-  ARM: mm: add v7 dcache level API
-  ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API
-
- arch/arm/include/asm/cacheflush.h | 17 +++++++++++
- arch/arm/kernel/smp.c             |  5 +++-
- arch/arm/kernel/suspend.c         | 17 ++++++++++-
- arch/arm/mm/cache-v7.S            | 62 +++++++++++++++++++++++++++++++++++++--
- arch/arm/mm/proc-macros.S         |  7 ++++-
- arch/arm/mm/proc-v7.S             |  2 +-
- 6 files changed, 103 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index d3eb222..f44e9cd 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -136,8 +136,11 @@ int __cpu_disable(void)
+ 	/*
+ 	 * Flush user cache and TLB mappings, and then remove this CPU
+ 	 * from the vm mask set of all processes.
++	 *
++	 * Caches are flushed to the Level of Unification Inner Shareable
++	 * to write-back dirty lines to unified caches shared by all CPUs.
+ 	 */
+-	flush_cache_all();
++	flush_cache_louis();
+ 	local_flush_tlb_all();
+ 
+ 	clear_tasks_mm_cpumask(cpu);
 -- 
 1.7.12
