@@ -1,62 +1,39 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 13 Sep 2012 18:16:35 +0200
-Subject: [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of
- ocp2scp
-In-Reply-To: <alpine.DEB.2.00.1209112218440.9444@utopia.booyaka.com>
-References: <1347008955-21310-1-git-send-email-kishon@ti.com>
- <alpine.DEB.2.00.1209112218440.9444@utopia.booyaka.com>
-Message-ID: <505206E3.7050307@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 13 Sep 2012 19:36:44 +0300
+Subject: [PATCHv8 0/5] ARM: OMAP4: core retention support
+Message-ID: <1347554209-23378-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
-On 09/12/2012 12:28 AM, Paul Walmsley wrote:
-> Hi Kishon, Beno?t,
-> 
-> On Fri, 7 Sep 2012, Kishon Vijay Abraham I wrote:
-> 
->> Made *ocp2scp_usb_phy_phy_48m* as the main_clk for ocp2scp. Since this 
->> ocp2scp module does not have any fck but does have a single opt_clock, 
->> it is added as the main_clk for ocp2scp. Also removed phy_48m as the 
->> optional clock since it is now made as the main clock. By this the 
->> driver need not enable/disable phy_48m clk separately and 
->> runtime_get/runtime_put will take care of that.
-> 
-> Looking at this patch, it doesn't seem to make sense from a hardware point 
-> of view.  If you look at the OMAP4430 TRM Rev. AE, Table 23-1166 "Clocks 
-> and Resets", the 48MHz clock input is listed as an "Optional functional 
-> clock".  The main functional clock is listed as "INIT_960M_FCLK", which 
-> according to the same TRM, Section 3.6.3.9.1 "Overview", is an alias for 
-> the clock we call "dpll_usb_clkdcoldo_ck".
-> 
-> So if any clock should be the main functional clock in the hwmod data, 
-> shouldn't it be dpll_usb_clkdcoldo_ck?  The goal with the hwmod data 
-> is/was to have it match the hardware.
+Changes compared to previous version:
 
-In this case, the ocp2scp IP is just the *bus controller* to access the
-real USB_UTMI_PHY IP.
+- Dropped following patches from the set as these were queued by Paul:
+0003-ARM-OMAP4-hwmod-flag-hwmods-modules-not-supporting-m.patch
+0004-ARM-OMAP-hwmod-Add-support-for-per-hwmod-module-cont.patch
+0005-ARM-OMAP4-pwrdm-add-support-for-reading-prev-logic-a.patch
+0009-ARM-OMAP4-hwmod-data-temporarily-comment-out-data-fo.patch
+0010-ARM-OMAP4-HWMOD-add-support-for-lostcontext_mask.patch
 
-The TRM diagram does not show that level of detail unfortunately. You
-can check the PRCM spec (Figure 78 : CD_L3_INIT_USB clock scheme) to see
-the two modules.
+- Dropped following patches for now as their need is not that clear at
+  the moment:
+0011-ARM-OMAP4-hwmod_data-add-context-lose-information-fo.patch
+0012-ARM-OMAP4-hwmod-update-context-lost-counter-logic-fo.patch
 
-So considering phy_48m as the main clock is still correct for the
-ocp2scp IP.
+- Rebased on top of func-pwrst-v6 from Jean and 3.6-rc5.
 
-The INIT_960M_FCLK will be a fck associated with the child of the
-ocp2scp nodes which is the usb_phy.
+- Added patch #5 for yet another bug fix: the fix for the omap4460
+  (patch #2) is incomplete, and can cause rare TWD timer bugs. This
+  patch fixes those.
 
-Upgrading the opt_clk to fck does make sense as soon as we don't have
-any other functional clock and as soon as this clock is *mandatory*. The
-optional aspect in that case is just a wrong PRCM naming for a clock
-that is mandatory. It is similar to the DSS case that does have only
-optional clocks that are mandatory.
+- Tested with omap4460 GP panda + omap4430 EMU blaze, with suspend +
+  cpuidle.
 
-I do agree that we must stick to the HW definition as far as we can. But
-the optional attribute is something that is wrong/inaccurate for a
-couple of IPs. HW folks agreed on that point and will fix that in the
-future.
+Branch also available here (it also has the func pwrst code + the queued
+hwmod patches as the code doesn't apply cleanly / work without these.)
 
-Regards,
-Benoit
+Tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+Branch: mainline-3.6-rc5-omap4-ret-v8
+
+-Tero
