@@ -1,92 +1,59 @@
-From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
-Date: Thu, 13 Sep 2012 13:29:30 +0900
-Subject: [PATCH] ARM: fix bad applied patch for arch/arm/Kconfig of stable
- 3.0.y tree.
-Message-ID: <1347510570-9272-1-git-send-email-koba@kmckk.co.jp>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Thu, 13 Sep 2012 10:04:09 +0530
+Subject: [PATCH v5 2/2] OMAP:IOMMU:flush L1 and L2 caches
+In-Reply-To: <20120912164121.GF28448@n2100.arm.linux.org.uk>
+References: <CADysL2bb+LC1ySgkp8Hd_VL8GaFJ_gsuMF=WkmWp+YTdJqKJ4A@mail.gmail.com>
+ <20120912164121.GF28448@n2100.arm.linux.org.uk>
+Message-ID: <CADysL2YgZ4E8ZLDnA4zn-bvXiaF--TrgQvPsTgBpKm7VQnSwuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_ERRATA_764369 and PL310_ERRATA_769419 do not appear in config menu in stable 3.0.y tree.
-This is because backported patch for arm/arm/Kconfig applied wrong place.
-This patch solves it.
+Hi Russell,
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
----
-Hello, Greg
-This is patch for stable 3.0.y tree. 3.2.y, 3.4.y and 3.5.y do not have this problem. Only 3.0.y.
 
- arch/arm/Kconfig |   52 ++++++++++++++++++++++++++--------------------------
- 1 file changed, 26 insertions(+), 26 deletions(-)
+On Wed, Sep 12, 2012 at 10:11 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Sep 12, 2012 at 08:49:16PM +0530, Gupta, Ramesh wrote:
+>> Thanks to the RMK's suggestions.
+>
+> I should've made clear the distinction between _range and _area.
+> A _range function takes start and end.  An _area function takes a start
+> and size.  So...
+>
+>> -static void flush_iopgd_range(u32 *first, u32 *last)
+>> +static void flush_iopgd_range(u32 *first, size_t size)
+>
+> This should change to flush_iopgd_area().
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7692bca..85368ed 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1234,6 +1234,32 @@ config ARM_ERRATA_754327
- 	  This workaround defines cpu_relax() as smp_mb(), preventing correctly
- 	  written polling loops from denying visibility of updates to memory.
- 
-+config ARM_ERRATA_764369
-+	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
-+	depends on CPU_V7 && SMP
-+	help
-+	  This option enables the workaround for erratum 764369
-+	  affecting Cortex-A9 MPCore with two or more processors (all
-+	  current revisions). Under certain timing circumstances, a data
-+	  cache line maintenance operation by MVA targeting an Inner
-+	  Shareable memory region may fail to proceed up to either the
-+	  Point of Coherency or to the Point of Unification of the
-+	  system. This workaround adds a DSB instruction before the
-+	  relevant cache maintenance functions and sets a specific bit
-+	  in the diagnostic control register of the SCU.
-+
-+config PL310_ERRATA_769419
-+	bool "PL310 errata: no automatic Store Buffer drain"
-+	depends on CACHE_L2X0
-+	help
-+	  On revisions of the PL310 prior to r3p2, the Store Buffer does
-+	  not automatically drain. This can cause normal, non-cacheable
-+	  writes to be retained when the memory system is idle, leading
-+	  to suboptimal I/O performance for drivers using coherent DMA.
-+	  This option adds a write barrier to the cpu_idle loop so that,
-+	  on systems with an outer cache, the store buffer is drained
-+	  explicitly.
-+
- endmenu
- 
- source "arch/arm/common/Kconfig"
-@@ -1298,32 +1324,6 @@ source "drivers/pci/Kconfig"
- 
- source "drivers/pcmcia/Kconfig"
- 
--config ARM_ERRATA_764369
--	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
--	depends on CPU_V7 && SMP
--	help
--	  This option enables the workaround for erratum 764369
--	  affecting Cortex-A9 MPCore with two or more processors (all
--	  current revisions). Under certain timing circumstances, a data
--	  cache line maintenance operation by MVA targeting an Inner
--	  Shareable memory region may fail to proceed up to either the
--	  Point of Coherency or to the Point of Unification of the
--	  system. This workaround adds a DSB instruction before the
--	  relevant cache maintenance functions and sets a specific bit
--	  in the diagnostic control register of the SCU.
--
--config PL310_ERRATA_769419
--	bool "PL310 errata: no automatic Store Buffer drain"
--	depends on CACHE_L2X0
--	help
--	  On revisions of the PL310 prior to r3p2, the Store Buffer does
--	  not automatically drain. This can cause normal, non-cacheable
--	  writes to be retained when the memory system is idle, leading
--	  to suboptimal I/O performance for drivers using coherent DMA.
--	  This option adds a write barrier to the cpu_idle loop so that,
--	  on systems with an outer cache, the store buffer is drained
--	  explicitly.
--
- endmenu
- 
- menu "Kernel Features"
--- 
-1.7.9.5
+Looks like I missed this, I will fix and send the updated patch.
+
+>
+>>  {
+>> -     /* FIXME: L2 cache should be taken care of if it exists */
+>> -     do {
+>> -             asm("mcr        p15, 0, %0, c7, c10, 1 @ flush_pgd"
+>> -                 : : "r" (first));
+>> -             first += L1_CACHE_BYTES / sizeof(*first);
+>> -     } while (first <= last);
+>> +     phys_addr_t phys = virt_to_phys(first);
+>> +
+>> +     iommu_flush_area(first, size);
+>> +     outer_flush_range(phys, phys + size);
+>>  }
+>>
+>> -static void flush_iopte_range(u32 *first, u32 *last)
+>> +static void flush_iopte_range(u32 *first, size_t size)
+>> +
+>
+> flush_iopte_area().  (And there shouldn't be a blank line between this
+> and the open curley.)
+
+I will fix it.
+
+> Otherwise, looks fine.
+
+thank you.
+
+
+Best regards
+Ramesh Gupta G
