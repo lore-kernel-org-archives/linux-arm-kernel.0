@@ -1,42 +1,32 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 13 Sep 2012 10:35:37 +0200
-Subject: [GIT PULL 5/5] ARM i.MX SoC updates
+Date: Thu, 13 Sep 2012 10:35:36 +0200
+Subject: [GIT PULL 4/5] ARM: i.MX: Fix SSI clock associations for i.MX25/i.MX35
 In-Reply-To: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
 References: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1347525337-19115-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1347525337-19115-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
 
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-soc
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes
 
-for you to fetch changes up to 7852399cc666fda491e481575bdbf61bace58f00:
+for you to fetch changes up to 48540058612786d365602f3324ed97f9071092de:
 
-  ARM: i.MX35: Implement camera and keypad clocks (2012-09-06 14:22:59 +0200)
-
-----------------------------------------------------------------
-ARM i.MX SoC updates
+  ARM: clk-imx35: Fix SSI clock registration (2012-09-11 11:52:28 +0200)
 
 ----------------------------------------------------------------
-Alex Gershgorin (1):
-      ARM: i.MX35: Implement camera and keypad clocks
+ARM: i.MX: Fix SSI clock associations for i.MX25/i.MX35
 
-Dave Martin (1):
-      ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: clk-imx25: Fix SSI clock registration
+      ARM: clk-imx35: Fix SSI clock registration
 
-Sascha Hauer (1):
-      ARM i.MX53: register CAN clocks
-
-Torben Hohn (1):
-      arm imx31: add a few pinmux settings the tt01 needs
-
- arch/arm/mach-imx/clk-imx35.c              |   11 +++-
- arch/arm/mach-imx/clk-imx51-imx53.c        |   14 ++++-
- arch/arm/plat-mxc/include/mach/iomux-mx3.h |    5 ++
- arch/arm/plat-mxc/ssi-fiq.S                |   89 ++++++++++++++++------------
- 4 files changed, 75 insertions(+), 44 deletions(-)
+ arch/arm/mach-imx/clk-imx25.c |    6 ++----
+ arch/arm/mach-imx/clk-imx35.c |    6 ++----
+ 2 files changed, 4 insertions(+), 8 deletions(-)
