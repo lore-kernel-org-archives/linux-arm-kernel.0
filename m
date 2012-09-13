@@ -1,58 +1,65 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 13 Sep 2012 10:13:38 +0200
-Subject: [PATCH 5/5] ARM: EXYNOS: Add secure firmware support to secondary CPU
- bring-up
-In-Reply-To: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
-References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1347524018-19301-6-git-send-email-t.figa@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 13 Sep 2012 10:19:20 +0200
+Subject: triggering an gpio-irq on both edges
+Message-ID: <20120913081920.GF19497@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boards using secure firmware must use different CPU boot registers and
-call secure firmware to boot the CPU.
+Hello,
 
-This is a follow-up on the patch by Kyungmin Park:
-[PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/183608/focus=184109
+My motivation for this mail is that currently mxs_gpio_set_irq_type
+doesn't support type=IRQ_TYPE_EDGE_RISING|IRQ_TYPE_EDGE_FALLING because
+the hardware doesn't support it.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/platsmp.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+The gpio-keys driver on the other hand wants a trigger in both
+directions.
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 816a27d..9d65b1b 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -25,6 +25,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
-+#include <asm/firmware.h>
- 
- #include <mach/hardware.h>
- #include <mach/regs-clock.h>
-@@ -43,6 +44,9 @@ static inline void __iomem *cpu_boot_reg_base(void)
- 
- static inline void __iomem *cpu_boot_reg(int cpu)
- {
-+	void __iomem *fw_boot_reg = call_firmware_op(cpu_boot_reg, cpu);
-+	if (fw_boot_reg)
-+		return fw_boot_reg;
- 	if (soc_is_exynos4412())
- 		return cpu_boot_reg_base() + 4*cpu;
- 	return cpu_boot_reg_base();
-@@ -151,6 +155,10 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
- 							cpu_boot_reg(phys_cpu));
-+
-+		/* Call Exynos specific smc call */
-+		call_firmware_op(cpu_boot, phys_cpu);
-+
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
- 		if (pen_release == -1)
+The mxc-gpio driver implements the missing hardware functionallity in
+software (gpio_set_irq_type):
+
+	set_irq_type:
+		if (both edges requested)
+			if (current value of gpio == 0)
+				trigger on rising edge
+			else
+				trigger on falling edge
+
+	handle_irq:
+		if (both edges requested)
+			trigger on other edge
+
+
+This is racy though: If there is an edge after reading out the gpio
+value and completion of the edge direction programming, you miss
+interrupts. Also just switching the direction in the irq handler is
+also wrong for the same reason.
+
+I guess there are more machines than mxc and mxs that have the same
+problem.
+
+In my opinion this calls for a wrapper, something like:
+
+	int gpio_irq_emulate_both_edges_set_irq_type(struct irq_data *d,
+		unsigned int type, int (*set_irq_type)(...),
+		int (*get_value)(...), struct something *privdata)
+	{
+		...
+	}
+
+	int gpio_irq_emulate_both_edges_handler(...)
+	{
+
+	}
+
+Does this sound good and possible? I didn't find something like that
+already implemented, but maybe I missed it?
+
+Any thoughts (and be it only "The xyz driver is affected, too.") are
+welcome.
+
+Best regards
+Uwe
+
 -- 
-1.7.12
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
