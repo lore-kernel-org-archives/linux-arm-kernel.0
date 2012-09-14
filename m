@@ -1,80 +1,141 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 14 Sep 2012 14:42:45 +0800
-Subject: [PATCH v7] ARM: dts: imx6q-sabrelite: add usbmisc device
-Message-ID: <1347604966-11956-1-git-send-email-richard.zhao@freescale.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 14 Sep 2012 15:51:31 +0900
+Subject: [PATCH V3] ARM: EXYNOS5: Add bus clock and set parent clock for
+ FIMD
+In-Reply-To: <1347622464-5551-1-git-send-email-l.krishna@samsung.com>
+References: <1347622464-5551-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <000001cd9245$5fac2b90$1f0482b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add usbmisc device
-- set property fsl,usbmisc for usb controllers
-- set disable-over-current for imx6q-sabrelite usb otg
+On Friday, September 14, 2012 8:34 PM Leela Krishna Amudala wrote
+> 
+> This patch adds the bus clock for FIMD and changes the device name for lcd clock
+> also sets mout_mpll_user as parent clock to fimd
+> 
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> ---
+>  arch/arm/mach-exynos/clock-exynos5.c       |   34 +++++++++++++++++++--------
+>  arch/arm/plat-samsung/include/plat/clock.h |    2 +
+>  2 files changed, 26 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+> index 774533c..7c6b1b4 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+>  	.ctrlbit	= (1 << 4),
+>  };
+> 
+> +static struct clk exynos5_clk_fimd1 = {
+> +	.name		= "fimd",
+> +	.devname	= "exynos5-fb.1",
+> +	.enable		= exynos5_clk_ip_disp1_ctrl,
+> +	.ctrlbit	= (1 << 0),
+> +};
+> +
+>  struct clk *exynos5_clkset_group_list[] = {
+>  	[0] = &clk_ext_xtal_mux,
+>  	[1] = NULL,
+> @@ -1120,6 +1127,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
+>  	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
+>  };
+> 
+> +struct clksrc_clk exynos5_clk_sclk_fimd1 = {
+> +	.clk	= {
+> +		.name	        = "sclk_fimd",
+                       ^^^^^^^
+Use tabs instead of spaces.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
-Changes form v6:
- - include clk that describe using clk lookup dt binding
+> +		.devname        = "exynos5-fb.1",
 
- arch/arm/boot/dts/imx6q-sabrelite.dts |    1 +
- arch/arm/boot/dts/imx6q.dtsi          |   11 +++++++++++
- 2 files changed, 12 insertions(+)
+Same as above.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index cfdbe53..66fc765 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -63,6 +63,7 @@
- 		aips-bus at 02100000 { /* AIPS2 */
- 			usb at 02184000 { /* USB OTG */
- 				vbus-supply = <&reg_usb_otg_vbus>;
-+				disable-over-current;
- 				status = "okay";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 925da33..6b832d5 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -665,6 +665,7 @@
- 				interrupts = <0 43 0x04>;
- 				clocks = <&clks 162>;
- 				fsl,usbphy = <&usbphy1>;
-+				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
- 
-@@ -674,6 +675,7 @@
- 				interrupts = <0 40 0x04>;
- 				clocks = <&clks 162>;
- 				fsl,usbphy = <&usbphy2>;
-+				fsl,usbmisc = <&usbmisc 1>;
- 				status = "disabled";
- 			};
- 
-@@ -682,6 +684,7 @@
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 41 0x04>;
- 				clocks = <&clks 162>;
-+				fsl,usbmisc = <&usbmisc 2>;
- 				status = "disabled";
- 			};
- 
-@@ -690,9 +693,17 @@
- 				reg = <0x02184600 0x200>;
- 				interrupts = <0 42 0x04>;
- 				clocks = <&clks 162>;
-+				fsl,usbmisc = <&usbmisc 3>;
- 				status = "disabled";
- 			};
- 
-+			usbmisc: usbmisc at 02184800 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx6q-usbmisc";
-+				reg = <0x02184800 0x200>;
-+				clocks = <&clks 162>;
-+			};
-+
- 			ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
--- 
-1.7.9.5
+> +		.enable         = exynos5_clksrc_mask_disp1_0_ctrl,
+
+Same as above.
+
+> +		.ctrlbit        = (1 << 0),
+
+Same as above.
+
+> +	},
+> +	.sources = &exynos5_clkset_group,
+> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> +};
+> +
+>  static struct clksrc_clk exynos5_clksrcs[] = {
+>  	{
+>  		.clk	= {
+> @@ -1131,16 +1150,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+>  		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+>  	}, {
+>  		.clk	= {
+> -			.name		= "sclk_fimd",
+> -			.devname	= "s3cfb.1",
+> -			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+> -			.ctrlbit	= (1 << 0),
+> -		},
+> -		.sources = &exynos5_clkset_group,
+> -		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> -		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> -	}, {
+> -		.clk	= {
+>  			.name		= "aclk_266_gscl",
+>  		},
+>  		.sources = &clk_src_gscl_266,
+> @@ -1240,12 +1249,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
+>  	&exynos5_clk_mdout_spi0,
+>  	&exynos5_clk_mdout_spi1,
+>  	&exynos5_clk_mdout_spi2,
+> +	&exynos5_clk_sclk_fimd1,
+>  };
+> 
+>  static struct clk *exynos5_clk_cdev[] = {
+>  	&exynos5_clk_pdma0,
+>  	&exynos5_clk_pdma1,
+>  	&exynos5_clk_mdma1,
+> +	&exynos5_clk_fimd1,
+>  };
+> 
+>  static struct clksrc_clk *exynos5_clksrc_cdev[] = {
+> @@ -1274,6 +1285,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
+>  	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
+>  	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
+>  	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
+> +	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
+>  };
+> 
+>  static unsigned long exynos5_epll_get_rate(struct clk *clk)
+> @@ -1492,6 +1504,8 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
+> 
+>  	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
+>  	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
+> +	clk_set_parent(&exynos5_clk_sclk_fimd1.clk,
+> +			&exynos5_clk_mout_mpll_user.clk);
+> 
+>  	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
+>  		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
+> diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+> index a62753d..d8d9802 100644
+> --- a/arch/arm/plat-samsung/include/plat/clock.h
+> +++ b/arch/arm/plat-samsung/include/plat/clock.h
+> @@ -83,6 +83,8 @@ extern struct clk clk_ext;
+>  extern struct clksrc_clk clk_epllref;
+>  extern struct clksrc_clk clk_esysclk;
+> 
+> +extern struct clksrc_clk exynos5_clk_sclk_fimd1;
+> +
+
+Also, is it right place for exynos5 specific clocks ???
+
+For example, exynos4 specific clocks are placed in
+'arch/arm/mach-exynos/clock-exynos4.h'.
+
+
+>  /* S3C64XX specific clocks */
+>  extern struct clk clk_h2;
+>  extern struct clk clk_27m;
+> --
+> 1.7.0.4
