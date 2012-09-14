@@ -1,44 +1,49 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 14 Sep 2012 15:25:45 -0300
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable CONFIG_GPIO_MC9S08DZ60
-Message-ID: <1347647145-23798-1-git-send-email-fabio.estevam@freescale.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 14 Sep 2012 21:01:09 +0200
+Subject: [PATCH] cpufreq: OMAP: remove loops_per_jiffy recalculate for smp
+In-Reply-To: <87sjak8z28.fsf@deeprootsystems.com>
+References: <1346981022-28011-1-git-send-email-shawn.guo@linaro.org>
+ <201209072115.08252.rjw@sisk.pl> <87sjak8z28.fsf@deeprootsystems.com>
+Message-ID: <201209142101.10082.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On mx35pdk board there is an 8-bit microcontroller that controls several IOs, such
-as backlight enable pin, USB host VBUS, etc.
+On Friday, September 14, 2012, Kevin Hilman wrote:
+> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
+> 
+> > On Friday, September 07, 2012, Shawn Guo wrote:
+> >> From: Richard Zhao <richard.zhao@freescale.com>
+> >> 
+> >> With ARM smp common code recalculating loops_per_jiffy in a cpufreq
+> >> transiton notifier call, the loops_per_jiffy recalculate in omap-cpufreq
+> >> driver becomes redundant.  Remove it.
+> >> 
+> >> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> >> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> >
+> > I suppose that Kevin is going to handle this, right?
+> 
+> Normally, yes, but I'm a bit behind, still catching up from some time
+> off.
+> 
+> > Kevin, if you want me to pull new material for v3.7, it's about time to get
+> > it ready.
+> 
+> Rafael, feel free to add this one to your pm-cpufreq branch with
+> 
+> Acked-by: Kevin Hilman <khilman@ti.com>
 
-Let it build by default.
+I'll take it, thanks!
 
-mx35pdk also needs CONFIG_LCD_PLATFORM to be selected to activate the display,
-so also make this the default.
+> Also, we have one other OMAP CPUfreq change that needs to go via the
+> OMAP tree with some corresponding clock changes:
+> 
+>   http://marc.info/?l=linux-omap&m=134740995111966&w=2
+> 
+> Can you ack that one?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Also select CONFIG_LCD_PLATFORM
- arch/arm/configs/imx_v6_v7_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Sure, please consider as ACKed by me in case I can't find the original message.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 565132d..8cfd747 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -140,6 +140,7 @@ CONFIG_I2C_IMX=y
- CONFIG_SPI=y
- CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_MC9S08DZ60=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
-@@ -156,6 +157,7 @@ CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_VIDEO_MX3=y
- CONFIG_FB=y
-+CONFIG_LCD_PLATFORM=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
--- 
-1.7.9.5
+Thanks,
+Rafael
