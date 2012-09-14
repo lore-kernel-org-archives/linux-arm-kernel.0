@@ -1,38 +1,97 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 14 Sep 2012 16:54:08 +0200
-Subject: [PATCH v3 2/5] Documentation: add description of DT binding for
- the gpio-mvebu driver
-In-Reply-To: <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
-References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <50524026.20104@gmail.com> <20120913223059.2d0606b2@skate>
- <50524363.9070100@gmail.com>
- <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
-Message-ID: <20120914165408.4beaefe7@skate>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 14 Sep 2012 15:56:24 +0100
+Subject: [PATCH v4 14/24] xen/arm: initialize grant_table on ARM
+In-Reply-To: <20120914131033.GM25249@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-14-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120914131033.GM25249@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1209141550080.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Linus Walleij,
-
-On Fri, 14 Sep 2012 15:17:09 +0200, Linus Walleij wrote:
-
-> >> Yes, I know, but MAINTAINERS does not mention an alternate maintainer
-> >> for the GPIO subsystem. Who is the interim maintainer that will
-> >> ultimately have to ack/nack those patches?
-> >
-> > Linus W. is.
+On Fri, 14 Sep 2012, Konrad Rzeszutek Wilk wrote:
+> On Fri, Sep 14, 2012 at 12:13:16PM +0100, Stefano Stabellini wrote:
+> > Initialize the grant table mapping at the address specified at index 0
+> > in the DT under the /xen node.
+> > After the grant table is initialized, call xenbus_probe (if not dom0).
 > 
-> I stated Reviewed-by: on the GPIO patch, please merge it through the
-> Marvell tree (I guess that's the plan?)
+> So we don't really care about the grant's size then? The DT xen.txt
+> talks about it..
 
-Yes, I guess it's the easiest plan (Jason ? Andrew ?). We however need
-Acks on the pinctrl patch series as well, since this one depends on it.
+I am assuming that the size of the memory region specified in the device
+tree is sufficiently large to map the entire grant table, given that both
+the device tree hypervisor entry and the grant table size comes from Xen.
 
-Thanks a lot for your review!
+The grant table size is currently queried to Xen directly via an
+hypercall (GNTTABOP_query_size). Basically the size in the device tree
+is redundant information.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+> > Changes in v2:
+> > 
+> > - introduce GRANT_TABLE_PHYSADDR;
+> > - remove unneeded initialization of boot_max_nr_grant_frames.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/xen/enlighten.c |   14 ++++++++++++++
+> >  1 files changed, 14 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index c2a47a7..036a4d8 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -1,8 +1,12 @@
+> >  #include <xen/xen.h>
+> > +#include <xen/grant_table.h>
+> > +#include <xen/hvm.h>
+> >  #include <xen/interface/xen.h>
+> >  #include <xen/interface/memory.h>
+> > +#include <xen/interface/hvm/params.h>
+> >  #include <xen/features.h>
+> >  #include <xen/platform_pci.h>
+> > +#include <xen/xenbus.h>
+> >  #include <asm/xen/hypervisor.h>
+> >  #include <asm/xen/hypercall.h>
+> >  #include <linux/module.h>
+> > @@ -42,6 +46,7 @@ EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> >   * see Documentation/devicetree/bindings/arm/xen.txt for the
+> >   * documentation of the Xen Device Tree format.
+> >   */
+> > +#define GRANT_TABLE_PHYSADDR 0
+> >  static int __init xen_guest_init(void)
+> >  {
+> >  	struct xen_add_to_physmap xatp;
+> > @@ -51,6 +56,7 @@ static int __init xen_guest_init(void)
+> >  	const char *s = NULL;
+> >  	const char *version = NULL;
+> >  	const char *xen_prefix = "xen,xen-";
+> > +	struct resource res;
+> >  
+> >  	node = of_find_compatible_node(NULL, NULL, "xen,xen");
+> >  	if (!node) {
+> > @@ -65,6 +71,9 @@ static int __init xen_guest_init(void)
+> >  		pr_debug("Xen version not found\n");
+> >  		return 0;
+> >  	}
+> > +	if (of_address_to_resource(node, GRANT_TABLE_PHYSADDR, &res))
+> > +		return 0;
+> > +	xen_hvm_resume_frames = res.start >> PAGE_SHIFT;
+> >  	xen_domain_type = XEN_HVM_DOMAIN;
+> >  
+> >  	xen_setup_features();
+> > @@ -98,6 +107,11 @@ static int __init xen_guest_init(void)
+> >  	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
+> >  	 * for secondary CPUs as they are brought up. */
+> >  	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
+> > +
+> > +	gnttab_init();
+> > +	if (!xen_initial_domain())
+> > +		xenbus_probe(NULL);
+> > +
+> >  	return 0;
+> >  }
+> >  core_initcall(xen_guest_init);
+> > -- 
+> > 1.7.2.5
+> 
