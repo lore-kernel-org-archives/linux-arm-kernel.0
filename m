@@ -1,40 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Sep 2012 15:05:57 +0100
-Subject: [PATCH v4 02/24] xen/arm: hypercalls
-In-Reply-To: <alpine.DEB.2.02.1209141458340.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <50533500.2020606@arm.com>
- <alpine.DEB.2.02.1209141458340.29232@kaball.uk.xensource.com>
-Message-ID: <505339C5.60907@arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 14 Sep 2012 07:07:50 -0700
+Subject: [PATCH] RTC: TWL: ensure all interrupts are disabled during probe
+In-Reply-To: <CAM=Q2cufVSReuvs3Yf6jvuBFeV9j5iPWV-DaMqRkCJFXUMZPQg@mail.gmail.com>
+ (Shubhrajyoti Datta's message of "Fri, 14 Sep 2012 17:12:19 +0530")
+References: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
+ <CAM=Q2cufVSReuvs3Yf6jvuBFeV9j5iPWV-DaMqRkCJFXUMZPQg@mail.gmail.com>
+Message-ID: <87r4q4aea1.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/12 15:02, Stefano Stabellini wrote:
-> On Fri, 14 Sep 2012, Marc Zyngier wrote:
->>> +/* HVC 0xEA1 */
->>> +#ifdef CONFIG_THUMB2_KERNEL
->>> +#define xen_hvc .word 0xf7e08ea1
->>> +#else
->>> +#define xen_hvc .word 0xe140ea71
->>> +#endif
+Shubhrajyoti Datta <omaplinuxkernel@gmail.com> writes:
+
+> Hi Kevin,
+>
+> On Fri, Sep 14, 2012 at 2:15 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> From: Kevin Hilman <khilman@ti.com>
 >>
->> You should consider using Dave Martin's opcode injection series for
->> that. The patches are already in Russell's for-next branch.
-> 
-> I am all for using Dave's patches and I have even already sent a patch
-> to change the wrappers to use __HVC:
-> 
-> http://marc.info/?l=linux-kernel&m=134513261623427&w=2
-> 
-> I have only temporarely dropped it, only to reduce the amount of
-> external dependencies of this series. It already depends on Konrad's
-> stable/for-linus-3.7, so I would rather send this patch out later on its
-> own...
+>> On some platforms, bootloaders are known to do some interesting RTC
+>> programming.  Without going into the obscurities as to why this may be
+>> the case, suffice it to say the the driver should not make any
+>> assumptions about the state of the RTC when the driver loads.  In
+>> particular, the driver probe should be sure that all interrupts are
+>> disabled until otherwise programmed.
+>>
+>> This was discovered when finding bursty I2C traffic every second on
+>> Overo platforms.  This I2C overhead was keeping the SoC from hitting
+>> deep power states.  The cause was found to be the RTC firing every
+>> second on the I2C-connected TWL PMIC.
+>>
+>> Special thanks to Felipe Balbi for suggesting to look for a rogue
+>> driver as the source of the I2C traffic rather than the I2C driver
+>> itself.
+>>
+>> Special thanks to Steve Sakoman for helping track down the source of
+>> the continuous RTC interrups on the Overo boards.
+>>
+>
+> Tested that the continuous interrupt issue after doing a i2c mm on omap4sdp.
+> This patch solves the issue.
+> thanks,
+>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Steve Sakoman <steve@sakoman.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> Patch applies to v3.6-rc5
+>>
+>>  drivers/rtc/rtc-twl.c |    5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+>> index c5d06fe..9277d94 100644
+>> --- a/drivers/rtc/rtc-twl.c
+>> +++ b/drivers/rtc/rtc-twl.c
+>> @@ -495,6 +495,11 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
+>>         if (ret < 0)
+>>                 goto out1;
+>>
+>> +       /* ensure interrupts are disabled, bootloaders can be strange */
+>> +       ret = twl_rtc_write_u8(0, REG_RTC_INTERRUPTS_REG);
+>> +       if (ret < 0)
+>> +               dev_warn(&pdev->dev, "unable to disable interrupt\n");
+>> +
+> Now that it is always 0 can the below read be removed as it is redundant now.
 
-Fair enough. As long as there's a plan to fix this soon enough, it
-should be alright.
+Possibly, but I don't know this HW well enough to know if there are any
+persistent bits in that register on any of the various derivations of
+this PMIC.  Since this read-back value is used throughout the driver, I
+decided not to mess with it when doing this targetted fix.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kevin
