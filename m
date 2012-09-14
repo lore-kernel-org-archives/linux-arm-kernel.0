@@ -1,39 +1,88 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 14 Sep 2012 10:07:23 +0300
-Subject: [PATCH v2 04/15] dmaengine: Pass no_wakeup parameter via
- device_prep_dma_cyclic() callback
-In-Reply-To: <1347593040.1943.24.camel@vkoul-udesk3>
+Date: Fri, 14 Sep 2012 10:12:25 +0300
+Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
+ dmaengine_prep_dma_cyclic()
+In-Reply-To: <5051FB4D.3000009@metafoo.de>
 References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
- <1347543485-339-5-git-send-email-peter.ujfalusi@ti.com>
- <1347593040.1943.24.camel@vkoul-udesk3>
-Message-ID: <5052D7AB.1090804@ti.com>
+ <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
+ <5051FB4D.3000009@metafoo.de>
+Message-ID: <5052D8D9.8060802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 06:24 AM, Vinod Koul wrote:
-> On Thu, 2012-09-13 at 16:37 +0300, Peter Ujfalusi wrote:
->> Change the parameter list of device_prep_dma_cyclic() so the DMA drivers
->> can receive the no_wakeup request coming from client drivers.
->> This feature can be used during audio operation to disable all audio
->> related interrupts.
-> We already have a flag to indicate this, see 
-> * @DMA_PREP_INTERRUPT - trigger an interrupt (callback) upon completion  of
-> *  this transaction
+Hi,
 
-I have also noticed this flag. It is not really a direct match for our case
-since the notion of "completion of this transfer" is not applicable for cyclic
-mode, but it is close enough.
+On 09/13/2012 06:27 PM, Lars-Peter Clausen wrote:
+> On 09/13/2012 03:37 PM, Peter Ujfalusi wrote:
+>> The dmaengine_prep_dma_cyclic() function primarily used by audio for cyclic
+>> transfer required by ALSA.
+>> With this new parameter it is going to be possible to enable the
+>> SNDRV_PCM_INFO_NO_PERIOD_WAKEUP mode on platforms where it is possible.
+>> This patch only changes the public API first. Followup patch will change
+>> the device_prep_dma_cyclic() callback parameters to pass this information
+>> towards the dma drivers.
+>>
+> 
+> Hi,
+> 
+> Hm... Do you think it would work as well if we implement this by setting the
+> callback for the descriptor to NULL? If the callback is NULL there is
+> nothing to at the end of a transfer/period and the dma engine driver may
+> choose to disable interrupts. This would also benefit non cyclic transfers
+> where the callback is NULL and we do not need add the new parameter to
+> dmaengine_prep_dma_cyclic.
 
-> Unfortunately, the addition of cyclic API missed having this flag. So
-> right way would be to add flag argument in the API.
+We could do that but dma drivers enable the interrupts within
+dmaengine_prep_dma_cyclic() call, and we fill up the callback for
+dmaengine_submit() dmaengine API call.
+We need to tell the dma drivers in dmaengine_prep_dma_cyclic() to suppress the
+interrupts.
 
-I have not looked at the non cyclic APIs, but I think I can modify the
-dmaengine_prep_dma_cyclic() to pass the flags instead of the 'bool no_wakeup'.
-If the DMA_PREP_INTERRUPT is not set dma drivers can interpret it in a way
-that they will disable all interrupts during cyclic mode.
-None of the dma drivers in cyclic mode cares about the flags AFAIK or they can
-just ignore this parameter for now (as they did with my no_wakeup parameter).
-Will resend the series soon with this change.
+Note: First I was trying this to be done in hw_params() time via the
+dmaengine_slave_config() call, but substream->runtime->no_period_wakeup is not
+configured in there. It is set for _prepare() and _trigger().
+
+As Vinod and Russell suggested I will modify the dmaengine_prep_dma_cyclic()
+API to pass flags as well instead of the no_wakeup parameter.
+
+> 
+> - Lars
+> 
+>> ---
+>>  include/linux/dmaengine.h     | 3 ++-
+>>  sound/soc/soc-dmaengine-pcm.c | 3 ++-
+>>  2 files changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index 9c02a45..990444b 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -653,7 +653,8 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_rio_sg(
+>>  
+>>  static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(
+>>  		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+>> -		size_t period_len, enum dma_transfer_direction dir)
+>> +		size_t period_len, enum dma_transfer_direction dir,
+>> +		bool no_wakeup)
+>>  {
+>>  	return chan->device->device_prep_dma_cyclic(chan, buf_addr, buf_len,
+>>  						period_len, dir, NULL);
+>> diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+>> index 5df529e..6b70adb 100644
+>> --- a/sound/soc/soc-dmaengine-pcm.c
+>> +++ b/sound/soc/soc-dmaengine-pcm.c
+>> @@ -147,7 +147,8 @@ static int dmaengine_pcm_prepare_and_submit(struct snd_pcm_substream *substream)
+>>  	desc = dmaengine_prep_dma_cyclic(chan,
+>>  		substream->runtime->dma_addr,
+>>  		snd_pcm_lib_buffer_bytes(substream),
+>> -		snd_pcm_lib_period_bytes(substream), direction);
+>> +		snd_pcm_lib_period_bytes(substream), direction,
+>> +		substream->runtime->no_period_wakeup);
+>>  
+>>  	if (!desc)
+>>  		return -ENOMEM;
+> 
+
 
 -- 
 P?ter
