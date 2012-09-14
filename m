@@ -1,63 +1,169 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Sep 2012 22:41:24 -0600
-Subject: [PATCH V4 5/5] ARM: bcm2835: instantiate console UART
+Date: Thu, 13 Sep 2012 22:41:23 -0600
+Subject: [PATCH V4 4/5] ARM: bcm2835: add stub clock driver
 In-Reply-To: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
 References: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347597684-30805-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1347597684-30805-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Simon Arlott <simon@fire.lp0.eu>
+
+This patch adds a minimal stub clock driver for the BCM2835. Its sole
+purpose is to allow the PL011 AMBA clk_get() API calls to provide
+something that looks enough like a clock that the driver probes and
+operates correctly.
 
 This patch was extracted from git://github.com/lp0/linux.git branch
 rpi-split as of 2012/09/08, and modified as follows:
 
 * s/bcm2708/bcm2835/.
 * Modified device tree vendor prefix.
-* Modified UART DT node to use a unit-address to create unique UART node
-  names, rather than using non-type names "uart0" and "uart1".
-  Note that UART 1 (the Broadcom "mini UART") is not yet present, but
-  I'm naming the DT node in anticipation that it will be added.
+* Moved implementation to drivers/clk/.
+* Modified .dev_id for UART clocks to match UART DT node names.
 
 Signed-off-by: Chris Boot <bootc@bootc.net>
 Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
 Signed-off-by: Dom Cobley <popcornmix@gmail.com>
 Signed-off-by: Dom Cobley <dc4@broadcom.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 --
 v4:
+* Moved implementation to drivers/clk/.
 * s/bcm2708/bcm2835/.
 * Updated for new device tree vendor prefix.
 v3:
 * New patch.
 ---
- arch/arm/boot/dts/bcm2835.dtsi |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/mach-bcm2835/bcm2835.c |    3 +++
+ drivers/clk/Makefile            |    1 +
+ drivers/clk/clk-bcm2835.c       |   52 +++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/bcm2835.h     |   24 ++++++++++++++++++
+ 4 files changed, 80 insertions(+)
+ create mode 100644 drivers/clk/clk-bcm2835.c
+ create mode 100644 include/linux/clk/bcm2835.h
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index c7ac399..e837780 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -6,7 +6,7 @@
- 	interrupt-parent = <&intc>;
+diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
+index e3f2968..f6fea49 100644
+--- a/arch/arm/mach-bcm2835/bcm2835.c
++++ b/arch/arm/mach-bcm2835/bcm2835.c
+@@ -16,6 +16,7 @@
+ #include <linux/irqchip/bcm2835.h>
+ #include <linux/of_platform.h>
+ #include <linux/bcm2835_timer.h>
++#include <linux/clk/bcm2835.h>
  
- 	chosen {
--		bootargs = "earlyprintk";
-+		bootargs = "earlyprintk console=ttyAMA0";
- 	};
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -38,6 +39,8 @@ void __init bcm2835_init(void)
+ {
+ 	int ret;
  
- 	timer {
-@@ -22,4 +22,11 @@
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 	};
++	bcm2835_init_clocks();
 +
-+	uart at 20201000 {
-+		compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
-+		reg = <0x20201000 0x1000>;
-+		interrupts = <2 25>;
-+		clock-frequency = <3000000>;
-+	};
- };
+ 	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
+ 				   NULL);
+ 	if (ret) {
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 6492651..f3e828c 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -3,6 +3,7 @@ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+ 				   clk-mux.o clk-divider.o clk-fixed-factor.o
+ # SoCs specific
++obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs/
+diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+new file mode 100644
+index 0000000..148ac35
+--- /dev/null
++++ b/drivers/clk/clk-bcm2835.c
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (C) 2010 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-private.h>
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/bcm2835.h>
++
++/*
++ * These are fixed clocks (and device tree doesn't support clk!).
++ *
++ * They're probably not all root clocks and it may be possible to
++ * turn them on and off but until this is mapped out better it's
++ * the only way they can be used.
++ */
++DEFINE_CLK_FIXED_RATE(sys_pclk,   CLK_IS_ROOT, 250000000, 0);
++DEFINE_CLK_FIXED_RATE(apb_pclk,   CLK_IS_ROOT, 126000000, 0);
++DEFINE_CLK_FIXED_RATE(uart0_pclk, CLK_IS_ROOT,   3000000, 0);
++DEFINE_CLK_FIXED_RATE(uart1_pclk, CLK_IS_ROOT, 125000000, 0);
++
++static struct clk_lookup lookups[] = {
++	{ .con_id = "sys_pclk", .clk = &sys_pclk },
++	{ .con_id = "apb_pclk", .clk = &apb_pclk },
++	{ .dev_id = "20201000.uart", .clk = &uart0_pclk },
++	{ .dev_id = "20215000.uart", .clk = &uart1_pclk }
++};
++
++void __init bcm2835_init_clocks(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(lookups); i++) {
++		__clk_init(NULL, lookups[i].clk);
++		clkdev_add(&lookups[i]);
++	}
++}
+diff --git a/include/linux/clk/bcm2835.h b/include/linux/clk/bcm2835.h
+new file mode 100644
+index 0000000..aa937f6
+--- /dev/null
++++ b/include/linux/clk/bcm2835.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2010 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __LINUX_CLK_BCM2835_H_
++#define __LINUX_CLK_BCM2835_H_
++
++void __init bcm2835_init_clocks(void);
++
++#endif
 -- 
 1.7.9.5
