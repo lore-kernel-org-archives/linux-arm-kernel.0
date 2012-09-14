@@ -1,55 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Sep 2012 15:20:54 +0100
-Subject: [PATCH v4 16/24] xen: clear IRQ_NOAUTOEN and IRQ_NOREQUEST
-In-Reply-To: <alpine.DEB.2.02.1209141508130.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-16-git-send-email-stefano.stabellini@eu.citrix.com>
- <505338E6.4050504@arm.com>
- <alpine.DEB.2.02.1209141508130.29232@kaball.uk.xensource.com>
-Message-ID: <50533D46.5000704@arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 14 Sep 2012 07:21:51 -0700
+Subject: [PATCH] cpufreq: OMAP: remove loops_per_jiffy recalculate for smp
+In-Reply-To: <201209072115.08252.rjw@sisk.pl> (Rafael J. Wysocki's message of
+ "Fri, 7 Sep 2012 21:15:08 +0200")
+References: <1346981022-28011-1-git-send-email-shawn.guo@linaro.org>
+ <201209072115.08252.rjw@sisk.pl>
+Message-ID: <87sjak8z28.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/12 15:13, Stefano Stabellini wrote:
-> On Fri, 14 Sep 2012, Marc Zyngier wrote:
->> On 14/09/12 12:13, Stefano Stabellini wrote:
->>> Reset the IRQ_NOAUTOEN and IRQ_NOREQUEST flags that are enabled by
->>> default on ARM. If IRQ_NOAUTOEN is set, __setup_irq doesn't call
->>> irq_startup, that is responsible for calling irq_unmask at startup time.
->>> As a result event channels remain masked.
->>>
->>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>> ---
->>>  drivers/xen/events.c |    1 +
->>>  1 files changed, 1 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/xen/events.c b/drivers/xen/events.c
->>> index 5ecb596..8ffb7b7 100644
->>> --- a/drivers/xen/events.c
->>> +++ b/drivers/xen/events.c
->>> @@ -836,6 +836,7 @@ int bind_evtchn_to_irq(unsigned int evtchn)
->>>  		struct irq_info *info = info_for_irq(irq);
->>>  		WARN_ON(info == NULL || info->type != IRQT_EVTCHN);
->>>  	}
->>> +	irq_clear_status_flags(irq, IRQ_NOREQUEST|IRQ_NOAUTOEN);
->>
->> This one just sent a shiver down my spine. Are you doing this for a PPI?
-> 
-> Not really: even though there is just one source of event notifications
-> (that is a PPI), we have many event channels. When a domain receives a
-> notification (via the PPI), it checks on a bitmask to which event channel
-> it corresponds. From the Linux point of view every event channel is a
-> Linux irq belonging to the xen_dynamic_chip (see
-> drivers/xen/events.c:xen_dynamic_chip).
-> 
-> So here I am not doing this for the one PPI, but I am doing this for
-> every Linux irq (of chip xen_dynamic_chip) that represents an event
-> channel.
+"Rafael J. Wysocki" <rjw@sisk.pl> writes:
 
-So this is some sort of secondary interrupt controller, cascaded into
-your GIC emulation, and this patch only affects the xen_dynamic_chip?
+> On Friday, September 07, 2012, Shawn Guo wrote:
+>> From: Richard Zhao <richard.zhao@freescale.com>
+>> 
+>> With ARM smp common code recalculating loops_per_jiffy in a cpufreq
+>> transiton notifier call, the loops_per_jiffy recalculate in omap-cpufreq
+>> driver becomes redundant.  Remove it.
+>> 
+>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>
+> I suppose that Kevin is going to handle this, right?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Normally, yes, but I'm a bit behind, still catching up from some time
+off.
+
+> Kevin, if you want me to pull new material for v3.7, it's about time to get
+> it ready.
+
+Rafael, feel free to add this one to your pm-cpufreq branch with
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+Also, we have one other OMAP CPUfreq change that needs to go via the
+OMAP tree with some corresponding clock changes:
+
+  http://marc.info/?l=linux-omap&m=134740995111966&w=2
+
+Can you ack that one?
+
+Thanks,
+
+Kevin
