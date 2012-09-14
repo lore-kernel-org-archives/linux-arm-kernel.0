@@ -1,27 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 14 Sep 2012 12:51:06 -0700
-Subject: [PATCH v2 0/4] lis3: lis3lv02d_i2c: Add device tree support
-In-Reply-To: <201209141531.36734.arnd@arndb.de>
-References: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
- <201209141531.36734.arnd@arndb.de>
-Message-ID: <20120914125106.ae809500.akpm@linux-foundation.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Sep 2012 20:01:33 +0000
+Subject: [PATCH V4 1/5] ARM: add infra-structure for BCM2835 and Raspberry
+ Pi
+In-Reply-To: <50535283.9040905@wwwdotorg.org>
+References: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
+ <201209140750.44039.arnd@arndb.de> <50535283.9040905@wwwdotorg.org>
+Message-ID: <201209142001.33954.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Sep 2012 15:31:36 +0000
-Arnd Bergmann <arnd@arndb.de> wrote:
+On Friday 14 September 2012, Stephen Warren wrote:
+> I guess I can see the advantage of having the .dts reg values match the
+> documentation. I just worry that doing so is more about matching the
+> documentation rather than describing the true HW. Still, I suppose with
+> the ranges property, it's clear what the true physical addresses are..
+> It also introduces a completely fake bus just to perform the address
+> re-writing; I wonder if putting the ranges property at the top-level
+> node work instead?.
 
-> On Friday 14 September 2012, AnilKumar Ch wrote:
-> > Adds device tree support to lis3lv02d_i2c driver. Along with this
-> > DT init is moved from core driver to individual drivers, with the
-> > current implementation some pdata is missing in lis3lv02d_i2c driver.
-> > 
-> > Also adds platform data for lis331dlh driver to am335x-EVM. These
-> > patches were tested on AM335x-EVM.
-> > 
-> 
-> No further comments on this version besides the ones I already gave
-> on v1.
+I don't think it easily works with the reg property in the root.
+Having a node for the "soc" components isn't all that unusual,
+a bunch of other platforms do that.
 
-My linux-arm-kernel subscription died so I don't know what your v1
-comments said.  Were they fatal?
+The advantage is that we have something to conceptually group
+all the on-chip components, and it works with the infrastructure
+in drivers/base/soc.c.
+
+> So  now that almost everything is ack'd, how should this get into the
+> tree - will you take (an updated version of) these patches and apply
+> them directly to arm-soc, or should I commit them and send a pull
+> request? (For the latter, I'd have to look up how to create a new k.org
+> git repo).
+
+We can do whatever suits you best. Pull requests are slightly faster
+to import. It's also ok if you use the linux-tegra git this time fi that
+helps you.
+
+	Arnd
