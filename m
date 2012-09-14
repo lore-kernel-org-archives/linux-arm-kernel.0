@@ -1,146 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 14 Sep 2012 15:44:05 +0100
-Subject: [PATCH v4 07/24] xen/arm: Xen detection and shared_info page
- mapping
-In-Reply-To: <20120914130807.GK25249@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-7-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120914130807.GK25249@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1209141530340.29232@kaball.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 14 Sep 2012 16:54:08 +0200
+Subject: [PATCH v3 2/5] Documentation: add description of DT binding for
+ the gpio-mvebu driver
+In-Reply-To: <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
+References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50524026.20104@gmail.com> <20120913223059.2d0606b2@skate>
+ <50524363.9070100@gmail.com>
+ <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
+Message-ID: <20120914165408.4beaefe7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Sep 2012, Konrad Rzeszutek Wilk wrote:
-> On Fri, Sep 14, 2012 at 12:13:09PM +0100, Stefano Stabellini wrote:
-> > Check for a node in the device tree compatible with "xen,xen", if it is
-> > present set xen_domain_type to XEN_HVM_DOMAIN and continue
-> > initialization.
-> > 
-> > Map the real shared info page using XENMEM_add_to_physmap with
-> > XENMAPSPACE_shared_info.
-> > 
-> > Changes in v4:
-> > 
-> > - simpler parsing of Xen version in the compatible DT node.
-> > 
-> > Changes in v3:
-> > 
-> > - use the "xen,xen" notation rather than "arm,xen";
-> > - add an additional check on the presence of the Xen version.
-> > 
-> > Changes in v2:
-> > 
-> > - replace pr_info with pr_debug.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/xen/enlighten.c |   61 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 61 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index c535540..6a0217d 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -5,6 +5,9 @@
-> >  #include <asm/xen/hypervisor.h>
-> >  #include <asm/xen/hypercall.h>
-> >  #include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/of_address.h>
-> >  
-> >  struct start_info _xen_start_info;
-> >  struct start_info *xen_start_info = &_xen_start_info;
-> > @@ -33,3 +36,61 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
-> >  	return -ENOSYS;
-> >  }
-> >  EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
-> > +
-> > +/*
-> > + * see Documentation/devicetree/bindings/arm/xen.txt for the
-> > + * documentation of the Xen Device Tree format.
-> > + */
-> > +static int __init xen_guest_init(void)
-> > +{
-> > +	struct xen_add_to_physmap xatp;
-> > +	static struct shared_info *shared_info_page = 0;
-> > +	struct device_node *node;
-> > +	int len;
-> > +	const char *s = NULL;
-> > +	const char *version = NULL;
-> > +	const char *xen_prefix = "xen,xen-";
-> > +
-> > +	node = of_find_compatible_node(NULL, NULL, "xen,xen");
-> > +	if (!node) {
-> > +		pr_debug("No Xen support\n");
-> > +		return 0;
-> > +	}
-> > +	s = of_get_property(node, "compatible", &len);
-> > +	if (strlen(xen_prefix) + 3  < len &&
-> > +			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+Dear Linus Walleij,
+
+On Fri, 14 Sep 2012 15:17:09 +0200, Linus Walleij wrote:
+
+> >> Yes, I know, but MAINTAINERS does not mention an alternate maintainer
+> >> for the GPIO subsystem. Who is the interim maintainer that will
+> >> ultimately have to ack/nack those patches?
+> >
+> > Linus W. is.
 > 
-> If we have version '4.3.1' won't this trip us over?
+> I stated Reviewed-by: on the GPIO patch, please merge it through the
+> Marvell tree (I guess that's the plan?)
 
-This isn't an issue:
+Yes, I guess it's the easiest plan (Jason ? Andrew ?). We however need
+Acks on the pinctrl patch series as well, since this one depends on it.
 
-if (8 + 3 < 14 &&
-    !strncmp("xen,xen-", "xen,xen-4.3.1", 8)
+Thanks a lot for your review!
 
-would return true
-
-and version is set to "4.3.1".
-
-
-> Or if we only have 'major' and 'minor', then won't '4.11' trip us
-> over too?
-
-For the same reason this shouldn't be an issue either:
-
-if (8 + 3 < 13 &&
-    !strncmp("xen,xen-", "xen,xen-4.11", 8)
-
-would return true
-
-and version would be set to "4.11".
-
-BTW I have just tried both out of paranoia and it works as expected.
-
-
-> > +		version = s + strlen(xen_prefix);
-> > +	if (version == NULL) {
-> > +		pr_debug("Xen version not found\n");
-> > +		return 0;
-> > +	}
-> > +	xen_domain_type = XEN_HVM_DOMAIN;
-> > +
-> > +	if (!shared_info_page)
-> > +		shared_info_page = (struct shared_info *)
-> > +			get_zeroed_page(GFP_KERNEL);
-> > +	if (!shared_info_page) {
-> > +		pr_err("not enough memory\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +	xatp.domid = DOMID_SELF;
-> > +	xatp.idx = 0;
-> > +	xatp.space = XENMAPSPACE_shared_info;
-> > +	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
-> > +	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
-> > +		BUG();
-> > +
-> > +	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
-> > +
-> > +	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
-> > +	 * page, we use it in the event channel upcall and in some pvclock
-> > +	 * related functions. We don't need the vcpu_info placement
-> > +	 * optimizations because we don't use any pv_mmu or pv_irq op on
-> > +	 * HVM.
-> > +	 * The shared info contains exactly 1 CPU (the boot CPU). The guest
-> > +	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
-> > +	 * for secondary CPUs as they are brought up. */
-> > +	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
-> > +	return 0;
-> > +}
-> > +core_initcall(xen_guest_init);
-> > -- 
-> > 1.7.2.5
-> 
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
