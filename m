@@ -1,44 +1,99 @@
 From: dciminaghi@mail.gnudd.com (Davide Ciminaghi)
-Date: Fri, 14 Sep 2012 18:24:03 +0200
-Subject: [PATCH 8/8] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+Date: Fri, 14 Sep 2012 18:24:01 +0200
+Subject: [PATCH 6/8] mmc: use the new <linux/sizes.h>
 In-Reply-To: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
 References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
-Message-ID: <1347639843-32119-9-git-send-email-dciminaghi@mail.gnudd.com>
+Message-ID: <1347639843-32119-7-git-send-email-dciminaghi@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alessandro Rubini <rubini@gnudd.com>
 
-The sta2x11 I/O Hub is a bridge from PCIe to AMBA. It reuses a number
-of amba drivers and needs to activate core bus support.
-
 Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
 Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
 ---
- arch/x86/Kconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/mmc/host/mmci.c     |    2 +-
+ drivers/mmc/host/msm_sdcc.c |    2 +-
+ drivers/mmc/host/mvsdio.c   |    2 +-
+ drivers/mmc/host/mxcmmc.c   |    2 +-
+ drivers/mmc/host/pxamci.c   |    3 +--
+ 5 files changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 694c74c..3df651a 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -509,6 +509,7 @@ config STA2X11
- 	select SWIOTLB
- 	select MFD_STA2X11
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
- 	default n
- 	---help---
- 	  This adds support for boards based on the STA2X11 IO-Hub,
-@@ -2161,6 +2162,9 @@ config GEOS
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 263102c..8e3f33e 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -33,10 +33,10 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
++#include <linux/sizes.h>
  
- endif # X86_32
+ #include <asm/div64.h>
+ #include <asm/io.h>
+-#include <asm/sizes.h>
  
-+config ARM_AMBA
-+        bool
-+
- config AMD_NB
- 	def_bool y
- 	depends on CPU_SUP_AMD && PCI
+ #include "mmci.h"
+ 
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 1d14cda..0718469 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -37,10 +37,10 @@
+ #include <linux/memory.h>
+ #include <linux/gfp.h>
+ #include <linux/gpio.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/div64.h>
+-#include <asm/sizes.h>
+ 
+ #include <mach/mmc.h>
+ #include <mach/msm_iomap.h>
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index a61cb5f..898550b 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -22,8 +22,8 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/mmc/host.h>
++#include <linux/sizes.h>
+ 
+-#include <asm/sizes.h>
+ #include <asm/unaligned.h>
+ #include <plat/mvsdio.h>
+ 
+diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+index 28ed52d..f9ccac3 100644
+--- a/drivers/mmc/host/mxcmmc.c
++++ b/drivers/mmc/host/mxcmmc.c
+@@ -34,10 +34,10 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/dmaengine.h>
+ #include <linux/types.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/dma.h>
+ #include <asm/irq.h>
+-#include <asm/sizes.h>
+ #include <mach/mmc.h>
+ 
+ #include <mach/dma.h>
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 11df800..2635550 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -33,8 +33,7 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_device.h>
+-
+-#include <asm/sizes.h>
++#include <linux/sizes.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/dma.h>
 -- 
 1.7.9.1
