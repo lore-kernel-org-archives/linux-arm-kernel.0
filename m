@@ -1,28 +1,109 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Sep 2012 09:30:50 +0100
-Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
-In-Reply-To: <1347591975.1943.12.camel@vkoul-udesk3>
-References: <1346731465-6301-1-git-send-email-marex@denx.de>
- <20120905014000.GP2362@S2101-09.ap.freescale.net>
- <201209050346.39253.marex@denx.de> <1347591975.1943.12.camel@vkoul-udesk3>
-Message-ID: <20120914083050.GA12245@n2100.arm.linux.org.uk>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 14 Sep 2012 16:35:22 +0800
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <87y5kfplet.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+ <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829083337.GI4011@b20223-02.ap.freescale.net>
+ <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829104559.GB25433@b20223-02.ap.freescale.net>
+ <87ipblqayc.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120911081833.GA4251@b20223-02.ap.freescale.net>
+ <87y5kfplet.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120914083520.GD7167@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 08:36:15AM +0530, Vinod Koul wrote:
-> On Wed, 2012-09-05 at 03:46 +0200, Marek Vasut wrote:
-> > One way to fix this is to recycle descriptors that were already used during the 
-> > transfer, but can we really do it fast enough, so the DMA would do it's job at 
-> > one end of the descriptor chain and we'd be building the other?
-> See the comment in dma_ctrl_flags:
-> * @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the client
-> *  acknowledges receipt, i.e. has has a chance to establish any dependency
-> *  chains
-> Setting this would mean that driver can reuse the descriptor once the
-> transaction has completed.
+On Wed, Sep 12, 2012 at 01:47:54PM +0300, Alexander Shishkin wrote:
+> Richard Zhao <richard.zhao@freescale.com> writes:
+> 
+> > On Tue, Sep 11, 2012 at 10:23:55AM +0300, Alexander Shishkin wrote:
+> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> 
+> >> > On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
+> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> >> 
+> >> >> > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
+> >> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> >> >> 
+> >> >> >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
+> >> >> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> >> >> >> 
+> >> >> >> >> > One role failed, but the other role will possiblly still work.
+> >> >> >> >> > For example, when udc start failed, if plug in a host device,
+> >> >> >> >> > it works.
+> >> >> >> >> 
+> >> >> >> >> If you're a host device, ci->role should be HOST at this point and
+> >> >> >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+> >> >> >> >> role detection must be fixed. If ci_role_start() fails for host, but it
+> >> >> >> >> still works when it's called again after the id pin change is detected,
+> >> >> >> >> again, the problem is elsewhere.
+> >> >> >> > The check is only for OTG device. For single role device, it just fail
+> >> >> >> > if it start the role failed.
+> >> >> >> 
+> >> >> >> Sorry, can you rephrase?
+> >> >> >> 
+> >> >> >> >> 
+> >> >> >> >> >
+> >> >> >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> >> >> >> >> > ---
+> >> >> >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
+> >> >> >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> >> >> >> >> >
+> >> >> >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> >> >> >> >> > index 19ef324..8fd390a 100644
+> >> >> >> >> > --- a/drivers/usb/chipidea/core.c
+> >> >> >> >> > +++ b/drivers/usb/chipidea/core.c
+> >> >> >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >> >> >> >> >  	ret = ci_role_start(ci, ci->role);
+> >> >> >> >> >  	if (ret) {
+> >> >> >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+> >> >> >> >> > -		ret = -ENODEV;
+> >> >> >> >> > -		goto rm_wq;
+> >> >> >> >> > +		ci->role = CI_ROLE_END;
+> >> >> >> >> 
+> >> >> >> >> So are you relying on id pin interrupt for initializing the role after
+> >> >> >> >> this? Can you provide more details?
+> >> >> >> > Yes. The ID pin detect still works. My case is, gadget role failed,
+> >> >> >> > host role works. I was trying not to ruin host function.
+> >> >> >> 
+> >> >> >> But it shouldn't even try to start the gadget, because ci_otg_role()
+> >> >> >> should set ci->role to HOST before ci_role_start() happens.
+> >> >> > It depends on ID pin. If ID pin is gadget and gadget is not support well,
+> >> >> > ci_role_start will fail. See below example.
+> >> >> >> 
+> >> >> >> Another question is, why does gadget start fail?
+> >> >> > There's one example:
+> >> >> > If usb phy don't support otg yet, otg_set_peripheral will fail, and
+> >> >> > then cause udc_start fail.
+> >> >> 
+> >> >> So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
+> >> >> platform data till the phy is fully implemented.
+> >> > It's just an example. We can not assume udc_start always success. If it
+> >> > fails, isn't it better to continue support of host than say game over?
+> >> 
+> >> Ok, I think what we need here is to rework error handling around role
+> >> switching, so that we can allow certain things to fail and retry at a
+> >> later point (say at id pin change), while being careful about the other
+> >> failures.
+> >> 
+> >> If this patch is not crucial for imx right now, I'd prefer to leave it
+> >> out.
+> > That's OK. but I hope other function related patch can be merged for
+> > 3.7 :)
+> 
+> Also 6/11 seems quite pointless to me. Otherwise, I'll send them to Greg
+> today.
+If set_peripheral is null, udc_start will fail. Or you prefer removing
+checking of otg_set_peripheral returned value?
 
-Actually, that has little meaning for slave DMA descriptors (other than
-it should already be set for consistency with the async_tx stuff, which
-has the above mentioned depenedency chains.)
-
-Once completed, descriptors can be reused irrespective of the above flag.
+Thanks
+Richard
+> 
+> Regards,
+> --
+> Alex
+> 
