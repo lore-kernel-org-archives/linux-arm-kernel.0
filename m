@@ -1,17 +1,16 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Sep 2012 14:06:16 -0600
-Subject: [GIT PULL 05/10] ARM: tegra: i2c driver enhancements mostly related
- to clocking
+Date: Fri, 14 Sep 2012 14:06:17 -0600
+Subject: [GIT PULL 06/10] ARM: tegra: implement CPU hotplug
 In-Reply-To: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
 References: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347653181-19936-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1347653181-19936-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains a number of fixes and cleanups to the Tegra I2C
-driver related to clocks. These are based on the common clock conversion
-in order to avoid duplicating the clock driver changes before and after
-the conversion. Finally, a bug-fix related to I2C_M_NOSTART is included.
+This branch implements CPU hot-plugging support for both Tegra20 and
+Tegra30. Portions of the implementation are contained in the clock
+driver, hence this branch is based on the common clock conversion in
+order to avoid duplicating work.
 
 This branch is based on previous pull request tegra-for-3.7-common-clk.
 
@@ -23,23 +22,38 @@ The following changes since commit b4350f40f73b75efdceae3d9e04266979acabd8c:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-drivers-i2c
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-cpu-hotplug
 
-for you to fetch changes up to fd301cc4e5ba839050be135a178031bcd0d363a5:
+for you to fetch changes up to 453689e407f2b7c0a72a2e6fb2ef84c20475773b:
 
-  i2c: tegra: dynamically control fast clk
+  ARM: tegra20: add CPU hotplug support
 
 ----------------------------------------------------------------
 
-Laxman Dewangan (6):
-      ARM: tegra: clock: add i2c fast clock entry in clock table
-      i2c: tegra: pass proper name for getting clock
-      ARM: tegra: clock: add connection name in i2c clock entry
-      ARM: tegra: clock: remove unused clock entry for i2c
-      i2c: tegra: I2_M_NOSTART functionality not supported in Tegra20
-      i2c: tegra: dynamically control fast clk
+Joseph Lo (5):
+      ARM: tegra: introduce tegra_cpu_car_ops structures
+      ARM: tegra: replace the CPU CAR access code by tegra_cpu_car_ops
+      ARM: tegra: clean up the common assembly macros into sleep.h
+      ARM: tegra30: add CPU hotplug support
+      ARM: tegra20: add CPU hotplug support
 
- arch/arm/mach-tegra/tegra20_clocks_data.c |   20 ++--
- arch/arm/mach-tegra/tegra30_clocks_data.c |   15 ++-
- drivers/i2c/busses/i2c-tegra.c            |  130 +++++++++++++++++-------
- 3 files changed, 110 insertions(+), 55 deletions(-)
+ arch/arm/mach-tegra/Makefile              |    2 +
+ arch/arm/mach-tegra/clock.c               |    4 +
+ arch/arm/mach-tegra/common.c              |    3 +
+ arch/arm/mach-tegra/headsmp.S             |    6 +-
+ arch/arm/mach-tegra/hotplug.c             |  118 +++++++-----------------
+ arch/arm/mach-tegra/platsmp.c             |   29 +-----
+ arch/arm/mach-tegra/sleep-t20.S           |   82 ++++++++++++++++
+ arch/arm/mach-tegra/sleep-t30.S           |  107 +++++++++++++++++++++
+ arch/arm/mach-tegra/sleep.S               |   33 +-------
+ arch/arm/mach-tegra/sleep.h               |   85 +++++++++++++++++
+ arch/arm/mach-tegra/tegra20_clocks.c      |   70 ++++++++++++++
+ arch/arm/mach-tegra/tegra20_clocks_data.c |    2 +
+ arch/arm/mach-tegra/tegra30_clocks.c      |   72 ++++++++++++++
+ arch/arm/mach-tegra/tegra30_clocks_data.c |    3 +
+ arch/arm/mach-tegra/tegra_cpu_car.h       |   87 +++++++++++++++++
+ 15 files changed, 556 insertions(+), 147 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/sleep-t20.S
+ create mode 100644 arch/arm/mach-tegra/sleep-t30.S
+ create mode 100644 arch/arm/mach-tegra/sleep.h
+ create mode 100644 arch/arm/mach-tegra/tegra_cpu_car.h
