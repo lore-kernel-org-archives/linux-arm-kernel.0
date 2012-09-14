@@ -1,47 +1,87 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 14 Sep 2012 12:28:28 +0300
-Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
- dmaengine_prep_dma_cyclic()
-In-Reply-To: <1347612630.1943.29.camel@vkoul-udesk3>
-References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
- <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
- <5051FB4D.3000009@metafoo.de> <1347593217.1943.26.camel@vkoul-udesk3>
- <5052E72A.8040207@metafoo.de> <1347612630.1943.29.camel@vkoul-udesk3>
-Message-ID: <5052F8BC.4020102@ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 14 Sep 2012 11:29:06 +0200
+Subject: [PATCH 3/6] staging: drm/imx: add i.MX IPUv3 base driver
+In-Reply-To: <1347445874-10779-4-git-send-email-s.hauer@pengutronix.de>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+ <1347445874-10779-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <5052F8E2.6010106@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/14/2012 11:50 AM, Vinod Koul wrote:
->> Well, the idea was that the driver would disable interrupts if there is no
->> callback to call, since there would be nothing to do in the interrupt
->> handler anyway. But I guess the flags approach should work fine as well.
-> Yes we _could_ do that, but this relies on dmaengine driver to have this
-> implicit understanding. Anyone using dmaengine library in ASoC may or
-> may not be aware of this, so i would consider it hackish.
+On 12.09.2012 12:31, Sascha Hauer wrote:
+> The IPU is the Image Processing Unit found on i.MX51/53/6 SoCs. It
+> features several units for image processing, this patch adds support
+> for the units needed for Framebuffer support, namely:
 > 
-> Using this flag explicitly makes everyone aware what the intended
-> behaviour is.
+> - Display Controller (dc)
+> - Display Interface (di)
+> - Display Multi Fifo Controller (dmfc)
+> - Display Processor (dp)
+> - Image DMA Controller (idmac)
+> 
+> This patch is based on the Freescale driver, but follows a different
+> approach. The Freescale code implements logical idmac channels and
+> the handling of the subunits is hidden in common idmac code pathes
+> in big switch/case statements. This patch instead just provides code
+> and resource management for the different subunits. The user, in this
+> case the framebuffer driver, decides how the different units play
+> together.
+> 
+> The IPU has other units missing in this patch:
+> 
+> - CMOS Sensor Interface (csi)
+> - Video Deinterlacer (vdi)
+> - Sensor Multi FIFO Controler (smfc)
+> - Image Converter (ic)
+> - Image Rotator (irt)
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+....
+> +static int ipu_reset(struct ipu_soc *ipu)
+> +{
+> +       unsigned long timeout;
+> +
+> +       ipu_cm_write(ipu, 0x807FFFFF, IPU_MEM_RST);
+> +
+> +       timeout = jiffies + msecs_to_jiffies(1000);
+> +       while (ipu_cm_read(ipu, IPU_MEM_RST) & 0x80000000) {
+> +               if (time_after(jiffies, timeout))
+> +                       return -ETIME;
+> +               cpu_relax();
+> +       }
+> +
+> +       mdelay(300);
+           ^^^^^^^^^^^^
 
-I'm not sure about which flags should ASoC set for the two case we are going
-to have. I think it should be something like this:
+> +       return 0;
+> +}
 
-unsigned long flags = DMA_CTRL_ACK;
+While doing some boot time measurement with i.MX6, we found that the 
+above mdelay(300) is hurting regarding boot time. On i.MX6 you have two 
+IPU instances, so in the end you get 600ms additional delay.
 
-if (!substream->runtime->no_period_wakeup)
-	flags |= DMA_PREP_INTERRUPT;
+Looking at the Freescale code, this function looks like
 
-I'm not 100% sure of the role of DMA_CTRL_ACK in this case. Or should we only
-handle the DMA_PREP_INTERRUPT flag, like this:
+static int ipu_reset(struct ipu_soc *ipu)
+{
+int timeout = 1000;
 
-unsigned long flags = 0;
+ipu_cm_write(ipu, 0x807FFFFF, IPU_MEM_RST);
 
-if (!substream->runtime->no_period_wakeup)
-	flags |= DMA_PREP_INTERRUPT;
+while (ipu_cm_read(ipu, IPU_MEM_RST) & 0x80000000) {
+  if (!timeout--)
+    return -ETIME;
+  msleep(1);
+}
+return 0;
+}
 
+So there is a msleep() in the loop but no mdelay() outside. Any idea why 
+the mdelay() is needed here? Or what could be done regarding boot time 
+with this?
 
-What do you think?
+Note: This is just a question, this shouldn't block the staging process.
 
--- 
-P?ter
+Best regards
+
+Dirk
