@@ -1,65 +1,37 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Fri, 14 Sep 2012 08:56:13 +0000
-Subject: [PATCH v2 06/11] USB: mxs-phy: add basic otg support
-In-Reply-To: <1346137397-32374-7-git-send-email-richard.zhao@freescale.com>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-7-git-send-email-richard.zhao@freescale.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803C81A63@039-SN2MPN1-022.039d.mgd.msft.net>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 14 Sep 2012 14:26:40 +0530
+Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
+In-Reply-To: <20120914083050.GA12245@n2100.arm.linux.org.uk>
+References: <1346731465-6301-1-git-send-email-marex@denx.de>
+ <20120905014000.GP2362@S2101-09.ap.freescale.net>
+ <201209050346.39253.marex@denx.de> <1347591975.1943.12.camel@vkoul-udesk3>
+ <20120914083050.GA12245@n2100.arm.linux.org.uk>
+Message-ID: <1347613000.1943.34.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
-> index c1a67cb..6a03e97 100644
-> --- a/drivers/usb/otg/mxs-phy.c
-> +++ b/drivers/usb/otg/mxs-phy.c
-> @@ -97,12 +97,24 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
-> int port)
->  	return 0;
->  }
+On Fri, 2012-09-14 at 09:30 +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 14, 2012 at 08:36:15AM +0530, Vinod Koul wrote:
+> > On Wed, 2012-09-05 at 03:46 +0200, Marek Vasut wrote:
+> > > One way to fix this is to recycle descriptors that were already used during the 
+> > > transfer, but can we really do it fast enough, so the DMA would do it's job at 
+> > > one end of the descriptor chain and we'd be building the other?
+> > See the comment in dma_ctrl_flags:
+> > * @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the client
+> > *  acknowledges receipt, i.e. has has a chance to establish any dependency
+> > *  chains
+> > Setting this would mean that driver can reuse the descriptor once the
+> > transaction has completed.
 > 
-> +static int mxs_phy_set_host(struct usb_otg *otg, struct usb_bus *host)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int mxs_phy_set_peripheral(struct usb_otg *otg,
-> +					struct usb_gadget *gadget)
-> +{
-> +	return 0;
-> +}
-> +
->  static int mxs_phy_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
->  	void __iomem *base;
->  	struct clk *clk;
->  	struct mxs_phy *mxs_phy;
-> +	struct usb_otg *otg;
+> Actually, that has little meaning for slave DMA descriptors (other than
+> it should already be set for consistency with the async_tx stuff, which
+> has the above mentioned depenedency chains.)
 > 
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!res) {
-> @@ -139,6 +151,15 @@ static int mxs_phy_probe(struct platform_device
-> *pdev)
-> 
->  	mxs_phy->clk = clk;
-> 
-> +	otg = devm_kzalloc(&pdev->dev, sizeof(struct usb_otg), GFP_KERNEL);
-> +	if (!otg)
-> +		return -ENOMEM;
-> +	otg->phy = &mxs_phy->phy;
-> +	otg->set_host = mxs_phy_set_host;
-> +	otg->set_peripheral = mxs_phy_set_peripheral;
-> +
-> +	mxs_phy->phy.otg = otg;
-> +
+> Once completed, descriptors can be reused irrespective of the above flag.
+Yes that is the reason no one in slave world uses it and we consider the
+descriptor can be reused once transaction is complete.
+FWIW I see some of the salve drivers do consider this flag!!
 
-Put otg struct at PHY driver is not a good practice.
-Only OTG driver who handles ID interrupt cases about host and gadget struct.
-PHY is a transceiver, it not cares otg, host and device at all.
 
->  	platform_set_drvdata(pdev, &mxs_phy->phy);
-> 
->  	return 0;
-> --
-> 1.7.9.5
+-- 
+~Vinod
