@@ -1,36 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Sep 2012 19:18:43 -0700
-Subject: [GIT PULL 1/7] omap non-critical fixes for v3.7 merge window
-Message-ID: <pull-1347589125-283636>
+Date: Thu, 13 Sep 2012 19:18:44 -0700
+Subject: [GIT PULL 3/7] omap gpmc cleanup for v3.7 merge window
+In-Reply-To: <pull-1347589125-283636>
+Message-ID: <mailman.2.1347589148.1458.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
 
-  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-noncritical-for-v3.7
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-gpmc-fixed-for-v3.7
 
-for you to fetch changes up to 3c5dc4a7daa6e64e39412fe9c7daa298834de623:
+for you to fetch changes up to 5c4684557b7e37afd42fa35f420f2f28bfb75442:
 
-  ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT* read/write (2012-09-12 21:14:34 -0700)
-
-----------------------------------------------------------------
-Non critical omap fixes that we not considered necessary
-for the v3.6 -rc cycle.
+  mtd: nand: omap2: use gpmc provided irqs (2012-08-30 12:53:24 -0700)
 
 ----------------------------------------------------------------
-Paul Walmsley (1):
-      ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT* read/write
+Changes for GPMC (General Purpose Memory Controller) that take it
+closer for being just a regular device driver.
 
-Santosh Shilimkar (1):
-      ARM: OMAP4: wakeupgen: Fix the typo in AUXCOREBOOT register save
+----------------------------------------------------------------
+Afzal Mohammed (10):
+      ARM: OMAP2+: gpmc: update nand register helper
+      ARM: OMAP2+: gpmc-nand: update gpmc-nand regs
+      mtd: nand: omap2: handle nand on gpmc
+      ARM: OMAP2+: gpmc-nand: update resource with memory
+      ARM: OMAP2+: gpmc-onenand: provide memory as resource
+      mtd: nand: omap2: obtain memory from resource
+      mtd: onenand: omap2: obtain memory from resource
+      ARM: OMAP2+: gpmc: Modify interrupt handling
+      ARM: OMAP2+: gpmc-nand: Modify Interrupt handling
+      mtd: nand: omap2: use gpmc provided irqs
 
-Wei Yongjun (1):
-      gpio/omap: fix possible memory leak in omap2_gpio_dev_init()
-
- arch/arm/mach-omap2/gpio.c           |    2 ++
- arch/arm/mach-omap2/omap-wakeupgen.c |    8 +-------
- 2 files changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/gpmc-nand.c        |   28 ++-
+ arch/arm/mach-omap2/gpmc-onenand.c     |   23 ++-
+ arch/arm/mach-omap2/gpmc.c             |  156 +++++++++++++++--
+ arch/arm/plat-omap/include/plat/gpmc.h |   19 ++
+ arch/arm/plat-omap/include/plat/nand.h |    2 +-
+ drivers/mtd/nand/omap2.c               |  301 ++++++++++++++++++++++++--------
+ drivers/mtd/onenand/omap2.c            |   29 +--
+ 7 files changed, 445 insertions(+), 113 deletions(-)
