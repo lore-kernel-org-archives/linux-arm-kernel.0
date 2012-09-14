@@ -1,38 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Sep 2012 16:01:56 +0200
-Subject: [PATCH 01/19] ARM: ux500: Add skeleton Device Tree for the HREF
- reference board
-In-Reply-To: <20120914093715.GM3374@gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-2-git-send-email-lee.jones@linaro.org>
- <CACRpkdbWVjiqrehj_v7M=cgnytEio5whTXOcax5wo0YSRe=-yA@mail.gmail.com>
- <20120914093715.GM3374@gmail.com>
-Message-ID: <CACRpkdauwbEswOAwTo9G21V5Ff8XFzdt7Y+aw9W2JYqfBs=y8Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 14 Sep 2012 15:02:14 +0100
+Subject: [PATCH v4 16/24] xen: clear IRQ_NOAUTOEN and IRQ_NOREQUEST
+In-Reply-To: <1347621207-11294-16-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-16-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <505338E6.4050504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 11:37 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, Sep 10, 2012 at 01:47:09AM -0700, Linus Walleij wrote:
->> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > First commit applying the new Device Tree for ST-Ericsson's u8500
->> > based hardware reference board.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> > +/dts-v1/;
->> > +/include/ "dbx5x0.dtsi"
->>
->> This include is not even in linux-next, is this patch series dependent
->> on some other series I have not seen, or that I have forgot that
->> I saw (and even possibly ACKed...)
->
-> Yes, all of the above.
->
-> I have them all here locally. Will test push something today hopefully.
+On 14/09/12 12:13, Stefano Stabellini wrote:
+> Reset the IRQ_NOAUTOEN and IRQ_NOREQUEST flags that are enabled by
+> default on ARM. If IRQ_NOAUTOEN is set, __setup_irq doesn't call
+> irq_startup, that is responsible for calling irq_unmask at startup time.
+> As a result event channels remain masked.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> ---
+>  drivers/xen/events.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/xen/events.c b/drivers/xen/events.c
+> index 5ecb596..8ffb7b7 100644
+> --- a/drivers/xen/events.c
+> +++ b/drivers/xen/events.c
+> @@ -836,6 +836,7 @@ int bind_evtchn_to_irq(unsigned int evtchn)
+>  		struct irq_info *info = info_for_irq(irq);
+>  		WARN_ON(info == NULL || info->type != IRQT_EVTCHN);
+>  	}
+> +	irq_clear_status_flags(irq, IRQ_NOREQUEST|IRQ_NOAUTOEN);
 
-OK then, when I see the complete set I will probably get the context.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+This one just sent a shiver down my spine. Are you doing this for a PPI?
 
-Yours,
-Linus Walleij
+	M.
+-- 
+Jazz is not dead. It just smells funny...
