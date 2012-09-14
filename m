@@ -1,36 +1,55 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 14 Sep 2012 09:35:30 +0200
-Subject: [Query] Does u-boot processes dtb file
-In-Reply-To: <CAKohpomubFQMj2uoP+Pb1xBsO7B14W3nR1ddSQ-ajRERNBQ+kg@mail.gmail.com>
-References: <CAKohpomkgk_hNAwqseAvc_cyLH+Vtr63r_hJGxsKueZhKno8_A@mail.gmail.com>	<5052D7EA.30902@de.bosch.com>
- <CAKohpomubFQMj2uoP+Pb1xBsO7B14W3nR1ddSQ-ajRERNBQ+kg@mail.gmail.com>
-Message-ID: <5052DE42.6080109@de.bosch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Sep 2012 07:55:38 +0000
+Subject: [PATCH V4 2/5] ARM: bcm2835: add interrupt controller driver
+In-Reply-To: <1347597684-30805-2-git-send-email-swarren@wwwdotorg.org>
+References: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
+ <1347597684-30805-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201209140755.38523.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.09.2012 09:16, Viresh Kumar wrote:
-> On 14 September 2012 12:38, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->> Working with U-Boot, to my understanding U-Boot modifies ('patches') the dtb
->> read from the boot device before passing it to the kernel. It e.g. adds the
->> kernel command line and the memory size you specify in U-Boot to the dtb.
+On Friday 14 September 2012, Stephen Warren wrote:
 > 
-> Thanks for your response.
+> From: Simon Arlott <simon@fire.lp0.eu>
 > 
-> But, if this information is also embedded in the dts earlier, will my workaround
-> of filling r2 work?
+> The BCM2835 contains a custom interrupt controller, which supports 72
+> interrupt sources using a 2-level register scheme. The interrupt
+> controller, or the HW block containing it, is referred to occasionally
+> as "armctrl" in the SoC documentation, hence the symbol naming in the
+> code.
+> 
+> This patch was extracted from git://github.com/lp0/linux.git branch
+> rpi-split as of 2012/09/08, and modified as follows:
+> 
+> * s/bcm2708/bcm2835/.
+> * Modified device tree vendor prefix.
+> * Moved implementation to drivers/irchip/.
+> * Added devicetree documentation, and hence removed list of IRQs from
+>   bcm2835.dtsi.
+> * Changed shift in MAKE_HWIRQ() and HWIRQ_BANK() from 8 to 5 to reduce
+>   the size of the hwirq space, and pass the total size of the hwirq space
+>   to irq_domain_add_linear(), rather than just the number of valid hwirqs;
+>   the two are different due to the hwirq space being sparse.
+> * Added the interrupt controller DT node to the top-level of the DT,
+>   rather than nesting it inside a /axi node. Hence, changed the reg value
+>   since /axi had a ranges property. This seems simpler to me, but I'm not
+>   sure if everyone will like this change or not.
+> * Don't set struct irq_domain_ops.map = irq_domain_simple_map, hence
+>   removing the need to patch include/linux/irqdomain.h or
+>   kernel/irq/irqdomain.c.
+> * Simplified armctrl_of_init() using of_iomap().
+> * Removed unused IS_VALID_BANK()/IS_VALID_IRQ() macros.
+> * Renamed armctrl_handle_irq() to prevent possible symbol clashes.
+> * Made armctrl_of_init() static.
+> * Removed comment "Each bank is registered as a separate interrupt
+>   controller" since this is no longer true.
+> * Removed FSF address from license header.
+> * Added my name to copyright header.
+> 
+> Signed-off-by: Chris Boot <bootc@bootc.net>
+> Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
+> Signed-off-by: Dom Cobley <popcornmix@gmail.com>
+> Signed-off-by: Dom Cobley <dc4@broadcom.com>
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 
-I think so, but I never tried it. It's on my todo list to try this ;) If 
-you add all the information needed in the dts file and the resulting dtb 
-file is identical to the 'patched' dtb U-Boot passes to the kernel, 
-there should be no difference (?).
-
-> Is filling bootargs and memory size the only stuff or some other things too?
-
-I'm not totally sure on this. You could debug this: (a) Take the dtb 
-file from your boot device. (b) dump the dtb file U-Boot passes to the 
-kernel (i.e. do a memory dump from the pointer U-Boot passes in r2). 
-Compare (a) and (b) with a binary diff.
-
-Best regards
-
-Dirk
+Acked-by: Arnd Bergmann <arnd@arndb.de>
