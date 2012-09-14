@@ -1,290 +1,321 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Sep 2012 22:41:21 -0600
-Subject: [PATCH V4 2/5] ARM: bcm2835: add interrupt controller driver
-In-Reply-To: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347597684-30805-2-git-send-email-swarren@wwwdotorg.org>
+Date: Thu, 13 Sep 2012 22:41:20 -0600
+Subject: [PATCH V4 1/5] ARM: add infra-structure for BCM2835 and Raspberry Pi
+Message-ID: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Simon Arlott <simon@fire.lp0.eu>
 
-The BCM2835 contains a custom interrupt controller, which supports 72
-interrupt sources using a 2-level register scheme. The interrupt
-controller, or the HW block containing it, is referred to occasionally
-as "armctrl" in the SoC documentation, hence the symbol naming in the
-code.
+The BCM2835 is an ARM SoC from Broadcom. This patch adds very basic
+support for this SoC.
+
+http://www.broadcom.com/products/BCM2835
+http://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pd
+
+Note that the documentation in the latter .pdf assumes the MMU setup
+that's used on the "VideoCore" companion processor, and does not document
+physical peripheral addresses. Subtract 0x5e000000 to obtain the physical
+addresses.
+
+The BCM2835 SoC is used in the Raspberry Pi. This patch also adds a
+minimal device tree for this board; enough to see some very early kernel
+boot messages through earlyprintk. However, this patch does not yet
+provide a useful booting system.
+
+http://www.raspberrypi.org/.
 
 This patch was extracted from git://github.com/lp0/linux.git branch
-rpi-split as of 2012/09/08, and modified as follows:
-
-* s/bcm2708/bcm2835/.
-* Modified device tree vendor prefix.
-* Moved implementation to drivers/irchip/.
-* Added devicetree documentation, and hence removed list of IRQs from
-  bcm2835.dtsi.
-* Changed shift in MAKE_HWIRQ() and HWIRQ_BANK() from 8 to 5 to reduce
-  the size of the hwirq space, and pass the total size of the hwirq space
-  to irq_domain_add_linear(), rather than just the number of valid hwirqs;
-  the two are different due to the hwirq space being sparse.
-* Added the interrupt controller DT node to the top-level of the DT,
-  rather than nesting it inside a /axi node. Hence, changed the reg value
-  since /axi had a ranges property. This seems simpler to me, but I'm not
-  sure if everyone will like this change or not.
-* Don't set struct irq_domain_ops.map = irq_domain_simple_map, hence
-  removing the need to patch include/linux/irqdomain.h or
-  kernel/irq/irqdomain.c.
-* Simplified armctrl_of_init() using of_iomap().
-* Removed unused IS_VALID_BANK()/IS_VALID_IRQ() macros.
-* Renamed armctrl_handle_irq() to prevent possible symbol clashes.
-* Made armctrl_of_init() static.
-* Removed comment "Each bank is registered as a separate interrupt
-  controller" since this is no longer true.
-* Removed FSF address from license header.
-* Added my name to copyright header.
+rpi-split from 3-4 months ago, and significantly stripped down and
+modified since.
 
 Signed-off-by: Chris Boot <bootc@bootc.net>
 Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
 Signed-off-by: Dom Cobley <popcornmix@gmail.com>
 Signed-off-by: Dom Cobley <dc4@broadcom.com>
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
---
-v4:
-* Moved IRQ driver to drivers/irqchip/.
-* Simplified armctrl_of_init() using of_iomap().
-* Moved binding into Documentation/devicetree/bindings/interrupt-controller/.
-* s/bcm2708/bcm2835/.
-* Updated for new device tree vendor prefix.
-v3:
-* New patch.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- .../brcm,bcm2835-armctrl-ic.txt                    |  110 ++++++++++
- arch/arm/boot/dts/bcm2835.dtsi                     |    8 +
- arch/arm/mach-bcm2835/bcm2835.c                    |   10 +-
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    1 +
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-bcm2835.c                      |  223 ++++++++++++++++++++
- include/linux/irqchip/bcm2835.h                    |   29 +++
- 8 files changed, 375 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
- create mode 100644 drivers/irqchip/Kconfig
- create mode 100644 drivers/irqchip/Makefile
- create mode 100644 drivers/irqchip/irq-bcm2835.c
- create mode 100644 include/linux/irqchip/bcm2835.h
+v4:
+* s/bcm2708/bcm2835/.
+* Modified device tree vendor prefix from broadcom to brcm.
+* Document device tree vendor prefix.
+* Added VFP (Kconfig help says one must be selected) and EABI (to match
+  binaries produced by RPi toolchains, so user-space works) to defconfig.
+v3:
+* Added DT binding documentation for the SoC itself.
+* Changed patch subject from "support" to "infra-structure", and added
+  to the commit description, to indicate that the patch isn't adding
+  complete support for the SoC/board.
+* Added all S-o-b tags from downstream, now that I have permission to
+  fix them up to be valid.
+* Changed patch author to Simon Arlott, now I have permission to change
+  his email address to something valid.
+* Limited my (c) additions to files I created; the other changes turnd
+  out to be trivial.
+v2:
+* Rename *_BASE to *_PHYS to match Simon's rpi-split branch.
+* Remove #define UART_BAUD since it isn't used.
+* Don't select WATCHDOG from ARCH_BCM2835
+* Remove 8250 and PL010 serial ports from bcm2835_defconfig
+* Remove <mach/hardware.h>
+* Rename common.c back to bcm2835.c; matches downstream and is
+  preferred naming style.
+---
+ Documentation/devicetree/bindings/arm/bcm2835.txt  |    8 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/Kconfig                                   |   17 ++++
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |   12 +++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   10 +++
+ arch/arm/configs/bcm2835_defconfig                 |   95 ++++++++++++++++++++
+ arch/arm/mach-bcm2835/Makefile                     |    1 +
+ arch/arm/mach-bcm2835/Makefile.boot                |    5 ++
+ arch/arm/mach-bcm2835/bcm2835.c                    |   77 ++++++++++++++++
+ arch/arm/mach-bcm2835/include/mach/bcm2835_soc.h   |   29 ++++++
+ arch/arm/mach-bcm2835/include/mach/debug-macro.S   |   21 +++++
+ arch/arm/mach-bcm2835/include/mach/timex.h         |   26 ++++++
+ arch/arm/mach-bcm2835/include/mach/uncompress.h    |   45 ++++++++++
+ 14 files changed, 348 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm2835.txt
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-b.dts
+ create mode 100644 arch/arm/boot/dts/bcm2835.dtsi
+ create mode 100644 arch/arm/configs/bcm2835_defconfig
+ create mode 100644 arch/arm/mach-bcm2835/Makefile
+ create mode 100644 arch/arm/mach-bcm2835/Makefile.boot
+ create mode 100644 arch/arm/mach-bcm2835/bcm2835.c
+ create mode 100644 arch/arm/mach-bcm2835/include/mach/bcm2835_soc.h
+ create mode 100644 arch/arm/mach-bcm2835/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-bcm2835/include/mach/timex.h
+ create mode 100644 arch/arm/mach-bcm2835/include/mach/uncompress.h
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+diff --git a/Documentation/devicetree/bindings/arm/bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm2835.txt
 new file mode 100644
-index 0000000..7bcf2f7
+index 0000000..ac68348
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-@@ -0,0 +1,110 @@
-+BCM2835 Top-Level ("ARMCTRL") Interrupt Controller
++++ b/Documentation/devicetree/bindings/arm/bcm2835.txt
+@@ -0,0 +1,8 @@
++Broadcom BCM2835 device tree bindings
++-------------------------------------------
 +
-+The BCM2835 contains a custom top-level interrupt controller, which supports
-+72 interrupt sources using a 2-level register scheme. The interrupt
-+controller, or the HW block containing it, is referred to occasionally
-+as "armctrl" in the SoC documentation, hence naming of this binding.
++Boards with the BCM2835 SoC shall have the following properties:
 +
-+Required properties:
++Required root node property:
 +
-+- compatible : should be "brcm,bcm2835-armctrl-ic.txt"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 2.
++compatible = "brcm,bcm2835";
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index db4d3af..4f293e5 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -10,6 +10,7 @@ apm	Applied Micro Circuits Corporation (APM)
+ arm	ARM Ltd.
+ atmel	Atmel Corporation
+ bosch	Bosch Sensortec GmbH
++brcm	Broadcom Corporation
+ cavium	Cavium, Inc.
+ chrp	Common Hardware Reference Platform
+ cortina	Cortina Systems, Inc.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d0021fe..04b063c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -349,6 +349,23 @@ config ARCH_AT91
+ 	  This enables support for systems based on Atmel
+ 	  AT91RM9200 and AT91SAM9* processors.
+ 
++config ARCH_BCM2835
++	bool "Broadcom BCM2835 family"
++	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARM_AMBA
++	select ARM_ERRATA_411920
++	select ARM_TIMER_SP804
++	select CLKDEV_LOOKUP
++	select COMMON_CLK
++	select CPU_V6
++	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  This enables support for the Broadcom BCM2835 SoC. This SoC is
++	  use in the Raspberry Pi, and Roku 2 devices.
 +
-+  The 1st cell is the interrupt bank; 0 for interrupts in the "IRQ basic
-+  pending" register, or 1/2 respectively for interrupts in the "IRQ pending
-+  1/2" register.
+ config ARCH_BCMRING
+ 	bool "Broadcom BCMRING"
+ 	depends on MMU
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a812d12..b1c333c 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -136,6 +136,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+ machine-$(CONFIG_ARCH_AT91)		:= at91
++machine-$(CONFIG_ARCH_BCM2835)		:= bcm2835
+ machine-$(CONFIG_ARCH_BCMRING)		:= bcmring
+ machine-$(CONFIG_ARCH_CLPS711X)		:= clps711x
+ machine-$(CONFIG_ARCH_CNS3XXX)		:= cns3xxx
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+new file mode 100644
+index 0000000..7dd860f
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -0,0 +1,12 @@
++/dts-v1/;
++/memreserve/ 0x0c000000 0x04000000;
++/include/ "bcm2835.dtsi"
 +
-+  The 2nd cell contains the interrupt number within the bank. Valid values
-+  are 0..7 for bank 0, and 0..31 for bank 1.
++/ {
++	compatible = "raspberrypi,model-b", "brcm,bcm2835";
++	model = "Raspberry Pi Model B";
 +
-+The interrupt sources are as follows:
-+
-+Bank 0:
-+0: ARM_TIMER
-+1: ARM_MAILBOX
-+2: ARM_DOORBELL_0
-+3: ARM_DOORBELL_1
-+4: VPU0_HALTED
-+5: VPU1_HALTED
-+6: ILLEGAL_TYPE0
-+7: ILLEGAL_TYPE1
-+
-+Bank 1:
-+0: TIMER0
-+1: TIMER1
-+2: TIMER2
-+3: TIMER3
-+4: CODEC0
-+5: CODEC1
-+6: CODEC2
-+7: VC_JPEG
-+8: ISP
-+9: VC_USB
-+10: VC_3D
-+11: TRANSPOSER
-+12: MULTICORESYNC0
-+13: MULTICORESYNC1
-+14: MULTICORESYNC2
-+15: MULTICORESYNC3
-+16: DMA0
-+17: DMA1
-+18: VC_DMA2
-+19: VC_DMA3
-+20: DMA4
-+21: DMA5
-+22: DMA6
-+23: DMA7
-+24: DMA8
-+25: DMA9
-+26: DMA10
-+27: DMA11
-+28: DMA12
-+29: AUX
-+30: ARM
-+31: VPUDMA
-+
-+Bank 2:
-+0: HOSTPORT
-+1: VIDEOSCALER
-+2: CCP2TX
-+3: SDC
-+4: DSI0
-+5: AVE
-+6: CAM0
-+7: CAM1
-+8: HDMI0
-+9: HDMI1
-+10: PIXELVALVE1
-+11: I2CSPISLV
-+12: DSI1
-+13: PWA0
-+14: PWA1
-+15: CPR
-+16: SMI
-+17: GPIO0
-+18: GPIO1
-+19: GPIO2
-+20: GPIO3
-+21: VC_I2C
-+22: VC_SPI
-+23: VC_I2SPCM
-+24: VC_SDIO
-+25: VC_UART
-+26: SLIMBUS
-+27: VEC
-+28: CPG
-+29: RNG
-+30: VC_ARASANSDIO
-+31: AVSPMON
-+
-+Example:
-+
-+intc: interrupt-controller {
-+	compatible = "brcm,bcm2835-armctrl-ic";
-+	reg = <0x2000b200 0x200>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
++	memory {
++		reg = <0 0x10000000>;
++	};
 +};
 diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 7e5c5a4..33e8d533 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
+new file mode 100644
+index 0000000..7e5c5a4
+--- /dev/null
 +++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -3,8 +3,16 @@
- / {
- 	compatible = "brcm,bcm2835";
- 	model = "BCM2835";
-+	interrupt-parent = <&intc>;
- 
- 	chosen {
- 		bootargs = "earlyprintk";
- 	};
+@@ -0,0 +1,10 @@
++/include/ "skeleton.dtsi"
 +
-+	intc: interrupt-controller {
-+		compatible = "brcm,bcm2835-armctrl-ic";
-+		reg = <0x2000b200 0x200>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++/ {
++	compatible = "brcm,bcm2835";
++	model = "BCM2835";
++
++	chosen {
++		bootargs = "earlyprintk";
 +	};
- };
-diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
-index f6b36b4..72c4b5f 100644
---- a/arch/arm/mach-bcm2835/bcm2835.c
-+++ b/arch/arm/mach-bcm2835/bcm2835.c
-@@ -13,12 +13,12 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/irqchip/bcm2835.h>
- #include <linux/of_platform.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
--#include <asm/exception.h>
- 
- #include <mach/bcm2835_soc.h>
- 
-@@ -34,14 +34,6 @@ void __init bcm2835_map_io(void)
- 	iotable_init(&io_map, 1);
- }
- 
--void __init bcm2835_init_irq(void)
--{
--}
--
--asmlinkage void __exception_irq_entry bcm2835_handle_irq(struct pt_regs *regs)
--{
--}
--
- void __init bcm2835_init(void)
- {
- 	int ret;
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 324e958..dbdefa3 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -154,4 +154,6 @@ source "drivers/vme/Kconfig"
- 
- source "drivers/pwm/Kconfig"
- 
-+source "drivers/irqchip/Kconfig"
-+
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index d64a0f7..f776bd6 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -6,6 +6,7 @@
- #
- 
- obj-y				+= bus/
-+obj-y				+= irqchip/
- 
- # GPIO must come after pinctrl as gpios may need to mux pins etc
- obj-y				+= pinctrl/
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
++};
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
 new file mode 100644
-index 0000000..e69de29
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-new file mode 100644
-index 0000000..054321d
+index 0000000..7aea702
 --- /dev/null
-+++ b/drivers/irqchip/Makefile
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -0,0 +1,95 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BSD_PROCESS_ACCT_V3=y
++CONFIG_FHANDLE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=18
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CGROUP_DEVICE=y
++CONFIG_CPUSETS=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_RESOURCE_COUNTERS=y
++CONFIG_CGROUP_PERF=y
++CONFIG_CFS_BANDWIDTH=y
++CONFIG_RT_GROUP_SCHED=y
++CONFIG_NAMESPACES=y
++CONFIG_SCHED_AUTOGROUP=y
++CONFIG_RELAY=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_BZIP2=y
++CONFIG_RD_LZMA=y
++CONFIG_RD_XZ=y
++CONFIG_RD_LZO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_JUMP_LABEL=y
++# CONFIG_BLOCK is not set
++CONFIG_ARCH_BCM2835=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_AEABI=y
++CONFIG_COMPACTION=y
++CONFIG_KSM=y
++CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
++CONFIG_CLEANCACHE=y
++CONFIG_SECCOMP=y
++CONFIG_CC_STACKPROTECTOR=y
++CONFIG_KEXEC=y
++CONFIG_CRASH_DUMP=y
++CONFIG_VFP=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++# CONFIG_SUSPEND is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_TTY_PRINTK=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_PROC_FS is not set
++# CONFIG_SYSFS is not set
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_UNUSED_SYMBOLS=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_MEMORY_INIT=y
++CONFIG_BOOT_PRINTK_DELAY=y
++CONFIG_SCHED_TRACER=y
++CONFIG_STACK_TRACER=y
++CONFIG_FUNCTION_PROFILER=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_KGDB=y
++CONFIG_KGDB_KDB=y
++CONFIG_TEST_KSTRTOX=y
++CONFIG_STRICT_DEVMEM=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++# CONFIG_XZ_DEC_X86 is not set
++# CONFIG_XZ_DEC_POWERPC is not set
++# CONFIG_XZ_DEC_IA64 is not set
++# CONFIG_XZ_DEC_ARM is not set
++# CONFIG_XZ_DEC_ARMTHUMB is not set
++# CONFIG_XZ_DEC_SPARC is not set
+diff --git a/arch/arm/mach-bcm2835/Makefile b/arch/arm/mach-bcm2835/Makefile
+new file mode 100644
+index 0000000..4c3892f
+--- /dev/null
++++ b/arch/arm/mach-bcm2835/Makefile
 @@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
-diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
++obj-y += bcm2835.o
+diff --git a/arch/arm/mach-bcm2835/Makefile.boot b/arch/arm/mach-bcm2835/Makefile.boot
 new file mode 100644
-index 0000000..dc670cc
+index 0000000..0831fd1
 --- /dev/null
-+++ b/drivers/irqchip/irq-bcm2835.c
-@@ -0,0 +1,223 @@
++++ b/arch/arm/mach-bcm2835/Makefile.boot
+@@ -0,0 +1,5 @@
++   zreladdr-y := 0x00008000
++params_phys-y := 0x00000100
++initrd_phys-y := 0x00800000
++
++dtb-y += bcm2835-rpi-b.dtb
+diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
+new file mode 100644
+index 0000000..f6b36b4
+--- /dev/null
++++ b/arch/arm/mach-bcm2835/bcm2835.c
+@@ -0,0 +1,77 @@
 +/*
-+ * Copyright 2010 Broadcom
-+ * Copyright 2012 Simon Arlott, Chris Boot, Stephen Warren
++ * Copyright (C) 2010 Broadcom
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -295,224 +326,143 @@ index 0000000..dc670cc
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
-+ * Quirk 1: Shortcut interrupts don't set the bank 1/2 register pending bits
-+ *
-+ * If an interrupt fires on bank 1 that isn't in the shortcuts list, bit 8
-+ * on bank 0 is set to signify that an interrupt in bank 1 has fired, and
-+ * to look in the bank 1 status register for more information.
-+ *
-+ * If an interrupt fires on bank 1 that _is_ in the shortcuts list, its
-+ * shortcut bit in bank 0 is set as well as its interrupt bit in the bank 1
-+ * status register, but bank 0 bit 8 is _not_ set.
-+ *
-+ * Quirk 2: You can't mask the register 1/2 pending interrupts
-+ *
-+ * In a proper cascaded interrupt controller, the interrupt lines with
-+ * cascaded interrupt controllers on them are just normal interrupt lines.
-+ * You can mask the interrupts and get on with things. With this controller
-+ * you can't do that.
-+ *
-+ * Quirk 3: The shortcut interrupts can't be (un)masked in bank 0
-+ *
-+ * Those interrupts that have shortcuts can only be masked/unmasked in
-+ * their respective banks' enable/disable registers. Doing so in the bank 0
-+ * enable/disable registers has no effect.
-+ *
-+ * The FIQ control register:
-+ *  Bits 0-6: IRQ (index in order of interrupts from banks 1, 2, then 0)
-+ *  Bit    7: Enable FIQ generation
-+ *  Bits  8+: Unused
-+ *
-+ * An interrupt must be disabled before configuring it for FIQ generation
-+ * otherwise both handlers will fire at the same time!
 + */
 +
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/irqchip/bcm2835.h>
++#include <linux/init.h>
++#include <linux/of_platform.h>
 +
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/time.h>
 +#include <asm/exception.h>
 +
-+/* Put the bank and irq (32 bits) into the hwirq */
-+#define MAKE_HWIRQ(b, n)	((b << 5) | (n))
-+#define HWIRQ_BANK(i)		(i >> 5)
-+#define HWIRQ_BIT(i)		BIT(i & 0x1f)
++#include <mach/bcm2835_soc.h>
 +
-+#define NR_IRQS_BANK0		8
-+#define BANK0_HWIRQ_MASK	0xff
-+/* Shortcuts can't be disabled so any unknown new ones need to be masked */
-+#define SHORTCUT1_MASK		0x00007c00
-+#define SHORTCUT2_MASK		0x001f8000
-+#define SHORTCUT_SHIFT		10
-+#define BANK1_HWIRQ		BIT(8)
-+#define BANK2_HWIRQ		BIT(9)
-+#define BANK0_VALID_MASK	(BANK0_HWIRQ_MASK | BANK1_HWIRQ | BANK2_HWIRQ \
-+					| SHORTCUT1_MASK | SHORTCUT2_MASK)
-+
-+#define REG_FIQ_CONTROL		0x0c
-+
-+#define NR_BANKS		3
-+#define IRQS_PER_BANK		32
-+
-+static int reg_pending[] __initconst = { 0x00, 0x04, 0x08 };
-+static int reg_enable[] __initconst = { 0x18, 0x10, 0x14 };
-+static int reg_disable[] __initconst = { 0x24, 0x1c, 0x20 };
-+static int bank_irqs[] __initconst = { 8, 32, 32 };
-+
-+static const int shortcuts[] = {
-+	7, 9, 10, 18, 19,		/* Bank 1 */
-+	21, 22, 23, 24, 25, 30		/* Bank 2 */
++static struct map_desc io_map __initdata = {
++	.virtual = BCM2835_PERIPH_VIRT,
++	.pfn = __phys_to_pfn(BCM2835_PERIPH_PHYS),
++	.length = BCM2835_PERIPH_SIZE,
++	.type = MT_DEVICE
 +};
 +
-+struct armctrl_ic {
-+	void __iomem *base;
-+	void __iomem *pending[NR_BANKS];
-+	void __iomem *enable[NR_BANKS];
-+	void __iomem *disable[NR_BANKS];
-+	struct irq_domain *domain;
-+};
-+
-+static struct armctrl_ic intc __read_mostly;
-+
-+static void armctrl_mask_irq(struct irq_data *d)
++void __init bcm2835_map_io(void)
 +{
-+	writel_relaxed(HWIRQ_BIT(d->hwirq), intc.disable[HWIRQ_BANK(d->hwirq)]);
++	iotable_init(&io_map, 1);
 +}
-+
-+static void armctrl_unmask_irq(struct irq_data *d)
-+{
-+	writel_relaxed(HWIRQ_BIT(d->hwirq), intc.enable[HWIRQ_BANK(d->hwirq)]);
-+}
-+
-+static struct irq_chip armctrl_chip = {
-+	.name = "ARMCTRL-level",
-+	.irq_mask = armctrl_mask_irq,
-+	.irq_unmask = armctrl_unmask_irq
-+};
-+
-+static int armctrl_xlate(struct irq_domain *d, struct device_node *ctrlr,
-+	const u32 *intspec, unsigned int intsize,
-+	unsigned long *out_hwirq, unsigned int *out_type)
-+{
-+	if (WARN_ON(intsize != 2))
-+		return -EINVAL;
-+
-+	if (WARN_ON(intspec[0] >= NR_BANKS))
-+		return -EINVAL;
-+
-+	if (WARN_ON(intspec[1] >= IRQS_PER_BANK))
-+		return -EINVAL;
-+
-+	if (WARN_ON(intspec[0] == 0 && intspec[1] >= NR_IRQS_BANK0))
-+		return -EINVAL;
-+
-+	*out_hwirq = MAKE_HWIRQ(intspec[0], intspec[1]);
-+	*out_type = IRQ_TYPE_NONE;
-+	return 0;
-+}
-+
-+static struct irq_domain_ops armctrl_ops = {
-+	.xlate = armctrl_xlate
-+};
-+
-+static int __init armctrl_of_init(struct device_node *node,
-+	struct device_node *parent)
-+{
-+	void __iomem *base;
-+	int irq, b, i;
-+
-+	base = of_iomap(node, 0);
-+	if (!base)
-+		panic("%s: unable to map IC registers\n",
-+			node->full_name);
-+
-+	intc.domain = irq_domain_add_linear(node, MAKE_HWIRQ(NR_BANKS, 0),
-+			&armctrl_ops, NULL);
-+	if (!intc.domain)
-+		panic("%s: unable to create IRQ domain\n", node->full_name);
-+
-+	for (b = 0; b < NR_BANKS; b++) {
-+		intc.pending[b] = base + reg_pending[b];
-+		intc.enable[b] = base + reg_enable[b];
-+		intc.disable[b] = base + reg_disable[b];
-+
-+		for (i = 0; i < bank_irqs[b]; i++) {
-+			irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i));
-+			BUG_ON(irq <= 0);
-+			irq_set_chip_and_handler(irq, &armctrl_chip,
-+				handle_level_irq);
-+			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+		}
-+	}
-+	return 0;
-+}
-+
-+static struct of_device_id irq_of_match[] __initconst = {
-+	{ .compatible = "brcm,bcm2835-armctrl-ic", .data = armctrl_of_init }
-+};
 +
 +void __init bcm2835_init_irq(void)
 +{
-+	of_irq_init(irq_of_match);
 +}
 +
-+/*
-+ * Handle each interrupt across the entire interrupt controller.  This reads the
-+ * status register before handling each interrupt, which is necessary given that
-+ * handle_IRQ may briefly re-enable interrupts for soft IRQ handling.
-+ */
-+
-+static void armctrl_handle_bank(int bank, struct pt_regs *regs)
++asmlinkage void __exception_irq_entry bcm2835_handle_irq(struct pt_regs *regs)
 +{
-+	u32 stat, irq;
++}
 +
-+	while ((stat = readl_relaxed(intc.pending[bank]))) {
-+		irq = MAKE_HWIRQ(bank, ffs(stat) - 1);
-+		handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
++void __init bcm2835_init(void)
++{
++	int ret;
++
++	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
++				   NULL);
++	if (ret) {
++		pr_err("of_platform_populate failed: %d\n", ret);
++		BUG();
 +	}
 +}
 +
-+static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
-+	u32 stat)
++static void __init bcm2835_timer_init(void)
 +{
-+	u32 irq = MAKE_HWIRQ(bank, shortcuts[ffs(stat >> SHORTCUT_SHIFT) - 1]);
-+	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
 +}
 +
-+asmlinkage void __exception_irq_entry bcm2835_handle_irq(
-+	struct pt_regs *regs)
-+{
-+	u32 stat, irq;
++struct sys_timer bcm2835_timer = {
++	.init = bcm2835_timer_init
++};
 +
-+	while ((stat = readl_relaxed(intc.pending[0]) & BANK0_VALID_MASK)) {
-+		if (stat & BANK0_HWIRQ_MASK) {
-+			irq = MAKE_HWIRQ(0, ffs(stat & BANK0_HWIRQ_MASK) - 1);
-+			handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
-+		} else if (stat & SHORTCUT1_MASK) {
-+			armctrl_handle_shortcut(1, regs, stat & SHORTCUT1_MASK);
-+		} else if (stat & SHORTCUT2_MASK) {
-+			armctrl_handle_shortcut(2, regs, stat & SHORTCUT2_MASK);
-+		} else if (stat & BANK1_HWIRQ) {
-+			armctrl_handle_bank(1, regs);
-+		} else if (stat & BANK2_HWIRQ) {
-+			armctrl_handle_bank(2, regs);
-+		} else {
-+			BUG();
-+		}
-+	}
-+}
-diff --git a/include/linux/irqchip/bcm2835.h b/include/linux/irqchip/bcm2835.h
++static const char * const bcm2835_compat[] = {
++	"brcm,bcm2835",
++	NULL
++};
++
++DT_MACHINE_START(BCM2835, "BCM2835")
++	.map_io = bcm2835_map_io,
++	.init_irq = bcm2835_init_irq,
++	.handle_irq = bcm2835_handle_irq,
++	.init_machine = bcm2835_init,
++	.timer = &bcm2835_timer,
++	.dt_compat = bcm2835_compat
++MACHINE_END
+diff --git a/arch/arm/mach-bcm2835/include/mach/bcm2835_soc.h b/arch/arm/mach-bcm2835/include/mach/bcm2835_soc.h
 new file mode 100644
-index 0000000..48a859b
+index 0000000..d4dfcf7
 --- /dev/null
-+++ b/include/linux/irqchip/bcm2835.h
++++ b/arch/arm/mach-bcm2835/include/mach/bcm2835_soc.h
 @@ -0,0 +1,29 @@
 +/*
++ * Copyright (C) 2012 Stephen Warren
++ *
++ * Derived from code:
 + * Copyright (C) 2010 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MACH_BCM2835_BCM2835_SOC_H__
++#define __MACH_BCM2835_BCM2835_SOC_H__
++
++#include <asm/sizes.h>
++
++#define BCM2835_PERIPH_PHYS	0x20000000
++#define BCM2835_PERIPH_VIRT	0xf0000000
++#define BCM2835_PERIPH_SIZE	SZ_16M
++#define BCM2835_DEBUG_PHYS	0x20201000
++#define BCM2835_DEBUG_VIRT	0xf0201000
++
++#endif
+diff --git a/arch/arm/mach-bcm2835/include/mach/debug-macro.S b/arch/arm/mach-bcm2835/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..8a161e4
+--- /dev/null
++++ b/arch/arm/mach-bcm2835/include/mach/debug-macro.S
+@@ -0,0 +1,21 @@
++/*
++ * Debugging macro include header
++ *
++ * Copyright (C) 2010 Broadcom
++ * Copyright (C) 1994-1999 Russell King
++ * Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <mach/bcm2835_soc.h>
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =BCM2835_DEBUG_PHYS
++	ldr	\rv, =BCM2835_DEBUG_VIRT
++	.endm
++
++#include <asm/hardware/debug-pl01x.S>
+diff --git a/arch/arm/mach-bcm2835/include/mach/timex.h b/arch/arm/mach-bcm2835/include/mach/timex.h
+new file mode 100644
+index 0000000..6d021e1
+--- /dev/null
++++ b/arch/arm/mach-bcm2835/include/mach/timex.h
+@@ -0,0 +1,26 @@
++/*
++ *  BCM2835 system clock frequency
++ *
++ *  Copyright (C) 2010 Broadcom
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -529,16 +479,62 @@ index 0000000..48a859b
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + */
 +
-+#ifndef __LINUX_IRQCHIP_BCM2835_H_
-+#define __LINUX_IRQCHIP_BCM2835_H_
++#ifndef __ASM_ARCH_TIMEX_H
++#define __ASM_ARCH_TIMEX_H
 +
-+#include <asm/exception.h>
-+
-+extern void bcm2835_init_irq(void);
-+
-+extern asmlinkage void __exception_irq_entry bcm2835_handle_irq(
-+	struct pt_regs *regs);
++#define CLOCK_TICK_RATE		(1000000)
 +
 +#endif
+diff --git a/arch/arm/mach-bcm2835/include/mach/uncompress.h b/arch/arm/mach-bcm2835/include/mach/uncompress.h
+new file mode 100644
+index 0000000..cc46dcc
+--- /dev/null
++++ b/arch/arm/mach-bcm2835/include/mach/uncompress.h
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (C) 2010 Broadcom
++ * Copyright (C) 2003 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/io.h>
++#include <linux/amba/serial.h>
++#include <mach/bcm2835_soc.h>
++
++#define UART0_BASE BCM2835_DEBUG_PHYS
++
++#define BCM2835_UART_DR IOMEM(UART0_BASE + UART01x_DR)
++#define BCM2835_UART_FR IOMEM(UART0_BASE + UART01x_FR)
++#define BCM2835_UART_CR IOMEM(UART0_BASE + UART011_CR)
++
++static inline void putc(int c)
++{
++	while (__raw_readl(BCM2835_UART_FR) & UART01x_FR_TXFF)
++		barrier();
++
++	__raw_writel(c, BCM2835_UART_DR);
++}
++
++static inline void flush(void)
++{
++	int fr;
++
++	do {
++		fr = __raw_readl(BCM2835_UART_FR);
++		barrier();
++	} while ((fr & (UART011_FR_TXFE | UART01x_FR_BUSY)) != UART011_FR_TXFE);
++}
++
++#define arch_decomp_setup()
++#define arch_decomp_wdog()
 -- 
 1.7.9.5
