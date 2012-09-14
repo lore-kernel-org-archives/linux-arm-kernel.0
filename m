@@ -1,91 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 08:26:06 +0000
-Subject: [PATCH 2/2] ARM: dts: AM33XX: Add lis331dlh device tree data to
- am335x-evm
-In-Reply-To: <1347551685-19781-3-git-send-email-anilkumar@ti.com>
-References: <1347551685-19781-1-git-send-email-anilkumar@ti.com>
- <1347551685-19781-3-git-send-email-anilkumar@ti.com>
-Message-ID: <201209140826.07069.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Sep 2012 09:27:56 +0100
+Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed via
+ Device Tree
+In-Reply-To: <20120912105202.GD2624@pengutronix.de>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
+ <20120912105202.GD2624@pengutronix.de>
+Message-ID: <20120914082754.GE3374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 September 2012, AnilKumar Ch wrote:
-> Add lis331dlh device tree data to am335x-evm.dts. In AM335x EVM
-> lis331dlh accelerometer is connected to I2C2 bus. So this patch
-> change the status to "okay" to use I2C2 bus. Also added all the
-> required platform data to am335x-evm.
+On Wed, Sep 12, 2012 at 12:52:02PM +0200, Wolfram Sang wrote:
+> On Mon, Sep 10, 2012 at 04:42:36AM -0700, Linus Walleij wrote:
+> > On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > 
+> > > Each I2C device can be correctly probed already using Device Tree,
+> > > but the sub-devices still have to be registered by calls to
+> > > i2c_register_board_info(). After this patch, each sub-device can
+> > > be registered directly from Device Tree instead, removing the
+> > > requirement for the aforementioned calls from platform code.
+> > >
+> > > CC: linux-i2c at vger.kernel.org
+> > > CC: Wolfram Sang <w.sang@pengutronix.de>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > The patch as such is fine.
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > ...but there will be merge issues (of the type I'm
+> > discussing with Arnd in another thread).
+> > 
+> > > ---
+> > >  drivers/i2c/busses/i2c-nomadik.c |    4 ++++
+> > >  1 file changed, 4 insertions(+)
+> > >
+> > > diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+> > > index 5d1a970..01231c2 100644
+> > > --- a/drivers/i2c/busses/i2c-nomadik.c
+> > > +++ b/drivers/i2c/busses/i2c-nomadik.c
+> > > @@ -26,6 +26,7 @@
+> > >  #include <linux/pm_runtime.h>
+> > >  #include <linux/platform_data/i2c-nomadik.h>
+> > >  #include <linux/of.h>
+> > > +#include <linux/of_i2c.h>
+> > 
+> > This is clearly dependent on the other patches to I2C to
+> > be merged first (the include above is not yet there in
+> > linux-next even), so this patch should go into Wolfram's
+> > tree right? Else we have to rip out all the patches to the
+> > I2C driver from his tree and funnel it all through ARM SoC.
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-evm.dts |   42 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index 9fb59c5..9e5a878 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -47,6 +47,15 @@
->  			};
->  		};
->  
-> +		i2c2: i2c at 4802a000 {
-> +			status = "okay";
-> +			clock-frequency = <400000>;
-> +
-> +			lis331dlh: lis331dlh at 18 {
-> +				reg = <0x18>;
-> +			};
-> +		};
+> First, I'd like to have this patch squashed with "i2c: nomadik: Add
+> Device Tree support to the Nomadik I2C driver". I wanted to do this on
+> my own, but the patches do not apply to 3.6-rc5 (with or without
+> regulator removal patch from Linus)?
 
-Why do you put the "reg" property here
+I'm really not keen on squashing all my patches together. They are
+clearly have very different purposes. If you think they are closely
+related, then pull them in sequentially, but please don't squash
+all my work into a single patch for no other reason than convenience.
 
->  		dcan1: d_can at 481d0000 {
->  			status = "okay";
->  			pinctrl-names = "default";
-> @@ -61,6 +70,39 @@
->  		regulator-max-microvolt = <5000000>;
->  		regulator-boot-on;
->  	};
-> +
-> +	lis3_reg: fixedregulator at 1 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "lis3_reg";
-> +		regulator-boot-on;
-> +	};
-> +};
-> +&lis331dlh {
-> +	compatible = "st,lis3lv02d-i2c";
+> I can also take the I2C related changes to the devicetrees via my tree.
+> This is not uncommon. Some people prefer to do this via their soc-trees,
+> though. I don't care much since this is not really a hard dependency
+> causing build failures or merge conflicts, but just needs a little extra
+> time until the patches are all there...
 
-and all the rest here? At least I would expect the "compatible" property
-to be in the same place above.
+It would be better for all the Device Tree changes go in as a single
+patch-set. Again, I don't care where they go, so long as they go in
+together. arm-soc seems like the most generic place for them to be
+pulled into though.
 
-Also, I think you should remove the "-i2c" postfix from the name, that
-is already implied by the parent bus.
+Kind regards,
+Lee
 
-> +	Vdd-supply = <&lis3_reg>;
-> +	Vdd_IO-supply = <&lis3_reg>;
-> +
-> +	st,click-single-x;
-> +	st,click-single-y;
-> +	st,click-single-z;
-> +	st,click-thresh-x = <10>;
-> +	st,click-thresh-y = <10>;
-> +	st,click-thresh-z = <10>;
-> +	st,irq1-click;
-> +	st,irq2-click;
-> +	st,wakeup-x-lo;
-> +	st,wakeup-x-hi;
-> +	st,wakeup-y-lo;
-> +	st,wakeup-y-hi;
-> +	st,wakeup-z-lo;
-> +	st,wakeup-z-hi;
-> +	st,min-limit-x = <120>;
-> +	st,min-limit-y = <120>;
-> +	st,min-limit-z = <140>;
-> +	st,max-limit-x = <550>;
-> +	st,max-limit-y = <550>;
-> +	st,max-limit-z = <750>;
-
-Is there a binding document that describes all these?
-
-	Arnd
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
