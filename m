@@ -1,48 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Sep 2012 19:34:12 -0700
-Subject: [GIT PULL 7/7] am33xx hwmod data for v3.7 merge window
-In-Reply-To: <pull-1347590052-683636>
-Message-ID: <mailman.13.1347590117.1458.linux-arm-kernel@lists.infradead.org>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 14 Sep 2012 08:15:20 +0530
+Subject: [PATCH v5 3/3] ARM: dt: mmp-dma: add binding file
+In-Reply-To: <1346641427-5002-4-git-send-email-zhangfei.gao@marvell.com>
+References: <1346641427-5002-1-git-send-email-zhangfei.gao@marvell.com>
+ <1346641427-5002-4-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1347590720.1943.0.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
+On Mon, 2012-09-03 at 11:03 +0800, Zhangfei Gao wrote:
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
 
-  ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
+I think this patch should be merged in tree having this file, possibly
+arm tree?
 
-are available in the git repository at:
+> ---
+>  Documentation/devicetree/bindings/dma/mmp-dma.txt |   75 +++++++++++++++++++++
+>  1 files changed, 75 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+> new file mode 100644
+> index 0000000..36254c4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+> @@ -0,0 +1,75 @@
+> +* MARVELL MMP DMA controller
+> +
+> +Marvell Peripheral DMA Controller
+> +Used platfroms: pxa688, pxa910, pxa3xx, etc
+> +
+> +Required properties:
+> +- compatible: Should be "marvell,pdma-1.0"
+> +- reg: Should contain DMA registers location and length.
+> +- interrupts: Either contain all of the per-channel DMA interrupts
+> +		or one irq for pdma device
+> +- #dma-channels: Number of DMA channels supported by the controller.
+> +
+> +"marvell,pdma-1.0"
+> +Used platfroms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
+> +
+> +Examples:
+> +
+> +/*
+> + * Each channel has specific irq
+> + * ICU parse out irq channel from ICU register,
+> + * while DMA controller may not able to distinguish the irq channel
+> + * Using this method, interrupt-parent is required as demuxer
+> + * For example, pxa688 icu register 0x128, bit 0~15 is PDMA channel irq,
+> + * 18~21 is ADMA irq
+> + */
+> +pdma: dma-controller at d4000000 {
+> +	      compatible = "marvell,pdma-1.0";
+> +	      reg = <0xd4000000 0x10000>;
+> +	      interrupts = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15>;
+> +	      interrupt-parent = <&intcmux32>;
+> +	      #dma-channels = <16>;
+> +      };
+> +
+> +/*
+> + * One irq for all channels
+> + * Dmaengine driver (DMA controller) distinguish irq channel via
+> + * parsing internal register
+> + */
+> +pdma: dma-controller at d4000000 {
+> +	      compatible = "marvell,pdma-1.0";
+> +	      reg = <0xd4000000 0x10000>;
+> +	      interrupts = <47>;
+> +	      #dma-channels = <16>;
+> +      };
+> +
+> +
+> +Marvell Two Channel DMA Controller used specifically for audio
+> +Used platfroms: pxa688, pxa910
+> +
+> +Required properties:
+> +- compatible: Should be "marvell,adma-1.0" or "marvell,pxa910-squ"
+> +- reg: Should contain DMA registers location and length.
+> +- interrupts: Either contain all of the per-channel DMA interrupts
+> +		or one irq for dma device
+> +
+> +"marvell,adma-1.0" used on pxa688
+> +"marvell,pxa910-squ" used on pxa910
+> +
+> +Examples:
+> +
+> +/* each channel has specific irq */
+> +adma0: dma-controller at d42a0800 {
+> +	      compatible = "marvell,adma-1.0";
+> +	      reg = <0xd42a0800 0x100>;
+> +	      interrupts = <18 19>;
+> +	      interrupt-parent = <&intcmux32>;
+> +      };
+> +
+> +/* One irq for all channels */
+> +squ: dma-controller at d42a0800 {
+> +	      compatible = "marvell,pxa910-squ";
+> +	      reg = <0xd42a0800 0x100>;
+> +	      interrupts = <46>;
+> +      };
+> +
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-am33xx-for-v3.7
 
-for you to fetch changes up to 11964f53eb4d9ce59a058be9999d9cfcb1ced878:
-
-  Merge tag 'omap-devel-a2-for-3.7' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-am33xx (2012-09-12 21:29:07 -0700)
-
-----------------------------------------------------------------
-
->From Paul Walmsley <paul@pwsan.com>:
-
-AM33xx hwmod data and miscellaneous clock and hwmod fixes.  AM33xx
-should now boot on mainline after this is applied, according to
-Vaibhav.
-
-----------------------------------------------------------------
-Tony Lindgren (1):
-      Merge tag 'omap-devel-a2-for-3.7' of git://git.kernel.org/.../pjw/omap-pending into devel-am33xx
-
-Vaibhav Hiremath (4):
-      ARM: OMAP2+: hwmod: Hook-up am33xx support in omap_hwmod framework
-      ARM: OMAP3+: hwmod: Add AM33XX HWMOD data
-      ARM: OMAP2+: dpll: Add missing soc_is_am33xx() check for common functions
-      ARM: AM33XX: clock: Add dcan clock aliases for device-tree
-
- arch/arm/mach-omap2/Makefile                 |    1 +
- arch/arm/mach-omap2/clkt_dpll.c              |    4 +-
- arch/arm/mach-omap2/clock33xx_data.c         |    2 +
- arch/arm/mach-omap2/dpll3xxx.c               |    4 +-
- arch/arm/mach-omap2/io.c                     |    2 +
- arch/arm/mach-omap2/omap_hwmod.c             |  178 ++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c   | 3381 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 8 files changed, 3569 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+-- 
+~Vinod
