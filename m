@@ -1,99 +1,70 @@
 From: dciminaghi@mail.gnudd.com (Davide Ciminaghi)
-Date: Fri, 14 Sep 2012 18:24:01 +0200
-Subject: [PATCH 6/8] mmc: use the new <linux/sizes.h>
-In-Reply-To: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
-References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
-Message-ID: <1347639843-32119-7-git-send-email-dciminaghi@mail.gnudd.com>
+Date: Fri, 14 Sep 2012 18:23:55 +0200
+Subject: [PATCH 0/8] enable support for AMBA drivers under x86
+Message-ID: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alessandro Rubini <rubini@gnudd.com>
+From: Davide Ciminaghi <ciminaghi@gnudd.com>
 
-Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
----
- drivers/mmc/host/mmci.c     |    2 +-
- drivers/mmc/host/msm_sdcc.c |    2 +-
- drivers/mmc/host/mvsdio.c   |    2 +-
- drivers/mmc/host/mxcmmc.c   |    2 +-
- drivers/mmc/host/pxamci.c   |    3 +--
- 5 files changed, 5 insertions(+), 6 deletions(-)
+Following Alessandro's report on build errors for amba drivers under x86
+(see [1]), here's a patchset fixing the errors and adding a pci-amba bridge
+driver.
+Some notes:
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 263102c..8e3f33e 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -33,10 +33,10 @@
- #include <linux/amba/mmci.h>
- #include <linux/pm_runtime.h>
- #include <linux/types.h>
-+#include <linux/sizes.h>
- 
- #include <asm/div64.h>
- #include <asm/io.h>
--#include <asm/sizes.h>
- 
- #include "mmci.h"
- 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 1d14cda..0718469 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -37,10 +37,10 @@
- #include <linux/memory.h>
- #include <linux/gfp.h>
- #include <linux/gpio.h>
-+#include <linux/sizes.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/div64.h>
--#include <asm/sizes.h>
- 
- #include <mach/mmc.h>
- #include <mach/msm_iomap.h>
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index a61cb5f..898550b 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -22,8 +22,8 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/mmc/host.h>
-+#include <linux/sizes.h>
- 
--#include <asm/sizes.h>
- #include <asm/unaligned.h>
- #include <plat/mvsdio.h>
- 
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 28ed52d..f9ccac3 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -34,10 +34,10 @@
- #include <linux/regulator/consumer.h>
- #include <linux/dmaengine.h>
- #include <linux/types.h>
-+#include <linux/sizes.h>
- 
- #include <asm/dma.h>
- #include <asm/irq.h>
--#include <asm/sizes.h>
- #include <mach/mmc.h>
- 
- #include <mach/dma.h>
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 11df800..2635550 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -33,8 +33,7 @@
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/of_device.h>
--
--#include <asm/sizes.h>
-+#include <linux/sizes.h>
- 
- #include <mach/hardware.h>
- #include <mach/dma.h>
+* 1/8 (DMA: PL330 ...) is quite fat. Should this be a problem, we
+could simply disable the PL330 driver under non ARM systems (we actually
+don't need the PL330 driver for our x86 platform).
+* All the mmc drivers have been fixed to use the new linux/sizes.h header.
+* As far as the mmci driver is concerned, readsl/writesl have been replaced
+by ioread32_rep/iowrite32_rep as suggested by Arnd Bergmann (see [2]).
+* asm/amba/pl080.h is needed by arch/arm/mach-s3c64xx/dma.c (registers
+definitions, struct pl080s_lli), so we need most of it to be globally
+visible. As a consequence Arnd's suggestion (see [2]) about splitting
+the file into two parts was not followed for now.
+
+Davide
+
+Notes:
+[1] https://lkml.org/lkml/2012/7/3/227
+[2] https://lkml.org/lkml/2012/7/3/236
+
+Alessandro Rubini (7):
+  DMA: PL330: use prefix in reg names to build under x86
+  gpio: pl061 depends on ARM
+  pl080.h: moved from arm/include/asm/hardware to include/linux/amba/
+  watchdog: sp805_wdt depends on ARM
+  mmc: use the new <linux/sizes.h>
+  drivers/amba: add support for a PCI bridge
+  x86: add CONFIG_ARM_AMBA, selected by STA2X11
+
+Davide Ciminaghi (1):
+  mmci: replace readsl/writesl with ioread32_rep/iowrite32_rep
+
+ arch/arm/include/asm/hardware/pl080.h |  146 ---------
+ arch/arm/mach-s3c64xx/dma.c           |    2 +-
+ arch/arm/mach-spear3xx/spear3xx.c     |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c     |    2 +-
+ arch/x86/Kconfig                      |    4 +
+ drivers/Kconfig                       |    2 +
+ drivers/amba/Kconfig                  |   10 +
+ drivers/amba/Makefile                 |    1 +
+ drivers/amba/pci-amba.c               |   96 ++++++
+ drivers/dma/amba-pl08x.c              |    2 +-
+ drivers/dma/pl330.c                   |  581 +++++++++++++++++----------------
+ drivers/gpio/Kconfig                  |    2 +-
+ drivers/mmc/host/mmci.c               |   10 +-
+ drivers/mmc/host/msm_sdcc.c           |    2 +-
+ drivers/mmc/host/mvsdio.c             |    2 +-
+ drivers/mmc/host/mxcmmc.c             |    2 +-
+ drivers/mmc/host/pxamci.c             |    3 +-
+ drivers/watchdog/Kconfig              |    2 +-
+ include/linux/amba/pl080.h            |  146 +++++++++
+ 19 files changed, 566 insertions(+), 451 deletions(-)
+ delete mode 100644 arch/arm/include/asm/hardware/pl080.h
+ create mode 100644 drivers/amba/Kconfig
+ create mode 100644 drivers/amba/pci-amba.c
+ create mode 100644 include/linux/amba/pl080.h
+
 -- 
 1.7.9.1
