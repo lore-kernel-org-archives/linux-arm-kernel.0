@@ -1,213 +1,117 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 14 Sep 2012 12:13:10 +0100
-Subject: [PATCH v4 08/24] xen/arm: Introduce xen_pfn_t for pfn and mfn types
-In-Reply-To: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
-Message-ID: <1347621207-11294-8-git-send-email-stefano.stabellini@eu.citrix.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 14 Sep 2012 11:16:26 +0000
+Subject: [PATCH 2/2] ARM: dts: AM33XX: Add lis331dlh device tree data to
+ am335x-evm
+In-Reply-To: <201209141028.38185.arnd@arndb.de>
+References: <1347551685-19781-1-git-send-email-anilkumar@ti.com>
+ <201209140826.07069.arnd@arndb.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2F0AB@DBDE01.ent.ti.com>
+ <201209141028.38185.arnd@arndb.de>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA2F2B1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the original Xen headers have xen_pfn_t as mfn and pfn type, however
-when they have been imported in Linux, xen_pfn_t has been replaced with
-unsigned long. That might work for x86 and ia64 but it does not for arm.
-Bring back xen_pfn_t and let each architecture define xen_pfn_t as they
-see fit.
++Daniel
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
----
- arch/arm/include/asm/xen/interface.h  |    4 ++++
- arch/ia64/include/asm/xen/interface.h |    5 ++++-
- arch/x86/include/asm/xen/interface.h  |    5 +++++
- include/xen/interface/grant_table.h   |    4 ++--
- include/xen/interface/memory.h        |    6 +++---
- include/xen/interface/platform.h      |    4 ++--
- include/xen/interface/xen.h           |    6 +++---
- include/xen/privcmd.h                 |    2 --
- 8 files changed, 23 insertions(+), 13 deletions(-)
+On Fri, Sep 14, 2012 at 15:58:37, Arnd Bergmann wrote:
+> On Friday 14 September 2012, AnilKumar, Chimata wrote:
+> >> On Fri, Sep 14, 2012 at 13:56:06, Arnd Bergmann wrote:
+> > > On Thursday 13 September 2012, AnilKumar Ch wrote:
+> 
+> > > 
+> > > Why do you put the "reg" property here
+> > 
+> > Here I specified reg property because lis331dlh I2C slave address is 0x18.
+> > 
+> > > 
+> > > >  		dcan1: d_can at 481d0000 {
+> > > >  			status = "okay";
+> > > >  			pinctrl-names = "default";
+> > > > @@ -61,6 +70,39 @@
+> > > >  		regulator-max-microvolt = <5000000>;
+> > > >  		regulator-boot-on;
+> > > >  	};
+> > > > +
+> > > > +	lis3_reg: fixedregulator at 1 {
+> > > > +		compatible = "regulator-fixed";
+> > > > +		regulator-name = "lis3_reg";
+> > > > +		regulator-boot-on;
+> > > > +	};
+> > > > +};
+> > > > +&lis331dlh {
+> > > > +	compatible = "st,lis3lv02d-i2c";
+> > > 
+> > > and all the rest here? At least I would expect the "compatible" property
+> > > to be in the same place above.
+> > 
+> > This data is appended to above one, to make it readable I moved remaining
+> > properties to here.
+> 
+> I don't follow how this is making things more readable.
 
-diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
-index 9e0ec5a..74c72b5 100644
---- a/arch/arm/include/asm/xen/interface.h
-+++ b/arch/arm/include/asm/xen/interface.h
-@@ -25,6 +25,9 @@
- 	} while (0)
- 
- #ifndef __ASSEMBLY__
-+/* Explicitly size integers that represent pfns in the interface with
-+ * Xen so that we can have one ABI that works for 32 and 64 bit guests. */
-+typedef uint64_t xen_pfn_t;
- /* Guest handles for primitive C types. */
- __DEFINE_GUEST_HANDLE(uchar, unsigned char);
- __DEFINE_GUEST_HANDLE(uint,  unsigned int);
-@@ -35,6 +38,7 @@ DEFINE_GUEST_HANDLE(long);
- DEFINE_GUEST_HANDLE(void);
- DEFINE_GUEST_HANDLE(uint64_t);
- DEFINE_GUEST_HANDLE(uint32_t);
-+DEFINE_GUEST_HANDLE(xen_pfn_t);
- 
- /* Maximum number of virtual CPUs in multi-processor guests. */
- #define MAX_VIRT_CPUS 1
-diff --git a/arch/ia64/include/asm/xen/interface.h b/arch/ia64/include/asm/xen/interface.h
-index 09d5f7f..686464e 100644
---- a/arch/ia64/include/asm/xen/interface.h
-+++ b/arch/ia64/include/asm/xen/interface.h
-@@ -67,6 +67,10 @@
- #define set_xen_guest_handle(hnd, val)	do { (hnd).p = val; } while (0)
- 
- #ifndef __ASSEMBLY__
-+/* Explicitly size integers that represent pfns in the public interface
-+ * with Xen so that we could have one ABI that works for 32 and 64 bit
-+ * guests. */
-+typedef unsigned long xen_pfn_t;
- /* Guest handles for primitive C types. */
- __DEFINE_GUEST_HANDLE(uchar, unsigned char);
- __DEFINE_GUEST_HANDLE(uint, unsigned int);
-@@ -79,7 +83,6 @@ DEFINE_GUEST_HANDLE(void);
- DEFINE_GUEST_HANDLE(uint64_t);
- DEFINE_GUEST_HANDLE(uint32_t);
- 
--typedef unsigned long xen_pfn_t;
- DEFINE_GUEST_HANDLE(xen_pfn_t);
- #define PRI_xen_pfn	"lx"
- #endif
-diff --git a/arch/x86/include/asm/xen/interface.h b/arch/x86/include/asm/xen/interface.h
-index cbf0c9d..2289075 100644
---- a/arch/x86/include/asm/xen/interface.h
-+++ b/arch/x86/include/asm/xen/interface.h
-@@ -47,6 +47,10 @@
- #endif
- 
- #ifndef __ASSEMBLY__
-+/* Explicitly size integers that represent pfns in the public interface
-+ * with Xen so that on ARM we can have one ABI that works for 32 and 64
-+ * bit guests. */
-+typedef unsigned long xen_pfn_t;
- /* Guest handles for primitive C types. */
- __DEFINE_GUEST_HANDLE(uchar, unsigned char);
- __DEFINE_GUEST_HANDLE(uint,  unsigned int);
-@@ -57,6 +61,7 @@ DEFINE_GUEST_HANDLE(long);
- DEFINE_GUEST_HANDLE(void);
- DEFINE_GUEST_HANDLE(uint64_t);
- DEFINE_GUEST_HANDLE(uint32_t);
-+DEFINE_GUEST_HANDLE(xen_pfn_t);
- #endif
- 
- #ifndef HYPERVISOR_VIRT_START
-diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
-index a17d844..7da811b 100644
---- a/include/xen/interface/grant_table.h
-+++ b/include/xen/interface/grant_table.h
-@@ -338,7 +338,7 @@ DEFINE_GUEST_HANDLE_STRUCT(gnttab_dump_table);
- #define GNTTABOP_transfer                4
- struct gnttab_transfer {
-     /* IN parameters. */
--    unsigned long mfn;
-+    xen_pfn_t mfn;
-     domid_t       domid;
-     grant_ref_t   ref;
-     /* OUT parameters. */
-@@ -375,7 +375,7 @@ struct gnttab_copy {
- 	struct {
- 		union {
- 			grant_ref_t ref;
--			unsigned long   gmfn;
-+			xen_pfn_t   gmfn;
- 		} u;
- 		domid_t  domid;
- 		uint16_t offset;
-diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-index eac3ce1..abbbff0 100644
---- a/include/xen/interface/memory.h
-+++ b/include/xen/interface/memory.h
-@@ -31,7 +31,7 @@ struct xen_memory_reservation {
-      *   OUT: GMFN bases of extents that were allocated
-      *   (NB. This command also updates the mach_to_phys translation table)
-      */
--    GUEST_HANDLE(ulong) extent_start;
-+    GUEST_HANDLE(xen_pfn_t) extent_start;
- 
-     /* Number of extents, and size/alignment of each (2^extent_order pages). */
-     unsigned long  nr_extents;
-@@ -130,7 +130,7 @@ struct xen_machphys_mfn_list {
-      * any large discontiguities in the machine address space, 2MB gaps in
-      * the machphys table will be represented by an MFN base of zero.
-      */
--    GUEST_HANDLE(ulong) extent_start;
-+    GUEST_HANDLE(xen_pfn_t) extent_start;
- 
-     /*
-      * Number of extents written to the above array. This will be smaller
-@@ -172,7 +172,7 @@ struct xen_add_to_physmap {
-     unsigned long idx;
- 
-     /* GPFN where the source mapping page should appear. */
--    unsigned long gpfn;
-+    xen_pfn_t gpfn;
- };
- DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap);
- 
-diff --git a/include/xen/interface/platform.h b/include/xen/interface/platform.h
-index 61fa661..a3275a8 100644
---- a/include/xen/interface/platform.h
-+++ b/include/xen/interface/platform.h
-@@ -54,7 +54,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime_t);
- #define XENPF_add_memtype         31
- struct xenpf_add_memtype {
- 	/* IN variables. */
--	unsigned long mfn;
-+	xen_pfn_t mfn;
- 	uint64_t nr_mfns;
- 	uint32_t type;
- 	/* OUT variables. */
-@@ -84,7 +84,7 @@ struct xenpf_read_memtype {
- 	/* IN variables. */
- 	uint32_t reg;
- 	/* OUT variables. */
--	unsigned long mfn;
-+	xen_pfn_t mfn;
- 	uint64_t nr_mfns;
- 	uint32_t type;
- };
-diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
-index 0801468..0054db1 100644
---- a/include/xen/interface/xen.h
-+++ b/include/xen/interface/xen.h
-@@ -190,7 +190,7 @@ struct mmuext_op {
- 	unsigned int cmd;
- 	union {
- 		/* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
--		unsigned long mfn;
-+		xen_pfn_t mfn;
- 		/* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
- 		unsigned long linear_addr;
- 	} arg1;
-@@ -430,11 +430,11 @@ struct start_info {
- 	unsigned long nr_pages;     /* Total pages allocated to this domain.  */
- 	unsigned long shared_info;  /* MACHINE address of shared info struct. */
- 	uint32_t flags;             /* SIF_xxx flags.                         */
--	unsigned long store_mfn;    /* MACHINE page number of shared page.    */
-+	xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
- 	uint32_t store_evtchn;      /* Event channel for store communication. */
- 	union {
- 		struct {
--			unsigned long mfn;  /* MACHINE page number of console page.   */
-+			xen_pfn_t mfn;      /* MACHINE page number of console page.   */
- 			uint32_t  evtchn;   /* Event channel for console page.        */
- 		} domU;
- 		struct {
-diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
-index 17857fb..59f1bd8 100644
---- a/include/xen/privcmd.h
-+++ b/include/xen/privcmd.h
-@@ -36,8 +36,6 @@
- #include <linux/types.h>
- #include <linux/compiler.h>
- 
--typedef unsigned long xen_pfn_t;
--
- struct privcmd_hypercall {
- 	__u64 op;
- 	__u64 arg[5];
--- 
-1.7.2.5
+Basic lis3 parameter is in i2c2 node to tell the hierarchy of
+nodes and remaining parameters at the bottom. With this way
+we can understand easily what is start & end braces so that
+node hierarchy is cleaner. (This is my view)
+
+> 
+> Maybe a more logical way to do this would be use the existing i2c2 label
+> and write all the additions as
+> 
+> i2c2: {
+> 	status = "okay";
+> 	clock-frequency = <400000>;
+> 
+> 	lis331dlh at 18 {
+> 		compatible = "st,lis3lv02d";
+> 		reg = <0x18>;
+> 
+> 		vdd-supply = <&lis3_reg>;
+> 		vdd-io-supply = <&lis3_reg>;
+> 		...
+> 	};
+> 
+
+If this is better/preferable way then I will change.
+
+> > > Also, I think you should remove the "-i2c" postfix from the name, that
+> > > is already implied by the parent bus.
+> > 
+> > I will remove, but in case of spi the compatible name is lis3lv02d_spi.
+> > By mistake I have uses "-i2c" instead of "_i2c".
+
+Then, I will change to 'st,lis3lv02d' in lis3lv02d_i2c driver
+and same will added to .dts file.
+
+Small question here, in my v2 version I have specified both
+the compatible names lis3lv02d and lis331dlh is it fine or
+only one is sufficient?
+
++static struct of_device_id lis3lv02d_i2c_dt_ids[] = {
++	{ .compatible = "st,lis3lv02d" },
++	{ .compatible = "st,lis331dlh" },
++	{}
++};
+
+> 
+> The normal convention is to use '-', not '_', so that part was ok.
+> 
+> I think naming the other one lis3lv02d_spi was a mistake, it should
+> be named 'st,lis3lv02d' independent of the bus IMHO.
+
+Yes, initially I expected the same. I think driver name is used
+as a compatible string.
+
+> 
+> > Document is already present, 
+> > http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commit;h=2f2ff3cc8d930493f9a598b9192706c09403e12e
+> > 
+> > Some minor changes in docs, in my next version I will update document
+> > as well. I will send V3 if there are no comments on v2.
+> 
+
+Can you just quickly review v2 series? So that I will send
+V3.
+
+Thanks
+AnilKumar
