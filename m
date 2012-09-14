@@ -1,114 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 14 Sep 2012 14:50:34 +0530
-Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
- drivers/bus/
-Message-ID: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Fri, 14 Sep 2012 14:51:36 +0530
+Subject: [PATCH 2/2] ARM: SAMSUNG: Add check for NULL in clock interface
+In-Reply-To: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
+References: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CANuQgHHXcdvX49kbY3QjustqQ+HgSghq0s+J2NdBPfiHivsn_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP interconnect drivers are used for the interconnect error handling.
-Since they are bus driver, lets move it to newly created drivers/bus.
+ping
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-Patch just moves OMAP interconnect drivers as is to the newly created
-driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
-tree and test on all OMAP boards.
+On 6 September 2012 19:55, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> The clock instance parameter in Samsung clock interface is not being checked
+> for NULL pointers. Add checks for NULL pointers.
+>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  arch/arm/plat-samsung/clock.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+> index 65c5eca..7938fbc 100644
+> --- a/arch/arm/plat-samsung/clock.c
+> +++ b/arch/arm/plat-samsung/clock.c
+> @@ -119,7 +119,7 @@ void clk_disable(struct clk *clk)
+>
+>  unsigned long clk_get_rate(struct clk *clk)
+>  {
+> -       if (IS_ERR(clk))
+> +       if (IS_ERR_OR_NULL(clk))
+>                 return 0;
+>
+>         if (clk->rate != 0)
+> @@ -136,7 +136,7 @@ unsigned long clk_get_rate(struct clk *clk)
+>
+>  long clk_round_rate(struct clk *clk, unsigned long rate)
+>  {
+> -       if (!IS_ERR(clk) && clk->ops && clk->ops->round_rate)
+> +       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
+>                 return (clk->ops->round_rate)(clk, rate);
+>
+>         return rate;
+> @@ -146,7 +146,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>  {
+>         int ret;
+>
+> -       if (IS_ERR(clk))
+> +       if (IS_ERR_OR_NULL(clk))
+>                 return -EINVAL;
+>
+>         /* We do not default just do a clk->rate = rate as
+> @@ -175,7 +175,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>  {
+>         int ret = 0;
+>
+> -       if (IS_ERR(clk))
+> +       if (IS_ERR_OR_NULL(clk) || IS_ERR_OR_NULL(parent))
+>                 return -EINVAL;
+>
+>         spin_lock(&clocks_lock);
+> --
+> 1.7.9.5
+>
 
- arch/arm/mach-omap2/Kconfig                        |    2 ++
- arch/arm/mach-omap2/Makefile                       |    5 -----
- drivers/bus/Kconfig                                |    6 ++++++
- drivers/bus/Makefile                               |    3 +++
- {arch/arm/mach-omap2 => drivers/bus}/omap_l3_noc.c |    0
- {arch/arm/mach-omap2 => drivers/bus}/omap_l3_noc.h |    0
- {arch/arm/mach-omap2 => drivers/bus}/omap_l3_smx.c |    0
- {arch/arm/mach-omap2 => drivers/bus}/omap_l3_smx.h |    0
- 8 files changed, 11 insertions(+), 5 deletions(-)
- rename {arch/arm/mach-omap2 => drivers/bus}/omap_l3_noc.c (100%)
- rename {arch/arm/mach-omap2 => drivers/bus}/omap_l3_noc.h (100%)
- rename {arch/arm/mach-omap2 => drivers/bus}/omap_l3_smx.c (100%)
- rename {arch/arm/mach-omap2 => drivers/bus}/omap_l3_smx.h (100%)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index dd2db02..7d3c8ab 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP3
- 	select ARM_CPU_SUSPEND if PM
- 	select MULTI_IRQ_HANDLER
- 	select SOC_HAS_OMAP2_SDRC
-+	select OMAP_INTERCONNECT
- 
- config ARCH_OMAP4
- 	bool "TI OMAP4"
-@@ -63,6 +64,7 @@ config ARCH_OMAP4
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select ARM_CPU_SUSPEND if PM
- 	select ARCH_NEEDS_CPU_IDLE_COUPLED
-+	select OMAP_INTERCONNECT
- 
- config SOC_OMAP5
- 	bool "TI OMAP5"
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index f6a24b3..7fed980 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -199,11 +199,6 @@ obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
- # EMU peripherals
- obj-$(CONFIG_OMAP3_EMU)			+= emu.o
- 
--# L3 interconnect
--obj-$(CONFIG_ARCH_OMAP3)		+= omap_l3_smx.o
--obj-$(CONFIG_ARCH_OMAP4)		+= omap_l3_noc.o
--obj-$(CONFIG_SOC_OMAP5)			+= omap_l3_noc.o
--
- obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
- mailbox_mach-objs			:= mailbox.o
- 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 6270415..bbec35d 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -12,4 +12,10 @@ config OMAP_OCP2SCP
- 	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
- 	  OCP2SCP.
- 
-+config OMAP_INTERCONNECT
-+	tristate "OMAP INTERCONNECT DRIVER"
-+	depends on ARCH_OMAP2PLUS
-+
-+	help
-+	  Driver to enable OMAP interconnect error handling driver.
- endmenu
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 0ec50bc..45d997c 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -3,3 +3,6 @@
- #
- 
- obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
-+
-+# Interconnect bus driver for OMAP SoCs.
-+obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
-diff --git a/arch/arm/mach-omap2/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-similarity index 100%
-rename from arch/arm/mach-omap2/omap_l3_noc.c
-rename to drivers/bus/omap_l3_noc.c
-diff --git a/arch/arm/mach-omap2/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-similarity index 100%
-rename from arch/arm/mach-omap2/omap_l3_noc.h
-rename to drivers/bus/omap_l3_noc.h
-diff --git a/arch/arm/mach-omap2/omap_l3_smx.c b/drivers/bus/omap_l3_smx.c
-similarity index 100%
-rename from arch/arm/mach-omap2/omap_l3_smx.c
-rename to drivers/bus/omap_l3_smx.c
-diff --git a/arch/arm/mach-omap2/omap_l3_smx.h b/drivers/bus/omap_l3_smx.h
-similarity index 100%
-rename from arch/arm/mach-omap2/omap_l3_smx.h
-rename to drivers/bus/omap_l3_smx.h
+
 -- 
-1.7.9.5
+with warm regards,
+Chander Kashyap
