@@ -1,43 +1,50 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Fri, 14 Sep 2012 13:03:58 +0900
-Subject: [PATCH 9/15] arch/arm/mach-s3c24xx/mach-h1940.c: removes
- unnecessary semicolon
-In-Reply-To: <1347469402-27557-9-git-send-email-peter.senna@gmail.com>
-References: <1347469402-27557-9-git-send-email-peter.senna@gmail.com>
-Message-ID: <01a301cd922d$f72da600$e588f200$@org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 14 Sep 2012 13:27:17 +0900
+Subject: [PATCH V2] ARM: EXYNOS5: Add bus clock and set parent clock for
+ FIMD
+In-Reply-To: <1347450536-21843-1-git-send-email-l.krishna@samsung.com>
+References: <1347450536-21843-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <001101cd9231$3927b9d0$ab772d70$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Senna Tschudin wrote:
+On Wednesday, September 12, 2012 8:49 PM Leela Krishna Amudala wrote
 > 
-> From: Peter Senna Tschudin <peter.senna@gmail.com>
+> This patch adds the bus clock for FIMD and changes the device name for lcd clock
+> also sets mout_mpll_user as parent clock to fimd
 > 
-> removes unnecessary semicolon
-> 
-> Found by Coccinelle: http://coccinelle.lip6.fr/
-> 
-> Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
-> 
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 > ---
->  arch/arm/mach-s3c24xx/mach-h1940.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-exynos/clock-exynos5.c       |   34 +++++++++++++++++++--------
+>  arch/arm/plat-samsung/include/plat/clock.h |    2 +
+>  2 files changed, 26 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-
-> s3c24xx/mach-h1940.c
-> index bb8d008..02ef7d5 100644
-> --- a/arch/arm/mach-s3c24xx/mach-h1940.c
-> +++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-> @@ -460,7 +460,7 @@ static void h1940_set_mmc_power(unsigned char
-> power_mode, unsigned short vdd)
->  		break;
->  	default:
->  		break;
-> -	};
-> +	}
->  }
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+> index 774533c..205d19f 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+
+[.....]
+
 > 
->  static struct s3c24xx_mci_pdata h1940_mmc_cfg __initdata = {
+> +struct clksrc_clk exynos5_clk_sclk_fimd = {
 
-Applied, thanks.
+Replace 'exynos5_clk_sclk_fimd' with 'exynos5_clk_sclk_fimd1'.
+This is because 'exynos5_clk_sclk_fimd0' can be added for other
+Exynos5 SoCs later.
 
-K-Gene <kgene@kernel.org>
+Best regards,
+Jingoo Han
+
+> +	.clk	= {
+> +		.name	        = "sclk_fimd",
+> +		.devname        = "exynos5-fb.1",
+> +		.enable         = exynos5_clksrc_mask_disp1_0_ctrl,
+> +		.ctrlbit        = (1 << 0),
+> +	},
+> +	.sources = &exynos5_clkset_group,
+> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> +};
+> +
