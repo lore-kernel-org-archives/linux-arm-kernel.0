@@ -1,77 +1,41 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 14 Sep 2012 10:32:20 +0530
-Subject: [PATCH] ARM: SAMSUNG: Use spin_lock_{irqsave,
- irqrestore} in clk_set_rate
-In-Reply-To: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
-References: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <5052BA5C.2040900@linaro.org>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 13 Sep 2012 22:19:04 -0700
+Subject: [PATCH] pinctrl: use kasprintf() in pinmux_request_gpio()
+In-Reply-To: <1347565754-9534-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1347565754-9534-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1347599944.9481.3.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping !
-
-On 09/07/2012 11:38 AM, Tushar Behera wrote:
-> The spinlock clocks_lock can be held during ISR, hence it is not safe to
-> hold that lock with disabling interrupts.
+On Thu, 2012-09-13 at 21:49 +0200, Thomas Petazzoni wrote:
+> Instead of using a temporary buffer, snprintf() and kstrdup(), just
+> use kasprintf() that does the same thing in just oneline.
 > 
-> It fixes following potential deadlock.
-> 
-> =========================================================
-> [ INFO: possible irq lock inversion dependency detected ]
-> 3.6.0-rc4+ #2 Not tainted
-> ---------------------------------------------------------
-> swapper/0/1 just changed the state of lock:
->  (&(&host->lock)->rlock){-.....}, at: [<c027fb0d>] sdhci_irq+0x15/0x564
-> but this lock took another, HARDIRQ-unsafe lock in the past:
->  (clocks_lock){+.+...}
-> 
-> and interrupts could create inverse lock ordering between them.
-> 
-> other info that might help us debug this:
->  Possible interrupt unsafe locking scenario:
-> 
->        CPU0                    CPU1
->        ----                    ----
->   lock(clocks_lock);
->                                local_irq_disable();
->                                lock(&(&host->lock)->rlock);
->                                lock(clocks_lock);
->   <Interrupt>
->     lock(&(&host->lock)->rlock);
-> 
->  *** DEADLOCK ***
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/plat-samsung/clock.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
+>  drivers/pinctrl/pinmux.c |    5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> index 65c5eca..9b71719 100644
-> --- a/arch/arm/plat-samsung/clock.c
-> +++ b/arch/arm/plat-samsung/clock.c
-> @@ -144,6 +144,7 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
->  
->  int clk_set_rate(struct clk *clk, unsigned long rate)
+> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+> index 3d5ac73..9301a7a 100644
+> --- a/drivers/pinctrl/pinmux.c
+> +++ b/drivers/pinctrl/pinmux.c
+> @@ -232,14 +232,11 @@ int pinmux_request_gpio(struct pinctrl_dev *pctldev,
+>  			struct pinctrl_gpio_range *range,
+>  			unsigned pin, unsigned gpio)
 >  {
-> +	unsigned long flags;
+> -	char gpiostr[16];
+>  	const char *owner;
 >  	int ret;
 >  
->  	if (IS_ERR(clk))
-> @@ -159,9 +160,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->  	if (clk->ops == NULL || clk->ops->set_rate == NULL)
+>  	/* Conjure some name stating what chip and pin this is taken by */
+> -	snprintf(gpiostr, 15, "%s:%d", range->name, gpio);
+> -
+> -	owner = kstrdup(gpiostr, GFP_KERNEL);
+> +	owner = kasprintf(GFP_KERNEL, "%s:%d", range->name, gpio);
+>  	if (!owner)
 >  		return -EINVAL;
 >  
-> -	spin_lock(&clocks_lock);
-> +	spin_lock_irqsave(&clocks_lock, flags);
->  	ret = (clk->ops->set_rate)(clk, rate);
-> -	spin_unlock(&clocks_lock);
-> +	spin_unlock_irqrestore(&clocks_lock, flags);
->  
->  	return ret;
->  }
-> 
 
-
--- 
-Tushar Behera
+No not really.  It's a bit different because the first
+snprintf is length limited but the kasprintf is not.
