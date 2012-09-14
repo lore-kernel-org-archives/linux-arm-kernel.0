@@ -1,28 +1,67 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 14 Sep 2012 06:36:35 -0700
-Subject: [PATCH] staging: ste_rmi4: remove gpio.h include
-In-Reply-To: <505322FD.1040802@gmail.com>
-References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1347541643-30665-1-git-send-email-robherring2@gmail.com>
- <5051E056.4060304@gmail.com> <20120914032716.GA10126@kroah.com>
- <505322FD.1040802@gmail.com>
-Message-ID: <20120914133635.GA20185@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Sep 2012 15:41:15 +0200
+Subject: [PATCH] pinctrl: document semantics vs GPIO
+In-Reply-To: <505205B1.4080708@wwwdotorg.org>
+References: <1347519686-10170-1-git-send-email-linus.walleij@stericsson.com>
+ <505205B1.4080708@wwwdotorg.org>
+Message-ID: <CACRpkdYy3KLMFYxgO=MnJTRwQs6hJ0u9=7a3HTg+WkYuPVeKcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 07:28:45AM -0500, Rob Herring wrote:
-> On 09/13/2012 10:27 PM, Greg Kroah-Hartman wrote:
-> > On Thu, Sep 13, 2012 at 08:32:06AM -0500, Rob Herring wrote:
-> >> Adding Greg KH's correct email...
-> >>
-> >> On 09/13/2012 08:07 AM, Rob Herring wrote:
-> >>> From: Rob Herring <rob.herring@calxeda.com>
-> >>>
-> >>> gpio.h is not needed and is going to be removed.
-> > 
-> > Care to send it to me in a format I can apply it in?
-> 
-> As I mentioned, this should go in via the arm-soc tree with rest of the
-> gpio clean-up, so I just need an ack.
+On Thu, Sep 13, 2012 at 6:11 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 09/13/2012 01:01 AM, Linus Walleij wrote:
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> +Here we first request a certain pin state and then request GPIO 14 to be
+>> +used. If you're using the subsystems orthogonally like this, always get
+>> +your pinctrl handle and select the desired pinctrl state BEFORE requesting
+>> +the GPIO. This is a semantic convention to avoid situations that can be
+>> +electrically unpleasant, you will certainly want to mux in and bias pins
+>> +in a certain way before the GPIO subsystems starts to deal with them.
+>
+> I'm not 100% certain that all HW will work best by first programming
+> pinctrl then programming GPIO. For example of strangeness, Tegra's GPIO
+> controller has a bit per-pin which overrides the pinmux's mux function
+> to enable GPIOs, yet the pinctrl's tri-state overrides the GPIO's
+> input/output control. I imagine HW engineers can come up with even more
+> bizarre schemes that might in some cases require the reverse order).
+>
+> However, I suppose what you've documented is likely common and it'd be
+> good to recommend a default order between the two APIs. I might whittle
+> out the part that justifies the order from a HW glitching perspective
+> though.
+
+Yeah. I think I'm on the safe side since I wrote "should" rather than "must",
+I have understood that some standardization people pay a lot of attention
+to which of these two words is used... "should" is possible to break but
+only for good reasons. But I diplomatized the language a bit more.
+
+>> +The above can be hidden: using pinctrl hogs, the driver may be setting
+>
+> s/the driver/the pinctrl driver/ I think.
+
+OK
+
+>> +up the config and muxing for the pins when the pinctrl driver is probing,
+>> +nevertheless orthogonal to the GPIO subsystem.
+>> +
+>> +But there are also situations where it makes sense for the GPIO subsystem
+>> +to communicate directly with with the pinctrl subsystem, using the latter
+>> +as a back-end. This is when the GPIO driver may call out to the functions
+>> +described in the section "Pin control interaction with the GPIO subsystem"
+>> +above. This only involves per-pin multiplexing, and will be completely
+>> +hidden behind the gpio_*() function namespace. In this case, the driver
+>> +need not interact with the pin control subsystem at all.
+>
+> I think it makes sense to more strongly recommend that for GPIO muxing,
+> the GPIO driver always call into the pinctrl subsystem (if needed by the
+> HW) to perform that muxing, so that standalone gpio_direction_*() always
+> work without any use of pinctrl; the interaction between the two should
+> only be required if pin configuration (not just pin muxing) is also
+> required.
+
+OK I will make it a MUST and see if someone yells back at me :-)
+
+It so happens that the OMAP driver does not implement it for
+now... but we can then require it for new drivers.
+
+Linus Walleij
