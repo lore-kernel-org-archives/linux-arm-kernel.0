@@ -1,247 +1,151 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 14 Sep 2012 09:14:53 -0400
-Subject: [PATCH v4 15/24] xen/arm: receive Xen events on ARM
-In-Reply-To: <1347621207-11294-15-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-15-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120914131453.GP25249@phenom.dumpdata.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 14 Sep 2012 08:27:16 -0500
+Subject: [PATCH V4 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201209140943.49904.arnd@arndb.de>
+References: <1347573629-21299-1-git-send-email-jon-hunter@ti.com>
+ <1347573629-21299-2-git-send-email-jon-hunter@ti.com>
+ <201209140943.49904.arnd@arndb.de>
+Message-ID: <505330B4.4070605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 12:13:17PM +0100, Stefano Stabellini wrote:
-> Compile events.c on ARM.
-> Parse, map and enable the IRQ to get event notifications from the device
-> tree (node "/xen").
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Hi Arnd,
 
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-
-> ---
->  arch/arm/include/asm/xen/events.h |   18 ++++++++++++++++++
->  arch/arm/xen/enlighten.c          |   33 +++++++++++++++++++++++++++++++++
->  arch/x86/xen/enlighten.c          |    1 +
->  arch/x86/xen/irq.c                |    1 +
->  arch/x86/xen/xen-ops.h            |    1 -
->  drivers/xen/events.c              |   17 ++++++++++++++---
->  include/xen/events.h              |    2 ++
->  7 files changed, 69 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/include/asm/xen/events.h
+On 09/14/2012 04:43 AM, Arnd Bergmann wrote:
+> On Thursday 13 September 2012, Jon Hunter wrote:
+>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+>> to add some basic helpers to retrieve a DMA controller device_node and the
+>> DMA request/channel information.
 > 
-> diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-> new file mode 100644
-> index 0000000..94b4e90
-> --- /dev/null
-> +++ b/arch/arm/include/asm/xen/events.h
-> @@ -0,0 +1,18 @@
-> +#ifndef _ASM_ARM_XEN_EVENTS_H
-> +#define _ASM_ARM_XEN_EVENTS_H
-> +
-> +#include <asm/ptrace.h>
-> +
-> +enum ipi_vector {
-> +	XEN_PLACEHOLDER_VECTOR,
-> +
-> +	/* Xen IPIs go here */
-> +	XEN_NR_IPIS,
-> +};
-> +
-> +static inline int xen_irqs_disabled(struct pt_regs *regs)
-> +{
-> +	return raw_irqs_disabled_flags(regs->ARM_cpsr);
-> +}
-> +
-> +#endif /* _ASM_ARM_XEN_EVENTS_H */
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 036a4d8..bad67ad 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -1,4 +1,5 @@
->  #include <xen/xen.h>
-> +#include <xen/events.h>
->  #include <xen/grant_table.h>
->  #include <xen/hvm.h>
->  #include <xen/interface/xen.h>
-> @@ -9,6 +10,8 @@
->  #include <xen/xenbus.h>
->  #include <asm/xen/hypervisor.h>
->  #include <asm/xen/hypercall.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irqreturn.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
-> @@ -33,6 +36,8 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
->  int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
->  EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
->  
-> +static __read_mostly int xen_events_irq = -1;
-> +
->  int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
->  			       unsigned long addr,
->  			       unsigned long mfn, int nr,
-> @@ -74,6 +79,9 @@ static int __init xen_guest_init(void)
->  	if (of_address_to_resource(node, GRANT_TABLE_PHYSADDR, &res))
->  		return 0;
->  	xen_hvm_resume_frames = res.start >> PAGE_SHIFT;
-> +	xen_events_irq = irq_of_parse_and_map(node, 0);
-> +	pr_info("Xen %s support found, events_irq=%d gnttab_frame_pfn=%lx\n",
-> +			version, xen_events_irq, xen_hvm_resume_frames);
->  	xen_domain_type = XEN_HVM_DOMAIN;
->  
->  	xen_setup_features();
-> @@ -115,3 +123,28 @@ static int __init xen_guest_init(void)
->  	return 0;
->  }
->  core_initcall(xen_guest_init);
-> +
-> +static irqreturn_t xen_arm_callback(int irq, void *arg)
-> +{
-> +	xen_hvm_evtchn_do_upcall();
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int __init xen_init_events(void)
-> +{
-> +	if (!xen_domain() || xen_events_irq < 0)
-> +		return -ENODEV;
-> +
-> +	xen_init_IRQ();
-> +
-> +	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
-> +			"events", xen_vcpu)) {
-> +		pr_err("Error requesting IRQ %d\n", xen_events_irq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	enable_percpu_irq(xen_events_irq, 0);
-> +
-> +	return 0;
-> +}
-> +postcore_initcall(xen_init_events);
-> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> index 9642d4a..3f8263e 100644
-> --- a/arch/x86/xen/enlighten.c
-> +++ b/arch/x86/xen/enlighten.c
-> @@ -33,6 +33,7 @@
->  #include <linux/memblock.h>
->  
->  #include <xen/xen.h>
-> +#include <xen/events.h>
->  #include <xen/interface/xen.h>
->  #include <xen/interface/version.h>
->  #include <xen/interface/physdev.h>
-> diff --git a/arch/x86/xen/irq.c b/arch/x86/xen/irq.c
-> index 1573376..01a4dc0 100644
-> --- a/arch/x86/xen/irq.c
-> +++ b/arch/x86/xen/irq.c
-> @@ -5,6 +5,7 @@
->  #include <xen/interface/xen.h>
->  #include <xen/interface/sched.h>
->  #include <xen/interface/vcpu.h>
-> +#include <xen/events.h>
->  
->  #include <asm/xen/hypercall.h>
->  #include <asm/xen/hypervisor.h>
-> diff --git a/arch/x86/xen/xen-ops.h b/arch/x86/xen/xen-ops.h
-> index 202d4c1..2368295 100644
-> --- a/arch/x86/xen/xen-ops.h
-> +++ b/arch/x86/xen/xen-ops.h
-> @@ -35,7 +35,6 @@ void xen_set_pat(u64);
->  
->  char * __init xen_memory_setup(void);
->  void __init xen_arch_setup(void);
-> -void __init xen_init_IRQ(void);
->  void xen_enable_sysenter(void);
->  void xen_enable_syscall(void);
->  void xen_vcpu_restore(void);
-> diff --git a/drivers/xen/events.c b/drivers/xen/events.c
-> index 7595581..5ecb596 100644
-> --- a/drivers/xen/events.c
-> +++ b/drivers/xen/events.c
-> @@ -31,14 +31,16 @@
->  #include <linux/irqnr.h>
->  #include <linux/pci.h>
->  
-> +#ifdef CONFIG_X86
->  #include <asm/desc.h>
->  #include <asm/ptrace.h>
->  #include <asm/irq.h>
->  #include <asm/idle.h>
->  #include <asm/io_apic.h>
-> -#include <asm/sync_bitops.h>
->  #include <asm/xen/page.h>
->  #include <asm/xen/pci.h>
-> +#endif
-> +#include <asm/sync_bitops.h>
->  #include <asm/xen/hypercall.h>
->  #include <asm/xen/hypervisor.h>
->  
-> @@ -50,6 +52,9 @@
->  #include <xen/interface/event_channel.h>
->  #include <xen/interface/hvm/hvm_op.h>
->  #include <xen/interface/hvm/params.h>
-> +#include <xen/interface/physdev.h>
-> +#include <xen/interface/sched.h>
-> +#include <asm/hw_irq.h>
->  
->  /*
->   * This lock protects updates to the following mapping and reference-count
-> @@ -1374,7 +1379,9 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
->  {
->  	struct pt_regs *old_regs = set_irq_regs(regs);
->  
-> +#ifdef CONFIG_X86
->  	exit_idle();
-> +#endif
->  	irq_enter();
->  
->  	__xen_evtchn_do_upcall();
-> @@ -1783,9 +1790,9 @@ void xen_callback_vector(void)
->  void xen_callback_vector(void) {}
->  #endif
->  
-> -void __init xen_init_IRQ(void)
-> +void xen_init_IRQ(void)
->  {
-> -	int i, rc;
-> +	int i;
->  
->  	evtchn_to_irq = kcalloc(NR_EVENT_CHANNELS, sizeof(*evtchn_to_irq),
->  				    GFP_KERNEL);
-> @@ -1801,6 +1808,7 @@ void __init xen_init_IRQ(void)
->  
->  	pirq_needs_eoi = pirq_needs_eoi_flag;
->  
-> +#ifdef CONFIG_X86
->  	if (xen_hvm_domain()) {
->  		xen_callback_vector();
->  		native_init_IRQ();
-> @@ -1808,6 +1816,7 @@ void __init xen_init_IRQ(void)
->  		 * __acpi_register_gsi can point at the right function */
->  		pci_xen_hvm_init();
->  	} else {
-> +		int rc;
->  		struct physdev_pirq_eoi_gmfn eoi_gmfn;
->  
->  		irq_ctx_init(smp_processor_id());
-> @@ -1823,4 +1832,6 @@ void __init xen_init_IRQ(void)
->  		} else
->  			pirq_needs_eoi = pirq_check_eoi_map;
->  	}
-> +#endif
->  }
-> +EXPORT_SYMBOL_GPL(xen_init_IRQ);
-> diff --git a/include/xen/events.h b/include/xen/events.h
-> index 04399b2..c6bfe01 100644
-> --- a/include/xen/events.h
-> +++ b/include/xen/events.h
-> @@ -109,4 +109,6 @@ int xen_irq_from_gsi(unsigned gsi);
->  /* Determine whether to ignore this IRQ if it is passed to a guest. */
->  int xen_test_irq_shared(int irq);
->  
-> +/* initialize Xen IRQ subsystem */
-> +void xen_init_IRQ(void);
->  #endif	/* _XEN_EVENTS_H */
-> -- 
-> 1.7.2.5
+> I think we're getting very close now, I only have a few small comments left
+> that should all be uncontroversial.
+> 
+>> +
+>> +Client drivers should specify the DMA property using a phandle to the controller
+>> +followed by DMA controller specific data.
+>> +
+>> +Required property:
+>> +- dmas:			List of one or more DMA specifiers, each consisting of
+>> +			- A phandle pointing to DMA controller node
+>> +			- A single integer cell containing DMA controller
+>> +			  specific information. This typically contains a dma
+>> +			  request line number or a channel number, but can
+>> +			  contain any data that is used required for configuring
+>> +			  a channel.
+>> +- dma-names: 		Contains one identifier string for each dma specifier in
+>> +			the dmas property. The specific strings that can be used
+>> +			are defined in the binding of the DMA client device.
+> 
+> I think here we need to clarify that listing the same name multiple times implies
+> having multiple alternatives for the same channel.
+
+Ok, however, the way it works right now is that we will use the first
+specifier that matches the name. So if there are multiple with the same
+name that would imply that someone will need call the
+xxx_request_slave_channel() multiple times to extract these. Is that ok?
+
+>> +Example:
+>> +
+>> +- One DMA write channel, one DMA read/write channel:
+>> +
+>> +	i2c1: i2c at 1 {
+>> +		...
+>> +		dmas = <&sdma 2		/* read channel */
+>> +			&sdma 3>;	/* write channel */
+>> +		dma-names = "rx", "tx"
+>> +		...
+>> +	};
+> 
+> And please add an example documenting this case.
+
+Ok.
+
+>> +/**
+>> + * of_dma_find_channel - Find a DMA channel by name
+>> + * @np:		device node to look for DMA channels
+>> + * @name:	name of desired channel
+>> + * @dma_spec:	pointer to DMA specifier as found in the device tree
+>> + *
+>> + * Find a DMA channel by the name. Returns 0 on success or appropriate
+>> + * errno value on error.
+>> + */
+>> +static int of_dma_find_channel(struct device_node *np, char *name,
+>> +			       struct of_phandle_args *dma_spec)
+>> +{
+>> +	int count, i;
+>> +	const char *s;
+>> +
+>> +	count = of_property_count_strings(np, "dma-names");
+>> +	if (count < 0)
+>> +		return count;
+>> +
+>> +	for (i = 0; i < count; i++) {
+>> +		of_property_read_string_index(np, "dma-names", i, &s);
+>> +
+>> +		if (strcmp(name, s))
+>> +			continue;
+>> +
+>> +		return of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+>> +							i, dma_spec);
+>> +	}
+>> +
+>> +	return -ENODEV;
+>> +}
+> 
+> I think we should at least keep trying the other channels with the same name when 
+> of_parse_phandle_with_args fails. We might want to do something smarter in
+> the long run, e.g. to spread channel allocations across the avaialable controllers.
+
+Ok, can add this.
+
+>> +/**
+>> + * of_dma_request_slave_channel - Get the DMA slave channel
+>> + * @np:		device node to get DMA request from
+>> + * @name:	name of desired channel
+>> + *
+>> + * Returns pointer to appropriate dma channel on success or NULL on error.
+>> + */
+>> +struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>> +					      char *name)
+>> +{
+>> ...
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_dma_request_slave_channel);
+> 
+> I think this no longer needs to be exported, with patch 2 on top.
+
+Right, I was in two minds but I can remove this.
+
+>> +/**
+>> + * of_dma_simple_xlate - Simple DMA engine translation function
+>> + * @dma_spec:	pointer to DMA specifier as found in the device tree
+>> + * @of_dma:	pointer to DMA controller data
+>> + *
+>> + * A simple translation function for devices that use a 32-bit value for the
+>> + * filter_param when calling the DMA engine dma_request_channel() function.
+>> + * Note that this translation function requires that #dma-cells is equal to 1
+>> + * and the argument of the dma specifier is the 32-bit filter_param. Returns
+>> + * pointer to appropriate dma channel on success or NULL on error.
+>> + */
+>> +struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+>> +						struct of_dma *ofdma)
+>> +{
+>> +	int count = dma_spec->args_count;
+>> +	struct of_dma_filter_info *info = ofdma->of_dma_data;
+>> +
+>> +	if (!info || !info->filter_fn)
+>> +		return NULL;
+>> +
+>> +	if (count != 1)
+>> +		return NULL;
+>> +
+>> +	return dma_request_channel(info->dma_cap, info->filter_fn,
+>> +			&dma_spec->args[0]);
+>> +}
+> 
+> But this one does.
+
+Good catch!
+
+Thanks
+Jon
