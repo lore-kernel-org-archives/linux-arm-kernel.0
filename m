@@ -1,92 +1,71 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 23:34:40 +0200
-Subject: [PATCH 12/24] ARM: msm: use __iomem pointers for MMIO
+Date: Fri, 14 Sep 2012 23:34:38 +0200
+Subject: [PATCH 10/24] ARM: ks8695: use __iomem pointers for MMIO
 In-Reply-To: <1347658492-11608-1-git-send-email-arnd@arndb.de>
 References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347658492-11608-13-git-send-email-arnd@arndb.de>
+Message-ID: <1347658492-11608-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 ARM is moving to stricter checks on readl/write functions,
 so we need to use the correct types everywhere.
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-msm/smd.c |   19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/mach-ks8695/cpu.c                     |    2 +-
+ arch/arm/mach-ks8695/include/mach/hardware.h   |    2 +-
+ arch/arm/mach-ks8695/include/mach/uncompress.h |    6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
-index 657be73..f4e475c 100644
---- a/arch/arm/mach-msm/smd.c
-+++ b/arch/arm/mach-msm/smd.c
-@@ -52,13 +52,14 @@ static int msm_smd_debug_mask;
+diff --git a/arch/arm/mach-ks8695/cpu.c b/arch/arm/mach-ks8695/cpu.c
+index 7f3f240..ddb2422 100644
+--- a/arch/arm/mach-ks8695/cpu.c
++++ b/arch/arm/mach-ks8695/cpu.c
+@@ -36,7 +36,7 @@
  
- struct shared_info {
- 	int ready;
--	unsigned state;
-+	void __iomem *state;
- };
+ static struct __initdata map_desc ks8695_io_desc[] = {
+ 	{
+-		.virtual	= KS8695_IO_VA,
++		.virtual	= (unsigned long)KS8695_IO_VA,
+ 		.pfn		= __phys_to_pfn(KS8695_IO_PA),
+ 		.length		= KS8695_IO_SIZE,
+ 		.type		= MT_DEVICE,
+diff --git a/arch/arm/mach-ks8695/include/mach/hardware.h b/arch/arm/mach-ks8695/include/mach/hardware.h
+index 5e0c388..5090338 100644
+--- a/arch/arm/mach-ks8695/include/mach/hardware.h
++++ b/arch/arm/mach-ks8695/include/mach/hardware.h
+@@ -33,7 +33,7 @@
+  * head debug code as the initial MMU setup only deals in L1 sections.
+  */
+ #define KS8695_IO_PA		0x03F00000
+-#define KS8695_IO_VA		0xF0000000
++#define KS8695_IO_VA		IOMEM(0xF0000000)
+ #define KS8695_IO_SIZE		SZ_1M
  
- static unsigned dummy_state[SMSM_STATE_COUNT];
+ #define KS8695_PCIMEM_PA	0x60000000
+diff --git a/arch/arm/mach-ks8695/include/mach/uncompress.h b/arch/arm/mach-ks8695/include/mach/uncompress.h
+index 9495cb4..8879d61 100644
+--- a/arch/arm/mach-ks8695/include/mach/uncompress.h
++++ b/arch/arm/mach-ks8695/include/mach/uncompress.h
+@@ -19,15 +19,15 @@
  
- static struct shared_info smd_info = {
--	.state = (unsigned) &dummy_state,
-+	/* FIXME: not a real __iomem pointer */
-+	.state = &dummy_state,
- };
+ static void putc(char c)
+ {
+-	while (!(__raw_readl(KS8695_UART_PA + KS8695_URLS) & URLS_URTHRE))
++	while (!(__raw_readl((void __iomem*)KS8695_UART_PA + KS8695_URLS) & URLS_URTHRE))
+ 		barrier();
  
- module_param_named(debug_mask, msm_smd_debug_mask,
-@@ -796,22 +797,22 @@ void *smem_alloc(unsigned id, unsigned size)
- 	return smem_find(id, size);
+-	__raw_writel(c, KS8695_UART_PA + KS8695_URTH);
++	__raw_writel(c, (void __iomem*)KS8695_UART_PA + KS8695_URTH);
  }
  
--void *smem_item(unsigned id, unsigned *size)
-+void __iomem *smem_item(unsigned id, unsigned *size)
+ static inline void flush(void)
  {
- 	struct smem_shared *shared = (void *) MSM_SHARED_RAM_BASE;
- 	struct smem_heap_entry *toc = shared->heap_toc;
- 
- 	if (id >= SMEM_NUM_ITEMS)
--		return 0;
-+		return NULL;
- 
- 	if (toc[id].allocated) {
- 		*size = toc[id].size;
--		return (void *) (MSM_SHARED_RAM_BASE + toc[id].offset);
-+		return (MSM_SHARED_RAM_BASE + toc[id].offset);
- 	} else {
- 		*size = 0;
- 	}
- 
--	return 0;
-+	return NULL;
+-	while (!(__raw_readl(KS8695_UART_PA + KS8695_URLS) & URLS_URTE))
++	while (!(__raw_readl((void __iomem*)KS8695_UART_PA + KS8695_URLS) & URLS_URTE))
+ 		barrier();
  }
  
- void *smem_find(unsigned id, unsigned size_in)
-@@ -857,7 +858,7 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
- int smsm_change_state(enum smsm_state_item item,
- 		      uint32_t clear_mask, uint32_t set_mask)
- {
--	unsigned long addr = smd_info.state + item * 4;
-+	void __iomem *addr = smd_info.state + item * 4;
- 	unsigned long flags;
- 	unsigned state;
- 
-@@ -943,10 +944,10 @@ int smd_core_init(void)
- 	/* wait for essential items to be initialized */
- 	for (;;) {
- 		unsigned size;
--		void *state;
-+		void __iomem *state;
- 		state = smem_item(SMEM_SMSM_SHARED_STATE, &size);
- 		if (size == SMSM_V1_SIZE || size == SMSM_V2_SIZE) {
--			smd_info.state = (unsigned)state;
-+			smd_info.state = state;
- 			break;
- 		}
- 	}
 -- 
 1.7.10
