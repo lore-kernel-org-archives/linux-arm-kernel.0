@@ -1,70 +1,43 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 14 Sep 2012 12:18:31 +0200
-Subject: [PATCH] ARM: OMAP: SmartReflex: fix error path in init function
-In-Reply-To: <1347617694-367-1-git-send-email-j-pihet@ti.com>
-References: <1347617694-367-1-git-send-email-j-pihet@ti.com>
-Message-ID: <CAORVsuVQeNXPkfk9uUg-yMF-KkoWc=sBfffcs99VT+jT+YeWOg@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 14 Sep 2012 10:20:02 +0000
+Subject: [PATCH v6 10/10] ARM: OMAP2+: tusb6010: generic timing calculation
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9E253B@DBDE01.ent.ti.com>
+References: <cover.1345524670.git.afzal@ti.com>
+ <bc000ac53bb1b3ae1a951bbcf372caf6336d2a19.1345524670.git.afzal@ti.com>
+ <20120824194630.GU11011@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9BA589@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC11D@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DEC85@DBDE01.ent.ti.com>
+ <20120906204354.GJ1303@atomide.com>
+ <20120911184606.GN23092@atomide.com>,
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E253B@DBDE01.ent.ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E3624@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+* Mohammed, Afzal: Wednesday, September 12, 2012 3:20 PM
 
-On Fri, Sep 14, 2012 at 12:14 PM,  <jean.pihet@newoldbits.com> wrote:
-> From: Jean Pihet <j-pihet@ti.com>
->
-> Fix the error handling path in omap_sr_probe to correctly
-> de-allocate resources in case of problems.
+> But some of the tusb async values is less by one. I need
+> to get it right.
 
-Please note that this patch applies on top of 'ARM: OMAP: SmartReflex:
-pass device dependent data via platform data' [1].
+Reason has been identified. It was due to rounding error,
+no changes are required in the expressions. Moving
+completely to picoseconds resolves the issue.
 
-[1] http://marc.info/?l=linux-omap&m=134761557609931&w=2
+Can you please try with the attached patch ?
 
-Regards,
-Jean
+Once it is confirmed that issue is resolved, I will cleanup
+gpmc-nand.c too (which would also take care of picoseconds)
 
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
->  drivers/power/avs/smartreflex.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
-> index 734493d..a802f4c 100644
-> --- a/drivers/power/avs/smartreflex.c
-> +++ b/drivers/power/avs/smartreflex.c
-> @@ -911,7 +911,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->         if (!sr_info->base) {
->                 dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
->                 ret = -ENOMEM;
-> -               goto err_release_region;
-> +               goto err_free_name;
->         }
->
->         if (irq)
-> @@ -949,7 +949,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->                 dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
->                         __func__);
->                 ret = PTR_ERR(sr_info->dbg_dir);
-> -               goto err_free_name;
-> +               goto err_debugfs;
->         }
->
->         (void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR,
-> @@ -993,11 +993,11 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->
->  err_debugfs:
->         debugfs_remove_recursive(sr_info->dbg_dir);
-> -err_free_name:
-> -       kfree(sr_info->name);
->  err_iounmap:
->         list_del(&sr_info->node);
->         iounmap(sr_info->base);
-> +err_free_name:
-> +       kfree(sr_info->name);
->  err_release_region:
->         release_mem_region(mem->start, resource_size(mem));
->  err_free_devinfo:
-> --
-> 1.7.7.6
->
+Note: As this mail is sent via exchange, I am attaching the
+patch so that it reaches you in proper way.
+
+Regards
+Afzal
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-gpmc-rounding-error-fix.patch
+Type: text/x-patch
+Size: 14228 bytes
+Desc: 0001-gpmc-rounding-error-fix.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120914/5b0b4601/attachment.bin>
