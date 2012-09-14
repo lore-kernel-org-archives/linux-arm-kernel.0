@@ -1,21 +1,22 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Sep 2012 09:31:07 -0600
-Subject: [PATCH] arm: tegra: dt: Add pinmux entries for Vbus regulator
- controls
-In-Reply-To: <1347614754-26357-1-git-send-email-vbyravarasu@nvidia.com>
-References: <1347614754-26357-1-git-send-email-vbyravarasu@nvidia.com>
-Message-ID: <50534DBB.6010700@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Sep 2012 15:31:36 +0000
+Subject: [PATCH v2 0/4] lis3: lis3lv02d_i2c: Add device tree support
+In-Reply-To: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
+References: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
+Message-ID: <201209141531.36734.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 03:25 AM, Venu Byravarasu wrote:
-> Adding pinmux entries for PI4 and PH7 to enable Vbus for USB1
-> and USB3 controllers on Cardhu A02 board.
+On Friday 14 September 2012, AnilKumar Ch wrote:
+> Adds device tree support to lis3lv02d_i2c driver. Along with this
+> DT init is moved from core driver to individual drivers, with the
+> current implementation some pdata is missing in lis3lv02d_i2c driver.
 > 
-> Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+> Also adds platform data for lis331dlh driver to am335x-EVM. These
+> patches were tested on AM335x-EVM.
+> 
 
-Given our internal discussions about whether to and how to configure
-open-drain and enable-input on these pins, I'd like to hold off on this
-patch. Lets resolve this internally first.
+No further comments on this version besides the ones I already gave
+on v1.
 
-Also, I assume we'll need an equivalent patch for Cardhu A04 too.
+	Arnd
