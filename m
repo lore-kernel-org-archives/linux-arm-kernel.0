@@ -1,33 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 14 Sep 2012 14:56:38 +0100
-Subject: [PATCH v4 00/24] Introduce Xen support on ARM (based on 3.6-rc5)
-In-Reply-To: <20120914132108.GQ25249@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <20120914132108.GQ25249@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1209141455350.29232@kaball.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Sep 2012 15:58:13 +0200
+Subject: [PATCH 10/19] ARM: ux500: Remove redundant #gpio-cell properties
+ from HREF and Snowball DT
+In-Reply-To: <20120914091037.GI3374@gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-11-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY_gyWRO20ZOfTmG=tzE_B3ObWZG_4f8gHS6vyiGZSh6Q@mail.gmail.com>
+ <20120914091037.GI3374@gmail.com>
+Message-ID: <CACRpkdbdPgQHT=F-sGULD=fqSo0-7vyRAUbPTNXM41Fn5nUdzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Sep 2012, Konrad Rzeszutek Wilk wrote:
-> I already put in these
-> 
-> 1)      xen/events: fix unmask_evtchn for PV on HVM guests
-> 2)      xen: missing includes
-> 3)      xen: update xen_add_to_physmap interface
-> 4)      xen: Introduce xen_pfn_t for pfn and mfn types
-> 5)      xen: clear IRQ_NOAUTOEN and IRQ_NOREQUEST
-> 6)      xen: allow privcmd for HVM guests
-> 
-> in my tree as they also impact/help the PVH domains which works for
-> x86 (Well, not all of them). They are in my stable/for-linus-3.7 git tree
-> (git://git.kernel.org/pub/scm/linux/kernel/git/konrad/xen.git)
-> and also in #linux-next.
-> 
-> 
-> If it would make reviewing easier, I would recommend you rebase
-> your tree on top of the stable/for-linus-3.7 and just post them
-> as it would make the number of patches smaller.
+On Fri, Sep 14, 2012 at 11:10 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, Sep 10, 2012 at 04:12:23AM -0700, Linus Walleij wrote:
+>> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > These properties have no place here as the populated nodes are
+>> > not related to GPIO Controllers.
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Squash this into the previous patch adding them...
+>> I think Arnd already noted.
+>
+> Well he noted that I'd duplicated the error from the snowball.dts
+> file, then rectified in this patch, which is fair enough. However,
+> I don't think the snowball.dts fix should be squashed into an HREF
+> enablement patch, and I can't find a suitable patch in the patch-
+> set where it would really fit. Should I leave the Snowball fix
+> separate and just fixup the HREF .dts file to never duplicate the
+> anomaly?
 
-I have done that and it went quite smoothly. The patch series is now 5
-patches smaller.
-Thanks!
+No you're right, this should be separate.
+
+I was confused that it was in the same patch set, I would
+suggest just sending this one on it's own as a snowball fix
+fair and square, and have ARM SoC push it to the -rcs as a
+regression fix, but your choice.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
