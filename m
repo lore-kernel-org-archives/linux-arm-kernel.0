@@ -1,22 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 15:31:36 +0000
-Subject: [PATCH v2 0/4] lis3: lis3lv02d_i2c: Add device tree support
-In-Reply-To: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
-References: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
-Message-ID: <201209141531.36734.arnd@arndb.de>
+From: steve@sakoman.com (Steve Sakoman)
+Date: Fri, 14 Sep 2012 08:33:42 -0700
+Subject: [PATCH] RTC: TWL: ensure all interrupts are disabled during probe
+In-Reply-To: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
+References: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <CAOSpxdbGZFFShcS=_BZ78tAB3A5esPxY2WqNaGA9VXsBj8sP7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 September 2012, AnilKumar Ch wrote:
-> Adds device tree support to lis3lv02d_i2c driver. Along with this
-> DT init is moved from core driver to individual drivers, with the
-> current implementation some pdata is missing in lis3lv02d_i2c driver.
-> 
-> Also adds platform data for lis331dlh driver to am335x-EVM. These
-> patches were tested on AM335x-EVM.
-> 
+On Thu, Sep 13, 2012 at 1:45 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> From: Kevin Hilman <khilman@ti.com>
+>
+> On some platforms, bootloaders are known to do some interesting RTC
+> programming.  Without going into the obscurities as to why this may be
+> the case, suffice it to say the the driver should not make any
+> assumptions about the state of the RTC when the driver loads.  In
+> particular, the driver probe should be sure that all interrupts are
+> disabled until otherwise programmed.
+>
+> This was discovered when finding bursty I2C traffic every second on
+> Overo platforms.  This I2C overhead was keeping the SoC from hitting
+> deep power states.  The cause was found to be the RTC firing every
+> second on the I2C-connected TWL PMIC.
+>
+> Special thanks to Felipe Balbi for suggesting to look for a rogue
+> driver as the source of the I2C traffic rather than the I2C driver
+> itself.
+>
+> Special thanks to Steve Sakoman for helping track down the source of
+> the continuous RTC interrups on the Overo boards.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Steve Sakoman <steve@sakoman.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-No further comments on this version besides the ones I already gave
-on v1.
+Tested on Overo/Tobi, and I no longer see the 1/second interrupts.
+Also verified that alarm interrupts still work using rtcwake.
 
-	Arnd
+Tested-by: Steve Sakoman <steve@sakoman.com>
