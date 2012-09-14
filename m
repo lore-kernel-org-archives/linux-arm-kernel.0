@@ -1,60 +1,36 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 14 Sep 2012 12:13:13 +0100
-Subject: [PATCH v4 11/24] xen: do not compile manage, balloon, pci, acpi,
- pcpu and cpu_hotplug on ARM
+Date: Fri, 14 Sep 2012 12:13:26 +0100
+Subject: [PATCH v4 24/24] MAINTAINERS: add myself as Xen ARM maintainer
 In-Reply-To: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
-Message-ID: <1347621207-11294-11-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347621207-11294-24-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v4:
-- compile pcpu only on x86;
-- use "+=" instead of ":=" for dom0- targets.
-
-Changes in v2:
-
-- make pci.o depend on CONFIG_PCI and acpi.o depend on CONFIG_ACPI.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- drivers/xen/Makefile |   13 +++++++++----
- 1 files changed, 9 insertions(+), 4 deletions(-)
+ MAINTAINERS |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index d80bea5..cd28aae 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -1,11 +1,18 @@
--obj-y	+= grant-table.o features.o events.o manage.o balloon.o
-+ifneq ($(CONFIG_ARM),y)
-+obj-y	+= manage.o balloon.o
-+obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
-+endif
-+obj-y	+= grant-table.o features.o events.o
- obj-y	+= xenbus/
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fdc0119..3d38291 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7752,6 +7752,13 @@ F:	drivers/xen/
+ F:	arch/x86/include/asm/xen/
+ F:	include/xen/
  
- nostackp := $(call cc-option, -fno-stack-protector)
- CFLAGS_features.o			:= $(nostackp)
- 
-+obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
-+dom0-$(CONFIG_PCI) += pci.o
-+dom0-$(CONFIG_ACPI) += acpi.o
-+dom0-$(CONFIG_X86) += pcpu.o
- obj-$(CONFIG_BLOCK)			+= biomerge.o
--obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
- obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
- obj-$(CONFIG_XEN_BALLOON)		+= xen-balloon.o
- obj-$(CONFIG_XEN_SELFBALLOONING)	+= xen-selfballoon.o
-@@ -17,8 +24,6 @@ obj-$(CONFIG_XEN_SYS_HYPERVISOR)	+= sys-hypervisor.o
- obj-$(CONFIG_XEN_PVHVM)			+= platform-pci.o
- obj-$(CONFIG_XEN_TMEM)			+= tmem.o
- obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
--obj-$(CONFIG_XEN_DOM0)			+= pcpu.o
--obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
- obj-$(CONFIG_XEN_MCE_LOG)		+= mcelog.o
- obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= xen-pciback/
- obj-$(CONFIG_XEN_PRIVCMD)		+= xen-privcmd.o
++XEN HYPERVISOR ARM
++M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
++L:	xen-devel at lists.xensource.com (moderated for non-subscribers)
++S:	Supported
++F:	arch/arm/xen/
++F:	arch/arm/include/asm/xen/
++
+ XEN NETWORK BACKEND DRIVER
+ M:	Ian Campbell <ian.campbell@citrix.com>
+ L:	xen-devel at lists.xensource.com (moderated for non-subscribers)
 -- 
 1.7.2.5
