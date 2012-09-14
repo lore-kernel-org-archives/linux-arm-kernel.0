@@ -1,36 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 20:01:57 +0000
-Subject: [PATCH v2 0/4] lis3: lis3lv02d_i2c: Add device tree support
-In-Reply-To: <20120914125106.ae809500.akpm@linux-foundation.org>
-References: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
- <201209141531.36734.arnd@arndb.de>
- <20120914125106.ae809500.akpm@linux-foundation.org>
-Message-ID: <201209142001.58022.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 14 Sep 2012 14:06:12 -0600
+Subject: [GIT PULL 01/10] ARM: tegra: fixes for 3.7
+Message-ID: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 September 2012, Andrew Morton wrote:
-> On Fri, 14 Sep 2012 15:31:36 +0000
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Friday 14 September 2012, AnilKumar Ch wrote:
-> > > Adds device tree support to lis3lv02d_i2c driver. Along with this
-> > > DT init is moved from core driver to individual drivers, with the
-> > > current implementation some pdata is missing in lis3lv02d_i2c driver.
-> > > 
-> > > Also adds platform data for lis331dlh driver to am335x-EVM. These
-> > > patches were tested on AM335x-EVM.
-> > > 
-> > 
-> > No further comments on this version besides the ones I already gave
-> > on v1.
-> 
-> My linux-arm-kernel subscription died so I don't know what your v1
-> comments said.  Were they fatal?
-> 
+This branch contains a number of minor bug-fixes for Tegra.
 
-Just details. AnilKumar just said in that thread that he'd do a version 3
-based on the earlier discussion once I was done looking at v2, so I replied
-here to say that there is nothing new to add.
+This branch is based on v3.6-rc4.
 
-	Arnd
+----------------------------------------------------------------
+
+The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+
+  Linux 3.6-rc4
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-fixes
+
+for you to fetch changes up to 4b1082ca8cd3bec99fc0ce020a8ba1fa3aa8e22a:
+
+  ARM: enable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
+
+----------------------------------------------------------------
+
+Peter De Schrijver (2):
+      ARM: tegra: fix return value for debugfs init
+      ARM: tegra: fix debugfs entry for Tegra30
+
+Stephen Warren (1):
+      ARM: enable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
+
+ arch/arm/Kconfig                |    2 +-
+ arch/arm/mach-tegra/powergate.c |   43 ++++++++++++++++++++++++++++-----
+ 2 files changed, 37 insertions(+), 8 deletions(-)
