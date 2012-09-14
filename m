@@ -1,42 +1,122 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Sep 2012 15:17:09 +0200
-Subject: [PATCH v3 2/5] Documentation: add description of DT binding for
- the gpio-mvebu driver
-In-Reply-To: <50524363.9070100@gmail.com>
-References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <50524026.20104@gmail.com> <20120913223059.2d0606b2@skate>
- <50524363.9070100@gmail.com>
-Message-ID: <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 14 Sep 2012 09:08:07 -0400
+Subject: [PATCH v4 07/24] xen/arm: Xen detection and shared_info page
+ mapping
+In-Reply-To: <1347621207-11294-7-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120914130807.GK25249@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 10:34 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 09/13/2012 03:30 PM, Thomas Petazzoni wrote:
->> Dear Rob Herring,
->>
->> On Thu, 13 Sep 2012 15:20:54 -0500, Rob Herring wrote:
->>> On 09/13/2012 10:54 AM, Thomas Petazzoni wrote:
->>>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>>> Cc: Linus Walleij <linus.walleij@stericsson.com>
->>>> Cc: Andrew Lunn <andrew@lunn.ch>
->>>> Cc: Jason Cooper <jason@lakedaemon.net>
->>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>>> ---
->>>
->>> Grant is pretty much offline right now.
->>
->> Yes, I know, but MAINTAINERS does not mention an alternate maintainer
->> for the GPIO subsystem. Who is the interim maintainer that will
->> ultimately have to ack/nack those patches?
->
-> Linus W. is.
+On Fri, Sep 14, 2012 at 12:13:09PM +0100, Stefano Stabellini wrote:
+> Check for a node in the device tree compatible with "xen,xen", if it is
+> present set xen_domain_type to XEN_HVM_DOMAIN and continue
+> initialization.
+> 
+> Map the real shared info page using XENMEM_add_to_physmap with
+> XENMAPSPACE_shared_info.
+> 
+> Changes in v4:
+> 
+> - simpler parsing of Xen version in the compatible DT node.
+> 
+> Changes in v3:
+> 
+> - use the "xen,xen" notation rather than "arm,xen";
+> - add an additional check on the presence of the Xen version.
+> 
+> Changes in v2:
+> 
+> - replace pr_info with pr_debug.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm/xen/enlighten.c |   61 ++++++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 61 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index c535540..6a0217d 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -5,6 +5,9 @@
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_address.h>
+>  
+>  struct start_info _xen_start_info;
+>  struct start_info *xen_start_info = &_xen_start_info;
+> @@ -33,3 +36,61 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+>  	return -ENOSYS;
+>  }
+>  EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> +
+> +/*
+> + * see Documentation/devicetree/bindings/arm/xen.txt for the
+> + * documentation of the Xen Device Tree format.
+> + */
+> +static int __init xen_guest_init(void)
+> +{
+> +	struct xen_add_to_physmap xatp;
+> +	static struct shared_info *shared_info_page = 0;
+> +	struct device_node *node;
+> +	int len;
+> +	const char *s = NULL;
+> +	const char *version = NULL;
+> +	const char *xen_prefix = "xen,xen-";
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "xen,xen");
+> +	if (!node) {
+> +		pr_debug("No Xen support\n");
+> +		return 0;
+> +	}
+> +	s = of_get_property(node, "compatible", &len);
+> +	if (strlen(xen_prefix) + 3  < len &&
+> +			!strncmp(xen_prefix, s, strlen(xen_prefix)))
 
-I stated Reviewed-by: on the GPIO patch, please merge it through the
-Marvell tree (I guess that's the plan?)
+If we have version '4.3.1' won't this trip us over?
 
-Acked-by: on the rest FWIW, I'm no ARM SoC nor DT maintainer...
+Or if we only have 'major' and 'minor', then won't '4.11' trip us
+over too?
 
-Yours,
-Linus Walleij
+
+> +		version = s + strlen(xen_prefix);
+> +	if (version == NULL) {
+> +		pr_debug("Xen version not found\n");
+> +		return 0;
+> +	}
+> +	xen_domain_type = XEN_HVM_DOMAIN;
+> +
+> +	if (!shared_info_page)
+> +		shared_info_page = (struct shared_info *)
+> +			get_zeroed_page(GFP_KERNEL);
+> +	if (!shared_info_page) {
+> +		pr_err("not enough memory\n");
+> +		return -ENOMEM;
+> +	}
+> +	xatp.domid = DOMID_SELF;
+> +	xatp.idx = 0;
+> +	xatp.space = XENMAPSPACE_shared_info;
+> +	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
+> +	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+> +		BUG();
+> +
+> +	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
+> +
+> +	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
+> +	 * page, we use it in the event channel upcall and in some pvclock
+> +	 * related functions. We don't need the vcpu_info placement
+> +	 * optimizations because we don't use any pv_mmu or pv_irq op on
+> +	 * HVM.
+> +	 * The shared info contains exactly 1 CPU (the boot CPU). The guest
+> +	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
+> +	 * for secondary CPUs as they are brought up. */
+> +	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
+> +	return 0;
+> +}
+> +core_initcall(xen_guest_init);
+> -- 
+> 1.7.2.5
