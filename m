@@ -1,55 +1,47 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Fri, 14 Sep 2012 12:14:54 +0200
-Subject: [PATCH] ARM: OMAP: SmartReflex: fix error path in init function
-Message-ID: <1347617694-367-1-git-send-email-j-pihet@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Sep 2012 11:15:44 +0100
+Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed via
+ Device Tree
+In-Reply-To: <20120914093945.GB2630@pengutronix.de>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
+ <20120912105202.GD2624@pengutronix.de>
+ <20120914082754.GE3374@gmail.com>
+ <20120914084141.GA2630@pengutronix.de>
+ <20120914090228.GH3374@gmail.com>
+ <20120914093945.GB2630@pengutronix.de>
+Message-ID: <20120914101542.GT3374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+> > Now there is:
+> >   git://git.linaro.org/people/ljones/linux-3.0-ux500.git preview-for-next
+> 
+> OK from having a glimpse, I'd prefer to squash (or have squashed)
+> 
+> 	i2c: nomadik: Add Device Tree support to the Nomadik I2C driver
+> 	i2c-nomadik: Register sub-devices when passed via Device Tree
 
-Fix the error handling path in omap_sr_probe to correctly
-de-allocate resources in case of problems.
+Sure, no problem
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- drivers/power/avs/smartreflex.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+> 	Documentation: Device Tree binding information for i2c-nomadik driver
+> 		(Documentation should go along with the code)
 
-diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
-index 734493d..a802f4c 100644
---- a/drivers/power/avs/smartreflex.c
-+++ b/drivers/power/avs/smartreflex.c
-@@ -911,7 +911,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	if (!sr_info->base) {
- 		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
- 		ret = -ENOMEM;
--		goto err_release_region;
-+		goto err_free_name;
- 	}
- 
- 	if (irq)
-@@ -949,7 +949,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
- 			__func__);
- 		ret = PTR_ERR(sr_info->dbg_dir);
--		goto err_free_name;
-+		goto err_debugfs;
- 	}
- 
- 	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR,
-@@ -993,11 +993,11 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 
- err_debugfs:
- 	debugfs_remove_recursive(sr_info->dbg_dir);
--err_free_name:
--	kfree(sr_info->name);
- err_iounmap:
- 	list_del(&sr_info->node);
- 	iounmap(sr_info->base);
-+err_free_name:
-+	kfree(sr_info->name);
- err_release_region:
- 	release_mem_region(mem->start, resource_size(mem));
- err_free_devinfo:
+I'm still not too sure about how this benefits anyone. You can ensure
+the documentation is placed in an adjacent patch, so it's just as easy
+to make reference to.
+
+> into one patch and take that via the I2C tree. This will allow me to
+> resolve the merge conflict in my tree on my own. I don't see a strong
+> reason to have those go via arm-soc (like prevented build-failures or
+> easier merges), if I missed such a reason, please let me know.
+
+I don't have any good reasons for you not to take the patch(es) though
+your tree. Please go ahead.
+
 -- 
-1.7.7.6
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
