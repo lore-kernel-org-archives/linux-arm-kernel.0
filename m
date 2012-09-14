@@ -1,60 +1,65 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Fri, 14 Sep 2012 14:51:52 +0530
-Subject: [PATCH 1/2] ARM: Exynos4: Put PCM, Slimbus,
- Spdif clocks to off state
-In-Reply-To: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
-References: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CANuQgHF4rapXX+xhMkvoxyyz8qJWfTLmz2PKaQGQZO4_OphMYA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Sep 2012 10:23:35 +0100
+Subject: [PATCH 06/19] ARM: ux500: Add nodes for the MSP into the HREF
+ Device Tree
+In-Reply-To: <CACRpkdbs9_hLB9c7WbWeR_6+Le4Svzc9Y5wTNVebOiRDB-o33g@mail.gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbs9_hLB9c7WbWeR_6+Le4Svzc9Y5wTNVebOiRDB-o33g@mail.gmail.com>
+Message-ID: <20120914092332.GL3374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+On Mon, Sep 10, 2012 at 02:53:45AM -0700, Linus Walleij wrote:
+> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > This patch enables the two important MSP devices for ST-Ericsson's
+> > hardware reference development board.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/hrefv60plus.dts |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+> > index 62b2ac1..4f0aee8 100644
+> > --- a/arch/arm/boot/dts/hrefv60plus.dts
+> > +++ b/arch/arm/boot/dts/hrefv60plus.dts
+> > @@ -77,5 +77,13 @@
+> >
+> >                         status = "okay";
+> >                 };
+> > +
+> > +               msp1: msp at 80124000 {
+> > +                       status = "okay";
+> > +               };
+> > +
+> > +               msp3: msp at 80125000 {
+> > +                       status = "okay";
+> > +               };
+> >         };
+> >  };
+> 
+> Does this really "enable" the MSPs as the title claims?
 
-On 6 September 2012 19:46, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> The clocks for PCM, Slimbus, Spdif added to off list in order
-> to turn them off at boot time.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> ---
->  arch/arm/mach-exynos/clock-exynos4.c |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-> index 7cc5491..6a45c9a 100644
-> --- a/arch/arm/mach-exynos/clock-exynos4.c
-> +++ b/arch/arm/mach-exynos/clock-exynos4.c
-> @@ -627,6 +627,25 @@ static struct clk exynos4_init_clocks_off[] = {
->                 .enable         = exynos4_clk_ip_peril_ctrl,
->                 .ctrlbit        = (1 << 21),
->         }, {
-> +               .name           = "pcm",
-> +               .devname        = "samsung-pcm.1",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 22),
-> +       }, {
-> +               .name           = "pcm",
-> +               .devname        = "samsung-pcm.2",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 23),
-> +       }, {
-> +               .name           = "slimbus",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 25),
-> +       }, {
-> +               .name           = "spdif",
-> +               .devname        = "samsung-spdif",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 26),
-> +       }, {
->                 .name           = "ac97",
->                 .devname        = "samsung-ac97",
->                 .enable         = exynos4_clk_ip_peril_ctrl,
-> --
-> 1.7.9.5
->
+Yes they do.
 
+> Aren's there any kind of bindings needed, not even a
+> register base?
 
+All that information is in the "disabled" node contained in .dtsi file.
+
++               msp0: msp at 80123000 {
++                       compatible = "stericsson,ux500-msp-i2s";
++                       reg = <0x80123000 0x1000>;
++                       interrupts = <0 31 0x4>;
++                       v-ape-supply = <&db8500_vape_reg>;
++                       status = "disabled";
+
+Then this patch "enable"s it (as the title suggests). :)
 
 -- 
-with warm regards,
-Chander Kashyap
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
