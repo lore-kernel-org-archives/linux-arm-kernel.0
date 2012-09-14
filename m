@@ -1,36 +1,44 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 14 Sep 2012 09:08:26 +0200
-Subject: [Query] Does u-boot processes dtb file
-In-Reply-To: <CAKohpomkgk_hNAwqseAvc_cyLH+Vtr63r_hJGxsKueZhKno8_A@mail.gmail.com>
-References: <CAKohpomkgk_hNAwqseAvc_cyLH+Vtr63r_hJGxsKueZhKno8_A@mail.gmail.com>
-Message-ID: <5052D7EA.30902@de.bosch.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 14 Sep 2012 10:15:05 +0300
+Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
+ dmaengine_prep_dma_cyclic()
+In-Reply-To: <20120913153824.GK28448@n2100.arm.linux.org.uk>
+References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
+ <5051FB4D.3000009@metafoo.de> <20120913153824.GK28448@n2100.arm.linux.org.uk>
+Message-ID: <5052D979.3030901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.09.2012 08:58, Viresh Kumar wrote:
-> Hi Arnd,
+On 09/13/2012 06:38 PM, Russell King - ARM Linux wrote:
+> On Thu, Sep 13, 2012 at 05:27:09PM +0200, Lars-Peter Clausen wrote:
+>> Hm... Do you think it would work as well if we implement this by setting the
+>> callback for the descriptor to NULL? If the callback is NULL there is
+>> nothing to at the end of a transfer/period and the dma engine driver may
+>> choose to disable interrupts. This would also benefit non cyclic transfers
+>> where the callback is NULL and we do not need add the new parameter to
+>> dmaengine_prep_dma_cyclic.
 > 
+> Actually, there's a way to do that already.  DMA_PREP_INTERRUPT.
+> Unfortunately, most DMA engine slave API users don't set it when they
+> setup their transfer:
 > 
-> Sorry for the stupid question, but somebody asked this to me and i wasn't sure
-> about it.
-> 
-> We boot with dtb from u-boot using following command:
-> bootm <uImage addr> <initrd addr> <dtb addr>
-> 
-> Does u-boot do anything special or simply passes address of dtb in r2 to kernel?
-> 
-> i.e. if i do bootm <uImage addr> and stop my kernel early using a debugger,
-> update r2 with dtb address, will it work the same way?
-> 
-> OR
-> 
-> Does any bootloader needs some special code for handling dtb's?
+>  * @DMA_PREP_INTERRUPT - trigger an interrupt (callback) upon completion of
+>  *  this transaction
 
-Working with U-Boot, to my understanding U-Boot modifies ('patches') the 
-dtb read from the boot device before passing it to the kernel. It e.g. 
-adds the kernel command line and the memory size you specify in U-Boot 
-to the dtb.
+As I mentioned already to Vinod: the description of this flag is close enough
+for our needs (other than the notion of 'this transaction' is not really
+correct for cyclic mode).
+I will resend the series to add the flags as new parameter instead of the
+no_wakeup.
 
-Best regards
+> 
+> if we fixed that, then we could use the lack of it to avoid the interrupt.
+> 
+> However, cyclic transfers don't have the flags parameter used to pass this
+> bit.  Yet another bit of yucky inconsistent design in DMA engine land...
+> 
 
-Dirk
+
+-- 
+P?ter
