@@ -1,51 +1,71 @@
-From: stefan.roese@gmail.com (Stefan Roese)
-Date: Fri, 14 Sep 2012 11:16:14 +0200
-Subject: [Query] Does u-boot processes dtb file
-In-Reply-To: <5052DE42.6080109@de.bosch.com>
-References: <CAKohpomkgk_hNAwqseAvc_cyLH+Vtr63r_hJGxsKueZhKno8_A@mail.gmail.com>	<5052D7EA.30902@de.bosch.com>
- <CAKohpomubFQMj2uoP+Pb1xBsO7B14W3nR1ddSQ-ajRERNBQ+kg@mail.gmail.com>
- <5052DE42.6080109@de.bosch.com>
-Message-ID: <5052F5DE.3010102@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Sep 2012 10:18:02 +0100
+Subject: [PATCH 09/19] ARM: ux500: Enable SSP (SPI) for HREF when booting
+ Device Tree
+In-Reply-To: <CACRpkdaC_enpxUFNM_wteAQWKER_naUNUH-s1pJtiGzVFSV+og@mail.gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaC_enpxUFNM_wteAQWKER_naUNUH-s1pJtiGzVFSV+og@mail.gmail.com>
+Message-ID: <20120914091800.GJ3374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 09:35 AM, Dirk Behme wrote:
-> On 14.09.2012 09:16, Viresh Kumar wrote:
->> On 14 September 2012 12:38, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->>> Working with U-Boot, to my understanding U-Boot modifies ('patches') the dtb
->>> read from the boot device before passing it to the kernel. It e.g. adds the
->>> kernel command line and the memory size you specify in U-Boot to the dtb.
->>
->> Thanks for your response.
->>
->> But, if this information is also embedded in the dts earlier, will my workaround
->> of filling r2 work?
+On Mon, Sep 10, 2012 at 04:11:10AM -0700, Linus Walleij wrote:
+> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> I think so, but I never tried it. It's on my todo list to try this ;) If 
-> you add all the information needed in the dts file and the resulting dtb 
-> file is identical to the 'patched' dtb U-Boot passes to the kernel, 
-> there should be no difference (?).
-
-Yes, this should work. As a matter of fact, we are using this
-pre-patched dtb method for booting directly from the SPL U-Boot version
-(small, limited U-Boot version) into the Linux kernel (skipping the
-full-blown U-Boot with the dtb patching upon bootm).
-
->> Is filling bootargs and memory size the only stuff or some other things too?
+> > Here we add a new SSP node to the HREF's Device Tree file which
+> > activates the generic one found in the .dtsi file. This will
+> > allow probing of the SSP driver when Device Tree is enabled.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> I'm not totally sure on this. You could debug this: (a) Take the dtb 
-> file from your boot device. (b) dump the dtb file U-Boot passes to the 
-> kernel (i.e. do a memory dump from the pointer U-Boot passes in r2). 
-> Compare (a) and (b) with a binary diff.
+> We have to look closer at this.
+> 
+> There are merged PL022 DT bindings (by Roland Stigge)
+> nowadays, see commit 6d3952a7dfa80919842bbe01ac7f693d40a1eb84
+> in linux-next:
+> 
+>  Optional properties:
+> +- num-cs : total number of chipselects
+>  - cs-gpios : should specify GPIOs used for chipselects.
+>    The gpios will be referred to as reg = <index> in the SPI child nodes.
+>    If unspecified, a single SPI device without a chip select can be used.
+> 
+> +SPI slave nodes must be children of the SPI master node and can
+> +contain the following properties.
+> +
+> +- pl022,interface : interface type:
+> +       0: SPI
+> +       1: Texas Instruments Synchronous Serial Frame Format
+> +       2: Microwire (Half Duplex)
+> +- pl022,com-mode : polling, interrupt or dma
+> +- pl022,rx-level-trig : Rx FIFO watermark level
+> +- pl022,tx-level-trig : Tx FIFO watermark level
+> +- pl022,ctrl-len : Microwire interface: Control length
+> +- pl022,wait-state : Microwire interface: Wait state
+> +- pl022,duplex : Microwire interface: Full/Half duplex
+> 
+> Currently this is defined as auxdata in board-mop500.c
+> but notanly cs-gpios (num chipselects) should come from
+> device tree instead.
+> 
+> It appears Roland has written his bindings such that DT
+> data augments platform data (yes, I am also getting crazy
+> about this prioritization, mea culpa for ACKing this without
+> proper discussion) so it appears that you could actually
+> use AUXDATA and some stuff in the DT at the same
+> time.
+> 
+> Or you could keep it like this and only have AUXDATA
+> as it stands, I just want a discussion about what is the right
+> thing to do before we commit to anything.
 
-The DT properties that are "patched" differ from platform to platform.
-Some also insert dynamically detected clock speeds. Also the board
-specific MAC address is often inserted into the dtb. But for basic
-kernel bootup, memsize and bootargs are definitely the most important ones.
+Sounds fine.
 
-You could also use U-Boot on the board (if available) to prepare/patch
-the dtb via the "fdt" commands. If you have questions on this, please
-ask on the u-boot list.
+I'll pull this for now.
 
-Cheers,
-Stefan
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
