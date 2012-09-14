@@ -1,24 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Sep 2012 01:14:31 +0100
-Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <20120915001431.GB12445@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 14 Sep 2012 19:46:03 -0400
+Subject: [PATCH v3 2/5] Documentation: add description of DT binding
+ for the gpio-mvebu driver
+In-Reply-To: <20120914165408.4beaefe7@skate>
+References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50524026.20104@gmail.com> <20120913223059.2d0606b2@skate>
+ <50524363.9070100@gmail.com>
+ <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
+ <20120914165408.4beaefe7@skate>
+Message-ID: <20120914234603.GB5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 05:41:56PM -0500, Jon Hunter wrote:
-> 3. Supporting legacy devices not using DMA Engine
+On Fri, Sep 14, 2012 at 04:54:08PM +0200, Thomas Petazzoni wrote:
+> Dear Linus Walleij,
 > 
->    These devices present a problem, as there may not be a uniform way to easily
->    support them with regard to device tree. Ideally, these should be migrated
->    to DMA engine. However, if this is not possible, then they should still be
->    able to use this binding, the only constaint imposed by this implementation
->    is that when requesting a DMA channel via of_dma_request_slave_channel(), it
->    will return a type of dma_chan.
+> On Fri, 14 Sep 2012 15:17:09 +0200, Linus Walleij wrote:
+> 
+> > >> Yes, I know, but MAINTAINERS does not mention an alternate maintainer
+> > >> for the GPIO subsystem. Who is the interim maintainer that will
+> > >> ultimately have to ack/nack those patches?
+> > >
+> > > Linus W. is.
+> > 
+> > I stated Reviewed-by: on the GPIO patch, please merge it through the
+> > Marvell tree (I guess that's the plan?)
+> 
+> Yes, I guess it's the easiest plan (Jason ? Andrew ?). We however need
+> Acks on the pinctrl patch series as well, since this one depends on it.
 
-As far as devices not using DMA engine, the answer is we don't support
-their specification in the DT model.  Note that the legacy OMAP DMA
-API is scheduled for removal next year, so it's not going to be around
-that much longer.
+Yes, that's the plan.  I'm currently waiting for my previous series of
+pull requests to get pulled before I start pulling in anything else.
+
+thx,
+
+Jason.
