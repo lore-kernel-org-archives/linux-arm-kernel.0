@@ -1,133 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 09:43:49 +0000
-Subject: [PATCH V4 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1347573629-21299-2-git-send-email-jon-hunter@ti.com>
-References: <1347573629-21299-1-git-send-email-jon-hunter@ti.com>
- <1347573629-21299-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <201209140943.49904.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 14 Sep 2012 11:52:00 +0200
+Subject: [GIT PULL] ARM: LPC32xx: core update
+In-Reply-To: <201209131155.16756.arnd@arndb.de>
+References: <50488FD6.4080402@antcom.de> <201209131155.16756.arnd@arndb.de>
+Message-ID: <5052FE40.2030305@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 September 2012, Jon Hunter wrote:
-> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
-> to add some basic helpers to retrieve a DMA controller device_node and the
-> DMA request/channel information.
+Hi Arnd,
 
-I think we're getting very close now, I only have a few small comments left
-that should all be uncontroversial.
+On 13/09/12 13:55, Arnd Bergmann wrote:
+> On Thursday 06 September 2012, Roland Stigge wrote:
+>>       ARM: LPC32xx: Provide DMA filter callbacks via platform data
+> 
+> This patch results in build errors in the for-next branch with lpc32xx_defconfig:
+> 
+> arch/arm/mach-lpc32xx/phy3250.c:40:35: fatal error: linux/mtd/lpc32xx_slc.h: No such file or directory
+> arch/arm/mach-lpc32xx/phy3250.c:41:35: fatal error: linux/mtd/lpc32xx_mlc.h: No such file or directory
+> arch/arm/mach-lpc32xx/phy3250.c:226:15: error: variable 'lpc32xx_slc_data' has initializer but incomplete type
+> arch/arm/mach-lpc32xx/phy3250.c:227:2: error: unknown field 'dma_filter' specified in initializer
+> arch/arm/mach-lpc32xx/phy3250.c:227:2: error: excess elements in struct initializer [-Werror]
+> arch/arm/mach-lpc32xx/phy3250.c:227:2: error: (near initialization for 'lpc32xx_slc_data') [-Werror]
+> arch/arm/mach-lpc32xx/phy3250.c:230:15: error: variable 'lpc32xx_mlc_data' has initializer but incomplete type
+> arch/arm/mach-lpc32xx/phy3250.c:231:2: error: unknown field 'dma_filter' specified in initializer
+> arch/arm/mach-lpc32xx/phy3250.c:231:2: error: excess elements in struct initializer [-Werror]
+> arch/arm/mach-lpc32xx/phy3250.c:231:2: error: (near initialization for 'lpc32xx_mlc_data') [-Werror]
+> 
+> It seems that we're missing a dependency. Which tree did the patch to add
+> these go through? Can we add that to the same branch in arm-soc?
 
-> +
-> +Client drivers should specify the DMA property using a phandle to the controller
-> +followed by DMA controller specific data.
-> +
-> +Required property:
-> +- dmas:			List of one or more DMA specifiers, each consisting of
-> +			- A phandle pointing to DMA controller node
-> +			- A single integer cell containing DMA controller
-> +			  specific information. This typically contains a dma
-> +			  request line number or a channel number, but can
-> +			  contain any data that is used required for configuring
-> +			  a channel.
-> +- dma-names: 		Contains one identifier string for each dma specifier in
-> +			the dmas property. The specific strings that can be used
-> +			are defined in the binding of the DMA client device.
+Right - there is a dependency on l2-mtd.git here.
 
-I think here we need to clarify that listing the same name multiple times implies
-having multiple alternatives for the same channel.
+Since they didn't request pull for 3.6, there is quite some stuff
+pending in their tree (but I wonder why it isn't already part of
+linux-next, so the above error at least shouldn't occur in linux-next).
 
-> +Example:
-> +
-> +- One DMA write channel, one DMA read/write channel:
-> +
-> +	i2c1: i2c at 1 {
-> +		...
-> +		dmas = <&sdma 2		/* read channel */
-> +			&sdma 3>;	/* write channel */
-> +		dma-names = "rx", "tx"
-> +		...
-> +	};
+So we have several alternative options here:
 
-And please add an example documenting this case.
+* If it is possible, include l2-mtd.git as a dependency in arm-soc.git
+* Merge the following 2 patches as minimal dependency:
+http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/c47bc5c84a65c31f41a555706363f9e350ca6338
+http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/f5e87dd7350c98a34aa7041264c337f0f33c02ff
+You actually only need the two .h files, ignore the patches for yet
+non-existing .c mtd driver files in arm-soc.git.
+* Defer the above (single) patch in arm-soc until l2-mtd is merged
+linux-next or mainline. Maybe l2-mtd.git will appear in linux-next soon,
+otherwise we will need to defer the above patch for lpc32xx/core for 3.8?
 
-> +/**
-> + * of_dma_find_channel - Find a DMA channel by name
-> + * @np:		device node to look for DMA channels
-> + * @name:	name of desired channel
-> + * @dma_spec:	pointer to DMA specifier as found in the device tree
-> + *
-> + * Find a DMA channel by the name. Returns 0 on success or appropriate
-> + * errno value on error.
-> + */
-> +static int of_dma_find_channel(struct device_node *np, char *name,
-> +			       struct of_phandle_args *dma_spec)
-> +{
-> +	int count, i;
-> +	const char *s;
-> +
-> +	count = of_property_count_strings(np, "dma-names");
-> +	if (count < 0)
-> +		return count;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		of_property_read_string_index(np, "dma-names", i, &s);
-> +
-> +		if (strcmp(name, s))
-> +			continue;
-> +
-> +		return of_parse_phandle_with_args(np, "dmas", "#dma-cells",
-> +							i, dma_spec);
-> +	}
-> +
-> +	return -ENODEV;
-> +}
+Sorry for the confusion,
 
-I think we should at least keep trying the other channels with the same name when 
-of_parse_phandle_with_args fails. We might want to do something smarter in
-the long run, e.g. to spread channel allocations across the avaialable controllers.
-
-> +/**
-> + * of_dma_request_slave_channel - Get the DMA slave channel
-> + * @np:		device node to get DMA request from
-> + * @name:	name of desired channel
-> + *
-> + * Returns pointer to appropriate dma channel on success or NULL on error.
-> + */
-> +struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
-> +					      char *name)
-> +{
-> ...
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_request_slave_channel);
-
-I think this no longer needs to be exported, with patch 2 on top.
-
-> +/**
-> + * of_dma_simple_xlate - Simple DMA engine translation function
-> + * @dma_spec:	pointer to DMA specifier as found in the device tree
-> + * @of_dma:	pointer to DMA controller data
-> + *
-> + * A simple translation function for devices that use a 32-bit value for the
-> + * filter_param when calling the DMA engine dma_request_channel() function.
-> + * Note that this translation function requires that #dma-cells is equal to 1
-> + * and the argument of the dma specifier is the 32-bit filter_param. Returns
-> + * pointer to appropriate dma channel on success or NULL on error.
-> + */
-> +struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-> +						struct of_dma *ofdma)
-> +{
-> +	int count = dma_spec->args_count;
-> +	struct of_dma_filter_info *info = ofdma->of_dma_data;
-> +
-> +	if (!info || !info->filter_fn)
-> +		return NULL;
-> +
-> +	if (count != 1)
-> +		return NULL;
-> +
-> +	return dma_request_channel(info->dma_cap, info->filter_fn,
-> +			&dma_spec->args[0]);
-> +}
-
-But this one does.
-
-	Arnd
+Roland
