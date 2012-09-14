@@ -1,55 +1,26 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 14 Sep 2012 13:27:08 +0100
-Subject: [PATCH v4 21/24] arm/v2m: initialize arch_timers even if
- v2m_timer is not present
-In-Reply-To: <1347621207-11294-21-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-21-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1347625628.2497.65.camel@hornet>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Sep 2012 07:28:45 -0500
+Subject: [PATCH] staging: ste_rmi4: remove gpio.h include
+In-Reply-To: <20120914032716.GA10126@kroah.com>
+References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
+ <1347541643-30665-1-git-send-email-robherring2@gmail.com>
+ <5051E056.4060304@gmail.com> <20120914032716.GA10126@kroah.com>
+Message-ID: <505322FD.1040802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-14 at 12:13 +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Pawel Moll <pawel.moll@arm.com>
-> CC: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
->  1 files changed, 6 insertions(+), 5 deletions(-)
+On 09/13/2012 10:27 PM, Greg Kroah-Hartman wrote:
+> On Thu, Sep 13, 2012 at 08:32:06AM -0500, Rob Herring wrote:
+>> Adding Greg KH's correct email...
+>>
+>> On 09/13/2012 08:07 AM, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> gpio.h is not needed and is going to be removed.
 > 
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 37608f2..4e567f7 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -621,16 +621,17 @@ static void __init v2m_dt_timer_init(void)
->  
->  	v2m_clk_init();
->  
-> -	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
-> -	if (WARN_ON(err))
-> -		return;
-> -	node = of_find_node_by_path(path);
-> -	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
->  	if (arch_timer_of_register() != 0)
->  		twd_local_timer_of_register();
->  
->  	if (arch_timer_sched_clock_init() != 0)
->  		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
-> +
-> +	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
-> +	if (WARN_ON(err))
-> +		return;
-> +	node = of_find_node_by_path(path);
-> +	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
->  }
->  
->  static struct sys_timer v2m_dt_timer = {
+> Care to send it to me in a format I can apply it in?
 
-Fair point. The alias is going to disappear anyway (I'm working on a VE
-platform rework right now), but in case I won't get it on time for 3.7,
-I'll make sure this one is merged instead.
+As I mentioned, this should go in via the arm-soc tree with rest of the
+gpio clean-up, so I just need an ack.
 
-Cheers!
-
-Pawe?
+Rob
