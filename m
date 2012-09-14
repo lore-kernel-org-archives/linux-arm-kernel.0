@@ -1,37 +1,47 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 14 Sep 2012 10:18:45 +0300
-Subject: [alsa-devel] [PATCH v2 03/15] dmaengine: Add no_wakeup parameter
- to dmaengine_prep_dma_cyclic()
-In-Reply-To: <1347593217.1943.26.camel@vkoul-udesk3>
-References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
- <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
- <5051FB4D.3000009@metafoo.de> <1347593217.1943.26.camel@vkoul-udesk3>
-Message-ID: <5052DA55.5080102@ti.com>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 14 Sep 2012 00:18:51 -0700
+Subject: [PATCH] pinctrl: use kasprintf() in pinmux_request_gpio()
+In-Reply-To: <1347599944.9481.3.camel@joe2Laptop>
+References: <1347565754-9534-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1347599944.9481.3.camel@joe2Laptop>
+Message-ID: <CAMbhsRSaHOgyTn56vQndn0TKh3AT9dk3pRVuJx3qJXWowsLVaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 06:26 AM, Vinod Koul wrote:
-> On Thu, 2012-09-13 at 17:27 +0200, Lars-Peter Clausen wrote:
->> Hi,
+On Thu, Sep 13, 2012 at 10:19 PM, Joe Perches <joe@perches.com> wrote:
+> On Thu, 2012-09-13 at 21:49 +0200, Thomas Petazzoni wrote:
+>> Instead of using a temporary buffer, snprintf() and kstrdup(), just
+>> use kasprintf() that does the same thing in just oneline.
 >>
->> Hm... Do you think it would work as well if we implement this by
->> setting the
->> callback for the descriptor to NULL? If the callback is NULL there is
->> nothing to at the end of a transfer/period and the dma engine driver
->> may
->> choose to disable interrupts. This would also benefit non cyclic
->> transfers
->> where the callback is NULL and we do not need add the new parameter to
->> dmaengine_prep_dma_cyclic.
-> That will work too.... BUT the idea of no_wake mode in ALSA is that we
-> should not have any interrupts, so anything which is going to cause
-> interrupts to AP in undesired. The interrupts still happen and it just
-> that dmaengine driver is not notifying client.
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  drivers/pinctrl/pinmux.c |    5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+>> index 3d5ac73..9301a7a 100644
+>> --- a/drivers/pinctrl/pinmux.c
+>> +++ b/drivers/pinctrl/pinmux.c
+>> @@ -232,14 +232,11 @@ int pinmux_request_gpio(struct pinctrl_dev *pctldev,
+>>                       struct pinctrl_gpio_range *range,
+>>                       unsigned pin, unsigned gpio)
+>>  {
+>> -     char gpiostr[16];
+>>       const char *owner;
+>>       int ret;
+>>
+>>       /* Conjure some name stating what chip and pin this is taken by */
+>> -     snprintf(gpiostr, 15, "%s:%d", range->name, gpio);
+>> -
+>> -     owner = kstrdup(gpiostr, GFP_KERNEL);
+>> +     owner = kasprintf(GFP_KERNEL, "%s:%d", range->name, gpio);
+>>       if (!owner)
+>>               return -EINVAL;
+>>
+>
+> No not really.  It's a bit different because the first
+> snprintf is length limited but the kasprintf is not.
 
-Yes, this is correct. We could go and hack around later if the callback is not
-present and modify the irq requests for the platform but it is really not
-elegant way of dealing with the issue IMHO.
-
-
--- 
-P?ter
+The one it's replacing is worse, it never sets gpiostr[15] to 0 and
+kstrdup will read past the end of the buffer if the string is
+truncated.
