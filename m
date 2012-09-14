@@ -1,35 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 15:26:35 +0000
-Subject: [PATCH V5 2/2] dmaengine: add helper function to request a slave
- DMA channel
-In-Reply-To: <1347635923-30166-3-git-send-email-jon-hunter@ti.com>
-References: <1347635923-30166-1-git-send-email-jon-hunter@ti.com>
- <1347635923-30166-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <201209141526.36088.arnd@arndb.de>
+Date: Fri, 14 Sep 2012 15:29:57 +0000
+Subject: [PATCH 2/2] ARM: dts: AM33XX: Add lis331dlh device tree data to
+ am335x-evm
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2F2B1@DBDE01.ent.ti.com>
+References: <1347551685-19781-1-git-send-email-anilkumar@ti.com>
+ <201209141028.38185.arnd@arndb.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2F2B1@DBDE01.ent.ti.com>
+Message-ID: <201209141529.57295.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 September 2012, Jon Hunter wrote:
-> Currently slave DMA channels are requested by calling dma_request_channel()
-> and requires DMA clients to pass various filter parameters to obtain the
-> appropriate channel.
+On Friday 14 September 2012, AnilKumar, Chimata wrote:
+> Small question here, in my v2 version I have specified both
+> the compatible names lis3lv02d and lis331dlh is it fine or
+> only one is sufficient?
 > 
-> With device-tree being used by architectures such as arm and the addition of
-> device-tree helper functions to extract the relevant DMA client information
-> from device-tree, add a new function to request a slave DMA channel using
-> device-tree. This function is currently a simple wrapper that calls the
-> device-tree of_dma_request_slave_channel() function.
+> +static struct of_device_id lis3lv02d_i2c_dt_ids[] = {
+> +       { .compatible = "st,lis3lv02d" },
+> +       { .compatible = "st,lis331dlh" },
+> +       {}
+> +};
 > 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+That's ok. In most cases, people will need the data field to point to a
+data structure with the differences between two chips, but not if they are
+identical from the software side.
+It's also fine if you just list one entry here and put both values as
+"compatible" in the device tree, to signify that the device is backwards
+compatible with the older variant.
+
+	Arnd
