@@ -1,65 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Sep 2012 10:23:35 +0100
-Subject: [PATCH 06/19] ARM: ux500: Add nodes for the MSP into the HREF
- Device Tree
-In-Reply-To: <CACRpkdbs9_hLB9c7WbWeR_6+Le4Svzc9Y5wTNVebOiRDB-o33g@mail.gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdbs9_hLB9c7WbWeR_6+Le4Svzc9Y5wTNVebOiRDB-o33g@mail.gmail.com>
-Message-ID: <20120914092332.GL3374@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Sep 2012 10:23:40 +0100
+Subject: Alignment problems: arm_memblock_steal() +
+ dma_declare_coherent_memory()
+In-Reply-To: <CACKLOr1_KqsKovcpV06_nAzVKRGAf3z17S-XfNBw8d3BbTshZg@mail.gmail.com>
+References: <CACKLOr1_KqsKovcpV06_nAzVKRGAf3z17S-XfNBw8d3BbTshZg@mail.gmail.com>
+Message-ID: <20120914092340.GB12245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 02:53:45AM -0700, Linus Walleij wrote:
-> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Fri, Sep 14, 2012 at 10:49:27AM +0200, javier Martin wrote:
+> Hello,
+> we use arm_memblock_steal() + dma_declare_coherent_memory() in order
+> to reserve son contiguous video memory in our platform:
+> http://git.linuxtv.org/media_tree.git/blob/refs/heads/staging/for_v3.7:/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
 > 
-> > This patch enables the two important MSP devices for ST-Ericsson's
-> > hardware reference development board.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/hrefv60plus.dts |    8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-> > index 62b2ac1..4f0aee8 100644
-> > --- a/arch/arm/boot/dts/hrefv60plus.dts
-> > +++ b/arch/arm/boot/dts/hrefv60plus.dts
-> > @@ -77,5 +77,13 @@
-> >
-> >                         status = "okay";
-> >                 };
-> > +
-> > +               msp1: msp at 80124000 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               msp3: msp at 80125000 {
-> > +                       status = "okay";
-> > +               };
-> >         };
-> >  };
+> We've noticed that some restrictive alignment constraints are being
+> applied. For example, for coda driver, the following allocations are
+> made:
 > 
-> Does this really "enable" the MSPs as the title claims?
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 557056
+> bytes, out of 8388608 (vaddr = 0xc6000000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 65536
+> bytes, out of 8388608 (vaddr = 0xc6100000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 10240
+> bytes, out of 8388608 (vaddr = 0xc6110000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 622080
+> bytes, out of 8388608 (vaddr = 0xc6200000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 622080
+> bytes, out of 8388608 (vaddr = 0xc6300000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 622080
+> bytes, out of 8388608 (vaddr = 0xc6400000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 589824
+> bytes, out of 8388608 (vaddr = 0xc6500000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 589824
+> bytes, out of 8388608 (vaddr = 0xc6600000) PAGE_SHIFT = 0xc
+> coda coda-imx27.0: dma_alloc_from_coherent: try to allocate 622080
+> bytes, out of 8388608 (vaddr = 0xc6700000) PAGE_SHIFT = 0xc
+> 
+> If we take a look at the size of each allocation and the different
+> vaddr values we find that the alignment is 0x100000 = 1MB for values
+> like 622080 byte size. Why is that?
 
-Yes they do.
+Have you thought about get_order() on the allocation size, and what the
+resulting order will be?  I'm sure if you could come up with a better
+allocation algorithm for this which doesn't lead to too much fragmentation
+(or convert it to use the pool infrastructure)...
 
-> Aren's there any kind of bindings needed, not even a
-> register base?
-
-All that information is in the "disabled" node contained in .dtsi file.
-
-+               msp0: msp at 80123000 {
-+                       compatible = "stericsson,ux500-msp-i2s";
-+                       reg = <0x80123000 0x1000>;
-+                       interrupts = <0 31 0x4>;
-+                       v-ape-supply = <&db8500_vape_reg>;
-+                       status = "disabled";
-
-Then this patch "enable"s it (as the title suggests). :)
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+BTW, your question has nothing to do with arm_memblock_steal().
