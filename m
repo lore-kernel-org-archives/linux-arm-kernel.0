@@ -1,17 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Sep 2012 16:46:23 -0600
-Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <5053B3BF.40500@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Sep 2012 00:27:03 +0100
+Subject: [PATCH 22/24] scsi: eesox: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-23-git-send-email-arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-23-git-send-email-arnd@arndb.de>
+Message-ID: <20120914232703.GE12245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 04:41 PM, Jon Hunter wrote:
-> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
-> to add some basic helpers to retrieve a DMA controller device_node and the
-> DMA request/channel information.
+On Fri, Sep 14, 2012 at 11:34:50PM +0200, Arnd Bergmann wrote:
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
 
-The binding looks good to me now, so,
-Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+There's nothing wrong with const iomem pointers.  If you think
+otherwise, patch x86 not to use const in its accessor implementation
+and watch the reaction:
+
+#define build_mmio_read(name, size, type, reg, barrier) \
+static inline type name(const volatile void __iomem *addr) \
+{ type ret; asm volatile("mov" size " %1,%0":reg (ret) \
+:"m" (*(volatile type __force *)addr) barrier); return ret; }
+
+build_mmio_read(readb, "b", unsigned char, "=q", :"memory")
+build_mmio_read(readw, "w", unsigned short, "=r", :"memory")
+build_mmio_read(readl, "l", unsigned int, "=r", :"memory")
