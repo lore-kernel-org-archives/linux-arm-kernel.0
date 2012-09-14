@@ -1,51 +1,52 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 14 Sep 2012 12:13:21 +0100
-Subject: [PATCH v4 19/24] xen/arm: compile blkfront and blkback
+Date: Fri, 14 Sep 2012 12:13:25 +0100
+Subject: [PATCH v4 23/24] xen: update xen_add_to_physmap interface
 In-Reply-To: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
-Message-ID: <1347621207-11294-19-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347621207-11294-23-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
----
- drivers/block/xen-blkback/blkback.c  |    1 +
- include/xen/interface/io/protocols.h |    3 +++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+Update struct xen_add_to_physmap to be in sync with Xen's version of the
+structure.
+The size field was introduced by:
 
-diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
-index 73f196c..63dd5b9 100644
---- a/drivers/block/xen-blkback/blkback.c
-+++ b/drivers/block/xen-blkback/blkback.c
-@@ -42,6 +42,7 @@
+changeset:   24164:707d27fe03e7
+user:        Jean Guyader <jean.guyader@eu.citrix.com>
+date:        Fri Nov 18 13:42:08 2011 +0000
+summary:     mm: New XENMEM space, XENMAPSPACE_gmfn_range
+
+According to the comment:
+
+"This new field .size is located in the 16 bits padding between .domid
+and .space in struct xen_add_to_physmap to stay compatible with older
+versions."
+
+Note: this patch should be already in Konrad's tree, it is here just for
+convenience.
+
+Changes in v2:
+
+- remove erroneous comment in the commit message.
+
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ include/xen/interface/memory.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index b5c3098..b66d04c 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -163,6 +163,9 @@ struct xen_add_to_physmap {
+     /* Which domain to change the mapping for. */
+     domid_t domid;
  
- #include <xen/events.h>
- #include <xen/page.h>
-+#include <xen/xen.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include "common.h"
-diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
-index 01fc8ae..0eafaf2 100644
---- a/include/xen/interface/io/protocols.h
-+++ b/include/xen/interface/io/protocols.h
-@@ -5,6 +5,7 @@
- #define XEN_IO_PROTO_ABI_X86_64     "x86_64-abi"
- #define XEN_IO_PROTO_ABI_IA64       "ia64-abi"
- #define XEN_IO_PROTO_ABI_POWERPC64  "powerpc64-abi"
-+#define XEN_IO_PROTO_ABI_ARM        "arm-abi"
- 
- #if defined(__i386__)
- # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_X86_32
-@@ -14,6 +15,8 @@
- # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
- #elif defined(__powerpc64__)
- # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
-+#elif defined(__arm__)
-+# define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
- #else
- # error arch fixup needed here
- #endif
++    /* Number of pages to go through for gmfn_range */
++    uint16_t    size;
++
+     /* Source mapping space. */
+ #define XENMAPSPACE_shared_info 0 /* shared info page */
+ #define XENMAPSPACE_grant_table 1 /* grant table page */
 -- 
 1.7.2.5
