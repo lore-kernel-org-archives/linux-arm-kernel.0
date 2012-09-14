@@ -1,69 +1,75 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 14 Sep 2012 09:57:34 +0200
-Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
-In-Reply-To: <1347591975.1943.12.camel@vkoul-udesk3>
-References: <1346731465-6301-1-git-send-email-marex@denx.de>
- <201209050346.39253.marex@denx.de> <1347591975.1943.12.camel@vkoul-udesk3>
-Message-ID: <201209140957.34863.marex@denx.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Sep 2012 09:03:48 +0100
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
+ DT and non-DT boots
+In-Reply-To: <CACRpkdaKa=NAObnjJyifhxyqu3Hcgj7Fxqi=bdNFqbm7V_8cSw@mail.gmail.com>
+References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaKa=NAObnjJyifhxyqu3Hcgj7Fxqi=bdNFqbm7V_8cSw@mail.gmail.com>
+Message-ID: <20120914080347.GB3374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Vinod Koul,
-
-> On Wed, 2012-09-05 at 03:46 +0200, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > On Tue, Sep 04, 2012 at 06:04:25AM +0200, Marek Vasut wrote:
-> > > > In case of a large SPI flash, the amount of DMA descriptors
-> > > > available to the DMA driver is not large enough anymore. For
-> > > > example 8MB SPI flash now needs 129 descriptors to be transfered
-> > > > in one long read. There are currently 53 descriptors available in
-> > > > one PAGE_SIZE-big block. Enlarge the allocated descriptor area to
-> > > > four PAGE_SIZE blocks to fulfill such requirements.
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > Cc: Dan Williams <djbw@fb.com>
-> > > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > > Vinod (copied) is the primary maintainer and collecting dma patches
-> > > now.
-> > 
-> > Understood.
-> > 
-> > Let me ask about another thing. If there'll eventually be some device
-> > that'd need even larger transfer (say ... hundreds of megs) we'd end up
-> > with trouble again.
-> > 
-> > One way to fix this is to recycle descriptors that were already used
-> > during the transfer, but can we really do it fast enough, so the DMA
-> > would do it's job at one end of the descriptor chain and we'd be
-> > building the other?
+On Thu, Sep 13, 2012 at 11:35:43AM +0200, Linus Walleij wrote:
+> On Mon, Aug 6, 2012 at 2:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> See the comment in dma_ctrl_flags:
-> * @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the
-> client *  acknowledges receipt, i.e. has has a chance to establish any
-> dependency *  chains
-> Setting this would mean that driver can reuse the descriptor once the
-> transaction has completed.
-
-Sure, but then building the DMA chain on-the-fly might be a little bit too 
-crazy. Still, I think we're safe with using 4 pages for now, it's more than 
-plenty.
-
-> > The other (easier) way is to let the device that claims the particular
-> > DMA channel allocate as much descriptors as it might ever need, which I
-> > think is wrong.
+> > If we're booting with Device Tree enabled, we want the IRQ numbers to
+> > be taken and translated from the Device Tree binary. If not, they
+> > should be taken from the resource allocation defined in the AB8500 MFD
+> > core driver.
+> >
+> > Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Correct.
+> Not having this patch in v3.6-rcN gives the following boot noise (and
+> the key does not work):
 > 
-> > What do you think ?
-> > 
-> > Best regards,
-> > Marek Vasut
+> ------------[ cut here ]------------
+> WARNING: at /home/elinwal/linux-stericsson/kernel/irq/irqdomain.c:137
+> irq_domain_legacy_revmap+0x20/0x48()
+> Modules linked in:
+> [<c0014710>] (unwind_backtrace+0x0/0xf8) from [<c001d37c>]
+> (warn_slowpath_common+0x4c/0x64)
+> [<c001d37c>] (warn_slowpath_common+0x4c/0x64) from [<c001d3b0>]
+> (warn_slowpath_null+0x1c/0x24)
+> [<c001d3b0>] (warn_slowpath_null+0x1c/0x24) from [<c0064200>]
+> (irq_domain_legacy_revmap+0x20/0x48)
+> [<c0064200>] (irq_domain_legacy_revmap+0x20/0x48) from [<c02cea28>]
+> (ab8500_ponkey_probe+0xd0/0x1f8)
+> [<c02cea28>] (ab8500_ponkey_probe+0xd0/0x1f8) from [<c01a1e20>]
+> (platform_drv_probe+0x14/0x18)
+> [<c01a1e20>] (platform_drv_probe+0x14/0x18) from [<c01a0be4>]
+> (driver_probe_device+0x78/0x208)
+> [<c01a0be4>] (driver_probe_device+0x78/0x208) from [<c01a0e00>]
+> (__driver_attach+0x8c/0x90)
+> [<c01a0e00>] (__driver_attach+0x8c/0x90) from [<c019f514>]
+> (bus_for_each_dev+0x50/0x7c)
+> [<c019f514>] (bus_for_each_dev+0x50/0x7c) from [<c01a0424>]
+> (bus_add_driver+0x170/0x23c)
+> [<c01a0424>] (bus_add_driver+0x170/0x23c) from [<c01a12b4>]
+> (driver_register+0x78/0x144)
+> [<c01a12b4>] (driver_register+0x78/0x144) from [<c0008598>]
+> (do_one_initcall+0x34/0x174)
+> [<c0008598>] (do_one_initcall+0x34/0x174) from [<c03df8e8>]
+> (kernel_init+0xfc/0x1bc)
+> [<c03df8e8>] (kernel_init+0xfc/0x1bc) from [<c000f1d4>]
+> (kernel_thread_exit+0x0/0x8)
+> ---[ end trace d77aa0db848f0e28 ]---
+> ab8500-core ab8500-core.0: Failed to request dbf IRQ#0: -22
+> ab8500-poweron-key: probe of ab8500-poweron-key.0 failed with error -22
+> 
+> So how do we proceed to not release v3.6 with this regression?
+> 
+> Shall all of the MFD IRQdomain stuff be pulled into the -rc series?
+> 
+> (Linux-next seems to be working, so the real fix is in there)
 
+I haven't tested this, but I think this patch should be pulled out
+of -next and pushed into the -rcs to fix the issue you see above.
+The real fix along with the revert to this patch also resides in
+-next and will be applied during the next merge window.
 
-Best regards,
-Marek Vasut
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
