@@ -1,36 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Sep 2012 10:10:39 +0100
-Subject: [PATCH 10/19] ARM: ux500: Remove redundant #gpio-cell properties
- from HREF and Snowball DT
-In-Reply-To: <CACRpkdY_gyWRO20ZOfTmG=tzE_B3ObWZG_4f8gHS6vyiGZSh6Q@mail.gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-11-git-send-email-lee.jones@linaro.org>
- <CACRpkdY_gyWRO20ZOfTmG=tzE_B3ObWZG_4f8gHS6vyiGZSh6Q@mail.gmail.com>
-Message-ID: <20120914091037.GI3374@gmail.com>
+From: stefan.roese@gmail.com (Stefan Roese)
+Date: Fri, 14 Sep 2012 11:16:14 +0200
+Subject: [Query] Does u-boot processes dtb file
+In-Reply-To: <5052DE42.6080109@de.bosch.com>
+References: <CAKohpomkgk_hNAwqseAvc_cyLH+Vtr63r_hJGxsKueZhKno8_A@mail.gmail.com>	<5052D7EA.30902@de.bosch.com>
+ <CAKohpomubFQMj2uoP+Pb1xBsO7B14W3nR1ddSQ-ajRERNBQ+kg@mail.gmail.com>
+ <5052DE42.6080109@de.bosch.com>
+Message-ID: <5052F5DE.3010102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 04:12:23AM -0700, Linus Walleij wrote:
-> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 09/14/2012 09:35 AM, Dirk Behme wrote:
+> On 14.09.2012 09:16, Viresh Kumar wrote:
+>> On 14 September 2012 12:38, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>>> Working with U-Boot, to my understanding U-Boot modifies ('patches') the dtb
+>>> read from the boot device before passing it to the kernel. It e.g. adds the
+>>> kernel command line and the memory size you specify in U-Boot to the dtb.
+>>
+>> Thanks for your response.
+>>
+>> But, if this information is also embedded in the dts earlier, will my workaround
+>> of filling r2 work?
 > 
-> > These properties have no place here as the populated nodes are
-> > not related to GPIO Controllers.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> I think so, but I never tried it. It's on my todo list to try this ;) If 
+> you add all the information needed in the dts file and the resulting dtb 
+> file is identical to the 'patched' dtb U-Boot passes to the kernel, 
+> there should be no difference (?).
+
+Yes, this should work. As a matter of fact, we are using this
+pre-patched dtb method for booting directly from the SPL U-Boot version
+(small, limited U-Boot version) into the Linux kernel (skipping the
+full-blown U-Boot with the dtb patching upon bootm).
+
+>> Is filling bootargs and memory size the only stuff or some other things too?
 > 
-> Squash this into the previous patch adding them...
-> I think Arnd already noted.
+> I'm not totally sure on this. You could debug this: (a) Take the dtb 
+> file from your boot device. (b) dump the dtb file U-Boot passes to the 
+> kernel (i.e. do a memory dump from the pointer U-Boot passes in r2). 
+> Compare (a) and (b) with a binary diff.
 
-Well he noted that I'd duplicated the error from the snowball.dts
-file, then rectified in this patch, which is fair enough. However,
-I don't think the snowball.dts fix should be squashed into an HREF
-enablement patch, and I can't find a suitable patch in the patch-
-set where it would really fit. Should I leave the Snowball fix
-separate and just fixup the HREF .dts file to never duplicate the
-anomaly?
+The DT properties that are "patched" differ from platform to platform.
+Some also insert dynamically detected clock speeds. Also the board
+specific MAC address is often inserted into the dtb. But for basic
+kernel bootup, memsize and bootargs are definitely the most important ones.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+You could also use U-Boot on the board (if available) to prepare/patch
+the dtb via the "fdt" commands. If you have questions on this, please
+ask on the u-boot list.
+
+Cheers,
+Stefan
