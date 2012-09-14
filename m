@@ -1,60 +1,50 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 14 Sep 2012 11:39:45 +0200
-Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed
- via Device Tree
-In-Reply-To: <20120914090228.GH3374@gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
- <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
- <20120912105202.GD2624@pengutronix.de>
- <20120914082754.GE3374@gmail.com>
- <20120914084141.GA2630@pengutronix.de>
- <20120914090228.GH3374@gmail.com>
-Message-ID: <20120914093945.GB2630@pengutronix.de>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 14 Sep 2012 15:08:08 +0530
+Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
+ dmaengine_prep_dma_cyclic()
+In-Reply-To: <5052F8BC.4020102@ti.com>
+References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
+ <5051FB4D.3000009@metafoo.de> <1347593217.1943.26.camel@vkoul-udesk3>
+ <5052E72A.8040207@metafoo.de> <1347612630.1943.29.camel@vkoul-udesk3>
+ <5052F8BC.4020102@ti.com>
+Message-ID: <1347615488.1943.47.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Ah, sorry. That's my fault for rushing though my ridiculously bloated post-
-> vacation inbox.
-
-:)
-
-> > all the infos I got. Some more context would have been helpful. Is there
-> > a branch somewhere with all the things collected?
+On Fri, 2012-09-14 at 12:28 +0300, Peter Ujfalusi wrote:
+> Hi,
 > 
-> There will be. I'm currently just Ack collecting. 
+> On 09/14/2012 11:50 AM, Vinod Koul wrote:
+> >> Well, the idea was that the driver would disable interrupts if there is no
+> >> callback to call, since there would be nothing to do in the interrupt
+> >> handler anyway. But I guess the flags approach should work fine as well.
+> > Yes we _could_ do that, but this relies on dmaengine driver to have this
+> > implicit understanding. Anyone using dmaengine library in ASoC may or
+> > may not be aware of this, so i would consider it hackish.
+> > 
+> > Using this flag explicitly makes everyone aware what the intended
+> > behaviour is.
 > 
-> In fact wait ...
+> I'm not sure about which flags should ASoC set for the two case we are going
+> to have. I think it should be something like this:
 > 
-> <3 mins pass>
+> unsigned long flags = DMA_CTRL_ACK;
+usage of ACK flag is mostly async_tx thingy, we can skip it for slave.
 > 
-> Now there is:
->   git://git.linaro.org/people/ljones/linux-3.0-ux500.git preview-for-next
-
-OK from having a glimpse, I'd prefer to squash (or have squashed)
-
-	i2c: nomadik: Add Device Tree support to the Nomadik I2C driver
-	Documentation: Device Tree binding information for i2c-nomadik driver
-		(Documentation should go along with the code)
-	i2c-nomadik: Register sub-devices when passed via Device Tree
-
-into one patch and take that via the I2C tree. This will allow me to
-resolve the merge conflict in my tree on my own. I don't see a strong
-reason to have those go via arm-soc (like prevented build-failures or
-easier merges), if I missed such a reason, please let me know.
-
-Regards,
-
-   Wolfram
+> if (!substream->runtime->no_period_wakeup)
+> 	flags |= DMA_PREP_INTERRUPT;
+> I'm not 100% sure of the role of DMA_CTRL_ACK in this case. Or should we only
+> handle the DMA_PREP_INTERRUPT flag, like this:
+> 
+> unsigned long flags = 0;
+> 
+> if (!substream->runtime->no_period_wakeup)
+> 	flags |= DMA_PREP_INTERRUPT;
+> 
+> 
+> What do you think?
+Looks fine.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120914/4f74d98d/attachment.sig>
+~Vinod
