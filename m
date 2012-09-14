@@ -1,37 +1,67 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 14 Sep 2012 14:26:40 +0530
-Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
-In-Reply-To: <20120914083050.GA12245@n2100.arm.linux.org.uk>
-References: <1346731465-6301-1-git-send-email-marex@denx.de>
- <20120905014000.GP2362@S2101-09.ap.freescale.net>
- <201209050346.39253.marex@denx.de> <1347591975.1943.12.camel@vkoul-udesk3>
- <20120914083050.GA12245@n2100.arm.linux.org.uk>
-Message-ID: <1347613000.1943.34.camel@vkoul-udesk3>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Sep 2012 10:02:30 +0100
+Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed via
+ Device Tree
+In-Reply-To: <20120914084141.GA2630@pengutronix.de>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
+ <20120912105202.GD2624@pengutronix.de>
+ <20120914082754.GE3374@gmail.com>
+ <20120914084141.GA2630@pengutronix.de>
+Message-ID: <20120914090228.GH3374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-14 at 09:30 +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 14, 2012 at 08:36:15AM +0530, Vinod Koul wrote:
-> > On Wed, 2012-09-05 at 03:46 +0200, Marek Vasut wrote:
-> > > One way to fix this is to recycle descriptors that were already used during the 
-> > > transfer, but can we really do it fast enough, so the DMA would do it's job at 
-> > > one end of the descriptor chain and we'd be building the other?
-> > See the comment in dma_ctrl_flags:
-> > * @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the client
-> > *  acknowledges receipt, i.e. has has a chance to establish any dependency
-> > *  chains
-> > Setting this would mean that driver can reuse the descriptor once the
-> > transaction has completed.
-> 
-> Actually, that has little meaning for slave DMA descriptors (other than
-> it should already be set for consistency with the async_tx stuff, which
-> has the above mentioned depenedency chains.)
-> 
-> Once completed, descriptors can be reused irrespective of the above flag.
-Yes that is the reason no one in slave world uses it and we consider the
-descriptor can be reused once transaction is complete.
-FWIW I see some of the salve drivers do consider this flag!!
 
+> > > First, I'd like to have this patch squashed with "i2c: nomadik: Add
+> > > Device Tree support to the Nomadik I2C driver". I wanted to do this on
+> > > my own, but the patches do not apply to 3.6-rc5 (with or without
+> > > regulator removal patch from Linus)?
+> > 
+> > I'm really not keen on squashing all my patches together. They are
+> > clearly have very different purposes. If you think they are closely
+> > related, then pull them in sequentially, but please don't squash
+> > all my work into a single patch for no other reason than convenience.
+> 
+> I can't follow this reasoning. I never asked you to squash all patches,
+> only those two needed to get proper device tree support. Why would you
+> want to let the device being detected via DT and not scan the child
+> nodes immediately?
+
+Ah, sorry. That's my fault for rushing though my ridiculously bloated post-
+vacation inbox. I *stupidly* thought you wanted me to squash two different
+patches, rather than these two. As such I unreservedly retract my previous
+statement. Yes, please squash.
+
+> > > I can also take the I2C related changes to the devicetrees via my tree.
+> > > This is not uncommon. Some people prefer to do this via their soc-trees,
+> > > though. I don't care much since this is not really a hard dependency
+> > > causing build failures or merge conflicts, but just needs a little extra
+> > > time until the patches are all there...
+> > 
+> > It would be better for all the Device Tree changes go in as a single
+> > patch-set. Again, I don't care where they go, so long as they go in
+> > together. arm-soc seems like the most generic place for them to be
+> > pulled into though.
+> 
+> This reasoning I can follow, but how should I know you aimed for that? I
+> only saw a patch [3/3] in one series making the driver probable via DT
+> and a patch [12/19] in another series to scan the child nodes. That's
+> all the infos I got. Some more context would have been helpful. Is there
+> a branch somewhere with all the things collected?
+
+There will be. I'm currently just Ack collecting. 
+
+In fact wait ...
+
+<3 mins pass>
+
+Now there is:
+  git://git.linaro.org/people/ljones/linux-3.0-ux500.git preview-for-next
 
 -- 
-~Vinod
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
