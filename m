@@ -1,50 +1,44 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 14 Sep 2012 13:27:17 +0900
-Subject: [PATCH V2] ARM: EXYNOS5: Add bus clock and set parent clock for
- FIMD
-In-Reply-To: <1347450536-21843-1-git-send-email-l.krishna@samsung.com>
-References: <1347450536-21843-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <001101cd9231$3927b9d0$ab772d70$%han@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 Sep 2012 13:33:34 +0900
+Subject: [PATCH v9 05/13] ARM: SoC: convert Exynos4 to SoC descriptor
+In-Reply-To: <1347461906-13527-6-git-send-email-arnd@arndb.de>
+References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
+ <1347461906-13527-6-git-send-email-arnd@arndb.de>
+Message-ID: <01ae01cd9232$19d78ff0$4d86afd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 12, 2012 8:49 PM Leela Krishna Amudala wrote
+Arnd Bergmann wrote:
 > 
-> This patch adds the bus clock for FIMD and changes the device name for lcd clock
-> also sets mout_mpll_user as parent clock to fimd
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c       |   34 +++++++++++++++++++--------
->  arch/arm/plat-samsung/include/plat/clock.h |    2 +
->  2 files changed, 26 insertions(+), 10 deletions(-)
+> Convert Exynos4 to use the SoC descriptor to provide its SMP
+> and CPU hotplug operations.
 > 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-> index 774533c..205d19f 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-[.....]
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-> 
-> +struct clksrc_clk exynos5_clk_sclk_fimd = {
-
-Replace 'exynos5_clk_sclk_fimd' with 'exynos5_clk_sclk_fimd1'.
-This is because 'exynos5_clk_sclk_fimd0' can be added for other
-Exynos5 SoCs later.
+Thanks.
 
 Best regards,
-Jingoo Han
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> +	.clk	= {
-> +		.name	        = "sclk_fimd",
-> +		.devname        = "exynos5-fb.1",
-> +		.enable         = exynos5_clksrc_mask_disp1_0_ctrl,
-> +		.ctrlbit        = (1 << 0),
-> +	},
-> +	.sources = &exynos5_clkset_group,
-> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
-> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
-> +};
-> +
+> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-exynos/common.h              |    5 +++++
+>  arch/arm/mach-exynos/hotplug.c             |   18 +++---------------
+>  arch/arm/mach-exynos/mach-armlex4210.c     |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c     |    1 +
+>  arch/arm/mach-exynos/mach-nuri.c           |    1 +
+>  arch/arm/mach-exynos/mach-origen.c         |    1 +
+>  arch/arm/mach-exynos/mach-smdk4x12.c       |    2 ++
+>  arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
+>  arch/arm/mach-exynos/mach-universal_c210.c |    1 +
+>  arch/arm/mach-exynos/platsmp.c             |   20 ++++++++++++++++----
+>  10 files changed, 33 insertions(+), 19 deletions(-)
