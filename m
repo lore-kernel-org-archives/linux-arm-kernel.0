@@ -1,43 +1,99 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 14 Sep 2012 11:18:51 +0800
-Subject: [PATCH 0/4] Add PHY nofity for some i.mx SoCs
-Message-ID: <1347592731-12998-1-git-send-email-peter.chen@freescale.com>
+Date: Fri, 14 Sep 2012 11:20:26 +0800
+Subject: [PATCH 1/4] usb: phy: add notify_suspend/notify_resume callback
+Message-ID: <1347592826-13050-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At some i.mx SoCs, when controller works at host mode, the PHY
-register needs to be changed at device connect, disconnect, bus
-suspend and resume due to the SoC limitations.
+This let usb phy driver has the chance to change hw settings during
+the controller suspend/resume procedure.
 
-The phy notification should be added according to below rules:
+Besides, old parameter "port" is useless for phy notify, as one usb
+phy is only for one usb port. New parameter "speed" stands for
+the device's speed which is on the port.
 
-1. Only set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
-during high speed host mode.
-2. Do not set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
-during the reset and speed negotiation period.
-3. Do not set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
-during host suspend/resume sequence.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ include/linux/usb/phy.h |   44 +++++++++++++++++++++++++++++++++++++-------
+ 1 files changed, 37 insertions(+), 7 deletions(-)
 
-Please refer: i.mx23RM(page 413) for detail.
-http://www.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
-
-Freescale i.MX SoC, i.mx23, i.mx28 and i.mx6(i.mx6SL does not
-need to follow the 3rd rule) need to follow above rules.
-
-The correct notification setting method should be:
-1. Set connect notify after the second bus reset.
-2. Set disconnect notify after disconnection.
-3. Set suspend nofity after bus goes to suspend (portsc.suspendM=1).
-4. Set resume notify after resume (portsc.fpr=0).
-
-Peter Chen (4):
-  usb: phy: add notify_suspend/notify_resume callback
-  usb: mxs-phy: implement notify_suspend/notify_resume callback
-  usb: chipidea: add phy notify at suspend/resume procedure
-  usb: refine phy notify operation during connection and disconnection
-
- drivers/usb/chipidea/host.c |   75 +++++++++++++++++++++++++++++++++++++++++-
- drivers/usb/core/hub.c      |   14 ++++----
- drivers/usb/otg/mxs-phy.c   |   56 +++++++++++++++++++++++++-------
- include/linux/usb/phy.h     |   44 +++++++++++++++++++++----
- 4 files changed, 161 insertions(+), 28 deletions(-)
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 06b5bae..45e2235 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -10,6 +10,7 @@
+ #define __LINUX_USB_PHY_H
+ 
+ #include <linux/notifier.h>
++#include <linux/usb.h>
+ 
+ enum usb_phy_events {
+ 	USB_EVENT_NONE,         /* no events or cable disconnected */
+@@ -98,9 +99,20 @@ struct usb_phy {
+ 	int	(*set_suspend)(struct usb_phy *x,
+ 				int suspend);
+ 
+-	/* notify phy connect status change */
+-	int	(*notify_connect)(struct usb_phy *x, int port);
+-	int	(*notify_disconnect)(struct usb_phy *x, int port);
++	/*
++	 * Notify phy that
++	 * - The controller's connect status change.
++	 * - The controller's suspend/resume occurs, and the device
++	 * is on the port.
++	 */
++	int	(*notify_connect)(struct usb_phy *x,
++			enum usb_device_speed speed);
++	int	(*notify_disconnect)(struct usb_phy *x,
++			enum usb_device_speed speed);
++	int	(*notify_suspend)(struct usb_phy *x,
++			enum usb_device_speed speed);
++	int	(*notify_resume)(struct usb_phy *x,
++			enum usb_device_speed speed);
+ };
+ 
+ 
+@@ -189,19 +201,37 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+ }
+ 
+ static inline int
+-usb_phy_notify_connect(struct usb_phy *x, int port)
++usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
+ {
+ 	if (x->notify_connect)
+-		return x->notify_connect(x, port);
++		return x->notify_connect(x, speed);
+ 	else
+ 		return 0;
+ }
+ 
+ static inline int
+-usb_phy_notify_disconnect(struct usb_phy *x, int port)
++usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
+ {
+ 	if (x->notify_disconnect)
+-		return x->notify_disconnect(x, port);
++		return x->notify_disconnect(x, speed);
++	else
++		return 0;
++}
++
++static inline int
++usb_phy_notify_suspend(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x->notify_suspend)
++		return x->notify_suspend(x, speed);
++	else
++		return 0;
++}
++
++static inline int
++usb_phy_notify_resume(struct usb_phy *x, enum usb_device_speed speed)
++{
++	if (x->notify_resume)
++		return x->notify_resume(x, speed);
+ 	else
+ 		return 0;
+ }
+-- 
+1.7.0.4
