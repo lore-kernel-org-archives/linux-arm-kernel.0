@@ -1,57 +1,46 @@
-From: schen@mvista.com (Steve Chen)
-Date: Fri, 14 Sep 2012 13:39:15 -0500
-Subject: Kernel fails to boot with "crc error -- System halted"
-In-Reply-To: <1347638108.3789.YahooMailNeo@web133202.mail.ir2.yahoo.com>
-References: <1347638108.3789.YahooMailNeo@web133202.mail.ir2.yahoo.com>
-Message-ID: <CAHKQLBEs0N5NBqmkSMALRx3ioV4g8JR1RY=g644R-wTU6YcNXA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 14 Sep 2012 14:06:13 -0600
+Subject: [GIT PULL 02/10] ARM: tegra: first round of cleanup
+In-Reply-To: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1347653181-19936-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 10:55 AM, Ellis Andrew <ajellisuk@yahoo.co.uk>wrote:
+This branch contains a few early cleanups; consistent use of IO_ADDRESS,
+always selecting USE_OF since we're converting to device-tree-only this
+merge window, and removing includes of some header files as part of
+working towards single zImage.
 
-> Hi
->
-> I have run into a major problem in that when I program my kernel into
-> flash on my system or try and run it from RAM I get the following output:
->
-> *## Booting image at 00060000 ...
-> ## Copy image from flash 00060000 to ram 00200000 ...
-> Image Name:
-> Image Type: ARM Linux Kernel Image (uncompressed)
-> Data Size: 1871640 Bytes = 1.8 MB
-> Load Address: 00008000
-> Entry Point: 00008000
-> Verifying Checksum ... OK
-> OK
->
-> Starting kernel ...
->
-> Uncompressing Linux.............................................
-> .................................................. ....................
->
-> crc error
->
-> -- System halted
-> *
->
-> The checksum passes, but the image type is uncompressed, so why is the
-> kernel trying to decompress?
->
-> From a successful build I had the same message about uncompressing the
-> kernel, so I don't understand what the problem is. I have previously been
-> able to build and run kernels without the above problem. I cannot work out
-> what I have done to cause this problem, could someone please enlighten me
-> as to what could be going wrong?
->
-> Kind regards
->
->
-I saw the same problem a few years ago.  The problem was traced to hardware
-data cache issue.  I would suggest test the RAM to make sure it functions
-properly, and perhaps disable data cache (typically chip maker fix this
-type of issues before the final release, so it is unlikely to help).
+This branch is based on v3.6-rc4.
 
-Steve
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120914/eff51c1c/attachment-0001.html>
+----------------------------------------------------------------
+
+The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+
+  Linux 3.6-rc4
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-cleanup
+
+for you to fetch changes up to a5b64ce64d6bdceecd45a07893affbf88d7bb7d2:
+
+  mmc: tegra: remove useless include of <mach/*.h>
+
+----------------------------------------------------------------
+
+Laxman Dewangan (1):
+      ARM: tegra: use IO_ADDRESS for getting virtual address
+
+Stephen Warren (3):
+      ARM: tegra: remove duplicate select USE_OF
+      gpio: tegra: remove useless includes of <mach/*.h>
+      mmc: tegra: remove useless include of <mach/*.h>
+
+ arch/arm/mach-tegra/Kconfig    |    1 -
+ arch/arm/mach-tegra/apbio.c    |    4 ++--
+ arch/arm/mach-tegra/fuse.c     |    4 ++--
+ drivers/gpio/gpio-tegra.c      |    3 ---
+ drivers/mmc/host/sdhci-tegra.c |    1 -
+ 5 files changed, 4 insertions(+), 9 deletions(-)
