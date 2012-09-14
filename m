@@ -1,48 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 23:34:43 +0200
-Subject: [PATCH 15/24] ARM: sa1100: use __iomem pointers for MMIO
+Date: Fri, 14 Sep 2012 23:34:51 +0200
+Subject: [PATCH 23/24] video: da8xx-fb: use __iomem pointers for MMIO
 In-Reply-To: <1347658492-11608-1-git-send-email-arnd@arndb.de>
 References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347658492-11608-16-git-send-email-arnd@arndb.de>
+Message-ID: <1347658492-11608-24-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 ARM is moving to stricter checks on readl/write functions,
 so we need to use the correct types everywhere.
 
-Cc: Jochen Friedrich <jochen@scram.de>
-Cc: Dominik Brodowski <linux@dominikbrodowski.net>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-sa1100/include/mach/simpad.h |    2 +-
- arch/arm/mach-sa1100/simpad.c              |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/video/da8xx-fb.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/include/mach/simpad.h b/arch/arm/mach-sa1100/include/mach/simpad.h
-index cdea671..ac2ea76 100644
---- a/arch/arm/mach-sa1100/include/mach/simpad.h
-+++ b/arch/arm/mach-sa1100/include/mach/simpad.h
-@@ -87,7 +87,7 @@
- #define SIMPAD_CS3_PCMCIA_SHORT		(SIMPAD_CS3_GPIO_BASE + 22)
- #define SIMPAD_CS3_GPIO_23		(SIMPAD_CS3_GPIO_BASE + 23)
+diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+index 7ae9d53..113d43a 100644
+--- a/drivers/video/da8xx-fb.c
++++ b/drivers/video/da8xx-fb.c
+@@ -131,7 +131,7 @@
+ #define UPPER_MARGIN	32
+ #define LOWER_MARGIN	32
  
--#define CS3_BASE        0xf1000000
-+#define CS3_BASE        IOMEM(0xf1000000)
+-static resource_size_t da8xx_fb_reg_base;
++static void __iomem *da8xx_fb_reg_base;
+ static struct resource *lcdc_regs;
+ static unsigned int lcd_revision;
+ static irq_handler_t lcdc_irq_handler;
+@@ -951,7 +951,7 @@ static int __devexit fb_remove(struct platform_device *dev)
+ 		clk_disable(par->lcdc_clk);
+ 		clk_put(par->lcdc_clk);
+ 		framebuffer_release(info);
+-		iounmap((void __iomem *)da8xx_fb_reg_base);
++		iounmap(da8xx_fb_reg_base);
+ 		release_mem_region(lcdc_regs->start, resource_size(lcdc_regs));
  
- long simpad_get_cs3_ro(void);
- long simpad_get_cs3_shadow(void);
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index fbd5359..6ca92d0 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -124,7 +124,7 @@ static struct map_desc simpad_io_desc[] __initdata = {
- 		.length		= 0x00800000,
- 		.type		= MT_DEVICE
- 	}, {	/* Simpad CS3 */
--		.virtual	= CS3_BASE,
-+		.virtual	= (unsigned long)CS3_BASE,
- 		.pfn		= __phys_to_pfn(SA1100_CS3_PHYS),
- 		.length		= 0x00100000,
- 		.type		= MT_DEVICE
+ 	}
+@@ -1171,7 +1171,7 @@ static int __devinit fb_probe(struct platform_device *device)
+ 	if (!lcdc_regs)
+ 		return -EBUSY;
+ 
+-	da8xx_fb_reg_base = (resource_size_t)ioremap(lcdc_regs->start, len);
++	da8xx_fb_reg_base = ioremap(lcdc_regs->start, len);
+ 	if (!da8xx_fb_reg_base) {
+ 		ret = -EBUSY;
+ 		goto err_request_mem;
+@@ -1392,7 +1392,7 @@ err_clk_put:
+ 	clk_put(fb_clk);
+ 
+ err_ioremap:
+-	iounmap((void __iomem *)da8xx_fb_reg_base);
++	iounmap(da8xx_fb_reg_base);
+ 
+ err_request_mem:
+ 	release_mem_region(lcdc_regs->start, len);
 -- 
 1.7.10
