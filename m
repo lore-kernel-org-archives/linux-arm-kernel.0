@@ -1,26 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 14 Sep 2012 15:38:01 -0700
-Subject: [PATCH 12/24] ARM: msm: use __iomem pointers for MMIO
-In-Reply-To: <1347658492-11608-13-git-send-email-arnd@arndb.de>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-13-git-send-email-arnd@arndb.de>
-Message-ID: <5053B1C9.10103@codeaurora.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 14 Sep 2012 17:41:55 -0500
+Subject: [PATCH V6 0/2] of: Add generic device tree DMA helpers
+Message-ID: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/12 14:34, Arnd Bergmann wrote:
-> ARM is moving to stricter checks on readl/write functions,
-> so we need to use the correct types everywhere.
->
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi all,
 
-I was going to send this patch out today. Thanks.
+I apologise for sending out so many updates in quick succession before everyone
+has had chance to review, however, I will be out of office next week and I know
+that several people have been waiting for this. Normally, I would not send out
+a series and disappear for a week, but Arnd agreed to help while I am out.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Arnd,
+Feel free to make any changes you see fit while I am out or correct any balls-up
+I have made!
+
+Cheers
+Jon
+
+This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2] to add
+some basic device-tree helpers to retrieve a DMA controller device_node and the
+DMA request/channel information.
+
+v6: - minor corrections in DMA binding documentation
+v5: - minor update to binding documentation
+    - added loop to exhaustively search for a slave channel in the case where
+      there could be alternative channels available
+v4: - revert the removal of xlate function from v3
+    - update the proposed binding format and APIs based upon discussions [3]
+v3: - avoid passing an xlate function and instead pass DMA engine parameters
+    - define number of dma channels and requests in dma-controller node
+v2: - remove of_dma_to_resource API
+    - make property #dma-cells required (no fallback anymore)
+    - another check in of_dma_xlate_onenumbercell() function
+
+[1] http://article.gmane.org/gmane.linux.drivers.devicetree/12022
+[2] http://article.gmane.org/gmane.linux.ports.arm.omap/73622
+[3] http://marc.info/?l=linux-omap&m=133582085008539&w=2
+
+Jon Hunter (2):
+  of: Add generic device tree DMA helpers
+  dmaengine: add helper function to request a slave DMA channel
+
+ Documentation/devicetree/bindings/dma/dma.txt |   81 +++++++++
+ drivers/dma/dmaengine.c                       |   16 ++
+ drivers/of/Makefile                           |    2 +-
+ drivers/of/dma.c                              |  219 +++++++++++++++++++++++++
+ include/linux/dmaengine.h                     |    6 +
+ include/linux/of_dma.h                        |   45 +++++
+ 6 files changed, 368 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/dma.txt
+ create mode 100644 drivers/of/dma.c
+ create mode 100644 include/linux/of_dma.h
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
