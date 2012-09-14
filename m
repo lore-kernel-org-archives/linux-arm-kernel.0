@@ -1,44 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Sep 2012 13:33:34 +0900
-Subject: [PATCH v9 05/13] ARM: SoC: convert Exynos4 to SoC descriptor
-In-Reply-To: <1347461906-13527-6-git-send-email-arnd@arndb.de>
-References: <1347461906-13527-1-git-send-email-arnd@arndb.de>
- <1347461906-13527-6-git-send-email-arnd@arndb.de>
-Message-ID: <01ae01cd9232$19d78ff0$4d86afd0$%kim@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Sep 2012 22:41:24 -0600
+Subject: [PATCH V4 5/5] ARM: bcm2835: instantiate console UART
+In-Reply-To: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347597684-30805-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1347597684-30805-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Convert Exynos4 to use the SoC descriptor to provide its SMP
-> and CPU hotplug operations.
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+From: Simon Arlott <simon@fire.lp0.eu>
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+This patch was extracted from git://github.com/lp0/linux.git branch
+rpi-split as of 2012/09/08, and modified as follows:
 
-Thanks.
+* s/bcm2708/bcm2835/.
+* Modified device tree vendor prefix.
+* Modified UART DT node to use a unit-address to create unique UART node
+  names, rather than using non-type names "uart0" and "uart1".
+  Note that UART 1 (the Broadcom "mini UART") is not yet present, but
+  I'm naming the DT node in anticipation that it will be added.
 
-Best regards,
-Kgene.
+Signed-off-by: Chris Boot <bootc@bootc.net>
+Signed-off-by: Simon Arlott <simon@fire.lp0.eu>
+Signed-off-by: Dom Cobley <popcornmix@gmail.com>
+Signed-off-by: Dom Cobley <dc4@broadcom.com>
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+v4:
+* s/bcm2708/bcm2835/.
+* Updated for new device tree vendor prefix.
+v3:
+* New patch.
+---
+ arch/arm/boot/dts/bcm2835.dtsi |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-exynos/common.h              |    5 +++++
->  arch/arm/mach-exynos/hotplug.c             |   18 +++---------------
->  arch/arm/mach-exynos/mach-armlex4210.c     |    1 +
->  arch/arm/mach-exynos/mach-exynos5-dt.c     |    1 +
->  arch/arm/mach-exynos/mach-nuri.c           |    1 +
->  arch/arm/mach-exynos/mach-origen.c         |    1 +
->  arch/arm/mach-exynos/mach-smdk4x12.c       |    2 ++
->  arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
->  arch/arm/mach-exynos/mach-universal_c210.c |    1 +
->  arch/arm/mach-exynos/platsmp.c             |   20 ++++++++++++++++----
->  10 files changed, 33 insertions(+), 19 deletions(-)
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index c7ac399..e837780 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -6,7 +6,7 @@
+ 	interrupt-parent = <&intc>;
+ 
+ 	chosen {
+-		bootargs = "earlyprintk";
++		bootargs = "earlyprintk console=ttyAMA0";
+ 	};
+ 
+ 	timer {
+@@ -22,4 +22,11 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
++
++	uart at 20201000 {
++		compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
++		reg = <0x20201000 0x1000>;
++		interrupts = <2 25>;
++		clock-frequency = <3000000>;
++	};
+ };
+-- 
+1.7.9.5
