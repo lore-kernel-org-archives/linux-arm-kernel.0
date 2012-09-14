@@ -1,94 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Sep 2012 19:18:45 -0700
-Subject: [GIT PULL 6/7] omap makefile and sparse cleanup for v3.7 merge window
-In-Reply-To: <pull-1347589125-283636>
-Message-ID: <mailman.7.1347589184.1458.linux-arm-kernel@lists.infradead.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Sep 2012 20:21:14 -0600
+Subject: [PATCH V3 2/5] ARM: bcm2708: add interrupt controller driver
+In-Reply-To: <201209131045.20730.arnd@arndb.de>
+References: <1347423509-30647-1-git-send-email-swarren@wwwdotorg.org>
+ <201209121037.43897.arnd@arndb.de> <50513300.6080403@wwwdotorg.org>
+ <201209131045.20730.arnd@arndb.de>
+Message-ID: <5052949A.1020909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
+On 09/13/2012 04:45 AM, Arnd Bergmann wrote:
+> On Thursday 13 September 2012, Stephen Warren wrote:
+>> On 09/12/2012 04:37 AM, Arnd Bergmann wrote:
 
-  ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
+>>>> @@ -0,0 +1,110 @@
+>>>> +BCM2708 Top-Level ("ARMCTRL") Interrupt Controller
+>>>> +
+>>>> +The BCM2708 contains a custom top-level interrupt controller, which supports
+>>>> +72 interrupt sources using a 2-level register scheme. The interrupt
+>>>> +controller, or the HW block containing it, is referred to occasionally
+>>>> +as "armctrl" in the SoC documentation, hence naming of this binding.
+>>>
+>>> Do we actually know that BCM2708 has the same one, or could it be present
+>>> just on bcm2835? It seem hard to find any information about bcm2708,
+>>> so I don't feel too good about using that name in bindings.
+>>
+>> I don't know anything at all about the BCM2708 really. Perhaps Dom at
+>> Broadcom can fill in some details?
+>>
+>> A similar discussion was apparently held downstream, and IIRC the
+>> reported decision there was that BCM2708 was the "parent" of a family of
+>> SoCs, so they made all the DT stuff compatible with both 2708 and 2835.
+>> Given the lack of documentation, I'd be quite happy to rework all of
+>> this to say just BCM2835 instead, and drop any reference to BCM2708 at
+>> all. Should I just go ahead and do that?
+> 
+> That's probably safer, yes.
 
-are available in the git repository at:
+Sounds good. For reference, I found:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-makefile-sparse-for-v3.7
+https://github.com/raspberrypi/linux/issues/22
 
-for you to fetch changes up to 3c101c41fbe5daf88afbbd575542aa1d047812bb:
+... where it sounds like BCM2708 isn't actually a chip at all, but a
+family name, so that supports this change.
 
-  Merge tag 'omap-cleanup-b-for-3.7' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into cleanup-makefile-sparse (2012-09-12 20:42:36 -0700)
+>>>> +asmlinkage void __exception_irq_entry bcm2708_armctrl_handle_irq(
+>>>> +	struct pt_regs *regs)
+>>>> +{
+>>>> +	u32 stat, irq;
+>>>> +
+>>>> +	while ((stat = readl_relaxed(intc.pending[0]) & BANK0_VALID_MASK)) {
+>>>> +		if (stat & BANK0_HWIRQ_MASK) {
+>>>> +			irq = MAKE_HWIRQ(0, ffs(stat & BANK0_HWIRQ_MASK) - 1);
+>>>> +			handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
+>>>> +		} else if (stat & SHORTCUT1_MASK) {
+>>>> +			armctrl_handle_shortcut(1, regs, stat & SHORTCUT1_MASK);
+>>>> +		} else if (stat & SHORTCUT2_MASK) {
+>>>> +			armctrl_handle_shortcut(2, regs, stat & SHORTCUT2_MASK);
+>>>> +		} else if (stat & BANK1_HWIRQ) {
+>>>> +			armctrl_handle_bank(1, regs);
+>>>> +		} else if (stat & BANK2_HWIRQ) {
+>>>> +			armctrl_handle_bank(2, regs);
+>>>> +		} else {
+>>>> +			BUG();
+>>>> +		}
+>>>> +	}
+>>>> +}
+>>>
+>>> I'm not sure if readl_relaxed() is appropriate here, or if you need readl().
+>>> If you have an MSI type interrupt signaling the completion of a DMA, you
+>>> need to ensure ordering between the data transfer and the interrupt
+>>> notification.
+>>
+>> I did wonder about this. I suppose it would be safe to globally replace
+>> all readl/writel_relaxed with plain readl/writel, and fix this up later
+>> if we can justify it. Should I go ahead and do that?
+> 
+> The synchronizations can be a bit expensive, so in the interrupt controller
+> driver it makes sense to use at least writel_relaxed, which should always
+> be fine because you don't have to worry about outgoing DMAs.
 
-----------------------------------------------------------------
-
->From Paul Walmsley <paul@pwsan.com>:
-
-Clean up and standardize several parts of
-arch/arm/mach-omap2/Makefile.  Beyond readability and diffstat
-improvements, the series should reduce the risk of conflicts during
-future cleanups by ensuring related lines are in the same section of the
-Makefile.
-
-smatch and string-wrapping cleanups for the OMAP subarch code.
-
-These changes fix some of the more meaningful warnings that smatch
-returns for the OMAP subarch code, and unwraps strings that are
-wrapped at the 80-column boundary, to conform with the current
-practice.
-
-----------------------------------------------------------------
-Paul Walmsley (8):
-      ARM: OMAP2+: clean up whitespace in Makefile
-      ARM: OMAP2+: clean up omap_hwmod.o build directives in Makefile
-      ARM: OMAP2+: move MPU INTCPS, secure monitor, SDRC build directives in Makefile
-      ARM: OMAP2+: clean up OMAP4 PRM & sleep build directives in Makefile
-      ARM: OMAP2+: clean up OMAP clock Makefile sections
-      ARM: OMAP2+: clean up PRCM sections of the Makefile
-      ARM: OMAP: clean up some smatch warnings, fix some printk(KERN_ERR ...
-      ARM: OMAP: unwrap strings
-
-Tony Lindgren (2):
-      Merge tag 'omap-cleanup-a-for-3.7' of git://git.kernel.org/.../pjw/omap-pending into cleanup-makefile-sparse
-      Merge tag 'omap-cleanup-b-for-3.7' of git://git.kernel.org/.../pjw/omap-pending into cleanup-makefile-sparse
-
- arch/arm/mach-omap1/board-htcherald.c       |    3 +-
- arch/arm/mach-omap1/clock.c                 |    4 +-
- arch/arm/mach-omap1/clock_data.c            |   13 ++--
- arch/arm/mach-omap1/dma.c                   |    5 +-
- arch/arm/mach-omap1/lcd_dma.c               |    6 +-
- arch/arm/mach-omap1/leds-h2p2-debug.c       |   12 +--
- arch/arm/mach-omap2/Makefile                |  108 +++++++++++----------------
- arch/arm/mach-omap2/board-n8x0.c            |    7 +-
- arch/arm/mach-omap2/board-overo.c           |    6 +-
- arch/arm/mach-omap2/board-zoom-debugboard.c |    7 +-
- arch/arm/mach-omap2/clkt34xx_dpll3m2.c      |   10 +--
- arch/arm/mach-omap2/clkt_clksel.c           |   28 ++++---
- arch/arm/mach-omap2/clkt_dpll.c             |    8 +-
- arch/arm/mach-omap2/clock.c                 |   20 ++---
- arch/arm/mach-omap2/clock3xxx.c             |    3 +-
- arch/arm/mach-omap2/clockdomain.c           |   74 +++++++++---------
- arch/arm/mach-omap2/common-board-devices.c  |    3 +-
- arch/arm/mach-omap2/dpll3xxx.c              |    7 +-
- arch/arm/mach-omap2/gpio.c                  |    1 +
- arch/arm/mach-omap2/gpmc.c                  |    2 +-
- arch/arm/mach-omap2/id.c                    |    5 +-
- arch/arm/mach-omap2/irq.c                   |    5 +-
- arch/arm/mach-omap2/omap_hwmod.c            |   16 ++--
- arch/arm/mach-omap2/opp.c                   |   15 ++--
- arch/arm/mach-omap2/pm.c                    |    4 +-
- arch/arm/mach-omap2/pm34xx.c                |    8 +-
- arch/arm/mach-omap2/pm44xx.c                |    8 +-
- arch/arm/mach-omap2/powerdomain.c           |   36 +++++----
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c  |    4 +-
- arch/arm/mach-omap2/powerdomain44xx.c       |    4 +-
- arch/arm/mach-omap2/prcm.c                  |    8 +-
- arch/arm/mach-omap2/serial.c                |   12 +--
- arch/arm/mach-omap2/sr_device.c             |   13 ++--
- arch/arm/mach-omap2/timer.c                 |    2 +-
- arch/arm/mach-omap2/vc.c                    |    5 +-
- arch/arm/mach-omap2/voltage.c               |   12 +--
- arch/arm/mach-omap2/vp.c                    |   16 ++--
- arch/arm/plat-omap/dma.c                    |   51 ++++++-------
- arch/arm/plat-omap/mux.c                    |    2 +-
- arch/arm/plat-omap/omap-pm-noop.c           |   39 +++++-----
- arch/arm/plat-omap/omap_device.c            |   25 +++----
- 41 files changed, 277 insertions(+), 340 deletions(-)
+Thinking some more about this - I doubt there are any MSI-style
+interrupts; there's certainly no PCI/PCIe on the Raspberry Pi board, and
+none documented in the SoC itself (although admittedly only a small
+subset of the SoC is publicly documented). I guess it's easiest just to
+leave that code as-is, and fix it up if the hardware ever turns out to
+be more complex, and actually have MSI.
