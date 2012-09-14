@@ -1,47 +1,34 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 14 Sep 2012 12:20:45 -0500
-Subject: [PATCH V5 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201209141526.17791.arnd@arndb.de>
-References: <1347635923-30166-1-git-send-email-jon-hunter@ti.com>
- <1347635923-30166-2-git-send-email-jon-hunter@ti.com>
- <201209141526.17791.arnd@arndb.de>
-Message-ID: <5053676D.8020602@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Sep 2012 18:29:45 +0100
+Subject: [PATCH v2 13/31] arm64: Device specific operations
+In-Reply-To: <20120815003355.GF19607@quad.lixom.net>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-14-git-send-email-catalin.marinas@arm.com>
+ <20120815003355.GF19607@quad.lixom.net>
+Message-ID: <20120914172944.GB2927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+(revisiting unanswered emails :))
 
-On 09/14/2012 10:26 AM, Arnd Bergmann wrote:
-> On Friday 14 September 2012, Jon Hunter wrote:
->>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Stephen Warren <swarren@nvidia.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Vinod Koul <vinod.koul@intel.com>
->> Cc: Dan Williams <djbw@fb.com>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+On Wed, Aug 15, 2012 at 01:33:55AM +0100, Olof Johansson wrote:
+> On Tue, Aug 14, 2012 at 06:52:14PM +0100, Catalin Marinas wrote:
+> > +/*
+> > + *  I/O port access primitives.
+> > + */
+> > +#define IO_SPACE_LIMIT		0xffff
+> > +
+> > +/*
+> > + * We currently don't have any platform with PCI support, so just leave this
+> > + * defined to 0 until needed.
+> > + */
+> > +#define PCI_IOBASE		((void __iomem *)0)
 > 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Thanks for all this work, looks great!
+> You could just leave out the PCI / I/O code alltogether instead.
 
-Thanks!
+I would leave this in as some of the first platforms to appear will have
+PCIe. At some point we'll add a fixed address where the PCI_IOBASE is
+mapped.
 
-> My final (tiny) comment on this:
-> 
->> +2. A single read-write channel with two alternative dma controllers:
->> +
->> +	dmas = <&dma1 5
->> +		&dma2 7
->> +		&dma3 2>;
->> +	dma-names = "rx-tx", "rx-tx", "rx-tx"
-> 
-> *three* alternative dma controllers, not two.
-
-Oops! I have been starring at this so long I can no longer see the wood
-for the trees!
-
-Jon
+-- 
+Catalin
