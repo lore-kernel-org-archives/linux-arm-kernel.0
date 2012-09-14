@@ -1,106 +1,173 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Sep 2012 23:34:36 +0200
-Subject: [PATCH 08/24] ARM: iop32x: use __iomem pointers for MMIO
-In-Reply-To: <1347658492-11608-1-git-send-email-arnd@arndb.de>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
-Message-ID: <1347658492-11608-9-git-send-email-arnd@arndb.de>
+Date: Fri, 14 Sep 2012 23:34:28 +0200
+Subject: [PATCH 00/24] ARM: readl/writel conversion fallout
+Message-ID: <1347658492-11608-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM is moving to stricter checks on readl/write functions,
-so we need to use the correct types everywhere.
+Linux-next currently contains 195bbcac "ARM: 7500/1: io: avoid writeback
+addressing modes for __raw_ accessors" from Will Deacon. While this
+patch does a number of very useful things, it also causes a lot of
+new build warnings in ARM specific code that was passing an integer
+as the address into readl/writel or similar functions.
 
+Most architectures have never allowed this, and my feeling is that
+it's time for ARM to do the same, so instead of changing the
+readl/writel behavior back, we should fix all code that uses
+incorrect addressing.
+
+A few people have already posted platform specific patches, this
+should take care of the rest that is needed for all defconfig
+builds. The majority of the warnings was in the shmobile platform,
+so those patches are by far the largest.
+
+I'm happy to have these patches go through individual subsystem
+maintainers, especially for the device drivers and those that
+have conflicts with other changes (ixp4xx, integrator, shmobile),
+but I can carry the reamining ones in one branch for arm-soc.
+
+Right now, the whole set is available in the testing/__iomem
+branch.
+
+	Arnd
+
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
 Cc: Imre Kaloz <kaloz@openwrt.org>
 Cc: Krzysztof Halasa <khc@pm.waw.pl>
-Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-iop32x/glantank.c                 |    2 +-
- arch/arm/mach-ixp4xx/common.c                   |    6 +++---
- arch/arm/mach-ixp4xx/include/mach/cpu.h         |    5 +++--
- arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h |    2 +-
- 4 files changed, 8 insertions(+), 7 deletions(-)
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Roland Stigge <stigge@antcom.de>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: STEricsson_nomadik_linux at list.st.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: linux-input at vger.kernel.org
+Cc: linux-scsi at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+Cc: netdev at vger.kernel.org
+Cc: spear-devel at list.st.com
 
-diff --git a/arch/arm/mach-iop32x/glantank.c b/arch/arm/mach-iop32x/glantank.c
-index c15a100..02e20c3 100644
---- a/arch/arm/mach-iop32x/glantank.c
-+++ b/arch/arm/mach-iop32x/glantank.c
-@@ -183,7 +183,7 @@ static struct i2c_board_info __initdata glantank_i2c_devices[] = {
- 
- static void glantank_power_off(void)
- {
--	__raw_writeb(0x01, 0xfe8d0004);
-+	__raw_writeb(0x01, IOMEM(0xfe8d0004));
- 
- 	while (1)
- 		;
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index a9f8094..8c9cd5d 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -53,17 +53,17 @@ static struct clock_event_device clockevent_ixp4xx;
-  *************************************************************************/
- static struct map_desc ixp4xx_io_desc[] __initdata = {
- 	{	/* UART, Interrupt ctrl, GPIO, timers, NPEs, MACs, USB .... */
--		.virtual	= IXP4XX_PERIPHERAL_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_PERIPHERAL_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_PERIPHERAL_BASE_PHYS),
- 		.length		= IXP4XX_PERIPHERAL_REGION_SIZE,
- 		.type		= MT_DEVICE
- 	}, {	/* Expansion Bus Config Registers */
--		.virtual	= IXP4XX_EXP_CFG_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_EXP_CFG_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_EXP_CFG_BASE_PHYS),
- 		.length		= IXP4XX_EXP_CFG_REGION_SIZE,
- 		.type		= MT_DEVICE
- 	}, {	/* PCI Registers */
--		.virtual	= IXP4XX_PCI_CFG_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_PCI_CFG_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_PCI_CFG_BASE_PHYS),
- 		.length		= IXP4XX_PCI_CFG_REGION_SIZE,
- 		.type		= MT_DEVICE
-diff --git a/arch/arm/mach-ixp4xx/include/mach/cpu.h b/arch/arm/mach-ixp4xx/include/mach/cpu.h
-index b2ef65d..e3d5a2e 100644
---- a/arch/arm/mach-ixp4xx/include/mach/cpu.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/cpu.h
-@@ -14,6 +14,7 @@
- #ifndef __ASM_ARCH_CPU_H__
- #define __ASM_ARCH_CPU_H__
- 
-+#include <linux/io.h>
- #include <asm/cputype.h>
- 
- /* Processor id value in CP15 Register 0 */
-@@ -37,7 +38,7 @@
- 
- static inline u32 ixp4xx_read_feature_bits(void)
- {
--	u32 val = ~*IXP4XX_EXP_CFG2;
-+	u32 val = ~__raw_readl(IXP4XX_EXP_CFG2);
- 
- 	if (cpu_is_ixp42x_rev_a0())
- 		return IXP42X_FEATURE_MASK & ~(IXP4XX_FEATURE_RCOMP |
-@@ -51,7 +52,7 @@ static inline u32 ixp4xx_read_feature_bits(void)
- 
- static inline void ixp4xx_write_feature_bits(u32 value)
- {
--	*IXP4XX_EXP_CFG2 = ~value;
-+	__raw_writel(~cpu_to_le32(value), IXP4XX_EXP_CFG2);
- }
- 
- #endif  /* _ASM_ARCH_CPU_H */
-diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-index 97c530f..2272f5a 100644
---- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-@@ -92,7 +92,7 @@
- /*
-  * Expansion Bus Controller registers.
-  */
--#define IXP4XX_EXP_REG(x) ((volatile u32 *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
-+#define IXP4XX_EXP_REG(x) ((volatile u32 __iomem *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
- 
- #define IXP4XX_EXP_CS0      IXP4XX_EXP_REG(IXP4XX_EXP_CS0_OFFSET)
- #define IXP4XX_EXP_CS1      IXP4XX_EXP_REG(IXP4XX_EXP_CS1_OFFSET)
+Arnd Bergmann (24):
+  ARM: shmobile: use __iomem pointers for MMIO
+  ARM: at91: use __iomem pointers for MMIO
+  ARM: ebsa: use __iomem pointers for MMIO
+  ARM: ep93xx: use _iomem pointers for MMIO
+  ARM: imx: use __iomem pointers for MMIO
+  ARM: integrator: use __iomem pointers for MMIO
+  ARM: iop13xx: use __iomem pointers for MMIO
+  ARM: iop32x: use __iomem pointers for MMIO
+  ARM: ixp4xx: use __iomem pointers for MMIO
+  ARM: ks8695: use __iomem pointers for MMIO
+  ARM: lpc32xx: use __iomem pointers for MMIO
+  ARM: msm: use __iomem pointers for MMIO
+  ARM: nomadik: use __iomem pointers for MMIO
+  ARM: prima2: use __iomem pointers for MMIO
+  ARM: sa1100: use __iomem pointers for MMIO
+  ARM: spear13xx: use __iomem pointers for MMIO
+  ARM: OMAP: use __iomem pointers for MMIO
+  ARM: samsung: use __iomem pointers for MMIO
+  sh: use __iomem pointers for MMIO
+  input: rpcmouse: use __iomem pointers for MMIO
+  serial: ks8695: use __iomem pointers for MMIO
+  scsi: eesox: use __iomem pointers for MMIO
+  video: da8xx-fb: use __iomem pointers for MMIO
+  net: seeq: use __iomem pointers for MMIO
+
+ arch/arm/mach-at91/at91x40.c                    |    2 +-
+ arch/arm/mach-at91/at91x40_time.c               |    4 +-
+ arch/arm/mach-at91/include/mach/hardware.h      |    4 +-
+ arch/arm/mach-at91/include/mach/uncompress.h    |    6 +-
+ arch/arm/mach-at91/setup.c                      |    4 +-
+ arch/arm/mach-ebsa110/core.c                    |    8 +--
+ arch/arm/mach-ebsa110/core.h                    |   12 ++--
+ arch/arm/mach-ep93xx/include/mach/ts72xx.h      |   10 ++--
+ arch/arm/mach-ep93xx/ts72xx.c                   |   10 ++--
+ arch/arm/mach-imx/mach-armadillo5x0.c           |    2 +-
+ arch/arm/mach-imx/mach-kzm_arm11_01.c           |    4 +-
+ arch/arm/mach-imx/mach-mx31ads.c                |    2 +-
+ arch/arm/mach-imx/mach-mx31lite.c               |    2 +-
+ arch/arm/mach-integrator/core.c                 |    4 +-
+ arch/arm/mach-integrator/cpu.c                  |    8 +--
+ arch/arm/mach-integrator/integrator_ap.c        |   12 ++--
+ arch/arm/mach-integrator/integrator_cp.c        |    6 +-
+ arch/arm/mach-integrator/pci_v3.c               |   12 ++--
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h    |   20 +++----
+ arch/arm/mach-iop13xx/include/mach/memory.h     |   14 ++---
+ arch/arm/mach-iop13xx/io.c                      |   12 ++--
+ arch/arm/mach-iop13xx/pci.c                     |   16 +++---
+ arch/arm/mach-iop13xx/pci.h                     |    4 +-
+ arch/arm/mach-iop13xx/setup.c                   |   10 ++--
+ arch/arm/mach-iop32x/glantank.c                 |    2 +-
+ arch/arm/mach-ixp4xx/common.c                   |    8 +--
+ arch/arm/mach-ixp4xx/include/mach/cpu.h         |    5 +-
+ arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h |   10 ++--
+ arch/arm/mach-ks8695/cpu.c                      |    2 +-
+ arch/arm/mach-ks8695/include/mach/hardware.h    |    2 +-
+ arch/arm/mach-ks8695/include/mach/uncompress.h  |    6 +-
+ arch/arm/mach-lpc32xx/common.c                  |    8 +--
+ arch/arm/mach-lpc32xx/include/mach/hardware.h   |    2 +-
+ arch/arm/mach-msm/smd.c                         |   19 +++---
+ arch/arm/mach-nomadik/board-nhk8815.c           |    3 +-
+ arch/arm/mach-nomadik/include/mach/hardware.h   |    2 +-
+ arch/arm/mach-nomadik/include/mach/uncompress.h |    8 +--
+ arch/arm/mach-prima2/include/mach/uncompress.h  |    4 +-
+ arch/arm/mach-sa1100/include/mach/simpad.h      |    2 +-
+ arch/arm/mach-sa1100/simpad.c                   |    2 +-
+ arch/arm/mach-shmobile/board-ap4evb.c           |   12 ++--
+ arch/arm/mach-shmobile/board-armadillo800eva.c  |    6 +-
+ arch/arm/mach-shmobile/board-bonito.c           |    8 +--
+ arch/arm/mach-shmobile/board-g3evm.c            |   12 ++--
+ arch/arm/mach-shmobile/board-g4evm.c            |   30 +++++-----
+ arch/arm/mach-shmobile/board-kzm9g.c            |    8 +--
+ arch/arm/mach-shmobile/board-mackerel.c         |   22 +++----
+ arch/arm/mach-shmobile/clock-r8a7740.c          |   46 +++++++--------
+ arch/arm/mach-shmobile/clock-sh7367.c           |   44 +++++++-------
+ arch/arm/mach-shmobile/clock-sh7372.c           |   60 +++++++++----------
+ arch/arm/mach-shmobile/clock-sh7377.c           |   50 ++++++++--------
+ arch/arm/mach-shmobile/clock-sh73a0.c           |   70 +++++++++++------------
+ arch/arm/mach-shmobile/include/mach/gpio.h      |    6 +-
+ arch/arm/mach-shmobile/intc-r8a7779.c           |   14 ++---
+ arch/arm/mach-shmobile/intc-sh7372.c            |   27 +++++----
+ arch/arm/mach-shmobile/intc-sh73a0.c            |   20 ++++---
+ arch/arm/mach-shmobile/pm-rmobile.c             |    6 +-
+ arch/arm/mach-shmobile/pm-sh7372.c              |   57 +++++++++---------
+ arch/arm/mach-shmobile/setup-sh7367.c           |    2 +-
+ arch/arm/mach-shmobile/setup-sh7377.c           |    2 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c           |    2 +-
+ arch/arm/mach-spear13xx/include/mach/spear.h    |   14 ++---
+ arch/arm/mach-spear13xx/spear13xx.c             |    6 +-
+ arch/arm/plat-mxc/include/mach/mx31.h           |    6 +-
+ arch/arm/plat-omap/include/plat/hardware.h      |   18 +++---
+ arch/arm/plat-samsung/s5p-irq-gpioint.c         |    4 +-
+ drivers/input/mouse/rpcmouse.c                  |    2 +-
+ drivers/net/ethernet/seeq/ether3.c              |    4 +-
+ drivers/scsi/arm/eesox.c                        |    2 +-
+ drivers/sh/intc/access.c                        |   56 +++++++++---------
+ drivers/sh/intc/chip.c                          |    8 +--
+ drivers/sh/intc/core.c                          |    6 +-
+ drivers/sh/intc/handle.c                        |    6 +-
+ drivers/sh/intc/internals.h                     |   18 +++---
+ drivers/sh/intc/virq.c                          |    3 +-
+ drivers/tty/serial/serial_ks8695.c              |    4 +-
+ drivers/video/da8xx-fb.c                        |    8 +--
+ include/linux/serial_sci.h                      |    2 +-
+ include/linux/sh_clk.h                          |    4 +-
+ 79 files changed, 477 insertions(+), 471 deletions(-)
+
 -- 
 1.7.10
