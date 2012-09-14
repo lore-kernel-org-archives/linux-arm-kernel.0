@@ -1,397 +1,168 @@
 From: dciminaghi@mail.gnudd.com (Davide Ciminaghi)
-Date: Fri, 14 Sep 2012 18:23:58 +0200
-Subject: [PATCH 3/8] pl080.h: moved from arm/include/asm/hardware to
- include/linux/amba/
+Date: Fri, 14 Sep 2012 18:24:02 +0200
+Subject: [PATCH 7/8] drivers/amba: add support for a PCI bridge
 In-Reply-To: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
 References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
-Message-ID: <1347639843-32119-4-git-send-email-dciminaghi@mail.gnudd.com>
+Message-ID: <1347639843-32119-8-git-send-email-dciminaghi@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alessandro Rubini <rubini@gnudd.com>
 
-The header is used by drivers/dma/amba-pl08x.c, which can be compiled
-under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
-moves it where it can be accessed by other architectures, and fixes
-all users.
+This is a PCI driver that registers AMBA devices for the range of
+supported devices.  It is currently used by STA2X11, which exports
+AMBA peripherals under PCIe.  The original AMBA drivers work with no
+changes or minimal ones.
 
 Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
 Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Alan Cox <alan@linux.intel.com>
 ---
- arch/arm/include/asm/hardware/pl080.h |  146 ---------------------------------
- arch/arm/mach-s3c64xx/dma.c           |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c     |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c     |    2 +-
- drivers/dma/amba-pl08x.c              |    2 +-
- include/linux/amba/pl080.h            |  146 +++++++++++++++++++++++++++++++++
- 6 files changed, 150 insertions(+), 150 deletions(-)
- delete mode 100644 arch/arm/include/asm/hardware/pl080.h
- create mode 100644 include/linux/amba/pl080.h
+ drivers/Kconfig         |    2 +
+ drivers/amba/Kconfig    |   10 +++++
+ drivers/amba/Makefile   |    1 +
+ drivers/amba/pci-amba.c |   96 +++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 109 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/amba/Kconfig
+ create mode 100644 drivers/amba/pci-amba.c
 
-diff --git a/arch/arm/include/asm/hardware/pl080.h b/arch/arm/include/asm/hardware/pl080.h
-deleted file mode 100644
-index 4eea210..0000000
---- a/arch/arm/include/asm/hardware/pl080.h
-+++ /dev/null
-@@ -1,146 +0,0 @@
--/* arch/arm/include/asm/hardware/pl080.h
-- *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *      http://armlinux.simtec.co.uk/
-- *      Ben Dooks <ben@simtec.co.uk>
-- *
-- * ARM PrimeCell PL080 DMA controller
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/* Note, there are some Samsung updates to this controller block which
-- * make it not entierly compatible with the PL080 specification from
-- * ARM. When in doubt, check the Samsung documentation first.
-- *
-- * The Samsung defines are PL080S, and add an extra control register,
-- * the ability to move more than 2^11 counts of data and some extra
-- * OneNAND features.
--*/
--
--#ifndef ASM_PL080_H
--#define ASM_PL080_H
--
--#define PL080_INT_STATUS			(0x00)
--#define PL080_TC_STATUS				(0x04)
--#define PL080_TC_CLEAR				(0x08)
--#define PL080_ERR_STATUS			(0x0C)
--#define PL080_ERR_CLEAR				(0x10)
--#define PL080_RAW_TC_STATUS			(0x14)
--#define PL080_RAW_ERR_STATUS			(0x18)
--#define PL080_EN_CHAN				(0x1c)
--#define PL080_SOFT_BREQ				(0x20)
--#define PL080_SOFT_SREQ				(0x24)
--#define PL080_SOFT_LBREQ			(0x28)
--#define PL080_SOFT_LSREQ			(0x2C)
--
--#define PL080_CONFIG				(0x30)
--#define PL080_CONFIG_M2_BE			(1 << 2)
--#define PL080_CONFIG_M1_BE			(1 << 1)
--#define PL080_CONFIG_ENABLE			(1 << 0)
--
--#define PL080_SYNC				(0x34)
--
--/* Per channel configuration registers */
--
--#define PL080_Cx_STRIDE				(0x20)
--#define PL080_Cx_BASE(x)			((0x100 + (x * 0x20)))
--#define PL080_Cx_SRC_ADDR(x)			((0x100 + (x * 0x20)))
--#define PL080_Cx_DST_ADDR(x)			((0x104 + (x * 0x20)))
--#define PL080_Cx_LLI(x)				((0x108 + (x * 0x20)))
--#define PL080_Cx_CONTROL(x)			((0x10C + (x * 0x20)))
--#define PL080_Cx_CONFIG(x)			((0x110 + (x * 0x20)))
--#define PL080S_Cx_CONTROL2(x)			((0x110 + (x * 0x20)))
--#define PL080S_Cx_CONFIG(x)			((0x114 + (x * 0x20)))
--
--#define PL080_CH_SRC_ADDR			(0x00)
--#define PL080_CH_DST_ADDR			(0x04)
--#define PL080_CH_LLI				(0x08)
--#define PL080_CH_CONTROL			(0x0C)
--#define PL080_CH_CONFIG				(0x10)
--#define PL080S_CH_CONTROL2			(0x10)
--#define PL080S_CH_CONFIG			(0x14)
--
--#define PL080_LLI_ADDR_MASK			(0x3fffffff << 2)
--#define PL080_LLI_ADDR_SHIFT			(2)
--#define PL080_LLI_LM_AHB2			(1 << 0)
--
--#define PL080_CONTROL_TC_IRQ_EN			(1 << 31)
--#define PL080_CONTROL_PROT_MASK			(0x7 << 28)
--#define PL080_CONTROL_PROT_SHIFT		(28)
--#define PL080_CONTROL_PROT_CACHE		(1 << 30)
--#define PL080_CONTROL_PROT_BUFF			(1 << 29)
--#define PL080_CONTROL_PROT_SYS			(1 << 28)
--#define PL080_CONTROL_DST_INCR			(1 << 27)
--#define PL080_CONTROL_SRC_INCR			(1 << 26)
--#define PL080_CONTROL_DST_AHB2			(1 << 25)
--#define PL080_CONTROL_SRC_AHB2			(1 << 24)
--#define PL080_CONTROL_DWIDTH_MASK		(0x7 << 21)
--#define PL080_CONTROL_DWIDTH_SHIFT		(21)
--#define PL080_CONTROL_SWIDTH_MASK		(0x7 << 18)
--#define PL080_CONTROL_SWIDTH_SHIFT		(18)
--#define PL080_CONTROL_DB_SIZE_MASK		(0x7 << 15)
--#define PL080_CONTROL_DB_SIZE_SHIFT		(15)
--#define PL080_CONTROL_SB_SIZE_MASK		(0x7 << 12)
--#define PL080_CONTROL_SB_SIZE_SHIFT		(12)
--#define PL080_CONTROL_TRANSFER_SIZE_MASK	(0xfff << 0)
--#define PL080_CONTROL_TRANSFER_SIZE_SHIFT	(0)
--
--#define PL080_BSIZE_1				(0x0)
--#define PL080_BSIZE_4				(0x1)
--#define PL080_BSIZE_8				(0x2)
--#define PL080_BSIZE_16				(0x3)
--#define PL080_BSIZE_32				(0x4)
--#define PL080_BSIZE_64				(0x5)
--#define PL080_BSIZE_128				(0x6)
--#define PL080_BSIZE_256				(0x7)
--
--#define PL080_WIDTH_8BIT			(0x0)
--#define PL080_WIDTH_16BIT			(0x1)
--#define PL080_WIDTH_32BIT			(0x2)
--
--#define PL080N_CONFIG_ITPROT			(1 << 20)
--#define PL080N_CONFIG_SECPROT			(1 << 19)
--#define PL080_CONFIG_HALT			(1 << 18)
--#define PL080_CONFIG_ACTIVE			(1 << 17)  /* RO */
--#define PL080_CONFIG_LOCK			(1 << 16)
--#define PL080_CONFIG_TC_IRQ_MASK		(1 << 15)
--#define PL080_CONFIG_ERR_IRQ_MASK		(1 << 14)
--#define PL080_CONFIG_FLOW_CONTROL_MASK		(0x7 << 11)
--#define PL080_CONFIG_FLOW_CONTROL_SHIFT		(11)
--#define PL080_CONFIG_DST_SEL_MASK		(0xf << 6)
--#define PL080_CONFIG_DST_SEL_SHIFT		(6)
--#define PL080_CONFIG_SRC_SEL_MASK		(0xf << 1)
--#define PL080_CONFIG_SRC_SEL_SHIFT		(1)
--#define PL080_CONFIG_ENABLE			(1 << 0)
--
--#define PL080_FLOW_MEM2MEM			(0x0)
--#define PL080_FLOW_MEM2PER			(0x1)
--#define PL080_FLOW_PER2MEM			(0x2)
--#define PL080_FLOW_SRC2DST			(0x3)
--#define PL080_FLOW_SRC2DST_DST			(0x4)
--#define PL080_FLOW_MEM2PER_PER			(0x5)
--#define PL080_FLOW_PER2MEM_PER			(0x6)
--#define PL080_FLOW_SRC2DST_SRC			(0x7)
--
--/* DMA linked list chain structure */
--
--struct pl080_lli {
--	u32	src_addr;
--	u32	dst_addr;
--	u32	next_lli;
--	u32	control0;
--};
--
--struct pl080s_lli {
--	u32	src_addr;
--	u32	dst_addr;
--	u32	next_lli;
--	u32	control0;
--	u32	control1;
--};
--
--#endif /* ASM_PL080_H */
-diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-index f2a7a17..a77f521 100644
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -23,6 +23,7 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/amba/pl080.h>
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index 324e958..cc549c8 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -154,4 +154,6 @@ source "drivers/vme/Kconfig"
  
- #include <mach/dma.h>
- #include <mach/map.h>
-@@ -30,7 +31,6 @@
+ source "drivers/pwm/Kconfig"
  
- #include <mach/regs-sys.h>
- 
--#include <asm/hardware/pl080.h>
- 
- /* dma channel state information */
- 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 98144ba..ba61129 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -15,9 +15,9 @@
- 
- #include <linux/amba/pl022.h>
- #include <linux/amba/pl08x.h>
-+#include <linux/amba/pl080.h>
- #include <linux/of_irq.h>
- #include <linux/io.h>
--#include <asm/hardware/pl080.h>
- #include <asm/hardware/vic.h>
- #include <plat/pl080.h>
- #include <mach/generic.h>
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 5a5a52d..8ce65a2 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -20,7 +20,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
--#include <asm/hardware/pl080.h>
-+#include <linux/amba/pl080.h>
- #include <asm/hardware/vic.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index d1cc579..b453c2f 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -83,7 +83,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/seq_file.h>
- #include <linux/slab.h>
--#include <asm/hardware/pl080.h>
-+#include <linux/amba/pl080.h>
- 
- #include "dmaengine.h"
- #include "virt-dma.h"
-diff --git a/include/linux/amba/pl080.h b/include/linux/amba/pl080.h
++source "drivers/amba/Kconfig"
++
+ endmenu
+diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
 new file mode 100644
-index 0000000..3e7b62f
+index 0000000..b5b5aca
 --- /dev/null
-+++ b/include/linux/amba/pl080.h
-@@ -0,0 +1,146 @@
-+/* include/linux/amba/pl080.h
-+ *
-+ * Copyright 2008 Openmoko, Inc.
-+ * Copyright 2008 Simtec Electronics
-+ *      http://armlinux.simtec.co.uk/
-+ *      Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * ARM PrimeCell PL080 DMA controller
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++++ b/drivers/amba/Kconfig
+@@ -0,0 +1,10 @@
 +
-+/* Note, there are some Samsung updates to this controller block which
-+ * make it not entierly compatible with the PL080 specification from
-+ * ARM. When in doubt, check the Samsung documentation first.
-+ *
-+ * The Samsung defines are PL080S, and add an extra control register,
-+ * the ability to move more than 2^11 counts of data and some extra
-+ * OneNAND features.
-+*/
++config PCI_AMBA
++	tristate "PCI-to-AMBA bridge"
++	depends on ARM_AMBA && PCI
++	---help---
++	  This compiles a PCI driver that registers AMBA devices, so
++	  the respective AMBA driver can be used unchanged if you have
++	  a PCI to amba bridge. This is required for STA2X11 support.
 +
-+#ifndef ASM_PL080_H
-+#define ASM_PL080_H
++	  If uncertain, choose N.
+diff --git a/drivers/amba/Makefile b/drivers/amba/Makefile
+index 66e81c2..d30e947 100644
+--- a/drivers/amba/Makefile
++++ b/drivers/amba/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_ARM_AMBA)		+= bus.o
++obj-$(CONFIG_PCI_AMBA)		+= pci-amba.o
+ obj-$(CONFIG_TEGRA_AHB)		+= tegra-ahb.o
+diff --git a/drivers/amba/pci-amba.c b/drivers/amba/pci-amba.c
+new file mode 100644
+index 0000000..d7a4049
+--- /dev/null
++++ b/drivers/amba/pci-amba.c
+@@ -0,0 +1,96 @@
++/*
++ * Support for AMBA devices (both APB and AHB) behind a PCI bridge
++ * Copyright 2012 ST Microelectronics (Alessandro Rubini)
++ * GNU GPL version 2.
++ */
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/amba/bus.h>
++#include <linux/pci.h>
++#include <linux/pci_ids.h>
++#include <linux/slab.h>
++#include <linux/irq.h>
++#include <linux/sizes.h>
 +
-+#define PL080_INT_STATUS			(0x00)
-+#define PL080_TC_STATUS				(0x04)
-+#define PL080_TC_CLEAR				(0x08)
-+#define PL080_ERR_STATUS			(0x0C)
-+#define PL080_ERR_CLEAR				(0x10)
-+#define PL080_RAW_TC_STATUS			(0x14)
-+#define PL080_RAW_ERR_STATUS			(0x18)
-+#define PL080_EN_CHAN				(0x1c)
-+#define PL080_SOFT_BREQ				(0x20)
-+#define PL080_SOFT_SREQ				(0x24)
-+#define PL080_SOFT_LBREQ			(0x28)
-+#define PL080_SOFT_LSREQ			(0x2C)
++static int __devinit pci_amba_probe(struct pci_dev *pdev,
++				     const struct pci_device_id *id)
++{
++	struct amba_device *adev;
++	char *name;
++	int ret;
 +
-+#define PL080_CONFIG				(0x30)
-+#define PL080_CONFIG_M2_BE			(1 << 2)
-+#define PL080_CONFIG_M1_BE			(1 << 1)
-+#define PL080_CONFIG_ENABLE			(1 << 0)
++	pci_enable_msi(pdev);
++	ret = pci_enable_device(pdev);
++	if (ret)
++		return ret;
 +
-+#define PL080_SYNC				(0x34)
++	/* Create a name: each of them must be different */
++	name = devm_kzalloc(&pdev->dev, strlen(dev_name(&pdev->dev)) + 6,
++		GFP_KERNEL);
++	sprintf(name, "amba-%s", dev_name(&pdev->dev));
 +
-+/* Per channel configuration registers */
++	/* Simply build an amba device and register it */
++	adev = amba_device_alloc(name,  pdev->resource[0].start, SZ_4K);
++	if (!adev)
++		return -ENOMEM;
++	adev->irq[0] = pdev->irq;
 +
-+#define PL080_Cx_STRIDE				(0x20)
-+#define PL080_Cx_BASE(x)			((0x100 + (x * 0x20)))
-+#define PL080_Cx_SRC_ADDR(x)			((0x100 + (x * 0x20)))
-+#define PL080_Cx_DST_ADDR(x)			((0x104 + (x * 0x20)))
-+#define PL080_Cx_LLI(x)				((0x108 + (x * 0x20)))
-+#define PL080_Cx_CONTROL(x)			((0x10C + (x * 0x20)))
-+#define PL080_Cx_CONFIG(x)			((0x110 + (x * 0x20)))
-+#define PL080S_Cx_CONTROL2(x)			((0x110 + (x * 0x20)))
-+#define PL080S_Cx_CONFIG(x)			((0x114 + (x * 0x20)))
++	/* This bridge can host both APB and AHB devices, so set master */
++	pci_set_master(pdev);
++	if (pdev->vendor == PCI_VENDOR_ID_STMICRO) {
++		/* Under sta2x11, DMA is there but limited to 512M */
++		adev->dma_mask = SZ_512M - 1;
++		adev->dev.coherent_dma_mask = SZ_512M - 1;
++	}
 +
-+#define PL080_CH_SRC_ADDR			(0x00)
-+#define PL080_CH_DST_ADDR			(0x04)
-+#define PL080_CH_LLI				(0x08)
-+#define PL080_CH_CONTROL			(0x0C)
-+#define PL080_CH_CONFIG				(0x10)
-+#define PL080S_CH_CONTROL2			(0x10)
-+#define PL080S_CH_CONFIG			(0x14)
++	adev->dev.platform_data = pdev->dev.platform_data;
++	pci_set_drvdata(pdev, adev);
 +
-+#define PL080_LLI_ADDR_MASK			(0x3fffffff << 2)
-+#define PL080_LLI_ADDR_SHIFT			(2)
-+#define PL080_LLI_LM_AHB2			(1 << 0)
-+
-+#define PL080_CONTROL_TC_IRQ_EN			(1 << 31)
-+#define PL080_CONTROL_PROT_MASK			(0x7 << 28)
-+#define PL080_CONTROL_PROT_SHIFT		(28)
-+#define PL080_CONTROL_PROT_CACHE		(1 << 30)
-+#define PL080_CONTROL_PROT_BUFF			(1 << 29)
-+#define PL080_CONTROL_PROT_SYS			(1 << 28)
-+#define PL080_CONTROL_DST_INCR			(1 << 27)
-+#define PL080_CONTROL_SRC_INCR			(1 << 26)
-+#define PL080_CONTROL_DST_AHB2			(1 << 25)
-+#define PL080_CONTROL_SRC_AHB2			(1 << 24)
-+#define PL080_CONTROL_DWIDTH_MASK		(0x7 << 21)
-+#define PL080_CONTROL_DWIDTH_SHIFT		(21)
-+#define PL080_CONTROL_SWIDTH_MASK		(0x7 << 18)
-+#define PL080_CONTROL_SWIDTH_SHIFT		(18)
-+#define PL080_CONTROL_DB_SIZE_MASK		(0x7 << 15)
-+#define PL080_CONTROL_DB_SIZE_SHIFT		(15)
-+#define PL080_CONTROL_SB_SIZE_MASK		(0x7 << 12)
-+#define PL080_CONTROL_SB_SIZE_SHIFT		(12)
-+#define PL080_CONTROL_TRANSFER_SIZE_MASK	(0xfff << 0)
-+#define PL080_CONTROL_TRANSFER_SIZE_SHIFT	(0)
-+
-+#define PL080_BSIZE_1				(0x0)
-+#define PL080_BSIZE_4				(0x1)
-+#define PL080_BSIZE_8				(0x2)
-+#define PL080_BSIZE_16				(0x3)
-+#define PL080_BSIZE_32				(0x4)
-+#define PL080_BSIZE_64				(0x5)
-+#define PL080_BSIZE_128				(0x6)
-+#define PL080_BSIZE_256				(0x7)
-+
-+#define PL080_WIDTH_8BIT			(0x0)
-+#define PL080_WIDTH_16BIT			(0x1)
-+#define PL080_WIDTH_32BIT			(0x2)
-+
-+#define PL080N_CONFIG_ITPROT			(1 << 20)
-+#define PL080N_CONFIG_SECPROT			(1 << 19)
-+#define PL080_CONFIG_HALT			(1 << 18)
-+#define PL080_CONFIG_ACTIVE			(1 << 17)  /* RO */
-+#define PL080_CONFIG_LOCK			(1 << 16)
-+#define PL080_CONFIG_TC_IRQ_MASK		(1 << 15)
-+#define PL080_CONFIG_ERR_IRQ_MASK		(1 << 14)
-+#define PL080_CONFIG_FLOW_CONTROL_MASK		(0x7 << 11)
-+#define PL080_CONFIG_FLOW_CONTROL_SHIFT		(11)
-+#define PL080_CONFIG_DST_SEL_MASK		(0xf << 6)
-+#define PL080_CONFIG_DST_SEL_SHIFT		(6)
-+#define PL080_CONFIG_SRC_SEL_MASK		(0xf << 1)
-+#define PL080_CONFIG_SRC_SEL_SHIFT		(1)
-+#define PL080_CONFIG_ENABLE			(1 << 0)
-+
-+#define PL080_FLOW_MEM2MEM			(0x0)
-+#define PL080_FLOW_MEM2PER			(0x1)
-+#define PL080_FLOW_PER2MEM			(0x2)
-+#define PL080_FLOW_SRC2DST			(0x3)
-+#define PL080_FLOW_SRC2DST_DST			(0x4)
-+#define PL080_FLOW_MEM2PER_PER			(0x5)
-+#define PL080_FLOW_PER2MEM_PER			(0x6)
-+#define PL080_FLOW_SRC2DST_SRC			(0x7)
-+
-+/* DMA linked list chain structure */
-+
-+struct pl080_lli {
-+	u32	src_addr;
-+	u32	dst_addr;
-+	u32	next_lli;
-+	u32	control0;
++	ret = amba_device_add(adev, &pdev->resource[0]);
++	if (ret < 0)
++		return ret;
++	return 0;
 +};
 +
-+struct pl080s_lli {
-+	u32	src_addr;
-+	u32	dst_addr;
-+	u32	next_lli;
-+	u32	control0;
-+	u32	control1;
++static void __devexit pci_amba_remove(struct pci_dev *pdev)
++{
++	struct amba_device *adev = pci_get_drvdata(pdev);
++	amba_device_unregister(adev);
++	pci_disable_msi(pdev);
++}
++
++static DEFINE_PCI_DEVICE_TABLE(pci_amba_table) = {
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_UART_HWFC)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_UART_NO_HWFC)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SOC_DMA)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_I2C)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SPI_HS)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SDIO_EMMC)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SDIO)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_AUDIO_ROUTER_DMA)},
++	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_AUDIO_ROUTER_MSPS)},
++	{0,}
 +};
 +
-+#endif /* ASM_PL080_H */
++static struct pci_driver pci_amba_driver = {
++	.name		= "pci-amba",
++	.id_table	= pci_amba_table,
++	.probe		= pci_amba_probe,
++	.remove		= __devexit_p(pci_amba_remove),
++};
++
++static int __init pci_amba_init(void)
++{
++	return pci_register_driver(&pci_amba_driver);
++}
++
++static void __exit pci_amba_exit(void)
++{
++	pci_unregister_driver(&pci_amba_driver);
++}
++
++module_init(pci_amba_init);
++module_exit(pci_amba_exit);
++
++MODULE_LICENSE("GPL");
 -- 
 1.7.9.1
