@@ -1,34 +1,51 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 14 Sep 2012 12:13:18 +0100
-Subject: [PATCH v4 16/24] xen: clear IRQ_NOAUTOEN and IRQ_NOREQUEST
+Date: Fri, 14 Sep 2012 12:13:21 +0100
+Subject: [PATCH v4 19/24] xen/arm: compile blkfront and blkback
 In-Reply-To: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
-Message-ID: <1347621207-11294-16-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347621207-11294-19-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Reset the IRQ_NOAUTOEN and IRQ_NOREQUEST flags that are enabled by
-default on ARM. If IRQ_NOAUTOEN is set, __setup_irq doesn't call
-irq_startup, that is responsible for calling irq_unmask at startup time.
-As a result event channels remain masked.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- drivers/xen/events.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/block/xen-blkback/blkback.c  |    1 +
+ include/xen/interface/io/protocols.h |    3 +++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/xen/events.c b/drivers/xen/events.c
-index 5ecb596..8ffb7b7 100644
---- a/drivers/xen/events.c
-+++ b/drivers/xen/events.c
-@@ -836,6 +836,7 @@ int bind_evtchn_to_irq(unsigned int evtchn)
- 		struct irq_info *info = info_for_irq(irq);
- 		WARN_ON(info == NULL || info->type != IRQT_EVTCHN);
- 	}
-+	irq_clear_status_flags(irq, IRQ_NOREQUEST|IRQ_NOAUTOEN);
+diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
+index 73f196c..63dd5b9 100644
+--- a/drivers/block/xen-blkback/blkback.c
++++ b/drivers/block/xen-blkback/blkback.c
+@@ -42,6 +42,7 @@
  
- out:
- 	mutex_unlock(&irq_mapping_update_lock);
+ #include <xen/events.h>
+ #include <xen/page.h>
++#include <xen/xen.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+ #include "common.h"
+diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
+index 01fc8ae..0eafaf2 100644
+--- a/include/xen/interface/io/protocols.h
++++ b/include/xen/interface/io/protocols.h
+@@ -5,6 +5,7 @@
+ #define XEN_IO_PROTO_ABI_X86_64     "x86_64-abi"
+ #define XEN_IO_PROTO_ABI_IA64       "ia64-abi"
+ #define XEN_IO_PROTO_ABI_POWERPC64  "powerpc64-abi"
++#define XEN_IO_PROTO_ABI_ARM        "arm-abi"
+ 
+ #if defined(__i386__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_X86_32
+@@ -14,6 +15,8 @@
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
+ #elif defined(__powerpc64__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
++#elif defined(__arm__)
++# define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
+ #else
+ # error arch fixup needed here
+ #endif
 -- 
 1.7.2.5
