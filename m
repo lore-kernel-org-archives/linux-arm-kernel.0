@@ -1,34 +1,43 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 14 Sep 2012 08:43:11 +0530
-Subject: [PATCH 0/2] ARM: EXYNOS: Set the capability of pdm0 and pdm1
- as DMA_PRIVATE
-In-Reply-To: <243801cd8cb9$f303e6d0$d90bb470$%kim@samsung.com>
-References: <1346215585-31023-1-git-send-email-tushar.behera@linaro.org>
- <1346374330.15463.5.camel@vkoul-mobl4>
- <243801cd8cb9$f303e6d0$d90bb470$%kim@samsung.com>
-Message-ID: <1347592391.1943.16.camel@vkoul-udesk3>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 14 Sep 2012 11:18:51 +0800
+Subject: [PATCH 0/4] Add PHY nofity for some i.mx SoCs
+Message-ID: <1347592731-12998-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-07 at 14:30 +0900, Kukjin Kim wrote:
-> Vinod Koul wrote:
-> > 
-> > On Wed, 2012-08-29 at 10:16 +0530, Tushar Behera wrote:
-> > > DMA clients pdma0 and pdma1 are internal to the SoC and are used only
-> > > by dedicated peripherals. Since they cannot be used for generic
-> > > purpose, their capability should be set as DMA_PRIVATE.
-> > >
-> > > The patches are rebased on top of v3.6-rc3.
-> > Kukjin, if you ack them I can take thru my tree, other way round is fine
-> > with me too.
-> 
-> Hi Vinod,
-> 
-> Looks good to me, please pick them into your tree with my ack.
-> 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-Okay applied both.
+At some i.mx SoCs, when controller works at host mode, the PHY
+register needs to be changed at device connect, disconnect, bus
+suspend and resume due to the SoC limitations.
 
+The phy notification should be added according to below rules:
 
--- 
-~Vinod
+1. Only set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
+during high speed host mode.
+2. Do not set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
+during the reset and speed negotiation period.
+3. Do not set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
+during host suspend/resume sequence.
+
+Please refer: i.mx23RM(page 413) for detail.
+http://www.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
+
+Freescale i.MX SoC, i.mx23, i.mx28 and i.mx6(i.mx6SL does not
+need to follow the 3rd rule) need to follow above rules.
+
+The correct notification setting method should be:
+1. Set connect notify after the second bus reset.
+2. Set disconnect notify after disconnection.
+3. Set suspend nofity after bus goes to suspend (portsc.suspendM=1).
+4. Set resume notify after resume (portsc.fpr=0).
+
+Peter Chen (4):
+  usb: phy: add notify_suspend/notify_resume callback
+  usb: mxs-phy: implement notify_suspend/notify_resume callback
+  usb: chipidea: add phy notify at suspend/resume procedure
+  usb: refine phy notify operation during connection and disconnection
+
+ drivers/usb/chipidea/host.c |   75 +++++++++++++++++++++++++++++++++++++++++-
+ drivers/usb/core/hub.c      |   14 ++++----
+ drivers/usb/otg/mxs-phy.c   |   56 +++++++++++++++++++++++++-------
+ include/linux/usb/phy.h     |   44 +++++++++++++++++++++----
+ 4 files changed, 161 insertions(+), 28 deletions(-)
