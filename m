@@ -1,43 +1,44 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 14 Sep 2012 22:18:10 +0400
-Subject: [PATCH v4 12/24] xen/arm: introduce CONFIG_XEN on ARM
-In-Reply-To: <1347621207-11294-12-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-12-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <505374E2.5080308@mvista.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 14 Sep 2012 15:25:45 -0300
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable CONFIG_GPIO_MC9S08DZ60
+Message-ID: <1347647145-23798-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On mx35pdk board there is an 8-bit microcontroller that controls several IOs, such
+as backlight enable pin, USB host VBUS, etc.
 
-On 09/14/2012 03:13 PM, Stefano Stabellini wrote:
+Let it build by default.
 
-> Changes in v2:
+mx35pdk also needs CONFIG_LCD_PLATFORM to be selected to activate the display,
+so also make this the default.
 
-> - mark Xen guest support on ARM as EXPERIMENTAL.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Also select CONFIG_LCD_PLATFORM
+ arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> ---
->  arch/arm/Kconfig |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2f88d8d..e92518d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1897,6 +1897,16 @@ config DEPRECATED_PARAM_STRUCT
->  	  This was deprecated in 2001 and announced to live on for 5 years.
->  	  Some old boot loaders still use this way.
->  
-> +config XEN_DOM0
-> +	def_bool y
-> +
-> +config XEN
-> +	bool "Xen guest support on ARM (EXPERIMENTAL)"
-> +	depends on EXPERIMENTAL && ARM && OF
-> +	select XEN_DOM0
-
-   What's the point of selecting it if it's always "y"?
-
-WBR, Sergei
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 565132d..8cfd747 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -140,6 +140,7 @@ CONFIG_I2C_IMX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_MC9S08DZ60=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+@@ -156,6 +157,7 @@ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_VIDEO_MX3=y
+ CONFIG_FB=y
++CONFIG_LCD_PLATFORM=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+-- 
+1.7.9.5
