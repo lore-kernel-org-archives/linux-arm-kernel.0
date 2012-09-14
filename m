@@ -1,35 +1,35 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 14 Sep 2012 10:30:59 +0800
-Subject: [PATCH] ARM: mmp: using for_each_set_bit to simplify the code
-Message-ID: <CAPgLHd-ac3JYu4SEQd0pPO-YBW4kM+DqcjHs3QzPdLWqc+CXfw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Sep 2012 19:34:04 -0700
+Subject: [GIT PULL 1/7] omap non-critical fixes for v3.7 merge window
+In-Reply-To: <pull-1347589125-283636>
+References: <pull-1347589125-283636>
+Message-ID: <20120914023403.GF4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+* Tony Lindgren <tony@atomide.com> [120913 19:20]:
+> The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+> 
+>   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-noncritical-for-v3.7
+> 
+> for you to fetch changes up to 3c5dc4a7daa6e64e39412fe9c7daa298834de623:
+> 
+>   ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT* read/write (2012-09-12 21:14:34 -0700)
+> 
+> ----------------------------------------------------------------
+> Non critical omap fixes that we not considered necessary
+> for the v3.6 -rc cycle.
+> 
+> ----------------------------------------------------------------
 
-Using for_each_set_bit() to simplify the code.
+Oops forgot to push out some of the tags and only this one
+seems to got sent. Still a valid pull request, but I'll repost
+the whole series of them.
 
-spatch with a semantic match is used to found this.
-(http://coccinelle.lip6.fr/)
+Regards,
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-mmp/irq.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-mmp/irq.c b/arch/arm/mach-mmp/irq.c
-index e60c7d9..3c71246 100644
---- a/arch/arm/mach-mmp/irq.c
-+++ b/arch/arm/mach-mmp/irq.c
-@@ -153,10 +153,8 @@ static void icu_mux_irq_demux(unsigned int irq, struct irq_desc *desc)
- 		status = readl_relaxed(data->reg_status) & ~mask;
- 		if (status == 0)
- 			break;
--		n = find_first_bit(&status, BITS_PER_LONG);
--		while (n < BITS_PER_LONG) {
-+		for_each_set_bit(n, &status, BITS_PER_LONG) {
- 			generic_handle_irq(icu_data[i].virq_base + n);
--			n = find_next_bit(&status, BITS_PER_LONG, n + 1);
- 		}
- 	}
- }
+Tony
