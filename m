@@ -1,116 +1,83 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 14 Sep 2012 13:25:25 +0300
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <20120914083520.GD7167@b20223-02.ap.freescale.net>
-References: <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
- <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828092730.GY4011@b20223-02.ap.freescale.net>
- <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829083337.GI4011@b20223-02.ap.freescale.net>
- <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829104559.GB25433@b20223-02.ap.freescale.net>
- <87ipblqayc.fsf@ashishki-desk.ger.corp.intel.com>
- <20120911081833.GA4251@b20223-02.ap.freescale.net>
- <87y5kfplet.fsf@ashishki-desk.ger.corp.intel.com>
- <20120914083520.GD7167@b20223-02.ap.freescale.net>
-Message-ID: <87har0q4tm.fsf@ashishki-desk.ger.corp.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Sep 2012 10:28:37 +0000
+Subject: [PATCH 2/2] ARM: dts: AM33XX: Add lis331dlh device tree data to
+ am335x-evm
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2F0AB@DBDE01.ent.ti.com>
+References: <1347551685-19781-1-git-send-email-anilkumar@ti.com>
+ <201209140826.07069.arnd@arndb.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2F0AB@DBDE01.ent.ti.com>
+Message-ID: <201209141028.38185.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+On Friday 14 September 2012, AnilKumar, Chimata wrote:
+>> On Fri, Sep 14, 2012 at 13:56:06, Arnd Bergmann wrote:
+> > On Thursday 13 September 2012, AnilKumar Ch wrote:
 
-> On Wed, Sep 12, 2012 at 01:47:54PM +0300, Alexander Shishkin wrote:
->> Richard Zhao <richard.zhao@freescale.com> writes:
->> 
->> > On Tue, Sep 11, 2012 at 10:23:55AM +0300, Alexander Shishkin wrote:
->> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> 
->> >> > On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
->> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> >> 
->> >> >> > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
->> >> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> >> >> 
->> >> >> >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
->> >> >> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> >> >> >> 
->> >> >> >> >> > One role failed, but the other role will possiblly still work.
->> >> >> >> >> > For example, when udc start failed, if plug in a host device,
->> >> >> >> >> > it works.
->> >> >> >> >> 
->> >> >> >> >> If you're a host device, ci->role should be HOST at this point and
->> >> >> >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
->> >> >> >> >> role detection must be fixed. If ci_role_start() fails for host, but it
->> >> >> >> >> still works when it's called again after the id pin change is detected,
->> >> >> >> >> again, the problem is elsewhere.
->> >> >> >> > The check is only for OTG device. For single role device, it just fail
->> >> >> >> > if it start the role failed.
->> >> >> >> 
->> >> >> >> Sorry, can you rephrase?
->> >> >> >> 
->> >> >> >> >> 
->> >> >> >> >> >
->> >> >> >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> >> >> >> >> > ---
->> >> >> >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
->> >> >> >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
->> >> >> >> >> >
->> >> >> >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->> >> >> >> >> > index 19ef324..8fd390a 100644
->> >> >> >> >> > --- a/drivers/usb/chipidea/core.c
->> >> >> >> >> > +++ b/drivers/usb/chipidea/core.c
->> >> >> >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->> >> >> >> >> >  	ret = ci_role_start(ci, ci->role);
->> >> >> >> >> >  	if (ret) {
->> >> >> >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
->> >> >> >> >> > -		ret = -ENODEV;
->> >> >> >> >> > -		goto rm_wq;
->> >> >> >> >> > +		ci->role = CI_ROLE_END;
->> >> >> >> >> 
->> >> >> >> >> So are you relying on id pin interrupt for initializing the role after
->> >> >> >> >> this? Can you provide more details?
->> >> >> >> > Yes. The ID pin detect still works. My case is, gadget role failed,
->> >> >> >> > host role works. I was trying not to ruin host function.
->> >> >> >> 
->> >> >> >> But it shouldn't even try to start the gadget, because ci_otg_role()
->> >> >> >> should set ci->role to HOST before ci_role_start() happens.
->> >> >> > It depends on ID pin. If ID pin is gadget and gadget is not support well,
->> >> >> > ci_role_start will fail. See below example.
->> >> >> >> 
->> >> >> >> Another question is, why does gadget start fail?
->> >> >> > There's one example:
->> >> >> > If usb phy don't support otg yet, otg_set_peripheral will fail, and
->> >> >> > then cause udc_start fail.
->> >> >> 
->> >> >> So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
->> >> >> platform data till the phy is fully implemented.
->> >> > It's just an example. We can not assume udc_start always success. If it
->> >> > fails, isn't it better to continue support of host than say game over?
->> >> 
->> >> Ok, I think what we need here is to rework error handling around role
->> >> switching, so that we can allow certain things to fail and retry at a
->> >> later point (say at id pin change), while being careful about the other
->> >> failures.
->> >> 
->> >> If this patch is not crucial for imx right now, I'd prefer to leave it
->> >> out.
->> > That's OK. but I hope other function related patch can be merged for
->> > 3.7 :)
->> 
->> Also 6/11 seems quite pointless to me. Otherwise, I'll send them to Greg
->> today.
-> If set_peripheral is null, udc_start will fail. Or you prefer removing
-> checking of otg_set_peripheral returned value?
+> > 
+> > Why do you put the "reg" property here
+> 
+> Here I specified reg property because lis331dlh I2C slave address is 0x18.
+> 
+> > 
+> > >  		dcan1: d_can at 481d0000 {
+> > >  			status = "okay";
+> > >  			pinctrl-names = "default";
+> > > @@ -61,6 +70,39 @@
+> > >  		regulator-max-microvolt = <5000000>;
+> > >  		regulator-boot-on;
+> > >  	};
+> > > +
+> > > +	lis3_reg: fixedregulator at 1 {
+> > > +		compatible = "regulator-fixed";
+> > > +		regulator-name = "lis3_reg";
+> > > +		regulator-boot-on;
+> > > +	};
+> > > +};
+> > > +&lis331dlh {
+> > > +	compatible = "st,lis3lv02d-i2c";
+> > 
+> > and all the rest here? At least I would expect the "compatible" property
+> > to be in the same place above.
+> 
+> This data is appended to above one, to make it readable I moved remaining
+> properties to here.
 
-I guess for now we could do something like
+I don't follow how this is making things more readable.
 
-        if (retval &&
-            !(ci->platdata->flags & CI13XXX_REQUIRE_TRANSCEIVER))
-                goto remove_dbg;
+Maybe a more logical way to do this would be use the existing i2c2 label
+and write all the additions as
 
-... or implement an otg driver. :)
+i2c2: {
+	status = "okay";
+	clock-frequency = <400000>;
 
-Regards,
---
-Alex
+	lis331dlh at 18 {
+		compatible = "st,lis3lv02d";
+		reg = <0x18>;
+
+		vdd-supply = <&lis3_reg>;
+		vdd-io-supply = <&lis3_reg>;
+		...
+	};
+
+> > Also, I think you should remove the "-i2c" postfix from the name, that
+> > is already implied by the parent bus.
+> 
+> I will remove, but in case of spi the compatible name is lis3lv02d_spi.
+> By mistake I have uses "-i2c" instead of "_i2c".
+
+The normal convention is to use '-', not '_', so that part was ok.
+
+I think naming the other one lis3lv02d_spi was a mistake, it should
+be named 'st,lis3lv02d' independent of the bus IMHO.
+
+> Document is already present, 
+> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commit;h=2f2ff3cc8d930493f9a598b9192706c09403e12e
+> 
+> Some minor changes in docs, in my next version I will update document
+> as well. I will send V3 if there are no comments on v2.
+
+Ok.
+
+	Arnd
