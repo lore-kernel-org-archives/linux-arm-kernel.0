@@ -1,140 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Sep 2012 08:00:30 -0500
-Subject: [PATCH v3 00/12] Initial multi-platform support
-In-Reply-To: <20120914005836.GC1338@S2101-09.ap.freescale.net>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <20120910190711.GA11366@page>
- <20120914005836.GC1338@S2101-09.ap.freescale.net>
-Message-ID: <50532A6E.8050609@gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 14 Sep 2012 14:03:39 +0100
+Subject: [PATCH v4 21/24] arm/v2m: initialize arch_timers even if
+ v2m_timer is not present
+In-Reply-To: <alpine.DEB.2.02.1209141347250.29232@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-21-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1347625628.2497.65.camel@hornet>
+ <alpine.DEB.2.02.1209141347250.29232@kaball.uk.xensource.com>
+Message-ID: <1347627819.2497.68.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2012 07:58 PM, Shawn Guo wrote:
-> On Mon, Sep 10, 2012 at 08:07:11PM +0100, Jamie Iles wrote:
->> 8<---
->>
->> Subject: [PATCH] ARM: picoxcell: fixup multiplatform breakage.
->>
->> The debug macros had a dependency on mach headers.  Break that
->> dependency and restore building.
->>
->> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
->> ---
->>  arch/arm/include/debug/picoxcell.S      |    4 ++--
->>  arch/arm/mach-picoxcell/common.c        |   11 ++++++-----
->>  arch/arm/mach-picoxcell/picoxcell_soc.h |   25 -------------------------
->>  3 files changed, 8 insertions(+), 32 deletions(-)
->>  delete mode 100644 arch/arm/mach-picoxcell/picoxcell_soc.h
->>
->> diff --git a/arch/arm/include/debug/picoxcell.S b/arch/arm/include/debug/picoxcell.S
->> index 58d4ee3..7419deb 100644
->> --- a/arch/arm/include/debug/picoxcell.S
->> +++ b/arch/arm/include/debug/picoxcell.S
->> @@ -9,10 +9,10 @@
->>   * accesses to the 8250.
->>   */
->>  #include <linux/serial_reg.h>
->> -#include <mach/hardware.h>
->> -#include <mach/map.h>
->>  
->>  #define UART_SHIFT 2
->> +#define PICOXCELL_UART1_BASE		0x80230000
->> +#define PHYS_TO_IO(x)			(((x) & 0x00ffffff) | 0xfe000000)
+On Fri, 2012-09-14 at 13:48 +0100, Stefano Stabellini wrote:
+> On Fri, 14 Sep 2012, Pawel Moll wrote:
+> > On Fri, 2012-09-14 at 12:13 +0100, Stefano Stabellini wrote:
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > CC: Russell King <linux@arm.linux.org.uk>
+> > > CC: Pawel Moll <pawel.moll@arm.com>
+> > > CC: Marc Zyngier <marc.zyngier@arm.com>
+> > > ---
+> > >  arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
+> > >  1 files changed, 6 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> > > index 37608f2..4e567f7 100644
+> > > --- a/arch/arm/mach-vexpress/v2m.c
+> > > +++ b/arch/arm/mach-vexpress/v2m.c
+> > > @@ -621,16 +621,17 @@ static void __init v2m_dt_timer_init(void)
+> > >  
+> > >  	v2m_clk_init();
+> > >  
+> > > -	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+> > > -	if (WARN_ON(err))
+> > > -		return;
+> > > -	node = of_find_node_by_path(path);
+> > > -	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+> > >  	if (arch_timer_of_register() != 0)
+> > >  		twd_local_timer_of_register();
+> > >  
+> > >  	if (arch_timer_sched_clock_init() != 0)
+> > >  		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+> > > +
+> > > +	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+> > > +	if (WARN_ON(err))
+> > > +		return;
+> > > +	node = of_find_node_by_path(path);
+> > > +	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+> > >  }
+> > >  
+> > >  static struct sys_timer v2m_dt_timer = {
+> > 
+> > Fair point. The alias is going to disappear anyway (I'm working on a VE
+> > platform rework right now), but in case I won't get it on time for 3.7,
+> > I'll make sure this one is merged instead.
 > 
-> ...
-> 
->>  
->>  		.macro	addruart, rp, rv, tmp
->>  		ldr	\rv, =PHYS_TO_IO(PICOXCELL_UART1_BASE)
->> diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
->> index a8b70b5..f6c0849 100644
->> --- a/arch/arm/mach-picoxcell/common.c
->> +++ b/arch/arm/mach-picoxcell/common.c
->> @@ -20,14 +20,15 @@
->>  #include <asm/hardware/vic.h>
->>  #include <asm/mach/map.h>
->>  
->> -#include "picoxcell_soc.h"
->>  #include "common.h"
->>  
->> -#define PHYS_TO_IO(x)		(((x) & 0x00ffffff) | 0xfe000000)
->> +#define PHYS_TO_IO(x)			(((x) & 0x00ffffff) | 0xfe000000)
-> 
-> So you end up with defining the same thing at two places.  You need to
-> somehow ensure any update to PHYS_TO_IO needs to get applied on both
-> to keep them synchronized.  This is difficult for maintaining.
-> 
-> We're running into the exactly same problem when moving debug-macro.S
-> for imx.  I believe this is a common issue which needs a common
-> solution.
-> 
-> I would propose to have the static mapping below (imx example) defined
-> in something like arch/arm/include/asm/mach/map_imx.h, so that both
-> imx machine code and ll-debug code can include it.
-> 
-> #define IMX_IO_P2V(x)   (                                               \
->                         (((x) & 0x80000000) >> 7) |                     \
->                         (0xf4000000 +                                   \
->                         (((x) & 0x50000000) >> 6) +                     \
->                         (((x) & 0x0b000000) >> 4) +                     \
->                         (((x) & 0x000fffff))))
-> 
-> Thoughts?
+> Great, thanks!
+> Should I leave this patch out of the Xen on ARM series for 3.7 then?
 
-My thought is to use a fixed virtual address across platforms and make
-the physical address a config option. Possibly the uart type can also be
-a config option. The 8250 one also needs register stride. See here:
+Em, I think so - it would conflict with my changes if they go in. Either
+way you'll have the problem sorted in 3.7.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/116982.html
-
-Rob
-
-> Regards,
-> Shawn
-> 
->> +#define PICOXCELL_PERIPH_BASE		0x80000000
->> +#define PICOXCELL_PERIPH_LENGTH		SZ_4M
->>  
->> -#define WDT_CTRL_REG_EN_MASK	(1 << 0)
->> -#define WDT_CTRL_REG_OFFS	(0x00)
->> -#define WDT_TIMEOUT_REG_OFFS	(0x04)
->> +#define WDT_CTRL_REG_EN_MASK		(1 << 0)
->> +#define WDT_CTRL_REG_OFFS		(0x00)
->> +#define WDT_TIMEOUT_REG_OFFS		(0x04)
->>  static void __iomem *wdt_regs;
->>  
->>  /*
->> diff --git a/arch/arm/mach-picoxcell/picoxcell_soc.h b/arch/arm/mach-picoxcell/picoxcell_soc.h
->> deleted file mode 100644
->> index 5566fc8..0000000
->> --- a/arch/arm/mach-picoxcell/picoxcell_soc.h
->> +++ /dev/null
->> @@ -1,25 +0,0 @@
->> -/*
->> - * Copyright (c) 2011 Picochip Ltd., Jamie Iles
->> - *
->> - * This file contains the hardware definitions of the picoXcell SoC devices.
->> - *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License as published by
->> - * the Free Software Foundation; either version 2 of the License, or
->> - * (at your option) any later version.
->> - *
->> - * This program is distributed in the hope that it will be useful,
->> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> - * GNU General Public License for more details.
->> - */
->> -#ifndef __PICOXCELL_SOC_H__
->> -#define __PICOXCELL_SOC_H__
->> -
->> -#define PICOXCELL_UART1_BASE		0x80230000
->> -#define PICOXCELL_PERIPH_BASE		0x80000000
->> -#define PICOXCELL_PERIPH_LENGTH		SZ_4M
->> -#define PICOXCELL_VIC0_BASE		0x80060000
->> -#define PICOXCELL_VIC1_BASE		0x80064000
->> -
->> -#endif /* __PICOXCELL_SOC_H__ */
->> -- 
->> 1.7.9.5
->>
+Pawe?
