@@ -1,66 +1,40 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 14 Sep 2012 13:36:53 +0530
-Subject: [PATCH v2 1/4] lis3: lis3lv02d: remove lis3lv02d driver DT init
+Date: Fri, 14 Sep 2012 13:36:54 +0530
+Subject: [PATCH v2 2/4] lis3: lis3lv02d_spi: Add lis3lv02d device tree init
 In-Reply-To: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
 References: <1347610016-10123-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1347610016-10123-2-git-send-email-anilkumar@ti.com>
+Message-ID: <1347610016-10123-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove lis3lv02d driver device tree initialization from core driver
-and move it to individual drivers. With the current implementation
-some pdata parameters are missing if we use lis3lv02d_init_device()
-in lis3lv02d_i2c driver.
+Add lis3lv02d device tree initialization code/API to take pdata
+from device node. Also remove CONFIG_OF ifdef from the driver,
+if CONFIG_OF is not defined then OF APIs returns 0.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- drivers/misc/lis3lv02d/lis3lv02d.c |    8 ++------
- drivers/misc/lis3lv02d/lis3lv02d.h |    1 +
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ drivers/misc/lis3lv02d/lis3lv02d_spi.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/misc/lis3lv02d/lis3lv02d.c b/drivers/misc/lis3lv02d/lis3lv02d.c
-index 79349ec..026021e 100644
---- a/drivers/misc/lis3lv02d/lis3lv02d.c
-+++ b/drivers/misc/lis3lv02d/lis3lv02d.c
-@@ -944,7 +944,7 @@ static void lis3lv02d_8b_configure(struct lis3lv02d *lis3,
- }
+diff --git a/drivers/misc/lis3lv02d/lis3lv02d_spi.c b/drivers/misc/lis3lv02d/lis3lv02d_spi.c
+index 23f3986..e1db6f4 100644
+--- a/drivers/misc/lis3lv02d/lis3lv02d_spi.c
++++ b/drivers/misc/lis3lv02d/lis3lv02d_spi.c
+@@ -84,10 +84,12 @@ static int __devinit lis302dl_spi_probe(struct spi_device *spi)
+ 	lis3_dev.ac		= lis3lv02d_axis_normal;
+ 	lis3_dev.pdata		= spi->dev.platform_data;
  
- #ifdef CONFIG_OF
--static int lis3lv02d_init_dt(struct lis3lv02d *lis3)
-+int lis3lv02d_init_dt(struct lis3lv02d *lis3)
- {
- 	struct lis3lv02d_platform_data *pdata;
- 	struct device_node *np = lis3->of_node;
-@@ -1084,7 +1084,7 @@ static int lis3lv02d_init_dt(struct lis3lv02d *lis3)
- }
+-#ifdef CONFIG_OF
+-	if (of_match_device(lis302dl_spi_dt_ids, &spi->dev))
++	if (of_match_device(lis302dl_spi_dt_ids, &spi->dev)) {
+ 		lis3_dev.of_node = spi->dev.of_node;
+-#endif
++		ret = lis3lv02d_init_dt(&lis3_dev);
++		if (ret)
++			return ret;
++	}
  
- #else
--static int lis3lv02d_init_dt(struct lis3lv02d *lis3)
-+int lis3lv02d_init_dt(struct lis3lv02d *lis3)
- {
- 	return 0;
- }
-@@ -1100,10 +1100,6 @@ int lis3lv02d_init_device(struct lis3lv02d *lis3)
- 	irq_handler_t thread_fn;
- 	int irq_flags = 0;
+ 	spi_set_drvdata(spi, &lis3_dev);
  
--	err = lis3lv02d_init_dt(lis3);
--	if (err < 0)
--		return err;
--
- 	lis3->whoami = lis3lv02d_read_8(lis3, WHO_AM_I);
- 
- 	switch (lis3->whoami) {
-diff --git a/drivers/misc/lis3lv02d/lis3lv02d.h b/drivers/misc/lis3lv02d/lis3lv02d.h
-index 4cf0779..b5505fa 100644
---- a/drivers/misc/lis3lv02d/lis3lv02d.h
-+++ b/drivers/misc/lis3lv02d/lis3lv02d.h
-@@ -326,5 +326,6 @@ void lis3lv02d_joystick_disable(struct lis3lv02d *lis3);
- void lis3lv02d_poweroff(struct lis3lv02d *lis3);
- int lis3lv02d_poweron(struct lis3lv02d *lis3);
- int lis3lv02d_remove_fs(struct lis3lv02d *lis3);
-+int lis3lv02d_init_dt(struct lis3lv02d *lis3);
- 
- extern struct lis3lv02d lis3_dev;
 -- 
 1.7.9.5
