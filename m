@@ -1,192 +1,314 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Sep 2012 10:11:28 -0600
-Subject: [PATCH RESEND 4/5] spi: tegra: remove support of legacy DMA driver
+Date: Fri, 14 Sep 2012 10:11:29 -0600
+Subject: [PATCH RESEND 5/5] ASoC: tegra: remove support of legacy DMA driver
  based access
 In-Reply-To: <1347639089-2520-1-git-send-email-swarren@wwwdotorg.org>
 References: <1347639089-2520-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1347639089-2520-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1347639089-2520-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laxman Dewangan <ldewangan@nvidia.com>
 
 Remove the support code which uses the legacy APB DMA driver
-for accessing the SPI FIFO.
+for accessing the I2S FIFO.
 The driver will use the dmaengine based APB DMA driver for
-accessing reqding/writing to SPI FIFO.
+accessing reqding/writing to I2S FIFO.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/spi/Kconfig     |    2 +-
- drivers/spi/spi-tegra.c |   55 +----------------------------------------------
- 2 files changed, 2 insertions(+), 55 deletions(-)
+ sound/soc/tegra/Kconfig     |    2 +-
+ sound/soc/tegra/tegra_pcm.c |  232 -------------------------------------------
+ sound/soc/tegra/tegra_pcm.h |   14 ---
+ 3 files changed, 1 insertions(+), 247 deletions(-)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 76631d0..323ea8f 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -387,7 +387,7 @@ config SPI_MXS
- 
- config SPI_TEGRA
- 	tristate "Nvidia Tegra SPI controller"
+diff --git a/sound/soc/tegra/Kconfig b/sound/soc/tegra/Kconfig
+index 02bcd30..19e5fe7 100644
+--- a/sound/soc/tegra/Kconfig
++++ b/sound/soc/tegra/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_SOC_TEGRA
+ 	tristate "SoC Audio for the Tegra System-on-Chip"
 -	depends on ARCH_TEGRA && (TEGRA_SYSTEM_DMA || TEGRA20_APB_DMA)
 +	depends on ARCH_TEGRA && TEGRA20_APB_DMA
+ 	select REGMAP_MMIO
+ 	select SND_SOC_DMAENGINE_PCM if TEGRA20_APB_DMA
  	help
- 	  SPI driver for NVidia Tegra SoCs
- 
-diff --git a/drivers/spi/spi-tegra.c b/drivers/spi/spi-tegra.c
-index e28445d..f900506 100644
---- a/drivers/spi/spi-tegra.c
-+++ b/drivers/spi/spi-tegra.c
-@@ -164,23 +164,15 @@ struct spi_tegra_data {
- 	 * for the generic case.
- 	 */
- 	int			dma_req_len;
--#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--	struct tegra_dma_req	rx_dma_req;
--	struct tegra_dma_channel *rx_dma;
--#else
- 	struct dma_chan		*rx_dma;
- 	struct dma_slave_config	sconfig;
- 	struct dma_async_tx_descriptor	*rx_dma_desc;
- 	dma_cookie_t		rx_cookie;
--#endif
- 	u32			*rx_bb;
- 	dma_addr_t		rx_bb_phys;
+diff --git a/sound/soc/tegra/tegra_pcm.c b/sound/soc/tegra/tegra_pcm.c
+index 8d6900c..e187339 100644
+--- a/sound/soc/tegra/tegra_pcm.c
++++ b/sound/soc/tegra/tegra_pcm.c
+@@ -57,237 +57,6 @@ static const struct snd_pcm_hardware tegra_pcm_hardware = {
+ 	.fifo_size		= 4,
  };
  
--#if !defined(CONFIG_TEGRA_SYSTEM_DMA)
- static void tegra_spi_rx_dma_complete(void *args);
--#endif
--
- static inline unsigned long spi_tegra_readl(struct spi_tegra_data *tspi,
- 					    unsigned long reg)
- {
-@@ -204,10 +196,6 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
- 	val &= ~SLINK_DMA_BLOCK_SIZE(~0) & ~SLINK_DMA_EN;
- 	val |= SLINK_DMA_BLOCK_SIZE(tspi->dma_req_len / 4 - 1);
- 	spi_tegra_writel(tspi, val, SLINK_DMA_CTL);
 -#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--	tspi->rx_dma_req.size = tspi->dma_req_len;
--	tegra_dma_enqueue_req(tspi->rx_dma, &tspi->rx_dma_req);
--#else
- 	tspi->rx_dma_desc = dmaengine_prep_slave_single(tspi->rx_dma,
- 				tspi->rx_bb_phys, tspi->dma_req_len,
- 				DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
-@@ -219,7 +207,6 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
- 	tspi->rx_dma_desc->callback_param = tspi;
- 	tspi->rx_cookie = dmaengine_submit(tspi->rx_dma_desc);
- 	dma_async_issue_pending(tspi->rx_dma);
--#endif
- 
- 	val |= SLINK_DMA_EN;
- 	spi_tegra_writel(tspi, val, SLINK_DMA_CTL);
-@@ -405,19 +392,12 @@ static void handle_spi_rx_dma_complete(struct spi_tegra_data *tspi)
- 
- 	spin_unlock_irqrestore(&tspi->lock, flags);
- }
--#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--static void tegra_spi_rx_dma_complete(struct tegra_dma_req *req)
+-static void tegra_pcm_queue_dma(struct tegra_runtime_data *prtd)
 -{
--	struct spi_tegra_data *tspi = req->dev;
--	handle_spi_rx_dma_complete(tspi);
+-	struct snd_pcm_substream *substream = prtd->substream;
+-	struct snd_dma_buffer *buf = &substream->dma_buffer;
+-	struct tegra_dma_req *dma_req;
+-	unsigned long addr;
+-
+-	dma_req = &prtd->dma_req[prtd->dma_req_idx];
+-	prtd->dma_req_idx = 1 - prtd->dma_req_idx;
+-
+-	addr = buf->addr + prtd->dma_pos;
+-	prtd->dma_pos += dma_req->size;
+-	if (prtd->dma_pos >= prtd->dma_pos_end)
+-		prtd->dma_pos = 0;
+-
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-		dma_req->source_addr = addr;
+-	else
+-		dma_req->dest_addr = addr;
+-
+-	tegra_dma_enqueue_req(prtd->dma_chan, dma_req);
 -}
--#else
-+
- static void tegra_spi_rx_dma_complete(void *args)
- {
- 	struct spi_tegra_data *tspi = args;
- 	handle_spi_rx_dma_complete(tspi);
- }
--#endif
- 
- static int spi_tegra_setup(struct spi_device *spi)
- {
-@@ -509,9 +489,7 @@ static int __devinit spi_tegra_probe(struct platform_device *pdev)
- 	struct spi_tegra_data	*tspi;
- 	struct resource		*r;
- 	int ret;
--#if !defined(CONFIG_TEGRA_SYSTEM_DMA)
- 	dma_cap_mask_t mask;
--#endif
- 
- 	master = spi_alloc_master(&pdev->dev, sizeof *tspi);
- 	if (master == NULL) {
-@@ -563,14 +541,6 @@ static int __devinit spi_tegra_probe(struct platform_device *pdev)
- 
- 	INIT_LIST_HEAD(&tspi->queue);
- 
--#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--	tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
--	if (!tspi->rx_dma) {
--		dev_err(&pdev->dev, "can not allocate rx dma channel\n");
--		ret = -ENODEV;
--		goto err3;
+-
+-static void dma_complete_callback(struct tegra_dma_req *req)
+-{
+-	struct tegra_runtime_data *prtd = (struct tegra_runtime_data *)req->dev;
+-	struct snd_pcm_substream *substream = prtd->substream;
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-
+-	spin_lock(&prtd->lock);
+-
+-	if (!prtd->running) {
+-		spin_unlock(&prtd->lock);
+-		return;
 -	}
+-
+-	if (++prtd->period_index >= runtime->periods)
+-		prtd->period_index = 0;
+-
+-	tegra_pcm_queue_dma(prtd);
+-
+-	spin_unlock(&prtd->lock);
+-
+-	snd_pcm_period_elapsed(substream);
+-}
+-
+-static void setup_dma_tx_request(struct tegra_dma_req *req,
+-					struct tegra_pcm_dma_params * dmap)
+-{
+-	req->complete = dma_complete_callback;
+-	req->to_memory = false;
+-	req->dest_addr = dmap->addr;
+-	req->dest_wrap = dmap->wrap;
+-	req->source_bus_width = 32;
+-	req->source_wrap = 0;
+-	req->dest_bus_width = dmap->width;
+-	req->req_sel = dmap->req_sel;
+-}
+-
+-static void setup_dma_rx_request(struct tegra_dma_req *req,
+-					struct tegra_pcm_dma_params * dmap)
+-{
+-	req->complete = dma_complete_callback;
+-	req->to_memory = true;
+-	req->source_addr = dmap->addr;
+-	req->dest_wrap = 0;
+-	req->source_bus_width = dmap->width;
+-	req->source_wrap = dmap->wrap;
+-	req->dest_bus_width = 32;
+-	req->req_sel = dmap->req_sel;
+-}
+-
+-static int tegra_pcm_open(struct snd_pcm_substream *substream)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct tegra_runtime_data *prtd;
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct tegra_pcm_dma_params * dmap;
+-	int ret = 0;
+-
+-	prtd = kzalloc(sizeof(struct tegra_runtime_data), GFP_KERNEL);
+-	if (prtd == NULL)
+-		return -ENOMEM;
+-
+-	runtime->private_data = prtd;
+-	prtd->substream = substream;
+-
+-	spin_lock_init(&prtd->lock);
+-
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+-		dmap = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+-		setup_dma_tx_request(&prtd->dma_req[0], dmap);
+-		setup_dma_tx_request(&prtd->dma_req[1], dmap);
+-	} else {
+-		dmap = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+-		setup_dma_rx_request(&prtd->dma_req[0], dmap);
+-		setup_dma_rx_request(&prtd->dma_req[1], dmap);
+-	}
+-
+-	prtd->dma_req[0].dev = prtd;
+-	prtd->dma_req[1].dev = prtd;
+-
+-	prtd->dma_chan = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+-	if (prtd->dma_chan == NULL) {
+-		ret = -ENOMEM;
+-		goto err;
+-	}
+-
+-	/* Set HW params now that initialization is complete */
+-	snd_soc_set_runtime_hwparams(substream, &tegra_pcm_hardware);
+-
+-	/* Ensure that buffer size is a multiple of period size */
+-	ret = snd_pcm_hw_constraint_integer(runtime,
+-						SNDRV_PCM_HW_PARAM_PERIODS);
+-	if (ret < 0)
+-		goto err;
+-
+-	return 0;
+-
+-err:
+-	if (prtd->dma_chan) {
+-		tegra_dma_free_channel(prtd->dma_chan);
+-	}
+-
+-	kfree(prtd);
+-
+-	return ret;
+-}
+-
+-static int tegra_pcm_close(struct snd_pcm_substream *substream)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct tegra_runtime_data *prtd = runtime->private_data;
+-
+-	tegra_dma_free_channel(prtd->dma_chan);
+-
+-	kfree(prtd);
+-
+-	return 0;
+-}
+-
+-static int tegra_pcm_hw_params(struct snd_pcm_substream *substream,
+-				struct snd_pcm_hw_params *params)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct tegra_runtime_data *prtd = runtime->private_data;
+-
+-	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+-
+-	prtd->dma_req[0].size = params_period_bytes(params);
+-	prtd->dma_req[1].size = prtd->dma_req[0].size;
+-
+-	return 0;
+-}
+-
+-static int tegra_pcm_hw_free(struct snd_pcm_substream *substream)
+-{
+-	snd_pcm_set_runtime_buffer(substream, NULL);
+-
+-	return 0;
+-}
+-
+-static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct tegra_runtime_data *prtd = runtime->private_data;
+-	unsigned long flags;
+-
+-	switch (cmd) {
+-	case SNDRV_PCM_TRIGGER_START:
+-		prtd->dma_pos = 0;
+-		prtd->dma_pos_end = frames_to_bytes(runtime, runtime->periods * runtime->period_size);
+-		prtd->period_index = 0;
+-		prtd->dma_req_idx = 0;
+-		/* Fall-through */
+-	case SNDRV_PCM_TRIGGER_RESUME:
+-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+-		spin_lock_irqsave(&prtd->lock, flags);
+-		prtd->running = 1;
+-		spin_unlock_irqrestore(&prtd->lock, flags);
+-		tegra_pcm_queue_dma(prtd);
+-		tegra_pcm_queue_dma(prtd);
+-		break;
+-	case SNDRV_PCM_TRIGGER_STOP:
+-	case SNDRV_PCM_TRIGGER_SUSPEND:
+-	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+-		spin_lock_irqsave(&prtd->lock, flags);
+-		prtd->running = 0;
+-		spin_unlock_irqrestore(&prtd->lock, flags);
+-		tegra_dma_dequeue_req(prtd->dma_chan, &prtd->dma_req[0]);
+-		tegra_dma_dequeue_req(prtd->dma_chan, &prtd->dma_req[1]);
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static snd_pcm_uframes_t tegra_pcm_pointer(struct snd_pcm_substream *substream)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct tegra_runtime_data *prtd = runtime->private_data;
+-
+-	return prtd->period_index * runtime->period_size;
+-}
+-
+-
+-static int tegra_pcm_mmap(struct snd_pcm_substream *substream,
+-				struct vm_area_struct *vma)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-
+-	return dma_mmap_writecombine(substream->pcm->card->dev, vma,
+-					runtime->dma_area,
+-					runtime->dma_addr,
+-					runtime->dma_bytes);
+-}
+-
+-static struct snd_pcm_ops tegra_pcm_ops = {
+-	.open		= tegra_pcm_open,
+-	.close		= tegra_pcm_close,
+-	.ioctl		= snd_pcm_lib_ioctl,
+-	.hw_params	= tegra_pcm_hw_params,
+-	.hw_free	= tegra_pcm_hw_free,
+-	.trigger	= tegra_pcm_trigger,
+-	.pointer	= tegra_pcm_pointer,
+-	.mmap		= tegra_pcm_mmap,
+-};
 -#else
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 	tspi->rx_dma = dma_request_channel(mask, NULL, NULL);
-@@ -580,8 +550,6 @@ static int __devinit spi_tegra_probe(struct platform_device *pdev)
- 		goto err3;
- 	}
+ static int tegra_pcm_open(struct snd_pcm_substream *substream)
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+@@ -399,7 +168,6 @@ static struct snd_pcm_ops tegra_pcm_ops = {
+ 	.pointer	= snd_dmaengine_pcm_pointer,
+ 	.mmap		= tegra_pcm_mmap,
+ };
+-#endif
  
+ static int tegra_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
+ {
+diff --git a/sound/soc/tegra/tegra_pcm.h b/sound/soc/tegra/tegra_pcm.h
+index a3a4503..b40279b 100644
+--- a/sound/soc/tegra/tegra_pcm.h
++++ b/sound/soc/tegra/tegra_pcm.h
+@@ -40,20 +40,6 @@ struct tegra_pcm_dma_params {
+ 	unsigned long req_sel;
+ };
+ 
+-#if defined(CONFIG_TEGRA_SYSTEM_DMA)
+-struct tegra_runtime_data {
+-	struct snd_pcm_substream *substream;
+-	spinlock_t lock;
+-	int running;
+-	int dma_pos;
+-	int dma_pos_end;
+-	int period_index;
+-	int dma_req_idx;
+-	struct tegra_dma_req dma_req[2];
+-	struct tegra_dma_channel *dma_chan;
+-};
 -#endif
 -
- 	tspi->rx_bb = dma_alloc_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
- 					 &tspi->rx_bb_phys, GFP_KERNEL);
- 	if (!tspi->rx_bb) {
-@@ -590,17 +558,6 @@ static int __devinit spi_tegra_probe(struct platform_device *pdev)
- 		goto err4;
- 	}
- 
--#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--	tspi->rx_dma_req.complete = tegra_spi_rx_dma_complete;
--	tspi->rx_dma_req.to_memory = 1;
--	tspi->rx_dma_req.dest_addr = tspi->rx_bb_phys;
--	tspi->rx_dma_req.dest_bus_width = 32;
--	tspi->rx_dma_req.source_addr = tspi->phys + SLINK_RX_FIFO;
--	tspi->rx_dma_req.source_bus_width = 32;
--	tspi->rx_dma_req.source_wrap = 4;
--	tspi->rx_dma_req.req_sel = spi_tegra_req_sels[pdev->id];
--	tspi->rx_dma_req.dev = tspi;
--#else
- 	/* Dmaengine Dma slave config */
- 	tspi->sconfig.src_addr = tspi->phys + SLINK_RX_FIFO;
- 	tspi->sconfig.dst_addr = tspi->phys + SLINK_RX_FIFO;
-@@ -616,7 +573,6 @@ static int __devinit spi_tegra_probe(struct platform_device *pdev)
- 			ret);
- 		goto err4;
- 	}
--#endif
- 
- 	master->dev.of_node = pdev->dev.of_node;
- 	ret = spi_register_master(master);
-@@ -630,11 +586,7 @@ err5:
- 	dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
- 			  tspi->rx_bb, tspi->rx_bb_phys);
- err4:
--#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--	tegra_dma_free_channel(tspi->rx_dma);
--#else
- 	dma_release_channel(tspi->rx_dma);
--#endif
- err3:
- 	clk_put(tspi->clk);
- err2:
-@@ -656,12 +608,7 @@ static int __devexit spi_tegra_remove(struct platform_device *pdev)
- 	tspi = spi_master_get_devdata(master);
- 
- 	spi_unregister_master(master);
--#if defined(CONFIG_TEGRA_SYSTEM_DMA)
--	tegra_dma_free_channel(tspi->rx_dma);
--#else
- 	dma_release_channel(tspi->rx_dma);
--#endif
--
- 	dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
- 			  tspi->rx_bb, tspi->rx_bb_phys);
+ int tegra_pcm_platform_register(struct device *dev);
+ void tegra_pcm_platform_unregister(struct device *dev);
  
 -- 
 1.7.0.4
