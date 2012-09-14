@@ -1,24 +1,32 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 13 Sep 2012 20:27:17 -0700
-Subject: [PATCH] staging: ste_rmi4: remove gpio.h include
-In-Reply-To: <5051E056.4060304@gmail.com>
-References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1347541643-30665-1-git-send-email-robherring2@gmail.com>
- <5051E056.4060304@gmail.com>
-Message-ID: <20120914032716.GA10126@kroah.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 14 Sep 2012 08:56:57 +0530
+Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
+ dmaengine_prep_dma_cyclic()
+In-Reply-To: <5051FB4D.3000009@metafoo.de>
+References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
+ <5051FB4D.3000009@metafoo.de>
+Message-ID: <1347593217.1943.26.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 08:32:06AM -0500, Rob Herring wrote:
-> Adding Greg KH's correct email...
+On Thu, 2012-09-13 at 17:27 +0200, Lars-Peter Clausen wrote:
+> Hi,
 > 
-> On 09/13/2012 08:07 AM, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > gpio.h is not needed and is going to be removed.
+> Hm... Do you think it would work as well if we implement this by
+> setting the
+> callback for the descriptor to NULL? If the callback is NULL there is
+> nothing to at the end of a transfer/period and the dma engine driver
+> may
+> choose to disable interrupts. This would also benefit non cyclic
+> transfers
+> where the callback is NULL and we do not need add the new parameter to
+> dmaengine_prep_dma_cyclic.
+That will work too.... BUT the idea of no_wake mode in ALSA is that we
+should not have any interrupts, so anything which is going to cause
+interrupts to AP in undesired. The interrupts still happen and it just
+that dmaengine driver is not notifying client.
 
-Care to send it to me in a format I can apply it in?
 
-thanks,
-
-greg k-h
+-- 
+~Vinod
