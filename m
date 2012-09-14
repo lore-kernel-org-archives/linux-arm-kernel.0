@@ -1,74 +1,102 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Fri, 14 Sep 2012 17:12:19 +0530
-Subject: [PATCH] RTC: TWL: ensure all interrupts are disabled during probe
-In-Reply-To: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
-References: <1347569157-19262-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <CAM=Q2cufVSReuvs3Yf6jvuBFeV9j5iPWV-DaMqRkCJFXUMZPQg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 14 Sep 2012 15:05:43 +0300
+Subject: [PATCH v3 00/15] ASoC: OMAP: Convert to use dmaengine
+Message-ID: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hello,
 
-On Fri, Sep 14, 2012 at 2:15 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> From: Kevin Hilman <khilman@ti.com>
->
-> On some platforms, bootloaders are known to do some interesting RTC
-> programming.  Without going into the obscurities as to why this may be
-> the case, suffice it to say the the driver should not make any
-> assumptions about the state of the RTC when the driver loads.  In
-> particular, the driver probe should be sure that all interrupts are
-> disabled until otherwise programmed.
->
-> This was discovered when finding bursty I2C traffic every second on
-> Overo platforms.  This I2C overhead was keeping the SoC from hitting
-> deep power states.  The cause was found to be the RTC firing every
-> second on the I2C-connected TWL PMIC.
->
-> Special thanks to Felipe Balbi for suggesting to look for a rogue
-> driver as the source of the I2C traffic rather than the I2C driver
-> itself.
->
-> Special thanks to Steve Sakoman for helping track down the source of
-> the continuous RTC interrups on the Overo boards.
->
+Changes since v2:
+- As it has been discussed the no_wakeup parameter has been replaced with flags
+  for the dmaengine APIs
 
-Tested that the continuous interrupt issue after doing a i2c mm on omap4sdp.
-This patch solves the issue.
-thanks,
+Changes since v1:
+- Support for pause/resume for OMAP audio via dmaengine
+- dmaengine: support for NO_PERIOD_WAKEUP in cyclic mode
+ - OMAP to keep supporting NO_PERIOD_WAKEUP for audio
+ - Other plaforms can also try to enable this mode since we have now generic
+   interface to do so.
 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Steve Sakoman <steve@sakoman.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Patch applies to v3.6-rc5
->
->  drivers/rtc/rtc-twl.c |    5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-> index c5d06fe..9277d94 100644
-> --- a/drivers/rtc/rtc-twl.c
-> +++ b/drivers/rtc/rtc-twl.c
-> @@ -495,6 +495,11 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
->         if (ret < 0)
->                 goto out1;
->
-> +       /* ensure interrupts are disabled, bootloaders can be strange */
-> +       ret = twl_rtc_write_u8(0, REG_RTC_INTERRUPTS_REG);
-> +       if (ret < 0)
-> +               dev_warn(&pdev->dev, "unable to disable interrupt\n");
-> +
-Now that it is always 0 can the below read be removed as it is redundant now.
+This series will switch the OMAP audio to use dmaengine.
+The final patch which does the switch was based on Russell King's earlier patch.
 
->         /* init cached IRQ enable bits */
->         ret = twl_rtc_read_u8(&rtc_irq_bits, REG_RTC_INTERRUPTS_REG);
->         if (ret < 0)
-> --
-> 1.7.9.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The first 10 patch is to prepare the OMAP audio drivers for a smooth change to
+dmaengine:
+- sDMA FRAME sync mode is removed and replaced with PACKET mode
+- dai drivers no longer need to configure sDMA sync mode
+- dai drivers does not need to specify the DMA word length - with the exception
+  of the omap-hdmi driver which requires 32bit word length regardless of the
+  audio format in use
+- the McPDM driver used (to my surprise) hackish way of getting the DMA channel
+  and address - via defines from some header files
+
+After the conversion OMAP audio support should have the same features as before,
+no regressions expected.
+
+I have tested the series on:
+- BeagleBoard (audio via McBSP): 
+ - aplay/arecord. In element mode and in threshold mode with different period
+   sizes
+ - mplayer -ao alsa: for direct ALSA access
+ - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
+- OMAP4 Blaze (audio via McPDM and DMIC)
+ - aplay/arecord
+ - mplayer -ao alsa: for direct ALSA access
+ - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
+
+The patches has been generated against:
+git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
+
+Janusz: Can you retest this series on OMAP1 to be sure I have not broken it?
+Ricardo: Can you test the omap-hmdi if it is still working?
+
+Regards,
+Peter
+---
+Peter Ujfalusi (15):
+  dmaengine: omap: Support for element mode in cyclic DMA
+  dmaengine: omap: Add support for pause/resume in cyclic dma mode
+  dmaengine: Add flags parameter to dmaengine_prep_dma_cyclic()
+  dmaengine: Pass flags via device_prep_dma_cyclic() callback
+  dmaengine: omap-dma: Add support to suppress interrupts in cyclic
+    mode
+  ASoC: omap-mcbsp: Use sDMA packet mode instead of frame mode
+  ASoC: omap-pcm: Select sDMA synchronization based on packet_size
+  ASoC: OMAP: Remove sync_mode from omap_pcm_dma_data struct
+  ASoC: omap-pcm: Prepare to configure the DMA data_type based on
+    stream properties
+  ARM: OMAP4: hwmod_data: Add resource names to McPDM memory ranges
+  ASoC: omap-mcpdm: Use platform_get_resource_* to get resources
+  ASoC: OMAP: mcbsp, mcpdm, dmic: Let omap-pcm to pick the dma_type
+  ASoC: omap-pcm, omap-dmic: Change the use of
+    omap_pcm_dma_data->data_type
+  ASoC: OMAP: mcbsp, mcpdm, dmic, hdmi: Set dma_data at startup time
+  ASoC: omap-pcm: Convert to use dmaengine
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +
+ drivers/dma/at_hdmac.c                     |   3 +-
+ drivers/dma/ep93xx_dma.c                   |   4 +-
+ drivers/dma/imx-dma.c                      |   2 +-
+ drivers/dma/imx-sdma.c                     |   2 +-
+ drivers/dma/mmp_tdma.c                     |   2 +-
+ drivers/dma/mxs-dma.c                      |   2 +-
+ drivers/dma/omap-dma.c                     |  45 ++++--
+ drivers/dma/pl330.c                        |   2 +-
+ drivers/dma/sa11x0-dma.c                   |   2 +-
+ drivers/dma/sirf-dma.c                     |   2 +-
+ drivers/dma/ste_dma40.c                    |   3 +-
+ drivers/dma/tegra20-apb-dma.c              |   2 +-
+ include/linux/dmaengine.h                  |   7 +-
+ sound/soc/omap/Kconfig                     |   3 +-
+ sound/soc/omap/omap-dmic.c                 |   9 +-
+ sound/soc/omap/omap-hdmi.c                 |  17 ++-
+ sound/soc/omap/omap-mcbsp.c                |  60 +++-----
+ sound/soc/omap/omap-mcpdm.c                |  40 +++--
+ sound/soc/omap/omap-pcm.c                  | 236 ++++++++---------------------
+ sound/soc/omap/omap-pcm.h                  |   4 +-
+ sound/soc/soc-dmaengine-pcm.c              |   6 +-
+ 22 files changed, 186 insertions(+), 269 deletions(-)
+
+-- 
+1.7.12
