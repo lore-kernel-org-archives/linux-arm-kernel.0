@@ -1,72 +1,159 @@
 From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 14 Sep 2012 09:01:51 -0400
-Subject: [PATCH v4 06/24] docs: Xen ARM DT bindings
-In-Reply-To: <1347621207-11294-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Fri, 14 Sep 2012 09:03:08 -0400
+Subject: [PATCH v4 10/24] xen/arm: compile and run xenbus
+In-Reply-To: <1347621207-11294-10-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120914130151.GH25249@phenom.dumpdata.com>
+ <1347621207-11294-10-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120914130308.GI25249@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 12:13:08PM +0100, Stefano Stabellini wrote:
-> Add a doc to describe the Xen ARM device tree bindings
+On Fri, Sep 14, 2012 at 12:13:12PM +0100, Stefano Stabellini wrote:
+> bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
+> an error.
+> 
+> If Linux is running as an HVM domain and is running as Dom0, use
+> xenstored_local_init to initialize the xenstore page and event channel.
+
+Let me stick it in my tree and see how it works overnight with HVM and PV guests.
+
+
 > 
 > 
 > Changes in v4:
 > 
-> - "xen,xen" should be last as it is less specific;
-> - update reg property using 2 address-cells and 2 size-cells.
+> - do not xs_reset_watches on dom0.
 > 
+> 
+> Changes in v2:
+> 
+> - refactor xenbus_init.
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: devicetree-discuss at lists.ozlabs.org
-> CC: David Vrabel <david.vrabel@citrix.com>
-> CC: Rob Herring <robherring2@gmail.com>
-> CC: Dave Martin <dave.martin@linaro.org>
 > ---
->  Documentation/devicetree/bindings/arm/xen.txt |   22 ++++++++++++++++++++++
->  1 files changed, 22 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/xen.txt
+>  drivers/xen/xenbus/xenbus_comms.c |    2 +-
+>  drivers/xen/xenbus/xenbus_probe.c |   62 +++++++++++++++++++++++++-----------
+>  drivers/xen/xenbus/xenbus_xs.c    |    3 +-
+>  3 files changed, 46 insertions(+), 21 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-> new file mode 100644
-> index 0000000..1f8f7d4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> @@ -0,0 +1,22 @@
-> +* Xen hypervisor device tree bindings
-> +
-> +Xen ARM virtual platforms shall have the following properties:
-> +
-> +- compatible:
-> +	compatible = "xen,xen-<version>", "xen,xen";
-> +  where <version> is the version of the Xen ABI of the platform.
-> +
-> +- reg: specifies the base physical address and size of a region in
-> +  memory where the grant table should be mapped to, using an
-> +  HYPERVISOR_memory_op hypercall. 
-> +
-> +- interrupts: the interrupt used by Xen to inject event notifications.
-
-Its singular here.. but in the example its plurar. What if you use
-multiple of the same number ("16 0xf")?
-
-> +
-> +
-> +Example:
-> +
-> +hypervisor {
-> +	compatible = "xen,xen-4.3", "xen,xen";
-> +	reg = <0 0xb0000000 0 0x20000>;
-
-So two grant tables?
-
-Hm, physical address is zero, and the size is 0xbignumber?
-Or is the '0' denotating a seperator of arguments, so it is
-0xb000.. for physical address and 0x20000 for size?
-
-
-> +	interrupts = <1 15 0xf08>;
+> diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
+> index 52fe7ad..c5aa55c 100644
+> --- a/drivers/xen/xenbus/xenbus_comms.c
+> +++ b/drivers/xen/xenbus/xenbus_comms.c
+> @@ -224,7 +224,7 @@ int xb_init_comms(void)
+>  		int err;
+>  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
+>  						0, "xenbus", &xb_waitq);
+> -		if (err <= 0) {
+> +		if (err < 0) {
+>  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+>  			return err;
+>  		}
+> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+> index b793723..a67ccc0 100644
+> --- a/drivers/xen/xenbus/xenbus_probe.c
+> +++ b/drivers/xen/xenbus/xenbus_probe.c
+> @@ -719,37 +719,61 @@ static int __init xenstored_local_init(void)
+>  	return err;
+>  }
+>  
+> +enum xenstore_init {
+> +	UNKNOWN,
+> +	PV,
+> +	HVM,
+> +	LOCAL,
 > +};
+>  static int __init xenbus_init(void)
+>  {
+>  	int err = 0;
+> +	enum xenstore_init usage = UNKNOWN;
+> +	uint64_t v = 0;
+>  
+>  	if (!xen_domain())
+>  		return -ENODEV;
+>  
+>  	xenbus_ring_ops_init();
+>  
+> -	if (xen_hvm_domain()) {
+> -		uint64_t v = 0;
+> -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> -		if (err)
+> -			goto out_error;
+> -		xen_store_evtchn = (int)v;
+> -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> -		if (err)
+> -			goto out_error;
+> -		xen_store_mfn = (unsigned long)v;
+> -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> -	} else {
+> -		xen_store_evtchn = xen_start_info->store_evtchn;
+> -		xen_store_mfn = xen_start_info->store_mfn;
+> -		if (xen_store_evtchn)
+> -			xenstored_ready = 1;
+> -		else {
+> +	if (xen_pv_domain())
+> +		usage = PV;
+> +	if (xen_hvm_domain())
+> +		usage = HVM;
+> +	if (xen_hvm_domain() && xen_initial_domain())
+> +		usage = LOCAL;
+> +	if (xen_pv_domain() && !xen_start_info->store_evtchn)
+> +		usage = LOCAL;
+> +	if (xen_pv_domain() && xen_start_info->store_evtchn)
+> +		xenstored_ready = 1;
+> +
+> +	switch (usage) {
+> +		case LOCAL:
+>  			err = xenstored_local_init();
+>  			if (err)
+>  				goto out_error;
+> -		}
+> -		xen_store_interface = mfn_to_virt(xen_store_mfn);
+> +			xen_store_interface = mfn_to_virt(xen_store_mfn);
+> +			break;
+> +		case PV:
+> +			xen_store_evtchn = xen_start_info->store_evtchn;
+> +			xen_store_mfn = xen_start_info->store_mfn;
+> +			xen_store_interface = mfn_to_virt(xen_store_mfn);
+> +			break;
+> +		case HVM:
+> +			err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> +			if (err)
+> +				goto out_error;
+> +			xen_store_evtchn = (int)v;
+> +			err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> +			if (err)
+> +				goto out_error;
+> +			xen_store_mfn = (unsigned long)v;
+> +			xen_store_interface =
+> +				ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> +			break;
+> +		default:
+> +			pr_warn("Xenstore state unknown\n");
+> +			break;
+>  	}
+>  
+>  	/* Initialize the interface to xenstore. */
+> diff --git a/drivers/xen/xenbus/xenbus_xs.c b/drivers/xen/xenbus/xenbus_xs.c
+> index bce15cf..131dec0 100644
+> --- a/drivers/xen/xenbus/xenbus_xs.c
+> +++ b/drivers/xen/xenbus/xenbus_xs.c
+> @@ -44,6 +44,7 @@
+>  #include <linux/rwsem.h>
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+> +#include <asm/xen/hypervisor.h>
+>  #include <xen/xenbus.h>
+>  #include <xen/xen.h>
+>  #include "xenbus_comms.h"
+> @@ -622,7 +623,7 @@ static void xs_reset_watches(void)
+>  {
+>  	int err, supported = 0;
+>  
+> -	if (!xen_hvm_domain())
+> +	if (!xen_hvm_domain() || xen_initial_domain())
+>  		return;
+>  
+>  	err = xenbus_scanf(XBT_NIL, "control",
 > -- 
 > 1.7.2.5
