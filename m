@@ -1,62 +1,77 @@
 From: vkoul@infradead.org (Vinod Koul)
-Date: Fri, 14 Sep 2012 08:36:15 +0530
+Date: Fri, 14 Sep 2012 08:36:39 +0530
 Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
-In-Reply-To: <201209050346.39253.marex@denx.de>
+In-Reply-To: <1346731465-6301-1-git-send-email-marex@denx.de>
 References: <1346731465-6301-1-git-send-email-marex@denx.de>
- <20120905014000.GP2362@S2101-09.ap.freescale.net>
- <201209050346.39253.marex@denx.de>
-Message-ID: <1347591975.1943.12.camel@vkoul-udesk3>
+Message-ID: <1347591999.1943.13.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-09-05 at 03:46 +0200, Marek Vasut wrote:
-> Dear Shawn Guo,
+On Tue, 2012-09-04 at 06:04 +0200, Marek Vasut wrote:
+> In case of a large SPI flash, the amount of DMA descriptors
+> available to the DMA driver is not large enough anymore. For
+> example 8MB SPI flash now needs 129 descriptors to be transfered
+> in one long read. There are currently 53 descriptors available in
+> one PAGE_SIZE-big block. Enlarge the allocated descriptor area to
+> four PAGE_SIZE blocks to fulfill such requirements.
 > 
-> > On Tue, Sep 04, 2012 at 06:04:25AM +0200, Marek Vasut wrote:
-> > > In case of a large SPI flash, the amount of DMA descriptors
-> > > available to the DMA driver is not large enough anymore. For
-> > > example 8MB SPI flash now needs 129 descriptors to be transfered
-> > > in one long read. There are currently 53 descriptors available in
-> > > one PAGE_SIZE-big block. Enlarge the allocated descriptor area to
-> > > four PAGE_SIZE blocks to fulfill such requirements.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: Dan Williams <djbw@fb.com>
-> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > Vinod (copied) is the primary maintainer and collecting dma patches now.
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+Applied thanks
+> ---
+>  drivers/dma/mxs-dma.c |   14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
 > 
-> Understood.
-> 
-> Let me ask about another thing. If there'll eventually be some device that'd 
-> need even larger transfer (say ... hundreds of megs) we'd end up with trouble 
-> again.
-> 
-> One way to fix this is to recycle descriptors that were already used during the 
-> transfer, but can we really do it fast enough, so the DMA would do it's job at 
-> one end of the descriptor chain and we'd be building the other?
-See the comment in dma_ctrl_flags:
-* @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the client
-*  acknowledges receipt, i.e. has has a chance to establish any dependency
-*  chains
-Setting this would mean that driver can reuse the descriptor once the
-transaction has completed.
-
-> 
-> The other (easier) way is to let the device that claims the particular DMA 
-> channel allocate as much descriptors as it might ever need, which I think is 
-> wrong.
-Correct.
-> 
-> What do you think ?
-> 
-> Best regards,
-> Marek Vasut
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index 7f41b25..e269325 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -101,7 +101,8 @@ struct mxs_dma_ccw {
+>  	u32		pio_words[MXS_PIO_WORDS];
+>  };
+>  
+> -#define NUM_CCW	(int)(PAGE_SIZE / sizeof(struct mxs_dma_ccw))
+> +#define CCW_BLOCK_SIZE	(4 * PAGE_SIZE)
+> +#define NUM_CCW	(int)(CCW_BLOCK_SIZE / sizeof(struct mxs_dma_ccw))
+>  
+>  struct mxs_dma_chan {
+>  	struct mxs_dma_engine		*mxs_dma;
+> @@ -354,14 +355,15 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+>  
+>  	mxs_chan->chan_irq = data->chan_irq;
+>  
+> -	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
+> -				&mxs_chan->ccw_phys, GFP_KERNEL);
+> +	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev,
+> +				CCW_BLOCK_SIZE, &mxs_chan->ccw_phys,
+> +				GFP_KERNEL);
+>  	if (!mxs_chan->ccw) {
+>  		ret = -ENOMEM;
+>  		goto err_alloc;
+>  	}
+>  
+> -	memset(mxs_chan->ccw, 0, PAGE_SIZE);
+> +	memset(mxs_chan->ccw, 0, CCW_BLOCK_SIZE);
+>  
+>  	if (mxs_chan->chan_irq != NO_IRQ) {
+>  		ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
+> @@ -387,7 +389,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+>  err_clk:
+>  	free_irq(mxs_chan->chan_irq, mxs_dma);
+>  err_irq:
+> -	dma_free_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
+> +	dma_free_coherent(mxs_dma->dma_device.dev, CCW_BLOCK_SIZE,
+>  			mxs_chan->ccw, mxs_chan->ccw_phys);
+>  err_alloc:
+>  	return ret;
+> @@ -402,7 +404,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
+>  
+>  	free_irq(mxs_chan->chan_irq, mxs_dma);
+>  
+> -	dma_free_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
+> +	dma_free_coherent(mxs_dma->dma_device.dev, CCW_BLOCK_SIZE,
+>  			mxs_chan->ccw, mxs_chan->ccw_phys);
+>  
+>  	clk_disable_unprepare(mxs_dma->clk);
