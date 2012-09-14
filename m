@@ -1,21 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Sep 2012 15:54:31 +0200
-Subject: [PATCH] pinctrl: use kasprintf() in pinmux_request_gpio()
-In-Reply-To: <CAMbhsRSaHOgyTn56vQndn0TKh3AT9dk3pRVuJx3qJXWowsLVaA@mail.gmail.com>
-References: <1347565754-9534-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347599944.9481.3.camel@joe2Laptop>
- <CAMbhsRSaHOgyTn56vQndn0TKh3AT9dk3pRVuJx3qJXWowsLVaA@mail.gmail.com>
-Message-ID: <CACRpkdbj=tKBymnHbAmZ=Q_=UuBv+L1g3uM=k=BjjczsFxwt=g@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 14 Sep 2012 14:56:38 +0100
+Subject: [PATCH v4 00/24] Introduce Xen support on ARM (based on 3.6-rc5)
+In-Reply-To: <20120914132108.GQ25249@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <20120914132108.GQ25249@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1209141455350.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 9:18 AM, Colin Cross <ccross@google.com> wrote:
+On Fri, 14 Sep 2012, Konrad Rzeszutek Wilk wrote:
+> I already put in these
+> 
+> 1)      xen/events: fix unmask_evtchn for PV on HVM guests
+> 2)      xen: missing includes
+> 3)      xen: update xen_add_to_physmap interface
+> 4)      xen: Introduce xen_pfn_t for pfn and mfn types
+> 5)      xen: clear IRQ_NOAUTOEN and IRQ_NOREQUEST
+> 6)      xen: allow privcmd for HVM guests
+> 
+> in my tree as they also impact/help the PVH domains which works for
+> x86 (Well, not all of them). They are in my stable/for-linus-3.7 git tree
+> (git://git.kernel.org/pub/scm/linux/kernel/git/konrad/xen.git)
+> and also in #linux-next.
+> 
+> 
+> If it would make reviewing easier, I would recommend you rebase
+> your tree on top of the stable/for-linus-3.7 and just post them
+> as it would make the number of patches smaller.
 
-> The one it's replacing is worse, it never sets gpiostr[15] to 0 and
-> kstrdup will read past the end of the buffer if the string is
-> truncated.
-
-I recorded this as an Acked-by ... :-)
-
-Yours,
-Linus Walleij
+I have done that and it went quite smoothly. The patch series is now 5
+patches smaller.
+Thanks!
