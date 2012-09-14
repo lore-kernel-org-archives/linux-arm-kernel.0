@@ -1,49 +1,47 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Fri, 14 Sep 2012 14:55:54 +0530
-Subject: [PATCH] arm: tegra: dt: Add pinmux entries for Vbus regulator controls
-Message-ID: <1347614754-26357-1-git-send-email-vbyravarasu@nvidia.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 14 Sep 2012 12:28:28 +0300
+Subject: [PATCH v2 03/15] dmaengine: Add no_wakeup parameter to
+ dmaengine_prep_dma_cyclic()
+In-Reply-To: <1347612630.1943.29.camel@vkoul-udesk3>
+References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347543485-339-4-git-send-email-peter.ujfalusi@ti.com>
+ <5051FB4D.3000009@metafoo.de> <1347593217.1943.26.camel@vkoul-udesk3>
+ <5052E72A.8040207@metafoo.de> <1347612630.1943.29.camel@vkoul-udesk3>
+Message-ID: <5052F8BC.4020102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding pinmux entries for PI4 and PH7 to enable Vbus for USB1
-and USB3 controllers on Cardhu A02 board.
+Hi,
 
-Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
----
+On 09/14/2012 11:50 AM, Vinod Koul wrote:
+>> Well, the idea was that the driver would disable interrupts if there is no
+>> callback to call, since there would be nothing to do in the interrupt
+>> handler anyway. But I guess the flags approach should work fine as well.
+> Yes we _could_ do that, but this relies on dmaengine driver to have this
+> implicit understanding. Anyone using dmaengine library in ASoC may or
+> may not be aware of this, so i would consider it hackish.
+> 
+> Using this flag explicitly makes everyone aware what the intended
+> behaviour is.
 
- arch/arm/boot/dts/tegra30-cardhu-a02.dts |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+I'm not sure about which flags should ASoC set for the two case we are going
+to have. I think it should be something like this:
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu-a02.dts b/arch/arm/boot/dts/tegra30-cardhu-a02.dts
-index dd4222f..b76ad31 100644
---- a/arch/arm/boot/dts/tegra30-cardhu-a02.dts
-+++ b/arch/arm/boot/dts/tegra30-cardhu-a02.dts
-@@ -8,6 +8,26 @@
- 	model = "NVIDIA Tegra30 Cardhu A02 evaluation board";
- 	compatible = "nvidia,cardhu-a02", "nvidia,cardhu", "nvidia,tegra30";
- 
-+	pinmux {
-+		gmi_rst_n_pi4 {
-+			nvidia,pins = "gmi_rst_n_pi4";
-+			nvidia,function = "gmi";
-+			nvidia,tristate = <0>;
-+			nvidia,enable-input = <1>;
-+			nvidia,open-drain = <1>;
-+			nvidia,pull = <0>;
-+		};
-+
-+		gmi_ad15_ph7 {
-+			nvidia,pins = "gmi_ad15_ph7";
-+			nvidia,function = "gmi";
-+			nvidia,tristate = <0>;
-+			nvidia,enable-input = <1>;
-+			nvidia,open-drain = <1>;
-+			nvidia,pull = <0>;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+unsigned long flags = DMA_CTRL_ACK;
+
+if (!substream->runtime->no_period_wakeup)
+	flags |= DMA_PREP_INTERRUPT;
+
+I'm not 100% sure of the role of DMA_CTRL_ACK in this case. Or should we only
+handle the DMA_PREP_INTERRUPT flag, like this:
+
+unsigned long flags = 0;
+
+if (!substream->runtime->no_period_wakeup)
+	flags |= DMA_PREP_INTERRUPT;
+
+
+What do you think?
+
 -- 
-1.7.1.1
+P?ter
