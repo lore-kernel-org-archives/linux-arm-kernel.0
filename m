@@ -1,82 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Sep 2012 09:27:56 +0100
-Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed via
- Device Tree
-In-Reply-To: <20120912105202.GD2624@pengutronix.de>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
- <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
- <20120912105202.GD2624@pengutronix.de>
-Message-ID: <20120914082754.GE3374@gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 14 Sep 2012 16:30:15 +0800
+Subject: [PATCH v2 06/11] USB: mxs-phy: add basic otg support
+In-Reply-To: <20120912103901.GA6614@as23.pp.htv.fi>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+ <1346137397-32374-7-git-send-email-richard.zhao@freescale.com>
+ <20120912103901.GA6614@as23.pp.htv.fi>
+Message-ID: <20120914083014.GC7167@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 12:52:02PM +0200, Wolfram Sang wrote:
-> On Mon, Sep 10, 2012 at 04:42:36AM -0700, Linus Walleij wrote:
-> > On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > 
-> > > Each I2C device can be correctly probed already using Device Tree,
-> > > but the sub-devices still have to be registered by calls to
-> > > i2c_register_board_info(). After this patch, each sub-device can
-> > > be registered directly from Device Tree instead, removing the
-> > > requirement for the aforementioned calls from platform code.
-> > >
-> > > CC: linux-i2c at vger.kernel.org
-> > > CC: Wolfram Sang <w.sang@pengutronix.de>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > The patch as such is fine.
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > ...but there will be merge issues (of the type I'm
-> > discussing with Arnd in another thread).
-> > 
-> > > ---
-> > >  drivers/i2c/busses/i2c-nomadik.c |    4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > >
-> > > diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-> > > index 5d1a970..01231c2 100644
-> > > --- a/drivers/i2c/busses/i2c-nomadik.c
-> > > +++ b/drivers/i2c/busses/i2c-nomadik.c
-> > > @@ -26,6 +26,7 @@
-> > >  #include <linux/pm_runtime.h>
-> > >  #include <linux/platform_data/i2c-nomadik.h>
-> > >  #include <linux/of.h>
-> > > +#include <linux/of_i2c.h>
-> > 
-> > This is clearly dependent on the other patches to I2C to
-> > be merged first (the include above is not yet there in
-> > linux-next even), so this patch should go into Wolfram's
-> > tree right? Else we have to rip out all the patches to the
-> > I2C driver from his tree and funnel it all through ARM SoC.
+On Wed, Sep 12, 2012 at 01:39:01PM +0300, Heikki Krogerus wrote:
+> Hi,
 > 
-> First, I'd like to have this patch squashed with "i2c: nomadik: Add
-> Device Tree support to the Nomadik I2C driver". I wanted to do this on
-> my own, but the patches do not apply to 3.6-rc5 (with or without
-> regulator removal patch from Linus)?
+> On Tue, Aug 28, 2012 at 03:03:12PM +0800, Richard Zhao wrote:
+> > +static int mxs_phy_set_host(struct usb_otg *otg, struct usb_bus *host)
+> > +{
+> 
+> Shouldn't you at least save the host pointer?
+> 
+> otg->host = host;
+It looks making sense, though it's not called by chipidea driver.
 
-I'm really not keen on squashing all my patches together. They are
-clearly have very different purposes. If you think they are closely
-related, then pull them in sequentially, but please don't squash
-all my work into a single patch for no other reason than convenience.
+> 
+> > +	return 0;
+> > +}
+> > +
+> > +static int mxs_phy_set_peripheral(struct usb_otg *otg,
+> > +					struct usb_gadget *gadget)
+> > +{
+> 
+> And the same with the gadget?
 
-> I can also take the I2C related changes to the devicetrees via my tree.
-> This is not uncommon. Some people prefer to do this via their soc-trees,
-> though. I don't care much since this is not really a hard dependency
-> causing build failures or merge conflicts, but just needs a little extra
-> time until the patches are all there...
-
-It would be better for all the Device Tree changes go in as a single
-patch-set. Again, I don't care where they go, so long as they go in
-together. arm-soc seems like the most generic place for them to be
-pulled into though.
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Richard
+> 
+> > +	return 0;
+> > +}
+> 
+> -- 
+> heikki
+> 
