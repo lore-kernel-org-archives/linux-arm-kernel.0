@@ -1,50 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Sep 2012 14:09:06 +0100
-Subject: FW: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe
- rather than as a device
-In-Reply-To: <20120827163337.GC4339@opensource.wolfsonmicro.com>
-References: <014401cd8165$99960c40$ccc224c0$@se>
- <50377C0D.2060905@stericsson.com>
- <20120827163337.GC4339@opensource.wolfsonmicro.com>
-Message-ID: <20120914130904.GB12893@gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 14 Sep 2012 09:01:51 -0400
+Subject: [PATCH v4 06/24] docs: Xen ARM DT bindings
+In-Reply-To: <1347621207-11294-6-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120914130151.GH25249@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 09:33:38AM -0700, Mark Brown wrote:
-> On Fri, Aug 24, 2012 at 03:05:17PM +0200, Ola Lilja wrote:
+On Fri, Sep 14, 2012 at 12:13:08PM +0100, Stefano Stabellini wrote:
+> Add a doc to describe the Xen ARM device tree bindings
 > 
-> > I haven't followed everything in this discussion, but what I meant in an earlier
-> > mail was that using the device for platform-DAI (MSP_I2S) also
-> > as platform int the DAI-link struct is not anything I can see fit (as in the
-> > patch Lee first submitted).
 > 
-> I'm not sure I fully understand the above - I didn't notice anything
-> with the dai links but I have to say that I could've looked more closely
-> as I was waiting for ARM side reviews.
+> Changes in v4:
 > 
-> > I can see a few acceptable solutions:
-> > 1) Use it as it is! (A virtual device for PCM is created in arch/arm and the
-> > probe is invoked from the machine-driver).
-> > 2) Since the actual platform is the DMA-block, maybe there is some way of making
-> > the device "non-virtual" by having some sub-device in the DMA-driver that is
-> > instead triggered in the same way as in 1).
+> - "xen,xen" should be last as it is less specific;
+> - update reg property using 2 address-cells and 2 size-cells.
 > 
-> The option we're using is essentially your option 2 but doing it from
-> the DAI driver rather than from the DMA driver (keeping things in the
-> audio subsystem since it's an audio specific issue).
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: devicetree-discuss at lists.ozlabs.org
+> CC: David Vrabel <david.vrabel@citrix.com>
+> CC: Rob Herring <robherring2@gmail.com>
+> CC: Dave Martin <dave.martin@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/xen.txt |   22 ++++++++++++++++++++++
+>  1 files changed, 22 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/xen.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> new file mode 100644
+> index 0000000..1f8f7d4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> @@ -0,0 +1,22 @@
+> +* Xen hypervisor device tree bindings
+> +
+> +Xen ARM virtual platforms shall have the following properties:
+> +
+> +- compatible:
+> +	compatible = "xen,xen-<version>", "xen,xen";
+> +  where <version> is the version of the Xen ABI of the platform.
+> +
+> +- reg: specifies the base physical address and size of a region in
+> +  memory where the grant table should be mapped to, using an
+> +  HYPERVISOR_memory_op hypercall. 
+> +
+> +- interrupts: the interrupt used by Xen to inject event notifications.
 
-Ola could you please reply to this. Without your Ack this is our biggest
-blocker. There are other audio drivers which do it this way already. We
-are already doing something you suggested, just in a slightly different
-(more contained) way.
+Its singular here.. but in the example its plurar. What if you use
+multiple of the same number ("16 0xf")?
 
-Please respond.
+> +
+> +
+> +Example:
+> +
+> +hypervisor {
+> +	compatible = "xen,xen-4.3", "xen,xen";
+> +	reg = <0 0xb0000000 0 0x20000>;
 
-Kind regards,
-Lee
+So two grant tables?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Hm, physical address is zero, and the size is 0xbignumber?
+Or is the '0' denotating a seperator of arguments, so it is
+0xb000.. for physical address and 0x20000 for size?
+
+
+> +	interrupts = <1 15 0xf08>;
+> +};
+> -- 
+> 1.7.2.5
