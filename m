@@ -1,39 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Sep 2012 10:41:45 -0600
-Subject: [PATCH v4 00/10] pinctrl: mvebu: pinctrl driver
-In-Reply-To: <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <50535E49.5060903@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Sep 2012 17:53:32 +0100
+Subject: [PATCH v3 09/31] arm64: Cache maintenance routines
+In-Reply-To: <alpine.LFD.2.02.1209101322140.28681@xanadu.home>
+References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
+ <1347035226-18649-10-git-send-email-catalin.marinas@arm.com>
+ <201209071928.09999.arnd@arndb.de> <20120910164815.GB8238@arm.com>
+ <alpine.LFD.2.02.1209101322140.28681@xanadu.home>
+Message-ID: <20120914165331.GA2927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2012 09:41 AM, Sebastian Hesselbarth wrote:
-> This patch set adds a core pinctrl driver for Marvell MVEBU SoCs and
-> SoC specific stubs for Armada 370, Armada XP, Dove, and Kirkwood.
-> The SoC specific stubs use the pinctrl-mvebu core driver that handles
-> pinctrl API and register accesses for common pinctrl registers.
+On Mon, Sep 10, 2012 at 06:29:21PM +0100, Nicolas Pitre wrote:
+> On Mon, 10 Sep 2012, Catalin Marinas wrote:
 > 
-> As especially Dove has some pinctrl registers that do not match the
-> common pinctrl register layout the core driver has been extended by
-> some callbacks to allow uncommon Dove pinctrl registers.
+> > On Fri, Sep 07, 2012 at 08:28:09PM +0100, Arnd Bergmann wrote:
+> > > On Friday 07 September 2012, Catalin Marinas wrote:
+> > > > +
+> > > > +/*
+> > > > + *	dmac_inv_range(start,end)
+> > > 
+> > > all of these appear to be unused now. Can you remove them?
+> > 
+> > They aren't currently used but I expect some partners to make use of
+> > them on their private development. I could drop them from the upstream
+> > branch temporarily.
 > 
-> DT binding documentation is added for all supported SoCs but as
-> Dove and Kirkwood are not yet ready for full DT support, the pinctrl
-> driver is only activated for Armada 370 and XP.
-> 
-> The driver of latest patch v4 has been tested on Dove, Armada 370, 
-> Armada XP, and 88f6281 variant of Kirkwood.
+> Depends.  If your expectation from those partners is a real probability 
+> then it is best to keep a skeleton in place for them to use, otherwise 
+> they might get ... creative.  If this is just wild speculation then you 
+> should drop it.
 
-The series,
-Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+I dropped them for now since there is no API using those functions. But
+I have a feeling they will be needed at some point (so I'll keep the
+patches around).
 
-(Mainly the DT bindings and .dts file edits)
-
-In past versions of this series, we were had discussions about the best
-way to represent the data tables in the SoC-specific pinctrl drivers. I
-haven't actually looked at the current state in this patchset, but since
-this is an internal implementation detail and doesn't affect the DT
-bindings at all, I figure it's not a big deal right now; if it is ever a
-problem, it can be fixed without affecting anything outside the driver,
-so I won't worry about it:-)
+-- 
+Catalin
