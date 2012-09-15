@@ -1,23 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 15 Sep 2012 11:12:40 -0600
-Subject: [PATCH V5 2/5] ARM: bcm2835: add interrupt controller driver
-In-Reply-To: <20120915094543.GH12245@n2100.arm.linux.org.uk>
-References: <1347690093-16910-1-git-send-email-swarren@wwwdotorg.org>
- <1347690093-16910-2-git-send-email-swarren@wwwdotorg.org>
- <20120915094543.GH12245@n2100.arm.linux.org.uk>
-Message-ID: <5054B708.5050005@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 15 Sep 2012 17:42:41 +0000
+Subject: [PATCH 05/24] ARM: imx: use __iomem pointers for MMIO
+In-Reply-To: <CAOMZO5DemdKtxORhRwyGyF46rdden5QRZh9D9f4KRki5+BfM2A@mail.gmail.com>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-6-git-send-email-arnd@arndb.de>
+ <CAOMZO5DemdKtxORhRwyGyF46rdden5QRZh9D9f4KRki5+BfM2A@mail.gmail.com>
+Message-ID: <201209151742.41828.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2012 03:45 AM, Russell King - ARM Linux wrote:
-> On Sat, Sep 15, 2012 at 12:21:30AM -0600, Stephen Warren wrote:
->> +static struct irq_chip armctrl_chip = {
->> +	.name = "ARMCTRL-level",
->> +	.irq_mask = armctrl_mask_irq,
->> +	.irq_unmask = armctrl_unmask_irq
->> +};
+On Friday 14 September 2012, Fabio Estevam wrote:
+> On Fri, Sep 14, 2012 at 6:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > ARM is moving to stricter checks on readl/write functions,
+> > so we need to use the correct types everywhere.
+> >
+> > This found a bug in mach-armadillo5x0.c, where we attempt mmio
+> > on the MXC_CCM_RCSR address that is currently defined to 0xc
+> > and consequently causes an illegal address access.
+> ...
 > 
-> Might we want to enable CONFIG_GENERIC_IRQ_SHOW_LEVEL ?
+> >         /* set NAND page size to 2k if not configured via boot mode pins */
+> > -       __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
+> > +       /* FIXME __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR); */
+> 
+> Good catch, the correct access would be:
+> __raw_readl(mx3_ccm_base + MXC_CCM_RCSR) ...
+> 
+> I will fix this after your series reaches linux-next.
+> 
 
-That sounds like a good idea. I'll patch that in locally without
-reposting unless anyone has an objection to this.
+I think I'd prefer it if you can fix it on the current kernel. This seems to
+be a serious bug that we actually want to fix in 3.6 or maybe backport to
+the stable series (I don't know when it was introduced). I'll just drop
+this hunk from my patch then.
+
+	Arnd
