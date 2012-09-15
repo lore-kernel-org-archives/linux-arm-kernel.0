@@ -1,21 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Sep 2012 20:12:48 +0000
-Subject: [PATCH] ARM: imx: armadillo5x0: Fix illegal register access
-In-Reply-To: <1347736516-10697-1-git-send-email-festevam@gmail.com>
-References: <1347736516-10697-1-git-send-email-festevam@gmail.com>
-Message-ID: <201209152012.49195.arnd@arndb.de>
+Date: Sat, 15 Sep 2012 20:14:37 +0000
+Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
+In-Reply-To: <20120915181057.GH4521@atomide.com>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-18-git-send-email-arnd@arndb.de>
+ <20120915181057.GH4521@atomide.com>
+Message-ID: <201209152014.37989.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 September 2012, Fabio Estevam wrote:
-> 
->         /* set NAND page size to 2k if not configured via boot mode pins */
-> -       __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
-> +       __raw_writel(__raw_readl(mx3_ccm_base + MXC_CCM_RCSR) |
-> +                                               (1 << 30), MXC_CCM_RCSR);
->  
->         /* RTC */
+On Saturday 15 September 2012, Tony Lindgren wrote:
+> With my patches, this is now all omap1 specific and
+> moved to arch/arm/mach-omap1/include/mach/hardware.h.
+> It's probably easiest to just update this patch on
+> top of the hardware.h changes I've done.
 
-Shouldn't you change both the read and the write here, rather than just the read?
+Yes, sounds good. Do you want to send a patch for that
+and let me drop this one then?
 
 	Arnd
