@@ -1,44 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 14 Sep 2012 20:13:25 -0400
-Subject: [PATCH] ARM: Dove: allow PCI to be disabled
-In-Reply-To: <20120910082941.GO13739@n2100.arm.linux.org.uk>
-References: <E1TAnGn-00086i-Lb@rmk-PC.arm.linux.org.uk>
- <20120909204705.GD3451@lunn.ch>
- <20120909205521.GI13739@n2100.arm.linux.org.uk>
- <20120909210126.GM4575@titan.lakedaemon.net>
- <20120910004511.GN13739@n2100.arm.linux.org.uk>
- <20120910014422.GQ4575@titan.lakedaemon.net>
- <20120910082941.GO13739@n2100.arm.linux.org.uk>
-Message-ID: <20120915001325.GD5469@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Sep 2012 01:14:31 +0100
+Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20120915001431.GB12445@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 09:29:42AM +0100, Russell King - ARM Linux wrote:
-> On Sun, Sep 09, 2012 at 09:44:22PM -0400, Jason Cooper wrote:
-> > iiuc, the regression you are refering to would occur iff this patch
-> > (without the select) makes it into mainline _before_ Andrew's patch in
-> > Greg's tree.  As I haven't pulled this patch yet, I can add a dependency
-> > in the tag message listing the patch in gregkh's usb tree.
+On Fri, Sep 14, 2012 at 05:41:56PM -0500, Jon Hunter wrote:
+> 3. Supporting legacy devices not using DMA Engine
 > 
-> For the regression to occur, you need to land on a commit in the tree
-> where this patch (without the select) is in the history but not the
-> patch in Greg's tree.
-> 
-> The commit history remains a series of independent branches even after
-> trees are merged into Linus' tree - there is _no_ linearisation of the
-> history in git.
+>    These devices present a problem, as there may not be a uniform way to easily
+>    support them with regard to device tree. Ideally, these should be migrated
+>    to DMA engine. However, if this is not possible, then they should still be
+>    able to use this binding, the only constaint imposed by this implementation
+>    is that when requesting a DMA channel via of_dma_request_slave_channel(), it
+>    will return a type of dma_chan.
 
-<ding> (light comes on).  Thank you!  Somewhere in the time I've been
-working with git I developed an incorrect assumption.  While
-embarrassing, I'm glad I asked for clarification.
-
-Anytime I view the merging of branches in my head, I always see gitg's
-"all branches" view.  Since patches are sorted over time, I assumed they
-became related that way once they were merged.  It sounds silly as I
-type it out loud. :-)
-
-It all makes sense now.
-
-Thanks for taking the time to explain it so clearly,
-
-Jason.
+As far as devices not using DMA engine, the answer is we don't support
+their specification in the DT model.  Note that the legacy OMAP DMA
+API is scheduled for removal next year, so it's not going to be around
+that much longer.
