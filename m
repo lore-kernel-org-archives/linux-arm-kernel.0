@@ -1,12 +1,12 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 15 Sep 2012 16:22:11 -0600
+Date: Sat, 15 Sep 2012 16:23:33 -0600
 Subject: [PATCH 2/2] PCI: Provide a default pcibios_update_irq()
 In-Reply-To: <20120915075301.GA31044@avionic-0098.mockup.avionic-design.de>
 References: <1347655456-2542-1-git-send-email-thierry.reding@avionic-design.de>
  <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
  <CAMuHMdWuR_tdMw9iVkaQ3D9p1HVU_L05ap=MzBuo1jLD6YdHHw@mail.gmail.com>
  <20120915075301.GA31044@avionic-0098.mockup.avionic-design.de>
-Message-ID: <CAErSpo7q9fvtjatfKqtb8SP3UOJdEXpbvFC_qMBTc6mAoRTQuA@mail.gmail.com>
+Message-ID: <CAErSpo6WaFv=CXtiWeDDvThjZRBRJKfJMgovuMjjZRpQGK-WJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,3 +33,11 @@ On Sat, Sep 15, 2012 at 1:53 AM, Thierry Reding
 > The problem with pr_debug() and dev_dbg() is that they will be compiled
 > out if DEBUG is not defined. Perhaps we should pass -DDEBUG if PCI_DEBUG
 > is configured and make this dev_dbg()?
+
+Sorry, fat-fingered the previous empty response.
+
+We already have this in drivers/pci/Makefile:
+
+    ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
+
+so dev_dbg() should be perfect.
