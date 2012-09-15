@@ -1,97 +1,199 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Sat, 15 Sep 2012 11:34:43 -0400
-Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
+Date: Sat, 15 Sep 2012 11:34:49 -0400
+Subject: [PATCH 03/15] ARM: Section based HYP idmap
 In-Reply-To: <20120915153359.21241.86002.stgit@ubuntu>
 References: <20120915153359.21241.86002.stgit@ubuntu>
-Message-ID: <20120915153443.21241.37958.stgit@ubuntu>
+Message-ID: <20120915153449.21241.26746.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM uses the stage-2 page tables and the Hyp page table format,
-so let's define the fields we need to access in KVM.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-We use pgprot_guest to indicate stage-2 entries.
+Add a HYP pgd to the core code (so it can benefit all Linux
+hypervisors).
 
-Christoffer Dall <c.dall@virtualopensystems.com>
+Populate this pgd with an identity mapping of the code contained
+in the .hyp.idmap.text section
+
+Offer a method to drop the this identity mapping through
+hyp_idmap_teardown and re-create it through hyp_idmap_setup.
+
+Make all the above depend on CONFIG_ARM_VIRT_EXT
+
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- arch/arm/include/asm/pgtable-3level.h |   13 +++++++++++++
- arch/arm/include/asm/pgtable.h        |    5 +++++
- arch/arm/mm/mmu.c                     |    3 +++
- 3 files changed, 21 insertions(+)
+ arch/arm/include/asm/idmap.h                |    7 ++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |    1 
+ arch/arm/kernel/vmlinux.lds.S               |    6 ++
+ arch/arm/mm/idmap.c                         |   88 +++++++++++++++++++++++----
+ 4 files changed, 89 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index b249035..7351eee 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -102,11 +102,24 @@
-  */
- #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
+diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+index bf863ed..a1ab8d6 100644
+--- a/arch/arm/include/asm/idmap.h
++++ b/arch/arm/include/asm/idmap.h
+@@ -11,4 +11,11 @@ extern pgd_t *idmap_pgd;
  
-+/*
-+ * 2-nd stage PTE definitions for LPAE.
-+ */
-+#define L_PTE2_SHARED		L_PTE_SHARED
-+#define L_PTE2_READ		(_AT(pteval_t, 1) << 6)	/* HAP[0] */
-+#define L_PTE2_WRITE		(_AT(pteval_t, 1) << 7)	/* HAP[1] */
-+#define L_PTE2_NORM_WB		(_AT(pteval_t, 3) << 4)	/* MemAttr[3:2] */
-+#define L_PTE2_INNER_WB		(_AT(pteval_t, 3) << 2)	/* MemAttr[1:0] */
+ void setup_mm_for_reboot(void);
+ 
++#ifdef CONFIG_ARM_VIRT_EXT
++extern pgd_t *hyp_pgd;
 +
- #ifndef __ASSEMBLY__
++void hyp_idmap_teardown(void);
++void hyp_idmap_setup(void);
++#endif
++
+ #endif	/* __ASM_IDMAP_H */
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index d795282..a2d404e 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -44,6 +44,7 @@
+ #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 54)
+ #define PMD_SECT_AP_WRITE	(_AT(pmdval_t, 0))
+ #define PMD_SECT_AP_READ	(_AT(pmdval_t, 0))
++#define PMD_SECT_AP1		(_AT(pmdval_t, 1) << 6)
+ #define PMD_SECT_TEX(x)		(_AT(pmdval_t, 0))
  
- #define pud_none(pud)		(!pud_val(pud))
- #define pud_bad(pud)		(!(pud_val(pud) & 2))
- #define pud_present(pud)	(pud_val(pud))
-+#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+						 PMD_TYPE_TABLE)
-+#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+						 PMD_TYPE_SECT)
+ /*
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 36ff15b..12fd2eb 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -19,7 +19,11 @@
+ 	ALIGN_FUNCTION();						\
+ 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
+ 	*(.idmap.text)							\
+-	VMLINUX_SYMBOL(__idmap_text_end) = .;
++	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
++	ALIGN_FUNCTION();						\
++	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
++	*(.hyp.idmap.text)						\
++	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
  
- #define pud_clear(pudp)			\
- 	do {				\
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 41dc31f..c422f62 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -70,6 +70,7 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+ #ifdef CONFIG_HOTPLUG_CPU
+ #define ARM_CPU_DISCARD(x)
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index ab88ed4..7a944af 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -1,4 +1,6 @@
++#include <linux/module.h>
+ #include <linux/kernel.h>
++#include <linux/slab.h>
  
- extern pgprot_t		pgprot_user;
- extern pgprot_t		pgprot_kernel;
-+extern pgprot_t		pgprot_guest;
+ #include <asm/cputype.h>
+ #include <asm/idmap.h>
+@@ -59,11 +61,20 @@ static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	} while (pud++, addr = next, addr != end);
+ }
  
- #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
+-static void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
++static void identity_mapping_add(pgd_t *pgd, const char *text_start,
++				 const char *text_end, unsigned long prot)
+ {
+-	unsigned long prot, next;
++	unsigned long addr, end;
++	unsigned long next;
++
++	addr = virt_to_phys(text_start);
++	end = virt_to_phys(text_end);
++
++	pr_info("Setting up static %sidentity map for 0x%llx - 0x%llx\n",
++		prot ? "HYP " : "",
++		(long long)addr, (long long)end);
++	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
  
-@@ -82,6 +83,10 @@ extern pgprot_t		pgprot_kernel;
- #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
- #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
- #define PAGE_KERNEL_EXEC	pgprot_kernel
-+#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_USER)
-+#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE2_READ | \
-+					  L_PTE2_NORM_WB | L_PTE2_INNER_WB | \
-+					  L_PTE2_SHARED)
+-	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
+ 	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+ 		prot |= PMD_BIT4;
  
- #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN)
- #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 76bf4f5..a153fd4 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -56,9 +56,11 @@ static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
- static unsigned int ecc_mask __initdata = 0;
- pgprot_t pgprot_user;
- pgprot_t pgprot_kernel;
-+pgprot_t pgprot_guest;
+@@ -78,24 +89,77 @@ extern char  __idmap_text_start[], __idmap_text_end[];
  
- EXPORT_SYMBOL(pgprot_user);
- EXPORT_SYMBOL(pgprot_kernel);
-+EXPORT_SYMBOL(pgprot_guest);
+ static int __init init_static_idmap(void)
+ {
+-	phys_addr_t idmap_start, idmap_end;
+-
+ 	idmap_pgd = pgd_alloc(&init_mm);
+ 	if (!idmap_pgd)
+ 		return -ENOMEM;
  
- struct cachepolicy {
- 	const char	policy[16];
-@@ -514,6 +516,7 @@ static void __init build_mem_type_table(void)
- 	pgprot_user   = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | user_pgprot);
- 	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
- 				 L_PTE_DIRTY | kern_pgprot);
-+	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG);
+-	/* Add an identity mapping for the physical address of the section. */
+-	idmap_start = virt_to_phys((void *)__idmap_text_start);
+-	idmap_end = virt_to_phys((void *)__idmap_text_end);
+-
+-	pr_info("Setting up static identity map for 0x%llx - 0x%llx\n",
+-		(long long)idmap_start, (long long)idmap_end);
+-	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
++	identity_mapping_add(idmap_pgd, __idmap_text_start,
++			     __idmap_text_end, 0);
  
- 	mem_types[MT_LOW_VECTORS].prot_l1 |= ecc_mask;
- 	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
+ 	return 0;
+ }
+ early_initcall(init_static_idmap);
+ 
++#ifdef CONFIG_ARM_VIRT_EXT
++pgd_t *hyp_pgd;
++EXPORT_SYMBOL_GPL(hyp_pgd);
++
++static void hyp_idmap_del_pmd(pgd_t *pgd, unsigned long addr)
++{
++	pud_t *pud;
++	pmd_t *pmd;
++
++	pud = pud_offset(pgd, addr);
++	pmd = pmd_offset(pud, addr);
++	pud_clear(pud);
++	clean_pmd_entry(pmd);
++	pmd_free(NULL, (pmd_t *)((unsigned long)pmd & PAGE_MASK));
++}
++
++extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
++
++/*
++ * This version actually frees the underlying pmds for all pgds in range and
++ * clear the pgds themselves afterwards.
++ */
++void hyp_idmap_teardown(void)
++{
++	unsigned long addr, end;
++	unsigned long next;
++	pgd_t *pgd = hyp_pgd;
++
++	addr = virt_to_phys(__hyp_idmap_text_start);
++	end = virt_to_phys(__hyp_idmap_text_end);
++
++	pgd += pgd_index(addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		if (!pgd_none_or_clear_bad(pgd))
++			hyp_idmap_del_pmd(pgd, addr);
++	} while (pgd++, addr = next, addr < end);
++}
++EXPORT_SYMBOL_GPL(hyp_idmap_teardown);
++
++void hyp_idmap_setup(void)
++{
++	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
++			     __hyp_idmap_text_end, PMD_SECT_AP1);
++}
++EXPORT_SYMBOL_GPL(hyp_idmap_setup);
++
++static int __init hyp_init_static_idmap(void)
++{
++	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
++	if (!hyp_pgd)
++		return -ENOMEM;
++
++	hyp_idmap_setup();
++
++	return 0;
++}
++early_initcall(hyp_init_static_idmap);
++#endif
++
+ /*
+  * In order to soft-boot, we need to switch to a 1:1 mapping for the
+  * cpu_reset functions. This will then ensure that we have predictable
