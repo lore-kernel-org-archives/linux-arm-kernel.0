@@ -1,44 +1,33 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sat, 15 Sep 2012 09:57:37 +0200
-Subject: [PATCH 1/2] PCI: Annotate pci_fixup_irqs with __devinit
-In-Reply-To: <20120914223531.GA8771@kroah.com>
-References: <1347655456-2542-1-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo6BqPUEpMmh2+FuEi-mHFK0U1XCmdCpJfo6V2XcNxzMNg@mail.gmail.com>
- <20120914223531.GA8771@kroah.com>
-Message-ID: <20120915075737.GA31258@avionic-0098.mockup.avionic-design.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 15 Sep 2012 07:55:17 +0000
+Subject: [PATCH 04/24] ARM: ep93xx: use __iomem pointers for MMIO
+In-Reply-To: <5053AC44.1030909@gmail.com>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-5-git-send-email-arnd@arndb.de>
+ <5053AC44.1030909@gmail.com>
+Message-ID: <201209150755.18188.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 03:35:31PM -0700, Greg Kroah-Hartman wrote:
-> On Fri, Sep 14, 2012 at 02:53:11PM -0600, Bjorn Helgaas wrote:
-> > +cc Greg KH
-> > 
-> > On Fri, Sep 14, 2012 at 2:44 PM, Thierry Reding
-> > <thierry.reding@avionic-design.de> wrote:
-> > > In order to keep pci_fixup_irqs() around after init (e.g. for hotplug),
-> > > mark it __devinit instead of __init. This requires the same change for
-> > > the implementation of the pcibios_update_irq() function on all
-> > > architectures.
-> > >
-> > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > > ---
-> > > Note: Ideally these annotations should go away completely in order to
-> > > be independent of the HOTPLUG symbol. However, there is work underway
-> > > to get rid of HOTPLUG altogether, so I've kept the __devinit for now.
+On Friday 14 September 2012, Ryan Mallon wrote:
+> On 15/09/12 07:34, Arnd Bergmann wrote:
 > 
-> No, just take away the __init marking completly.  For 3.7,
-> CONFIG_HOTPLUG will always be enabled, making it be the same thing.
-> That way this saves me the time and energy from deleting the __devinit
-> markings when I get to that point in the patch series :)
+> > ARM is moving to stricter checks on readl/write functions,
+> > so we need to use the correct types everywhere.
+> > 
+> > Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> > Cc: Ryan Mallon <rmallon@gmail.com>
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> 
+> Hi Arnd,
+> 
+> Do you want me to queue both this and my patch to move the 
+> ts72xx.h header into arch/arm/mach-ep93xx on to my ep93xx-fixes
+> branch? That way you won't have to deal with any conflicts at
+> your end.
+> 
 
-Done. I'll give other people some time to comment before sending the
-updated series.
+Yes, that would be great, thanks!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120915/3d83027b/attachment.sig>
+	Arnd
