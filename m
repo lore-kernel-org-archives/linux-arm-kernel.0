@@ -1,566 +1,296 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Sat, 15 Sep 2012 11:35:46 -0400
-Subject: [PATCH 12/15] KVM: ARM: User space API for getting/setting co-proc
- registers
+Date: Sat, 15 Sep 2012 11:35:52 -0400
+Subject: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
 In-Reply-To: <20120915153359.21241.86002.stgit@ubuntu>
 References: <20120915153359.21241.86002.stgit@ubuntu>
-Message-ID: <20120915153546.21241.22315.stgit@ubuntu>
+Message-ID: <20120915153552.21241.8656.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following three ioctls are implemented:
- -  KVM_GET_REG_LIST
- -  KVM_GET_ONE_REG
- -  KVM_SET_ONE_REG
+From: Christoffer Dall <cdall@cs.columbia.edu>
 
-Now we have a table for all the cp15 registers, we can drive a generic
-API.
+Handles the guest faults in KVM by mapping in corresponding user pages
+in the 2nd stage page tables.
 
-The register IDs carry the following encoding:
+We invalidate the instruction cache by MVA whenever we map a page to the
+guest (no, we cannot only do it when we have an iabt because the guest
+may happily read/write a page before hitting the icache) if the hardware
+uses VIPT or PIPT.  In the latter case, we can invalidate only that
+physical page.  In the first case, all bets are off and we simply must
+invalidate the whole affair.  Not that VIVT icaches are tagged with
+vmids, and we are out of the woods on that one.  Alexander Graf was nice
+enough to remind us of this massive pain.
 
-ARM registers are mapped using the lower 32 bits.  The upper 16 of that
-is the register group type, or coprocessor number:
+There may be a subtle bug hidden in, which we currently hide by marking
+all pages dirty even when the pages are only mapped read-only.  The
+current hypothesis is that marking pages dirty may exercise the IO system
+and data cache more and therefore we don't see stale data in the guest,
+but it's purely guesswork.  The bug is manifested by seemingly random
+kernel crashes in guests when the host is under extreme memory pressure and
+swapping is enabled.
 
-ARM 32-bit CP15 registers have the following id bit patterns:
-  0x4002 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
-
-ARM 64-bit CP15 registers have the following id bit patterns:
-  0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
-
-For futureproofing, we need to tell QEMU about the CP15 registers the
-host lets the guest access.
-
-It will need this information to restore a current guest on a future
-CPU or perhaps a future KVM which allow some of these to be changed.
-
-We use a separate table for these, as they're only for the userspace API.
-
-Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- Documentation/virtual/kvm/api.txt |   46 +++++
- arch/arm/include/asm/kvm_coproc.h |    9 +
- arch/arm/include/asm/kvm_host.h   |    4 
- arch/arm/kvm/coproc.c             |  332 +++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/guest.c              |    9 +
- 5 files changed, 396 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/kvm_arm.h |    9 ++
+ arch/arm/include/asm/kvm_asm.h |    2 +
+ arch/arm/kvm/mmu.c             |  155 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/trace.h           |   28 +++++++
+ 4 files changed, 193 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 605986f..035d4cb 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -1756,6 +1756,13 @@ is the register group type, or coprocessor number:
- ARM core registers have the following id bit patterns:
-   0x4002 0000 0010 <index into the kvm_regs struct:32>
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index ae586c1..4cff3b7 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -158,11 +158,20 @@
+ #define HSR_ISS		(HSR_IL - 1)
+ #define HSR_ISV_SHIFT	(24)
+ #define HSR_ISV		(1U << HSR_ISV_SHIFT)
++#define HSR_FSC		(0x3f)
++#define HSR_FSC_TYPE	(0x3c)
++#define HSR_WNR		(1 << 6)
+ #define HSR_CV_SHIFT	(24)
+ #define HSR_CV		(1U << HSR_CV_SHIFT)
+ #define HSR_COND_SHIFT	(20)
+ #define HSR_COND	(0xfU << HSR_COND_SHIFT)
  
-+ARM 32-bit CP15 registers have the following id bit patterns:
-+  0x4002 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
++#define FSC_FAULT	(0x04)
++#define FSC_PERM	(0x0c)
 +
-+ARM 64-bit CP15 registers have the following id bit patterns:
-+  0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
++/* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
++#define HPFAR_MASK	(~0xf)
 +
-+
- 4.69 KVM_GET_ONE_REG
+ #define HSR_EC_UNKNOWN	(0x00)
+ #define HSR_EC_WFI	(0x01)
+ #define HSR_EC_CP15_32	(0x03)
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 201ec1f..40ee099 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -43,6 +43,8 @@ extern char __kvm_hyp_vector[];
+ extern char __kvm_hyp_code_start[];
+ extern char __kvm_hyp_code_end[];
  
- Capability: KVM_CAP_ONE_REG
-@@ -2048,6 +2055,45 @@ This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
++
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
  
- 
-+4.77 KVM_ARM_VCPU_INIT
-+
-+Capability: basic
-+Architectures: arm
-+Type: vcpu ioctl
-+Parameters: struct struct kvm_vcpu_init (in)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?EINVAL: ???the target is unknown, or the combination of features is invalid.
-+ ?ENOENT: ???a features bit specified is unknown.
-+
-+This tells KVM what type of CPU to present to the guest, and what
-+optional features it should have. ?This will cause a reset of the cpu
-+registers to their initial values. ?If this is not called, KVM_RUN will
-+return ENOEXEC for that vcpu.
-+
-+Note that because some registers reflect machine topology, all vcpus
-+should be created before this ioctl is invoked.
-+
-+4.78 KVM_GET_REG_LIST
-+
-+Capability: basic
-+Architectures: arm
-+Type: vcpu ioctl
-+Parameters: struct kvm_reg_list (in/out)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?E2BIG: ????the reg index list is too big to fit in the array specified by
-+ ????????????the user (the number required will be written into n).
-+
-+struct kvm_reg_list {
-+	__u64 n; /* number of registers in reg[] */
-+	__u64 reg[0];
-+};
-+
-+This ioctl returns the guest registers that are supported for the
-+KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
-+
-+
- 5. The kvm_run structure
- ------------------------
- 
-diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
-index c451fb4..05943ec 100644
---- a/arch/arm/include/asm/kvm_coproc.h
-+++ b/arch/arm/include/asm/kvm_coproc.h
-@@ -27,5 +27,14 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+
-+unsigned long kvm_arm_num_guest_msrs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_msrindices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- void kvm_coproc_table_init(void);
-+
-+struct kvm_one_reg;
-+int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-+int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-+int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-+unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
- #endif /* __ARM_KVM_COPROC_H__ */
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index c98dcd7..97608d7 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -26,6 +26,7 @@
- #define KVM_MEMORY_SLOTS 32
- #define KVM_PRIVATE_MEM_SLOTS 4
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-+#define KVM_HAVE_ONE_REG
- 
- #define NUM_FEATURES 0
- 
-@@ -191,6 +192,9 @@ int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
- 
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
-+
- /* We do not have shadow page tables, hence the empty hooks */
- static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
- {
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index a6d8bb0..7eb0aed 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -17,6 +17,7 @@
-  */
- #include <linux/mm.h>
- #include <linux/kvm_host.h>
-+#include <linux/uaccess.h>
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index ea17a97..52cc280 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -21,10 +21,16 @@
+ #include <linux/io.h>
+ #include <asm/idmap.h>
+ #include <asm/pgalloc.h>
++#include <asm/cacheflush.h>
  #include <asm/kvm_arm.h>
- #include <asm/kvm_host.h>
- #include <asm/kvm_emulate.h>
-@@ -564,8 +565,239 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return emulate_cp15(vcpu, &params);
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
+ #include <asm/mach/map.h>
++#include <asm/kvm_asm.h>
++#include <trace/events/kvm.h>
++
++#include "trace.h"
+ 
+ static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
+ 
+@@ -490,9 +496,156 @@ out:
+ 	return ret;
  }
  
-+/******************************************************************************
-+ * Userspace API
-+ *****************************************************************************/
-+
-+static bool index_to_params(u64 id, struct coproc_params *params)
++static void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
 +{
-+	switch (id & KVM_REG_SIZE_MASK) {
-+	case KVM_REG_SIZE_U32:
-+		/* Any unused index bits means it's not valid. */
-+		if (id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK
-+			   | KVM_REG_ARM_COPROC_MASK
-+			   | KVM_REG_ARM_32_CRN_MASK
-+			   | KVM_REG_ARM_CRM_MASK
-+			   | KVM_REG_ARM_OPC1_MASK
-+			   | KVM_REG_ARM_32_OPC2_MASK))
-+			return false;
-+
-+		params->is_64bit = false;
-+		params->CRn = ((id & KVM_REG_ARM_32_CRN_MASK)
-+			       >> KVM_REG_ARM_32_CRN_SHIFT);
-+		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
-+			       >> KVM_REG_ARM_CRM_SHIFT);
-+		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
-+			       >> KVM_REG_ARM_OPC1_SHIFT);
-+		params->Op2 = ((id & KVM_REG_ARM_32_OPC2_MASK)
-+			       >> KVM_REG_ARM_32_OPC2_SHIFT);
-+		return true;
-+	case KVM_REG_SIZE_U64:
-+		/* Any unused index bits means it's not valid. */
-+		if (id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK
-+			      | KVM_REG_ARM_COPROC_MASK
-+			      | KVM_REG_ARM_CRM_MASK
-+			      | KVM_REG_ARM_OPC1_MASK))
-+			return false;
-+		params->is_64bit = true;
-+		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
-+			       >> KVM_REG_ARM_CRM_SHIFT);
-+		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
-+			       >> KVM_REG_ARM_OPC1_SHIFT);
-+		params->Op2 = 0;
-+		params->CRn = 0;
-+		return true;
-+	default:
-+		return false;
++	/*
++	 * If we are going to insert an instruction page and the icache is
++	 * either VIPT or PIPT, there is a potential problem where the host
++	 * (or another VM) may have used this page at the same virtual address
++	 * as this guest, and we read incorrect data from the icache.  If
++	 * we're using a PIPT cache, we can invalidate just that page, but if
++	 * we are using a VIPT cache we need to invalidate the entire icache -
++	 * damn shame - as written in the ARM ARM (DDI 0406C - Page B3-1384)
++	 */
++	if (icache_is_pipt()) {
++		unsigned long hva = gfn_to_hva(kvm, gfn);
++		__cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
++	} else if (!icache_is_vivt_asid_tagged()) {
++		/* any kind of VIPT cache */
++		__flush_icache_all();
 +	}
 +}
 +
-+/* Decode an index value, and find the cp15 coproc_reg entry. */
-+static const struct coproc_reg *index_to_coproc_reg(struct kvm_vcpu *vcpu,
-+						    u64 id)
++static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
++			  gfn_t gfn, struct kvm_memory_slot *memslot,
++			  bool is_iabt, unsigned long fault_status)
 +{
-+	size_t num;
-+	const struct coproc_reg *table, *r;
-+	struct coproc_params params;
++	pte_t new_pte;
++	pfn_t pfn, pfn_existing = KVM_PFN_ERR_BAD;
++	int ret;
++	bool write_fault, writable;
++	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
 +
-+	/* We only do cp15 for now. */
-+	if ((id & KVM_REG_ARM_COPROC_MASK) >> KVM_REG_ARM_COPROC_SHIFT != 15)
-+		return NULL;
++	if (is_iabt)
++		write_fault = false;
++	else if ((vcpu->arch.hsr & HSR_ISV) && !(vcpu->arch.hsr & HSR_WNR))
++		write_fault = false;
++	else
++		write_fault = true;
 +
-+	if (!index_to_params(id, &params))
-+		return NULL;
++	if (fault_status == FSC_PERM && !write_fault) {
++		kvm_err("Unexpected L2 read permission error\n");
++		return -EFAULT;
++	}
 +
-+	table = get_target_table(vcpu->arch.target, &num);
-+	r = find_reg(&params, table, num);
-+	if (!r)
-+		r = find_reg(&params, cp15_regs, ARRAY_SIZE(cp15_regs));
++	/*
++	 * If this is a write fault (think COW) we need to make sure the
++	 * existing page, which other CPUs might still read, doesn't go away
++	 * from under us, by calling gfn_to_pfn_prot(write_fault=true).
++	 * Therefore, we call gfn_to_pfn_prot(write_fault=false), which will
++	 * pin the existing page, then we get a new page for the user space
++	 * pte and map this in the stage-2 table where we also make sure to
++	 * flush the TLB for the VM, if there was an existing entry (the entry
++	 * was updated setting the write flag to the potentially new page).
++	 */
++	if (fault_status == FSC_PERM) {
++		pfn_existing = gfn_to_pfn_prot(vcpu->kvm, gfn, false, NULL);
++		if (is_error_pfn(pfn_existing))
++			return -EFAULT;
++	}
 +
-+	/* Not saved in the cp15 array? */
-+	if (r && !r->reg)
-+		r = NULL;
++	pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
++	if (is_error_pfn(pfn)) {
++		ret = -EFAULT;
++		goto out_put_existing;
++	}
 +
-+	return r;
++	/* We need minimum second+third level pages */
++	ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
++	if (ret)
++		goto out;
++	new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
++	if (writable)
++		pte_val(new_pte) |= L_PTE2_WRITE;
++	coherent_icache_guest_page(vcpu->kvm, gfn);
++
++	spin_lock(&vcpu->kvm->arch.pgd_lock);
++	stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte);
++	spin_unlock(&vcpu->kvm->arch.pgd_lock);
++
++out:
++	/*
++	 * XXX TODO FIXME:
++	 * This is _really_ *weird* !!!
++	 * We should only be calling the _dirty verison when we map something
++	 * writable, but this causes memory failures in guests under heavy
++	 * memory pressure on the host and heavy swapping.
++	 */
++	kvm_release_pfn_dirty(pfn);
++out_put_existing:
++	if (!is_error_pfn(pfn_existing))
++		kvm_release_pfn_clean(pfn_existing);
++	return ret;
 +}
 +
-+/*
-+ * These are the invariant cp15 registers: we let the guest see the host
-+ * versions of these, so they're part of the guest state.
++/**
++ * kvm_handle_guest_abort - handles all 2nd stage aborts
++ * @vcpu:	the VCPU pointer
++ * @run:	the kvm_run structure
 + *
-+ * A future CPU may provide a mechanism to present different values to
-+ * the guest, or a future kvm may trap them.
++ * Any abort that gets to the host is almost guaranteed to be caused by a
++ * missing second stage translation table entry, which can mean that either the
++ * guest simply needs more memory and we must allocate an appropriate page or it
++ * can mean that the guest tried to access I/O memory, which is emulated by user
++ * space. The distinction is based on the IPA causing the fault and whether this
++ * memory region has been registered as standard RAM by user space.
 + */
-+/* Unfortunately, there's no register-argument for mrc, so generate. */
-+#define FUNCTION_FOR32(crn, crm, op1, op2, name)			\
-+	static void get_##name(struct kvm_vcpu *v,			\
-+			       const struct coproc_reg *r)		\
-+	{								\
-+		u32 val;						\
-+									\
-+		asm volatile("mrc p15, " __stringify(op1)		\
-+			     ", %0, c" __stringify(crn)			\
-+			     ", c" __stringify(crm)			\
-+			     ", " __stringify(op2) "\n" : "=r" (val));	\
-+		((struct coproc_reg *)r)->val = val;			\
-+	}
-+
-+FUNCTION_FOR32(0, 0, 0, 0, MIDR)
-+FUNCTION_FOR32(0, 0, 0, 1, CTR)
-+FUNCTION_FOR32(0, 0, 0, 2, TCMTR)
-+FUNCTION_FOR32(0, 0, 0, 3, TLBTR)
-+FUNCTION_FOR32(0, 0, 0, 6, REVIDR)
-+FUNCTION_FOR32(0, 1, 0, 0, ID_PFR0)
-+FUNCTION_FOR32(0, 1, 0, 1, ID_PFR1)
-+FUNCTION_FOR32(0, 1, 0, 2, ID_DFR0)
-+FUNCTION_FOR32(0, 1, 0, 3, ID_AFR0)
-+FUNCTION_FOR32(0, 1, 0, 4, ID_MMFR0)
-+FUNCTION_FOR32(0, 1, 0, 5, ID_MMFR1)
-+FUNCTION_FOR32(0, 1, 0, 6, ID_MMFR2)
-+FUNCTION_FOR32(0, 1, 0, 7, ID_MMFR3)
-+FUNCTION_FOR32(0, 2, 0, 0, ID_ISAR0)
-+FUNCTION_FOR32(0, 2, 0, 1, ID_ISAR1)
-+FUNCTION_FOR32(0, 2, 0, 2, ID_ISAR2)
-+FUNCTION_FOR32(0, 2, 0, 3, ID_ISAR3)
-+FUNCTION_FOR32(0, 2, 0, 4, ID_ISAR4)
-+FUNCTION_FOR32(0, 2, 0, 5, ID_ISAR5)
-+FUNCTION_FOR32(0, 0, 1, 1, CLIDR)
-+FUNCTION_FOR32(0, 0, 1, 7, AIDR)
-+
-+/* ->val is filled in by kvm_invariant_coproc_table_init() */
-+static struct coproc_reg invariant_cp15[] = {
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 0), is32, NULL, get_MIDR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 1), is32, NULL, get_CTR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 2), is32, NULL, get_TCMTR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
-+
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 3), is32, NULL, get_ID_AFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 4), is32, NULL, get_ID_MMFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 5), is32, NULL, get_ID_MMFR1 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 6), is32, NULL, get_ID_MMFR2 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 7), is32, NULL, get_ID_MMFR3 },
-+
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 0), is32, NULL, get_ID_ISAR0 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 1), is32, NULL, get_ID_ISAR1 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 2), is32, NULL, get_ID_ISAR2 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
-+
-+	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
-+	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
-+};
-+
-+static int reg_from_user(void *val, const void __user *uaddr, u64 id)
-+{
-+	/* This Just Works because we are little endian. */
-+	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static int reg_to_user(void __user *uaddr, const void *val, u64 id)
-+{
-+	/* This Just Works because we are little endian. */
-+	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static int get_invariant_cp15(u64 id, void __user *uaddr)
-+{
-+	struct coproc_params params;
-+	const struct coproc_reg *r;
-+
-+	if (!index_to_params(id, &params))
-+		return -ENOENT;
-+
-+	r = find_reg(&params, invariant_cp15, ARRAY_SIZE(invariant_cp15));
-+	if (!r)
-+		return -ENOENT;
-+
-+	return reg_to_user(uaddr, &r->val, id);
-+}
-+
-+static int set_invariant_cp15(u64 id, void __user *uaddr)
-+{
-+	struct coproc_params params;
-+	const struct coproc_reg *r;
-+	int err;
-+	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
-+
-+	if (!index_to_params(id, &params))
-+		return -ENOENT;
-+	r = find_reg(&params, invariant_cp15, ARRAY_SIZE(invariant_cp15));
-+	if (!r)
-+		return -ENOENT;
-+
-+	err = reg_from_user(&val, uaddr, id);
-+	if (err)
-+		return err;
-+
-+	/* This is what we mean by invariant: you can't change it. */
-+	if (r->val != val)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	const struct coproc_reg *r;
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+
-+	r = index_to_coproc_reg(vcpu, reg->id);
-+	if (!r)
-+		return get_invariant_cp15(reg->id, uaddr);
-+
-+	/* Note: copies two regs if size is 64 bit. */
-+	return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
-+}
-+
-+int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	const struct coproc_reg *r;
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+
-+	r = index_to_coproc_reg(vcpu, reg->id);
-+	if (!r)
-+		return set_invariant_cp15(reg->id, uaddr);
-+
-+	/* Note: copies two regs if size is 64 bit */
-+	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
-+}
-+
- static int cmp_reg(const struct coproc_reg *i1, const struct coproc_reg *i2)
+ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
  {
-+	BUG_ON(i1 == i2);
-+	if (!i1)
-+		return 1;
-+	else if (!i2)
-+		return -1;
- 	if (i1->CRn != i2->CRn)
- 		return i1->CRn - i2->CRn;
- 	if (i1->CRm != i2->CRm)
-@@ -575,6 +807,102 @@ static int cmp_reg(const struct coproc_reg *i1, const struct coproc_reg *i2)
- 	return i1->Op2 - i2->Op2;
- }
- 
-+static u64 cp15_to_index(const struct coproc_reg *reg)
-+{
-+	u64 val = KVM_REG_ARM | (15 << KVM_REG_ARM_COPROC_SHIFT);
-+	if (reg->is_64) {
-+		val |= KVM_REG_SIZE_U64;
-+		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
-+		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
-+	} else {
-+		val |= KVM_REG_SIZE_U32;
-+		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
-+		val |= (reg->Op2 << KVM_REG_ARM_32_OPC2_SHIFT);
-+		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
-+		val |= (reg->CRn << KVM_REG_ARM_32_CRN_SHIFT);
+-	return -EINVAL;
++	unsigned long hsr_ec;
++	unsigned long fault_status;
++	phys_addr_t fault_ipa;
++	struct kvm_memory_slot *memslot = NULL;
++	bool is_iabt;
++	gfn_t gfn;
++	int ret;
++
++	hsr_ec = vcpu->arch.hsr >> HSR_EC_SHIFT;
++	is_iabt = (hsr_ec == HSR_EC_IABT);
++	fault_ipa = ((phys_addr_t)vcpu->arch.hpfar & HPFAR_MASK) << 8;
++
++	trace_kvm_guest_fault(*vcpu_pc(vcpu), vcpu->arch.hsr,
++			      vcpu->arch.hdfar, vcpu->arch.hifar, fault_ipa);
++
++	/* Check the stage-2 fault is trans. fault or write fault */
++	fault_status = (vcpu->arch.hsr & HSR_FSC_TYPE);
++	if (fault_status != FSC_FAULT && fault_status != FSC_PERM) {
++		kvm_err("Unsupported fault status: EC=%#lx DFCS=%#lx\n",
++			hsr_ec, fault_status);
++		return -EFAULT;
 +	}
-+	return val;
-+}
 +
-+static bool copy_reg_to_user(const struct coproc_reg *reg, u64 __user **uind)
-+{
-+	if (!*uind)
-+		return true;
-+
-+	if (put_user(cp15_to_index(reg), *uind))
-+		return false;
-+
-+	(*uind)++;
-+	return true;
-+}
-+
-+/* Assumed ordered tables, see kvm_coproc_table_init. */
-+static int walk_cp15(struct kvm_vcpu *vcpu, u64 __user *uind)
-+{
-+	const struct coproc_reg *i1, *i2, *end1, *end2;
-+	unsigned int total = 0;
-+	size_t num;
-+
-+	/* We check for duplicates here, to allow arch-specific overrides. */
-+	i1 = get_target_table(vcpu->arch.target, &num);
-+	end1 = i1 + num;
-+	i2 = cp15_regs;
-+	end2 = cp15_regs + ARRAY_SIZE(cp15_regs);
-+
-+	BUG_ON(i1 == end1 || i2 == end2);
-+
-+	/* Walk carefully, as both tables may refer to the same register. */
-+	while (i1 || i2) {
-+		int cmp = cmp_reg(i1, i2);
-+		/* target-specific overrides generic entry. */
-+		if (cmp <= 0) {
-+			/* Ignore registers we trap but don't save. */
-+			if (i1->reg) {
-+				if (!copy_reg_to_user(i1, &uind))
-+					return -EFAULT;
-+				total++;
-+			}
-+		} else {
-+			/* Ignore registers we trap but don't save. */
-+			if (i2->reg) {
-+				if (!copy_reg_to_user(i2, &uind))
-+					return -EFAULT;
-+				total++;
-+			}
++	gfn = fault_ipa >> PAGE_SHIFT;
++	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
++		if (is_iabt) {
++			/* Prefetch Abort on I/O address */
++			kvm_inject_pabt(vcpu, vcpu->arch.hifar);
++			return 1;
 +		}
 +
-+		if (cmp <= 0 && ++i1 == end1)
-+			i1 = NULL;
-+		if (cmp >= 0 && ++i2 == end2)
-+			i2 = NULL;
-+	}
-+	return total;
-+}
-+
-+unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu)
-+{
-+	return ARRAY_SIZE(invariant_cp15)
-+		+ walk_cp15(vcpu, (u64 __user *)NULL);
-+}
-+
-+int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	unsigned int i;
-+	int err;
-+
-+	/* Then give them all the invariant registers' indices. */
-+	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++) {
-+		if (put_user(cp15_to_index(&invariant_cp15[i]), uindices))
-+			return -EFAULT;
-+		uindices++;
++		kvm_pr_unimpl("I/O address abort...");
++		return 0;
 +	}
 +
-+	err = walk_cp15(vcpu, uindices);
-+	if (err > 0)
-+		err = 0;
-+	return err;
-+}
++	memslot = gfn_to_memslot(vcpu->kvm, gfn);
++	if (!memslot->user_alloc) {
++		kvm_err("non user-alloc memslots not supported\n");
++		return -EINVAL;
++	}
 +
- void kvm_coproc_table_init(void)
- {
- 	unsigned int i;
-@@ -585,6 +913,10 @@ void kvm_coproc_table_init(void)
- 	for (i = 1; i < ARRAY_SIZE(cp15_cortex_a15_regs); i++)
- 		BUG_ON(cmp_reg(&cp15_cortex_a15_regs[i-1],
- 			       &cp15_cortex_a15_regs[i]) >= 0);
++	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot,
++			     is_iabt, fault_status);
++	return ret ? ret : 1;
+ }
+ 
+ static void handle_hva_to_gpa(struct kvm *kvm, unsigned long hva,
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+index 772e045..40606c9 100644
+--- a/arch/arm/kvm/trace.h
++++ b/arch/arm/kvm/trace.h
+@@ -39,6 +39,34 @@ TRACE_EVENT(kvm_exit,
+ 	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
+ );
+ 
++TRACE_EVENT(kvm_guest_fault,
++	TP_PROTO(unsigned long vcpu_pc, unsigned long hsr,
++		 unsigned long hdfar, unsigned long hifar,
++		 unsigned long ipa),
++	TP_ARGS(vcpu_pc, hsr, hdfar, hifar, ipa),
 +
-+	/* We abuse the reset function to overwrite the table itself. */
-+	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
-+		invariant_cp15[i].reset(NULL, &invariant_cp15[i]);
- }
- 
- /**
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 19a5389..8ad3df7 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -26,6 +26,7 @@
- #include <asm/kvm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
- 
- #define VM_STAT(x) { #x, offsetof(struct kvm, stat.x), KVM_STAT_VM }
- #define VCPU_STAT(x) { #x, offsetof(struct kvm_vcpu, stat.x), KVM_STAT_VCPU }
-@@ -109,7 +110,7 @@ static unsigned long num_core_regs(void)
-  */
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
--	return num_core_regs();
-+	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu);
- }
- 
- /**
-@@ -128,7 +129,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
--	return 0;
-+	return kvm_arm_copy_coproc_indices(vcpu, uindices);
- }
- 
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-@@ -141,7 +142,7 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
--	return -EINVAL;
-+	return kvm_arm_coproc_get_reg(vcpu, reg);
- }
- 
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-@@ -154,7 +155,7 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
--	return -EINVAL;
-+	return kvm_arm_coproc_set_reg(vcpu, reg);
- }
- 
- int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
++	TP_STRUCT__entry(
++		__field(	unsigned long,	vcpu_pc		)
++		__field(	unsigned long,	hsr		)
++		__field(	unsigned long,	hdfar		)
++		__field(	unsigned long,	hifar		)
++		__field(	unsigned long,	ipa		)
++	),
++
++	TP_fast_assign(
++		__entry->vcpu_pc		= vcpu_pc;
++		__entry->hsr			= hsr;
++		__entry->hdfar			= hdfar;
++		__entry->hifar			= hifar;
++		__entry->ipa			= ipa;
++	),
++
++	TP_printk("guest fault at PC %#08lx (hdfar %#08lx, hifar %#08lx, "
++		  "ipa %#08lx, hsr %#08lx",
++		  __entry->vcpu_pc, __entry->hdfar, __entry->hifar,
++		  __entry->hsr, __entry->ipa)
++);
++
+ TRACE_EVENT(kvm_irq_line,
+ 	TP_PROTO(unsigned int type, int vcpu_idx, int irq_num, int level),
+ 	TP_ARGS(type, vcpu_idx, irq_num, level),
