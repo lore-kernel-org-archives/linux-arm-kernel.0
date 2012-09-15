@@ -1,37 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Sep 2012 17:42:41 +0000
-Subject: [PATCH 05/24] ARM: imx: use __iomem pointers for MMIO
-In-Reply-To: <CAOMZO5DemdKtxORhRwyGyF46rdden5QRZh9D9f4KRki5+BfM2A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 15 Sep 2012 11:10:58 -0700
+Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-18-git-send-email-arnd@arndb.de>
 References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-6-git-send-email-arnd@arndb.de>
- <CAOMZO5DemdKtxORhRwyGyF46rdden5QRZh9D9f4KRki5+BfM2A@mail.gmail.com>
-Message-ID: <201209151742.41828.arnd@arndb.de>
+ <1347658492-11608-18-git-send-email-arnd@arndb.de>
+Message-ID: <20120915181057.GH4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 September 2012, Fabio Estevam wrote:
-> On Fri, Sep 14, 2012 at 6:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > ARM is moving to stricter checks on readl/write functions,
-> > so we need to use the correct types everywhere.
-> >
-> > This found a bug in mach-armadillo5x0.c, where we attempt mmio
-> > on the MXC_CCM_RCSR address that is currently defined to 0xc
-> > and consequently causes an illegal address access.
-> ...
+* Arnd Bergmann <arnd@arndb.de> [120914 14:36]:
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
 > 
-> >         /* set NAND page size to 2k if not configured via boot mode pins */
-> > -       __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
-> > +       /* FIXME __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR); */
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/plat-omap/include/plat/hardware.h |   18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
 > 
-> Good catch, the correct access would be:
-> __raw_readl(mx3_ccm_base + MXC_CCM_RCSR) ...
-> 
-> I will fix this after your series reaches linux-next.
-> 
+> diff --git a/arch/arm/plat-omap/include/plat/hardware.h b/arch/arm/plat-omap/include/plat/hardware.h
+> index ddbde38..2518f6c 100644
+> --- a/arch/arm/plat-omap/include/plat/hardware.h
+> +++ b/arch/arm/plat-omap/include/plat/hardware.h
 
-I think I'd prefer it if you can fix it on the current kernel. This seems to
-be a serious bug that we actually want to fix in 3.6 or maybe backport to
-the stable series (I don't know when it was introduced). I'll just drop
-this hunk from my patch then.
+With my patches, this is now all omap1 specific and
+moved to arch/arm/mach-omap1/include/mach/hardware.h.
+It's probably easiest to just update this patch on
+top of the hardware.h changes I've done.
 
-	Arnd
+Regards,
+
+Tony
