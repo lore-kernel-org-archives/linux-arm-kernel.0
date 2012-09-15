@@ -1,47 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 15 Sep 2012 00:23:35 -0600
-Subject: [PATCH] MAINTAINERS: add an entry for the BCM2835 ARM sub-architecture
-Message-ID: <1347690215-17200-1-git-send-email-swarren@wwwdotorg.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 15 Sep 2012 09:32:10 +0200
+Subject: [PATCH 2/2] PCI: Provide a default pcibios_update_irq()
+In-Reply-To: <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
+References: <1347655456-2542-1-git-send-email-thierry.reding@avionic-design.de>
+ <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <CAMuHMdWuR_tdMw9iVkaQ3D9p1HVU_L05ap=MzBuo1jLD6YdHHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as the maintainer for the BCM2835 ARM support, and related
-drivers. This is mainly so that the MAINTAINERS file contains some
-relevant entry, and the rpi/ARM mailing lists; I'd be quite happy if
-anyone else came along and wanted to maintain/co-maintain this.
+On Fri, Sep 14, 2012 at 10:44 PM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -17,6 +17,14 @@
+>  #include <linux/ioport.h>
+>  #include <linux/cache.h>
+>
+> +void __devinit __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+> +{
+> +#ifdef CONFIG_PCI_DEBUG
+> +       printk(KERN_DEBUG "PCI: Assigning IRQ %02d to %s\n", irq,
+> +              pci_name(dev));
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
-Vince, can you confirm that the linux-rpi-kernel list is moderated for
-non-subscribers?
+pr_debug()?
+Or even better, dev_dbg()?
 
-Note that I cut down the individual to/cc entries when sending this patch,
-since otherwise it doesn't get through to the rpi mailing list, and I
-wanted to ensure this received coverage there.
----
- MAINTAINERS |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+> +#endif
+> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+> +}
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fdc0119..988553e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1613,6 +1613,16 @@ L:	netdev at vger.kernel.org
- S:	Supported
- F:	drivers/net/ethernet/broadcom/bnx2x/
- 
-+BROADCOM BCM2835 ARM ARCHICTURE
-+M:	Stephen Warren <swarren@wwwdotorg.org>
-+L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
-+S:	Maintained
-+F:	arch/arm/mach-bcm2835/
-+F:	arch/arm/boot/dts/bcm2835*
-+F:	arch/arm/configs/bcm2835_defconfig
-+F:	drivers/*/*bcm2835*
-+
- BROADCOM TG3 GIGABIT ETHERNET DRIVER
- M:	Matt Carlson <mcarlson@broadcom.com>
- M:	Michael Chan <mchan@broadcom.com>
--- 
-1.7.9.5
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
