@@ -1,58 +1,37 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sat, 15 Sep 2012 22:04:22 +0300
-Subject: Kernel panic - not syncing: No init found
-In-Reply-To: <1347466702.70460.YahooMailNeo@web133201.mail.ir2.yahoo.com>
-References: <1347466702.70460.YahooMailNeo@web133201.mail.ir2.yahoo.com>
-Message-ID: <20120915190422.GB4434@tarshish>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 15 Sep 2012 16:15:16 -0300
+Subject: [PATCH] ARM: imx: armadillo5x0: Fix illegal register access
+Message-ID: <1347736516-10697-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ellis,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, Sep 12, 2012 at 05:18:22PM +0100, Ellis Andrew wrote:
-> After a lot of searching with Google I have found this is a common problem, 
-> unfortunately none of the solutions I have found, fix the problem.
-> 
-> The original error I got was:
-> 
-> Kernel panic - not syncing: No init found.  Try passing init= option to kernel.
-> 
-> The command line option was:
-> root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0
-> 
-> I after digging around with google, I found a suggestion which I tried, I made my command line:
-> root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0 init=/sbin/init panic=4
-> 
-> But I now get the following error:
-> 
-> Freeing init memory: 88K
-> Failed to execute /sbin/init.  Attempting defaults...
-> Kernel panic - not syncing: No init found.  Try passing init= option to kernel.
-> 
-> I can see that the Root drive is being mounted.
-> 
-> The contents of the init file is:
-> 
-> #!/bin/busybox ash
-> /bin/busybox mount -t sysfs /dev/sys /sys
-> /bin/busybox mount -t proc  /proc
-> /bin/busybox mount -t devpts /dev/pts
-> # Populate /dev according to /sys
-> /bin/busybox mdev -s
-> /bin/busybox --install -s
-> /linuxrc
-> exec /sbin/init "$@"?  </dev/console >/dev/console 2>&1
-> 
-> Does anyone have any suggestions on how to fix this please? 
+commit 0c8bad6a(Armadillo 500 add NAND flash device support (resend).)
+introduced an incorrect access to MXC_CCM_RCSR.
 
-The most common reason for this failure is that your root filesystem layout is 
-not what you think it is. Try booting into initramfs and mounting your jffs2 
-filesystem from there to examine it directly on your running system.
+MXC_CCM_RCSR is an offset and in order to properly access this register, 
+the mx3_ccm_base needs to be passed, otherwise an illegal access is done.
 
-baruch
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-armadillo5x0.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
+diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
+index 2c6ab32..d22e8cc 100644
+--- a/arch/arm/mach-imx/mach-armadillo5x0.c
++++ b/arch/arm/mach-imx/mach-armadillo5x0.c
+@@ -526,7 +526,8 @@ static void __init armadillo5x0_init(void)
+ 	imx31_add_mxc_nand(&armadillo5x0_nand_board_info);
+ 
+ 	/* set NAND page size to 2k if not configured via boot mode pins */
+-	__raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
++	__raw_writel(__raw_readl(mx3_ccm_base + MXC_CCM_RCSR) |
++						(1 << 30), MXC_CCM_RCSR);
+ 
+ 	/* RTC */
+ 	/* Get RTC IRQ and register the chip */
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.9.5
