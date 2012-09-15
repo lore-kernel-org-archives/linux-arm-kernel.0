@@ -1,38 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 14 Sep 2012 19:46:03 -0400
-Subject: [PATCH v3 2/5] Documentation: add description of DT binding
- for the gpio-mvebu driver
-In-Reply-To: <20120914165408.4beaefe7@skate>
-References: <1347551658-24449-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1347551658-24449-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <50524026.20104@gmail.com> <20120913223059.2d0606b2@skate>
- <50524363.9070100@gmail.com>
- <CACRpkdY3ePZLUJsX_X9QGyo6dCDmweUd5Lq7BYnQ4P0uGVj-uQ@mail.gmail.com>
- <20120914165408.4beaefe7@skate>
-Message-ID: <20120914234603.GB5469@titan.lakedaemon.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 14 Sep 2012 19:28:33 -0700
+Subject: [PATCH V3 1/2] hwmon: Add devicetree bindings to gpio-fan
+In-Reply-To: <1347638826-31797-1-git-send-email-jm@lentin.co.uk>
+References: <20120910184919.GA30872@roeck-us.net>
+ <1347638826-31797-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120915022833.GA20375@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 04:54:08PM +0200, Thomas Petazzoni wrote:
-> Dear Linus Walleij,
+On Fri, Sep 14, 2012 at 05:07:06PM +0100, Jamie Lentin wrote:
+> Allow a gpio-fan to be defined in devicetree, see binding documentation
+> for details.
 > 
-> On Fri, 14 Sep 2012 15:17:09 +0200, Linus Walleij wrote:
-> 
-> > >> Yes, I know, but MAINTAINERS does not mention an alternate maintainer
-> > >> for the GPIO subsystem. Who is the interim maintainer that will
-> > >> ultimately have to ack/nack those patches?
-> > >
-> > > Linus W. is.
-> > 
-> > I stated Reviewed-by: on the GPIO patch, please merge it through the
-> > Marvell tree (I guess that's the plan?)
-> 
-> Yes, I guess it's the easiest plan (Jason ? Andrew ?). We however need
-> Acks on the pinctrl patch series as well, since this one depends on it.
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Yes, that's the plan.  I'm currently waiting for my previous series of
-pull requests to get pulled before I start pulling in anything else.
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 
-thx,
+I take it this will go through the arm tree ?
 
-Jason.
+Guenter
