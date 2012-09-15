@@ -1,45 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Sep 2012 19:32:49 +0100
-Subject: [BUG] Deferred probing in driver model is racy, resulting in
- lost probes
-In-Reply-To: <20120915160304.GA536@kroah.com>
-References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
- <20120915160304.GA536@kroah.com>
-Message-ID: <20120915183249.GI12245@n2100.arm.linux.org.uk>
+Date: Sat, 15 Sep 2012 19:33:38 +0100
+Subject: [PATCH V5 2/5] ARM: bcm2835: add interrupt controller driver
+In-Reply-To: <5054B708.5050005@wwwdotorg.org>
+References: <1347690093-16910-1-git-send-email-swarren@wwwdotorg.org>
+ <1347690093-16910-2-git-send-email-swarren@wwwdotorg.org>
+ <20120915094543.GH12245@n2100.arm.linux.org.uk>
+ <5054B708.5050005@wwwdotorg.org>
+Message-ID: <20120915183338.GJ12245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 09:03:04AM -0700, Greg Kroah-Hartman wrote:
-> On Sat, Aug 18, 2012 at 03:58:56PM +0100, Russell King - ARM Linux wrote:
-> > Okay, so EPROBE_DEFER seems to work when I build everything into the
-> > kernel, but when I build a pile of ASoC drivers as modules, it fails
-> > every time I've tried booting the platform so far.
+On Sat, Sep 15, 2012 at 11:12:40AM -0600, Stephen Warren wrote:
+> On 09/15/2012 03:45 AM, Russell King - ARM Linux wrote:
+> > On Sat, Sep 15, 2012 at 12:21:30AM -0600, Stephen Warren wrote:
+> >> +static struct irq_chip armctrl_chip = {
+> >> +	.name = "ARMCTRL-level",
+> >> +	.irq_mask = armctrl_mask_irq,
+> >> +	.irq_unmask = armctrl_unmask_irq
+> >> +};
+> > 
+> > Might we want to enable CONFIG_GENERIC_IRQ_SHOW_LEVEL ?
 > 
-> Ugh, sorry for the delay in this, but this is really Grant's area, as he
-> added this feature.
-> 
-> Actually, for some reason, I thought this was only supposed to work for
-> built-in drivers, not for modules at all.  The fact that it works for
-> them some times seems like an additional feature :)
+> That sounds like a good idea. I'll patch that in locally without
+> reposting unless anyone has an objection to this.
 
-It has to work for modules because there's no way to tell modprobe about
-these kinds of dependencies - the modules make no direct reference to
-their dependent drivers.
-
-Think of a driver making use of gpiolib.  It makes reference only to
-GPIO functions defined by gpiolib, which then redirects them to the
-appropriate driver.
-
-If upon requesting the GPIOs, it finds that the GPIOs it should be
-using aren't there yet, it would decide to return -EPROBE_DEFER.
-There is no direct reference to the GPIO module (which could be some
-I2C peripheral also built as a module).
-
-If you happen to have udev setup to automatically load all modules for
-devices, this provides a definite case where EPROBE_DEFER sorts out the
-probe ordering in this case - in theory, when the GPIO driver module
-gets loaded, the GPIO-using driver will reprobe and hopefully initialize.
-
-So, I think there's a valid use case by this for modules - in any case,
-we can't really treat built-in drivers differently from modular drivers
-unless we want them scattered with #ifdef MODULE...#endif stuff.
+Just to be clear, I think that's something that we should enable ARM-wide,
+not on a per-machine or per-SoC basis.
