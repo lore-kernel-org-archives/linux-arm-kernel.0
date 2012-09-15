@@ -1,41 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 15 Sep 2012 09:32:10 +0200
-Subject: [PATCH 2/2] PCI: Provide a default pcibios_update_irq()
-In-Reply-To: <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
-References: <1347655456-2542-1-git-send-email-thierry.reding@avionic-design.de>
- <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <CAMuHMdWuR_tdMw9iVkaQ3D9p1HVU_L05ap=MzBuo1jLD6YdHHw@mail.gmail.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Sat, 15 Sep 2012 00:41:53 -0700
+Subject: [PATCH v2 RESEND 1/2] ARM: arch timer: Set the TVAL before timer is
+ enabled
+Message-ID: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 10:44 PM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> --- a/drivers/pci/setup-irq.c
-> +++ b/drivers/pci/setup-irq.c
-> @@ -17,6 +17,14 @@
->  #include <linux/ioport.h>
->  #include <linux/cache.h>
->
-> +void __devinit __weak pcibios_update_irq(struct pci_dev *dev, int irq)
-> +{
-> +#ifdef CONFIG_PCI_DEBUG
-> +       printk(KERN_DEBUG "PCI: Assigning IRQ %02d to %s\n", irq,
-> +              pci_name(dev));
+On some hardware, the timer deasserts the interrupt when a
+new TVAL is written only when the enable bit is cleared.
+Hence explicitly disable the timer and then program the
+TVAL followed by enabling the timer.
+If this order is not followed, there are chances that
+you would not receive any timer interrupts.
 
-pr_debug()?
-Or even better, dev_dbg()?
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/kernel/arch_timer.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-> +#endif
-> +       pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-> +}
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index c04c2a6..8672a75 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -206,9 +206,10 @@ static inline void set_next_event(const int access, unsigned long evt)
+ {
+ 	unsigned long ctrl;
+ 	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
+-	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+-	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
++	ctrl &= ~(ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_MASK);
++	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
+ 	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt);
++	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+ 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
+ }
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
