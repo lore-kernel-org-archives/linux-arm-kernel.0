@@ -1,22 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 15 Sep 2012 00:00:59 -0400 (EDT)
-Subject: [PATCH 24/24] net: seeq: use __iomem pointers for MMIO
-In-Reply-To: <20120914235607.GF12245@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 14 Sep 2012 22:16:02 -0700
+Subject: [PATCH 12/24] ARM: msm: use __iomem pointers for MMIO
+In-Reply-To: <5053B1C9.10103@codeaurora.org>
 References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-25-git-send-email-arnd@arndb.de>
- <20120914235607.GF12245@n2100.arm.linux.org.uk>
-Message-ID: <20120915.000059.636218745264773259.davem@davemloft.net>
+ <1347658492-11608-13-git-send-email-arnd@arndb.de>
+ <5053B1C9.10103@codeaurora.org>
+Message-ID: <20120915051602.GA7930@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Sat, 15 Sep 2012 00:56:07 +0100
-
-> On Fri, Sep 14, 2012 at 11:34:52PM +0200, Arnd Bergmann wrote:
->> ARM is moving to stricter checks on readl/write functions,
->> so we need to use the correct types everywhere.
+On Fri, Sep 14, 2012 at 03:38:01PM -0700, Stephen Boyd wrote:
+> On 09/14/12 14:34, Arnd Bergmann wrote:
+> > ARM is moving to stricter checks on readl/write functions,
+> > so we need to use the correct types everywhere.
+> >
+> > Cc: David Brown <davidb@codeaurora.org>
+> > Cc: Daniel Walker <dwalker@fifo99.com>
+> > Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> Same comment as for eesox.  const void __iomem * is not a problem on
-> x86, so it should not be a problem on ARM.
+> I was going to send this patch out today. Thanks.
+> 
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Agreed.
+Acked-by: David Brown <davidb@codeaurora.org>
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
