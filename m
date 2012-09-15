@@ -1,28 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Sep 2012 19:33:38 +0100
-Subject: [PATCH V5 2/5] ARM: bcm2835: add interrupt controller driver
-In-Reply-To: <5054B708.5050005@wwwdotorg.org>
-References: <1347690093-16910-1-git-send-email-swarren@wwwdotorg.org>
- <1347690093-16910-2-git-send-email-swarren@wwwdotorg.org>
- <20120915094543.GH12245@n2100.arm.linux.org.uk>
- <5054B708.5050005@wwwdotorg.org>
-Message-ID: <20120915183338.GJ12245@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sat, 15 Sep 2012 22:04:22 +0300
+Subject: Kernel panic - not syncing: No init found
+In-Reply-To: <1347466702.70460.YahooMailNeo@web133201.mail.ir2.yahoo.com>
+References: <1347466702.70460.YahooMailNeo@web133201.mail.ir2.yahoo.com>
+Message-ID: <20120915190422.GB4434@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 11:12:40AM -0600, Stephen Warren wrote:
-> On 09/15/2012 03:45 AM, Russell King - ARM Linux wrote:
-> > On Sat, Sep 15, 2012 at 12:21:30AM -0600, Stephen Warren wrote:
-> >> +static struct irq_chip armctrl_chip = {
-> >> +	.name = "ARMCTRL-level",
-> >> +	.irq_mask = armctrl_mask_irq,
-> >> +	.irq_unmask = armctrl_unmask_irq
-> >> +};
-> > 
-> > Might we want to enable CONFIG_GENERIC_IRQ_SHOW_LEVEL ?
-> 
-> That sounds like a good idea. I'll patch that in locally without
-> reposting unless anyone has an objection to this.
+Hi Ellis,
 
-Just to be clear, I think that's something that we should enable ARM-wide,
-not on a per-machine or per-SoC basis.
+On Wed, Sep 12, 2012 at 05:18:22PM +0100, Ellis Andrew wrote:
+> After a lot of searching with Google I have found this is a common problem, 
+> unfortunately none of the solutions I have found, fix the problem.
+> 
+> The original error I got was:
+> 
+> Kernel panic - not syncing: No init found.  Try passing init= option to kernel.
+> 
+> The command line option was:
+> root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0
+> 
+> I after digging around with google, I found a suggestion which I tried, I made my command line:
+> root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0 init=/sbin/init panic=4
+> 
+> But I now get the following error:
+> 
+> Freeing init memory: 88K
+> Failed to execute /sbin/init.  Attempting defaults...
+> Kernel panic - not syncing: No init found.  Try passing init= option to kernel.
+> 
+> I can see that the Root drive is being mounted.
+> 
+> The contents of the init file is:
+> 
+> #!/bin/busybox ash
+> /bin/busybox mount -t sysfs /dev/sys /sys
+> /bin/busybox mount -t proc  /proc
+> /bin/busybox mount -t devpts /dev/pts
+> # Populate /dev according to /sys
+> /bin/busybox mdev -s
+> /bin/busybox --install -s
+> /linuxrc
+> exec /sbin/init "$@"?  </dev/console >/dev/console 2>&1
+> 
+> Does anyone have any suggestions on how to fix this please? 
+
+The most common reason for this failure is that your root filesystem layout is 
+not what you think it is. Try booting into initramfs and mounting your jffs2 
+filesystem from there to examine it directly on your running system.
+
+baruch
+
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
