@@ -1,57 +1,57 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sun, 16 Sep 2012 08:50:38 +0200
-Subject: [PATCH 2/2] PCI: Provide a default pcibios_update_irq()
-In-Reply-To: <CAErSpo6WaFv=CXtiWeDDvThjZRBRJKfJMgovuMjjZRpQGK-WJA@mail.gmail.com>
-References: <1347655456-2542-1-git-send-email-thierry.reding@avionic-design.de>
- <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
- <CAMuHMdWuR_tdMw9iVkaQ3D9p1HVU_L05ap=MzBuo1jLD6YdHHw@mail.gmail.com>
- <20120915075301.GA31044@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6WaFv=CXtiWeDDvThjZRBRJKfJMgovuMjjZRpQGK-WJA@mail.gmail.com>
-Message-ID: <20120916065038.GB11030@avionic-0098.mockup.avionic-design.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 16 Sep 2012 09:21:45 +0200
+Subject: [PATCH 05/24] ARM: imx: use __iomem pointers for MMIO
+In-Reply-To: <201209151742.41828.arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-6-git-send-email-arnd@arndb.de>
+ <CAOMZO5DemdKtxORhRwyGyF46rdden5QRZh9D9f4KRki5+BfM2A@mail.gmail.com>
+ <201209151742.41828.arnd@arndb.de>
+Message-ID: <20120916072145.GZ6180@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 04:23:33PM -0600, Bjorn Helgaas wrote:
-> On Sat, Sep 15, 2012 at 1:53 AM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > On Sat, Sep 15, 2012 at 09:32:10AM +0200, Geert Uytterhoeven wrote:
-> >> On Fri, Sep 14, 2012 at 10:44 PM, Thierry Reding
-> >> <thierry.reding@avionic-design.de> wrote:
-> >> > --- a/drivers/pci/setup-irq.c
-> >> > +++ b/drivers/pci/setup-irq.c
-> >> > @@ -17,6 +17,14 @@
-> >> >  #include <linux/ioport.h>
-> >> >  #include <linux/cache.h>
-> >> >
-> >> > +void __devinit __weak pcibios_update_irq(struct pci_dev *dev, int irq)
-> >> > +{
-> >> > +#ifdef CONFIG_PCI_DEBUG
-> >> > +       printk(KERN_DEBUG "PCI: Assigning IRQ %02d to %s\n", irq,
-> >> > +              pci_name(dev));
-> >>
-> >> pr_debug()?
-> >> Or even better, dev_dbg()?
-> >
-> > The problem with pr_debug() and dev_dbg() is that they will be compiled
-> > out if DEBUG is not defined. Perhaps we should pass -DDEBUG if PCI_DEBUG
-> > is configured and make this dev_dbg()?
+On Sat, Sep 15, 2012 at 05:42:41PM +0000, Arnd Bergmann wrote:
+> On Friday 14 September 2012, Fabio Estevam wrote:
+> > On Fri, Sep 14, 2012 at 6:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > ARM is moving to stricter checks on readl/write functions,
+> > > so we need to use the correct types everywhere.
+> > >
+> > > This found a bug in mach-armadillo5x0.c, where we attempt mmio
+> > > on the MXC_CCM_RCSR address that is currently defined to 0xc
+> > > and consequently causes an illegal address access.
+> > ...
+> > 
+> > >         /* set NAND page size to 2k if not configured via boot mode pins */
+> > > -       __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
+> > > +       /* FIXME __raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR); */
+> > 
+> > Good catch, the correct access would be:
+> > __raw_readl(mx3_ccm_base + MXC_CCM_RCSR) ...
+> > 
+> > I will fix this after your series reaches linux-next.
+> > 
 > 
-> Sorry, fat-fingered the previous empty response.
-> 
-> We already have this in drivers/pci/Makefile:
-> 
->     ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
-> 
-> so dev_dbg() should be perfect.
+> I think I'd prefer it if you can fix it on the current kernel. This seems to
+> be a serious bug that we actually want to fix in 3.6 or maybe backport to
+> the stable series (I don't know when it was introduced). I'll just drop
+> this hunk from my patch then.
 
-Yeah, this occurred to me as well and I was just about to look it up
-when I read your response. I'll make it dev_dbg() then.
+This was introduced between 3.4 and 3,5 with:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120916/4e0ee8a5/attachment.sig>
+commit eb92044eb3d59d29c9812e85e3a4bf41f6f38e3a
+Author: Sascha Hauer <s.hauer@pengutronix.de>
+Date:   Tue Apr 3 12:42:27 2012 +0200
+
+    ARM i.MX3: Make ccm base address a variable
+    
+    Instead of having a cpu_is_* in each ccm register access it
+    is more efficient to make it a variable.
+    
+    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
