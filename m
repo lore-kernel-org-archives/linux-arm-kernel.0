@@ -1,30 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Sep 2012 00:13:41 +0200
-Subject: [PATCH 1/8] DMA: PL330: use prefix in reg names to build under x86
-In-Reply-To: <1347639843-32119-2-git-send-email-dciminaghi@mail.gnudd.com>
-References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
- <1347639843-32119-2-git-send-email-dciminaghi@mail.gnudd.com>
-Message-ID: <CACRpkdYW2jYp4PSRiBQbPSt=U99JQPyb5Y9x57ORM9pgVJYWMg@mail.gmail.com>
+Date: Mon, 17 Sep 2012 00:19:11 +0200
+Subject: [PATCH 06/24] ARM: integrator: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-7-git-send-email-arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-7-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdYsv7LJj=aJj3y-GhpAMD8PTKdLsYO8KATWevMM4F5MaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 6:23 PM, Davide Ciminaghi
-<dciminaghi@mail.gnudd.com> wrote:
+On Fri, Sep 14, 2012 at 11:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> From: Alessandro Rubini <rubini@gnudd.com>
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
 >
-> This driver would not compile if ARM_AMBA is selected under x86,
-> because "CS" and "DS" are already defined there.  But AMBA
-> is used in the x86 world by a PCI-to-AMBA bridge, to be submitted.
+> This patch has a few small conflicts with stuff in linux-next, which
+> we have to sort out in arm-soc.
 >
-> The patch adds the "PL330_" prefix to all register and bit fields,
-> so it can be built by randomconfig after ARM_AMBA appears within x86.
->
-> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Looks sound.
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+However if Russell applies some of the stuff that is pending
+in his tracker (was pending uncertain acceptance of
+CONFIG_ATAGS, which is merged now) this will likely
+conflict.
 
 Yours,
 Linus Walleij
