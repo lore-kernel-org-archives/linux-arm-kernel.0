@@ -1,20 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 16 Sep 2012 13:44:23 -0700
-Subject: [PATCH] ASoC: ams-delta: Convert to use snd_soc_register_card()
-In-Reply-To: <1347823023-24922-1-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <20120906073633.GC22330@opensource.wolfsonmicro.com>
- <1347823023-24922-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20120916204422.GJ4521@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Sep 2012 00:09:10 +0200
+Subject: triggering an gpio-irq on both edges
+In-Reply-To: <20120913081920.GF19497@pengutronix.de>
+References: <20120913081920.GF19497@pengutronix.de>
+Message-ID: <CACRpkdbcMVhm+pXKHkOs7xVxzyi+gtMdpYD6FHWLG-xGUG9Hgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [120916 12:18]:
-> 
-> Tony,
-> Please give your ack on the arch/arm/mach-omap1 bits if acceptable. I
-> believe there should be no merge conflicts if this change goes through
-> sound/soc.
+On Thu, Sep 13, 2012 at 10:19 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-Yes looks good to me:
+> I guess there are more machines than mxc and mxs that have the same
+> problem.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+The COH901 GPIO driver has the same issue, see
+drivers/pinctrl/pinctrl-coh901.c, functions named
+u300_toggle_trigger() etc.
+
+It will toggle the trigger from rising to falling on every
+arriving IRQ by calling u300_toggle_trigger() from
+fastpath in the IRQ handler.
+
+Theoretically it is racy, but since it's used for GPIO
+and these signals tend to not be super-fast we're safe.
+It's used for card detection on SD cards and such.
+
+> In my opinion this calls for a wrapper, something like:
+>
+>         int gpio_irq_emulate_both_edges_set_irq_type(struct irq_data *d,
+>                 unsigned int type, int (*set_irq_type)(...),
+>                 int (*get_value)(...), struct something *privdata)
+>         {
+>                 ...
+>         }
+>
+>         int gpio_irq_emulate_both_edges_handler(...)
+>         {
+>
+>         }
+>
+> Does this sound good and possible? I didn't find something like that
+> already implemented, but maybe I missed it?
+
+I've thought about this too but never thought there was something
+generic enough to do about it...
+
+Yours,
+Linus Walleij
