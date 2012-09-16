@@ -1,66 +1,52 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 16 Sep 2012 13:14:20 +0200
-Subject: [PATCH V4] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <20120916111223.GD933@pengutronix.de>
-References: <1345779871-7677-1-git-send-email-marex@denx.de>
- <201209161251.41895.marex@denx.de> <20120916111223.GD933@pengutronix.de>
-Message-ID: <201209161314.21049.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 16 Sep 2012 08:40:15 -0400
+Subject: [PATCH v4 03/10] pinctrl: mvebu: kirkwood pinctrl driver
+In-Reply-To: <20120916074652.GM28177@lunn.ch>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120916074652.GM28177@lunn.ch>
+Message-ID: <20120916124015.GI5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Sun, Sep 16, 2012 at 09:46:52AM +0200, Andrew Lunn wrote:
+> > +++ b/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+> > @@ -0,0 +1,279 @@
+> > +* Marvell Kirkwood SoC pinctrl driver for mpp
+> > +
+> > +Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
+> > +part and usage.
+> > +
+> > +Required properties:
+> > +- compatible: "marvell,88f6180-pinctrl",
+> > +              "marvell,88f6190-pinctrl", "marvell,88f6192-pinctrl",
+> > +              "marvell,88f6281-pinctrl", "marvell,88f6282-pinctrl"
+> > +
+> > +This driver supports all kirkwood variants, i.e. 88f6180, 88f619x, and 88f628
+> 
+> Hi Sebastian 
+> 
+> The current MPP code determines for itself what chip it is running on.
+> It can then check if a pin configuration is valid for the current
+> run time environment.
+> 
+> Here you are suggesting we have to put into the DT what chip we expect
+> to be on.
+> 
+> What is the advantage of this, over getting the information from the
+> device itself?
 
-> > > Unsurprisingly, I also couldn't get the mode switching between DMA and
-> > > PIOQUEUE to work :(
-> > 
-> > I'd say more work should be invested into this.
-> 
-> I ran out of ideas. Next thing I'd do is to ask FSL if this is possible
-> at all. Yet, I'd like to have some solution for 3.7.
+The DT should describe the hardware as accurately as possible.  We can't
+always assume Linux will be the only thing the DT is handed off to.
 
-Why? You now have the module option solution.
+> If i wanted to mass convert all existing kirkwood DT boards over to
+> use pinctrl, im stuck at the very first step. I've no idea what chip
+> they use, it was not relevant before.
 
-> > Besides, what about rather > trying PIO + DMA instead of PIOQ + DMA?
-> 
-> That could also be a solution.
-> 
-> > > However, I did come up with an idea how to select DMA or PIOQUEUE per
-> > > bus via devicetree. If we change the view from "I want PIOQUEUE" to "I
-> > > don't want DMA", we could simply override the default DMA configuration
-> > > 
-> > > in the devicetree with, e.g.:
-> > > 			i2c0: i2c at 80058000 {
-> > > 			
-> > > 				...
-> > > 				fsl,i2c-dma-channel = <>;
-> > > 			
-> > > 			};
-> > > 
-> > > So, no DMA channel set up will fall back to PIOQUEUE. This is more
-> > > generic than a custom binding, because if one doesn't want DMA, don't
-> > > configure it. That should also work with other devices which can fall
-> > > back to something. I think this is worth trying, another advantage is
-> > > that it doesn't expose something new to the user. So, there is no
-> > > legacy support needed in case there will be a better way of
-> > > configuration.
-> > 
-> > Ewww ... that's such an ad-hoc hack.
-> 
-> Please give reasons.
+Let's try to do the DT correctly, and create a migration path for
+kirkwood to work first, then migrate to using the DT fully.
 
-It's abuse of proper configuration of hardware property.
+thx,
 
-> > Besides, someone might simply forget to add the binding, you'd need to
-> > print a warning.
-> 
-> ? It is "on" by default because of the entry in the dtsi. And the status
-> of DMA will be printed.
-> 
-> > > +	dev_info(dev, "registered. DMA: %s\n", i2c->dma_mode ? "on" : "off");
-> > 
-> > dev_debug() ?
-> 
-> Yup.
-
-Best regards,
-Marek Vasut
+Jason.
