@@ -1,134 +1,57 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 16 Sep 2012 14:41:28 +0800
-Subject: [BUG] Deferred probing in driver model is racy,
- resulting in lost probes
-In-Reply-To: <20120818145856.GP18957@n2100.arm.linux.org.uk>
-References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
-Message-ID: <CACVXFVPahbFVEP4p2Z9-TvjQ52tUCMuDeLx0X6GP5t0h5gEV8g@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sun, 16 Sep 2012 08:50:38 +0200
+Subject: [PATCH 2/2] PCI: Provide a default pcibios_update_irq()
+In-Reply-To: <CAErSpo6WaFv=CXtiWeDDvThjZRBRJKfJMgovuMjjZRpQGK-WJA@mail.gmail.com>
+References: <1347655456-2542-1-git-send-email-thierry.reding@avionic-design.de>
+ <1347655456-2542-2-git-send-email-thierry.reding@avionic-design.de>
+ <CAMuHMdWuR_tdMw9iVkaQ3D9p1HVU_L05ap=MzBuo1jLD6YdHHw@mail.gmail.com>
+ <20120915075301.GA31044@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6WaFv=CXtiWeDDvThjZRBRJKfJMgovuMjjZRpQGK-WJA@mail.gmail.com>
+Message-ID: <20120916065038.GB11030@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 18, 2012 at 10:58 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Okay, so EPROBE_DEFER seems to work when I build everything into the
-> kernel, but when I build a pile of ASoC drivers as modules, it fails
-> every time I've tried booting the platform so far.
->
-> This is a v3.5 based kernel, with preempt enabled.
->
-> Okay, what I have is a bunch of devices already pre-registered in the
-> system:
->
->         kirkwood-spdif-audio.1 (requiring module snd_soc_kirkwood_spdif)
->         kirkwood-i2s.1 (requiring module snd_soc_kirkwood_i2s)
->         kirkwood-pcm-audio.1 (requiring module snd_soc_kirkwood)
->         spdif-dit (requiring module snd_soc_spdif)
->
-> and the modules were loaded in this order:
->
-> Module                  Size  Used by
-> snd_soc_spdif           1020  0         (spdif-dit driver)
-> dove                   24577  1         (dove-drm driver)
-> snd_soc_kirkwood_i2s     5209  0        (kirkwood-i2s driver)
-> snd_soc_kirkwood        3629  0         (kirkwood-pcm-audio driver)
-> snd_soc_kirkwood_spdif     1449  0      (kirkwood-spdif-audio driver)
->
-> snd_soc_kirkwood_spdif will return -EPROBE_DEFER if it can't find the
-> devices registered into ASoC by the other three modules (referred to as
-> the CPU DAI, and Codec DAI).
->
-> What I see in the debugging is this (I've added some to increase the
-> debuggability):
->
-> bus: 'platform': add driver kirkwood-spdif-audio
-> bus: 'platform': driver_probe_device: matched device kirkwood-spdif-audio.1 with driver kirkwood-spdif-audio
-> bus: 'platform': really_probe: probing driver kirkwood-spdif-audio with device kirkwood-spdif-audio.1
-> kirkwood-spdif-audio kirkwood-spdif-audio.1: CPU DAI kirkwood-i2s.1 not registered
-> bus: 'platform': add driver kirkwood-pcm-audio
-> bus: 'platform': add driver kirkwood-i2s
-> kirkwood-spdif-audio kirkwood-spdif-audio.1: failed to register card
-> bus: 'platform': add driver dove-drm
-> platform kirkwood-spdif-audio.1: Driver kirkwood-spdif-audio requests probe deferral
-> platform kirkwood-spdif-audio.1: Added to deferred list
-> bus: 'platform': driver_probe_device: matched device kirkwood-pcm-audio.1 with driver kirkwood-pcm-audio
-> bus: 'platform': really_probe: probing driver kirkwood-pcm-audio with device kirkwood-pcm-audio.1
-> driver: 'kirkwood-pcm-audio.1': driver_bound: bound to device 'kirkwood-pcm-audio'
-> bus: 'platform': really_probe: bound device kirkwood-pcm-audio.1 to driver kirkwood-pcm-audio
-> platform kirkwood-spdif-audio.1: Retrying from deferred list
-> bus: device_attach 'kirkwood-spdif-audio.1' unbound
+On Sat, Sep 15, 2012 at 04:23:33PM -0600, Bjorn Helgaas wrote:
+> On Sat, Sep 15, 2012 at 1:53 AM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+> > On Sat, Sep 15, 2012 at 09:32:10AM +0200, Geert Uytterhoeven wrote:
+> >> On Fri, Sep 14, 2012 at 10:44 PM, Thierry Reding
+> >> <thierry.reding@avionic-design.de> wrote:
+> >> > --- a/drivers/pci/setup-irq.c
+> >> > +++ b/drivers/pci/setup-irq.c
+> >> > @@ -17,6 +17,14 @@
+> >> >  #include <linux/ioport.h>
+> >> >  #include <linux/cache.h>
+> >> >
+> >> > +void __devinit __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+> >> > +{
+> >> > +#ifdef CONFIG_PCI_DEBUG
+> >> > +       printk(KERN_DEBUG "PCI: Assigning IRQ %02d to %s\n", irq,
+> >> > +              pci_name(dev));
+> >>
+> >> pr_debug()?
+> >> Or even better, dev_dbg()?
+> >
+> > The problem with pr_debug() and dev_dbg() is that they will be compiled
+> > out if DEBUG is not defined. Perhaps we should pass -DDEBUG if PCI_DEBUG
+> > is configured and make this dev_dbg()?
+> 
+> Sorry, fat-fingered the previous empty response.
+> 
+> We already have this in drivers/pci/Makefile:
+> 
+>     ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
+> 
+> so dev_dbg() should be perfect.
 
-Looks the above message is added by yourself, where did you add
-the message?
+Yeah, this occurred to me as well and I was just about to look it up
+when I read your response. I'll make it dev_dbg() then.
 
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'dove-temp'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'galcore'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'alarmtimer'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'mv_xor_shared'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'mv_xor'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'serial8250'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'sata_mv'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'orion_spi'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'mv643xx_eth'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'mv643xx_eth_port'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'ap510-vmeta'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'orion-ehci'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'rtc-mv'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'mv64xxx_i2c'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'gpio-rc-recv'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'sdhci-pxav2'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'sdhci-dove'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'leds-gpio'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'snd-soc-dummy'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'soc-audio'
-> bus: __device_attach 'kirkwood-spdif-audio.1' probing with 'kirkwood-pcm-audio'
->
-> What you notice here is that the kirkwood-spdif-audio driver has gone
-> missing - it hasn't been unloaded, and it still appears in sysfs, and
-> it can still be cleanly unloaded and reloaded.
-
-It is a bit weird, and I am wondering why is the driver of  kirkwood-spdif-audio
-deleted from bus->p->klist_drivers without being unregistered from
-platform bus?
-
->
-> bus: 'platform': driver_probe_device: matched device kirkwood-i2s.1 with driver kirkwood-i2s
-> bus: 'platform': really_probe: probing driver kirkwood-i2s with device kirkwood-i2s.1
-> kirkwood-i2s kirkwood-i2s.1: found external clock
-> driver: 'kirkwood-i2s.1': driver_bound: bound to device 'kirkwood-i2s'
-> bus: 'platform': really_probe: bound device kirkwood-i2s.1 to driver kirkwood-i2s
-> bus: 'platform': driver_probe_device: matched device dove-drm with driver dove-drm
-> bus: 'platform': really_probe: probing driver dove-drm with device dove-drm
-> bus: 'platform': add driver spdif-dit
-> [drm] Supports vblank timestamp caching Rev 1 (10.10.2010).
-> [drm] No driver support for vblank timestamp query.
-> fb0: dove-drmfb frame buffer device
-> drm: registered panic notifier
-> [drm] Initialized dove-drm 1.0.0 20120730 on minor 0
-> driver: 'dove-drm': driver_bound: bound to device 'dove-drm'
-> bus: 'platform': really_probe: bound device dove-drm to driver dove-drm
-> bus: 'platform': driver_probe_device: matched device spdif-dit with driver spdif-dit
-> bus: 'platform': really_probe: probing driver spdif-dit with device spdif-dit
-> driver: 'spdif-dit': driver_bound: bound to device 'spdif-dit'
-> bus: 'platform': really_probe: bound device spdif-dit to driver spdif-dit
->
-> I suspect what is going on is that we have a race condition between the
-> device being added to the deferred list vs other drivers successfully
-> probing and running the deferred list, and the driver with the deferred
-> device being added to the driver list.
->
-> This allows the deferred list to be run *before* the driver is placed
-> onto the bus driver list, which means when we try to re-probe deferred
-
-Looks the above should not be a problem. After the driver is placed
-on the bus, it still will call driver_attach to probe all unbound devices
-on the bus.
-
-> devices, we find no matching driver to probe the device with.  This
-> then results in the device being dropped off the deferred probe list
-> (as the only way it stays on that list is if a driver is probed _and_
-> it returns -EPROBE_DEFER.)
-
-
-Thanks,
--- 
-Ming Lei
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120916/4e0ee8a5/attachment.sig>
