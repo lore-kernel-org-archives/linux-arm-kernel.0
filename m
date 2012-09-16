@@ -1,28 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 16 Sep 2012 13:38:50 -0700
-Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
-In-Reply-To: <201209152014.37989.arnd@arndb.de>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-18-git-send-email-arnd@arndb.de>
- <20120915181057.GH4521@atomide.com>
- <201209152014.37989.arnd@arndb.de>
-Message-ID: <20120916203850.GI4521@atomide.com>
+Date: Sun, 16 Sep 2012 13:44:23 -0700
+Subject: [PATCH] ASoC: ams-delta: Convert to use snd_soc_register_card()
+In-Reply-To: <1347823023-24922-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <20120906073633.GC22330@opensource.wolfsonmicro.com>
+ <1347823023-24922-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20120916204422.GJ4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120915 13:15]:
-> On Saturday 15 September 2012, Tony Lindgren wrote:
-> > With my patches, this is now all omap1 specific and
-> > moved to arch/arm/mach-omap1/include/mach/hardware.h.
-> > It's probably easiest to just update this patch on
-> > top of the hardware.h changes I've done.
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [120916 12:18]:
 > 
-> Yes, sounds good. Do you want to send a patch for that
-> and let me drop this one then?
+> Tony,
+> Please give your ack on the arch/arm/mach-omap1 bits if acceptable. I
+> believe there should be no merge conflicts if this change goes through
+> sound/soc.
 
-Yes I can pick this one and update it against one of my
-branches to avoid merge conflicts.
+Yes looks good to me:
 
-Regards,
-
-Tony
+Acked-by: Tony Lindgren <tony@atomide.com>
