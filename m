@@ -1,49 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Sep 2012 00:09:10 +0200
-Subject: triggering an gpio-irq on both edges
-In-Reply-To: <20120913081920.GF19497@pengutronix.de>
-References: <20120913081920.GF19497@pengutronix.de>
-Message-ID: <CACRpkdbcMVhm+pXKHkOs7xVxzyi+gtMdpYD6FHWLG-xGUG9Hgw@mail.gmail.com>
+Date: Mon, 17 Sep 2012 00:11:59 +0200
+Subject: [PATCH 3/8] pl080.h: moved from arm/include/asm/hardware to
+ include/linux/amba/
+In-Reply-To: <1347639843-32119-4-git-send-email-dciminaghi@mail.gnudd.com>
+References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
+ <1347639843-32119-4-git-send-email-dciminaghi@mail.gnudd.com>
+Message-ID: <CACRpkdbaJ6p7wbW5LukET9kE2=jY5w5s74-duPJR7H-XsPPhZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 10:19 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On Fri, Sep 14, 2012 at 6:23 PM, Davide Ciminaghi
+<dciminaghi@mail.gnudd.com> wrote:
 
-> I guess there are more machines than mxc and mxs that have the same
-> problem.
-
-The COH901 GPIO driver has the same issue, see
-drivers/pinctrl/pinctrl-coh901.c, functions named
-u300_toggle_trigger() etc.
-
-It will toggle the trigger from rising to falling on every
-arriving IRQ by calling u300_toggle_trigger() from
-fastpath in the IRQ handler.
-
-Theoretically it is racy, but since it's used for GPIO
-and these signals tend to not be super-fast we're safe.
-It's used for card detection on SD cards and such.
-
-> In my opinion this calls for a wrapper, something like:
+> From: Alessandro Rubini <rubini@gnudd.com>
 >
->         int gpio_irq_emulate_both_edges_set_irq_type(struct irq_data *d,
->                 unsigned int type, int (*set_irq_type)(...),
->                 int (*get_value)(...), struct something *privdata)
->         {
->                 ...
->         }
+> The header is used by drivers/dma/amba-pl08x.c, which can be compiled
+> under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
+> moves it where it can be accessed by other architectures, and fixes
+> all users.
 >
->         int gpio_irq_emulate_both_edges_handler(...)
->         {
->
->         }
->
-> Does this sound good and possible? I didn't find something like that
-> already implemented, but maybe I missed it?
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
 
-I've thought about this too but never thought there was something
-generic enough to do about it...
+It's not really platform data or anything, but as long as the
+old Samsung drivers are using it we cannot cut it from the
+global scope, and I cannot think of anything better to do
+so:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
