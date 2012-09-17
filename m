@@ -1,124 +1,100 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Sep 2012 08:33:06 -0500
-Subject: [PATCH v4 06/24] docs: Xen ARM DT bindings
-In-Reply-To: <alpine.DEB.2.02.1209141514590.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-6-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120914130151.GH25249@phenom.dumpdata.com>
- <alpine.DEB.2.02.1209141514590.29232@kaball.uk.xensource.com>
-Message-ID: <50572692.1090805@gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 17 Sep 2012 15:36:07 +0200
+Subject: [PATCH 27/34] media: mx2_camera: use managed functions to clean
+ up code
+In-Reply-To: <Pine.LNX.4.64.1209171110580.1689@axis700.grange>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <1347860103-4141-28-git-send-email-shawn.guo@linaro.org>
+ <Pine.LNX.4.64.1209171110580.1689@axis700.grange>
+Message-ID: <CACKLOr1pa+kskDjFVJ6N++f4i5NMyEtjFELqrwqvaPR4ErXiNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 09:26 AM, Stefano Stabellini wrote:
-> On Fri, 14 Sep 2012, Konrad Rzeszutek Wilk wrote:
->> On Fri, Sep 14, 2012 at 12:13:08PM +0100, Stefano Stabellini wrote:
->>> Add a doc to describe the Xen ARM device tree bindings
->>>
->>>
->>> Changes in v4:
->>>
->>> - "xen,xen" should be last as it is less specific;
->>> - update reg property using 2 address-cells and 2 size-cells.
->>>
->>>
->>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> CC: devicetree-discuss at lists.ozlabs.org
->>> CC: David Vrabel <david.vrabel@citrix.com>
->>> CC: Rob Herring <robherring2@gmail.com>
->>> CC: Dave Martin <dave.martin@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/arm/xen.txt |   22 ++++++++++++++++++++++
->>>  1 files changed, 22 insertions(+), 0 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/xen.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
->>> new file mode 100644
->>> index 0000000..1f8f7d4
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/xen.txt
->>> @@ -0,0 +1,22 @@
->>> +* Xen hypervisor device tree bindings
->>> +
->>> +Xen ARM virtual platforms shall have the following properties:
->>> +
+Hi,
 
-State that they are part of top-level "hypervisor" node.
-
->>> +- compatible:
->>> +	compatible = "xen,xen-<version>", "xen,xen";
->>> +  where <version> is the version of the Xen ABI of the platform.
->>> +
->>> +- reg: specifies the base physical address and size of a region in
->>> +  memory where the grant table should be mapped to, using an
->>> +  HYPERVISOR_memory_op hypercall. 
->>> +
->>> +- interrupts: the interrupt used by Xen to inject event notifications.
+On 17 September 2012 11:11, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> On Mon, 17 Sep 2012, Shawn Guo wrote:
+>
+>> Use managed functions to clean up the error handling code and function
+>> mx2_camera_remove().  Along with the change, a few variables get removed
+>> from struct mx2_camera_dev.
 >>
->> Its singular here.. but in the example its plurar. What if you use
->> multiple of the same number ("16 0xf")?
-> 
-> The "interrupts" property in the example below is a standard property to
-> describe interrupts. We just happen to declare only one interrupt.
-> 
-> From the device tree point of view it would be possible to declare more
-> than one interrupt here, but Xen only supports one really.
-> 
-> Regarding the three cells used in the example (<1 15 0xf08>), they have
-> a specific meaning in the GIC context:
-> 
-> """
->   The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
->   interrupts.
-> 
->   The 2nd cell contains the interrupt number for the interrupt type.
->   SPI interrupts are in the range [0-987].  PPI interrupts are in the
->   range [0-15].
-> 
->   The 3rd cell is the flags, encoded as follows:
-> 	bits[3:0] trigger type and level flags.
-> 		1 = low-to-high edge triggered
-> 		2 = high-to-low edge triggered
-> 		4 = active high level-sensitive
-> 		8 = active low level-sensitive
-> 	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
-> 	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
-> 	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
-> """
-> 
-> So <1 15 0xf08> means the last PPI.
+>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>> Cc: linux-media at vger.kernel.org
+>
+> (in case you want to push it via arm-soc)
+>
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Since it is a PPI, it is handled differently than a normal interrupt.
-That is fine, but you should somehow state that a GIC node is also required.
+This patch breaks the driver:
 
-> 
->>> +
->>> +
->>> +Example:
->>> +
->>> +hypervisor {
->>> +	compatible = "xen,xen-4.3", "xen,xen";
->>> +	reg = <0 0xb0000000 0 0x20000>;
->>
->> So two grant tables?
->>
->> Hm, physical address is zero, and the size is 0xbignumber?
->> Or is the '0' denotating a seperator of arguments, so it is
->> 0xb000.. for physical address and 0x20000 for size?
-> 
-> from http://devicetree.org/Device_Tree_Usage:
-> 
-> "Each addressable device gets a reg which is a list of tuples in the
-> form reg = <address1 length1 [address2 length2] [address3 length3] ...
-> Each tuple represents an address range used by the device. Each address
-> value is a list of one or more 32 bit integers called cells. Similarly,
-> the length value can either be a list of cells, or empty."
-> 
-> In this case the address is: [0 0xb0000000], that means
-> 0x00000000b0000000, and the length is [0 0x20000], that means
-> 0x0000000000020000.
+soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+Unable to handle kernel paging request at virtual address 656d6162
+pgd = c0004000
+[656d6162] *pgd=00000000
+Internal error: Oops: 80000005 [#1] PREEMPT ARM
+Modules linked in:
+CPU: 0    Not tainted  (3.6.0-rc5-01222-g3413fb1 #12)
+PC is at 0x656d6162
+LR is at soc_camera_host_register+0x230/0x81c
+pc : [<656d6162>]    lr : [<c01ff6a0>]    psr: 40000033
+sp : c3025e48  ip : 00000000  fp : 00000000
+r10: c03f236c  r9 : 00000000  r8 : 00000001
+r7 : 00000000  r6 : c317d414  r5 : c30431a0  r4 : c317d600
+r3 : 656d6163  r2 : c3025e18  r1 : 000c0000  r0 : c317d600
+Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment kernel
+Control: 0005317f  Table: a0004000  DAC: 00000017
+Process swapper (pid: 1, stack limit = 0xc3024270)
+Stack: (0xc3025e48 to 0xc3026000)
+5e40:                   c3006460 00000000 c3192960 00000043 c317d638 c005d624
+5e60: 00000043 c317d410 c317d478 c317d414 c02012f0 c317d410 00000000 00000043
+5e80: c31a9800 c31a9820 00000000 c022ca74 c300ab20 00000000 c306e4a8 c306e4a0
+5ea0: c30000c0 40000013 000080d0 c317d410 c317d410 c306e4a8 c306e4a0 00000001
+5ec0: 00000000 c03f236c 00000000 c02c8d50 00000000 c03535ee c317d410 c02c8a44
+5ee0: c306e4a8 c306e4a8 c03fc478 c03fc478 00000050 c03e0774 c03dc684 c0189d30
+5f00: c306e4a8 c0188c3c c306e4a8 c306e4dc c03fc478 00000000 00000050 c0188db8
+5f20: c03fc478 c3025f30 c0188d58 c0187610 c300760c c3079ad0 c03fc478 c03fc478
+5f40: c318e680 c03f6458 00000000 c0187d24 c03535ee c03535ee c3025f58 c03fc478
+5f60: 00000001 c04049c0 00000000 c01892c8 c03fc464 00000001 c04049c0 00000000
+5f80: 00000050 c018a05c c03dc67c c03d4e84 c04049c0 c00087c8 00000006 00000006
+5fa0: c03eeca0 c03dc67c 00000007 c03dc67c 00000007 c04049c0 c03c41a4 00000050
+5fc0: c03e0774 c03c42f4 00000006 00000006 c03c41a4 00000000 00000000 c03c4214
+5fe0: c0014900 00000013 00000000 00000000 00000000 c0014900 ffffffff ffffffff
+[<c01ff6a0>] (soc_camera_host_register+0x230/0x81c) from [<c02c8d50>]
+(mx2_camera_probe+0x30c/0x3ac)
+[<c02c8d50>] (mx2_camera_probe+0x30c/0x3ac) from [<c0189d30>]
+(platform_drv_probe+0x14/0x18)
+[<c0189d30>] (platform_drv_probe+0x14/0x18) from [<c0188c3c>]
+(driver_probe_device+0xb0/0x1cc)
+[<c0188c3c>] (driver_probe_device+0xb0/0x1cc) from [<c0188db8>]
+(__driver_attach+0x60/0x84)
+[<c0188db8>] (__driver_attach+0x60/0x84) from [<c0187610>]
+(bus_for_each_dev+0x48/0x84)
+[<c0187610>] (bus_for_each_dev+0x48/0x84) from [<c0187d24>]
+(bus_add_driver+0x9c/0x20c)
+[<c0187d24>] (bus_add_driver+0x9c/0x20c) from [<c01892c8>]
+(driver_register+0xa0/0x138)
+[<c01892c8>] (driver_register+0xa0/0x138) from [<c018a05c>]
+(platform_driver_probe+0x18/0x98)
+[<c018a05c>] (platform_driver_probe+0x18/0x98) from [<c00087c8>]
+(do_one_initcall+0x94/0x16c)
+[<c00087c8>] (do_one_initcall+0x94/0x16c) from [<c03c42f4>]
+(kernel_init+0xe0/0x1ac)
+[<c03c42f4>] (kernel_init+0xe0/0x1ac) from [<c0014900>]
+(kernel_thread_exit+0x0/0x8)
+Code: bad PC value
+---[ end trace 7f259a1ce2e10b1a ]---
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-But the size depends on #size-cells and #address-cells. I would expect
-those to be 1 for a 32-bit guest.
 
-Rob
+
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
