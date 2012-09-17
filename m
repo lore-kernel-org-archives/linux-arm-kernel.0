@@ -1,55 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 10:28:49 -0700
-Subject: [PATCH v2 2/2] ARM: OMAP2+: Enable pinctrl dummy states
-In-Reply-To: <1347902538-21208-3-git-send-email-mporter@ti.com>
-References: <1347902538-21208-1-git-send-email-mporter@ti.com>
- <1347902538-21208-3-git-send-email-mporter@ti.com>
-Message-ID: <20120917172849.GQ4521@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 17 Sep 2012 13:29:53 -0400 (EDT)
+Subject: [PATCH] ARM: Add config option DEBUG_DECOMPRESS_KERNEL
+In-Reply-To: <1347887324-22884-1-git-send-email-mvs@tigris.de>
+References: <1347887324-22884-1-git-send-email-mvs@tigris.de>
+Message-ID: <alpine.LFD.2.02.1209171322290.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [120917 10:21]:
-> Enable pinctrl dummy states for all OMAP platforms that don't
-> populate DT. This allows drivers to be converted to pinctrl
-> and not generate new warnings on platforms that do not provide
-> pinctrl data. These platforms already have pinmuxes configured
-> before the drivers probe.
+On Mon, 17 Sep 2012, Maximilian Schwerin wrote:
 
-Thanks this should do the trick until we've converted to use DT.
-I'll queue this for the upcoming merge window.
-
-Regards,
-
-Tony
- 
-> Signed-off-by: Matt Porter <mporter@ti.com>
+> This change allows preventing the message "Uncompressing Linux..." from
+> being sent to serial port. This is necessary if the primary serial port is
+> used for something other than kernel debugging (e.g. some external device
+> controlled by serial commands).
+> 
+> Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
 > ---
->  arch/arm/mach-omap2/devices.c |    5 +++++
->  1 file changed, 5 insertions(+)
+>  arch/arm/Kconfig.debug          |    9 +++++++++
+>  arch/arm/boot/compressed/misc.c |    4 ++++
+>  2 files changed, 13 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 1efa984..6ef4010 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -17,6 +17,7 @@
->  #include <linux/err.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
-> +#include <linux/pinctrl/machine.h>
->  #include <linux/platform_data/omap4-keypad.h>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index e968a52..96e90dc 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -46,6 +46,15 @@ config OLD_MCOUNT
+>  	depends on FUNCTION_TRACER && FRAME_POINTER
+>  	default y
 >  
->  #include <asm/mach-types.h>
-> @@ -628,6 +629,10 @@ static inline void omap_init_vout(void) {}
+> +config DEBUG_DECOMPRESS_KERNEL
+> +	bool "Using serial port during decompressing kernel"
+> +	depends on DEBUG_KERNEL
+> +	default n
+> +	help
+> +	  If you say Y here you will confirm the start and the end of
+> +	  decompressing Linux seeing "Uncompressing Linux... " and
+> +	  " done, booting the kernel.\n" on console.
+
+First, "default n" is the default already, so you don't need to provide 
+it.
+
+Next, this is going to disable the output by default for everyone which 
+is an unwelcome change.  You should make sure that the default behavior 
+is like before, and that the option allows you to disable the output.
+
+And then the DEBUG_DECOMPRESS_KERNEL option is a rather bad name.  This 
+output has not been considered "debugging" before.  What about 
+"INHIBIT_DECOMPRESSOR_OUTPUT" instead?
+
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index 8e2a8fc..edf4a35 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -144,11 +144,15 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 >  
->  static int __init omap2_init_devices(void)
->  {
-> +	/* Enable dummy states for those platforms without pinctrl support */
-> +	if (!of_have_populated_dt())
-> +		pinctrl_provide_dummies();
-> +
->  	/*
->  	 * please keep these calls, and their implementations above,
->  	 * in alphabetical order so they're easier to sort through.
-> -- 
-> 1.7.9.5
-> 
+>  	arch_decomp_setup();
+>  
+> +#ifdef CONFIG_DEBUG_DECOMPRESS_KERNEL
+>  	putstr("Uncompressing Linux...");
+> +#endif /* CONFIG_DEBUG_DECOMPRESS_KERNEL */
+>  	ret = do_decompress(input_data, input_data_end - input_data,
+>  			    output_data, error);
+>  	if (ret)
+>  		error("decompressor returned an error");
+> +#ifdef CONFIG_DEBUG_DECOMPRESS_KERNEL
+>  	else
+>  		putstr(" done, booting the kernel.\n");
+> +#endif /* CONFIG_DEBUG_DECOMPRESS_KERNEL */
+
+That would be cleaner if you simply redefined putstr() to an empty stub.  
+Similarly for error() which still can output to the same UART.
+
+
+Nicolas
