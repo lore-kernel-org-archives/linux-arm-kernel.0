@@ -1,48 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Sep 2012 08:20:36 +0900
-Subject: [GIT PULL] Samsung fixes-3 for v3.6
-In-Reply-To: <CAOesGMgu-me77fj85apd3X9SZvTPU5+EVD2MOWwuZoaCPF9cvQ@mail.gmail.com>
-References: <05be01cd9527$b35c3480$1a149d80$%kim@samsung.com>
- <CAOesGMiJGihDWpQbgJo9FYSM8FF0WY-B4PtnbE2uWwJcjWzjUA@mail.gmail.com>
- <05c501cd9528$eb916fe0$c2b44fa0$%kim@samsung.com>
- <CAOesGMgu-me77fj85apd3X9SZvTPU5+EVD2MOWwuZoaCPF9cvQ@mail.gmail.com>
-Message-ID: <05c801cd952b$0b48dfb0$21da9f10$%kim@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Sep 2012 16:35:41 -0700
+Subject: [PATCH] ARM: smp: Formalize an IPI for wakeup
+In-Reply-To: <1347315869-28285-1-git-send-email-sboyd@codeaurora.org>
+References: <1347315869-28285-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5057B3CD.1090805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> Hi,
-> 
-> On Mon, Sep 17, 2012 at 4:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> 
-> > Well...I don't think so, others also should be fixed before v3.6 because
-> as
-> > you can see, it can occur unexpected behavior and must be wrong. But
-> last
-> > one is small thing...
-> 
-> "ARM: EXYNOS: fixed SYSMMU setup definition to mate parameter name" is
-> a valid cleanup, but it has zero functional impact, it just reorders
-> two unused arguments to a stub macro.
-> 
-> "ARM: S3C24xx: delete double assignment" is a valid bugfix, but the
-> bug was introduced in "ARM: S3C2410: H1940: Use leds-gpio driver for
-> LEDs managing" in 2.6.39 so fixing it in 3.7 seems just as fine as
-> 3.6, in my opinion -- it's gone unnoticed so far and was just found by
-> tools.
-> 
-> "ARM: S3C24XX: removes unnecessary semicolon" fixes a harmless extra
-> semicolon after a switch statement. Valid cleanup but definitely not
-> urgent for 3.6.
-> 
-Agreed. Let me sort out the branch for fixes soon, then re-send pull
-request.
+On 09/10/12 15:24, Stephen Boyd wrote:
+> Remove the offset from ipi_msg_type and assume that SGI0 is the
+> wakeup interrupt now that all WFI hotplug users call
+> gic_raise_softirq() with 0 instead of 1. This allows us to 
+> track how many wakeup interrupts are sent and also removes the
+> unknown IPI printk message for WFI hotplug based systems.
+>
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-Thanks.
+I'm going to put this into the patch tracker in a few hours if there are
+no further comments.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
