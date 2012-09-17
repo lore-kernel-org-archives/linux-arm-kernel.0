@@ -1,83 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 Sep 2012 20:25:31 +0900
-Subject: [PATCH] ARM: SAMSUNG: Use spin_lock_{irqsave,irqrestore} in
- clk_set_rate
-In-Reply-To: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
-References: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <051201cd94c7$25ea0970$71be1c50$%kim@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 17 Sep 2012 21:26:15 +1000
+Subject: linux-next: build failure after merge of the final tree (arm-soc
+ tree related)
+Message-ID: <20120917212615.91bc134d237dcd5968f9f549@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
-> 
-> The spinlock clocks_lock can be held during ISR, hence it is not safe to
-> hold that lock with disabling interrupts.
-> 
-> It fixes following potential deadlock.
-> 
-> =========================================================
-> [ INFO: possible irq lock inversion dependency detected ]
-> 3.6.0-rc4+ #2 Not tainted
-> ---------------------------------------------------------
-> swapper/0/1 just changed the state of lock:
->  (&(&host->lock)->rlock){-.....}, at: [<c027fb0d>] sdhci_irq+0x15/0x564
-> but this lock took another, HARDIRQ-unsafe lock in the past:
->  (clocks_lock){+.+...}
-> 
-> and interrupts could create inverse lock ordering between them.
-> 
-> other info that might help us debug this:
->  Possible interrupt unsafe locking scenario:
-> 
->        CPU0                    CPU1
->        ----                    ----
->   lock(clocks_lock);
->                                local_irq_disable();
->                                lock(&(&host->lock)->rlock);
->                                lock(clocks_lock);
->   <Interrupt>
->     lock(&(&host->lock)->rlock);
-> 
->  *** DEADLOCK ***
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
->  arch/arm/plat-samsung/clock.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> index 65c5eca..9b71719 100644
-> --- a/arch/arm/plat-samsung/clock.c
-> +++ b/arch/arm/plat-samsung/clock.c
-> @@ -144,6 +144,7 @@ long clk_round_rate(struct clk *clk, unsigned long
-> rate)
-> 
->  int clk_set_rate(struct clk *clk, unsigned long rate)
->  {
-> +	unsigned long flags;
->  	int ret;
-> 
->  	if (IS_ERR(clk))
-> @@ -159,9 +160,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->  	if (clk->ops == NULL || clk->ops->set_rate == NULL)
->  		return -EINVAL;
-> 
-> -	spin_lock(&clocks_lock);
-> +	spin_lock_irqsave(&clocks_lock, flags);
->  	ret = (clk->ops->set_rate)(clk, rate);
-> -	spin_unlock(&clocks_lock);
-> +	spin_unlock_irqrestore(&clocks_lock, flags);
-> 
->  	return ret;
->  }
-> --
-> 1.7.4.1
+Hi all,
 
-Looks OK, applied.
-Thanks.
+After merging the final tree, today's linux-next build (powerpc
+allyesconfig) failed like this:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+drivers/mfd/twl-core.c:49:22: fatal error: plat/cpu.h: No such file or directory
+
+Caused by commit 7d7e1eba7e92 ("ARM: OMAP2+: Prepare for irqs.h removal").
+
+I have added the following patch to restrict this driver to ARM until it
+is fixed:
+
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Mon, 17 Sep 2012 21:18:21 +1000
+Subject: [PATCH] ARM: retrict TWL4030_CORE to ARM while it is broken
+
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ drivers/mfd/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index df850c4..af5e5b7 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -257,6 +257,7 @@ config MENELAUS
+ config TWL4030_CORE
+ 	bool "Texas Instruments TWL4030/TWL5030/TWL6030/TPS659x0 Support"
+ 	depends on I2C=y && GENERIC_HARDIRQS
++	depends on ARM
+ 	select IRQ_DOMAIN
+ 	help
+ 	  Say yes here if you have TWL4030 / TWL6030 family chip on your board.
+-- 
+1.7.10.280.gaa39
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120917/4435ad6a/attachment.sig>
