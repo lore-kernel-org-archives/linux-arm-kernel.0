@@ -1,46 +1,51 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 17 Sep 2012 18:39:00 +0100
-Subject: [PATCH v5 14/17] xen/arm: implement alloc/free_xenballooned_pages
- with alloc_pages/kfree
+Date: Mon, 17 Sep 2012 18:39:01 +0100
+Subject: [PATCH v5 15/17] xen/arm: compile blkfront and blkback
 In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-Message-ID: <1347903543-2135-14-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347903543-2135-15-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Only until we get the balloon driver to work.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- arch/arm/xen/enlighten.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+ drivers/block/xen-blkback/blkback.c  |    1 +
+ include/xen/interface/io/protocols.h |    3 +++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index bad67ad..59bcb96 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -148,3 +148,21 @@ static int __init xen_init_events(void)
- 	return 0;
- }
- postcore_initcall(xen_init_events);
-+
-+/* XXX: only until balloon is properly working */
-+int alloc_xenballooned_pages(int nr_pages, struct page **pages, bool highmem)
-+{
-+	*pages = alloc_pages(highmem ? GFP_HIGHUSER : GFP_KERNEL,
-+			get_order(nr_pages));
-+	if (*pages == NULL)
-+		return -ENOMEM;
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(alloc_xenballooned_pages);
-+
-+void free_xenballooned_pages(int nr_pages, struct page **pages)
-+{
-+	kfree(*pages);
-+	*pages = NULL;
-+}
-+EXPORT_SYMBOL_GPL(free_xenballooned_pages);
+diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
+index 73f196c..63dd5b9 100644
+--- a/drivers/block/xen-blkback/blkback.c
++++ b/drivers/block/xen-blkback/blkback.c
+@@ -42,6 +42,7 @@
+ 
+ #include <xen/events.h>
+ #include <xen/page.h>
++#include <xen/xen.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+ #include "common.h"
+diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
+index 01fc8ae..0eafaf2 100644
+--- a/include/xen/interface/io/protocols.h
++++ b/include/xen/interface/io/protocols.h
+@@ -5,6 +5,7 @@
+ #define XEN_IO_PROTO_ABI_X86_64     "x86_64-abi"
+ #define XEN_IO_PROTO_ABI_IA64       "ia64-abi"
+ #define XEN_IO_PROTO_ABI_POWERPC64  "powerpc64-abi"
++#define XEN_IO_PROTO_ABI_ARM        "arm-abi"
+ 
+ #if defined(__i386__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_X86_32
+@@ -14,6 +15,8 @@
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
+ #elif defined(__powerpc64__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
++#elif defined(__arm__)
++# define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
+ #else
+ # error arch fixup needed here
+ #endif
 -- 
 1.7.2.5
