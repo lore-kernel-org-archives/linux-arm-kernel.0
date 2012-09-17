@@ -1,34 +1,83 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 17 Sep 2012 13:24:20 +0200
-Subject: [PATCH 1/7] ARM: samsung: Remove unused fields from FIMC and CSIS
- platform data
-In-Reply-To: <050d01cd94c3$f39c4210$dad4c630$%kim@samsung.com>
-References: <1347878888-30001-1-git-send-email-s.nawrocki@samsung.com>
- <1347879100-30150-1-git-send-email-s.nawrocki@samsung.com>
- <050d01cd94c3$f39c4210$dad4c630$%kim@samsung.com>
-Message-ID: <50570864.4090605@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 17 Sep 2012 20:25:31 +0900
+Subject: [PATCH] ARM: SAMSUNG: Use spin_lock_{irqsave,irqrestore} in
+ clk_set_rate
+In-Reply-To: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
+References: <1346998102-5317-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <051201cd94c7$25ea0970$71be1c50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2012 01:02 PM, Kukjin Kim wrote:
-> Sylwester Nawrocki wrote:
->>
->> The MIPI-CSI2 bus data alignment is now being derived from the media
->> bus pixel code, the drivers don't use the corresponding structure
->> fields, so remove them. Also remove the s5p_csis_phy_enable callback
->> which is now used directly by s5p-csis driver.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Tushar Behera wrote:
 > 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> The spinlock clocks_lock can be held during ISR, hence it is not safe to
+> hold that lock with disabling interrupts.
+> 
+> It fixes following potential deadlock.
+> 
+> =========================================================
+> [ INFO: possible irq lock inversion dependency detected ]
+> 3.6.0-rc4+ #2 Not tainted
+> ---------------------------------------------------------
+> swapper/0/1 just changed the state of lock:
+>  (&(&host->lock)->rlock){-.....}, at: [<c027fb0d>] sdhci_irq+0x15/0x564
+> but this lock took another, HARDIRQ-unsafe lock in the past:
+>  (clocks_lock){+.+...}
+> 
+> and interrupts could create inverse lock ordering between them.
+> 
+> other info that might help us debug this:
+>  Possible interrupt unsafe locking scenario:
+> 
+>        CPU0                    CPU1
+>        ----                    ----
+>   lock(clocks_lock);
+>                                local_irq_disable();
+>                                lock(&(&host->lock)->rlock);
+>                                lock(clocks_lock);
+>   <Interrupt>
+>     lock(&(&host->lock)->rlock);
+> 
+>  *** DEADLOCK ***
+> 
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+>  arch/arm/plat-samsung/clock.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+> index 65c5eca..9b71719 100644
+> --- a/arch/arm/plat-samsung/clock.c
+> +++ b/arch/arm/plat-samsung/clock.c
+> @@ -144,6 +144,7 @@ long clk_round_rate(struct clk *clk, unsigned long
+> rate)
+> 
+>  int clk_set_rate(struct clk *clk, unsigned long rate)
+>  {
+> +	unsigned long flags;
+>  	int ret;
+> 
+>  	if (IS_ERR(clk))
+> @@ -159,9 +160,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>  	if (clk->ops == NULL || clk->ops->set_rate == NULL)
+>  		return -EINVAL;
+> 
+> -	spin_lock(&clocks_lock);
+> +	spin_lock_irqsave(&clocks_lock, flags);
+>  	ret = (clk->ops->set_rate)(clk, rate);
+> -	spin_unlock(&clocks_lock);
+> +	spin_unlock_irqrestore(&clocks_lock, flags);
+> 
+>  	return ret;
+>  }
+> --
+> 1.7.4.1
 
-Thank you for your ack on these three first patches, I'll then ask
-Mauro to push it upstream through his tree. As he usually sends
-his patches out late during merge window, there should hopefully
-be no merge conflicts.
+Looks OK, applied.
+Thanks.
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
