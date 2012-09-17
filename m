@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Sep 2012 13:34:58 +0800
-Subject: [PATCH 29/34] mmc: mxcmmc: remove mach/hardware.h inclusion
+Date: Mon, 17 Sep 2012 13:34:59 +0800
+Subject: [PATCH 30/34] video: imxfb: remove mach/hardware.h inclusion
 In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347860103-4141-30-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347860103-4141-31-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,255 +14,257 @@ accordingly.
 As the result, mach/hardware.h inclusion gets removed from the driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 ---
- arch/arm/mach-imx/clk-imx27.c                |   12 +++++-----
- arch/arm/mach-imx/clk-imx31.c                |    4 ++--
- arch/arm/mach-imx/devices/devices-common.h   |    1 +
- arch/arm/mach-imx/devices/platform-mxc-mmc.c |   15 +++++++------
- arch/arm/mach-imx/mach-mx31_3ds.c            |    2 +-
- arch/arm/mach-imx/mach-mx31moboard.c         |    4 ++--
- arch/arm/mach-imx/mach-pcm038.c              |    2 +-
- drivers/mmc/host/mxcmmc.c                    |   31 ++++++++++++++++++++++++--
- 8 files changed, 50 insertions(+), 21 deletions(-)
+ arch/arm/mach-imx/clk-imx1.c                |    6 ++---
+ arch/arm/mach-imx/clk-imx21.c               |    6 ++---
+ arch/arm/mach-imx/clk-imx25.c               |    6 ++---
+ arch/arm/mach-imx/clk-imx27.c               |    6 ++---
+ arch/arm/mach-imx/devices/devices-common.h  |    1 +
+ arch/arm/mach-imx/devices/platform-imx-fb.c |   11 ++++----
+ drivers/video/imxfb.c                       |   38 ++++++++++++++++++++++-----
+ 7 files changed, 51 insertions(+), 23 deletions(-)
 
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 6b9407b..4bff66a 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -100,9 +100,9 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[per2], "per", "imx1-cspi.1");
+ 	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.1");
+ 	clk_register_clkdev(clk[per2], NULL, "imx-mmc.0");
+-	clk_register_clkdev(clk[per2], "per", "imx-fb.0");
+-	clk_register_clkdev(clk[dummy], "ipg", "imx-fb.0");
+-	clk_register_clkdev(clk[dummy], "ahb", "imx-fb.0");
++	clk_register_clkdev(clk[per2], "per", "imx1-fb.0");
++	clk_register_clkdev(clk[dummy], "ipg", "imx1-fb.0");
++	clk_register_clkdev(clk[dummy], "ahb", "imx1-fb.0");
+ 	clk_register_clkdev(clk[hclk], "mshc", NULL);
+ 	clk_register_clkdev(clk[per3], "ssi", NULL);
+ 	clk_register_clkdev(clk[clk32], NULL, "imx1-rtc.0");
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+index 96a4788..e981b48 100644
+--- a/arch/arm/mach-imx/clk-imx21.c
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -157,9 +157,9 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
+ 	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx21-cspi.1");
+ 	clk_register_clkdev(clk[per2], "per", "imx21-cspi.2");
+ 	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx21-cspi.2");
+-	clk_register_clkdev(clk[per3], "per", "imx-fb.0");
+-	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
+-	clk_register_clkdev(clk[lcdc_hclk_gate], "ahb", "imx-fb.0");
++	clk_register_clkdev(clk[per3], "per", "imx21-fb.0");
++	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
++	clk_register_clkdev(clk[lcdc_hclk_gate], "ahb", "imx21-fb.0");
+ 	clk_register_clkdev(clk[usb_gate], "per", "imx21-hcd.0");
+ 	clk_register_clkdev(clk[usb_hclk_gate], "ahb", "imx21-hcd.0");
+ 	clk_register_clkdev(clk[nfc_gate], NULL, "imx21-nand.0");
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 71fe521..da7155d 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -219,9 +219,9 @@ int __init mx25_clocks_init(void)
+ 	clk_register_clkdev(clk[fec_ipg], "ipg", "imx25-fec.0");
+ 	clk_register_clkdev(clk[fec_ahb], "ahb", "imx25-fec.0");
+ 	clk_register_clkdev(clk[dryice_ipg], NULL, "imxdi_rtc.0");
+-	clk_register_clkdev(clk[lcdc_ipg_per], "per", "imx-fb.0");
+-	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx-fb.0");
+-	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx-fb.0");
++	clk_register_clkdev(clk[lcdc_ipg_per], "per", "imx21-fb.0");
++	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx21-fb.0");
++	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx21-fb.0");
+ 	clk_register_clkdev(clk[wdt_ipg], NULL, "imx2-wdt.0");
+ 	clk_register_clkdev(clk[ssi1_ipg], NULL, "imx-ssi.0");
+ 	clk_register_clkdev(clk[ssi2_ipg], NULL, "imx-ssi.1");
 diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index e26de52..114be46 100644
+index 114be46..f3a66a9 100644
 --- a/arch/arm/mach-imx/clk-imx27.c
 +++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -212,12 +212,12 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[gpt6_ipg_gate], "ipg", "imx-gpt.5");
- 	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.5");
- 	clk_register_clkdev(clk[pwm_ipg_gate], NULL, "mxc_pwm.0");
--	clk_register_clkdev(clk[per2_gate], "per", "mxc-mmc.0");
--	clk_register_clkdev(clk[sdhc1_ipg_gate], "ipg", "mxc-mmc.0");
--	clk_register_clkdev(clk[per2_gate], "per", "mxc-mmc.1");
--	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "mxc-mmc.1");
--	clk_register_clkdev(clk[per2_gate], "per", "mxc-mmc.2");
--	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "mxc-mmc.2");
-+	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.0");
-+	clk_register_clkdev(clk[sdhc1_ipg_gate], "ipg", "imx21-mmc.0");
-+	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.1");
-+	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.1");
-+	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.2");
-+	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.2");
+@@ -221,9 +221,9 @@ int __init mx27_clocks_init(unsigned long fref)
  	clk_register_clkdev(clk[cspi1_ipg_gate], NULL, "imx27-cspi.0");
  	clk_register_clkdev(clk[cspi2_ipg_gate], NULL, "imx27-cspi.1");
  	clk_register_clkdev(clk[cspi3_ipg_gate], NULL, "imx27-cspi.2");
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index d9ff16e..1277f73 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -159,8 +159,8 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[i2c2_gate], NULL, "imx21-i2c.1");
- 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
- 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1.0");
--	clk_register_clkdev(clk[sdhc1_gate], NULL, "mxc-mmc.0");
--	clk_register_clkdev(clk[sdhc2_gate], NULL, "mxc-mmc.1");
-+	clk_register_clkdev(clk[sdhc1_gate], NULL, "imx31-mmc.0");
-+	clk_register_clkdev(clk[sdhc2_gate], NULL, "imx31-mmc.1");
- 	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_gate], NULL, "imx-ssi.1");
- 	clk_register_clkdev(clk[firi_gate], "firi", NULL);
+-	clk_register_clkdev(clk[per3_gate], "per", "imx-fb.0");
+-	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
+-	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
++	clk_register_clkdev(clk[per3_gate], "per", "imx21-fb.0");
++	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
++	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
+ 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
+ 	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
+ 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
 diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index 8112a1a..7fa3ef7 100644
+index 7fa3ef7..c32279b 100644
 --- a/arch/arm/mach-imx/devices/devices-common.h
 +++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -228,6 +228,7 @@ struct platform_device *__init imx_add_mxc_ehci(
+@@ -100,6 +100,7 @@ struct platform_device *__init imx_add_imxdi_rtc(
  
- #include <linux/platform_data/mmc-mxcmmc.h>
- struct imx_mxc_mmc_data {
+ #include <linux/platform_data/video-imxfb.h>
+ struct imx_imx_fb_data {
 +	const char *devid;
- 	int id;
  	resource_size_t iobase;
  	resource_size_t iosize;
-diff --git a/arch/arm/mach-imx/devices/platform-mxc-mmc.c b/arch/arm/mach-imx/devices/platform-mxc-mmc.c
-index ce90ab0..487f61c 100644
---- a/arch/arm/mach-imx/devices/platform-mxc-mmc.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc-mmc.c
-@@ -10,21 +10,22 @@
+ 	resource_size_t irq;
+diff --git a/arch/arm/mach-imx/devices/platform-imx-fb.c b/arch/arm/mach-imx/devices/platform-imx-fb.c
+index 4e6f857..abea28b 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-fb.c
++++ b/arch/arm/mach-imx/devices/platform-imx-fb.c
+@@ -10,8 +10,9 @@
  #include <mach/hardware.h>
  #include "devices-common.h"
  
--#define imx_mxc_mmc_data_entry_single(soc, _id, _hwid, _size)		\
-+#define imx_mxc_mmc_data_entry_single(soc, _devid, _id, _hwid, _size)	\
+-#define imx_imx_fb_data_entry_single(soc, _size)			\
++#define imx_imx_fb_data_entry_single(soc, _devid, _size)		\
  	{								\
 +		.devid = _devid,					\
- 		.id = _id,						\
- 		.iobase = soc ## _SDHC ## _hwid ## _BASE_ADDR,		\
+ 		.iobase = soc ## _LCDC_BASE_ADDR,			\
  		.iosize = _size,					\
- 		.irq = soc ## _INT_SDHC ## _hwid,			\
- 		.dmareq = soc ## _DMA_REQ_SDHC ## _hwid,		\
- 	}
--#define imx_mxc_mmc_data_entry(soc, _id, _hwid, _size)			\
--	[_id] = imx_mxc_mmc_data_entry_single(soc, _id, _hwid, _size)
-+#define imx_mxc_mmc_data_entry(soc, _devid, _id, _hwid, _size)		\
-+	[_id] = imx_mxc_mmc_data_entry_single(soc, _devid, _id, _hwid, _size)
+ 		.irq = soc ## _INT_LCDC,				\
+@@ -19,22 +20,22 @@
+ 
+ #ifdef CONFIG_SOC_IMX1
+ const struct imx_imx_fb_data imx1_imx_fb_data __initconst =
+-	imx_imx_fb_data_entry_single(MX1, SZ_4K);
++	imx_imx_fb_data_entry_single(MX1, "imx1-fb", SZ_4K);
+ #endif /* ifdef CONFIG_SOC_IMX1 */
  
  #ifdef CONFIG_SOC_IMX21
- const struct imx_mxc_mmc_data imx21_mxc_mmc_data[] __initconst = {
- #define imx21_mxc_mmc_data_entry(_id, _hwid)				\
--	imx_mxc_mmc_data_entry(MX21, _id, _hwid, SZ_4K)
-+	imx_mxc_mmc_data_entry(MX21, "imx21-mmc", _id, _hwid, SZ_4K)
- 	imx21_mxc_mmc_data_entry(0, 1),
- 	imx21_mxc_mmc_data_entry(1, 2),
- };
-@@ -33,7 +34,7 @@ const struct imx_mxc_mmc_data imx21_mxc_mmc_data[] __initconst = {
+ const struct imx_imx_fb_data imx21_imx_fb_data __initconst =
+-	imx_imx_fb_data_entry_single(MX21, SZ_4K);
++	imx_imx_fb_data_entry_single(MX21, "imx21-fb", SZ_4K);
+ #endif /* ifdef CONFIG_SOC_IMX21 */
+ 
+ #ifdef CONFIG_SOC_IMX25
+ const struct imx_imx_fb_data imx25_imx_fb_data __initconst =
+-	imx_imx_fb_data_entry_single(MX25, SZ_16K);
++	imx_imx_fb_data_entry_single(MX25, "imx21-fb", SZ_16K);
+ #endif /* ifdef CONFIG_SOC_IMX25 */
+ 
  #ifdef CONFIG_SOC_IMX27
- const struct imx_mxc_mmc_data imx27_mxc_mmc_data[] __initconst = {
- #define imx27_mxc_mmc_data_entry(_id, _hwid)				\
--	imx_mxc_mmc_data_entry(MX27, _id, _hwid, SZ_4K)
-+	imx_mxc_mmc_data_entry(MX27, "imx21-mmc", _id, _hwid, SZ_4K)
- 	imx27_mxc_mmc_data_entry(0, 1),
- 	imx27_mxc_mmc_data_entry(1, 2),
- };
-@@ -42,7 +43,7 @@ const struct imx_mxc_mmc_data imx27_mxc_mmc_data[] __initconst = {
- #ifdef CONFIG_SOC_IMX31
- const struct imx_mxc_mmc_data imx31_mxc_mmc_data[] __initconst = {
- #define imx31_mxc_mmc_data_entry(_id, _hwid)				\
--	imx_mxc_mmc_data_entry(MX31, _id, _hwid, SZ_16K)
-+	imx_mxc_mmc_data_entry(MX31, "imx31-mmc", _id, _hwid, SZ_16K)
- 	imx31_mxc_mmc_data_entry(0, 1),
- 	imx31_mxc_mmc_data_entry(1, 2),
- };
-@@ -67,7 +68,7 @@ struct platform_device *__init imx_add_mxc_mmc(
- 			.flags = IORESOURCE_DMA,
- 		},
- 	};
--	return imx_add_platform_device_dmamask("mxc-mmc", data->id,
-+	return imx_add_platform_device_dmamask(data->devid, data->id,
- 			res, ARRAY_SIZE(res),
- 			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
- }
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 5377c88..0333567 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -393,7 +393,7 @@ static struct regulator_init_data gpo_init = {
- };
+ const struct imx_imx_fb_data imx27_imx_fb_data __initconst =
+-	imx_imx_fb_data_entry_single(MX27, SZ_4K);
++	imx_imx_fb_data_entry_single(MX27, "imx21-fb", SZ_4K);
+ #endif /* ifdef CONFIG_SOC_IMX27 */
  
- static struct regulator_consumer_supply vmmc2_consumers[] = {
--	REGULATOR_SUPPLY("vmmc", "mxc-mmc.0"),
-+	REGULATOR_SUPPLY("vmmc", "imx31-mmc.0"),
- };
+ struct platform_device *__init imx_add_imx_fb(
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 53ffdfc..64a39e7 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -33,7 +33,6 @@
+ #include <linux/math64.h>
  
- static struct regulator_init_data vmmc2_init = {
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index e719c76..31c7d05 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -175,11 +175,11 @@ static const struct spi_imx_master moboard_spi1_pdata __initconst = {
- 
- static struct regulator_consumer_supply sdhc_consumers[] = {
- 	{
--		.dev_name = "mxc-mmc.0",
-+		.dev_name = "imx31-mmc.0",
- 		.supply	= "sdhc0_vcc",
- 	},
- 	{
--		.dev_name = "mxc-mmc.1",
-+		.dev_name = "imx31-mmc.1",
- 		.supply	= "sdhc1_vcc",
- 	},
- };
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 4a52340..8bf95f5 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -212,7 +212,7 @@ static const struct spi_imx_master pcm038_spi0_data __initconst = {
- 
- static struct regulator_consumer_supply sdhc1_consumers[] = {
- 	{
--		.dev_name = "mxc-mmc.1",
-+		.dev_name = "imx21-mmc.1",
- 		.supply	= "sdhc_vcc",
- 	},
- };
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 7b1161d..15010b3 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -41,7 +41,6 @@
- #include <linux/platform_data/mmc-mxcmmc.h>
- 
- #include <linux/platform_data/dma-imx.h>
+ #include <linux/platform_data/video-imxfb.h>
 -#include <mach/hardware.h>
  
- #define DRIVER_NAME "mxc-mmc"
+ /*
+  * Complain if VAR is out of range.
+@@ -53,8 +52,8 @@
+ #define LCDC_SIZE	0x04
+ #define SIZE_XMAX(x)	((((x) >> 4) & 0x3f) << 20)
  
-@@ -112,6 +111,11 @@
- #define INT_WRITE_OP_DONE_EN		(1 << 1)
- #define INT_READ_OP_EN			(1 << 0)
+-#define YMAX_MASK       (cpu_is_mx1() ? 0x1ff : 0x3ff)
+-#define SIZE_YMAX(y)	((y) & YMAX_MASK)
++#define YMAX_MASK_IMX1	0x1ff
++#define YMAX_MASK_IMX21	0x3ff
  
-+enum mxcmci_type {
-+	IMX21_MMC,
-+	IMX31_MMC,
+ #define LCDC_VPW	0x08
+ #define VPW_VPW(x)	((x) & 0x3ff)
+@@ -128,12 +127,18 @@ struct imxfb_rgb {
+ 	struct fb_bitfield	transp;
+ };
+ 
++enum imxfb_type {
++	IMX1_FB,
++	IMX21_FB,
 +};
 +
- struct mxcmci_host {
- 	struct mmc_host		*mmc;
- 	struct resource		*res;
-@@ -150,7 +154,26 @@ struct mxcmci_host {
- 	int			dmareq;
- 	struct dma_slave_config dma_slave_config;
- 	struct imx_dma_data	dma_data;
-+	enum mxcmci_type	devtype;
-+};
-+
-+static struct platform_device_id mxcmci_devtype[] = {
+ struct imxfb_info {
+ 	struct platform_device  *pdev;
+ 	void __iomem		*regs;
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	enum imxfb_type		devtype;
+ 
+ 	/*
+ 	 * These are the addresses we mapped
+@@ -168,6 +173,24 @@ struct imxfb_info {
+ 	void (*backlight_power)(int);
+ };
+ 
++static struct platform_device_id imxfb_devtype[] = {
 +	{
-+		.name = "imx21-mmc",
-+		.driver_data = IMX21_MMC,
++		.name = "imx1-fb",
++		.driver_data = IMX1_FB,
 +	}, {
-+		.name = "imx31-mmc",
-+		.driver_data = IMX31_MMC,
++		.name = "imx21-fb",
++		.driver_data = IMX21_FB,
 +	}, {
 +		/* sentinel */
 +	}
- };
-+MODULE_DEVICE_TABLE(platform, mxcmci_devtype);
++};
++MODULE_DEVICE_TABLE(platform, imxfb_devtype);
 +
-+static inline int is_imx31_mmc(struct mxcmci_host *host)
++static inline int is_imx1_fb(struct imxfb_info *fbi)
 +{
-+	return host->devtype == IMX31_MMC;
++	return fbi->devtype == IMX1_FB;
 +}
- 
- static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios);
- 
-@@ -811,6 +834,8 @@ static void mxcmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 
- static void mxcmci_init_card(struct mmc_host *host, struct mmc_card *card)
- {
-+	struct mxcmci_host *mxcmci = mmc_priv(host);
 +
- 	/*
- 	 * MX3 SoCs have a silicon bug which corrupts CRC calculation of
- 	 * multi-block transfers when connected SDIO peripheral doesn't
-@@ -818,7 +843,7 @@ static void mxcmci_init_card(struct mmc_host *host, struct mmc_card *card)
- 	 * One way to prevent this is to only allow 1-bit transfers.
- 	 */
+ #define IMX_NAME	"IMX"
  
--	if (cpu_is_mx3() && card->type == MMC_TYPE_SDIO)
-+	if (is_imx31_mmc(mxcmci) && card->type == MMC_TYPE_SDIO)
- 		host->caps &= ~MMC_CAP_4_BIT_DATA;
- 	else
- 		host->caps |= MMC_CAP_4_BIT_DATA;
-@@ -888,6 +913,7 @@ static int mxcmci_probe(struct platform_device *pdev)
+ /*
+@@ -366,7 +389,7 @@ static int imxfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+ 		break;
+ 	case 16:
+ 	default:
+-		if (cpu_is_mx1())
++		if (is_imx1_fb(fbi))
+ 			pcr |= PCR_BPIX_12;
+ 		else
+ 			pcr |= PCR_BPIX_16;
+@@ -596,6 +619,7 @@ static struct fb_ops imxfb_ops = {
+ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *info)
+ {
+ 	struct imxfb_info *fbi = info->par;
++	u32 ymax_mask = is_imx1_fb(fbi) ? YMAX_MASK_IMX1 : YMAX_MASK_IMX21;
  
- 	host->mmc = mmc;
- 	host->pdata = pdev->dev.platform_data;
-+	host->devtype = pdev->id_entry->driver_data;
- 	spin_lock_init(&host->lock);
+ 	pr_debug("var: xres=%d hslen=%d lm=%d rm=%d\n",
+ 		var->xres, var->hsync_len,
+@@ -617,7 +641,7 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+ 	if (var->right_margin > 255)
+ 		printk(KERN_ERR "%s: invalid right_margin %d\n",
+ 			info->fix.id, var->right_margin);
+-	if (var->yres < 1 || var->yres > YMAX_MASK)
++	if (var->yres < 1 || var->yres > ymax_mask)
+ 		printk(KERN_ERR "%s: invalid yres %d\n",
+ 			info->fix.id, var->yres);
+ 	if (var->vsync_len > 100)
+@@ -645,7 +669,7 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+ 		VCR_V_WAIT_2(var->upper_margin),
+ 		fbi->regs + LCDC_VCR);
  
- 	mxcmci_init_ocr(host);
-@@ -1056,6 +1082,7 @@ static const struct dev_pm_ops mxcmci_pm_ops = {
- static struct platform_driver mxcmci_driver = {
- 	.probe		= mxcmci_probe,
- 	.remove		= mxcmci_remove,
-+	.id_table	= mxcmci_devtype,
+-	writel(SIZE_XMAX(var->xres) | SIZE_YMAX(var->yres),
++	writel(SIZE_XMAX(var->xres) | (var->yres & ymax_mask),
+ 			fbi->regs + LCDC_SIZE);
+ 
+ 	writel(fbi->pcr, fbi->regs + LCDC_PCR);
+@@ -765,6 +789,7 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	fbi = info->par;
++	fbi->devtype = pdev->id_entry->driver_data;
+ 
+ 	if (!fb_mode)
+ 		fb_mode = pdata->mode[0].mode.name;
+@@ -938,6 +963,7 @@ static struct platform_driver imxfb_driver = {
  	.driver		= {
- 		.name		= DRIVER_NAME,
- 		.owner		= THIS_MODULE,
+ 		.name	= DRIVER_NAME,
+ 	},
++	.id_table	= imxfb_devtype,
+ };
+ 
+ static int imxfb_setup(void)
 -- 
 1.7.9.5
