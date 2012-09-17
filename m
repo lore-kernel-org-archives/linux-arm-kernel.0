@@ -1,62 +1,54 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Sep 2012 17:27:00 +0200
-Subject: [PATCH 03/16] ARM: at91: gpio: implement request
+Date: Mon, 17 Sep 2012 17:27:13 +0200
+Subject: [PATCH 16/16] MTD: atmel_nand: add pinctrl consumer support
 In-Reply-To: <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120917140423.GA17667@game.jcrosoft.org>
  <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1347895633-1763-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1347895633-1763-16-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the pin as pio when requested.
-
-It is needed to configure the pin as PIO at "request time" when we are
-using DT. Indeed, the muxing via old AT91 API is not allowed anymore if
-we are using the plain gpiolib.
-
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-at91/gpio.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/mtd/nand/atmel_nand.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index be42cf0..3b8f463 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -46,6 +46,7 @@ struct at91_gpio_chip {
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 7275ad4..f48587b 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -39,6 +39,7 @@
+ #include <linux/gpio.h>
+ #include <linux/io.h>
+ #include <linux/platform_data/atmel.h>
++#include <linux/pinctrl/consumer.h>
  
- #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+ #include <mach/cpu.h>
  
-+static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
- static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
- static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
- static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
-@@ -59,6 +60,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
- 	{								\
- 		.chip = {						\
- 			.label		  = name,			\
-+			.request	  = at91_gpiolib_request,	\
- 			.direction_input  = at91_gpiolib_direction_input, \
- 			.direction_output = at91_gpiolib_direction_output, \
- 			.get		  = at91_gpiolib_get,		\
-@@ -862,6 +864,16 @@ void __init at91_gpio_irq_setup(void)
- }
+@@ -539,6 +540,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	struct resource *mem;
+ 	struct mtd_part_parser_data ppdata = {};
+ 	int res;
++	struct pinctrl *pinctrl;
  
- /* gpiolib support */
-+static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-+	void __iomem *pio = at91_gpio->regbase;
-+	unsigned mask = 1 << offset;
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem) {
+@@ -583,6 +585,13 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	nand_chip->IO_ADDR_W = host->io_base;
+ 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		dev_err(host->dev, "Failed to request pinctrl\n");
++		res = PTR_ERR(pinctrl);
++		goto err_ecc_ioremap;
++	}
 +
-+	__raw_writel(mask, pio + PIO_PER);
-+	return 0;
-+}
-+
- static int at91_gpiolib_direction_input(struct gpio_chip *chip,
- 					unsigned offset)
- {
+ 	if (gpio_is_valid(host->board.rdy_pin)) {
+ 		res = devm_gpio_request(&pdev->dev,
+ 				host->board.rdy_pin, "nand_rdy");
 -- 
 1.7.10.4
