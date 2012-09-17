@@ -1,90 +1,37 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Sep 2012 17:27:11 +0200
-Subject: [PATCH 14/16] MTD: atmel nand: fix gpio missing request
+Date: Mon, 17 Sep 2012 17:27:10 +0200
+Subject: [PATCH 13/16] arm: at91: dt: sam9g20ek: use rts/cts/dtr/dsr/dcd/ri
+ pinctrl group for uart0
 In-Reply-To: <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120917140423.GA17667@game.jcrosoft.org>
  <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1347895633-1763-14-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1347895633-1763-13-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-without this the gpio will not be muxed as a gpio by the current custom pinmux
-or later by the pinctrl
-
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- drivers/mtd/nand/atmel_nand.c |   50 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 97ac671..7275ad4 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -583,8 +583,41 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	nand_chip->IO_ADDR_W = host->io_base;
- 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index b06c0db..e33ab0a 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -35,6 +35,12 @@
+ 			};
  
--	if (gpio_is_valid(host->board.rdy_pin))
-+	if (gpio_is_valid(host->board.rdy_pin)) {
-+		res = devm_gpio_request(&pdev->dev,
-+				host->board.rdy_pin, "nand_rdy");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
-+		res = gpio_direction_input(host->board.rdy_pin);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request input direction rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
- 		nand_chip->dev_ready = atmel_nand_device_ready;
-+	}
-+
-+	if (gpio_is_valid(host->board.enable_pin)) {
-+		res = devm_gpio_request(&pdev->dev,
-+				host->board.enable_pin, "nand_enable");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
-+		res = gpio_direction_output(host->board.enable_pin, 1);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request output direction enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+	}
+ 			usart0: serial at fffb0000 {
++				pinctrl-0 =
++					<&pinctrl_uart0
++					 &pinctrl_uart0_rts_cts
++					 &pinctrl_uart0_dtr_dsr
++					 &pinctrl_uart0_dcd
++					 &pinctrl_uart0_ri>;
+ 				status = "okay";
+ 			};
  
- 	nand_chip->ecc.mode = host->board.ecc_mode;
- 
-@@ -622,6 +655,21 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	atmel_nand_enable(host);
- 
- 	if (gpio_is_valid(host->board.det_pin)) {
-+		res = devm_gpio_request(&pdev->dev,
-+				host->board.det_pin, "nand_det");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
-+
-+		res = gpio_direction_input(host->board.det_pin);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request input direction det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
-+
- 		if (gpio_get_value(host->board.det_pin)) {
- 			printk(KERN_INFO "No SmartMedia card inserted.\n");
- 			res = -ENXIO;
 -- 
 1.7.10.4
