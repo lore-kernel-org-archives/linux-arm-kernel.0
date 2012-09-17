@@ -1,82 +1,46 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 17 Sep 2012 12:51:40 +0200
-Subject: [PATCH 3/7] ARM: EXYNOS: Change MIPI-CSIS device regulator supply
- names
-In-Reply-To: <1347879100-30150-1-git-send-email-s.nawrocki@samsung.com>
-References: <1347878888-30001-1-git-send-email-s.nawrocki@samsung.com>
- <1347879100-30150-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1347879100-30150-3-git-send-email-s.nawrocki@samsung.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 17 Sep 2012 11:57:19 +0100
+Subject: [PATCH v4 12/24] xen/arm: introduce CONFIG_XEN on ARM
+In-Reply-To: <505374E2.5080308@mvista.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-12-git-send-email-stefano.stabellini@eu.citrix.com>
+ <505374E2.5080308@mvista.com>
+Message-ID: <alpine.DEB.2.02.1209171155010.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename MIPI-CSIS regulator supply names to match definitions in
-the driver after commit "s5p-csis: Change regulator supply names".
+On Fri, 14 Sep 2012, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 09/14/2012 03:13 PM, Stefano Stabellini wrote:
+> 
+> > Changes in v2:
+> 
+> > - mark Xen guest support on ARM as EXPERIMENTAL.
+> 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > ---
+> >  arch/arm/Kconfig |   10 ++++++++++
+> >  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 2f88d8d..e92518d 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1897,6 +1897,16 @@ config DEPRECATED_PARAM_STRUCT
+> >  	  This was deprecated in 2001 and announced to live on for 5 years.
+> >  	  Some old boot loaders still use this way.
+> >  
+> > +config XEN_DOM0
+> > +	def_bool y
+> > +
+> > +config XEN
+> > +	bool "Xen guest support on ARM (EXPERIMENTAL)"
+> > +	depends on EXPERIMENTAL && ARM && OF
+> > +	select XEN_DOM0
+> 
+>    What's the point of selecting it if it's always "y"?
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/mach-nuri.c           | 4 ++--
- arch/arm/mach-exynos/mach-origen.c         | 4 ++--
- arch/arm/mach-exynos/mach-universal_c210.c | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index da6e7ce..bfe6955 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -378,10 +378,10 @@ static struct regulator_consumer_supply __initdata max8997_ldo1_[] = {
- };
- static struct regulator_consumer_supply __initdata max8997_ldo3_[] = {
- 	REGULATOR_SUPPLY("vusb_d", "s3c-hsotg"), /* USB */
--	REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"), /* MIPI */
-+	REGULATOR_SUPPLY("vddcore", "s5p-mipi-csis.0"), /* MIPI */
- };
- static struct regulator_consumer_supply __initdata max8997_ldo4_[] = {
--	REGULATOR_SUPPLY("vdd18", "s5p-mipi-csis.0"), /* MIPI */
-+	REGULATOR_SUPPLY("vddio", "s5p-mipi-csis.0"), /* MIPI */
- };
- static struct regulator_consumer_supply __initdata max8997_ldo5_[] = {
- 	REGULATOR_SUPPLY("vhsic", "modemctl"), /* MODEM */
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index 65ac45b..b58bbca 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -96,12 +96,12 @@ static struct s3c2410_uartcfg origen_uartcfgs[] __initdata = {
- };
- 
- static struct regulator_consumer_supply __initdata ldo3_consumer[] = {
--	REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"), /* MIPI */
-+	REGULATOR_SUPPLY("vddcore", "s5p-mipi-csis.0"), /* MIPI */
- 	REGULATOR_SUPPLY("vdd", "exynos4-hdmi"), /* HDMI */
- 	REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"), /* HDMI */
- };
- static struct regulator_consumer_supply __initdata ldo6_consumer[] = {
--	REGULATOR_SUPPLY("vdd18", "s5p-mipi-csis.0"), /* MIPI */
-+	REGULATOR_SUPPLY("vddio", "s5p-mipi-csis.0"), /* MIPI */
- };
- static struct regulator_consumer_supply __initdata ldo7_consumer[] = {
- 	REGULATOR_SUPPLY("avdd", "alc5625"), /* Realtek ALC5625 */
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index 0b0a2d0..ac00757 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -211,7 +211,7 @@ static struct regulator_consumer_supply lp3974_ldo3_consumer[] = {
- 	REGULATOR_SUPPLY("vusb_a", "s3c-hsotg"),
- 	REGULATOR_SUPPLY("vdd", "exynos4-hdmi"),
- 	REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"),
--	REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"),
-+	REGULATOR_SUPPLY("vddcore", "s5p-mipi-csis.0"),
- };
- 
- static struct regulator_init_data lp3974_ldo3_data = {
-@@ -275,7 +275,7 @@ static struct regulator_init_data lp3974_ldo6_data = {
- };
- 
- static struct regulator_consumer_supply lp3974_ldo7_consumer[] = {
--	REGULATOR_SUPPLY("vdd18", "s5p-mipi-csis.0"),
-+	REGULATOR_SUPPLY("vddio", "s5p-mipi-csis.0"),
- };
- 
- static struct regulator_init_data lp3974_ldo7_data = {
--- 
-1.7.11.3
+That's because on X86 is not always "y": there are things under
+drivers/xen that compile on both platforms and depend on XEN_DOM0.
