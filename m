@@ -1,110 +1,81 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 17 Sep 2012 08:47:46 +0530
-Subject: [PATCH v3 00/15] ASoC: OMAP: Convert to use dmaengine
-In-Reply-To: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1347851866.1943.126.camel@vkoul-udesk3>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 17 Sep 2012 11:34:32 +0800
+Subject: [PATCH v3] input: qt1070: Add device tree support
+In-Reply-To: <1347358459-11598-1-git-send-email-voice.shen@atmel.com>
+References: <1347358459-11598-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <50569A48.3080300@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-14 at 15:05 +0300, Peter Ujfalusi wrote:
-> Hello,
+Hi Dmitry,
 
-dmaengine parts look good to me. How do you want to get this merged,
-dmaengine or ASoC tree?
-> 
-> Changes since v2:
-> - As it has been discussed the no_wakeup parameter has been replaced with flags
->   for the dmaengine APIs
-> 
-> Changes since v1:
-> - Support for pause/resume for OMAP audio via dmaengine
-> - dmaengine: support for NO_PERIOD_WAKEUP in cyclic mode
->  - OMAP to keep supporting NO_PERIOD_WAKEUP for audio
->  - Other plaforms can also try to enable this mode since we have now generic
->    interface to do so.
-> 
-> This series will switch the OMAP audio to use dmaengine.
-> The final patch which does the switch was based on Russell King's earlier patch.
-> 
-> The first 10 patch is to prepare the OMAP audio drivers for a smooth change to
-> dmaengine:
-> - sDMA FRAME sync mode is removed and replaced with PACKET mode
-> - dai drivers no longer need to configure sDMA sync mode
-> - dai drivers does not need to specify the DMA word length - with the exception
->   of the omap-hdmi driver which requires 32bit word length regardless of the
->   audio format in use
-> - the McPDM driver used (to my surprise) hackish way of getting the DMA channel
->   and address - via defines from some header files
-> 
-> After the conversion OMAP audio support should have the same features as before,
-> no regressions expected.
-> 
-> I have tested the series on:
-> - BeagleBoard (audio via McBSP): 
->  - aplay/arecord. In element mode and in threshold mode with different period
->    sizes
->  - mplayer -ao alsa: for direct ALSA access
->  - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
-> - OMAP4 Blaze (audio via McPDM and DMIC)
->  - aplay/arecord
->  - mplayer -ao alsa: for direct ALSA access
->  - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
-> 
-> The patches has been generated against:
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
-> 
-> Janusz: Can you retest this series on OMAP1 to be sure I have not broken it?
-> Ricardo: Can you test the omap-hmdi if it is still working?
-> 
-> Regards,
-> Peter
+On 9/11/2012 18:14, Bo Shen wrote:
+> Add qt1070 device tree support
+> Using device node to parse irq
+>
+> Test this on at91sam9x5ek board
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 > ---
-> Peter Ujfalusi (15):
->   dmaengine: omap: Support for element mode in cyclic DMA
->   dmaengine: omap: Add support for pause/resume in cyclic dma mode
->   dmaengine: Add flags parameter to dmaengine_prep_dma_cyclic()
->   dmaengine: Pass flags via device_prep_dma_cyclic() callback
->   dmaengine: omap-dma: Add support to suppress interrupts in cyclic
->     mode
->   ASoC: omap-mcbsp: Use sDMA packet mode instead of frame mode
->   ASoC: omap-pcm: Select sDMA synchronization based on packet_size
->   ASoC: OMAP: Remove sync_mode from omap_pcm_dma_data struct
->   ASoC: omap-pcm: Prepare to configure the DMA data_type based on
->     stream properties
->   ARM: OMAP4: hwmod_data: Add resource names to McPDM memory ranges
->   ASoC: omap-mcpdm: Use platform_get_resource_* to get resources
->   ASoC: OMAP: mcbsp, mcpdm, dmic: Let omap-pcm to pick the dma_type
->   ASoC: omap-pcm, omap-dmic: Change the use of
->     omap_pcm_dma_data->data_type
->   ASoC: OMAP: mcbsp, mcpdm, dmic, hdmi: Set dma_data at startup time
->   ASoC: omap-pcm: Convert to use dmaengine
-> 
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +
->  drivers/dma/at_hdmac.c                     |   3 +-
->  drivers/dma/ep93xx_dma.c                   |   4 +-
->  drivers/dma/imx-dma.c                      |   2 +-
->  drivers/dma/imx-sdma.c                     |   2 +-
->  drivers/dma/mmp_tdma.c                     |   2 +-
->  drivers/dma/mxs-dma.c                      |   2 +-
->  drivers/dma/omap-dma.c                     |  45 ++++--
->  drivers/dma/pl330.c                        |   2 +-
->  drivers/dma/sa11x0-dma.c                   |   2 +-
->  drivers/dma/sirf-dma.c                     |   2 +-
->  drivers/dma/ste_dma40.c                    |   3 +-
->  drivers/dma/tegra20-apb-dma.c              |   2 +-
->  include/linux/dmaengine.h                  |   7 +-
->  sound/soc/omap/Kconfig                     |   3 +-
->  sound/soc/omap/omap-dmic.c                 |   9 +-
->  sound/soc/omap/omap-hdmi.c                 |  17 ++-
->  sound/soc/omap/omap-mcbsp.c                |  60 +++-----
->  sound/soc/omap/omap-mcpdm.c                |  40 +++--
->  sound/soc/omap/omap-pcm.c                  | 236 ++++++++---------------------
->  sound/soc/omap/omap-pcm.h                  |   4 +-
->  sound/soc/soc-dmaengine-pcm.c              |   6 +-
->  22 files changed, 186 insertions(+), 269 deletions(-)
-> 
+> change since v2
+>    Using device node to parse irq,
+>    Remove gpio relative stuff
+>
+> change since v1
+>    Add gpio relative stuff, gpio_is_valid, gpio_request
+> ---
+>   .../devicetree/bindings/input/atmel-qt1070.txt     |   16 ++++++++++++++++
+>   drivers/input/keyboard/qt1070.c                    |    9 +++++++++
+>   2 files changed, 25 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/input/atmel-qt1070.txt
+>
 
+Ping?
 
--- 
-~Vinod
+> diff --git a/Documentation/devicetree/bindings/input/atmel-qt1070.txt b/Documentation/devicetree/bindings/input/atmel-qt1070.txt
+> new file mode 100644
+> index 0000000..e1fc09e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/atmel-qt1070.txt
+> @@ -0,0 +1,16 @@
+> +Atmel qt1070 keyboard interface
+> +
+> +Required Properties:
+> +- compatible: Should be "atmel,qt1070"
+> +- reg: I2C slave address
+> +- interrupt-parent: Depends on SoC
+> +- interrupts: The interrupt pin number to the cpu, and trigger mode.
+> +
+> +Example:
+> +
+> +	qt1070 at 1b {
+> +		compatible = "atmel,qt1070";
+> +		reg = <0x1b>;
+> +		interrupt-parent = <&pioA>;
+> +		interrupts = <7 0x0>;
+> +	};
+> diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
+> index ca68f29..60457dc 100644
+> --- a/drivers/input/keyboard/qt1070.c
+> +++ b/drivers/input/keyboard/qt1070.c
+> @@ -249,10 +249,19 @@ static const struct i2c_device_id qt1070_id[] = {
+>   };
+>   MODULE_DEVICE_TABLE(i2c, qt1070_id);
+>
+> +#ifdef CONFIG_OF
+> +static struct of_device_id atmel_qt1070_of_match[] = {
+> +	{ .compatible = "atmel,qt1070" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, atmel_qt1070_of_match);
+> +#endif
+> +
+>   static struct i2c_driver qt1070_driver = {
+>   	.driver	= {
+>   		.name	= "qt1070",
+>   		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(atmel_qt1070_of_match),
+>   	},
+>   	.id_table	= qt1070_id,
+>   	.probe		= qt1070_probe,
+>
