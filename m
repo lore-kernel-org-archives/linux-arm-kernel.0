@@ -1,44 +1,34 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 17 Sep 2012 18:02:43 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the mtd tree
-Message-ID: <20120917180243.ba626fb72dced777cd4e057e@canb.auug.org.au>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 17 Sep 2012 08:06:07 +0000
+Subject: [PATCH v9 3/3] ARM: OMAP2+: gpmc: minimal driver support
+In-Reply-To: <alpine.DEB.2.00.1209121631440.17903@utopia.booyaka.com>
+References: <cover.1347355380.git.afzal@ti.com>
+ <35901c3137e42170066f3efb5026b0749ccdcbb5.1347355380.git.afzal@ti.com>
+ <alpine.DEB.2.00.1209121631440.17903@utopia.booyaka.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E4D92@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Paul,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-imx/clk-imx51-imx53.c between commit 75453a08e365 ("ARM:
-i.MX5: Add nand oftree support") from the mtd tree and commit
-a745f039b901 ("ARM i.MX53: register CAN clocks") from the arm-soc tree.
+On Wed, Sep 12, 2012 at 22:04:16, Paul Walmsley wrote:
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+> Two checkpatch warnings are added by this patch:
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+I did checkpatch earlier, but without --strict
 
-diff --cc arch/arm/mach-imx/clk-imx51-imx53.c
-index e81f17a,e5165a8..0000000
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@@ -456,7 -461,10 +462,11 @@@ int __init mx53_clocks_init(unsigned lo
-  	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "63fcc000.ssi");
-  	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "50014000.ssi");
-  	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "63fd0000.ssi");
- +	clk_register_clkdev(clk[nfc_gate], NULL, "63fdb000.nand");
-+ 	clk_register_clkdev(clk[can1_ipg_gate], "ipg", "53fc8000.can");
-+ 	clk_register_clkdev(clk[can1_serial_gate], "per", "53fc8000.can");
-+ 	clk_register_clkdev(clk[can2_ipg_gate], "ipg", "53fcc000.can");
-+ 	clk_register_clkdev(clk[can2_serial_gate], "per", "53fcc000.can");
-  
-  	/* set SDHC root clock to 200MHZ*/
-  	clk_set_rate(clk[esdhc_a_podf], 200000000);
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120917/b5b19959/attachment.sig>
+> I've fixed them here in the obvious way.  But please make sure that all 
+> your patches are clean with 'checkpatch.pl --strict'; saves us time and 
+> frustration...
+
+I am sorry for that, in future --strict will be part of my process
+
+Perhaps it would be better to patch Documentation with a mention
+of --strict for checkpatch
+
+And seeing an unpleasant behavior with --strict, running
+checkpatch over cached changes (for pre-commit hook) is
+not making effect of --strict felt
+
+Regards
+Afzal
