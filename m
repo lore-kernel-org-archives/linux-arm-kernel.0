@@ -1,90 +1,48 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 17 Sep 2012 18:38:51 +0100
-Subject: [PATCH v5 05/17] xen/arm: empty implementation of grant_table arch
- specific functions
+Date: Mon, 17 Sep 2012 18:38:56 +0100
+Subject: [PATCH v5 10/17] xen/arm: introduce CONFIG_XEN on ARM
 In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-Message-ID: <1347903543-2135-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347903543-2135-10-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Changes in v5:
+
+- make XEN_DOM0 depend on XEN;
+- avoid "select XEN_DOM0" in XEN.
+
+
 Changes in v2:
 
-- return -ENOSYS rather than -1.
+- mark Xen guest support on ARM as EXPERIMENTAL.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: Sergei Shtylyov <sshtylyov@mvista.com>
 ---
- arch/arm/xen/Makefile      |    2 +-
- arch/arm/xen/grant-table.c |   53 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/xen/grant-table.c
+ arch/arm/Kconfig |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index b9d6acc..4384103 100644
---- a/arch/arm/xen/Makefile
-+++ b/arch/arm/xen/Makefile
-@@ -1 +1 @@
--obj-y		:= enlighten.o hypercall.o
-+obj-y		:= enlighten.o hypercall.o grant-table.o
-diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
-new file mode 100644
-index 0000000..dbd1330
---- /dev/null
-+++ b/arch/arm/xen/grant-table.c
-@@ -0,0 +1,53 @@
-+/******************************************************************************
-+ * grant_table.c
-+ * ARM specific part
-+ *
-+ * Granting foreign access to our memory reservation.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation; or, when distributed
-+ * separately from the Linux kernel or incorporated into other
-+ * software packages, subject to the following license:
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this source file (the "Software"), to deal in the Software without
-+ * restriction, including without limitation the rights to use, copy, modify,
-+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-+ * and to permit persons to whom the Software is furnished to do so, subject to
-+ * the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-+ * IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2f88d8d..3361466 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1897,6 +1897,16 @@ config DEPRECATED_PARAM_STRUCT
+ 	  This was deprecated in 2001 and announced to live on for 5 years.
+ 	  Some old boot loaders still use this way.
+ 
++config XEN_DOM0
++	def_bool y
++	depends on XEN
 +
-+#include <xen/interface/xen.h>
-+#include <xen/page.h>
-+#include <xen/grant_table.h>
++config XEN
++	bool "Xen guest support on ARM (EXPERIMENTAL)"
++	depends on EXPERIMENTAL && ARM && OF
++	help
++	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
 +
-+int arch_gnttab_map_shared(unsigned long *frames, unsigned long nr_gframes,
-+			   unsigned long max_nr_gframes,
-+			   void **__shared)
-+{
-+	return -ENOSYS;
-+}
-+
-+void arch_gnttab_unmap(void *shared, unsigned long nr_gframes)
-+{
-+	return;
-+}
-+
-+int arch_gnttab_map_status(uint64_t *frames, unsigned long nr_gframes,
-+			   unsigned long max_nr_gframes,
-+			   grant_status_t **__shared)
-+{
-+	return -ENOSYS;
-+}
+ endmenu
+ 
+ menu "Boot options"
 -- 
 1.7.2.5
