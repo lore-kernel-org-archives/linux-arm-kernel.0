@@ -1,52 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 17 Sep 2012 10:02:24 -0600
-Subject: [GIT PULL] ARM: tegra: switch to dmaengine
-Message-ID: <1347897744-8009-1-git-send-email-swarren@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Sep 2012 09:46:08 -0700
+Subject: [GIT PULL 1/7] omap non-critical fixes for v3.7 merge window
+In-Reply-To: <20120917031725.GD13322@quad.lixom.net>
+References: <pull-1347589125-283636> <20120914023403.GF4521@atomide.com>
+ <20120917031725.GD13322@quad.lixom.net>
+Message-ID: <20120917164608.GK4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra code-base has contained both a legacy DMA and a dmaengine
-driver since v3.6-rcX. This series flips Tegra's defconfig to enable
-dmaengine rather than the legacy driver, and removes the legacy driver
-and all client code.
+* Olof Johansson <olof@lixom.net> [120916 20:18]:
+> On Thu, Sep 13, 2012 at 07:34:04PM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [120913 19:20]:
+> > > The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+> > > 
+> > >   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-noncritical-for-v3.7
+> > > 
+> > > for you to fetch changes up to 3c5dc4a7daa6e64e39412fe9c7daa298834de623:
+> > > 
+> > >   ARM: OMAP4: wakeupgen: remove duplicate AUXCOREBOOT* read/write (2012-09-12 21:14:34 -0700)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Non critical omap fixes that we not considered necessary
+> > > for the v3.6 -rc cycle.
+> > > 
+> > > ----------------------------------------------------------------
+> > 
+> > Oops forgot to push out some of the tags and only this one
+> > seems to got sent. Still a valid pull request, but I'll repost
+> > the whole series of them.
+> 
+> Ah, I noticed this now. And it also explains why I got 4 copies of all pull
+> requests, they all looked identical until the one that was missing a tag,
+> I suppose. :)
 
-The branch is based on v3.6-rc6 in order to pick up a bug-fix to the
-ASoC Tegra PCM driver that's required for audio to work correctly when
-using dmaengine.
+Yes sorry for the extra spam, looks like you already found the right
+tag for the am33xx changes.
 
-----------------------------------------------------------------
+Thanks,
 
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
-
-  Linux 3.6-rc6
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-dmaengine
-
-for you to fetch changes up to 9891e3240543c45176b1298164418b61e8909ed0:
-
-  ASoC: tegra: remove support of legacy DMA driver based access
-
-----------------------------------------------------------------
-
-Laxman Dewangan (5):
-      ARM: tegra: config: enable dmaengine based APB DMA driver
-      ARM: tegra: dma: remove legacy APB DMA driver
-      ARM: tegra: apbio: remove support of legacy DMA driver based access
-      spi: tegra: remove support of legacy DMA driver based access
-      ASoC: tegra: remove support of legacy DMA driver based access
-
- arch/arm/configs/tegra_defconfig       |    2 +
- arch/arm/mach-tegra/Kconfig            |    7 -
- arch/arm/mach-tegra/Makefile           |    1 -
- arch/arm/mach-tegra/apbio.c            |  118 +----
- arch/arm/mach-tegra/dma.c              |  823 ---------------------------
- arch/arm/mach-tegra/include/mach/dma.h |   97 ----
- drivers/spi/Kconfig                    |    2 +-
- drivers/spi/spi-tegra.c                |   55 +--
- sound/soc/tegra/Kconfig                |    2 +-
- sound/soc/tegra/tegra_pcm.c            |  232 --------
- sound/soc/tegra/tegra_pcm.h            |   14 -
- 11 files changed, 6 insertions(+), 1347 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/dma.c
+Tony
