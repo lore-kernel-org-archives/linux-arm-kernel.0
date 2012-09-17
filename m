@@ -1,31 +1,20 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 17 Sep 2012 01:45:34 +0200
-Subject: [PATCH 17/19] mfd: Enable the tc3589x for Device Tree
-In-Reply-To: <1347016499-29354-18-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-18-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120916234534.GQ3647@sortiz-mobl>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 16 Sep 2012 17:30:30 -0700
+Subject: [GIT PULL] i.MX patches for -next
+In-Reply-To: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
+References: <1347525337-19115-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120917003030.GB19186@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Fri, Sep 07, 2012 at 12:14:57PM +0100, Lee Jones wrote:
-> Here we provide a means to probe and extract vital information
-> from Device Tree when booting with it enabled. Without this
-> patch sub-devices wouldn't be able to reference the tc3589x
-> from Device Tree.
+On Thu, Sep 13, 2012 at 10:35:32AM +0200, Sascha Hauer wrote:
+> Hi Arnd, Olof,
 > 
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/tc3589x.c |   43 ++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 40 insertions(+), 3 deletions(-)
-Applied as well, thanks.
+> Please pull the following patches I queued up for the next merge window.
+> 
+> I just checked there are no merge conflicts with the arm-soc/for-next branch.
 
-Cheers,
-Samuel.
+Thanks, pulled 1-5.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+
+-Olof
