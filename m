@@ -1,43 +1,52 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 17 Sep 2012 08:54:08 -0700
-Subject: [PATCH v7 0/11] KGDB/KDB FIQ (NMI) debugger
-In-Reply-To: <20120917153943.GA7510@lizard>
-References: <20120913150133.GA16238@lizard> <20120917113750.GA28838@kroah.com>
- <50571ADF.3000406@windriver.com> <20120917125427.GA23516@kroah.com>
- <20120917153943.GA7510@lizard>
-Message-ID: <20120917155408.GA302@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 17 Sep 2012 10:02:24 -0600
+Subject: [GIT PULL] ARM: tegra: switch to dmaengine
+Message-ID: <1347897744-8009-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 08:39:43AM -0700, Anton Vorontsov wrote:
-> On Mon, Sep 17, 2012 at 05:54:27AM -0700, Greg Kroah-Hartman wrote:
-> [...]
-> > > > To make it easier, can I just take the tty driver patches now?  Will
-> > > > that break anything?
-> > > 
-> > > I have not made my way through the entire series yet, so I am not sure
-> > > if you need the kdb header changes or not, but so far it looks like
-> > > the tty pieces are separate.  If you add your ack Greg, I'll take the
-> > > whole series and merge it into kgdb-next, or after I finish the review
-> > > we could do it the other way around.
-> > 
-> > Your tree is fine:
-> > 
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > Let me know if you have problems merging this due to any tty patches,
-> > and if so, I'll be glad to take them through my tree.
-> 
-> Guys, thanks for taking a look into this!
-> 
-> The patch that adds nmi console driver (i.e. tty/serial/kgdb_nmi.c)
-> depends on the first KDB patches in these series, and it depends on
-> amba-pl1011 and tty_port work, which is in tty-next.
-> 
-> So, the series have to go via tty-next; I believe Jason won't able
-> to take it via his tree.
+The Tegra code-base has contained both a legacy DMA and a dmaengine
+driver since v3.6-rcX. This series flips Tegra's defconfig to enable
+dmaengine rather than the legacy driver, and removes the legacy driver
+and all client code.
 
-Ok, I'll wait for Jason to review them.  Jason, let me know how it
-goes...
+The branch is based on v3.6-rc6 in order to pick up a bug-fix to the
+ASoC Tegra PCM driver that's required for audio to work correctly when
+using dmaengine.
 
-greg k-h
+----------------------------------------------------------------
+
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+
+  Linux 3.6-rc6
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-dmaengine
+
+for you to fetch changes up to 9891e3240543c45176b1298164418b61e8909ed0:
+
+  ASoC: tegra: remove support of legacy DMA driver based access
+
+----------------------------------------------------------------
+
+Laxman Dewangan (5):
+      ARM: tegra: config: enable dmaengine based APB DMA driver
+      ARM: tegra: dma: remove legacy APB DMA driver
+      ARM: tegra: apbio: remove support of legacy DMA driver based access
+      spi: tegra: remove support of legacy DMA driver based access
+      ASoC: tegra: remove support of legacy DMA driver based access
+
+ arch/arm/configs/tegra_defconfig       |    2 +
+ arch/arm/mach-tegra/Kconfig            |    7 -
+ arch/arm/mach-tegra/Makefile           |    1 -
+ arch/arm/mach-tegra/apbio.c            |  118 +----
+ arch/arm/mach-tegra/dma.c              |  823 ---------------------------
+ arch/arm/mach-tegra/include/mach/dma.h |   97 ----
+ drivers/spi/Kconfig                    |    2 +-
+ drivers/spi/spi-tegra.c                |   55 +--
+ sound/soc/tegra/Kconfig                |    2 +-
+ sound/soc/tegra/tegra_pcm.c            |  232 --------
+ sound/soc/tegra/tegra_pcm.h            |   14 -
+ 11 files changed, 6 insertions(+), 1347 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/dma.c
