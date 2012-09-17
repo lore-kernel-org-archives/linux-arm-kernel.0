@@ -1,56 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 16:10:02 -0700
-Subject: [PATCH v6 10/10] ARM: OMAP2+: tusb6010: generic timing calculation
-In-Reply-To: <20120917225023.GJ11762@atomide.com>
-References: <20120824194630.GU11011@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9BA589@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9DC11D@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9DEC85@DBDE01.ent.ti.com>
- <20120906204354.GJ1303@atomide.com>
- <20120911184606.GN23092@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9E253B@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9E3624@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9E4DFE@DBDE01.ent.ti.com>
- <20120917225023.GJ11762@atomide.com>
-Message-ID: <20120917231001.GK11762@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Sep 2012 16:17:26 -0700
+Subject: [GIT PULL] Samsung fixes-3 for v3.6
+In-Reply-To: <05c501cd9528$eb916fe0$c2b44fa0$%kim@samsung.com>
+References: <05be01cd9527$b35c3480$1a149d80$%kim@samsung.com>
+ <CAOesGMiJGihDWpQbgJo9FYSM8FF0WY-B4PtnbE2uWwJcjWzjUA@mail.gmail.com>
+ <05c501cd9528$eb916fe0$c2b44fa0$%kim@samsung.com>
+Message-ID: <CAOesGMgu-me77fj85apd3X9SZvTPU5+EVD2MOWwuZoaCPF9cvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120917 15:54]:
-> * Mohammed, Afzal <afzal@ti.com> [120917 01:40]:
-> > Hi Tony,
-> > 
-> > On Fri, Sep 14, 2012 at 15:50:02, Mohammed, Afzal wrote:
-> > > * Mohammed, Afzal: Wednesday, September 12, 2012 3:20 PM
-> > 
-> > > > But some of the tusb async values is less by one. I need
-> > > > to get it right.
-> > > 
-> > > Reason has been identified. It was due to rounding error,
-> > > no changes are required in the expressions. Moving
-> > > completely to picoseconds resolves the issue.
-> > > 
-> > > Can you please try with the attached patch ?
-> 
-> Gave it a quick try and it seemed to work.. But when I tried
-> rebasing my patches for the cbus to keep things working with
-> the watchdog, I ran into multiple merge conflicts with
-> current linux next and gave up.
+Hi,
 
-OK went back to my original branch without current linux
-next and with the new cbus + retu driver from Aaro applied.
-Confirmed it's now working on n800 tusb6010.
-  
-> Care to repost this series updated against current linux
-> next?
-> 
-> I'm afraid I've pretty much lost track of all the patches
-> and rather not start resolving the conflicts as I'm sure
-> I'll break something else :)
+On Mon, Sep 17, 2012 at 4:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-You should still repost the whole updated series against
-linux next.
+> Well...I don't think so, others also should be fixed before v3.6 because as
+> you can see, it can occur unexpected behavior and must be wrong. But last
+> one is small thing...
 
-Regards,
+"ARM: EXYNOS: fixed SYSMMU setup definition to mate parameter name" is
+a valid cleanup, but it has zero functional impact, it just reorders
+two unused arguments to a stub macro.
 
-Tony
+"ARM: S3C24xx: delete double assignment" is a valid bugfix, but the
+bug was introduced in "ARM: S3C2410: H1940: Use leds-gpio driver for
+LEDs managing" in 2.6.39 so fixing it in 3.7 seems just as fine as
+3.6, in my opinion -- it's gone unnoticed so far and was just found by
+tools.
+
+"ARM: S3C24XX: removes unnecessary semicolon" fixes a harmless extra
+semicolon after a switch statement. Valid cleanup but definitely not
+urgent for 3.6.
+
+
+-Olof
