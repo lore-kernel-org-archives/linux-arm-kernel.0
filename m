@@ -1,42 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 16 Sep 2012 22:28:35 -0300
-Subject: [PATCH v3] ARM: imx: armadillo5x0: Fix illegal register access
-Message-ID: <1347845315-16565-1-git-send-email-festevam@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 16 Sep 2012 19:09:59 -0700
+Subject: [GIT PULL 01/10] ARM: tegra: fixes for 3.7
+In-Reply-To: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
+References: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120917020959.GE19186@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Sep 14, 2012 at 02:06:12PM -0600, Stephen Warren wrote:
+> This branch contains a number of minor bug-fixes for Tegra.
+> 
+> This branch is based on v3.6-rc4.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+> 
+>   Linux 3.6-rc4
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-fixes
 
-Since commit eb92044eb (ARM i.MX3: Make ccm base address a variable )
-it is necessary to pass the CCM register base as a variable.
+Pulled into next/fixes-non-critical.
 
-Fix the CCM register access in mach-armadillo5x0 by passing mx3_ccm_base and 
-avoid illegal accesses.
+Thanks!
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Indicate the correct commit that caused the issue
-Changes since v1:
-- Also fixes the write part.
-
- arch/arm/mach-imx/mach-armadillo5x0.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
-index 2c6ab32..9f39f7e 100644
---- a/arch/arm/mach-imx/mach-armadillo5x0.c
-+++ b/arch/arm/mach-imx/mach-armadillo5x0.c
-@@ -526,7 +526,8 @@ static void __init armadillo5x0_init(void)
- 	imx31_add_mxc_nand(&armadillo5x0_nand_board_info);
- 
- 	/* set NAND page size to 2k if not configured via boot mode pins */
--	__raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
-+	__raw_writel(__raw_readl(mx3_ccm_base + MXC_CCM_RCSR) | 
-+					(1 << 30), mx3_ccm_base + MXC_CCM_RCSR);
- 
- 	/* RTC */
- 	/* Get RTC IRQ and register the chip */
--- 
-1.7.9.5
+-Olof
