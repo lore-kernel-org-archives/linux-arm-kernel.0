@@ -1,45 +1,54 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon, 17 Sep 2012 13:22:18 -0400
-Subject: [PATCH v2 2/2] ARM: OMAP2+: Enable pinctrl dummy states
-In-Reply-To: <1347902538-21208-1-git-send-email-mporter@ti.com>
-References: <1347902538-21208-1-git-send-email-mporter@ti.com>
-Message-ID: <1347902538-21208-3-git-send-email-mporter@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Sep 2012 10:22:09 -0700
+Subject: linux-next: build failure after merge of the final tree
+ (arm-soc tree related)
+In-Reply-To: <201209171429.31794.arnd@arndb.de>
+References: <20120917212615.91bc134d237dcd5968f9f549@canb.auug.org.au>
+ <201209171429.31794.arnd@arndb.de>
+Message-ID: <20120917172208.GN4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl dummy states for all OMAP platforms that don't
-populate DT. This allows drivers to be converted to pinctrl
-and not generate new warnings on platforms that do not provide
-pinctrl data. These platforms already have pinmuxes configured
-before the drivers probe.
+* Arnd Bergmann <arnd@arndb.de> [120917 07:30]:
+> On Monday 17 September 2012, Stephen Rothwell wrote:
+> > After merging the final tree, today's linux-next build (powerpc
+> > allyesconfig) failed like this:
+> > 
+> > drivers/mfd/twl-core.c:49:22: fatal error: plat/cpu.h: No such file or directory
+> > 
+> > Caused by commit 7d7e1eba7e92 ("ARM: OMAP2+: Prepare for irqs.h removal").
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/mach-omap2/devices.c |    5 +++++
- 1 file changed, 5 insertions(+)
+Oops, sorry I screwed up there. That used to get included indirectly
+earlier if SPARSE_IRQ was not set.
+ 
+> > I have added the following patch to restrict this driver to ARM until it
+> > is fixed:
+> > 
+> > From: Stephen Rothwell <sfr@canb.auug.org.au>
+> > Date: Mon, 17 Sep 2012 21:18:21 +1000
+> > Subject: [PATCH] ARM: retrict TWL4030_CORE to ARM while it is broken
+> > 
+> > Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> 
+> Thanks!
+> 
+> If it requires plat/cpu.h, it should actually be limited to CONFIG_ARCH_OMAP,
+> otherwise we will get the same problem on non-OMAP ARM builds. From what
+> I can tell, the problem is the clocks_init function, which is the only
+> part that is not completely generic.
+> 
+> The trivial workaround would be to enclose the "#include <plat/cpu.h>"
+> statement in #ifdef CONFIG_ARCH_OMAP, but with the common clock code
+> in place, we should probably be able to come up with a better solution
+> that works independent of the omap platform.
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 1efa984..6ef4010 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -17,6 +17,7 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- #include <linux/of.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_data/omap4-keypad.h>
- 
- #include <asm/mach-types.h>
-@@ -628,6 +629,10 @@ static inline void omap_init_vout(void) {}
- 
- static int __init omap2_init_devices(void)
- {
-+	/* Enable dummy states for those platforms without pinctrl support */
-+	if (!of_have_populated_dt())
-+		pinctrl_provide_dummies();
-+
- 	/*
- 	 * please keep these calls, and their implementations above,
- 	 * in alphabetical order so they're easier to sort through.
--- 
-1.7.9.5
+There are patches coming to remove cpu_is_omap usage from drivers,
+and until then we should just ifdef the plat/cpu.h include.
+
+It is possible to use these kind of external PM chips with other
+SoCs, they're just not omap related and that's why there drivers
+have not had the Kconfig dependency. I'll post a patch for that.
+
+Regards,
+
+Tony
