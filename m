@@ -1,94 +1,55 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 17 Sep 2012 13:22:55 +0530
-Subject: [PATCH 1/2] i2c: s3c2410: add optional pin configuration using
- pinctrl interface
-In-Reply-To: <CACRpkdZ7kjfDQ-CNCcCv5fQwSqMez6sKSMUMLB=0Aviboiz=2g@mail.gmail.com>
-References: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
- <1346923381-14144-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdZ7kjfDQ-CNCcCv5fQwSqMez6sKSMUMLB=0Aviboiz=2g@mail.gmail.com>
-Message-ID: <CAJuYYwQWXOnRoCmiKJUwnBiceUimrK7BHeKZUKZ+pB679fhQNA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Sep 2012 09:51:38 +0200
+Subject: [PATCH 00/34] i.MX multi-platform support
+In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120917075138.GN6180@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2012 01:32, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Sep 6, 2012 at 11:23 AM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->
->> Add optional support for i2c bus pin configuration using pinctrl interface
->>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> (...)
->> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> (...)
->> -       else
->> -               if (s3c24xx_i2c_parse_dt_gpio(i2c))
->> +       } else if (!IS_ERR_OR_NULL(i2c->pctrl) &&
->> +                       !IS_ERR_OR_NULL(i2c->pctrl_state)) {
->
-> You don't need to check i2c->pctrl here, just check i2c->pctrl_state.
->
-> If i2c->pctrl failed the other one will be null too, anyway.
-> (Or the struct isn't kzalloc:ed properly... which I assume.)
+Hi Shawn,
 
-Yes, that's right. I will modify this check.
+On Mon, Sep 17, 2012 at 01:34:29PM +0800, Shawn Guo wrote:
+> The series enables multi-platform support for imx.  Since the required
+> frameworks (clk, pwm) and spare_irq have already been adopted on imx,
+> the series is all about cleaning up mach/* headers.  Along with the
+> changes, arch/arm/plat-mxc gets merged into arch/arm/mach-imx.
+> 
+> It's based on a bunch of branches (works from others), Rob's initial
+> multi-platform series, Arnd's platform-data and smp_ops (Marc's) and
+> imx 3.7 material (Sascha and myself).
+> 
+> It's available on branch below.
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform
+> 
+> It's been tested on imx5 and imx6, and only compile-tested on imx2 and
+> imx3, so testing on imx2/3 are appreciated.
 
->
->> +               if (pinctrl_select_state(i2c->pctrl, i2c->pctrl_state)) {
->> +                       dev_err(i2c->dev, "failed to configure io-pins\n");
->> +                       return -ENXIO;
->> +               }
->> +       } else if (s3c24xx_i2c_parse_dt_gpio(i2c)) {
->>                         return -EINVAL;
->> +       }
->>
->>         /* write slave address */
->>
->> @@ -1013,6 +1022,10 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
->>         i2c->adap.algo_data = i2c;
->>         i2c->adap.dev.parent = &pdev->dev;
->>
->> +       i2c->pctrl = devm_pinctrl_get(i2c->dev);
->> +       if (!IS_ERR_OR_NULL(i2c->pctrl))
->> +               i2c->pctrl_state = pinctrl_lookup_state(i2c->pctrl, "default");
->> +
->
-> If all you do is select the default state (later, in the init function)
-> the use devm_pinctrl_get_select_default() and be done
-> with it.
+Great work! This really pushes the i.MX architecture one step closer to
+a clean code base.
 
-The driver has a separate init which is invoked during probe. This
-init function sets up the i/o pads for the i2c controller. This
-function has to support three different types of Samsung platforms -
-(a) non-dt (b) dt without pinctrl and (c) dt with pinctrl. And the
-decision to use one of the types of pin setup has to be taken at
-runtime (to support multi-platform images)
+I gave it a test on i.MX1, i.MX27, i.MX31 and i.MX35. All run fine, but
+the last patch breaks the imx_v4_v5_defconfig: Somehow it now defaults
+to ARMv7 based machines. I haven't looked into it, just reenabled
+ARMv4/ARMv5 and the boards again -> works. The config should be updated
+with the last patch.
 
-So the order that is used is
+I'm fine with the changes to mx2-camera, but Javier should give his ok
+to it, he has worked on it quite a lot recently.
 
-1. Check if platform data has a callback for pin setup. If yes, invoke
-that callback.
+One other issue related to imx-dma, see comment to that patch.
 
-2. If not, check if a vaild pinctrl state available, (implies pinctrl
-driver support is available), then use the pinctrl_select_state() call
-to setup the pins.
+Otherwise:
 
-3. If both the above options are not available, then try setting up
-the pins with information available in device tree node.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-When all the Samsung platforms switch to using device tree and pinctrl
-driver, this code would be simplified to use the
-devm_pinctrl_get_select_default() function.
+Thanks
+ Sascha
 
->
-> In any case do not open code the string "default", use
-> PINCTRL_STATE_DEFAULT which defines to that string.
-
-Okay, that was a mistake. I will fix this.
-
->
-> Yours,
-> Linus Walleij
-
-Thanks,
-Thomas.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
