@@ -1,137 +1,108 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Sep 2012 09:56:04 +0200
-Subject: [PATCH 02/24] ARM: at91: use __iomem pointers for MMIO
-In-Reply-To: <1347658492-11608-3-git-send-email-arnd@arndb.de>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-3-git-send-email-arnd@arndb.de>
-Message-ID: <5056D794.5000107@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Sep 2012 09:58:14 +0200
+Subject: [PATCH 25/34] dma: imx-dma: remove mach/hardware.h inclusion
+In-Reply-To: <1347860103-4141-26-git-send-email-shawn.guo@linaro.org>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <1347860103-4141-26-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120917075814.GO6180@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2012 11:34 PM, Arnd Bergmann :
-> ARM is moving to stricter checks on readl/write functions,
-> so we need to use the correct types everywhere.
+On Mon, Sep 17, 2012 at 01:34:54PM +0800, Shawn Guo wrote:
+> It changes the driver to use platform_device_id rather than cpu_is_xxx
+> to determine the controller type, and updates the platform code
+> accordingly.
 > 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-at91/at91x40.c                 |    2 +-
->  arch/arm/mach-at91/at91x40_time.c            |    4 ++--
->  arch/arm/mach-at91/include/mach/hardware.h   |    4 ++--
->  arch/arm/mach-at91/include/mach/uncompress.h |    6 +++---
->  arch/arm/mach-at91/setup.c                   |    4 ++--
->  5 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-> index 46090e6..6bd7300 100644
-> --- a/arch/arm/mach-at91/at91x40.c
-> +++ b/arch/arm/mach-at91/at91x40.c
-> @@ -47,7 +47,7 @@ static void at91x40_idle(void)
->  	 * Disable the processor clock.  The processor will be automatically
->  	 * re-enabled by an interrupt or by a reset.
->  	 */
-> -	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
-> +	__raw_writel(AT91_PS_CR_CPU, AT91_IO_P2V(AT91_PS_CR));
->  	cpu_do_idle();
->  }
->  
-> diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
-> index 6ca680a..ee06d7b 100644
-> --- a/arch/arm/mach-at91/at91x40_time.c
-> +++ b/arch/arm/mach-at91/at91x40_time.c
-> @@ -29,10 +29,10 @@
->  #include <mach/at91_tc.h>
->  
->  #define at91_tc_read(field) \
-> -	__raw_readl(AT91_TC + field)
-> +	__raw_readl(AT91_IO_P2V(AT91_TC) + field)
->  
->  #define at91_tc_write(field, value) \
-> -	__raw_writel(value, AT91_TC + field);
-> +	__raw_writel(value, AT91_IO_P2V(AT91_TC) + field);
->  
->  /*
->   *	3 counter/timer units present.
-> diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-> index 09242b6..711a789 100644
-> --- a/arch/arm/mach-at91/include/mach/hardware.h
-> +++ b/arch/arm/mach-at91/include/mach/hardware.h
-> @@ -67,13 +67,13 @@
->   * to 0xFEF78000 .. 0xFF000000.  (544Kb)
->   */
->  #define AT91_IO_PHYS_BASE	0xFFF78000
-> -#define AT91_IO_VIRT_BASE	(0xFF000000 - AT91_IO_SIZE)
-> +#define AT91_IO_VIRT_BASE	IOMEM(0xFF000000 - AT91_IO_SIZE)
->  #else
->  /*
->   * Identity mapping for the non MMU case.
->   */
->  #define AT91_IO_PHYS_BASE	AT91_BASE_SYS
-> -#define AT91_IO_VIRT_BASE	AT91_IO_PHYS_BASE
-> +#define AT91_IO_VIRT_BASE	IOMEM(AT91_IO_PHYS_BASE)
->  #endif
->  
->  #define AT91_IO_SIZE		(0xFFFFFFFF - AT91_IO_PHYS_BASE + 1)
-> diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
-> index 6f6118d..58c9d5b 100644
-> --- a/arch/arm/mach-at91/include/mach/uncompress.h
-> +++ b/arch/arm/mach-at91/include/mach/uncompress.h
-> @@ -94,7 +94,7 @@ static const u32 uarts_sam9x5[] = {
->  	0,
->  };
->  
-> -static inline const u32* decomp_soc_detect(u32 dbgu_base)
-> +static inline const u32* decomp_soc_detect(void __iomem*dbgu_base)
+> As the result, mach/hardware.h inclusion gets removed from the driver.
 
-A whitespace is missing before the *, no?
+I know the important thing for you is to get rid of the mach/hardware.h
+inclusion, but I think the subject for this patch should rather be that
+you switch to platform_device_id for this driver.
 
->  {
->  	u32 cidr, socid;
->  
-> @@ -142,10 +142,10 @@ static inline void arch_decomp_setup(void)
->  	int i = 0;
->  	const u32* usarts;
->  
-> -	usarts = decomp_soc_detect(AT91_BASE_DBGU0);
-> +	usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU0);
->  
->  	if (!usarts)
-> -		usarts = decomp_soc_detect(AT91_BASE_DBGU1);
-> +		usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU1);
->  	if (!usarts) {
->  		at91_uart = NULL;
->  		return;
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index 944bffb..e6f52de 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -73,7 +73,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
->  {
->  	struct map_desc *desc = &sram_desc[bank];
->  
-> -	desc->virtual = AT91_IO_VIRT_BASE - length;
-> +	desc->virtual = (unsigned long)AT91_IO_VIRT_BASE - length;
->  	if (bank > 0)
->  		desc->virtual -= sram_desc[bank - 1].length;
->  
-> @@ -88,7 +88,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
->  }
->  
->  static struct map_desc at91_io_desc __initdata = {
-> -	.virtual	= AT91_VA_BASE_SYS,
-> +	.virtual	= (unsigned long)AT91_VA_BASE_SYS,
->  	.pfn		= __phys_to_pfn(AT91_BASE_SYS),
->  	.length		= SZ_16K,
->  	.type		= MT_DEVICE,
-> 
+This patch misses to adjust the clock lookups according to the new
+platform_device_ids. Please fixup the patch with the following.
 
-Otherwise, look good.
+Sascha
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+8<---------------------------------------------------------
 
-You can carry it directly in the arm-soc tree.
+>From 3094908fcbb4532056034539ea57042cd60abf47 Mon Sep 17 00:00:00 2001
+From: Sascha Hauer <s.hauer@pengutronix.de>
+Date: Mon, 17 Sep 2012 09:39:30 +0200
+Subject: [PATCH] ARM i.MX DMA: Fixup clock lookups after platform_device_id conversion
 
-Bye,
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx1.c          |    3 ++-
+ arch/arm/mach-imx/clk-imx21.c         |    4 ++--
+ arch/arm/mach-imx/clk-imx27.c         |    4 ++--
+ include/linux/platform_data/dma-imx.h |    4 +++-
+ 4 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 7b76bc3..e8d9242 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -82,7 +82,8 @@ int __init mx1_clocks_init(unsigned long fref)
+ 			pr_err("imx1 clk %d: register failed with %ld\n",
+ 				i, PTR_ERR(clk[i]));
+ 
+-	clk_register_clkdev(clk[dma_gate], "ahb", "imx-dma");
++	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
++	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
+ 	clk_register_clkdev(clk[mma_gate], "mma", NULL);
+ 	clk_register_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
+ 	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+index 52b0563..d7ed660 100644
+--- a/arch/arm/mach-imx/clk-imx21.c
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -162,8 +162,8 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
+ 	clk_register_clkdev(clk[usb_gate], "per", "imx21-hcd.0");
+ 	clk_register_clkdev(clk[usb_hclk_gate], "ahb", "imx21-hcd.0");
+ 	clk_register_clkdev(clk[nfc_gate], NULL, "imx21-nand.0");
+-	clk_register_clkdev(clk[dma_hclk_gate], "ahb", "imx-dma");
+-	clk_register_clkdev(clk[dma_gate], "ipg", "imx-dma");
++	clk_register_clkdev(clk[dma_hclk_gate], "ahb", "imx21-dma");
++	clk_register_clkdev(clk[dma_gate], "ipg", "imx21-dma");
+ 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+ 	clk_register_clkdev(clk[i2c_gate], NULL, "imx21-i2c.0");
+ 	clk_register_clkdev(clk[kpp_gate], NULL, "mxc-keypad");
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index e813745..d286bac 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -241,8 +241,8 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
+ 	clk_register_clkdev(clk[vpu_baud_gate], "per", "imx-vpu");
+ 	clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "imx-vpu");
+-	clk_register_clkdev(clk[dma_ahb_gate], "ahb", "imx-dma");
+-	clk_register_clkdev(clk[dma_ipg_gate], "ipg", "imx-dma");
++	clk_register_clkdev(clk[dma_ahb_gate], "ahb", "imx27-dma");
++	clk_register_clkdev(clk[dma_ipg_gate], "ipg", "imx27-dma");
+ 	clk_register_clkdev(clk[fec_ipg_gate], "ipg", "imx27-fec.0");
+ 	clk_register_clkdev(clk[fec_ahb_gate], "ahb", "imx27-fec.0");
+ 	clk_register_clkdev(clk[wdog_ipg_gate], NULL, "imx2-wdt.0");
+diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
+index 1b90803..f6d30cc 100644
+--- a/include/linux/platform_data/dma-imx.h
++++ b/include/linux/platform_data/dma-imx.h
+@@ -61,7 +61,9 @@ static inline int imx_dma_is_ipu(struct dma_chan *chan)
+ static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
+ {
+ 	return strstr(dev_name(chan->device->dev), "sdma") ||
+-		!strcmp(dev_name(chan->device->dev), "imx-dma");
++		!strcmp(dev_name(chan->device->dev), "imx1-dma") ||
++		!strcmp(dev_name(chan->device->dev), "imx21-dma") ||
++		!strcmp(dev_name(chan->device->dev), "imx27-dma");
+ }
+ 
+ #endif
 -- 
-Nicolas Ferre
+1.7.10.4
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
