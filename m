@@ -1,118 +1,33 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Sep 2012 13:34:43 +0800
-Subject: [PATCH 14/34] dma: ipu: rename mach/ipu.h to
- include/linux/dma/ipu-dma.h
+Date: Mon, 17 Sep 2012 13:34:46 +0800
+Subject: [PATCH 17/34] usb: ehci-mxc: remove unneeded mach/hardware.h inclusion
 In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347860103-4141-15-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347860103-4141-18-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The header ipu.h really belongs to dma subsystem rather than imx
-platform.  Rename it to ipu-dma.h and put it into include/linux/dma/.
+The inclusion of mach/hardware.h is not used by the driver at all.
+Remove it.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: linux-media at vger.kernel.org
-Cc: linux-fbdev at vger.kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
 ---
- drivers/dma/ipu/ipu_idmac.c                        |    3 +--
- drivers/dma/ipu/ipu_irq.c                          |    3 +--
- drivers/media/video/mx3_camera.c                   |    2 +-
- drivers/video/mx3fb.c                              |    2 +-
- .../mach/ipu.h => include/linux/dma/ipu-dma.h      |    6 +++---
- 5 files changed, 7 insertions(+), 9 deletions(-)
- rename arch/arm/mach-imx/include/mach/ipu.h => include/linux/dma/ipu-dma.h (97%)
+ drivers/usb/host/ehci-mxc.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index c7573e5..6585537 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -22,8 +22,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
--
--#include <mach/ipu.h>
-+#include <linux/dma/ipu-dma.h>
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index a6e2ea4..e5e9856 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -24,7 +24,6 @@
+ #include <linux/usb/ulpi.h>
+ #include <linux/slab.h>
  
- #include "../dmaengine.h"
- #include "ipu_intern.h"
-diff --git a/drivers/dma/ipu/ipu_irq.c b/drivers/dma/ipu/ipu_irq.c
-index fa95bcc..a5ee37d 100644
---- a/drivers/dma/ipu/ipu_irq.c
-+++ b/drivers/dma/ipu/ipu_irq.c
-@@ -15,8 +15,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/module.h>
--
--#include <mach/ipu.h>
-+#include <linux/dma/ipu-dma.h>
+-#include <mach/hardware.h>
+ #include <linux/platform_data/usb-ehci-mxc.h>
  
- #include "ipu_intern.h"
- 
-diff --git a/drivers/media/video/mx3_camera.c b/drivers/media/video/mx3_camera.c
-index 1481b0d..892cba5 100644
---- a/drivers/media/video/mx3_camera.c
-+++ b/drivers/media/video/mx3_camera.c
-@@ -17,6 +17,7 @@
- #include <linux/vmalloc.h>
- #include <linux/interrupt.h>
- #include <linux/sched.h>
-+#include <linux/dma/ipu-dma.h>
- 
- #include <media/v4l2-common.h>
- #include <media/v4l2-dev.h>
-@@ -24,7 +25,6 @@
- #include <media/soc_camera.h>
- #include <media/soc_mediabus.h>
- 
--#include <mach/ipu.h>
- #include <linux/platform_data/camera-mx3.h>
- #include <linux/platform_data/dma-imx.h>
- 
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index d738108..3b63ad8 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -26,10 +26,10 @@
- #include <linux/console.h>
- #include <linux/clk.h>
- #include <linux/mutex.h>
-+#include <linux/dma/ipu-dma.h>
- 
- #include <linux/platform_data/dma-imx.h>
- #include <mach/hardware.h>
--#include <mach/ipu.h>
- #include <linux/platform_data/video-mx3fb.h>
- 
- #include <asm/io.h>
-diff --git a/arch/arm/mach-imx/include/mach/ipu.h b/include/linux/dma/ipu-dma.h
-similarity index 97%
-rename from arch/arm/mach-imx/include/mach/ipu.h
-rename to include/linux/dma/ipu-dma.h
-index 539e559..1803111 100644
---- a/arch/arm/mach-imx/include/mach/ipu.h
-+++ b/include/linux/dma/ipu-dma.h
-@@ -9,8 +9,8 @@
-  * published by the Free Software Foundation.
-  */
- 
--#ifndef _IPU_H_
--#define _IPU_H_
-+#ifndef __LINUX_DMA_IPU_DMA_H
-+#define __LINUX_DMA_IPU_DMA_H
- 
- #include <linux/types.h>
- #include <linux/dmaengine.h>
-@@ -174,4 +174,4 @@ struct idmac_channel {
- #define to_tx_desc(tx) container_of(tx, struct idmac_tx_desc, txd)
- #define to_idmac_chan(c) container_of(c, struct idmac_channel, dma_chan)
- 
--#endif
-+#endif /* __LINUX_DMA_IPU_DMA_H */
+ #include <asm/mach-types.h>
 -- 
 1.7.9.5
