@@ -1,33 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 15:26:36 -0700
-Subject: [PATCH] mfd: Fix compile for twl-core.c by removing
- cpu_is_omap usage
-In-Reply-To: <alpine.DEB.2.00.1209172222570.18885@utopia.booyaka.com>
-References: <20120917202943.GV4521@atomide.com>
- <alpine.DEB.2.00.1209172207480.16117@utopia.booyaka.com>
- <20120917221406.GG11762@atomide.com>
- <alpine.DEB.2.00.1209172222570.18885@utopia.booyaka.com>
-Message-ID: <20120917222635.GI11762@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 17 Sep 2012 18:31:21 -0400 (EDT)
+Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for clean
+ and flush range
+In-Reply-To: <5057881A.9020604@gmail.com>
+References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
+ <1347890398-22088-1-git-send-email-robherring2@gmail.com>
+ <20120917194733.GQ12245@n2100.arm.linux.org.uk> <5057881A.9020604@gmail.com>
+Message-ID: <alpine.LFD.2.02.1209171827260.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120917 15:25]:
-> On Mon, 17 Sep 2012, Tony Lindgren wrote:
+On Mon, 17 Sep 2012, Rob Herring wrote:
+
+> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
+> > Plus, because there's little justification behind this patch (apart
+> > from a vague reference to the speed of IO accesses) I'm going to say
+> > NAK to this until further information is forthcoming justifying this
+> > change.
+> > 
 > 
-> > We need to queue this ASAP and before other patches to fix the
-> > build breakage in linux next. Then you can merge in that commit
-> > too, does that work for you?
-> 
-> That's fine, we'll just need a stable commit then that the CCF patches can 
-> be based on.
+> 30% faster network transmit rate with pktgen on highbank.
 
-OK cool, will let you know that once we hear from Samuel. Care to
-ack the clock related changes?
+Please always include your benchmark results in the patch description. 
+That is highly valuable information when looking at commit logs.
 
-There's pm24xx.c at least using osc_ck naming, so I added a new
-alias to keep it generic for the driver instead of using omap
-specific names.
 
-Regards,
-
-Tony 
+Nicolas
