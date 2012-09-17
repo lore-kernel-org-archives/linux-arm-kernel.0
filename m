@@ -1,24 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Sep 2012 20:08:49 -0700
-Subject: [GIT PULL 6/7] omap makefile and sparse cleanup for v3.7 merge
- window
-In-Reply-To: <E1TCLkx-0006iv-9h@merlin.infradead.org>
-References: <pull-1347590052-683636> <E1TCLkx-0006iv-9h@merlin.infradead.org>
-Message-ID: <20120917030849.GB13322@quad.lixom.net>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 17 Sep 2012 08:36:06 +0530
+Subject: [PATCH 1/8] DMA: PL330: use prefix in reg names to build under x86
+In-Reply-To: <1347639843-32119-2-git-send-email-dciminaghi@mail.gnudd.com>
+References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
+ <1347639843-32119-2-git-send-email-dciminaghi@mail.gnudd.com>
+Message-ID: <1347851166.1943.122.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 07:34:12PM -0700, Tony Lindgren wrote:
-> The following changes since commit 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
+On Fri, 2012-09-14 at 18:23 +0200, Davide Ciminaghi wrote:
+> From: Alessandro Rubini <rubini@gnudd.com>
 > 
->   ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
+> This driver would not compile if ARM_AMBA is selected under x86,
+> because "CS" and "DS" are already defined there.  But AMBA
+> is used in the x86 world by a PCI-to-AMBA bridge, to be submitted.
 > 
-> are available in the git repository at:
+> The patch adds the "PL330_" prefix to all register and bit fields,
+> so it can be built by randomconfig after ARM_AMBA appears within x86.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-makefile-sparse-for-v3.7
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> ---
+Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
 
-
-Pulled into next/cleanup. Thanks!
-
-
--Olof
+-- 
+~Vinod
