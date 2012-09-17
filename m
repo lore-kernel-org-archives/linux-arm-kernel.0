@@ -1,82 +1,88 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 17 Sep 2012 18:10:29 +0800
-Subject: [PATCH v6 0/4] add syscon driver based on regmap for general
- registers access
-In-Reply-To: <20120905055410.GZ2362@S2101-09.ap.freescale.net>
-References: <1346813836-28736-1-git-send-email-b29396@freescale.com>
- <20120905055410.GZ2362@S2101-09.ap.freescale.net>
-Message-ID: <20120917101028.GA13226@shlinux2.ap.freescale.net>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Mon, 17 Sep 2012 19:37:19 +0900
+Subject: [PATCH V4] ARM: EXYNOS5: Add bus clock and set parent clock for
+ FIMD
+In-Reply-To: <002001cd94bc$05177bc0$0f467340$%han@samsung.com>
+References: <1347892995-17924-1-git-send-email-l.krishna@samsung.com>
+ <002001cd94bc$05177bc0$0f467340$%han@samsung.com>
+Message-ID: <04f401cd94c0$6a13da10$3e3b8e30$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+Jingoo Han wrote:
+> 
+> On Monday, September 17, 2012 11:43 PM Leela Krishna Amudala wrote
+> >
+> > This patch adds the bus clock for FIMD and changes the device name for
+> lcd clock
+> > also sets mout_mpll_user as parent clock to fimd
+> >
+> > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> 
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> 
+In this case, since Leela addressed comments from you, seems it should be
+'Reviewed-by'?
 
-On Wed, Sep 05, 2012 at 01:54:12PM +0800, Shawn Guo wrote:
-> Hi Samuel,
+> It looks good.
 > 
-> The series needs to go via mfd or arm-soc tree as a whole.  In case
-> you want to take it through mfd tree, here is my ack.
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Otherwise, I can take it via arm-soc tree with your ack.
-> 
-Ping...
+> > ---
+> >  arch/arm/mach-exynos/clock-exynos5.c |   35
+++++++++++++++++++++++++----
+> -----
+> >  arch/arm/mach-exynos/clock-exynos5.h |   17 ++++++++++++++++
+> >  2 files changed, 42 insertions(+), 10 deletions(-)
+> >  create mode 100644 arch/arm/mach-exynos/clock-exynos5.h
 
-Regards
-Dong Aisheng
+[snip]
 
-> Regards,
-> Shawn
-> 
-> On Wed, Sep 05, 2012 at 10:57:12AM +0800, Dong Aisheng wrote:
-> > This patch series mainly adds an syscon driver which is used to access
-> > general system controller registers like FSL IOMUXC GPR and ANATOP,
-> > after that, we convert all the exist private access general registers code to use
-> > standard API from regmap to access registers.
-> > Finally we remove the old mfd anatop driver which is only for anatop register
-> > access.
-> > 
-> > The patch series is based on linus's tree 3.6-rc4 since commit 5b716ac.
-> > 
-> > ChangeLog v5->v6:
-> >  * put node after call syscon_node_to_regmap in anatop regulator driver
-> >  * using dev instead of &pdev->dev in syscon probe
-> > ChangeLog v4->v5:
-> >  * change syscon driver depends on OF
-> >  * do not call of_node_put in syscon_node_to_regmap
-> >  * renamed: include/linux/fsl/imx6q-iomuxc-gpr.h ->
-> > 	    include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > ChangeLog v3->v4:
-> > Only '[PATCH v4 1/7] mfd: add syscon driver based on regmap' is changed.
-> > 
-> > Dong Aisheng (4):
-> >   mfd: add syscon driver based on regmap
-> >   ARM: imx6q: add iomuxc gpr support into syscon
-> >   regulator: anatop-regulator: convert to use syscon to access anatop
-> >     register
-> >   mfd: anatop-mfd: remove anatop driver
-> > 
-> >  Documentation/devicetree/bindings/mfd/syscon.txt |   20 ++
-> >  arch/arm/boot/dts/imx6q.dtsi                     |    9 +-
-> >  arch/arm/mach-imx/Kconfig                        |    2 +-
-> >  arch/arm/mach-imx/mach-imx6q.c                   |   47 ++--
-> >  drivers/mfd/Kconfig                              |   12 +-
-> >  drivers/mfd/Makefile                             |    2 +-
-> >  drivers/mfd/anatop-mfd.c                         |  124 ---------
-> >  drivers/mfd/syscon.c                             |  176 ++++++++++++
-> >  drivers/regulator/Kconfig                        |    2 +-
-> >  drivers/regulator/anatop-regulator.c             |   31 ++-
-> >  include/linux/mfd/anatop.h                       |   40 ---
-> >  include/linux/mfd/syscon.h                       |   23 ++
-> >  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h      |  319 ++++++++++++++++++++++
-> >  13 files changed, 593 insertions(+), 214 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/syscon.txt
-> >  delete mode 100644 drivers/mfd/anatop-mfd.c
-> >  create mode 100644 drivers/mfd/syscon.c
-> >  delete mode 100644 include/linux/mfd/anatop.h
-> >  create mode 100644 include/linux/mfd/syscon.h
-> >  create mode 100644 include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > 
-> > 
-> 
+> >  	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
+> >  	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
+> > +	clk_set_parent(&exynos5_clk_sclk_fimd1.clk,
+> > +			&exynos5_clk_mout_mpll_user.clk);
+
+Well, do we _really_ need to set same parent clock for fimd1 here on all of
+exynos5? I don't think so.
+
+> >
+> >  	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
+> >  		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
+> > diff --git a/arch/arm/mach-exynos/clock-exynos5.h b/arch/arm/mach-
+> exynos/clock-exynos5.h
+> > new file mode 100644
+> > index 0000000..6f78f5d
+> > --- /dev/null
+> > +++ b/arch/arm/mach-exynos/clock-exynos5.h
+> > @@ -0,0 +1,17 @@
+> > +/*
+> > + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> > + *		http://www.samsung.com
+> > + *
+> > + * Header file for exynos5 clock support
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +#ifndef __ASM_ARCH_EXYNOS5_CLOCK_H
+> > +#define __ASM_ARCH_EXYNOS5_CLOCK_H __FILE__
+> > +
+> > +extern struct clksrc_clk exynos5_clk_sclk_fimd1;
+> > +
+
+I don't have any idea why we need this.
+
+Note, the 'clock-exynos4.h' is for supporting common exynos4 and specific
+exynos4210 and exynos4x12.
+
+[snip]
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
