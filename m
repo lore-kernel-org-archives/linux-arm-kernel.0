@@ -1,43 +1,102 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 17 Sep 2012 19:20:05 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-Message-ID: <20120917192005.ab08c24f98010107fa855edf@canb.auug.org.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 17 Sep 2012 11:20:32 +0200
+Subject: [PATCH v3] input: qt1070: Add device tree support
+In-Reply-To: <1347358459-11598-1-git-send-email-voice.shen@atmel.com>
+References: <1347358459-11598-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <5056EB60.8080100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 09/11/2012 12:14 PM, Bo Shen :
+> Add qt1070 device tree support
+> Using device node to parse irq
+> 
+> Test this on at91sam9x5ek board
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+> change since v2
+>   Using device node to parse irq,
+>   Remove gpio relative stuff
+> 
+> change since v1
+>   Add gpio relative stuff, gpio_is_valid, gpio_request
+> ---
+>  .../devicetree/bindings/input/atmel-qt1070.txt     |   16 ++++++++++++++++
+>  drivers/input/keyboard/qt1070.c                    |    9 +++++++++
+>  2 files changed, 25 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/atmel-qt1070.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/atmel-qt1070.txt b/Documentation/devicetree/bindings/input/atmel-qt1070.txt
+> new file mode 100644
+> index 0000000..e1fc09e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/atmel-qt1070.txt
+> @@ -0,0 +1,16 @@
+> +Atmel qt1070 keyboard interface
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/staging/tidspbridge/core/wdt.c between commit c37a1747acbf
-("staging: tidspbridge: Prepare for irqs.h removal") from the  tree and
-commit ec2c0825ca31 ("ARM: OMAP2+: Remove hardcoded IRQs and enable
-SPARSE_IRQ") from the arm-soc tree.
+Nitpicking: there is usually a "*" at the beginning to give it a
+title-ish look ;-)
 
-I fixed it up (I guess - see below) and can carry the fix as necessary
-(no action is required).
+Please tell that
 
+> +
+> +Required Properties:
+> +- compatible: Should be "atmel,qt1070"
+> +- reg: I2C slave address
+> +- interrupt-parent: Depends on SoC
+> +- interrupts: The interrupt pin number to the cpu, and trigger mode.
+> +
+> +Example:
+> +
+> +	qt1070 at 1b {
+
+I think that you need to replace by a generic name for the node name:
+
+qt1070: keyboard at 1b {
+	compatible = "atmel,qt1070";
+	[..]
+};
+
+I found "keyboard" to be the most appropriate in the ePAPR.
+
+
+> +		compatible = "atmel,qt1070";
+> +		reg = <0x1b>;
+> +		interrupt-parent = <&pioA>;
+> +		interrupts = <7 0x0>;
+> +	};
+> diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
+> index ca68f29..60457dc 100644
+> --- a/drivers/input/keyboard/qt1070.c
+> +++ b/drivers/input/keyboard/qt1070.c
+> @@ -249,10 +249,19 @@ static const struct i2c_device_id qt1070_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, qt1070_id);
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id atmel_qt1070_of_match[] = {
+> +	{ .compatible = "atmel,qt1070" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, atmel_qt1070_of_match);
+> +#endif
+> +
+>  static struct i2c_driver qt1070_driver = {
+>  	.driver	= {
+>  		.name	= "qt1070",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(atmel_qt1070_of_match),
+>  	},
+>  	.id_table	= qt1070_id,
+>  	.probe		= qt1070_probe,
+> 
+
+Otherwise, looks good. So, if you agree on my comments and for next
+revision, you can add my:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Bye,
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/staging/tidspbridge/core/wdt.c
-index 1ed1474,453ef74..0000000
---- a/drivers/staging/tidspbridge/core/wdt.c
-+++ b/drivers/staging/tidspbridge/core/wdt.c
-@@@ -25,8 -25,7 +25,8 @@@
-  #include <dspbridge/host_os.h>
-  
-  
- +#define OMAP34XX_WDT3_BASE 		(0x49000000 + 0x30000)
-- #define INT_34XX_WDT3_IRQ 		36
-+ #define INT_34XX_WDT3_IRQ 		(36 + NR_IRQS)
-  
-  static struct dsp_wdt_setting dsp_wdt;
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120917/5991381c/attachment.sig>
+Nicolas Ferre
