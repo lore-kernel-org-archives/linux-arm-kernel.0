@@ -1,57 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 Sep 2012 19:39:18 +0900
-Subject: [PATCH 0/3] ARM: dts: Exynos4 dts reorganization
-References: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
- <CAJuYYwRWqvzw_MdLa7NfE9ppbPiz8=HTXUW+-mXedvu2GPQWBg@mail.gmail.com>
-Message-ID: <04f501cd94c0$b0a61b00$11f25100$%kim@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 17 Sep 2012 12:48:08 +0200
+Subject: [PATCH 0/7] s5p-fimc/mipi-csis drivers cleanup
+Message-ID: <1347878888-30001-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Thomas Abraham wrote:
-> >
-> > On 3 September 2012 18:04, Tomasz Figa <t.figa@samsung.com> wrote:
-> > > This patch series prepares existing Exynos4210 DT infrastructure to be
-> > > further extended for new SoCs from Exynos4 line and new boards.
-> > >
-> > > Tomasz Figa (3):
-> > >   ARM: dts: Move parts common to Exynos4 from Exynos4210.dtsi to
-> > >     Exynos4.dtsi
-> > >   ARM: EXYNOS: exynos4-dt: Use exynos4 prefix instead of exynos4210
-> > >   ARM: dts: exynos4: Assume status of all optional nodes as disabled
-> > >
-> > >  arch/arm/boot/dts/exynos4.dtsi            | 232
-> > ++++++++++++++++++++++++++++++
-> > >  arch/arm/boot/dts/exynos4210-origen.dts   |  58 +-------
-> > >  arch/arm/boot/dts/exynos4210-smdkv310.dts |  52 +------
-> > >  arch/arm/boot/dts/exynos4210.dtsi         | 181
-+----------------------
-> > >  arch/arm/mach-exynos/mach-exynos4-dt.c    |  18 +--
-> > >  5 files changed, 248 insertions(+), 293 deletions(-)
-> > >  create mode 100644 arch/arm/boot/dts/exynos4.dtsi
-> > >
-> >
-> > Thanks, we can build Exynos4412 device tree support on top of this
-> series.
-> >
-> > Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
-> 
-> Thomas, thanks for your ack on this series and I'm OK on this series.
-> 
-> But you know, Donjin Kim submitted almost same patch except gpio stuff one
-> month before this series but needs to update something though. So would be
-> nice if either Tomasz or Dongjin could ack on the other patch?
-> 
-Hmm...OK, I couldn't get any response from anyone so I will pick up this
-patches. If any objection, please let me know.
+This series is a cleanup of s5p-fimc/mipi-csis drivers and changes required
+for adding device tree support. It depends on Arnd's platform data headers
+cleanup patch:
+"ARM: samsung: move platform_data definitions"
+git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commit;h=d7243bd51b783ffd2
 
-Of course, if any regarding patches, need to work against on them.
+Sylwester Nawrocki (7):
+  ARM: samsung: Remove unused fields from FIMC and CSIS platform data
+  ARM: samsung: Change __s5p_mipi_phy_control() function signature
+  ARM: EXYNOS: Change MIPI-CSIS device regulator supply names
+  s5p-csis: Replace phy_enable platform data callback with direct call
+  s5p-fimc: Remove unused platform data structure fields
+  s5p-csis: Allow to specify pixel clock's source through platform data
+  s5p-csis: Change regulator supply names
 
-Thanks.
+ arch/arm/mach-exynos/mach-nuri.c           |  7 ++-----
+ arch/arm/mach-exynos/mach-origen.c         |  4 ++--
+ arch/arm/mach-exynos/mach-universal_c210.c |  7 ++-----
+ arch/arm/plat-samsung/setup-mipiphy.c      | 20 +++++++-------------
+ drivers/media/video/s5p-fimc/mipi-csis.c   | 23 +++++++++++++----------
+ include/linux/platform_data/mipi-csis.h    | 30 ++++++++++++------------------
+ include/media/s5p_fimc.h                   |  2 --
+ 7 files changed, 38 insertions(+), 55 deletions(-)
 
-Best regards,
-Kgene.
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+1.7.11.3
