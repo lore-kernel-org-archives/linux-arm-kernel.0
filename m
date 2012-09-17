@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Sep 2012 13:34:45 +0800
-Subject: [PATCH 16/34] ASoC: imx-ssi: remove unneeded mach/hardware.h inclusion
+Date: Mon, 17 Sep 2012 13:34:47 +0800
+Subject: [PATCH 18/34] video: mx3fb: remove unneeded mach/hardware.h inclusion
 In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347860103-4141-17-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347860103-4141-19-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,23 +11,23 @@ The inclusion of mach/hardware.h is not used by the driver at all.
 Remove it.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: alsa-devel at alsa-project.org
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 ---
- sound/soc/fsl/imx-ssi.c |    1 -
+ drivers/video/mx3fb.c |    1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-index e6a17ba..1a28f15 100644
---- a/sound/soc/fsl/imx-ssi.c
-+++ b/sound/soc/fsl/imx-ssi.c
-@@ -48,7 +48,6 @@
- #include <sound/soc.h>
+diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+index 3b63ad8..fc50320 100644
+--- a/drivers/video/mx3fb.c
++++ b/drivers/video/mx3fb.c
+@@ -29,7 +29,6 @@
+ #include <linux/dma/ipu-dma.h>
  
- #include <linux/platform_data/asoc-imx-ssi.h>
+ #include <linux/platform_data/dma-imx.h>
 -#include <mach/hardware.h>
+ #include <linux/platform_data/video-mx3fb.h>
  
- #include "imx-ssi.h"
- 
+ #include <asm/io.h>
 -- 
 1.7.9.5
