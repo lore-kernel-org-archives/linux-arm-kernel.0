@@ -1,38 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Sep 2012 11:38:13 +0000
-Subject: [PATCH 00/34] i.MX multi-platform support
-In-Reply-To: <20120917075138.GN6180@pengutronix.de>
+Date: Mon, 17 Sep 2012 11:44:18 +0000
+Subject: [PATCH 34/34] ARM: imx: enable multi-platform build
+In-Reply-To: <1347860103-4141-35-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <20120917075138.GN6180@pengutronix.de>
-Message-ID: <201209171138.13327.arnd@arndb.de>
+ <1347860103-4141-35-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201209171144.18507.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 September 2012, Sascha Hauer wrote:
-> On Mon, Sep 17, 2012 at 01:34:29PM +0800, Shawn Guo wrote:
-> > The series enables multi-platform support for imx.  Since the required
-> > frameworks (clk, pwm) and spare_irq have already been adopted on imx,
-> > the series is all about cleaning up mach/* headers.  Along with the
-> > changes, arch/arm/plat-mxc gets merged into arch/arm/mach-imx.
-> > 
-> > It's based on a bunch of branches (works from others), Rob's initial
-> > multi-platform series, Arnd's platform-data and smp_ops (Marc's) and
-> > imx 3.7 material (Sascha and myself).
-> > 
-> > It's available on branch below.
-> > 
-> >   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform
-> > 
-> > It's been tested on imx5 and imx6, and only compile-tested on imx2 and
-> > imx3, so testing on imx2/3 are appreciated.
-> 
-> Great work! This really pushes the i.MX architecture one step closer to
-> a clean code base.
+On Monday 17 September 2012, Shawn Guo wrote:
+> -menu "Freescale MXC Implementations"
+> -
+> -choice
+> -       prompt "Freescale CPU family:"
+> -       default ARCH_IMX_V6_V7
+> -
+>  config ARCH_IMX_V4_V5
+> -       bool "i.MX1, i.MX21, i.MX25, i.MX27"
+> -       select AUTO_ZRELADDR if !ZBOOT_ROM
+> -       select ARM_PATCH_PHYS_VIRT
+> -       help
+> -         This enables support for systems based on the Freescale i.MX ARMv4
+> -         and ARMv5 SoCs
+> +       def_bool y
+> +       depends on ARCH_MULTI_V4_V5
+>  
 
-I agree, this series is wonderful, I thought it would take much longer
-to get this far.
+This is good, but I'd also suggest using specific dependencies on the
+architecture level (V4, V4T, V5, V6, V6K, V7). For the other platforms
+in the Rob's multiplatform series, this is not an issue because each
+of them only works on exactly one architecture level.
 
-Two small comments on the last two patches from me, but overall I really
-love it.
+For i.MX and other platforms that us a bunch of different CPU cores,
+I think it's helpful if you can limit the configuration to a specific
+architecture level, because that can result in a slightly more
+efficient kernel binary. E.g. when you want to build a THUMB2 based
+kernel, you can start by enabling only ARMv7 CPUs, and then select all
+the board configurations without having to know which ones are actually
+V6 or V7.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Doing this will require another update to the defconfig file, in addition
+to the one mentioned by Sascha.
+
+	Arnd
