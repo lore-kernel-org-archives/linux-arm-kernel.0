@@ -1,40 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 13:32:33 -0700
-Subject: linux-next: build failure after merge of the final tree
- (arm-soc tree related)
-In-Reply-To: <20120917172208.GN4521@atomide.com>
-References: <20120917212615.91bc134d237dcd5968f9f549@canb.auug.org.au>
- <201209171429.31794.arnd@arndb.de>
- <20120917172208.GN4521@atomide.com>
-Message-ID: <20120917203233.GW4521@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Sep 2012 20:42:11 +0000
+Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <20120915001431.GB12445@n2100.arm.linux.org.uk>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
+ <20120915001431.GB12445@n2100.arm.linux.org.uk>
+Message-ID: <201209172042.11860.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120917 10:25]:
-> * Arnd Bergmann <arnd@arndb.de> [120917 07:30]:
-> > 
-> > If it requires plat/cpu.h, it should actually be limited to CONFIG_ARCH_OMAP,
-> > otherwise we will get the same problem on non-OMAP ARM builds. From what
-> > I can tell, the problem is the clocks_init function, which is the only
-> > part that is not completely generic.
-> > 
-> > The trivial workaround would be to enclose the "#include <plat/cpu.h>"
-> > statement in #ifdef CONFIG_ARCH_OMAP, but with the common clock code
-> > in place, we should probably be able to come up with a better solution
-> > that works independent of the omap platform.
+On Saturday 15 September 2012, Russell King - ARM Linux wrote:
 > 
-> There are patches coming to remove cpu_is_omap usage from drivers,
-> and until then we should just ifdef the plat/cpu.h include.
+> On Fri, Sep 14, 2012 at 05:41:56PM -0500, Jon Hunter wrote:
+> > 3. Supporting legacy devices not using DMA Engine
+> > 
+> >    These devices present a problem, as there may not be a uniform way to easily
+> >    support them with regard to device tree. Ideally, these should be migrated
+> >    to DMA engine. However, if this is not possible, then they should still be
+> >    able to use this binding, the only constaint imposed by this implementation
+> >    is that when requesting a DMA channel via of_dma_request_slave_channel(), it
+> >    will return a type of dma_chan.
 > 
-> It is possible to use these kind of external PM chips with other
-> SoCs, they're just not omap related and that's why there drivers
-> have not had the Kconfig dependency. I'll post a patch for that.
+> As far as devices not using DMA engine, the answer is we don't support
+> their specification in the DT model.  Note that the legacy OMAP DMA
+> API is scheduled for removal next year, so it's not going to be around
+> that much longer.
 
-Looks like we can just remove the cpu_is_omap code with clock
-aliases, patch posted with Subject:
+There are a few platforms using the ISA DMA API (rpc, h720x, shark, footbridge),
+and I agree that they are unlikely to see OF support, although if they did, it
+wouldn't be unreasonable to encode their DMA channels using the same binding.
 
-[PATCH] mfd: Fix compile for twl-core.c by removing cpu_is_omap usage
+The other ones that are currently around with their own DMA implementation are
 
-Regards,
+bcmring --> platform is going away
+samsung --> gradually getting moved to dmaengine, already has its own binding
+            that needs to be replaced with this one, so best do it at the same
+            time.
+tegra   --> old dma code gone in 3.7
+pxa/mmp --> dmaengine implementation being worked on, should wait for that.
+msm     --> dma implementation only used by two drivers (serial and mmc). 
 
-Tony
+Outside of arch/arm, at least sh, cris, unicore32 and blackfin have their
+own dma APIs based on the ISA interfaces. I don't currently see any of them
+moving towards DT, but it's definitely possible. 
+
+Among the above MSM seems to be the most likely candidate to use the binding
+before moving to DT. The msm_sdcc driver is (like much of the msm platform
+code) lagging far behind the internel version that qualcomm have, and the
+device tree binding they are using is incompatible with the common MMC
+binding (and of course the DMA binding here) as well. For getting MSM up
+to speed compared with the other platforms, they have to use proper DT
+bindings as well as proper DMA engine support. Between those two, I'd prefer
+fixing the DT binding first, in order to limit the amount of changes that
+have to be done to external device tree files.
+
+	Arnd
