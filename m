@@ -1,41 +1,72 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Mon, 17 Sep 2012 07:43:11 -0500
-Subject: [PATCH v7 0/11] KGDB/KDB FIQ (NMI) debugger
-In-Reply-To: <20120917113750.GA28838@kroah.com>
-References: <20120913150133.GA16238@lizard> <20120917113750.GA28838@kroah.com>
-Message-ID: <50571ADF.3000406@windriver.com>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Mon, 17 Sep 2012 18:24:39 +0530
+Subject: [PATCH v6 0/5] usb: phy: samsung: Introducing usb phy driver for
+ samsung SoCs
+Message-ID: <1347886484-16064-1-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2012 06:37 AM, Greg Kroah-Hartman wrote:
-> On Thu, Sep 13, 2012 at 08:01:33AM -0700, Anton Vorontsov wrote:
->> Hi all,
->>
->> Here comes the lucky v7:
->>
->> - Per Alan Cox's suggestion added hangup method and removed a small
->>   leftover;
->> - Per Colin Cross' suggestion moved IRQ quiescing logic into
->>   poll_get_char routine. IIUC, Alan is less unhappy about it.  As a
->>   result, clear_irq() callback dropped.
->>
->> These patches can be found in the following repo (based on tty-next):
->>
->> 	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
->>
->> Old changelogs and rationale for these patches can be found here:
->>
->> 	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
->> 	v6: http://lkml.org/lkml/2012/9/10/2
-> I have no objection to these patches, and as they are based on my
-> tty-next tree, should I be the ones accepting them?  If so, then I need
-> a bunch of acks from others involved in the kdb/kgdb code before I can
-> do so.
->
-> To make it easier, can I just take the tty driver patches now?  Will
-> that break anything?
+Changes from v5:
+Moved clk_get() to driver's probe function. Now reference clock frequency
+selection value is stored in samsung_usbphy structure for later use. Used
+IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
 
-I have not made my way through the entire series yet, so I am not sure if you need the kdb header changes or not, but so far it looks like the tty pieces are separate.  If you add your ack Greg, I'll take the whole series and merge it into kgdb-next, or after I finish the review we could do it the other way around.
+Changes from v4:
+Moved header file contents to driver's source file
+Removed unnecessary print message from driver's probe function
+Dropped the Free Software Foundation address from the header
+Changed the platform data code to use __initdata
 
-Cheers,
-Jason.
+Changes from v3:
+Replaced susbsys_initcall()/module_exit() by module_platform_driver().
+Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
+is registered
+Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
+
+Changes from v2:
+Changed the driver filenames to samsung-usbphy
+Changed 's3c' to 'samsung' for platform device as well as platform data
+Moved platform data structure to a separate file
+Rectified coding style related errors
+
+Changes from v1:
+Rebased patches to latest usb-next branch
+Changed the name 'sec_usbphy' to 'samsung_usbphy'
+
+This patch set introduces a phy driver for samsung SoCs. It uses the existing
+transceiver infrastructure to provide phy control functions. Use of this driver
+can be extended for usb host phy as well. Over the period of time all the phy
+related code for most of the samsung SoCs can be integrated here.
+Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
+when they start supporting this phy driver. 
+This driver is tested with smdk6410 and Exynos4210(with DT).
+
+Praveen Paneri (5):
+  usb: phy: samsung: Introducing usb phy driver for hsotg
+  usb: s3c-hsotg: Adding phy driver support
+  ARM: S3C64XX: Removing old phy setup code
+  ARM: S3C64XX: Enabling samsung-usbphy driver
+  ARM: Exynos4210: Enabling samsung-usbphy driver
+
+ .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |    5 +
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |    8 +
+ arch/arm/mach-exynos/setup-usb-phy.c               |   13 +
+ arch/arm/mach-s3c64xx/include/mach/map.h           |    2 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |   10 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |   11 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   10 +-
+ arch/arm/mach-s3c64xx/setup-usb-phy.c              |   79 +----
+ arch/arm/plat-samsung/devs.c                       |   28 ++
+ arch/arm/plat-samsung/include/plat/devs.h          |    1 +
+ arch/arm/plat-samsung/include/plat/usb-phy.h       |    1 +
+ drivers/usb/gadget/s3c-hsotg.c                     |   37 ++-
+ drivers/usb/phy/Kconfig                            |    8 +
+ drivers/usb/phy/Makefile                           |    1 +
+ drivers/usb/phy/samsung-usbphy.c                   |  360 ++++++++++++++++++++
+ include/linux/platform_data/samsung-usbphy.h       |   27 ++
+ 18 files changed, 520 insertions(+), 91 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+ create mode 100644 drivers/usb/phy/samsung-usbphy.c
+ create mode 100644 include/linux/platform_data/samsung-usbphy.h
