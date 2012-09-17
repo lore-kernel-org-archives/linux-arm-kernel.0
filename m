@@ -1,85 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 16 Sep 2012 22:13:07 -0500
-Subject: [PATCH] ARM: highbank: call highbank_pm_init in .init_late hook
-In-Reply-To: <1347850216-1979-1-git-send-email-shawn.guo@linaro.org>
-References: <1347850216-1979-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <50569543.1030300@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 16 Sep 2012 20:16:39 -0700
+Subject: [GIT PULL 7/7] am33xx hwmod data for v3.7 merge window
+In-Reply-To: <E1TCLVa-0003Ea-Ej@merlin.infradead.org>
+References: <pull-1347589125-283636> <E1TCLVa-0003Ea-Ej@merlin.infradead.org>
+Message-ID: <20120917031639.GC13322@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2012 09:50 PM, Shawn Guo wrote:
-> Being a module_init call, highbank_pm_init will cause problem with
-> multi-platform build running on other platforms.  Call it in the
-> .init_late hook instead.
-
-I don't think this needs to be init_late that I recall, so
-highbank_pm_init can just be called from highbank_init. I can update it.
-
-I've scanned all the other platforms converted and it looks like I'm the
-only problem. :)
-
-Rob
-
+On Thu, Sep 13, 2012 at 07:18:45PM -0700, Tony Lindgren wrote:
+> The following changes since commit 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-highbank/core.h     |    5 +++++
->  arch/arm/mach-highbank/highbank.c |    6 ++++++
->  arch/arm/mach-highbank/pm.c       |    4 +---
->  3 files changed, 12 insertions(+), 3 deletions(-)
+>   ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
 > 
-> diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-> index 598ee78..c2e2c46 100644
-> --- a/arch/arm/mach-highbank/core.h
-> +++ b/arch/arm/mach-highbank/core.h
-> @@ -10,5 +10,10 @@ static inline void highbank_lluart_map_io(void) {}
->  
->  extern void highbank_smc1(int fn, int arg);
->  extern void highbank_cpu_die(unsigned int cpu);
-> +#ifdef CONFIG_PM
-> +extern void highbank_pm_init(void);
-> +#else
-> +static inline void highbank_pm_init(void) {}
-> +#endif
->  
->  extern struct smp_operations highbank_smp_ops;
-> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-> index 709bd72..8b1c5ba 100644
-> --- a/arch/arm/mach-highbank/highbank.c
-> +++ b/arch/arm/mach-highbank/highbank.c
-> @@ -156,6 +156,11 @@ static void __init highbank_init(void)
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
->  
-> +static void __init highbank_init_late(void)
-> +{
-> +	highbank_pm_init();
-> +}
-> +
->  static const char *highbank_match[] __initconst = {
->  	"calxeda,highbank",
->  	NULL,
-> @@ -168,6 +173,7 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
->  	.timer		= &highbank_timer,
->  	.handle_irq	= gic_handle_irq,
->  	.init_machine	= highbank_init,
-> +	.init_late	= highbank_init_late,
->  	.dt_compat	= highbank_match,
->  	.restart	= highbank_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-> index 33b3beb..de866f2 100644
-> --- a/arch/arm/mach-highbank/pm.c
-> +++ b/arch/arm/mach-highbank/pm.c
-> @@ -47,9 +47,7 @@ static const struct platform_suspend_ops highbank_pm_ops = {
->  	.valid = suspend_valid_only_mem,
->  };
->  
-> -static int __init highbank_pm_init(void)
-> +void __init highbank_pm_init(void)
->  {
->  	suspend_set_ops(&highbank_pm_ops);
-> -	return 0;
->  }
-> -module_init(highbank_pm_init);
+> are available in the git repository at:
 > 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap 
+> 
+> for you to fetch changes up to 11964f53eb4d9ce59a058be9999d9cfcb1ced878:
+> 
+>   Merge tag 'omap-devel-a2-for-3.7' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-am33xx (2012-09-12 21:29:07 -0700)
+
+Looks like you did the request-pull before the tag had propagated out to the
+public git here, since it's not in the message above. Looking at your tree, it
+seems to be at tags/omap-devel-am33xx-for-v3.7, so I pulled that into next/soc.
+
+
+-Olof
