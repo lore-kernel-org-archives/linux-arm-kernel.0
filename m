@@ -1,33 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Sep 2012 11:32:52 +0000
-Subject: [PATCH 33/34] ARM: imx: remove header file mach/irqs.h
-In-Reply-To: <1347860103-4141-34-git-send-email-shawn.guo@linaro.org>
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <1347860103-4141-34-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201209171132.52380.arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 17 Sep 2012 04:34:23 -0700
+Subject: [PATCH v2 1/2] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <1347880974-13615-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1347880974-13615-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20120917113423.GA28759@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 September 2012, Shawn Guo wrote:
-> @@ -269,6 +268,8 @@ static int imx_pcm_fiq_new(struct snd_soc_pcm_runtime *rtd)
->         return 0;
->  }
->  
-> +extern int mxc_set_irq_fiq(unsigned int irq, unsigned int type);
-> +
->  static void imx_pcm_fiq_free(struct snd_pcm *pcm)
->  {
->         mxc_set_irq_fiq(ssi_irq, 0);
+On Mon, Sep 17, 2012 at 01:22:53PM +0200, Thierry Reding wrote:
+> Remove the __init annotations in order to keep pci_fixup_irqs() around
+> after init (e.g. for hotplug). This requires the same change for the
+> implementation of pcibios_update_irq() on all architectures. While at
+> it, all __devinit annotations are removed as well, since they will be
+> useless now that HOTPLUG is always on.
+> 
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+> Changes in v2:
+> - remove __init and __devinit annotations altogether
 
-Hmm, this is quite hacky, I can see why you left it all the way
-to the end of the otherwise excellent series ;-)
-
-We already have some fiq specific stuff in the
-include/linux/platform_data/asoc-imx-ssi.h header file,
-so I think it's best to put this declaration there, too.
-
-If we want to eventually clean up the fiq usage in this driver,
-I think we should extend the DT binding for the interrupt controller
-to describe the fiq correctly so it can all be done transparently.
-
-	Arnd
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
