@@ -1,28 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 17 Sep 2012 18:31:21 -0400 (EDT)
-Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for clean
- and flush range
-In-Reply-To: <5057881A.9020604@gmail.com>
-References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
- <1347890398-22088-1-git-send-email-robherring2@gmail.com>
- <20120917194733.GQ12245@n2100.arm.linux.org.uk> <5057881A.9020604@gmail.com>
-Message-ID: <alpine.LFD.2.02.1209171827260.28681@xanadu.home>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 17 Sep 2012 15:35:59 -0700
+Subject: [PATCH v3 4/4] ARM: dts: AM33XX: Add lis331dlh device tree data
+ to am335x-evm
+In-Reply-To: <1347866602-2088-5-git-send-email-anilkumar@ti.com>
+References: <1347866602-2088-1-git-send-email-anilkumar@ti.com>
+ <1347866602-2088-5-git-send-email-anilkumar@ti.com>
+Message-ID: <20120917153559.e07ca263.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Sep 2012, Rob Herring wrote:
+On Mon, 17 Sep 2012 12:53:22 +0530
+AnilKumar Ch <anilkumar@ti.com> wrote:
 
-> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
-> > Plus, because there's little justification behind this patch (apart
-> > from a vague reference to the speed of IO accesses) I'm going to say
-> > NAK to this until further information is forthcoming justifying this
-> > change.
-> > 
+> Add lis331dlh device tree data to am335x-evm.dts. In AM335x EVM
+> lis331dlh accelerometer is connected to I2C2 bus. So this patch
+> change the status of I2C2 node to "okay" to use I2C2 bus. Also
+> added all the required platform data to am335x-evm.
 > 
-> 30% faster network transmit rate with pktgen on highbank.
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> ---
+>  arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
 
-Please always include your benchmark results in the patch description. 
-That is highly valuable information when looking at commit logs.
-
-
-Nicolas
+Your arch/arm/boot/dts/am335x-evm.dts differs significantly from the
+one in linux-next (it should not do so), so I didn't do anything with
+this patch.
