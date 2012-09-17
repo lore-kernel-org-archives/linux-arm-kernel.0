@@ -1,53 +1,63 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 17 Sep 2012 05:54:27 -0700
-Subject: [PATCH v7 0/11] KGDB/KDB FIQ (NMI) debugger
-In-Reply-To: <50571ADF.3000406@windriver.com>
-References: <20120913150133.GA16238@lizard> <20120917113750.GA28838@kroah.com>
- <50571ADF.3000406@windriver.com>
-Message-ID: <20120917125427.GA23516@kroah.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 17 Sep 2012 10:01:45 -0300
+Subject: [PATCH v2 2/2] ARM: dts: imx23-olinuxino: Add USB host support
+Message-ID: <1347886905-6582-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 07:43:11AM -0500, Jason Wessel wrote:
-> On 09/17/2012 06:37 AM, Greg Kroah-Hartman wrote:
-> > On Thu, Sep 13, 2012 at 08:01:33AM -0700, Anton Vorontsov wrote:
-> >> Hi all,
-> >>
-> >> Here comes the lucky v7:
-> >>
-> >> - Per Alan Cox's suggestion added hangup method and removed a small
-> >>   leftover;
-> >> - Per Colin Cross' suggestion moved IRQ quiescing logic into
-> >>   poll_get_char routine. IIUC, Alan is less unhappy about it.  As a
-> >>   result, clear_irq() callback dropped.
-> >>
-> >> These patches can be found in the following repo (based on tty-next):
-> >>
-> >> 	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
-> >>
-> >> Old changelogs and rationale for these patches can be found here:
-> >>
-> >> 	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
-> >> 	v6: http://lkml.org/lkml/2012/9/10/2
-> > I have no objection to these patches, and as they are based on my
-> > tty-next tree, should I be the ones accepting them?  If so, then I need
-> > a bunch of acks from others involved in the kdb/kgdb code before I can
-> > do so.
-> >
-> > To make it easier, can I just take the tty driver patches now?  Will
-> > that break anything?
-> 
-> I have not made my way through the entire series yet, so I am not sure
-> if you need the kdb header changes or not, but so far it looks like
-> the tty pieces are separate.  If you add your ack Greg, I'll take the
-> whole series and merge it into kgdb-next, or after I finish the review
-> we could do it the other way around.
+Add USB host support.
 
-Your tree is fine:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Fix indentation
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+ arch/arm/boot/dts/imx23-olinuxino.dts |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Let me know if you have problems merging this due to any tty patches,
-and if so, I'll be glad to take them through my tree.
-
-greg k-h
+diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
+index 711dcf5..daddd1e 100644
+--- a/arch/arm/boot/dts/imx23-olinuxino.dts
++++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+@@ -40,6 +40,7 @@
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+ 						0x2013 /* MX23_PAD_SSP1_DETECT__GPIO_2_1 */
++						0x0113 /* MX23_PAD_GPMI_ALE__GPIO_0_17 */
+ 					>;
+ 					fsl,drive-strength = <0>;
+ 					fsl,voltage = <1>;
+@@ -60,6 +61,31 @@
+ 				pinctrl-0 = <&auart0_2pins_a>;
+ 				status = "okay";
+ 			};
++
++			usbphy0: usbphy at 8007c000 {
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		usb0: usb at 80080000 {
++			vbus-supply = <&reg_usb0_vbus>;
++			status = "okay";
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_usb0_vbus: usb0_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb0_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			startup-delay-us = <300>; /* LAN9215 requires a POR of 200us minimum */
++			gpio = <&gpio0 17 0>;
+ 		};
+ 	};
+ 
+-- 
+1.7.9.5
