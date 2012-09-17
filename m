@@ -1,40 +1,38 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 17 Sep 2012 04:37:50 -0700
-Subject: [PATCH v7 0/11] KGDB/KDB FIQ (NMI) debugger
-In-Reply-To: <20120913150133.GA16238@lizard>
-References: <20120913150133.GA16238@lizard>
-Message-ID: <20120917113750.GA28838@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Sep 2012 11:38:13 +0000
+Subject: [PATCH 00/34] i.MX multi-platform support
+In-Reply-To: <20120917075138.GN6180@pengutronix.de>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <20120917075138.GN6180@pengutronix.de>
+Message-ID: <201209171138.13327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 08:01:33AM -0700, Anton Vorontsov wrote:
-> Hi all,
+On Monday 17 September 2012, Sascha Hauer wrote:
+> On Mon, Sep 17, 2012 at 01:34:29PM +0800, Shawn Guo wrote:
+> > The series enables multi-platform support for imx.  Since the required
+> > frameworks (clk, pwm) and spare_irq have already been adopted on imx,
+> > the series is all about cleaning up mach/* headers.  Along with the
+> > changes, arch/arm/plat-mxc gets merged into arch/arm/mach-imx.
+> > 
+> > It's based on a bunch of branches (works from others), Rob's initial
+> > multi-platform series, Arnd's platform-data and smp_ops (Marc's) and
+> > imx 3.7 material (Sascha and myself).
+> > 
+> > It's available on branch below.
+> > 
+> >   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform
+> > 
+> > It's been tested on imx5 and imx6, and only compile-tested on imx2 and
+> > imx3, so testing on imx2/3 are appreciated.
 > 
-> Here comes the lucky v7:
-> 
-> - Per Alan Cox's suggestion added hangup method and removed a small
->   leftover;
-> - Per Colin Cross' suggestion moved IRQ quiescing logic into
->   poll_get_char routine. IIUC, Alan is less unhappy about it.  As a
->   result, clear_irq() callback dropped.
-> 
-> These patches can be found in the following repo (based on tty-next):
-> 
-> 	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
-> 
-> Old changelogs and rationale for these patches can be found here:
-> 
-> 	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
-> 	v6: http://lkml.org/lkml/2012/9/10/2
+> Great work! This really pushes the i.MX architecture one step closer to
+> a clean code base.
 
-I have no objection to these patches, and as they are based on my
-tty-next tree, should I be the ones accepting them?  If so, then I need
-a bunch of acks from others involved in the kdb/kgdb code before I can
-do so.
+I agree, this series is wonderful, I thought it would take much longer
+to get this far.
 
-To make it easier, can I just take the tty driver patches now?  Will
-that break anything?
+Two small comments on the last two patches from me, but overall I really
+love it.
 
-thanks,
-
-greg k-h
+Acked-by: Arnd Bergmann <arnd@arndb.de>
