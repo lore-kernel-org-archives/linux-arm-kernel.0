@@ -1,19 +1,36 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Mon, 17 Sep 2012 15:17:23 +0200
-Subject: [PATCH] ARM: Add config option DEBUG_DECOMPRESS_KERNEL
-In-Reply-To: <1347887324-22884-1-git-send-email-mvs@tigris.de>
-References: <1347887324-22884-1-git-send-email-mvs@tigris.de>
-Message-ID: <20120917131723.GB25899@glitch>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 17 Sep 2012 15:30:54 +0200
+Subject: [PATCH v6 0/4] add syscon driver based on regmap for general
+ registers access
+In-Reply-To: <20120917101028.GA13226@shlinux2.ap.freescale.net>
+References: <1346813836-28736-1-git-send-email-b29396@freescale.com>
+ <20120905055410.GZ2362@S2101-09.ap.freescale.net>
+ <20120917101028.GA13226@shlinux2.ap.freescale.net>
+Message-ID: <20120917133054.GT3647@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 03:08:44PM +0200, Maximilian Schwerin wrote:
-> This change allows preventing the message "Uncompressing Linux..." from
-> being sent to serial port. This is necessary if the primary serial port is
-> used for something other than kernel debugging (e.g. some external device
-> controlled by serial commands).
+Hi Dong,
 
-Disabling CONFIG_DEBUG_LL doesn't work?
+On Mon, Sep 17, 2012 at 06:10:29PM +0800, Dong Aisheng wrote:
+> Hi Samuel,
+> 
+> On Wed, Sep 05, 2012 at 01:54:12PM +0800, Shawn Guo wrote:
+> > Hi Samuel,
+> > 
+> > The series needs to go via mfd or arm-soc tree as a whole.  In case
+> > you want to take it through mfd tree, here is my ack.
+> > 
+> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > Otherwise, I can take it via arm-soc tree with your ack.
+> > 
+> Ping...
+All 4 patches applied to my for-next branch. Sorry for the delay.
 
-Regards,
-Domenico
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
