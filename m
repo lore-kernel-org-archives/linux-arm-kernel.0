@@ -1,26 +1,34 @@
-From: ciminaghi@gnudd.com (Davide Ciminaghi)
-Date: Mon, 17 Sep 2012 10:58:50 +0200
-Subject: [PATCH 2/8] gpio: pl061 depends on ARM
-In-Reply-To: <505372E0.1040906@mvista.com>
-References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
- <1347639843-32119-3-git-send-email-dciminaghi@mail.gnudd.com>
- <505372E0.1040906@mvista.com>
-Message-ID: <20120917085850.GE17079@mail.gnudd.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Sep 2012 11:01:23 +0200
+Subject: [PATCH v2 04/15] dmaengine: Pass no_wakeup parameter via
+ device_prep_dma_cyclic() callback
+In-Reply-To: <1347543485-339-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347543485-339-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <CACRpkdYAxFzPAZgMsdj9C3YVLzMc_w41Xs0SiqX-1DWaZqxAdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 10:09:36PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 09/14/2012 08:23 PM, Davide Ciminaghi wrote:
-> 
-> > From: Alessandro Rubini <rubini@gnudd.com>
-> 
-> > Patch dece904d itroduced chained_irq_enter/exit, which is only
-> 
->   Rather commit dece904d. And you need to also specify its summary in parens.
->
-ok, will fix this
+On Thu, Sep 13, 2012 at 3:37 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
 
-Thanks and regards
-Davide
+> Change the parameter list of device_prep_dma_cyclic() so the DMA drivers
+> can receive the no_wakeup request coming from client drivers.
+> This feature can be used during audio operation to disable all audio
+> related interrupts.
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+> CC: Barry Song <baohua.song@csr.com>
+> CC: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> CC: Vista Silicon <javier.martin@vista-silicon.com>
+> CC: Zhangfei Gao <zhangfei.gao@marvell.com>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> CC: Laxman Dewangan <ldewangan@nvidia.com>
+
+After some discussion with clever people I know I have come to the conclusion
+that this is a good idea, so:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
