@@ -1,60 +1,70 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 17 Sep 2012 18:38:50 +0100
-Subject: [PATCH v5 04/17] xen/arm: sync_bitops
+Date: Mon, 17 Sep 2012 18:38:52 +0100
+Subject: [PATCH v5 06/17] docs: Xen ARM DT bindings
 In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-Message-ID: <1347903543-2135-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347903543-2135-6-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sync_bitops functions are equivalent to the SMP implementation of the
-original functions, independently from CONFIG_SMP being defined.
+Add a doc to describe the Xen ARM device tree bindings
 
-We need them because _set_bit etc are not SMP safe if !CONFIG_SMP. But
-under Xen you might be communicating with a completely external entity
-who might be on another CPU (e.g. two uniprocessor guests communicating
-via event channels and grant tables). So we need a variant of the bit
-ops which are SMP safe even on a UP kernel.
+
+Changes in v5:
+
+- add a comment about the size of the grant table memory region;
+- add a comment about the required presence of a GIC node;
+- specify that the described properties are part of a top-level
+"hypervisor" node;
+- specify #address-cells and #size-cells for the example.
+
+
+Changes in v4:
+
+- "xen,xen" should be last as it is less specific;
+- update reg property using 2 address-cells and 2 size-cells.
+
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: devicetree-discuss at lists.ozlabs.org
+CC: David Vrabel <david.vrabel@citrix.com>
+CC: Rob Herring <robherring2@gmail.com>
+CC: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/include/asm/sync_bitops.h |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/sync_bitops.h
+ Documentation/devicetree/bindings/arm/xen.txt |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/xen.txt
 
-diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
 new file mode 100644
-index 0000000..63479ee
+index 0000000..0f7b9c2
 --- /dev/null
-+++ b/arch/arm/include/asm/sync_bitops.h
-@@ -0,0 +1,27 @@
-+#ifndef __ASM_SYNC_BITOPS_H__
-+#define __ASM_SYNC_BITOPS_H__
++++ b/Documentation/devicetree/bindings/arm/xen.txt
+@@ -0,0 +1,25 @@
++* Xen hypervisor device tree bindings
 +
-+#include <asm/bitops.h>
-+#include <asm/system.h>
++Xen ARM virtual platforms shall have a top-level "hypervisor" node with
++the following properties:
 +
-+/* sync_bitops functions are equivalent to the SMP implementation of the
-+ * original functions, independently from CONFIG_SMP being defined.
-+ *
-+ * We need them because _set_bit etc are not SMP safe if !CONFIG_SMP. But
-+ * under Xen you might be communicating with a completely external entity
-+ * who might be on another CPU (e.g. two uniprocessor guests communicating
-+ * via event channels and grant tables). So we need a variant of the bit
-+ * ops which are SMP safe even on a UP kernel.
-+ */
++- compatible:
++	compatible = "xen,xen-<version>", "xen,xen";
++  where <version> is the version of the Xen ABI of the platform.
 +
-+#define sync_set_bit(nr, p)		_set_bit(nr, p)
-+#define sync_clear_bit(nr, p)		_clear_bit(nr, p)
-+#define sync_change_bit(nr, p)		_change_bit(nr, p)
-+#define sync_test_and_set_bit(nr, p)	_test_and_set_bit(nr, p)
-+#define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
-+#define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
-+#define sync_test_bit(nr, addr)		test_bit(nr, addr)
-+#define sync_cmpxchg			cmpxchg
++- reg: specifies the base physical address and size of a region in
++  memory where the grant table should be mapped to, using an
++  HYPERVISOR_memory_op hypercall. The memory region is large enough to map
++  the whole grant table (it is larger or equal to gnttab_max_grant_frames()).
++
++- interrupts: the interrupt used by Xen to inject event notifications.
++  A GIC node is also required.
 +
 +
-+#endif
++Example (assuming #address-cells = <2> and #size-cells = <2>):
++
++hypervisor {
++	compatible = "xen,xen-4.3", "xen,xen";
++	reg = <0 0xb0000000 0 0x20000>;
++	interrupts = <1 15 0xf08>;
++};
 -- 
 1.7.2.5
