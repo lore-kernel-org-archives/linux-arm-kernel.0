@@ -1,49 +1,82 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 18 Sep 2012 11:05:13 -0400
-Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
-In-Reply-To: <CAHkRjk6aOHDPcMZt==8mN9R-vJQ+RYvZ-LzimQ+no4yibJdGkQ@mail.gmail.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153443.21241.37958.stgit@ubuntu>
- <20120918124724.GK32204@mudshark.cambridge.arm.com>
- <CAHkRjk6aOHDPcMZt==8mN9R-vJQ+RYvZ-LzimQ+no4yibJdGkQ@mail.gmail.com>
-Message-ID: <CANM98q+_R4raAXX4upOjFOqOOBaFz3nXYXr9E2+OUP1CzD-vcg@mail.gmail.com>
+From: ajellisuk@yahoo.co.uk (Ellis Andrew)
+Date: Mon, 17 Sep 2012 12:49:37 +0100 (BST)
+Subject: Kernel panic - not syncing: No init found
+In-Reply-To: <20120915190422.GB4434@tarshish>
+References: <1347466702.70460.YahooMailNeo@web133201.mail.ir2.yahoo.com>
+ <20120915190422.GB4434@tarshish>
+Message-ID: <1347882577.12909.YahooMailNeo@web133203.mail.ir2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 10:06 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On 18 September 2012 13:47, Will Deacon <will.deacon@arm.com> wrote:
->> On Sat, Sep 15, 2012 at 04:34:43PM +0100, Christoffer Dall wrote:
->>> +#define L_PTE2_SHARED                L_PTE_SHARED
->>> +#define L_PTE2_READ          (_AT(pteval_t, 1) << 6) /* HAP[0] */
->>> +#define L_PTE2_WRITE         (_AT(pteval_t, 1) << 7) /* HAP[1] */
->>
->> This is actually HAP[2:1], not HAP[1:0]. Also, can you follow what we do for
->> stage 1 translation and name these RDONLY and WRONLY (do you even use
->> that?).
->
-> We can't use RDONLY as this would have value 0 as the HAP attributes
-> (stage 2 overriding stage 1 translation attributes). Unless you add 4
-> definitions like NOACCESS, RDONLY, WRONLY and RDWR to cover all the
-> bit combinations.
->
->>> +#define L_PTE2_NORM_WB               (_AT(pteval_t, 3) << 4) /* MemAttr[3:2] */
->>> +#define L_PTE2_INNER_WB              (_AT(pteval_t, 3) << 2) /* MemAttr[1:0] */
->>
->> Another minor nit: PTE2 looks awful. Maybe L_PTE_HYP_* instead?
->
-> L_PTE_HYP may be confused with the Stage 1 Hyp translation which is
-> different from the guest Stage 2.
+Hi Baruch
 
-exactly, it's misleading, how about L_PTE_STAGE2, a little verbose,
-but clear...?
+Thank you for your reply.
 
->
-> But I have another minor nit - just write them in the ascending bit
-> order as other definitions in this file.
->
+I have done a bit of searching around, and I'm not sure how to boot into initrmafs. Can you please point me towards some instructions on how to do this.
 
-ok, will fix.
+Kind regards
 
-Thanks,
--Christoffer
+Andrew
+
+
+
+
+________________________________
+ From: Baruch Siach <baruch@tkos.co.il>
+To: Ellis Andrew <ajellisuk@yahoo.co.uk> 
+Cc: "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org> 
+Sent: Saturday, 15 September 2012, 20:04
+Subject: Re: Kernel panic - not syncing: No init found
+ 
+Hi Ellis,
+
+On Wed, Sep 12, 2012 at 05:18:22PM +0100, Ellis Andrew wrote:
+> After a lot of searching with Google I have found this is a common problem, 
+> unfortunately none of the solutions I have found, fix the problem.
+> 
+> The original error I got was:
+> 
+> Kernel panic - not syncing: No init found.? Try passing init= option to kernel.
+> 
+> The command line option was:
+> root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0
+> 
+> I after digging around with google, I found a suggestion which I tried, I made my command line:
+> root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0 init=/sbin/init panic=4
+> 
+> But I now get the following error:
+> 
+> Freeing init memory: 88K
+> Failed to execute /sbin/init.? Attempting defaults...
+> Kernel panic - not syncing: No init found.? Try passing init= option to kernel.
+> 
+> I can see that the Root drive is being mounted.
+> 
+> The contents of the init file is:
+> 
+> #!/bin/busybox ash
+> /bin/busybox mount -t sysfs /dev/sys /sys
+> /bin/busybox mount -t proc? /proc
+> /bin/busybox mount -t devpts /dev/pts
+> # Populate /dev according to /sys
+> /bin/busybox mdev -s
+> /bin/busybox --install -s
+> /linuxrc
+> exec /sbin/init "$@"?? </dev/console >/dev/console 2>&1
+> 
+> Does anyone have any suggestions on how to fix this please? 
+
+The most common reason for this failure is that your root filesystem layout is 
+not what you think it is. Try booting into initramfs and mounting your jffs2 
+filesystem from there to examine it directly on your running system.
+
+baruch
+
+
+-- 
+? ? http://baruch.siach.name/blog/? ? ? ? ? ? ? ? ? ~. .~?  Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+?  - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120917/43ba1442/attachment.html>
