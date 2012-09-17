@@ -1,112 +1,60 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 17 Sep 2012 18:38:53 +0100
-Subject: [PATCH v5 07/17] xen/arm: Xen detection and shared_info page mapping
+Date: Mon, 17 Sep 2012 18:38:55 +0100
+Subject: [PATCH v5 09/17] xen: do not compile manage, balloon, pci, acpi,
+ pcpu and cpu_hotplug on ARM
 In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-Message-ID: <1347903543-2135-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347903543-2135-9-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for a node in the device tree compatible with "xen,xen", if it is
-present set xen_domain_type to XEN_HVM_DOMAIN and continue
-initialization.
-
-Map the real shared info page using XENMEM_add_to_physmap with
-XENMAPSPACE_shared_info.
-
 Changes in v4:
-
-- simpler parsing of Xen version in the compatible DT node.
-
-Changes in v3:
-
-- use the "xen,xen" notation rather than "arm,xen";
-- add an additional check on the presence of the Xen version.
+- compile pcpu only on x86;
+- use "+=" instead of ":=" for dom0- targets.
 
 Changes in v2:
 
-- replace pr_info with pr_debug.
+- make pci.o depend on CONFIG_PCI and acpi.o depend on CONFIG_ACPI.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- arch/arm/xen/enlighten.c |   61 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 61 insertions(+), 0 deletions(-)
+ drivers/xen/Makefile |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index c535540..6a0217d 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -5,6 +5,9 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index d80bea5..cd28aae 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -1,11 +1,18 @@
+-obj-y	+= grant-table.o features.o events.o manage.o balloon.o
++ifneq ($(CONFIG_ARM),y)
++obj-y	+= manage.o balloon.o
++obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
++endif
++obj-y	+= grant-table.o features.o events.o
+ obj-y	+= xenbus/
  
- struct start_info _xen_start_info;
- struct start_info *xen_start_info = &_xen_start_info;
-@@ -33,3 +36,61 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
- 	return -ENOSYS;
- }
- EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
-+
-+/*
-+ * see Documentation/devicetree/bindings/arm/xen.txt for the
-+ * documentation of the Xen Device Tree format.
-+ */
-+static int __init xen_guest_init(void)
-+{
-+	struct xen_add_to_physmap xatp;
-+	static struct shared_info *shared_info_page = 0;
-+	struct device_node *node;
-+	int len;
-+	const char *s = NULL;
-+	const char *version = NULL;
-+	const char *xen_prefix = "xen,xen-";
-+
-+	node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+	if (!node) {
-+		pr_debug("No Xen support\n");
-+		return 0;
-+	}
-+	s = of_get_property(node, "compatible", &len);
-+	if (strlen(xen_prefix) + 3  < len &&
-+			!strncmp(xen_prefix, s, strlen(xen_prefix)))
-+		version = s + strlen(xen_prefix);
-+	if (version == NULL) {
-+		pr_debug("Xen version not found\n");
-+		return 0;
-+	}
-+	xen_domain_type = XEN_HVM_DOMAIN;
-+
-+	if (!shared_info_page)
-+		shared_info_page = (struct shared_info *)
-+			get_zeroed_page(GFP_KERNEL);
-+	if (!shared_info_page) {
-+		pr_err("not enough memory\n");
-+		return -ENOMEM;
-+	}
-+	xatp.domid = DOMID_SELF;
-+	xatp.idx = 0;
-+	xatp.space = XENMAPSPACE_shared_info;
-+	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
-+	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
-+		BUG();
-+
-+	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
-+
-+	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
-+	 * page, we use it in the event channel upcall and in some pvclock
-+	 * related functions. We don't need the vcpu_info placement
-+	 * optimizations because we don't use any pv_mmu or pv_irq op on
-+	 * HVM.
-+	 * The shared info contains exactly 1 CPU (the boot CPU). The guest
-+	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
-+	 * for secondary CPUs as they are brought up. */
-+	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
-+	return 0;
-+}
-+core_initcall(xen_guest_init);
+ nostackp := $(call cc-option, -fno-stack-protector)
+ CFLAGS_features.o			:= $(nostackp)
+ 
++obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
++dom0-$(CONFIG_PCI) += pci.o
++dom0-$(CONFIG_ACPI) += acpi.o
++dom0-$(CONFIG_X86) += pcpu.o
+ obj-$(CONFIG_BLOCK)			+= biomerge.o
+-obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+ obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
+ obj-$(CONFIG_XEN_BALLOON)		+= xen-balloon.o
+ obj-$(CONFIG_XEN_SELFBALLOONING)	+= xen-selfballoon.o
+@@ -17,8 +24,6 @@ obj-$(CONFIG_XEN_SYS_HYPERVISOR)	+= sys-hypervisor.o
+ obj-$(CONFIG_XEN_PVHVM)			+= platform-pci.o
+ obj-$(CONFIG_XEN_TMEM)			+= tmem.o
+ obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
+-obj-$(CONFIG_XEN_DOM0)			+= pcpu.o
+-obj-$(CONFIG_XEN_DOM0)			+= pci.o acpi.o
+ obj-$(CONFIG_XEN_MCE_LOG)		+= mcelog.o
+ obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= xen-pciback/
+ obj-$(CONFIG_XEN_PRIVCMD)		+= xen-privcmd.o
 -- 
 1.7.2.5
