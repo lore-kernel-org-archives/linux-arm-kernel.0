@@ -1,36 +1,61 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 17 Sep 2012 18:39:03 +0100
-Subject: [PATCH v5 17/17] MAINTAINERS: add myself as Xen ARM maintainer
+Date: Mon, 17 Sep 2012 18:38:57 +0100
+Subject: [PATCH v5 11/17] xen/arm: get privilege status
 In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-Message-ID: <1347903543-2135-17-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1347903543-2135-11-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use Xen features to figure out if we are privileged.
+
+XENFEAT_dom0 was introduced by 23735 in xen-unstable.hg.
+
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: Arnd Bergmann <arnd@arndb.de>
 ---
- MAINTAINERS |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/xen/enlighten.c         |    7 +++++++
+ include/xen/interface/features.h |    3 +++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fdc0119..3d38291 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7752,6 +7752,13 @@ F:	drivers/xen/
- F:	arch/x86/include/asm/xen/
- F:	include/xen/
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 6a0217d..c2a47a7 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -1,6 +1,7 @@
+ #include <xen/xen.h>
+ #include <xen/interface/xen.h>
+ #include <xen/interface/memory.h>
++#include <xen/features.h>
+ #include <xen/platform_pci.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+@@ -66,6 +67,12 @@ static int __init xen_guest_init(void)
+ 	}
+ 	xen_domain_type = XEN_HVM_DOMAIN;
  
-+XEN HYPERVISOR ARM
-+M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-+L:	xen-devel at lists.xensource.com (moderated for non-subscribers)
-+S:	Supported
-+F:	arch/arm/xen/
-+F:	arch/arm/include/asm/xen/
++	xen_setup_features();
++	if (xen_feature(XENFEAT_dom0))
++		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
++	else
++		xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
 +
- XEN NETWORK BACKEND DRIVER
- M:	Ian Campbell <ian.campbell@citrix.com>
- L:	xen-devel at lists.xensource.com (moderated for non-subscribers)
+ 	if (!shared_info_page)
+ 		shared_info_page = (struct shared_info *)
+ 			get_zeroed_page(GFP_KERNEL);
+diff --git a/include/xen/interface/features.h b/include/xen/interface/features.h
+index b6ca39a..131a6cc 100644
+--- a/include/xen/interface/features.h
++++ b/include/xen/interface/features.h
+@@ -50,6 +50,9 @@
+ /* x86: pirq can be used by HVM guests */
+ #define XENFEAT_hvm_pirqs           10
+ 
++/* operation as Dom0 is supported */
++#define XENFEAT_dom0                      11
++
+ #define XENFEAT_NR_SUBMAPS 1
+ 
+ #endif /* __XEN_PUBLIC_FEATURES_H__ */
 -- 
 1.7.2.5
