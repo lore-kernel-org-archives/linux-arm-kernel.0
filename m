@@ -1,506 +1,1076 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Sep 2012 17:27:01 +0200
-Subject: [PATCH 04/16] at91: regroup gpio and pinctrl under the same ranges
+Date: Mon, 17 Sep 2012 17:27:06 +0200
+Subject: [PATCH 09/16] arm: at91: dt: at91sam9 add serial pinctrl support
 In-Reply-To: <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120917140423.GA17667@game.jcrosoft.org>
  <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1347895633-1763-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1347895633-1763-9-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix also the reg size as we have 512 bytes bank not 256 bytes per gpio/mux
-controller
+Set the dbgu pinctrl config by default as we have only one possible config
+For other uart set the rxd/txd by default.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+For at91sam9x5ek create soc based dts as we need to include specific soc dtsi.
+
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/boot/dts/at91sam9260.dtsi |   59 ++++++++++++---------
- arch/arm/boot/dts/at91sam9263.dtsi |  102 +++++++++++++++++++-----------------
- arch/arm/boot/dts/at91sam9g45.dtsi |   95 +++++++++++++++++----------------
- arch/arm/boot/dts/at91sam9n12.dtsi |   83 +++++++++++++++--------------
- arch/arm/boot/dts/at91sam9x5.dtsi  |   77 ++++++++++++++-------------
- 5 files changed, 225 insertions(+), 191 deletions(-)
+ arch/arm/boot/dts/at91sam9260.dtsi                 |  109 ++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   57 ++++++++++
+ arch/arm/boot/dts/at91sam9g15.dtsi                 |   28 +++++
+ arch/arm/boot/dts/at91sam9g15ek.dts                |   16 +++
+ arch/arm/boot/dts/at91sam9g25.dtsi                 |   28 +++++
+ arch/arm/boot/dts/at91sam9g25ek.dts                |   65 +++---------
+ arch/arm/boot/dts/at91sam9g35.dtsi                 |   28 +++++
+ arch/arm/boot/dts/at91sam9g35ek.dts                |   16 +++
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   73 +++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |   83 +++++++++++++++
+ arch/arm/boot/dts/at91sam9x25.dtsi                 |   28 +++++
+ arch/arm/boot/dts/at91sam9x25ek.dts                |   16 +++
+ arch/arm/boot/dts/at91sam9x35.dtsi                 |   28 +++++
+ arch/arm/boot/dts/at91sam9x35ek.dts                |   16 +++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   97 +++++++++++++++--
+ .../dts/{at91sam9g25ek.dts => at91sam9x5ek.dtsi}   |    8 +-
+ arch/arm/mach-at91/Makefile.boot                   |    4 +
+ 17 files changed, 637 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9g15.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9g15ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9g25.dtsi
+ rewrite arch/arm/boot/dts/at91sam9g25ek.dts (62%)
+ create mode 100644 arch/arm/boot/dts/at91sam9g35.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9g35ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9x25.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9x25ek.dts
+ create mode 100644 arch/arm/boot/dts/at91sam9x35.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9x35ek.dts
+ rename arch/arm/boot/dts/{at91sam9g25ek.dts => at91sam9x5ek.dtsi} (75%)
 
 diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 7c95f76..3ae7abcd 100644
+index b1c945f..a3d7132 100644
 --- a/arch/arm/boot/dts/at91sam9260.dtsi
 +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -97,34 +97,41 @@
- 				interrupts = <26 4 0 27 4 0 28 4 0>;
- 			};
+@@ -111,6 +111,101 @@
+ 				      >;
  
--			pioA: gpio at fffff400 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff400 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+			pinctrl at fffff400 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff400 0xfffff400 0x600>;
+ 				/* shared pinctrl settings */
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<1 14 0x1 0x0	/* PB14 periph A */
++							 1 15 0x1 0x1>;	/* PB15 periph with pullup */
++					};
++				};
 +
-+				pioA: gpio at fffff400 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
++				uart0 {
++					pinctrl_uart0: uart0-0 {
++						atmel,pins =
++							<1 4 0x1 0x0	/* PB4 periph A */
++							 1 5 0x1 0x0>;	/* PB5 periph A */
++					};
++
++					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
++						atmel,pins =
++							<1 26 0x1 0x0	/* PB26 periph A */
++							 1 27 0x1 0x0>;	/* PB27 periph A */
++					};
++
++					pinctrl_uart0_dtr_dsr: uart0_dtr_dsr-0 {
++						atmel,pins =
++							<1 24 0x1 0x0	/* PB24 periph A */
++							 1 22 0x1 0x0>;	/* PB22 periph A */
++					};
++
++					pinctrl_uart0_dcd: uart0_dcd-0 {
++						atmel,pins =
++							<1 23 0x1 0x0>;	/* PB23 periph A */
++					};
++
++					pinctrl_uart0_ri: uart0_ri-0 {
++						atmel,pins =
++							<1 25 0x1 0x0>;	/* PB25 periph A */
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1-0 {
++						atmel,pins =
++							<2 6 0x1 0x1	/* PB6 periph A with pullup */
++							 2 7 0x1 0x0>;	/* PB7 periph A */
++					};
++
++					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
++						atmel,pins =
++							<1 28 0x1 0x0	/* PB28 periph A */
++							 1 29 0x1 0x0>;	/* PB29 periph A */
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2-0 {
++						atmel,pins =
++							<1 8 0x1 0x1	/* PB8 periph A with pullup */
++							 1 9 0x1 0x0>;	/* PB9 periph A */
++					};
++
++					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
++						atmel,pins =
++							<0 4 0x1 0x0	/* PA4 periph A */
++							 0 5 0x1 0x0>;	/* PA5 periph A */
++					};
++				};
++
++				uart3 {
++					pinctrl_uart3: uart3-0 {
++						atmel,pins =
++							<2 10 0x1 0x1	/* PB10 periph A with pullup */
++							 2 11 0x1 0x0>;	/* PB11 periph A */
++					};
++
++					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
++						atmel,pins =
++							<3 8 0x2 0x0	/* PB8 periph B */
++							 3 10 0x2 0x0>;	/* PB10 periph B */
++					};
++				};
++
++				uart4 {
++					pinctrl_uart4: uart4-0 {
++						atmel,pins =
++							<0 31 0x2 0x1	/* PA31 periph B with pullup */
++							 0 30 0x2 0x0>;	/* PA30 periph B */
++					};
++				};
++
++				uart5 {
++					pinctrl_uart5: uart5-0 {
++						atmel,pins =
++							<2 12 0x1 0x1	/* PB12 periph A with pullup */
++							 2 13 0x1 0x0>;	/* PB13 periph A */
++					};
 +				};
  
--			pioB: gpio at fffff600 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff600 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+				pioB: gpio at fffff600 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 
--			pioC: gpio at fffff800 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff800 0x100>;
--				interrupts = <4 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
-+				pioC: gpio at fffff800 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+@@ -147,6 +242,8 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 4 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
  			};
  
- 			dbgu: serial at fffff200 {
+@@ -156,6 +253,8 @@
+ 				interrupts = <6 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -165,6 +264,8 @@
+ 				interrupts = <7 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -174,6 +275,8 @@
+ 				interrupts = <8 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -183,6 +286,8 @@
+ 				interrupts = <23 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart3>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -192,6 +297,8 @@
+ 				interrupts = <24 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart4>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -201,6 +308,8 @@
+ 				interrupts = <25 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart5>;
+ 				status = "disabled";
+ 			};
+ 
 diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 195019b..ff882a6 100644
+index 4307f02..8bc4ce7 100644
 --- a/arch/arm/boot/dts/at91sam9263.dtsi
 +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -88,54 +88,60 @@
- 				reg = <0xfffffd10 0x10>;
+@@ -104,6 +104,55 @@
+ 				      >;
+ 
+ 				/* shared pinctrl settings */
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<2 30 0x1 0x0	/* PC30 periph A */
++							 2 31 0x1 0x1>;	/* PC31 periph with pullup */
++					};
++				};
++
++				uart0 {
++					pinctrl_uart0: uart0-0 {
++						atmel,pins =
++							<0 26 0x1 0x1	/* PA26 periph A with pullup */
++							 0 27 0x1 0x0>;	/* PA27 periph A */
++					};
++
++					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
++						atmel,pins =
++							<0 28 0x1 0x0	/* PA28 periph A */
++							 0 29 0x1 0x0>;	/* PA29 periph A */
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1-0 {
++						atmel,pins =
++							<3 0 0x1 0x1	/* PD0 periph A with pullup */
++							 3 1 0x1 0x0>;	/* PD1 periph A */
++					};
++
++					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
++						atmel,pins =
++							<3 7 0x2 0x0	/* PD7 periph B */
++							 3 8 0x2 0x0>;	/* PD8 periph B */
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2-0 {
++						atmel,pins =
++							<3 2 0x1 0x1	/* PD2 periph A with pullup */
++							 3 3 0x1 0x0>;	/* PD3 periph A */
++					};
++
++					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
++						atmel,pins =
++							<3 5 0x2 0x0	/* PD5 periph B */
++							 4 6 0x2 0x0>;	/* PD6 periph B */
++					};
++				};
+ 
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+@@ -160,6 +209,8 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+ 				interrupts = <1 4 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
  			};
  
--			pioA: gpio at fffff200 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff200 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioB: gpio at fffff400 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff400 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioC: gpio at fffff600 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff600 0x100>;
--				interrupts = <4 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioD: gpio at fffff800 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff800 0x100>;
--				interrupts = <4 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioE: gpio at fffffa00 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffffa00 0x100>;
--				interrupts = <4 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
-+			pinctrl at fffff200 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff200 0xfffff200 0xa00>;
-+
-+				pioA: gpio at fffff200 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff200 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioB: gpio at fffff400 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioC: gpio at fffff600 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioD: gpio at fffff800 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioE: gpio at fffffa00 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffffa00 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
+@@ -169,6 +220,8 @@
+ 				interrupts = <7 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
+ 				status = "disabled";
  			};
  
- 			dbgu: serial at ffffee00 {
+@@ -178,6 +231,8 @@
+ 				interrupts = <8 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -187,6 +242,8 @@
+ 				interrupts = <9 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9g15.dtsi b/arch/arm/boot/dts/at91sam9g15.dtsi
+new file mode 100644
+index 0000000..fbe7a70
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9g15.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * at91sam9g15.dtsi - Device Tree Include file for AT91SAM9G15 SoC
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++
++/include/ "at91sam9x5.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G15 SoC";
++	compatible = "atmel, at91sam9g15, atmel,at91sam9x5";
++
++	ahb {
++		apb {
++			pinctrl at fffff400 {
++				atmel,mux-mask = <
++				      /*    A         B          C     */
++				       0xffffffff 0xffe0399f 0x00000000  /* pioA */
++				       0x00040000 0x00047e3f 0x00000000  /* pioB */
++				       0xfdffffff 0x00000000 0xb83fffff  /* pioC */
++				       0x003fffff 0x003f8000 0x00000000  /* pioD */
++				      >;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/at91sam9g15ek.dts b/arch/arm/boot/dts/at91sam9g15ek.dts
+new file mode 100644
+index 0000000..86dd3f6
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9g15ek.dts
+@@ -0,0 +1,16 @@
++/*
++ * at91sam9g15ek.dts - Device Tree file for AT91SAM9G15-EK board
++ *
++ *  Copyright (C) 2012 Atmel,
++ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g15.dtsi"
++/include/ "at91sam9x5ek.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G25-EK";
++	compatible = "atmel,at91sam9g15ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++};
+diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
+new file mode 100644
+index 0000000..05a718f
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9g25.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * at91sam9g25.dtsi - Device Tree Include file for AT91SAM9G25 SoC
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++
++/include/ "at91sam9x5.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G25 SoC";
++	compatible = "atmel, at91sam9g25, atmel,at91sam9x5";
++
++	ahb {
++		apb {
++			pinctrl at fffff400 {
++				atmel,mux-mask = <
++				      /*    A         B          C     */
++				       0xffffffff 0xffe0399f 0xc000001c  /* pioA */
++				       0x0007ffff 0x8000fe3f 0x00000000  /* pioB */
++				       0x80000000 0x07c0ffff 0xb83fffff  /* pioC */
++				       0x003fffff 0x003f8000 0x00000000  /* pioD */
++				      >;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+dissimilarity index 62%
+index 7829a4d..c5ab16f 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -1,49 +1,16 @@
+-/*
+- * at91sam9g25ek.dts - Device Tree file for AT91SAM9G25-EK board
+- *
+- *  Copyright (C) 2012 Atmel,
+- *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
+- *
+- * Licensed under GPLv2 or later.
+- */
+-/dts-v1/;
+-/include/ "at91sam9x5.dtsi"
+-/include/ "at91sam9x5cm.dtsi"
+-
+-/ {
+-	model = "Atmel AT91SAM9G25-EK";
+-	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+-
+-	chosen {
+-		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
+-	};
+-
+-	ahb {
+-		apb {
+-			dbgu: serial at fffff200 {
+-				status = "okay";
+-			};
+-
+-			usart0: serial at f801c000 {
+-				status = "okay";
+-			};
+-
+-			macb0: ethernet at f802c000 {
+-				phy-mode = "rmii";
+-				status = "okay";
+-			};
+-		};
+-
+-		usb0: ohci at 00600000 {
+-			status = "okay";
+-			num-ports = <2>;
+-			atmel,vbus-gpio = <&pioD 19 1
+-					   &pioD 20 1
+-					  >;
+-		};
+-
+-		usb1: ehci at 00700000 {
+-			status = "okay";
+-		};
+-	};
+-};
++/*
++ * at91sam9g25ek.dts - Device Tree file for AT91SAM9G25-EK board
++ *
++ *  Copyright (C) 2012 Atmel,
++ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g25.dtsi"
++/include/ "at91sam9x5ek.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G25-EK";
++	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++};
+diff --git a/arch/arm/boot/dts/at91sam9g35.dtsi b/arch/arm/boot/dts/at91sam9g35.dtsi
+new file mode 100644
+index 0000000..f9d14a7
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9g35.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * at91sam9g35.dtsi - Device Tree Include file for AT91SAM9G35 SoC
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++
++/include/ "at91sam9x5.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G35 SoC";
++	compatible = "atmel, at91sam9g35, atmel,at91sam9x5";
++
++	ahb {
++		apb {
++			pinctrl at fffff400 {
++				atmel,mux-mask = <
++				      /*    A         B          C     */
++				       0xffffffff 0xffe0399f 0xc000000c  /* pioA */
++				       0x000406ff 0x00047e3f 0x00000000  /* pioB */
++				       0xfdffffff 0x00000000 0xb83fffff  /* pioC */
++				       0x003fffff 0x003f8000 0x00000000  /* pioD */
++				      >;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/at91sam9g35ek.dts b/arch/arm/boot/dts/at91sam9g35ek.dts
+new file mode 100644
+index 0000000..95944bd
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9g35ek.dts
+@@ -0,0 +1,16 @@
++/*
++ * at91sam9g35ek.dts - Device Tree file for AT91SAM9G35-EK board
++ *
++ *  Copyright (C) 2012 Atmel,
++ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g35.dtsi"
++/include/ "at91sam9x5ek.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G35-EK";
++	compatible = "atmel,at91sam9g35ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++};
 diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 63751b1..990f2b1 100644
+index 57ae4c3..301458e 100644
 --- a/arch/arm/boot/dts/at91sam9g45.dtsi
 +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -106,54 +106,61 @@
- 				interrupts = <21 4 0>;
- 			};
+@@ -122,6 +122,69 @@
+ 				      >;
  
--			pioA: gpio at fffff200 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff200 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+			pinctrl at fffff200 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff200 0xfffff200 0xa00>;
+ 				/* shared pinctrl settings */
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<1 12 0x1 0x0	/* PB12 periph A */
++							 1 13 0x1 0x0>;	/* PB13 periph A */
++					};
++				};
 +
-+				pioA: gpio at fffff200 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff200 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
++				uart0 {
++					pinctrl_uart0: uart0-0 {
++						atmel,pins =
++							<1 19 0x1 0x1	/* PB19 periph A with pullup */
++							 1 18 0x1 0x0>;	/* PB18 periph A */
++					};
++
++					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
++						atmel,pins =
++							<1 17 0x2 0x0	/* PB17 periph B */
++							 1 15 0x2 0x0>;	/* PB15 periph B */
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1-0 {
++						atmel,pins =
++							<1 4 0x1 0x1	/* PB4 periph A with pullup */
++							 1 5 0x1 0x0>;	/* PB5 periph A */
++					};
++
++					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
++						atmel,pins =
++							<3 16 0x1 0x0	/* PD16 periph A */
++							 3 17 0x1 0x0>;	/* PD17 periph A */
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2-0 {
++						atmel,pins =
++							<1 6 0x1 0x1	/* PB6 periph A with pullup */
++							 1 7 0x1 0x0>;	/* PB7 periph A */
++					};
++
++					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
++						atmel,pins =
++							<2 9 0x2 0x0	/* PC9 periph B */
++							 2 11 0x2 0x0>;	/* PC11 periph B */
++					};
++				};
++
++				uart3 {
++					pinctrl_uart3: uart3-0 {
++						atmel,pins =
++							<1 8 0x1 0x1	/* PB9 periph A with pullup */
++							 1 9 0x1 0x0>;	/* PB8 periph A */
++					};
++
++					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
++						atmel,pins =
++							<0 23 0x2 0x0	/* PA23 periph B */
++							 0 24 0x2 0x0>;	/* PA24 periph B */
++					};
 +				};
  
--			pioB: gpio at fffff400 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff400 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+				pioB: gpio at fffff400 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 
--			pioC: gpio at fffff600 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff600 0x100>;
--				interrupts = <4 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+				pioC: gpio at fffff600 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 
--			pioD: gpio at fffff800 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffff800 0x100>;
--				interrupts = <5 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+				pioD: gpio at fffff800 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <5 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 
--			pioE: gpio at fffffa00 {
--				compatible = "atmel,at91rm9200-gpio";
--				reg = <0xfffffa00 0x100>;
--				interrupts = <5 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
-+				pioE: gpio at fffffa00 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffffa00 0x200>;
-+					interrupts = <5 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+@@ -178,6 +241,8 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+ 				interrupts = <1 4 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
  			};
  
- 			dbgu: serial at ffffee00 {
+@@ -187,6 +252,8 @@
+ 				interrupts = <7 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -196,6 +263,8 @@
+ 				interrupts = <8 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -205,6 +274,8 @@
+ 				interrupts = <9 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -214,6 +285,8 @@
+ 				interrupts = <10 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart3>;
+ 				status = "disabled";
+ 			};
+ 
 diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index ef9336a..29706bd 100644
+index a2d6201..699b2f3 100644
 --- a/arch/arm/boot/dts/at91sam9n12.dtsi
 +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -100,44 +100,51 @@
- 				interrupts = <20 4 0>;
+@@ -115,6 +115,79 @@
+ 				      >;
+ 
+ 				/* shared pinctrl settings */
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<0 9 0x1 0x0	/* PA9 periph A */
++							 0 10 0x1 0x1>;	/* PA10 periph with pullup */
++					};
++				};
++
++				uart0 {
++					pinctrl_uart0: uart0-0 {
++						atmel,pins =
++							<0 1 0x1 0x1	/* PA1 periph A with pullup */
++							 0 0 0x1 0x0>;	/* PA0 periph A */
++					};
++
++					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
++						atmel,pins =
++							<0 2 0x1 0x0	/* PA2 periph A */
++							 0 3 0x1 0x0>;	/* PA3 periph A */
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1-0 {
++						atmel,pins =
++							<0 6 0x1 0x1	/* PA6 periph A with pullup */
++							 0 5 0x1 0x0>;	/* PA5 periph A */
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2-0 {
++						atmel,pins =
++							<0 8 0x1 0x1	/* PA8 periph A with pullup */
++							 0 7 0x1 0x0>;	/* PA7 periph A */
++					};
++
++					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
++						atmel,pins =
++							<1 0 0x2 0x0	/* PB0 periph B */
++							 1 1 0x2 0x0>;	/* PB1 periph B */
++					};
++				};
++
++				uart3 {
++					pinctrl_uart3: uart3-0 {
++						atmel,pins =
++							<2 23 0x2 0x1	/* PC23 periph B with pullup */
++							 2 22 0x2 0x0>;	/* PC22 periph B */
++					};
++
++					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
++						atmel,pins =
++							<2 24 0x2 0x0	/* PC24 periph B */
++							 2 25 0x2 0x0>;	/* PC25 periph B */
++					};
++				};
++
++				usart0 {
++					pinctrl_usart0: usart0-0 {
++						atmel,pins =
++							<2 9 0x3 0x1	/* PC9 periph C with pullup */
++							 2 8 0x3 0x0>;	/* PC8 periph C */
++					};
++				};
++
++				usart1 {
++					pinctrl_usart1: usart1-0 {
++						atmel,pins =
++							<2 16 0x3 0x1	/* PC17 periph C with pullup */
++							 2 17 0x3 0x0>;	/* PC16 periph C */
++					};
++				};
+ 
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+@@ -161,6 +234,8 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 4 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
  			};
  
--			pioA: gpio at fffff400 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffff400 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioB: gpio at fffff600 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffff600 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioC: gpio at fffff800 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffff800 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
--
--			pioD: gpio at fffffa00 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffffa00 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
+@@ -170,6 +245,8 @@
+ 				interrupts = <5 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -179,6 +256,8 @@
+ 				interrupts = <6 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -188,6 +267,8 @@
+ 				interrupts = <7 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -197,6 +278,8 @@
+ 				interrupts = <8 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart3>;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
+new file mode 100644
+index 0000000..956c65f
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9x25.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * at91sam9x25.dtsi - Device Tree Include file for AT91SAM9X25 SoC
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
++
++/include/ "at91sam9x5.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9X25 SoC";
++	compatible = "atmel, at91sam9x25, atmel,at91sam9x5";
++
++	ahb {
++		apb {
 +			pinctrl at fffff400 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff400 0xfffff400 0x800>;
++				atmel,mux-mask = <
++				      /*    A         B          C     */
++				       0xffffffff 0xffe03fff 0xc000001c  /* pioA */
++				       0x0007ffff 0x00047e3f 0x00000000  /* pioB */
++				       0x80000000 0xfffd0000 0xb83fffff  /* pioC */
++				       0x003fffff 0x003f8000 0x00000000  /* pioD */
++				      >;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/at91sam9x25ek.dts b/arch/arm/boot/dts/at91sam9x25ek.dts
+new file mode 100644
+index 0000000..af907ea
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9x25ek.dts
+@@ -0,0 +1,16 @@
++/*
++ * at91sam9x25ek.dts - Device Tree file for AT91SAM9X25-EK board
++ *
++ *  Copyright (C) 2012 Atmel,
++ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9x25.dtsi"
++/include/ "at91sam9x5ek.dtsi"
 +
-+				pioA: gpio at fffff400 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
++/ {
++	model = "Atmel AT91SAM9G25-EK";
++	compatible = "atmel,at91sam9x25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++};
+diff --git a/arch/arm/boot/dts/at91sam9x35.dtsi b/arch/arm/boot/dts/at91sam9x35.dtsi
+new file mode 100644
+index 0000000..fb102d6
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9x35.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * at91sam9x35.dtsi - Device Tree Include file for AT91SAM9X35 SoC
++ *
++ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2.
++ */
 +
-+				pioB: gpio at fffff600 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
++/include/ "at91sam9x5.dtsi"
 +
-+				pioC: gpio at fffff800 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
++/ {
++	model = "Atmel AT91SAM9X35 SoC";
++	compatible = "atmel, at91sam9x35, atmel,at91sam9x5";
 +
-+				pioD: gpio at fffffa00 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffffa00 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 			};
- 
- 			dbgu: serial at fffff200 {
++	ahb {
++		apb {
++			pinctrl at fffff400 {
++				atmel,mux-mask = <
++				      /*    A         B          C     */
++				       0xffffffff 0xffe03fff 0xc000000c  /* pioA */
++				       0x000406ff 0x00047e3f 0x00000000  /* pioB */
++				       0xfdffffff 0x00000000 0xb83fffff  /* pioC */
++				       0x003fffff 0x003f8000 0x00000000  /* pioD */
++				      >;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/at91sam9x35ek.dts b/arch/arm/boot/dts/at91sam9x35ek.dts
+new file mode 100644
+index 0000000..5ccb607
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9x35ek.dts
+@@ -0,0 +1,16 @@
++/*
++ * at91sam9x35ek.dts - Device Tree file for AT91SAM9X35-EK board
++ *
++ *  Copyright (C) 2012 Atmel,
++ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9x35.dtsi"
++/include/ "at91sam9x5ek.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9X35-EK";
++	compatible = "atmel,at91sam9x35ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++};
 diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 8a387a8..bc6cd3f 100644
+index bc7a178..6482a85 100644
 --- a/arch/arm/boot/dts/at91sam9x5.dtsi
 +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -108,44 +108,51 @@
+@@ -108,21 +108,92 @@
  				interrupts = <21 4 0>;
  			};
  
--			pioA: gpio at fffff400 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffff400 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+			pinctrl at fffff200 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff400 0xfffff400 0x800>;
+-			pinctrl at fffff200 {
++			pinctrl at fffff400 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
+ 				ranges = <0xfffff400 0xfffff400 0x800>;
+ 
+-				atmel,mux-mask = <
+-				      /*    A         B          C     */
+-				       0xffffffff 0xffe0399f 0xc000001c  /* pioA */
+-				       0xffffffff 0xffc003ff 0xffc003ff  /* pioB */
+-				       0xffffffff 0xffc003ff 0xffc003ff  /* pioC */
+-				       0xffffffff 0xffc003ff 0xffc003ff  /* pioD */
+-				      >;
+-
+ 				/* shared pinctrl settings */
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<0 9 0x1 0x0	/* PA9 periph A */
++							 0 10 0x1 0x1>;	/* PA10 periph A with pullup */
++					};
++				};
 +
-+				pioA: gpio at fffff400 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
++				uart0 {
++					pinctrl_uart0: uart0-0 {
++						atmel,pins =
++							<0 0 0x1 0x1	/* PA0 periph A with pullup */
++							 0 1 0x1 0x0>;	/* PA1 periph A */
++					};
++
++					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
++						atmel,pins =
++							<0 2 0x1 0x0	/* PA2 periph A */
++							 0 3 0x1 0x0>;	/* PA3 periph A */
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1-0 {
++						atmel,pins =
++							<0 5 0x1 0x1	/* PA5 periph A with pullup */
++							 0 6 0x1 0x0>;	/* PA6 periph A */
++					};
++
++					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
++						atmel,pins =
++							<3 27 0x3 0x0	/* PC27 periph C */
++							 3 28 0x3 0x0>;	/* PC28 periph C */
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2-0 {
++						atmel,pins =
++							<0 7 0x1 0x1	/* PA7 periph A with pullup */
++							 0 8 0x1 0x0>;	/* PA8 periph A */
++					};
++
++					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
++						atmel,pins =
++							<0 0 0x2 0x0	/* PB0 periph B */
++							 0 1 0x2 0x0>;	/* PB1 periph B */
++					};
++				};
++
++				uart3 {
++					pinctrl_uart3: uart3-0 {
++						atmel,pins =
++							<3 23 0x2 0x1	/* PC22 periph B with pullup */
++							 3 23 0x2 0x0>;	/* PC23 periph B */
++					};
++
++					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
++						atmel,pins =
++							<3 24 0x2 0x0	/* PC24 periph B */
++							 3 25 0x2 0x0>;	/* PC25 periph B */
++					};
++				};
++
++				usart0 {
++					pinctrl_usart0: usart0-0 {
++						atmel,pins =
++							<3 8 0x3 0x0	/* PC8 periph C */
++							 3 9 0x3 0x1>;	/* PC9 periph C with pullup */
++					};
++				};
++
++				usart1 {
++					pinctrl_usart1: usart1-0 {
++						atmel,pins =
++							<3 16 0x3 0x0	/* PC16 periph C */
++							 3 17 0x3 0x1>;	/* PC17 periph C with pullup */
++					};
 +				};
  
--			pioB: gpio at fffff600 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffff600 0x100>;
--				interrupts = <2 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+				pioB: gpio at fffff600 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 
--			pioC: gpio at fffff800 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffff800 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--			};
-+				pioC: gpio at fffff800 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 
--			pioD: gpio at fffffa00 {
--				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
--				reg = <0xfffffa00 0x100>;
--				interrupts = <3 4 1>;
--				#gpio-cells = <2>;
--				gpio-controller;
--				interrupt-controller;
--				#interrupt-cells = <2>;
-+				pioD: gpio at fffffa00 {
-+					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-+					reg = <0xfffffa00 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+@@ -171,6 +242,8 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 4 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
  			};
  
- 			dbgu: serial at fffff200 {
+@@ -180,6 +253,8 @@
+ 				interrupts = <5 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -189,6 +264,8 @@
+ 				interrupts = <6 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -198,6 +275,8 @@
+ 				interrupts = <7 4 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+similarity index 75%
+rename from arch/arm/boot/dts/at91sam9g25ek.dts
+rename to arch/arm/boot/dts/at91sam9x5ek.dtsi
+index 7829a4d..e5000a7 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -1,18 +1,16 @@
+ /*
+- * at91sam9g25ek.dts - Device Tree file for AT91SAM9G25-EK board
++ * at91sam9x5ek.dtsi - Device Tree file for AT91SAM9x5CM Base board
+  *
+  *  Copyright (C) 2012 Atmel,
+  *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
+  *
+  * Licensed under GPLv2 or later.
+  */
+-/dts-v1/;
+-/include/ "at91sam9x5.dtsi"
+ /include/ "at91sam9x5cm.dtsi"
+ 
+ / {
+-	model = "Atmel AT91SAM9G25-EK";
+-	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++	model = "Atmel AT91SAM9X5-EK";
++	compatible = "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+ 
+ 	chosen {
+ 		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 30bb733..0838d30 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -35,4 +35,8 @@ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb
+ # sam9n12
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9n12ek.dtb
+ # sam9x5
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g15ek.dtb
+ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g25ek.dtb
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g35ek.dtb
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9x25ek.dtb
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9x35ek.dtb
 -- 
 1.7.10.4
