@@ -1,28 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 14:51:28 -0700
-Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
- drivers/bus/
-In-Reply-To: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20120917215128.GF11762@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Sep 2012 22:59:58 +0100
+Subject: [PATCH 2/8] gpio: pl061 depends on ARM
+In-Reply-To: <1347639843-32119-3-git-send-email-dciminaghi@mail.gnudd.com>
+References: <1347639843-32119-1-git-send-email-dciminaghi@mail.gnudd.com>
+ <1347639843-32119-3-git-send-email-dciminaghi@mail.gnudd.com>
+Message-ID: <20120917215958.GT12245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
-> OMAP interconnect drivers are used for the interconnect error handling.
-> Since they are bus driver, lets move it to newly created drivers/bus.
+On Fri, Sep 14, 2012 at 06:23:57PM +0200, Davide Ciminaghi wrote:
+> From: Alessandro Rubini <rubini@gnudd.com>
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Patch just moves OMAP interconnect drivers as is to the newly created
-> driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
-> tree and test on all OMAP boards.
+> Patch dece904d itroduced chained_irq_enter/exit, which is only
+> available for arch/arm and the driver won't compile elsewhere.
+> 
+> The dependency is thus made explicit, because AMBA is used in the x86
+> world by a PCI-to-AMBA bridge, to be submitted.
+> 
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
 
-Great, looks like this should not conflict with other
-omap patches queued, so Arnd should probably take this into
-the bus branch:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+The real solution to this is to stop the madness that chained_irq_enter/
+chained_irq_exit are both ARM-only.
