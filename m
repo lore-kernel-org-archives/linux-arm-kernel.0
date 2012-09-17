@@ -1,38 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Sep 2012 19:10:40 -0700
-Subject: [GIT PULL 03/10] ARM: tegra: remove board files
-In-Reply-To: <1347653181-19936-3-git-send-email-swarren@wwwdotorg.org>
+Date: Sun, 16 Sep 2012 19:10:56 -0700
+Subject: [GIT PULL 04/10] ARM: tegra: switch to the common clock framework
+In-Reply-To: <1347653181-19936-4-git-send-email-swarren@wwwdotorg.org>
 References: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
- <1347653181-19936-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120917021040.GG19186@quad.lixom.net>
+ <1347653181-19936-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120917021056.GH19186@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 02:06:14PM -0600, Stephen Warren wrote:
-> This branch removes all remaining board files for Tegra; booting is
-> now through device tree only.
+On Fri, Sep 14, 2012 at 02:06:15PM -0600, Stephen Warren wrote:
+> This branch contains a few bug-fixes, followed by a conversion of Tegra's
+> clock driver to the common clock framework, followed by various bug fixes
+> found after the conversion.
 > 
-> Related, the Harmony DT is augmented with regulators, since this allows
-> removal of board-harmony-power.c; no other boards had regulator support.
-> This change depends on an enhancement to the TPS6586x regulator driver,
-> hence the dependency mentioned below.
+> This branch depends on v3.6-rc4.
 > 
-> This branch is based on v3.6-rc4, followed by a merge of
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tps6589x-dt
-> 
-> This branch is a dependency the cleanup2 branch.
+> This branch is a dependency for a few later pull requests.
 > 
 > ----------------------------------------------------------------
 > 
-> The following changes since commit 1ab710fe61b91a2448de9843c746555f9725b9cc:
+> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
 > 
->   Merge commit 'tps6589x-dt' into for-3.7/board-removal
+>   Linux 3.6-rc4
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-board-removal
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-common-clk
 
-Pulled into next/cleanup. Thanks!
+Pulled into next/soc. Thanks!
 
 
 -Olof
