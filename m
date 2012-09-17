@@ -1,29 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Sep 2012 18:10:41 -0700
-Subject: [PATCH] ARM: ux500: 8500: use hsit_a_2 group for HSI
-In-Reply-To: <1347620075-18022-1-git-send-email-linus.walleij@stericsson.com>
-References: <1347620075-18022-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120917011041.GD19186@quad.lixom.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 16 Sep 2012 22:28:35 -0300
+Subject: [PATCH v3] ARM: imx: armadillo5x0: Fix illegal register access
+Message-ID: <1347845315-16565-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 12:54:35PM +0200, Linus Walleij wrote:
-> From: Patrice Chotard <patrice.chotard@stericsson.com>
-> 
-> Due to specific constraint, pin HSIT_ACWAKE0_a is
-> not driven by HSI block but as a GPIO.
-> 
-> Cc: arm at kernel.org
-> Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC maintainers - I'll take this fixup through the pinctrl
-> tree if you don't mind.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Sure, you should know best yourself if you're likely to have conflicts with
-other updates in this merge window anyway.
+Since commit eb92044eb (ARM i.MX3: Make ccm base address a variable )
+it is necessary to pass the CCM register base as a variable.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Fix the CCM register access in mach-armadillo5x0 by passing mx3_ccm_base and 
+avoid illegal accesses.
 
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Indicate the correct commit that caused the issue
+Changes since v1:
+- Also fixes the write part.
 
--Olof
+ arch/arm/mach-imx/mach-armadillo5x0.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
+index 2c6ab32..9f39f7e 100644
+--- a/arch/arm/mach-imx/mach-armadillo5x0.c
++++ b/arch/arm/mach-imx/mach-armadillo5x0.c
+@@ -526,7 +526,8 @@ static void __init armadillo5x0_init(void)
+ 	imx31_add_mxc_nand(&armadillo5x0_nand_board_info);
+ 
+ 	/* set NAND page size to 2k if not configured via boot mode pins */
+-	__raw_writel(__raw_readl(MXC_CCM_RCSR) | (1 << 30), MXC_CCM_RCSR);
++	__raw_writel(__raw_readl(mx3_ccm_base + MXC_CCM_RCSR) | 
++					(1 << 30), mx3_ccm_base + MXC_CCM_RCSR);
+ 
+ 	/* RTC */
+ 	/* Get RTC IRQ and register the chip */
+-- 
+1.7.9.5
