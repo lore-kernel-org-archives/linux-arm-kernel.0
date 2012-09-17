@@ -1,82 +1,147 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 17 Sep 2012 10:08:56 +0000
-Subject: [PATCH v3] USB: mxs-phy: add basic otg support
-In-Reply-To: <1347872703-15167-1-git-send-email-richard.zhao@freescale.com>
-References: <1347872703-15167-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803C8293E@039-SN2MPN1-022.039d.mgd.msft.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 17 Sep 2012 19:05:52 +0900
+Subject: [PATCH V4] ARM: EXYNOS5: Add bus clock and set parent clock for
+ FIMD
+In-Reply-To: <1347892995-17924-1-git-send-email-l.krishna@samsung.com>
+References: <1347892995-17924-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <002001cd94bc$05177bc0$0f467340$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, September 17, 2012 11:43 PM Leela Krishna Amudala wrote
+> 
+> This patch adds the bus clock for FIMD and changes the device name for lcd clock
+> also sets mout_mpll_user as parent clock to fimd
+> 
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 
-The purpose for this patch is to have set_peripheral implementation,
-but in current chipidea code, we don't need to know gadget at all,
-as when id switch occurs, the core code know its role (device or host)
-very well, and will call related stop/start function.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-We have already many code bind struct otg with struct phy, we'd better
-split them at later code.
- 
-A better approach to fix this problem is to either not call set_peripheral
-if both device and host use chipidea driver, or implement otg struct
-at chipidea driver.
+It looks good.
 
 
-> Changes from v2:
->  - assign host/gadget in mxs_phy_set_host/mxs_phy_set_peripheral
+> ---
+>  arch/arm/mach-exynos/clock-exynos5.c |   35 ++++++++++++++++++++++++---------
+>  arch/arm/mach-exynos/clock-exynos5.h |   17 ++++++++++++++++
+>  2 files changed, 42 insertions(+), 10 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/clock-exynos5.h
 > 
->  drivers/usb/otg/mxs-phy.c |   25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+> index 774533c..0f6ff97 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -27,6 +27,7 @@
+>  #include <mach/sysmmu.h>
 > 
-> diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
-> index 88db976..3255112 100644
-> --- a/drivers/usb/otg/mxs-phy.c
-> +++ b/drivers/usb/otg/mxs-phy.c
-> @@ -129,12 +129,28 @@ static int mxs_phy_on_disconnect(struct usb_phy
-> *phy, int port)
->  	return 0;
->  }
+>  #include "common.h"
+> +#include "clock-exynos5.h"
 > 
-> +static int mxs_phy_set_host(struct usb_otg *otg, struct usb_bus *host)
-> +{
-> +	otg->host = host;
+>  #ifdef CONFIG_PM_SLEEP
+>  static struct sleep_save exynos5_clock_save[] = {
+> @@ -891,6 +892,13 @@ static struct clk exynos5_clk_mdma1 = {
+>  	.ctrlbit	= (1 << 4),
+>  };
+> 
+> +static struct clk exynos5_clk_fimd1 = {
+> +	.name		= "fimd",
+> +	.devname	= "exynos5-fb.1",
+> +	.enable		= exynos5_clk_ip_disp1_ctrl,
+> +	.ctrlbit	= (1 << 0),
+> +};
 > +
-> +	return 0;
-> +}
-> +
-> +static int mxs_phy_set_peripheral(struct usb_otg *otg,
-> +					struct usb_gadget *gadget)
-> +{
-> +	otg->gadget = gadget;
-> +
-> +	return 0;
-> +}
-> +
->  static int mxs_phy_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
->  	void __iomem *base;
->  	struct clk *clk;
->  	struct mxs_phy *mxs_phy;
-> +	struct usb_otg *otg;
+>  struct clk *exynos5_clkset_group_list[] = {
+>  	[0] = &clk_ext_xtal_mux,
+>  	[1] = NULL,
+> @@ -1120,6 +1128,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
+>  	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
+>  };
 > 
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!res) {
-> @@ -171,6 +187,15 @@ static int mxs_phy_probe(struct platform_device
-> *pdev)
-> 
->  	mxs_phy->clk = clk;
-> 
-> +	otg = devm_kzalloc(&pdev->dev, sizeof(struct usb_otg), GFP_KERNEL);
-> +	if (!otg)
-> +		return -ENOMEM;
-> +	otg->phy = &mxs_phy->phy;
-> +	otg->set_host = mxs_phy_set_host;
-> +	otg->set_peripheral = mxs_phy_set_peripheral;
+> +struct clksrc_clk exynos5_clk_sclk_fimd1 = {
+> +	.clk	= {
+> +		.name		= "sclk_fimd",
+> +		.devname	= "exynos5-fb.1",
+> +		.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+> +		.ctrlbit	= (1 << 0),
+> +	},
+> +	.sources = &exynos5_clkset_group,
+> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> +};
 > +
-> +	mxs_phy->phy.otg = otg;
-> +
->  	platform_set_drvdata(pdev, &mxs_phy->phy);
+>  static struct clksrc_clk exynos5_clksrcs[] = {
+>  	{
+>  		.clk	= {
+> @@ -1131,16 +1151,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+>  		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+>  	}, {
+>  		.clk	= {
+> -			.name		= "sclk_fimd",
+> -			.devname	= "s3cfb.1",
+> -			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+> -			.ctrlbit	= (1 << 0),
+> -		},
+> -		.sources = &exynos5_clkset_group,
+> -		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> -		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> -	}, {
+> -		.clk	= {
+>  			.name		= "aclk_266_gscl",
+>  		},
+>  		.sources = &clk_src_gscl_266,
+> @@ -1240,12 +1250,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
+>  	&exynos5_clk_mdout_spi0,
+>  	&exynos5_clk_mdout_spi1,
+>  	&exynos5_clk_mdout_spi2,
+> +	&exynos5_clk_sclk_fimd1,
+>  };
 > 
->  	return 0;
+>  static struct clk *exynos5_clk_cdev[] = {
+>  	&exynos5_clk_pdma0,
+>  	&exynos5_clk_pdma1,
+>  	&exynos5_clk_mdma1,
+> +	&exynos5_clk_fimd1,
+>  };
+> 
+>  static struct clksrc_clk *exynos5_clksrc_cdev[] = {
+> @@ -1274,6 +1286,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
+>  	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
+>  	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
+>  	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
+> +	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
+>  };
+> 
+>  static unsigned long exynos5_epll_get_rate(struct clk *clk)
+> @@ -1492,6 +1505,8 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
+> 
+>  	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
+>  	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
+> +	clk_set_parent(&exynos5_clk_sclk_fimd1.clk,
+> +			&exynos5_clk_mout_mpll_user.clk);
+> 
+>  	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
+>  		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.h b/arch/arm/mach-exynos/clock-exynos5.h
+> new file mode 100644
+> index 0000000..6f78f5d
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/clock-exynos5.h
+> @@ -0,0 +1,17 @@
+> +/*
+> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Header file for exynos5 clock support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __ASM_ARCH_EXYNOS5_CLOCK_H
+> +#define __ASM_ARCH_EXYNOS5_CLOCK_H __FILE__
+> +
+> +extern struct clksrc_clk exynos5_clk_sclk_fimd1;
+> +
+> +#endif /* __ASM_ARCH_EXYNOS5_CLOCK_H */
 > --
-> 1.7.9.5
+> 1.7.0.4
