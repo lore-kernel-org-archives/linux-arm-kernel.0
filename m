@@ -1,50 +1,38 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 17 Sep 2012 16:07:37 +0400
-Subject: [PATCH v4 12/24] xen/arm: introduce CONFIG_XEN on ARM
-In-Reply-To: <alpine.DEB.2.02.1209171155010.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
- <1347621207-11294-12-git-send-email-stefano.stabellini@eu.citrix.com>
- <505374E2.5080308@mvista.com>
- <alpine.DEB.2.02.1209171155010.29232@kaball.uk.xensource.com>
-Message-ID: <50571289.3040509@mvista.com>
+Date: Mon, 17 Sep 2012 16:09:34 +0400
+Subject: [PATCH] spi: pl022:  Add clk_{un}prepare() support in runtime PM
+In-Reply-To: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
+References: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
+Message-ID: <505712FE.3040500@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 17-09-2012 14:57, Stefano Stabellini wrote:
+On 17-09-2012 14:37, Vipul Kumar Samar wrote:
 
->>> Changes in v2:
+> clk_{un}prepare is mandatory for platforms using common clock framework. Add
+> clk_{un}prepare() support for spi-pl022 runtime PM.
 
->>> - mark Xen guest support on ARM as EXPERIMENTAL.
+> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+[...]
 
->>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>> ---
->>>   arch/arm/Kconfig |   10 ++++++++++
->>>   1 files changed, 10 insertions(+), 0 deletions(-)
+> @@ -2342,10 +2342,13 @@ static int pl022_runtime_suspend(struct device *dev)
+>   static int pl022_runtime_resume(struct device *dev)
+>   {
+>   	struct pl022 *pl022 = dev_get_drvdata(dev);
+> +	int ret = 0;
 
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index 2f88d8d..e92518d 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -1897,6 +1897,16 @@ config DEPRECATED_PARAM_STRUCT
->>>   	  This was deprecated in 2001 and announced to live on for 5 years.
->>>   	  Some old boot loaders still use this way.
->>>
->>> +config XEN_DOM0
->>> +	def_bool y
->>> +
->>> +config XEN
->>> +	bool "Xen guest support on ARM (EXPERIMENTAL)"
->>> +	depends on EXPERIMENTAL && ARM && OF
->>> +	select XEN_DOM0
+    Don't need to init it at all.
 
->>     What's the point of selecting it if it's always "y"?
-
-> That's because on X86 is not always "y": there are things under
-> drivers/xen that compile on both platforms and depend on XEN_DOM0.
-
-    But we're not on x86. On ARM this select is pointless.
+> -	clk_enable(pl022->clk);
+> +	ret = clk_prepare_enable(pl022->clk);
+> +	if (ret)
+> +		dev_err(dev, "could not enable SSP/SPI bus clock\n");
+>
+> -	return 0;
+> +	return ret;
+>   }
+>   #endif
 
 WBR, Sergei
