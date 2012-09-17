@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Sep 2012 13:34:50 +0800
-Subject: [PATCH 21/34] mtd: mxc_nand: remove mach/hardware.h inclusion
+Date: Mon, 17 Sep 2012 13:34:51 +0800
+Subject: [PATCH 22/34] rtc: mxc_rtc: remove mach/hardware.h inclusion
 In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347860103-4141-22-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347860103-4141-23-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,336 +14,187 @@ accordingly.
 As the result, mach/hardware.h inclusion gets removed from the driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: linux-mtd at lists.infradead.org
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: rtc-linux at googlegroups.com
 ---
- arch/arm/mach-imx/clk-imx21.c                 |    2 +-
- arch/arm/mach-imx/clk-imx25.c                 |    2 +-
- arch/arm/mach-imx/clk-imx27.c                 |    2 +-
- arch/arm/mach-imx/clk-imx31.c                 |    2 +-
- arch/arm/mach-imx/clk-imx35.c                 |    2 +-
- arch/arm/mach-imx/clk-imx51-imx53.c           |    2 +-
- arch/arm/mach-imx/devices/devices-common.h    |    1 +
- arch/arm/mach-imx/devices/platform-mxc_nand.c |   20 +++---
- arch/arm/mach-imx/imx27-dt.c                  |    2 +-
- drivers/mtd/nand/mxc_nand.c                   |   86 +++++++++++++++----------
- 10 files changed, 71 insertions(+), 50 deletions(-)
+ arch/arm/mach-imx/clk-imx1.c                 |    2 +-
+ arch/arm/mach-imx/clk-imx27.c                |    2 +-
+ arch/arm/mach-imx/clk-imx31.c                |    2 +-
+ arch/arm/mach-imx/devices/devices-common.h   |    1 +
+ arch/arm/mach-imx/devices/platform-mxc_rtc.c |    9 ++++---
+ drivers/rtc/rtc-mxc.c                        |   34 +++++++++++++++++++++++---
+ 6 files changed, 40 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
-index 09fc31c..96a4788 100644
---- a/arch/arm/mach-imx/clk-imx21.c
-+++ b/arch/arm/mach-imx/clk-imx21.c
-@@ -162,7 +162,7 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
- 	clk_register_clkdev(clk[lcdc_hclk_gate], "ahb", "imx-fb.0");
- 	clk_register_clkdev(clk[usb_gate], "per", "imx21-hcd.0");
- 	clk_register_clkdev(clk[usb_hclk_gate], "ahb", "imx21-hcd.0");
--	clk_register_clkdev(clk[nfc_gate], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[nfc_gate], NULL, "imx21-nand.0");
- 	clk_register_clkdev(clk[dma_hclk_gate], "ahb", "imx-dma");
- 	clk_register_clkdev(clk[dma_gate], "ipg", "imx-dma");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index 54edac0..1aea073 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -198,7 +198,7 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
--	clk_register_clkdev(clk[nfc_ipg_per], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
- 	/* i.mx25 has the i.mx35 type cspi */
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
- 	clk_register_clkdev(clk[cspi2_ipg], NULL, "imx35-cspi.1");
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 1cd1c5b..6b9407b 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -105,7 +105,7 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[dummy], "ahb", "imx-fb.0");
+ 	clk_register_clkdev(clk[hclk], "mshc", NULL);
+ 	clk_register_clkdev(clk[per3], "ssi", NULL);
+-	clk_register_clkdev(clk[clk32], NULL, "mxc_rtc.0");
++	clk_register_clkdev(clk[clk32], NULL, "imx1-rtc.0");
+ 	clk_register_clkdev(clk[clko], "clko", NULL);
+ 
+ 	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
 diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index d9aac0f..6ae2868 100644
+index 6ae2868..5ff5cf0 100644
 --- a/arch/arm/mach-imx/clk-imx27.c
 +++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -239,7 +239,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.2");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
--	clk_register_clkdev(clk[nfc_baud_gate], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
- 	clk_register_clkdev(clk[vpu_baud_gate], "per", "imx-vpu");
- 	clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "imx-vpu");
- 	clk_register_clkdev(clk[dma_ahb_gate], "ahb", "imx-dma");
+@@ -259,7 +259,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
+ 	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
+ 	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
+-	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "mxc_rtc");
++	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "imx21-rtc");
+ 	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+ 	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
+ 	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
 diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 76e6462..729d1a9 100644
+index 729d1a9..d9ff16e 100644
 --- a/arch/arm/mach-imx/clk-imx31.c
 +++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -127,7 +127,7 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[rtc_gate], NULL, "mxc_rtc");
+@@ -124,7 +124,7 @@ int __init mx31_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
+ 	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
+ 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+-	clk_register_clkdev(clk[rtc_gate], NULL, "mxc_rtc");
++	clk_register_clkdev(clk[rtc_gate], NULL, "imx21-rtc");
  	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
  	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
--	clk_register_clkdev(clk[nfc], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[nfc], NULL, "imx27-nand.0");
- 	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
- 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
- 	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index ee25812..fec48e6 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -256,7 +256,7 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[ipg], "ipg", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
--	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 
- 	clk_prepare_enable(clk[spba_gate]);
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index c8ee7d2..22afd5f 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -272,7 +272,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
--	clk_register_clkdev(clk[nfc_gate], NULL, "mxc_nand");
-+	clk_register_clkdev(clk[nfc_gate], NULL, "imx51-nand");
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
- 	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "imx-ssi.2");
+ 	clk_register_clkdev(clk[nfc], NULL, "imx27-nand.0");
 diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index b0f4747..d9717b3 100644
+index d9717b3..73ae524 100644
 --- a/arch/arm/mach-imx/devices/devices-common.h
 +++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -239,6 +239,7 @@ struct platform_device *__init imx_add_mxc_mmc(
+@@ -274,6 +274,7 @@ struct platform_device *__init imx_add_mxc_pwm(
  
- #include <linux/platform_data/mtd-mxc_nand.h>
- struct imx_mxc_nand_data {
+ /* mxc_rtc */
+ struct imx_mxc_rtc_data {
 +	const char *devid;
- 	/*
- 	 * id is traditionally 0, but -1 is more appropriate.  We use -1 for new
- 	 * machines but don't change existing devices as the nand device usually
-diff --git a/arch/arm/mach-imx/devices/platform-mxc_nand.c b/arch/arm/mach-imx/devices/platform-mxc_nand.c
-index eb73b82..cec6961 100644
---- a/arch/arm/mach-imx/devices/platform-mxc_nand.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_nand.c
-@@ -10,15 +10,17 @@
+ 	resource_size_t iobase;
+ 	resource_size_t irq;
+ };
+diff --git a/arch/arm/mach-imx/devices/platform-mxc_rtc.c b/arch/arm/mach-imx/devices/platform-mxc_rtc.c
+index daaf979..f35f848 100644
+--- a/arch/arm/mach-imx/devices/platform-mxc_rtc.c
++++ b/arch/arm/mach-imx/devices/platform-mxc_rtc.c
+@@ -9,20 +9,21 @@
  #include <mach/hardware.h>
  #include "devices-common.h"
  
--#define imx_mxc_nand_data_entry_single(soc, _size)			\
-+#define imx_mxc_nand_data_entry_single(soc, _devid, _size)		\
+-#define imx_mxc_rtc_data_entry_single(soc)				\
++#define imx_mxc_rtc_data_entry_single(soc, _devid)			\
  	{								\
 +		.devid = _devid,					\
- 		.iobase = soc ## _NFC_BASE_ADDR,			\
- 		.iosize = _size,					\
- 		.irq = soc ## _INT_NFC					\
+ 		.iobase = soc ## _RTC_BASE_ADDR,			\
+ 		.irq = soc ## _INT_RTC,					\
  	}
  
--#define imx_mxc_nandv3_data_entry_single(soc, _size)			\
-+#define imx_mxc_nandv3_data_entry_single(soc, _devid, _size)		\
- 	{								\
-+		.devid = _devid,					\
- 		.id = -1,						\
- 		.iobase = soc ## _NFC_BASE_ADDR,			\
- 		.iosize = _size,					\
-@@ -28,32 +30,32 @@
- 
- #ifdef CONFIG_SOC_IMX21
- const struct imx_mxc_nand_data imx21_mxc_nand_data __initconst =
--	imx_mxc_nand_data_entry_single(MX21, SZ_4K);
-+	imx_mxc_nand_data_entry_single(MX21, "imx21-nand", SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX21 */
- 
- #ifdef CONFIG_SOC_IMX25
- const struct imx_mxc_nand_data imx25_mxc_nand_data __initconst =
--	imx_mxc_nand_data_entry_single(MX25, SZ_8K);
-+	imx_mxc_nand_data_entry_single(MX25, "imx25-nand", SZ_8K);
- #endif /* ifdef CONFIG_SOC_IMX25 */
- 
- #ifdef CONFIG_SOC_IMX27
- const struct imx_mxc_nand_data imx27_mxc_nand_data __initconst =
--	imx_mxc_nand_data_entry_single(MX27, SZ_4K);
-+	imx_mxc_nand_data_entry_single(MX27, "imx27-nand", SZ_4K);
- #endif /* ifdef CONFIG_SOC_IMX27 */
- 
  #ifdef CONFIG_SOC_IMX31
- const struct imx_mxc_nand_data imx31_mxc_nand_data __initconst =
--	imx_mxc_nand_data_entry_single(MX31, SZ_4K);
-+	imx_mxc_nand_data_entry_single(MX31, "imx27-nand", SZ_4K);
- #endif
+ const struct imx_mxc_rtc_data imx31_mxc_rtc_data __initconst =
+-	imx_mxc_rtc_data_entry_single(MX31);
++	imx_mxc_rtc_data_entry_single(MX31, "imx21-rtc");
+ #endif /* ifdef CONFIG_SOC_IMX31 */
  
  #ifdef CONFIG_SOC_IMX35
- const struct imx_mxc_nand_data imx35_mxc_nand_data __initconst =
--	imx_mxc_nand_data_entry_single(MX35, SZ_8K);
-+	imx_mxc_nand_data_entry_single(MX35, "imx25-nand", SZ_8K);
- #endif
+ const struct imx_mxc_rtc_data imx35_mxc_rtc_data __initconst =
+-	imx_mxc_rtc_data_entry_single(MX35);
++	imx_mxc_rtc_data_entry_single(MX35, "imx21-rtc");
+ #endif /* ifdef CONFIG_SOC_IMX35 */
  
- #ifdef CONFIG_SOC_IMX51
- const struct imx_mxc_nand_data imx51_mxc_nand_data __initconst =
--	imx_mxc_nandv3_data_entry_single(MX51, SZ_16K);
-+	imx_mxc_nandv3_data_entry_single(MX51, "imx51-nand", SZ_16K);
- #endif
- 
- struct platform_device *__init imx_add_mxc_nand(
-@@ -76,7 +78,7 @@ struct platform_device *__init imx_add_mxc_nand(
- 			.flags = IORESOURCE_IRQ,
+ struct platform_device *__init imx_add_mxc_rtc(
+@@ -40,6 +41,6 @@ struct platform_device *__init imx_add_mxc_rtc(
  		},
  	};
--	return imx_add_platform_device("mxc_nand", data->id,
-+	return imx_add_platform_device(data->devid, data->id,
- 			res + !data->axibase,
- 			ARRAY_SIZE(res) - !data->axibase,
- 			pdata, sizeof(*pdata));
-diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
-index 43fbf86..a6c288e 100644
---- a/arch/arm/mach-imx/imx27-dt.c
-+++ b/arch/arm/mach-imx/imx27-dt.c
-@@ -29,7 +29,7 @@ static const struct of_dev_auxdata imx27_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("fsl,imx27-cspi", MX27_CSPI2_BASE_ADDR, "imx27-cspi.1", NULL),
- 	OF_DEV_AUXDATA("fsl,imx27-cspi", MX27_CSPI3_BASE_ADDR, "imx27-cspi.2", NULL),
- 	OF_DEV_AUXDATA("fsl,imx27-wdt", MX27_WDOG_BASE_ADDR, "imx2-wdt.0", NULL),
--	OF_DEV_AUXDATA("fsl,imx27-nand", MX27_NFC_BASE_ADDR, "mxc_nand.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx27-nand", MX27_NFC_BASE_ADDR, "imx27-nand.0", NULL),
- 	{ /* sentinel */ }
- };
  
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 5683604..d5f8f01 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -37,15 +37,9 @@
+-	return imx_add_platform_device("mxc_rtc", -1,
++	return imx_add_platform_device(data->devid, -1,
+ 			res, ARRAY_SIZE(res), NULL, 0);
+ }
+diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+index e3e50d6..aa81c32 100644
+--- a/drivers/rtc/rtc-mxc.c
++++ b/drivers/rtc/rtc-mxc.c
+@@ -17,8 +17,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
  
- #include <asm/mach/flash.h>
- #include <linux/platform_data/mtd-mxc_nand.h>
 -#include <mach/hardware.h>
- 
- #define DRIVER_NAME "mxc_nand"
- 
--#define nfc_is_v21()		(cpu_is_mx25() || cpu_is_mx35())
--#define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
--#define nfc_is_v3_2()		(cpu_is_mx51() || cpu_is_mx53())
--#define nfc_is_v3()		nfc_is_v3_2()
 -
- /* Addresses for NFC registers */
- #define NFC_V1_V2_BUF_SIZE		(host->regs + 0x00)
- #define NFC_V1_V2_BUF_ADDR		(host->regs + 0x04)
-@@ -1260,6 +1254,45 @@ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
- 	.eccsize = 0,
+ #define RTC_INPUT_CLK_32768HZ	(0x00 << 5)
+ #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
+ #define RTC_INPUT_CLK_38400HZ	(0x02 << 5)
+@@ -72,14 +70,38 @@ static const u32 PIE_BIT_DEF[MAX_PIE_NUM][2] = {
+ #define RTC_TEST2	0x2C	/*  32bit rtc test reg 2 */
+ #define RTC_TEST3	0x30	/*  32bit rtc test reg 3 */
+ 
++enum imx_rtc_type {
++	IMX1_RTC,
++	IMX21_RTC,
++};
++
+ struct rtc_plat_data {
+ 	struct rtc_device *rtc;
+ 	void __iomem *ioaddr;
+ 	int irq;
+ 	struct clk *clk;
+ 	struct rtc_time g_rtc_alarm;
++	enum imx_rtc_type devtype;
  };
  
-+static inline int is_imx21_nfc(struct mxc_nand_host *host)
-+{
-+	return host->devtype_data == &imx21_nand_devtype_data;
-+}
-+
-+static inline int is_imx27_nfc(struct mxc_nand_host *host)
-+{
-+	return host->devtype_data == &imx27_nand_devtype_data;
-+}
-+
-+static inline int is_imx25_nfc(struct mxc_nand_host *host)
-+{
-+	return host->devtype_data == &imx25_nand_devtype_data;
-+}
-+
-+static inline int is_imx51_nfc(struct mxc_nand_host *host)
-+{
-+	return host->devtype_data == &imx51_nand_devtype_data;
-+}
-+
-+static struct platform_device_id mxcnd_devtype[] = {
++static struct platform_device_id imx_rtc_devtype[] = {
 +	{
-+		.name = "imx21-nand",
-+		.driver_data = (kernel_ulong_t) &imx21_nand_devtype_data,
++		.name = "imx1-rtc",
++		.driver_data = IMX1_RTC,
 +	}, {
-+		.name = "imx27-nand",
-+		.driver_data = (kernel_ulong_t) &imx27_nand_devtype_data,
-+	}, {
-+		.name = "imx25-nand",
-+		.driver_data = (kernel_ulong_t) &imx25_nand_devtype_data,
-+	}, {
-+		.name = "imx51-nand",
-+		.driver_data = (kernel_ulong_t) &imx51_nand_devtype_data,
++		.name = "imx21-rtc",
++		.driver_data = IMX21_RTC,
 +	}, {
 +		/* sentinel */
 +	}
 +};
-+MODULE_DEVICE_TABLE(platform, mxcnd_devtype);
++MODULE_DEVICE_TABLE(platform, imx_rtc_devtype);
 +
- #ifdef CONFIG_OF_MTD
- static const struct of_device_id mxcnd_dt_ids[] = {
- 	{
-@@ -1311,30 +1344,6 @@ static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
- }
- #endif
- 
--static int __init mxcnd_probe_pdata(struct mxc_nand_host *host)
--{
--	struct mxc_nand_platform_data *pdata = host->dev->platform_data;
--
--	if (!pdata)
--		return -ENODEV;
--
--	host->pdata = *pdata;
--
--	if (nfc_is_v1()) {
--		if (cpu_is_mx21())
--			host->devtype_data = &imx21_nand_devtype_data;
--		else
--			host->devtype_data = &imx27_nand_devtype_data;
--	} else if (nfc_is_v21()) {
--		host->devtype_data = &imx25_nand_devtype_data;
--	} else if (nfc_is_v3_2()) {
--		host->devtype_data = &imx51_nand_devtype_data;
--	} else
--		BUG();
--
--	return 0;
--}
--
- static int __init mxcnd_probe(struct platform_device *pdev)
++static inline int is_imx1_rtc(struct rtc_plat_data *data)
++{
++	return data->devtype == IMX1_RTC;
++}
++
+ /*
+  * This function is used to obtain the RTC time or the alarm value in
+  * second.
+@@ -278,10 +300,13 @@ static int mxc_rtc_read_time(struct device *dev, struct rtc_time *tm)
+  */
+ static int mxc_rtc_set_mmss(struct device *dev, unsigned long time)
  {
- 	struct nand_chip *this;
-@@ -1396,8 +1405,16 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	host->main_area0 = host->base;
++	struct platform_device *pdev = to_platform_device(dev);
++	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
++
+ 	/*
+ 	 * TTC_DAYR register is 9-bit in MX1 SoC, save time and day of year only
+ 	 */
+-	if (cpu_is_mx1()) {
++	if (is_imx1_rtc(pdata)) {
+ 		struct rtc_time tm;
  
- 	err = mxcnd_probe_dt(host);
--	if (err > 0)
--		err = mxcnd_probe_pdata(host);
-+	if (err > 0) {
-+		struct mxc_nand_platform_data *pdata = pdev->dev.platform_data;
-+		if (pdata) {
-+			host->pdata = *pdata;
-+			host->devtype_data = (struct mxc_nand_devtype_data *)
-+						pdev->id_entry->driver_data;
-+		} else {
-+			err = -ENODEV;
-+		}
-+	}
- 	if (err < 0)
- 		goto eirq;
+ 		rtc_time_to_tm(time, &tm);
+@@ -360,6 +385,8 @@ static int __init mxc_rtc_probe(struct platform_device *pdev)
+ 	if (!pdata)
+ 		return -ENOMEM;
  
-@@ -1473,7 +1490,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	}
- 
- 	/* first scan to find the device and get the page size */
--	if (nand_scan_ident(mtd, nfc_is_v21() ? 4 : 1, NULL)) {
-+	if (nand_scan_ident(mtd, is_imx25_nfc(host) ? 4 : 1, NULL)) {
- 		err = -ENXIO;
- 		goto escan;
- 	}
-@@ -1487,7 +1504,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 		this->ecc.layout = host->devtype_data->ecclayout_4k;
- 
- 	if (this->ecc.mode == NAND_ECC_HW) {
--		if (nfc_is_v1())
-+		if (is_imx21_nfc(host) || is_imx27_nfc(host))
- 			this->ecc.strength = 1;
- 		else
- 			this->ecc.strength = (host->eccsize == 4) ? 4 : 8;
-@@ -1549,6 +1566,7 @@ static struct platform_driver mxcnd_driver = {
- 		   .owner = THIS_MODULE,
- 		   .of_match_table = of_match_ptr(mxcnd_dt_ids),
++	pdata->devtype = pdev->id_entry->driver_data;
++
+ 	if (!devm_request_mem_region(&pdev->dev, res->start,
+ 				     resource_size(res), pdev->name))
+ 		return -EBUSY;
+@@ -482,6 +509,7 @@ static struct platform_driver mxc_rtc_driver = {
+ #endif
+ 		   .owner	= THIS_MODULE,
  	},
-+	.id_table = mxcnd_devtype,
- 	.remove = __devexit_p(mxcnd_remove),
++	.id_table	= imx_rtc_devtype,
+ 	.remove		= __exit_p(mxc_rtc_remove),
  };
  
 -- 
