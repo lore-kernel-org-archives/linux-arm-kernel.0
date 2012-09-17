@@ -1,44 +1,74 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Sep 2012 19:13:09 -0700
-Subject: [GIT PULL 08/10] ARM: tegra: second round of cleanups
-In-Reply-To: <1347653181-19936-8-git-send-email-swarren@wwwdotorg.org>
-References: <1347653181-19936-1-git-send-email-swarren@wwwdotorg.org>
- <1347653181-19936-8-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120917021309.GN19186@quad.lixom.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 17 Sep 2012 10:50:16 +0800
+Subject: [PATCH] ARM: highbank: call highbank_pm_init in .init_late hook
+Message-ID: <1347850216-1979-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 02:06:19PM -0600, Stephen Warren wrote:
-> This branch mainly removes dead code following the removal of all board
-> files. The removals depend on various changes in other branches, so they
-> are all merged together and form the basis of this branch, as enumerated
-> below.
-> 
-> Finally, there are no remaining users of pinconf-tegra.h outside the
-> pinctrl subsystem, so that header is incorporated into an existing file
-> there. This reduces the number of headers in mach-tegra/include, and so
-> helps move towards single zImage.
-> 
-> This branch is based on tegra-for-3.7-cleanup, followed by a merge of
-> tegra-for-3.7-board-removal, followed by a merge of
-> tegra-for-3.7-common-clk, followed by a merge of:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv-for-v3.7
-> 
-> ----------------------------------------------------------------
-> 
-> The following changes since commit fef40b2369a4ececa16b4d02b625e45252fe5d0a:
-> 
->   Merge commit 'xceiv-for-v3.7' into for-3.7/cleanup2
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-cleanup2
+Being a module_init call, highbank_pm_init will cause problem with
+multi-platform build running on other platforms.  Call it in the
+.init_late hook instead.
 
-Hi,
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-highbank/core.h     |    5 +++++
+ arch/arm/mach-highbank/highbank.c |    6 ++++++
+ arch/arm/mach-highbank/pm.c       |    4 +---
+ 3 files changed, 12 insertions(+), 3 deletions(-)
 
-Nothing wrong with this branch, but I'm holding off until I get a strong
-handshake from Felipe that his branch will not be rebased (sent off-list).
-
-
--Olof
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index 598ee78..c2e2c46 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -10,5 +10,10 @@ static inline void highbank_lluart_map_io(void) {}
+ 
+ extern void highbank_smc1(int fn, int arg);
+ extern void highbank_cpu_die(unsigned int cpu);
++#ifdef CONFIG_PM
++extern void highbank_pm_init(void);
++#else
++static inline void highbank_pm_init(void) {}
++#endif
+ 
+ extern struct smp_operations highbank_smp_ops;
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 709bd72..8b1c5ba 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -156,6 +156,11 @@ static void __init highbank_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++static void __init highbank_init_late(void)
++{
++	highbank_pm_init();
++}
++
+ static const char *highbank_match[] __initconst = {
+ 	"calxeda,highbank",
+ 	NULL,
+@@ -168,6 +173,7 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
+ 	.timer		= &highbank_timer,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= highbank_init,
++	.init_late	= highbank_init_late,
+ 	.dt_compat	= highbank_match,
+ 	.restart	= highbank_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+index 33b3beb..de866f2 100644
+--- a/arch/arm/mach-highbank/pm.c
++++ b/arch/arm/mach-highbank/pm.c
+@@ -47,9 +47,7 @@ static const struct platform_suspend_ops highbank_pm_ops = {
+ 	.valid = suspend_valid_only_mem,
+ };
+ 
+-static int __init highbank_pm_init(void)
++void __init highbank_pm_init(void)
+ {
+ 	suspend_set_ops(&highbank_pm_ops);
+-	return 0;
+ }
+-module_init(highbank_pm_init);
+-- 
+1.7.9.5
