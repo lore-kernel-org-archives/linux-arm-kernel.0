@@ -1,162 +1,170 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Sep 2012 17:27:12 +0200
-Subject: [PATCH 15/16] arm: at91: dt: at91sam9 add nand pinctrl support
+Date: Mon, 17 Sep 2012 17:27:02 +0200
+Subject: [PATCH 05/16] arm: at91: at91sam9x5: fix gpio number per bank
 In-Reply-To: <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120917140423.GA17667@game.jcrosoft.org>
  <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1347895633-1763-15-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1347895633-1763-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On the at91sam9x5 SoC series, GPIO banks B and D only have 19 and 22
+pins. So add a property to set this parameter.
+
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/boot/dts/at91sam9260.dtsi |   10 ++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   10 ++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   10 ++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   10 ++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   10 ++++++++++
- 5 files changed, 50 insertions(+)
+ .../devicetree/bindings/gpio/gpio_atmel.txt        |    5 +++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    2 ++
+ arch/arm/mach-at91/gpio.c                          |   33 +++++++++++++-------
+ 3 files changed, 29 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index a3d7132..00f96ff 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -207,6 +207,14 @@
- 					};
- 				};
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+index 66efc80..85f8c0d 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+@@ -9,6 +9,10 @@ Required properties:
+   unused).
+ - gpio-controller: Marks the device node as a GPIO controller.
  
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<2 13 0x0 0x1	/* PC13 gpio RDY pin pull_up */
-+							 2 14 0x0 0x1>;	/* PC14 gpio enable pin pull_up */
-+					};
-+				};
++optional properties:
++- #gpio-lines: Number of gpio if absent 32.
 +
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -372,6 +380,8 @@
- 			      >;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioC 13 0
- 				 &pioC 14 0
- 				 0
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 8bc4ce7..bc3920e 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -154,6 +154,14 @@
- 					};
- 				};
++
+ Example:
+ 	pioA: gpio at fffff200 {
+ 		compatible = "atmel,at91rm9200-gpio";
+@@ -16,5 +20,6 @@ Example:
+ 		interrupts = <2 4>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
++		#gpio-lines = <19>;
+ 	};
  
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<0 22 0x0 0x1	/* PA22 gpio RDY pin pull_up*/
-+							 3 15 0x0 0x1>;	/* PD15 gpio enable pin pull_up */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -271,6 +279,8 @@
- 			      >;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioA 22 0
- 				 &pioD 15 0
- 				 0
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 301458e..1ea95ab 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -186,6 +186,14 @@
- 					};
- 				};
- 
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<2 8 0x0 0x1	/* PC8 gpio RDY pin pull_up*/
-+							 2 14 0x0 0x1>;	/* PC14 gpio enable pin pull_up */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -344,6 +352,8 @@
- 			      >;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioC 8 0
- 				 &pioC 14 0
- 				 0
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 699b2f3..56aa1a0 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -189,6 +189,14 @@
- 					};
- 				};
- 
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<3 5 0x0 0x1	/* PD5 gpio RDY pin pull_up*/
-+							 3 4 0x0 0x1>;	/* PD4 gpio enable pin pull_up */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -295,6 +303,8 @@
- 			       >;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioD 5 0
- 				 &pioD 4 0
- 				 0
 diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 6482a85..b035fa6 100644
+index bc6cd3f..b3efecb 100644
 --- a/arch/arm/boot/dts/at91sam9x5.dtsi
 +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -195,6 +195,14 @@
- 					};
+@@ -130,6 +130,7 @@
+ 					interrupts = <2 4 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
++					#gpio-lines = <19>;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
  				};
+@@ -150,6 +151,7 @@
+ 					interrupts = <3 4 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
++					#gpio-lines = <22>;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
+ 				};
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 3b8f463..a34f0ed 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -33,6 +33,8 @@
  
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<3 4 0x0 0x1	/* PD5 gpio RDY pin pull_up */
-+							 3 5 0x0 0x1>;	/* PD4 gpio enable pin pull_up */
-+					};
-+				};
+ #include "generic.h"
+ 
++#define MAX_NB_GPIO_PER_BANK	32
 +
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -341,6 +349,8 @@
- 			      >;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioD 5 0
- 				 &pioD 4 0
- 				 0
+ struct at91_gpio_chip {
+ 	struct gpio_chip	chip;
+ 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
+@@ -56,7 +58,7 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset);
+ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 
+-#define AT91_GPIO_CHIP(name, nr_gpio)					\
++#define AT91_GPIO_CHIP(name)						\
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
+@@ -67,16 +69,16 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 			.set		  = at91_gpiolib_set,		\
+ 			.dbg_show	  = at91_gpiolib_dbg_show,	\
+ 			.to_irq		  = at91_gpiolib_to_irq,	\
+-			.ngpio		  = nr_gpio,			\
++			.ngpio		  = MAX_NB_GPIO_PER_BANK,	\
+ 		},							\
+ 	}
+ 
+ static struct at91_gpio_chip gpio_chip[] = {
+-	AT91_GPIO_CHIP("pioA", 32),
+-	AT91_GPIO_CHIP("pioB", 32),
+-	AT91_GPIO_CHIP("pioC", 32),
+-	AT91_GPIO_CHIP("pioD", 32),
+-	AT91_GPIO_CHIP("pioE", 32),
++	AT91_GPIO_CHIP("pioA"),
++	AT91_GPIO_CHIP("pioB"),
++	AT91_GPIO_CHIP("pioC"),
++	AT91_GPIO_CHIP("pioD"),
++	AT91_GPIO_CHIP("pioE"),
+ };
+ 
+ static int gpio_banks;
+@@ -91,7 +93,7 @@ static unsigned long at91_gpio_caps;
+ 
+ static inline void __iomem *pin_to_controller(unsigned pin)
+ {
+-	pin /= 32;
++	pin /= MAX_NB_GPIO_PER_BANK;
+ 	if (likely(pin < gpio_banks))
+ 		return gpio_chip[pin].regbase;
+ 
+@@ -100,7 +102,7 @@ static inline void __iomem *pin_to_controller(unsigned pin)
+ 
+ static inline unsigned pin_to_mask(unsigned pin)
+ {
+-	return 1 << (pin % 32);
++	return 1 << (pin % MAX_NB_GPIO_PER_BANK);
+ }
+ 
+ 
+@@ -992,6 +994,7 @@ static void __init of_at91_gpio_init_one(struct device_node *np)
+ {
+ 	int alias_idx;
+ 	struct at91_gpio_chip *at91_gpio;
++	uint32_t ngpio;
+ 
+ 	if (!np)
+ 		return;
+@@ -1004,7 +1007,7 @@ static void __init of_at91_gpio_init_one(struct device_node *np)
+ 	}
+ 
+ 	at91_gpio = &gpio_chip[alias_idx];
+-	at91_gpio->chip.base = alias_idx * at91_gpio->chip.ngpio;
++	at91_gpio->chip.base = alias_idx * MAX_NB_GPIO_PER_BANK;
+ 
+ 	at91_gpio->regbase = of_iomap(np, 0);
+ 	if (!at91_gpio->regbase) {
+@@ -1024,6 +1027,14 @@ static void __init of_at91_gpio_init_one(struct device_node *np)
+ 	if (of_device_is_compatible(np, "atmel,at91sam9x5-gpio"))
+ 		at91_gpio_caps |= AT91_GPIO_CAP_PIO3;
+ 
++	if (!of_property_read_u32(np, "#gpio-lines", &ngpio)) {
++		if (ngpio >= MAX_NB_GPIO_PER_BANK)
++			pr_err("at91_gpio.%d, gpio-nb >= %d failback to %d\n",
++			       alias_idx, MAX_NB_GPIO_PER_BANK, MAX_NB_GPIO_PER_BANK);
++		else
++			at91_gpio->chip.ngpio = ngpio;
++	}
++
+ 	/* Setup clock */
+ 	if (at91_gpio_setup_clk(alias_idx))
+ 		goto ioremap_err;
+@@ -1061,7 +1072,7 @@ static void __init at91_gpio_init_one(int idx, u32 regbase, int pioc_hwirq)
+ {
+ 	struct at91_gpio_chip *at91_gpio = &gpio_chip[idx];
+ 
+-	at91_gpio->chip.base = idx * at91_gpio->chip.ngpio;
++	at91_gpio->chip.base = idx * MAX_NB_GPIO_PER_BANK;
+ 	at91_gpio->pioc_hwirq = pioc_hwirq;
+ 	at91_gpio->pioc_idx = idx;
+ 
 -- 
 1.7.10.4
