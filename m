@@ -1,72 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Sep 2012 09:55:12 -0500
-Subject: [PATCH] ARM: highbank: call highbank_pm_init from .init_machine
-Message-ID: <1347893712-21819-1-git-send-email-robherring2@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 17 Sep 2012 17:27:03 +0200
+Subject: [PATCH 06/16] ARM: at91: add dummies pinctrl for non dt platform
+In-Reply-To: <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20120917140423.GA17667@game.jcrosoft.org>
+ <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1347895633-1763-6-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
-
-Being a module_init call, highbank_pm_init will cause problem with
-multi-platform build running on other platforms.  Call it from
-.init_machine instead.
-
-Reported-by: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
-Arnd, Olof,
+ arch/arm/mach-at91/setup.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Can you please apply this to the multi-platform branch or I can send an updated
-pull request if you prefer.
-
-Rob
-
- arch/arm/mach-highbank/core.h     |    6 ++++++
- arch/arm/mach-highbank/highbank.c |    1 +
- arch/arm/mach-highbank/pm.c       |    4 +---
- 3 files changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-index 141ed51..8b9fb1a 100644
---- a/arch/arm/mach-highbank/core.h
-+++ b/arch/arm/mach-highbank/core.h
-@@ -8,4 +8,10 @@ extern void highbank_lluart_map_io(void);
- static inline void highbank_lluart_map_io(void) {}
- #endif
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 944bffb..50c69b5 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -10,6 +10,7 @@
+ #include <linux/mm.h>
+ #include <linux/pm.h>
+ #include <linux/of_address.h>
++#include <linux/pinctrl/machine.h>
  
-+#ifdef CONFIG_PM_SLEEP
-+extern void highbank_pm_init(void);
-+#else
-+static inline void highbank_pm_init(void) {}
-+#endif
+ #include <asm/system_misc.h>
+ #include <asm/mach/map.h>
+@@ -463,4 +464,6 @@ void __init at91_initialize(unsigned long main_clock)
+ 	at91_boot_soc.register_clocks();
+ 
+ 	at91_boot_soc.init();
 +
- extern void highbank_smc1(int fn, int arg);
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index d75b0a7..f376c26 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -152,6 +152,7 @@ static void highbank_power_off(void)
- static void __init highbank_init(void)
- {
- 	pm_power_off = highbank_power_off;
-+	highbank_pm_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	pinctrl_provide_dummies();
  }
-diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-index 33b3beb..de866f2 100644
---- a/arch/arm/mach-highbank/pm.c
-+++ b/arch/arm/mach-highbank/pm.c
-@@ -47,9 +47,7 @@ static const struct platform_suspend_ops highbank_pm_ops = {
- 	.valid = suspend_valid_only_mem,
- };
- 
--static int __init highbank_pm_init(void)
-+void __init highbank_pm_init(void)
- {
- 	suspend_set_ops(&highbank_pm_ops);
--	return 0;
- }
--module_init(highbank_pm_init);
 -- 
-1.7.9.5
+1.7.10.4
