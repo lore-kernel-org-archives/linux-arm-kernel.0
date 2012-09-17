@@ -1,38 +1,41 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 17 Sep 2012 16:09:34 +0400
-Subject: [PATCH] spi: pl022:  Add clk_{un}prepare() support in runtime PM
-In-Reply-To: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
-References: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
-Message-ID: <505712FE.3040500@mvista.com>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Mon, 17 Sep 2012 07:43:11 -0500
+Subject: [PATCH v7 0/11] KGDB/KDB FIQ (NMI) debugger
+In-Reply-To: <20120917113750.GA28838@kroah.com>
+References: <20120913150133.GA16238@lizard> <20120917113750.GA28838@kroah.com>
+Message-ID: <50571ADF.3000406@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 17-09-2012 14:37, Vipul Kumar Samar wrote:
-
-> clk_{un}prepare is mandatory for platforms using common clock framework. Add
-> clk_{un}prepare() support for spi-pl022 runtime PM.
-
-> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-[...]
-
-> @@ -2342,10 +2342,13 @@ static int pl022_runtime_suspend(struct device *dev)
->   static int pl022_runtime_resume(struct device *dev)
->   {
->   	struct pl022 *pl022 = dev_get_drvdata(dev);
-> +	int ret = 0;
-
-    Don't need to init it at all.
-
-> -	clk_enable(pl022->clk);
-> +	ret = clk_prepare_enable(pl022->clk);
-> +	if (ret)
-> +		dev_err(dev, "could not enable SSP/SPI bus clock\n");
+On 09/17/2012 06:37 AM, Greg Kroah-Hartman wrote:
+> On Thu, Sep 13, 2012 at 08:01:33AM -0700, Anton Vorontsov wrote:
+>> Hi all,
+>>
+>> Here comes the lucky v7:
+>>
+>> - Per Alan Cox's suggestion added hangup method and removed a small
+>>   leftover;
+>> - Per Colin Cross' suggestion moved IRQ quiescing logic into
+>>   poll_get_char routine. IIUC, Alan is less unhappy about it.  As a
+>>   result, clear_irq() callback dropped.
+>>
+>> These patches can be found in the following repo (based on tty-next):
+>>
+>> 	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
+>>
+>> Old changelogs and rationale for these patches can be found here:
+>>
+>> 	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
+>> 	v6: http://lkml.org/lkml/2012/9/10/2
+> I have no objection to these patches, and as they are based on my
+> tty-next tree, should I be the ones accepting them?  If so, then I need
+> a bunch of acks from others involved in the kdb/kgdb code before I can
+> do so.
 >
-> -	return 0;
-> +	return ret;
->   }
->   #endif
+> To make it easier, can I just take the tty driver patches now?  Will
+> that break anything?
 
-WBR, Sergei
+I have not made my way through the entire series yet, so I am not sure if you need the kdb header changes or not, but so far it looks like the tty pieces are separate.  If you add your ack Greg, I'll take the whole series and merge it into kgdb-next, or after I finish the review we could do it the other way around.
+
+Cheers,
+Jason.
