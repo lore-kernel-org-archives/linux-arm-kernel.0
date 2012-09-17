@@ -1,106 +1,136 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 17 Sep 2012 08:52:59 +0000
-Subject: [PATCH] USB: chipidea: use OTGSC_BSV to detect vbus valid
-In-Reply-To: <1347871821-14643-1-git-send-email-richard.zhao@freescale.com>
-References: <1347871821-14643-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803C8284B@039-SN2MPN1-022.039d.mgd.msft.net>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Mon, 17 Sep 2012 20:13:15 +0530
+Subject: [PATCH V4] ARM: EXYNOS5: Add bus clock and set parent clock for FIMD
+Message-ID: <1347892995-17924-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds the bus clock for FIMD and changes the device name for lcd clock
+also sets mout_mpll_user as parent clock to fimd
+
+Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+---
+ arch/arm/mach-exynos/clock-exynos5.c |   35 ++++++++++++++++++++++++---------
+ arch/arm/mach-exynos/clock-exynos5.h |   17 ++++++++++++++++
+ 2 files changed, 42 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/clock-exynos5.h
+
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index 774533c..0f6ff97 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -27,6 +27,7 @@
+ #include <mach/sysmmu.h>
  
-
+ #include "common.h"
++#include "clock-exynos5.h"
  
-> 
-> OTGSC_AVVIS cannot be set when vbus voltage goes valid or invalid on
-> imx, so convert to use OTGSC_BSV.
-> 
-
-Not just on imx, from the IC guys, it is chipidea's feature.
-the AVVIS will not go to 1 when the vbus goes to high if ID = 1.
-
-> OTGSC_BSVIE and OTGSC_BSVIS is not cleared when hw_device_reset, so we
-> don't need to call hw_enable_vbus_intr after hw_device_reset.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  drivers/usb/chipidea/udc.c |   17 ++++++++---------
->  1 file changed, 8 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> index 2f45bba..b158a04 100644
-> --- a/drivers/usb/chipidea/udc.c
-> +++ b/drivers/usb/chipidea/udc.c
-> @@ -307,14 +307,13 @@ static u32 hw_test_and_clear_intr_active(struct
-> ci13xxx *ci)
-> 
->  static void hw_enable_vbus_intr(struct ci13xxx *ci)
->  {
-> -	hw_write(ci, OP_OTGSC, OTGSC_AVVIS, OTGSC_AVVIS);
-> -	hw_write(ci, OP_OTGSC, OTGSC_AVVIE, OTGSC_AVVIE);
-> -	queue_work(ci->wq, &ci->vbus_work);
-> +	hw_write(ci, OP_OTGSC, OTGSC_BSVIS, OTGSC_BSVIS);
-> +	hw_write(ci, OP_OTGSC, OTGSC_BSVIE, OTGSC_BSVIE);
->  }
-> 
->  static void hw_disable_vbus_intr(struct ci13xxx *ci)
->  {
-> -	hw_write(ci, OP_OTGSC, OTGSC_AVVIE, 0);
-> +	hw_write(ci, OP_OTGSC, OTGSC_BSVIE, 0);
->  }
-> 
->  /**
-> @@ -387,7 +386,7 @@ static void vbus_work(struct work_struct *work)
->  {
->  	struct ci13xxx *ci = container_of(work, struct ci13xxx, vbus_work);
-> 
-> -	if (hw_read(ci, OP_OTGSC, OTGSC_AVV))
-> +	if (hw_read(ci, OP_OTGSC, OTGSC_BSV))
->  		usb_gadget_vbus_connect(&ci->gadget);
->  	else
->  		usb_gadget_vbus_disconnect(&ci->gadget);
-> @@ -1392,7 +1391,6 @@ static int ci13xxx_vbus_session(struct usb_gadget
-> *_gadget, int is_active)
->  		if (is_active) {
->  			pm_runtime_get_sync(&_gadget->dev);
->  			hw_device_reset(ci, USBMODE_CM_DC);
-> -			hw_enable_vbus_intr(ci);
->  			hw_device_state(ci, ci->ep0out->qh.dma);
->  		} else {
->  			hw_device_state(ci, 0);
-> @@ -1569,7 +1567,6 @@ static int ci13xxx_start(struct usb_gadget *gadget,
->  		if (ci->vbus_active) {
->  			if (ci->platdata->flags & CI13XXX_REGS_SHARED) {
->  				hw_device_reset(ci, USBMODE_CM_DC);
-> -				hw_enable_vbus_intr(ci);
->  			}
->  		} else {
->  			pm_runtime_put_sync(&ci->gadget.dev);
-> @@ -1680,7 +1677,7 @@ static irqreturn_t udc_irq(struct ci13xxx *ci)
->  	intr = hw_read(ci, OP_OTGSC, ~0);
->  	hw_write(ci, OP_OTGSC, ~0, intr);
-> 
-> -	if (intr & (OTGSC_AVVIE & OTGSC_AVVIS))
-> +	if ((intr & OTGSC_BSVIE) && (intr & OTGSC_BSVIS))
->  		queue_work(ci->wq, &ci->vbus_work);
-> 
->  	spin_unlock(&ci->lock);
-> @@ -1758,7 +1755,6 @@ static int udc_start(struct ci13xxx *ci)
->  		retval = hw_device_reset(ci, USBMODE_CM_DC);
->  		if (retval)
->  			goto put_transceiver;
-> -		hw_enable_vbus_intr(ci);
->  	}
-> 
->  	retval = device_register(&ci->gadget.dev);
-> @@ -1782,6 +1778,9 @@ static int udc_start(struct ci13xxx *ci)
->  	if (retval)
->  		goto remove_trans;
-> 
-> +	queue_work(ci->wq, &ci->vbus_work);
-> +	hw_enable_vbus_intr(ci);
-> +
->  	pm_runtime_no_callbacks(&ci->gadget.dev);
->  	pm_runtime_enable(&ci->gadget.dev);
-> 
-> --
-> 1.7.9.5
+ #ifdef CONFIG_PM_SLEEP
+ static struct sleep_save exynos5_clock_save[] = {
+@@ -891,6 +892,13 @@ static struct clk exynos5_clk_mdma1 = {
+ 	.ctrlbit	= (1 << 4),
+ };
+ 
++static struct clk exynos5_clk_fimd1 = {
++	.name		= "fimd",
++	.devname	= "exynos5-fb.1",
++	.enable		= exynos5_clk_ip_disp1_ctrl,
++	.ctrlbit	= (1 << 0),
++};
++
+ struct clk *exynos5_clkset_group_list[] = {
+ 	[0] = &clk_ext_xtal_mux,
+ 	[1] = NULL,
+@@ -1120,6 +1128,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
+ 	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
+ };
+ 
++struct clksrc_clk exynos5_clk_sclk_fimd1 = {
++	.clk	= {
++		.name		= "sclk_fimd",
++		.devname	= "exynos5-fb.1",
++		.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
++		.ctrlbit	= (1 << 0),
++	},
++	.sources = &exynos5_clkset_group,
++	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
++	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
++};
++
+ static struct clksrc_clk exynos5_clksrcs[] = {
+ 	{
+ 		.clk	= {
+@@ -1131,16 +1151,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+ 		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+ 	}, {
+ 		.clk	= {
+-			.name		= "sclk_fimd",
+-			.devname	= "s3cfb.1",
+-			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+-			.ctrlbit	= (1 << 0),
+-		},
+-		.sources = &exynos5_clkset_group,
+-		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+-		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+-	}, {
+-		.clk	= {
+ 			.name		= "aclk_266_gscl",
+ 		},
+ 		.sources = &clk_src_gscl_266,
+@@ -1240,12 +1250,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
+ 	&exynos5_clk_mdout_spi0,
+ 	&exynos5_clk_mdout_spi1,
+ 	&exynos5_clk_mdout_spi2,
++	&exynos5_clk_sclk_fimd1,
+ };
+ 
+ static struct clk *exynos5_clk_cdev[] = {
+ 	&exynos5_clk_pdma0,
+ 	&exynos5_clk_pdma1,
+ 	&exynos5_clk_mdma1,
++	&exynos5_clk_fimd1,
+ };
+ 
+ static struct clksrc_clk *exynos5_clksrc_cdev[] = {
+@@ -1274,6 +1286,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
+ 	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
+ 	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
+ 	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
++	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
+ };
+ 
+ static unsigned long exynos5_epll_get_rate(struct clk *clk)
+@@ -1492,6 +1505,8 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
+ 
+ 	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
+ 	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
++	clk_set_parent(&exynos5_clk_sclk_fimd1.clk,
++			&exynos5_clk_mout_mpll_user.clk);
+ 
+ 	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
+ 		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
+diff --git a/arch/arm/mach-exynos/clock-exynos5.h b/arch/arm/mach-exynos/clock-exynos5.h
+new file mode 100644
+index 0000000..6f78f5d
+--- /dev/null
++++ b/arch/arm/mach-exynos/clock-exynos5.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Header file for exynos5 clock support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_EXYNOS5_CLOCK_H
++#define __ASM_ARCH_EXYNOS5_CLOCK_H __FILE__
++
++extern struct clksrc_clk exynos5_clk_sclk_fimd1;
++
++#endif /* __ASM_ARCH_EXYNOS5_CLOCK_H */
+-- 
+1.7.0.4
