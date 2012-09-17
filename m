@@ -1,79 +1,180 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Sep 2012 15:29:14 -0500
-Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for
- clean and flush range
-In-Reply-To: <20120917194733.GQ12245@n2100.arm.linux.org.uk>
-References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
- <1347890398-22088-1-git-send-email-robherring2@gmail.com>
- <20120917194733.GQ12245@n2100.arm.linux.org.uk>
-Message-ID: <5057881A.9020604@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Sep 2012 13:29:44 -0700
+Subject: [PATCH] mfd: Fix compile for twl-core.c by removing cpu_is_omap usage
+Message-ID: <20120917202943.GV4521@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 17, 2012 at 08:59:58AM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> All but background ops are atomic on the pl310, so a spinlock is not
->> needed for a cache sync if background operations are not used. Using
->> background ops was an optimization for flushing large buffers, but that's
->> not needed for platforms where i/o is coherent and/or that have a larger
->> cache size than likely to flush at once. The cache sync spinlock is
->> taken on every readl/writel and can be a bottleneck for code paths with
->> register accesses.
->>
->> The default behaviour is unchanged. Platforms can enable using atomic
->> cache ops only by adding "arm,use-atomic-ops" to pl310 device-tree
->> node.
->>
->> It is assumed that remaining background ops are only used in non-SMP
->> code paths.
-> 
-> (a) you're not describing hardware, you're describing a feature of the
->     Linux kernel's implementation - no, you're describing a configuration
->     feature of the kernel.  This should not be in DT.
-> (b) you're disabling the optimization to avoid doing a lengthy line-by-line
->     cache operation when the size is larger than the cache size, and trading
->     it for possibly slightly quicker accesses.
-> 
-> The problem I have with this is it's likely that you've only looked at
-> "oh, this makes IO accesses faster" and not the total picture wrt the
-> effect on time taken by the DMA API.
+Commit 7d7e1eba (ARM: OMAP2+: Prepare for irqs.h removal) broke
+compile for non-omap as include plat/cpu.h was added:
 
-No, I'm looking at the system performance and profiling led me here. If
-i/o is coherent, then L2 cache operations are never called by the DMA
-mapping API. So we have a optimization using background ops that I will
-never hit and that optimization gives me a negative performance impact.
+drivers/mfd/twl-core.c:49:22: fatal error: plat/cpu.h: No such file or directory
 
-I could easily "fix" this in the xgmac driver by using __raw_writel or
-writel_relaxed, but that would break non-coherent operation which does
-need the L2 cache barriers.
+This header was indirectly included earlier when SPARSE_IRQ was not
+set, but does not exist on most platforms.
 
-Even with non-coherent i/o, I'm not likely to be doing >4MB at a time
-flushes on my system. It is certainly impossible for networking. I'm not
-sure about SATA, but I'd guess that size is also unlikely.
+Fix the problem by removing the cpu_is_omap usage that should
+not exist in drivers at all. We can do this by adding proper
+clock aliases for the twl-core.c drivers, and drop separate
+handling for cases when clock framework is not available as
+the behaviour will stay the same.
 
-> Plus, because there's little justification behind this patch (apart
-> from a vague reference to the speed of IO accesses) I'm going to say
-> NAK to this until further information is forthcoming justifying this
-> change.
-> 
+Note that we need to add a platform device to avoid using the
+i2c provided names that may be different on various omaps.
 
-30% faster network transmit rate with pktgen on highbank.
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-> In any case (a) applies whatever.  This is not hardware description,
-> this is implementation configuration which has nothing to do with DT.
-> Don't use DT as a dumping ground for implementation configuration.
+---
 
-It's not without precedence, but you are right that it is a questionable
-use of DT. I'm open to suggestions of how you would expose this
-configuration to platforms. We obviously don't want a compile time
-option. Some options:
+Samuel, I'd like to queue this via arm-soc as that's where I have
+the breaking patch is if this patch is OK with you.
 
-- Add a flags param to l2x0_of_init to configure it
-- Add non-background version of functions and override the function ptrs
-in platform code.
-- Add a new call to configure l2 settings like this.
-- Expose the use_background_ops variable directly
-
-Rob
+--- a/arch/arm/mach-omap2/clock2430_data.c
++++ b/arch/arm/mach-omap2/clock2430_data.c
+@@ -1856,6 +1856,7 @@ static struct omap_clk omap2430_clks[] = {
+ 	CLK(NULL,	"func_32k_ck",	&func_32k_ck,	CK_243X),
+ 	CLK(NULL,	"secure_32k_ck", &secure_32k_ck, CK_243X),
+ 	CLK(NULL,	"osc_ck",	&osc_ck,	CK_243X),
++	CLK("twl",	"fck",		&osc_ck,	CK_243X),
+ 	CLK(NULL,	"sys_ck",	&sys_ck,	CK_243X),
+ 	CLK(NULL,	"alt_ck",	&alt_ck,	CK_243X),
+ 	CLK(NULL,	"mcbsp_clks",	&mcbsp_clks,	CK_243X),
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -3226,6 +3226,7 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"virt_26000000_ck",	&virt_26000000_ck,	CK_3XXX),
+ 	CLK(NULL,	"virt_38_4m_ck", &virt_38_4m_ck, CK_3XXX),
+ 	CLK(NULL,	"osc_sys_ck",	&osc_sys_ck,	CK_3XXX),
++	CLK("twl",	"fck",		&osc_sys_ck,	CK_3XXX),
+ 	CLK(NULL,	"sys_ck",	&sys_ck,	CK_3XXX),
+ 	CLK(NULL,	"sys_altclk",	&sys_altclk,	CK_3XXX),
+ 	CLK(NULL,	"mcbsp_clks",	&mcbsp_clks,	CK_3XXX),
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -46,8 +46,6 @@
+ #include <linux/i2c.h>
+ #include <linux/i2c/twl.h>
+ 
+-#include <plat/cpu.h>
+-
+ #include "twl-core.h"
+ 
+ /*
+@@ -1134,12 +1132,7 @@ static void clocks_init(struct device *dev,
+ 	u32 rate;
+ 	u8 ctrl = HFCLK_FREQ_26_MHZ;
+ 
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+-	if (cpu_is_omap2430())
+-		osc = clk_get(dev, "osc_ck");
+-	else
+-		osc = clk_get(dev, "osc_sys_ck");
+-
++	osc = clk_get(dev, "fck");
+ 	if (IS_ERR(osc)) {
+ 		printk(KERN_WARNING "Skipping twl internal clock init and "
+ 				"using bootloader value (unknown osc rate)\n");
+@@ -1149,18 +1142,6 @@ static void clocks_init(struct device *dev,
+ 	rate = clk_get_rate(osc);
+ 	clk_put(osc);
+ 
+-#else
+-	/* REVISIT for non-OMAP systems, pass the clock rate from
+-	 * board init code, using platform_data.
+-	 */
+-	osc = ERR_PTR(-EIO);
+-
+-	printk(KERN_WARNING "Skipping twl internal clock init and "
+-	       "using bootloader value (unknown osc rate)\n");
+-
+-	return;
+-#endif
+-
+ 	switch (rate) {
+ 	case 19200000:
+ 		ctrl = HFCLK_FREQ_19p2_MHZ;
+@@ -1222,10 +1203,23 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ {
+ 	struct twl4030_platform_data	*pdata = client->dev.platform_data;
+ 	struct device_node		*node = client->dev.of_node;
++	struct platform_device		*pdev;
+ 	int				irq_base = 0;
+ 	int				status;
+ 	unsigned			i, num_slaves;
+ 
++	pdev = platform_device_alloc(DRIVER_NAME, -1);
++	if (!pdev) {
++		dev_err(&client->dev, "can't alloc pdev\n");
++		return -ENOMEM;
++	}
++
++	status = platform_device_add(pdev);
++	if (status) {
++		platform_device_put(pdev);
++		return status;
++	}
++
+ 	if (node && !pdata) {
+ 		/*
+ 		 * XXX: Temporary pdata until the information is correctly
+@@ -1234,23 +1228,30 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 		pdata = devm_kzalloc(&client->dev,
+ 				     sizeof(struct twl4030_platform_data),
+ 				     GFP_KERNEL);
+-		if (!pdata)
+-			return -ENOMEM;
++		if (!pdata) {
++			status = -ENOMEM;
++			goto free;
++		}
+ 	}
+ 
+ 	if (!pdata) {
+ 		dev_dbg(&client->dev, "no platform data?\n");
+-		return -EINVAL;
++		status = -EINVAL;
++		goto free;
+ 	}
+ 
++	platform_set_drvdata(pdev, pdata);
++
+ 	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C) == 0) {
+ 		dev_dbg(&client->dev, "can't talk I2C?\n");
+-		return -EIO;
++		status = -EIO;
++		goto free;
+ 	}
+ 
+ 	if (inuse) {
+ 		dev_dbg(&client->dev, "driver is already in use\n");
+-		return -EBUSY;
++		status = -EBUSY;
++		goto free;
+ 	}
+ 
+ 	if ((id->driver_data) & TWL6030_CLASS) {
+@@ -1285,7 +1286,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 	inuse = true;
+ 
+ 	/* setup clock framework */
+-	clocks_init(&client->dev, pdata->clock);
++	clocks_init(&pdev->dev, pdata->clock);
+ 
+ 	/* read TWL IDCODE Register */
+ 	if (twl_id == TWL4030_CLASS_ID) {
+@@ -1335,6 +1336,9 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ fail:
+ 	if (status < 0)
+ 		twl_remove(client);
++free:
++	if (status < 0)
++		platform_device_unregister(pdev);
+ 
+ 	return status;
+ }
