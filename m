@@ -1,32 +1,61 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 17 Sep 2012 08:14:20 +0000
-Subject: [PATCH v9 1/3] ARM: OMAP2/3: hwmod data: add gpmc
-In-Reply-To: <alpine.DEB.2.00.1209122202030.7275@utopia.booyaka.com>
-References: <cover.1347355380.git.afzal@ti.com>
- <eb0761d198e52ea7d39d201702e1eff84c511396.1347355380.git.afzal@ti.com>
- <alpine.DEB.2.00.1209122202030.7275@utopia.booyaka.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E4DAD@DBDE01.ent.ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 17 Sep 2012 10:18:42 +0200 (CEST)
+Subject: [PATCH 26/34] media: mx2_camera: remove dead code in
+ mx2_camera_add_device
+In-Reply-To: <1347860103-4141-27-git-send-email-shawn.guo@linaro.org>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <1347860103-4141-27-git-send-email-shawn.guo@linaro.org>
+Message-ID: <Pine.LNX.4.64.1209171017460.1689@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Shawn
 
-On Thu, Sep 13, 2012 at 03:45:27, Paul Walmsley wrote:
+Thanks for the clean up. Would you like these patches to go via a single 
+tree, presumably, arm-soc? In this case
 
-> > +				HWMOD_INIT_NO_RESET |
+On Mon, 17 Sep 2012, Shawn Guo wrote:
 
-> As I understand it, this is not due to any GPMC-related reset bugs, but 
-> just because the kernel is relying on the bootloader GPMC timing data 
-> being preserved.  Is that correct?
+> This is a piece of code becoming dead since commit 2c9ba37 ([media]
+> V4L: mx2_camera: remove unsupported i.MX27 DMA mode, make EMMA
+> mandatory).  It should have been removed together with the commit.
+> Remove it now.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: linux-media at vger.kernel.org
 
-Yes, it is due to Kernel relying on bootloader gpmc settings
-
-> Assuming it is, ideally we wouldn't merge such a patch, but I guess this 
-> is somewhat complicated now with the DT transition.  So those should be 
-> marked with comments so we know this is not a hardware bug... something 
-> like the following.
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
 Thanks
+Guennadi
 
-Regards
-Afzal
+> ---
+>  drivers/media/video/mx2_camera.c |    4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+> index 965427f..89c7e28 100644
+> --- a/drivers/media/video/mx2_camera.c
+> +++ b/drivers/media/video/mx2_camera.c
+> @@ -441,11 +441,9 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+>  
+>  	csicr1 = CSICR1_MCLKEN;
+>  
+> -	if (cpu_is_mx27()) {
+> +	if (cpu_is_mx27())
+>  		csicr1 |= CSICR1_PRP_IF_EN | CSICR1_FCC |
+>  			CSICR1_RXFF_LEVEL(0);
+> -	} else if (cpu_is_mx27())
+> -		csicr1 |= CSICR1_SOF_INTEN | CSICR1_RXFF_LEVEL(2);
+>  
+>  	pcdev->csicr1 = csicr1;
+>  	writel(pcdev->csicr1, pcdev->base_csi + CSICR1);
+> -- 
+> 1.7.9.5
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
