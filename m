@@ -1,86 +1,166 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Mon, 17 Sep 2012 16:43:35 +0300
-Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
-In-Reply-To: <505096EF.8060208@bluegiga.com>
-References: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
- <20120910060840.GT26709@S2101-09.ap.freescale.net>
- <504DBB10.9030702@bluegiga.com>
- <CAKGA1bm990BXJuZ=sQFgaciJxeP_ytPV2tfm1rHi=s=w7b-OYg@mail.gmail.com>
- <505096EF.8060208@bluegiga.com>
-Message-ID: <50572907.6000700@bluegiga.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 17 Sep 2012 14:45:00 +0100
+Subject: [PATCH v4 10/24] xen/arm: compile and run xenbus
+In-Reply-To: <20120917132932.GA11517@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-10-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120917132932.GA11517@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1209171444060.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 17 Sep 2012, Konrad Rzeszutek Wilk wrote:
+> On Fri, Sep 14, 2012 at 12:13:12PM +0100, Stefano Stabellini wrote:
+> > bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
+> > an error.
+> > 
+> > If Linux is running as an HVM domain and is running as Dom0, use
+> > xenstored_local_init to initialize the xenstore page and event channel.
+> > 
+> > 
+> > Changes in v4:
+> > 
+> > - do not xs_reset_watches on dom0.
+> > 
+> > 
+> > Changes in v2:
+> > 
+> > - refactor xenbus_init.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> 
+> 
+> If you would like I can also carry this in my tree.
 
-Is it OK to use broken-cd? broken-cd feature is documented as "There is 
-no card detection available; polling must be used". In this case the 
-card detect is not broken but it is unrouted so it is unavailable.
-
-Documentation about broken-cd has been added by commit:
-https://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commitdiff;h=abe1e05da365350ac282ba5f6831aae13d97074e
-
-Any tips about power management implementation are welcome if I have to 
-use PM instead of polling method.
-
-Regards,
-Lauri
+OK, let's do that. I'll rebase again on your tree with this patch.
 
 
-On 09/12/2012 05:06 PM, Lauri Hintsala wrote:
-> Hi,
->
-> On 09/10/2012 05:58 PM, Matt Sealey wrote:
->> I think this describes three use cases which are different, as Shawn
->> said we have here;
->>
->> * missing card detect support (card detect is not wired so it's
->> impossible to tell, and the controller doesn't support the SD standard
->> card detection)
->> * non-removable device
->> * broken card detect support
->>
->> The third one is what the property sounds like it describes, but this
->> is not the use case you are describing at all. This kind of property
->> naming is more like describing "card detect doesn't operate reliably"
->> which is true of i.MX devices with certain versions of the eSDHC and
->> uSDHC controllers, where non-GPIO card detection interferes with SDIO
->> interrupts, but in this case a board designer should add a real card
->> detect pin to the board (most more expensive push-push SD card slots
->> come with a pin you can wire for CD). In cases where errata is
->> published after boards are shipped, broken-cd is a meaningful
->> description when described in the absense of a gpio cd description, or
->> presence of some cd-handled-internally style property (forgive me for
->> not cross-referencing the FSL definition for this property, we don't
->> use it here at Genesi since all our boards have GPIO CD)
->>
->> It seems your device is a combination of the top two in the list, it
->> is not down to a broken feature at all, but one that should be
->> possible to not implement for devices which are permanently connected.
->> A non-removable device should be able to be powered down, at least
->> using runtime PM or clock gating (if this works, remember to whitelist
->> the card for clock gating!) but card detect shouldn't be used in this
->> case to detect if the card is powered or not (this is a problem for
->> your card controller and card driver state tracker. The MMC subsystem
->> already tracks this state fairly well for power management).
->
-> Do you mean the polling mode shouldn't been used to detect if the device
-> is powered?
->
-> Is there any examples how PM support could be implemented? I'm not
-> familiar with PM subsystem. How is it done in practice? Should I play
-> with fixed regulators?
->
-> BR,
-> Lauri
->
->
->> I would refrain from calling a feature "broken card detect" if there
->> is actually no breakage involved especially if it would be more
->> prudent instead look into how to figure out how to track power
->> management state properly without cluttering the device tree.
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >  drivers/xen/xenbus/xenbus_comms.c |    2 +-
+> >  drivers/xen/xenbus/xenbus_probe.c |   62 +++++++++++++++++++++++++-----------
+> >  drivers/xen/xenbus/xenbus_xs.c    |    3 +-
+> >  3 files changed, 46 insertions(+), 21 deletions(-)
+> > 
+> > diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
+> > index 52fe7ad..c5aa55c 100644
+> > --- a/drivers/xen/xenbus/xenbus_comms.c
+> > +++ b/drivers/xen/xenbus/xenbus_comms.c
+> > @@ -224,7 +224,7 @@ int xb_init_comms(void)
+> >  		int err;
+> >  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
+> >  						0, "xenbus", &xb_waitq);
+> > -		if (err <= 0) {
+> > +		if (err < 0) {
+> >  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+> >  			return err;
+> >  		}
+> > diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+> > index b793723..a67ccc0 100644
+> > --- a/drivers/xen/xenbus/xenbus_probe.c
+> > +++ b/drivers/xen/xenbus/xenbus_probe.c
+> > @@ -719,37 +719,61 @@ static int __init xenstored_local_init(void)
+> >  	return err;
+> >  }
+> >  
+> > +enum xenstore_init {
+> > +	UNKNOWN,
+> > +	PV,
+> > +	HVM,
+> > +	LOCAL,
+> > +};
+> >  static int __init xenbus_init(void)
+> >  {
+> >  	int err = 0;
+> > +	enum xenstore_init usage = UNKNOWN;
+> > +	uint64_t v = 0;
+> >  
+> >  	if (!xen_domain())
+> >  		return -ENODEV;
+> >  
+> >  	xenbus_ring_ops_init();
+> >  
+> > -	if (xen_hvm_domain()) {
+> > -		uint64_t v = 0;
+> > -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> > -		if (err)
+> > -			goto out_error;
+> > -		xen_store_evtchn = (int)v;
+> > -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> > -		if (err)
+> > -			goto out_error;
+> > -		xen_store_mfn = (unsigned long)v;
+> > -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> > -	} else {
+> > -		xen_store_evtchn = xen_start_info->store_evtchn;
+> > -		xen_store_mfn = xen_start_info->store_mfn;
+> > -		if (xen_store_evtchn)
+> > -			xenstored_ready = 1;
+> > -		else {
+> > +	if (xen_pv_domain())
+> > +		usage = PV;
+> > +	if (xen_hvm_domain())
+> > +		usage = HVM;
+> > +	if (xen_hvm_domain() && xen_initial_domain())
+> > +		usage = LOCAL;
+> > +	if (xen_pv_domain() && !xen_start_info->store_evtchn)
+> > +		usage = LOCAL;
+> > +	if (xen_pv_domain() && xen_start_info->store_evtchn)
+> > +		xenstored_ready = 1;
+> > +
+> > +	switch (usage) {
+> > +		case LOCAL:
+> >  			err = xenstored_local_init();
+> >  			if (err)
+> >  				goto out_error;
+> > -		}
+> > -		xen_store_interface = mfn_to_virt(xen_store_mfn);
+> > +			xen_store_interface = mfn_to_virt(xen_store_mfn);
+> > +			break;
+> > +		case PV:
+> > +			xen_store_evtchn = xen_start_info->store_evtchn;
+> > +			xen_store_mfn = xen_start_info->store_mfn;
+> > +			xen_store_interface = mfn_to_virt(xen_store_mfn);
+> > +			break;
+> > +		case HVM:
+> > +			err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> > +			if (err)
+> > +				goto out_error;
+> > +			xen_store_evtchn = (int)v;
+> > +			err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> > +			if (err)
+> > +				goto out_error;
+> > +			xen_store_mfn = (unsigned long)v;
+> > +			xen_store_interface =
+> > +				ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> > +			break;
+> > +		default:
+> > +			pr_warn("Xenstore state unknown\n");
+> > +			break;
+> >  	}
+> >  
+> >  	/* Initialize the interface to xenstore. */
+> > diff --git a/drivers/xen/xenbus/xenbus_xs.c b/drivers/xen/xenbus/xenbus_xs.c
+> > index bce15cf..131dec0 100644
+> > --- a/drivers/xen/xenbus/xenbus_xs.c
+> > +++ b/drivers/xen/xenbus/xenbus_xs.c
+> > @@ -44,6 +44,7 @@
+> >  #include <linux/rwsem.h>
+> >  #include <linux/module.h>
+> >  #include <linux/mutex.h>
+> > +#include <asm/xen/hypervisor.h>
+> >  #include <xen/xenbus.h>
+> >  #include <xen/xen.h>
+> >  #include "xenbus_comms.h"
+> > @@ -622,7 +623,7 @@ static void xs_reset_watches(void)
+> >  {
+> >  	int err, supported = 0;
+> >  
+> > -	if (!xen_hvm_domain())
+> > +	if (!xen_hvm_domain() || xen_initial_domain())
+> >  		return;
+> >  
+> >  	err = xenbus_scanf(XBT_NIL, "control",
+> > -- 
+> > 1.7.2.5
+> 
