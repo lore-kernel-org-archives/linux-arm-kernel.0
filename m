@@ -1,46 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 13:53:38 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-In-Reply-To: <20120917192005.ab08c24f98010107fa855edf@canb.auug.org.au>
-References: <20120917192005.ab08c24f98010107fa855edf@canb.auug.org.au>
-Message-ID: <20120917205338.GA11762@atomide.com>
+Date: Mon, 17 Sep 2012 14:25:07 -0700
+Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
+In-Reply-To: <20120916203850.GI4521@atomide.com>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-18-git-send-email-arnd@arndb.de>
+ <20120915181057.GH4521@atomide.com>
+ <201209152014.37989.arnd@arndb.de>
+ <20120916203850.GI4521@atomide.com>
+Message-ID: <20120917212506.GB11762@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Rothwell <sfr@canb.auug.org.au> [120917 02:21]:
-> Hi all,
+* Tony Lindgren <tony@atomide.com> [120916 13:39]:
+> * Arnd Bergmann <arnd@arndb.de> [120915 13:15]:
+> > On Saturday 15 September 2012, Tony Lindgren wrote:
+> > > With my patches, this is now all omap1 specific and
+> > > moved to arch/arm/mach-omap1/include/mach/hardware.h.
+> > > It's probably easiest to just update this patch on
+> > > top of the hardware.h changes I've done.
+> > 
+> > Yes, sounds good. Do you want to send a patch for that
+> > and let me drop this one then?
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/staging/tidspbridge/core/wdt.c between commit c37a1747acbf
-> ("staging: tidspbridge: Prepare for irqs.h removal") from the  tree and
-> commit ec2c0825ca31 ("ARM: OMAP2+: Remove hardcoded IRQs and enable
-> SPARSE_IRQ") from the arm-soc tree.
-> 
-> I fixed it up (I guess - see below) and can carry the fix as necessary
-> (no action is required).
+> Yes I can pick this one and update it against one of my
+> branches to avoid merge conflicts.
 
-Yes thanks again. This is the right fix for now, eventually
-the numbers should come from platform data or device tree..
+This applies against mach-omap1/include/mach/hardware.h
+with some fuzz so no issues there.
+
+But I think we should not apply it as these are physical
+addresses, not virtual addresses for omap1.
+
+We have IOMEM already in use for omap_read/write because of:
+
+#define OMAP1_IO_ADDRESS(pa)	IOMEM((pa) - OMAP1_IO_OFFSET)
+
+I think the right solution is to eventually get rid of
+omap_read/write for omap1 also and replace them with ioremap
++ readl/writel.
+
+Or am I missing something?
 
 Regards,
 
 Tony
- 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/staging/tidspbridge/core/wdt.c
-> index 1ed1474,453ef74..0000000
-> --- a/drivers/staging/tidspbridge/core/wdt.c
-> +++ b/drivers/staging/tidspbridge/core/wdt.c
-> @@@ -25,8 -25,7 +25,8 @@@
->   #include <dspbridge/host_os.h>
->   
->   
->  +#define OMAP34XX_WDT3_BASE 		(0x49000000 + 0x30000)
-> - #define INT_34XX_WDT3_IRQ 		36
-> + #define INT_34XX_WDT3_IRQ 		(36 + NR_IRQS)
->   
->   static struct dsp_wdt_setting dsp_wdt;
->   
