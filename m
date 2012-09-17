@@ -1,83 +1,56 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 17 Sep 2012 16:06:15 -0700
-Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201209172042.11860.arnd@arndb.de>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
- <20120915001431.GB12445@n2100.arm.linux.org.uk>
- <201209172042.11860.arnd@arndb.de>
-Message-ID: <20120917230615.GA26502@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Sep 2012 16:10:02 -0700
+Subject: [PATCH v6 10/10] ARM: OMAP2+: tusb6010: generic timing calculation
+In-Reply-To: <20120917225023.GJ11762@atomide.com>
+References: <20120824194630.GU11011@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9BA589@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC11D@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DEC85@DBDE01.ent.ti.com>
+ <20120906204354.GJ1303@atomide.com>
+ <20120911184606.GN23092@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E253B@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E3624@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E4DFE@DBDE01.ent.ti.com>
+ <20120917225023.GJ11762@atomide.com>
+Message-ID: <20120917231001.GK11762@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 08:42:11PM +0000, Arnd Bergmann wrote:
-> On Saturday 15 September 2012, Russell King - ARM Linux wrote:
+* Tony Lindgren <tony@atomide.com> [120917 15:54]:
+> * Mohammed, Afzal <afzal@ti.com> [120917 01:40]:
+> > Hi Tony,
 > > 
-> > On Fri, Sep 14, 2012 at 05:41:56PM -0500, Jon Hunter wrote:
-> > > 3. Supporting legacy devices not using DMA Engine
+> > On Fri, Sep 14, 2012 at 15:50:02, Mohammed, Afzal wrote:
+> > > * Mohammed, Afzal: Wednesday, September 12, 2012 3:20 PM
+> > 
+> > > > But some of the tusb async values is less by one. I need
+> > > > to get it right.
 > > > 
-> > >    These devices present a problem, as there may not be a uniform way to easily
-> > >    support them with regard to device tree. Ideally, these should be migrated
-> > >    to DMA engine. However, if this is not possible, then they should still be
-> > >    able to use this binding, the only constaint imposed by this implementation
-> > >    is that when requesting a DMA channel via of_dma_request_slave_channel(), it
-> > >    will return a type of dma_chan.
-> > 
-> > As far as devices not using DMA engine, the answer is we don't support
-> > their specification in the DT model.  Note that the legacy OMAP DMA
-> > API is scheduled for removal next year, so it's not going to be around
-> > that much longer.
+> > > Reason has been identified. It was due to rounding error,
+> > > no changes are required in the expressions. Moving
+> > > completely to picoseconds resolves the issue.
+> > > 
+> > > Can you please try with the attached patch ?
 > 
-> There are a few platforms using the ISA DMA API (rpc, h720x, shark, footbridge),
-> and I agree that they are unlikely to see OF support, although if they did, it
-> wouldn't be unreasonable to encode their DMA channels using the same binding.
+> Gave it a quick try and it seemed to work.. But when I tried
+> rebasing my patches for the cbus to keep things working with
+> the watchdog, I ran into multiple merge conflicts with
+> current linux next and gave up.
+
+OK went back to my original branch without current linux
+next and with the new cbus + retu driver from Aaro applied.
+Confirmed it's now working on n800 tusb6010.
+  
+> Care to repost this series updated against current linux
+> next?
 > 
-> The other ones that are currently around with their own DMA implementation are
-> 
-> bcmring --> platform is going away
-> samsung --> gradually getting moved to dmaengine, already has its own binding
->             that needs to be replaced with this one, so best do it at the same
->             time.
-> tegra   --> old dma code gone in 3.7
-> pxa/mmp --> dmaengine implementation being worked on, should wait for that.
-> msm     --> dma implementation only used by two drivers (serial and mmc). 
-> 
-> Outside of arch/arm, at least sh, cris, unicore32 and blackfin have their
-> own dma APIs based on the ISA interfaces. I don't currently see any of them
-> moving towards DT, but it's definitely possible. 
-> 
-> Among the above MSM seems to be the most likely candidate to use the binding
-> before moving to DT. The msm_sdcc driver is (like much of the msm platform
-> code) lagging far behind the internel version that qualcomm have, and the
-> device tree binding they are using is incompatible with the common MMC
-> binding (and of course the DMA binding here) as well. For getting MSM up
-> to speed compared with the other platforms, they have to use proper DT
-> bindings as well as proper DMA engine support. Between those two, I'd prefer
-> fixing the DT binding first, in order to limit the amount of changes that
-> have to be done to external device tree files.
+> I'm afraid I've pretty much lost track of all the patches
+> and rather not start resolving the conflicts as I'm sure
+> I'll break something else :)
 
-There is also a lot of similarity between the mmci hardware and the
-msm_sdcc hardware.  Enough so, that it is probably better for us to
-make the mmci driver work with our hardware, rather than trying to
-keep msm_sdcc going.
+You should still repost the whole updated series against
+linux next.
 
-There is also an MSM nand device that appears to have not made it in.
-It is heavily dependent on the weird features of the DMA hardware.  I
-don't have any current plans to support this device, since most boards
-using MSMs these days are using mmc/sd instead of bare NAND.
+Regards,
 
-Our DMA hardware is really weird, but should be a bit reasonable.  It
-is also being gradually replaced in newer chips with a different DMA
-framework.
-
-As far as I'm concerned, I consider making our DMA driver(s) use the
-DMA engine API to be part of getting these platforms working with DT.
-
-It is planned, but there are quite a few things that need to be
-tackled first.
-
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Tony
