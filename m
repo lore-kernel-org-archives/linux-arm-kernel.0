@@ -1,88 +1,46 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 17 Sep 2012 19:37:19 +0900
-Subject: [PATCH V4] ARM: EXYNOS5: Add bus clock and set parent clock for
- FIMD
-In-Reply-To: <002001cd94bc$05177bc0$0f467340$%han@samsung.com>
-References: <1347892995-17924-1-git-send-email-l.krishna@samsung.com>
- <002001cd94bc$05177bc0$0f467340$%han@samsung.com>
-Message-ID: <04f401cd94c0$6a13da10$3e3b8e30$@org>
+From: vipulkumar.samar@st.com (Vipul Kumar Samar)
+Date: Mon, 17 Sep 2012 16:07:10 +0530
+Subject: [PATCH] spi: pl022:  Add clk_{un}prepare() support in runtime PM
+Message-ID: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingoo Han wrote:
-> 
-> On Monday, September 17, 2012 11:43 PM Leela Krishna Amudala wrote
-> >
-> > This patch adds the bus clock for FIMD and changes the device name for
-> lcd clock
-> > also sets mout_mpll_user as parent clock to fimd
-> >
-> > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> 
-> Acked-by: Jingoo Han <jg1.han@samsung.com>
-> 
-In this case, since Leela addressed comments from you, seems it should be
-'Reviewed-by'?
+clk_{un}prepare is mandatory for platforms using common clock framework. Add
+clk_{un}prepare() support for spi-pl022 runtime PM.
 
-> It looks good.
-> 
-> 
-> > ---
-> >  arch/arm/mach-exynos/clock-exynos5.c |   35
-++++++++++++++++++++++++----
-> -----
-> >  arch/arm/mach-exynos/clock-exynos5.h |   17 ++++++++++++++++
-> >  2 files changed, 42 insertions(+), 10 deletions(-)
-> >  create mode 100644 arch/arm/mach-exynos/clock-exynos5.h
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+---
+ drivers/spi/spi-pl022.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-[snip]
-
-> >  	clk_set_rate(&exynos5_clk_aclk_acp.clk, 267000000);
-> >  	clk_set_rate(&exynos5_clk_pclk_acp.clk, 134000000);
-> > +	clk_set_parent(&exynos5_clk_sclk_fimd1.clk,
-> > +			&exynos5_clk_mout_mpll_user.clk);
-
-Well, do we _really_ need to set same parent clock for fimd1 here on all of
-exynos5? I don't think so.
-
-> >
-> >  	for (ptr = 0; ptr < ARRAY_SIZE(exynos5_clksrcs); ptr++)
-> >  		s3c_set_clksrc(&exynos5_clksrcs[ptr], true);
-> > diff --git a/arch/arm/mach-exynos/clock-exynos5.h b/arch/arm/mach-
-> exynos/clock-exynos5.h
-> > new file mode 100644
-> > index 0000000..6f78f5d
-> > --- /dev/null
-> > +++ b/arch/arm/mach-exynos/clock-exynos5.h
-> > @@ -0,0 +1,17 @@
-> > +/*
-> > + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com
-> > + *
-> > + * Header file for exynos5 clock support
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > +*/
-> > +
-> > +#ifndef __ASM_ARCH_EXYNOS5_CLOCK_H
-> > +#define __ASM_ARCH_EXYNOS5_CLOCK_H __FILE__
-> > +
-> > +extern struct clksrc_clk exynos5_clk_sclk_fimd1;
-> > +
-
-I don't have any idea why we need this.
-
-Note, the 'clock-exynos4.h' is for supporting common exynos4 and specific
-exynos4210 and exynos4x12.
-
-[snip]
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index f2a80ff..500e75e 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2334,7 +2334,7 @@ static int pl022_runtime_suspend(struct device *dev)
+ {
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
+ 
+-	clk_disable(pl022->clk);
++	clk_disable_unprepare(pl022->clk);
+ 
+ 	return 0;
+ }
+@@ -2342,10 +2342,13 @@ static int pl022_runtime_suspend(struct device *dev)
+ static int pl022_runtime_resume(struct device *dev)
+ {
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
++	int ret = 0;
+ 
+-	clk_enable(pl022->clk);
++	ret = clk_prepare_enable(pl022->clk);
++	if (ret)
++		dev_err(dev, "could not enable SSP/SPI bus clock\n");
+ 
+-	return 0;
++	return ret;
+ }
+ #endif
+ 
+-- 
+1.7.2.2
