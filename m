@@ -1,79 +1,66 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Mon, 17 Sep 2012 12:53:22 +0530
-Subject: [PATCH v3 4/4] ARM: dts: AM33XX: Add lis331dlh device tree data to
- am335x-evm
+Date: Mon, 17 Sep 2012 12:53:19 +0530
+Subject: [PATCH v3 1/4] lis3: lis3lv02d: remove lis3lv02d driver DT init
 In-Reply-To: <1347866602-2088-1-git-send-email-anilkumar@ti.com>
 References: <1347866602-2088-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1347866602-2088-5-git-send-email-anilkumar@ti.com>
+Message-ID: <1347866602-2088-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add lis331dlh device tree data to am335x-evm.dts. In AM335x EVM
-lis331dlh accelerometer is connected to I2C2 bus. So this patch
-change the status of I2C2 node to "okay" to use I2C2 bus. Also
-added all the required platform data to am335x-evm.
+Remove lis3lv02d driver device tree initialization from core driver
+and move it to individual drivers. With the current implementation
+some pdata parameters are missing if we use lis3lv02d_init_device()
+in lis3lv02d_i2c driver.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/misc/lis3lv02d/lis3lv02d.c |    8 ++------
+ drivers/misc/lis3lv02d/lis3lv02d.h |    1 +
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9fb59c5..be309df 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -47,6 +47,39 @@
- 			};
- 		};
+diff --git a/drivers/misc/lis3lv02d/lis3lv02d.c b/drivers/misc/lis3lv02d/lis3lv02d.c
+index 79349ec..026021e 100644
+--- a/drivers/misc/lis3lv02d/lis3lv02d.c
++++ b/drivers/misc/lis3lv02d/lis3lv02d.c
+@@ -944,7 +944,7 @@ static void lis3lv02d_8b_configure(struct lis3lv02d *lis3,
+ }
  
-+		i2c2: i2c at 4802a000 {
-+			status = "okay";
-+			clock-frequency = <400000>;
-+
-+			lis331dlh: lis331dlh at 18 {
-+				compatible = "st,lis331dlh", "st,lis3lv02d";
-+				reg = <0x18>;
-+				Vdd-supply = <&lis3_reg>;
-+				Vdd_IO-supply = <&lis3_reg>;
-+
-+				st,click-single-x;
-+				st,click-single-y;
-+				st,click-single-z;
-+				st,click-thresh-x = <10>;
-+				st,click-thresh-y = <10>;
-+				st,click-thresh-z = <10>;
-+				st,irq1-click;
-+				st,irq2-click;
-+				st,wakeup-x-lo;
-+				st,wakeup-x-hi;
-+				st,wakeup-y-lo;
-+				st,wakeup-y-hi;
-+				st,wakeup-z-lo;
-+				st,wakeup-z-hi;
-+				st,min-limit-x = <120>;
-+				st,min-limit-y = <120>;
-+				st,min-limit-z = <140>;
-+				st,max-limit-x = <550>;
-+				st,max-limit-y = <550>;
-+				st,max-limit-z = <750>;
-+			};
-+		};
-+
- 		dcan1: d_can at 481d0000 {
- 			status = "okay";
- 			pinctrl-names = "default";
-@@ -61,6 +94,12 @@
- 		regulator-max-microvolt = <5000000>;
- 		regulator-boot-on;
- 	};
-+
-+	lis3_reg: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lis3_reg";
-+		regulator-boot-on;
-+	};
- };
+ #ifdef CONFIG_OF
+-static int lis3lv02d_init_dt(struct lis3lv02d *lis3)
++int lis3lv02d_init_dt(struct lis3lv02d *lis3)
+ {
+ 	struct lis3lv02d_platform_data *pdata;
+ 	struct device_node *np = lis3->of_node;
+@@ -1084,7 +1084,7 @@ static int lis3lv02d_init_dt(struct lis3lv02d *lis3)
+ }
  
- /include/ "tps65910.dtsi"
+ #else
+-static int lis3lv02d_init_dt(struct lis3lv02d *lis3)
++int lis3lv02d_init_dt(struct lis3lv02d *lis3)
+ {
+ 	return 0;
+ }
+@@ -1100,10 +1100,6 @@ int lis3lv02d_init_device(struct lis3lv02d *lis3)
+ 	irq_handler_t thread_fn;
+ 	int irq_flags = 0;
+ 
+-	err = lis3lv02d_init_dt(lis3);
+-	if (err < 0)
+-		return err;
+-
+ 	lis3->whoami = lis3lv02d_read_8(lis3, WHO_AM_I);
+ 
+ 	switch (lis3->whoami) {
+diff --git a/drivers/misc/lis3lv02d/lis3lv02d.h b/drivers/misc/lis3lv02d/lis3lv02d.h
+index 4cf0779..b5505fa 100644
+--- a/drivers/misc/lis3lv02d/lis3lv02d.h
++++ b/drivers/misc/lis3lv02d/lis3lv02d.h
+@@ -326,5 +326,6 @@ void lis3lv02d_joystick_disable(struct lis3lv02d *lis3);
+ void lis3lv02d_poweroff(struct lis3lv02d *lis3);
+ int lis3lv02d_poweron(struct lis3lv02d *lis3);
+ int lis3lv02d_remove_fs(struct lis3lv02d *lis3);
++int lis3lv02d_init_dt(struct lis3lv02d *lis3);
+ 
+ extern struct lis3lv02d lis3_dev;
 -- 
 1.7.9.5
