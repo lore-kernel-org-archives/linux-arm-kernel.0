@@ -1,38 +1,62 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Sep 2012 17:27:03 +0200
-Subject: [PATCH 06/16] ARM: at91: add dummies pinctrl for non dt platform
+Date: Mon, 17 Sep 2012 17:27:00 +0200
+Subject: [PATCH 03/16] ARM: at91: gpio: implement request
 In-Reply-To: <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120917140423.GA17667@game.jcrosoft.org>
  <1347895633-1763-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1347895633-1763-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1347895633-1763-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Configure the pin as pio when requested.
+
+It is needed to configure the pin as PIO at "request time" when we are
+using DT. Indeed, the muxing via old AT91 API is not allowed anymore if
+we are using the plain gpiolib.
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-at91/setup.c |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-at91/gpio.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 944bffb..50c69b5 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -10,6 +10,7 @@
- #include <linux/mm.h>
- #include <linux/pm.h>
- #include <linux/of_address.h>
-+#include <linux/pinctrl/machine.h>
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index be42cf0..3b8f463 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -46,6 +46,7 @@ struct at91_gpio_chip {
  
- #include <asm/system_misc.h>
- #include <asm/mach/map.h>
-@@ -463,4 +464,6 @@ void __init at91_initialize(unsigned long main_clock)
- 	at91_boot_soc.register_clocks();
+ #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
  
- 	at91_boot_soc.init();
-+
-+	pinctrl_provide_dummies();
++static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
+@@ -59,6 +60,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
++			.request	  = at91_gpiolib_request,	\
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
+@@ -862,6 +864,16 @@ void __init at91_gpio_irq_setup(void)
  }
+ 
+ /* gpiolib support */
++static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++
++	__raw_writel(mask, pio + PIO_PER);
++	return 0;
++}
++
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset)
+ {
 -- 
 1.7.10.4
