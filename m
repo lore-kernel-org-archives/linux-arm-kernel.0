@@ -1,320 +1,226 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Sep 2012 13:34:30 +0800
-Subject: [PATCH 01/34] ARM: imx: include board headers in the same folder
+Date: Mon, 17 Sep 2012 13:34:31 +0800
+Subject: [PATCH 02/34] ASoC: mx27vis: retrieve gpio numbers from platform_data
 In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347860103-4141-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347860103-4141-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The headers that are only used by board files do not necessarily
-need to be in plat-mxc/include/mach.  Move them to the same place
-as those board files.
+Rather than including mach/iomux-mx27.h to define gpio numbers and set
+up the pins, the patch moves all these into machine code and has the
+gpio numbers passed to driver via platform_data.  As the result, we
+can remove the mach/iomux-mx27.h inclusion from driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Javier Martin <javier.martin@vista-silicon.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: alsa-devel at alsa-project.org
 ---
- .../include/mach => mach-imx}/3ds_debugboard.h     |    0
- .../include/mach => mach-imx}/board-mx31lilly.h    |    0
- .../include/mach => mach-imx}/board-mx31lite.h     |    0
- .../include/mach => mach-imx}/board-mx31moboard.h  |    0
- .../include/mach => mach-imx}/board-pcm038.h       |    0
- .../include/mach => mach-imx}/eukrea-baseboards.h  |    0
- arch/arm/mach-imx/mach-cpuimx27.c                  |    2 +-
- arch/arm/mach-imx/mach-cpuimx35.c                  |    2 +-
- arch/arm/mach-imx/mach-cpuimx51sd.c                |    2 +-
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c           |    2 +-
- arch/arm/mach-imx/mach-mx27_3ds.c                  |    2 +-
- arch/arm/mach-imx/mach-mx31_3ds.c                  |    2 +-
- arch/arm/mach-imx/mach-mx31lilly.c                 |    2 +-
- arch/arm/mach-imx/mach-mx31lite.c                  |    2 +-
- arch/arm/mach-imx/mach-mx31moboard.c               |    2 +-
- arch/arm/mach-imx/mach-mx35_3ds.c                  |    2 +-
- arch/arm/mach-imx/mach-mx51_3ds.c                  |    2 +-
- arch/arm/mach-imx/mach-pcm038.c                    |    2 +-
- arch/arm/mach-imx/mx31lilly-db.c                   |    2 +-
- arch/arm/mach-imx/mx31lite-db.c                    |    2 +-
- arch/arm/mach-imx/mx31moboard-smartbot.c           |    2 +-
- 21 files changed, 15 insertions(+), 15 deletions(-)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/3ds_debugboard.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-mx31lilly.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-mx31lite.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-mx31moboard.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-pcm038.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/eukrea-baseboards.h (100%)
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   42 ++++++++++++++++++++++++++-
+ include/linux/platform_data/asoc-mx27vis.h  |   11 +++++++
+ sound/soc/fsl/mx27vis-aic32x4.c             |   42 +++++++++++++--------------
+ 3 files changed, 72 insertions(+), 23 deletions(-)
+ create mode 100644 include/linux/platform_data/asoc-mx27vis.h
 
-diff --git a/arch/arm/plat-mxc/include/mach/3ds_debugboard.h b/arch/arm/mach-imx/3ds_debugboard.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/3ds_debugboard.h
-rename to arch/arm/mach-imx/3ds_debugboard.h
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lilly.h b/arch/arm/mach-imx/board-mx31lilly.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/board-mx31lilly.h
-rename to arch/arm/mach-imx/board-mx31lilly.h
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31lite.h b/arch/arm/mach-imx/board-mx31lite.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/board-mx31lite.h
-rename to arch/arm/mach-imx/board-mx31lite.h
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31moboard.h b/arch/arm/mach-imx/board-mx31moboard.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/board-mx31moboard.h
-rename to arch/arm/mach-imx/board-mx31moboard.h
-diff --git a/arch/arm/plat-mxc/include/mach/board-pcm038.h b/arch/arm/mach-imx/board-pcm038.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/board-pcm038.h
-rename to arch/arm/mach-imx/board-pcm038.h
-diff --git a/arch/arm/plat-mxc/include/mach/eukrea-baseboards.h b/arch/arm/mach-imx/eukrea-baseboards.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/eukrea-baseboards.h
-rename to arch/arm/mach-imx/eukrea-baseboards.h
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index 2bb9e18..1734320 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -34,13 +34,13 @@
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
- 
--#include <mach/eukrea-baseboards.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx27.h>
- #include <mach/ulpi.h>
- 
- #include "devices-imx27.h"
-+#include "eukrea-baseboards.h"
- 
- static const int eukrea_cpuimx27_pins[] __initconst = {
- 	/* UART1 */
-diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
-index d49b0ec..0abfcb4 100644
---- a/arch/arm/mach-imx/mach-cpuimx35.c
-+++ b/arch/arm/mach-imx/mach-cpuimx35.c
-@@ -37,12 +37,12 @@
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
- 
--#include <mach/eukrea-baseboards.h>
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
- 
- #include "devices-imx35.h"
-+#include "eukrea-baseboards.h"
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
-diff --git a/arch/arm/mach-imx/mach-cpuimx51sd.c b/arch/arm/mach-imx/mach-cpuimx51sd.c
-index b87cc49..6cb3887 100644
---- a/arch/arm/mach-imx/mach-cpuimx51sd.c
-+++ b/arch/arm/mach-imx/mach-cpuimx51sd.c
-@@ -26,7 +26,6 @@
- #include <linux/spi/spi.h>
- #include <linux/can/platform/mcp251x.h>
- 
--#include <mach/eukrea-baseboards.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx51.h>
-@@ -38,6 +37,7 @@
- 
- #include "devices-imx51.h"
- #include "cpu_op-mx51.h"
-+#include "eukrea-baseboards.h"
- 
- #define USBH1_RST		IMX_GPIO_NR(2, 28)
- #define ETH_RST			IMX_GPIO_NR(2, 31)
-diff --git a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-index 017bbb70..4eab1d7 100644
---- a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-+++ b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-@@ -27,7 +27,6 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- 
--#include <mach/eukrea-baseboards.h>
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index f264ddd..5627229 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -33,6 +33,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/leds.h>
+ #include <linux/memblock.h>
++#include <linux/platform_data/asoc-mx27vis.h>
+ #include <media/soc_camera.h>
+ #include <sound/tlv320aic32x4.h>
  #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +38,7 @@
- #include <mach/iomux-mx25.h>
+@@ -58,6 +59,11 @@
+ #define EXPBOARD_BIT1		(GPIO_PORTD + 27)
+ #define EXPBOARD_BIT0		(GPIO_PORTD + 28)
  
- #include "devices-imx25.h"
-+#include "eukrea-baseboards.h"
++#define AMP_GAIN_0		(GPIO_PORTF + 9)
++#define AMP_GAIN_1		(GPIO_PORTF + 8)
++#define AMP_MUTE_SDL		(GPIO_PORTE + 5)
++#define AMP_MUTE_SDR		(GPIO_PORTF + 7)
++
+ static const int visstrim_m10_pins[] __initconst = {
+ 	/* UART1 (console) */
+ 	PE12_PF_UART1_TXD,
+@@ -139,6 +145,11 @@ static const int visstrim_m10_pins[] __initconst = {
+ 	EXPBOARD_BIT2 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+ 	EXPBOARD_BIT1 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+ 	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
++	/* Audio AMP control */
++	AMP_GAIN_0 | GPIO_GPIO | GPIO_OUT,
++	AMP_GAIN_1 | GPIO_GPIO | GPIO_OUT,
++	AMP_MUTE_SDL | GPIO_GPIO | GPIO_OUT,
++	AMP_MUTE_SDR | GPIO_GPIO | GPIO_OUT,
+ };
  
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 05996f3..c69df6c 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -40,8 +40,8 @@
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
- #include <mach/ulpi.h>
--#include <mach/3ds_debugboard.h>
+ static struct gpio visstrim_m10_version_gpios[] = {
+@@ -166,6 +177,26 @@ static const struct gpio visstrim_m10_gpios[] __initconst = {
+ 		.flags = GPIOF_DIR_OUT | GPIOF_INIT_LOW,
+ 		.label = "usbotg_cs",
+ 	},
++	{
++		.gpio = AMP_GAIN_0,
++		.flags = GPIOF_DIR_OUT,
++		.label = "amp-gain-0",
++	},
++	{
++		.gpio = AMP_GAIN_1,
++		.flags = GPIOF_DIR_OUT,
++		.label = "amp-gain-1",
++	},
++	{
++		.gpio = AMP_MUTE_SDL,
++		.flags = GPIOF_DIR_OUT,
++		.label = "amp-mute-sdl",
++	},
++	{
++		.gpio = AMP_MUTE_SDR,
++		.flags = GPIOF_DIR_OUT,
++		.label = "amp-mute-sdr",
++	},
+ };
  
-+#include "3ds_debugboard.h"
- #include "devices-imx27.h"
+ /* Camera */
+@@ -405,6 +436,14 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+ 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+ };
  
- #define SD1_EN_GPIO		IMX_GPIO_NR(2, 25)
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 8915f93..6750443 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -39,9 +39,9 @@
- #include <asm/memblock.h>
- #include <mach/common.h>
- #include <mach/iomux-mx3.h>
--#include <mach/3ds_debugboard.h>
- #include <mach/ulpi.h>
++/* Audio */
++static const struct snd_mx27vis_platform_data snd_mx27vis_pdata __initconst = {
++	.amp_gain0_gpio = AMP_GAIN_0,
++	.amp_gain1_gpio = AMP_GAIN_1,
++	.amp_mutel_gpio = AMP_MUTE_SDL,
++	.amp_muter_gpio = AMP_MUTE_SDR,
++};
++
+ static void __init visstrim_m10_revision(void)
+ {
+ 	int exp_version = 0;
+@@ -463,7 +502,8 @@ static void __init visstrim_m10_board_init(void)
+ 	imx27_add_fec(NULL);
+ 	imx_add_gpio_keys(&visstrim_gpio_keys_platform_data);
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+-	imx_add_platform_device("mx27vis", 0, NULL, 0, NULL, 0);
++	imx_add_platform_device("mx27vis", 0, NULL, 0, &snd_mx27vis_pdata,
++				sizeof(snd_mx27vis_pdata));
+ 	platform_device_register_resndata(NULL, "soc-camera-pdrv", 0, NULL, 0,
+ 				      &iclink_tvp5150, sizeof(iclink_tvp5150));
+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
+diff --git a/include/linux/platform_data/asoc-mx27vis.h b/include/linux/platform_data/asoc-mx27vis.h
+new file mode 100644
+index 0000000..409adcd
+--- /dev/null
++++ b/include/linux/platform_data/asoc-mx27vis.h
+@@ -0,0 +1,11 @@
++#ifndef __PLATFORM_DATA_ASOC_MX27VIS_H
++#define __PLATFORM_DATA_ASOC_MX27VIS_H
++
++struct snd_mx27vis_platform_data {
++	int amp_gain0_gpio;
++	int amp_gain1_gpio;
++	int amp_mutel_gpio;
++	int amp_muter_gpio;
++};
++
++#endif /* __PLATFORM_DATA_ASOC_MX27VIS_H */
+diff --git a/sound/soc/fsl/mx27vis-aic32x4.c b/sound/soc/fsl/mx27vis-aic32x4.c
+index f6d04ad..2b76877 100644
+--- a/sound/soc/fsl/mx27vis-aic32x4.c
++++ b/sound/soc/fsl/mx27vis-aic32x4.c
+@@ -26,13 +26,13 @@
+ #include <linux/device.h>
+ #include <linux/i2c.h>
+ #include <linux/gpio.h>
++#include <linux/platform_data/asoc-mx27vis.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/soc.h>
+ #include <sound/soc-dapm.h>
+ #include <sound/tlv.h>
+ #include <asm/mach-types.h>
+-#include <mach/iomux-mx27.h>
  
-+#include "3ds_debugboard.h"
- #include "devices-imx31.h"
+ #include "../codecs/tlv320aic32x4.h"
+ #include "imx-ssi.h"
+@@ -41,20 +41,12 @@
+ #define MX27VIS_AMP_GAIN	0
+ #define MX27VIS_AMP_MUTE	1
  
- static int mx31_3ds_pins[] = {
-diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
-index 34b9bf0..2be500a 100644
---- a/arch/arm/mach-imx/mach-mx31lilly.c
-+++ b/arch/arm/mach-imx/mach-mx31lilly.c
-@@ -45,9 +45,9 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx3.h>
--#include <mach/board-mx31lilly.h>
- #include <mach/ulpi.h>
+-#define MX27VIS_PIN_G0		(GPIO_PORTF + 9)
+-#define MX27VIS_PIN_G1		(GPIO_PORTF + 8)
+-#define MX27VIS_PIN_SDL		(GPIO_PORTE + 5)
+-#define MX27VIS_PIN_SDR		(GPIO_PORTF + 7)
+-
+ static int mx27vis_amp_gain;
+ static int mx27vis_amp_mute;
+-
+-static const int mx27vis_amp_pins[] = {
+-	MX27VIS_PIN_G0 | GPIO_GPIO | GPIO_OUT,
+-	MX27VIS_PIN_G1 | GPIO_GPIO | GPIO_OUT,
+-	MX27VIS_PIN_SDL | GPIO_GPIO | GPIO_OUT,
+-	MX27VIS_PIN_SDR | GPIO_GPIO | GPIO_OUT,
+-};
++static int mx27vis_amp_gain0_gpio;
++static int mx27vis_amp_gain1_gpio;
++static int mx27vis_amp_mutel_gpio;
++static int mx27vis_amp_muter_gpio;
  
-+#include "board-mx31lilly.h"
- #include "devices-imx31.h"
+ static int mx27vis_aic32x4_hw_params(struct snd_pcm_substream *substream,
+ 			    struct snd_pcm_hw_params *params)
+@@ -109,13 +101,13 @@ static int mx27vis_amp_set(struct snd_kcontrol *kcontrol,
  
- /*
-diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
-index c8785b3..1704308 100644
---- a/arch/arm/mach-imx/mach-mx31lite.c
-+++ b/arch/arm/mach-imx/mach-mx31lite.c
-@@ -41,10 +41,10 @@
+ 	switch (reg) {
+ 	case MX27VIS_AMP_GAIN:
+-		gpio_set_value(MX27VIS_PIN_G0, value & 1);
+-		gpio_set_value(MX27VIS_PIN_G1, value >> 1);
++		gpio_set_value(mx27vis_amp_gain0_gpio, value & 1);
++		gpio_set_value(mx27vis_amp_gain1_gpio, value >> 1);
+ 		mx27vis_amp_gain = value;
+ 		break;
+ 	case MX27VIS_AMP_MUTE:
+-		gpio_set_value(MX27VIS_PIN_SDL, value & 1);
+-		gpio_set_value(MX27VIS_PIN_SDR, value >> 1);
++		gpio_set_value(mx27vis_amp_mutel_gpio, value & 1);
++		gpio_set_value(mx27vis_amp_muter_gpio, value >> 1);
+ 		mx27vis_amp_mute = value;
+ 		break;
+ 	}
+@@ -190,8 +182,19 @@ static struct snd_soc_card mx27vis_aic32x4 = {
  
- #include <mach/hardware.h>
- #include <mach/common.h>
--#include <mach/board-mx31lite.h>
- #include <mach/iomux-mx3.h>
- #include <mach/ulpi.h>
+ static int __devinit mx27vis_aic32x4_probe(struct platform_device *pdev)
+ {
++	struct snd_mx27vis_platform_data *pdata = pdev->dev.platform_data;
+ 	int ret;
  
-+#include "board-mx31lite.h"
- #include "devices-imx31.h"
++	if (!pdata) {
++		dev_err(&pdev->dev, "No platform data supplied\n");
++		return -EINVAL;
++	}
++
++	mx27vis_amp_gain0_gpio = pdata->amp_gain0_gpio;
++	mx27vis_amp_gain1_gpio = pdata->amp_gain1_gpio;
++	mx27vis_amp_mutel_gpio = pdata->amp_mutel_gpio;
++	mx27vis_amp_muter_gpio = pdata->amp_muter_gpio;
++
+ 	mx27vis_aic32x4.dev = &pdev->dev;
+ 	ret = snd_soc_register_card(&mx27vis_aic32x4);
+ 	if (ret) {
+@@ -213,11 +216,6 @@ static int __devinit mx27vis_aic32x4_probe(struct platform_device *pdev)
+ 			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
+ 	);
  
- /*
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index 459e754..2290d30 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -42,13 +42,13 @@
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
- #include <asm/memblock.h>
--#include <mach/board-mx31moboard.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx3.h>
- #include <mach/ulpi.h>
- #include <linux/platform_data/asoc-imx-ssi.h>
+-	ret = mxc_gpio_setup_multiple_pins(mx27vis_amp_pins,
+-			ARRAY_SIZE(mx27vis_amp_pins), "MX27VIS_AMP");
+-	if (ret)
+-		printk(KERN_ERR "ASoC: unable to setup gpios\n");
+-
+ 	return ret;
+ }
  
-+#include "board-mx31moboard.h"
- #include "devices-imx31.h"
- 
- static unsigned int moboard_pins[] = {
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 504983c..aac59b0 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -46,11 +46,11 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
--#include <mach/3ds_debugboard.h>
- #include <video/platform_lcd.h>
- 
- #include <media/soc_camera.h>
- 
-+#include "3ds_debugboard.h"
- #include "devices-imx35.h"
- 
- #define GPIO_MC9S08DZ60_GPS_ENABLE 0
-diff --git a/arch/arm/mach-imx/mach-mx51_3ds.c b/arch/arm/mach-imx/mach-mx51_3ds.c
-index 9ee84a4..4e84f80 100644
---- a/arch/arm/mach-imx/mach-mx51_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx51_3ds.c
-@@ -22,8 +22,8 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx51.h>
--#include <mach/3ds_debugboard.h>
- 
-+#include "3ds_debugboard.h"
- #include "devices-imx51.h"
- 
- #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 95f49d93..ad329d5 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -33,12 +33,12 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- 
--#include <mach/board-pcm038.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx27.h>
- #include <mach/ulpi.h>
- 
-+#include "board-pcm038.h"
- #include "devices-imx27.h"
- 
- static const int pcm038_pins[] __initconst = {
-diff --git a/arch/arm/mach-imx/mx31lilly-db.c b/arch/arm/mach-imx/mx31lilly-db.c
-index 29e890f..f2acf22 100644
---- a/arch/arm/mach-imx/mx31lilly-db.c
-+++ b/arch/arm/mach-imx/mx31lilly-db.c
-@@ -33,8 +33,8 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx3.h>
--#include <mach/board-mx31lilly.h>
- 
-+#include "board-mx31lilly.h"
- #include "devices-imx31.h"
- 
- /*
-diff --git a/arch/arm/mach-imx/mx31lite-db.c b/arch/arm/mach-imx/mx31lite-db.c
-index 83d17d9..fe4048d 100644
---- a/arch/arm/mach-imx/mx31lite-db.c
-+++ b/arch/arm/mach-imx/mx31lite-db.c
-@@ -34,8 +34,8 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx3.h>
--#include <mach/board-mx31lite.h>
- 
-+#include "board-mx31lite.h"
- #include "devices-imx31.h"
- 
- /*
-diff --git a/arch/arm/mach-imx/mx31moboard-smartbot.c b/arch/arm/mach-imx/mx31moboard-smartbot.c
-index fabb801..fc8d178 100644
---- a/arch/arm/mach-imx/mx31moboard-smartbot.c
-+++ b/arch/arm/mach-imx/mx31moboard-smartbot.c
-@@ -26,11 +26,11 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <mach/iomux-mx3.h>
--#include <mach/board-mx31moboard.h>
- #include <mach/ulpi.h>
- 
- #include <media/soc_camera.h>
- 
-+#include "board-mx31moboard.h"
- #include "devices-imx31.h"
- 
- static unsigned int smartbot_pins[] = {
 -- 
 1.7.9.5
