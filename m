@@ -1,84 +1,137 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Sep 2012 07:11:19 -0700
-Subject: linux-next: build failure after merge of the final tree (arm-soc
- tree related)
-In-Reply-To: <20120917212615.91bc134d237dcd5968f9f549@canb.auug.org.au>
-References: <20120917212615.91bc134d237dcd5968f9f549@canb.auug.org.au>
-Message-ID: <20120917141119.GA18715@quad.lixom.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 17 Sep 2012 15:12:11 +0100
+Subject: [PATCH v4 06/24] docs: Xen ARM DT bindings
+In-Reply-To: <50572692.1090805@gmail.com>
+References: <alpine.DEB.2.02.1209141145150.29232@kaball.uk.xensource.com>
+ <1347621207-11294-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120914130151.GH25249@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1209141514590.29232@kaball.uk.xensource.com>
+ <50572692.1090805@gmail.com>
+Message-ID: <alpine.DEB.2.02.1209171508470.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Sep 17, 2012 at 09:26:15PM +1000, Stephen Rothwell wrote:
-> Hi all,
+On Mon, 17 Sep 2012, Rob Herring wrote:
+> On 09/14/2012 09:26 AM, Stefano Stabellini wrote:
+> > On Fri, 14 Sep 2012, Konrad Rzeszutek Wilk wrote:
+> >> On Fri, Sep 14, 2012 at 12:13:08PM +0100, Stefano Stabellini wrote:
+> >>> Add a doc to describe the Xen ARM device tree bindings
+> >>>
+> >>>
+> >>> Changes in v4:
+> >>>
+> >>> - "xen,xen" should be last as it is less specific;
+> >>> - update reg property using 2 address-cells and 2 size-cells.
+> >>>
+> >>>
+> >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >>> CC: devicetree-discuss at lists.ozlabs.org
+> >>> CC: David Vrabel <david.vrabel@citrix.com>
+> >>> CC: Rob Herring <robherring2@gmail.com>
+> >>> CC: Dave Martin <dave.martin@linaro.org>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/arm/xen.txt |   22 ++++++++++++++++++++++
+> >>>  1 files changed, 22 insertions(+), 0 deletions(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/arm/xen.txt
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> >>> new file mode 100644
+> >>> index 0000000..1f8f7d4
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> >>> @@ -0,0 +1,22 @@
+> >>> +* Xen hypervisor device tree bindings
+> >>> +
+> >>> +Xen ARM virtual platforms shall have the following properties:
+> >>> +
 > 
-> After merging the final tree, today's linux-next build (powerpc
-> allyesconfig) failed like this:
+> State that they are part of top-level "hypervisor" node.
+
+OK
+
+
+> >>> +- compatible:
+> >>> +	compatible = "xen,xen-<version>", "xen,xen";
+> >>> +  where <version> is the version of the Xen ABI of the platform.
+> >>> +
+> >>> +- reg: specifies the base physical address and size of a region in
+> >>> +  memory where the grant table should be mapped to, using an
+> >>> +  HYPERVISOR_memory_op hypercall. 
+> >>> +
+> >>> +- interrupts: the interrupt used by Xen to inject event notifications.
+> >>
+> >> Its singular here.. but in the example its plurar. What if you use
+> >> multiple of the same number ("16 0xf")?
+> > 
+> > The "interrupts" property in the example below is a standard property to
+> > describe interrupts. We just happen to declare only one interrupt.
+> > 
+> > From the device tree point of view it would be possible to declare more
+> > than one interrupt here, but Xen only supports one really.
+> > 
+> > Regarding the three cells used in the example (<1 15 0xf08>), they have
+> > a specific meaning in the GIC context:
+> > 
+> > """
+> >   The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+> >   interrupts.
+> > 
+> >   The 2nd cell contains the interrupt number for the interrupt type.
+> >   SPI interrupts are in the range [0-987].  PPI interrupts are in the
+> >   range [0-15].
+> > 
+> >   The 3rd cell is the flags, encoded as follows:
+> > 	bits[3:0] trigger type and level flags.
+> > 		1 = low-to-high edge triggered
+> > 		2 = high-to-low edge triggered
+> > 		4 = active high level-sensitive
+> > 		8 = active low level-sensitive
+> > 	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
+> > 	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
+> > 	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
+> > """
+> > 
+> > So <1 15 0xf08> means the last PPI.
 > 
-> drivers/mfd/twl-core.c:49:22: fatal error: plat/cpu.h: No such file or directory
+> Since it is a PPI, it is handled differently than a normal interrupt.
+> That is fine, but you should somehow state that a GIC node is also required.
+
+Yes, good idea
+
+
+> >>> +
+> >>> +
+> >>> +Example:
+> >>> +
+> >>> +hypervisor {
+> >>> +	compatible = "xen,xen-4.3", "xen,xen";
+> >>> +	reg = <0 0xb0000000 0 0x20000>;
+> >>
+> >> So two grant tables?
+> >>
+> >> Hm, physical address is zero, and the size is 0xbignumber?
+> >> Or is the '0' denotating a seperator of arguments, so it is
+> >> 0xb000.. for physical address and 0x20000 for size?
+> > 
+> > from http://devicetree.org/Device_Tree_Usage:
+> > 
+> > "Each addressable device gets a reg which is a list of tuples in the
+> > form reg = <address1 length1 [address2 length2] [address3 length3] ...
+> > Each tuple represents an address range used by the device. Each address
+> > value is a list of one or more 32 bit integers called cells. Similarly,
+> > the length value can either be a list of cells, or empty."
+> > 
+> > In this case the address is: [0 0xb0000000], that means
+> > 0x00000000b0000000, and the length is [0 0x20000], that means
+> > 0x0000000000020000.
 > 
-> Caused by commit 7d7e1eba7e92 ("ARM: OMAP2+: Prepare for irqs.h removal").
-> 
-> I have added the following patch to restrict this driver to ARM until it
-> is fixed:
-> 
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Mon, 17 Sep 2012 21:18:21 +1000
-> Subject: [PATCH] ARM: retrict TWL4030_CORE to ARM while it is broken
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> ---
->  drivers/mfd/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index df850c4..af5e5b7 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -257,6 +257,7 @@ config MENELAUS
->  config TWL4030_CORE
->  	bool "Texas Instruments TWL4030/TWL5030/TWL6030/TPS659x0 Support"
->  	depends on I2C=y && GENERIC_HARDIRQS
-> +	depends on ARM
->  	select IRQ_DOMAIN
->  	help
->  	  Say yes here if you have TWL4030 / TWL6030 family chip on your board.
-
-Gack. This will break on non-OMAP ARM platforms now too, so it needs to be
-depends on ARCH_OMAP instead of ARM.
-
-Tony, can I get an Acked-by so I can apply this to next/cleanup? Sam, if
-you prefer to apply it yourself, let me know.
-
-
--Olof
-
->From 571a231c7f38b720001e1c7c3d5fb08fe265d03b Mon Sep 17 00:00:00 2001
-From: Olof Johansson <olof@lixom.net>
-Date: Mon, 17 Sep 2012 07:05:04 -0700
-Subject: [PATCH] MFD: make TWL4030_CORE depend on ARCH_OMAP
-
-It uses OMAP-only header files, and since it's an OMAP companion chip
-it doesn't really make sense to enable on other platforms.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- drivers/mfd/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index b1a1462..d48083b 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -256,7 +256,7 @@ config MENELAUS
+> But the size depends on #size-cells and #address-cells. I would expect
+> those to be 1 for a 32-bit guest.
  
- config TWL4030_CORE
- 	bool "Texas Instruments TWL4030/TWL5030/TWL6030/TPS659x0 Support"
--	depends on I2C=y && GENERIC_HARDIRQS
-+	depends on I2C=y && GENERIC_HARDIRQS && ARCH_OMAP
- 	select IRQ_DOMAIN
- 	help
- 	  Say yes here if you have TWL4030 / TWL6030 family chip on your board.
--- 
-1.7.10.1.488.g05fbf7a
+I was looking at the Versatile Express DTS (vexpress-v2p-ca15-tc1.dts)
+that on Linux v3.6-rc5 has:
+
+#address-cells = <2>;
+#size-cells = <2>;
+
+What should I use for the example in this doc?
