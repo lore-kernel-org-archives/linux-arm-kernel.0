@@ -1,34 +1,20 @@
-From: vincent.sanders@collabora.co.uk (Vincent Sanders)
-Date: Mon, 17 Sep 2012 12:00:32 +0100
-Subject: [PATCH] MAINTAINERS: add an entry for the BCM2835 ARM
- sub-architecture
-In-Reply-To: <1347690215-17200-1-git-send-email-swarren@wwwdotorg.org>
-References: <1347690215-17200-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120917110031.GA5038@mail.collabora.co.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 17 Sep 2012 04:18:05 -0700
+Subject: [PATCH 17/34] usb: ehci-mxc: remove unneeded mach/hardware.h
+ inclusion
+In-Reply-To: <1347860103-4141-18-git-send-email-shawn.guo@linaro.org>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <1347860103-4141-18-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120917111805.GB28340@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 12:23:35AM -0600, Stephen Warren wrote:
-> Add myself as the maintainer for the BCM2835 ARM support, and related
-> drivers. This is mainly so that the MAINTAINERS file contains some
-> relevant entry, and the rpi/ARM mailing lists; I'd be quite happy if
-> anyone else came along and wanted to maintain/co-maintain this.
+On Mon, Sep 17, 2012 at 01:34:46PM +0800, Shawn Guo wrote:
+> The inclusion of mach/hardware.h is not used by the driver at all.
+> Remove it.
 > 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> Vince, can you confirm that the linux-rpi-kernel list is moderated for
-> non-subscribers?
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-usb at vger.kernel.org
 
-It is
-
-> 
-> Note that I cut down the individual to/cc entries when sending this patch,
-> since otherwise it doesn't get through to the rpi mailing list, and I
-> wanted to ensure this received coverage there.
-
-I have looked at altering this value but it seems I do not have access
-to do this. I have been trying to moderate the list at least once a
-day to try and keep the delays down.
-
---
-Regards Vincent
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
