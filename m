@@ -1,201 +1,143 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Sep 2012 13:34:51 +0800
-Subject: [PATCH 22/34] rtc: mxc_rtc: remove mach/hardware.h inclusion
+Date: Mon, 17 Sep 2012 13:34:52 +0800
+Subject: [PATCH 23/34] dma: imx-dma: use devm_kzalloc and devm_request_irq
 In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1347860103-4141-23-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1347860103-4141-24-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It changes the driver to use platform_device_id rather than cpu_is_xxx
-to determine the controller type, and updates the platform code
-accordingly.
-
-As the result, mach/hardware.h inclusion gets removed from the driver.
+Use managed functions devm_kzalloc and devm_request_irq instead to
+make the error patch simpler.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: rtc-linux at googlegroups.com
+Cc: Vinod Koul <vinod.koul@linux.intel.com>
 ---
- arch/arm/mach-imx/clk-imx1.c                 |    2 +-
- arch/arm/mach-imx/clk-imx27.c                |    2 +-
- arch/arm/mach-imx/clk-imx31.c                |    2 +-
- arch/arm/mach-imx/devices/devices-common.h   |    1 +
- arch/arm/mach-imx/devices/platform-mxc_rtc.c |    9 ++++---
- drivers/rtc/rtc-mxc.c                        |   34 +++++++++++++++++++++++---
- 6 files changed, 40 insertions(+), 10 deletions(-)
+ drivers/dma/imx-dma.c |   54 ++++++++++++++-----------------------------------
+ 1 file changed, 15 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-index 1cd1c5b..6b9407b 100644
---- a/arch/arm/mach-imx/clk-imx1.c
-+++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -105,7 +105,7 @@ int __init mx1_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[dummy], "ahb", "imx-fb.0");
- 	clk_register_clkdev(clk[hclk], "mshc", NULL);
- 	clk_register_clkdev(clk[per3], "ssi", NULL);
--	clk_register_clkdev(clk[clk32], NULL, "mxc_rtc.0");
-+	clk_register_clkdev(clk[clk32], NULL, "imx1-rtc.0");
- 	clk_register_clkdev(clk[clko], "clko", NULL);
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index b90aaec..64ba65b 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -962,7 +962,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	int ret, i;
  
- 	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 6ae2868..5ff5cf0 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -259,7 +259,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
- 	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
- 	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
--	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "mxc_rtc");
-+	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "imx21-rtc");
- 	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
- 	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
- 	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
-diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-index 729d1a9..d9ff16e 100644
---- a/arch/arm/mach-imx/clk-imx31.c
-+++ b/arch/arm/mach-imx/clk-imx31.c
-@@ -124,7 +124,7 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
- 	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
--	clk_register_clkdev(clk[rtc_gate], NULL, "mxc_rtc");
-+	clk_register_clkdev(clk[rtc_gate], NULL, "imx21-rtc");
- 	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
- 	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
- 	clk_register_clkdev(clk[nfc], NULL, "imx27-nand.0");
-diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index d9717b3..73ae524 100644
---- a/arch/arm/mach-imx/devices/devices-common.h
-+++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -274,6 +274,7 @@ struct platform_device *__init imx_add_mxc_pwm(
  
- /* mxc_rtc */
- struct imx_mxc_rtc_data {
-+	const char *devid;
- 	resource_size_t iobase;
- 	resource_size_t irq;
- };
-diff --git a/arch/arm/mach-imx/devices/platform-mxc_rtc.c b/arch/arm/mach-imx/devices/platform-mxc_rtc.c
-index daaf979..f35f848 100644
---- a/arch/arm/mach-imx/devices/platform-mxc_rtc.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_rtc.c
-@@ -9,20 +9,21 @@
- #include <mach/hardware.h>
- #include "devices-common.h"
- 
--#define imx_mxc_rtc_data_entry_single(soc)				\
-+#define imx_mxc_rtc_data_entry_single(soc, _devid)			\
- 	{								\
-+		.devid = _devid,					\
- 		.iobase = soc ## _RTC_BASE_ADDR,			\
- 		.irq = soc ## _INT_RTC,					\
- 	}
- 
- #ifdef CONFIG_SOC_IMX31
- const struct imx_mxc_rtc_data imx31_mxc_rtc_data __initconst =
--	imx_mxc_rtc_data_entry_single(MX31);
-+	imx_mxc_rtc_data_entry_single(MX31, "imx21-rtc");
- #endif /* ifdef CONFIG_SOC_IMX31 */
- 
- #ifdef CONFIG_SOC_IMX35
- const struct imx_mxc_rtc_data imx35_mxc_rtc_data __initconst =
--	imx_mxc_rtc_data_entry_single(MX35);
-+	imx_mxc_rtc_data_entry_single(MX35, "imx21-rtc");
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
- struct platform_device *__init imx_add_mxc_rtc(
-@@ -40,6 +41,6 @@ struct platform_device *__init imx_add_mxc_rtc(
- 		},
- 	};
- 
--	return imx_add_platform_device("mxc_rtc", -1,
-+	return imx_add_platform_device(data->devid, -1,
- 			res, ARRAY_SIZE(res), NULL, 0);
- }
-diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index e3e50d6..aa81c32 100644
---- a/drivers/rtc/rtc-mxc.c
-+++ b/drivers/rtc/rtc-mxc.c
-@@ -17,8 +17,6 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- 
--#include <mach/hardware.h>
--
- #define RTC_INPUT_CLK_32768HZ	(0x00 << 5)
- #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
- #define RTC_INPUT_CLK_38400HZ	(0x02 << 5)
-@@ -72,14 +70,38 @@ static const u32 PIE_BIT_DEF[MAX_PIE_NUM][2] = {
- #define RTC_TEST2	0x2C	/*  32bit rtc test reg 2 */
- #define RTC_TEST3	0x30	/*  32bit rtc test reg 3 */
- 
-+enum imx_rtc_type {
-+	IMX1_RTC,
-+	IMX21_RTC,
-+};
-+
- struct rtc_plat_data {
- 	struct rtc_device *rtc;
- 	void __iomem *ioaddr;
- 	int irq;
- 	struct clk *clk;
- 	struct rtc_time g_rtc_alarm;
-+	enum imx_rtc_type devtype;
- };
- 
-+static struct platform_device_id imx_rtc_devtype[] = {
-+	{
-+		.name = "imx1-rtc",
-+		.driver_data = IMX1_RTC,
-+	}, {
-+		.name = "imx21-rtc",
-+		.driver_data = IMX21_RTC,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(platform, imx_rtc_devtype);
-+
-+static inline int is_imx1_rtc(struct rtc_plat_data *data)
-+{
-+	return data->devtype == IMX1_RTC;
-+}
-+
- /*
-  * This function is used to obtain the RTC time or the alarm value in
-  * second.
-@@ -278,10 +300,13 @@ static int mxc_rtc_read_time(struct device *dev, struct rtc_time *tm)
-  */
- static int mxc_rtc_set_mmss(struct device *dev, unsigned long time)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
-+
- 	/*
- 	 * TTC_DAYR register is 9-bit in MX1 SoC, save time and day of year only
- 	 */
--	if (cpu_is_mx1()) {
-+	if (is_imx1_rtc(pdata)) {
- 		struct rtc_time tm;
- 
- 		rtc_time_to_tm(time, &tm);
-@@ -360,6 +385,8 @@ static int __init mxc_rtc_probe(struct platform_device *pdev)
- 	if (!pdata)
+-	imxdma = kzalloc(sizeof(*imxdma), GFP_KERNEL);
++	imxdma = devm_kzalloc(&pdev->dev, sizeof(*imxdma), GFP_KERNEL);
+ 	if (!imxdma)
  		return -ENOMEM;
  
-+	pdata->devtype = pdev->id_entry->driver_data;
-+
- 	if (!devm_request_mem_region(&pdev->dev, res->start,
- 				     resource_size(res), pdev->name))
- 		return -EBUSY;
-@@ -482,6 +509,7 @@ static struct platform_driver mxc_rtc_driver = {
- #endif
- 		   .owner	= THIS_MODULE,
- 	},
-+	.id_table	= imx_rtc_devtype,
- 	.remove		= __exit_p(mxc_rtc_remove),
- };
+@@ -978,16 +978,12 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	}
  
+ 	imxdma->dma_ipg = devm_clk_get(&pdev->dev, "ipg");
+-	if (IS_ERR(imxdma->dma_ipg)) {
+-		ret = PTR_ERR(imxdma->dma_ipg);
+-		goto err_clk;
+-	}
++	if (IS_ERR(imxdma->dma_ipg))
++		return PTR_ERR(imxdma->dma_ipg);
+ 
+ 	imxdma->dma_ahb = devm_clk_get(&pdev->dev, "ahb");
+-	if (IS_ERR(imxdma->dma_ahb)) {
+-		ret = PTR_ERR(imxdma->dma_ahb);
+-		goto err_clk;
+-	}
++	if (IS_ERR(imxdma->dma_ahb))
++		return PTR_ERR(imxdma->dma_ahb);
+ 
+ 	clk_prepare_enable(imxdma->dma_ipg);
+ 	clk_prepare_enable(imxdma->dma_ahb);
+@@ -996,17 +992,18 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	imx_dmav1_writel(imxdma, DCR_DRST, DMA_DCR);
+ 
+ 	if (cpu_is_mx1()) {
+-		ret = request_irq(MX1_DMA_INT, dma_irq_handler, 0, "DMA", imxdma);
++		ret = devm_request_irq(&pdev->dev, MX1_DMA_INT,
++				       dma_irq_handler, 0, "DMA", imxdma);
+ 		if (ret) {
+ 			dev_warn(imxdma->dev, "Can't register IRQ for DMA\n");
+-			goto err_enable;
++			goto err;
+ 		}
+ 
+-		ret = request_irq(MX1_DMA_ERR, imxdma_err_handler, 0, "DMA", imxdma);
++		ret = devm_request_irq(&pdev->dev, MX1_DMA_ERR,
++				       imxdma_err_handler, 0, "DMA", imxdma);
+ 		if (ret) {
+ 			dev_warn(imxdma->dev, "Can't register ERRIRQ for DMA\n");
+-			free_irq(MX1_DMA_INT, NULL);
+-			goto err_enable;
++			goto err;
+ 		}
+ 	}
+ 
+@@ -1037,13 +1034,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 		struct imxdma_channel *imxdmac = &imxdma->channel[i];
+ 
+ 		if (cpu_is_mx21() || cpu_is_mx27()) {
+-			ret = request_irq(MX2x_INT_DMACH0 + i,
++			ret = devm_request_irq(&pdev->dev, MX2x_INT_DMACH0 + i,
+ 					dma_irq_handler, 0, "DMA", imxdma);
+ 			if (ret) {
+ 				dev_warn(imxdma->dev, "Can't register IRQ %d "
+ 					 "for DMA channel %d\n",
+ 					 MX2x_INT_DMACH0 + i, i);
+-				goto err_init;
++				goto err;
+ 			}
+ 			init_timer(&imxdmac->watchdog);
+ 			imxdmac->watchdog.function = &imxdma_watchdog;
+@@ -1089,46 +1086,25 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	ret = dma_async_device_register(&imxdma->dma_device);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "unable to register\n");
+-		goto err_init;
++		goto err;
+ 	}
+ 
+ 	return 0;
+ 
+-err_init:
+-
+-	if (cpu_is_mx21() || cpu_is_mx27()) {
+-		while (--i >= 0)
+-			free_irq(MX2x_INT_DMACH0 + i, NULL);
+-	} else if cpu_is_mx1() {
+-		free_irq(MX1_DMA_INT, NULL);
+-		free_irq(MX1_DMA_ERR, NULL);
+-	}
+-err_enable:
++err:
+ 	clk_disable_unprepare(imxdma->dma_ipg);
+ 	clk_disable_unprepare(imxdma->dma_ahb);
+-err_clk:
+-	kfree(imxdma);
+ 	return ret;
+ }
+ 
+ static int __exit imxdma_remove(struct platform_device *pdev)
+ {
+ 	struct imxdma_engine *imxdma = platform_get_drvdata(pdev);
+-	int i;
+ 
+         dma_async_device_unregister(&imxdma->dma_device);
+ 
+-	if (cpu_is_mx21() || cpu_is_mx27()) {
+-		for (i = 0; i < IMX_DMA_CHANNELS; i++)
+-			free_irq(MX2x_INT_DMACH0 + i, NULL);
+-	} else if cpu_is_mx1() {
+-		free_irq(MX1_DMA_INT, NULL);
+-		free_irq(MX1_DMA_ERR, NULL);
+-	}
+-
+ 	clk_disable_unprepare(imxdma->dma_ipg);
+ 	clk_disable_unprepare(imxdma->dma_ahb);
+-	kfree(imxdma);
+ 
+         return 0;
+ }
 -- 
 1.7.9.5
