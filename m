@@ -1,34 +1,32 @@
 From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 17 Sep 2012 08:06:07 +0000
-Subject: [PATCH v9 3/3] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <alpine.DEB.2.00.1209121631440.17903@utopia.booyaka.com>
+Date: Mon, 17 Sep 2012 08:14:20 +0000
+Subject: [PATCH v9 1/3] ARM: OMAP2/3: hwmod data: add gpmc
+In-Reply-To: <alpine.DEB.2.00.1209122202030.7275@utopia.booyaka.com>
 References: <cover.1347355380.git.afzal@ti.com>
- <35901c3137e42170066f3efb5026b0749ccdcbb5.1347355380.git.afzal@ti.com>
- <alpine.DEB.2.00.1209121631440.17903@utopia.booyaka.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E4D92@DBDE01.ent.ti.com>
+ <eb0761d198e52ea7d39d201702e1eff84c511396.1347355380.git.afzal@ti.com>
+ <alpine.DEB.2.00.1209122202030.7275@utopia.booyaka.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E4DAD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Paul,
 
-On Wed, Sep 12, 2012 at 22:04:16, Paul Walmsley wrote:
+On Thu, Sep 13, 2012 at 03:45:27, Paul Walmsley wrote:
 
-> Two checkpatch warnings are added by this patch:
+> > +				HWMOD_INIT_NO_RESET |
 
-I did checkpatch earlier, but without --strict
+> As I understand it, this is not due to any GPMC-related reset bugs, but 
+> just because the kernel is relying on the bootloader GPMC timing data 
+> being preserved.  Is that correct?
 
-> I've fixed them here in the obvious way.  But please make sure that all 
-> your patches are clean with 'checkpatch.pl --strict'; saves us time and 
-> frustration...
+Yes, it is due to Kernel relying on bootloader gpmc settings
 
-I am sorry for that, in future --strict will be part of my process
+> Assuming it is, ideally we wouldn't merge such a patch, but I guess this 
+> is somewhat complicated now with the DT transition.  So those should be 
+> marked with comments so we know this is not a hardware bug... something 
+> like the following.
 
-Perhaps it would be better to patch Documentation with a mention
-of --strict for checkpatch
-
-And seeing an unpleasant behavior with --strict, running
-checkpatch over cached changes (for pre-commit hook) is
-not making effect of --strict felt
+Thanks
 
 Regards
 Afzal
