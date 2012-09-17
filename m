@@ -1,32 +1,22 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 17 Sep 2012 01:41:26 -0400
-Subject: [PATCH 29/34] mmc: mxcmmc: remove mach/hardware.h inclusion
-In-Reply-To: <1347860103-4141-30-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Mon, 17 Sep 2012 13:34:58 +0800")
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <1347860103-4141-30-git-send-email-shawn.guo@linaro.org>
-Message-ID: <m3392h1a0p.fsf@pullcord.laptop.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 17 Sep 2012 14:28:44 +0800
+Subject: [PATCH] ARM: dts: mxs: Add ethernetX to macX aliases
+In-Reply-To: <1347535402-17148-1-git-send-email-marex@denx.de>
+References: <1347535402-17148-1-git-send-email-marex@denx.de>
+Message-ID: <20120917062842.GA6413@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 13, 2012 at 01:23:22PM +0200, Marek Vasut wrote:
+> Add ethernet0 and ethernet1 aliases into the imx28.dtsi file, as
+> that is what most bootloaders use to pass MAC address. The bootloader
+> seeks for this alias and adds "mac-address" and "local-mac-address"
+> properties to the aliased node. This fixes issues with FEC having
+> NULL MAC address when update_fec_mac_prop() wasn't called. And
+> not all boards call update_fec_mac_prop() .
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-On Mon, Sep 17 2012, Shawn Guo wrote:
-> It changes the driver to use platform_device_id rather than cpu_is_xxx
-> to determine the controller type, and updates the platform code
-> accordingly.
->
-> As the result, mach/hardware.h inclusion gets removed from the driver.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: linux-mmc at vger.kernel.org
-
-Acked-by: Chris Ball <cjb@laptop.org>
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Applied, thanks.
