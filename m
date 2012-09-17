@@ -1,45 +1,32 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 17 Sep 2012 12:58:44 +0530
-Subject: [PATCH 1/2] i2c: s3c2410: add optional pin configuration using
- pinctrl interface
-In-Reply-To: <504E3DBA.3080603@wwwdotorg.org>
-References: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
- <1346923381-14144-2-git-send-email-thomas.abraham@linaro.org>
- <2444562.GB3nOHUb9M@amdc1227>
- <CAJuYYwQCQDTnpPR5WABtbozZOgc6_SZRBv3b6D8KY78tzMt-Eg@mail.gmail.com>
- <504E3DBA.3080603@wwwdotorg.org>
-Message-ID: <CAJuYYwQDw1zbprdTW=SC-+DvfcK9RDE-C8bJOzcy39QukRWHBg@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 17 Sep 2012 03:52:52 -0400
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: convert to DMA engine API
+In-Reply-To: <k139rl$gbm$2@ger.gmane.org> (Koen Kooi's message of "Wed, 22 Aug
+ 2012 20:53:43 +0200")
+References: <1345574589-24757-1-git-send-email-mporter@ti.com>
+ <1345574589-24757-3-git-send-email-mporter@ti.com>
+ <k139rl$gbm$2@ger.gmane.org>
+Message-ID: <m3ipbdytkb.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2012 00:51, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/06/2012 05:06 AM, Thomas Abraham wrote:
->> On 6 September 2012 15:04, Tomasz Figa <t.figa@samsung.com> wrote:
->>> Hi,
->>>
->>> This patch shows the problem of the need to explicitly migrate all drivers
->>> to pinctrl.
->>>
->>> Maybe we should consider extending the pinctrl subsystem to set the default
->>> state automatically before binding a driver to a device, at least in case
->>> of DT-based platforms?
->>
->> The pinctrl driver allows for activating default pin configuration
->> when the pinctrl driver loads. This is referred to as "hogging". But
->> should hog be used or not is something that needs to be decided. Some
->> of the factors which favor the driver explicitly setting up the pin
->> configuration are
->>
->> 1. After a suspend and resume cycle, the pin configuration registers
->> may be reset to default values. Hence, during resume, the pin
->> configuration has be redone.
+Hi,
+
+On Wed, Aug 22 2012, Koen Kooi wrote:
+> Op 21-08-12 20:43, Matt Porter schreef:
+>> Removes use of the DaVinci EDMA private DMA API and replaces it with use
+>> of the DMA engine API.
+>> 
+>> Signed-off-by: Matt Porter <mporter@ti.com>
 >
-> I'd think it's the pinctrl driver's responsibility to make hogging work
-> correctly across suspend/resume.
+> Runtime tested on hawkboard with 3.6.0-rc2 with rootfs on SD and running
+> bonnie++ on it.
+>
+> Tested-by: Koen Kooi <koen@dominion.thruhere.net>
 
-Ok. I will add this functionality in the Samsung pinctrl driver.
+Thanks, pushed to mmc-next for 3.7.
 
-Thanks,
-Thomas.
-
-[...]
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
