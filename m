@@ -1,36 +1,23 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Sep 2012 12:13:22 -0700
-Subject: [PATCH] ARM: msm: Silence warning when CONFIG_MMC=n
-Message-ID: <1347909202-14773-1-git-send-email-sboyd@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Sep 2012 20:41:43 +0100
+Subject: [PATCH] ARM: Add config option DEBUG_DECOMPRESS_KERNEL
+In-Reply-To: <1347887324-22884-1-git-send-email-mvs@tigris.de>
+References: <1347887324-22884-1-git-send-email-mvs@tigris.de>
+Message-ID: <20120917194143.GP12245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-msm/board-trout.c:67:6: warning: unused variable 'rc'
+On Mon, Sep 17, 2012 at 03:08:44PM +0200, Maximilian Schwerin wrote:
+> This change allows preventing the message "Uncompressing Linux..." from
+> being sent to serial port. This is necessary if the primary serial port is
+> used for something other than kernel debugging (e.g. some external device
+> controlled by serial commands).
 
-Just drop the #ifdef and do this unconditionally.
+You know, it doesn't have to go to the serial port.  It can go to
+anything. We have at least one platform where it goes to the framebuffer
+instead, but getting access to the framebuffer is a whole new load of
+platform dependence that we don't want here.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/board-trout.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-index 4ba0800..7861c1b 100644
---- a/arch/arm/mach-msm/board-trout.c
-+++ b/arch/arm/mach-msm/board-trout.c
-@@ -67,12 +67,9 @@ static void __init trout_init(void)
- 
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
--#ifdef CONFIG_MMC
-         rc = trout_init_mmc(system_rev);
-         if (rc)
-                 printk(KERN_CRIT "%s: MMC init failure (%d)\n", __func__, rc);
--#endif
--
- }
- 
- static struct map_desc trout_io_desc[] __initdata = {
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+In any case, ifdefing out the callsites is not the correct approach.
+We already have this stuff fairly well abstracted, and there's no reason
+why this can't be done by defining empty putc() and flush() functions.
