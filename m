@@ -1,105 +1,52 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 18 Sep 2012 14:49:00 +0200
-Subject: [PATCH] spi/pl022: Devicetree support w/o platform data
-Message-ID: <1347972540-29667-1-git-send-email-stigge@antcom.de>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 18 Sep 2012 14:49:18 +0200
+Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
+ precisely
+In-Reply-To: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20120918124918.GK2505@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even with devicetree support, we needed platform data to provide some data like
-bus_id and enable_dma, leading to mixed device tree and platform data. This
-patch makes it possible to provide all that information via device tree. Now,
-the data must be provided via platform data _or_ device tree completely.
+On Wed, Aug 29, 2012 at 09:55:30AM +0300, Hiroshi Doyu wrote:
+> The following APIs are needed for us to support the legacy Tegra
+> memory manager for devices("NvMap") with *DMA mapping API*.
 
-Only in case of callback specification (dma_filter()), platform data is
-necessary.
+Maybe I am not understanding the need completly. Can you elaborate on
+why this is needed for legacy Tegra?
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> New API:
+> 
+>  ->iova_alloc(): To allocate IOVA area.
+>  ->iova_alloc_at(): To allocate IOVA area at specific address.
+>  ->iova_free():  To free IOVA area.
+> 
+>  ->map_page_at(): To map page at specific IOVA.
 
----
- Documentation/devicetree/bindings/spi/spi_pl022.txt |    9 ++++
- drivers/spi/spi-pl022.c                             |   41 +++++++++++++++++---
- 2 files changed, 45 insertions(+), 5 deletions(-)
+This sounds like a layering violation. The situation today is as
+follows:
 
---- linux-2.6.orig/Documentation/devicetree/bindings/spi/spi_pl022.txt
-+++ linux-2.6/Documentation/devicetree/bindings/spi/spi_pl022.txt
-@@ -10,6 +10,15 @@ Optional properties:
- - cs-gpios : should specify GPIOs used for chipselects.
-   The gpios will be referred to as reg = <index> in the SPI child nodes.
-   If unspecified, a single SPI device without a chip select can be used.
-+- pl022,bus-id : Bus ID (0, 1, ...)
-+- pl022,enable-dma : enables DMA driven transfers (boolean)
-+- pl022,autosuspend-delay : delay in ms following transfer completion before
-+			    the runtime power management system suspends the
-+			    device. A setting of 0 indicates no delay and the
-+                            device will be suspended immediately
-+- pl022,rt : indicates the controller should run the message pump with realtime
-+             priority to minimise the transfer latency on the bus (boolean)
-+
- 
- SPI slave nodes must be children of the SPI master node and can
- contain the following properties.
---- linux-2.6.orig/drivers/spi/spi-pl022.c
-+++ linux-2.6/drivers/spi/spi-pl022.c
-@@ -2024,6 +2024,36 @@ static void pl022_cleanup(struct spi_dev
- 	kfree(chip);
- }
- 
-+static struct pl022_ssp_controller *
-+pl022_platform_data_dt_get(struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct pl022_ssp_controller *pd;
-+	u32 tmp;
-+
-+	if (!np) {
-+		dev_err(dev, "no dt node defined\n");
-+		return NULL;
-+	}
-+
-+	pd = devm_kzalloc(dev, sizeof(struct pl022_ssp_controller), GFP_KERNEL);
-+	if (!pd) {
-+		dev_err(dev, "cannot allocate platform data memory\n");
-+		return NULL;
-+	}
-+
-+	of_property_read_u32(np, "pl022,bus-id", &tmp);
-+	pd->bus_id = tmp;
-+	of_property_read_u32(np, "num-cs", &tmp);
-+	pd->num_chipselect = tmp;
-+	pd->enable_dma = of_property_read_bool(np, "pl022,enable-dma") ? 1 : 0;
-+	of_property_read_u32(np, "pl022,autosuspend-delay",
-+			     &pd->autosuspend_delay);
-+	pd->rt = of_property_read_bool(np, "pl022,rt");
-+
-+	return pd;
-+}
-+
- static int __devinit
- pl022_probe(struct amba_device *adev, const struct amba_id *id)
- {
-@@ -2036,18 +2066,19 @@ pl022_probe(struct amba_device *adev, co
- 
- 	dev_info(&adev->dev,
- 		 "ARM PL022 driver, device ID: 0x%08x\n", adev->periphid);
--	if (platform_info == NULL) {
--		dev_err(&adev->dev, "probe - no platform data supplied\n");
-+	if (!platform_info && IS_ENABLED(CONFIG_OF))
-+		platform_info = pl022_platform_data_dt_get(dev);
-+
-+	if (!platform_info) {
-+		dev_err(dev, "probe: no platform data defined\n");
- 		status = -ENODEV;
- 		goto err_no_pdata;
- 	}
- 
- 	if (platform_info->num_chipselect) {
- 		num_cs = platform_info->num_chipselect;
--	} else if (IS_ENABLED(CONFIG_OF)) {
--		of_property_read_u32(np, "num-cs", &num_cs);
- 	} else {
--		dev_err(&adev->dev, "probe: no chip select defined\n");
-+		dev_err(dev, "probe: no chip select defined\n");
- 		status = -ENODEV;
- 		goto err_no_pdata;
- 	}
+	DMA-API   : Handle DMA-addresses including an address allocator
+	IOMMU-API : Full control over DMA address space, no address
+	            allocator
+
+So what you want to do add to the DMA-API is already part of the
+IOMMU-API.
+
+Here is my suggestion what you can do instead of extending the DMA-API.
+You can use the IOMMU-API to initialize the device address space with
+any mappings at the IOVAs you need the mappings. In the end you allocate
+another free range in the device address space and use that to satisfy
+DMA-API allocations. Any reason why that could not work?
+
+
+Regards,
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
