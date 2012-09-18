@@ -1,57 +1,23 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 Sep 2012 15:12:54 -0600
-Subject: [PATCH 3/3] ARM: OMAP2+: hwmod code: convert missing clockdomain
- warnings to debug messages
-In-Reply-To: <20120918211146.16484.85893.stgit@dusk.lan>
-References: <20120918211146.16484.85893.stgit@dusk.lan>
-Message-ID: <20120918211251.16484.18401.stgit@dusk.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Sep 2012 23:20:57 +0200
+Subject: [PATCH 1/2] ARM: LPC32xx: DTS update for devicetree completion of
+ spi-pl022
+In-Reply-To: <1347973228-29839-1-git-send-email-stigge@antcom.de>
+References: <1347973228-29839-1-git-send-email-stigge@antcom.de>
+Message-ID: <CACRpkdbchKn4Od7PJD83J1rxWayrUaavXP8Afx+M0RQuzEmbPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The decision was made a few months ago to allow struct omap_hwmod
-records and struct clk records to omit clockdomain information if the
-clockdomain is not software-controllable.  See for example commit
-868c157df9721675c19729eed2c96bac6c3f1d01 ("ARM: OMAP2+: hwmod: remove
-prm_clkdm, cm_clkdm; allow hwmods to have no clockdomain").
+On Tue, Sep 18, 2012 at 3:00 PM, Roland Stigge <stigge@antcom.de> wrote:
 
-So convert an existing pr_warning() to a pr_debug() (regarding missing
-clockdomains in clocks), and add a pr_debug() for missing hwmod
-clockdomains.  It's still useful to enable these messages for
-debugging, since missing clockdomains can cause hard-to-debug problems
-with power management; see for example commit
-6c4a057bffe9823221eab547e11fac181dc18a2b ("ARM: OMAP4: clock data:
-Force a DPLL clkdm/pwrdm ON before a relock").
+> spi-pl022 got a further update to its devicetree support, completing properties
+> such that no platform data is necessary anymore. This patch adjusts
+> lpc32xx.dtsi accordingly.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+FWIW Acked-by: Linus Walleij <linus.walleij@linaro.org>
+on both patches...
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 80cea5b..e05228a 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -685,8 +685,8 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 	}
- 
- 	if (!oh->_clk->clkdm)
--		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
--			   oh->main_clk, oh->_clk->name);
-+		pr_debug("omap_hwmod: %s: missing clockdomain for %s.\n",
-+			 oh->main_clk, oh->_clk->name);
- 
- 	return ret;
- }
-@@ -1380,8 +1380,10 @@ static struct omap_hwmod *_lookup(const char *name)
-  */
- static int _init_clkdm(struct omap_hwmod *oh)
- {
--	if (!oh->clkdm_name)
-+	if (!oh->clkdm_name) {
-+		pr_debug("omap_hwmod: %s: missing clockdomain\n", oh->name);
- 		return 0;
-+	}
- 
- 	oh->clkdm = clkdm_lookup(oh->clkdm_name);
- 	if (!oh->clkdm) {
+Yours,
+Linus Walleij
