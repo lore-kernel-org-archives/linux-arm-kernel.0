@@ -1,15 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Sep 2012 11:25:37 +0900
-Subject: [PATCH] ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and SDHI2
-In-Reply-To: <1346922571-16271-1-git-send-email-koba@kmckk.co.jp>
-References: <1346922571-16271-1-git-send-email-koba@kmckk.co.jp>
-Message-ID: <20120918022537.GF28305@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Sep 2012 19:28:57 -0700
+Subject: [GIT PULL] omap fixes for linux next for v3.7 merge window
+Message-ID: <20120918022856.GN11762@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 06:09:31PM +0900, Tetsuyuki Kobayshi wrote:
-> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-> 
-> This patch enables DMAEngine on SHDI0 and SDHI2 for kzm9g.
+Hi Arnd & Olof,
 
-Thanks, applied to boards.
+Here is the fix for the twl-core compile on non-omap
+platforms and few other fixes.
+
+This will probably cause a minor merge conflicts with
+the led changes merged in the arm-soc next/drivers branch
+as both linux/leds.h and linux/platform_data/gpio-omap.h
+now need to be included.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
+
+  ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/cleanup-fixes-for-v3.7
+
+for you to fetch changes up to de6ca33a96a6bf61fcb91d3d399703e19ead9d1e:
+
+  ARM: OMAP1: Include gpio-omap.h for board-h2 and board-h3 (2012-09-17 16:28:03 -0700)
+
+----------------------------------------------------------------
+These fixes are needed to fix non-omap build breakage for
+twl-core driver and to fix omap1_defconfig compile when
+led driver changes and omap sparse IRQ changes are merged
+together. Also fix warnings for omaps not using pinctrl
+framework yet.
+
+----------------------------------------------------------------
+Matt Porter (1):
+      ARM: OMAP2+: Enable pinctrl dummy states
+
+Tony Lindgren (2):
+      mfd: Fix compile for twl-core.c by removing cpu_is_omap usage
+      ARM: OMAP1: Include gpio-omap.h for board-h2 and board-h3
+
+ arch/arm/mach-omap1/board-h2.c       |    1 +
+ arch/arm/mach-omap1/board-h3.c       |    1 +
+ arch/arm/mach-omap2/clock2430_data.c |    1 +
+ arch/arm/mach-omap2/clock3xxx_data.c |    1 +
+ arch/arm/mach-omap2/devices.c        |    5 +++
+ drivers/mfd/twl-core.c               |   56 ++++++++++++++++++----------------
+ 6 files changed, 39 insertions(+), 26 deletions(-)
