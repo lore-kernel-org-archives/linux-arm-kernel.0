@@ -1,7 +1,7 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 18 Sep 2012 09:55:40 +0300
-Subject: [GIT PULL] hwspinlock: a single fix for 3.6
-Message-ID: <CAK=WgbbGk1L9Jmh=XUc9U_D0B_-xrr2pm1quDtBFcKo2gvOuYQ@mail.gmail.com>
+Date: Tue, 18 Sep 2012 09:56:55 +0300
+Subject: [GIT PULL] rpmsg: a fix for 3.6
+Message-ID: <CAK=WgbYzUTfMiW5J-5xWHLjy64Gmi44z3iktrr-aY67Pa9Egog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,20 @@ The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git
-tags/hwspinlock-3.6-fix
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
+tags/rpmsg-3.6-fix
 
-for you to fetch changes up to e352614cd3e7a5f7af7cff894a3b5a705181de21:
+for you to fetch changes up to eeb0074f36d1ab0729d06f1c56add9c7799679e2:
 
-  hwspinlock/core: move the dereference below the NULL test
-(2012-09-10 13:19:25 +0300)
-
-----------------------------------------------------------------
-A single hwspinlock fix by Wei Yongjun, which prevents potential
-NULL dereferences.
+  rpmsg: fix dma_free_coherent dev parameter (2012-09-12 12:03:57 +0300)
 
 ----------------------------------------------------------------
-Wei Yongjun (1):
-      hwspinlock/core: move the dereference below the NULL test
+A quick rpmsg fix from Fernando, fixing two buggy invocations of
+dma_free_coherent.
 
- drivers/hwspinlock/hwspinlock_core.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Fernando Guzman Lugo (1):
+      rpmsg: fix dma_free_coherent dev parameter
+
+ drivers/rpmsg/virtio_rpmsg_bus.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
