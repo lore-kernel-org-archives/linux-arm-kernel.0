@@ -1,33 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Sep 2012 22:04:42 +0100
-Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
-In-Reply-To: <20120915153436.21241.95691.stgit@ubuntu>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153436.21241.95691.stgit@ubuntu>
-Message-ID: <20120918210442.GA12245@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 18 Sep 2012 15:12:45 -0600
+Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: resolve some OMAP4 warnings
+Message-ID: <20120918211146.16484.85893.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 11:34:36AM -0400, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> The KVM hypervisor mmu code requires access to the mem_type prot_pte
-> field when setting up page tables pointing to a device. Unfortunately,
-> the mem_type structure is opaque.
-> 
-> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
-> value.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+The decision was made a few months ago to weaken the clockdomain
+requirements for hwmods and clocks.  Convert some of these
+warnings into debug messages.  In other cases, don't return an
+error when a clockdomain isn't specified.  And while here,
+appropriately mark some OMAP4 hwmods that don't have idle
+reporting bits.
 
-Is there a reason why we need this to be exposed, along with all the
-page table manipulation in patch 7?
+---
 
-Is there a reason why we can't have new MT_ types for PAGE_HYP and
-the HYP MT_DEVICE type (which is the same as MT_DEVICE but with
-PTE_USER set) and have the standard ARM/generic kernel code build
-those mappings?
+hwmod_omap4_warning_fixes_a_3.7
+   text    data     bss     dec     hex filename
+7333017  764092 5611596 13708705         d12da1 vmlinux.omap2plus_defconfig.orig
+7332977  764068 5611596 13708641         d12d61 vmlinux.omap2plus_defconfig
 
-That would (it seems) also avoid the need to export the pXd_clear_bad()
-acessors too...
+Paul Walmsley (3):
+      ARM: OMAP4: hwmod data: add missing HWMOD_NO_IDLEST flags to some PRCM IP blocks
+      ARM: OMAP4+: hwmod code: remove clkdm requirement in _omap4_wait_target_*()
+      ARM: OMAP2+: hwmod code: convert missing clockdomain warnings to debug messages
+
+
+ arch/arm/mach-omap2/omap_hwmod.c           |   16 +++++++++-------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +++
+ 2 files changed, 12 insertions(+), 7 deletions(-)
