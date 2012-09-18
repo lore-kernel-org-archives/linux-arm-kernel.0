@@ -1,24 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 18 Sep 2012 13:59:39 -0700
-Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
-In-Reply-To: <20120918174559.227378fc@endymion.delvare>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
- <20120918152430.GA5911@roeck-us.net>
- <20120918174559.227378fc@endymion.delvare>
-Message-ID: <20120918205939.GA7006@roeck-us.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Sep 2012 22:04:42 +0100
+Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
+In-Reply-To: <20120915153436.21241.95691.stgit@ubuntu>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153436.21241.95691.stgit@ubuntu>
+Message-ID: <20120918210442.GA12245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 05:45:59PM +0200, Jean Delvare wrote:
-> On Tue, 18 Sep 2012 08:24:30 -0700, Guenter Roeck wrote:
-> > I don't even understand what you are trying to do, much less why you don't
-> > just use the existing infrastructure, and I don't have time to try to figure
-> > it out. Maybe Jean has time to review this driver, but not me.
+On Sat, Sep 15, 2012 at 11:34:36AM -0400, Christoffer Dall wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> No, I do not. My backlog is huge already :(
+> The KVM hypervisor mmu code requires access to the mem_type prot_pte
+> field when setting up page tables pointing to a device. Unfortunately,
+> the mem_type structure is opaque.
 > 
-then my conclusion is NACK and that it should be changed to a regular hwmon
-driver. I'll be happy to review it once that is done.
+> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
+> value.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 
-Guenter
+Is there a reason why we need this to be exposed, along with all the
+page table manipulation in patch 7?
+
+Is there a reason why we can't have new MT_ types for PAGE_HYP and
+the HYP MT_DEVICE type (which is the same as MT_DEVICE but with
+PTE_USER set) and have the standard ARM/generic kernel code build
+those mappings?
+
+That would (it seems) also avoid the need to export the pXd_clear_bad()
+acessors too...
