@@ -1,43 +1,48 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 18 Sep 2012 10:00:37 +0200
-Subject: [PATCH] clk: Make the managed clk functions generically available
-In-Reply-To: <20120915213151.GM12245@n2100.arm.linux.org.uk>
-References: <1347202862-1617-1-git-send-email-lars@metafoo.de>
- <20120909235059.GA2643@sirena.org.uk>
- <20120910001524.GL13739@n2100.arm.linux.org.uk>
- <20120910002020.GB16249@opensource.wolfsonmicro.com>
- <20120910003913.GM13739@n2100.arm.linux.org.uk>
- <504F4E36.20309@metafoo.de>
- <1347375033.27206.3.camel@sauron.fi.intel.com>
- <504FE633.2090304@snapgear.com> <5050F3DB.1050202@metafoo.de>
- <20120915213151.GM12245@n2100.arm.linux.org.uk>
-Message-ID: <20120918080037.GA15982@avionic-0098.mockup.avionic-design.de>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 18 Sep 2012 16:02:03 +0800
+Subject: [PATCH] ARM: OMAP: OMAP_DEBUG_LEDS needs to select LEDS_CLASS
+In-Reply-To: <CAF+7xWnJj4XovwT5K_BDN8Q4GBLogsCb29Ro9t0Taek95HaPDg@mail.gmail.com>
+References: <1347939042.15578.1.camel@phoenix>
+ <CAK5ve-LXv76vuBLHQQtREHn_ZogUsbyqzz2-uTHT_Ps-9vS3Pw@mail.gmail.com>
+ <CAF+7xWnJj4XovwT5K_BDN8Q4GBLogsCb29Ro9t0Taek95HaPDg@mail.gmail.com>
+Message-ID: <CAK5ve-L92DqDv7ZApaaN5BOby+oPf2Ate-3jvgkadm7gfXZLcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 10:31:52PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 12, 2012 at 10:43:07PM +0200, Lars-Peter Clausen wrote:
-> > I wouldn't mind having this merged sooner rather than later, there is at least
-> > one driver in next which is currently broken due to the missing devm_clk_get.
-> > Russell what's your plan for the patch? Maybe under the given circumstances it
-> > makes sense to let it go through the m68k tree.
-> 
-> Ok, I've merged it but there was no indication in the patch that it was
-> supposed to be a fix... there's no cc: to stable.  Does it need to go to
-> stable?  When was this brokenness introduced?  What's the story for the
-> m68k bit?
+On Tue, Sep 18, 2012 at 2:49 PM, Axel Lin <axel.lin@gmail.com> wrote:
+> 2012/9/18 Bryan Wu <bryan.wu@canonical.com>:
+>> On Tue, Sep 18, 2012 at 11:30 AM, Axel Lin <axel.lin@gmail.com> wrote:
+>>> This fixes below build error when CONFIG_LEDS_CLASS is not set.
+>>>
+>>>   LD      init/built-in.o
+>>> arch/arm/plat-omap/built-in.o: In function `fpga_probe':
+>>> arch/arm/plat-omap/debug-leds.c:113: undefined reference to `led_classdev_register'
+>>> make: *** [vmlinux] Error 1
+>>>
+>>
+>> Thanks for posting this. But I think Tony has already fixed it in mainline:
+>> --
+>> commit 359f64f7b3997e94ee71039b5fcdc1278b9b77c4
+>> Author: Tony Lindgren <tony@atomide.com>
+>> Date:   Wed Sep 15 10:18:51 2010 -0700
+>>
+>>     omap: Fix compile dependency to LEDS_CLASS
+>>
+>>     If we LEDS_CLASS is not selected, we will get undefined reference
+>>     to `led_classdev_register'.
+>>
+>>     Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> Commit 359f64f7b was commited on Sep 15 2010.
+> This patch is against current linux-next tree.
+> I got the build error on linux-next tree (next-20120917).
+>
 
-What tree is this supposed to go through? I've checked your ARM tree as
-well as Mike's clock tree but neither seem to carry this patch. The
-reason I ask is because I want to take a patch series that converts the
-Unicore32 PWM code to the PWM framework into linux-next but it depends
-on this patch as well.
+Obviously, linux-next is not updated to latest mainline, -:D
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/1a279ff2/attachment.sig>
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.186-168-78255 Mobile
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
