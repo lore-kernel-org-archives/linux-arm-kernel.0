@@ -1,47 +1,263 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 18 Sep 2012 17:53:02 -0400
-Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
-In-Reply-To: <20120918210442.GA12245@n2100.arm.linux.org.uk>
+Date: Tue, 18 Sep 2012 18:01:27 -0400
+Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
+In-Reply-To: <20120918124724.GK32204@mudshark.cambridge.arm.com>
 References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153436.21241.95691.stgit@ubuntu>
- <20120918210442.GA12245@n2100.arm.linux.org.uk>
-Message-ID: <CANM98qL-CZT23T+MNg=EA_ieY+TJF6=F_6XpixWmfEqPN4-A7g@mail.gmail.com>
+ <20120915153443.21241.37958.stgit@ubuntu>
+ <20120918124724.GK32204@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qJZBYjBh5Jqu4H_oiS+4vgVi3PNcOUP1prUApOTmhoqpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 5:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Sep 15, 2012 at 11:34:36AM -0400, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, Sep 18, 2012 at 8:47 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Sep 15, 2012 at 04:34:43PM +0100, Christoffer Dall wrote:
+>> KVM uses the stage-2 page tables and the Hyp page table format,
+>> so let's define the fields we need to access in KVM.
 >>
->> The KVM hypervisor mmu code requires access to the mem_type prot_pte
->> field when setting up page tables pointing to a device. Unfortunately,
->> the mem_type structure is opaque.
+>> We use pgprot_guest to indicate stage-2 entries.
 >>
->> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
->> value.
+>> Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>>  arch/arm/include/asm/pgtable-3level.h |   13 +++++++++++++
+>>  arch/arm/include/asm/pgtable.h        |    5 +++++
+>>  arch/arm/mm/mmu.c                     |    3 +++
+>>  3 files changed, 21 insertions(+)
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index b249035..7351eee 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -102,11 +102,24 @@
+>>   */
+>>  #define L_PGD_SWAPPER                (_AT(pgdval_t, 1) << 55)        /* swapper_pg_dir entry */
+>>
+>> +/*
+>> + * 2-nd stage PTE definitions for LPAE.
+>> + */
 >
-> Is there a reason why we need this to be exposed, along with all the
-> page table manipulation in patch 7?
+> Minor nit: 2nd
 >
-> Is there a reason why we can't have new MT_ types for PAGE_HYP and
-> the HYP MT_DEVICE type (which is the same as MT_DEVICE but with
-> PTE_USER set) and have the standard ARM/generic kernel code build
-> those mappings?
-
-For hyp mode we can do this, but we cannot do this for the cpu
-interfaces that need to be mapped into each VM as they have each their
-own pgd. We can move the Hyp mode mappings, and I was playing with the
-though of having a PAGE_KVM_DEVICE set in pgtable.h and a
-pgprot_guest_device setup in build_mem_type_table.
-
-What do you think?
-
+>> +#define L_PTE2_SHARED                L_PTE_SHARED
+>> +#define L_PTE2_READ          (_AT(pteval_t, 1) << 6) /* HAP[0] */
+>> +#define L_PTE2_WRITE         (_AT(pteval_t, 1) << 7) /* HAP[1] */
 >
-> That would (it seems) also avoid the need to export the pXd_clear_bad()
-> acessors too...
+> This is actually HAP[2:1], not HAP[1:0]. Also, can you follow what we do for
+> stage 1 translation and name these RDONLY and WRONLY (do you even use
+> that?).
+>
 
-for hyp mode mappings this would be true, then.
+The ARM arm is actually ambiguous, B3-1335 defines it as HAP[2:1], but
+B3-1355 defines it as HAP[1:0] and I chose the latter as it is more
+clear to most people not knowing that for historical reasons {H}AP[0]
+is not defined. If there's a consensus for the other choice here, then
+I'm good with that.
+
+Also, these bits have a different meaning for stage-2, HAP[2] (ok, in
+this case it's less misleading with bit index 2), HAP[2] actually
+means you can write this, two clear bits means access denied, not
+read/write, so it made more sense to me to do:
+
+prot = READ | WRITE;
+
+than
+
+prt = RDONLY | WRONLY; // (not mutually exclusive). See my point?
+
+>> +#define L_PTE2_NORM_WB               (_AT(pteval_t, 3) << 4) /* MemAttr[3:2] */
+>> +#define L_PTE2_INNER_WB              (_AT(pteval_t, 3) << 2) /* MemAttr[1:0] */
+>
+> Another minor nit: PTE2 looks awful. Maybe L_PTE_HYP_* instead?
+>
+>>  #ifndef __ASSEMBLY__
+>>
+>>  #define pud_none(pud)                (!pud_val(pud))
+>>  #define pud_bad(pud)         (!(pud_val(pud) & 2))
+>>  #define pud_present(pud)     (pud_val(pud))
+>> +#define pmd_table(pmd)               ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>> +                                              PMD_TYPE_TABLE)
+>> +#define pmd_sect(pmd)                ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>> +                                              PMD_TYPE_SECT)
+>>
+>>  #define pud_clear(pudp)                      \
+>>       do {                            \
+>> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+>> index 41dc31f..c422f62 100644
+>> --- a/arch/arm/include/asm/pgtable.h
+>> +++ b/arch/arm/include/asm/pgtable.h
+>> @@ -70,6 +70,7 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+>>
+>>  extern pgprot_t              pgprot_user;
+>>  extern pgprot_t              pgprot_kernel;
+>> +extern pgprot_t              pgprot_guest;
+>>
+>>  #define _MOD_PROT(p, b)      __pgprot(pgprot_val(p) | (b))
+>>
+>> @@ -82,6 +83,10 @@ extern pgprot_t            pgprot_kernel;
+>>  #define PAGE_READONLY_EXEC   _MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+>>  #define PAGE_KERNEL          _MOD_PROT(pgprot_kernel, L_PTE_XN)
+>>  #define PAGE_KERNEL_EXEC     pgprot_kernel
+>> +#define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_USER)
+>
+> Just define L_PTE_HYP to L_PTE_USER, otherwise that's confusing.
+>
+>> +#define PAGE_KVM_GUEST               _MOD_PROT(pgprot_guest, L_PTE2_READ | \
+>> +                                       L_PTE2_NORM_WB | L_PTE2_INNER_WB | \
+>> +                                       L_PTE2_SHARED)
+>
+> It would be cleaner to separate the cacheability attributes out from here
+> and into the cache_policies array. Then you just need L_PTE_HYP_RDONLY here.
+>
+
+ok, below is an attempt to rework all this, comments please:
+
+
+diff --git a/arch/arm/include/asm/pgtable-3level.h
+b/arch/arm/include/asm/pgtable-3level.h
+index 7351eee..6df235c 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -103,13 +103,19 @@
+ #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
+
+ /*
+- * 2-nd stage PTE definitions for LPAE.
++ * 2nd stage PTE definitions for LPAE.
+  */
+-#define L_PTE2_SHARED		L_PTE_SHARED
+-#define L_PTE2_READ		(_AT(pteval_t, 1) << 6)	/* HAP[0] */
+-#define L_PTE2_WRITE		(_AT(pteval_t, 1) << 7)	/* HAP[1] */
+-#define L_PTE2_NORM_WB		(_AT(pteval_t, 3) << 4)	/* MemAttr[3:2] */
+-#define L_PTE2_INNER_WB		(_AT(pteval_t, 3) << 2)	/* MemAttr[1:0] */
++#define L_PTE_S2_SHARED		L_PTE_SHARED
++#define L_PTE_S2_READ		(_AT(pteval_t, 1) << 6)	  /* HAP[1] */
++#define L_PTE_S2_WRITE		(_AT(pteval_t, 1) << 7)	  /* HAP[2] */
++#define L_PTE_S2_MT_UNCACHED	(_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
++#define L_PTE_S2_MT_WRTHROUGH	(_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
++#define L_PTE_S2_MT_WRBACK	(_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
++
++/*
++ * Hyp-mode PL2 PTE definitions for LPAE.
++ */
++#define L_PTE_HYP		L_PTE_USER
+
+ #ifndef __ASSEMBLY__
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index c422f62..6ab276b 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -83,10 +83,8 @@ extern pgprot_t		pgprot_guest;
+ #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+ #define PAGE_KERNEL_EXEC	pgprot_kernel
+-#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_USER)
+-#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE2_READ | \
+-					  L_PTE2_NORM_WB | L_PTE2_INNER_WB | \
+-					  L_PTE2_SHARED)
++#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
++#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE_S2_READ)
+
+ #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN)
+ #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 82d0edf..3ff427b 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -476,7 +476,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm,
+phys_addr_t guest_ipa,
+
+ 	end = (guest_ipa + size + PAGE_SIZE - 1) & PAGE_MASK;
+ 	prot = __pgprot(get_mem_type_prot_pte(MT_DEVICE) | L_PTE_USER |
+-			L_PTE2_READ | L_PTE2_WRITE);
++			L_PTE_S2_READ | L_PTE_S2_WRITE);
+ 	pfn = __phys_to_pfn(pa);
+
+ 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+@@ -567,7 +567,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu,
+phys_addr_t fault_ipa,
+ 		goto out;
+ 	new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
+ 	if (writable)
+-		pte_val(new_pte) |= L_PTE2_WRITE;
++		pte_val(new_pte) |= L_PTE_S2_WRITE;
+ 	coherent_icache_guest_page(vcpu->kvm, gfn);
+
+ 	spin_lock(&vcpu->kvm->arch.pgd_lock);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f2b6287..a06f3496 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -67,6 +67,7 @@ struct cachepolicy {
+ 	unsigned int	cr_mask;
+ 	pmdval_t	pmd;
+ 	pteval_t	pte;
++	pteval_t	pte_s2;
+ };
+
+ static struct cachepolicy cache_policies[] __initdata = {
+@@ -75,26 +76,31 @@ static struct cachepolicy cache_policies[] __initdata = {
+ 		.cr_mask	= CR_W|CR_C,
+ 		.pmd		= PMD_SECT_UNCACHED,
+ 		.pte		= L_PTE_MT_UNCACHED,
++		.pte_s2		= L_PTE_S2_MT_UNCACHED,
+ 	}, {
+ 		.policy		= "buffered",
+ 		.cr_mask	= CR_C,
+ 		.pmd		= PMD_SECT_BUFFERED,
+ 		.pte		= L_PTE_MT_BUFFERABLE,
++		.pte_s2		= L_PTE_S2_MT_UNCACHED,
+ 	}, {
+ 		.policy		= "writethrough",
+ 		.cr_mask	= 0,
+ 		.pmd		= PMD_SECT_WT,
+ 		.pte		= L_PTE_MT_WRITETHROUGH,
++		.pte_s2		= L_PTE_S2_MT_WRTHROUGH,
+ 	}, {
+ 		.policy		= "writeback",
+ 		.cr_mask	= 0,
+ 		.pmd		= PMD_SECT_WB,
+ 		.pte		= L_PTE_MT_WRITEBACK,
++		.pte_s2		= L_PTE_S2_MT_WRBACK,
+ 	}, {
+ 		.policy		= "writealloc",
+ 		.cr_mask	= 0,
+ 		.pmd		= PMD_SECT_WBWA,
+ 		.pte		= L_PTE_MT_WRITEALLOC,
++		.pte_s2		= L_PTE_S2_MT_WRBACK,
+ 	}
+ };
+
+@@ -318,7 +324,7 @@ static void __init build_mem_type_table(void)
+ {
+ 	struct cachepolicy *cp;
+ 	unsigned int cr = get_cr();
+-	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
++	pteval_t user_pgprot, kern_pgprot, vecs_pgprot, guest_pgprot;
+ 	int cpu_arch = cpu_architecture();
+ 	int i;
+
+@@ -430,6 +436,7 @@ static void __init build_mem_type_table(void)
+ 	 */
+ 	cp = &cache_policies[cachepolicy];
+ 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
++	guest_pgprot = cp->pte_s2;
+
+ 	/*
+ 	 * Enable CPU-specific coherency if supported.
+@@ -464,6 +471,7 @@ static void __init build_mem_type_table(void)
+ 			user_pgprot |= L_PTE_SHARED;
+ 			kern_pgprot |= L_PTE_SHARED;
+ 			vecs_pgprot |= L_PTE_SHARED;
++			guest_pgprot |= L_PTE_SHARED;
+ 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
+ 			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
+ 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
+@@ -518,7 +526,7 @@ static void __init build_mem_type_table(void)
+ 	pgprot_user   = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | user_pgprot);
+ 	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
+ 				 L_PTE_DIRTY | kern_pgprot);
+-	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG);
++	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | guest_pgprot);
+
+ 	mem_types[MT_LOW_VECTORS].prot_l1 |= ecc_mask;
+ 	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
