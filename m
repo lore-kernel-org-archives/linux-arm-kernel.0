@@ -1,9 +1,9 @@
 From: peter.senna@gmail.com (Peter Senna Tschudin)
-Date: Tue, 18 Sep 2012 14:07:56 +0200
-Subject: [PATCH 06/10] drivers/video/imxfb.c: fix error return code
+Date: Tue, 18 Sep 2012 14:07:58 +0200
+Subject: [PATCH 08/10] drivers/video/cyber2000fb.c: fix error return code
 In-Reply-To: <1347970080-25175-1-git-send-email-peter.senna@gmail.com>
 References: <1347970080-25175-1-git-send-email-peter.senna@gmail.com>
-Message-ID: <1347970080-25175-6-git-send-email-peter.senna@gmail.com>
+Message-ID: <1347970080-25175-8-git-send-email-peter.senna@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,20 +34,24 @@ ret@p1 = 0
 
 Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
 ---
- drivers/video/imxfb.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/video/cyber2000fb.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index caad368..469b07c 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -803,6 +803,7 @@ static int __init imxfb_probe(struct platform_device *pdev)
- 	fbi->regs = ioremap(res->start, resource_size(res));
- 	if (fbi->regs == NULL) {
- 		dev_err(&pdev->dev, "Cannot map frame buffer registers\n");
-+		ret = -ENOMEM;
- 		goto failed_ioremap;
- 	}
+diff --git a/drivers/video/cyber2000fb.c b/drivers/video/cyber2000fb.c
+index c1527f5..e40125c 100644
+--- a/drivers/video/cyber2000fb.c
++++ b/drivers/video/cyber2000fb.c
+@@ -1804,8 +1804,10 @@ cyberpro_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
  
+ 	cfb->irq = dev->irq;
+ 	cfb->region = pci_ioremap_bar(dev, 0);
+-	if (!cfb->region)
++	if (!cfb->region) {
++		err = -ENOMEM;
+ 		goto failed_ioremap;
++	}
+ 
+ 	cfb->regs = cfb->region + MMIO_OFFSET;
+ 	cfb->fb.device = &dev->dev;
 -- 
 1.7.11.4
