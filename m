@@ -1,106 +1,145 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 18 Sep 2012 10:52:06 +0200
-Subject: [PATCH 2/8] ARM: OMAP2+: hwmod: manage the wake-up latency constraints
+Date: Tue, 18 Sep 2012 10:52:08 +0200
+Subject: [PATCH 4/8] ARM: OMAP3: cpuidle: next C-state decision depends on the
+ PM QoS MPU and CORE constraints
 In-Reply-To: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
 References: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1347958332-2205-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1347958332-2205-5-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP PM code implements a handler for the per-device PM QoS framework.
-The handler queries the omap_hwmod layer in order to manage the power domains
-wake-up latency constraints. Hwmod retrieves the correct power domain
-and if it exists it calls the corresponding power domain function.
+The MPU latency figures for cpuidle include the MPU itself and also
+the peripherals needed for the MPU to execute instructions (e.g.
+main memory, caches, IRQ controller, MMU etc). On OMAP3 those
+peripherals belong to the MPU and CORE power domains and so the
+cpuidle C-states are a combination of MPU and CORE states.
 
-Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
-latency constraints on MPU, CORE and PER.
+This patch implements the relation between the cpuidle and per-
+device PM QoS frameworks in the OMAP3 specific idle callbacks.
+
+The chosen C-state shall satisfy the following conditions:
+ . it satisfies the enable_off_mode flag,
+ . the next state for MPU and CORE power domains is not lower than the
+   next state calculated by the per-device PM QoS.
+
+Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
+on MPU, CORE and PER.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   44 +++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    5 +++
- 2 files changed, 48 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |   49 +++++++++++++++++++++++++------------
+ 1 files changed, 33 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6ca8e51..5990835 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -145,6 +145,7 @@
- #include "powerdomain.h"
- #include <plat/clock.h>
- #include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
- #include <plat/prcm.h>
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 4ca37d2..ca6cb71 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -76,8 +76,8 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+ static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
  
- #include "cm2xxx_3xxx.h"
-@@ -3554,10 +3555,51 @@ ohsps_unlock:
+ static int __omap3_enter_idle(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index)
++			      struct cpuidle_driver *drv,
++			      int index)
+ {
+ 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
+ 	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
+@@ -134,10 +134,14 @@ return_sleep_time:
+  *
+  * Called from the CPUidle framework to program the device to the
+  * specified target state selected by the governor.
++ *
++ * Note: this function does not check for any pending activity or dependency
++ * between power domains states, so the caller shall check the parameters
++ * correctness.
+  */
+ static inline int omap3_enter_idle(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index)
++				   struct cpuidle_driver *drv,
++				   int index)
+ {
+ 	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
  }
- 
- /**
-+ * omap_hwmod_set_wakeuplat_constraint - Set or update a wake-up latency
-+ * constraint
-+ * @oh: struct omap_hwmod* to which the target device belongs to.
-+ * @cookie: identifier of the constraints list for @oh.
-+ * @min_latency: the minimum allowed wake-up latency for @oh.
-+ *
-+ * Returns the return value from pwrdm_wakeuplat_update_constraint(),
-+ * or -EINVAL in case of invalid parameters.
-+ */
-+int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
-+					long min_latency)
-+{
-+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
-+
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	return pwrdm_wakeuplat_update_constraint(pwrdm, cookie, min_latency);
-+}
-+
-+/**
-+ * omap_hwmod_remove_wakeuplat_constraint - Release a wake-up latency
-+ * constraint
-+ * @oh: struct omap_hwmod* to which the target device belongs to.
-+ * @cookie: identifier of the constraints list for @oh.
-+ *
-+ * Removes a wakeup latency contraint.  Returns the return value from
-+ * pwrdm_wakeuplat_remove_constraint(), or -EINVAL in case of invalid
-+ * parameters.
-+ */
-+int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
-+{
-+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
-+
-+	if (!pwrdm)
-+		return -EINVAL;
-+
-+	return pwrdm_wakeuplat_remove_constraint(pwrdm, cookie);
-+}
-+
-+/**
-  * omap_hwmod_get_context_loss_count - get lost context count
-  * @oh: struct omap_hwmod *
+@@ -152,8 +156,10 @@ static inline int omap3_enter_idle(struct cpuidle_device *dev,
+  * to the caller. Else, this function searches for a lower c-state which is
+  * still valid (as defined in omap3_power_states[]) and returns its index.
   *
-- * Query the powerdomain of of @oh to get the context loss
-+ * Query the powerdomain of @oh to get the context loss
-  * count for this device.
-  *
-  * Returns the context loss count of the powerdomain assocated with @oh
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 6132972..fa0b350 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -640,6 +640,11 @@ int omap_hwmod_for_each_by_class(const char *classname,
- 				 void *user);
+- * A state is valid if the 'valid' field is enabled and
+- * if it satisfies the enable_off_mode condition.
++ * A state is valid if:
++ * . it satisfies the enable_off_mode flag,
++ * . the next state for MPU and CORE power domains is not lower than the
++ *   state programmed by the per-device PM QoS.
+  */
+ static int next_valid_state(struct cpuidle_device *dev,
+ 			    struct cpuidle_driver *drv, int index)
+@@ -161,6 +167,8 @@ static int next_valid_state(struct cpuidle_device *dev,
+ 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
+ 	u32 mpu_deepest_state = PWRDM_FUNC_PWRST_CSWR;
+ 	u32 core_deepest_state = PWRDM_FUNC_PWRST_CSWR;
++	u32 mpu_pm_qos_next_state = mpu_pd->wkup_lat_next_state;
++	u32 core_pm_qos_next_state = core_pd->wkup_lat_next_state;
+ 	int idx;
+ 	int next_index = 0; /* C1 is the default value */
  
- int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
-+
-+int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
-+					long min_latency);
-+int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie);
-+
- int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+@@ -177,7 +185,9 @@ static int next_valid_state(struct cpuidle_device *dev,
  
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
+ 	/* Check if current state is valid */
+ 	if ((cx->mpu_state >= mpu_deepest_state) &&
+-	    (cx->core_state >= core_deepest_state))
++	    (cx->core_state >= core_deepest_state) &&
++	    (cx->mpu_state >= mpu_pm_qos_next_state) &&
++	    (cx->core_state >= core_pm_qos_next_state))
+ 		return index;
+ 
+ 	/*
+@@ -187,7 +197,9 @@ static int next_valid_state(struct cpuidle_device *dev,
+ 	for (idx = index - 1; idx >= 0; idx--) {
+ 		cx =  &omap3_idle_data[idx];
+ 		if ((cx->mpu_state >= mpu_deepest_state) &&
+-		    (cx->core_state >= core_deepest_state)) {
++		    (cx->core_state >= core_deepest_state) &&
++		    (cx->mpu_state >= mpu_pm_qos_next_state) &&
++		    (cx->core_state >= core_pm_qos_next_state)) {
+ 			next_index = idx;
+ 			break;
+ 		}
+@@ -223,14 +235,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 	else
+ 		new_state_idx = next_valid_state(dev, drv, index);
+ 
+-	/*
+-	 * FIXME: we currently manage device-specific idle states
+-	 *        for PER and CORE in combination with CPU-specific
+-	 *        idle states.  This is wrong, and device-specific
+-	 *        idle management needs to be separated out into
+-	 *        its own code.
+-	 */
+-
+ 	/* Program PER state */
+ 	cx = &omap3_idle_data[new_state_idx];
+ 	core_next_state = cx->core_state;
+@@ -264,6 +268,19 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 
+ DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+ 
++/*
++ * Note about the latency related fields of the cpuidle_driver struct:
++ *
++ * - exit_latency = sleep + wake-up latencies of the MPU,
++ *  which include the MPU itself and the peripherals needed
++ *  for the MPU to execute instructions (e.g. main memory,
++ *  caches, IRQ controller, MMU etc). Some of those peripherals
++ *  can belong to other power domains than the MPU subsystem and so
++ *  the corresponding latencies must be included in this figure
++ *
++ * - target_residency: required amount of time in the C state
++ *  to break even on energy cost
++ */
+ struct cpuidle_driver omap3_idle_driver = {
+ 	.name = 	"omap3_idle",
+ 	.owner = 	THIS_MODULE,
 -- 
 1.7.7.6
