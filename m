@@ -1,20 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Sep 2012 16:05:43 +0800
-Subject: [alsa-devel] [PATCH 00/34] i.MX multi-platform support
-In-Reply-To: <20120918075213.GD24458@pengutronix.de>
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <20120918075213.GD24458@pengutronix.de>
-Message-ID: <20120918080541.GA6377@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 18 Sep 2012 10:05:31 +0200
+Subject: [PATCH] ARM i.MX25: Make timer irq work again
+Message-ID: <1347955531-31304-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 09:52:13AM +0200, Sascha Hauer wrote:
-> I just had a look at the remaining initcalls in arch-imx. Most of them
-> are protected with a cpu_is_*, but this one should be fixed before i.MX
-> is enabled for multi platform:
-> 
-> arch/arm/mach-imx/devices/devices.c:48:core_initcall(mxc_device_init);
-> 
-Ah, I missed that.  Thanks for reminding, Sascha.
+Since i.MX has SPARSE_IRQ enabled the i.MX25 timer is broken. This
+is because the internal irqs now start at an offset of NR_IRQS_LEGACY.
+The patch fixed this up, but missed the i.MX25 timer which used a
+hardcoded value instead of a define. This patch introduces a define
+for the timer irq and uses it.
 
-Shawn
+This is broken since introduced with 3.6-rc1:
+
+| commit 8842a9e2869cae14bbb8184004a42fc3070587fb
+| Author: Shawn Guo <shawn.guo@linaro.org>
+| Date:   Thu Jun 14 11:16:14 2012 +0800
+|
+|    ARM: imx: enable SPARSE_IRQ for imx platform
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx25.c         |    2 +-
+ arch/arm/plat-mxc/include/mach/mx25.h |    1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index fdd8cc8..0fc72fc 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -243,6 +243,6 @@ int __init mx25_clocks_init(void)
+ 	clk_register_clkdev(clk[sdma_ahb], "ahb", "imx35-sdma");
+ 	clk_register_clkdev(clk[iim_ipg], "iim", NULL);
+ 
+-	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
++	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), MX25_INT_GPT1);
+ 	return 0;
+ }
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+index 627d94f..ec46640 100644
+--- a/arch/arm/plat-mxc/include/mach/mx25.h
++++ b/arch/arm/plat-mxc/include/mach/mx25.h
+@@ -98,6 +98,7 @@
+ #define MX25_INT_UART1		(NR_IRQS_LEGACY + 45)
+ #define MX25_INT_GPIO2		(NR_IRQS_LEGACY + 51)
+ #define MX25_INT_GPIO1		(NR_IRQS_LEGACY + 52)
++#define MX25_INT_GPT1		(NR_IRQS_LEGACY + 54)
+ #define MX25_INT_FEC		(NR_IRQS_LEGACY + 57)
+ 
+ #define MX25_DMA_REQ_SSI2_RX1	22
+-- 
+1.7.10.4
