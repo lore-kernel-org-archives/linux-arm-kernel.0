@@ -1,74 +1,71 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Sep 2012 17:35:32 +0100
-Subject: [RFC PATCH v2 2/5] ARM: mm: rename jump labels in v7_flush_dcache_all
- function
+Date: Tue, 18 Sep 2012 17:35:33 +0100
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use cache
+ LoUIS operations
 In-Reply-To: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1347986135-17979-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames jump labels in v7_flush_dcache_all in order to define
-a specific flush cache levels entry point.
+In processors like A15/A7 L2 cache is unified and integrated within the
+processor cache hierarchy, so that it is not considered an outer cache
+anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
+all cache levels up to Level of Coherency (LoC) that includes
+the L2 unified cache.
 
-TODO: factor out the level flushing loop if considered worthwhile and
-      define the input registers requirements.
+When a single CPU is suspended (CPU idle) a complete L2 clean is not
+required, so generic cpu_suspend code must clean the data cache using the
+newly introduced cache LoUIS function.
 
+The context and stack pointer (context pointer) are cleaned to main memory
+using cache area functions that operate on MVA and guarantee that the data
+is written back to main memory (perform cache cleaning up to the Point of
+Coherency - PoC) so that the processor can fetch the context when the MMU
+is off in the cpu_resume code path.
+
+outer_cache management remains unchanged.
+
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/mm/cache-v7.S | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/kernel/suspend.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index d1fa2f6..140b294 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -48,7 +48,7 @@ ENTRY(v7_flush_dcache_louis)
- 	mov	r3, r3, lsr #20			@ r3 = LoUIS * 2
- 	moveq	pc, lr				@ return if level == 0
- 	mov	r10, #0				@ r10 (starting level) = 0
--	b	loop1				@ start flushing cache levels
-+	b	flush_levels			@ start flushing cache levels
- ENDPROC(v7_flush_dcache_louis)
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index 1794cc3..358bca3 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -17,6 +17,8 @@ extern void cpu_resume_mmu(void);
+  */
+ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+ {
++	u32 *ctx = ptr;
++
+ 	*save_ptr = virt_to_phys(ptr);
  
- /*
-@@ -67,7 +67,7 @@ ENTRY(v7_flush_dcache_all)
- 	mov	r3, r3, lsr #23			@ left align loc bit field
- 	beq	finished			@ if loc is 0, then no need to clean
- 	mov	r10, #0				@ start clean at cache level 0
--loop1:
-+flush_levels:
- 	add	r2, r10, r10, lsr #1		@ work out 3x current cache level
- 	mov	r1, r0, lsr r2			@ extract cache type bits from clidr
- 	and	r1, r1, #7			@ mask of the bits for current cache only
-@@ -89,9 +89,9 @@ loop1:
- 	clz	r5, r4				@ find bit position of way size increment
- 	ldr	r7, =0x7fff
- 	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
--loop2:
-+loop1:
- 	mov	r9, r4				@ create working copy of max way size
--loop3:
-+loop2:
-  ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
-  THUMB(	lsl	r6, r9, r5		)
-  THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
-@@ -100,13 +100,13 @@ loop3:
-  THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
- 	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
- 	subs	r9, r9, #1			@ decrement the way
--	bge	loop3
--	subs	r7, r7, #1			@ decrement the index
- 	bge	loop2
-+	subs	r7, r7, #1			@ decrement the index
-+	bge	loop1
- skip:
- 	add	r10, r10, #2			@ increment cache number
- 	cmp	r3, r10
--	bgt	loop1
-+	bgt	flush_levels
- finished:
- 	mov	r10, #0				@ swith back to cache level 0
- 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+ 	/* This must correspond to the LDM in cpu_resume() assembly */
+@@ -26,7 +28,20 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+ 
+ 	cpu_do_suspend(ptr);
+ 
+-	flush_cache_all();
++	flush_cache_louis();
++
++	/*
++	 * flush_cache_louis does not guarantee that
++	 * save_ptr and ptr are cleaned to main memory,
++	 * just up to the Level of Unification Inner Shareable.
++	 * Since the context pointer and context itself
++	 * are to be retrieved with the MMU off that
++	 * data must be cleaned from all cache levels
++	 * to main memory using "area" cache primitives.
++	*/
++	__cpuc_flush_dcache_area(ctx, ptrsz);
++	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
++
+ 	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
+ 	outer_clean_range(virt_to_phys(save_ptr),
+ 			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
 -- 
 1.7.12
