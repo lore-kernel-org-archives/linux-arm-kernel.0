@@ -1,47 +1,49 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 18 Sep 2012 10:37:51 -0400
-Subject: [PATCH v5 00/17] Introduce Xen support on ARM (based on 3.6-rc5)
-In-Reply-To: <alpine.DEB.2.02.1209181450570.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
- <201209181234.29557.arnd@arndb.de>
- <alpine.DEB.2.02.1209181450570.29232@kaball.uk.xensource.com>
-Message-ID: <20120918143751.GA19332@phenom.dumpdata.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 18 Sep 2012 16:49:19 +0200
+Subject: [GIT PULL] i.MX fixes for 3.6
+Message-ID: <20120918144919.GT6180@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 02:57:05PM +0100, Stefano Stabellini wrote:
-> On Tue, 18 Sep 2012, Arnd Bergmann wrote:
-> > On Monday 17 September 2012, Stefano Stabellini wrote:
-> > 
-> > > I am also attaching to this email the dts'es that I am currently using
-> > > for dom0 and domU: vexpress-v2p-ca15-tc1.dts (that includes
-> > > vexpress-v2m-rs1-rtsm.dtsi) is the dts used for dom0 and it is passed to
-> > > Linux by Xen, while vexpress-virt.dts is the dts used for other domUs
-> > > and it is appended in binary form to the guest kernel image. I am not
-> > > sure where they are supposed to live yet, so I am just attaching them
-> > > here so that people can actually try out this series if they want to.
-> > 
-> > You can submit the dts files separately so we can include them in
-> > the arm-soc tree. Pawel Moll is handling vexpress related changes these
-> > days, so it would be reasonable if he included them in a pull request.
-> 
-> OK, I'll submit them as a patch series separately.
-> 
-> 
-> > > The patch series has been rebased on Konrad's stable/for-linus-3.7
-> > > branch.
-> > > 
-> > > Arnd, Russell, what do you think about this series? If you are OK with
-> > > it, to whom should I submit it?
-> > 
-> > I have no objections to your patches from this series. IMHO they should
-> > be submitted through the Xen tree,
->     
-> Konrad, are you happy to carry this series in your tree?
 
-Yes.
-> 
-> 
-> >but it would be good to have an Ack from Russell.
-> 
-> Indeed
+Hi Arnd, Olof,
+
+Please pull the following i.MX fixes for 3.6.
+
+Thanks
+ Sascha
+
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+
+  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes
+
+for you to fetch changes up to 42a3f891caee0d9baa60a6964e41a28b9c657407:
+
+  ARM i.MX25: Make timer irq work again (2012-09-18 16:46:50 +0200)
+
+----------------------------------------------------------------
+ARM i.MX: Two fixes for i.MX
+
+- armadillo5x0 board broken since v3.5 (stable material)
+- i.MX25 Architecture broken since v3.6-rc1
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: imx: armadillo5x0: Fix illegal register access
+
+Sascha Hauer (1):
+      ARM i.MX25: Make timer irq work again
+
+ arch/arm/mach-imx/clk-imx25.c         |    2 +-
+ arch/arm/mach-imx/mach-armadillo5x0.c |    3 ++-
+ arch/arm/plat-mxc/include/mach/mx25.h |    1 +
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
