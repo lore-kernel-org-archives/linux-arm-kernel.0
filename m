@@ -1,92 +1,184 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:42 +0100
-Subject: [PATCH v2 00/13] Versatile Express infrastructure
-Message-ID: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+Date: Tue, 18 Sep 2012 15:17:51 +0100
+Subject: [PATCH v2 09/13] ARM: vexpress: Reset driver
+In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-10-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This is a simple driver providing platform restart and power off
+functions using VE config infrastructure.
 
-This is a second version of the series I posted two weeks ago.
-It has been heavily reworked based on feedback - mainly there
-is no special bus_type and the interaction between a device
-and a bridge is much more similar to what clocks/interrupts/
-GPIOs are doing.
+By writing to the "active" attribute of the reboot or reset device,
+user can decide what if the platform is supposed to execute full power
+cycle (reboot, default) or simply assert system level reset signal.
 
-I believe I have Cc-ed all relevant maintainers (input,
-fb, hwmon, regulators, common clock) in the subsystem-specific
-patches (1 to 6). If the code looks good I'll prepare a git
-pull request for Arnd and Olof with patches 7 to 13. I still
-hope to get this series merged in 3.7 window.
-
-Regards
-
-Pawel
-
-
-Pawel Moll (13):
-  input: ambakmi: (Un)prepare clocks when (dis)enabling
-  video: Versatile Express display output driver
-  hwmon: Versatile Express hwmon driver
-  regulators: Versatile Express regulator driver
-  clk: Versatile Express clock generators ("osc") driver
-  clk: Common clocks implementation for Versatile Express
-  misc: Versatile Express config infrastructure
-  mfd: Versatile Express system registers driver
-  ARM: vexpress: Reset driver
-  ARM: vexpress: Add config bus components and clocks to DTs
-  ARM: vexpress: Start using new Versatile Express infrastructure
-  ARM: vexpress: Remove motherboard dependencies in the DTS files
-  ARM: vexpress: Make the DEBUG_LL UART detection more specific
-
- .../devicetree/bindings/arm/vexpress-sysreg.txt    |   50 ++
- Documentation/devicetree/bindings/arm/vexpress.txt |   68 ++-
- arch/arm/Kconfig                                   |    4 +-
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  145 +++++-
- arch/arm/boot/dts/vexpress-v2m.dtsi                |  145 +++++-
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  115 ++++-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  179 ++++++-
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |   79 ++-
- arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  125 ++++-
- arch/arm/include/asm/hardware/sp810.h              |    6 +-
- arch/arm/mach-vexpress/Makefile                    |    2 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                  |   41 +-
- arch/arm/mach-vexpress/include/mach/debug-macro.S  |   10 +-
- arch/arm/mach-vexpress/include/mach/motherboard.h  |   81 ---
- arch/arm/mach-vexpress/include/mach/uncompress.h   |   12 +-
- arch/arm/mach-vexpress/platsmp.c                   |    3 +-
- arch/arm/mach-vexpress/reset.c                     |  141 +++++
- arch/arm/mach-vexpress/v2m.c                       |  350 ++++---------
- drivers/clk/Kconfig                                |    8 +-
- drivers/clk/versatile/Makefile                     |    2 +
- drivers/clk/versatile/clk-vexpress-osc.c           |  146 ++++++
- drivers/clk/versatile/clk-vexpress.c               |  142 +++++
- drivers/hwmon/Kconfig                              |    8 +
- drivers/hwmon/Makefile                             |    1 +
- drivers/hwmon/vexpress.c                           |  330 ++++++++++++
- drivers/input/serio/ambakmi.c                      |    6 +-
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/vexpress-sysreg.c                      |  542 ++++++++++++++++++++
- drivers/misc/Kconfig                               |    6 +
- drivers/misc/Makefile                              |    1 +
- drivers/misc/vexpress-config.c                     |  276 ++++++++++
- drivers/regulator/Kconfig                          |    7 +
- drivers/regulator/Makefile                         |    1 +
- drivers/regulator/vexpress.c                       |  155 ++++++
- drivers/video/Makefile                             |    3 +
- drivers/video/vexpress-dvi.c                       |  208 ++++++++
- include/linux/vexpress.h                           |  100 ++++
- 37 files changed, 3067 insertions(+), 432 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mach-vexpress/reset.c |  141 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/vexpress.h       |    3 +
+ 2 files changed, 144 insertions(+)
  create mode 100644 arch/arm/mach-vexpress/reset.c
- create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
- create mode 100644 drivers/clk/versatile/clk-vexpress.c
- create mode 100644 drivers/hwmon/vexpress.c
- create mode 100644 drivers/mfd/vexpress-sysreg.c
- create mode 100644 drivers/misc/vexpress-config.c
- create mode 100644 drivers/regulator/vexpress.c
- create mode 100644 drivers/video/vexpress-dvi.c
- create mode 100644 include/linux/vexpress.h
 
+diff --git a/arch/arm/mach-vexpress/reset.c b/arch/arm/mach-vexpress/reset.c
+new file mode 100644
+index 0000000..465923a
+--- /dev/null
++++ b/arch/arm/mach-vexpress/reset.c
+@@ -0,0 +1,141 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ */
++
++#include <linux/jiffies.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/stat.h>
++#include <linux/vexpress.h>
++
++static void vexpress_reset_do(struct device *dev, const char *what)
++{
++	int err = -ENOENT;
++	struct vexpress_config_func *func =
++			vexpress_config_func_get_by_dev(dev);
++
++	if (func) {
++		unsigned long timeout;
++
++		err = vexpress_config_write(func, 0, 0);
++
++		timeout = jiffies + HZ;
++		while (time_before(jiffies, timeout))
++			cpu_relax();
++	}
++
++	dev_emerg(dev, "Unable to %s (%d)\n", what, err);
++}
++
++static struct device *vexpress_power_off_device;
++
++void vexpress_power_off(void)
++{
++	vexpress_reset_do(vexpress_power_off_device, "power off");
++}
++
++static struct device *vexpress_restart_device;
++
++void vexpress_restart(char str, const char *cmd)
++{
++	vexpress_reset_do(vexpress_restart_device, "restart");
++}
++
++static ssize_t vexpress_reset_active_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "%d\n", vexpress_restart_device == dev);
++}
++
++static ssize_t vexpress_reset_active_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	long value;
++	int err = kstrtol(buf, 0, &value);
++
++	if (!err && value)
++		vexpress_restart_device = dev;
++
++	return err ? err : count;
++}
++
++DEVICE_ATTR(active, S_IRUGO | S_IWUSR, vexpress_reset_active_show,
++		vexpress_reset_active_store);
++
++
++enum vexpress_reset_func { FUNC_RESET, FUNC_SHUTDOWN, FUNC_REBOOT };
++
++static struct of_device_id vexpress_reset_of_match[] = {
++	{
++		.compatible = "arm,vexpress-reset",
++		.data = (void *)FUNC_RESET,
++	}, {
++		.compatible = "arm,vexpress-shutdown",
++		.data = (void *)FUNC_SHUTDOWN
++	}, {
++		.compatible = "arm,vexpress-reboot",
++		.data = (void *)FUNC_REBOOT
++	},
++	{}
++};
++
++static int vexpress_reset_probe(struct platform_device *pdev)
++{
++	enum vexpress_reset_func func;
++	const struct of_device_id *match =
++			of_match_device(vexpress_reset_of_match, &pdev->dev);
++
++	if (match)
++		func = (enum vexpress_reset_func)match->data;
++	else
++		func = pdev->id_entry->driver_data;
++
++	switch (func) {
++	case FUNC_SHUTDOWN:
++		vexpress_power_off_device = &pdev->dev;
++		break;
++	case FUNC_RESET:
++		if (!vexpress_restart_device)
++			vexpress_restart_device = &pdev->dev;
++		device_create_file(&pdev->dev, &dev_attr_active);
++		break;
++	case FUNC_REBOOT:
++		vexpress_restart_device = &pdev->dev;
++		device_create_file(&pdev->dev, &dev_attr_active);
++		break;
++	};
++
++	return 0;
++}
++
++static const struct platform_device_id vexpress_reset_id_table[] = {
++	{ .name = "vexpress-reset", .driver_data = FUNC_RESET, },
++	{ .name = "vexpress-shutdown", .driver_data = FUNC_SHUTDOWN, },
++	{ .name = "vexpress-reboot", .driver_data = FUNC_REBOOT, },
++	{}
++};
++
++static struct platform_driver vexpress_reset_driver = {
++	.probe = vexpress_reset_probe,
++	.driver = {
++		.name = "vexpress-reset",
++		.of_match_table = vexpress_reset_of_match,
++	},
++	.id_table = vexpress_reset_id_table,
++};
++
++static int __init vexpress_reset_init(void)
++{
++	return platform_driver_register(&vexpress_reset_driver);
++}
++device_initcall(vexpress_reset_init);
+diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
+index 8ed285c..8423083 100644
+--- a/include/linux/vexpress.h
++++ b/include/linux/vexpress.h
+@@ -86,4 +86,7 @@ unsigned __vexpress_get_site(struct device *dev, struct device_node *node);
+ void vexpress_sysreg_early_init(void __iomem *base);
+ void vexpress_sysreg_of_early_init(void);
+ 
++void vexpress_power_off(void);
++void vexpress_restart(char str, const char *cmd);
++
+ #endif
 -- 
 1.7.9.5
