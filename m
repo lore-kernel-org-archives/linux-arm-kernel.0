@@ -1,68 +1,64 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 18 Sep 2012 08:33:49 +0200
-Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <CAErSpo42AME4nJqdVk9cC2EcTfu96r+yxmmOB=hXNi6jh-c+XA@mail.gmail.com>
-References: <50294BCA.1070807@wwwdotorg.org>
- <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
- <502AA96B.2050709@wwwdotorg.org>
- <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
- <CAErSpo4Bm_Ryx=OK+svjqAwD4N8v0vrheLVdc-N1ijx8i_-N3w@mail.gmail.com>
- <502AD82F.3080702@wwwdotorg.org> <502AE485.8060307@wwwdotorg.org>
- <504A848B.1090703@wwwdotorg.org>
- <20120908000430.GF13739@n2100.arm.linux.org.uk>
- <CAErSpo42AME4nJqdVk9cC2EcTfu96r+yxmmOB=hXNi6jh-c+XA@mail.gmail.com>
-Message-ID: <20120918063349.GD1459@avionic-0098.mockup.avionic-design.de>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 18 Sep 2012 14:34:48 +0800
+Subject: [PATCH] ARM: OMAP: OMAP_DEBUG_LEDS needs to select LEDS_CLASS
+In-Reply-To: <1347939042.15578.1.camel@phoenix>
+References: <1347939042.15578.1.camel@phoenix>
+Message-ID: <CAK5ve-LXv76vuBLHQQtREHn_ZogUsbyqzz2-uTHT_Ps-9vS3Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 08, 2012 at 11:51:00AM -0600, Bjorn Helgaas wrote:
-> On Fri, Sep 7, 2012 at 6:04 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Sep 07, 2012 at 05:34:35PM -0600, Stephen Warren wrote:
-> >> I guess it's a pretty basic premise of the current PCI code that all the
-> >> PCI scanning happens well before any device drivers are registered,
-> >> which in turn means that device_add() doesn't trigger the device's
-> >> probe() until much later, after all the fixups and resource assignments
-> >> are done?
-> >
-> > Are you saying that the PCI layer is again screwed up after all my
-> > hard work several years ago to ensure that PCI devices are properly
-> > setup _before_ they're made available to the PCI drivers then?  That
-> > was around the time I was looking at Cardbus stuff, ensuring that that
-> > worked with the same guarantees.
-> >
-> > Not amused.
-> >
-> > What is wrong with the "probe devices, apply fixups, setup resources,
-> > apply more fixups, publish" process that it's had to be yet again
-> > broken?
-> 
-> It seems that there are some bugs in the PCI layer, no doubt
-> introduced after all your hard work.  We'll do our best to fix them.
-> 
-> The particular issue of pci_fixup_irqs() has been on my list for a
-> while, and we talked about it at the recent PCI mini-summit.  It's
-> clearly broken that we do this with for_each_pci_dev() once at
-> boot-time because that does nothing for hot-added devices.  It's also
-> broken that it is called after device_add() because the core shouldn't
-> touch the device after it's available to drivers.
-> 
-> This should get fixed reasonably soon, probably not in v3.6, but
-> hopefully in v3.7.  It's not completely trivial because many arches
-> have the same problem, and we need to fix all of them.
+On Tue, Sep 18, 2012 at 11:30 AM, Axel Lin <axel.lin@gmail.com> wrote:
+> This fixes below build error when CONFIG_LEDS_CLASS is not set.
+>
+>   LD      init/built-in.o
+> arch/arm/plat-omap/built-in.o: In function `fpga_probe':
+> arch/arm/plat-omap/debug-leds.c:113: undefined reference to `led_classdev_register'
+> make: *** [vmlinux] Error 1
+>
 
-Has there been any progress on this? I've read the PCI mini summit notes
-that you posted a while ago but it doesn't mention the pci_fixup_irqs()
-issue. Was there some decision as to how this should be solved? If I
-understand correctly this should solve the issue that Stephen has been
-seeing with bogus interrupt assignments, so we'll need this to fix PCIe
-on Tegra. Is there anything I can do to help move this forward?
+Thanks for posting this. But I think Tony has already fixed it in mainline:
+--
+commit 359f64f7b3997e94ee71039b5fcdc1278b9b77c4
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Wed Sep 15 10:18:51 2010 -0700
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/8c0a26ef/attachment.sig>
+    omap: Fix compile dependency to LEDS_CLASS
+
+    If we LEDS_CLASS is not selected, we will get undefined reference
+    to `led_classdev_register'.
+
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+--
+
+-Bryan
+
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+>  arch/arm/plat-omap/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index ca83a76..c262781 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -43,6 +43,7 @@ config OMAP_DEBUG_DEVICES
+>
+>  config OMAP_DEBUG_LEDS
+>         def_bool y if NEW_LEDS
+> +       select LEDS_CLASS
+>         depends on OMAP_DEBUG_DEVICES
+>
+>  config POWER_AVS_OMAP
+> --
+> 1.7.9.5
+>
+>
+>
+
+
+
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.186-168-78255 Mobile
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
