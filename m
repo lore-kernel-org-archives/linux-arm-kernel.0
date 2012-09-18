@@ -1,79 +1,148 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 18 Sep 2012 20:53:22 +0200
-Subject: [PATCH 2/2] ARM: pci: Allow passing per-controller private data
-In-Reply-To: <CAErSpo591Ybuf95nU-O38=PrqtuJHWkWcce+5Owbc8YAprAUBw@mail.gmail.com>
-References: <1347657078-32230-1-git-send-email-thierry.reding@avionic-design.de>
- <1347657078-32230-3-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo754W2TKr46V5FKwX43eusoOVjxkAWJ=kkB0BvRt_bJBw@mail.gmail.com>
- <20120918183428.GC29360@avionic-0098.mockup.avionic-design.de>
- <CAErSpo591Ybuf95nU-O38=PrqtuJHWkWcce+5Owbc8YAprAUBw@mail.gmail.com>
-Message-ID: <20120918185322.GE29360@avionic-0098.mockup.avionic-design.de>
+From: mporter@ti.com (Matt Porter)
+Date: Tue, 18 Sep 2012 14:57:15 -0400
+Subject: [PATCH] dma: edma: fix slave config dependency on direction
+Message-ID: <1347994635-15246-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 12:38:53PM -0600, Bjorn Helgaas wrote:
-> On Tue, Sep 18, 2012 at 12:34 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > On Tue, Sep 18, 2012 at 11:21:21AM -0600, Bjorn Helgaas wrote:
-> >> On Fri, Sep 14, 2012 at 3:11 PM, Thierry Reding
-> >> <thierry.reding@avionic-design.de> wrote:
-> >> > In order to allow drivers to specify private data for each controller,
-> >> > this commit adds a private_data field to the struct hw_pci. This field
-> >> > is an array of nr_controllers pointers that will be used to initialize
-> >> > the private_data field of the corresponding controller's pci_sys_data
-> >> > structure.
-> >>
-> >> I guess you aren't changing the design here because struct hw_pci
-> >> already includes "nr_controllers," but having nr_controllers and a
-> >> private_data[] array sounds like something that might make it hard to
-> >> hot-add a host bridge after boot.
-> >
-> > What I do in the Tegra PCIe driver is to pass each of the root ports to
-> > pci_common_init() individually because they can be enabled or disabled
-> > by device tree data. I suppose to some degree you can consider that hot-
-> > adding. Not that Tegra is likely to ever need to support that. I don't
-> > know how likely it is for any ARM platform to ever need support for hot-
-> > adding a host bridge.
-> >
-> > Eventually I think it would be advantageous for this to be generalized
-> > further such that PCI initialization can be shared across architectures.
-> > That's probably not an easy task so I was going to start by making
-> > incremental changes that enable the Tegra code to work and, if time
-> > allows, help further with subsequent improvements.
-> >
-> > It also seems that parts of the PCI core aren't ready yet for hot-adding
-> > host bridges. One thing I came across while working on the Tegra code is
-> > that MSI setup and teardown needs to be done by the arch_setup_msi_irq()
-> > and arch_teardown_msi_irq() respectively, which are expected to be
-> > builtin. That was also the last issue that keeps the Tegra PCIe driver
-> > from being built as a module. I think that will also make it impossible
-> > to hot-add host bridges. On x86 this seems to be handled by platform
-> > code, but on Tegra for example MSI setup and teardown is tightly coupled
-> > to the PCIe controller. That was one of the things I thought I could
-> > take a look at eventually, but getting Tegra support cleaned up is
-> > higher priority right now.
-> 
-> The PCI core doesn't support hot-add of host bridges yet, but there's
-> a lot of work in that area right now, which is why it's on my mind :)
-> I'm not suggesting you change anything here; just keep it in the back
-> of your mind for the future.  Thanks for the arch_setup_msi_irq() tip;
-> I'll look into that.
+The edma_slave_config() implementation depends on the
+direction field such that it will not properly configure
+a slave channel when called without direction set.
 
-I think it wouldn't even be that hard to implement. When I last looked
-at this it seemed like a simple registration mechanism in the core
-should work. That is the core would keep a list of registered host
-bridges, each of which would implement setup_msi() and teardown_msi()
-operations. Then, whenever an MSI is requested, the core would look up
-the corresponding host bridge and call the associated setup_msi()
-callback. Perhaps these could go into struct pci_ops. It already has
-pointers for configuration space access, which is also controller-
-specific.
+This fixes the implementation so that the slave config
+is copied as is and prep_slave_sg() handles the
+direction dependent handling. spi-omap2-mcspi and
+omap_hsmmc both expose this bug as they configure the
+slave channel config from a common path with an unconfigured
+direction field.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/185827fa/attachment.sig>
+Signed-off-by: Matt Porter <mporter@ti.com>
+---
+ drivers/dma/edma.c |   55 ++++++++++++++++++++++++++--------------------------
+ 1 file changed, 27 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 05aea3c..fdcf079 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -69,9 +69,7 @@ struct edma_chan {
+ 	int				ch_num;
+ 	bool				alloced;
+ 	int				slot[EDMA_MAX_SLOTS];
+-	dma_addr_t			addr;
+-	int				addr_width;
+-	int				maxburst;
++	struct dma_slave_config		cfg;
+ };
+ 
+ struct edma_cc {
+@@ -178,29 +176,14 @@ static int edma_terminate_all(struct edma_chan *echan)
+ 	return 0;
+ }
+ 
+-
+ static int edma_slave_config(struct edma_chan *echan,
+-	struct dma_slave_config *config)
++	struct dma_slave_config *cfg)
+ {
+-	if ((config->src_addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES) ||
+-	    (config->dst_addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
++	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
++	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+ 		return -EINVAL;
+ 
+-	if (config->direction == DMA_MEM_TO_DEV) {
+-		if (config->dst_addr)
+-			echan->addr = config->dst_addr;
+-		if (config->dst_addr_width)
+-			echan->addr_width = config->dst_addr_width;
+-		if (config->dst_maxburst)
+-			echan->maxburst = config->dst_maxburst;
+-	} else if (config->direction == DMA_DEV_TO_MEM) {
+-		if (config->src_addr)
+-			echan->addr = config->src_addr;
+-		if (config->src_addr_width)
+-			echan->addr_width = config->src_addr_width;
+-		if (config->src_maxburst)
+-			echan->maxburst = config->src_maxburst;
+-	}
++	memcpy(&echan->cfg, cfg, sizeof(echan->cfg));
+ 
+ 	return 0;
+ }
+@@ -235,6 +218,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	struct edma_chan *echan = to_edma_chan(chan);
+ 	struct device *dev = chan->device->dev;
+ 	struct edma_desc *edesc;
++	dma_addr_t dev_addr;
++	enum dma_slave_buswidth dev_width;
++	u32 burst;
+ 	struct scatterlist *sg;
+ 	int i;
+ 	int acnt, bcnt, ccnt, src, dst, cidx;
+@@ -243,7 +229,20 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	if (unlikely(!echan || !sgl || !sg_len))
+ 		return NULL;
+ 
+-	if (echan->addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
++	if (direction == DMA_DEV_TO_MEM) {
++		dev_addr = echan->cfg.src_addr;
++		dev_width = echan->cfg.src_addr_width;
++		burst = echan->cfg.src_maxburst;
++	} else if (direction == DMA_MEM_TO_DEV) {
++		dev_addr = echan->cfg.dst_addr;
++		dev_width = echan->cfg.dst_addr_width;
++		burst = echan->cfg.dst_maxburst;
++	} else {
++		dev_err(dev, "%s: bad direction?\n", __func__);
++		return NULL;
++	}
++
++	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+ 		dev_err(dev, "Undefined slave buswidth\n");
+ 		return NULL;
+ 	}
+@@ -275,14 +274,14 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 			}
+ 		}
+ 
+-		acnt = echan->addr_width;
++		acnt = dev_width;
+ 
+ 		/*
+ 		 * If the maxburst is equal to the fifo width, use
+ 		 * A-synced transfers. This allows for large contiguous
+ 		 * buffer transfers using only one PaRAM set.
+ 		 */
+-		if (echan->maxburst == 1) {
++		if (burst == 1) {
+ 			edesc->absync = false;
+ 			ccnt = sg_dma_len(sg) / acnt / (SZ_64K - 1);
+ 			bcnt = sg_dma_len(sg) / acnt - ccnt * (SZ_64K - 1);
+@@ -302,7 +301,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 		 */
+ 		} else {
+ 			edesc->absync = true;
+-			bcnt = echan->maxburst;
++			bcnt = burst;
+ 			ccnt = sg_dma_len(sg) / (acnt * bcnt);
+ 			if (ccnt > (SZ_64K - 1)) {
+ 				dev_err(dev, "Exceeded max SG segment size\n");
+@@ -313,13 +312,13 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 
+ 		if (direction == DMA_MEM_TO_DEV) {
+ 			src = sg_dma_address(sg);
+-			dst = echan->addr;
++			dst = dev_addr;
+ 			src_bidx = acnt;
+ 			src_cidx = cidx;
+ 			dst_bidx = 0;
+ 			dst_cidx = 0;
+ 		} else {
+-			src = echan->addr;
++			src = dev_addr;
+ 			dst = sg_dma_address(sg);
+ 			src_bidx = 0;
+ 			src_cidx = 0;
+-- 
+1.7.9.5
