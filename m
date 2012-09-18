@@ -1,62 +1,55 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 18 Sep 2012 09:47:27 +0530
-Subject: [PATCH 2/2] ARM: SAMSUNG: Add check for NULL in clock interface
-In-Reply-To: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
-References: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAJuYYwR9ttbL9oknv7L60GnS3U1c_MX0Qddr6fg1zh7T1LzR=w@mail.gmail.com>
+Date: Tue, 18 Sep 2012 09:50:40 +0530
+Subject: [PATCH] ARM: dts: use uart2 for console on smdkv310 and smdk5250
+In-Reply-To: <052601cd94ca$058db4d0$10a91e70$%kim@samsung.com>
+References: <052601cd94ca$058db4d0$10a91e70$%kim@samsung.com>
+Message-ID: <CAJuYYwQ0A9c_R=HzjeBCxL7E5bpw3j+64ApsCH5Uc8Q6i+HY4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2012 19:55, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> The clock instance parameter in Samsung clock interface is not being checked
-> for NULL pointers. Add checks for NULL pointers.
+On 17 September 2012 17:16, Kukjin Kim <kgene.kim@samsung.com> wrote:
 >
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  arch/arm/plat-samsung/clock.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> index 65c5eca..7938fbc 100644
-> --- a/arch/arm/plat-samsung/clock.c
-> +++ b/arch/arm/plat-samsung/clock.c
-> @@ -119,7 +119,7 @@ void clk_disable(struct clk *clk)
+> diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> index 1beccc8..cb01e3d 100644
+> --- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> +++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> @@ -26,7 +26,7 @@
+>         };
 >
->  unsigned long clk_get_rate(struct clk *clk)
->  {
-> -       if (IS_ERR(clk))
-> +       if (IS_ERR_OR_NULL(clk))
->                 return 0;
->
->         if (clk->rate != 0)
-> @@ -136,7 +136,7 @@ unsigned long clk_get_rate(struct clk *clk)
->
->  long clk_round_rate(struct clk *clk, unsigned long rate)
->  {
-> -       if (!IS_ERR(clk) && clk->ops && clk->ops->round_rate)
-> +       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
->                 return (clk->ops->round_rate)(clk, rate);
->
->         return rate;
-> @@ -146,7 +146,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->  {
->         int ret;
->
-> -       if (IS_ERR(clk))
-> +       if (IS_ERR_OR_NULL(clk))
->                 return -EINVAL;
->
->         /* We do not default just do a clk->rate = rate as
-> @@ -175,7 +175,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->  {
->         int ret = 0;
->
-> -       if (IS_ERR(clk))
-> +       if (IS_ERR_OR_NULL(clk) || IS_ERR_OR_NULL(parent))
->                 return -EINVAL;
->
->         spin_lock(&clocks_lock);
-> --
-> 1.7.9.5
+>         chosen {
+> -               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc";
+> +               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+>         };
 
-Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+Dear Mr. Kim,
+
+What is the reason for changing the console port to 2 for smdkv310 board?
+
+Thanks,
+Thomas.
+
+>
+>         sdhci at 12530000 {
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 8a5e348..62e1039 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -21,7 +21,7 @@
+>         };
+>
+>         chosen {
+> -               bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+> +               bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+>         };
+>
+>         i2c at 12C60000 {
+> --
+> 1.7.4.1
+>
