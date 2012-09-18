@@ -1,31 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Sep 2012 21:25:44 +0000
-Subject: [PATCH 08+09/24] ARM: ixp4xx: use __iomem pointers for MMIO
-In-Reply-To: <m3ehlzdr9d.fsf_-_@intrepid.localdomain>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-10-git-send-email-arnd@arndb.de>
- <m3ehlzdr9d.fsf_-_@intrepid.localdomain>
-Message-ID: <201209182125.44494.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 18 Sep 2012 16:50:39 -0500
+Subject: [PATCH 3/3] ARM: OMAP2+: hwmod code: convert missing clockdomain
+ warnings to debug messages
+In-Reply-To: <20120918211251.16484.18401.stgit@dusk.lan>
+References: <20120918211146.16484.85893.stgit@dusk.lan>
+ <20120918211251.16484.18401.stgit@dusk.lan>
+Message-ID: <5058ECAF.7010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012, Krzysztof Halasa wrote:
-> > @@ -51,7 +52,7 @@ static inline u32 ixp4xx_read_feature_bits(void)
-> >  
-> >  static inline void ixp4xx_write_feature_bits(u32 value)
-> >  {
-> > -     *IXP4XX_EXP_CFG2 = ~value;
-> > +     __raw_writel(~cpu_to_le32(value), IXP4XX_EXP_CFG2);
-> >  }
-> 
-> The EXP_CFG2 register is already in host order, no need for
-> cpu_to_le32() as the replaced code clearly shows.
-> 
-> Can you merge both IXP4xx parts (in the two patches) and fix the above,
-> please? Thanks.
+Hi Paul,
 
-Thanks for pointing this out, that was a mistake on my end, because I first
-tried to convert to writel, with byteswap and then made up my mind and used
-__raw_writel instead because it seemed silly to do two byteswaps.
+On 9/18/2012 4:12 PM, Paul Walmsley wrote:
+> The decision was made a few months ago to allow struct omap_hwmod
+> records and struct clk records to omit clockdomain information if the
+> clockdomain is not software-controllable.  See for example commit
+> 868c157df9721675c19729eed2c96bac6c3f1d01 ("ARM: OMAP2+: hwmod: remove
+> prm_clkdm, cm_clkdm; allow hwmods to have no clockdomain").
+>
+> So convert an existing pr_warning() to a pr_debug() (regarding missing
+> clockdomains in clocks), and add a pr_debug() for missing hwmod
+> clockdomains.
 
-	Arnd
+At some point I sent you a small RFC to still keep the message if 
+neither oh->clkdm nor oh->_clk->clkdm was there. I've never had the time 
+to test it, but that should then cover OMAP2, 3 & 4 cases.
+
+Regards,
+Benoit
+
+>  It's still useful to enable these messages for
+> debugging, since missing clockdomains can cause hard-to-debug problems
+> with power management; see for example commit
+> 6c4a057bffe9823221eab547e11fac181dc18a2b ("ARM: OMAP4: clock data:
+> Force a DPLL clkdm/pwrdm ON before a relock").
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod.c |    8 +++++---
+>   1 file changed, 5 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 80cea5b..e05228a 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -685,8 +685,8 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>   	}
+>
+>   	if (!oh->_clk->clkdm)
+> -		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
+> -			   oh->main_clk, oh->_clk->name);
+> +		pr_debug("omap_hwmod: %s: missing clockdomain for %s.\n",
+> +			 oh->main_clk, oh->_clk->name);
+>
+>   	return ret;
+>   }
+> @@ -1380,8 +1380,10 @@ static struct omap_hwmod *_lookup(const char *name)
+>    */
+>   static int _init_clkdm(struct omap_hwmod *oh)
+>   {
+> -	if (!oh->clkdm_name)
+> +	if (!oh->clkdm_name) {
+> +		pr_debug("omap_hwmod: %s: missing clockdomain\n", oh->name);
+>   		return 0;
+> +	}
+>
+>   	oh->clkdm = clkdm_lookup(oh->clkdm_name);
+>   	if (!oh->clkdm) {
+>
+>
