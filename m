@@ -1,72 +1,47 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 18 Sep 2012 16:50:39 -0500
-Subject: [PATCH 3/3] ARM: OMAP2+: hwmod code: convert missing clockdomain
- warnings to debug messages
-In-Reply-To: <20120918211251.16484.18401.stgit@dusk.lan>
-References: <20120918211146.16484.85893.stgit@dusk.lan>
- <20120918211251.16484.18401.stgit@dusk.lan>
-Message-ID: <5058ECAF.7010609@ti.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 18 Sep 2012 17:53:02 -0400
+Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
+In-Reply-To: <20120918210442.GA12245@n2100.arm.linux.org.uk>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153436.21241.95691.stgit@ubuntu>
+ <20120918210442.GA12245@n2100.arm.linux.org.uk>
+Message-ID: <CANM98qL-CZT23T+MNg=EA_ieY+TJF6=F_6XpixWmfEqPN4-A7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Tue, Sep 18, 2012 at 5:04 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Sep 15, 2012 at 11:34:36AM -0400, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> The KVM hypervisor mmu code requires access to the mem_type prot_pte
+>> field when setting up page tables pointing to a device. Unfortunately,
+>> the mem_type structure is opaque.
+>>
+>> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
+>> value.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>
+> Is there a reason why we need this to be exposed, along with all the
+> page table manipulation in patch 7?
+>
+> Is there a reason why we can't have new MT_ types for PAGE_HYP and
+> the HYP MT_DEVICE type (which is the same as MT_DEVICE but with
+> PTE_USER set) and have the standard ARM/generic kernel code build
+> those mappings?
 
-On 9/18/2012 4:12 PM, Paul Walmsley wrote:
-> The decision was made a few months ago to allow struct omap_hwmod
-> records and struct clk records to omit clockdomain information if the
-> clockdomain is not software-controllable.  See for example commit
-> 868c157df9721675c19729eed2c96bac6c3f1d01 ("ARM: OMAP2+: hwmod: remove
-> prm_clkdm, cm_clkdm; allow hwmods to have no clockdomain").
->
-> So convert an existing pr_warning() to a pr_debug() (regarding missing
-> clockdomains in clocks), and add a pr_debug() for missing hwmod
-> clockdomains.
+For hyp mode we can do this, but we cannot do this for the cpu
+interfaces that need to be mapped into each VM as they have each their
+own pgd. We can move the Hyp mode mappings, and I was playing with the
+though of having a PAGE_KVM_DEVICE set in pgtable.h and a
+pgprot_guest_device setup in build_mem_type_table.
 
-At some point I sent you a small RFC to still keep the message if 
-neither oh->clkdm nor oh->_clk->clkdm was there. I've never had the time 
-to test it, but that should then cover OMAP2, 3 & 4 cases.
+What do you think?
 
-Regards,
-Benoit
+>
+> That would (it seems) also avoid the need to export the pXd_clear_bad()
+> acessors too...
 
->  It's still useful to enable these messages for
-> debugging, since missing clockdomains can cause hard-to-debug problems
-> with power management; see for example commit
-> 6c4a057bffe9823221eab547e11fac181dc18a2b ("ARM: OMAP4: clock data:
-> Force a DPLL clkdm/pwrdm ON before a relock").
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c |    8 +++++---
->   1 file changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 80cea5b..e05228a 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -685,8 +685,8 @@ static int _init_main_clk(struct omap_hwmod *oh)
->   	}
->
->   	if (!oh->_clk->clkdm)
-> -		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
-> -			   oh->main_clk, oh->_clk->name);
-> +		pr_debug("omap_hwmod: %s: missing clockdomain for %s.\n",
-> +			 oh->main_clk, oh->_clk->name);
->
->   	return ret;
->   }
-> @@ -1380,8 +1380,10 @@ static struct omap_hwmod *_lookup(const char *name)
->    */
->   static int _init_clkdm(struct omap_hwmod *oh)
->   {
-> -	if (!oh->clkdm_name)
-> +	if (!oh->clkdm_name) {
-> +		pr_debug("omap_hwmod: %s: missing clockdomain\n", oh->name);
->   		return 0;
-> +	}
->
->   	oh->clkdm = clkdm_lookup(oh->clkdm_name);
->   	if (!oh->clkdm) {
->
->
+for hyp mode mappings this would be true, then.
