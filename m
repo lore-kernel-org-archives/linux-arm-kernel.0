@@ -1,58 +1,54 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 18 Sep 2012 11:21:21 -0600
-Subject: [PATCH 2/2] ARM: pci: Allow passing per-controller private data
-In-Reply-To: <1347657078-32230-3-git-send-email-thierry.reding@avionic-design.de>
-References: <1347657078-32230-1-git-send-email-thierry.reding@avionic-design.de>
- <1347657078-32230-3-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <CAErSpo754W2TKr46V5FKwX43eusoOVjxkAWJ=kkB0BvRt_bJBw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Sep 2012 13:24:26 -0400
+Subject: [GIT PULL V2 1/4] ARM: Kirkwood: DT bindings for v3.7
+In-Reply-To: <20120913053045.GB24290@quad.lixom.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+ <20120910054835.GC15277@titan.lakedaemon.net>
+ <20120913053045.GB24290@quad.lixom.net>
+Message-ID: <20120918172426.GL5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 3:11 PM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> In order to allow drivers to specify private data for each controller,
-> this commit adds a private_data field to the struct hw_pci. This field
-> is an array of nr_controllers pointers that will be used to initialize
-> the private_data field of the corresponding controller's pci_sys_data
-> structure.
+On Wed, Sep 12, 2012 at 10:30:45PM -0700, Olof Johansson wrote:
+> On Mon, Sep 10, 2012 at 01:48:35AM -0400, Jason Cooper wrote:
+> > Arnd, Olof,
+> > 
+> > This branch depends on arm/cache-l2x0 which is going in through rmk's
+> > tree.  arm/cache-l2x0 contains the following from Gregory Clement:
+> > 
+> > 	arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
+> > 	arm: cache-l2x0: add an optional register to save/restore
+> 
+> Ok, we need to make sure that Russell is happy with the patches and
+> is pulling them in (with an agreement to not rebase the merged branch)
+> before we can pull in your branch that builds on it.
 
-I guess you aren't changing the design here because struct hw_pci
-already includes "nr_controllers," but having nr_controllers and a
-private_data[] array sounds like something that might make it hard to
-hot-add a host bridge after boot.
+Arnd, Olof,
 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
->  arch/arm/include/asm/mach/pci.h | 1 +
->  arch/arm/kernel/bios32.c        | 3 +++
->  2 files changed, 4 insertions(+)
->
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index 26c511f..736cb8d 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -21,6 +21,7 @@ struct hw_pci {
->  #endif
->         struct pci_ops  *ops;
->         int             nr_controllers;
-> +       void            **private_data;
->         int             (*setup)(int nr, struct pci_sys_data *);
->         struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
->         void            (*preinit)(void);
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 7288093..07a38d8 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -442,6 +442,9 @@ static void __devinit pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
->                 sys->map_irq = hw->map_irq;
->                 INIT_LIST_HEAD(&sys->resources);
->
-> +               if (hw->private_data)
-> +                       sys->private_data = hw->private_data[nr];
-> +
->                 ret = hw->setup(nr, sys);
->
->                 if (ret > 0) {
-> --
-> 1.7.12
->
+Ok, I'm still mastering the art of branch dependencies.  The acceptance
+of Gregory's cache-l2x0 series is holding up everything else.
+Rightfully so, rmk has some issues with it.
+
+However, in my pullrqs and in my branch merging I treated it as a
+dependency for everything that came after it (pr 1,2,3,4).  I'd like to
+undo that now to get things moving.  The dependency was not strictly
+necessary, I was simply trying to achieve an ordering of branches.
+
+The only way I know to do this is to redo my branches and republish.
+Basically, I would remove Gregory's patches and the dependency on 'arm:
+cache-l2x0' from pullrq [1/4] Kirkwood DT bindings.
+
+Obviously, this would break things for folks tracking my branches.
+Hopefully anyone crazy enough to track my branches is competent enough
+rebase onto the new branches.  Even still, I don't want to mess anyone up.
+
+I think the benefits of getting these patches in for this merge window
+outweigh a onetime breaking of my branches.  Is there anything I'm not
+considering before I do this?
+
+I'll do the work now, but hold off on pushing or sending new pullrq's
+for a day or two or until I hear from you guys.
+
+thx,
+
+Jason.
