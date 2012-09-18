@@ -1,55 +1,53 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Tue, 18 Sep 2012 17:38:04 +0530
-Subject: [REPOST PATCH v2 1/2] spi: omap2-mcspi: add pinctrl support
-In-Reply-To: <1347969685-15571-1-git-send-email-mporter@ti.com>
-References: <1347969685-15571-1-git-send-email-mporter@ti.com>
-Message-ID: <50586424.9040601@ti.com>
+From: peter.senna@gmail.com (Peter Senna Tschudin)
+Date: Tue, 18 Sep 2012 14:07:56 +0200
+Subject: [PATCH 06/10] drivers/video/imxfb.c: fix error return code
+In-Reply-To: <1347970080-25175-1-git-send-email-peter.senna@gmail.com>
+References: <1347970080-25175-1-git-send-email-peter.senna@gmail.com>
+Message-ID: <1347970080-25175-6-git-send-email-peter.senna@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012 05:31 PM, Matt Porter wrote:
-> Adds pinctrl support to support OMAP platforms that boot from DT
-> and rely on pinctrl support to set pinmuxes.
-looks good
+From: Peter Senna Tschudin <peter.senna@gmail.com>
 
-Acked-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Convert a nonnegative error return code to a negative one, as returned
+elsewhere in the function.
 
+A simplified version of the semantic match that finds this problem is as
+follows: (http://coccinelle.lip6.fr/)
 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  drivers/spi/spi-omap2-mcspi.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-> index b2fb141..9502566 100644
-> --- a/drivers/spi/spi-omap2-mcspi.c
-> +++ b/drivers/spi/spi-omap2-mcspi.c
-> @@ -38,6 +38,8 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/pinctrl/consumer.h>
-> +#include <linux/err.h>
->  
->  #include <linux/spi/spi.h>
->  
-> @@ -1124,6 +1126,7 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
->  	static int		bus_num = 1;
->  	struct device_node	*node = pdev->dev.of_node;
->  	const struct of_device_id *match;
-> +	struct pinctrl *pinctrl;
->  
->  	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
->  	if (master == NULL) {
-> @@ -1219,6 +1222,11 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
->  	if (status < 0)
->  		goto dma_chnl_free;
->  
-> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(pinctrl))
-> +		dev_warn(&pdev->dev,
-> +			"pins are not configured from the driver\n");
-> +
->  	pm_runtime_use_autosuspend(&pdev->dev);
->  	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
->  	pm_runtime_enable(&pdev->dev);
+// <smpl>
+(
+if at p1 (\(ret < 0\|ret != 0\))
+ { ... return ret; }
+|
+ret@p1 = 0
+)
+... when != ret = e1
+    when != &ret
+*if(...)
+{
+  ... when != ret = e2
+      when forall
+ return ret;
+}
+// </smpl>
+
+Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
+---
+ drivers/video/imxfb.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index caad368..469b07c 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -803,6 +803,7 @@ static int __init imxfb_probe(struct platform_device *pdev)
+ 	fbi->regs = ioremap(res->start, resource_size(res));
+ 	if (fbi->regs == NULL) {
+ 		dev_err(&pdev->dev, "Cannot map frame buffer registers\n");
++		ret = -ENOMEM;
+ 		goto failed_ioremap;
+ 	}
+ 
+-- 
+1.7.11.4
