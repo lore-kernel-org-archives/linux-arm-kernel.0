@@ -1,24 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Sep 2012 09:28:44 +0100
-Subject: [PATCH v3 02/15] dmaengine: omap: Add support for pause/resume
- in cyclic dma mode
-In-Reply-To: <1347851637.1943.125.camel@vkoul-udesk3>
-References: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
- <1347624358-25582-3-git-send-email-peter.ujfalusi@ti.com>
- <1347851637.1943.125.camel@vkoul-udesk3>
-Message-ID: <20120918082843.GD12445@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 18 Sep 2012 10:30:55 +0200
+Subject: [GIT PULL] at91: one fix for 3.6
+Message-ID: <5058313F.8060704@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 08:43:57AM +0530, Vinod Koul wrote:
-> On Fri, 2012-09-14 at 15:05 +0300, Peter Ujfalusi wrote:
-> > -       /* FIXME: not supported by platform private API */
-> > -       return -EINVAL;
-> > +       /* Pause/Resume only allowed with cyclic mode */
-> > +       if (!c->cyclic)
-> > +               return -EINVAL; 
-> This is not a dma restriction right?
+Arnd, Olof,
 
-This is needed because this is not a real "pause" - it is a stop, which
-causes the contents of the DMA engine's FIFOs to be discarded - which
-means a subsequent resume will loose data.
+We have one last minute fix. It can help us to use the device tree for 
+GPIO interrupt attached devices. I have based my tag on top of the "fixes" pull 
+request that I've already sent to you.
+I hope that it could make it for 3.6-final.
+
+The following changes since commit 51a6149b89b822cacf572b2ca2a15cb6f2232b11:
+
+  ARM: at91/feature-removal-schedule: delay at91_mci removal (2012-08-27 09:59:36 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 51ac51a6a5ab5f0aff46c4757ba4c32f3f8f7a2e:
+
+  ARM: at91: fix missing #interrupt-cells on gpio-controller (2012-09-17 10:25:01 +0200)
+
+----------------------------------------------------------------
+Modify AT91 device tree files for making the GPIO interrupts work.
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91: fix missing #interrupt-cells on gpio-controller
+
+ arch/arm/boot/dts/at91sam9260.dtsi | 3 +++
+ arch/arm/boot/dts/at91sam9263.dtsi | 5 +++++
+ arch/arm/boot/dts/at91sam9g45.dtsi | 5 +++++
+ arch/arm/boot/dts/at91sam9n12.dtsi | 4 ++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++++
+ 5 files changed, 21 insertions(+)
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
