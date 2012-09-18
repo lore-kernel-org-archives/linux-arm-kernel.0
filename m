@@ -1,63 +1,30 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 18 Sep 2012 16:07:40 -0700
-Subject: [PATCH] rtc: snvs: improve timeout handling in snvs_rtc_enable()
-In-Reply-To: <1345277408-30044-1-git-send-email-LW@KARO-electronics.de>
-References: <1345277408-30044-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20120918160740.6dbdc797.akpm@linux-foundation.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 19 Sep 2012 08:56:21 +0900
+Subject: [PATCH 01/24] ARM: shmobile: use __iomem pointers for MMIO
+In-Reply-To: <201209181604.49562.arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <201209180831.06572.arnd@arndb.de>
+ <20120918115038.GB3198@verge.net.au>
+ <201209181604.49562.arnd@arndb.de>
+Message-ID: <20120918235619.GA12583@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 18 Aug 2012 10:10:08 +0200
-Lothar Wa__mann <LW@karo-electronics.de> wrote:
+On Tue, Sep 18, 2012 at 04:04:49PM +0000, Arnd Bergmann wrote:
+> On Tuesday 18 September 2012, Simon Horman wrote:
+> > > I agree it's not nice to have to do this, but this is largely because
+> > > of shmobile doing things differently from all other ARM platforms, on
+> > > which the respective patches tend to clean up things and reduce the
+> > > number of type casts.
+> > > 
+> > > The only alternative I can see is for shmobile to introduce its own
+> > > mach/io.h file with the relaxed type checking, but that would only
+> > > defer the problem until the point where you want shmobile to be part
+> > > of the common multiplatform kernel binary.
+> > 
+> > If it is needed in the long term, then I'm happy with it going in now.
+> > Could you remove the portion that Paul objected to?
+> 
+> Yes, I already did that.
 
-> If snvs_rtc_enable() happens to be descheduled for a period longer
-> than the timout period, a timeout may be indicated even if the RTC
-> status has changed meanwhile. Force a status read at the end of the
-> timeout period to prevent bogus timeout errors.
-
-(delayed, sorry)
-
-> --- a/drivers/rtc/rtc-snvs.c
-> +++ b/drivers/rtc/rtc-snvs.c
-> @@ -81,6 +81,13 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
->  	}
->  }
->  
-> +static int snvs_rtc_enable_done(int enable, void __iomem *addr)
-> +{
-> +	u32 lpcr = readl(addr + SNVS_LPCR);
-> +
-> +	return !!enable ^ !(lpcr & SNVS_LPCR_SRTC_ENV);
-> +}
-> +
->  static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
->  {
->  	unsigned long timeout = jiffies + msecs_to_jiffies(1);
-> @@ -99,18 +106,15 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
->  	spin_unlock_irqrestore(&data->lock, flags);
->  
->  	while (1) {
-> -		lpcr = readl(data->ioaddr + SNVS_LPCR);
-> +		if (snvs_rtc_enable_done(enable, data->ioaddr))
-> +			break;
->  
-> -		if (enable) {
-> -			if (lpcr & SNVS_LPCR_SRTC_ENV)
-> -				break;
-> -		} else {
-> -			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
-> +		if (time_after(jiffies, timeout)) {
-> +			if (snvs_rtc_enable_done(enable, data->ioaddr))
->  				break;
-> +			else
-> +				return -ETIMEDOUT;
->  		}
-> -
-> -		if (time_after(jiffies, timeout))
-> -			return -ETIMEDOUT;
->  	}
->  
->  	return 0;
-
-I think this will have been addressed by
-http://ozlabs.org/~akpm/mmots/broken-out/rtc-snvs-add-freescale-rtc-snvs-driver-fix.patch?
+Great, thanks.
