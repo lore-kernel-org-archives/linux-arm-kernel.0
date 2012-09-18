@@ -1,39 +1,105 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Sep 2012 15:06:16 +0100
-Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
-In-Reply-To: <20120918124724.GK32204@mudshark.cambridge.arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153443.21241.37958.stgit@ubuntu>
- <20120918124724.GK32204@mudshark.cambridge.arm.com>
-Message-ID: <CAHkRjk6aOHDPcMZt==8mN9R-vJQ+RYvZ-LzimQ+no4yibJdGkQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Sep 2012 17:02:17 +0300
+Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
+ suspended.
+In-Reply-To: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
+References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120918140213.GA27463@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 September 2012 13:47, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Sep 15, 2012 at 04:34:43PM +0100, Christoffer Dall wrote:
->> +#define L_PTE2_SHARED                L_PTE_SHARED
->> +#define L_PTE2_READ          (_AT(pteval_t, 1) << 6) /* HAP[0] */
->> +#define L_PTE2_WRITE         (_AT(pteval_t, 1) << 7) /* HAP[1] */
->
-> This is actually HAP[2:1], not HAP[1:0]. Also, can you follow what we do for
-> stage 1 translation and name these RDONLY and WRONLY (do you even use
-> that?).
+On Tue, Sep 18, 2012 at 06:10:50PM +0530, Sourav Poddar wrote:
+> Greg's tty-next is not booting on 2420 based N800. The failure is
+> observed at serial init itself. The reason might be that n800 tries to
+> resume even though it is not suspended before.
+> 
+> Reported-by: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 
-We can't use RDONLY as this would have value 0 as the HAP attributes
-(stage 2 overriding stage 1 translation attributes). Unless you add 4
-definitions like NOACCESS, RDONLY, WRONLY and RDWR to cover all the
-bit combinations.
+FWIW:
 
->> +#define L_PTE2_NORM_WB               (_AT(pteval_t, 3) << 4) /* MemAttr[3:2] */
->> +#define L_PTE2_INNER_WB              (_AT(pteval_t, 3) << 2) /* MemAttr[1:0] */
->
-> Another minor nit: PTE2 looks awful. Maybe L_PTE_HYP_* instead?
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-L_PTE_HYP may be confused with the Stage 1 Hyp translation which is
-different from the guest Stage 2.
+Paul does this fix the issue for you ? Note that it depends on a
+previous patch Sourav sent [1]
 
-But I have another minor nit - just write them in the ascending bit
-order as other definitions in this file.
+[1] http://marc.info/?l=linux-omap&m=134796819607889&w=2
+
+There's one thing that gets my attention, though, why only n800 would
+fail here ?
+
+I wonder if we should be using:
+
+pm_runtime_set_active(dev);
+pm_runtime_get_enable(dev);
+
+to prevent our runtime_resume() to be called from probe, but Sourav
+tested and it doesn't work on BeagleBoard, but it works on PandaBoard.
+
+Does it ring any bell ??
+
+> ---
+> This patch is developed on top of greg's tty-next branch
+> CommitId: e740d8f tty: serial: Samsung: Fix return value +
+> the following patch which I have already posted to the mailing list.
+> http://comments.gmane.org/gmane.linux.ports.arm.omap/84729
+> 
+>  drivers/tty/serial/omap-serial.c |   11 ++++++++++-
+>  1 files changed, 10 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 3c05c5e..bc355f2 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -110,6 +110,7 @@ struct uart_omap_port {
+>  	u32			calc_latency;
+>  	struct work_struct	qos_work;
+>  	struct pinctrl		*pins;
+> +	unsigned int		suspended:1;
+>  };
+>  
+>  #define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
+> @@ -1545,14 +1546,20 @@ static int serial_omap_runtime_suspend(struct device *dev)
+>  	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+>  	schedule_work(&up->qos_work);
+>  
+> +	up->suspended = true;
+> +
+>  	return 0;
+>  }
+>  
+>  static int serial_omap_runtime_resume(struct device *dev)
+>  {
+>  	struct uart_omap_port *up = dev_get_drvdata(dev);
+> +	u32 loss_cnt;
+> +
+> +	if (!up->suspended)
+> +		return 0;
+>  
+> -	u32 loss_cnt = serial_omap_get_context_loss_count(up);
+> +	loss_cnt = serial_omap_get_context_loss_count(up);
+>  
+>  	if (up->context_loss_cnt != loss_cnt)
+>  		serial_omap_restore_context(up);
+> @@ -1560,6 +1567,8 @@ static int serial_omap_runtime_resume(struct device *dev)
+>  	up->latency = up->calc_latency;
+>  	schedule_work(&up->qos_work);
+>  
+> +	up->suspended = false;
+> +
+>  	return 0;
+>  }
+>  #endif
+> -- 
+> 1.7.1
+> 
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/c854c223/attachment-0001.sig>
