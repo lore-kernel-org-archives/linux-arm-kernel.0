@@ -1,52 +1,33 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 18 Sep 2012 08:43:55 +0530
-Subject: [PATCH V6 2/2] dmaengine: add helper function to request a
- slave DMA channel
-In-Reply-To: <20120917223619.GC12445@n2100.arm.linux.org.uk>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
- <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
- <20120917223619.GC12445@n2100.arm.linux.org.uk>
-Message-ID: <1347938035.1943.162.camel@vkoul-udesk3>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Tue, 18 Sep 2012 11:30:42 +0800
+Subject: [PATCH] ARM: OMAP: OMAP_DEBUG_LEDS needs to select LEDS_CLASS
+Message-ID: <1347939042.15578.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-09-17 at 23:36 +0100, Russell King - ARM Linux wrote:
-> > 
-> > I believe that Jon is on vacation this week, so if this is the only issue
-> > holding up the merge, maybe you can change this in his patch directly, or
-> > I can send an updated version if you prefer.
-> 
-> I worry that too much is going on here too quickly.  We have some people
-> working on changing the way DMA engine selects channels.  Meanwhile we
-> have other people trying to create an OF DMA engine API.
-> 
-> It seems that Vinod's working on a way for platforms to specify bindings
-> to the DMA engine code, and the DMA engine code itself selects the
-> appropriate channel.  This patch, on the other hand, introduces a set of
-> translation functions which need to be provided by platform code,
-> which returns the dma_chan pointer.
-> 
-> This sounds like a recipe for a total abortion of interfaces.  Only one
-> of those two activities should be going on at any one time, or if they
-> have to occur, they need coordination so that the we don't end up with
-> two totally different schemes.
-> 
-> In the mad rush to DTify everything, don't make hasty decisions, because
-> it is very difficult to change it later - especially something like this
-> which defines how DT encodes this information.
-We discussed this in KS and IMHO we need to merge these two approaches.
+This fixes below build error when CONFIG_LEDS_CLASS is not set.
 
-For DT bindings, I think the binding itself shouldn't change based on my
-work but I would like these same bindings to help build the DMA engine
-code mappings.
+  LD      init/built-in.o
+arch/arm/plat-omap/built-in.o: In function `fpga_probe':
+arch/arm/plat-omap/debug-leds.c:113: undefined reference to `led_classdev_register'
+make: *** [vmlinux] Error 1
 
-Now would it make sense to NOT merge these changes for 3.7 and postpone
-to 3.8. I can host these patches on a topic branch and merge them when
-we are ready. I plan to spend some good amount of time on my work this
-week so we should be ready pretty soon.
-One these changes are merged, users can start moving to this scheme.
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/plat-omap/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index ca83a76..c262781 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -43,6 +43,7 @@ config OMAP_DEBUG_DEVICES
+ 
+ config OMAP_DEBUG_LEDS
+ 	def_bool y if NEW_LEDS
++	select LEDS_CLASS
+ 	depends on OMAP_DEBUG_DEVICES
+ 
+ config POWER_AVS_OMAP
 -- 
-~Vinod
+1.7.9.5
