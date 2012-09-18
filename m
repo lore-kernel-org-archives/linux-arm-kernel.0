@@ -1,26 +1,53 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Sep 2012 10:54:16 +0900
-Subject: [PATCH 0/2] ARM; shmobile: kzm9g: enable sensors on the board
-Message-ID: <1347933258-4372-1-git-send-email-horms@verge.net.au>
+Date: Tue, 18 Sep 2012 10:54:17 +0900
+Subject: [PATCH 1/2] ARM: shmobile: kzm9g: enable magnetometer ak8975.
+In-Reply-To: <1347933258-4372-1-git-send-email-horms@verge.net.au>
+References: <1347933258-4372-1-git-send-email-horms@verge.net.au>
+Message-ID: <1347933258-4372-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a forward of a short patch series by Tetsuyuki Kobayashi
-to linux-arm-kernel in preparation for a future pull request.
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-----------------------------------------------------------------
-KZM-A9-GT board (kzm9g) has 2 sensor chip on the board.
- - magnetometer AK8975
- - three-axis digital accelerometer ADXL345
-This patch registers device driver and assign I2C slave address and IRQ.
+This patch enables magnetometer ak8975.
+I checked ak8975_probe() returns successfully.
 
-Tetsuyuki Kobayashi (2):
-  ARM: shmobile: kzm9g: enable magnetometer ak8975.
-  ARM: shmobile: kzm9g: enable three-axis digital accelerometer ADXL345
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/kzm9g_defconfig     |    2 ++
+ arch/arm/mach-shmobile/board-kzm9g.c |    6 +++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
- arch/arm/configs/kzm9g_defconfig     |    4 ++++
- arch/arm/mach-shmobile/board-kzm9g.c |   10 +++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index 2388c86..2aaa2ff 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -118,6 +118,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_ASYNC_TX_DMA=y
+ CONFIG_STAGING=y
++CONFIG_SENSORS_AK8975=y
++CONFIG_IIO=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_INOTIFY_USER=y
+ CONFIG_VFAT_FS=y
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 53b7ea9..7965012 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -558,7 +558,11 @@ static struct i2c_board_info i2c0_devices[] = {
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("r2025sd", 0x32),
+-	}
++	},
++	{
++		I2C_BOARD_INFO("ak8975", 0x0c),
++		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
++	},
+ };
+ 
+ static struct i2c_board_info i2c1_devices[] = {
 -- 
-1.7.9.5
+1.7.10.4
