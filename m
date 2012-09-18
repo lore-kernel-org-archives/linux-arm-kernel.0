@@ -1,39 +1,22 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 18 Sep 2012 12:09:46 +0200
-Subject: [PATCH] ARM: ux500: fix spi2 pin group
-Message-ID: <1347962986-12280-1-git-send-email-linus.walleij@stericsson.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Tue, 18 Sep 2012 12:31:45 +0200
+Subject: [PATCH 09/24] ARM: ixp4xx: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-10-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Fri, 14 Sep 2012 23:34:37 +0200")
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-10-git-send-email-arnd@arndb.de>
+Message-ID: <m3ipbbmxke.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+Arnd Bergmann <arnd@arndb.de> writes:
 
-GPIO216_AG12 is configured as a gpio for SPI2, so select
-the spi2_oc1_2 pin group instead of spi2_oc1_1
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
+>
+> At the moment, this patch conflicts with other patches in linux-next,
+> need to sort this out.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi Olof, Arnd:
-
-Again I'd prefer to take this through the pinctrl tree if it's
-OK with you. We are deploying pinctrl internally and ironing out
-bugs as we test more and more use cases.
----
- arch/arm/mach-ux500/board-mop500-pins.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index f0affc3..a96b945 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -219,7 +219,7 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_MUX("usb_a_1", "usb", "musb-ux500.0"),
- 	DB8500_PIN("GPIO257_AE29", out_hi, "musb-ux500.0"), /* STP */
- 	/* Mux in SPI2 pins on the "other C1" altfunction */
--	DB8500_MUX("spi2_oc1_1", "spi2", "spi2"),
-+	DB8500_MUX("spi2_oc1_2", "spi2", "spi2"),
- 	DB8500_PIN("GPIO216_AG12", gpio_out_hi, "spi2"), /* FRM */
- 	DB8500_PIN("GPIO218_AH11", in_pd, "spi2"), /* RXD */
- 	DB8500_PIN("GPIO215_AH13", out_lo, "spi2"), /* TXD */
+Very nice, I will take care of these 3 patches.
 -- 
-1.7.11.3
+Krzysztof Halasa
