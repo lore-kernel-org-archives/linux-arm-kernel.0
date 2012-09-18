@@ -1,53 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Sep 2012 16:54:44 -0700
-Subject: [PATCH] ARM: OMAP1: Include gpio-omap.h for board-h2 and board-h3
-Message-ID: <20120917234821.GL11762@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Sep 2012 09:45:46 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: Boards for 3.7 #2
+In-Reply-To: <20120916234044.GA19186@quad.lixom.net>
+References: <1347517071-30647-1-git-send-email-horms@verge.net.au>
+ <20120916234044.GA19186@quad.lixom.net>
+Message-ID: <20120918004546.GU14808@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From de6ca33a96a6bf61fcb91d3d399703e19ead9d1e Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 17 Sep 2012 16:24:20 -0700
-Subject: [PATCH] ARM: OMAP1: Include gpio-omap.h for board-h2 and board-h3
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+On Sun, Sep 16, 2012 at 04:40:44PM -0700, Olof Johansson wrote:
+> On Thu, Sep 13, 2012 at 03:17:50PM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Arnd,
+> > 
+> > please consider the following board enhancement from
+> > Iwamatsu-san for inclusion in 3.7.
+> > 
+> > ----------------------------------------------------------------
+> > The following changes since commit eb8ca943bae2b84c3fc14dfd7a908cb334465fef:
+> > 
+> >   ARM: shmobile: marzen: enable thermal sensor (2012-09-06 10:24:17 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
+> 
+> Thanks, I did this as a re-pull of the old branch, so it's still there as
+> renesas/boards with this new patch at the top of the branch.
 
-Merge of the LED related changes with omap sparse IRQ and
-hardware.h related changes causes a build issue otherwise:
-
-arch/arm/mach-omap1/board-h2.c:319: error: implicit declaration of function ?OMAP_MPUIO?
-arch/arm/mach-omap1/board-h2.c:319: error: initializer element is not constant
-arch/arm/mach-omap1/board-h2.c:319: error: (near initialization for ?h2_gpio_led_pins[1].gpio?)
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
----
-
-Noticed this with current linux next and omap1_defconfig.
-The arm-soc drivers branch builds fine, but merged
-with omap-cleanup-sparseirq-for-v3.7 compile breaks.
-
-I'll queue this into cleanup-fixes branch on top of the
-omap-cleanup-sparseirq-for-v3.7 branch.
-
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -31,6 +31,7 @@
- #include <linux/i2c/tps65010.h>
- #include <linux/smc91x.h>
- #include <linux/omapfb.h>
-+#include <linux/platform_data/gpio-omap.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
---- a/arch/arm/mach-omap1/board-h3.c
-+++ b/arch/arm/mach-omap1/board-h3.c
-@@ -31,6 +31,7 @@
- #include <linux/i2c/tps65010.h>
- #include <linux/smc91x.h>
- #include <linux/omapfb.h>
-+#include <linux/platform_data/gpio-omap.h>
- 
- #include <asm/setup.h>
- #include <asm/page.h>
+Thanks.
