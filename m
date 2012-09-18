@@ -1,43 +1,34 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 18 Sep 2012 08:32:09 -0400
-Subject: [PATCH 00/15] KVM/ARM Implementation
-In-Reply-To: <20120918122111.GI32204@mudshark.cambridge.arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120918122111.GI32204@mudshark.cambridge.arm.com>
-Message-ID: <CANM98q+sHjKnEOKwXGtUdOJJp_tobm5ckSzKHhYJfSeWr0k2kw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Sep 2012 12:34:29 +0000
+Subject: [PATCH v5 00/17] Introduce Xen support on ARM (based on 3.6-rc5)
+In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
+Message-ID: <201209181234.29557.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 8:21 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Christoffer,
->
-> On Sat, Sep 15, 2012 at 04:34:29PM +0100, Christoffer Dall wrote:
->> The following series implements KVM support for ARM processors,
->> specifically on the Cortex A-15 platform.  We feel this is ready to be
->> merged.
->>
->> Work is done in collaboration between Columbia University, Virtual Open
->> Systems and ARM/Linaro.
->>
->> The patch series applies to Linux 3.6-rc5 with a number of merges:
->>  1. git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git
->>         branch: io (fc8a08c3a3a)
->
-> This is a rebasing branch. If you want to merge it, I can push a separate
-> stable branch for you if you like? That said, I imagine the only patch you
-> want from there is the non-writeback I/O accessors, so I could just stick
-> that somewhere else until it hits mainline.
->
-> Let me know,
->
-Hi Will,
+On Monday 17 September 2012, Stefano Stabellini wrote:
 
-I actually merged this branch so Marc could merge from my branches, so
-I included it in the base for this patch series as well, to minimize
-the diff between the HEAD of kvm-arm-v11-vgic-times and kvm-arm-master
-at time of sending these patches out. You don't have to prepare the
-patch separately, as the kernel boots just fine without it now when we
-have thumb mmio instruction decoding, albeit somewhat slower.
+> I am also attaching to this email the dts'es that I am currently using
+> for dom0 and domU: vexpress-v2p-ca15-tc1.dts (that includes
+> vexpress-v2m-rs1-rtsm.dtsi) is the dts used for dom0 and it is passed to
+> Linux by Xen, while vexpress-virt.dts is the dts used for other domUs
+> and it is appended in binary form to the guest kernel image. I am not
+> sure where they are supposed to live yet, so I am just attaching them
+> here so that people can actually try out this series if they want to.
 
-Thanks!
--Christoffer
+You can submit the dts files separately so we can include them in
+the arm-soc tree. Pawel Moll is handling vexpress related changes these
+days, so it would be reasonable if he included them in a pull request.
+ 
+> The patch series has been rebased on Konrad's stable/for-linus-3.7
+> branch.
+> 
+> Arnd, Russell, what do you think about this series? If you are OK with
+> it, to whom should I submit it?
+
+I have no objections to your patches from this series. IMHO they should
+be submitted through the Xen tree, but it would be good to have an Ack
+from Russell.
+
+	Arnd
