@@ -1,113 +1,146 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 18 Sep 2012 10:52:04 +0200
-Subject: [PATCH v9 0/8] PM QoS: implement the OMAP low level constraints
- management code
-Message-ID: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
+Date: Tue, 18 Sep 2012 10:52:07 +0200
+Subject: [PATCH 3/8] ARM: OMAP: omap_device: register to the per-device PM QoS
+ framework
+In-Reply-To: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
+References: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
+Message-ID: <1347958332-2205-4-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-. Implement the devices wake-up latency constraints using the global
-  device PM QoS notification handler which applies the constraints to the
-  underlying layer,
-. Implement the low level code which controls the power domains next
-  functional power states, through the hwmod and pwrdm layers,
-. Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
-  comments in the code and [1] for the details on where the numbers
-  are magically coming from,
-. Implement the relation between the cpuidle and per-device PM QoS frameworks
-  in the OMAP3 specific idle callbacks.
-  The chosen C-state shall satisfy the following conditions:
-   . it satisfies the enable_off_mode flag,
-   . the next state for MPU and CORE power domains is not lower than the
-     state programmed by the per-device PM QoS.
-. convert I2C driver to PM QoS for latency constraints,
-. remove the latency related functions from the API (omap_pm_set_*) and
-  update the kernel Documentation accordingly.
+Implement the devices wake-up latency constraints using the global
+device PM QoS notification handler which applies the constraints to the
+underlying layer by calling the corresponding function at hwmod level.
 
+Reworked after Paul's suggestions.
 
-ToDo:
-1. Re-visit the OMAP power domains states initialization procedure. Currently
-   the power states that have been changed from the constraints API which were
-   applied before the initialization of the power domains are lost
-2. Further clean-up the OMAP PM layer, use the generic frameworks instead (OPP,
-   PM QoS for throughput constraints ...)
+Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
+latency constraints on MPU, CORE and PER.
 
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/plat-omap/omap_device.c |   81 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 80 insertions(+), 1 deletions(-)
 
-Based on mainline kernel 3.6.0-rc4 with the functional power states changes v6 [2]
-applied.
-
-Tested cpuidle and suspend on OMAP3 Beagleboard (ES2.x) with constraints
-on MPU, CORE, PER in RETention and OFF modes.
-
-[1] http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
-[2] http://marc.info/?l=linux-omap&m=134744375320874&w=2
-
-
-History:
-v9:
-. ported to latest functional power states code,
-. changed the locking from mutex to spinlock, as reported by Djamil Elaidi
-  <d-elaidi@ti.com>,
-. simplified the memory allocation code, using GFP_ATOMIC since the code can be
-  used under spinlock
-
-v8:
-. reworked the code after internal review and testing with OMAP3&4 device
-   OFF
-
-v7:
-. rebased on top of the functional power state changes
-
-v6:
-. minor change in the commits description after Kevin's review
-. added Kevin's Reviewed-by
-
-v5:
-. rebased on latest linux-omap
-. rework after Kevin's comments on the MLs
-
-v4:
-. split up the patches which remove the omap_pm_ code from the patch set.
-  Those patches are to be submitted later, on top of this patch set.
-. latency numbers: provide the measurements setup and conditions in the code
-  comments, added the link to the details on wiki [1].
-. improved kerneldoc
-. split big functions into smaller ones, in order to improve the readability
-
-v3: reworked the error return path and improved the kerneldoc
-
-v2: reworked the OMAP specific cpuidle code to demote the initial C-state to
-     a valid C-state which fulfills the per-device constraints
-
-v1: initial version
-
-
-Jean Pihet (8):
-  ARM: OMAP2+: PM QoS: control the power domains next state from the
-    constraints
-  ARM: OMAP2+: hwmod: manage the wake-up latency constraints
-  ARM: OMAP: omap_device: register to the per-device PM QoS framework
-  ARM: OMAP3: cpuidle: next C-state decision depends on the PM QoS MPU
-    and CORE constraints
-  ARM: OMAP3: update cpuidle latency and threshold figures
-  ARM: OMAP3: powerdomain data: add wake-up latency figures
-  ARM: OMAP: convert I2C driver to PM QoS for latency constraints
-  ARM: OMAP: PM: remove the latency related functions from the API
-
- Documentation/arm/OMAP/omap_pm               |   68 +++------
- arch/arm/mach-omap2/cpuidle34xx.c            |  103 +++++++++----
- arch/arm/mach-omap2/omap_hwmod.c             |   44 +++++-
- arch/arm/mach-omap2/powerdomain.c            |  212 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h            |   18 ++-
- arch/arm/mach-omap2/powerdomains3xxx_data.c  |   83 ++++++++++
- arch/arm/plat-omap/i2c.c                     |   21 ---
- arch/arm/plat-omap/include/plat/omap-pm.h    |   99 ------------
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    5 +
- arch/arm/plat-omap/omap-pm-noop.c            |   88 -----------
- arch/arm/plat-omap/omap_device.c             |   81 ++++++++++-
- drivers/i2c/busses/i2c-omap.c                |   28 ++--
- include/linux/i2c-omap.h                     |    1 -
- 13 files changed, 550 insertions(+), 301 deletions(-)
-
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index c490240..011825f 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -3,6 +3,7 @@
+  * omap_device implementation
+  *
+  * Copyright (C) 2009-2010 Nokia Corporation
++ * Copyright (C) 2012 Texas Instruments, Inc.
+  * Paul Walmsley, Kevin Hilman
+  *
+  * Developed in collaboration with (alphabetical order): Benoit
+@@ -89,6 +90,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/of.h>
+ #include <linux/notifier.h>
++#include <linux/pm_qos.h>
+ 
+ #include <plat/omap_device.h>
+ #include <plat/omap_hwmod.h>
+@@ -401,6 +403,72 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 	return NOTIFY_DONE;
+ }
+ 
++/**
++ * _omap_device_pm_qos_handler - interface to the per-device PM QoS framework
++ * @nb: pointer to omap_device_pm_qos_nb (not used)
++ * @new_value: new maximum wakeup latency constraint for @req->dev (in us)
++ * @req: struct dev_pm_qos_request * passed by the Linux PM QoS code
++ *
++ * Called by the Linux core device PM QoS code to alter the maximum
++ * wakeup latency constraint on a device.  If the underlying device is
++ * an omap_device, then this code will pass the constraint on to the
++ * underlying hwmods.  Returns -EINVAL if this code can't handle the
++ * constraint for some reason, or passes along the return code from the
++ * hwmod wakeup latency constraint functions.
++ */
++static int _omap_device_pm_qos_handler(struct notifier_block *nb,
++				       unsigned long new_value,
++				       void *req)
++{
++	struct omap_device *od;
++	struct omap_hwmod *oh;
++	struct platform_device *pdev;
++	struct dev_pm_qos_request *dev_pm_qos_req = req;
++	int ret = NOTIFY_OK;
++	int r, i;
++
++	pr_debug("OMAP PM constraints: req at 0x%p, new_value=%lu\n",
++		 req, new_value);
++
++	/* Look for the platform device for the constraint target device */
++	pdev = to_platform_device(dev_pm_qos_req->dev);
++
++	/* Try to catch non platform devices */
++	if (pdev->name == NULL) {
++		pr_err("%s: Error: platform device for device %s not valid\n",
++		       __func__, dev_name(dev_pm_qos_req->dev));
++		return NOTIFY_DONE;
++	}
++
++	/* Find the associated omap_device for dev */
++	od = to_omap_device(pdev);
++	if (od == NULL) {
++		pr_err("%s: Error: no omap_device for device %s\n",
++		       __func__, dev_name(dev_pm_qos_req->dev));
++		return NOTIFY_DONE;
++	}
++
++	pr_debug("OMAP PM constraints: req at 0x%p, dev=0x%p, new_value=%lu\n",
++		 req, dev_pm_qos_req->dev, new_value);
++
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		oh = od->hwmods[i];
++		if (new_value == PM_QOS_DEV_LAT_DEFAULT_VALUE)
++			r = omap_hwmod_remove_wakeuplat_constraint(
++							oh,
++							dev_pm_qos_req);
++		else
++			r = omap_hwmod_set_wakeuplat_constraint(
++							oh,
++							dev_pm_qos_req,
++							new_value);
++
++		if (!r)
++			ret = NOTIFY_BAD;
++	}
++
++	return ret;
++}
+ 
+ /* Public functions for use by core code */
+ 
+@@ -1115,13 +1183,24 @@ int omap_device_enable_clocks(struct omap_device *od)
+ 	return 0;
+ }
+ 
++static struct notifier_block omap_device_pm_qos_nb = {
++	.notifier_call = _omap_device_pm_qos_handler,
++};
++
+ static struct notifier_block platform_nb = {
+ 	.notifier_call = _omap_device_notifier_call,
+ };
+ 
+ static int __init omap_device_init(void)
+ {
++	int ret;
++
+ 	bus_register_notifier(&platform_bus_type, &platform_nb);
+-	return 0;
++
++	ret = dev_pm_qos_add_global_notifier(&omap_device_pm_qos_nb);
++	if (ret)
++		pr_err("omap_device: cannot add global notifier for dev PM QoS\n");
++
++	return ret;
+ }
+ core_initcall(omap_device_init);
 -- 
 1.7.7.6
