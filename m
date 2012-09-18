@@ -1,60 +1,111 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:44 +0100
-Subject: [PATCH v2 02/13] video: Versatile Express display output driver
+Date: Tue, 18 Sep 2012 15:17:50 +0100
+Subject: [PATCH v2 08/13] mfd: Versatile Express system registers driver
 In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1347977875-16855-3-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-9-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versatile Express' DVI video output can be connected to one the three
-sources - motherboard's CLCD controller or a video signal generated
-by one of the daughterboards.
+This is a platform driver for Versatile Express' "system
+register" block. It's a random collection of registers providing
+the following functionality:
 
-This driver configures the muxer FPGA so the output displays
-content of one of the framebuffers in the system (0 by default,
-can be changed by user writing to "fb" attribute of the muxfpga
-device). The decision is based on an educated guess in case of
-DT-less system or on the "arm,vexpress,site" property of the
-display controller's DT node.
+- low level platform functions like board ID access; in order to
+  use those, the driver must be initialized early, either statically
+  or based on the DT
 
-It will also set up the display formatter mode and keep it up
-to date with mode changes requested by the user (eg. with fbset
-tool).
+- config bus bridge via "system control" interface; as the response
+  from the controller does not generate interrupt (yet), the status
+  register is periodically polled using a timer
+
+- pseudo GPIO lines providing MMC card status and Flash WP#
+  signal control
+
+- LED interface for a set of 8 LEDs on the motherboard, with
+  "heartbeat" and "mmc0" as default triggers for 2 of them
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/video/Makefile       |    3 +
- drivers/video/vexpress-dvi.c |  208 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 211 insertions(+)
- create mode 100644 drivers/video/vexpress-dvi.c
+ .../devicetree/bindings/arm/vexpress-sysreg.txt    |   50 ++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/vexpress-sysreg.c                      |  542 ++++++++++++++++++++
+ include/linux/vexpress.h                           |   25 +
+ 4 files changed, 618 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
+ create mode 100644 drivers/mfd/vexpress-sysreg.c
 
-Hi Florian,
-
-Assuming it's not totally crap ;-) what would be you preference about
-merging this patch? Would you take it through your tree?
-
-Regards
-
-Pawel
-
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index ee8dafb..01d28d5 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -170,3 +170,6 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
- 
- #video output switch sysfs driver
- obj-$(CONFIG_VIDEO_OUTPUT_CONTROL) += output.o
-+
-+# platform specific output drivers
-+obj-$(CONFIG_VEXPRESS_CONFIG)	  += vexpress-dvi.o
-diff --git a/drivers/video/vexpress-dvi.c b/drivers/video/vexpress-dvi.c
+diff --git a/Documentation/devicetree/bindings/arm/vexpress-sysreg.txt b/Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
 new file mode 100644
-index 0000000..fc50fc6
+index 0000000..9cf3f25
 --- /dev/null
-+++ b/drivers/video/vexpress-dvi.c
-@@ -0,0 +1,208 @@
++++ b/Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
+@@ -0,0 +1,50 @@
++ARM Versatile Express system registers
++--------------------------------------
++
++This is a system control registers block, providing multiple low level
++platform functions like board detection and identification, software
++interrupt generation, MMC and NOR Flash control etc.
++
++Required node properties:
++- compatible value : = "arm,vexpress,sysreg";
++- reg : physical base address and the size of the registers window
++- gpio-controller : specifies that the node is a GPIO controller
++- #gpio-cells : size of the GPIO specifier, should be 2:
++  - first cell is the pseudo-GPIO line number:
++    0 - MMC CARDIN
++    1 - MMC WPROT
++    2 - NOR FLASH WPn
++  - second cell can take standard GPIO flags (currently ignored).
++
++Example:
++	v2m_sysreg: sysreg at 10000000 {
++ 		compatible = "arm,vexpress-sysreg";
++ 		reg = <0x10000000 0x1000>;
++		gpio-controller;
++		#gpio-cells = <2>;
++ 	};
++
++This block also can also act a bridge to the platform's configuration
++bus via "system control" interface, addressing devices with site number,
++position in the board stack, config controller, function and device
++numbers - see motherboard's TRM for more details.
++
++The node describing a config device must refer to the sysreg node via
++"arm,vexpress,config-bridge" phandle (can be also defined in the node's
++parent) and relies on the board topology properties - see main vexpress
++node documentation for more details. It must must also define the
++following property:
++- arm,vexpress-sysreg,func : must contain two cells:
++  - first cell defines function number (eg. 1 for clock generator,
++    2 for voltage regulators etc.)
++  - device number (eg. osc 0, osc 1 etc.)
++
++Example:
++	mcc {
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++		osc at 0 {
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 0>;
++		};
++	};
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 79dd22d..6b3f9f9 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -132,3 +132,4 @@ obj-$(CONFIG_MFD_RC5T583)	+= rc5t583.o rc5t583-irq.o
+ obj-$(CONFIG_MFD_SEC_CORE)	+= sec-core.o sec-irq.o
+ obj-$(CONFIG_MFD_ANATOP)	+= anatop-mfd.o
+ obj-$(CONFIG_MFD_LM3533)	+= lm3533-core.o lm3533-ctrlbank.o
++obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-sysreg.o
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+new file mode 100644
+index 0000000..d33dcf3
+--- /dev/null
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -0,0 +1,542 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -68,200 +119,575 @@ index 0000000..fc50fc6
 + * Copyright (C) 2012 ARM Limited
 + */
 +
-+#define pr_fmt(fmt) "vexpress-dvi: " fmt
-+
-+#include <linux/fb.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/leds.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/driver.h>
++#include <linux/slab.h>
++#include <linux/stat.h>
++#include <linux/timer.h>
 +#include <linux/vexpress.h>
 +
++#define SYS_ID			0x000
++#define SYS_SW			0x004
++#define SYS_LED			0x008
++#define SYS_100HZ		0x024
++#define SYS_FLAGS		0x030
++#define SYS_FLAGSSET		0x030
++#define SYS_FLAGSCLR		0x034
++#define SYS_NVFLAGS		0x038
++#define SYS_NVFLAGSSET		0x038
++#define SYS_NVFLAGSCLR		0x03c
++#define SYS_MCI			0x048
++#define SYS_FLASH		0x04c
++#define SYS_CFGSW		0x058
++#define SYS_24MHZ		0x05c
++#define SYS_MISC		0x060
++#define SYS_DMA			0x064
++#define SYS_PROCID0		0x084
++#define SYS_PROCID1		0x088
++#define SYS_CFGDATA		0x0a0
++#define SYS_CFGCTRL		0x0a4
++#define SYS_CFGSTAT		0x0a8
 +
-+static struct vexpress_config_func *vexpress_dvimode_func;
++#define SYS_HBI_MASK		0xfff
++#define SYS_ID_HBI_SHIFT	16
++#define SYS_PROCIDx_HBI_SHIFT	0
 +
-+static struct {
-+	u32 xres, yres, mode;
-+} vexpress_dvi_dvimodes[] = {
-+	{ 640, 480, 0 }, /* VGA */
-+	{ 800, 600, 1 }, /* SVGA */
-+	{ 1024, 768, 2 }, /* XGA */
-+	{ 1280, 1024, 3 }, /* SXGA */
-+	{ 1600, 1200, 4 }, /* UXGA */
-+	{ 1920, 1080, 5 }, /* HD1080 */
++#define SYS_MCI_CARDIN		(1 << 0)
++#define SYS_MCI_WPROT		(1 << 1)
++
++#define SYS_FLASH_WPn		(1 << 0)
++
++#define SYS_MISC_MASTERSITE	(1 << 14)
++
++#define SYS_CFGCTRL_START	(1 << 31)
++#define SYS_CFGCTRL_WRITE	(1 << 30)
++#define SYS_CFGCTRL_DCC(n)	(((n) & 0xf) << 26)
++#define SYS_CFGCTRL_FUNC(n)	(((n) & 0x3f) << 20)
++#define SYS_CFGCTRL_SITE(n)	(((n) & 0x3) << 16)
++#define SYS_CFGCTRL_POSITION(n)	(((n) & 0xf) << 12)
++#define SYS_CFGCTRL_DEVICE(n)	(((n) & 0xfff) << 0)
++
++#define SYS_CFGSTAT_ERR		(1 << 1)
++#define SYS_CFGSTAT_COMPLETE	(1 << 0)
++
++
++static void __iomem *vexpress_sysreg_base;
++static struct device *vexpress_sysreg_dev;
++static int vexpress_master_site;
++
++
++void vexpress_flags_set(u32 data)
++{
++	writel(~0, vexpress_sysreg_base + SYS_FLAGSCLR);
++	writel(data, vexpress_sysreg_base + SYS_FLAGSSET);
++}
++
++u32 vexpress_get_procid(int site)
++{
++	if (site == VEXPRESS_SITE_MASTER)
++		site = vexpress_master_site;
++
++	return readl(vexpress_sysreg_base + (site == VEXPRESS_SITE_DB1 ?
++			SYS_PROCID0 : SYS_PROCID1));
++}
++
++u32 vexpress_get_hbi(int site)
++{
++	u32 id;
++
++	switch (site) {
++	case VEXPRESS_SITE_MB:
++		id = readl(vexpress_sysreg_base + SYS_ID);
++		return (id >> SYS_ID_HBI_SHIFT) & SYS_HBI_MASK;
++	case VEXPRESS_SITE_MASTER:
++	case VEXPRESS_SITE_DB1:
++	case VEXPRESS_SITE_DB2:
++		id = vexpress_get_procid(site);
++		return (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
++	}
++
++	return ~0;
++}
++
++void __iomem *vexpress_get_24mhz_clock_base(void)
++{
++	return vexpress_sysreg_base + SYS_24MHZ;
++}
++
++
++static void vexpress_sysreg_find_prop(struct device_node *node,
++		const char *name, u32 *val)
++{
++	of_node_get(node);
++	while (node) {
++		if (of_property_read_u32(node, name, val) == 0) {
++			of_node_put(node);
++			return;
++		}
++		node = of_get_next_parent(node);
++	}
++}
++
++unsigned __vexpress_get_site(struct device *dev, struct device_node *node)
++{
++	u32 site = 0;
++
++	WARN_ON(dev && node && dev->of_node != node);
++	if (dev && !node)
++		node = dev->of_node;
++
++	if (node) {
++		vexpress_sysreg_find_prop(node, "arm,vexpress,site", &site);
++	} else if (dev && dev->bus == &platform_bus_type) {
++		struct platform_device *pdev = to_platform_device(dev);
++
++		if (pdev->num_resources == 1 &&
++				pdev->resource[0].flags == IORESOURCE_BUS)
++			site = pdev->resource[0].start;
++	} else if (dev && strncmp(dev_name(dev), "ct:", 3) == 0) {
++		site = VEXPRESS_SITE_MASTER;
++	}
++
++	if (site == VEXPRESS_SITE_MASTER)
++		site = vexpress_master_site;
++
++	return site;
++}
++
++
++struct vexpress_sysreg_config_func {
++	u32 template;
++	u32 device;
 +};
 +
-+static void vexpress_dvi_mode_set(struct fb_info *info, u32 xres, u32 yres)
++static struct vexpress_config_bridge *vexpress_sysreg_config_bridge;
++static struct timer_list vexpress_sysreg_config_timer;
++static u32 *vexpress_sysreg_config_data;
++static int vexpress_sysreg_config_tries;
++
++static void *vexpress_sysreg_config_func_get(struct device *dev,
++		struct device_node *node)
 +{
-+	int err = -ENOENT;
-+	int i;
++	struct vexpress_sysreg_config_func *config_func;
++	u32 site;
++	u32 position = 0;
++	u32 dcc = 0;
++	u32 func_device[2];
++	int err = -EFAULT;
 +
-+	if (!vexpress_dvimode_func)
-+		return;
++	if (node) {
++		of_node_get(node);
++		vexpress_sysreg_find_prop(node, "arm,vexpress,site", &site);
++		vexpress_sysreg_find_prop(node, "arm,vexpress,position",
++				&position);
++		vexpress_sysreg_find_prop(node, "arm,vexpress,dcc", &dcc);
++		err = of_property_read_u32_array(node,
++				"arm,vexpress-sysreg,func", func_device,
++				ARRAY_SIZE(func_device));
++		of_node_put(node);
++	} else if (dev && dev->bus == &platform_bus_type) {
++		struct platform_device *pdev = to_platform_device(dev);
 +
-+	for (i = 0; i < ARRAY_SIZE(vexpress_dvi_dvimodes); i++) {
-+		if (vexpress_dvi_dvimodes[i].xres == xres &&
-+				vexpress_dvi_dvimodes[i].yres == yres) {
-+			pr_debug("mode: %ux%u = %d\n", xres, yres,
-+					vexpress_dvi_dvimodes[i].mode);
-+			err = vexpress_config_write(vexpress_dvimode_func, 0,
-+					vexpress_dvi_dvimodes[i].mode);
-+			break;
++		if (pdev->num_resources == 1 &&
++				pdev->resource[0].flags == IORESOURCE_BUS) {
++			site = pdev->resource[0].start;
++			func_device[0] = pdev->resource[0].end;
++			func_device[1] = pdev->id;
++			err = 0;
 +		}
 +	}
++	if (err)
++		return NULL;
++
++	config_func = kzalloc(sizeof(*config_func), GFP_KERNEL);
++	if (!config_func)
++		return NULL;
++
++	config_func->template = SYS_CFGCTRL_DCC(dcc);
++	config_func->template |= SYS_CFGCTRL_FUNC(func_device[0]);
++	config_func->template |= SYS_CFGCTRL_SITE(site == VEXPRESS_SITE_MASTER ?
++			vexpress_master_site : site);
++	config_func->template |= SYS_CFGCTRL_POSITION(position);
++	config_func->device |= func_device[1];
++
++	dev_dbg(vexpress_sysreg_dev, "func 0x%p = 0x%x, %d\n", config_func,
++			config_func->template, config_func->device);
++
++	return config_func;
++}
++
++static void vexpress_sysreg_config_func_put(void *func)
++{
++	kfree(func);
++}
++
++static int vexpress_sysreg_config_func_exec(void *func, int offset,
++		bool write, u32 *data)
++{
++	int res;
++	struct vexpress_sysreg_config_func *config_func = func;
++	u32 command;
++
++	if (WARN_ON(!vexpress_sysreg_base))
++		return -ENOENT;
++
++	command = readl(vexpress_sysreg_base + SYS_CFGCTRL);
++	if (WARN_ON(command & SYS_CFGCTRL_START))
++		return -EBUSY;
++
++	command = SYS_CFGCTRL_START;
++	command |= write ? SYS_CFGCTRL_WRITE : 0;
++	command |= config_func->template;
++	command |= SYS_CFGCTRL_DEVICE(config_func->device + offset);
++
++	if (write) {
++		dev_dbg(vexpress_sysreg_dev, "write cmd %x, data %x\n",
++				command, *data);
++		writel(*data, vexpress_sysreg_base + SYS_CFGDATA);
++	} else {
++		dev_dbg(vexpress_sysreg_dev, "read cmd %x\n", command);
++		vexpress_sysreg_config_data = data;
++	}
++	writel(0, vexpress_sysreg_base + SYS_CFGSTAT);
++	writel(command, vexpress_sysreg_base + SYS_CFGCTRL);
++	mb();
++
++	if (vexpress_sysreg_dev) {
++		/* Schedule completion check */
++		vexpress_sysreg_config_tries = 100;
++		mod_timer(&vexpress_sysreg_config_timer,
++				jiffies + usecs_to_jiffies(100));
++		res = VEXPRESS_CONFIG_EXEC_WAIT;
++	} else {
++		/* Early execution, no timer available, have to spin */
++		u32 stat;
++
++		do {
++			cpu_relax();
++			stat = readl(vexpress_sysreg_base + SYS_CFGSTAT);
++		} while (!stat);
++
++		if (!write && (stat & SYS_CFGSTAT_COMPLETE))
++			*data = readl(vexpress_sysreg_base + SYS_CFGDATA);
++		res = VEXPRESS_CONFIG_EXEC_DONE;
++
++		if (stat & SYS_CFGSTAT_ERR)
++			res = -EINVAL;
++	}
++
++	return res;
++}
++
++struct vexpress_config_bridge_info vexpress_sysreg_config_bridge_info = {
++	.name = "vexpress-sysreg",
++	.func_get = vexpress_sysreg_config_func_get,
++	.func_put = vexpress_sysreg_config_func_put,
++	.func_exec = vexpress_sysreg_config_func_exec,
++};
++
++static void vexpress_sysreg_config_complete(unsigned long data)
++{
++	int err = 0;
++	u32 stat = readl(vexpress_sysreg_base + SYS_CFGSTAT);
++
++	if (stat & SYS_CFGSTAT_ERR)
++		err = -EINVAL;
++	if (!vexpress_sysreg_config_tries--)
++		err = -ETIMEDOUT;
 +
 +	if (err)
-+		pr_warn("Failed to set %ux%u mode! (%d)\n", xres, yres, err);
-+}
++		dev_err(vexpress_sysreg_dev, "error %d\n", err);
 +
-+
-+static struct vexpress_config_func *vexpress_muxfpga_func;
-+static int vexpress_dvi_fb = -1;
-+
-+static int vexpress_dvi_mux_set(struct fb_info *info)
-+{
-+	u32 site = vexpress_get_site_by_dev(info->device);
-+	int err = vexpress_config_write(vexpress_muxfpga_func, 0, site);
-+
-+	if (!err) {
-+		pr_debug("Selected MUXFPGA input %d (fb%d)\n", site,
-+				info->node);
-+		vexpress_dvi_fb = info->node;
-+		vexpress_dvi_mode_set(info, info->var.xres,
-+				info->var.yres);
-+	} else {
-+		pr_warn("Failed to select MUXFPGA input %d (fb%d)! (%d)\n",
-+				site, info->node, err);
++	if (!err && !(stat & SYS_CFGSTAT_COMPLETE)) {
++		mod_timer(&vexpress_sysreg_config_timer,
++				jiffies + usecs_to_jiffies(50));
++		return;
 +	}
 +
-+	return err;
++	if (vexpress_sysreg_config_data) {
++		*vexpress_sysreg_config_data = readl(vexpress_sysreg_base +
++				SYS_CFGDATA);
++		dev_dbg(vexpress_sysreg_dev, "read data %x\n",
++				*vexpress_sysreg_config_data);
++		vexpress_sysreg_config_data = NULL;
++	}
++
++	vexpress_config_complete(vexpress_sysreg_config_bridge, err);
 +}
 +
-+static int vexpress_dvi_fb_select(int fb)
++
++void __init vexpress_sysreg_early_init(void __iomem *base)
 +{
-+	int err;
-+	struct fb_info *info = registered_fb[fb];
++	struct device_node *node = of_find_compatible_node(NULL, NULL,
++			"arm,vexpress-sysreg");
 +
-+	if (!info || !lock_fb_info(info))
-+		return -ENODEV;
++	if (node)
++		base = of_iomap(node, 0);
 +
-+	err = vexpress_dvi_mux_set(info);
++	if (WARN_ON(!base))
++		return;
 +
-+	unlock_fb_info(info);
++	vexpress_sysreg_base = base;
 +
-+	return err;
++	if (readl(vexpress_sysreg_base + SYS_MISC) & SYS_MISC_MASTERSITE)
++		vexpress_master_site = VEXPRESS_SITE_DB2;
++	else
++		vexpress_master_site = VEXPRESS_SITE_DB1;
++
++	vexpress_sysreg_config_bridge = vexpress_config_bridge_register(
++			node, &vexpress_sysreg_config_bridge_info);
++	WARN_ON(!vexpress_sysreg_config_bridge);
 +}
 +
-+static ssize_t vexpress_dvi_fb_show(struct device *dev,
++void __init vexpress_sysreg_of_early_init(void)
++{
++	vexpress_sysreg_early_init(NULL);
++}
++
++
++static struct vexpress_sysreg_gpio {
++	unsigned long reg;
++	u32 value;
++} vexpress_sysreg_gpios[] = {
++	[VEXPRESS_GPIO_MMC_CARDIN] = {
++		.reg = SYS_MCI,
++		.value = SYS_MCI_CARDIN,
++	},
++	[VEXPRESS_GPIO_MMC_WPROT] = {
++		.reg = SYS_MCI,
++		.value = SYS_MCI_WPROT,
++	},
++	[VEXPRESS_GPIO_FLASH_WPn] = {
++		.reg = SYS_FLASH,
++		.value = SYS_FLASH_WPn,
++	},
++};
++
++static int vexpress_sysreg_gpio_direction_input(struct gpio_chip *chip,
++				       unsigned offset)
++{
++	return 0;
++}
++
++static int vexpress_sysreg_gpio_direction_output(struct gpio_chip *chip,
++						unsigned offset, int value)
++{
++	return 0;
++}
++
++static int vexpress_sysreg_gpio_get(struct gpio_chip *chip,
++				       unsigned offset)
++{
++	struct vexpress_sysreg_gpio *gpio = &vexpress_sysreg_gpios[offset];
++	u32 reg_value = readl(vexpress_sysreg_base + gpio->reg);
++
++	return !!(reg_value & gpio->value);
++}
++
++static void vexpress_sysreg_gpio_set(struct gpio_chip *chip,
++				       unsigned offset, int value)
++{
++	struct vexpress_sysreg_gpio *gpio = &vexpress_sysreg_gpios[offset];
++	u32 reg_value = readl(vexpress_sysreg_base + gpio->reg);
++
++	if (value)
++		reg_value |= gpio->value;
++	else
++		reg_value &= ~gpio->value;
++
++	writel(reg_value, vexpress_sysreg_base + gpio->reg);
++}
++
++static struct gpio_chip vexpress_sysreg_gpio_chip = {
++	.label = "vexpress-sysreg",
++	.direction_input = vexpress_sysreg_gpio_direction_input,
++	.direction_output = vexpress_sysreg_gpio_direction_output,
++	.get = vexpress_sysreg_gpio_get,
++	.set = vexpress_sysreg_gpio_set,
++	.ngpio = ARRAY_SIZE(vexpress_sysreg_gpios),
++	.base = 0,
++};
++
++
++static ssize_t vexpress_sysreg_sys_id_show(struct device *dev,
 +		struct device_attribute *attr, char *buf)
 +{
-+	return sprintf(buf, "%d\n", vexpress_dvi_fb);
++	return sprintf(buf, "0x%08x\n", readl(vexpress_sysreg_base + SYS_ID));
 +}
 +
-+static ssize_t vexpress_dvi_fb_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
++DEVICE_ATTR(sys_id, S_IRUGO, vexpress_sysreg_sys_id_show, NULL);
++
++static int __devinit vexpress_sysreg_probe(struct platform_device *pdev)
 +{
-+	long value;
-+	int err = kstrtol(buf, 0, &value);
++	int err;
++	struct resource *res = platform_get_resource(pdev,
++			IORESOURCE_MEM, 0);
 +
-+	if (!err)
-+		err = vexpress_dvi_fb_select(value);
-+
-+	return err ? err : count;
-+}
-+
-+DEVICE_ATTR(fb, S_IRUGO | S_IWUSR, vexpress_dvi_fb_show,
-+		vexpress_dvi_fb_store);
-+
-+
-+static int vexpress_dvi_fb_event_notify(struct notifier_block *self,
-+			      unsigned long action, void *data)
-+{
-+	struct fb_event *event = data;
-+	struct fb_info *info = event->info;
-+	struct fb_videomode *mode = event->data;
-+
-+	switch (action) {
-+	case FB_EVENT_FB_REGISTERED:
-+		if (vexpress_dvi_fb < 0)
-+			vexpress_dvi_mux_set(info);
-+		break;
-+	case FB_EVENT_MODE_CHANGE:
-+	case FB_EVENT_MODE_CHANGE_ALL:
-+		if (info->node == vexpress_dvi_fb)
-+			vexpress_dvi_mode_set(info, mode->xres, mode->yres);
-+		break;
++	if (!devm_request_mem_region(&pdev->dev, res->start,
++			resource_size(res), pdev->name)) {
++		dev_err(&pdev->dev, "Failed to request memory region!\n");
++		return -EBUSY;
 +	}
 +
-+	return NOTIFY_OK;
-+}
++	if (!vexpress_sysreg_base)
++		vexpress_sysreg_base = devm_ioremap(&pdev->dev, res->start,
++				resource_size(res));
 +
-+static struct notifier_block vexpress_dvi_fb_notifier = {
-+	.notifier_call = vexpress_dvi_fb_event_notify,
-+};
-+
-+
-+enum vexpress_dvi_func { FUNC_MUXFPGA, FUNC_DVIMODE };
-+
-+static struct of_device_id vexpress_dvi_of_match[] = {
-+	{
-+		.compatible = "arm,vexpress-muxfpga",
-+		.data = (void *)FUNC_MUXFPGA,
-+	}, {
-+		.compatible = "arm,vexpress-dvimode",
-+		.data = (void *)FUNC_DVIMODE,
-+	},
-+	{}
-+};
-+
-+static int vexpress_dvi_probe(struct platform_device *pdev)
-+{
-+	enum vexpress_dvi_func func;
-+	const struct of_device_id *match =
-+			of_match_device(vexpress_dvi_of_match, &pdev->dev);
-+
-+	if (match)
-+		func = (enum vexpress_dvi_func)match->data;
-+	else
-+		func = pdev->id_entry->driver_data;
-+
-+	switch (func) {
-+	case FUNC_MUXFPGA:
-+		vexpress_muxfpga_func =
-+				vexpress_config_func_get_by_dev(&pdev->dev);
-+		device_create_file(&pdev->dev, &dev_attr_fb);
-+		break;
-+	case FUNC_DVIMODE:
-+		vexpress_dvimode_func =
-+				vexpress_config_func_get_by_dev(&pdev->dev);
-+		break;
++	if (!vexpress_sysreg_base) {
++		dev_err(&pdev->dev, "Failed to obtain base address!\n");
++		return -EFAULT;
 +	}
 +
-+	if (vexpress_muxfpga_func && vexpress_dvimode_func) {
-+		fb_register_client(&vexpress_dvi_fb_notifier);
-+		vexpress_dvi_fb_select(0);
++	setup_timer(&vexpress_sysreg_config_timer,
++			vexpress_sysreg_config_complete, 0);
++
++	vexpress_sysreg_gpio_chip.dev = &pdev->dev;
++	err = gpiochip_add(&vexpress_sysreg_gpio_chip);
++	if (err) {
++		vexpress_config_bridge_unregister(
++				vexpress_sysreg_config_bridge);
++		dev_err(&pdev->dev, "Failed to register GPIO chip! (%d)\n",
++				err);
++		return err;
 +	}
++
++	vexpress_sysreg_dev = &pdev->dev;
++
++	device_create_file(vexpress_sysreg_dev, &dev_attr_sys_id);
 +
 +	return 0;
 +}
 +
-+static const struct platform_device_id vexpress_dvi_id_table[] = {
-+	{ .name = "vexpress-muxfpga", .driver_data = FUNC_MUXFPGA, },
-+	{ .name = "vexpress-dvimode", .driver_data = FUNC_DVIMODE, },
-+	{}
++static const struct of_device_id vexpress_sysreg_match[] = {
++	{ .compatible = "arm,vexpress-sysreg", },
++	{},
 +};
 +
-+static struct platform_driver vexpress_dvi_driver = {
-+	.probe = vexpress_dvi_probe,
++static struct platform_driver vexpress_sysreg_driver = {
 +	.driver = {
-+		.name = "vexpress-dvi",
-+		.of_match_table = vexpress_dvi_of_match,
++		.name = "vexpress-sysreg",
++		.of_match_table = vexpress_sysreg_match,
 +	},
-+	.id_table = vexpress_dvi_id_table,
++	.probe = vexpress_sysreg_probe,
 +};
 +
-+static int __init vexpress_dvi_init(void)
++static int __init vexpress_sysreg_init(void)
 +{
-+	return platform_driver_register(&vexpress_dvi_driver);
++	return platform_driver_register(&vexpress_sysreg_driver);
 +}
-+device_initcall(vexpress_dvi_init);
++core_initcall(vexpress_sysreg_init);
++
++
++struct vexpress_sysreg_led {
++	u32 mask;
++	struct led_classdev cdev;
++} vexpress_sysreg_leds[] = {
++	{ .mask = 1 << 0, .cdev.name = "v2m:green:user1",
++			.cdev.default_trigger = "heartbeat", },
++	{ .mask = 1 << 1, .cdev.name = "v2m:green:user2",
++			.cdev.default_trigger = "mmc0", },
++	{ .mask = 1 << 2, .cdev.name = "v2m:green:user3", },
++	{ .mask = 1 << 3, .cdev.name = "v2m:green:user4", },
++	{ .mask = 1 << 4, .cdev.name = "v2m:green:user5", },
++	{ .mask = 1 << 5, .cdev.name = "v2m:green:user6", },
++	{ .mask = 1 << 6, .cdev.name = "v2m:green:user7", },
++	{ .mask = 1 << 7, .cdev.name = "v2m:green:user8", },
++};
++
++static DEFINE_SPINLOCK(vexpress_sysreg_leds_lock);
++
++static void vexpress_sysreg_led_brightness_set(struct led_classdev *cdev,
++		enum led_brightness brightness)
++{
++	struct vexpress_sysreg_led *led = container_of(cdev,
++			struct vexpress_sysreg_led, cdev);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(&vexpress_sysreg_leds_lock, flags);
++
++	val = readl(vexpress_sysreg_base + SYS_LED);
++	if (brightness == LED_OFF)
++		val &= ~led->mask;
++	else
++		val |= led->mask;
++	writel(val, vexpress_sysreg_base + SYS_LED);
++
++	spin_unlock_irqrestore(&vexpress_sysreg_leds_lock, flags);
++}
++
++static int __init vexpress_sysreg_init_leds(void)
++{
++	struct vexpress_sysreg_led *led;
++	int i;
++
++	/* Clear all user LEDs */
++	writel(0, vexpress_sysreg_base + SYS_LED);
++
++	for (i = 0, led = vexpress_sysreg_leds;
++			i < ARRAY_SIZE(vexpress_sysreg_leds); i++, led++) {
++		int err;
++
++		led->cdev.brightness_set = vexpress_sysreg_led_brightness_set;
++		err = led_classdev_register(vexpress_sysreg_dev, &led->cdev);
++		if (err) {
++			dev_err(vexpress_sysreg_dev,
++					"Failed to register LED %d! (%d)\n",
++					i, err);
++			while (led--, i--)
++				led_classdev_unregister(&led->cdev);
++			return err;
++		}
++	}
++
++	return 0;
++}
++device_initcall(vexpress_sysreg_init_leds);
+diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
+index b4acb20..8ed285c 100644
+--- a/include/linux/vexpress.h
++++ b/include/linux/vexpress.h
+@@ -24,6 +24,17 @@
+ #define VEXPRESS_CONFIG_EXEC_DONE	0
+ #define VEXPRESS_CONFIG_EXEC_WAIT	1
+ 
++#define VEXPRESS_GPIO_MMC_CARDIN	0
++#define VEXPRESS_GPIO_MMC_WPROT		1
++#define VEXPRESS_GPIO_FLASH_WPn		2
++
++#define VEXPRESS_RES_FUNC(_site, _func)	\
++{					\
++	.start = (_site),		\
++	.end = (_func),			\
++	.flags = IORESOURCE_BUS,	\
++}
++
+ /* Config bridge API */
+ 
+ struct vexpress_config_bridge_info {
+@@ -61,4 +72,18 @@ int vexpress_config_read(struct vexpress_config_func *func, int offset,
+ int vexpress_config_write(struct vexpress_config_func *func, int offset,
+ 		u32 data);
+ 
++/* Platform control */
++
++u32 vexpress_get_procid(int site);
++u32 vexpress_get_hbi(int site);
++void *vexpress_get_24mhz_clock_base(void);
++void vexpress_flags_set(u32 data);
++
++#define vexpress_get_site_by_node(node) __vexpress_get_site(NULL, node)
++#define vexpress_get_site_by_dev(dev) __vexpress_get_site(dev, NULL)
++unsigned __vexpress_get_site(struct device *dev, struct device_node *node);
++
++void vexpress_sysreg_early_init(void __iomem *base);
++void vexpress_sysreg_of_early_init(void);
++
+ #endif
 -- 
 1.7.9.5
