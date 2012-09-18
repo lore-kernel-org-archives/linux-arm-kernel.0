@@ -1,39 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Sep 2012 09:49:39 +0800
-Subject: [PATCH 26/34] media: mx2_camera: remove dead code in
- mx2_camera_add_device
-In-Reply-To: <Pine.LNX.4.64.1209171017460.1689@axis700.grange>
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <1347860103-4141-27-git-send-email-shawn.guo@linaro.org>
- <Pine.LNX.4.64.1209171017460.1689@axis700.grange>
-Message-ID: <20120918014936.GG1338@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Sep 2012 10:54:16 +0900
+Subject: [PATCH 0/2] ARM; shmobile: kzm9g: enable sensors on the board
+Message-ID: <1347933258-4372-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 10:18:42AM +0200, Guennadi Liakhovetski wrote:
-> Hi Shawn
-> 
-> Thanks for the clean up. Would you like these patches to go via a single 
-> tree, presumably, arm-soc? In this case
-> 
-Yes, to save the cross-tree dependency, I would like to have the series
-go via arm-soc tree as a whole.
+This is a forward of a short patch series by Tetsuyuki Kobayashi
+to linux-arm-kernel in preparation for a future pull request.
 
-> On Mon, 17 Sep 2012, Shawn Guo wrote:
-> 
-> > This is a piece of code becoming dead since commit 2c9ba37 ([media]
-> > V4L: mx2_camera: remove unsupported i.MX27 DMA mode, make EMMA
-> > mandatory).  It should have been removed together with the commit.
-> > Remove it now.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Cc: linux-media at vger.kernel.org
-> 
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-Thanks, Guennadi.
+----------------------------------------------------------------
+KZM-A9-GT board (kzm9g) has 2 sensor chip on the board.
+ - magnetometer AK8975
+ - three-axis digital accelerometer ADXL345
+This patch registers device driver and assign I2C slave address and IRQ.
+
+Tetsuyuki Kobayashi (2):
+  ARM: shmobile: kzm9g: enable magnetometer ak8975.
+  ARM: shmobile: kzm9g: enable three-axis digital accelerometer ADXL345
+
+ arch/arm/configs/kzm9g_defconfig     |    4 ++++
+ arch/arm/mach-shmobile/board-kzm9g.c |   10 +++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
 -- 
-Regards,
-Shawn
+1.7.9.5
