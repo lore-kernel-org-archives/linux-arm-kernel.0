@@ -1,38 +1,29 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 18 Sep 2012 07:35:43 +0000
-Subject: [PATCH v3 4/4] ARM: dts: AM33XX: Add lis331dlh device tree data
- to am335x-evm
-In-Reply-To: <20120917153559.e07ca263.akpm@linux-foundation.org>
-References: <1347866602-2088-1-git-send-email-anilkumar@ti.com>
- <1347866602-2088-5-git-send-email-anilkumar@ti.com>
- <20120917153559.e07ca263.akpm@linux-foundation.org>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA32D69@DBDE01.ent.ti.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 18 Sep 2012 16:37:41 +0900
+Subject: [PATCH 19/24] sh: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-20-git-send-email-arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-20-git-send-email-arnd@arndb.de>
+Message-ID: <20120918073741.GN13568@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Tue, Sep 18, 2012 at 04:05:59, Andrew Morton wrote:
-> On Mon, 17 Sep 2012 12:53:22 +0530
-> AnilKumar Ch <anilkumar@ti.com> wrote:
+On Fri, Sep 14, 2012 at 11:34:47PM +0200, Arnd Bergmann wrote:
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
 > 
-> > Add lis331dlh device tree data to am335x-evm.dts. In AM335x EVM
-> > lis331dlh accelerometer is connected to I2C2 bus. So this patch
-> > change the status of I2C2 node to "okay" to use I2C2 bus. Also
-> > added all the required platform data to am335x-evm.
-> > 
-> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> > ---
-> >  arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
+> I'm not completely sure about this patch, and it will
+> probably require some arch/sh changes to go along with it,
+> but it's clear that something has to be done to avoid
+> getting hundreds of new warnings on each shmobile build
+> in v3.7.
+> Please see this as a prototype.
 > 
-> Your arch/arm/boot/dts/am335x-evm.dts differs significantly from the
-> one in linux-next (it should not do so), so I didn't do anything with
-> this patch.
-> 
+I have no intention of making this change for arch/sh.
 
-Thanks for pushing remaining patches.
-
-ACK from the reviewers(Arnd) will help to include in linux-omap branch.
-
-Thanks
-AnilKumar
+The __raw variants already accept both __iomem pointers and integer
+addresses, which was largely intentional. New code could use the __iomem
+annotations while older code could continue to use the integer addresses
+without issue. If you wish to go through the kernel and audit every
+single __raw user, you're certainly welcome to, but until then such a
+change is premature.
