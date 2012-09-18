@@ -1,114 +1,76 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Sep 2012 21:43:55 -0500
-Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for
- clean and flush range
-In-Reply-To: <20120917214732.GR12245@n2100.arm.linux.org.uk>
-References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
- <1347890398-22088-1-git-send-email-robherring2@gmail.com>
- <20120917194733.GQ12245@n2100.arm.linux.org.uk> <5057881A.9020604@gmail.com>
- <20120917214732.GR12245@n2100.arm.linux.org.uk>
-Message-ID: <5057DFEB.40101@gmail.com>
+Date: Mon, 17 Sep 2012 21:59:01 -0500
+Subject: [PATCH v5 06/17] docs: Xen ARM DT bindings
+In-Reply-To: <1347903543-2135-6-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
+ <1347903543-2135-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <5057E375.2050103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2012 04:47 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 17, 2012 at 03:29:14PM -0500, Rob Herring wrote:
->> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
->>> (a) you're not describing hardware, you're describing a feature of the
->>>     Linux kernel's implementation - no, you're describing a configuration
->>>     feature of the kernel.  This should not be in DT.
->>> (b) you're disabling the optimization to avoid doing a lengthy line-by-line
->>>     cache operation when the size is larger than the cache size, and trading
->>>     it for possibly slightly quicker accesses.
->>>
->>> The problem I have with this is it's likely that you've only looked at
->>> "oh, this makes IO accesses faster" and not the total picture wrt the
->>> effect on time taken by the DMA API.
->>
->> I could easily "fix" this in the xgmac driver by using __raw_writel or
->> writel_relaxed, but that would break non-coherent operation which does
->> need the L2 cache barriers.
+On 09/17/2012 12:38 PM, Stefano Stabellini wrote:
+> Add a doc to describe the Xen ARM device tree bindings
 > 
-> Note that in many cases, drivers do not need a barrier before every write
-> or after every read operation.
 > 
-> In terms of L2 coherency, the only time that L2 actually needs to be
-> touched is when your MMIO access provokes the device to read from memory.
-> Most accesses do not.
-
-Agreed. The current approach is a bit of a sledge hammer for relatively
-few places that need it.
-
-> The solution - using the relaxed MMIO accessors, not fiddling around
-> with the L2 cache code.
-
-I have done that in critical paths as well. As I explained in my
-response to Catalin, too many barriers is not my problem. The network
-transmit path is a single writel and one explicit wmb already. Using
-relaxed accessors will only make both wmb's explicit. I still need them
-at least for the L1 in the coherent case. Even if I'm coherent, I still
-have to ensure the order the DMA descriptors are written and the order
-of DMA descriptor writes with the DMA poll register write. But there are
-not any universal L1 only barriers.
-
-The sequence is like this:
-Write out N DMA descriptors
-barrier
-Write 1st DMA descriptor's ready bit
-barrier
-Write DMA poll register
-
-For non-coherent, the barrier needs to be a dsb and L2 sync. For
-coherent, this only really needs to be a dsb. Removal of the spinlock is
-enough to make the L2 sync a don't care.
-
-> However, there's an in-built problem here - which I'm told of by PowerPC
-> folk.  Apparantly, Linus refuses to accept that anyone needs relaxed MMIO
-> accessors and essentially says "all platforms must behave like x86 does".
-> I don't actually know Linus' real position, or what his position would be
-> if he new that without relaxed accessors, we have to do a very time
-> consuming operation...  It might be worth broaching the subject of true
-> relaxed MMIO accessors again.
+> Changes in v5:
 > 
-> The only issue with that approach is getting people who don't have the
-> problem (iow, x86 driver authors) to understand this issue - and that's
-> where I absolutely agree with Linus' apparant position...
-
-Also, how much of this knowledge should be in the driver? While I really
-don't care if the xgmac driver works in non-coherent mode, that's
-clearly not going to be acceptable. Differences between coherent or
-non-coherent need to stay abstracted out of the drivers.
-
-> A better solution than relaxed IO accessors maybe a barrier, but don't
-> call it that.  Maybe call it "pre_dma();" and "post_dma();" - that way
-> people won't get bogged down in barrier terminology or whatever.  They
-> just call "pre_dma();" before they write to a register which provokes
-> DMA, and "post_dma();" before they read from a register to get DMA
-> status.  What platforms do for each of those calls is up to them, and
-> whether platforms use relaxed MMIO accessors becomes their choice too.
-
-If pre_dma() still calls l2x0 cache sync which takes a spinlock, then
-I'm back to the same problem.
-
-These would need to be per device as well. Perhaps it could be part of
-the DMA mapping API ops.
-
-Rob
-
-> Another but - we have a hell of a lot of drivers... and existing
-> accessors must work as per x86...
+> - add a comment about the size of the grant table memory region;
+> - add a comment about the required presence of a GIC node;
+> - specify that the described properties are part of a top-level
+> "hypervisor" node;
+> - specify #address-cells and #size-cells for the example.
 > 
->> It's not without precedence, but you are right that it is a questionable
->> use of DT. I'm open to suggestions of how you would expose this
->> configuration to platforms. We obviously don't want a compile time
->> option. Some options:
->>
->> - Add a flags param to l2x0_of_init to configure it
->> - Add non-background version of functions and override the function ptrs
->> in platform code.
->> - Add a new call to configure l2 settings like this.
->> - Expose the use_background_ops variable directly
 > 
-> - command line setting which is available to everyone whether they're using
-> DT or not.
+> Changes in v4:
+> 
+> - "xen,xen" should be last as it is less specific;
+> - update reg property using 2 address-cells and 2 size-cells.
+> 
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: devicetree-discuss at lists.ozlabs.org
+> CC: David Vrabel <david.vrabel@citrix.com>
+> CC: Rob Herring <robherring2@gmail.com>
+> CC: Dave Martin <dave.martin@linaro.org>
+
+This is so minimal now and it doesn't seem to have any overlap with kvm, so:
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+> ---
+>  Documentation/devicetree/bindings/arm/xen.txt |   25 +++++++++++++++++++++++++
+>  1 files changed, 25 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/xen.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> new file mode 100644
+> index 0000000..0f7b9c2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> @@ -0,0 +1,25 @@
+> +* Xen hypervisor device tree bindings
+> +
+> +Xen ARM virtual platforms shall have a top-level "hypervisor" node with
+> +the following properties:
+> +
+> +- compatible:
+> +	compatible = "xen,xen-<version>", "xen,xen";
+> +  where <version> is the version of the Xen ABI of the platform.
+> +
+> +- reg: specifies the base physical address and size of a region in
+> +  memory where the grant table should be mapped to, using an
+> +  HYPERVISOR_memory_op hypercall. The memory region is large enough to map
+> +  the whole grant table (it is larger or equal to gnttab_max_grant_frames()).
+> +
+> +- interrupts: the interrupt used by Xen to inject event notifications.
+> +  A GIC node is also required.
+> +
+> +
+> +Example (assuming #address-cells = <2> and #size-cells = <2>):
+> +
+> +hypervisor {
+> +	compatible = "xen,xen-4.3", "xen,xen";
+> +	reg = <0 0xb0000000 0 0x20000>;
+> +	interrupts = <1 15 0xf08>;
+> +};
 > 
