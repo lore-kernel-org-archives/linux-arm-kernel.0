@@ -1,32 +1,78 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:51 +0100
-Subject: [PATCH v2 09/13] ARM: vexpress: Reset driver
+Date: Tue, 18 Sep 2012 15:17:48 +0100
+Subject: [PATCH v2 06/13] clk: Common clocks implementation for Versatile
+ Express
 In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1347977875-16855-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-7-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a simple driver providing platform restart and power off
-functions using VE config infrastructure.
-
-By writing to the "active" attribute of the reboot or reset device,
-user can decide what if the platform is supposed to execute full power
-cycle (reboot, default) or simply assert system level reset signal.
+This patch adds a DT and non-DT based implementation of
+the common clock infrastructure for Versatile Express
+platform. It registers (statically or using DT) all
+required fixed clocks, initialises motherboard's SP810
+cell (that provides clocks for SP804 timers) and
+explicitly registers VE "osc" driver, to make the
+clock generators available early.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/reset.c |  141 ++++++++++++++++++++++++++++++++++++++++
- include/linux/vexpress.h       |    3 +
- 2 files changed, 144 insertions(+)
- create mode 100644 arch/arm/mach-vexpress/reset.c
+ arch/arm/include/asm/hardware/sp810.h |    2 +
+ drivers/clk/Kconfig                   |    8 +-
+ drivers/clk/versatile/Makefile        |    1 +
+ drivers/clk/versatile/clk-vexpress.c  |  142 +++++++++++++++++++++++++++++++++
+ 4 files changed, 150 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/clk/versatile/clk-vexpress.c
 
-diff --git a/arch/arm/mach-vexpress/reset.c b/arch/arm/mach-vexpress/reset.c
+diff --git a/arch/arm/include/asm/hardware/sp810.h b/arch/arm/include/asm/hardware/sp810.h
+index 6b9b077..afd7e91 100644
+--- a/arch/arm/include/asm/hardware/sp810.h
++++ b/arch/arm/include/asm/hardware/sp810.h
+@@ -56,6 +56,8 @@
+ #define SCCTRL_TIMEREN1SEL_REFCLK	(0 << 17)
+ #define SCCTRL_TIMEREN1SEL_TIMCLK	(1 << 17)
+ 
++#define SCCTRL_TIMERENnSEL_SHIFT(n)	(15 + ((n) * 2))
++
+ static inline void sysctl_soft_reset(void __iomem *base)
+ {
+ 	/* switch to slow mode */
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 89b726d..3e4eda2 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -42,9 +42,11 @@ config COMMON_CLK_WM831X
+ 
+ config COMMON_CLK_VERSATILE
+ 	tristate "Clock driver for ARM Reference designs"
+-	depends on ARCH_INTEGRATOR || ARCH_REALVIEW
++	depends on ARCH_INTEGRATOR || ARCH_REALVIEW || ARCH_VEXPRESS
+ 	---help---
+-          Supports clocking on ARM Reference designs Integrator/AP,
+-	  Integrator/CP, RealView PB1176, EB, PB11MP and PBX.
++          Supports clocking on ARM Reference designs:
++	  - Integrator/AP and Integrator/CP
++	  - RealView PB1176, EB, PB11MP and PBX
++	  - Versatile Express
+ 
+ endmenu
+diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
+index 1e49a7a..c776053 100644
+--- a/drivers/clk/versatile/Makefile
++++ b/drivers/clk/versatile/Makefile
+@@ -2,4 +2,5 @@
+ obj-$(CONFIG_ICST)		+= clk-icst.o
+ obj-$(CONFIG_ARCH_INTEGRATOR)	+= clk-integrator.o
+ obj-$(CONFIG_ARCH_REALVIEW)	+= clk-realview.o
++obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= clk-vexpress-osc.o
+diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
 new file mode 100644
-index 0000000..465923a
+index 0000000..c742ac7
 --- /dev/null
-+++ b/arch/arm/mach-vexpress/reset.c
-@@ -0,0 +1,141 @@
++++ b/drivers/clk/versatile/clk-vexpress.c
+@@ -0,0 +1,142 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -40,145 +86,134 @@ index 0000000..465923a
 + * Copyright (C) 2012 ARM Limited
 + */
 +
-+#include <linux/jiffies.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/stat.h>
++#include <linux/of_address.h>
 +#include <linux/vexpress.h>
 +
-+static void vexpress_reset_do(struct device *dev, const char *what)
++#include <asm/hardware/sp810.h>
++
++static struct clk *vexpress_sp810_timerclken[4];
++static DEFINE_SPINLOCK(vexpress_sp810_lock);
++
++static void __init vexpress_sp810_init(void __iomem *base)
 +{
-+	int err = -ENOENT;
-+	struct vexpress_config_func *func =
-+			vexpress_config_func_get_by_dev(dev);
++	int i;
 +
-+	if (func) {
-+		unsigned long timeout;
++	if (WARN_ON(!base))
++		return;
 +
-+		err = vexpress_config_write(func, 0, 0);
++	for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++) {
++		char name[12];
++		const char *parents[] = {
++			"v2m:refclk32khz", /* REFCLK */
++			"v2m:refclk1mhz" /* TIMCLK */
++		};
 +
-+		timeout = jiffies + HZ;
-+		while (time_before(jiffies, timeout))
-+			cpu_relax();
++		snprintf(name, ARRAY_SIZE(name), "timerclken%d", i);
++
++		vexpress_sp810_timerclken[i] = clk_register_mux(NULL, name,
++				parents, 2, 0, base + SCCTRL,
++				SCCTRL_TIMERENnSEL_SHIFT(i), 1,
++				0, &vexpress_sp810_lock);
++
++		if (WARN_ON(IS_ERR(vexpress_sp810_timerclken[i])))
++			break;
++	}
++}
++
++
++static const char * const vexpress_clk_24mhz_periphs[] __initconst = {
++	"mb:uart0", "mb:uart1", "mb:uart2", "mb:uart3",
++	"mb:mmci", "mb:kmi0", "mb:kmi1"
++};
++
++void __init vexpress_clk_init(void __iomem *sp810_base)
++{
++	struct clk *clk;
++	int i;
++
++	clk = clk_register_fixed_rate(NULL, "dummy_apb_pclk", NULL,
++			CLK_IS_ROOT, 0);
++	WARN_ON(clk_register_clkdev(clk, "apb_pclk", NULL));
++
++	clk = clk_register_fixed_rate(NULL, "v2m:clk_24mhz", NULL,
++			CLK_IS_ROOT, 24000000);
++	for (i = 0; i < ARRAY_SIZE(vexpress_clk_24mhz_periphs); i++)
++		WARN_ON(clk_register_clkdev(clk, NULL,
++				vexpress_clk_24mhz_periphs[i]));
++
++	clk = clk_register_fixed_rate(NULL, "v2m:refclk32khz", NULL,
++			CLK_IS_ROOT, 32768);
++	WARN_ON(clk_register_clkdev(clk, NULL, "v2m:wdt"));
++
++	clk = clk_register_fixed_rate(NULL, "v2m:refclk1mhz", NULL,
++			CLK_IS_ROOT, 1000000);
++
++	vexpress_sp810_init(sp810_base);
++
++	for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++)
++		WARN_ON(clk_set_parent(vexpress_sp810_timerclken[i], clk));
++
++	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[0],
++				"v2m-timer0", "sp804"));
++	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[1],
++				"v2m-timer1", "sp804"));
++}
++
++#if defined(CONFIG_OF)
++
++struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
++{
++	if (WARN_ON(clkspec->args_count != 1 || clkspec->args[0] >
++			ARRAY_SIZE(vexpress_sp810_timerclken)))
++		return NULL;
++
++	return vexpress_sp810_timerclken[clkspec->args[0]];
++}
++
++static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
++	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
++	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
++	{}
++};
++
++void __init vexpress_clk_of_init(void)
++{
++	struct device_node *node;
++	struct clk *clk;
++	struct clk *refclk, *timclk;
++
++	of_clk_init(vexpress_fixed_clk_match);
++
++	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
++	vexpress_sp810_init(of_iomap(node, 0));
++	of_clk_add_provider(node, vexpress_sp810_of_get, NULL);
++
++	/* Select "better" (faster) parent for SP804 timers */
++	refclk = of_clk_get_by_name(node, "refclk");
++	timclk = of_clk_get_by_name(node, "timclk");
++	if (!WARN_ON(IS_ERR(refclk) || IS_ERR(timclk))) {
++		int i = 0;
++
++		if (clk_get_rate(refclk) > clk_get_rate(timclk))
++			clk = refclk;
++		else
++			clk = timclk;
++
++		for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++)
++			WARN_ON(clk_set_parent(vexpress_sp810_timerclken[i],
++					clk));
 +	}
 +
-+	dev_emerg(dev, "Unable to %s (%d)\n", what, err);
++	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[0],
++				"v2m-timer0", "sp804"));
++	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[1],
++				"v2m-timer1", "sp804"));
 +}
 +
-+static struct device *vexpress_power_off_device;
-+
-+void vexpress_power_off(void)
-+{
-+	vexpress_reset_do(vexpress_power_off_device, "power off");
-+}
-+
-+static struct device *vexpress_restart_device;
-+
-+void vexpress_restart(char str, const char *cmd)
-+{
-+	vexpress_reset_do(vexpress_restart_device, "restart");
-+}
-+
-+static ssize_t vexpress_reset_active_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	return sprintf(buf, "%d\n", vexpress_restart_device == dev);
-+}
-+
-+static ssize_t vexpress_reset_active_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	long value;
-+	int err = kstrtol(buf, 0, &value);
-+
-+	if (!err && value)
-+		vexpress_restart_device = dev;
-+
-+	return err ? err : count;
-+}
-+
-+DEVICE_ATTR(active, S_IRUGO | S_IWUSR, vexpress_reset_active_show,
-+		vexpress_reset_active_store);
-+
-+
-+enum vexpress_reset_func { FUNC_RESET, FUNC_SHUTDOWN, FUNC_REBOOT };
-+
-+static struct of_device_id vexpress_reset_of_match[] = {
-+	{
-+		.compatible = "arm,vexpress-reset",
-+		.data = (void *)FUNC_RESET,
-+	}, {
-+		.compatible = "arm,vexpress-shutdown",
-+		.data = (void *)FUNC_SHUTDOWN
-+	}, {
-+		.compatible = "arm,vexpress-reboot",
-+		.data = (void *)FUNC_REBOOT
-+	},
-+	{}
-+};
-+
-+static int vexpress_reset_probe(struct platform_device *pdev)
-+{
-+	enum vexpress_reset_func func;
-+	const struct of_device_id *match =
-+			of_match_device(vexpress_reset_of_match, &pdev->dev);
-+
-+	if (match)
-+		func = (enum vexpress_reset_func)match->data;
-+	else
-+		func = pdev->id_entry->driver_data;
-+
-+	switch (func) {
-+	case FUNC_SHUTDOWN:
-+		vexpress_power_off_device = &pdev->dev;
-+		break;
-+	case FUNC_RESET:
-+		if (!vexpress_restart_device)
-+			vexpress_restart_device = &pdev->dev;
-+		device_create_file(&pdev->dev, &dev_attr_active);
-+		break;
-+	case FUNC_REBOOT:
-+		vexpress_restart_device = &pdev->dev;
-+		device_create_file(&pdev->dev, &dev_attr_active);
-+		break;
-+	};
-+
-+	return 0;
-+}
-+
-+static const struct platform_device_id vexpress_reset_id_table[] = {
-+	{ .name = "vexpress-reset", .driver_data = FUNC_RESET, },
-+	{ .name = "vexpress-shutdown", .driver_data = FUNC_SHUTDOWN, },
-+	{ .name = "vexpress-reboot", .driver_data = FUNC_REBOOT, },
-+	{}
-+};
-+
-+static struct platform_driver vexpress_reset_driver = {
-+	.probe = vexpress_reset_probe,
-+	.driver = {
-+		.name = "vexpress-reset",
-+		.of_match_table = vexpress_reset_of_match,
-+	},
-+	.id_table = vexpress_reset_id_table,
-+};
-+
-+static int __init vexpress_reset_init(void)
-+{
-+	return platform_driver_register(&vexpress_reset_driver);
-+}
-+device_initcall(vexpress_reset_init);
-diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
-index 8ed285c..8423083 100644
---- a/include/linux/vexpress.h
-+++ b/include/linux/vexpress.h
-@@ -86,4 +86,7 @@ unsigned __vexpress_get_site(struct device *dev, struct device_node *node);
- void vexpress_sysreg_early_init(void __iomem *base);
- void vexpress_sysreg_of_early_init(void);
- 
-+void vexpress_power_off(void);
-+void vexpress_restart(char str, const char *cmd);
-+
- #endif
++#endif
 -- 
 1.7.9.5
