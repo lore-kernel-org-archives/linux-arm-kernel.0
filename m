@@ -1,192 +1,46 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Sep 2012 11:53:16 +0300
-Subject: [PATCH 7/8] ARM: OMAP: convert I2C driver to PM QoS for latency
- constraints
-In-Reply-To: <1347958332-2205-8-git-send-email-j-pihet@ti.com>
-References: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
- <1347958332-2205-8-git-send-email-j-pihet@ti.com>
-Message-ID: <20120918085314.GB22993@arwen.pp.htv.fi>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Tue, 18 Sep 2012 14:30:10 +0530
+Subject: [PATCH v2 04/15] dmaengine: Pass no_wakeup parameter via
+ device_prep_dma_cyclic() callback
+In-Reply-To: <20120918083146.GE12445@n2100.arm.linux.org.uk>
+References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347543485-339-5-git-send-email-peter.ujfalusi@ti.com>
+ <CACRpkdYAxFzPAZgMsdj9C3YVLzMc_w41Xs0SiqX-1DWaZqxAdw@mail.gmail.com>
+ <20120918083146.GE12445@n2100.arm.linux.org.uk>
+Message-ID: <1347958810.1943.176.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Sep 18, 2012 at 10:52:11AM +0200, Jean Pihet wrote:
-> Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
-> API to the new PM QoS API.
-> Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
-> class of PM QoS. The resulting MPU constraints are used by cpuidle to
-> decide the next power state of the MPU subsystem.
+On Tue, 2012-09-18 at 09:31 +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 17, 2012 at 11:01:23AM +0200, Linus Walleij wrote:
+> > On Thu, Sep 13, 2012 at 3:37 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> > 
+> > > Change the parameter list of device_prep_dma_cyclic() so the DMA drivers
+> > > can receive the no_wakeup request coming from client drivers.
+> > > This feature can be used during audio operation to disable all audio
+> > > related interrupts.
+> > >
+> > > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > > CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > CC: Barry Song <baohua.song@csr.com>
+> > > CC: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> > > CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > > CC: Vista Silicon <javier.martin@vista-silicon.com>
+> > > CC: Zhangfei Gao <zhangfei.gao@marvell.com>
+> > > CC: Shawn Guo <shawn.guo@linaro.org>
+> > > CC: Laxman Dewangan <ldewangan@nvidia.com>
+> > 
+> > After some discussion with clever people I know I have come to the conclusion
+> > that this is a good idea, so:
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> The I2C device latency timing is derived from the FIFO size and the
-> clock speed and so is applicable to all OMAP SoCs.
+> NAKed-by: me
 > 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> If you look at the other sub-threads of the patch you're acking, you'll
+> notice that there's a v3 of this patch set which changes the way this is
+> done.
+Was it a genuine mistake, think v3 reply v2? Or less caffeine..... :)
 
-this needs to be rebased on top of Wolfram's i2c-next branch which has a
-big series of patches on top of the i2c driver.
-
-Also, please keep Shubhro in Cc for any i2c and spi patches ;-)
-
-> ---
->  arch/arm/plat-omap/i2c.c      |   21 ---------------------
->  drivers/i2c/busses/i2c-omap.c |   28 +++++++++++++++++-----------
->  include/linux/i2c-omap.h      |    1 -
->  3 files changed, 17 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-> index db071bc..dba8338 100644
-> --- a/arch/arm/plat-omap/i2c.c
-> +++ b/arch/arm/plat-omap/i2c.c
-> @@ -26,7 +26,6 @@
->  #include <linux/kernel.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
-> -#include <linux/i2c-omap.h>
->  #include <linux/slab.h>
->  #include <linux/err.h>
->  #include <linux/clk.h>
-> @@ -34,7 +33,6 @@
->  #include <mach/irqs.h>
->  #include <plat/mux.h>
->  #include <plat/i2c.h>
-> -#include <plat/omap-pm.h>
->  #include <plat/omap_device.h>
->  
->  #define OMAP_I2C_SIZE		0x3f
-> @@ -129,16 +127,6 @@ static inline int omap1_i2c_add_bus(int bus_id)
->  
->  
->  #ifdef CONFIG_ARCH_OMAP2PLUS
-> -/*
-> - * XXX This function is a temporary compatibility wrapper - only
-> - * needed until the I2C driver can be converted to call
-> - * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
-> - */
-> -static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
-> -{
-> -	omap_pm_set_max_mpu_wakeup_lat(dev, t);
-> -}
-> -
->  static inline int omap2_i2c_add_bus(int bus_id)
->  {
->  	int l;
-> @@ -170,15 +158,6 @@ static inline int omap2_i2c_add_bus(int bus_id)
->  	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
->  	pdata->flags = dev_attr->flags;
->  
-> -	/*
-> -	 * When waiting for completion of a i2c transfer, we need to
-> -	 * set a wake up latency constraint for the MPU. This is to
-> -	 * ensure quick enough wakeup from idle, when transfer
-> -	 * completes.
-> -	 * Only omap3 has support for constraints
-> -	 */
-> -	if (cpu_is_omap34xx())
-> -		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
->  	pdev = omap_device_build(name, bus_id, oh, pdata,
->  			sizeof(struct omap_i2c_bus_platform_data),
->  			NULL, 0, 0);
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 5d19a49..bd45cee 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -43,6 +43,7 @@
->  #include <linux/slab.h>
->  #include <linux/i2c-omap.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/pm_qos.h>
->  
->  /* I2C controller revisions */
->  #define OMAP_I2C_OMAP1_REV_2		0x20
-> @@ -183,8 +184,7 @@ struct omap_i2c_dev {
->  	struct completion	cmd_complete;
->  	struct resource		*ioarea;
->  	u32			latency;	/* maximum mpu wkup latency */
-> -	void			(*set_mpu_wkup_lat)(struct device *dev,
-> -						    long latency);
-> +	struct pm_qos_request	pm_qos_request;
->  	u32			speed;		/* Speed of bus in kHz */
->  	u32			dtrev;		/* extra revision from DT */
->  	u32			flags;
-> @@ -590,8 +590,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  	if (r < 0)
->  		goto out;
->  
-> -	if (dev->set_mpu_wkup_lat != NULL)
-> -		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
-> +	/*
-> +	 * When waiting for completion of a i2c transfer, we need to
-> +	 * set a wake up latency constraint for the MPU. This is to
-> +	 * ensure quick enough wakeup from idle, when transfer
-> +	 * completes.
-> +	 */
-> +	if (dev->latency)
-> +		pm_qos_add_request(&dev->pm_qos_request,
-> +				   PM_QOS_CPU_DMA_LATENCY,
-> +				   dev->latency);
->  
->  	for (i = 0; i < num; i++) {
->  		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
-> @@ -599,8 +607,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  			break;
->  	}
->  
-> -	if (dev->set_mpu_wkup_lat != NULL)
-> -		dev->set_mpu_wkup_lat(dev->dev, -1);
-> +	if (dev->latency)
-> +		pm_qos_remove_request(&dev->pm_qos_request);
->  
->  	if (r == 0)
->  		r = num;
-> @@ -989,7 +997,6 @@ omap_i2c_probe(struct platform_device *pdev)
->  	} else if (pdata != NULL) {
->  		dev->speed = pdata->clkrate;
->  		dev->flags = pdata->flags;
-> -		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
->  		dev->dtrev = pdata->rev;
->  	}
->  
-> @@ -1046,10 +1053,9 @@ omap_i2c_probe(struct platform_device *pdev)
->  		else
->  			dev->b_hw = 1; /* Enable hardware fixes */
->  
-> -		/* calculate wakeup latency constraint for MPU */
-> -		if (dev->set_mpu_wkup_lat != NULL)
-> -			dev->latency = (1000000 * dev->fifo_size) /
-> -				       (1000 * dev->speed / 8);
-> +		/* calculate wakeup latency constraint */
-> +		dev->latency = (1000000 * dev->fifo_size) /
-> +			       (1000 * dev->speed / 8);
->  	}
->  
->  	/* reset ASAP, clearing any IRQs */
-> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-> index 92a0dc7..df804ba 100644
-> --- a/include/linux/i2c-omap.h
-> +++ b/include/linux/i2c-omap.h
-> @@ -34,7 +34,6 @@ struct omap_i2c_bus_platform_data {
->  	u32		clkrate;
->  	u32		rev;
->  	u32		flags;
-> -	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
->  };
->  
->  #endif
-> -- 
-> 1.7.7.6
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/e61da966/attachment.sig>
+~Vinod
