@@ -1,32 +1,53 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 18 Sep 2012 09:56:55 +0300
-Subject: [GIT PULL] rpmsg: a fix for 3.6
-Message-ID: <CAK=WgbYzUTfMiW5J-5xWHLjy64Gmi44z3iktrr-aY67Pa9Egog@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Sep 2012 16:11:31 +0900
+Subject: [PATCH 01/24] ARM: shmobile: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-2-git-send-email-arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-2-git-send-email-arnd@arndb.de>
+Message-ID: <20120918071131.GB31953@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Sep 14, 2012 at 11:34:29PM +0200, Arnd Bergmann wrote:
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
+> 
+> This patch is a bit ugly for shmobile, which is the only platform
+> that just uses integer literals all over the place, but I can't
+> see a better way to do this.
+> 
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: linux-sh at vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+Wow, thats a lot of chrun, but if we must
 
-  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+Acked-by: Simon Horman <horms@verge.net.au>
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
-tags/rpmsg-3.6-fix
-
-for you to fetch changes up to eeb0074f36d1ab0729d06f1c56add9c7799679e2:
-
-  rpmsg: fix dma_free_coherent dev parameter (2012-09-12 12:03:57 +0300)
-
-----------------------------------------------------------------
-A quick rpmsg fix from Fernando, fixing two buggy invocations of
-dma_free_coherent.
-
-----------------------------------------------------------------
-Fernando Guzman Lugo (1):
-      rpmsg: fix dma_free_coherent dev parameter
-
- drivers/rpmsg/virtio_rpmsg_bus.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> ---
+>  arch/arm/mach-shmobile/board-ap4evb.c          |   12 ++--
+>  arch/arm/mach-shmobile/board-armadillo800eva.c |    6 +-
+>  arch/arm/mach-shmobile/board-bonito.c          |    8 +--
+>  arch/arm/mach-shmobile/board-g3evm.c           |   12 ++--
+>  arch/arm/mach-shmobile/board-g4evm.c           |   30 +++++-----
+>  arch/arm/mach-shmobile/board-kzm9g.c           |    8 +--
+>  arch/arm/mach-shmobile/board-mackerel.c        |   22 ++++----
+>  arch/arm/mach-shmobile/clock-r8a7740.c         |   46 ++++++++--------
+>  arch/arm/mach-shmobile/clock-sh7367.c          |   44 +++++++--------
+>  arch/arm/mach-shmobile/clock-sh7372.c          |   60 ++++++++++----------
+>  arch/arm/mach-shmobile/clock-sh7377.c          |   50 ++++++++---------
+>  arch/arm/mach-shmobile/clock-sh73a0.c          |   70 ++++++++++++------------
+>  arch/arm/mach-shmobile/include/mach/gpio.h     |    6 +-
+>  arch/arm/mach-shmobile/intc-r8a7779.c          |   14 ++---
+>  arch/arm/mach-shmobile/intc-sh7372.c           |   27 +++++----
+>  arch/arm/mach-shmobile/intc-sh73a0.c           |   20 ++++---
+>  arch/arm/mach-shmobile/pm-rmobile.c            |    6 +-
+>  arch/arm/mach-shmobile/pm-sh7372.c             |   57 +++++++++----------
+>  arch/arm/mach-shmobile/setup-sh7367.c          |    2 +-
+>  arch/arm/mach-shmobile/setup-sh7377.c          |    2 +-
+>  arch/arm/mach-shmobile/setup-sh73a0.c          |    2 +-
+>  include/linux/serial_sci.h                     |    2 +-
+>  22 files changed, 256 insertions(+), 250 deletions(-)
