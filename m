@@ -1,35 +1,25 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Tue, 18 Sep 2012 23:52:09 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS5: Add fimd node to the exynos5250 dtsi file
-In-Reply-To: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
-References: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <1347992531-27279-2-git-send-email-l.krishna@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Sep 2012 12:23:59 +0000
+Subject: [PATCH] ARM: ux500: fix spi2 pin group
+In-Reply-To: <1347962986-12280-1-git-send-email-linus.walleij@stericsson.com>
+References: <1347962986-12280-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201209181223.59918.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the fimd node with compatibility string, hardware address,
-interrupt line numbers to the exynos5250 dtsi file.
+On Tuesday 18 September 2012, Linus Walleij wrote:
+> From: Patrice Chotard <patrice.chotard@stericsson.com>
+> 
+> GPIO216_AG12 is configured as a gpio for SPI2, so select
+> the spi2_oc1_2 pin group instead of spi2_oc1_1
+> 
+> Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi Olof, Arnd:
+> 
+> Again I'd prefer to take this through the pinctrl tree if it's
+> OK with you. We are deploying pinctrl internally and ironing out
+> bugs as we test more and more use cases.
 
-Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index b55794b..6d27ca4 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -488,4 +488,11 @@
- 		reg = <0x13e30000 0x1000>;
- 		interrupts = <0 88 0>;
- 	};
-+
-+	fimd {
-+		compatible = "samsung,exynos5-drm";
-+		interrupt-parent = <&combiner>;
-+		reg = <0x14400000 0x40000>;
-+		interrupts = <18 5>, <18 4>, <18 6>;
-+	};
- };
--- 
-1.7.0.4
+Acked-by: Arnd Bergmann <arnd@arndb.de>
