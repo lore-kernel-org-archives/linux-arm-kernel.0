@@ -1,45 +1,56 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 18 Sep 2012 10:40:07 +0530
-Subject: [PATCH 0/2] Replace the obsolete preset API by timings API
-In-Reply-To: <1344429020-27616-1-git-send-email-prabhakar.lad@ti.com>
-References: <1344429020-27616-1-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <CA+V-a8t2H_1xJb4MCfzSzHtrjTbq7HFNjuWtgtwWERS_3qZH1Q@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 18 Sep 2012 10:57:26 +0530
+Subject: [PATCH v2 1/2] spi: omap2-mcspi: add pinctrl support
+In-Reply-To: <1347902538-21208-2-git-send-email-mporter@ti.com>
+References: <1347902538-21208-1-git-send-email-mporter@ti.com>
+ <1347902538-21208-2-git-send-email-mporter@ti.com>
+Message-ID: <5058063E.40509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro/Sekhar
+On Monday 17 September 2012 10:52 PM, Matt Porter wrote:
+> Adds pinctrl support to support OMAP platforms that boot from DT
+> and rely on pinctrl support to set pinmuxes.
+>
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+looks good to me.
+you may want to repost with Mark in cc to review.
+Acked-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-On Wed, Aug 8, 2012 at 6:00 PM, Prabhakar Lad <prabhakar.lad@ti.com> wrote:
-> This first patch replaces the obsolete preset API by timings
-> API for davinci VPBE, appropriate chnages in machine file for
-> dm644x in which VPBE is enabled. And the second patch adds support for
-> timings API for ths7303 driver. Sending them as s series
-> since VPBE uses the ths7303 driver.
+>  drivers/spi/spi-omap2-mcspi.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 >
-> Hans Verkuil (1):
->   dm644x: replace the obsolete preset API by the timings API.
->
-> Manjunath Hadli (1):
->   ths7303: enable THS7303 for HD modes
->
-Can you pull this patchset ? Please inform me if anything is
-needed from my side.
-
-Regards,
---Prabhakar
-
->  arch/arm/mach-davinci/board-dm644x-evm.c   |   15 ++--
->  arch/arm/mach-davinci/dm644x.c             |   17 +---
->  drivers/media/video/davinci/vpbe.c         |  110 ++++++++++++----------------
->  drivers/media/video/davinci/vpbe_display.c |   60 +++++++--------
->  drivers/media/video/davinci/vpbe_venc.c    |   25 +++---
->  drivers/media/video/ths7303.c              |  107 +++++++++++++++++++++++----
->  include/media/davinci/vpbe.h               |   14 ++--
->  include/media/davinci/vpbe_types.h         |    8 +--
->  include/media/davinci/vpbe_venc.h          |    2 +-
->  9 files changed, 202 insertions(+), 156 deletions(-)
->
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+> index b2fb141..9502566 100644
+> --- a/drivers/spi/spi-omap2-mcspi.c
+> +++ b/drivers/spi/spi-omap2-mcspi.c
+> @@ -38,6 +38,8 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pinctrl/consumer.h>
+> +#include <linux/err.h>
+>  
+>  #include <linux/spi/spi.h>
+>  
+> @@ -1124,6 +1126,7 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
+>  	static int		bus_num = 1;
+>  	struct device_node	*node = pdev->dev.of_node;
+>  	const struct of_device_id *match;
+> +	struct pinctrl *pinctrl;
+>  
+>  	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
+>  	if (master == NULL) {
+> @@ -1219,6 +1222,11 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
+>  	if (status < 0)
+>  		goto dma_chnl_free;
+>  
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl))
+> +		dev_warn(&pdev->dev,
+> +			"pins are not configured from the driver\n");
+> +
+>  	pm_runtime_use_autosuspend(&pdev->dev);
+>  	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
+>  	pm_runtime_enable(&pdev->dev);
