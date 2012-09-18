@@ -1,52 +1,43 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 18 Sep 2012 14:49:18 +0200
-Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
- precisely
-In-Reply-To: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20120918124918.GK2505@amd.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 18 Sep 2012 07:50:04 -0500
+Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for
+ clean and flush range
+In-Reply-To: <alpine.LFD.2.02.1209171827260.28681@xanadu.home>
+References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
+ <1347890398-22088-1-git-send-email-robherring2@gmail.com>
+ <20120917194733.GQ12245@n2100.arm.linux.org.uk> <5057881A.9020604@gmail.com>
+ <alpine.LFD.2.02.1209171827260.28681@xanadu.home>
+Message-ID: <50586DFC.9000902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 09:55:30AM +0300, Hiroshi Doyu wrote:
-> The following APIs are needed for us to support the legacy Tegra
-> memory manager for devices("NvMap") with *DMA mapping API*.
-
-Maybe I am not understanding the need completly. Can you elaborate on
-why this is needed for legacy Tegra?
-
-> New API:
+On 09/17/2012 05:31 PM, Nicolas Pitre wrote:
+> On Mon, 17 Sep 2012, Rob Herring wrote:
 > 
->  ->iova_alloc(): To allocate IOVA area.
->  ->iova_alloc_at(): To allocate IOVA area at specific address.
->  ->iova_free():  To free IOVA area.
+>> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
+>>> Plus, because there's little justification behind this patch (apart
+>>> from a vague reference to the speed of IO accesses) I'm going to say
+>>> NAK to this until further information is forthcoming justifying this
+>>> change.
+>>>
+>>
+>> 30% faster network transmit rate with pktgen on highbank.
 > 
->  ->map_page_at(): To map page at specific IOVA.
+> Please always include your benchmark results in the patch description. 
+> That is highly valuable information when looking at commit logs.
+> 
 
-This sounds like a layering violation. The situation today is as
-follows:
+Agreed as it would now be helpful if the original optimization to use
+background ops had some data as well:
 
-	DMA-API   : Handle DMA-addresses including an address allocator
-	IOMMU-API : Full control over DMA address space, no address
-	            allocator
+    ARM: l2x0: Optimise the range based operations
 
-So what you want to do add to the DMA-API is already part of the
-IOMMU-API.
+    For the big buffers which are in excess of cache size, the maintaince
+    operations by PA are very slow. For such buffers the maintainace
+    operations can be speeded up by using the WAY based method.
 
-Here is my suggestion what you can do instead of extending the DMA-API.
-You can use the IOMMU-API to initialize the device address space with
-any mappings at the IOVAs you need the mappings. In the end you allocate
-another free range in the device address space and use that to satisfy
-DMA-API allocations. Any reason why that could not work?
+    Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+    Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-
-Regards,
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Rob
