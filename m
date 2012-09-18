@@ -1,52 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 Sep 2012 22:57:08 +0000 (UTC)
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <20120918140213.GA27463@arwen.pp.htv.fi>
-References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
- <20120918140213.GA27463@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.00.1209182255500.4747@utopia.booyaka.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 18 Sep 2012 16:07:40 -0700
+Subject: [PATCH] rtc: snvs: improve timeout handling in snvs_rtc_enable()
+In-Reply-To: <1345277408-30044-1-git-send-email-LW@KARO-electronics.de>
+References: <1345277408-30044-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20120918160740.6dbdc797.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Sep 2012, Felipe Balbi wrote:
+On Sat, 18 Aug 2012 10:10:08 +0200
+Lothar Wa__mann <LW@karo-electronics.de> wrote:
 
-> On Tue, Sep 18, 2012 at 06:10:50PM +0530, Sourav Poddar wrote:
-> > Greg's tty-next is not booting on 2420 based N800. The failure is
-> > observed at serial init itself. The reason might be that n800 tries to
-> > resume even though it is not suspended before.
-> > 
-> > Reported-by: Paul Walmsley <paul@pwsan.com>
-> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> 
-> FWIW:
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> 
-> Paul does this fix the issue for you ? Note that it depends on a
-> previous patch Sourav sent [1]
-> 
-> [1] http://marc.info/?l=linux-omap&m=134796819607889&w=2
+> If snvs_rtc_enable() happens to be descheduled for a period longer
+> than the timout period, a timeout may be indicated even if the RTC
+> status has changed meanwhile. Force a status read at the end of the
+> timeout period to prevent bogus timeout errors.
 
-Yes, thanks - that fixes it,
+(delayed, sorry)
 
-Tested-by: Paul Walmsley <paul@pwsan.com>
+> --- a/drivers/rtc/rtc-snvs.c
+> +++ b/drivers/rtc/rtc-snvs.c
+> @@ -81,6 +81,13 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
+>  	}
+>  }
+>  
+> +static int snvs_rtc_enable_done(int enable, void __iomem *addr)
+> +{
+> +	u32 lpcr = readl(addr + SNVS_LPCR);
+> +
+> +	return !!enable ^ !(lpcr & SNVS_LPCR_SRTC_ENV);
+> +}
+> +
+>  static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+>  {
+>  	unsigned long timeout = jiffies + msecs_to_jiffies(1);
+> @@ -99,18 +106,15 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+>  	spin_unlock_irqrestore(&data->lock, flags);
+>  
+>  	while (1) {
+> -		lpcr = readl(data->ioaddr + SNVS_LPCR);
+> +		if (snvs_rtc_enable_done(enable, data->ioaddr))
+> +			break;
+>  
+> -		if (enable) {
+> -			if (lpcr & SNVS_LPCR_SRTC_ENV)
+> -				break;
+> -		} else {
+> -			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
+> +		if (time_after(jiffies, timeout)) {
+> +			if (snvs_rtc_enable_done(enable, data->ioaddr))
+>  				break;
+> +			else
+> +				return -ETIMEDOUT;
+>  		}
+> -
+> -		if (time_after(jiffies, timeout))
+> -			return -ETIMEDOUT;
+>  	}
+>  
+>  	return 0;
 
-> There's one thing that gets my attention, though, why only n800 would
-> fail here ?
-> 
-> I wonder if we should be using:
-> 
-> pm_runtime_set_active(dev);
-> pm_runtime_get_enable(dev);
-> 
-> to prevent our runtime_resume() to be called from probe, but Sourav
-> tested and it doesn't work on BeagleBoard, but it works on PandaBoard.
-> 
-> Does it ring any bell ??
-
-Nothing off the top of my head but haven't looked into it -- maybe this 
-rings a bell with Kevin?
-
-
-- Paul
+I think this will have been addressed by
+http://ozlabs.org/~akpm/mmots/broken-out/rtc-snvs-add-freescale-rtc-snvs-driver-fix.patch?
