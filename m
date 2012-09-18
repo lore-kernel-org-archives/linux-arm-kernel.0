@@ -1,105 +1,43 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 18 Sep 2012 15:53:53 +0200
-Subject: [PATCH v2] spi/pl022: Devicetree support w/o platform data
-Message-ID: <1347976433-1176-1-git-send-email-stigge@antcom.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 18 Sep 2012 14:57:05 +0100
+Subject: [PATCH v5 00/17] Introduce Xen support on ARM (based on 3.6-rc5)
+In-Reply-To: <201209181234.29557.arnd@arndb.de>
+References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
+ <201209181234.29557.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.02.1209181450570.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even with devicetree support, we needed platform data to provide some data,
-leading to mixed device tree and platform data. This patch makes it possible to
-provide all that information via device tree. Now, the data must be provided
-via platform data _or_ device tree completely.
+On Tue, 18 Sep 2012, Arnd Bergmann wrote:
+> On Monday 17 September 2012, Stefano Stabellini wrote:
+> 
+> > I am also attaching to this email the dts'es that I am currently using
+> > for dom0 and domU: vexpress-v2p-ca15-tc1.dts (that includes
+> > vexpress-v2m-rs1-rtsm.dtsi) is the dts used for dom0 and it is passed to
+> > Linux by Xen, while vexpress-virt.dts is the dts used for other domUs
+> > and it is appended in binary form to the guest kernel image. I am not
+> > sure where they are supposed to live yet, so I am just attaching them
+> > here so that people can actually try out this series if they want to.
+> 
+> You can submit the dts files separately so we can include them in
+> the arm-soc tree. Pawel Moll is handling vexpress related changes these
+> days, so it would be reasonable if he included them in a pull request.
 
-Only in case of DMA where a callback specification is necessary (dma_filter()),
-platform data is the only option.
+OK, I'll submit them as a patch series separately.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
 
----
-Changes since v1:
-* Removed property pl022,bus-id: Set to -1 (auto) in DT case
-* Removed property pl022,enable-dma: Only useful in platform data (no OF node)
-  case, since dma_filter() callback only possible via platform data
+> > The patch series has been rebased on Konrad's stable/for-linus-3.7
+> > branch.
+> > 
+> > Arnd, Russell, what do you think about this series? If you are OK with
+> > it, to whom should I submit it?
+> 
+> I have no objections to your patches from this series. IMHO they should
+> be submitted through the Xen tree,
+    
+Konrad, are you happy to carry this series in your tree?
 
- Documentation/devicetree/bindings/spi/spi_pl022.txt |    7 +++
- drivers/spi/spi-pl022.c                             |   39 +++++++++++++++++---
- 2 files changed, 41 insertions(+), 5 deletions(-)
 
---- linux-2.6.orig/Documentation/devicetree/bindings/spi/spi_pl022.txt
-+++ linux-2.6/Documentation/devicetree/bindings/spi/spi_pl022.txt
-@@ -10,6 +10,13 @@ Optional properties:
- - cs-gpios : should specify GPIOs used for chipselects.
-   The gpios will be referred to as reg = <index> in the SPI child nodes.
-   If unspecified, a single SPI device without a chip select can be used.
-+- pl022,autosuspend-delay : delay in ms following transfer completion before
-+			    the runtime power management system suspends the
-+			    device. A setting of 0 indicates no delay and the
-+                            device will be suspended immediately
-+- pl022,rt : indicates the controller should run the message pump with realtime
-+             priority to minimise the transfer latency on the bus (boolean)
-+
- 
- SPI slave nodes must be children of the SPI master node and can
- contain the following properties.
---- linux-2.6.orig/drivers/spi/spi-pl022.c
-+++ linux-2.6/drivers/spi/spi-pl022.c
-@@ -2024,6 +2024,34 @@ static void pl022_cleanup(struct spi_dev
- 	kfree(chip);
- }
- 
-+static struct pl022_ssp_controller *
-+pl022_platform_data_dt_get(struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct pl022_ssp_controller *pd;
-+	u32 tmp;
-+
-+	if (!np) {
-+		dev_err(dev, "no dt node defined\n");
-+		return NULL;
-+	}
-+
-+	pd = devm_kzalloc(dev, sizeof(struct pl022_ssp_controller), GFP_KERNEL);
-+	if (!pd) {
-+		dev_err(dev, "cannot allocate platform data memory\n");
-+		return NULL;
-+	}
-+
-+	pd->bus_id = -1;
-+	of_property_read_u32(np, "num-cs", &tmp);
-+	pd->num_chipselect = tmp;
-+	of_property_read_u32(np, "pl022,autosuspend-delay",
-+			     &pd->autosuspend_delay);
-+	pd->rt = of_property_read_bool(np, "pl022,rt");
-+
-+	return pd;
-+}
-+
- static int __devinit
- pl022_probe(struct amba_device *adev, const struct amba_id *id)
- {
-@@ -2036,18 +2064,19 @@ pl022_probe(struct amba_device *adev, co
- 
- 	dev_info(&adev->dev,
- 		 "ARM PL022 driver, device ID: 0x%08x\n", adev->periphid);
--	if (platform_info == NULL) {
--		dev_err(&adev->dev, "probe - no platform data supplied\n");
-+	if (!platform_info && IS_ENABLED(CONFIG_OF))
-+		platform_info = pl022_platform_data_dt_get(dev);
-+
-+	if (!platform_info) {
-+		dev_err(dev, "probe: no platform data defined\n");
- 		status = -ENODEV;
- 		goto err_no_pdata;
- 	}
- 
- 	if (platform_info->num_chipselect) {
- 		num_cs = platform_info->num_chipselect;
--	} else if (IS_ENABLED(CONFIG_OF)) {
--		of_property_read_u32(np, "num-cs", &num_cs);
- 	} else {
--		dev_err(&adev->dev, "probe: no chip select defined\n");
-+		dev_err(dev, "probe: no chip select defined\n");
- 		status = -ENODEV;
- 		goto err_no_pdata;
- 	}
+>but it would be good to have an Ack from Russell.
+
+Indeed
