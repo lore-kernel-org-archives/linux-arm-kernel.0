@@ -1,40 +1,114 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Sep 2012 19:37:49 -0700
-Subject: [GIT PULL] omap fixes for linux next for v3.7 merge window
-In-Reply-To: <20120918022856.GN11762@atomide.com>
-References: <20120918022856.GN11762@atomide.com>
-Message-ID: <CAOesGMjadRQk0=DRZGvE6Lds4+ovFPMA3hQQZGYhe_GemEmycQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 17 Sep 2012 21:43:55 -0500
+Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for
+ clean and flush range
+In-Reply-To: <20120917214732.GR12245@n2100.arm.linux.org.uk>
+References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
+ <1347890398-22088-1-git-send-email-robherring2@gmail.com>
+ <20120917194733.GQ12245@n2100.arm.linux.org.uk> <5057881A.9020604@gmail.com>
+ <20120917214732.GR12245@n2100.arm.linux.org.uk>
+Message-ID: <5057DFEB.40101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/17/2012 04:47 PM, Russell King - ARM Linux wrote:
+> On Mon, Sep 17, 2012 at 03:29:14PM -0500, Rob Herring wrote:
+>> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
+>>> (a) you're not describing hardware, you're describing a feature of the
+>>>     Linux kernel's implementation - no, you're describing a configuration
+>>>     feature of the kernel.  This should not be in DT.
+>>> (b) you're disabling the optimization to avoid doing a lengthy line-by-line
+>>>     cache operation when the size is larger than the cache size, and trading
+>>>     it for possibly slightly quicker accesses.
+>>>
+>>> The problem I have with this is it's likely that you've only looked at
+>>> "oh, this makes IO accesses faster" and not the total picture wrt the
+>>> effect on time taken by the DMA API.
+>>
+>> I could easily "fix" this in the xgmac driver by using __raw_writel or
+>> writel_relaxed, but that would break non-coherent operation which does
+>> need the L2 cache barriers.
+> 
+> Note that in many cases, drivers do not need a barrier before every write
+> or after every read operation.
+> 
+> In terms of L2 coherency, the only time that L2 actually needs to be
+> touched is when your MMIO access provokes the device to read from memory.
+> Most accesses do not.
 
-On Mon, Sep 17, 2012 at 7:28 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Arnd & Olof,
->
-> Here is the fix for the twl-core compile on non-omap
-> platforms and few other fixes.
->
-> This will probably cause a minor merge conflicts with
-> the led changes merged in the arm-soc next/drivers branch
-> as both linux/leds.h and linux/platform_data/gpio-omap.h
-> now need to be included.
->
-> Regards,
->
-> Tony
->
->
-> The following changes since commit 68cb700c59fae6cd539c9dc1e9f2584f671935a0:
->
->   ARM: OMAP1: Move SoC specific headers from plat to mach for omap1 (2012-09-12 18:06:31 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/cleanup-fixes-for-v3.7
+Agreed. The current approach is a bit of a sledge hammer for relatively
+few places that need it.
 
-Thanks, pulled in on top of next/cleanup. We might have missed the
--next train for the day though.
+> The solution - using the relaxed MMIO accessors, not fiddling around
+> with the L2 cache code.
 
+I have done that in critical paths as well. As I explained in my
+response to Catalin, too many barriers is not my problem. The network
+transmit path is a single writel and one explicit wmb already. Using
+relaxed accessors will only make both wmb's explicit. I still need them
+at least for the L1 in the coherent case. Even if I'm coherent, I still
+have to ensure the order the DMA descriptors are written and the order
+of DMA descriptor writes with the DMA poll register write. But there are
+not any universal L1 only barriers.
 
--Olof
+The sequence is like this:
+Write out N DMA descriptors
+barrier
+Write 1st DMA descriptor's ready bit
+barrier
+Write DMA poll register
+
+For non-coherent, the barrier needs to be a dsb and L2 sync. For
+coherent, this only really needs to be a dsb. Removal of the spinlock is
+enough to make the L2 sync a don't care.
+
+> However, there's an in-built problem here - which I'm told of by PowerPC
+> folk.  Apparantly, Linus refuses to accept that anyone needs relaxed MMIO
+> accessors and essentially says "all platforms must behave like x86 does".
+> I don't actually know Linus' real position, or what his position would be
+> if he new that without relaxed accessors, we have to do a very time
+> consuming operation...  It might be worth broaching the subject of true
+> relaxed MMIO accessors again.
+> 
+> The only issue with that approach is getting people who don't have the
+> problem (iow, x86 driver authors) to understand this issue - and that's
+> where I absolutely agree with Linus' apparant position...
+
+Also, how much of this knowledge should be in the driver? While I really
+don't care if the xgmac driver works in non-coherent mode, that's
+clearly not going to be acceptable. Differences between coherent or
+non-coherent need to stay abstracted out of the drivers.
+
+> A better solution than relaxed IO accessors maybe a barrier, but don't
+> call it that.  Maybe call it "pre_dma();" and "post_dma();" - that way
+> people won't get bogged down in barrier terminology or whatever.  They
+> just call "pre_dma();" before they write to a register which provokes
+> DMA, and "post_dma();" before they read from a register to get DMA
+> status.  What platforms do for each of those calls is up to them, and
+> whether platforms use relaxed MMIO accessors becomes their choice too.
+
+If pre_dma() still calls l2x0 cache sync which takes a spinlock, then
+I'm back to the same problem.
+
+These would need to be per device as well. Perhaps it could be part of
+the DMA mapping API ops.
+
+Rob
+
+> Another but - we have a hell of a lot of drivers... and existing
+> accessors must work as per x86...
+> 
+>> It's not without precedence, but you are right that it is a questionable
+>> use of DT. I'm open to suggestions of how you would expose this
+>> configuration to platforms. We obviously don't want a compile time
+>> option. Some options:
+>>
+>> - Add a flags param to l2x0_of_init to configure it
+>> - Add non-background version of functions and override the function ptrs
+>> in platform code.
+>> - Add a new call to configure l2 settings like this.
+>> - Expose the use_background_ops variable directly
+> 
+> - command line setting which is available to everyone whether they're using
+> DT or not.
+> 
