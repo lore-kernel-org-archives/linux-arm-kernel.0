@@ -1,14 +1,14 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 18 Sep 2012 14:57:05 +0100
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 18 Sep 2012 09:53:28 -0400
 Subject: [PATCH v5 00/17] Introduce Xen support on ARM (based on 3.6-rc5)
 In-Reply-To: <201209181234.29557.arnd@arndb.de>
 References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
  <201209181234.29557.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.02.1209181450570.29232@kaball.uk.xensource.com>
+Message-ID: <20120918135328.GG12053@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Sep 2012, Arnd Bergmann wrote:
+On Tue, Sep 18, 2012 at 12:34:29PM +0000, Arnd Bergmann wrote:
 > On Monday 17 September 2012, Stefano Stabellini wrote:
 > 
 > > I am also attaching to this email the dts'es that I am currently using
@@ -22,10 +22,7 @@ On Tue, 18 Sep 2012, Arnd Bergmann wrote:
 > You can submit the dts files separately so we can include them in
 > the arm-soc tree. Pawel Moll is handling vexpress related changes these
 > days, so it would be reasonable if he included them in a pull request.
-
-OK, I'll submit them as a patch series separately.
-
-
+>  
 > > The patch series has been rebased on Konrad's stable/for-linus-3.7
 > > branch.
 > > 
@@ -33,11 +30,10 @@ OK, I'll submit them as a patch series separately.
 > > it, to whom should I submit it?
 > 
 > I have no objections to your patches from this series. IMHO they should
-> be submitted through the Xen tree,
-    
-Konrad, are you happy to carry this series in your tree?
+> be submitted through the Xen tree, but it would be good to have an Ack
+> from Russell.
 
+OK, I can do that.
 
->but it would be good to have an Ack from Russell.
-
-Indeed
+How do we get Russell to look at these patches? Bribes? Ship him some
+beer/wine to be delievered to his office?
