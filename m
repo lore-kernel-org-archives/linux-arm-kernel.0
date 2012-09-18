@@ -1,36 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Sep 2012 14:22:59 +0200
-Subject: [PATCH v2 04/15] dmaengine: Pass no_wakeup parameter via
- device_prep_dma_cyclic() callback
-In-Reply-To: <1347958810.1943.176.camel@vkoul-udesk3>
-References: <1347543485-339-1-git-send-email-peter.ujfalusi@ti.com>
- <1347543485-339-5-git-send-email-peter.ujfalusi@ti.com>
- <CACRpkdYAxFzPAZgMsdj9C3YVLzMc_w41Xs0SiqX-1DWaZqxAdw@mail.gmail.com>
- <20120918083146.GE12445@n2100.arm.linux.org.uk>
- <1347958810.1943.176.camel@vkoul-udesk3>
-Message-ID: <CACRpkdbphfZ+Q9L1H3x_cs_nxjYYg4xuerOHJzzdkogsKu948Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Sep 2012 13:23:08 +0100
+Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
+In-Reply-To: <20120915153436.21241.95691.stgit@ubuntu>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153436.21241.95691.stgit@ubuntu>
+Message-ID: <20120918122308.GJ32204@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 11:00 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Tue, 2012-09-18 at 09:31 +0100, Russell King - ARM Linux wrote:
->> On Mon, Sep 17, 2012 at 11:01:23AM +0200, Linus Walleij wrote:
->> > On Thu, Sep 13, 2012 at 3:37 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
->> >
->> > After some discussion with clever people I know I have come to the conclusion
->> > that this is a good idea, so:
->> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> NAKed-by: me
->>
->> If you look at the other sub-threads of the patch you're acking, you'll
->> notice that there's a v3 of this patch set which changes the way this is
->> done.
->
-> Was it a genuine mistake, think v3 reply v2? Or less caffeine..... :)
+On Sat, Sep 15, 2012 at 04:34:36PM +0100, Christoffer Dall wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> The KVM hypervisor mmu code requires access to the mem_type prot_pte
+> field when setting up page tables pointing to a device. Unfortunately,
+> the mem_type structure is opaque.
+> 
+> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
+> value.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+>  arch/arm/include/asm/mach/map.h |    1 +
+>  arch/arm/mm/mmu.c               |    6 ++++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+> index a6efcdd..3787c9f 100644
+> --- a/arch/arm/include/asm/mach/map.h
+> +++ b/arch/arm/include/asm/mach/map.h
+> @@ -37,6 +37,7 @@ extern void iotable_init(struct map_desc *, int);
+>  
+>  struct mem_type;
+>  extern const struct mem_type *get_mem_type(unsigned int type);
+> +extern pteval_t get_mem_type_prot_pte(unsigned int type);
+>  /*
+>   * external interface to remap single page with appropriate type
+>   */
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4c2d045..76bf4f5 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -301,6 +301,12 @@ const struct mem_type *get_mem_type(unsigned int type)
+>  }
+>  EXPORT_SYMBOL(get_mem_type);
+>  
+> +pteval_t get_mem_type_prot_pte(unsigned int type)
+> +{
+> +	return get_mem_type(type)->prot_pte;
+> +}
+> +EXPORT_SYMBOL(get_mem_type_prot_pte);
+> +
 
-I think both, stupid me.
-Ack on v3 indeed, I was probably fooled by some gmail autothreading, grrr.
+get_mem_type can return NULL, so you should probably pass the error through
+rather than dereferencing it.
 
-Yours,
-Linus Walleij
+Will
