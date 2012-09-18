@@ -1,35 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Sep 2012 15:20:08 +0000
-Subject: [PATCH V6 2/2] dmaengine: add helper function to request a slave
- DMA channel
-In-Reply-To: <20120918132113.GT27758@beef>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347938035.1943.162.camel@vkoul-udesk3> <20120918132113.GT27758@beef>
-Message-ID: <201209181520.08845.arnd@arndb.de>
+Date: Tue, 18 Sep 2012 15:24:22 +0000
+Subject: [PATCH v2 08/13] mfd: Versatile Express system registers driver
+In-Reply-To: <1347977875-16855-9-git-send-email-pawel.moll@arm.com>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-9-git-send-email-pawel.moll@arm.com>
+Message-ID: <201209181524.22620.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012, Matt Porter wrote:
-> On Tue, Sep 18, 2012 at 08:43:55AM +0530, Vinod Koul wrote:
-> > 
-> > Now would it make sense to NOT merge these changes for 3.7 and postpone
-> > to 3.8. I can host these patches on a topic branch and merge them when
-> > we are ready. I plan to spend some good amount of time on my work this
-> > week so we should be ready pretty soon.
-> > One these changes are merged, users can start moving to this scheme.
-> 
-> FWIW, I'm already basing the EDMA dmaengine support for OMAP (specifically
-> for AM335x) on using these helpers since AM335x only boots from DT.
+On Tuesday 18 September 2012, Pawel Moll wrote:
+> +The node describing a config device must refer to the sysreg node via
+> +"arm,vexpress,config-bridge" phandle (can be also defined in the node's
+> +parent) and relies on the board topology properties - see main vexpress
+> +node documentation for more details. It must must also define the
+> +following property:
+> +- arm,vexpress-sysreg,func : must contain two cells:
+> +  - first cell defines function number (eg. 1 for clock generator,
+> +    2 for voltage regulators etc.)
+> +  - device number (eg. osc 0, osc 1 etc.)
+> +
+> +Example:
+> +       mcc {
+> +               arm,vexpress,config-bridge = <&v2m_sysreg>;
+> +
+> +               osc at 0 {
+> +                       compatible = "arm,vexpress-osc";
+> +                       arm,vexpress-sysreg,func = <1 0>;
+> +               };
+> +       };
 
-I suspect the same thing will be happening for a lot of platforms
-after 3.7-rc1: ux500, lpc32xx, integrator, imx, mxs and probably
-others are all waiting for this so they can complete the move
-to DT-only booting.
+Why are you using a nonstandard property for the address?
+AFAICT, the same can be expressed normally doing
 
-Having some support for the new binding in 3.7 would be a great
-help to reduce interdependencies for the 3.8 merge cycle. Both the
-driver interface and the binding should actually be in a good
-shape now, so I'd very much appriciate it getting merged for 3.7,
-even if the implementation may have to change again in 3.8.
+       mcc {
+	        #address-cells = <2>;
+	 	#size-cells = <0>;
+               arm,vexpress,config-bridge = <&v2m_sysreg>;
+
+               osc at 0 {
+                       compatible = "arm,vexpress-osc";
+                       reg = <1 0>;
+               };
+       };
+
+which is more in line with how we represent e.g. i2c buses.
 
 	Arnd
