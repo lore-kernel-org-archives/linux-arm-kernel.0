@@ -1,31 +1,47 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 18 Sep 2012 16:47:04 +0200
-Subject: [PATCH v2] spi/pl022: Devicetree support w/o platform data
-In-Reply-To: <201209181443.29025.arnd@arndb.de>
-References: <1347976433-1176-1-git-send-email-stigge@antcom.de>
- <201209181443.29025.arnd@arndb.de>
-Message-ID: <50588968.9090505@antcom.de>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 18 Sep 2012 10:37:51 -0400
+Subject: [PATCH v5 00/17] Introduce Xen support on ARM (based on 3.6-rc5)
+In-Reply-To: <alpine.DEB.2.02.1209181450570.29232@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
+ <201209181234.29557.arnd@arndb.de>
+ <alpine.DEB.2.02.1209181450570.29232@kaball.uk.xensource.com>
+Message-ID: <20120918143751.GA19332@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2012 04:43 PM, Arnd Bergmann wrote:
-> On Tuesday 18 September 2012, Roland Stigge wrote:
->> Even with devicetree support, we needed platform data to provide some data,
->> leading to mixed device tree and platform data. This patch makes it possible to
->> provide all that information via device tree. Now, the data must be provided
->> via platform data or device tree completely.
->>
->> Only in case of DMA where a callback specification is necessary (dma_filter()),
->> platform data is the only option.
->>
->> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On Tue, Sep 18, 2012 at 02:57:05PM +0100, Stefano Stabellini wrote:
+> On Tue, 18 Sep 2012, Arnd Bergmann wrote:
+> > On Monday 17 September 2012, Stefano Stabellini wrote:
+> > 
+> > > I am also attaching to this email the dts'es that I am currently using
+> > > for dom0 and domU: vexpress-v2p-ca15-tc1.dts (that includes
+> > > vexpress-v2m-rs1-rtsm.dtsi) is the dts used for dom0 and it is passed to
+> > > Linux by Xen, while vexpress-virt.dts is the dts used for other domUs
+> > > and it is appended in binary form to the guest kernel image. I am not
+> > > sure where they are supposed to live yet, so I am just attaching them
+> > > here so that people can actually try out this series if they want to.
+> > 
+> > You can submit the dts files separately so we can include them in
+> > the arm-soc tree. Pawel Moll is handling vexpress related changes these
+> > days, so it would be reasonable if he included them in a pull request.
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> OK, I'll submit them as a patch series separately.
+> 
+> 
+> > > The patch series has been rebased on Konrad's stable/for-linus-3.7
+> > > branch.
+> > > 
+> > > Arnd, Russell, what do you think about this series? If you are OK with
+> > > it, to whom should I submit it?
+> > 
+> > I have no objections to your patches from this series. IMHO they should
+> > be submitted through the Xen tree,
+>     
+> Konrad, are you happy to carry this series in your tree?
 
-Thanks for reviewing.
-
-Of the arm-soc.git / LPC32xx related adjustments, the dts patch is
-obsolete now. But I will do a pull request for the other one (unchanged)
-when the above spi-pl022 patch is subsystem-merged.
-
-Roland
+Yes.
+> 
+> 
+> >but it would be good to have an Ack from Russell.
+> 
+> Indeed
