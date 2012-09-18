@@ -1,45 +1,22 @@
-From: lugo.fernando@gmail.com (Fernando Lugo)
-Date: Tue, 18 Sep 2012 13:25:35 -0500
-Subject: [PATCHv2 0/3] remoteproc: introduce rproc recovery
-In-Reply-To: <CAK=WgbaoPMj9OobHuC=VObTjvT--faen2_rfY-s4Jk-+Fqi5iQ@mail.gmail.com>
-References: <1346351174-28441-1-git-send-email-fernando.lugo@ti.com>
- <CAK=WgbaoPMj9OobHuC=VObTjvT--faen2_rfY-s4Jk-+Fqi5iQ@mail.gmail.com>
-Message-ID: <CAA=eUFmnB-UT5-m8tLPponifQgkhi4g6L5yVoi938=oa8tMqZA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 18 Sep 2012 20:27:17 +0200
+Subject: [PATCH] arch/arm/plat-mxc/ulpi.c: Remove unecessary semicolon
+In-Reply-To: <1347986174-30287-5-git-send-email-peter.senna@gmail.com>
+References: <1347986174-30287-1-git-send-email-peter.senna@gmail.com>
+ <1347986174-30287-5-git-send-email-peter.senna@gmail.com>
+Message-ID: <20120918182717.GC5525@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hello,
 
-On Tue, Sep 18, 2012 at 4:59 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Fernando,
->
-> On Thu, Aug 30, 2012 at 9:26 PM, Fernando Guzman Lugo
-> <fernando.lugo@ti.com> wrote:
->> These set of patches make possible the remoteproc recover after a crash.
->> This is a hard recovery, that means the remoteproc is reset and it will
->> start from the beginning. When a crash happen all the virtio devices are
->> destroyed. Therefore, both rpmsg drivers and devices are gracefully
->> removed which also cause rproc users become 0 and the remoteproc is turned
->> off. After the virtio devices are destroyed the crash handler function
->> will read the virtio information from the firmware in order to recreate
->> the virtio devices that will boot the remoteproc and everything will be
->> functional again.
->
-> Applied to remoteproc's for-next branch with a few changes (so we
-> don't miss the merge window).
->
-> The changes are detailed in the commit logs of the patches, please let
-> me know if there's any issue.
+$Subject ~= s/unecessary/unnecessary/
 
-That sounds good. Thanks.
+other than that the patch looks correct.
 
-Regards,
-Fernando.
+Best regards
+Uwe
 
->
-> Thanks!
-> Ohad.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
