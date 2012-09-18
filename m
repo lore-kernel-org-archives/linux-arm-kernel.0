@@ -1,78 +1,70 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:48 +0100
-Subject: [PATCH v2 06/13] clk: Common clocks implementation for Versatile
- Express
+Date: Tue, 18 Sep 2012 15:17:46 +0100
+Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
 In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1347977875-16855-7-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a DT and non-DT based implementation of
-the common clock infrastructure for Versatile Express
-platform. It registers (statically or using DT) all
-required fixed clocks, initialises motherboard's SP810
-cell (that provides clocks for SP804 timers) and
-explicitly registers VE "osc" driver, to make the
-clock generators available early.
+Implementation of the regulator framework driver for the
+Versatile Express voltage control. Devices without
+voltage constraints (ie. "regulator-[min|max]-microvolt"
+properties in the DT node) are treated as fixed (or rather
+read-only) regulators.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/include/asm/hardware/sp810.h |    2 +
- drivers/clk/Kconfig                   |    8 +-
- drivers/clk/versatile/Makefile        |    1 +
- drivers/clk/versatile/clk-vexpress.c  |  142 +++++++++++++++++++++++++++++++++
- 4 files changed, 150 insertions(+), 3 deletions(-)
- create mode 100644 drivers/clk/versatile/clk-vexpress.c
+ drivers/regulator/Kconfig    |    7 ++
+ drivers/regulator/Makefile   |    1 +
+ drivers/regulator/vexpress.c |  155 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 163 insertions(+)
+ create mode 100644 drivers/regulator/vexpress.c
 
-diff --git a/arch/arm/include/asm/hardware/sp810.h b/arch/arm/include/asm/hardware/sp810.h
-index 6b9b077..afd7e91 100644
---- a/arch/arm/include/asm/hardware/sp810.h
-+++ b/arch/arm/include/asm/hardware/sp810.h
-@@ -56,6 +56,8 @@
- #define SCCTRL_TIMEREN1SEL_REFCLK	(0 << 17)
- #define SCCTRL_TIMEREN1SEL_TIMCLK	(1 << 17)
+Hi Liam, Mark,
+
+Do you think it would be possible to have this merged in time for 3.7?
+
+Cheers!
+
+Pawel
+
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 4e932cc..a823951 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -404,6 +404,13 @@ config REGULATOR_TWL4030
+ 	  This driver supports the voltage regulators provided by
+ 	  this family of companion chips.
  
-+#define SCCTRL_TIMERENnSEL_SHIFT(n)	(15 + ((n) * 2))
++config REGULATOR_VEXPRESS
++	tristate "Versatile Express regulators"
++	depends on VEXPRESS_CONFIG
++	help
++	  This driver provides support for voltage regulators available
++	  on the ARM Ltd's Versatile Express platform.
 +
- static inline void sysctl_soft_reset(void __iomem *base)
- {
- 	/* switch to slow mode */
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 89b726d..3e4eda2 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -42,9 +42,11 @@ config COMMON_CLK_WM831X
- 
- config COMMON_CLK_VERSATILE
- 	tristate "Clock driver for ARM Reference designs"
--	depends on ARCH_INTEGRATOR || ARCH_REALVIEW
-+	depends on ARCH_INTEGRATOR || ARCH_REALVIEW || ARCH_VEXPRESS
- 	---help---
--          Supports clocking on ARM Reference designs Integrator/AP,
--	  Integrator/CP, RealView PB1176, EB, PB11MP and PBX.
-+          Supports clocking on ARM Reference designs:
-+	  - Integrator/AP and Integrator/CP
-+	  - RealView PB1176, EB, PB11MP and PBX
-+	  - Versatile Express
- 
- endmenu
-diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
-index 1e49a7a..c776053 100644
---- a/drivers/clk/versatile/Makefile
-+++ b/drivers/clk/versatile/Makefile
-@@ -2,4 +2,5 @@
- obj-$(CONFIG_ICST)		+= clk-icst.o
- obj-$(CONFIG_ARCH_INTEGRATOR)	+= clk-integrator.o
- obj-$(CONFIG_ARCH_REALVIEW)	+= clk-realview.o
-+obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= clk-vexpress-osc.o
-diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
+ config REGULATOR_WM831X
+ 	tristate "Wolfson Microelectronics WM831x PMIC regulators"
+ 	depends on MFD_WM831X
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 3342615..0d4e10f 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -55,6 +55,7 @@ obj-$(CONFIG_REGULATOR_TPS6586X) += tps6586x-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS65910) += tps65910-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS65912) += tps65912-regulator.o
+ obj-$(CONFIG_REGULATOR_TWL4030) += twl-regulator.o
++obj-$(CONFIG_REGULATOR_VEXPRESS) += vexpress.o
+ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-dcdc.o
+ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-isink.o
+ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-ldo.o
+diff --git a/drivers/regulator/vexpress.c b/drivers/regulator/vexpress.c
 new file mode 100644
-index 0000000..c742ac7
+index 0000000..a2682bb
 --- /dev/null
-+++ b/drivers/clk/versatile/clk-vexpress.c
-@@ -0,0 +1,142 @@
++++ b/drivers/regulator/vexpress.c
+@@ -0,0 +1,155 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -86,134 +78,147 @@ index 0000000..c742ac7
 + * Copyright (C) 2012 ARM Limited
 + */
 +
-+#include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
++#define DRVNAME "vexpress-regulator"
++#define pr_fmt(fmt) DRVNAME ": " fmt
++
++#include <linux/device.h>
 +#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/of_regulator.h>
 +#include <linux/vexpress.h>
 +
-+#include <asm/hardware/sp810.h>
-+
-+static struct clk *vexpress_sp810_timerclken[4];
-+static DEFINE_SPINLOCK(vexpress_sp810_lock);
-+
-+static void __init vexpress_sp810_init(void __iomem *base)
-+{
-+	int i;
-+
-+	if (WARN_ON(!base))
-+		return;
-+
-+	for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++) {
-+		char name[12];
-+		const char *parents[] = {
-+			"v2m:refclk32khz", /* REFCLK */
-+			"v2m:refclk1mhz" /* TIMCLK */
-+		};
-+
-+		snprintf(name, ARRAY_SIZE(name), "timerclken%d", i);
-+
-+		vexpress_sp810_timerclken[i] = clk_register_mux(NULL, name,
-+				parents, 2, 0, base + SCCTRL,
-+				SCCTRL_TIMERENnSEL_SHIFT(i), 1,
-+				0, &vexpress_sp810_lock);
-+
-+		if (WARN_ON(IS_ERR(vexpress_sp810_timerclken[i])))
-+			break;
-+	}
-+}
-+
-+
-+static const char * const vexpress_clk_24mhz_periphs[] __initconst = {
-+	"mb:uart0", "mb:uart1", "mb:uart2", "mb:uart3",
-+	"mb:mmci", "mb:kmi0", "mb:kmi1"
++struct vexpress_regulator {
++	struct regulator_desc desc;
++	struct regulator_dev *regdev;
++	struct vexpress_config_func *func;
 +};
 +
-+void __init vexpress_clk_init(void __iomem *sp810_base)
++static int vexpress_regulator_get_voltage(struct regulator_dev *regdev)
 +{
-+	struct clk *clk;
-+	int i;
++	struct vexpress_regulator *reg = rdev_get_drvdata(regdev);
++	u32 uV;
++	int err = vexpress_config_read(reg->func, 0, &uV);
 +
-+	clk = clk_register_fixed_rate(NULL, "dummy_apb_pclk", NULL,
-+			CLK_IS_ROOT, 0);
-+	WARN_ON(clk_register_clkdev(clk, "apb_pclk", NULL));
-+
-+	clk = clk_register_fixed_rate(NULL, "v2m:clk_24mhz", NULL,
-+			CLK_IS_ROOT, 24000000);
-+	for (i = 0; i < ARRAY_SIZE(vexpress_clk_24mhz_periphs); i++)
-+		WARN_ON(clk_register_clkdev(clk, NULL,
-+				vexpress_clk_24mhz_periphs[i]));
-+
-+	clk = clk_register_fixed_rate(NULL, "v2m:refclk32khz", NULL,
-+			CLK_IS_ROOT, 32768);
-+	WARN_ON(clk_register_clkdev(clk, NULL, "v2m:wdt"));
-+
-+	clk = clk_register_fixed_rate(NULL, "v2m:refclk1mhz", NULL,
-+			CLK_IS_ROOT, 1000000);
-+
-+	vexpress_sp810_init(sp810_base);
-+
-+	for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++)
-+		WARN_ON(clk_set_parent(vexpress_sp810_timerclken[i], clk));
-+
-+	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[0],
-+				"v2m-timer0", "sp804"));
-+	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[1],
-+				"v2m-timer1", "sp804"));
++	return err ? err : uV;
 +}
 +
-+#if defined(CONFIG_OF)
-+
-+struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
++static int vexpress_regulator_set_voltage(struct regulator_dev *regdev,
++		int min_uV, int max_uV, unsigned *selector)
 +{
-+	if (WARN_ON(clkspec->args_count != 1 || clkspec->args[0] >
-+			ARRAY_SIZE(vexpress_sp810_timerclken)))
-+		return NULL;
++	struct vexpress_regulator *reg = rdev_get_drvdata(regdev);
 +
-+	return vexpress_sp810_timerclken[clkspec->args[0]];
++	return vexpress_config_write(reg->func, 0, min_uV);
 +}
 +
-+static const __initconst struct of_device_id vexpress_fixed_clk_match[] = {
-+	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-+	{ .compatible = "arm,vexpress-osc", .data = vexpress_osc_of_setup, },
-+	{}
++static struct regulator_ops vexpress_regulator_ops_ro = {
++	.get_voltage = vexpress_regulator_get_voltage,
 +};
 +
-+void __init vexpress_clk_of_init(void)
++static struct regulator_ops vexpress_regulator_ops = {
++	.get_voltage = vexpress_regulator_get_voltage,
++	.set_voltage = vexpress_regulator_set_voltage,
++};
++
++static int vexpress_regulator_probe(struct platform_device *pdev)
 +{
-+	struct device_node *node;
-+	struct clk *clk;
-+	struct clk *refclk, *timclk;
++	int err;
++	struct vexpress_regulator *reg;
++	struct regulator_init_data *init_data;
++	struct regulator_config config = { };
 +
-+	of_clk_init(vexpress_fixed_clk_match);
-+
-+	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
-+	vexpress_sp810_init(of_iomap(node, 0));
-+	of_clk_add_provider(node, vexpress_sp810_of_get, NULL);
-+
-+	/* Select "better" (faster) parent for SP804 timers */
-+	refclk = of_clk_get_by_name(node, "refclk");
-+	timclk = of_clk_get_by_name(node, "timclk");
-+	if (!WARN_ON(IS_ERR(refclk) || IS_ERR(timclk))) {
-+		int i = 0;
-+
-+		if (clk_get_rate(refclk) > clk_get_rate(timclk))
-+			clk = refclk;
-+		else
-+			clk = timclk;
-+
-+		for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++)
-+			WARN_ON(clk_set_parent(vexpress_sp810_timerclken[i],
-+					clk));
++	reg = devm_kzalloc(&pdev->dev, sizeof(*reg), GFP_KERNEL);
++	if (!reg) {
++		err = -ENOMEM;
++		goto error_kzalloc;
 +	}
 +
-+	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[0],
-+				"v2m-timer0", "sp804"));
-+	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[1],
-+				"v2m-timer1", "sp804"));
++	reg->func = vexpress_config_func_get_by_dev(&pdev->dev);
++	if (!reg->func) {
++		err = -ENXIO;
++		goto error_get_func;
++	}
++
++	reg->desc.name = dev_name(&pdev->dev);
++	reg->desc.type = REGULATOR_VOLTAGE;
++	reg->desc.owner = THIS_MODULE;
++
++	init_data = of_get_regulator_init_data(&pdev->dev, pdev->dev.of_node);
++	if (!init_data) {
++		err = -EINVAL;
++		goto error_get_regulator_init_data;
++	}
++
++	init_data->constraints.apply_uV = 0;
++	if (init_data->constraints.min_uV && init_data->constraints.max_uV)
++		reg->desc.ops = &vexpress_regulator_ops;
++	else
++		reg->desc.ops = &vexpress_regulator_ops_ro;
++
++	config.dev = &pdev->dev;
++	config.init_data = init_data;
++	config.driver_data = reg;
++	config.of_node = pdev->dev.of_node;
++
++	reg->regdev = regulator_register(&reg->desc, &config);
++	if (IS_ERR(reg->regdev)) {
++		err = PTR_ERR(reg->regdev);
++		goto error_regulator_register;
++	}
++
++	platform_set_drvdata(pdev, reg);
++
++	return 0;
++
++error_regulator_register:
++error_get_regulator_init_data:
++	vexpress_config_func_put(reg->func);
++error_get_func:
++error_kzalloc:
++	return err;
 +}
 +
-+#endif
++static int __devexit vexpress_regulator_remove(struct platform_device *pdev)
++{
++	struct vexpress_regulator *reg = platform_get_drvdata(pdev);
++
++	vexpress_config_func_put(reg->func);
++	regulator_unregister(reg->regdev);
++
++	return 0;
++}
++
++static struct of_device_id vexpress_regulator_of_match[] = {
++	{ .compatible = "arm,vexpress-volt", },
++};
++
++static struct platform_driver vexpress_regulator_driver = {
++	.probe = vexpress_regulator_probe,
++	.remove = __devexit_p(vexpress_regulator_remove),
++	.driver	= {
++		.name = DRVNAME,
++		.owner = THIS_MODULE,
++		.of_match_table = vexpress_regulator_of_match,
++	},
++};
++
++static int __init vexpress_regulator_init(void)
++{
++	return platform_driver_register(&vexpress_regulator_driver);
++}
++
++static void __exit vexpress_regulator_exit(void)
++{
++	platform_driver_unregister(&vexpress_regulator_driver);
++}
++
++MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
++MODULE_DESCRIPTION("Versatile Express regulator");
++MODULE_LICENSE("GPL");
++
++module_init(vexpress_regulator_init);
++module_exit(vexpress_regulator_exit);
 -- 
 1.7.9.5
