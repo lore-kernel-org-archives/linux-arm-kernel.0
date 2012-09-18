@@ -1,30 +1,20 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Sep 2012 17:45:22 +0200
-Subject: [PATCH 1/1] ARM: ux500: Remove redundant #gpio-cell properties from
- Snowball DT
-Message-ID: <1347983122-15174-1-git-send-email-lee.jones@linaro.org>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Tue, 18 Sep 2012 17:45:59 +0200
+Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
+In-Reply-To: <20120918152430.GA5911@roeck-us.net>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
+ <20120918152430.GA5911@roeck-us.net>
+Message-ID: <20120918174559.227378fc@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This property has no place here as the populated node is not related
-to a GPIO controller.
+On Tue, 18 Sep 2012 08:24:30 -0700, Guenter Roeck wrote:
+> I don't even understand what you are trying to do, much less why you don't
+> just use the existing infrastructure, and I don't have time to try to figure
+> it out. Maybe Jean has time to review this driver, but not me.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/snowball.dts |    1 -
- 1 file changed, 1 deletion(-)
+No, I do not. My backlog is huge already :(
 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 2969997..702c0ba 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -127,7 +127,6 @@
- 			mmc-cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 
--			#gpio-cells = <1>;
- 			cd-gpios  = <&gpio6 26 0x4>; // 218
- 			cd-inverted;
- 
 -- 
-1.7.9.5
+Jean Delvare
