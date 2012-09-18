@@ -1,106 +1,97 @@
-From: zhanzhenbo@gmail.com (steve.zhan)
-Date: Tue, 18 Sep 2012 16:20:58 +0800
-Subject: ARM: smp: why don't eliminate warning "Unknown IPI message 0x1"?
-In-Reply-To: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
-References: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
-Message-ID: <CAKvkGKcm=pYkcqsESK_XPqJL09bde2+tHheUJwBDjPXLTn=vGQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Sep 2012 09:21:27 +0100
+Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for
+ clean and flush range
+In-Reply-To: <5057DFEB.40101@gmail.com>
+References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
+ <1347890398-22088-1-git-send-email-robherring2@gmail.com>
+ <20120917194733.GQ12245@n2100.arm.linux.org.uk>
+ <5057881A.9020604@gmail.com>
+ <20120917214732.GR12245@n2100.arm.linux.org.uk>
+ <5057DFEB.40101@gmail.com>
+Message-ID: <20120918082127.GA5990@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Below is the whole of the patch.
+On Tue, Sep 18, 2012 at 03:43:55AM +0100, Rob Herring wrote:
+> On 09/17/2012 04:47 PM, Russell King - ARM Linux wrote:
+> > On Mon, Sep 17, 2012 at 03:29:14PM -0500, Rob Herring wrote:
+> >> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
+> >>> (a) you're not describing hardware, you're describing a feature of the
+> >>>     Linux kernel's implementation - no, you're describing a configuration
+> >>>     feature of the kernel.  This should not be in DT.
+> >>> (b) you're disabling the optimization to avoid doing a lengthy line-by-line
+> >>>     cache operation when the size is larger than the cache size, and trading
+> >>>     it for possibly slightly quicker accesses.
+> >>>
+> >>> The problem I have with this is it's likely that you've only looked at
+> >>> "oh, this makes IO accesses faster" and not the total picture wrt the
+> >>> effect on time taken by the DMA API.
+> >>
+> >> I could easily "fix" this in the xgmac driver by using __raw_writel or
+> >> writel_relaxed, but that would break non-coherent operation which does
+> >> need the L2 cache barriers.
+> > 
+> > Note that in many cases, drivers do not need a barrier before every write
+> > or after every read operation.
+> > 
+> > In terms of L2 coherency, the only time that L2 actually needs to be
+> > touched is when your MMIO access provokes the device to read from memory.
+> > Most accesses do not.
+> 
+> Agreed. The current approach is a bit of a sledge hammer for relatively
+> few places that need it.
+> 
+> > The solution - using the relaxed MMIO accessors, not fiddling around
+> > with the L2 cache code.
+> 
+> I have done that in critical paths as well. As I explained in my
+> response to Catalin, too many barriers is not my problem. The network
+> transmit path is a single writel and one explicit wmb already. Using
+> relaxed accessors will only make both wmb's explicit. I still need them
+> at least for the L1 in the coherent case. Even if I'm coherent, I still
+> have to ensure the order the DMA descriptors are written and the order
+> of DMA descriptor writes with the DMA poll register write. But there are
+> not any universal L1 only barriers.
+> 
+> The sequence is like this:
+> Write out N DMA descriptors
+> barrier
+> Write 1st DMA descriptor's ready bit
+> barrier
+> Write DMA poll register
+> 
+> For non-coherent, the barrier needs to be a dsb and L2 sync. For
+> coherent, this only really needs to be a dsb. Removal of the spinlock is
+> enough to make the L2 sync a don't care.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index ea73045..8605400 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -25,6 +25,7 @@
- #include <linux/percpu.h>
- #include <linux/clockchips.h>
- #include <linux/completion.h>
-+#include <linux/threads.h>
+Is your platform coherent for all devices? You could override the
+outer_sync() to be a no-op. You wouldn't need it for other operations
+and DSB is enough.
 
- #include <linux/atomic.h>
- #include <asm/cacheflush.h>
-@@ -495,11 +496,28 @@ asmlinkage void __exception_irq_entry do_IPI(int
-ipinr, struct pt_regs *regs)
-        handle_IPI(ipinr, regs);
- }
+> > However, there's an in-built problem here - which I'm told of by PowerPC
+> > folk.  Apparantly, Linus refuses to accept that anyone needs relaxed MMIO
+> > accessors and essentially says "all platforms must behave like x86 does".
+> > I don't actually know Linus' real position, or what his position would be
+> > if he new that without relaxed accessors, we have to do a very time
+> > consuming operation...  It might be worth broaching the subject of true
+> > relaxed MMIO accessors again.
+> > 
+> > The only issue with that approach is getting people who don't have the
+> > problem (iow, x86 driver authors) to understand this issue - and that's
+> > where I absolutely agree with Linus' apparant position...
+> 
+> Also, how much of this knowledge should be in the driver? While I really
+> don't care if the xgmac driver works in non-coherent mode, that's
+> clearly not going to be acceptable. Differences between coherent or
+> non-coherent need to stay abstracted out of the drivers.
 
-+static int ipi_wakeup_nr[NR_CPUS];
-+
-+void smp_send_wakeup_ipi_begin(unsigned int cpu, unsigned int irq)
-+{
-+       ipi_wakeup_nr[cpu] = irq + 1;
-+       gic_raise_softirq(cpumask_of(cpu),irq);
-+}
-+
-+void smp_send_wakeup_ipi_end(unsigned int cpu, unsigned int irq)
-+{
-+       BUG_ON(ipi_wakeup_nr[cpu] != irq + 1);
-+       ipi_wakeup_nr[cpu] = 0;
-+}
-+
- void handle_IPI(int ipinr, struct pt_regs *regs)
- {
-        unsigned int cpu = smp_processor_id();
-        struct pt_regs *old_regs = set_irq_regs(regs);
+I agree. So you either change outer_sync() for your platform if it is
+fully coherent or improve the DMA API (the latter requiring wider
+acceptance, though it has more benefits).
 
-+       if (ipi_wakeup_nr[cpu] == ipinr + 1)
-+               goto Exit;
-+
-        if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
-                __inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
-
-@@ -537,6 +555,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-                       cpu, ipinr);
-                break;
-        }
-+Exit:
-        set_irq_regs(old_regs);
- }
-
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index db0117e..ecc6add 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -127,7 +127,7 @@ int __cpuinit boot_secondary(unsigned int cpu,
-struct task_struct *idle)
-         * the boot monitor to read the system wide flags register,
-         * and branch to the address found there.
-         */
--       gic_raise_softirq(cpumask_of(cpu), 1);
-+       smp_send_wakeup_ipi_begin(cpu, 0);
-
-        timeout = jiffies + (1 * HZ);
-        while (time_before(jiffies, timeout)) {
-@@ -137,6 +137,7 @@ int __cpuinit boot_secondary(unsigned int cpu,
-struct task_struct *idle)
-
-                udelay(10);
-        }
-+       smp_send_wakeup_ipi_end(cpu, 0);
-
-        /*
-         * now the secondary core is starting up let it run its
-
-
-2012/9/18, ??? <zhanzhenbo@gmail.com>:
-> Russell King want people to move to SGI0 for this, so that we can have
-> SGI1-N
-> as the proper IPIs, but now we can't do this, maybe we must wait for
-> so many years.
-> But, Do you think we can use a another way to resolve this problem,
-> because this warning message will oftenly appeare in products.
->
-> We can't assume the fixed IPI number that can wakeup secondary cores.
-> "I'd much rather see platforms deciding whether they need to use SGI1
-> or whether they can switch to SGI0 instead."
->
-> Just give one ugly idea. I have modify this for example in msm platform.
-> Pls check the attached git diff patch Or below lines and give your
-> suggestions
->
-
+Dropping the locks in cache-l2x0.c is not the right solution. It seems
+that you don't actually need the L2 cache sync for your device at all.
 
 -- 
-Steve Zhan
+Catalin
