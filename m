@@ -1,43 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 18 Sep 2012 07:50:04 -0500
-Subject: [PATCH v2] ARM: l2x0: make background cache ops optional for
- clean and flush range
-In-Reply-To: <alpine.LFD.2.02.1209171827260.28681@xanadu.home>
-References: <1347306334-781-1-git-send-email-robherring2@gmail.com>
- <1347890398-22088-1-git-send-email-robherring2@gmail.com>
- <20120917194733.GQ12245@n2100.arm.linux.org.uk> <5057881A.9020604@gmail.com>
- <alpine.LFD.2.02.1209171827260.28681@xanadu.home>
-Message-ID: <50586DFC.9000902@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Sep 2012 12:50:05 +0000
+Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <20120917230615.GA26502@codeaurora.org>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <201209172042.11860.arnd@arndb.de> <20120917230615.GA26502@codeaurora.org>
+Message-ID: <201209181250.05647.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2012 05:31 PM, Nicolas Pitre wrote:
-> On Mon, 17 Sep 2012, Rob Herring wrote:
+On Monday 17 September 2012, David Brown wrote:
+> There is also a lot of similarity between the mmci hardware and the
+> msm_sdcc hardware.  Enough so, that it is probably better for us to
+> make the mmci driver work with our hardware, rather than trying to
+> keep msm_sdcc going.
 > 
->> On 09/17/2012 02:47 PM, Russell King - ARM Linux wrote:
->>> Plus, because there's little justification behind this patch (apart
->>> from a vague reference to the speed of IO accesses) I'm going to say
->>> NAK to this until further information is forthcoming justifying this
->>> change.
->>>
->>
->> 30% faster network transmit rate with pktgen on highbank.
+> There is also an MSM nand device that appears to have not made it in.
+> It is heavily dependent on the weird features of the DMA hardware.  I
+> don't have any current plans to support this device, since most boards
+> using MSMs these days are using mmc/sd instead of bare NAND.
 > 
-> Please always include your benchmark results in the patch description. 
-> That is highly valuable information when looking at commit logs.
+> Our DMA hardware is really weird, but should be a bit reasonable.  It
+> is also being gradually replaced in newer chips with a different DMA
+> framework.
 > 
+> As far as I'm concerned, I consider making our DMA driver(s) use the
+> DMA engine API to be part of getting these platforms working with DT.
+> 
+> It is planned, but there are quite a few things that need to be
+> tackled first.
 
-Agreed as it would now be helpful if the original optimization to use
-background ops had some data as well:
+Ok, thanks for the information.
 
-    ARM: l2x0: Optimise the range based operations
-
-    For the big buffers which are in excess of cache size, the maintaince
-    operations by PA are very slow. For such buffers the maintainace
-    operations can be speeded up by using the WAY based method.
-
-    Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-    Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-    Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-
-Rob
+	Arnd
