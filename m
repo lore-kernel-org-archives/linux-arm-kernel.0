@@ -1,32 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Sep 2012 14:03:28 +0200
-Subject: [PATCH] spi/pl022: Devicetree support w/o platform data
-In-Reply-To: <1347901159-3665-1-git-send-email-stigge@antcom.de>
-References: <1347901159-3665-1-git-send-email-stigge@antcom.de>
-Message-ID: <CACRpkdbRQsLWT=xocPTQnLVU34MGSX6XgZ+-f3w-hOetzwnbuw@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 18 Sep 2012 17:38:04 +0530
+Subject: [REPOST PATCH v2 1/2] spi: omap2-mcspi: add pinctrl support
+In-Reply-To: <1347969685-15571-1-git-send-email-mporter@ti.com>
+References: <1347969685-15571-1-git-send-email-mporter@ti.com>
+Message-ID: <50586424.9040601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 6:59 PM, Roland Stigge <stigge@antcom.de> wrote:
+On Tuesday 18 September 2012 05:31 PM, Matt Porter wrote:
+> Adds pinctrl support to support OMAP platforms that boot from DT
+> and rely on pinctrl support to set pinmuxes.
+looks good
 
-> Even with devicetree support, we needed platform data to provide some data like
-> bus_id and enable_dma, leading to mixed device tree and platform data. This
-> patch makes it possible to provide all that information via device tree. Now,
-> the data must be provided via platform data _or_ device tree completely.
+Acked-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+
+
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  drivers/spi/spi-omap2-mcspi.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 >
-> Only in case of callback specification (dma_filter()), platform data is
-> necessary.
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-
-This looks good so:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-But I think you need to page Mark Brown so it
-gets picked to the stuff queued for the next merge window.
-I think the dependent patch is in his SPI tree.
-
-So I'd resend it to mark+grant with my ACK.
-
-Yours,
-Linus Walleij
+> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+> index b2fb141..9502566 100644
+> --- a/drivers/spi/spi-omap2-mcspi.c
+> +++ b/drivers/spi/spi-omap2-mcspi.c
+> @@ -38,6 +38,8 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pinctrl/consumer.h>
+> +#include <linux/err.h>
+>  
+>  #include <linux/spi/spi.h>
+>  
+> @@ -1124,6 +1126,7 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
+>  	static int		bus_num = 1;
+>  	struct device_node	*node = pdev->dev.of_node;
+>  	const struct of_device_id *match;
+> +	struct pinctrl *pinctrl;
+>  
+>  	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
+>  	if (master == NULL) {
+> @@ -1219,6 +1222,11 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
+>  	if (status < 0)
+>  		goto dma_chnl_free;
+>  
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl))
+> +		dev_warn(&pdev->dev,
+> +			"pins are not configured from the driver\n");
+> +
+>  	pm_runtime_use_autosuspend(&pdev->dev);
+>  	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
+>  	pm_runtime_enable(&pdev->dev);
