@@ -1,30 +1,40 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Sep 2012 13:46:58 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6 #3
-Message-ID: <1347943619-27649-1-git-send-email-horms@verge.net.au>
+Date: Tue, 18 Sep 2012 13:46:59 +0900
+Subject: [PATCH] ARM: shmobile: kzm9g: bugfix: correct mmcif interrupt settings
+In-Reply-To: <1347943619-27649-1-git-send-email-horms@verge.net.au>
+References: <1347943619-27649-1-git-send-email-horms@verge.net.au>
+Message-ID: <1347943619-27649-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-please consider the following fix for the KZM-A9-GT board for 3.6.
+Correct interrupt settings of sh_mmc:int and sh_mmc:error in board-kzm9g.c.
 
-----------------------------------------------------------------
-The following changes since commit 28e515878f8896b33c325ff9767cb0237210fb4c:
-
-  ARM: shmobile: armadillo800eva: enable rw rootfs mount (2012-09-03 17:31:34 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
-
-for you to fetch changes up to a704835d6a7a8254067a1be60d614cd5c0c73e44:
-
-  ARM: shmobile: kzm9g: bugfix: correct mmcif interrupt settings (2012-09-18 11:19:44 +0900)
-
-----------------------------------------------------------------
-Tetsuyuki Kobayashi (1):
-      ARM: shmobile: kzm9g: bugfix: correct mmcif interrupt settings
-
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
  arch/arm/mach-shmobile/board-kzm9g.c |    4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 53b7ea9..3b8a017 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -346,11 +346,11 @@ static struct resource sh_mmcif_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= gic_spi(141),
++		.start	= gic_spi(140),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	[2] = {
+-		.start	= gic_spi(140),
++		.start	= gic_spi(141),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+-- 
+1.7.10.4
