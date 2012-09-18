@@ -1,29 +1,31 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 18 Sep 2012 14:13:05 +0200
-Subject: [PATCH 09/19] ARM: ux500: Enable SSP (SPI) for HREF when booting
- Device Tree
-In-Reply-To: <CACRpkdZLdernphVSfwHS43HptS+33=PzorihQ0bBKm689u_oFw@mail.gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaC_enpxUFNM_wteAQWKER_naUNUH-s1pJtiGzVFSV+og@mail.gmail.com>
- <505757D8.8090405@antcom.de>
- <CACRpkdZLdernphVSfwHS43HptS+33=PzorihQ0bBKm689u_oFw@mail.gmail.com>
-Message-ID: <50586551.5020404@antcom.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Sep 2012 13:21:11 +0100
+Subject: [PATCH 00/15] KVM/ARM Implementation
+In-Reply-To: <20120915153359.21241.86002.stgit@ubuntu>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+Message-ID: <20120918122111.GI32204@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Christoffer,
 
-On 09/18/2012 02:08 PM, Linus Walleij wrote:
->> When we have sorted out this driver change (please check the new pl022
->> specific dt property names!), I will provide patches for arm-soc to
->> actually use this new interface via dts files.
+On Sat, Sep 15, 2012 at 04:34:29PM +0100, Christoffer Dall wrote:
+> The following series implements KVM support for ARM processors,
+> specifically on the Cortex A-15 platform.  We feel this is ready to be
+> merged.
 > 
-> OK cool I guess you will do this for the LPC32xx? Or are you testing
-> this on some other platforms?
+> Work is done in collaboration between Columbia University, Virtual Open
+> Systems and ARM/Linaro.
+> 
+> The patch series applies to Linux 3.6-rc5 with a number of merges:
+>  1. git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git
+>         branch: io (fc8a08c3a3a)
 
-LPC32xx for now. The new code is backwards compatible, so I'd prefer for
-others to adopt and test it on their platforms individually before
-patching everything at once without testing.
+This is a rebasing branch. If you want to merge it, I can push a separate
+stable branch for you if you like? That said, I imagine the only patch you
+want from there is the non-writeback I/O accessors, so I could just stick
+that somewhere else until it hits mainline.
 
-Roland
+Let me know,
+
+Will
