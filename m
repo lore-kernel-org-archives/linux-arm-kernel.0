@@ -1,146 +1,167 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 18 Sep 2012 10:52:07 +0200
-Subject: [PATCH 3/8] ARM: OMAP: omap_device: register to the per-device PM QoS
- framework
+Date: Tue, 18 Sep 2012 10:52:11 +0200
+Subject: [PATCH 7/8] ARM: OMAP: convert I2C driver to PM QoS for latency
+ constraints
 In-Reply-To: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
 References: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1347958332-2205-4-git-send-email-j-pihet@ti.com>
+Message-ID: <1347958332-2205-8-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the devices wake-up latency constraints using the global
-device PM QoS notification handler which applies the constraints to the
-underlying layer by calling the corresponding function at hwmod level.
+Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
+API to the new PM QoS API.
+Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
+class of PM QoS. The resulting MPU constraints are used by cpuidle to
+decide the next power state of the MPU subsystem.
 
-Reworked after Paul's suggestions.
-
-Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using wake-up
-latency constraints on MPU, CORE and PER.
+The I2C device latency timing is derived from the FIFO size and the
+clock speed and so is applicable to all OMAP SoCs.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/plat-omap/omap_device.c |   81 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 80 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/i2c.c      |   21 ---------------------
+ drivers/i2c/busses/i2c-omap.c |   28 +++++++++++++++++-----------
+ include/linux/i2c-omap.h      |    1 -
+ 3 files changed, 17 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index c490240..011825f 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -3,6 +3,7 @@
-  * omap_device implementation
-  *
-  * Copyright (C) 2009-2010 Nokia Corporation
-+ * Copyright (C) 2012 Texas Instruments, Inc.
-  * Paul Walmsley, Kevin Hilman
-  *
-  * Developed in collaboration with (alphabetical order): Benoit
-@@ -89,6 +90,7 @@
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index db071bc..dba8338 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -26,7 +26,6 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c-omap.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
+@@ -34,7 +33,6 @@
+ #include <mach/irqs.h>
+ #include <plat/mux.h>
+ #include <plat/i2c.h>
+-#include <plat/omap-pm.h>
+ #include <plat/omap_device.h>
+ 
+ #define OMAP_I2C_SIZE		0x3f
+@@ -129,16 +127,6 @@ static inline int omap1_i2c_add_bus(int bus_id)
+ 
+ 
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+-/*
+- * XXX This function is a temporary compatibility wrapper - only
+- * needed until the I2C driver can be converted to call
+- * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
+- */
+-static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
+-{
+-	omap_pm_set_max_mpu_wakeup_lat(dev, t);
+-}
+-
+ static inline int omap2_i2c_add_bus(int bus_id)
+ {
+ 	int l;
+@@ -170,15 +158,6 @@ static inline int omap2_i2c_add_bus(int bus_id)
+ 	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
+ 	pdata->flags = dev_attr->flags;
+ 
+-	/*
+-	 * When waiting for completion of a i2c transfer, we need to
+-	 * set a wake up latency constraint for the MPU. This is to
+-	 * ensure quick enough wakeup from idle, when transfer
+-	 * completes.
+-	 * Only omap3 has support for constraints
+-	 */
+-	if (cpu_is_omap34xx())
+-		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+ 	pdev = omap_device_build(name, bus_id, oh, pdata,
+ 			sizeof(struct omap_i2c_bus_platform_data),
+ 			NULL, 0, 0);
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 5d19a49..bd45cee 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -43,6 +43,7 @@
+ #include <linux/slab.h>
+ #include <linux/i2c-omap.h>
  #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
 +#include <linux/pm_qos.h>
  
- #include <plat/omap_device.h>
- #include <plat/omap_hwmod.h>
-@@ -401,6 +403,72 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 	return NOTIFY_DONE;
- }
+ /* I2C controller revisions */
+ #define OMAP_I2C_OMAP1_REV_2		0x20
+@@ -183,8 +184,7 @@ struct omap_i2c_dev {
+ 	struct completion	cmd_complete;
+ 	struct resource		*ioarea;
+ 	u32			latency;	/* maximum mpu wkup latency */
+-	void			(*set_mpu_wkup_lat)(struct device *dev,
+-						    long latency);
++	struct pm_qos_request	pm_qos_request;
+ 	u32			speed;		/* Speed of bus in kHz */
+ 	u32			dtrev;		/* extra revision from DT */
+ 	u32			flags;
+@@ -590,8 +590,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 	if (r < 0)
+ 		goto out;
  
-+/**
-+ * _omap_device_pm_qos_handler - interface to the per-device PM QoS framework
-+ * @nb: pointer to omap_device_pm_qos_nb (not used)
-+ * @new_value: new maximum wakeup latency constraint for @req->dev (in us)
-+ * @req: struct dev_pm_qos_request * passed by the Linux PM QoS code
-+ *
-+ * Called by the Linux core device PM QoS code to alter the maximum
-+ * wakeup latency constraint on a device.  If the underlying device is
-+ * an omap_device, then this code will pass the constraint on to the
-+ * underlying hwmods.  Returns -EINVAL if this code can't handle the
-+ * constraint for some reason, or passes along the return code from the
-+ * hwmod wakeup latency constraint functions.
-+ */
-+static int _omap_device_pm_qos_handler(struct notifier_block *nb,
-+				       unsigned long new_value,
-+				       void *req)
-+{
-+	struct omap_device *od;
-+	struct omap_hwmod *oh;
-+	struct platform_device *pdev;
-+	struct dev_pm_qos_request *dev_pm_qos_req = req;
-+	int ret = NOTIFY_OK;
-+	int r, i;
-+
-+	pr_debug("OMAP PM constraints: req at 0x%p, new_value=%lu\n",
-+		 req, new_value);
-+
-+	/* Look for the platform device for the constraint target device */
-+	pdev = to_platform_device(dev_pm_qos_req->dev);
-+
-+	/* Try to catch non platform devices */
-+	if (pdev->name == NULL) {
-+		pr_err("%s: Error: platform device for device %s not valid\n",
-+		       __func__, dev_name(dev_pm_qos_req->dev));
-+		return NOTIFY_DONE;
-+	}
-+
-+	/* Find the associated omap_device for dev */
-+	od = to_omap_device(pdev);
-+	if (od == NULL) {
-+		pr_err("%s: Error: no omap_device for device %s\n",
-+		       __func__, dev_name(dev_pm_qos_req->dev));
-+		return NOTIFY_DONE;
-+	}
-+
-+	pr_debug("OMAP PM constraints: req at 0x%p, dev=0x%p, new_value=%lu\n",
-+		 req, dev_pm_qos_req->dev, new_value);
-+
-+	for (i = 0; i < od->hwmods_cnt; i++) {
-+		oh = od->hwmods[i];
-+		if (new_value == PM_QOS_DEV_LAT_DEFAULT_VALUE)
-+			r = omap_hwmod_remove_wakeuplat_constraint(
-+							oh,
-+							dev_pm_qos_req);
-+		else
-+			r = omap_hwmod_set_wakeuplat_constraint(
-+							oh,
-+							dev_pm_qos_req,
-+							new_value);
-+
-+		if (!r)
-+			ret = NOTIFY_BAD;
-+	}
-+
-+	return ret;
-+}
+-	if (dev->set_mpu_wkup_lat != NULL)
+-		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
++	/*
++	 * When waiting for completion of a i2c transfer, we need to
++	 * set a wake up latency constraint for the MPU. This is to
++	 * ensure quick enough wakeup from idle, when transfer
++	 * completes.
++	 */
++	if (dev->latency)
++		pm_qos_add_request(&dev->pm_qos_request,
++				   PM_QOS_CPU_DMA_LATENCY,
++				   dev->latency);
  
- /* Public functions for use by core code */
+ 	for (i = 0; i < num; i++) {
+ 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
+@@ -599,8 +607,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 			break;
+ 	}
  
-@@ -1115,13 +1183,24 @@ int omap_device_enable_clocks(struct omap_device *od)
- 	return 0;
- }
+-	if (dev->set_mpu_wkup_lat != NULL)
+-		dev->set_mpu_wkup_lat(dev->dev, -1);
++	if (dev->latency)
++		pm_qos_remove_request(&dev->pm_qos_request);
  
-+static struct notifier_block omap_device_pm_qos_nb = {
-+	.notifier_call = _omap_device_pm_qos_handler,
-+};
-+
- static struct notifier_block platform_nb = {
- 	.notifier_call = _omap_device_notifier_call,
+ 	if (r == 0)
+ 		r = num;
+@@ -989,7 +997,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	} else if (pdata != NULL) {
+ 		dev->speed = pdata->clkrate;
+ 		dev->flags = pdata->flags;
+-		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+ 		dev->dtrev = pdata->rev;
+ 	}
+ 
+@@ -1046,10 +1053,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		else
+ 			dev->b_hw = 1; /* Enable hardware fixes */
+ 
+-		/* calculate wakeup latency constraint for MPU */
+-		if (dev->set_mpu_wkup_lat != NULL)
+-			dev->latency = (1000000 * dev->fifo_size) /
+-				       (1000 * dev->speed / 8);
++		/* calculate wakeup latency constraint */
++		dev->latency = (1000000 * dev->fifo_size) /
++			       (1000 * dev->speed / 8);
+ 	}
+ 
+ 	/* reset ASAP, clearing any IRQs */
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index 92a0dc7..df804ba 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -34,7 +34,6 @@ struct omap_i2c_bus_platform_data {
+ 	u32		clkrate;
+ 	u32		rev;
+ 	u32		flags;
+-	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
  };
  
- static int __init omap_device_init(void)
- {
-+	int ret;
-+
- 	bus_register_notifier(&platform_bus_type, &platform_nb);
--	return 0;
-+
-+	ret = dev_pm_qos_add_global_notifier(&omap_device_pm_qos_nb);
-+	if (ret)
-+		pr_err("omap_device: cannot add global notifier for dev PM QoS\n");
-+
-+	return ret;
- }
- core_initcall(omap_device_init);
+ #endif
 -- 
 1.7.7.6
