@@ -1,26 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2012 11:04:39 +0100
-Subject: ARM: hw_breakpoint: silent EPERM when setting ARM_DSCR_MDBGEN on
- ARM_DEBUG_ARCH_V7_ECP14
-In-Reply-To: <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
-References: <CAPfQmK+jYnVybyrBcnNkbm=Ta+7hjPNh5TqiL2tAFY8YBTyLEw@mail.gmail.com>
- <20120913214102.GB11399@mudshark.cambridge.arm.com>
- <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
-Message-ID: <20120918100438.GC32204@mudshark.cambridge.arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 18 Sep 2012 12:09:46 +0200
+Subject: [PATCH] ARM: ux500: fix spi2 pin group
+Message-ID: <1347962986-12280-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 09:08:24AM +0100, Valentin Pistol wrote:
-> Is there a reliable way to determine that they are locked down?
-> Any particular register/bit I can check to confirm?
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-You can take a look at the DBGAUTHSTATUS register and try to determine the
-signal values for SPNIDEN, DBGEN and NIDEN.
+GPIO216_AG12 is configured as a gpio for SPI2, so select
+the spi2_oc1_2 pin group instead of spi2_oc1_1
 
-> > Completely untested patch below, please let me know how you get on...
-> 
-> Looks good, I'll give it a try.
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi Olof, Arnd:
 
-Great. Let me know if it helps and, if so, I'll merge it.
+Again I'd prefer to take this through the pinctrl tree if it's
+OK with you. We are deploying pinctrl internally and ironing out
+bugs as we test more and more use cases.
+---
+ arch/arm/mach-ux500/board-mop500-pins.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index f0affc3..a96b945 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -219,7 +219,7 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_MUX("usb_a_1", "usb", "musb-ux500.0"),
+ 	DB8500_PIN("GPIO257_AE29", out_hi, "musb-ux500.0"), /* STP */
+ 	/* Mux in SPI2 pins on the "other C1" altfunction */
+-	DB8500_MUX("spi2_oc1_1", "spi2", "spi2"),
++	DB8500_MUX("spi2_oc1_2", "spi2", "spi2"),
+ 	DB8500_PIN("GPIO216_AG12", gpio_out_hi, "spi2"), /* FRM */
+ 	DB8500_PIN("GPIO218_AH11", in_pd, "spi2"), /* RXD */
+ 	DB8500_PIN("GPIO215_AH13", out_lo, "spi2"), /* TXD */
+-- 
+1.7.11.3
