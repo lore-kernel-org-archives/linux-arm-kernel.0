@@ -1,105 +1,92 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Sep 2012 17:02:17 +0300
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
-References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20120918140213.GA27463@arwen.pp.htv.fi>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 18 Sep 2012 15:17:42 +0100
+Subject: [PATCH v2 00/13] Versatile Express infrastructure
+Message-ID: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 06:10:50PM +0530, Sourav Poddar wrote:
-> Greg's tty-next is not booting on 2420 based N800. The failure is
-> observed at serial init itself. The reason might be that n800 tries to
-> resume even though it is not suspended before.
-> 
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Hi All,
 
-FWIW:
+This is a second version of the series I posted two weeks ago.
+It has been heavily reworked based on feedback - mainly there
+is no special bus_type and the interaction between a device
+and a bridge is much more similar to what clocks/interrupts/
+GPIOs are doing.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+I believe I have Cc-ed all relevant maintainers (input,
+fb, hwmon, regulators, common clock) in the subsystem-specific
+patches (1 to 6). If the code looks good I'll prepare a git
+pull request for Arnd and Olof with patches 7 to 13. I still
+hope to get this series merged in 3.7 window.
 
-Paul does this fix the issue for you ? Note that it depends on a
-previous patch Sourav sent [1]
+Regards
 
-[1] http://marc.info/?l=linux-omap&m=134796819607889&w=2
+Pawel
 
-There's one thing that gets my attention, though, why only n800 would
-fail here ?
 
-I wonder if we should be using:
+Pawel Moll (13):
+  input: ambakmi: (Un)prepare clocks when (dis)enabling
+  video: Versatile Express display output driver
+  hwmon: Versatile Express hwmon driver
+  regulators: Versatile Express regulator driver
+  clk: Versatile Express clock generators ("osc") driver
+  clk: Common clocks implementation for Versatile Express
+  misc: Versatile Express config infrastructure
+  mfd: Versatile Express system registers driver
+  ARM: vexpress: Reset driver
+  ARM: vexpress: Add config bus components and clocks to DTs
+  ARM: vexpress: Start using new Versatile Express infrastructure
+  ARM: vexpress: Remove motherboard dependencies in the DTS files
+  ARM: vexpress: Make the DEBUG_LL UART detection more specific
 
-pm_runtime_set_active(dev);
-pm_runtime_get_enable(dev);
-
-to prevent our runtime_resume() to be called from probe, but Sourav
-tested and it doesn't work on BeagleBoard, but it works on PandaBoard.
-
-Does it ring any bell ??
-
-> ---
-> This patch is developed on top of greg's tty-next branch
-> CommitId: e740d8f tty: serial: Samsung: Fix return value +
-> the following patch which I have already posted to the mailing list.
-> http://comments.gmane.org/gmane.linux.ports.arm.omap/84729
-> 
->  drivers/tty/serial/omap-serial.c |   11 ++++++++++-
->  1 files changed, 10 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 3c05c5e..bc355f2 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -110,6 +110,7 @@ struct uart_omap_port {
->  	u32			calc_latency;
->  	struct work_struct	qos_work;
->  	struct pinctrl		*pins;
-> +	unsigned int		suspended:1;
->  };
->  
->  #define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
-> @@ -1545,14 +1546,20 @@ static int serial_omap_runtime_suspend(struct device *dev)
->  	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
->  	schedule_work(&up->qos_work);
->  
-> +	up->suspended = true;
-> +
->  	return 0;
->  }
->  
->  static int serial_omap_runtime_resume(struct device *dev)
->  {
->  	struct uart_omap_port *up = dev_get_drvdata(dev);
-> +	u32 loss_cnt;
-> +
-> +	if (!up->suspended)
-> +		return 0;
->  
-> -	u32 loss_cnt = serial_omap_get_context_loss_count(up);
-> +	loss_cnt = serial_omap_get_context_loss_count(up);
->  
->  	if (up->context_loss_cnt != loss_cnt)
->  		serial_omap_restore_context(up);
-> @@ -1560,6 +1567,8 @@ static int serial_omap_runtime_resume(struct device *dev)
->  	up->latency = up->calc_latency;
->  	schedule_work(&up->qos_work);
->  
-> +	up->suspended = false;
-> +
->  	return 0;
->  }
->  #endif
-> -- 
-> 1.7.1
-> 
+ .../devicetree/bindings/arm/vexpress-sysreg.txt    |   50 ++
+ Documentation/devicetree/bindings/arm/vexpress.txt |   68 ++-
+ arch/arm/Kconfig                                   |    4 +-
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  145 +++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  145 +++++-
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  115 ++++-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  179 ++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |   79 ++-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  125 ++++-
+ arch/arm/include/asm/hardware/sp810.h              |    6 +-
+ arch/arm/mach-vexpress/Makefile                    |    2 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |   41 +-
+ arch/arm/mach-vexpress/include/mach/debug-macro.S  |   10 +-
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |   81 ---
+ arch/arm/mach-vexpress/include/mach/uncompress.h   |   12 +-
+ arch/arm/mach-vexpress/platsmp.c                   |    3 +-
+ arch/arm/mach-vexpress/reset.c                     |  141 +++++
+ arch/arm/mach-vexpress/v2m.c                       |  350 ++++---------
+ drivers/clk/Kconfig                                |    8 +-
+ drivers/clk/versatile/Makefile                     |    2 +
+ drivers/clk/versatile/clk-vexpress-osc.c           |  146 ++++++
+ drivers/clk/versatile/clk-vexpress.c               |  142 +++++
+ drivers/hwmon/Kconfig                              |    8 +
+ drivers/hwmon/Makefile                             |    1 +
+ drivers/hwmon/vexpress.c                           |  330 ++++++++++++
+ drivers/input/serio/ambakmi.c                      |    6 +-
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/vexpress-sysreg.c                      |  542 ++++++++++++++++++++
+ drivers/misc/Kconfig                               |    6 +
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/vexpress-config.c                     |  276 ++++++++++
+ drivers/regulator/Kconfig                          |    7 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/vexpress.c                       |  155 ++++++
+ drivers/video/Makefile                             |    3 +
+ drivers/video/vexpress-dvi.c                       |  208 ++++++++
+ include/linux/vexpress.h                           |  100 ++++
+ 37 files changed, 3067 insertions(+), 432 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
+ create mode 100644 arch/arm/mach-vexpress/reset.c
+ create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
+ create mode 100644 drivers/clk/versatile/clk-vexpress.c
+ create mode 100644 drivers/hwmon/vexpress.c
+ create mode 100644 drivers/mfd/vexpress-sysreg.c
+ create mode 100644 drivers/misc/vexpress-config.c
+ create mode 100644 drivers/regulator/vexpress.c
+ create mode 100644 drivers/video/vexpress-dvi.c
+ create mode 100644 include/linux/vexpress.h
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/c854c223/attachment-0001.sig>
+1.7.9.5
