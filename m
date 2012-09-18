@@ -1,36 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2012 14:08:21 +0100
-Subject: [PATCH 05/15] ARM: Expose PMNC bitfields for KVM use
-In-Reply-To: <20120915153502.21241.13218.stgit@ubuntu>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153502.21241.13218.stgit@ubuntu>
-Message-ID: <20120918130821.GN32204@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Sep 2012 13:13:30 +0000
+Subject: [PATCH] spi/pl022: Devicetree support w/o platform data
+In-Reply-To: <1347972540-29667-1-git-send-email-stigge@antcom.de>
+References: <1347972540-29667-1-git-send-email-stigge@antcom.de>
+Message-ID: <201209181313.30880.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2012 at 04:35:02PM +0100, Christoffer Dall wrote:
-> From: Rusty Russell <rusty.russell@linaro.org>
-> 
-> We want some of these for use in KVM, so pull them out of
-> arch/arm/kernel/perf_event_v7.c into their own asm/perf_bits.h.
-> 
-> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
->  arch/arm/include/asm/perf_bits.h |   56 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/perf_event_v7.c  |   51 +----------------------------------
->  2 files changed, 57 insertions(+), 50 deletions(-)
->  create mode 100644 arch/arm/include/asm/perf_bits.h
+On Tuesday 18 September 2012, Roland Stigge wrote:
+> --- linux-2.6.orig/Documentation/devicetree/bindings/spi/spi_pl022.txt
+> +++ linux-2.6/Documentation/devicetree/bindings/spi/spi_pl022.txt
+> @@ -10,6 +10,15 @@ Optional properties:
+>  - cs-gpios : should specify GPIOs used for chipselects.
+>    The gpios will be referred to as reg = <index> in the SPI child nodes.
+>    If unspecified, a single SPI device without a chip select can be used.
+> +- pl022,bus-id : Bus ID (0, 1, ...)
 
-I don't like this I'm afraid. These bit definitions, although useful for
-kvm, are only applicable to ARMv7 PMUs. Perf does a reasonable job of
-separating the low-level CPU-specific code and adding the v7 definitions
-into their own global header feels like a step backwards. I also want to
-move a load of this into drivers/ at some point and this won't help with
-that effort.
+I don't understand why we need the bus-id here. My understanding is that
+this is a linux-specific number that should not be necessary when all
+devices are described in the device tree rather than through spi_board_info.
 
-Is KVM just using this for world switch? If so, why does it care about the
-bit definitions (and what do you do for things like debug regs)? Is there
-anything I could add to perf that you could call instead?
+Can't you just set master->bus_num to -1 when using the DT for probing?
 
-Will
+> +- pl022,enable-dma : enables DMA driven transfers (boolean)
+
+Similar thing here: Can't you just set the enable_dma flag when
+a dma channel is provided in the device tree and unset it otherwise?
+
+It also seems a bit pointless to enable DMA mode when you don't provide
+a way to specify the channel at the same time.
+
+	Arnd
