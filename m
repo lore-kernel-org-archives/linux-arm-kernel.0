@@ -1,52 +1,49 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 18:03:39 +0100
-Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
-In-Reply-To: <20120918160909.GA15587@opensource.wolfsonmicro.com>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
- <20120918150212.GA12543@opensource.wolfsonmicro.com>
- <1347983056.11116.11.camel@hornet>
- <20120918160909.GA15587@opensource.wolfsonmicro.com>
-Message-ID: <1347987819.11116.38.camel@hornet>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 18 Sep 2012 11:13:23 -0600
+Subject: [PATCH 1/2] ARM: pci: Keep pci_common_init() around after init
+In-Reply-To: <1347657078-32230-2-git-send-email-thierry.reding@avionic-design.de>
+References: <1347657078-32230-1-git-send-email-thierry.reding@avionic-design.de>
+ <1347657078-32230-2-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <CAErSpo7bix_4bayh2ha_yogwNiLACU7Bymd_H5ur1wxF-tmTNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-18 at 17:09 +0100, Mark Brown wrote:
-> On Tue, Sep 18, 2012 at 04:44:16PM +0100, Pawel Moll wrote:
-> 
-> > Well, that's what it really is. The config API sends a request "set xyz
-> > uV" to the microcontrollers. And the micro can (at least in theory) get
-> > you any voltage within the min/max limits by whatever means it has (at
-> > least some of the daugtherboards use micro's DAC to adjust reference
-> > voltage for a DC/DC converter with a feedback loop using ADC).
-> 
-> And the microcontroller is incapable of telling us what it supports, 
+On Fri, Sep 14, 2012 at 3:11 PM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> When using deferred driver probing, PCI host controller drivers may
+> actually require this function after the init stage.
+>
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+>  arch/arm/kernel/bios32.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 2b2f25e..7288093 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -423,7 +423,7 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>         return irq;
+>  }
+>
+> -static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+> +static void __devinit pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
 
-No, there is no such . Device Tree defines per-device min/max
-constraints and any value between these values should be supported.
+Shouldn't we just remove __init completely, since Greg KH is in the
+process of removing __devinit?
 
-> or even what's physically present?
-
-You mean read back what voltage is set now? By all means - that's what
-it is doing for "read only" devices.
-
-> > But fair enough, I should have done better work in describing this.
-> 
-> So this is going to break interoperation with a bunch of consumer
-> drivers that rely on being able to tell what voltages are supported.
-> The key thing for them would be that regulator_is_supported_voltage()
-> works, currently it relies on list_voltage() as that's the only way to
-> do that right now.
-
-Ok, I guess I should use regulator_list_voltage_linear() and
-regulator_map_voltage_linear() then? I'll just have to carefully think
-what step to choose.
-
-> > v3 to follow.
-> 
-> v3?  I didn't see V2.  Please also CC posts to the relevant mailing
-> lists for the subsystem (lkml in this case).
-
-Sure, will do.
-
-Pawel
+>  {
+>         struct pci_sys_data *sys = NULL;
+>         int ret;
+> @@ -472,7 +472,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+>         }
+>  }
+>
+> -void __init pci_common_init(struct hw_pci *hw)
+> +void __devinit pci_common_init(struct hw_pci *hw)
+>  {
+>         struct pci_sys_data *sys;
+>         LIST_HEAD(head);
+> --
+> 1.7.12
+>
