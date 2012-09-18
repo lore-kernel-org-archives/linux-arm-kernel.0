@@ -1,68 +1,33 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Sep 2012 10:31:52 -0700
-Subject: [PATCH V5 4/5] ARM: bcm2835: add stub clock driver
-In-Reply-To: <1347690093-16910-4-git-send-email-swarren@wwwdotorg.org>
-References: <1347690093-16910-1-git-send-email-swarren@wwwdotorg.org>
- <1347690093-16910-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120918173152.17033.40823@nucleus>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 18 Sep 2012 10:33:21 -0700
+Subject: ARM: smp: why don't eliminate warning "Unknown IPI message 0x1"?
+In-Reply-To: <20120918093853.GW12245@n2100.arm.linux.org.uk>
+References: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
+ <20120918093853.GW12245@n2100.arm.linux.org.uk>
+Message-ID: <5058B061.5020902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2012-09-14 23:21:32)
-> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-> new file mode 100644
-> index 0000000..148ac35
-> --- /dev/null
-> +++ b/drivers/clk/clk-bcm2835.c
-> @@ -0,0 +1,52 @@
-> +/*
-> + * Copyright (C) 2010 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-private.h>
-> +#include <linux/clk-provider.h>
+On 09/18/12 02:38, Russell King - ARM Linux wrote:
+> On Tue, Sep 18, 2012 at 04:07:49PM +0800, ??? wrote:
+>> Russell King want people to move to SGI0 for this, so that we can have SGI1-N
+>> as the proper IPIs, but now we can't do this, maybe we must wait for
+>> so many years.
+>> But, Do you think we can use a another way to resolve this problem,
+>> because this warning message will oftenly appeare in products.
+>>
+>> We can't assume the fixed IPI number that can wakeup secondary cores.
+>> "I'd much rather see platforms deciding whether they need to use SGI1
+>> or whether they can switch to SGI0 instead."
+> Why not just fix your platform to use SGI0.  I think we're _finally_
+> there with everyone using SGI0, which means we can commit the patch
+> which fixes this.
+>
 
-No need to include clk-provider.h or clk.h if you pull in clk-private.h.
+Yes. I'm going to put it in the patch tracker now.
 
-Do you really need clk-private.h?  I really hate that approach and I'm
-trying to minimize the number of platforms using those interfaces.  I
-plan to delete clk-private.h once OMAP and Tegra move away from
-statically initialized clocks needed during early boot.
+https://patchwork.kernel.org/patch/1433931/
 
-> +#include <linux/clkdev.h>
-> +#include <linux/clk/bcm2835.h>
-> +
-> +/*
-> + * These are fixed clocks (and device tree doesn't support clk!).
-> + *
-> + * They're probably not all root clocks and it may be possible to
-> + * turn them on and off but until this is mapped out better it's
-> + * the only way they can be used.
-> + */
-> +DEFINE_CLK_FIXED_RATE(sys_pclk,   CLK_IS_ROOT, 250000000, 0);
-> +DEFINE_CLK_FIXED_RATE(apb_pclk,   CLK_IS_ROOT, 126000000, 0);
-> +DEFINE_CLK_FIXED_RATE(uart0_pclk, CLK_IS_ROOT,   3000000, 0);
-> +DEFINE_CLK_FIXED_RATE(uart1_pclk, CLK_IS_ROOT, 125000000, 0);
-> +
-
-How about:
-
-clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT, 250000000);
-
-Regards,
-Mike
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
