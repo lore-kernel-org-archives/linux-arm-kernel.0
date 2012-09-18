@@ -1,54 +1,68 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Sep 2012 13:24:26 -0400
-Subject: [GIT PULL V2 1/4] ARM: Kirkwood: DT bindings for v3.7
-In-Reply-To: <20120913053045.GB24290@quad.lixom.net>
-References: <20120829001129.GO19437@titan.lakedaemon.net>
- <20120910054835.GC15277@titan.lakedaemon.net>
- <20120913053045.GB24290@quad.lixom.net>
-Message-ID: <20120918172426.GL5469@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Sep 2012 10:31:52 -0700
+Subject: [PATCH V5 4/5] ARM: bcm2835: add stub clock driver
+In-Reply-To: <1347690093-16910-4-git-send-email-swarren@wwwdotorg.org>
+References: <1347690093-16910-1-git-send-email-swarren@wwwdotorg.org>
+ <1347690093-16910-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120918173152.17033.40823@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 10:30:45PM -0700, Olof Johansson wrote:
-> On Mon, Sep 10, 2012 at 01:48:35AM -0400, Jason Cooper wrote:
-> > Arnd, Olof,
-> > 
-> > This branch depends on arm/cache-l2x0 which is going in through rmk's
-> > tree.  arm/cache-l2x0 contains the following from Gregory Clement:
-> > 
-> > 	arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
-> > 	arm: cache-l2x0: add an optional register to save/restore
-> 
-> Ok, we need to make sure that Russell is happy with the patches and
-> is pulling them in (with an agreement to not rebase the merged branch)
-> before we can pull in your branch that builds on it.
+Quoting Stephen Warren (2012-09-14 23:21:32)
+> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+> new file mode 100644
+> index 0000000..148ac35
+> --- /dev/null
+> +++ b/drivers/clk/clk-bcm2835.c
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Copyright (C) 2010 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-private.h>
+> +#include <linux/clk-provider.h>
 
-Arnd, Olof,
+No need to include clk-provider.h or clk.h if you pull in clk-private.h.
 
-Ok, I'm still mastering the art of branch dependencies.  The acceptance
-of Gregory's cache-l2x0 series is holding up everything else.
-Rightfully so, rmk has some issues with it.
+Do you really need clk-private.h?  I really hate that approach and I'm
+trying to minimize the number of platforms using those interfaces.  I
+plan to delete clk-private.h once OMAP and Tegra move away from
+statically initialized clocks needed during early boot.
 
-However, in my pullrqs and in my branch merging I treated it as a
-dependency for everything that came after it (pr 1,2,3,4).  I'd like to
-undo that now to get things moving.  The dependency was not strictly
-necessary, I was simply trying to achieve an ordering of branches.
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/bcm2835.h>
+> +
+> +/*
+> + * These are fixed clocks (and device tree doesn't support clk!).
+> + *
+> + * They're probably not all root clocks and it may be possible to
+> + * turn them on and off but until this is mapped out better it's
+> + * the only way they can be used.
+> + */
+> +DEFINE_CLK_FIXED_RATE(sys_pclk,   CLK_IS_ROOT, 250000000, 0);
+> +DEFINE_CLK_FIXED_RATE(apb_pclk,   CLK_IS_ROOT, 126000000, 0);
+> +DEFINE_CLK_FIXED_RATE(uart0_pclk, CLK_IS_ROOT,   3000000, 0);
+> +DEFINE_CLK_FIXED_RATE(uart1_pclk, CLK_IS_ROOT, 125000000, 0);
+> +
 
-The only way I know to do this is to redo my branches and republish.
-Basically, I would remove Gregory's patches and the dependency on 'arm:
-cache-l2x0' from pullrq [1/4] Kirkwood DT bindings.
+How about:
 
-Obviously, this would break things for folks tracking my branches.
-Hopefully anyone crazy enough to track my branches is competent enough
-rebase onto the new branches.  Even still, I don't want to mess anyone up.
+clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT, 250000000);
 
-I think the benefits of getting these patches in for this merge window
-outweigh a onetime breaking of my branches.  Is there anything I'm not
-considering before I do this?
-
-I'll do the work now, but hold off on pushing or sending new pullrq's
-for a day or two or until I hear from you guys.
-
-thx,
-
-Jason.
+Regards,
+Mike
