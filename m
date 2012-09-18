@@ -1,56 +1,154 @@
 From: sjg@chromium.org (Simon Glass)
-Date: Tue, 18 Sep 2012 11:21:54 -0700
-Subject: [PATCH 2/7] spi: s3c64xx: Fix enum dma_data_direction warning
+Date: Tue, 18 Sep 2012 11:21:58 -0700
+Subject: [PATCH 6/7] spi: s3c64xx: Tidy up SPI chip select handling
 In-Reply-To: <1347992519-6904-1-git-send-email-sjg@chromium.org>
 References: <1347992519-6904-1-git-send-email-sjg@chromium.org>
-Message-ID: <1347992519-6904-3-git-send-email-sjg@chromium.org>
+Message-ID: <1347992519-6904-7-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the effect is harmless, the SPI driver is actually using the wrong
-enum and this generates warnings:
+While it is possible to use a GPIO, it is useful to be able to use the
+SPI peripheral's built-in chip select feature. This should be supported.
 
-drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_dmacb':
-drivers/spi/spi-s3c64xx.c:268:21: warning: comparison between 'enum dma_data_direction' and 'enum dma_transfer_direction' [-Wenum-compare]
-drivers/spi/spi-s3c64xx.c:277:21: warning: comparison between 'enum dma_data_direction' and 'enum dma_transfer_direction' [-Wenum-compare]
-drivers/spi/spi-s3c64xx.c: In function 'prepare_dma':
-drivers/spi/spi-s3c64xx.c:296:21: warning: comparison between 'enum dma_data_direction' and 'enum dma_transfer_direction' [-Wenum-compare]
+The current driver is broken in that it doesn't properly support
+the cs_change property in the message. To fix this, the chip select
+should be changed in one place (enable/disable_cs()) instead of using the
+macro separately in a different place. Also we need to make sure that
+the FIFOs are cleared even in the event of an empty transaction or
+error.
+
+(This adds a proposed new fdt binding for Samsung SPI)
 
 Signed-off-by: Simon Glass <sjg@chromium.org>
 ---
- drivers/spi/spi-s3c64xx.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/spi/spi-samsung.txt        |    7 ++++
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h   |    6 ++-
+ drivers/spi/spi-s3c64xx.c                          |   34 +++++++++++++------
+ 3 files changed, 34 insertions(+), 13 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+index 59bfc4f..74d67e1 100644
+--- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
++++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+@@ -60,6 +60,13 @@ SPI Controller specific data in SPI slave nodes:
+       - 2: 180 degree phase shift sampling.
+       - 3: 270 degree phase shift sampling.
+ 
++- The spi slave nodes may provide the following optional properties:
++
++  - samsung,spi-cs: (boolean property). If present, uses the SPI controller's
++    built-in chip select feature,  rather than toggling GPIOs manually. The
++    correct chip select line must still be specified in cs-gpio, and in this
++    case should be assigned to the SPI controller.
++
+ Aliases:
+ 
+ - All the SPI controller nodes should be represented in the aliases node using
+diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+index ceba18d..7103f71 100644
+--- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
++++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+@@ -17,7 +17,8 @@ struct platform_device;
+  * struct s3c64xx_spi_csinfo - ChipSelect description
+  * @fb_delay: Slave specific feedback delay.
+  *            Refer to FB_CLK_SEL register definition in SPI chapter.
+- * @line: Custom 'identity' of the CS line.
++ * @line: Custom 'identity' of the CS line (-1 to use SPI controller)
++ * @use_spi_cs: Use SPI's chip select toggle instead of GPIO
+  *
+  * This is per SPI-Slave Chipselect information.
+  * Allocate and initialize one in machine init code and make the
+@@ -25,7 +26,8 @@ struct platform_device;
+  */
+ struct s3c64xx_spi_csinfo {
+ 	u8 fb_delay;
+-	unsigned line;
++	int line;
++	bool only_spi_cs;
+ };
+ 
+ /**
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 646a765..3152659 100644
+index ed12872..c34ef8f 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -260,7 +260,7 @@ static void s3c64xx_spi_dmacb(void *data)
- 	struct s3c64xx_spi_dma_data *dma = data;
- 	unsigned long flags;
+@@ -414,14 +414,21 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+ 			/* Deselect the last toggled device */
+ 			cs = sdd->tgl_spi->controller_data;
+-			gpio_set_value(cs->line,
+-				spi->mode & SPI_CS_HIGH ? 0 : 1);
++			writel(S3C64XX_SPI_SLAVE_SIG_INACT,
++				sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++			if (!cs->only_spi_cs) {
++				gpio_set_value(cs->line,
++					spi->mode & SPI_CS_HIGH ? 0 : 1);
++			}
+ 		}
+ 		sdd->tgl_spi = NULL;
+ 	}
  
--	if (dma->direction == DMA_DEV_TO_MEM)
-+	if (dma->direction == DMA_FROM_DEVICE)
- 		sdd = container_of(data,
- 			struct s3c64xx_spi_driver_data, rx_dma);
++	/* Start the signals */
+ 	cs = spi->controller_data;
+-	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
++	if (!cs->only_spi_cs)
++		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
++	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+ }
+ 
+ static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
+@@ -514,7 +521,10 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 	if (sdd->tgl_spi == spi)
+ 		sdd->tgl_spi = NULL;
+ 
+-	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
++	/* Quiese the signals */
++	writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
++	if (!cs->only_spi_cs)
++		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+ }
+ 
+ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+@@ -746,17 +756,10 @@ static int s3c64xx_spi_transfer_one_message(struct spi_master *master,
+ 		/* Slave Select */
+ 		enable_cs(sdd, spi);
+ 
+-		/* Start the signals */
+-		writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+-
+ 		spin_unlock_irqrestore(&sdd->lock, flags);
+ 
+ 		status = wait_for_xfer(sdd, xfer, use_dma);
+ 
+-		/* Quiese the signals */
+-		writel(S3C64XX_SPI_SLAVE_SIG_INACT,
+-		       sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+-
+ 		if (status) {
+ 			dev_err(&spi->dev, "I/O Error: "
+ 				"rx-%d tx-%d res:rx-%c tx-%c len-%d\n",
+@@ -801,6 +804,9 @@ out:
  	else
-@@ -269,7 +269,7 @@ static void s3c64xx_spi_dmacb(void *data)
+ 		sdd->tgl_spi = spi;
  
- 	spin_lock_irqsave(&sdd->lock, flags);
++	/* Make sure empty transactions and error clean up the state */
++	flush_fifo(sdd);
++
+ 	if (have_dma)
+ 		s3c64xx_spi_unmap_mssg(sdd, msg);
+ out_nomap:
+@@ -878,6 +884,12 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+ 		return ERR_PTR(-EINVAL);
+ 	}
  
--	if (dma->direction == DMA_DEV_TO_MEM) {
-+	if (dma->direction == DMA_FROM_DEVICE) {
- 		sdd->state &= ~RXBUSY;
- 		if (!(sdd->state & TXBUSY))
- 			complete(&sdd->xfer_completion);
-@@ -289,7 +289,7 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
- 	struct samsung_dma_prep info;
- 	struct samsung_dma_config config;
- 
--	if (dma->direction == DMA_DEV_TO_MEM) {
-+	if (dma->direction == DMA_FROM_DEVICE) {
- 		sdd = container_of((void *)dma,
- 			struct s3c64xx_spi_driver_data, rx_dma);
- 		config.direction = sdd->rx_dma.direction;
++	/*
++	 * Rather than manually toggle GPIOs, we can use the SPI chip select
++	 * feature.
++	 */
++	cs->only_spi_cs = of_property_read_bool(data_np, "samsung,spi-cs");
++
+ 	of_property_read_u32(data_np, "samsung,spi-feedback-delay", &fb_delay);
+ 	cs->fb_delay = fb_delay;
+ 	return cs;
 -- 
 1.7.7.3
