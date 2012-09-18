@@ -1,51 +1,35 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 18 Sep 2012 11:10:04 -0400
-Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
-In-Reply-To: <20120918150757.GD15785@arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153443.21241.37958.stgit@ubuntu>
- <20120918124724.GK32204@mudshark.cambridge.arm.com>
- <CAHkRjk6aOHDPcMZt==8mN9R-vJQ+RYvZ-LzimQ+no4yibJdGkQ@mail.gmail.com>
- <CANM98q+_R4raAXX4upOjFOqOOBaFz3nXYXr9E2+OUP1CzD-vcg@mail.gmail.com>
- <20120918150757.GD15785@arm.com>
-Message-ID: <CANM98qL=13ChBYDzHh4AL_-jWZB856K1n96CLqzX1m2c7i3XKA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Sep 2012 15:20:08 +0000
+Subject: [PATCH V6 2/2] dmaengine: add helper function to request a slave
+ DMA channel
+In-Reply-To: <20120918132113.GT27758@beef>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347938035.1943.162.camel@vkoul-udesk3> <20120918132113.GT27758@beef>
+Message-ID: <201209181520.08845.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 11:07 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Sep 18, 2012 at 04:05:13PM +0100, Christoffer Dall wrote:
->> On Tue, Sep 18, 2012 at 10:06 AM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On 18 September 2012 13:47, Will Deacon <will.deacon@arm.com> wrote:
->> >> On Sat, Sep 15, 2012 at 04:34:43PM +0100, Christoffer Dall wrote:
->> >>> +#define L_PTE2_SHARED                L_PTE_SHARED
->> >>> +#define L_PTE2_READ          (_AT(pteval_t, 1) << 6) /* HAP[0] */
->> >>> +#define L_PTE2_WRITE         (_AT(pteval_t, 1) << 7) /* HAP[1] */
->> >>
->> >> This is actually HAP[2:1], not HAP[1:0]. Also, can you follow what we do for
->> >> stage 1 translation and name these RDONLY and WRONLY (do you even use
->> >> that?).
->> >
->> > We can't use RDONLY as this would have value 0 as the HAP attributes
->> > (stage 2 overriding stage 1 translation attributes). Unless you add 4
->> > definitions like NOACCESS, RDONLY, WRONLY and RDWR to cover all the
->> > bit combinations.
->> >
->> >>> +#define L_PTE2_NORM_WB               (_AT(pteval_t, 3) << 4) /* MemAttr[3:2] */
->> >>> +#define L_PTE2_INNER_WB              (_AT(pteval_t, 3) << 2) /* MemAttr[1:0] */
->> >>
->> >> Another minor nit: PTE2 looks awful. Maybe L_PTE_HYP_* instead?
->> >
->> > L_PTE_HYP may be confused with the Stage 1 Hyp translation which is
->> > different from the guest Stage 2.
->>
->> exactly, it's misleading, how about L_PTE_STAGE2, a little verbose,
->> but clear...?
->
-> I don't mind any (apart from L_PTE_HYP_ would be confusing) for stage 2.
-> You could just use S2 to make it shorter.
->
-I'm good with that, done.
+On Tuesday 18 September 2012, Matt Porter wrote:
+> On Tue, Sep 18, 2012 at 08:43:55AM +0530, Vinod Koul wrote:
+> > 
+> > Now would it make sense to NOT merge these changes for 3.7 and postpone
+> > to 3.8. I can host these patches on a topic branch and merge them when
+> > we are ready. I plan to spend some good amount of time on my work this
+> > week so we should be ready pretty soon.
+> > One these changes are merged, users can start moving to this scheme.
+> 
+> FWIW, I'm already basing the EDMA dmaengine support for OMAP (specifically
+> for AM335x) on using these helpers since AM335x only boots from DT.
 
--Christoffer
+I suspect the same thing will be happening for a lot of platforms
+after 3.7-rc1: ux500, lpc32xx, integrator, imx, mxs and probably
+others are all waiting for this so they can complete the move
+to DT-only booting.
+
+Having some support for the new binding in 3.7 would be a great
+help to reduce interdependencies for the 3.8 merge cycle. Both the
+driver interface and the binding should actually be in a good
+shape now, so I'd very much appriciate it getting merged for 3.7,
+even if the implementation may have to change again in 3.8.
+
+	Arnd
