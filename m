@@ -1,51 +1,64 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 18 Sep 2012 22:19:21 +0530
-Subject: [PATCH] arch/arm/mach-davinci/board-dm646x-evm.c: Remove
- unecessary
-In-Reply-To: <1347986174-30287-2-git-send-email-peter.senna@gmail.com>
-References: <1347986174-30287-1-git-send-email-peter.senna@gmail.com>
- <1347986174-30287-2-git-send-email-peter.senna@gmail.com>
-Message-ID: <CA+V-a8tNCjXKgfV9TtWroZ+FvFQFqmrVfczVxEmUkZt2pQL3RQ@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 18 Sep 2012 18:51:23 +0200
+Subject: [PATCH v6 0/7] ARM: OMAP2+: PM: introduce the power domains
+ functional states
+In-Reply-To: <CAORVsuVZ5AnsN9HYoXntMcF2Yc4VM3Mwk2bQBiGnV0=kdpMYfA@mail.gmail.com>
+References: <1347443732-7411-1-git-send-email-j-pihet@ti.com>
+ <87har2rc9q.fsf@deeprootsystems.com>
+ <CAORVsuVZ5AnsN9HYoXntMcF2Yc4VM3Mwk2bQBiGnV0=kdpMYfA@mail.gmail.com>
+Message-ID: <CAORVsuV6h5JNXOB+u66OE4Sf3kiVKCaamEv1zQ7isgewUm0a1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Paul,
 
-Thanks for the patch.
+On Thu, Sep 13, 2012 at 9:04 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> On Thu, Sep 13, 2012 at 2:34 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>>
+>>> Here is a re-spin after some comments and suggestions after review
+>>> and discussions.
+Did you have a chance to look at the series?
 
-On Tue, Sep 18, 2012 at 10:06 PM, Peter Senna Tschudin
-<peter.senna@gmail.com> wrote:
-> Found by http://coccinelle.lip6.fr/
->
-The commit message 'Remove unecessary' doesn't explain
-what are you trying to do.
+Regards,
+Jean
 
-Thanks,
---Prabhakar
-
-> Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
-> ---
->  arch/arm/mach-davinci/board-dm646x-evm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> Implement the functional states for the power domains:
+>>> - unify the API to use the functional states. The new API
+>>>   consists of the pwrdm_set*_fpwrst and pwrdm_read*_fpwrst
+>>>   functions and is the API to use to control the power domains
+>>>   power and logic states,
+>>> - reorganize the powerdomain API in internal and external parts,
+>>>   in powerdomain.h [1]
+>>> - protect the power domain state change by a lock in the
+>>>   functions that read and set the powerdomains next functional state,
+>>> - introduce the functional states for power domains power states and
+>>>   logic power states [2], and the conversion functions between the
+>>>   functional and internal states. The conversion functions are
+>>>   lightweight and generic. The power domains allowed states [3] are
+>>>   defined in the pwrsts and pwrsts_logic_ret fields of the struct
+>>>   powerdomain,
+>>> - program the logic power state of power domains from the functional
+>>>   states, in pwrdm_set*_fpwrst
+>>> - convert the OMAP2/3/4 PM code to use the updated API,
+>>> - provide the power domains statistics by functional states,
+>>> - provide ftrace tracepoints with the functional state,
+>>> - provide error logs in critical code, which makes the development
+>>>   easier.
+>>
+>> I just gave this series a round of PM testing.  I tested retention
+>> and off in idle & suspend, with and without CPUidle on 3430/n900,
+>> 3530/Overo, 3730/OveroSTORM, 3730/Beagle-xM and 4430/Panda (though only
+>> MPU/CPU ret/off is supported for OMAP4 in mainline.)
+>>
+>> All PM tests passed with flying colors.  Nice!
+> Great!
 >
-> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-> index 958679a..1ccaace 100644
-> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-> @@ -193,7 +193,7 @@ static int evm_led_setup(struct i2c_client *client, int gpio,
->         while (ngpio--) {
->                 leds->gpio = gpio++;
->                 leds++;
-> -       };
-> +       }
+> Thanks a lot Kevin for testing
 >
->         evm_led_dev = platform_device_alloc("leds-gpio", 0);
->         platform_device_add_data(evm_led_dev, &evm_led_data,
-> --
-> 1.7.11.4
+> Jean
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>> Kevin
