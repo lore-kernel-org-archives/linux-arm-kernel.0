@@ -1,77 +1,40 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Tue, 18 Sep 2012 15:06:36 -0700
-Subject: [PATCH 5/6] staging: drm/imx: Add devicetree binding documentation
-In-Reply-To: <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
-References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
- <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <5058F06C.1020409@boundarydevices.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 18 Sep 2012 18:13:50 -0400
+Subject: [PATCH 05/15] ARM: Expose PMNC bitfields for KVM use
+In-Reply-To: <20120918130821.GN32204@mudshark.cambridge.arm.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153502.21241.13218.stgit@ubuntu>
+ <20120918130821.GN32204@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qL-hQ3eV9UTOB12F9pN0r++uuE=o7MVuc+r0BEb5ovFJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On 09/12/2012 03:31 AM, Sascha Hauer wrote:
-> From: Philipp Zabel<p.zabel@pengutronix.de>
+On Tue, Sep 18, 2012 at 9:08 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Sep 15, 2012 at 04:35:02PM +0100, Christoffer Dall wrote:
+>> From: Rusty Russell <rusty.russell@linaro.org>
+>>
+>> We want some of these for use in KVM, so pull them out of
+>> arch/arm/kernel/perf_event_v7.c into their own asm/perf_bits.h.
+>>
+>> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>>  arch/arm/include/asm/perf_bits.h |   56 ++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kernel/perf_event_v7.c  |   51 +----------------------------------
+>>  2 files changed, 57 insertions(+), 50 deletions(-)
+>>  create mode 100644 arch/arm/include/asm/perf_bits.h
 >
-> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
-> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
-> ---
->   .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   41 ++++++++++++++++++++
->   1 file changed, 41 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> I don't like this I'm afraid. These bit definitions, although useful for
+> kvm, are only applicable to ARMv7 PMUs. Perf does a reasonable job of
+> separating the low-level CPU-specific code and adding the v7 definitions
+> into their own global header feels like a step backwards. I also want to
+> move a load of this into drivers/ at some point and this won't help with
+> that effort.
 >
-> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> new file mode 100644
-> index 0000000..07654f0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> @@ -0,0 +1,41 @@
-> +Freescale i.MX IPUv3
-> +====================
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,<chip>-ipu"
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- interrupts: Should contain sync interrupt and error interrupt,
-> +  in this order.
-> +- #crtc-cells: 1, See below
-> +
-> +example:
-> +
-> +ipu: ipu at 18000000 {
-> +	#crtc-cells =<1>;
-> +	compatible = "fsl,imx53-ipu";
-> +	reg =<0x18000000 0x080000000>;
-> +	interrupts =<11 10>;
-> +};
-> +
-> +Parallel display support
-> +========================
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx-parallel-display"
-> +- crtc: the crtc this display is connected to, see below
-> +Optional properties:
-> +- interface_pix_fmt: How this display is connected to the
-> +  crtc. Currently supported types: "rgb24", "rgb565"
-> +- edid: verbatim EDID data block describing attached display.
-> +- ddc: phandle describing the i2c bus handling the display data
-> +  channel
-> +
-> +example:
-> +
-> +display at di0 {
-> +	compatible = "fsl,imx-parallel-display";
-> +	edid = [edid-data];
-> +	crtc =<&ipu 0>;
-> +	interface-pix-fmt = "rgb24";
-> +};
+> Is KVM just using this for world switch? If so, why does it care about the
+> bit definitions (and what do you do for things like debug regs)? Is there
+> anything I could add to perf that you could call instead?
+>
+I'm going to let Rusty reply to this one...
 
-Do you have a working sample of [edid-data] for a parallel/LVDS/HDMI
-display or know a good way to produce one?
-
-Thanks in advance,
-
-
-Eric
+-Christoffer
