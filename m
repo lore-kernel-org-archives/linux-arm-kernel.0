@@ -1,27 +1,41 @@
-From: viric@viric.name (=?iso-8859-1?Q?Llu=EDs?= Batlle i Rossell)
-Date: Tue, 18 Sep 2012 17:46:27 +0200
-Subject: Bad traps for unaligned access in STM instruction
-In-Reply-To: <alpine.LFD.2.02.1209181140450.28681@xanadu.home>
-References: <20120915104602.GY1943@vicerveza.homeunix.net>
- <20120915105151.GZ1943@vicerveza.homeunix.net>
- <20120918152502.GB2110@linaro.org>
- <20120918153119.GC8632@vicerveza.homeunix.net>
- <alpine.LFD.2.02.1209181140450.28681@xanadu.home>
-Message-ID: <20120918154627.GD8632@vicerveza.homeunix.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 18 Sep 2012 17:49:14 +0200
+Subject: [PATCH 11/19] ARM: ux500: Add all known I2C sub-device nodes to
+ the HREF DT
+In-Reply-To: <CACRpkdY+t9MwWewtZzpD7i4eeTxVHNk+NxSZ1E=T-k4a0mveHg@mail.gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-12-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY+t9MwWewtZzpD7i4eeTxVHNk+NxSZ1E=T-k4a0mveHg@mail.gmail.com>
+Message-ID: <20120918154909.GB11404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 11:44:02AM -0400, Nicolas Pitre wrote:
-> On Tue, 18 Sep 2012, Llu?s Batlle i Rossell wrote:
+On Mon, Sep 10, 2012 at 04:34:15AM -0700, Linus Walleij wrote:
+> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> > In an ideal userland software world, the counters of the traps would be zero.
-> > But they are not. And without fixup, the mkfs.btrfs fails to run properly, and
-> > creates a broken filesystem that crashes the kernel.
+> > Here we add the skeleton nodes for each of the known I2C sub-devices
+> > currently registered on ST-Ericsson's HREF Development Platform. We
+> > will fill these nodes in turn as the drivers are enabled for Device
+> > Tree.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> If a broken btrfs filesystem crashes the kernel, you should definitively 
-> report it as a bug to the btrfs developers.  Filesystem code must be 
-> immune to any kind of corruptions and gracefully cope with them.
+> Can't we have it the other way around (discussing patch ordering
+> with Arnd simultaneously), so you first add the DT support to the
+> subdevices, then add the more complete nodes to the device tree?
+> 
+> And if you put in a device tree like this, will these devices
+> not collide with the ones that are currently supplied from
+> the boardfiles? I'm a bit confused here, maybe I'm not smart
+> enough to understand this...
 
-Yes I know; I did report that.
+We finished this conversation about future ordering didn't we?
 
-Thank you
+Would you mind reviewing the code in the patch please, as it's
+still missing your Ack, so can't send.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
