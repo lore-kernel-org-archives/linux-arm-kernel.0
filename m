@@ -1,35 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Sep 2012 09:13:54 +0000
-Subject: [PATCH 12/34] media: mx1_camera: remove the driver
-In-Reply-To: <20120918012848.GE1338@S2101-09.ap.freescale.net>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 18 Sep 2012 11:18:42 +0200
+Subject: [PATCH 29/34] mmc: mxcmmc: remove mach/hardware.h inclusion
+In-Reply-To: <m3392h1a0p.fsf@pullcord.laptop.org>
 References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <Pine.LNX.4.64.1209171031010.1689@axis700.grange>
- <20120918012848.GE1338@S2101-09.ap.freescale.net>
-Message-ID: <201209180913.54835.arnd@arndb.de>
+ <1347860103-4141-30-git-send-email-shawn.guo@linaro.org>
+ <m3392h1a0p.fsf@pullcord.laptop.org>
+Message-ID: <CACKLOr24teo+Y6ZqZCAdg7poMN8w3s0QQavV2F+M=fJCcF0aqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012, Shawn Guo wrote:
-> 
-> On Mon, Sep 17, 2012 at 10:33:25AM +0200, Guennadi Liakhovetski wrote:
-> > Ok, it used to compile not-so-long-ago, but it doesn't seem to be cared 
-> > for a lot lately. Let's give Paulius a bit more time to react to this 
-> > mail, otherwise I'll have no objections. Just as an idea, to make it a bit 
-> > milder we could first mark it BROKEN and add to remove schedule... But I 
-> > don't mind either way.
-> > 
-> I chose to remove the driver completely rather than marking it BROKEN
-> because the removal of the driver cleans up platform code a lot :)
-> 
-> Ok, if we hear anything back from Paulius in the next couple of weeks,
-> I keep the driver there with BROKEN marked.
+Hi Shawn,
 
-Sounds fine to me. Of course, if someone wants the driver back and is
-willing to fix it, we'll just revert this patch even after the driver
-is gone.
 
-I would like an Ack from Mauro however. You did not Cc him directly
-in the patch, and he probably has an opionion on it as well, or may
-want to take this patch through his git tree.
 
-	Arnd
+On 17 September 2012 07:41, Chris Ball <cjb@laptop.org> wrote:
+> Hi,
+>
+> On Mon, Sep 17 2012, Shawn Guo wrote:
+>> It changes the driver to use platform_device_id rather than cpu_is_xxx
+>> to determine the controller type, and updates the platform code
+>> accordingly.
+>>
+>> As the result, mach/hardware.h inclusion gets removed from the driver.
+>>
+>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Chris Ball <cjb@laptop.org>
+>> Cc: linux-mmc at vger.kernel.org
+>
+the dma fix provided by Sascha is needed for this patch to work too:
+
+http://www.spinics.net/lists/arm-kernel/msg195690.html
+
+Otherwise:
+
+Tested-by: Javier Martin <javier.martin@vista-silicon.com>
+
+
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
