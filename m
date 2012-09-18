@@ -1,33 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Sep 2012 10:33:21 -0700
-Subject: ARM: smp: why don't eliminate warning "Unknown IPI message 0x1"?
-In-Reply-To: <20120918093853.GW12245@n2100.arm.linux.org.uk>
-References: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
- <20120918093853.GW12245@n2100.arm.linux.org.uk>
-Message-ID: <5058B061.5020902@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Sep 2012 11:04:30 -0700
+Subject: [PATCH v2 7/9] ARM: OMAP: iommu: optimize save and restore
+ routines
+In-Reply-To: <1347479152-588-8-git-send-email-omar.luna@linaro.org>
+References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
+ <1347479152-588-8-git-send-email-omar.luna@linaro.org>
+Message-ID: <20120918180430.GV11762@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/12 02:38, Russell King - ARM Linux wrote:
-> On Tue, Sep 18, 2012 at 04:07:49PM +0800, ??? wrote:
->> Russell King want people to move to SGI0 for this, so that we can have SGI1-N
->> as the proper IPIs, but now we can't do this, maybe we must wait for
->> so many years.
->> But, Do you think we can use a another way to resolve this problem,
->> because this warning message will oftenly appeare in products.
->>
->> We can't assume the fixed IPI number that can wakeup secondary cores.
->> "I'd much rather see platforms deciding whether they need to use SGI1
->> or whether they can switch to SGI0 instead."
-> Why not just fix your platform to use SGI0.  I think we're _finally_
-> there with everyone using SGI0, which means we can commit the patch
-> which fixes this.
->
+* Omar Ramirez Luna <omar.luna@linaro.org> [120912 12:47]:
+> --- a/arch/arm/plat-omap/include/plat/iommu.h
+> +++ b/arch/arm/plat-omap/include/plat/iommu.h
+> @@ -27,6 +27,13 @@ struct iotlb_entry {
+>  	};
+>  };
+>  
+> +/* context registers */
+> +struct iommu_regs {
+> +	u32 irqen;
+> +	u32 cntl;
+> +	u32 ttb;
+> +};
+> +
+>  struct omap_iommu {
+>  	const char	*name;
+>  	struct module	*owner;
+> @@ -50,7 +57,8 @@ struct omap_iommu {
+>  	struct list_head	mmap;
+>  	struct mutex		mmap_lock; /* protect mmap */
+>  
+> -	void *ctx; /* iommu context: registres saved area */
+> +	struct iommu_regs context;
+> +	int ctx_loss_cnt;
+>  	u32 da_start;
+>  	u32 da_end;
+>  };
+> --- a/arch/arm/plat-omap/include/plat/iommu2.h
+> +++ b/arch/arm/plat-omap/include/plat/iommu2.h
+> @@ -35,8 +35,6 @@
+>  #define MMU_READ_RAM		0x6c
+>  #define MMU_EMU_FAULT_AD	0x70
+>  
+> -#define MMU_REG_SIZE		256
+> -
+>  /*
+>   * MMU Register bit definitions
+>   */
 
-Yes. I'm going to put it in the patch tracker now.
+These headers should be moved to include/linux/platform_data/iommu-omap.h
+or something like that. Care to take care of that too?
 
-https://patchwork.kernel.org/patch/1433931/
+I guess there's no reason to have both iommu.h and iommuh2.h?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+
+Tony
