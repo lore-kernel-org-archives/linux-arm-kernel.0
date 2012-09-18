@@ -1,70 +1,202 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:45 +0100
-Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
+Date: Tue, 18 Sep 2012 15:17:49 +0100
+Subject: [PATCH v2 07/13] misc: Versatile Express config infrastructure
 In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-8-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hwmon framework driver for Versatile Express sensors, providing
-information about board level voltage (only when regulator driver
-is not configured), currents, temperature and power/energy usage.
-Labels for the values can be defined as DT properties.
+Versatile Express platform has an elaborated configuration system,
+consisting of microcontrollers residing on the mother- and
+daughterboards known as Motherboard/Daughterboard Configuration
+Controller (MCC and DCC). The controllers are responsible for
+the platform initialization (reset generation, flash programming,
+FPGA bitfiles loading etc.) but also control clock generators,
+voltage regulators, gather environmental data like temperature,
+power consumption etc. Even the video output switch (FPGA) is
+controlled that way.
+
+Those devices are _not_ visible in the main address space and
+the usual communication channel uses some kind of a bridge in
+the peripheral block sending commands (requests) to the
+controllers and receiving responses. It can take up to
+500 microseconds for a transaction to be completed, therefore
+it is important to provide a non-blocking interface to it.
+
+This patch adds an abstraction of this infrastructure. Bridge
+drivers can register themselves with the framework. Then,
+a driver of a device can request an abstract "function" - the
+request will be redirected to a bridge referred by thedd
+"arm,vexpress,config-bridge" property of the device tree node.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/hwmon/Kconfig    |    8 ++
- drivers/hwmon/Makefile   |    1 +
- drivers/hwmon/vexpress.c |  330 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 339 insertions(+)
- create mode 100644 drivers/hwmon/vexpress.c
+ Documentation/devicetree/bindings/arm/vexpress.txt |   68 ++++-
+ drivers/misc/Kconfig                               |    6 +
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/vexpress-config.c                     |  276 ++++++++++++++++++++
+ include/linux/vexpress.h                           |   64 +++++
+ 5 files changed, 414 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/misc/vexpress-config.c
+ create mode 100644 include/linux/vexpress.h
 
-Hi Jean, Guenter,
+Hi Arnd,
 
-Would you be able to merge this in time for 3.7? (if it looks fine, that is)
+As it doesn't seem to be a "bus" any more, I left it in in misc for
+now... It looks to me like there should be some kind of place for
+"system/soc control" drivers. Or maybe there is, and I just missed
+it?
 
-Regards
+Cheers!
 
 Pawel
 
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index b0a2e4c..7359a07 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -1187,6 +1187,14 @@ config SENSORS_TWL4030_MADC
- 	This driver can also be built as a module. If so it will be called
- 	twl4030-madc-hwmon.
+diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
+index ec8b50c..5d9996b 100644
+--- a/Documentation/devicetree/bindings/arm/vexpress.txt
++++ b/Documentation/devicetree/bindings/arm/vexpress.txt
+@@ -11,6 +11,10 @@ the motherboard file using a /include/ directive. As the motherboard
+ can be initialized in one of two different configurations ("memory
+ maps"), care must be taken to include the correct one.
  
-+config SENSORS_VEXPRESS
-+	tristate "Versatile Express"
-+	depends on VEXPRESS_CONFIG
-+	help
-+	  This driver provides support for hardware sensors available on
-+	  the ARM Ltd's Versatile Express platform. It can provide wide
-+	  range of information like temperature, power, energy.
 +
- config SENSORS_VIA_CPUTEMP
- 	tristate "VIA CPU temperature sensor"
- 	depends on X86
-diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-index 7aa9811..e719a7d 100644
---- a/drivers/hwmon/Makefile
-+++ b/drivers/hwmon/Makefile
-@@ -120,6 +120,7 @@ obj-$(CONFIG_SENSORS_TMP102)	+= tmp102.o
- obj-$(CONFIG_SENSORS_TMP401)	+= tmp401.o
- obj-$(CONFIG_SENSORS_TMP421)	+= tmp421.o
- obj-$(CONFIG_SENSORS_TWL4030_MADC)+= twl4030-madc-hwmon.o
-+obj-$(CONFIG_SENSORS_VEXPRESS)	+= vexpress.o
- obj-$(CONFIG_SENSORS_VIA_CPUTEMP)+= via-cputemp.o
- obj-$(CONFIG_SENSORS_VIA686A)	+= via686a.o
- obj-$(CONFIG_SENSORS_VT1211)	+= vt1211.o
-diff --git a/drivers/hwmon/vexpress.c b/drivers/hwmon/vexpress.c
++Root node
++---------
++
+ Required properties in the root node:
+ - compatible value:
+ 	compatible = "arm,vexpress,<model>", "arm,vexpress";
+@@ -45,6 +49,10 @@ Optional properties in the root node:
+   - Coretile Express A9x4 (V2P-CA9) HBI-0225:
+ 	arm,hbi = <0x225>;
+ 
++
++CPU nodes
++---------
++
+ Top-level standard "cpus" node is required. It must contain a node
+ with device_type = "cpu" property for every available core, eg.:
+ 
+@@ -59,6 +67,52 @@ with device_type = "cpu" property for every available core, eg.:
+ 		};
+ 	};
+ 
++
++Configuration infrastructure
++----------------------------
++
++The platform has an elaborated configuration system, consisting of
++microcontrollers residing on the mother- and daughterboards known
++as Motherboard/Daughterboard Configuration Controller (MCC and DCC).
++The controllers are responsible for the platform initialization
++(reset generation, flash programming, FPGA bitfiles loading etc.)
++but also control clock generators, voltage regulators, gather
++environmental data like temperature, power consumption etc. Even
++the video output switch (FPGA) is controlled that way.
++
++Nodes describing devices controlled by this infrastructure should
++point at the bridge device node:
++- bridge phandle:
++	arm,vexpress,config-bridge = <phandle>;
++This property can be also defined in a parent node (eg. for a DCC)
++and is effective for all children.
++
++
++Platform topology
++-----------------
++
++As Versatile Express can be configured in number of physically
++different setups, the device tree should describe platform topology.
++Root node and main motherboard node must define the following
++property, describing physical location of the children nodes:
++- site number:
++	arm,vexpress,site = <number>;
++  where 0 means motherboard, 1 or 2 are daugtherboard sites,
++  0xf means "master" site (site containing main CPU tile)
++- when daughterboards are stacked on one site, their position
++  in the stack be be described with:
++	arm,vexpress,position = <number>;
++- when describing tiles consisting more than one DCC, its number
++  can be described with:
++	arm,vexpress,dcc = <number>;
++
++Any of the numbers above defaults to zero if not defined in
++the node or any of its parent.
++
++
++Motherboard
++-----------
++
+ The motherboard description file provides a single "motherboard" node
+ using 2 address cells corresponding to the Static Memory Bus used
+ between the motherboard and the tile. The first cell defines the Chip
+@@ -96,13 +150,16 @@ The tile description must define "ranges", "interrupt-map-mask" and
+ "interrupt-map" properties to translate the motherboard's address
+ and interrupt space into one used by the tile's processor.
+ 
+-Abbreviated example:
++
++Example of a VE tile description (simplified)
++---------------------------------------------
+ 
+ /dts-v1/;
+ 
+ / {
+ 	model = "V2P-CA5s";
+ 	arm,hbi = <0x225>;
++	arm,vexpress,site = <0xf>;
+ 	compatible = "arm,vexpress-v2p-ca5s", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
+ 	#address-cells = <1>;
+@@ -134,6 +191,15 @@ Abbreviated example:
+ 		      <0x2c000100 0x100>;
+ 	};
+ 
++	dcc {
++		compatible = "simple-bus";
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++		osc at 0 {
++			compatible = "arm,vexpress-osc";
++		};
++	};
++
+ 	motherboard {
+ 		/* CS0 is visible at 0x08000000 */
+ 		ranges = <0 0 0x08000000 0x04000000>;
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 98a442d..77274c9d 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -509,6 +509,12 @@ config USB_SWITCH_FSA9480
+ 	  stereo and mono audio, video, microphone and UART data to use
+ 	  a common connector port.
+ 
++config VEXPRESS_CONFIG
++	bool
++	help
++	  Platform configuration infrastructure for the ARM Ltd.
++	  Versatile Express.
++
+ source "drivers/misc/c2port/Kconfig"
+ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index b88df7a..dc180c6 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -50,3 +50,4 @@ obj-y				+= carma/
+ obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
+ obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
+ obj-$(CONFIG_INTEL_MEI)		+= mei/
++obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+diff --git a/drivers/misc/vexpress-config.c b/drivers/misc/vexpress-config.c
 new file mode 100644
-index 0000000..fe80c63
+index 0000000..340cb2d
 --- /dev/null
-+++ b/drivers/hwmon/vexpress.c
-@@ -0,0 +1,330 @@
++++ b/drivers/misc/vexpress-config.c
+@@ -0,0 +1,276 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -78,322 +210,338 @@ index 0000000..fe80c63
 + * Copyright (C) 2012 ARM Limited
 + */
 +
-+#define DRVNAME "vexpress-hwmon"
-+#define pr_fmt(fmt) DRVNAME ": " fmt
++#define pr_fmt(fmt) "vexpress-config: " fmt
 +
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/hwmon.h>
-+#include <linux/module.h>
++#include <linux/bitops.h>
++#include <linux/completion.h>
++#include <linux/export.h>
++#include <linux/init.h>
++#include <linux/list.h>
 +#include <linux/of_device.h>
-+#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/string.h>
 +#include <linux/vexpress.h>
 +
-+static struct device *vexpress_hwmon_dev;
-+static int vexpress_hwmon_dev_refcount;
-+static DEFINE_SPINLOCK(vexpress_hwmon_dev_lock);
 +
-+static ssize_t vexpress_hwmon_name_show(struct device *dev,
-+		struct device_attribute *dev_attr, char *buffer)
++#define VEXPRESS_CONFIG_MAX_BRIDGES 2
++
++struct vexpress_config_bridge {
++	struct device_node *node;
++	struct vexpress_config_bridge_info *info;
++	struct list_head transactions;
++	spinlock_t transactions_lock;
++} vexpress_config_bridges[VEXPRESS_CONFIG_MAX_BRIDGES];
++
++static DECLARE_BITMAP(vexpress_config_bridges_map,
++		ARRAY_SIZE(vexpress_config_bridges));
++static DEFINE_MUTEX(vexpress_config_bridges_mutex);
++
++struct vexpress_config_bridge *vexpress_config_bridge_register(
++		struct device_node *node,
++		struct vexpress_config_bridge_info *info)
 +{
-+	return sprintf(buffer, "%s\n", DRVNAME);
++	struct vexpress_config_bridge *bridge;
++	int i;
++
++	pr_debug("Registering bridge '%s'\n", info->name);
++
++	mutex_lock(&vexpress_config_bridges_mutex);
++	i = find_first_zero_bit(vexpress_config_bridges_map,
++			ARRAY_SIZE(vexpress_config_bridges));
++	if (i >= ARRAY_SIZE(vexpress_config_bridges)) {
++		pr_err("Can't register more bridges!\n");
++		mutex_unlock(&vexpress_config_bridges_mutex);
++		return NULL;
++	}
++	__set_bit(i, vexpress_config_bridges_map);
++	bridge = &vexpress_config_bridges[i];
++
++	bridge->node = node;
++	bridge->info = info;
++	INIT_LIST_HEAD(&bridge->transactions);
++	spin_lock_init(&bridge->transactions_lock);
++
++	mutex_unlock(&vexpress_config_bridges_mutex);
++
++	return bridge;
 +}
 +
-+static struct device_attribute vexpress_hwmon_name_attr =
-+		__ATTR(name, 0444, vexpress_hwmon_name_show, NULL);
++void vexpress_config_bridge_unregister(struct vexpress_config_bridge *bridge)
++{
++	struct vexpress_config_bridge __bridge = *bridge;
++	int i;
 +
-+struct vexpress_hwmon_attrs {
-+	struct vexpress_config_func *func;
-+	const char *label;
-+	struct device_attribute label_attr;
-+	char label_name[16];
-+	struct device_attribute input_attr;
-+	char input_name[16];
-+	u32 divisor;
++	mutex_lock(&vexpress_config_bridges_mutex);
++	for (i = 0; i < ARRAY_SIZE(vexpress_config_bridges); i++)
++		if (&vexpress_config_bridges[i] == bridge)
++			__clear_bit(i, vexpress_config_bridges_map);
++	mutex_unlock(&vexpress_config_bridges_mutex);
++
++	WARN_ON(!list_empty(&__bridge.transactions));
++	while (!list_empty(&__bridge.transactions))
++		cpu_relax();
++}
++
++
++struct vexpress_config_func {
++	struct vexpress_config_bridge *bridge;
++	void *func;
 +};
 +
-+static ssize_t vexpress_hwmon_label_show(struct device *dev,
-+		struct device_attribute *dev_attr, char *buffer)
++struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
++		struct device_node *node)
 +{
-+	struct vexpress_hwmon_attrs *attrs = container_of(dev_attr,
-+			struct vexpress_hwmon_attrs, label_attr);
++	struct device_node *bridge_node;
++	struct vexpress_config_func *func;
++	int i;
 +
-+	return snprintf(buffer, PAGE_SIZE, "%s\n", attrs->label);
-+}
++	if (WARN_ON(dev && node && dev->of_node != node))
++		return NULL;
++	if (dev && !node)
++		node = dev->of_node;
 +
-+static ssize_t vexpress_hwmon_u32_show(struct device *dev,
-+		struct device_attribute *dev_attr, char *buffer)
-+{
-+	struct vexpress_hwmon_attrs *attrs = container_of(dev_attr,
-+			struct vexpress_hwmon_attrs, input_attr);
-+	int err;
-+	u32 value;
++	func = kzalloc(sizeof(*func), GFP_KERNEL);
++	if (!func)
++		return NULL;
 +
-+	err = vexpress_config_read(attrs->func, 0, &value);
-+	if (err)
-+		return err;
++	bridge_node = of_node_get(node);
++	while (bridge_node) {
++		const __be32 *prop = of_get_property(bridge_node,
++				"arm,vexpress,config-bridge", NULL);
 +
-+	return snprintf(buffer, PAGE_SIZE, "%u\n", value / attrs->divisor);
-+}
-+
-+static ssize_t vexpress_hwmon_u64_show(struct device *dev,
-+		struct device_attribute *dev_attr, char *buffer)
-+{
-+	struct vexpress_hwmon_attrs *attrs = container_of(dev_attr,
-+			struct vexpress_hwmon_attrs, input_attr);
-+	int err;
-+	u32 value_hi, value_lo;
-+
-+	err = vexpress_config_read(attrs->func, 0, &value_lo);
-+	if (err)
-+		return err;
-+
-+	err = vexpress_config_read(attrs->func, 1, &value_hi);
-+	if (err)
-+		return err;
-+
-+	return snprintf(buffer, PAGE_SIZE, "%llu\n",
-+			div_u64(((u64)value_hi << 32) | value_lo,
-+			attrs->divisor));
-+}
-+
-+static struct device *vexpress_hwmon_dev_get(void)
-+{
-+	struct device *result;
-+
-+	spin_lock(&vexpress_hwmon_dev_lock);
-+
-+	if (vexpress_hwmon_dev) {
-+		result = vexpress_hwmon_dev;
-+	} else {
-+		int err;
-+
-+		result = hwmon_device_register(NULL);
-+		if (IS_ERR(result))
-+			goto out;
-+
-+		err = device_create_file(result, &vexpress_hwmon_name_attr);
-+		if (err) {
-+			result = ERR_PTR(err);
-+			hwmon_device_unregister(result);
-+			goto out;
++		if (prop) {
++			bridge_node = of_find_node_by_phandle(
++					be32_to_cpup(prop));
++			break;
 +		}
 +
-+		vexpress_hwmon_dev = result;
++		bridge_node = of_get_next_parent(bridge_node);
 +	}
 +
-+	vexpress_hwmon_dev_refcount++;
++	mutex_lock(&vexpress_config_bridges_mutex);
++	for (i = 0; i < ARRAY_SIZE(vexpress_config_bridges); i++) {
++		struct vexpress_config_bridge *bridge =
++				&vexpress_config_bridges[i];
 +
-+out:
-+	spin_unlock(&vexpress_hwmon_dev_lock);
++		if (test_bit(i, vexpress_config_bridges_map) &&
++				bridge->node == bridge_node) {
++			func->bridge = bridge;
++			func->func = bridge->info->func_get(dev, node);
++			break;
++		}
++	}
++	mutex_unlock(&vexpress_config_bridges_mutex);
 +
-+	return result;
++	if (!func->func) {
++		of_node_put(node);
++		kfree(func);
++		return NULL;
++	}
++
++	return func;
 +}
 +
-+static void vexpress_hwmon_dev_put(void)
++void vexpress_config_func_put(struct vexpress_config_func *func)
 +{
-+	spin_lock(&vexpress_hwmon_dev_lock);
-+
-+	if (--vexpress_hwmon_dev_refcount == 0) {
-+		hwmon_device_unregister(vexpress_hwmon_dev);
-+		vexpress_hwmon_dev = NULL;
-+	}
-+
-+	WARN_ON(vexpress_hwmon_dev_refcount < 0);
-+
-+	spin_unlock(&vexpress_hwmon_dev_lock);
++	func->bridge->info->func_put(func->func);
++	of_node_put(func->bridge->node);
++	kfree(func);
 +}
 +
-+struct vexpress_hwmon_func {
-+	const char *name;
-+	bool wide;
-+	u32 divisor;
-+	atomic_t index;
++
++struct vexpress_config_trans {
++	struct vexpress_config_func *func;
++	int offset;
++	bool write;
++	u32 *data;
++	int status;
++	struct completion completion;
++	struct list_head list;
 +};
 +
-+#if !defined(CONFIG_REGULATOR_VEXPRESS)
-+static struct vexpress_hwmon_func vexpress_hwmon_volt = {
-+	.name = "in",
-+	.divisor = 1000,
-+};
-+#endif
-+
-+static struct vexpress_hwmon_func vexpress_hwmon_amp = {
-+	.name = "curr",
-+	.divisor = 1000,
-+};
-+
-+static struct vexpress_hwmon_func vexpress_hwmon_temp = {
-+	.name = "temp",
-+	.divisor = 1000,
-+};
-+
-+static struct vexpress_hwmon_func vexpress_hwmon_power = {
-+	.name = "power",
-+	.divisor = 1,
-+};
-+
-+static struct vexpress_hwmon_func vexpress_hwmon_energy = {
-+	.name = "energy",
-+	.wide = true,
-+	.divisor = 1,
-+};
-+
-+static struct of_device_id vexpress_hwmon_of_match[] = {
-+#if !defined(CONFIG_REGULATOR_VEXPRESS)
-+	{
-+		.compatible = "arm,vexpress-volt",
-+		.data = &vexpress_hwmon_volt,
-+	},
-+#endif
-+	{
-+		.compatible = "arm,vexpress-amp",
-+		.data = &vexpress_hwmon_amp,
-+	}, {
-+		.compatible = "arm,vexpress-temp",
-+		.data = &vexpress_hwmon_temp,
-+	}, {
-+		.compatible = "arm,vexpress-power",
-+		.data = &vexpress_hwmon_power,
-+	}, {
-+		.compatible = "arm,vexpress-energy",
-+		.data = &vexpress_hwmon_energy,
-+	},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, vexpress_hwmon_of_match);
-+
-+static int vexpress_hwmon_probe(struct platform_device *pdev)
++static void vexpress_config_dump_trans(const char *what,
++		struct vexpress_config_trans *trans)
 +{
-+	int err;
-+	const struct of_device_id *match;
-+	struct vexpress_hwmon_func *hwmon_func;
-+	struct device *hwmon_dev;
-+	struct vexpress_hwmon_attrs *attrs;
-+	const char *attr_name;
-+	int attr_index;
++	pr_debug("%s %s trans %p func 0x%p offset %d data 0x%x status %d\n",
++			what, trans->write ? "write" : "read", trans,
++			trans->func->func, trans->offset,
++			trans->data ? *trans->data : 0, trans->status);
++}
 +
-+	match = of_match_device(vexpress_hwmon_of_match, &pdev->dev);
-+	if (!match) {
-+		err = -EINVAL;
-+		goto error_match_device;
-+	}
-+	hwmon_func = match->data;
++static int vexpress_config_schedule(struct vexpress_config_trans *trans)
++{
++	int res;
++	struct vexpress_config_bridge *bridge = trans->func->bridge;
++	unsigned long flags;
 +
-+	hwmon_dev = vexpress_hwmon_dev_get();
-+	if (IS_ERR(hwmon_dev)) {
-+		err = PTR_ERR(hwmon_dev);
-+		goto error_hwmon_dev_get;
-+	}
++	init_completion(&trans->completion);
++	trans->status = -EFAULT;
 +
-+	attrs = devm_kzalloc(&pdev->dev, sizeof(*attrs), GFP_KERNEL);
-+	if (!attrs) {
-+		err = -ENOMEM;
-+		goto error_kzalloc;
-+	}
++	spin_lock_irqsave(&bridge->transactions_lock, flags);
 +
-+	attrs->func = vexpress_config_func_get_by_dev(&pdev->dev);
-+	if (!attrs->func) {
-+		err = -ENXIO;
-+		goto error_get_func;
-+	}
++	vexpress_config_dump_trans("Executing", trans);
 +
-+	err = sysfs_create_link(&pdev->dev.kobj, &hwmon_dev->kobj, "hwmon");
-+	if (err)
-+		goto error_create_link;
-+
-+	attr_index = atomic_inc_return(&hwmon_func->index);
-+	attr_name = hwmon_func->name;
-+
-+	snprintf(attrs->input_name, sizeof(attrs->input_name),
-+			"%s%d_input", attr_name, attr_index);
-+	attrs->input_attr.attr.name = attrs->input_name;
-+	attrs->input_attr.attr.mode = 0444;
-+	if (hwmon_func->wide)
-+		attrs->input_attr.show = vexpress_hwmon_u64_show;
++	if (list_empty(&bridge->transactions))
++		res = bridge->info->func_exec(trans->func->func, trans->offset,
++				trans->write, trans->data);
 +	else
-+		attrs->input_attr.show = vexpress_hwmon_u32_show;
-+	sysfs_attr_init(&attrs->input_attr.attr);
-+	err = device_create_file(hwmon_dev, &attrs->input_attr);
-+	if (err)
-+		goto error_create_input;
++		res = VEXPRESS_CONFIG_EXEC_WAIT;
 +
-+	attrs->label = of_get_property(pdev->dev.of_node, "label", NULL);
-+	if (attrs->label) {
-+		snprintf(attrs->label_name, sizeof(attrs->label_name),
-+				"%s%d_label", attr_name, attr_index);
-+		attrs->label_attr.attr.name = attrs->label_name;
-+		attrs->label_attr.attr.mode = 0444;
-+		attrs->label_attr.show = vexpress_hwmon_label_show;
-+		sysfs_attr_init(&attrs->label_attr.attr);
-+		err = device_create_file(hwmon_dev, &attrs->label_attr);
-+		if (err)
-+			goto error_create_label;
++	switch (res) {
++	case VEXPRESS_CONFIG_EXEC_DONE:
++		vexpress_config_dump_trans("Finished", trans);
++		res = trans->status;
++		break;
++	case VEXPRESS_CONFIG_EXEC_WAIT:
++		list_add_tail(&trans->list, &bridge->transactions);
++		break;
 +	}
 +
-+	attrs->divisor = hwmon_func->divisor;
++	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
 +
-+	platform_set_drvdata(pdev, attrs);
-+
-+	return 0;
-+
-+error_create_label:
-+	device_remove_file(hwmon_dev, &attrs->input_attr);
-+error_create_input:
-+	sysfs_remove_link(&pdev->dev.kobj, "hwmon");
-+error_create_link:
-+	vexpress_config_func_put(attrs->func);
-+error_get_func:
-+error_kzalloc:
-+	vexpress_hwmon_dev_put();
-+error_hwmon_dev_get:
-+error_match_device:
-+	return err;
++	return res;
 +}
 +
-+static int __devexit vexpress_hwmon_remove(struct platform_device *pdev)
++void vexpress_config_complete(struct vexpress_config_bridge *bridge,
++		int status)
 +{
-+	struct vexpress_hwmon_attrs *attrs = platform_get_drvdata(pdev);
-+	const struct of_device_id *match =
-+		of_match_device(vexpress_hwmon_of_match, &pdev->dev);
-+	struct vexpress_hwmon_func *hwmon_func = match->data;
++	struct vexpress_config_trans *trans;
++	unsigned long flags;
 +
-+	if (attrs->label)
-+		device_remove_file(vexpress_hwmon_dev, &attrs->label_attr);
-+	device_remove_file(vexpress_hwmon_dev, &attrs->input_attr);
-+	atomic_dec(&hwmon_func->index);
-+	sysfs_remove_link(&pdev->dev.kobj, "hwmon");
-+	vexpress_config_func_put(attrs->func);
-+	vexpress_hwmon_dev_put();
++	spin_lock_irqsave(&bridge->transactions_lock, flags);
 +
-+	return 0;
++	trans = list_first_entry(&bridge->transactions,
++			struct vexpress_config_trans, list);
++	vexpress_config_dump_trans("Completed", trans);
++
++	trans->status = status;
++	list_del(&trans->list);
++
++	if (!list_empty(&bridge->transactions)) {
++		vexpress_config_dump_trans("Pending", trans);
++
++		bridge->info->func_exec(trans->func->func, trans->offset,
++				trans->write, trans->data);
++	}
++	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
++
++	complete(&trans->completion);
 +}
 +
-+static struct platform_driver vexpress_hwmon_driver = {
-+	.probe = vexpress_hwmon_probe,
-+	.remove = __devexit_p(vexpress_hwmon_remove),
-+	.driver	= {
-+		.name = DRVNAME,
-+		.owner = THIS_MODULE,
-+		.of_match_table = vexpress_hwmon_of_match,
-+	},
++int vexpress_config_wait(struct vexpress_config_trans *trans)
++{
++	wait_for_completion(&trans->completion);
++
++	return trans->status;
++}
++
++
++int vexpress_config_read(struct vexpress_config_func *func, int offset,
++		u32 *data)
++{
++	struct vexpress_config_trans trans = {
++		.func = func,
++		.offset = offset,
++		.write = false,
++		.data = data,
++		.status = 0,
++	};
++	int res = vexpress_config_schedule(&trans);
++
++	if (res == VEXPRESS_CONFIG_EXEC_WAIT)
++		res = vexpress_config_wait(&trans);
++
++	return res;
++}
++EXPORT_SYMBOL(vexpress_config_read);
++
++int vexpress_config_write(struct vexpress_config_func *func, int offset,
++		u32 data)
++{
++	struct vexpress_config_trans trans = {
++		.func = func,
++		.offset = offset,
++		.write = true,
++		.data = &data,
++		.status = 0,
++	};
++	int res = vexpress_config_schedule(&trans);
++
++	if (res == VEXPRESS_CONFIG_EXEC_WAIT)
++		res = vexpress_config_wait(&trans);
++
++	return res;
++}
++EXPORT_SYMBOL(vexpress_config_write);
+diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
+new file mode 100644
+index 0000000..b4acb20
+--- /dev/null
++++ b/include/linux/vexpress.h
+@@ -0,0 +1,64 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ */
++
++#ifndef _LINUX_VEXPRESS_H
++#define _LINUX_VEXPRESS_H
++
++#include <linux/device.h>
++
++#define VEXPRESS_SITE_MB		0
++#define VEXPRESS_SITE_DB1		1
++#define VEXPRESS_SITE_DB2		2
++#define VEXPRESS_SITE_MASTER		0xf
++
++#define VEXPRESS_CONFIG_EXEC_DONE	0
++#define VEXPRESS_CONFIG_EXEC_WAIT	1
++
++/* Config bridge API */
++
++struct vexpress_config_bridge_info {
++	const char *name;
++	void *(*func_get)(struct device *dev, struct device_node *node);
++	void (*func_put)(void *func);
++	int (*func_exec)(void *func, int offset, bool write, u32 *data);
 +};
 +
-+static int __init vexpress_hwmon_init(void)
-+{
-+	return platform_driver_register(&vexpress_hwmon_driver);
-+}
++struct vexpress_config_bridge;
 +
-+static void __exit vexpress_hwmon_exit(void)
-+{
-+	platform_driver_unregister(&vexpress_hwmon_driver);
-+}
++struct vexpress_config_bridge *vexpress_config_bridge_register(
++		struct device_node *node,
++		struct vexpress_config_bridge_info *info);
++void vexpress_config_bridge_unregister(struct vexpress_config_bridge *bridge);
 +
-+MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
-+MODULE_DESCRIPTION("Versatile Express hwmon");
-+MODULE_LICENSE("GPL");
++void vexpress_config_complete(struct vexpress_config_bridge *bridge,
++		int status);
 +
-+module_init(vexpress_hwmon_init);
-+module_exit(vexpress_hwmon_exit);
++/* Config function API */
++
++struct vexpress_config_func;
++
++struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
++		struct device_node *node);
++#define vexpress_config_func_get_by_dev(dev) \
++		__vexpress_config_func_get(dev, NULL)
++#define vexpress_config_func_get_by_node(node) \
++		__vexpress_config_func_get(NULL, node)
++void vexpress_config_func_put(struct vexpress_config_func *func);
++
++/* Both may sleep! */
++int vexpress_config_read(struct vexpress_config_func *func, int offset,
++		u32 *data);
++int vexpress_config_write(struct vexpress_config_func *func, int offset,
++		u32 data);
++
++#endif
 -- 
 1.7.9.5
