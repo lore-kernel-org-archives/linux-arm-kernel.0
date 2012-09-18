@@ -1,33 +1,106 @@
-From: shawn.guo@linaro.org (Shawn Guo)
+From: zhanzhenbo@gmail.com (steve.zhan)
 Date: Tue, 18 Sep 2012 16:20:58 +0800
-Subject: [PATCH 00/34] i.MX multi-platform support
-In-Reply-To: <20120917075138.GN6180@pengutronix.de>
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <20120917075138.GN6180@pengutronix.de>
-Message-ID: <20120918082055.GD6377@S2101-09.ap.freescale.net>
+Subject: ARM: smp: why don't eliminate warning "Unknown IPI message 0x1"?
+In-Reply-To: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
+References: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
+Message-ID: <CAKvkGKcm=pYkcqsESK_XPqJL09bde2+tHheUJwBDjPXLTn=vGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 09:51:38AM +0200, Sascha Hauer wrote:
-> I gave it a test on i.MX1, i.MX27, i.MX31 and i.MX35. All run fine, but
-> the last patch breaks the imx_v4_v5_defconfig: Somehow it now defaults
-> to ARMv7 based machines. I haven't looked into it, just reenabled
-> ARMv4/ARMv5 and the boards again -> works. The config should be updated
-> with the last patch.
-> 
-Yes, I will rework the patch with all these and Arnd's comment on the
-last patch taken into account.
+Below is the whole of the patch.
 
-> I'm fine with the changes to mx2-camera, but Javier should give his ok
-> to it, he has worked on it quite a lot recently.
-> 
-> One other issue related to imx-dma, see comment to that patch.
-> 
-> Otherwise:
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-Thanks a lot.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ea73045..8605400 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
++#include <linux/threads.h>
 
-Shawn
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -495,11 +496,28 @@ asmlinkage void __exception_irq_entry do_IPI(int
+ipinr, struct pt_regs *regs)
+        handle_IPI(ipinr, regs);
+ }
+
++static int ipi_wakeup_nr[NR_CPUS];
++
++void smp_send_wakeup_ipi_begin(unsigned int cpu, unsigned int irq)
++{
++       ipi_wakeup_nr[cpu] = irq + 1;
++       gic_raise_softirq(cpumask_of(cpu),irq);
++}
++
++void smp_send_wakeup_ipi_end(unsigned int cpu, unsigned int irq)
++{
++       BUG_ON(ipi_wakeup_nr[cpu] != irq + 1);
++       ipi_wakeup_nr[cpu] = 0;
++}
++
+ void handle_IPI(int ipinr, struct pt_regs *regs)
+ {
+        unsigned int cpu = smp_processor_id();
+        struct pt_regs *old_regs = set_irq_regs(regs);
+
++       if (ipi_wakeup_nr[cpu] == ipinr + 1)
++               goto Exit;
++
+        if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
+                __inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
+
+@@ -537,6 +555,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+                       cpu, ipinr);
+                break;
+        }
++Exit:
+        set_irq_regs(old_regs);
+ }
+
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index db0117e..ecc6add 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -127,7 +127,7 @@ int __cpuinit boot_secondary(unsigned int cpu,
+struct task_struct *idle)
+         * the boot monitor to read the system wide flags register,
+         * and branch to the address found there.
+         */
+-       gic_raise_softirq(cpumask_of(cpu), 1);
++       smp_send_wakeup_ipi_begin(cpu, 0);
+
+        timeout = jiffies + (1 * HZ);
+        while (time_before(jiffies, timeout)) {
+@@ -137,6 +137,7 @@ int __cpuinit boot_secondary(unsigned int cpu,
+struct task_struct *idle)
+
+                udelay(10);
+        }
++       smp_send_wakeup_ipi_end(cpu, 0);
+
+        /*
+         * now the secondary core is starting up let it run its
+
+
+2012/9/18, ??? <zhanzhenbo@gmail.com>:
+> Russell King want people to move to SGI0 for this, so that we can have
+> SGI1-N
+> as the proper IPIs, but now we can't do this, maybe we must wait for
+> so many years.
+> But, Do you think we can use a another way to resolve this problem,
+> because this warning message will oftenly appeare in products.
+>
+> We can't assume the fixed IPI number that can wakeup secondary cores.
+> "I'd much rather see platforms deciding whether they need to use SGI1
+> or whether they can switch to SGI0 instead."
+>
+> Just give one ugly idea. I have modify this for example in msm platform.
+> Pls check the attached git diff patch Or below lines and give your
+> suggestions
+>
+
+
+-- 
+Steve Zhan
