@@ -1,37 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Sep 2012 13:50:56 +0200
-Subject: [PATCH] spi: pl022: Add clk_{un}prepare() support in runtime PM
-In-Reply-To: <CAOh2x==GY6xvyWmLJtpR68x1kiFWO8F85RwS6VfHjJA8YdhgvA@mail.gmail.com>
-References: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
- <CACRpkdbHegZAw+9XXzOb5UPPqJvzoNfPJ5aPDhuwWWhWunuv8w@mail.gmail.com>
- <CAOh2x==GY6xvyWmLJtpR68x1kiFWO8F85RwS6VfHjJA8YdhgvA@mail.gmail.com>
-Message-ID: <CACRpkdYnW=VbR1ieF1oicdPF79jV2raX9xkccE_ndrxQQjkUqw@mail.gmail.com>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Tue, 18 Sep 2012 17:22:26 +0530
+Subject: [PATCH v2 1/1] ARM: LPAE: Fix mapping in alloc_init_pte for
+ unaligned addresses.
+In-Reply-To: <CAJ7qFSeoyVGie__3mJ8=edeEf7Jh7TQY8vcWgGdOtWVXa8TU0Q@mail.gmail.com>
+References: <1344238885-13683-1-git-send-email-r.sricharan@ti.com>
+ <CAJ7qFSeoyVGie__3mJ8=edeEf7Jh7TQY8vcWgGdOtWVXa8TU0Q@mail.gmail.com>
+Message-ID: <CAJ7qFScGw8oA9y7gjoUTp6xCoLnQti2OXuVqCMrxJUeHDSRENA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 6:09 AM, viresh kumar <viresh.kumar@linaro.org> wrote:
+Hi,
+On Fri, Aug 17, 2012 at 4:32 PM, R, Sricharan <r.sricharan@ti.com> wrote:
+> Hi,
+>
+>> With LPAE, When either the start address or end address
+>> or physical address to be mapped is unaligned,
+>> alloc_init_section creates page granularity mappings.
+>> alloc_init_section calls alloc_init_pte which populates
+>> one pmd entry and sets up the ptes. But if the size is
+>> greater than what can be mapped by one pmd entry,
+>> then the rest remains unmapped.
+>>
+>> The issue becomes visible when LPAE is enabled, where we have
+>> the 3 levels with seperate pgd and pmd's.
+>> When a static mapping for 3MB is requested, only 2MB is mapped
+>> and the remaining 1MB is unmapped. Fixing this here, by looping
+>> in to map the entire unaligned address range.
+>>
+>> Boot tested on OMAP5 evm with both LPAE enabled/disabled
+>> and verified that static mappings with unaligned addresses
+>> are properly mapped.
+>>
+>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>> [V2] Moved the loop to alloc_init_pte as per Russell's
+>>      feedback and changed the subject accordingly.
+>>      Using PMD_XXX instead of SECTION_XXX to avoid
+>>      different loop increments with/without LPAE.
+>>
+>>  arch/arm/mm/mmu.c |   22 ++++++++++++++++++----
+>>  1 file changed, 18 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index cf4528d..0ed8808 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -585,11 +585,25 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>>                                   unsigned long end, unsigned long pfn,
+>>                                   const struct mem_type *type)
+>>  {
+>> -       pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
+>> +       unsigned long next;
+>> +       pte_t *pte;
+>> +       phys_addr_t phys;
+>> +
+>>         do {
+>> -               set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
+>> -               pfn++;
+>> -       } while (pte++, addr += PAGE_SIZE, addr != end);
+>> +               if ((end-addr) & PMD_MASK)
+>> +                       next = (addr + PMD_SIZE) & PMD_MASK;
+>> +               else
+>> +                       next = end;
+>> +
+>> +               pte = early_pte_alloc(pmd, addr, type->prot_l1);
+>> +               do {
+>> +                       set_pte_ext(pte, pfn_pte(pfn,
+>> +                                       __pgprot(type->prot_pte)), 0);
+>> +                       pfn++;
+>> +               } while (pte++, addr += PAGE_SIZE, addr != next);
+>> +
+>> +               phys += next - addr;
+>> +       } while (pmd++, addr = next, addr != end);
+>>  }
+>>
+>   ping..
 
-> Yes, we don't need to call prepare() again atleast for SPEAr. You are correct.
-> I saw the driver after a long time :)
+  Ping again.
+  The issue is reproducible in mainline with CMA + LPAE enabled.
+  CMA tries to reserve/map 16 MB with 2 level table entries and
+   crashes in alloc_init_pte.
 
-I'm asking because it's actually OK to do this, I was more asking whether it
-was really needed by any platforms...
+  This patch fixes that. Just posted a V3 of the same patch.
 
-> Can you please elaborate, why can't i see any clk_disable/enable calls anywhere
-> else from probe. If i remember correctly, earlier we used to enable/disable
-> clk after transfers and also during suspend/resume.
+         https://patchwork.kernel.org/patch/1472031/
 
-We clk_disable() at runtime_suspend() and clk_enable() at runtime resume,
-and the driver gives hints to the runtime PM layer to autosuspend the
-driver whenever it's unused. Check the pm_runtime_* calls.
 
-> The amba layer is taking care of interface clock only and not
-> functional clock. So
-> i believe that's not the magic code. :)
-
-This clock is the one for the external bus. In some designs these two
-clocks are one and the same, and these won't currently get into any clock
-disabled states, sadly. (We need to fix that some day.)
-
-Yours,
-Linus Walleij
+Thanks,
+ Sricharan
