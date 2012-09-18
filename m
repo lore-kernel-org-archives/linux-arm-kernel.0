@@ -1,53 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 18 Sep 2012 10:05:31 +0200
-Subject: [PATCH] ARM i.MX25: Make timer irq work again
-Message-ID: <1347955531-31304-1-git-send-email-s.hauer@pengutronix.de>
+From: zhanzhenbo@gmail.com (=?GB2312?B?1b/V8bKo?=)
+Date: Tue, 18 Sep 2012 16:07:49 +0800
+Subject: ARM: smp: why don't eliminate warning "Unknown IPI message 0x1"?
+Message-ID: <CAKvkGKfjShpdTagsHAhyMr3rHfUQc4qpZjW9wMdht4N36Pk5rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since i.MX has SPARSE_IRQ enabled the i.MX25 timer is broken. This
-is because the internal irqs now start at an offset of NR_IRQS_LEGACY.
-The patch fixed this up, but missed the i.MX25 timer which used a
-hardcoded value instead of a define. This patch introduces a define
-for the timer irq and uses it.
+Russell King want people to move to SGI0 for this, so that we can have SGI1-N
+as the proper IPIs, but now we can't do this, maybe we must wait for
+so many years.
+But, Do you think we can use a another way to resolve this problem,
+because this warning message will oftenly appeare in products.
 
-This is broken since introduced with 3.6-rc1:
+We can't assume the fixed IPI number that can wakeup secondary cores.
+"I'd much rather see platforms deciding whether they need to use SGI1
+or whether they can switch to SGI0 instead."
 
-| commit 8842a9e2869cae14bbb8184004a42fc3070587fb
-| Author: Shawn Guo <shawn.guo@linaro.org>
-| Date:   Thu Jun 14 11:16:14 2012 +0800
-|
-|    ARM: imx: enable SPARSE_IRQ for imx platform
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx25.c         |    2 +-
- arch/arm/plat-mxc/include/mach/mx25.h |    1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index fdd8cc8..0fc72fc 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -243,6 +243,6 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[sdma_ahb], "ahb", "imx35-sdma");
- 	clk_register_clkdev(clk[iim_ipg], "iim", NULL);
+Just give one ugly idea. I have modify this for example in msm platform.
+Pls check the attached git diff patch Or below lines and give your suggestions
+-------------- next part --------------
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ea73045..8605400 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
++#include <linux/threads.h>
  
--	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
-+	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), MX25_INT_GPT1);
- 	return 0;
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -495,11 +496,28 @@ asmlinkage void __exception_irq_entry do_IPI(int ipinr, struct pt_regs *regs)
+ 	handle_IPI(ipinr, regs);
  }
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 627d94f..ec46640 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -98,6 +98,7 @@
- #define MX25_INT_UART1		(NR_IRQS_LEGACY + 45)
- #define MX25_INT_GPIO2		(NR_IRQS_LEGACY + 51)
- #define MX25_INT_GPIO1		(NR_IRQS_LEGACY + 52)
-+#define MX25_INT_GPT1		(NR_IRQS_LEGACY + 54)
- #define MX25_INT_FEC		(NR_IRQS_LEGACY + 57)
  
- #define MX25_DMA_REQ_SSI2_RX1	22
--- 
-1.7.10.4
++static int ipi_wakeup_nr[NR_CPUS];
++
++void smp_send_wakeup_ipi_begin(unsigned int cpu, unsigned int irq)
++{
++	ipi_wakeup_nr[cpu] = irq + 1;
++	gic_raise_softirq(cpumask_of(cpu),irq);
++}
++
++void smp_send_wakeup_ipi_end(unsigned int cpu, unsigned int irq)
++{
++	BUG_ON(ipi_wakeup_nr[cpu] != irq + 1);
++	ipi_wakeup_nr[cpu] = 0;
++}
++
+ void handle_IPI(int ipinr, struct pt_regs *regs)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	if (ipi_wakeup_nr[cpu] == ipinr + 1)
++		goto Exit;
++
+ 	if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
+ 		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
+ 
+@@ -537,6 +555,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		       cpu, ipinr);
+ 		break;
+ 	}
++Exit:	
+ 	set_irq_regs(old_regs);
+ }
+ 
