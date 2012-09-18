@@ -1,23 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Sep 2012 15:44:43 +0800
-Subject: [PATCH 25/34] dma: imx-dma: remove mach/hardware.h inclusion
-In-Reply-To: <CACKLOr244aYqmtQWXV=mP--pEuua7UswwpNrxwfN8GC5GhhQmg@mail.gmail.com>
-References: <CACKLOr0-s5Cuuun-sRvs=V3-J7wCjsKfDz8fVWxQGNbZEepDwQ@mail.gmail.com>
- <CACKLOr244aYqmtQWXV=mP--pEuua7UswwpNrxwfN8GC5GhhQmg@mail.gmail.com>
-Message-ID: <20120918074440.GI1338@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 18 Sep 2012 09:52:13 +0200
+Subject: [PATCH 00/34] i.MX multi-platform support
+In-Reply-To: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120918075213.GD24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 09:23:21AM +0200, javier Martin wrote:
-> False alarm. With Sascha's fix it works properly. Don't forget to add
-> it to your series:
-> 
-OK.
+Hi Shawn,
 
-> Tested-by: Javier Martin <javier.martin@vista-silicon.com>
+On Mon, Sep 17, 2012 at 01:34:29PM +0800, Shawn Guo wrote:
+> The series enables multi-platform support for imx.  Since the required
+> frameworks (clk, pwm) and spare_irq have already been adopted on imx,
+> the series is all about cleaning up mach/* headers.  Along with the
+> changes, arch/arm/plat-mxc gets merged into arch/arm/mach-imx.
 > 
-Thanks, Javier.
+> It's based on a bunch of branches (works from others), Rob's initial
+> multi-platform series, Arnd's platform-data and smp_ops (Marc's) and
+> imx 3.7 material (Sascha and myself).
+> 
+> It's available on branch below.
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform
+> 
+> It's been tested on imx5 and imx6, and only compile-tested on imx2 and
+> imx3, so testing on imx2/3 are appreciated.
+> 
+> Subsystem maintainers,
+> 
+> I plan to send the whole series via arm-soc tree at the end of 3.7
+> merge window when all dependant bits hit mainline.  Please have a
+> look at the patches you get copied and provide ACKs if the changes
+> are good.  Thanks.
+
+I just had a look at the remaining initcalls in arch-imx. Most of them
+are protected with a cpu_is_*, but this one should be fixed before i.MX
+is enabled for multi platform:
+
+arch/arm/mach-imx/devices/devices.c:48:core_initcall(mxc_device_init);
+
+I think this won't harm others directly, but it will register i.MX
+related devices on foreign platforms.
+
+Sascha
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
