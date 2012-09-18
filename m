@@ -1,61 +1,267 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:43 +0100
-Subject: [PATCH v2 01/13] input: ambakmi: (Un)prepare clocks when (dis)enabling
+Date: Tue, 18 Sep 2012 15:17:44 +0100
+Subject: [PATCH v2 02/13] video: Versatile Express display output driver
 In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1347977875-16855-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clocks must be prepared before enabling and unprepared
-after disabling. Use appropriate functions to do this
-in one go.
+Versatile Express' DVI video output can be connected to one the three
+sources - motherboard's CLCD controller or a video signal generated
+by one of the daughterboards.
+
+This driver configures the muxer FPGA so the output displays
+content of one of the framebuffers in the system (0 by default,
+can be changed by user writing to "fb" attribute of the muxfpga
+device). The decision is based on an educated guess in case of
+DT-less system or on the "arm,vexpress,site" property of the
+display controller's DT node.
+
+It will also set up the display formatter mode and keep it up
+to date with mode changes requested by the user (eg. with fbset
+tool).
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/input/serio/ambakmi.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/video/Makefile       |    3 +
+ drivers/video/vexpress-dvi.c |  208 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 211 insertions(+)
+ create mode 100644 drivers/video/vexpress-dvi.c
 
-Hi Russell, Dmitry,
+Hi Florian,
 
-What would be your preference regarding merging this patch? Russell's patch
-system? Dmitry's git tree? Or maybe you want me to add it to a pull request
-for arm-soc guys?
+Assuming it's not totally crap ;-) what would be you preference about
+merging this patch? Would you take it through your tree?
 
-Cheers!
+Regards
 
 Pawel
 
-diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
-index 2ffd110..2e77246 100644
---- a/drivers/input/serio/ambakmi.c
-+++ b/drivers/input/serio/ambakmi.c
-@@ -72,7 +72,7 @@ static int amba_kmi_open(struct serio *io)
- 	unsigned int divisor;
- 	int ret;
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index ee8dafb..01d28d5 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -170,3 +170,6 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
  
--	ret = clk_enable(kmi->clk);
-+	ret = clk_prepare_enable(kmi->clk);
- 	if (ret)
- 		goto out;
- 
-@@ -92,7 +92,7 @@ static int amba_kmi_open(struct serio *io)
- 	return 0;
- 
-  clk_disable:
--	clk_disable(kmi->clk);
-+	clk_disable_unprepare(kmi->clk);
-  out:
- 	return ret;
- }
-@@ -104,7 +104,7 @@ static void amba_kmi_close(struct serio *io)
- 	writeb(0, KMICR);
- 
- 	free_irq(kmi->irq, kmi);
--	clk_disable(kmi->clk);
-+	clk_disable_unprepare(kmi->clk);
- }
- 
- static int __devinit amba_kmi_probe(struct amba_device *dev,
+ #video output switch sysfs driver
+ obj-$(CONFIG_VIDEO_OUTPUT_CONTROL) += output.o
++
++# platform specific output drivers
++obj-$(CONFIG_VEXPRESS_CONFIG)	  += vexpress-dvi.o
+diff --git a/drivers/video/vexpress-dvi.c b/drivers/video/vexpress-dvi.c
+new file mode 100644
+index 0000000..fc50fc6
+--- /dev/null
++++ b/drivers/video/vexpress-dvi.c
+@@ -0,0 +1,208 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ */
++
++#define pr_fmt(fmt) "vexpress-dvi: " fmt
++
++#include <linux/fb.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/vexpress.h>
++
++
++static struct vexpress_config_func *vexpress_dvimode_func;
++
++static struct {
++	u32 xres, yres, mode;
++} vexpress_dvi_dvimodes[] = {
++	{ 640, 480, 0 }, /* VGA */
++	{ 800, 600, 1 }, /* SVGA */
++	{ 1024, 768, 2 }, /* XGA */
++	{ 1280, 1024, 3 }, /* SXGA */
++	{ 1600, 1200, 4 }, /* UXGA */
++	{ 1920, 1080, 5 }, /* HD1080 */
++};
++
++static void vexpress_dvi_mode_set(struct fb_info *info, u32 xres, u32 yres)
++{
++	int err = -ENOENT;
++	int i;
++
++	if (!vexpress_dvimode_func)
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(vexpress_dvi_dvimodes); i++) {
++		if (vexpress_dvi_dvimodes[i].xres == xres &&
++				vexpress_dvi_dvimodes[i].yres == yres) {
++			pr_debug("mode: %ux%u = %d\n", xres, yres,
++					vexpress_dvi_dvimodes[i].mode);
++			err = vexpress_config_write(vexpress_dvimode_func, 0,
++					vexpress_dvi_dvimodes[i].mode);
++			break;
++		}
++	}
++
++	if (err)
++		pr_warn("Failed to set %ux%u mode! (%d)\n", xres, yres, err);
++}
++
++
++static struct vexpress_config_func *vexpress_muxfpga_func;
++static int vexpress_dvi_fb = -1;
++
++static int vexpress_dvi_mux_set(struct fb_info *info)
++{
++	u32 site = vexpress_get_site_by_dev(info->device);
++	int err = vexpress_config_write(vexpress_muxfpga_func, 0, site);
++
++	if (!err) {
++		pr_debug("Selected MUXFPGA input %d (fb%d)\n", site,
++				info->node);
++		vexpress_dvi_fb = info->node;
++		vexpress_dvi_mode_set(info, info->var.xres,
++				info->var.yres);
++	} else {
++		pr_warn("Failed to select MUXFPGA input %d (fb%d)! (%d)\n",
++				site, info->node, err);
++	}
++
++	return err;
++}
++
++static int vexpress_dvi_fb_select(int fb)
++{
++	int err;
++	struct fb_info *info = registered_fb[fb];
++
++	if (!info || !lock_fb_info(info))
++		return -ENODEV;
++
++	err = vexpress_dvi_mux_set(info);
++
++	unlock_fb_info(info);
++
++	return err;
++}
++
++static ssize_t vexpress_dvi_fb_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "%d\n", vexpress_dvi_fb);
++}
++
++static ssize_t vexpress_dvi_fb_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	long value;
++	int err = kstrtol(buf, 0, &value);
++
++	if (!err)
++		err = vexpress_dvi_fb_select(value);
++
++	return err ? err : count;
++}
++
++DEVICE_ATTR(fb, S_IRUGO | S_IWUSR, vexpress_dvi_fb_show,
++		vexpress_dvi_fb_store);
++
++
++static int vexpress_dvi_fb_event_notify(struct notifier_block *self,
++			      unsigned long action, void *data)
++{
++	struct fb_event *event = data;
++	struct fb_info *info = event->info;
++	struct fb_videomode *mode = event->data;
++
++	switch (action) {
++	case FB_EVENT_FB_REGISTERED:
++		if (vexpress_dvi_fb < 0)
++			vexpress_dvi_mux_set(info);
++		break;
++	case FB_EVENT_MODE_CHANGE:
++	case FB_EVENT_MODE_CHANGE_ALL:
++		if (info->node == vexpress_dvi_fb)
++			vexpress_dvi_mode_set(info, mode->xres, mode->yres);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block vexpress_dvi_fb_notifier = {
++	.notifier_call = vexpress_dvi_fb_event_notify,
++};
++
++
++enum vexpress_dvi_func { FUNC_MUXFPGA, FUNC_DVIMODE };
++
++static struct of_device_id vexpress_dvi_of_match[] = {
++	{
++		.compatible = "arm,vexpress-muxfpga",
++		.data = (void *)FUNC_MUXFPGA,
++	}, {
++		.compatible = "arm,vexpress-dvimode",
++		.data = (void *)FUNC_DVIMODE,
++	},
++	{}
++};
++
++static int vexpress_dvi_probe(struct platform_device *pdev)
++{
++	enum vexpress_dvi_func func;
++	const struct of_device_id *match =
++			of_match_device(vexpress_dvi_of_match, &pdev->dev);
++
++	if (match)
++		func = (enum vexpress_dvi_func)match->data;
++	else
++		func = pdev->id_entry->driver_data;
++
++	switch (func) {
++	case FUNC_MUXFPGA:
++		vexpress_muxfpga_func =
++				vexpress_config_func_get_by_dev(&pdev->dev);
++		device_create_file(&pdev->dev, &dev_attr_fb);
++		break;
++	case FUNC_DVIMODE:
++		vexpress_dvimode_func =
++				vexpress_config_func_get_by_dev(&pdev->dev);
++		break;
++	}
++
++	if (vexpress_muxfpga_func && vexpress_dvimode_func) {
++		fb_register_client(&vexpress_dvi_fb_notifier);
++		vexpress_dvi_fb_select(0);
++	}
++
++	return 0;
++}
++
++static const struct platform_device_id vexpress_dvi_id_table[] = {
++	{ .name = "vexpress-muxfpga", .driver_data = FUNC_MUXFPGA, },
++	{ .name = "vexpress-dvimode", .driver_data = FUNC_DVIMODE, },
++	{}
++};
++
++static struct platform_driver vexpress_dvi_driver = {
++	.probe = vexpress_dvi_probe,
++	.driver = {
++		.name = "vexpress-dvi",
++		.of_match_table = vexpress_dvi_of_match,
++	},
++	.id_table = vexpress_dvi_id_table,
++};
++
++static int __init vexpress_dvi_init(void)
++{
++	return platform_driver_register(&vexpress_dvi_driver);
++}
++device_initcall(vexpress_dvi_init);
 -- 
 1.7.9.5
