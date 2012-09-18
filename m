@@ -1,31 +1,26 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 18 Sep 2012 12:59:42 +0300
-Subject: [PATCHv2 0/3] remoteproc: introduce rproc recovery
-In-Reply-To: <1346351174-28441-1-git-send-email-fernando.lugo@ti.com>
-References: <1346351174-28441-1-git-send-email-fernando.lugo@ti.com>
-Message-ID: <CAK=WgbaoPMj9OobHuC=VObTjvT--faen2_rfY-s4Jk-+Fqi5iQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Sep 2012 11:04:39 +0100
+Subject: ARM: hw_breakpoint: silent EPERM when setting ARM_DSCR_MDBGEN on
+ ARM_DEBUG_ARCH_V7_ECP14
+In-Reply-To: <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
+References: <CAPfQmK+jYnVybyrBcnNkbm=Ta+7hjPNh5TqiL2tAFY8YBTyLEw@mail.gmail.com>
+ <20120913214102.GB11399@mudshark.cambridge.arm.com>
+ <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
+Message-ID: <20120918100438.GC32204@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fernando,
+On Fri, Sep 14, 2012 at 09:08:24AM +0100, Valentin Pistol wrote:
+> Is there a reliable way to determine that they are locked down?
+> Any particular register/bit I can check to confirm?
 
-On Thu, Aug 30, 2012 at 9:26 PM, Fernando Guzman Lugo
-<fernando.lugo@ti.com> wrote:
-> These set of patches make possible the remoteproc recover after a crash.
-> This is a hard recovery, that means the remoteproc is reset and it will
-> start from the beginning. When a crash happen all the virtio devices are
-> destroyed. Therefore, both rpmsg drivers and devices are gracefully
-> removed which also cause rproc users become 0 and the remoteproc is turned
-> off. After the virtio devices are destroyed the crash handler function
-> will read the virtio information from the firmware in order to recreate
-> the virtio devices that will boot the remoteproc and everything will be
-> functional again.
+You can take a look at the DBGAUTHSTATUS register and try to determine the
+signal values for SPNIDEN, DBGEN and NIDEN.
 
-Applied to remoteproc's for-next branch with a few changes (so we
-don't miss the merge window).
+> > Completely untested patch below, please let me know how you get on...
+> 
+> Looks good, I'll give it a try.
 
-The changes are detailed in the commit logs of the patches, please let
-me know if there's any issue.
+Great. Let me know if it helps and, if so, I'll merge it.
 
-Thanks!
-Ohad.
+Will
