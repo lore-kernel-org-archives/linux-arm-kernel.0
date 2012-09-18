@@ -1,63 +1,121 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 18 Sep 2012 13:25:55 +0200
-Subject: [PATCH] clk: Make the managed clk functions generically available
-In-Reply-To: <20120918093536.GV12245@n2100.arm.linux.org.uk>
-References: <20120910001524.GL13739@n2100.arm.linux.org.uk>
- <20120910002020.GB16249@opensource.wolfsonmicro.com>
- <20120910003913.GM13739@n2100.arm.linux.org.uk>
- <504F4E36.20309@metafoo.de>
- <1347375033.27206.3.camel@sauron.fi.intel.com>
- <504FE633.2090304@snapgear.com> <5050F3DB.1050202@metafoo.de>
- <20120915213151.GM12245@n2100.arm.linux.org.uk>
- <20120918080037.GA15982@avionic-0098.mockup.avionic-design.de>
- <20120918093536.GV12245@n2100.arm.linux.org.uk>
-Message-ID: <20120918112555.GA21004@avionic-0098.mockup.avionic-design.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 18 Sep 2012 13:26:38 +0200
+Subject: [PATCH] ARM: ux500: tidy up pin sleep modes
+Message-ID: <1347967598-24691-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 10:35:36AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 18, 2012 at 10:00:37AM +0200, Thierry Reding wrote:
-> > On Sat, Sep 15, 2012 at 10:31:52PM +0100, Russell King - ARM Linux wrote:
-> > > On Wed, Sep 12, 2012 at 10:43:07PM +0200, Lars-Peter Clausen wrote:
-> > > > I wouldn't mind having this merged sooner rather than later, there is at least
-> > > > one driver in next which is currently broken due to the missing devm_clk_get.
-> > > > Russell what's your plan for the patch? Maybe under the given circumstances it
-> > > > makes sense to let it go through the m68k tree.
-> > > 
-> > > Ok, I've merged it but there was no indication in the patch that it was
-> > > supposed to be a fix... there's no cc: to stable.  Does it need to go to
-> > > stable?  When was this brokenness introduced?  What's the story for the
-> > > m68k bit?
-> > 
-> > What tree is this supposed to go through? I've checked your ARM tree as
-> > well as Mike's clock tree but neither seem to carry this patch. The
-> > reason I ask is because I want to take a patch series that converts the
-> > Unicore32 PWM code to the PWM framework into linux-next but it depends
-> > on this patch as well.
-> 
-> It /is/ in my tree (you'll notice that it is in linux-next.)  You're
-> probably looking at my Linaro tree instead, which doesn't carry
-> anything which isn't about to be sent to Linus.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I must be blind then. next-20120918 doesn't have it. And looking at your
-tree here[0] doesn't show the commit either.
+This named the sleep mode pin configurations as *slpm* rather
+than *sleep* to correspond better with the settings from the
+datasheet. It also defines an optional sleep mode for the SPI
+controller SPI2.
 
-> I'll publish the branch for this in the next couple of days.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Arnd, Olof: again a patch I'd like to take through the pinctrl
+tree for simplicity.
+---
+ arch/arm/mach-ux500/board-mop500-pins.c | 48 ++++++++++++++++++++-------------
+ 1 file changed, 29 insertions(+), 19 deletions(-)
 
-Are you saying you haven't pushed the branch containing this commit to
-your tree yet? That would certainly explain why I can't find it. Sorry
-if I'm being dense.
-
-I'll assume that it'll show up in linux-next eventually and that I can
-push the dependent series as well.
-
-Thierry
-
-[0]: git://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/bafc5ce2/attachment.sig>
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index 32fd992..3a314b0 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -32,14 +32,14 @@ static enum custom_pin_cfg_t pinsfor;
+ BIAS(pd, PIN_PULL_DOWN);
+ BIAS(slpm_gpio_nopull, PIN_SLPM_GPIO|PIN_SLPM_INPUT_NOPULL);
+ BIAS(in_nopull, PIN_INPUT_NOPULL);
+-BIAS(in_nopull_sleep_nowkup, PIN_INPUT_NOPULL|PIN_SLPM_WAKEUP_DISABLE);
++BIAS(in_nopull_slpm_nowkup, PIN_INPUT_NOPULL|PIN_SLPM_WAKEUP_DISABLE);
+ BIAS(in_pu, PIN_INPUT_PULLUP);
+ BIAS(in_pd, PIN_INPUT_PULLDOWN);
+ BIAS(in_pd_slpm_in_pu, PIN_INPUT_PULLDOWN|PIN_SLPM_INPUT_PULLUP);
+ BIAS(in_pu_slpm_out_lo, PIN_INPUT_PULLUP|PIN_SLPM_OUTPUT_LOW);
+ BIAS(out_hi, PIN_OUTPUT_HIGH);
+ BIAS(out_lo, PIN_OUTPUT_LOW);
+-BIAS(out_lo_sleep_nowkup, PIN_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE);
++BIAS(out_lo_slpm_nowkup, PIN_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE);
+ /* These also force them into GPIO mode */
+ BIAS(gpio_in_pu, PIN_INPUT_PULLUP|PIN_GPIOMODE_ENABLED);
+ BIAS(gpio_in_pd, PIN_INPUT_PULLDOWN|PIN_GPIOMODE_ENABLED);
+@@ -48,11 +48,13 @@ BIAS(gpio_in_pd_slpm_gpio_nopull, PIN_INPUT_PULLDOWN|PIN_GPIOMODE_ENABLED|PIN_SL
+ BIAS(gpio_out_hi, PIN_OUTPUT_HIGH|PIN_GPIOMODE_ENABLED);
+ BIAS(gpio_out_lo, PIN_OUTPUT_LOW|PIN_GPIOMODE_ENABLED);
+ /* Sleep modes */
+-BIAS(sleep_in_wkup_pdis, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+-BIAS(sleep_in_nopull_wkup, PIN_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE);
+-BIAS(sleep_out_hi_wkup_pdis, PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+-BIAS(sleep_out_lo_wkup, PIN_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
+-BIAS(sleep_out_wkup_pdis, PIN_SLPM_DIR_OUTPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_in_nopull_wkup, PIN_SLEEPMODE_ENABLED|PIN_SLPM_DIR_INPUT|PIN_SLPM_PULL_NONE|PIN_SLPM_WAKEUP_ENABLE);
++BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
++BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ 
+ /* We use these to define hog settings that are always done on boot */
+ #define DB8500_MUX_HOG(group,func) \
+@@ -65,6 +67,9 @@ BIAS(sleep_out_wkup_pdis, PIN_SLPM_DIR_OUTPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PD
+ 	PIN_MAP_MUX_GROUP_DEFAULT(dev, "pinctrl-db8500", group, func)
+ #define DB8500_PIN(pin,conf,dev) \
+ 	PIN_MAP_CONFIGS_PIN_DEFAULT(dev, "pinctrl-db8500", pin, conf)
++#define DB8500_PIN_SLEEP(pin, conf, dev) \
++	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500",	\
++			    pin, conf)
+ 
+ #define DB8500_PIN_SLEEP(pin,conf,dev) \
+ 	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500",	\
+@@ -134,22 +139,22 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN("GPIO2_AH4", in_pu, "uart0"), /* RXD */
+ 	DB8500_PIN("GPIO3_AH3", out_hi, "uart0"), /* TXD */
+ 	/* UART0 sleep state */
+-	DB8500_PIN_SLEEP("GPIO0_AJ5", sleep_in_wkup_pdis, "uart0"),
+-	DB8500_PIN_SLEEP("GPIO1_AJ3", sleep_out_hi_wkup_pdis, "uart0"),
+-	DB8500_PIN_SLEEP("GPIO2_AH4", sleep_in_wkup_pdis, "uart0"),
+-	DB8500_PIN_SLEEP("GPIO3_AH3", sleep_out_wkup_pdis, "uart0"),
++	DB8500_PIN_SLEEP("GPIO0_AJ5", slpm_in_wkup_pdis, "uart0"),
++	DB8500_PIN_SLEEP("GPIO1_AJ3", slpm_out_hi_wkup_pdis, "uart0"),
++	DB8500_PIN_SLEEP("GPIO2_AH4", slpm_in_wkup_pdis, "uart0"),
++	DB8500_PIN_SLEEP("GPIO3_AH3", slpm_out_wkup_pdis, "uart0"),
+ 	/* MSP1 for ALSA codec */
+ 	DB8500_MUX("msp1txrx_a_1", "msp1", "ux500-msp-i2s.1"),
+ 	DB8500_MUX("msp1_a_1", "msp1", "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO33_AF2", out_lo_sleep_nowkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO34_AE1", in_nopull_sleep_nowkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO35_AE2", in_nopull_sleep_nowkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO36_AG2", in_nopull_sleep_nowkup, "ux500-msp-i2s.1"),
++	DB8500_PIN("GPIO33_AF2", out_lo_slpm_nowkup, "ux500-msp-i2s.1"),
++	DB8500_PIN("GPIO34_AE1", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
++	DB8500_PIN("GPIO35_AE2", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
++	DB8500_PIN("GPIO36_AG2", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
+ 	/* MSP1 sleep state */
+-	DB8500_PIN_SLEEP("GPIO33_AF2", sleep_out_lo_wkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN_SLEEP("GPIO34_AE1", sleep_in_nopull_wkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN_SLEEP("GPIO35_AE2", sleep_in_nopull_wkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN_SLEEP("GPIO36_AG2", sleep_in_nopull_wkup, "ux500-msp-i2s.1"),
++	DB8500_PIN_SLEEP("GPIO33_AF2", slpm_out_lo_wkup, "ux500-msp-i2s.1"),
++	DB8500_PIN_SLEEP("GPIO34_AE1", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
++	DB8500_PIN_SLEEP("GPIO35_AE2", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
++	DB8500_PIN_SLEEP("GPIO36_AG2", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
+ 	/* Mux in LCD data lines 8 thru 11 and LCDA CLK for MCDE TVOUT */
+ 	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
+ 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
+@@ -224,6 +229,11 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN("GPIO218_AH11", in_pd, "spi2"), /* RXD */
+ 	DB8500_PIN("GPIO215_AH13", out_lo, "spi2"), /* TXD */
+ 	DB8500_PIN("GPIO217_AH12", out_lo, "spi2"), /* CLK */
++	/* SPI2 sleep state */
++	DB8500_PIN_SLEEP("GPIO216_AG12", slpm_in_wkup_pdis, "spi2"), /* FRM */
++	DB8500_PIN_SLEEP("GPIO218_AH11", slpm_in_wkup_pdis, "spi2"), /* RXD */
++	DB8500_PIN_SLEEP("GPIO215_AH13", slpm_out_lo_wkup_pdis, "spi2"), /* TXD */
++	DB8500_PIN_SLEEP("GPIO217_AH12", slpm_wkup_pdis, "spi2"), /* CLK */
+ };
+ 
+ /*
+-- 
+1.7.11.3
