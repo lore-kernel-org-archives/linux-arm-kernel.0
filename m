@@ -1,51 +1,79 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 18 Sep 2012 20:14:39 +0200
-Subject: [PATCH 1/2] ARM: pci: Keep pci_common_init() around after init
-In-Reply-To: <CAErSpo7bix_4bayh2ha_yogwNiLACU7Bymd_H5ur1wxF-tmTNw@mail.gmail.com>
-References: <1347657078-32230-1-git-send-email-thierry.reding@avionic-design.de>
- <1347657078-32230-2-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo7bix_4bayh2ha_yogwNiLACU7Bymd_H5ur1wxF-tmTNw@mail.gmail.com>
-Message-ID: <20120918181439.GB29360@avionic-0098.mockup.avionic-design.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 18 Sep 2012 14:18:26 -0400 (EDT)
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.02.1209181417580.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 11:13:23AM -0600, Bjorn Helgaas wrote:
-> On Fri, Sep 14, 2012 at 3:11 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > When using deferred driver probing, PCI host controller drivers may
-> > actually require this function after the init stage.
-> >
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> >  arch/arm/kernel/bios32.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> > index 2b2f25e..7288093 100644
-> > --- a/arch/arm/kernel/bios32.c
-> > +++ b/arch/arm/kernel/bios32.c
-> > @@ -423,7 +423,7 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> >         return irq;
-> >  }
-> >
-> > -static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
-> > +static void __devinit pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+On Tue, 18 Sep 2012, Lorenzo Pieralisi wrote:
+
+> In processors like A15/A7 L2 cache is unified and integrated within the
+> processor cache hierarchy, so that it is not considered an outer cache
+> anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
+> all cache levels up to Level of Coherency (LoC) that includes
+> the L2 unified cache.
 > 
-> Shouldn't we just remove __init completely, since Greg KH is in the
-> process of removing __devinit?
+> When a single CPU is suspended (CPU idle) a complete L2 clean is not
+> required, so generic cpu_suspend code must clean the data cache using the
+> newly introduced cache LoUIS function.
+> 
+> The context and stack pointer (context pointer) are cleaned to main memory
+> using cache area functions that operate on MVA and guarantee that the data
+> is written back to main memory (perform cache cleaning up to the Point of
+> Coherency - PoC) so that the processor can fetch the context when the MMU
+> is off in the cpu_resume code path.
+> 
+> outer_cache management remains unchanged.
+> 
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Yes, we probably should. In fact I have a patch on top of this marked
-work-in-progress that I forgot to squash into this. That patch includes
-the removal of __devinit for pcibios_update_irq() that should be covered
-by a different patch I sent a few days ago as well as pcibios_swizzle()
-and pcibios_init_resources(). I'll squash it into this patch and will
-resend.
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/1d937aaa/attachment.sig>
+> ---
+>  arch/arm/kernel/suspend.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> index 1794cc3..358bca3 100644
+> --- a/arch/arm/kernel/suspend.c
+> +++ b/arch/arm/kernel/suspend.c
+> @@ -17,6 +17,8 @@ extern void cpu_resume_mmu(void);
+>   */
+>  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>  {
+> +	u32 *ctx = ptr;
+> +
+>  	*save_ptr = virt_to_phys(ptr);
+>  
+>  	/* This must correspond to the LDM in cpu_resume() assembly */
+> @@ -26,7 +28,20 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>  
+>  	cpu_do_suspend(ptr);
+>  
+> -	flush_cache_all();
+> +	flush_cache_louis();
+> +
+> +	/*
+> +	 * flush_cache_louis does not guarantee that
+> +	 * save_ptr and ptr are cleaned to main memory,
+> +	 * just up to the Level of Unification Inner Shareable.
+> +	 * Since the context pointer and context itself
+> +	 * are to be retrieved with the MMU off that
+> +	 * data must be cleaned from all cache levels
+> +	 * to main memory using "area" cache primitives.
+> +	*/
+> +	__cpuc_flush_dcache_area(ctx, ptrsz);
+> +	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
+> +
+>  	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
+>  	outer_clean_range(virt_to_phys(save_ptr),
+>  			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
+> -- 
+> 1.7.12
+> 
+> 
