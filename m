@@ -1,31 +1,43 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Tue, 18 Sep 2012 23:52:11 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS: Add drm-device node to the dtsi file
-In-Reply-To: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
-References: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <1347992531-27279-4-git-send-email-l.krishna@samsung.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 18 Sep 2012 08:32:09 -0400
+Subject: [PATCH 00/15] KVM/ARM Implementation
+In-Reply-To: <20120918122111.GI32204@mudshark.cambridge.arm.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120918122111.GI32204@mudshark.cambridge.arm.com>
+Message-ID: <CANM98q+sHjKnEOKwXGtUdOJJp_tobm5ckSzKHhYJfSeWr0k2kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds platform drm-device node to the dtsi file
+On Tue, Sep 18, 2012 at 8:21 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Christoffer,
+>
+> On Sat, Sep 15, 2012 at 04:34:29PM +0100, Christoffer Dall wrote:
+>> The following series implements KVM support for ARM processors,
+>> specifically on the Cortex A-15 platform.  We feel this is ready to be
+>> merged.
+>>
+>> Work is done in collaboration between Columbia University, Virtual Open
+>> Systems and ARM/Linaro.
+>>
+>> The patch series applies to Linux 3.6-rc5 with a number of merges:
+>>  1. git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git
+>>         branch: io (fc8a08c3a3a)
+>
+> This is a rebasing branch. If you want to merge it, I can push a separate
+> stable branch for you if you like? That said, I imagine the only patch you
+> want from there is the non-writeback I/O accessors, so I could just stick
+> that somewhere else until it hits mainline.
+>
+> Let me know,
+>
+Hi Will,
 
-Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+I actually merged this branch so Marc could merge from my branches, so
+I included it in the base for this patch series as well, to minimize
+the diff between the HEAD of kvm-arm-v11-vgic-times and kvm-arm-master
+at time of sending these patches out. You don't have to prepare the
+patch separately, as the kernel boots just fine without it now when we
+have thumb mmio instruction decoding, albeit somewhat slower.
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 6d27ca4..b1fa93e 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -495,4 +495,8 @@
- 		reg = <0x14400000 0x40000>;
- 		interrupts = <18 5>, <18 4>, <18 6>;
- 	};
-+
-+	drm-device {
-+		compatible = "samsung,exynos-drm-device";
-+	};
- };
--- 
-1.7.0.4
+Thanks!
+-Christoffer
