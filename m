@@ -1,831 +1,1177 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 18 Sep 2012 15:17:53 +0100
-Subject: [PATCH v2 11/13] ARM: vexpress: Start using new Versatile Express
- infrastructure
+Date: Tue, 18 Sep 2012 15:17:52 +0100
+Subject: [PATCH v2 10/13] ARM: vexpress: Add config bus components and clocks
+ to DTs
 In-Reply-To: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
 References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1347977875-16855-12-git-send-email-pawel.moll@arm.com>
+Message-ID: <1347977875-16855-11-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch starts using all the configuration infrastructure.
-
-- generic GPIO library is forced now
-
-- sysreg GPIOs are used to as MMC CD and WP information sources;
-  thanks to this MMCI auxiliary data is not longer necessary
-
-- DVI muxer and mode control is removed from non-DT V2P-CA9 code
-  as this is now handled by the vexpress-display driver
-
-- oscillator control is removed as is being handled by the
-  common clock driver now
-
-- the sysreg and sysctl control is now delegated to the
-  appropriate drivers and all related code was removed
-
-- NOR Flash set_vpp function has been removed as the control
-  bit used does _not_ control its VPP line, but the #WP signal
-  instead (which is de facto unusable in case of Linux MTD
-  drivers); this also allowed the remove its DT auxiliary
-  data
-
-The non-DT code defines only minimal required number of
-the config devices. Device Trees are updated to make use
-of all new features.
+Add description of all functions provided by Versatile Express
+motherboard and daughterboards configuration controllers and
+clock dependencies between devices.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/Kconfig                                  |    4 +-
- arch/arm/include/asm/hardware/sp810.h             |    6 -
- arch/arm/mach-vexpress/Makefile                   |    2 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                 |   41 +--
- arch/arm/mach-vexpress/include/mach/motherboard.h |   81 -----
- arch/arm/mach-vexpress/platsmp.c                  |    3 +-
- arch/arm/mach-vexpress/v2m.c                      |  334 +++++----------------
- include/linux/vexpress.h                          |    8 +
- 8 files changed, 104 insertions(+), 375 deletions(-)
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi     |  134 ++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi         |  134 ++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |  109 +++++++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |  173 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   73 +++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts      |  119 ++++++++++++++++++
+ 6 files changed, 738 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b53ea6c..dc67a77 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -322,11 +322,12 @@ config ARCH_VERSATILE
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index d8a827b..fffda1f 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -24,6 +24,7 @@
  
- config ARCH_VEXPRESS
- 	bool "ARM Ltd. Versatile Express family"
--	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_TIMER_SP804
- 	select CLKDEV_LOOKUP
- 	select COMMON_CLK
-+	select COMMON_CLK_VERSATILE
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
- 	select HAVE_PATA_PLATFORM
-@@ -335,6 +336,7 @@ config ARCH_VEXPRESS
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-+	select VEXPRESS_CONFIG
- 	help
- 	  This enables support for the ARM Ltd Versatile Express boards.
+ 	motherboard {
+ 		compatible = "simple-bus";
++		arm,vexpress,site = <0>;
+ 		arm,v2m-memory-map = "rs1";
+ 		#address-cells = <2>; /* SMB chipselect number and offset */
+ 		#size-cells = <1>;
+@@ -72,14 +73,20 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 3 0 0x200000>;
  
-diff --git a/arch/arm/include/asm/hardware/sp810.h b/arch/arm/include/asm/hardware/sp810.h
-index afd7e91..6636430 100644
---- a/arch/arm/include/asm/hardware/sp810.h
-+++ b/arch/arm/include/asm/hardware/sp810.h
-@@ -50,12 +50,6 @@
- #define SCPCELLID2		0xFF8
- #define SCPCELLID3		0xFFC
+-			sysreg at 010000 {
++			v2m_sysreg: sysreg at 010000 {
+ 				compatible = "arm,vexpress-sysreg";
+ 				reg = <0x010000 0x1000>;
++				gpio-controller;
++				#gpio-cells = <2>;
+ 			};
  
--#define SCCTRL_TIMEREN0SEL_REFCLK	(0 << 15)
--#define SCCTRL_TIMEREN0SEL_TIMCLK	(1 << 15)
--
--#define SCCTRL_TIMEREN1SEL_REFCLK	(0 << 17)
--#define SCCTRL_TIMEREN1SEL_TIMCLK	(1 << 17)
--
- #define SCCTRL_TIMERENnSEL_SHIFT(n)	(15 + ((n) * 2))
+-			sysctl at 020000 {
++			v2m_sysctl: sysctl at 020000 {
+ 				compatible = "arm,sp810", "arm,primecell";
+ 				reg = <0x020000 0x1000>;
++				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
++				clock-names = "refclk", "timclk", "apb_pclk";
++				#clock-cells = <1>;
++				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+ 			};
  
- static inline void sysctl_soft_reset(void __iomem *base)
-diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
-index 90551b9..a1e2921 100644
---- a/arch/arm/mach-vexpress/Makefile
-+++ b/arch/arm/mach-vexpress/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel.
- #
+ 			/* PCI-E I2C bus */
+@@ -100,66 +107,92 @@
+ 				compatible = "arm,pl041", "arm,primecell";
+ 				reg = <0x040000 0x1000>;
+ 				interrupts = <11>;
++				clocks = <&smbclk>;
++				clock-names = "apb_pclk";
+ 			};
  
--obj-y					:= v2m.o
-+obj-y					:= v2m.o reset.o
- obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 61c4924..49ddf7e 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -9,6 +9,7 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
- #include <linux/clkdev.h>
-+#include <linux/vexpress.h>
+ 			mmci at 050000 {
+ 				compatible = "arm,pl180", "arm,primecell";
+ 				reg = <0x050000 0x1000>;
+ 				interrupts = <9 10>;
++				cd-gpios = <&v2m_sysreg 0 0>;
++				wp-gpios = <&v2m_sysreg 1 0>;
++				max-frequency = <12000000>;
++				vmmc-supply = <&v2m_fixed_3v3>;
++				clocks = <&v2m_clk24mhz>, <&smbclk>;
++				clock-names = "mclk", "apb_pclk";
+ 			};
  
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -64,19 +65,6 @@ static void __init ct_ca9x4_init_irq(void)
- 	ca9x4_twd_init();
- }
+ 			kmi at 060000 {
+ 				compatible = "arm,pl050", "arm,primecell";
+ 				reg = <0x060000 0x1000>;
+ 				interrupts = <12>;
++				clocks = <&v2m_clk24mhz>, <&smbclk>;
++				clock-names = "KMIREFCLK", "apb_pclk";
+ 			};
  
--static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
--{
--	u32 site = v2m_get_master_site();
--
--	/*
--	 * Old firmware was using the "site" component of the command
--	 * to control the DVI muxer (while it should be always 0 ie. MB).
--	 * Newer firmware uses the data register. Keep both for compatibility.
--	 */
--	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE(site), site);
--	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE(SYS_CFG_SITE_MB), 2);
--}
--
- static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
- {
- 	unsigned long framesize = 1024 * 768 * 2;
-@@ -93,7 +81,6 @@ static struct clcd_board ct_ca9x4_clcd_data = {
- 	.caps		= CLCD_CAP_5551 | CLCD_CAP_565,
- 	.check		= clcdfb_check,
- 	.decode		= clcdfb_decode,
--	.enable		= ct_ca9x4_clcd_enable,
- 	.setup		= ct_ca9x4_clcd_setup,
- 	.mmap		= versatile_clcd_mmap_dma,
- 	.remove		= versatile_clcd_remove_dma,
-@@ -111,14 +98,6 @@ static struct amba_device *ct_ca9x4_amba_devs[] __initdata = {
- 	&gpio_device,
+ 			kmi at 070000 {
+ 				compatible = "arm,pl050", "arm,primecell";
+ 				reg = <0x070000 0x1000>;
+ 				interrupts = <13>;
++				clocks = <&v2m_clk24mhz>, <&smbclk>;
++				clock-names = "KMIREFCLK", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial0: uart at 090000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x090000 0x1000>;
+ 				interrupts = <5>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial1: uart at 0a0000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x0a0000 0x1000>;
+ 				interrupts = <6>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial2: uart at 0b0000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x0b0000 0x1000>;
+ 				interrupts = <7>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial3: uart at 0c0000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x0c0000 0x1000>;
+ 				interrupts = <8>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			wdt at 0f0000 {
+ 				compatible = "arm,sp805", "arm,primecell";
+ 				reg = <0x0f0000 0x1000>;
+ 				interrupts = <0>;
++				clocks = <&v2m_refclk32khz>, <&smbclk>;
++				clock-names = "wdogclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_timer01: timer at 110000 {
+ 				compatible = "arm,sp804", "arm,primecell";
+ 				reg = <0x110000 0x1000>;
+ 				interrupts = <2>;
++				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
+ 			};
+ 
+ 			v2m_timer23: timer at 120000 {
+ 				compatible = "arm,sp804", "arm,primecell";
+ 				reg = <0x120000 0x1000>;
+ 				interrupts = <3>;
++				clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&smbclk>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
+ 			};
+ 
+ 			/* DVI I2C bus */
+@@ -185,6 +218,8 @@
+ 				compatible = "arm,pl031", "arm,primecell";
+ 				reg = <0x170000 0x1000>;
+ 				interrupts = <4>;
++				clocks = <&smbclk>;
++				clock-names = "apb_pclk";
+ 			};
+ 
+ 			compact-flash at 1a0000 {
+@@ -198,6 +233,8 @@
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f0000 0x1000>;
+ 				interrupts = <14>;
++				clocks = <&v2m_oscclk1>, <&smbclk>;
++				clock-names = "clcdclk", "apb_pclk";
+ 			};
+ 		};
+ 
+@@ -208,5 +245,98 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		v2m_clk24mhz: clk24mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++			clock-output-names = "v2m:clk24mhz";
++		};
++
++		v2m_refclk1mhz: refclk1mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++			clock-output-names = "v2m:refclk1mhz";
++		};
++
++		v2m_refclk32khz: refclk32khz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "v2m:refclk32khz";
++		};
++
++		mcc {
++			compatible = "simple-bus";
++			arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++			osc at 0 {
++				/* MCC static memory clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 0>;
++				freq-range = <25000000 60000000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk0";
++			};
++
++			v2m_oscclk1: osc at 1 {
++				/* CLCD clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 1>;
++				freq-range = <23750000 63500000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk1";
++			};
++
++			v2m_oscclk2: osc at 2 {
++				/* IO FPGA peripheral clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 2>;
++				freq-range = <24000000 24000000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk2";
++			};
++
++			volt at 0 {
++				/* Logic level voltage */
++				compatible = "arm,vexpress-volt";
++				arm,vexpress-sysreg,func = <2 0>;
++				regulator-name = "VIO";
++				regulator-always-on;
++			};
++
++			temp at 0 {
++				/* MCC internal operating temperature */
++				compatible = "arm,vexpress-temp";
++				arm,vexpress-sysreg,func = <4 0>;
++				label = "MCC";
++			};
++
++			reset at 0 {
++				compatible = "arm,vexpress-reset";
++				arm,vexpress-sysreg,func = <5 0>;
++			};
++
++			muxfpga at 0 {
++				compatible = "arm,vexpress-muxfpga";
++				arm,vexpress-sysreg,func = <7 0>;
++			};
++
++			shutdown at 0 {
++				compatible = "arm,vexpress-shutdown";
++				arm,vexpress-sysreg,func = <8 0>;
++			};
++
++			reboot at 0 {
++				compatible = "arm,vexpress-reboot";
++				arm,vexpress-sysreg,func = <9 0>;
++			};
++
++			dvimode at 0 {
++				compatible = "arm,vexpress-dvimode";
++				arm,vexpress-sysreg,func = <11 0>;
++			};
++		};
+ 	};
  };
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index dba53fd..10e05d9 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -24,6 +24,7 @@
  
--
--static struct v2m_osc ct_osc1 = {
--	.osc = 1,
--	.rate_min = 10000000,
--	.rate_max = 80000000,
--	.rate_default = 23750000,
--};
--
- static struct resource pmu_resources[] = {
- 	[0] = {
- 		.start	= IRQ_CT_CA9X4_PMU_CPU0,
-@@ -149,10 +128,18 @@ static struct platform_device pmu_device = {
- 	.resource	= pmu_resources,
+ 	motherboard {
+ 		compatible = "simple-bus";
++		arm,vexpress,site = <0>;
+ 		#address-cells = <2>; /* SMB chipselect number and offset */
+ 		#size-cells = <1>;
+ 		#interrupt-cells = <1>;
+@@ -71,14 +72,20 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 7 0 0x20000>;
+ 
+-			sysreg at 00000 {
++			v2m_sysreg: sysreg at 00000 {
+ 				compatible = "arm,vexpress-sysreg";
+ 				reg = <0x00000 0x1000>;
++				gpio-controller;
++				#gpio-cells = <2>;
+ 			};
+ 
+-			sysctl at 01000 {
++			v2m_sysctl: sysctl at 01000 {
+ 				compatible = "arm,sp810", "arm,primecell";
+ 				reg = <0x01000 0x1000>;
++				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
++				clock-names = "refclk", "timclk", "apb_pclk";
++				#clock-cells = <1>;
++				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+ 			};
+ 
+ 			/* PCI-E I2C bus */
+@@ -99,66 +106,92 @@
+ 				compatible = "arm,pl041", "arm,primecell";
+ 				reg = <0x04000 0x1000>;
+ 				interrupts = <11>;
++				clocks = <&smbclk>;
++				clock-names = "apb_pclk";
+ 			};
+ 
+ 			mmci at 05000 {
+ 				compatible = "arm,pl180", "arm,primecell";
+ 				reg = <0x05000 0x1000>;
+ 				interrupts = <9 10>;
++				cd-gpios = <&v2m_sysreg 0 0>;
++				wp-gpios = <&v2m_sysreg 1 0>;
++				max-frequency = <12000000>;
++				vmmc-supply = <&v2m_fixed_3v3>;
++				clocks = <&v2m_clk24mhz>, <&smbclk>;
++				clock-names = "mclk", "apb_pclk";
+ 			};
+ 
+ 			kmi at 06000 {
+ 				compatible = "arm,pl050", "arm,primecell";
+ 				reg = <0x06000 0x1000>;
+ 				interrupts = <12>;
++				clocks = <&v2m_clk24mhz>, <&smbclk>;
++				clock-names = "KMIREFCLK", "apb_pclk";
+ 			};
+ 
+ 			kmi at 07000 {
+ 				compatible = "arm,pl050", "arm,primecell";
+ 				reg = <0x07000 0x1000>;
+ 				interrupts = <13>;
++				clocks = <&v2m_clk24mhz>, <&smbclk>;
++				clock-names = "KMIREFCLK", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial0: uart at 09000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x09000 0x1000>;
+ 				interrupts = <5>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial1: uart at 0a000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x0a000 0x1000>;
+ 				interrupts = <6>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial2: uart at 0b000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x0b000 0x1000>;
+ 				interrupts = <7>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_serial3: uart at 0c000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0x0c000 0x1000>;
+ 				interrupts = <8>;
++				clocks = <&v2m_oscclk2>, <&smbclk>;
++				clock-names = "uartclk", "apb_pclk";
+ 			};
+ 
+ 			wdt at 0f000 {
+ 				compatible = "arm,sp805", "arm,primecell";
+ 				reg = <0x0f000 0x1000>;
+ 				interrupts = <0>;
++				clocks = <&v2m_refclk32khz>, <&smbclk>;
++				clock-names = "wdogclk", "apb_pclk";
+ 			};
+ 
+ 			v2m_timer01: timer at 11000 {
+ 				compatible = "arm,sp804", "arm,primecell";
+ 				reg = <0x11000 0x1000>;
+ 				interrupts = <2>;
++				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
+ 			};
+ 
+ 			v2m_timer23: timer at 12000 {
+ 				compatible = "arm,sp804", "arm,primecell";
+ 				reg = <0x12000 0x1000>;
+ 				interrupts = <3>;
++				clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&smbclk>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
+ 			};
+ 
+ 			/* DVI I2C bus */
+@@ -184,6 +217,8 @@
+ 				compatible = "arm,pl031", "arm,primecell";
+ 				reg = <0x17000 0x1000>;
+ 				interrupts = <4>;
++				clocks = <&smbclk>;
++				clock-names = "apb_pclk";
+ 			};
+ 
+ 			compact-flash at 1a000 {
+@@ -197,6 +232,8 @@
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f000 0x1000>;
+ 				interrupts = <14>;
++				clocks = <&v2m_oscclk1>, <&smbclk>;
++				clock-names = "clcdclk", "apb_pclk";
+ 			};
+ 		};
+ 
+@@ -207,5 +244,98 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		v2m_clk24mhz: clk24mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++			clock-output-names = "v2m:clk24mhz";
++		};
++
++		v2m_refclk1mhz: refclk1mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++			clock-output-names = "v2m:refclk1mhz";
++		};
++
++		v2m_refclk32khz: refclk32khz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "v2m:refclk32khz";
++		};
++
++		mcc {
++			compatible = "simple-bus";
++			arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++			osc at 0 {
++				/* MCC static memory clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 0>;
++				freq-range = <25000000 60000000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk0";
++			};
++
++			v2m_oscclk1: osc at 1 {
++				/* CLCD clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 1>;
++				freq-range = <23750000 63500000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk1";
++			};
++
++			v2m_oscclk2: osc at 2 {
++				/* IO FPGA peripheral clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 2>;
++				freq-range = <24000000 24000000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk2";
++			};
++
++			volt at 0 {
++				/* Logic level voltage */
++				compatible = "arm,vexpress-volt";
++				arm,vexpress-sysreg,func = <2 0>;
++				regulator-name = "VIO";
++				regulator-always-on;
++			};
++
++			temp at 0 {
++				/* MCC internal operating temperature */
++				compatible = "arm,vexpress-temp";
++				arm,vexpress-sysreg,func = <4 0>;
++				label = "MCC";
++			};
++
++			reset at 0 {
++				compatible = "arm,vexpress-reset";
++				arm,vexpress-sysreg,func = <5 0>;
++			};
++
++			muxfpga at 0 {
++				compatible = "arm,vexpress-muxfpga";
++				arm,vexpress-sysreg,func = <7 0>;
++			};
++
++			shutdown at 0 {
++				compatible = "arm,vexpress-shutdown";
++				arm,vexpress-sysreg,func = <8 0>;
++			};
++
++			reboot at 0 {
++				compatible = "arm,vexpress-reboot";
++				arm,vexpress-sysreg,func = <9 0>;
++			};
++
++			dvimode at 0 {
++				compatible = "arm,vexpress-dvimode";
++				arm,vexpress-sysreg,func = <11 0>;
++			};
++		};
+ 	};
  };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index d12b34c..7c237af 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -12,6 +12,7 @@
+ / {
+ 	model = "V2P-CA15";
+ 	arm,hbi = <0x237>;
++	arm,vexpress,site = <0xf>;
+ 	compatible = "arm,vexpress,v2p-ca15,tc1", "arm,vexpress,v2p-ca15", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
+ 	#address-cells = <2>;
+@@ -54,17 +55,24 @@
+ 		compatible = "arm,hdlcd";
+ 		reg = <0 0x2b000000 0 0x1000>;
+ 		interrupts = <0 85 4>;
++		clocks = <&oscclk5>;
++		clock-names = "pxlclk";
+ 	};
  
-+static struct platform_device osc1_device = {
-+	.name		= "vexpress-osc",
-+	.id		= 1,
-+	.num_resources	= 1,
-+	.resource	= (struct resource []) {
-+		VEXPRESS_RES_FUNC(0xf, 1),
-+	},
-+};
+ 	memory-controller at 2b0a0000 {
+ 		compatible = "arm,pl341", "arm,primecell";
+ 		reg = <0 0x2b0a0000 0 0x1000>;
++		clocks = <&oscclk7>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	wdt at 2b060000 {
+ 		compatible = "arm,sp805", "arm,primecell";
++		status = "disabled";
+ 		reg = <0 0x2b060000 0 0x1000>;
+ 		interrupts = <98>;
++		clocks = <&oscclk7>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	gic: interrupt-controller at 2c001000 {
+@@ -84,6 +92,8 @@
+ 		reg = <0 0x7ffd0000 0 0x1000>;
+ 		interrupts = <0 86 4>,
+ 			     <0 87 4>;
++		clocks = <&oscclk7>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	dma at 7ffb0000 {
+@@ -94,6 +104,8 @@
+ 			     <0 89 4>,
+ 			     <0 90 4>,
+ 			     <0 91 4>;
++		clocks = <&oscclk7>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	timer {
+@@ -110,6 +122,103 @@
+ 			     <0 69 4>;
+ 	};
+ 
++	dcc {
++		compatible = "simple-bus";
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
 +
- static void __init ct_ca9x4_init(void)
- {
- 	int i;
--	struct clk *clk;
- 
- #ifdef CONFIG_CACHE_L2X0
- 	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
-@@ -164,14 +151,14 @@ static void __init ct_ca9x4_init(void)
- 	l2x0_init(l2x0_base, 0x00400000, 0xfe0fffff);
- #endif
- 
--	ct_osc1.site = v2m_get_master_site();
--	clk = v2m_osc_register("ct:osc1", &ct_osc1);
--	clk_register_clkdev(clk, NULL, "ct:clcd");
--
- 	for (i = 0; i < ARRAY_SIZE(ct_ca9x4_amba_devs); i++)
- 		amba_device_register(ct_ca9x4_amba_devs[i], &iomem_resource);
- 
- 	platform_device_register(&pmu_device);
-+	platform_device_register(&osc1_device);
++		osc at 0 {
++			/* CPU PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 0>;
++			freq-range = <50000000 60000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk0";
++		};
 +
-+	WARN_ON(clk_register_clkdev(vexpress_osc_setup(&osc1_device.dev),
-+			NULL, "ct:clcd"));
- }
- 
- #ifdef CONFIG_SMP
-diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
-index 1e388c7..68abc8b 100644
---- a/arch/arm/mach-vexpress/include/mach/motherboard.h
-+++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
-@@ -1,8 +1,6 @@
- #ifndef __MACH_MOTHERBOARD_H
- #define __MACH_MOTHERBOARD_H
- 
--#include <linux/clk-provider.h>
--
- /*
-  * Physical addresses, offset from V2M_PA_CS0-3
-  */
-@@ -41,31 +39,6 @@
- #define V2M_CF			(V2M_PA_CS7 + 0x0001a000)
- #define V2M_CLCD		(V2M_PA_CS7 + 0x0001f000)
- 
--/*
-- * Offsets from SYSREGS base
-- */
--#define V2M_SYS_ID		0x000
--#define V2M_SYS_SW		0x004
--#define V2M_SYS_LED		0x008
--#define V2M_SYS_100HZ		0x024
--#define V2M_SYS_FLAGS		0x030
--#define V2M_SYS_FLAGSSET	0x030
--#define V2M_SYS_FLAGSCLR	0x034
--#define V2M_SYS_NVFLAGS		0x038
--#define V2M_SYS_NVFLAGSSET	0x038
--#define V2M_SYS_NVFLAGSCLR	0x03c
--#define V2M_SYS_MCI		0x048
--#define V2M_SYS_FLASH		0x03c
--#define V2M_SYS_CFGSW		0x058
--#define V2M_SYS_24MHZ		0x05c
--#define V2M_SYS_MISC		0x060
--#define V2M_SYS_DMA		0x064
--#define V2M_SYS_PROCID0		0x084
--#define V2M_SYS_PROCID1		0x088
--#define V2M_SYS_CFGDATA		0x0a0
--#define V2M_SYS_CFGCTRL		0x0a4
--#define V2M_SYS_CFGSTAT		0x0a8
--
- 
- /*
-  * Interrupts.  Those in {} are for AMBA devices
-@@ -91,43 +64,6 @@
- 
- 
- /*
-- * Configuration
-- */
--#define SYS_CFG_START		(1 << 31)
--#define SYS_CFG_WRITE		(1 << 30)
--#define SYS_CFG_OSC		(1 << 20)
--#define SYS_CFG_VOLT		(2 << 20)
--#define SYS_CFG_AMP		(3 << 20)
--#define SYS_CFG_TEMP		(4 << 20)
--#define SYS_CFG_RESET		(5 << 20)
--#define SYS_CFG_SCC		(6 << 20)
--#define SYS_CFG_MUXFPGA		(7 << 20)
--#define SYS_CFG_SHUTDOWN	(8 << 20)
--#define SYS_CFG_REBOOT		(9 << 20)
--#define SYS_CFG_DVIMODE		(11 << 20)
--#define SYS_CFG_POWER		(12 << 20)
--#define SYS_CFG_SITE(n)		((n) << 16)
--#define SYS_CFG_SITE_MB		0
--#define SYS_CFG_SITE_DB1	1
--#define SYS_CFG_SITE_DB2	2
--#define SYS_CFG_STACK(n)	((n) << 12)
--
--#define SYS_CFG_ERR		(1 << 1)
--#define SYS_CFG_COMPLETE	(1 << 0)
--
--int v2m_cfg_write(u32 devfn, u32 data);
--int v2m_cfg_read(u32 devfn, u32 *data);
--void v2m_flags_set(u32 data);
--
--/*
-- * Miscellaneous
-- */
--#define SYS_MISC_MASTERSITE	(1 << 14)
--#define SYS_PROCIDx_HBI_MASK	0xfff
--
--int v2m_get_master_site(void);
--
--/*
-  * Core tile IDs
-  */
- #define V2M_CT_ID_CA9		0x0c000191
-@@ -149,21 +85,4 @@ struct ct_desc {
- 
- extern struct ct_desc *ct_desc;
- 
--/*
-- * OSC clock provider
-- */
--struct v2m_osc {
--	struct clk_hw hw;
--	u8 site; /* 0 = motherboard, 1 = site 1, 2 = site 2 */
--	u8 stack; /* board stack position */
--	u16 osc;
--	unsigned long rate_min;
--	unsigned long rate_max;
--	unsigned long rate_default;
--};
--
--#define to_v2m_osc(osc) container_of(osc, struct v2m_osc, hw)
--
--struct clk *v2m_osc_register(const char *name, struct v2m_osc *osc);
--
- #endif
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 14ba112..f07cb2f 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -13,6 +13,7 @@
- #include <linux/smp.h>
- #include <linux/io.h>
- #include <linux/of_fdt.h>
-+#include <linux/vexpress.h>
- 
- #include <asm/smp_scu.h>
- #include <asm/hardware/gic.h>
-@@ -193,5 +194,5 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	v2m_flags_set(virt_to_phys(versatile_secondary_startup));
-+	vexpress_flags_set(virt_to_phys(versatile_secondary_startup));
- }
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 37608f2..827d02f 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -15,11 +15,10 @@
- #include <linux/smsc911x.h>
- #include <linux/spinlock.h>
- #include <linux/usb/isp1760.h>
--#include <linux/clkdev.h>
--#include <linux/clk-provider.h>
- #include <linux/mtd/physmap.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
-+#include <linux/vexpress.h>
- 
- #include <asm/arch_timer.h>
- #include <asm/mach-types.h>
-@@ -32,7 +31,6 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/timer-sp.h>
--#include <asm/hardware/sp810.h>
- 
- #include <mach/ct-ca9x4.h>
- #include <mach/motherboard.h>
-@@ -56,22 +54,6 @@ static struct map_desc v2m_io_desc[] __initdata = {
- 	},
- };
- 
--static void __iomem *v2m_sysreg_base;
--
--static void __init v2m_sysctl_init(void __iomem *base)
--{
--	u32 scctrl;
--
--	if (WARN_ON(!base))
--		return;
--
--	/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
--	scctrl = readl(base + SCCTRL);
--	scctrl |= SCCTRL_TIMEREN0SEL_TIMCLK;
--	scctrl |= SCCTRL_TIMEREN1SEL_TIMCLK;
--	writel(scctrl, base + SCCTRL);
--}
--
- static void __init v2m_sp804_init(void __iomem *base, unsigned int irq)
- {
- 	if (WARN_ON(!base || irq == NO_IRQ))
-@@ -85,69 +67,6 @@ static void __init v2m_sp804_init(void __iomem *base, unsigned int irq)
- }
- 
- 
--static DEFINE_SPINLOCK(v2m_cfg_lock);
--
--int v2m_cfg_write(u32 devfn, u32 data)
--{
--	/* Configuration interface broken? */
--	u32 val;
--
--	printk("%s: writing %08x to %08x\n", __func__, data, devfn);
--
--	devfn |= SYS_CFG_START | SYS_CFG_WRITE;
--
--	spin_lock(&v2m_cfg_lock);
--	val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
--	writel(val & ~SYS_CFG_COMPLETE, v2m_sysreg_base + V2M_SYS_CFGSTAT);
--
--	writel(data, v2m_sysreg_base +  V2M_SYS_CFGDATA);
--	writel(devfn, v2m_sysreg_base + V2M_SYS_CFGCTRL);
--
--	do {
--		val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
--	} while (val == 0);
--	spin_unlock(&v2m_cfg_lock);
--
--	return !!(val & SYS_CFG_ERR);
--}
--
--int v2m_cfg_read(u32 devfn, u32 *data)
--{
--	u32 val;
--
--	devfn |= SYS_CFG_START;
--
--	spin_lock(&v2m_cfg_lock);
--	writel(0, v2m_sysreg_base + V2M_SYS_CFGSTAT);
--	writel(devfn, v2m_sysreg_base + V2M_SYS_CFGCTRL);
--
--	mb();
--
--	do {
--		cpu_relax();
--		val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
--	} while (val == 0);
--
--	*data = readl(v2m_sysreg_base + V2M_SYS_CFGDATA);
--	spin_unlock(&v2m_cfg_lock);
--
--	return !!(val & SYS_CFG_ERR);
--}
--
--void __init v2m_flags_set(u32 data)
--{
--	writel(~0, v2m_sysreg_base + V2M_SYS_FLAGSCLR);
--	writel(data, v2m_sysreg_base + V2M_SYS_FLAGSSET);
--}
--
--int v2m_get_master_site(void)
--{
--	u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
--
--	return misc & SYS_MISC_MASTERSITE ? SYS_CFG_SITE_DB2 : SYS_CFG_SITE_DB1;
--}
--
--
- static struct resource v2m_pcie_i2c_resource = {
- 	.start	= V2M_SERIAL_BUS_PCI,
- 	.end	= V2M_SERIAL_BUS_PCI + SZ_4K - 1,
-@@ -235,14 +154,8 @@ static struct platform_device v2m_usb_device = {
- 	.dev.platform_data = &v2m_usb_config,
- };
- 
--static void v2m_flash_set_vpp(struct platform_device *pdev, int on)
--{
--	writel(on != 0, v2m_sysreg_base + V2M_SYS_FLASH);
--}
--
- static struct physmap_flash_data v2m_flash_data = {
- 	.width		= 4,
--	.set_vpp	= v2m_flash_set_vpp,
- };
- 
- static struct resource v2m_flash_resources[] = {
-@@ -289,14 +202,61 @@ static struct platform_device v2m_cf_device = {
- 	.dev.platform_data = &v2m_pata_data,
- };
- 
--static unsigned int v2m_mmci_status(struct device *dev)
--{
--	return readl(v2m_sysreg_base + V2M_SYS_MCI) & (1 << 0);
--}
--
- static struct mmci_platform_data v2m_mmci_data = {
- 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
--	.status		= v2m_mmci_status,
-+	.gpio_wp	= VEXPRESS_GPIO_MMC_WPROT,
-+	.gpio_cd	= VEXPRESS_GPIO_MMC_CARDIN,
-+};
++		osc at 4 {
++			/* Multiplexed AXI master clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 4>;
++			freq-range = <20000000 40000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk4";
++		};
 +
-+static struct resource v2m_sysreg_resources[] = {
-+	{
-+		.start	= V2M_SYSREGS,
-+		.end	= V2M_SYSREGS + 0xfff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
++		oscclk5: osc at 5 {
++			/* HDLCD PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 5>;
++			freq-range = <23750000 165000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk5";
++		};
 +
-+static struct platform_device v2m_sysreg_device = {
-+	.name		= "vexpress-sysreg",
-+	.id		= -1,
-+	.resource	= v2m_sysreg_resources,
-+	.num_resources	= ARRAY_SIZE(v2m_sysreg_resources),
-+};
++		smbclk: osc at 6 {
++			/* SMB clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 6>;
++			freq-range = <20000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk6";
++		};
 +
-+static struct platform_device v2m_muxfpga_device = {
-+	.name		= "vexpress-muxfpga",
-+	.id		= 0,
-+	.num_resources	= 1,
-+	.resource	= (struct resource []) {
-+		VEXPRESS_RES_FUNC(0, 7),
-+	}
-+};
++		oscclk7: osc at 7 {
++			/* SYS PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 7>;
++			freq-range = <20000000 60000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk7";
++		};
 +
-+static struct platform_device v2m_shutdown_device = {
-+	.name		= "vexpress-shutdown",
-+	.id		= 0,
-+	.num_resources	= 1,
-+	.resource	= (struct resource []) {
-+		VEXPRESS_RES_FUNC(0, 8),
-+	}
-+};
++		osc at 8 {
++			/* DDR2 PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 8>;
++			freq-range = <40000000 40000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk8";
++		};
 +
-+static struct platform_device v2m_reboot_device = {
-+	.name		= "vexpress-reboot",
-+	.id		= 0,
-+	.num_resources	= 1,
-+	.resource	= (struct resource []) {
-+		VEXPRESS_RES_FUNC(0, 9),
-+	}
-+};
++		volt at 0 {
++			/* CPU core voltage */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 0>;
++			regulator-name = "Cores";
++			regulator-min-microvolt = <900000>;
++			regulator-max-microvolt = <1050000>;
++			regulator-always-on;
++		};
 +
-+static struct platform_device v2m_dvimode_device = {
-+	.name		= "vexpress-dvimode",
-+	.id		= 0,
-+	.num_resources	= 1,
-+	.resource	= (struct resource []) {
-+		VEXPRESS_RES_FUNC(0, 11),
-+	}
- };
- 
- static AMBA_APB_DEVICE(aaci,  "mb:aaci",  0, V2M_AACI, IRQ_V2M_AACI, NULL);
-@@ -323,123 +283,9 @@ static struct amba_device *v2m_amba_devs[] __initdata = {
- 	&rtc_device,
- };
- 
--
--static unsigned long v2m_osc_recalc_rate(struct clk_hw *hw,
--		unsigned long parent_rate)
--{
--	struct v2m_osc *osc = to_v2m_osc(hw);
--
--	return !parent_rate ? osc->rate_default : parent_rate;
--}
--
--static long v2m_osc_round_rate(struct clk_hw *hw, unsigned long rate,
--		unsigned long *parent_rate)
--{
--	struct v2m_osc *osc = to_v2m_osc(hw);
--
--	if (WARN_ON(rate < osc->rate_min))
--		rate = osc->rate_min;
--
--	if (WARN_ON(rate > osc->rate_max))
--		rate = osc->rate_max;
--
--	return rate;
--}
--
--static int v2m_osc_set_rate(struct clk_hw *hw, unsigned long rate,
--		unsigned long parent_rate)
--{
--	struct v2m_osc *osc = to_v2m_osc(hw);
--
--	v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE(osc->site) |
--			SYS_CFG_STACK(osc->stack) | osc->osc, rate);
--
--	return 0;
--}
--
--static struct clk_ops v2m_osc_ops = {
--	.recalc_rate = v2m_osc_recalc_rate,
--	.round_rate = v2m_osc_round_rate,
--	.set_rate = v2m_osc_set_rate,
--};
--
--struct clk * __init v2m_osc_register(const char *name, struct v2m_osc *osc)
--{
--	struct clk_init_data init;
--
--	WARN_ON(osc->site > 2);
--	WARN_ON(osc->stack > 15);
--	WARN_ON(osc->osc > 4095);
--
--	init.name = name;
--	init.ops = &v2m_osc_ops;
--	init.flags = CLK_IS_ROOT;
--	init.num_parents = 0;
--
--	osc->hw.init = &init;
--
--	return clk_register(NULL, &osc->hw);
--}
--
--static struct v2m_osc v2m_mb_osc1 = {
--	.site = SYS_CFG_SITE_MB,
--	.osc = 1,
--	.rate_min = 23750000,
--	.rate_max = 63500000,
--	.rate_default = 23750000,
--};
--
--static const char *v2m_ref_clk_periphs[] __initconst = {
--	"mb:wdt",   "1000f000.wdt",  "1c0f0000.wdt",	/* SP805 WDT */
--};
--
--static const char *v2m_osc1_periphs[] __initconst = {
--	"mb:clcd",  "1001f000.clcd", "1c1f0000.clcd",	/* PL111 CLCD */
--};
--
--static const char *v2m_osc2_periphs[] __initconst = {
--	"mb:mmci",  "10005000.mmci", "1c050000.mmci",	/* PL180 MMCI */
--	"mb:kmi0",  "10006000.kmi",  "1c060000.kmi",	/* PL050 KMI0 */
--	"mb:kmi1",  "10007000.kmi",  "1c070000.kmi",	/* PL050 KMI1 */
--	"mb:uart0", "10009000.uart", "1c090000.uart",	/* PL011 UART0 */
--	"mb:uart1", "1000a000.uart", "1c0a0000.uart",	/* PL011 UART1 */
--	"mb:uart2", "1000b000.uart", "1c0b0000.uart",	/* PL011 UART2 */
--	"mb:uart3", "1000c000.uart", "1c0c0000.uart",	/* PL011 UART3 */
--};
--
--static void __init v2m_clk_init(void)
--{
--	struct clk *clk;
--	int i;
--
--	clk = clk_register_fixed_rate(NULL, "dummy_apb_pclk", NULL,
--			CLK_IS_ROOT, 0);
--	WARN_ON(clk_register_clkdev(clk, "apb_pclk", NULL));
--
--	clk = clk_register_fixed_rate(NULL, "mb:ref_clk", NULL,
--			CLK_IS_ROOT, 32768);
--	for (i = 0; i < ARRAY_SIZE(v2m_ref_clk_periphs); i++)
--		WARN_ON(clk_register_clkdev(clk, NULL, v2m_ref_clk_periphs[i]));
--
--	clk = clk_register_fixed_rate(NULL, "mb:sp804_clk", NULL,
--			CLK_IS_ROOT, 1000000);
--	WARN_ON(clk_register_clkdev(clk, "v2m-timer0", "sp804"));
--	WARN_ON(clk_register_clkdev(clk, "v2m-timer1", "sp804"));
--
--	clk = v2m_osc_register("mb:osc1", &v2m_mb_osc1);
--	for (i = 0; i < ARRAY_SIZE(v2m_osc1_periphs); i++)
--		WARN_ON(clk_register_clkdev(clk, NULL, v2m_osc1_periphs[i]));
--
--	clk = clk_register_fixed_rate(NULL, "mb:osc2", NULL,
--			CLK_IS_ROOT, 24000000);
--	for (i = 0; i < ARRAY_SIZE(v2m_osc2_periphs); i++)
--		WARN_ON(clk_register_clkdev(clk, NULL, v2m_osc2_periphs[i]));
--}
--
- static void __init v2m_timer_init(void)
- {
--	v2m_sysctl_init(ioremap(V2M_SYSCTL, SZ_4K));
--	v2m_clk_init();
-+	vexpress_clk_init(ioremap(V2M_SYSCTL, SZ_4K));
- 	v2m_sp804_init(ioremap(V2M_TIMER01, SZ_4K), IRQ_V2M_TIMER0);
- }
- 
-@@ -451,19 +297,7 @@ static void __init v2m_init_early(void)
- {
- 	if (ct_desc->init_early)
- 		ct_desc->init_early();
--	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
--}
--
--static void v2m_power_off(void)
--{
--	if (v2m_cfg_write(SYS_CFG_SHUTDOWN | SYS_CFG_SITE(SYS_CFG_SITE_MB), 0))
--		printk(KERN_EMERG "Unable to shutdown\n");
--}
--
--static void v2m_restart(char str, const char *cmd)
--{
--	if (v2m_cfg_write(SYS_CFG_REBOOT | SYS_CFG_SITE(SYS_CFG_SITE_MB), 0))
--		printk(KERN_EMERG "Unable to reboot\n");
-+	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
- }
- 
- struct ct_desc *ct_desc;
-@@ -480,7 +314,7 @@ static void __init v2m_populate_ct_desc(void)
- 	u32 current_tile_id;
- 
- 	ct_desc = NULL;
--	current_tile_id = readl(v2m_sysreg_base + V2M_SYS_PROCID0)
-+	current_tile_id = vexpress_get_procid(VEXPRESS_SITE_MASTER)
- 				& V2M_CT_ID_MASK;
- 
- 	for (i = 0; i < ARRAY_SIZE(ct_descs) && !ct_desc; ++i)
-@@ -496,7 +330,7 @@ static void __init v2m_populate_ct_desc(void)
- static void __init v2m_map_io(void)
- {
- 	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
--	v2m_sysreg_base = ioremap(V2M_SYSREGS, SZ_4K);
-+	vexpress_sysreg_early_init(ioremap(V2M_SYSREGS, SZ_4K));
- 	v2m_populate_ct_desc();
- 	ct_desc->map_io();
- }
-@@ -513,6 +347,12 @@ static void __init v2m_init(void)
- 	regulator_register_fixed(0, v2m_eth_supplies,
- 			ARRAY_SIZE(v2m_eth_supplies));
- 
-+	platform_device_register(&v2m_muxfpga_device);
-+	platform_device_register(&v2m_shutdown_device);
-+	platform_device_register(&v2m_reboot_device);
-+	platform_device_register(&v2m_dvimode_device);
++		amp at 0 {
++			/* Total current for the two cores */
++			compatible = "arm,vexpress-amp";
++			arm,vexpress-sysreg,func = <3 0>;
++			label = "Cores";
++		};
 +
-+	platform_device_register(&v2m_sysreg_device);
- 	platform_device_register(&v2m_pcie_i2c_device);
- 	platform_device_register(&v2m_ddc_i2c_device);
- 	platform_device_register(&v2m_flash_device);
-@@ -523,7 +363,7 @@ static void __init v2m_init(void)
- 	for (i = 0; i < ARRAY_SIZE(v2m_amba_devs); i++)
- 		amba_device_register(v2m_amba_devs[i], &iomem_resource);
- 
--	pm_power_off = v2m_power_off;
-+	pm_power_off = vexpress_power_off;
- 
- 	ct_desc->init_tile();
- }
-@@ -536,7 +376,7 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
- 	.timer		= &v2m_timer,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= v2m_init,
--	.restart	= v2m_restart,
-+	.restart	= vexpress_restart,
- MACHINE_END
- 
- #if defined(CONFIG_ARCH_VEXPRESS_DT)
-@@ -579,20 +419,13 @@ void __init v2m_dt_map_io(void)
- 
- void __init v2m_dt_init_early(void)
- {
--	struct device_node *node;
- 	u32 dt_hbi;
- 
--	node = of_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
--	v2m_sysreg_base = of_iomap(node, 0);
--	if (WARN_ON(!v2m_sysreg_base))
--		return;
-+	vexpress_sysreg_of_early_init();
- 
- 	/* Confirm board type against DT property, if available */
- 	if (of_property_read_u32(allnodes, "arm,hbi", &dt_hbi) == 0) {
--		int site = v2m_get_master_site();
--		u32 id = readl(v2m_sysreg_base + (site == SYS_CFG_SITE_DB2 ?
--				V2M_SYS_PROCID1 : V2M_SYS_PROCID0));
--		u32 hbi = id & SYS_PROCIDx_HBI_MASK;
-+		u32 hbi = vexpress_get_hbi(VEXPRESS_SITE_MASTER);
- 
- 		if (WARN_ON(dt_hbi != hbi))
- 			pr_warning("vexpress: DT HBI (%x) is not matching "
-@@ -612,14 +445,10 @@ static void __init v2m_dt_init_irq(void)
- 
- static void __init v2m_dt_timer_init(void)
- {
--	struct device_node *node;
--	const char *path;
--	int err;
-+	struct device_node *node = NULL;
- 
--	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
--	v2m_sysctl_init(of_iomap(node, 0));
-+	vexpress_clk_of_init();
- 
--	v2m_clk_init();
- 
- 	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
- 	if (WARN_ON(err))
-@@ -630,33 +459,22 @@ static void __init v2m_dt_timer_init(void)
- 		twd_local_timer_of_register();
- 
- 	if (arch_timer_sched_clock_init() != 0)
--		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
-+		versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
-+				24000000);
- }
- 
- static struct sys_timer v2m_dt_timer = {
- 	.init = v2m_dt_timer_init,
- };
- 
--static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
--	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
--			&v2m_flash_data),
--	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
--	/* RS1 memory map */
--	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
--			&v2m_flash_data),
--	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
--	{}
--};
--
- static void __init v2m_dt_init(void)
- {
- 	l2x0_of_init(0x00400000, 0xfe0fffff);
--	of_platform_populate(NULL, of_default_bus_match_table,
--			v2m_dt_auxdata_lookup, NULL);
--	pm_power_off = v2m_power_off;
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	pm_power_off = vexpress_power_off;
- }
- 
--const static char *v2m_dt_match[] __initconst = {
-+static const char * const v2m_dt_match[] __initconst = {
- 	"arm,vexpress",
- 	NULL,
- };
-@@ -669,7 +487,7 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
- 	.timer		= &v2m_dt_timer,
- 	.init_machine	= v2m_dt_init,
- 	.handle_irq	= gic_handle_irq,
--	.restart	= v2m_restart,
-+	.restart	= vexpress_restart,
- MACHINE_END
- 
- #endif
-diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
-index 8423083..021e8cf 100644
---- a/include/linux/vexpress.h
-+++ b/include/linux/vexpress.h
-@@ -89,4 +89,12 @@ void vexpress_sysreg_of_early_init(void);
- void vexpress_power_off(void);
- void vexpress_restart(char str, const char *cmd);
- 
-+/* Clocks */
++		temp at 0 {
++			/* DCC internal temperature */
++			compatible = "arm,vexpress-temp";
++			arm,vexpress-sysreg,func = <4 0>;
++			label = "DCC";
++		};
 +
-+struct clk *vexpress_osc_setup(struct device *dev);
-+void vexpress_osc_of_setup(struct device_node *node);
++		power at 0 {
++			/* Total power */
++			compatible = "arm,vexpress-power";
++			arm,vexpress-sysreg,func = <12 0>;
++			label = "Cores";
++		};
 +
-+void vexpress_clk_init(void __iomem *sp810_base);
-+void vexpress_clk_of_init(void);
++		energy at 0 {
++			/* Total energy */
++			compatible = "arm,vexpress-energy";
++			arm,vexpress-sysreg,func = <13 0>;
++			label = "Cores";
++		};
++	};
 +
- #endif
+ 	motherboard {
+ 		ranges = <0 0 0 0x08000000 0x04000000>,
+ 			 <1 0 0 0x14000000 0x04000000>,
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 4890a81..c41a82d 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -12,6 +12,7 @@
+ / {
+ 	model = "V2P-CA15_CA7";
+ 	arm,hbi = <0x249>;
++	arm,vexpress,site = <0xf>;
+ 	compatible = "arm,vexpress,v2p-ca15_a7", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
+ 	#address-cells = <2>;
+@@ -74,17 +75,23 @@
+ 		compatible = "arm,sp805", "arm,primecell";
+ 		reg = <0 0x2a490000 0 0x1000>;
+ 		interrupts = <98>;
++		clocks = <&oscclk6a>, <&oscclk6a>;
++		clock-names = "wdogclk", "apb_pclk";
+ 	};
+ 
+ 	hdlcd at 2b000000 {
+ 		compatible = "arm,hdlcd";
+ 		reg = <0 0x2b000000 0 0x1000>;
+ 		interrupts = <0 85 4>;
++		clocks = <&oscclk5>;
++		clock-names = "pxlclk";
+ 	};
+ 
+ 	memory-controller at 2b0a0000 {
+ 		compatible = "arm,pl341", "arm,primecell";
+ 		reg = <0 0x2b0a0000 0 0x1000>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	gic: interrupt-controller at 2c001000 {
+@@ -104,6 +111,8 @@
+ 		reg = <0 0x7ffd0000 0 0x1000>;
+ 		interrupts = <0 86 4>,
+ 			     <0 87 4>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	dma at 7ff00000 {
+@@ -114,6 +123,8 @@
+ 			     <0 89 4>,
+ 			     <0 90 4>,
+ 			     <0 91 4>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	timer {
+@@ -130,6 +141,168 @@
+ 			     <0 69 4>;
+ 	};
+ 
++	oscclk6a: oscclk6a {
++		/* Reference 24MHz clock */
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-output-names = "oscclk6a";
++	};
++
++	dcc {
++		compatible = "simple-bus";
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++		osc at 0 {
++			/* A15 PLL 0 reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 0>;
++			freq-range = <17000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk0";
++		};
++
++		osc at 1 {
++			/* A15 PLL 1 reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 1>;
++			freq-range = <17000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk1";
++		};
++
++		osc at 2 {
++			/* A7 PLL 0 reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 2>;
++			freq-range = <17000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk2";
++		};
++
++		osc at 3 {
++			/* A7 PLL 1 reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 3>;
++			freq-range = <17000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk3";
++		};
++
++		osc at 4 {
++			/* External AXI master clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 4>;
++			freq-range = <20000000 40000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk4";
++		};
++
++		oscclk5: osc at 5 {
++			/* HDLCD PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 5>;
++			freq-range = <23750000 165000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk5";
++		};
++
++		smbclk: osc at 6 {
++			/* Static memory controller clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 6>;
++			freq-range = <20000000 40000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk6";
++		};
++
++		osc at 7 {
++			/* SYS PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 7>;
++			freq-range = <17000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk7";
++		};
++
++		osc at 8 {
++			/* DDR2 PLL reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 8>;
++			freq-range = <20000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk8";
++		};
++
++		volt at 0 {
++			/* A15 CPU core voltage */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 0>;
++			regulator-name = "A15 Vcore";
++			regulator-min-microvolt = <900000>;
++			regulator-max-microvolt = <1050000>;
++			regulator-always-on;
++		};
++
++		volt at 1 {
++			/* A7 CPU core voltage */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 1>;
++			regulator-name = "A7 Vcore";
++			regulator-min-microvolt = <900000>;
++			regulator-max-microvolt = <1050000>;
++			regulator-always-on;
++		};
++
++		amp at 0 {
++			/* Total current for the two A15 cores */
++			compatible = "arm,vexpress-amp";
++			arm,vexpress-sysreg,func = <3 0>;
++			label = "A15 Icore";
++		};
++
++		amp at 1 {
++			/* Total current for the three A7 cores */
++			compatible = "arm,vexpress-amp";
++			arm,vexpress-sysreg,func = <3 1>;
++			label = "A7 Icore";
++		};
++
++		temp at 0 {
++			/* DCC internal temperature */
++			compatible = "arm,vexpress-temp";
++			arm,vexpress-sysreg,func = <4 0>;
++			label = "DCC";
++		};
++
++		power at 0 {
++			/* Total power for the two A15 cores */
++			compatible = "arm,vexpress-power";
++			arm,vexpress-sysreg,func = <12 0>;
++			label = "A15 Pcore";
++		};
++		power at 1 {
++			/* Total power for the three A7 cores */
++			compatible = "arm,vexpress-power";
++			arm,vexpress-sysreg,func = <12 1>;
++			label = "A7 Pcore";
++		};
++
++		energy at 0 {
++			/* Total energy for the two A15 cores */
++			compatible = "arm,vexpress-energy";
++			arm,vexpress-sysreg,func = <13 0>;
++			label = "A15 Jcore";
++		};
++
++		energy at 2 {
++			/* Total energy for the three A7 cores */
++			compatible = "arm,vexpress-energy";
++			arm,vexpress-sysreg,func = <13 2>;
++			label = "A7 Jcore";
++		};
++	};
++
+ 	motherboard {
+ 		ranges = <0 0 0 0x08000000 0x04000000>,
+ 			 <1 0 0 0x14000000 0x04000000>,
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index 18917a0..94486d6 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -12,6 +12,7 @@
+ / {
+ 	model = "V2P-CA5s";
+ 	arm,hbi = <0x225>;
++	arm,vexpress,site = <0xf>;
+ 	compatible = "arm,vexpress,v2p-ca5s", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
+ 	#address-cells = <1>;
+@@ -56,11 +57,15 @@
+ 		compatible = "arm,hdlcd";
+ 		reg = <0x2a110000 0x1000>;
+ 		interrupts = <0 85 4>;
++		clocks = <&oscclk3>;
++		clock-names = "pxlclk";
+ 	};
+ 
+ 	memory-controller at 2a150000 {
+ 		compatible = "arm,pl341", "arm,primecell";
+ 		reg = <0x2a150000 0x1000>;
++		clocks = <&oscclk1>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	memory-controller at 2a190000 {
+@@ -68,6 +73,8 @@
+ 		reg = <0x2a190000 0x1000>;
+ 		interrupts = <0 86 4>,
+ 			     <0 87 4>;
++		clocks = <&oscclk1>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	scu at 2c000000 {
+@@ -109,6 +116,72 @@
+ 			     <0 69 4>;
+ 	};
+ 
++	dcc {
++		compatible = "simple-bus";
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++		osc at 0 {
++			/* CPU and internal AXI reference clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 0>;
++			freq-range = <50000000 100000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk0";
++		};
++
++		oscclk1: osc at 1 {
++			/* Multiplexed AXI master clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 1>;
++			freq-range = <5000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk1";
++		};
++
++		osc at 2 {
++			/* DDR2 */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 2>;
++			freq-range = <80000000 120000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk2";
++		};
++
++		oscclk3: osc at 3 {
++			/* HDLCD */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 3>;
++			freq-range = <23750000 165000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk3";
++		};
++
++		osc at 4 {
++			/* Test chip gate configuration */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 4>;
++			freq-range = <80000000 80000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk4";
++		};
++
++		smbclk: osc at 5 {
++			/* SMB clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 5>;
++			freq-range = <25000000 60000000>;
++			#clock-cells = <0>;
++			clock-output-names = "oscclk5";
++		};
++
++		temp at 0 {
++			/* DCC internal operating temperature */
++			compatible = "arm,vexpress-temp";
++			arm,vexpress-sysreg,func = <4 0>;
++			label = "DCC";
++		};
++	};
++
+ 	motherboard {
+ 		ranges = <0 0 0x08000000 0x04000000>,
+ 			 <1 0 0x14000000 0x04000000>,
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 3f0c736..bebbea4 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -12,6 +12,7 @@
+ / {
+ 	model = "V2P-CA9";
+ 	arm,hbi = <0x191>;
++	arm,vexpress,site = <0xf>;
+ 	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress";
+ 	interrupt-parent = <&gic>;
+ 	#address-cells = <1>;
+@@ -70,11 +71,15 @@
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
+ 		interrupts = <0 44 4>;
++		clocks = <&oscclk1>, <&oscclk2>;
++		clock-names = "clcdclk", "apb_pclk";
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+ 		compatible = "arm,pl341", "arm,primecell";
+ 		reg = <0x100e0000 0x1000>;
++		clocks = <&oscclk2>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	memory-controller at 100e1000 {
+@@ -82,6 +87,8 @@
+ 		reg = <0x100e1000 0x1000>;
+ 		interrupts = <0 45 4>,
+ 			     <0 46 4>;
++		clocks = <&oscclk2>;
++		clock-names = "apb_pclk";
+ 	};
+ 
+ 	timer at 100e4000 {
+@@ -89,12 +96,16 @@
+ 		reg = <0x100e4000 0x1000>;
+ 		interrupts = <0 48 4>,
+ 			     <0 49 4>;
++		clocks = <&oscclk2>, <&oscclk2>;
++		clock-names = "timclk", "apb_pclk";
+ 	};
+ 
+ 	watchdog at 100e5000 {
+ 		compatible = "arm,sp805", "arm,primecell";
+ 		reg = <0x100e5000 0x1000>;
+ 		interrupts = <0 51 4>;
++		clocks = <&oscclk2>, <&oscclk2>;
++		clock-names = "wdogclk", "apb_pclk";
+ 	};
+ 
+ 	scu at 1e000000 {
+@@ -140,6 +151,114 @@
+ 			     <0 63 4>;
+ 	};
+ 
++	dcc {
++		compatible = "simple-bus";
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++		osc at 0 {
++			/* ACLK clock to the AXI master port on the test chip */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 0>;
++			freq-range = <30000000 50000000>;
++			#clock-cells = <0>;
++			clock-output-names = "extsaxiclk";
++		};
++
++		oscclk1: osc at 1 {
++			/* Reference clock for the CLCD */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 1>;
++			freq-range = <10000000 80000000>;
++			#clock-cells = <0>;
++			clock-output-names = "clcdclk";
++		};
++
++		smbclk: oscclk2: osc at 2 {
++			/* Reference clock for the test chip internal PLLs */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 2>;
++			freq-range = <33000000 100000000>;
++			#clock-cells = <0>;
++			clock-output-names = "tcrefclk";
++		};
++
++		volt at 0 {
++			/* Test Chip internal logic voltage */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 0>;
++			regulator-name = "VD10";
++			regulator-always-on;
++		};
++
++		volt at 1 {
++			/* PL310, L2 cache, RAM cell supply (not PL310 logic) */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 1>;
++			regulator-name = "VD10_S2";
++			regulator-always-on;
++		};
++
++		volt at 2 {
++			/* Cortex-A9 system supply, Cores, MPEs, SCU and PL310 logic */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 2>;
++			regulator-name = "VD10_S3";
++			regulator-always-on;
++		};
++
++		volt at 3 {
++			/* DDR2 SDRAM and Test Chip DDR2 I/O supply */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 3>;
++			regulator-name = "VCC1V8";
++			regulator-always-on;
++		};
++
++		volt at 4 {
++			/* DDR2 SDRAM VTT termination voltage */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 4>;
++			regulator-name = "DDR2VTT";
++			regulator-always-on;
++		};
++
++		volt at 5 {
++			/* Local board supply for miscellaneous logic external to the Test Chip */
++			arm,vexpress-sysreg,func = <2 5>;
++			compatible = "arm,vexpress-volt";
++			regulator-name = "VCC3V3";
++			regulator-always-on;
++		};
++
++		amp at 0 {
++			/* PL310, L2 cache, RAM cell supply (not PL310 logic) */
++			compatible = "arm,vexpress-amp";
++			arm,vexpress-sysreg,func = <3 0>;
++			label = "VD10_S2";
++		};
++
++		amp at 1 {
++			/* Cortex-A9 system supply, Cores, MPEs, SCU and PL310 logic */
++			compatible = "arm,vexpress-amp";
++			arm,vexpress-sysreg,func = <3 1>;
++			label = "VD10_S3";
++		};
++
++		power at 0 {
++			/* PL310, L2 cache, RAM cell supply (not PL310 logic) */
++			compatible = "arm,vexpress-power";
++			arm,vexpress-sysreg,func = <12 0>;
++			label = "PVD10_S2";
++		};
++
++		power at 1 {
++			/* Cortex-A9 system supply, Cores, MPEs, SCU and PL310 logic */
++			compatible = "arm,vexpress-power";
++			arm,vexpress-sysreg,func = <12 1>;
++			label = "PVD10_S3";
++		};
++	};
++
+ 	motherboard {
+ 		ranges = <0 0 0x40000000 0x04000000>,
+ 			 <1 0 0x44000000 0x04000000>,
 -- 
 1.7.9.5
