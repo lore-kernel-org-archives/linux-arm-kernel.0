@@ -1,32 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 18 Sep 2012 08:51:59 -0600
-Subject: [PATCH] i2c: i2c-gpio: fix issue when DT node greater than 1
-In-Reply-To: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
-References: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <50588A8F.30203@wwwdotorg.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 18 Sep 2012 16:02:12 +0100
+Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
+In-Reply-To: <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
+Message-ID: <20120918150212.GA12543@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2012 03:02 AM, Bo Shen wrote:
-> When i2c-gpio node number is greater than 1, the second can not sucessfully
-> regiter
-> 
-> Using alias method to get the pdev->id, or else the second device will use
-> the same id which will cause fail to register
+On Tue, Sep 18, 2012 at 03:17:46PM +0100, Pawel Moll wrote:
+> Implementation of the regulator framework driver for the
+> Versatile Express voltage control. Devices without
+> voltage constraints (ie. "regulator-[min|max]-microvolt"
+> properties in the DT node) are treated as fixed (or rather
+> read-only) regulators.
 
-pdev->id shouldn't be used at all with device tree. Why does
-registration fail without this change?
+This doesn't seem great...  it doesn't seem to know or represent
+anything at all about the hardware, I'd expect a voltage regulator to at
+a minimum be able to implement list_voltage().  You've not provided any
+information on what the hardware actually is and the driver just seems
+to proxy through to some other API which actually implements the
+regulator support.
 
-> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-> index e62d2d9..051fbb3 100644
-> --- a/drivers/i2c/busses/i2c-gpio.c
-> +++ b/drivers/i2c/busses/i2c-gpio.c
-> @@ -136,6 +136,7 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
->  		ret = of_i2c_gpio_probe(pdev->dev.of_node, pdata);
->  		if (ret)
->  			return ret;
-> +		pdev->id = of_alias_get_id(pdev->dev.of_node, "i2c-gpio");
->  	} else {
->  		if (!pdev->dev.platform_data)
->  			return -ENXIO;
-> 
+> +	init_data->constraints.apply_uV = 0;
+
+This seems broken, why are you interfering with the supplied
+constraints?
