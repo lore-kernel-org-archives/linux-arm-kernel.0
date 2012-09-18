@@ -1,263 +1,77 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 18 Sep 2012 18:01:27 -0400
-Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
-In-Reply-To: <20120918124724.GK32204@mudshark.cambridge.arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153443.21241.37958.stgit@ubuntu>
- <20120918124724.GK32204@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qJZBYjBh5Jqu4H_oiS+4vgVi3PNcOUP1prUApOTmhoqpQ@mail.gmail.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Tue, 18 Sep 2012 15:06:36 -0700
+Subject: [PATCH 5/6] staging: drm/imx: Add devicetree binding documentation
+In-Reply-To: <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+ <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <5058F06C.1020409@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 8:47 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Sep 15, 2012 at 04:34:43PM +0100, Christoffer Dall wrote:
->> KVM uses the stage-2 page tables and the Hyp page table format,
->> so let's define the fields we need to access in KVM.
->>
->> We use pgprot_guest to indicate stage-2 entries.
->>
->> Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
->>  arch/arm/include/asm/pgtable-3level.h |   13 +++++++++++++
->>  arch/arm/include/asm/pgtable.h        |    5 +++++
->>  arch/arm/mm/mmu.c                     |    3 +++
->>  3 files changed, 21 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
->> index b249035..7351eee 100644
->> --- a/arch/arm/include/asm/pgtable-3level.h
->> +++ b/arch/arm/include/asm/pgtable-3level.h
->> @@ -102,11 +102,24 @@
->>   */
->>  #define L_PGD_SWAPPER                (_AT(pgdval_t, 1) << 55)        /* swapper_pg_dir entry */
->>
->> +/*
->> + * 2-nd stage PTE definitions for LPAE.
->> + */
+Hi Sascha,
+
+On 09/12/2012 03:31 AM, Sascha Hauer wrote:
+> From: Philipp Zabel<p.zabel@pengutronix.de>
 >
-> Minor nit: 2nd
+> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
+> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+> ---
+>   .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   41 ++++++++++++++++++++
+>   1 file changed, 41 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
 >
->> +#define L_PTE2_SHARED                L_PTE_SHARED
->> +#define L_PTE2_READ          (_AT(pteval_t, 1) << 6) /* HAP[0] */
->> +#define L_PTE2_WRITE         (_AT(pteval_t, 1) << 7) /* HAP[1] */
->
-> This is actually HAP[2:1], not HAP[1:0]. Also, can you follow what we do for
-> stage 1 translation and name these RDONLY and WRONLY (do you even use
-> that?).
->
+> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> new file mode 100644
+> index 0000000..07654f0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> @@ -0,0 +1,41 @@
+> +Freescale i.MX IPUv3
+> +====================
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,<chip>-ipu"
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +- interrupts: Should contain sync interrupt and error interrupt,
+> +  in this order.
+> +- #crtc-cells: 1, See below
+> +
+> +example:
+> +
+> +ipu: ipu at 18000000 {
+> +	#crtc-cells =<1>;
+> +	compatible = "fsl,imx53-ipu";
+> +	reg =<0x18000000 0x080000000>;
+> +	interrupts =<11 10>;
+> +};
+> +
+> +Parallel display support
+> +========================
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx-parallel-display"
+> +- crtc: the crtc this display is connected to, see below
+> +Optional properties:
+> +- interface_pix_fmt: How this display is connected to the
+> +  crtc. Currently supported types: "rgb24", "rgb565"
+> +- edid: verbatim EDID data block describing attached display.
+> +- ddc: phandle describing the i2c bus handling the display data
+> +  channel
+> +
+> +example:
+> +
+> +display at di0 {
+> +	compatible = "fsl,imx-parallel-display";
+> +	edid = [edid-data];
+> +	crtc =<&ipu 0>;
+> +	interface-pix-fmt = "rgb24";
+> +};
 
-The ARM arm is actually ambiguous, B3-1335 defines it as HAP[2:1], but
-B3-1355 defines it as HAP[1:0] and I chose the latter as it is more
-clear to most people not knowing that for historical reasons {H}AP[0]
-is not defined. If there's a consensus for the other choice here, then
-I'm good with that.
+Do you have a working sample of [edid-data] for a parallel/LVDS/HDMI
+display or know a good way to produce one?
 
-Also, these bits have a different meaning for stage-2, HAP[2] (ok, in
-this case it's less misleading with bit index 2), HAP[2] actually
-means you can write this, two clear bits means access denied, not
-read/write, so it made more sense to me to do:
-
-prot = READ | WRITE;
-
-than
-
-prt = RDONLY | WRONLY; // (not mutually exclusive). See my point?
-
->> +#define L_PTE2_NORM_WB               (_AT(pteval_t, 3) << 4) /* MemAttr[3:2] */
->> +#define L_PTE2_INNER_WB              (_AT(pteval_t, 3) << 2) /* MemAttr[1:0] */
->
-> Another minor nit: PTE2 looks awful. Maybe L_PTE_HYP_* instead?
->
->>  #ifndef __ASSEMBLY__
->>
->>  #define pud_none(pud)                (!pud_val(pud))
->>  #define pud_bad(pud)         (!(pud_val(pud) & 2))
->>  #define pud_present(pud)     (pud_val(pud))
->> +#define pmd_table(pmd)               ((pmd_val(pmd) & PMD_TYPE_MASK) == \
->> +                                              PMD_TYPE_TABLE)
->> +#define pmd_sect(pmd)                ((pmd_val(pmd) & PMD_TYPE_MASK) == \
->> +                                              PMD_TYPE_SECT)
->>
->>  #define pud_clear(pudp)                      \
->>       do {                            \
->> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
->> index 41dc31f..c422f62 100644
->> --- a/arch/arm/include/asm/pgtable.h
->> +++ b/arch/arm/include/asm/pgtable.h
->> @@ -70,6 +70,7 @@ extern void __pgd_error(const char *file, int line, pgd_t);
->>
->>  extern pgprot_t              pgprot_user;
->>  extern pgprot_t              pgprot_kernel;
->> +extern pgprot_t              pgprot_guest;
->>
->>  #define _MOD_PROT(p, b)      __pgprot(pgprot_val(p) | (b))
->>
->> @@ -82,6 +83,10 @@ extern pgprot_t            pgprot_kernel;
->>  #define PAGE_READONLY_EXEC   _MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
->>  #define PAGE_KERNEL          _MOD_PROT(pgprot_kernel, L_PTE_XN)
->>  #define PAGE_KERNEL_EXEC     pgprot_kernel
->> +#define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_USER)
->
-> Just define L_PTE_HYP to L_PTE_USER, otherwise that's confusing.
->
->> +#define PAGE_KVM_GUEST               _MOD_PROT(pgprot_guest, L_PTE2_READ | \
->> +                                       L_PTE2_NORM_WB | L_PTE2_INNER_WB | \
->> +                                       L_PTE2_SHARED)
->
-> It would be cleaner to separate the cacheability attributes out from here
-> and into the cache_policies array. Then you just need L_PTE_HYP_RDONLY here.
->
-
-ok, below is an attempt to rework all this, comments please:
+Thanks in advance,
 
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h
-b/arch/arm/include/asm/pgtable-3level.h
-index 7351eee..6df235c 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -103,13 +103,19 @@
- #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
-
- /*
-- * 2-nd stage PTE definitions for LPAE.
-+ * 2nd stage PTE definitions for LPAE.
-  */
--#define L_PTE2_SHARED		L_PTE_SHARED
--#define L_PTE2_READ		(_AT(pteval_t, 1) << 6)	/* HAP[0] */
--#define L_PTE2_WRITE		(_AT(pteval_t, 1) << 7)	/* HAP[1] */
--#define L_PTE2_NORM_WB		(_AT(pteval_t, 3) << 4)	/* MemAttr[3:2] */
--#define L_PTE2_INNER_WB		(_AT(pteval_t, 3) << 2)	/* MemAttr[1:0] */
-+#define L_PTE_S2_SHARED		L_PTE_SHARED
-+#define L_PTE_S2_READ		(_AT(pteval_t, 1) << 6)	  /* HAP[1] */
-+#define L_PTE_S2_WRITE		(_AT(pteval_t, 1) << 7)	  /* HAP[2] */
-+#define L_PTE_S2_MT_UNCACHED	(_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
-+#define L_PTE_S2_MT_WRTHROUGH	(_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
-+#define L_PTE_S2_MT_WRBACK	(_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
-+
-+/*
-+ * Hyp-mode PL2 PTE definitions for LPAE.
-+ */
-+#define L_PTE_HYP		L_PTE_USER
-
- #ifndef __ASSEMBLY__
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index c422f62..6ab276b 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -83,10 +83,8 @@ extern pgprot_t		pgprot_guest;
- #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
- #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
- #define PAGE_KERNEL_EXEC	pgprot_kernel
--#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_USER)
--#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE2_READ | \
--					  L_PTE2_NORM_WB | L_PTE2_INNER_WB | \
--					  L_PTE2_SHARED)
-+#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-+#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE_S2_READ)
-
- #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN)
- #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 82d0edf..3ff427b 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -476,7 +476,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm,
-phys_addr_t guest_ipa,
-
- 	end = (guest_ipa + size + PAGE_SIZE - 1) & PAGE_MASK;
- 	prot = __pgprot(get_mem_type_prot_pte(MT_DEVICE) | L_PTE_USER |
--			L_PTE2_READ | L_PTE2_WRITE);
-+			L_PTE_S2_READ | L_PTE_S2_WRITE);
- 	pfn = __phys_to_pfn(pa);
-
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
-@@ -567,7 +567,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu,
-phys_addr_t fault_ipa,
- 		goto out;
- 	new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
- 	if (writable)
--		pte_val(new_pte) |= L_PTE2_WRITE;
-+		pte_val(new_pte) |= L_PTE_S2_WRITE;
- 	coherent_icache_guest_page(vcpu->kvm, gfn);
-
- 	spin_lock(&vcpu->kvm->arch.pgd_lock);
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f2b6287..a06f3496 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -67,6 +67,7 @@ struct cachepolicy {
- 	unsigned int	cr_mask;
- 	pmdval_t	pmd;
- 	pteval_t	pte;
-+	pteval_t	pte_s2;
- };
-
- static struct cachepolicy cache_policies[] __initdata = {
-@@ -75,26 +76,31 @@ static struct cachepolicy cache_policies[] __initdata = {
- 		.cr_mask	= CR_W|CR_C,
- 		.pmd		= PMD_SECT_UNCACHED,
- 		.pte		= L_PTE_MT_UNCACHED,
-+		.pte_s2		= L_PTE_S2_MT_UNCACHED,
- 	}, {
- 		.policy		= "buffered",
- 		.cr_mask	= CR_C,
- 		.pmd		= PMD_SECT_BUFFERED,
- 		.pte		= L_PTE_MT_BUFFERABLE,
-+		.pte_s2		= L_PTE_S2_MT_UNCACHED,
- 	}, {
- 		.policy		= "writethrough",
- 		.cr_mask	= 0,
- 		.pmd		= PMD_SECT_WT,
- 		.pte		= L_PTE_MT_WRITETHROUGH,
-+		.pte_s2		= L_PTE_S2_MT_WRTHROUGH,
- 	}, {
- 		.policy		= "writeback",
- 		.cr_mask	= 0,
- 		.pmd		= PMD_SECT_WB,
- 		.pte		= L_PTE_MT_WRITEBACK,
-+		.pte_s2		= L_PTE_S2_MT_WRBACK,
- 	}, {
- 		.policy		= "writealloc",
- 		.cr_mask	= 0,
- 		.pmd		= PMD_SECT_WBWA,
- 		.pte		= L_PTE_MT_WRITEALLOC,
-+		.pte_s2		= L_PTE_S2_MT_WRBACK,
- 	}
- };
-
-@@ -318,7 +324,7 @@ static void __init build_mem_type_table(void)
- {
- 	struct cachepolicy *cp;
- 	unsigned int cr = get_cr();
--	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
-+	pteval_t user_pgprot, kern_pgprot, vecs_pgprot, guest_pgprot;
- 	int cpu_arch = cpu_architecture();
- 	int i;
-
-@@ -430,6 +436,7 @@ static void __init build_mem_type_table(void)
- 	 */
- 	cp = &cache_policies[cachepolicy];
- 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
-+	guest_pgprot = cp->pte_s2;
-
- 	/*
- 	 * Enable CPU-specific coherency if supported.
-@@ -464,6 +471,7 @@ static void __init build_mem_type_table(void)
- 			user_pgprot |= L_PTE_SHARED;
- 			kern_pgprot |= L_PTE_SHARED;
- 			vecs_pgprot |= L_PTE_SHARED;
-+			guest_pgprot |= L_PTE_SHARED;
- 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
- 			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
- 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
-@@ -518,7 +526,7 @@ static void __init build_mem_type_table(void)
- 	pgprot_user   = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | user_pgprot);
- 	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
- 				 L_PTE_DIRTY | kern_pgprot);
--	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG);
-+	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | guest_pgprot);
-
- 	mem_types[MT_LOW_VECTORS].prot_l1 |= ecc_mask;
- 	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
+Eric
