@@ -1,20 +1,27 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 18 Sep 2012 17:45:59 +0200
-Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
-In-Reply-To: <20120918152430.GA5911@roeck-us.net>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
- <20120918152430.GA5911@roeck-us.net>
-Message-ID: <20120918174559.227378fc@endymion.delvare>
+From: viric@viric.name (=?iso-8859-1?Q?Llu=EDs?= Batlle i Rossell)
+Date: Tue, 18 Sep 2012 17:46:27 +0200
+Subject: Bad traps for unaligned access in STM instruction
+In-Reply-To: <alpine.LFD.2.02.1209181140450.28681@xanadu.home>
+References: <20120915104602.GY1943@vicerveza.homeunix.net>
+ <20120915105151.GZ1943@vicerveza.homeunix.net>
+ <20120918152502.GB2110@linaro.org>
+ <20120918153119.GC8632@vicerveza.homeunix.net>
+ <alpine.LFD.2.02.1209181140450.28681@xanadu.home>
+Message-ID: <20120918154627.GD8632@vicerveza.homeunix.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Sep 2012 08:24:30 -0700, Guenter Roeck wrote:
-> I don't even understand what you are trying to do, much less why you don't
-> just use the existing infrastructure, and I don't have time to try to figure
-> it out. Maybe Jean has time to review this driver, but not me.
+On Tue, Sep 18, 2012 at 11:44:02AM -0400, Nicolas Pitre wrote:
+> On Tue, 18 Sep 2012, Llu?s Batlle i Rossell wrote:
+> 
+> > In an ideal userland software world, the counters of the traps would be zero.
+> > But they are not. And without fixup, the mkfs.btrfs fails to run properly, and
+> > creates a broken filesystem that crashes the kernel.
+> 
+> If a broken btrfs filesystem crashes the kernel, you should definitively 
+> report it as a bug to the btrfs developers.  Filesystem code must be 
+> immune to any kind of corruptions and gracefully cope with them.
 
-No, I do not. My backlog is huge already :(
+Yes I know; I did report that.
 
--- 
-Jean Delvare
+Thank you
