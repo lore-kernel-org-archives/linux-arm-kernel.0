@@ -1,34 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Sep 2012 12:34:29 +0000
-Subject: [PATCH v5 00/17] Introduce Xen support on ARM (based on 3.6-rc5)
-In-Reply-To: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1209171215490.29232@kaball.uk.xensource.com>
-Message-ID: <201209181234.29557.arnd@arndb.de>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Tue, 18 Sep 2012 18:10:50 +0530
+Subject: [RFT/PATCH] serial: omap: prevent resume if device is not suspended.
+Message-ID: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 September 2012, Stefano Stabellini wrote:
+Greg's tty-next is not booting on 2420 based N800. The failure is
+observed at serial init itself. The reason might be that n800 tries to
+resume even though it is not suspended before.
 
-> I am also attaching to this email the dts'es that I am currently using
-> for dom0 and domU: vexpress-v2p-ca15-tc1.dts (that includes
-> vexpress-v2m-rs1-rtsm.dtsi) is the dts used for dom0 and it is passed to
-> Linux by Xen, while vexpress-virt.dts is the dts used for other domUs
-> and it is appended in binary form to the guest kernel image. I am not
-> sure where they are supposed to live yet, so I am just attaching them
-> here so that people can actually try out this series if they want to.
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+This patch is developed on top of greg's tty-next branch
+CommitId: e740d8f tty: serial: Samsung: Fix return value +
+the following patch which I have already posted to the mailing list.
+http://comments.gmane.org/gmane.linux.ports.arm.omap/84729
 
-You can submit the dts files separately so we can include them in
-the arm-soc tree. Pawel Moll is handling vexpress related changes these
-days, so it would be reasonable if he included them in a pull request.
+ drivers/tty/serial/omap-serial.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 3c05c5e..bc355f2 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -110,6 +110,7 @@ struct uart_omap_port {
+ 	u32			calc_latency;
+ 	struct work_struct	qos_work;
+ 	struct pinctrl		*pins;
++	unsigned int		suspended:1;
+ };
  
-> The patch series has been rebased on Konrad's stable/for-linus-3.7
-> branch.
-> 
-> Arnd, Russell, what do you think about this series? If you are OK with
-> it, to whom should I submit it?
-
-I have no objections to your patches from this series. IMHO they should
-be submitted through the Xen tree, but it would be good to have an Ack
-from Russell.
-
-	Arnd
+ #define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
+@@ -1545,14 +1546,20 @@ static int serial_omap_runtime_suspend(struct device *dev)
+ 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+ 	schedule_work(&up->qos_work);
+ 
++	up->suspended = true;
++
+ 	return 0;
+ }
+ 
+ static int serial_omap_runtime_resume(struct device *dev)
+ {
+ 	struct uart_omap_port *up = dev_get_drvdata(dev);
++	u32 loss_cnt;
++
++	if (!up->suspended)
++		return 0;
+ 
+-	u32 loss_cnt = serial_omap_get_context_loss_count(up);
++	loss_cnt = serial_omap_get_context_loss_count(up);
+ 
+ 	if (up->context_loss_cnt != loss_cnt)
+ 		serial_omap_restore_context(up);
+@@ -1560,6 +1567,8 @@ static int serial_omap_runtime_resume(struct device *dev)
+ 	up->latency = up->calc_latency;
+ 	schedule_work(&up->qos_work);
+ 
++	up->suspended = false;
++
+ 	return 0;
+ }
+ #endif
+-- 
+1.7.1
