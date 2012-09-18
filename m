@@ -1,79 +1,33 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Tue, 18 Sep 2012 16:40:08 +0530
-Subject: [PATCH V3] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses.
-Message-ID: <1347966608-14780-1-git-send-email-r.sricharan@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Sep 2012 13:22:06 +0200
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between DT
+ and non-DT boots
+In-Reply-To: <20120914080347.GB3374@gmail.com>
+References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaKa=NAObnjJyifhxyqu3Hcgj7Fxqi=bdNFqbm7V_8cSw@mail.gmail.com>
+ <20120914080347.GB3374@gmail.com>
+Message-ID: <CACRpkdbntZ2k+2mi7=nCL2RV+YcbYi=wbK2RaDKsKNKqsCxMOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With LPAE, When either the start address or end address
-or physical address to be mapped is unaligned,
-alloc_init_section creates page granularity mappings.
-alloc_init_section calls alloc_init_pte which populates
-one pmd entry and sets up the ptes. But if the size is
-greater than what can be mapped by one pmd entry,
-then the rest remains unmapped.
+On Fri, Sep 14, 2012 at 10:03 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, Sep 13, 2012 at 11:35:43AM +0200, Linus Walleij wrote:
+>>
+>> Not having this patch in v3.6-rcN gives the following boot noise (and
+>> the key does not work):
+>>
+>> ------------[ cut here ]------------
+>> WARNING: at /home/elinwal/linux-stericsson/kernel/irq/irqdomain.c:137
+>> irq_domain_legacy_revmap+0x20/0x48()
+(...)
+> I haven't tested this, but I think this patch should be pulled out
+> of -next and pushed into the -rcs to fix the issue you see above.
+> The real fix along with the revert to this patch also resides in
+> -next and will be applied during the next merge window.
 
-The issue becomes visible when LPAE is enabled, where we have
-the 3 levels with seperate pgd and pmd's.
-When a static mapping for 3MB is requested, only 2MB is mapped
-and the remaining 1MB is unmapped. Fixing this here, by looping
-in to map the entire unaligned address range.
+Dmitry, can you fix this?
 
-Also the issue can be reproduced by enabling CMA + LPAE.
-CMA tries to map 16MB with 2 level tables during boot.
+v3.6-rc6 is regressing on us...
 
-Boot tested on OMAP5 evm with both LPAE enabled/disabled
-and verified that static mappings with unaligned addresses
-are properly mapped. Also the verified the boot with CMA and LPAE
-enabled.
-
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- [V2] Moved the loop to alloc_init_pte as per Russell's
-     feedback and changed the subject accordingly.
-     Using PMD_XXX instead of SECTION_XXX to avoid
-     different loop increments with/without LPAE.
-
- [v3] Removed the dummy variable phys and updated
-      the commit log for CMA case.
-
- arch/arm/mm/mmu.c |   20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index c2fa21d..53c9787 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -579,11 +579,23 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  const struct mem_type *type)
- {
--	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
-+	unsigned long next;
-+	pte_t *pte;
-+
- 	do {
--		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
--		pfn++;
--	} while (pte++, addr += PAGE_SIZE, addr != end);
-+		if ((end-addr) & PMD_MASK)
-+			next = (addr + PMD_SIZE) & PMD_MASK;
-+		else
-+			next = end;
-+
-+		pte = early_pte_alloc(pmd, addr, type->prot_l1);
-+		do {
-+			set_pte_ext(pte, pfn_pte(pfn,
-+					__pgprot(type->prot_pte)), 0);
-+			pfn++;
-+		} while (pte++, addr += PAGE_SIZE, addr != next);
-+
-+	} while (pmd++, addr = next, addr != end);
- }
- 
- static void __init alloc_init_section(pud_t *pud, unsigned long addr,
--- 
-1.7.9.5
+Yours,
+Linus Walleij
