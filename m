@@ -1,70 +1,92 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Tue, 18 Sep 2012 17:05:54 +0530
-Subject: [PATCH] serial: omap: Remove unnecessary checks from suspend/resume
-Message-ID: <1347968154-27997-1-git-send-email-sourav.poddar@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Sep 2012 14:34:46 +0300
+Subject: [PATCH] serial: omap: Remove unnecessary checks from
+ suspend/resume
+In-Reply-To: <1347968154-27997-1-git-send-email-sourav.poddar@ti.com>
+References: <1347968154-27997-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120918113444.GG24047@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the check for "up" being valid on suspend/resume callbacks.
-It should be valid always. Get rid of the "pdata" check also as
-serial_omap_get_context_loss_count() checks for it.
+On Tue, Sep 18, 2012 at 05:05:54PM +0530, Sourav Poddar wrote:
+> Drop the check for "up" being valid on suspend/resume callbacks.
+> It should be valid always. Get rid of the "pdata" check also as
+> serial_omap_get_context_loss_count() checks for it.
+> 
+> Tested on omap4 panda and 3630 based Beagle board.
 
-Tested on omap4 panda and 3630 based Beagle board.
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- drivers/tty/serial/omap-serial.c |   23 +++++++++--------------
- 1 files changed, 9 insertions(+), 14 deletions(-)
+you need a blank line here. Other than that:
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index f175385..3c05c5e 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1222,10 +1222,8 @@ static int serial_omap_suspend(struct device *dev)
- {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
- 
--	if (up) {
--		uart_suspend_port(&serial_omap_reg, &up->port);
--		flush_work_sync(&up->qos_work);
--	}
-+	uart_suspend_port(&serial_omap_reg, &up->port);
-+	flush_work_sync(&up->qos_work);
- 
- 	return 0;
- }
-@@ -1234,8 +1232,8 @@ static int serial_omap_resume(struct device *dev)
- {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
- 
--	if (up)
--		uart_resume_port(&serial_omap_reg, &up->port);
-+	uart_resume_port(&serial_omap_reg, &up->port);
-+
- 	return 0;
- }
- #endif
-@@ -1553,17 +1551,14 @@ static int serial_omap_runtime_suspend(struct device *dev)
- static int serial_omap_runtime_resume(struct device *dev)
- {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
--	struct omap_uart_port_info *pdata = dev->platform_data;
- 
--	if (up && pdata) {
--			u32 loss_cnt = serial_omap_get_context_loss_count(up);
-+	u32 loss_cnt = serial_omap_get_context_loss_count(up);
- 
--			if (up->context_loss_cnt != loss_cnt)
--				serial_omap_restore_context(up);
-+	if (up->context_loss_cnt != loss_cnt)
-+		serial_omap_restore_context(up);
- 
--		up->latency = up->calc_latency;
--		schedule_work(&up->qos_work);
--	}
-+	up->latency = up->calc_latency;
-+	schedule_work(&up->qos_work);
- 
- 	return 0;
- }
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+ps: what kind of tests did you run, btw ?
+
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+>  drivers/tty/serial/omap-serial.c |   23 +++++++++--------------
+>  1 files changed, 9 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index f175385..3c05c5e 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -1222,10 +1222,8 @@ static int serial_omap_suspend(struct device *dev)
+>  {
+>  	struct uart_omap_port *up = dev_get_drvdata(dev);
+>  
+> -	if (up) {
+> -		uart_suspend_port(&serial_omap_reg, &up->port);
+> -		flush_work_sync(&up->qos_work);
+> -	}
+> +	uart_suspend_port(&serial_omap_reg, &up->port);
+> +	flush_work_sync(&up->qos_work);
+>  
+>  	return 0;
+>  }
+> @@ -1234,8 +1232,8 @@ static int serial_omap_resume(struct device *dev)
+>  {
+>  	struct uart_omap_port *up = dev_get_drvdata(dev);
+>  
+> -	if (up)
+> -		uart_resume_port(&serial_omap_reg, &up->port);
+> +	uart_resume_port(&serial_omap_reg, &up->port);
+> +
+>  	return 0;
+>  }
+>  #endif
+> @@ -1553,17 +1551,14 @@ static int serial_omap_runtime_suspend(struct device *dev)
+>  static int serial_omap_runtime_resume(struct device *dev)
+>  {
+>  	struct uart_omap_port *up = dev_get_drvdata(dev);
+> -	struct omap_uart_port_info *pdata = dev->platform_data;
+>  
+> -	if (up && pdata) {
+> -			u32 loss_cnt = serial_omap_get_context_loss_count(up);
+> +	u32 loss_cnt = serial_omap_get_context_loss_count(up);
+>  
+> -			if (up->context_loss_cnt != loss_cnt)
+> -				serial_omap_restore_context(up);
+> +	if (up->context_loss_cnt != loss_cnt)
+> +		serial_omap_restore_context(up);
+>  
+> -		up->latency = up->calc_latency;
+> -		schedule_work(&up->qos_work);
+> -	}
+> +	up->latency = up->calc_latency;
+> +	schedule_work(&up->qos_work);
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.7.1
+> 
+
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120918/c02b5095/attachment-0001.sig>
