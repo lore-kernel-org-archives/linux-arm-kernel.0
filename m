@@ -1,32 +1,53 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Tue, 18 Sep 2012 09:39:09 +0530
-Subject: [PATCH] spi: pl022: Add clk_{un}prepare() support in runtime PM
-In-Reply-To: <CACRpkdbHegZAw+9XXzOb5UPPqJvzoNfPJ5aPDhuwWWhWunuv8w@mail.gmail.com>
-References: <1f784b72399e0e96414f00866b209e2e218065af.1347877746.git.vipulkumar.samar@st.com>
- <CACRpkdbHegZAw+9XXzOb5UPPqJvzoNfPJ5aPDhuwWWhWunuv8w@mail.gmail.com>
-Message-ID: <CAOh2x==GY6xvyWmLJtpR68x1kiFWO8F85RwS6VfHjJA8YdhgvA@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 18 Sep 2012 09:46:02 +0530
+Subject: [PATCH 1/2] ARM: Exynos4: Put PCM, Slimbus,
+ Spdif clocks to off state
+In-Reply-To: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
+References: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CAJuYYwT443=NPZX4n2Y9TToWZ9-yH5YQyCa3iq_LRCv1XnF0WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 7:09 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This driver does clk_prepare/unprepare at probe
-> and removed, so I guess what you're trying to say is that
-> on your platform the clk_unprepare() process context call
-> is needed to save power?
+On 6 September 2012 19:46, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> The clocks for PCM, Slimbus, Spdif added to off list in order
+> to turn them off at boot time.
 >
-> Please elaborate...
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  arch/arm/mach-exynos/clock-exynos4.c |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
+> index 7cc5491..6a45c9a 100644
+> --- a/arch/arm/mach-exynos/clock-exynos4.c
+> +++ b/arch/arm/mach-exynos/clock-exynos4.c
+> @@ -627,6 +627,25 @@ static struct clk exynos4_init_clocks_off[] = {
+>                 .enable         = exynos4_clk_ip_peril_ctrl,
+>                 .ctrlbit        = (1 << 21),
+>         }, {
+> +               .name           = "pcm",
+> +               .devname        = "samsung-pcm.1",
+> +               .enable         = exynos4_clk_ip_peril_ctrl,
+> +               .ctrlbit        = (1 << 22),
+> +       }, {
+> +               .name           = "pcm",
+> +               .devname        = "samsung-pcm.2",
+> +               .enable         = exynos4_clk_ip_peril_ctrl,
+> +               .ctrlbit        = (1 << 23),
+> +       }, {
+> +               .name           = "slimbus",
+> +               .enable         = exynos4_clk_ip_peril_ctrl,
+> +               .ctrlbit        = (1 << 25),
+> +       }, {
+> +               .name           = "spdif",
+> +               .devname        = "samsung-spdif",
+> +               .enable         = exynos4_clk_ip_peril_ctrl,
+> +               .ctrlbit        = (1 << 26),
+> +       }, {
+>                 .name           = "ac97",
+>                 .devname        = "samsung-ac97",
+>                 .enable         = exynos4_clk_ip_peril_ctrl,
+> --
+> 1.7.9.5
 
-Hi Linus,
-
-Yes, we don't need to call prepare() again atleast for SPEAr. You are correct.
-I saw the driver after a long time :)
-Can you please elaborate, why can't i see any clk_disable/enable calls anywhere
-else from probe. If i remember correctly, earlier we used to enable/disable
-clk after transfers and also during suspend/resume.
-
-The amba layer is taking care of interface clock only and not
-functional clock. So
-i believe that's not the magic code. :)
-
---
-viresh
+Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
