@@ -1,9 +1,9 @@
 From: peter.senna@gmail.com (Peter Senna Tschudin)
-Date: Tue, 18 Sep 2012 18:36:10 +0200
-Subject: [PATCH] arch/arm/mach-omap1/devices.c: Remove unecessary semicolon
+Date: Tue, 18 Sep 2012 18:36:09 +0200
+Subject: [PATCH] arch/arm/mach-davinci/board-dm646x-evm.c: Remove unecessary
 In-Reply-To: <1347986174-30287-1-git-send-email-peter.senna@gmail.com>
 References: <1347986174-30287-1-git-send-email-peter.senna@gmail.com>
-Message-ID: <1347986174-30287-3-git-send-email-peter.senna@gmail.com>
+Message-ID: <1347986174-30287-2-git-send-email-peter.senna@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,21 @@ Found by http://coccinelle.lip6.fr/
 
 Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
 ---
- arch/arm/mach-omap1/devices.c | 2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index fa1fa4d..688b23a 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -232,7 +232,7 @@ void __init omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 
- 		omap_mmc_add("mmci-omap", i, base, size, irq,
- 				rx_req, tx_req, mmc_data[i]);
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 958679a..1ccaace 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -193,7 +193,7 @@ static int evm_led_setup(struct i2c_client *client, int gpio,
+ 	while (ngpio--) {
+ 		leds->gpio = gpio++;
+ 		leds++;
 -	};
 +	}
- }
  
- #endif
+ 	evm_led_dev = platform_device_alloc("leds-gpio", 0);
+ 	platform_device_add_data(evm_led_dev, &evm_led_data,
 -- 
 1.7.11.4
