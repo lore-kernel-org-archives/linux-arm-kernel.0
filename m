@@ -1,29 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Sep 2012 07:44:21 -0700
-Subject: [GIT PULL] at91: one fix for 3.6
-In-Reply-To: <5058313F.8060704@atmel.com>
-References: <5058313F.8060704@atmel.com>
-Message-ID: <CAOesGMgSqmvtOeANaAHW_XVt=YaUGe2xmL6FMd_X-9=fArC_0g@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 18 Sep 2012 16:47:04 +0200
+Subject: [PATCH v2] spi/pl022: Devicetree support w/o platform data
+In-Reply-To: <201209181443.29025.arnd@arndb.de>
+References: <1347976433-1176-1-git-send-email-stigge@antcom.de>
+ <201209181443.29025.arnd@arndb.de>
+Message-ID: <50588968.9090505@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 1:30 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof,
->
-> We have one last minute fix. It can help us to use the device tree for
-> GPIO interrupt attached devices. I have based my tag on top of the "fixes" pull
-> request that I've already sent to you.
-> I hope that it could make it for 3.6-final.
->
-> The following changes since commit 51a6149b89b822cacf572b2ca2a15cb6f2232b11:
->
->   ARM: at91/feature-removal-schedule: delay at91_mci removal (2012-08-27 09:59:36 +0200)
->
-> are available in the git repository at:
->
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+On 09/18/2012 04:43 PM, Arnd Bergmann wrote:
+> On Tuesday 18 September 2012, Roland Stigge wrote:
+>> Even with devicetree support, we needed platform data to provide some data,
+>> leading to mixed device tree and platform data. This patch makes it possible to
+>> provide all that information via device tree. Now, the data must be provided
+>> via platform data or device tree completely.
+>>
+>> Only in case of DMA where a callback specification is necessary (dma_filter()),
+>> platform data is the only option.
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Pulled, thanks.
+Thanks for reviewing.
 
+Of the arm-soc.git / LPC32xx related adjustments, the dts patch is
+obsolete now. But I will do a pull request for the other one (unchanged)
+when the above spi-pl022 patch is subsystem-merged.
 
--Olof
+Roland
