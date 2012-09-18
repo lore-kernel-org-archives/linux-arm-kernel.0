@@ -1,52 +1,61 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 18 Sep 2012 09:46:02 +0530
-Subject: [PATCH 1/2] ARM: Exynos4: Put PCM, Slimbus,
- Spdif clocks to off state
-In-Reply-To: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
-References: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAJuYYwT443=NPZX4n2Y9TToWZ9-yH5YQyCa3iq_LRCv1XnF0WQ@mail.gmail.com>
+Date: Tue, 18 Sep 2012 09:47:27 +0530
+Subject: [PATCH 2/2] ARM: SAMSUNG: Add check for NULL in clock interface
+In-Reply-To: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
+References: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CAJuYYwR9ttbL9oknv7L60GnS3U1c_MX0Qddr6fg1zh7T1LzR=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2012 19:46, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> The clocks for PCM, Slimbus, Spdif added to off list in order
-> to turn them off at boot time.
+On 6 September 2012 19:55, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> The clock instance parameter in Samsung clock interface is not being checked
+> for NULL pointers. Add checks for NULL pointers.
 >
 > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 > ---
->  arch/arm/mach-exynos/clock-exynos4.c |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+>  arch/arm/plat-samsung/clock.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-> index 7cc5491..6a45c9a 100644
-> --- a/arch/arm/mach-exynos/clock-exynos4.c
-> +++ b/arch/arm/mach-exynos/clock-exynos4.c
-> @@ -627,6 +627,25 @@ static struct clk exynos4_init_clocks_off[] = {
->                 .enable         = exynos4_clk_ip_peril_ctrl,
->                 .ctrlbit        = (1 << 21),
->         }, {
-> +               .name           = "pcm",
-> +               .devname        = "samsung-pcm.1",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 22),
-> +       }, {
-> +               .name           = "pcm",
-> +               .devname        = "samsung-pcm.2",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 23),
-> +       }, {
-> +               .name           = "slimbus",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 25),
-> +       }, {
-> +               .name           = "spdif",
-> +               .devname        = "samsung-spdif",
-> +               .enable         = exynos4_clk_ip_peril_ctrl,
-> +               .ctrlbit        = (1 << 26),
-> +       }, {
->                 .name           = "ac97",
->                 .devname        = "samsung-ac97",
->                 .enable         = exynos4_clk_ip_peril_ctrl,
+> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+> index 65c5eca..7938fbc 100644
+> --- a/arch/arm/plat-samsung/clock.c
+> +++ b/arch/arm/plat-samsung/clock.c
+> @@ -119,7 +119,7 @@ void clk_disable(struct clk *clk)
+>
+>  unsigned long clk_get_rate(struct clk *clk)
+>  {
+> -       if (IS_ERR(clk))
+> +       if (IS_ERR_OR_NULL(clk))
+>                 return 0;
+>
+>         if (clk->rate != 0)
+> @@ -136,7 +136,7 @@ unsigned long clk_get_rate(struct clk *clk)
+>
+>  long clk_round_rate(struct clk *clk, unsigned long rate)
+>  {
+> -       if (!IS_ERR(clk) && clk->ops && clk->ops->round_rate)
+> +       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
+>                 return (clk->ops->round_rate)(clk, rate);
+>
+>         return rate;
+> @@ -146,7 +146,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>  {
+>         int ret;
+>
+> -       if (IS_ERR(clk))
+> +       if (IS_ERR_OR_NULL(clk))
+>                 return -EINVAL;
+>
+>         /* We do not default just do a clk->rate = rate as
+> @@ -175,7 +175,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>  {
+>         int ret = 0;
+>
+> -       if (IS_ERR(clk))
+> +       if (IS_ERR_OR_NULL(clk) || IS_ERR_OR_NULL(parent))
+>                 return -EINVAL;
+>
+>         spin_lock(&clocks_lock);
 > --
 > 1.7.9.5
 
