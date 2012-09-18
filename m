@@ -1,71 +1,49 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Sep 2012 17:35:33 +0100
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use cache
- LoUIS operations
+Date: Tue, 18 Sep 2012 17:35:35 +0100
+Subject: [RFC PATCH v2 5/5] ARM: mm: update __v7_setup() to the new LoUIS
+ cache maintenance API
 In-Reply-To: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1347986135-17979-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In processors like A15/A7 L2 cache is unified and integrated within the
-processor cache hierarchy, so that it is not considered an outer cache
-anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
-all cache levels up to Level of Coherency (LoC) that includes
-the L2 unified cache.
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-When a single CPU is suspended (CPU idle) a complete L2 clean is not
-required, so generic cpu_suspend code must clean the data cache using the
-newly introduced cache LoUIS function.
+The ARMv7 processor setup function __v7_setup() cleans and invalidates the
+CPU cache before enabling MMU to start the CPU with a clean CPU local cache.
 
-The context and stack pointer (context pointer) are cleaned to main memory
-using cache area functions that operate on MVA and guarantee that the data
-is written back to main memory (perform cache cleaning up to the Point of
-Coherency - PoC) so that the processor can fetch the context when the MMU
-is off in the cpu_resume code path.
+But on ARMv7 architectures like Cortex-[A15/A8], this code will end
+up flushing the L2 caches(up to level of Coherency) which is undesirable
+and expensive. The setup functions are used in the CPU hotplug scenario too
+and hence flushing all cache levels should be avoided.
 
-outer_cache management remains unchanged.
+This patch replaces the cache flushing call with the newly introduced
+v7 dcache LoUIS API where only cache levels up to LoUIS are cleaned and
+invalidated when a processors executes __v7_setup which is the expected
+behavior.
 
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+For processors like A9 and A5 where the L2 cache is an outer one the
+behavior should be unchanged.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/kernel/suspend.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ arch/arm/mm/proc-v7.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index 1794cc3..358bca3 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -17,6 +17,8 @@ extern void cpu_resume_mmu(void);
-  */
- void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
- {
-+	u32 *ctx = ptr;
-+
- 	*save_ptr = virt_to_phys(ptr);
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index c2e2b66..846d279 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -172,7 +172,7 @@ __v7_ca15mp_setup:
+ __v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+-	bl	v7_flush_dcache_all
++	bl      v7_flush_dcache_louis
+ 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
  
- 	/* This must correspond to the LDM in cpu_resume() assembly */
-@@ -26,7 +28,20 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
- 
- 	cpu_do_suspend(ptr);
- 
--	flush_cache_all();
-+	flush_cache_louis();
-+
-+	/*
-+	 * flush_cache_louis does not guarantee that
-+	 * save_ptr and ptr are cleaned to main memory,
-+	 * just up to the Level of Unification Inner Shareable.
-+	 * Since the context pointer and context itself
-+	 * are to be retrieved with the MMU off that
-+	 * data must be cleaned from all cache levels
-+	 * to main memory using "area" cache primitives.
-+	*/
-+	__cpuc_flush_dcache_area(ctx, ptrsz);
-+	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
-+
- 	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
- 	outer_clean_range(virt_to_phys(save_ptr),
- 			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
+ 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
 -- 
 1.7.12
