@@ -1,57 +1,24 @@
-From: viric@viric.name (=?iso-8859-1?Q?Llu=EDs?= Batlle i Rossell)
-Date: Tue, 18 Sep 2012 17:31:19 +0200
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 18 Sep 2012 11:44:02 -0400 (EDT)
 Subject: Bad traps for unaligned access in STM instruction
-In-Reply-To: <20120918152502.GB2110@linaro.org>
+In-Reply-To: <20120918153119.GC8632@vicerveza.homeunix.net>
 References: <20120915104602.GY1943@vicerveza.homeunix.net>
  <20120915105151.GZ1943@vicerveza.homeunix.net>
  <20120918152502.GB2110@linaro.org>
-Message-ID: <20120918153119.GC8632@vicerveza.homeunix.net>
+ <20120918153119.GC8632@vicerveza.homeunix.net>
+Message-ID: <alpine.LFD.2.02.1209181140450.28681@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 04:25:02PM +0100, Dave Martin wrote:
-> On Sat, Sep 15, 2012 at 12:51:51PM +0200, Llu?s Batlle i Rossell wrote:
-> > On Sat, Sep 15, 2012 at 12:46:02PM +0200, Llu?s Batlle i Rossell wrote:
-> > > I'll start looking at the arm traps for unaligned accesses, but maybe someone
-> > > here can give a quick answer.
-> > 
-> > Ah stupid me, here goes the quick answer. I had mode 'warn', and not
-> > 'fixup+warn'. With 'fixup' enabled, all works fine.
-> > 
-> > I was used to mips, where I think there isn't a 'warn' that doesn't 'fixup'.
-> 
-> What source are you actually trying to build/run here?  The "fixup" alignment
-> mode is primarily a workaround for incorrect code, because the legacy rotated
-> unaligned access behaviour would cause really weird things to happen silently
-> in the offending code.  (Although misaligned LDM/STM was never permitted by
-> the architecture anyway, and normally indicates badly-written code.)
-> 
-> Pure C code should never trigger alignment faults fixups unless it
-> violates the C language specification.
-> 
-> Assembler should not trigger faults at all, because it's arch-specific
-> and so you can and should fix it not to cause faults.  Optimising code
-> in assembler becomes pointless if you write or use it in a way which
-> triggers unnecessary faults into the kernel.
-> 
-> If you are getting faults in compiled code and the source code follows
-> the C standard with regard to alignment requirements, this suggests a
-> bug in the compiler.
+On Tue, 18 Sep 2012, Llu?s Batlle i Rossell wrote:
 
-This happened in the btrfs userland code, where there are packed structs, and
-structs stored at some offsets of datablocks. Offsets like '+17 bytes' since
-block start loaded from disk, and so.
+> In an ideal userland software world, the counters of the traps would be zero.
+> But they are not. And without fixup, the mkfs.btrfs fails to run properly, and
+> creates a broken filesystem that crashes the kernel.
 
-Then, some functions take pointers to structs. The "datablock+17bytes" is passed
-to processing functions as a pointer to struct. The code in those functions,
-expects that the structs are properly aligned.
+If a broken btrfs filesystem crashes the kernel, you should definitively 
+report it as a bug to the btrfs developers.  Filesystem code must be 
+immune to any kind of corruptions and gracefully cope with them.
 
-In an ideal userland software world, the counters of the traps would be zero.
-But they are not. And without fixup, the mkfs.btrfs fails to run properly, and
-creates a broken filesystem that crashes the kernel.
 
-Is the best way to deal with it, to allocate the structs in stack, copy from
-unaligned places to stack, and then work with those stack struct pointers?
-
-Thank you a lot for your answer,
-Llu?s.
+Nicolas
