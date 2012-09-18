@@ -1,30 +1,52 @@
-From: peter.senna@gmail.com (Peter Senna Tschudin)
-Date: Tue, 18 Sep 2012 18:59:59 +0200
-Subject: [PATCH v2] arch/arm/mach-davinci/board-dm646x-evm.c: Remove
- unecessary semicolon
-Message-ID: <1347987599-30802-1-git-send-email-peter.senna@gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 18 Sep 2012 18:03:39 +0100
+Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
+In-Reply-To: <20120918160909.GA15587@opensource.wolfsonmicro.com>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
+ <20120918150212.GA12543@opensource.wolfsonmicro.com>
+ <1347983056.11116.11.camel@hornet>
+ <20120918160909.GA15587@opensource.wolfsonmicro.com>
+Message-ID: <1347987819.11116.38.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Found by http://coccinelle.lip6.fr/
+On Tue, 2012-09-18 at 17:09 +0100, Mark Brown wrote:
+> On Tue, Sep 18, 2012 at 04:44:16PM +0100, Pawel Moll wrote:
+> 
+> > Well, that's what it really is. The config API sends a request "set xyz
+> > uV" to the microcontrollers. And the micro can (at least in theory) get
+> > you any voltage within the min/max limits by whatever means it has (at
+> > least some of the daugtherboards use micro's DAC to adjust reference
+> > voltage for a DC/DC converter with a feedback loop using ADC).
+> 
+> And the microcontroller is incapable of telling us what it supports, 
 
-Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
----
- arch/arm/mach-davinci/board-dm646x-evm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+No, there is no such . Device Tree defines per-device min/max
+constraints and any value between these values should be supported.
 
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 958679a..1ccaace 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -193,7 +193,7 @@ static int evm_led_setup(struct i2c_client *client, int gpio,
- 	while (ngpio--) {
- 		leds->gpio = gpio++;
- 		leds++;
--	};
-+	}
- 
- 	evm_led_dev = platform_device_alloc("leds-gpio", 0);
- 	platform_device_add_data(evm_led_dev, &evm_led_data,
--- 
-1.7.11.4
+> or even what's physically present?
+
+You mean read back what voltage is set now? By all means - that's what
+it is doing for "read only" devices.
+
+> > But fair enough, I should have done better work in describing this.
+> 
+> So this is going to break interoperation with a bunch of consumer
+> drivers that rely on being able to tell what voltages are supported.
+> The key thing for them would be that regulator_is_supported_voltage()
+> works, currently it relies on list_voltage() as that's the only way to
+> do that right now.
+
+Ok, I guess I should use regulator_list_voltage_linear() and
+regulator_map_voltage_linear() then? I'll just have to carefully think
+what step to choose.
+
+> > v3 to follow.
+> 
+> v3?  I didn't see V2.  Please also CC posts to the relevant mailing
+> lists for the subsystem (lkml in this case).
+
+Sure, will do.
+
+Pawel
