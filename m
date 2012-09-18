@@ -1,27 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Sep 2012 16:04:49 +0000
-Subject: [PATCH 01/24] ARM: shmobile: use __iomem pointers for MMIO
-In-Reply-To: <20120918115038.GB3198@verge.net.au>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <201209180831.06572.arnd@arndb.de> <20120918115038.GB3198@verge.net.au>
-Message-ID: <201209181604.49562.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 18 Sep 2012 17:09:09 +0100
+Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
+In-Reply-To: <1347983056.11116.11.camel@hornet>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
+ <20120918150212.GA12543@opensource.wolfsonmicro.com>
+ <1347983056.11116.11.camel@hornet>
+Message-ID: <20120918160909.GA15587@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012, Simon Horman wrote:
-> > I agree it's not nice to have to do this, but this is largely because
-> > of shmobile doing things differently from all other ARM platforms, on
-> > which the respective patches tend to clean up things and reduce the
-> > number of type casts.
-> > 
-> > The only alternative I can see is for shmobile to introduce its own
-> > mach/io.h file with the relaxed type checking, but that would only
-> > defer the problem until the point where you want shmobile to be part
-> > of the common multiplatform kernel binary.
-> 
-> If it is needed in the long term, then I'm happy with it going in now.
-> Could you remove the portion that Paul objected to?
+On Tue, Sep 18, 2012 at 04:44:16PM +0100, Pawel Moll wrote:
 
-Yes, I already did that.
+> Well, that's what it really is. The config API sends a request "set xyz
+> uV" to the microcontrollers. And the micro can (at least in theory) get
+> you any voltage within the min/max limits by whatever means it has (at
+> least some of the daugtherboards use micro's DAC to adjust reference
+> voltage for a DC/DC converter with a feedback loop using ADC).
 
-	Arnd
+And the microcontroller is incapable of telling us what it supports, or
+even what's physically present?
+
+> But fair enough, I should have done better work in describing this.
+
+So this is going to break interoperation with a bunch of consumer
+drivers that rely on being able to tell what voltages are supported.
+The key thing for them would be that regulator_is_supported_voltage()
+works, currently it relies on list_voltage() as that's the only way to
+do that right now.
+
+> v3 to follow.
+
+v3?  I didn't see V2.  Please also CC posts to the relevant mailing
+lists for the subsystem (lkml in this case).
