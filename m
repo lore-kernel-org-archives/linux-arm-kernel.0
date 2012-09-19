@@ -1,44 +1,48 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 19 Sep 2012 18:02:51 +0200
-Subject: [PATCH 3/4] mfd: dbx500: Provide a more accurate smp_twd clock
-In-Reply-To: <1346415691-13371-4-git-send-email-ulf.hansson@stericsson.com>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
- <1346415691-13371-4-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20120919160251.GM28670@sortiz-mobl>
+Date: Wed, 19 Sep 2012 18:03:02 +0200
+Subject: [rtc-linux] [PATCH 1/1] drivers/rtc/rtc-ab8500.c: Revoke Device
+ Tree enablement
+In-Reply-To: <CACRpkdbXwLXoWL+PS-wJ9cbztC-jWhyc=vr+98ffg70f6coaiQ@mail.gmail.com>
+References: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
+ <1344527828-6283-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZa-72QogrZ-P5jbDHTTX64babZo3ydjzfgC-4LWUBfMg@mail.gmail.com>
+ <20120831110818.GA5962@gmail.com>
+ <CACRpkdat3zj_47r7ENz7Qv3N8cNOSKDV+k5em9DjOhkNycy9gQ@mail.gmail.com>
+ <CACRpkdbXwLXoWL+PS-wJ9cbztC-jWhyc=vr+98ffg70f6coaiQ@mail.gmail.com>
+Message-ID: <20120919160302.GN28670@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Linus,
 
-On Fri, Aug 31, 2012 at 02:21:30PM +0200, Ulf Hansson wrote:
-> From: Michel Jaouen <michel.jaouen@stericsson.com>
-> 
-> The local timer clock is based on ARM subsystem clock. This patch
-> obtains a more exact value of that clock by reading PRCMU registers.
-> Using this increases the accuracy of the local timer events.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
-> Signed-off-by: Michel Jaouen <michel.jaouen@stericsson.com>
-> ---
->  drivers/mfd/db8500-prcmu.c       |   42 ++++++++++++++++++++++++++++++++++++++
->  drivers/mfd/dbx500-prcmu-regs.h  |    4 +++-
->  include/linux/mfd/dbx500-prcmu.h |    1 +
->  3 files changed, 46 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index 4f74529..e7f9539 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -418,6 +418,9 @@ static struct {
->  
->  static atomic_t ac_wake_req_state = ATOMIC_INIT(0);
->  
-> +/* Functions definition */
-> +static void compute_armss_rate(void);
-> +
-I'm not a big fan of forward declarations, but I still applied your patch to
-my for-next branch. Thanks.
+On Sat, Sep 01, 2012 at 01:28:34AM +0200, Linus Walleij wrote:
+> On Sat, Sep 1, 2012 at 1:27 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Fri, Aug 31, 2012 at 1:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> On Tue, Aug 14, 2012 at 10:32:02AM +0200, Linus Walleij wrote:
+> >>> On Thu, Aug 9, 2012 at 5:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >>>
+> >>> > All AB8500 devices are now registered via MFD core, so Device Tree
+> >>> > capability is no longer required for probing. Here we pull the DT
+> >>> > match table to ensure we're no longer probed during Device Tree
+> >>> > start-up.
+> >>> >
+> >>> > CC: Alessandro Zummo <a.zummo@towertech.it>
+> >>> > CC: rtc-linux at googlegroups.com
+> >>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>>
+> >>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> I'm guessing we still need Alessandro's Ack?
+> >
+> > Well, usually we have Andrew Morton merging patches for RTC, so
+> > put him on CC.
+> >
+> > If I was the MFD maintainer I'd just merge this though, it's quite
+> > obvious.
+> >
+> > Sam: do you agree?
+I'd love to see the patch first :)
+Could you please bounce it to me ?
 
 Cheers,
 Samuel.
