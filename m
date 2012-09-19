@@ -1,64 +1,31 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 19 Sep 2012 16:02:51 +0530
-Subject: [PATCH 1/2] ARM: dts: omap: add *reg* property for ocp2scp
-In-Reply-To: <1348050772-27819-1-git-send-email-kishon@ti.com>
-References: <1348050772-27819-1-git-send-email-kishon@ti.com>
-Message-ID: <1348050772-27819-2-git-send-email-kishon@ti.com>
+Date: Wed, 19 Sep 2012 16:02:50 +0530
+Subject: [PATCH 0/2] ARM: dts: Add subnode for ocp2scp
+Message-ID: <1348050772-27819-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*reg* property for ocp2scp was previously obtained from ti,hwmods property.
-But that is now explicitly added to the dt node. Also updated the
-documentation with *reg* info.
+This patch series contains a patch to explicitly add reg property
+to the ocp2scp dt node and a patch to add the subnode for ocp2scp
+(omap-usb2).
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
+Since the original patch series that adds ocp2scp driver and ocp2scp
+data are merged in arm-soc, I'm sending this patch series based on the
+same tree.
+
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+
+But Benoit already pointed out that there's going to be merge conflicts
+as he has sent a bunch of dt data patches to linux-omap (devel-dt) tree.
+So now I'm not sure how that can be actually avoided.
+
+Kishon Vijay Abraham I (2):
+  ARM: dts: omap4: add *reg* property for ocp2scp
+  ARM: dts: omap: Add omap-usb2 dt data
+
  .../devicetree/bindings/bus/omap-ocp2scp.txt       |   14 ++++++++++++++
- arch/arm/boot/dts/omap4.dtsi                       |    3 ++-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap4.dtsi                       |    8 +++++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-index d2fe064..1d5f203 100644
---- a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-+++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-@@ -2,9 +2,23 @@
- 
- properties:
- - compatible : Should be "ti,omap-ocp2scp"
-+- reg : Address and length of the register set for the device
- - #address-cells, #size-cells : Must be present if the device has sub-nodes
- - ranges : the child address space are mapped 1:1 onto the parent address space
- - ti,hwmods : must be "ocp2scp_usb_phy"
- 
- Sub-nodes:
- All the devices connected to ocp2scp are described using sub-node to ocp2scp
-+
-+ocp2scp at 4a0ad000 {
-+	compatible = "ti,omap-ocp2scp";
-+	reg = <0x4a0ad000 0x1f>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+	ti,hwmods = "ocp2scp_usb_phy";
-+	subnode1 {
-+	};
-+	subnode2 {
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 8a780b2..4fbb9dc 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -296,8 +296,9 @@
- 			ti,hwmods = "dmic";
- 		};
- 
--		ocp2scp {
-+		ocp2scp at 4a0ad000 {
- 			compatible = "ti,omap-ocp2scp";
-+			reg = <0x4a0ad000 0x1f>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
 -- 
 1.7.9.5
