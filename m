@@ -1,53 +1,75 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 19 Sep 2012 20:02:37 +0900
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <m3627aguhl.fsf@pullcord.laptop.org>
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1587150.uFGRdL0s8e@amdc1227> <m3a9wmgvip.fsf@pullcord.laptop.org>
- <1907099.4JSZthrgh2@amdc1227> <m3627aguhl.fsf@pullcord.laptop.org>
-Message-ID: <5059A64D.6000700@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Sep 2012 13:02:56 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <201209191250.54418.marex@denx.de>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <20120919031526.GC6460@S2100-06.ap.freescale.net>
+ <50599F96.5040600@free-electrons.com> <201209191250.54418.marex@denx.de>
+Message-ID: <5059A660.9080302@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marek,
 
-On 09/19/2012 07:47 PM, Chris Ball wrote:
-> Hi,
-> 
-> On Wed, Sep 19 2012, Tomasz Figa wrote:
->> We could just check if the regulator provides the capability to change the 
->> voltage.
+Le 19/09/2012 12:50, Marek Vasut a ?crit :
+>> Le 19/09/2012 05:15, Shawn Guo a ?crit :
+>>> On Wed, Sep 19, 2012 at 12:37:17AM +0200, Marek Vasut wrote:
+>>>> Don't load the FEC MAC address from OCOTP, but use the one supplied
+>>>> via device tree by U-Boot. This is the preferred way, every DT-capable
+>>>> bootloader does set up "mac-address" and "local-mac-address" properties
+>>>> into the DT passed to the kernel.
+>>>
+>>> Ok, since you are the maintainer of m28evk board, it could be your call
+>>> to do so.  While for imx28-evk, the kernel at least runs with bootlets
+>>> which is not DT capable.
+>>>
+>>>> Signed-off-by: Marek Vasut <marex@denx.de>
+>>>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+>>>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>>>> ---
+>>>>
+>>>>  arch/arm/mach-mxs/mach-mxs.c |    2 --
+>>>>  1 file changed, 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+>>>> index 170a930..71d47f5 100644
+>>>> --- a/arch/arm/mach-mxs/mach-mxs.c
+>>>> +++ b/arch/arm/mach-mxs/mach-mxs.c
+>>>> @@ -255,8 +255,6 @@ static void __init imx28_evk_post_init(void)
+>>>>
+>>>>  static void __init m28evk_init(void)
+>>>>  {
+>>>>
+>>>> -	update_fec_mac_prop(OUI_DENX);
+>>>> -
+>>>
+>>> Since it's the only user of OUI_DENX, can we remove enum mac_oui
+>>> completely and make update_fec_mac_prop a fsl specific call?
 >>
->> I don't see any direct way of querying the regulator for provided 
->> capabilities (correct me if I'm just blind), but calling 
->> regulator_count_voltages() on the regulator and checking if the returned 
->> value is 1 should be enough to assume that the regulator is fixed.
+>> I have a patch on the way that adds the Crystalfontz OUI for the
+>> CFA-10049, so it will be quite useful to me in the future.
 > 
-> Sounds good, I agree.  Are you able to test that the obvious patch below
-> works on your fixed-regulator board?
-> 
-> Jaehoon and Adrian, can you think of any reason why we shouldn't replace
-> MMC_CAP2_BROKEN_VOLTAGE with the regulator_count_voltages() call below?
-> Thanks.
-I think this is better than using MMC_CAP2_BROKEN_VOLTAGE.
-I tested with this..and working fine.
+> Do you use U-Boot on that board?
 
-Best Regards,
-Jaehoon Chung
-> 
-> 
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index 044cd01..a3cc740 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1132,7 +1132,7 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
->  		 */
->  		voltage = regulator_get_voltage(supply);
->  
-> -		if (mmc->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
-> +		if (regulator_count_voltages(supply) == 1)
->  			min_uV = max_uV = voltage;
->  
->  		if (voltage < 0)
-> 
+No, we use barebox for it. And since the CFA-10049 is an expansion board
+to the CFA-10036, we only have support for the CFA-10036 in barebox, and
+support the devices present in the CFA-10049 through loading a different
+device tree.
+
+So basically, I'd like to avoid to get the mac from the ocotp in
+barebox, since I won't need it if the CFA-10049 isn't plugged in.
+
+Moreover, I've found no clue that barebox adds the local-mac-address or
+the mac-address fields to the device tree, so this assumption seems
+quite u-boot specific.
+
+tl;dr: I found the current way of handling the mac address very
+convenient, and I wouldn't like to see it removed.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
