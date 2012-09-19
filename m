@@ -1,64 +1,49 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 19 Sep 2012 01:42:01 -0400
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <1346748609-11115-2-git-send-email-t.figa@samsung.com> (Tomasz
- Figa's message of "Tue, 04 Sep 2012 10:50:05 +0200")
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1346748609-11115-2-git-send-email-t.figa@samsung.com>
-Message-ID: <m38vc6k1qu.fsf@pullcord.laptop.org>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 19 Sep 2012 13:39:34 +0930
+Subject: [kvmarm] [PATCH 05/15] ARM: Expose PMNC bitfields for KVM use
+In-Reply-To: <20120918130821.GN32204@mudshark.cambridge.arm.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153502.21241.13218.stgit@ubuntu>
+ <20120918130821.GN32204@mudshark.cambridge.arm.com>
+Message-ID: <87fw6epsap.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Sep 04 2012, Tomasz Figa wrote:
-> Some boards use fixed voltage regulator for vmmc supply (e.g. for eMMC
-> memories). MMC_CAP2_BROKEN_VOLTAGE must be enabled for them to operate
-> correctly.
+Will Deacon <will.deacon@arm.com> writes:
+> On Sat, Sep 15, 2012 at 04:35:02PM +0100, Christoffer Dall wrote:
+>> From: Rusty Russell <rusty.russell@linaro.org>
+>> 
+>> We want some of these for use in KVM, so pull them out of
+>> arch/arm/kernel/perf_event_v7.c into their own asm/perf_bits.h.
+>> 
+>> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>>  arch/arm/include/asm/perf_bits.h |   56 ++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kernel/perf_event_v7.c  |   51 +----------------------------------
+>>  2 files changed, 57 insertions(+), 50 deletions(-)
+>>  create mode 100644 arch/arm/include/asm/perf_bits.h
 >
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Chris Ball <cjb@laptop.org>
-> CC: linux-mmc at vger.kernel.org
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  Documentation/devicetree/bindings/mmc/mmc.txt | 1 +
->  drivers/mmc/host/sdhci-s3c.c                  | 3 +++
->  2 files changed, 4 insertions(+)
+> I don't like this I'm afraid. These bit definitions, although useful for
+> kvm, are only applicable to ARMv7 PMUs. Perf does a reasonable job of
+> separating the low-level CPU-specific code and adding the v7 definitions
+> into their own global header feels like a step backwards. I also want to
+> move a load of this into drivers/ at some point and this won't help with
+> that effort.
 >
-> diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-> index 8a6811f..ecbde68 100644
-> --- a/Documentation/devicetree/bindings/mmc/mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-> @@ -16,6 +16,7 @@ Optional properties:
->  - wp-inverted: when present, polarity on the wp gpio line is inverted
->  - non-removable: non-removable slot (like eMMC)
->  - max-frequency: maximum operating clock frequency
-> +- broken-voltage: vmmc regulator does not allow voltage control
->  
->  Example:
->  
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 445910e..39715b8 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -443,6 +443,9 @@ static int __devinit sdhci_s3c_parse_dt(struct device *dev,
->  	if (!ourhost->gpios)
->  		return -ENOMEM;
->  
-> +	if (of_get_property(node, "broken-voltage", 0))
-> +		pdata->host_caps2 |= MMC_CAP2_BROKEN_VOLTAGE;
-> +
->  	/* get the card detection method */
->  	if (of_get_property(node, "broken-cd", 0)) {
->  		pdata->cd_type = S3C_SDHCI_CD_NONE;
+> Is KVM just using this for world switch? If so, why does it care about the
+> bit definitions (and what do you do for things like debug regs)? Is there
+> anything I could add to perf that you could call instead?
 
-Is there a reason we can't make this a property on the regulator instead?
+No, we need these definitions if we ever want to actually implement
+PMU for the guest.[1]
 
-Thanks,
+But we don't do this yet, so you can defer this patch until then if you
+want.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Cheers,
+Rusty.
+[1] Which we should do, since you NAKed the patch which would allow the
+    guest to detect that we don't have a PMU, insisting that "all A15s have
+    a PMU", despite the fact that we don't.  I assume this means you're
+    busy implementing it right now :)
