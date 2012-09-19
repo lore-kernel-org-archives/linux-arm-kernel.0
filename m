@@ -1,65 +1,64 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 19 Sep 2012 08:55:11 +0200
-Subject: [PATCH] clk: Make the managed clk functions generically available
-In-Reply-To: <20120918204014.GY12245@n2100.arm.linux.org.uk>
-References: <20120910003913.GM13739@n2100.arm.linux.org.uk>
- <504F4E36.20309@metafoo.de>
- <1347375033.27206.3.camel@sauron.fi.intel.com>
- <504FE633.2090304@snapgear.com> <5050F3DB.1050202@metafoo.de>
- <20120915213151.GM12245@n2100.arm.linux.org.uk>
- <20120918080037.GA15982@avionic-0098.mockup.avionic-design.de>
- <20120918093536.GV12245@n2100.arm.linux.org.uk>
- <20120918112555.GA21004@avionic-0098.mockup.avionic-design.de>
- <20120918204014.GY12245@n2100.arm.linux.org.uk>
-Message-ID: <20120919065510.GA3213@avionic-0098.mockup.avionic-design.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 19 Sep 2012 09:58:43 +0300
+Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA
+ more precisely
+In-Reply-To: <20120918124918.GK2505@amd.com>
+References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+ <20120918124918.GK2505@amd.com>
+Message-ID: <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 09:40:14PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 18, 2012 at 01:25:55PM +0200, Thierry Reding wrote:
-> > On Tue, Sep 18, 2012 at 10:35:36AM +0100, Russell King - ARM Linux wrote:
-> > > On Tue, Sep 18, 2012 at 10:00:37AM +0200, Thierry Reding wrote:
-> > > > On Sat, Sep 15, 2012 at 10:31:52PM +0100, Russell King - ARM Linux wrote:
-> > > > > On Wed, Sep 12, 2012 at 10:43:07PM +0200, Lars-Peter Clausen wrote:
-> > > > > > I wouldn't mind having this merged sooner rather than later, there is at least
-> > > > > > one driver in next which is currently broken due to the missing devm_clk_get.
-> > > > > > Russell what's your plan for the patch? Maybe under the given circumstances it
-> > > > > > makes sense to let it go through the m68k tree.
-> > > > > 
-> > > > > Ok, I've merged it but there was no indication in the patch that it was
-> > > > > supposed to be a fix... there's no cc: to stable.  Does it need to go to
-> > > > > stable?  When was this brokenness introduced?  What's the story for the
-> > > > > m68k bit?
+Hi Joerg,
+
+On Tue, 18 Sep 2012 14:49:18 +0200
+Joerg Roedel <joerg.roedel@amd.com> wrote:
+
+> On Wed, Aug 29, 2012 at 09:55:30AM +0300, Hiroshi Doyu wrote:
+> > The following APIs are needed for us to support the legacy Tegra
+> > memory manager for devices("NvMap") with *DMA mapping API*.
 > 
-> I said abouve "I've merged it" - that means, I've put it in my
-> tree...
-> 
-> > > > What tree is this supposed to go through? I've checked your ARM tree as
-> > > > well as Mike's clock tree but neither seem to carry this patch. The
-> > > > reason I ask is because I want to take a patch series that converts the
-> > > > Unicore32 PWM code to the PWM framework into linux-next but it depends
-> > > > on this patch as well.
-> > > 
-> > > It /is/ in my tree (you'll notice that it is in linux-next.)  You're
-> > > probably looking at my Linaro tree instead, which doesn't carry
-> > > anything which isn't about to be sent to Linus.
+> Maybe I am not understanding the need completly. Can you elaborate on
+> why this is needed for legacy Tegra?
+
+Actually not for legacy but it's necessary to replace homebrewed
+in-kernel API(not upstreamed) with the standard ones. The homebrewed
+in-kernel API has been used for the abvoe nvmap as its backend. The
+homebrewed ones are being replaced with the standard ones, IOMMU-API,
+DMA-API and dma-buf, mainly for transition purpose. I found that some
+missing features in DMA-API for that. I posted since other SoCs may
+have the similiar requirements, (1) To specify IOVA address at
+allocation, and (2) To have IOVA allocation and mapping separately.
+
+> > New API:
 > > 
-> > I must be blind then. next-20120918 doesn't have it. And looking at your
-> > tree here[0] doesn't show the commit either.
+> >  ->iova_alloc(): To allocate IOVA area.
+> >  ->iova_alloc_at(): To allocate IOVA area at specific address.
+> >  ->iova_free():  To free IOVA area.
+> > 
+> >  ->map_page_at(): To map page at specific IOVA.
 > 
-> Hmm, it's possible I didn't push the tree out... well, I have done so
-> now, so it should be visible from tonight onwards and should be in
-> -next sometime during the next couple of days (it seems to take a
-> couple of days between me pushing stuff out one evening to stuff
-> appearing in -next because of the timezones and timing of sfr's pulls.)
+> This sounds like a layering violation. The situation today is as
+> follows:
+> 
+> 	DMA-API   : Handle DMA-addresses including an address allocator
+> 	IOMMU-API : Full control over DMA address space, no address
+> 	            allocator
+> 
+> So what you want to do add to the DMA-API is already part of the
+> IOMMU-API.
+>
+> Here is my suggestion what you can do instead of extending the DMA-API.
+> You can use the IOMMU-API to initialize the device address space with
+> any mappings at the IOVAs you need the mappings. In the end you allocate
+> another free range in the device address space and use that to satisfy
+> DMA-API allocations. Any reason why that could not work?
 
-Okay, I see it both in your tree and in linux-next now. Thanks!
+I guess that it would work. Originally I thought that using DMA-API
+and IOMMU-API together in driver might be kind of layering violation
+since IOMMU-API itself is used in DMA-API. Only DMA-API used in driver
+might be cleaner. Considering that DMA API traditionally handling
+*anonymous* {bus,iova} address only, introducing the concept of
+specific address in DMA API may not be so encouraged, though.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/bc3925c9/attachment.sig>
+It would be nice to listen how other SoCs have solved similar needs.
