@@ -1,49 +1,65 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 20 Sep 2012 10:53:11 +0200
-Subject: [RFC 0/6] pinctrl: samsung: Remove static platform-specific data
-Message-ID: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
+From: takacs.aron@infracont.hu (=?ISO-8859-2?Q?Tak=E1cs_=C1ron?=)
+Date: Wed, 19 Sep 2012 09:23:44 +0200
+Subject: Fwd: PXA270 flash
+In-Reply-To: <505970C1.7060804@infracont.hu>
+References: <505970C1.7060804@infracont.hu>
+Message-ID: <50597300.1060707@infracont.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC series is a work on replacing static platform-specific data in
-pinctrl-samsung driver with data dynamically parsed from device tree.
 
-It aims at reducing the SoC-specific part of the driver and thus the
-amount of modifications to driver sources when adding support for next
-SoCs (like Exynos4x12).
+Hello,
 
-Furthermore, moving definitions of pin banks to device tree will allow
-to simplify GPIO and GEINT specification to a format similar to used
-previously by gpiolib-based implementation, using a phandle to the bank
-and pin index inside the bank, e.g.
-	gpios = <&gpa1 4 0>;
-	interrupt-parent = <&gpa1>;
-	interrupts = <4 0>;
+I have the following problem:
+I have been using a PXA270 based board (Toradex Colibri) with linux
+-.6.35.5. Now I decided to move to linux-3.6-rc4. At first I made a
+simple 'make colibri_pxa270_defconfig'+ 'make vmlinux' to build the
+kernel. It builds ok, it can be started from u-boot, but it doesn't find
+the onboard flash. The boot messages are the following:
 
-Any comments are welcome.
+[    0.697232] physmap platform flash device: 02000000 at 00000000
+[    1.653417] CFI: Found no physmap-flash.0 device at location zero
+[    1.664090] physmap-flash physmap-flash.0: map_probe failed
 
-TODO:
- - bindings documentation
- - per-bank GPIO and GEINT specification
+I don't know if it is related to the flash problem but there is another
+interesting message right at the beginning of the boot process:
 
-Tomasz Figa (6):
-  pinctrl: exynos: Parse wakeup-eint parameters from DT
-  pinctrl: samsung: Parse pin banks from DT
-  pinctrl: exynos: Remove static platform-specific data
-  pinctrl: samsung: Parse bank-specific eint offset from DT
-  ARM: dts: exynos4210: Remove legacy gpio nodes
-  ARM: dts: exynos4210: Add platform-specific descriptions for pin
-    controllers
+[    0.000000] Booting Linux on physical CPU 0
+[    0.000000] Linux version 3.6.0-rc4 (roni at Roni-laptop) (gcc version
+4.6.3 (S2
+[    0.000000] BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc
+space   <<<<<<<<<
+[    0.000000] Run Mode clock: 208.00MHz (*16)
+[    0.000000] Turbo Mode clock: 520.00MHz (*2.5, active)
+[    0.000000] Memory clock: 208.00MHz (/2)
+[    0.000000] System bus clock: 208.00MHz
 
- arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi | 605 ++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi       |   2 +
- arch/arm/boot/dts/exynos4210.dtsi               | 241 +---------
- drivers/pinctrl/pinctrl-exynos.c                | 124 ++---
- drivers/pinctrl/pinctrl-exynos.h                | 157 ------
- drivers/pinctrl/pinctrl-samsung.c               | 153 +++++-
- drivers/pinctrl/pinctrl-samsung.h               |  19 +-
- 7 files changed, 813 insertions(+), 488 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
 
--- 
-1.7.12
+When I run the 2.6.35.5 kernel on the same board, it finds the flash and
+the partitions on it too.
+Information: The Colibri board has two 16bit flash chips put on the
+32bit bus (parallel).
+I have traced down the problem to the flash probing routine
+'cfi_qry_mode_on()'. With the 2.6.35.5 kernel it writes 0xf000f0 and
+then 0x980098 to the flash to put it into query mode (cfi_util.c:57-58).
+Then it reads (in function cfi_qry_present() at cfi_utils:37-39)
+0x510051, 0x520052, 0x590059 from the flash. 51, 52, 59 are the ascii
+values for 'Q', 'R', and 'Y' as expected.
+In the case of the 3.6-rc4 kernel the values given to the
+'__raw_writel()' function@map.h:421 are 0xf000f0 and 0x980098. It
+seems to be ok.
+But the values read back are: 0x510000, 0x520000, 0x590000. I think
+these should be 0x510051, 0x520052, 0x590059 as are in the case of the
+2.6.35.5 kernel.
+
+Now, I am stuck with it. I have tried it with linux-3.5.4 and
+linux-3.6-rc6, too. The situation is the same.
+Could somebody please help me solving this? I don't know what I am doing
+wrong.
+Thank you for your help!
+
+Best regards,
+
+     ?ron
+
+p.s.: Sorry for my poor English, I hope you understand the problem!
