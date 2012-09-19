@@ -1,88 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Sep 2012 09:44:24 -0700
-Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
-In-Reply-To: <20120919133648.GB6106@arwen.pp.htv.fi>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <20120916203850.GI4521@atomide.com>
- <20120917212506.GB11762@atomide.com>
- <201209191335.48051.arnd@arndb.de>
- <20120919133648.GB6106@arwen.pp.htv.fi>
-Message-ID: <20120919164424.GD11762@atomide.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 19 Sep 2012 18:56:00 +0200
+Subject: [PATCH 3/4] mfd: dbx500: Provide a more accurate smp_twd clock
+In-Reply-To: <20120919164231.17033.27762@nucleus>
+References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
+ <1346415691-13371-4-git-send-email-ulf.hansson@stericsson.com>
+ <20120919160251.GM28670@sortiz-mobl>
+ <20120919164231.17033.27762@nucleus>
+Message-ID: <20120919165600.GP28670@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [120919 06:42]:
-> On Wed, Sep 19, 2012 at 01:35:47PM +0000, Arnd Bergmann wrote:
-> > On Monday 17 September 2012, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [120916 13:39]:
-> > > > * Arnd Bergmann <arnd@arndb.de> [120915 13:15]:
-> > > > > On Saturday 15 September 2012, Tony Lindgren wrote:
-> > > > > > With my patches, this is now all omap1 specific and
-> > > > > > moved to arch/arm/mach-omap1/include/mach/hardware.h.
-> > > > > > It's probably easiest to just update this patch on
-> > > > > > top of the hardware.h changes I've done.
-> > > > > 
-> > > > > Yes, sounds good. Do you want to send a patch for that
-> > > > > and let me drop this one then?
-> > > > 
-> > > > Yes I can pick this one and update it against one of my
-> > > > branches to avoid merge conflicts.
-> > > 
-> > > This applies against mach-omap1/include/mach/hardware.h
-> > > with some fuzz so no issues there.
-> > > 
-> > > But I think we should not apply it as these are physical
-> > > addresses, not virtual addresses for omap1.
-> > 
-> > Right, I misread what is actually going on here because the
-> > only driver I looked at treated the address as a virtual
-> > address pointer.
-> > 
-> > > We have IOMEM already in use for omap_read/write because of:
-> > > 
-> > > #define OMAP1_IO_ADDRESS(pa)    IOMEM((pa) - OMAP1_IO_OFFSET)
-> > > 
-> > > I think the right solution is to eventually get rid of
-> > > omap_read/write for omap1 also and replace them with ioremap
-> > > + readl/writel.
-> > 
-> > Agreed.
+Hi Mike,
 
-OK.
- 
-> > > Or am I missing something?
+On Wed, Sep 19, 2012 at 09:42:31AM -0700, Mike Turquette wrote:
+> Quoting Samuel Ortiz (2012-09-19 09:02:51)
+> > Hi Ulf,
 > > 
-> > I did not see any new warnings for omap1, but I did see this
-> > on omap2plus_defconfig:
+> > On Fri, Aug 31, 2012 at 02:21:30PM +0200, Ulf Hansson wrote:
+> > > From: Michel Jaouen <michel.jaouen@stericsson.com>
+> > > 
+> > > The local timer clock is based on ARM subsystem clock. This patch
+> > > obtains a more exact value of that clock by reading PRCMU registers.
+> > > Using this increases the accuracy of the local timer events.
+> > > 
+> > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > > Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
+> > > Signed-off-by: Michel Jaouen <michel.jaouen@stericsson.com>
+> > > ---
+> > >  drivers/mfd/db8500-prcmu.c       |   42 ++++++++++++++++++++++++++++++++++++++
+> > >  drivers/mfd/dbx500-prcmu-regs.h  |    4 +++-
+> > >  include/linux/mfd/dbx500-prcmu.h |    1 +
+> > >  3 files changed, 46 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> > > index 4f74529..e7f9539 100644
+> > > --- a/drivers/mfd/db8500-prcmu.c
+> > > +++ b/drivers/mfd/db8500-prcmu.c
+> > > @@ -418,6 +418,9 @@ static struct {
+> > >  
+> > >  static atomic_t ac_wake_req_state = ATOMIC_INIT(0);
+> > >  
+> > > +/* Functions definition */
+> > > +static void compute_armss_rate(void);
+> > > +
+> > I'm not a big fan of forward declarations, but I still applied your patch to
+> > my for-next branch. Thanks.
 > > 
-> > drivers/watchdog/omap_wdt.c: In function 'omap_wdt_ioctl':
-> > drivers/watchdog/omap_wdt.c:222:4: error: passing argument 1 of '__raw_readw' makes pointer from integer without a cast [-Werror]
-> > arch/arm/include/asm/io.h:71:90: note: expected 'const volatile void *' but argument is of type 'unsigned int'
-> > 
-> > It seems I misinterpreted this, and it's actually a bug in the watchdog
-> > driver that should be fixed using this patch instead (and backport it
-> > to stable)
-> > 
-> > diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-> > index fceec4f..7b45802 100644
-> > --- a/drivers/watchdog/omap_wdt.c
-> > +++ b/drivers/watchdog/omap_wdt.c
-> > @@ -218,9 +218,11 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
-> >  	case WDIOC_GETSTATUS:
-> >  		return put_user(0, (int __user *)arg);
-> >  	case WDIOC_GETBOOTSTATUS:
-> > +#ifdef CONFIG_ARCH_OMAP1
-> >  		if (cpu_is_omap16xx())
-> > -			return put_user(__raw_readw(ARM_SYSST),
-> > +			return put_user(omap_readw(ARM_SYSST),
-> >  					(int __user *)arg);
-> > +#endif
 > 
-> indeed... my bad. I agree this should be changed by something better
-> though.
+> Samuel,
+> 
+> Not sure if you were Cc'd on the rest of the patches in this series but
+> after some discussion (see patch #1) I took all four patches into
+> clk-next, including the MFD change.  This was done first week of
+> September.  At this point those patches have shifted into my stable
+> branch that I have promised not to rebase (for arm-soc dependencies).
+> 
+> Are you OK with me taking this patch through the clk-next branch?
+Yes, I'm fine with it.
 
-Yes that's wrong.
+Cheers,
+Samuel.
 
-Regards,
-
-Tony
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
