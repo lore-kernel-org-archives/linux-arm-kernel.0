@@ -1,51 +1,82 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Sep 2012 00:00:39 -0700
-Subject: [PATCH 0/5] Trim down mach includes in MSM drivers
-Message-ID: <1348038044-1790-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 19 Sep 2012 00:00:44 -0700
+Subject: [PATCH 5/5] ARM: msm: Remove unused cpu.h header file
+In-Reply-To: <1348038044-1790-1-git-send-email-sboyd@codeaurora.org>
+References: <1348038044-1790-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1348038044-1790-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series trims the usage of mach includes in MSM 
-drivers. In particular it targets the msm_iomap.h header
-file and completely removes the cpu.h header file. After
-this series we only have one driver using the iomap.h file
-outside of mach-msm. Once that driver is moved to be
-a platform device we can make msm_iomap.h private to mach-msm.
+This header file is no longer used now that the msm timer.c and
+the gpio driver have been made more runtime aware. Remove the
+header file so no future users pop-up.
 
-This series is based on linux-next-20120917, which has the msm
-DT timer patches (the other user of cpu.h in MSM).
-
-Patches 2 and 3 can probably be routed the appropriate subsystem
-trees if desired. It would be good if patch 1, 4, and 5 go
-through the MSM tree, so it may be easier to just put all these
-patches through the MSM tree.
-
-Stephen Boyd (5):
-  ARM: msm: Move dma.h #defines that are private to dma.c
-  mmc: msm_sdcc: Remove unnecessary include
-  video: msm: Remove useless mach/* includes
-  gpio: Make gpio-msm-v1 into a platform driver
-  ARM: msm: Remove unused cpu.h header file
-
- arch/arm/mach-msm/board-halibut.c    |   1 +
- arch/arm/mach-msm/board-msm7x30.c    |   1 +
- arch/arm/mach-msm/board-qsd8x50.c    |   1 +
- arch/arm/mach-msm/board-trout.c      |   1 +
- arch/arm/mach-msm/devices-msm7x00.c  |  31 +++++
- arch/arm/mach-msm/devices-msm7x30.c  |  31 +++++
- arch/arm/mach-msm/devices-qsd8x50.c  |  31 +++++
- arch/arm/mach-msm/devices.h          |   4 +
- arch/arm/mach-msm/dma.c              |  26 +++++
- arch/arm/mach-msm/include/mach/cpu.h |  54 ---------
- arch/arm/mach-msm/include/mach/dma.h |  26 -----
- drivers/gpio/gpio-msm-v1.c           | 220 ++++++++++++++++++++++++-----------
- drivers/mmc/host/msm_sdcc.c          |   1 -
- drivers/video/msm/mddi.c             |   3 -
- drivers/video/msm/mdp.c              |   1 -
- drivers/video/msm/mdp_hw.h           |   1 -
- 16 files changed, 276 insertions(+), 157 deletions(-)
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/include/mach/cpu.h | 54 ------------------------------------
+ 1 file changed, 54 deletions(-)
  delete mode 100644 arch/arm/mach-msm/include/mach/cpu.h
 
+diff --git a/arch/arm/mach-msm/include/mach/cpu.h b/arch/arm/mach-msm/include/mach/cpu.h
+deleted file mode 100644
+index a9481b0..0000000
+--- a/arch/arm/mach-msm/include/mach/cpu.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- */
+-
+-#ifndef __ARCH_ARM_MACH_MSM_CPU_H__
+-#define __ARCH_ARM_MACH_MSM_CPU_H__
+-
+-/* TODO: For now, only one CPU can be compiled at a time. */
+-
+-#define cpu_is_msm7x01()	0
+-#define cpu_is_msm7x30()	0
+-#define cpu_is_qsd8x50()	0
+-#define cpu_is_msm8x60()	0
+-#define cpu_is_msm8960()	0
+-
+-#ifdef CONFIG_ARCH_MSM7X00A
+-# undef cpu_is_msm7x01
+-# define cpu_is_msm7x01()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_MSM7X30
+-# undef cpu_is_msm7x30
+-# define cpu_is_msm7x30()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_QSD8X50
+-# undef cpu_is_qsd8x50
+-# define cpu_is_qsd8x50()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_MSM8X60
+-# undef cpu_is_msm8x60
+-# define cpu_is_msm8x60()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_MSM8960
+-# undef cpu_is_msm8960
+-# define cpu_is_msm8960()	1
+-#endif
+-
+-#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
