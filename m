@@ -1,42 +1,43 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 19 Sep 2012 18:04:48 +0100
-Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
-In-Reply-To: <20120918152430.GA5911@roeck-us.net>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
- <20120918152430.GA5911@roeck-us.net>
-Message-ID: <1348074288.11116.86.camel@hornet>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 19 Sep 2012 10:06:30 -0700
+Subject: [PATCH 20/24] input: rpcmouse: use __iomem pointers for MMIO
+In-Reply-To: <1347658492-11608-21-git-send-email-arnd@arndb.de>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <1347658492-11608-21-git-send-email-arnd@arndb.de>
+Message-ID: <20120919170630.GC16286@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-Thanks for your quick response (and apologies about me being delayed), I
-appreciate your time!
-
-On Tue, 2012-09-18 at 16:24 +0100, Guenter Roeck wrote:
-> and a highly unusual way of, as much as I understand of it, bypass the hwmon
-> infrastructure as much as possible.
-
-I can assure you that it wasn't my aim. Generally, my platform has a lot
-of small "control" devices providing one sensor each. And as they are
-separate from the device model point of view, I wanted them to be
-logically grouped around a single hwmon device (I was actually looking
-at the coretemp driver). But it's not a big deal, really.
-
-> I don't even understand what you are trying to do, much less why you don't
-> just use the existing infrastructure, and I don't have time to try to figure
-> it out. Maybe Jean has time to review this driver, but not me.
+On Fri, Sep 14, 2012 at 11:34:48PM +0200, Arnd Bergmann wrote:
+> ARM is moving to stricter checks on readl/write functions,
+> so we need to use the correct types everywhere.
 > 
-> So, no, for my part I don't think it would be a good idea to rush this driver
-> into 3.7.
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: linux-input at vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+> ---
+>  drivers/input/mouse/rpcmouse.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Really, I would suggest to submit a standard hwmon driver (there are lots of
-> examples out there).
+> diff --git a/drivers/input/mouse/rpcmouse.c b/drivers/input/mouse/rpcmouse.c
+> index 272dedd..21c60fe 100644
+> --- a/drivers/input/mouse/rpcmouse.c
+> +++ b/drivers/input/mouse/rpcmouse.c
+> @@ -42,7 +42,7 @@ static irqreturn_t rpcmouse_irq(int irq, void *dev_id)
+>  
+>  	x = (short) iomd_readl(IOMD_MOUSEX);
+>  	y = (short) iomd_readl(IOMD_MOUSEY);
+> -	b = (short) (__raw_readl(0xe0310000) ^ 0x70);
+> +	b = (short) (__raw_readl(IOMEM(0xe0310000)) ^ 0x70);
+>  
+>  	dx = x - rpcmouse_lastx;
+>  	dy = y - rpcmouse_lasty;
+> -- 
+> 1.7.10
+> 
 
-Sure thing, I'll quickly spin a simplified version and post it for
-review.
-
-Thanks!
-
-Pawel
+-- 
+Dmitry
