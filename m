@@ -1,103 +1,147 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 19 Sep 2012 17:00:29 +0530
-Subject: [PATCH 4/4] usb: phy: omap-usb2: enable 960Mhz clock for omap5
+Date: Wed, 19 Sep 2012 17:00:27 +0530
+Subject: [PATCH 2/4] usb: dwc3: Fix gadget pullup in SS mode
 In-Reply-To: <1348054229-27362-1-git-send-email-kishon@ti.com>
 References: <1348054229-27362-1-git-send-email-kishon@ti.com>
-Message-ID: <1348054229-27362-5-git-send-email-kishon@ti.com>
+Message-ID: <1348054229-27362-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"usb_otg_ss_refclk960m" is needed by usb2 phy present in omap5. For
-omap4, the clk_get of this clock will fail since it does not have this
-clock.
+From: Moiz Sonasath <m-sonasath@ti.com>
 
+For the gadget pullup functionality to work in
+SS mode it requires a particular sequence of
+toggling the run-stop bit. Here is the required
+sequence:
+
+- Set DCTL[31]
+- Clear DCTL[31]
+- Clear OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
+- Clear DCTL[8:5] = 0x00
+- Set DCTL[8:5] = 0x05
+- Wait 25 Ms
+- Set DCTL[31]
+- Set OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
+
+Tested rigourously the gadget pull-up functionality
+in bot HS and SS modes.
+
+Signed-off-by: Moiz Sonasath <m-sonasath@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/usb/usb-phy.txt |    3 +++
- drivers/usb/phy/omap-usb2.c                       |   28 ++++++++++++++++++++-
- 2 files changed, 30 insertions(+), 1 deletion(-)
+ drivers/usb/dwc3/gadget.c   |   21 +++++++++++++++------
+ drivers/usb/phy/omap-usb3.c |   16 ++++++++++++++++
+ include/linux/usb/phy.h     |   10 +++++++++-
+ 3 files changed, 40 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
-index 7c5fd89..d5626de 100644
---- a/Documentation/devicetree/bindings/usb/usb-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
-@@ -24,6 +24,9 @@ Required properties:
- add the address of control module phy power register until a driver for
- control module is added
+diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
+index 58fdfad..bcc0102 100644
+--- a/drivers/usb/dwc3/gadget.c
++++ b/drivers/usb/dwc3/gadget.c
+@@ -49,6 +49,7 @@
  
-+Optional properties:
-+ - has960mhzclk: should be added if the phy needs 960mhz clock
-+
- This is usually a subnode of ocp2scp to which it is connected.
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
++#include <linux/usb/otg.h>
  
- usb3phy at 4a084400 {
-diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
-index d36c282..d6612ba 100644
---- a/drivers/usb/phy/omap-usb2.c
-+++ b/drivers/usb/phy/omap-usb2.c
-@@ -146,6 +146,7 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
- 	struct omap_usb			*phy;
- 	struct usb_otg			*otg;
- 	struct resource			*res;
-+	struct device_node		*np = pdev->dev.of_node;
+ #include "core.h"
+ #include "gadget.h"
+@@ -1417,19 +1418,27 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
+ 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
+ 	if (is_on) {
+ 		if (dwc->revision <= DWC3_REVISION_187A) {
+-			reg &= ~DWC3_DCTL_TRGTULST_MASK;
+-			reg |= DWC3_DCTL_TRGTULST_RX_DET;
++			reg &= ~DWC3_DCTL_ULSTCHNGREQ_MASK;
++			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
++			reg |= DWC3_DCTL_ULSTCHNG_RX_DETECT;
++			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
++			mdelay(25);
++			reg |= DWC3_DCTL_RUN_STOP;
++			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
++			usb_phy_poweron(dwc->usb3_phy);
+ 		}
  
- 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
- 	if (!phy) {
-@@ -190,6 +191,15 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
+-		if (dwc->revision >= DWC3_REVISION_194A)
++		if (dwc->revision >= DWC3_REVISION_194A) {
+ 			reg &= ~DWC3_DCTL_KEEP_CONNECT;
+-		reg |= DWC3_DCTL_RUN_STOP;
++			reg |= DWC3_DCTL_RUN_STOP;
++			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
++		}
+ 	} else {
+ 		reg &= ~DWC3_DCTL_RUN_STOP;
++		dwc3_writel(dwc->regs, DWC3_DCTL, reg);
++		usb_phy_shutdown(dwc->usb3_phy);
  	}
- 	clk_prepare(phy->wkupclk);
  
-+	if (of_property_read_bool(np, "has960mhzclk")) {
-+		phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
-+		if (IS_ERR(phy->optclk)) {
-+			dev_err(&pdev->dev, "unable to get refclk960m\n");
-+			return PTR_ERR(phy->optclk);
-+		}
-+		clk_prepare(phy->optclk);
-+	}
-+
- 	usb_add_phy(&phy->phy, USB_PHY_TYPE_USB2);
- 
- 	platform_set_drvdata(pdev, phy);
-@@ -204,6 +214,7 @@ static int __devexit omap_usb2_remove(struct platform_device *pdev)
- 	struct omap_usb	*phy = platform_get_drvdata(pdev);
- 
- 	clk_unprepare(phy->wkupclk);
-+	clk_unprepare(phy->optclk);
- 	usb_remove_phy(&phy->phy);
- 
- 	return 0;
-@@ -217,6 +228,7 @@ static int omap_usb2_runtime_suspend(struct device *dev)
- 	struct omap_usb	*phy = platform_get_drvdata(pdev);
- 
- 	clk_disable(phy->wkupclk);
-+	clk_disable(phy->optclk);
- 
+-	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+-
+ 	do {
+ 		reg = dwc3_readl(dwc->regs, DWC3_DSTS);
+ 		if (is_on) {
+diff --git a/drivers/usb/phy/omap-usb3.c b/drivers/usb/phy/omap-usb3.c
+index 4dc84ca..26402d5 100644
+--- a/drivers/usb/phy/omap-usb3.c
++++ b/drivers/usb/phy/omap-usb3.c
+@@ -212,6 +212,20 @@ static int omap_usb3_init(struct usb_phy *x)
  	return 0;
  }
-@@ -228,8 +240,22 @@ static int omap_usb2_runtime_resume(struct device *dev)
- 	struct omap_usb	*phy = platform_get_drvdata(pdev);
  
- 	ret = clk_enable(phy->wkupclk);
--	if (ret < 0)
-+	if (ret < 0) {
- 		dev_err(phy->dev, "Failed to enable wkupclk %d\n", ret);
-+		return ret;
-+	}
++static void omap_usb3_poweron(struct usb_phy *x)
++{
++	struct omap_usb *phy = phy_to_omapusb(x);
 +
-+	if (phy->optclk) {
-+		ret = clk_enable(phy->optclk);
-+		if (ret) {
-+			dev_err(phy->dev, "Failed to enable optclk %d\n", ret);
-+			goto err;
-+		}
-+	}
++	omap5_usb_phy_power(phy, 1);
++}
 +
-+	return 0;
-+err:
-+	clk_disable(phy->wkupclk);
++static void omap_usb3_shutdown(struct usb_phy *x)
++{
++	struct omap_usb *phy = phy_to_omapusb(x);
++
++	omap5_usb_phy_power(phy, 0);
++}
++
+ static int __devinit omap_usb3_probe(struct platform_device *pdev)
+ {
+ 	struct omap_usb			*phy;
+@@ -253,6 +267,8 @@ static int __devinit omap_usb3_probe(struct platform_device *pdev)
+ 	phy->phy.dev		= phy->dev;
+ 	phy->phy.label		= "omap-usb3";
+ 	phy->phy.init		= omap_usb3_init;
++	phy->phy.poweron	= omap_usb3_poweron;
++	phy->phy.shutdown	= omap_usb3_shutdown;
+ 	phy->phy.set_suspend	= omap_usb3_suspend;
  
- 	return ret;
+ 	phy->is_suspended	= 1;
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 06b5bae..aaa8e16 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -86,8 +86,9 @@ struct usb_phy {
+ 	/* to support controllers that have multiple transceivers */
+ 	struct list_head	head;
+ 
+-	/* initialize/shutdown the OTG controller */
++	/* initialize/poweron/shutdown the OTG controller */
+ 	int	(*init)(struct usb_phy *x);
++	void    (*poweron)(struct usb_phy *x);
+ 	void	(*shutdown)(struct usb_phy *x);
+ 
+ 	/* effective for B devices, ignored for A-peripheral */
+@@ -135,6 +136,13 @@ usb_phy_init(struct usb_phy *x)
  }
+ 
+ static inline void
++usb_phy_poweron(struct usb_phy *x)
++{
++	if (x->poweron)
++		x->poweron(x);
++}
++
++static inline void
+ usb_phy_shutdown(struct usb_phy *x)
+ {
+ 	if (x->shutdown)
 -- 
 1.7.9.5
