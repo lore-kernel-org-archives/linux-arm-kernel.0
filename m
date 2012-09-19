@@ -1,56 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Sep 2012 10:30:08 +0100
-Subject: [kvmarm] [PATCH 05/15] ARM: Expose PMNC bitfields for KVM use
-In-Reply-To: <87fw6epsap.fsf@rustcorp.com.au>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153502.21241.13218.stgit@ubuntu>
- <20120918130821.GN32204@mudshark.cambridge.arm.com>
- <87fw6epsap.fsf@rustcorp.com.au>
-Message-ID: <20120919093008.GB22271@mudshark.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 19 Sep 2012 15:02:05 +0530
+Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
+Message-ID: <1348047128-25692-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 05:09:34AM +0100, Rusty Russell wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> > On Sat, Sep 15, 2012 at 04:35:02PM +0100, Christoffer Dall wrote:
-> >> From: Rusty Russell <rusty.russell@linaro.org>
-> >> 
-> >> We want some of these for use in KVM, so pull them out of
-> >> arch/arm/kernel/perf_event_v7.c into their own asm/perf_bits.h.
-> >> 
-> >> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
-> >> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> >> ---
-> >>  arch/arm/include/asm/perf_bits.h |   56 ++++++++++++++++++++++++++++++++++++++
-> >>  arch/arm/kernel/perf_event_v7.c  |   51 +----------------------------------
-> >>  2 files changed, 57 insertions(+), 50 deletions(-)
-> >>  create mode 100644 arch/arm/include/asm/perf_bits.h
-> >
-> > I don't like this I'm afraid. These bit definitions, although useful for
-> > kvm, are only applicable to ARMv7 PMUs. Perf does a reasonable job of
-> > separating the low-level CPU-specific code and adding the v7 definitions
-> > into their own global header feels like a step backwards. I also want to
-> > move a load of this into drivers/ at some point and this won't help with
-> > that effort.
-> >
-> > Is KVM just using this for world switch? If so, why does it care about the
-> > bit definitions (and what do you do for things like debug regs)? Is there
-> > anything I could add to perf that you could call instead?
-> 
-> No, we need these definitions if we ever want to actually implement
-> PMU for the guest.[1]
-> 
-> But we don't do this yet, so you can defer this patch until then if you
-> want.
+This patch series adds dt data to get MUSB working in omap4 and omap3
 
-Ok, let's postpone the pain for the moment.
+Changes from v2:
+* Changes the subject of all the patches to include "ARM: dts:"
+* Added reg property and interrupt property for "usb_otg_hs". Previously these
+  were obtained from ti,hwmods property.
+* Rebased on
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git devel-dt
 
-> [1] Which we should do, since you NAKed the patch which would allow the
->     guest to detect that we don't have a PMU, insisting that "all A15s have
->     a PMU", despite the fact that we don't.  I assume this means you're
->     busy implementing it right now :)
+Changes from v1:
+Just removed the omap-usb2 dt data and sent that as a separate patch.
 
-Yeah, right! Happy to add hooks to perf if you need them though, rather than
-expose the raw bit definitions.
+Kishon Vijay Abraham I (3):
+  ARM: dts: Add twl6030-usb data
+  ARM: dts: Add twl4030-usb data
+  ARM: dts: omap: Add usb_otg and glue data
 
-Will
+ arch/arm/boot/dts/omap3-beagle-xm.dts |    6 ++++++
+ arch/arm/boot/dts/omap3-evm.dts       |    6 ++++++
+ arch/arm/boot/dts/omap3-overo.dtsi    |    6 ++++++
+ arch/arm/boot/dts/omap3.dtsi          |   11 +++++++++++
+ arch/arm/boot/dts/omap4-panda.dts     |   10 ++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts       |   10 ++++++++++
+ arch/arm/boot/dts/omap4.dtsi          |   12 ++++++++++++
+ arch/arm/boot/dts/twl4030.dtsi        |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/twl6030.dtsi        |    5 +++++
+ 9 files changed, 87 insertions(+)
+
+-- 
+1.7.9.5
