@@ -1,64 +1,90 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 19 Sep 2012 09:58:43 +0300
-Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA
- more precisely
-In-Reply-To: <20120918124918.GK2505@amd.com>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
- <20120918124918.GK2505@amd.com>
-Message-ID: <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Wed, 19 Sep 2012 08:59:14 +0200
+Subject: [PATCH v2 2/2] mmc: atmel-mci: AP700x PDC is not connected to MCI
+In-Reply-To: <m3d31ik2p0.fsf@pullcord.laptop.org>
+References: <503F9613.5060007@yahoo.es> <m3d31ik2p0.fsf@pullcord.laptop.org>
+Message-ID: <50596D42.3070709@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi Chris,
 
-On Tue, 18 Sep 2012 14:49:18 +0200
-Joerg Roedel <joerg.roedel@amd.com> wrote:
-
-> On Wed, Aug 29, 2012 at 09:55:30AM +0300, Hiroshi Doyu wrote:
-> > The following APIs are needed for us to support the legacy Tegra
-> > memory manager for devices("NvMap") with *DMA mapping API*.
-> 
-> Maybe I am not understanding the need completly. Can you elaborate on
-> why this is needed for legacy Tegra?
-
-Actually not for legacy but it's necessary to replace homebrewed
-in-kernel API(not upstreamed) with the standard ones. The homebrewed
-in-kernel API has been used for the abvoe nvmap as its backend. The
-homebrewed ones are being replaced with the standard ones, IOMMU-API,
-DMA-API and dma-buf, mainly for transition purpose. I found that some
-missing features in DMA-API for that. I posted since other SoCs may
-have the similiar requirements, (1) To specify IOVA address at
-allocation, and (2) To have IOVA allocation and mapping separately.
-
-> > New API:
-> > 
-> >  ->iova_alloc(): To allocate IOVA area.
-> >  ->iova_alloc_at(): To allocate IOVA area at specific address.
-> >  ->iova_free():  To free IOVA area.
-> > 
-> >  ->map_page_at(): To map page at specific IOVA.
-> 
-> This sounds like a layering violation. The situation today is as
-> follows:
-> 
-> 	DMA-API   : Handle DMA-addresses including an address allocator
-> 	IOMMU-API : Full control over DMA address space, no address
-> 	            allocator
-> 
-> So what you want to do add to the DMA-API is already part of the
-> IOMMU-API.
+Le 09/19/2012 07:21 AM, Chris Ball a ?crit :
+> Hi,
 >
-> Here is my suggestion what you can do instead of extending the DMA-API.
-> You can use the IOMMU-API to initialize the device address space with
-> any mappings at the IOVAs you need the mappings. In the end you allocate
-> another free range in the device address space and use that to satisfy
-> DMA-API allocations. Any reason why that could not work?
+> On Thu, Aug 30 2012, Hein Tibosch wrote:
+>> Earlier, atmel-mci was adapted to make use of the peripheral DMA
+>> controller (PDC), in case normal DMA wouldn't work.
+>> ( http://comments.gmane.org/gmane.linux.kernel.mmc/9403 )
+>> This works OK on ARM platforms (AT91), but it broke the driver
+>> for AVR32, the AP700x.
+>> Although the MCI has PDC support, the connection is not done for
+>> AVR chips
+>>
+>> This patch makes the use of PDC depend on CONFIG_AVR32
+>>
+>> Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
+>>
+>> ---
+>>   drivers/mmc/host/atmel-mci-regs.h |    7 +++++++
+>>   drivers/mmc/host/atmel-mci.c      |    2 +-
+>>   2 files changed, 8 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+>> index ab56f7d..c97001e 100644
+>> --- a/drivers/mmc/host/atmel-mci-regs.h
+>> +++ b/drivers/mmc/host/atmel-mci-regs.h
+>> @@ -140,6 +140,13 @@
+>>   #define atmci_writel(port,reg,value)			\
+>>   	__raw_writel((value), (port)->regs + reg)
+>>
+>> +/* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
+>> +#ifdef CONFIG_AVR32
+>> +#	define ATMCI_PDC_CONNECTED	0
+>> +#else
+>> +#	define ATMCI_PDC_CONNECTED	1
+>> +#endif
+>> +
+>>   /*
+>>    * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
+>>    * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
+>> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+>> index a6a5593..b8de891 100644
+>> --- a/drivers/mmc/host/atmel-mci.c
+>> +++ b/drivers/mmc/host/atmel-mci.c
+>> @@ -2208,7 +2208,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
+>>   			"version: 0x%x\n", version);
+>>
+>>   	host->caps.has_dma_conf_reg = 0;
+>> -	host->caps.has_pdc = 1;
+>> +	host->caps.has_pdc = ATMCI_PDC_CONNECTED;
+>>   	host->caps.has_cfg_reg = 0;
+>>   	host->caps.has_cstor_reg = 0;
+>>   	host->caps.has_highspeed = 0;
+>
+> Thanks, pushed to mmc-next for 3.7.
+>
+> I changed the commit message text to reflect my understanding of what
+> the patch does better, from:
+>    This patch makes the use of PDC depend on CONFIG_AVR32.
+> to:
+>    This patch makes the use of PDC depend on !CONFIG_AVR32.
+>
 
-I guess that it would work. Originally I thought that using DMA-API
-and IOMMU-API together in driver might be kind of layering violation
-since IOMMU-API itself is used in DMA-API. Only DMA-API used in driver
-might be cleaner. Considering that DMA API traditionally handling
-*anonymous* {bus,iova} address only, introducing the concept of
-specific address in DMA API may not be so encouraged, though.
+You're right.
 
-It would be nice to listen how other SoCs have solved similar needs.
+> (Ludovic, perhaps you could give an ACK for this patch?)
+>
+
+It was given for the first version but not reported in the second 
+version. So yes you can add
+
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+
+Thanks
+
+Ludovic
+
+> - Chris.
+>
