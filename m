@@ -1,43 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Sep 2012 08:10:43 -0700
-Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
- drivers/bus/
-In-Reply-To: <201209191458.00531.arnd@arndb.de>
-References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
- <20120917215128.GF11762@atomide.com>
- <201209191458.00531.arnd@arndb.de>
-Message-ID: <CAOesGMgHr4pnqerTm=bL8K5cwYxX6Ry9waEOc4H4y3xBzCFkMQ@mail.gmail.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Wed, 19 Sep 2012 16:10:54 +0100
+Subject: [PATCH v2 4/9] net/macb: remove macb_get_drvinfo()
+In-Reply-To: <3fbd9b0eb1e255eccd14ad43044e146776baa963.1348055112.git.nicolas.ferre@atmel.com>
+References: <cover.1348055112.git.nicolas.ferre@atmel.com>
+ <3fbd9b0eb1e255eccd14ad43044e146776baa963.1348055112.git.nicolas.ferre@atmel.com>
+Message-ID: <1348067454.4836.56.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 7:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 17 September 2012, Tony Lindgren wrote:
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
->> > OMAP interconnect drivers are used for the interconnect error handling.
->> > Since they are bus driver, lets move it to newly created drivers/bus.
->> >
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->> > Cc: Tony Lindgren <tony@atomide.com>
->> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > ---
->> > Patch just moves OMAP interconnect drivers as is to the newly created
->> > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
->> > tree and test on all OMAP boards.
->>
->> Great, looks like this should not conflict with other
->> omap patches queued, so Arnd should probably take this into
->> the bus branch:
->>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> Ok, added to the branch. In the future please Cc both Olof and me when submitting
-> patches for inclusion.
->
-> Olof: I figured it would be easier if I just add this one than relaying it to
-> you.
+On Wed, 2012-09-19 at 13:55 +0200, Nicolas Ferre wrote:
+> This function has little meaning so remove it altogether and
+> let ethtool core fill in the fields automatically.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 11 -----------
+>  1 file changed, 11 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 2948553..31f945c 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -1217,20 +1217,9 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+>  	return phy_ethtool_sset(phydev, cmd);
+>  }
+>  
+> -static void macb_get_drvinfo(struct net_device *dev,
+> -			     struct ethtool_drvinfo *info)
+> -{
+> -	struct macb *bp = netdev_priv(dev);
+> -
+> -	strcpy(info->driver, bp->pdev->dev.driver->name);
+> -	strcpy(info->version, "$Revision: 1.14 $");
+> -	strcpy(info->bus_info, dev_name(&bp->pdev->dev));
+> -}
+> -
+>  static const struct ethtool_ops macb_ethtool_ops = {
+>  	.get_settings		= macb_get_settings,
+>  	.set_settings		= macb_set_settings,
+> -	.get_drvinfo		= macb_get_drvinfo,
+>  	.get_link		= ethtool_op_get_link,
+>  };
+>  
 
-Sounds good, thanks for the heads up.
-
-
--Olof
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
