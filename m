@@ -1,50 +1,37 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 19 Sep 2012 06:24:46 -0400
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <1587150.uFGRdL0s8e@amdc1227> (Tomasz Figa's message of "Wed, 19
- Sep 2012 12:13:14 +0200")
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1346748609-11115-2-git-send-email-t.figa@samsung.com>
- <m38vc6k1qu.fsf@pullcord.laptop.org> <1587150.uFGRdL0s8e@amdc1227>
-Message-ID: <m3a9wmgvip.fsf@pullcord.laptop.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 19 Sep 2012 16:02:52 +0530
+Subject: [PATCH 2/2] ARM: dts: omap: Add omap-usb2 dt data
+In-Reply-To: <1348050772-27819-1-git-send-email-kishon@ti.com>
+References: <1348050772-27819-1-git-send-email-kishon@ti.com>
+Message-ID: <1348050772-27819-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+connected to ocp2scp, omap-usb2 dt data is added as a child node
+of ocp2scp.
 
-On Wed, Sep 19 2012, Tomasz Figa wrote:
-> Hi Chris,
->
-> On Wednesday 19 of September 2012 01:42:01 Chris Ball wrote:
->> On Tue, Sep 04 2012, Tomasz Figa wrote:
->> > Some boards use fixed voltage regulator for vmmc supply (e.g. for eMMC
->> > memories). MMC_CAP2_BROKEN_VOLTAGE must be enabled for them to operate
->> > correctly.
->>>
->> Is there a reason we can't make this a property on the regulator instead?
->
-> Is there a reason we can't make this a property of the mmc subsystem? ;)
->
-> Now, seriously, could you elaborate on this a bit more? Do you mean that a 
-> regulator should provide a dummy set voltage operation that would accept 
-> any voltage?
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Sorry for the terseness.
-
-It seems like we're encoding exactly the same information twice in two
-different subsystems -- I don't see the point, so I'd like to think
-about how we could do better.
-
-For example, if we're only concerned about fixed regulators, could we
-just detect a fixed regulator in the driver and avoid the failing call
-to regulator_set_voltage() directly, without needing to go via this
-capability?  Seems like the capability doesn't tell us anything we
-couldn't already have known.
-
-Thanks,
-
-- Chris.
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 4fbb9dc..28eaddc 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -303,6 +303,11 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp_usb_phy";
++			usb2phy at 4a0ad080 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a0ad080 0x58>,
++				      <0x4a002300 0x4>; /* TO BE REMOVED: SCM */
++			};
+ 		};
+ 	};
+ };
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.9.5
