@@ -1,155 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Sep 2012 13:52:27 +0000
-Subject: [PATCH 09/24] ARM: ixp4xx: use __iomem pointers for MMIO
-In-Reply-To: <m3ipbbdtlt.fsf@intrepid.localdomain>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <m3ipbbmxke.fsf@intrepid.localdomain> <m3ipbbdtlt.fsf@intrepid.localdomain>
-Message-ID: <201209191352.28034.arnd@arndb.de>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 19 Sep 2012 09:52:08 -0400
+Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347662517-4210-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20120919135208.GA16522@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012, Krzysztof Halasa wrote:
-> Krzysztof Halasa <khc@pm.waw.pl> writes:
+On Fri, Sep 14, 2012 at 05:41:56PM -0500, Jon Hunter wrote:
+
+...
+
+Typo nits in the binding examples below...
+
+>  Documentation/devicetree/bindings/dma/dma.txt |   81 +++++++++
+>  drivers/of/Makefile                           |    2 +-
+>  drivers/of/dma.c                              |  219 +++++++++++++++++++++++++
+>  include/linux/of_dma.h                        |   45 +++++
+>  4 files changed, 346 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/dma.txt
+>  create mode 100644 drivers/of/dma.c
+>  create mode 100644 include/linux/of_dma.h
 > 
-> >> At the moment, this patch conflicts with other patches in linux-next,
-> >> need to sort this out.
-> >
-> > Very nice, I will take care of these 3 patches.
-> 
-> I mean, just this one IXP4xx patch :-)
+> diff --git a/Documentation/devicetree/bindings/dma/dma.txt b/Documentation/devicetree/bindings/dma/dma.txt
+> new file mode 100644
+> index 0000000..a4f59a5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/dma.txt
+> @@ -0,0 +1,81 @@
+> +* Generic DMA Controller and DMA request bindings
+> +
+> +Generic binding to provide a way for a driver using DMA Engine to retrieve the
+> +DMA request or channel information that goes from a hardware device to a DMA
+> +controller.
+> +
+> +
+> +* DMA controller
+> +
+> +Required property:
+> +- #dma-cells: 		Must be at least 1. Used to provide DMA controller
+> +			specific information. See DMA client binding below for
+> +			more details.
+> +
+> +Optional properties:
+> +- #dma-channels: 	Number of DMA channels supported by the controller.
+> +- #dma-requests: 	Number of DMA requests signals supported by the
+> +			controller.
+> +
+> +Example:
+> +
+> +	dma: dma at 48000000 {
+> +		compatible = "ti,omap-sdma"
 
-Ok. I just noticed that I made a mistake in splitting up the changes between
-iop32x and ixp4xx. I've corrected this in my tree now and fixed the bug you
-pointed out, see the new version below. I'm not completely sure how to
-proceed with this. I noticed you have some patches in linux-next but haven't
-sent any pull requests yet. The merge window is getting closer, so I'd
-like to come to a conclusion with this.
+; here
 
-	Arnd
+> +		reg = <0x48000000 0x1000>;
+> +		interrupts = <0 12 0x4
+> +			      0 13 0x4
+> +			      0 14 0x4
+> +			      0 15 0x4>;
+> +		#dma-cells = <1>;
+> +		#dma-channels = <32>;
+> +		#dma-requests = <127>;
+> +	};
+> +
+> +
+> +* DMA client
+> +
+> +Client drivers should specify the DMA property using a phandle to the controller
+> +followed by DMA controller specific data.
+> +
+> +Required property:
+> +- dmas:			List of one or more DMA specifiers, each consisting of
+> +			- A phandle pointing to DMA controller node
+> +			- A number of integer cells, as determined by the
+> +			  #dma-cells property in the node referenced by phandle
+> +			  containing DMA controller specific information. This
+> +			  typically contains a DMA request line number or a
+> +			  channel number, but can contain any data that is used
+> +			  required for configuring a channel.
+> +- dma-names: 		Contains one identifier string for each DMA specifier in
+> +			the dmas property. The specific strings that can be used
+> +			are defined in the binding of the DMA client device.
+> +			Multiple DMA specifiers can be used to represent
+> +			alternatives and in this case the dma-names for those
+> +			DMA specifiers must be identical (see examples).
+> +
+> +Examples:
+> +
+> +1. A device with one DMA read channel, one DMA write channel:
+> +
+> +	i2c1: i2c at 1 {
+> +		...
+> +		dmas = <&dma 2		/* read channel */
+> +			&dma 3>;	/* write channel */
+> +		dma-names = "rx", "tx"
 
-8<----
->From 13ec32f47cb42cecc9cd262c307ef9377c601007 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 14 Sep 2012 20:19:40 +0000
-Subject: [PATCH] ARM: ixp4xx: use __iomem pointers for MMIO
+; here too
 
-ARM is moving to stricter checks on readl/write functions,
-so we need to use the correct types everywhere.
+> +		...
+> +	};
+> +
+> +2. A single read-write channel with three alternative DMA controllers:
+> +
+> +	dmas = <&dma1 5
+> +		&dma2 7
+> +		&dma3 2>;
+> +	dma-names = "rx-tx", "rx-tx", "rx-tx"
 
-At the moment, this patch conflicts with other patches in linux-next,
-need to sort this out.
+again ;
 
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Krzysztof Halasa <khc@pm.waw.pl>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> +
+> +3. A device with three channels, one of which has two alternatives:
+> +
+> +	dmas = <&dma1 2			/* read channel */
+> +		&dma1 3			/* write channel */
+> +		&dma2 0			/* error read */
+> +		&dma3 0>;		/* alternative error read */
+> +	dma-names = "rx", "tx", "error", "error";
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index a9f8094..fdf91a1 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -53,24 +53,24 @@ static struct clock_event_device clockevent_ixp4xx;
-  *************************************************************************/
- static struct map_desc ixp4xx_io_desc[] __initdata = {
- 	{	/* UART, Interrupt ctrl, GPIO, timers, NPEs, MACs, USB .... */
--		.virtual	= IXP4XX_PERIPHERAL_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_PERIPHERAL_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_PERIPHERAL_BASE_PHYS),
- 		.length		= IXP4XX_PERIPHERAL_REGION_SIZE,
- 		.type		= MT_DEVICE
- 	}, {	/* Expansion Bus Config Registers */
--		.virtual	= IXP4XX_EXP_CFG_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_EXP_CFG_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_EXP_CFG_BASE_PHYS),
- 		.length		= IXP4XX_EXP_CFG_REGION_SIZE,
- 		.type		= MT_DEVICE
- 	}, {	/* PCI Registers */
--		.virtual	= IXP4XX_PCI_CFG_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_PCI_CFG_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_PCI_CFG_BASE_PHYS),
- 		.length		= IXP4XX_PCI_CFG_REGION_SIZE,
- 		.type		= MT_DEVICE
- 	},
- #ifdef CONFIG_DEBUG_LL
- 	{	/* Debug UART mapping */
--		.virtual	= IXP4XX_DEBUG_UART_BASE_VIRT,
-+		.virtual	= (unsigned long)IXP4XX_DEBUG_UART_BASE_VIRT,
- 		.pfn		= __phys_to_pfn(IXP4XX_DEBUG_UART_BASE_PHYS),
- 		.length		= IXP4XX_DEBUG_UART_REGION_SIZE,
- 		.type		= MT_DEVICE
-diff --git a/arch/arm/mach-ixp4xx/include/mach/cpu.h b/arch/arm/mach-ixp4xx/include/mach/cpu.h
-index b2ef65d..ebc0ba3 100644
---- a/arch/arm/mach-ixp4xx/include/mach/cpu.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/cpu.h
-@@ -14,6 +14,7 @@
- #ifndef __ASM_ARCH_CPU_H__
- #define __ASM_ARCH_CPU_H__
- 
-+#include <linux/io.h>
- #include <asm/cputype.h>
- 
- /* Processor id value in CP15 Register 0 */
-@@ -37,7 +38,7 @@
- 
- static inline u32 ixp4xx_read_feature_bits(void)
- {
--	u32 val = ~*IXP4XX_EXP_CFG2;
-+	u32 val = ~__raw_readl(IXP4XX_EXP_CFG2);
- 
- 	if (cpu_is_ixp42x_rev_a0())
- 		return IXP42X_FEATURE_MASK & ~(IXP4XX_FEATURE_RCOMP |
-@@ -51,7 +52,7 @@ static inline u32 ixp4xx_read_feature_bits(void)
- 
- static inline void ixp4xx_write_feature_bits(u32 value)
- {
--	*IXP4XX_EXP_CFG2 = ~value;
-+	__raw_writel(~value, IXP4XX_EXP_CFG2);
- }
- 
- #endif  /* _ASM_ARCH_CPU_H */
-diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-index 97c530f..eb68b61 100644
---- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-@@ -49,21 +49,21 @@
-  * Expansion BUS Configuration registers
-  */
- #define IXP4XX_EXP_CFG_BASE_PHYS	(0xC4000000)
--#define IXP4XX_EXP_CFG_BASE_VIRT	(0xFFBFE000)
-+#define IXP4XX_EXP_CFG_BASE_VIRT	IOMEM(0xFFBFE000)
- #define IXP4XX_EXP_CFG_REGION_SIZE	(0x00001000)
- 
- /*
-  * PCI Config registers
-  */
- #define IXP4XX_PCI_CFG_BASE_PHYS	(0xC0000000)
--#define	IXP4XX_PCI_CFG_BASE_VIRT	(0xFFBFF000)
-+#define	IXP4XX_PCI_CFG_BASE_VIRT	IOMEM(0xFFBFF000)
- #define IXP4XX_PCI_CFG_REGION_SIZE	(0x00001000)
- 
- /*
-  * Peripheral space
-  */
- #define IXP4XX_PERIPHERAL_BASE_PHYS	(0xC8000000)
--#define IXP4XX_PERIPHERAL_BASE_VIRT	(0xFFBEB000)
-+#define IXP4XX_PERIPHERAL_BASE_VIRT	IOMEM(0xFFBEB000)
- #define IXP4XX_PERIPHERAL_REGION_SIZE	(0x00013000)
- 
- /*
-@@ -73,7 +73,7 @@
-  * aligned so that it * can be used with the low-level debug code.
-  */
- #define	IXP4XX_DEBUG_UART_BASE_PHYS	(0xC8000000)
--#define	IXP4XX_DEBUG_UART_BASE_VIRT	(0xffb00000)
-+#define	IXP4XX_DEBUG_UART_BASE_VIRT	IOMEM(0xffb00000)
- #define	IXP4XX_DEBUG_UART_REGION_SIZE	(0x00001000)
- 
- #define IXP4XX_EXP_CS0_OFFSET	0x00
-@@ -92,7 +92,7 @@
- /*
-  * Expansion Bus Controller registers.
-  */
--#define IXP4XX_EXP_REG(x) ((volatile u32 *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
-+#define IXP4XX_EXP_REG(x) ((volatile u32 __iomem *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
- 
- #define IXP4XX_EXP_CS0      IXP4XX_EXP_REG(IXP4XX_EXP_CS0_OFFSET)
- #define IXP4XX_EXP_CS1      IXP4XX_EXP_REG(IXP4XX_EXP_CS1_OFFSET)
+Patch for these posted separately.
+
+-Matt
