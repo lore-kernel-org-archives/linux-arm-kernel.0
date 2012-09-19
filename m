@@ -1,31 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Sep 2012 13:55:18 +0200
-Subject: [PATCH v2 5/9] net/macb: tx status is more than 8 bits now
-In-Reply-To: <cover.1348055112.git.nicolas.ferre@atmel.com>
-References: <cover.1348055112.git.nicolas.ferre@atmel.com>
-Message-ID: <bfe08a1f18b7f4bb248517e319b6c42f041f7351.1348055112.git.nicolas.ferre@atmel.com>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Wed, 19 Sep 2012 06:57:24 -0500
+Subject: [PATCH v7 0/11] KGDB/KDB FIQ (NMI) debugger
+In-Reply-To: <20120917155408.GA302@kroah.com>
+References: <20120913150133.GA16238@lizard> <20120917113750.GA28838@kroah.com>
+ <50571ADF.3000406@windriver.com> <20120917125427.GA23516@kroah.com>
+ <20120917153943.GA7510@lizard> <20120917155408.GA302@kroah.com>
+Message-ID: <5059B324.70409@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some revision of GEM, TSR status register has more information.
+On 09/17/2012 10:54 AM, Greg Kroah-Hartman wrote:
+> On Mon, Sep 17, 2012 at 08:39:43AM -0700, Anton Vorontsov wrote:
+>> On Mon, Sep 17, 2012 at 05:54:27AM -0700, Greg Kroah-Hartman wrote:
+>> [...]
+>>>>> To make it easier, can I just take the tty driver patches now?  Will
+>>>>> that break anything?
+>>>> I have not made my way through the entire series yet, so I am not sure
+>>>> if you need the kdb header changes or not, but so far it looks like
+>>>> the tty pieces are separate.  If you add your ack Greg, I'll take the
+>>>> whole series and merge it into kgdb-next, or after I finish the review
+>>>> we could do it the other way around.
+>>> Your tree is fine:
+>>>
+>>> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>
+>>> Let me know if you have problems merging this due to any tty patches,
+>>> and if so, I'll be glad to take them through my tree.
+>> Guys, thanks for taking a look into this!
+>>
+>> The patch that adds nmi console driver (i.e. tty/serial/kgdb_nmi.c)
+>> depends on the first KDB patches in these series, and it depends on
+>> amba-pl1011 and tty_port work, which is in tty-next.
+>>
+>> So, the series have to go via tty-next; I believe Jason won't able
+>> to take it via his tree.
+> Ok, I'll wait for Jason to review them.  Jason, let me know how it
+> goes...
+>
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Other than 1, 2 and 7.   They all get:
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 31f945c..e98f6fc 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -310,7 +310,7 @@ static void macb_tx(struct macb *bp)
- 	status = macb_readl(bp, TSR);
- 	macb_writel(bp, TSR, status);
- 
--	netdev_vdbg(bp->dev, "macb_tx status = %02lx\n", (unsigned long)status);
-+	netdev_vdbg(bp->dev, "macb_tx status = 0x%03lx\n", (unsigned long)status);
- 
- 	if (status & (MACB_BIT(UND) | MACB_BIT(TSR_RLE))) {
- 		int i;
--- 
-1.7.11.3
+Acked-by: Jason Wessel <jason.wessel@windriver.com>
+
+I ran out of time to review things yesterday, but it is all reviewed now.   After we get some more comments from Anton, we can move forward.
+
+Cheers,
+Jason.
