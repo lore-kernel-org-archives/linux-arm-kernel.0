@@ -1,121 +1,163 @@
 From: ryan.harkin@linaro.org (Ryan Harkin)
-Date: Wed, 19 Sep 2012 17:04:25 +0100
-Subject: [RFC PATCH 2/3] ARM: vexpress: Add device tree support for CLCD driver
+Date: Wed, 19 Sep 2012 17:04:26 +0100
+Subject: [RFC PATCH 3/3] ARM: vexpress: configure CLCD driver device tree
+ support for A9 CoreTile
 In-Reply-To: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
 References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
-Message-ID: <1348070666-9153-3-git-send-email-ryan.harkin@linaro.org>
+Message-ID: <1348070666-9153-4-git-send-email-ryan.harkin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for device tree in the amba-clcd PL111 video driver.
+Configuration for the amba-clcd PL111 driver is added to the A9 CoreTile's DTS
+file.
 
-Special case support is added for the A9 CoreTile which uses the "legacy"
-address map and has a PL111 device on-board.  The default case is to configure
-the device on the motherboard.
+Configuration of the motherboard CLCD driver is removed from the DTSI files to
+prevent duplicate CLCD drivers being registered.
 
-Oscillator support is added for the A9 CoreTile's CLCD driver.
+A generic set of CLCD panel descriptions has been split into its own DTSI file.
+Currently, only XVGA and VGA monitors are described.
 
 Signed-off-by: Ryan Harkin <ryan.harkin@linaro.org>
 ---
- arch/arm/mach-vexpress/v2m.c |   58 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ arch/arm/boot/dts/clcd-panels.dtsi      |   52 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi |    8 ++---
+ arch/arm/boot/dts/vexpress-v2m.dtsi     |    8 ++---
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  |    6 ++++
+ 4 files changed, 62 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 37608f2..799e00e 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -3,6 +3,7 @@
-  */
- #include <linux/device.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/clcd.h>
- #include <linux/amba/mmci.h>
- #include <linux/io.h>
- #include <linux/init.h>
-@@ -37,6 +38,7 @@
- #include <mach/ct-ca9x4.h>
- #include <mach/motherboard.h>
- 
-+#include <plat/clcd.h>
- #include <plat/sched_clock.h>
- 
- #include "core.h"
-@@ -541,6 +543,54 @@ MACHINE_END
- 
- #if defined(CONFIG_ARCH_VEXPRESS_DT)
- 
-+static struct v2m_osc v2m_dt_clcd_osc = {
-+	.rate_min = 10000000,
-+	.rate_max = 165000000,
-+	.rate_default = 23750000,
+diff --git a/arch/arm/boot/dts/clcd-panels.dtsi b/arch/arm/boot/dts/clcd-panels.dtsi
+new file mode 100644
+index 0000000..0b0ff6e
+--- /dev/null
++++ b/arch/arm/boot/dts/clcd-panels.dtsi
+@@ -0,0 +1,52 @@
++/*
++ * ARM Ltd. Versatile Express
++ *
++ */
++
++/ {
++	panels {
++		panel at 0 {
++			compatible	= "panel";
++			mode		= "VGA";
++			refresh		= <60>;
++			xres		= <640>;
++			yres		= <480>;
++			pixclock	= <39721>;
++			left_margin	= <40>;
++			right_margin	= <24>;
++			upper_margin	= <32>;
++			lower_margin	= <11>;
++			hsync_len	= <96>;
++			vsync_len	= <2>;
++			sync		= <0>;
++			vmode		= "FB_VMODE_NONINTERLACED";
++
++			tim2		= "TIM2_BCD", "TIM2_IPC";
++			cntl		= "CNTL_LCDTFT", "CNTL_BGR", "CNTL_LCDVCOMP(1)";
++			caps		= "CLCD_CAP_5551", "CLCD_CAP_565", "CLCD_CAP_888";
++			bpp		= <16>;
++		};
++
++		panel at 1 {
++			compatible	= "panel";
++			mode		= "XVGA";
++			refresh		= <60>;
++			xres		= <1024>;
++			yres		= <768>;
++			pixclock	= <15748>;
++			left_margin	= <152>;
++			right_margin	= <48>;
++			upper_margin	= <23>;
++			lower_margin	= <3>;
++			hsync_len	= <104>;
++			vsync_len	= <4>;
++			sync		= <0>;
++			vmode		= "FB_VMODE_NONINTERLACED";
++
++			tim2		= "TIM2_BCD", "TIM2_IPC";
++			cntl		= "CNTL_LCDTFT", "CNTL_BGR", "CNTL_LCDVCOMP(1)";
++			caps		= "CLCD_CAP_5551", "CLCD_CAP_565", "CLCD_CAP_888";
++			bpp		= <16>;
++		};
++	};
 +};
-+
-+static int v2m_dt_clcd_init(void)
-+{
-+	struct device_node *node;
-+	u32 osc;
-+	u32 clcd_site;
-+	u32 dvimode;
-+	const __be32 *prop;
-+	int len, na, ns;
-+	phys_addr_t reg_base;
-+
-+	node = of_find_compatible_node(NULL, NULL, "arm,pl111");
-+	if (!node)
-+		return -ENODEV;
-+
-+	na = of_n_addr_cells(node);
-+	ns = of_n_size_cells(node);
-+
-+	prop = of_get_property(node, "reg", &len);
-+	if (WARN_ON(!prop || len < (na + ns) * sizeof(*prop)))
-+		return -EINVAL;
-+	reg_base = of_read_number(prop, na);
-+
-+	switch (reg_base) {
-+	case CT_CA9X4_CLCDC:
-+		clcd_site = v2m_get_master_site();
-+		dvimode = 2;
-+		break;
-+	default:
-+		clcd_site = SYS_CFG_SITE_MB;
-+		dvimode = 0;
-+		break;
-+	}
-+
-+	if (of_property_read_u32(node, "arm,vexpress-osc", &osc) != 0)
-+		return -EINVAL;
-+	v2m_dt_clcd_osc.site = clcd_site;
-+	v2m_dt_clcd_osc.osc = osc;
-+	v2m_cfg_write(SYS_CFG_MUXFPGA | clcd_site, clcd_site);
-+	v2m_cfg_write(SYS_CFG_DVIMODE | clcd_site, dvimode);
-+	return 0;
-+}
-+
- static struct map_desc v2m_rs1_io_desc __initdata = {
- 	.virtual	= V2M_PERIPH,
- 	.pfn		= __phys_to_pfn(0x1c000000),
-@@ -598,6 +648,8 @@ void __init v2m_dt_init_early(void)
- 			pr_warning("vexpress: DT HBI (%x) is not matching "
- 					"hardware (%x)!\n", dt_hbi, hbi);
- 	}
-+
-+	v2m_dt_clcd_init();
- }
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index d8a827b..301d3f6 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -17,6 +17,8 @@
+  * CHANGES TO vexpress-v2m.dtsi!
+  */
  
- static  struct of_device_id vexpress_irq_match[] __initdata = {
-@@ -631,6 +683,12 @@ static void __init v2m_dt_timer_init(void)
- 
- 	if (arch_timer_sched_clock_init() != 0)
- 		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
++/include/ "clcd-panels.dtsi"
 +
-+	if (v2m_dt_clcd_osc.site) {
-+		/* core tile clcd controller for A9 */
-+		clk = v2m_osc_register("10020000.clcd", &v2m_dt_clcd_osc);
-+		clk_register_clkdev(clk, NULL, "10020000.clcd");
-+	}
- }
+ / {
+ 	aliases {
+ 		arm,v2m_timer = &v2m_timer01;
+@@ -193,12 +195,6 @@
+ 				       0x1a0100 0xf00>;
+ 				reg-shift = <2>;
+ 			};
+-
+-			clcd at 1f0000 {
+-				compatible = "arm,pl111", "arm,primecell";
+-				reg = <0x1f0000 0x1000>;
+-				interrupts = <14>;
+-			};
+ 		};
  
- static struct sys_timer v2m_dt_timer = {
+ 		v2m_fixed_3v3: fixedregulator at 0 {
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index dba53fd..43cd86f 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -17,6 +17,8 @@
+  * CHANGES TO vexpress-v2m-rs1.dtsi!
+  */
+ 
++/include/ "clcd-panels.dtsi"
++
+ / {
+ 	aliases {
+ 		arm,v2m_timer = &v2m_timer01;
+@@ -192,12 +194,6 @@
+ 				       0x1a100 0xf00>;
+ 				reg-shift = <2>;
+ 			};
+-
+-			clcd at 1f000 {
+-				compatible = "arm,pl111", "arm,primecell";
+-				reg = <0x1f000 0x1000>;
+-				interrupts = <14>;
+-			};
+ 		};
+ 
+ 		v2m_fixed_3v3: fixedregulator at 0 {
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 3f0c736..2ebb132 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -9,6 +9,8 @@
+ 
+ /dts-v1/;
+ 
++/memreserve/ 0x9f000000 0x01000000;
++
+ / {
+ 	model = "V2P-CA9";
+ 	arm,hbi = <0x191>;
+@@ -70,6 +72,10 @@
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
+ 		interrupts = <0 44 4>;
++		mode = "XVGA";
++		arm,vexpress-osc = <1>;
++		use_dma = <1>;
++		framebuffer = <0x9f000000 0x01000000>;
+ 	};
+ 
+ 	memory-controller at 100e0000 {
 -- 
 1.7.9.5
