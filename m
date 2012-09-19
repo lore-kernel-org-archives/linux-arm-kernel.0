@@ -1,56 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Sep 2012 15:31:17 -0600
-Subject: [PATCH 3/5] ARM: tegra: add TWD to device tree
-In-Reply-To: <1348090279-22631-1-git-send-email-swarren@wwwdotorg.org>
-References: <1348090279-22631-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1348090279-22631-3-git-send-email-swarren@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Sep 2012 21:35:06 +0000 (UTC)
+Subject: [PATCH v2 2/9] ARM: OMAP3: hwmod data: add mmu data for iva and
+ isp
+In-Reply-To: <1347479152-588-3-git-send-email-omar.luna@linaro.org>
+References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
+ <1347479152-588-3-git-send-email-omar.luna@linaro.org>
+Message-ID: <alpine.DEB.2.00.1209192134490.5264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Wed, 12 Sep 2012, Omar Ramirez Luna wrote:
 
-This will allow timer.c to use twd_local_timer_of_register(), and
-hence not need to hard-code the TWD address or IRQ.
+> Add mmu hwmod data for iva and isp.
+> 
+> Due to compatibility an ifdef CONFIG_OMAP_IOMMU_IVA2 needs to be
+> propagated (previously on iommu resource info) to hwmod data in OMAP3,
+> so users of iommu and tidspbridge can avoid issues of two modules
+> managing mmu data/irqs/resets; this until tidspbridge can be migrated
+> to iommu framework.
+> 
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra20.dtsi |    6 ++++++
- arch/arm/boot/dts/tegra30.dtsi |    6 ++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+Thanks, queued for 3.7.
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 9d22238..723fd43 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -4,6 +4,12 @@
- 	compatible = "nvidia,tegra20";
- 	interrupt-parent = <&intc>;
- 
-+	timer at 50004600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0x50040600 0x20>;
-+		interrupts = <1 13 0x304>;
-+	};
-+
- 	intc: interrupt-controller {
- 		compatible = "arm,cortex-a9-gic";
- 		reg = <0x50041000 0x1000
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index ffb035a..15e61b6 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -4,6 +4,12 @@
- 	compatible = "nvidia,tegra30";
- 	interrupt-parent = <&intc>;
- 
-+	timer at 50004600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0x50040600 0x20>;
-+		interrupts = <1 13 0xf04>;
-+	};
-+
- 	intc: interrupt-controller {
- 		compatible = "arm,cortex-a9-gic";
- 		reg = <0x50041000 0x1000
--- 
-1.7.0.4
+- Paul
