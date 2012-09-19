@@ -1,126 +1,87 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Sep 2012 15:31:15 -0600
-Subject: [PATCH 1/5] ARM: tegra: define DT bindings for and instantiate timer
-Message-ID: <1348090279-22631-1-git-send-email-swarren@wwwdotorg.org>
+Date: Wed, 19 Sep 2012 15:31:16 -0600
+Subject: [PATCH 2/5] ARM: tegra: define DT bindings for and instantiate RTC
+In-Reply-To: <1348090279-22631-1-git-send-email-swarren@wwwdotorg.org>
+References: <1348090279-22631-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1348090279-22631-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The Tegra timer provides a number of 29-bit timer channels, a single
-32-bit free running counter, and in the Tegra30 variant, 5 watchdog modules.
-The first two channels may also trigger a legacy watchdog reset.
+The Tegra RTC maintains seconds and milliseconds counters, and five alarm
+registers. The alarms and other interrupts may wake the system from
+low-power state.
 
 Define a DT binding for this HW module, and add the module into the Tegra
 device tree files.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- .../bindings/timer/nvidia,tegra20-timer.txt        |   21 ++++++++++++++++++
- .../bindings/timer/nvidia,tegra30-timer.txt        |   23 ++++++++++++++++++++
- arch/arm/boot/dts/tegra20.dtsi                     |    9 +++++++
- arch/arm/boot/dts/tegra30.dtsi                     |   11 +++++++++
- 4 files changed, 64 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
- create mode 100644 Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
+ .../devicetree/bindings/rtc/nvidia,tegra20-rtc.txt |   19 +++++++++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    6 ++++++
+ arch/arm/boot/dts/tegra30.dtsi                     |    6 ++++++
+ 3 files changed, 31 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
 
-diff --git a/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt b/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
+diff --git a/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt b/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
 new file mode 100644
-index 0000000..e019fdc
+index 0000000..93f45e9
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
-@@ -0,0 +1,21 @@
-+NVIDIA Tegra20 timer
++++ b/Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
+@@ -0,0 +1,19 @@
++NVIDIA Tegra20 real-time clock
 +
-+The Tegra20 timer provides four 29-bit timer channels and a single 32-bit free
-+running counter. The first two channels may also trigger a watchdog reset.
++The Tegra RTC maintains seconds and milliseconds counters, and five alarm
++registers. The alarms and other interrupts may wake the system from low-power
++state.
 +
 +Required properties:
 +
-+- compatible : should be "nvidia,tegra20-timer".
++- compatible : should be "nvidia,tegra20-rtc".
 +- reg : Specifies base physical address and size of the registers.
-+- interrupts : A list of 4 interrupts; one per timer channel.
++- interrupts : A single interrupt specifier.
 +
 +Example:
 +
 +timer {
-+	compatible = "nvidia,tegra20-timer";
-+	reg = <0x60005000 0x60>;
-+	interrupts = <0 0 0x04
-+			0 1 0x04
-+			0 41 0x04
-+			0 42 0x04>;
-+};
-diff --git a/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt b/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
-new file mode 100644
-index 0000000..906109d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
-@@ -0,0 +1,23 @@
-+NVIDIA Tegra30 timer
-+
-+The Tegra30 timer provides ten 29-bit timer channels, a single 32-bit free
-+running counter, and 5 watchdog modules. The first two channels may also
-+trigger a legacy watchdog reset.
-+
-+Required properties:
-+
-+- compatible : should be "nvidia,tegra30-timer", "nvidia,tegra20-timer".
-+- reg : Specifies base physical address and size of the registers.
-+- interrupts : A list of 6 interrupts; one per each of timer channels 1
-+    through 5, and one for the shared interrupt for the remaining channels.
-+
-+timer {
-+	compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
-+	reg = <0x60005000 0x400>;
-+	interrupts = <0 0 0x04
-+		      0 1 0x04
-+		      0 41 0x04
-+		      0 42 0x04
-+		      0 121 0x04
-+		      0 122 0x04>;
++	compatible = "nvidia,tegra20-rtc";
++	reg = <0x7000e000 0x100>;
++	interrupts = <0 2 0x04>;
 +};
 diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 405d167..0fadf4d 100644
+index 0fadf4d..9d22238 100644
 --- a/arch/arm/boot/dts/tegra20.dtsi
 +++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -12,6 +12,15 @@
- 		#interrupt-cells = <3>;
+@@ -138,6 +138,12 @@
+ 		#pwm-cells = <2>;
  	};
  
-+	timer at 60005000 {
-+		compatible = "nvidia,tegra20-timer";
-+		reg = <0x60005000 0x60>;
-+		interrupts = <0 0 0x04
-+			      0 1 0x04
-+			      0 41 0x04
-+			      0 42 0x04>;
++	rtc {
++		compatible = "nvidia,tegra20-rtc";
++		reg = <0x7000e000 0x100>;
++		interrupts = <0 2 0x04>;
 +	};
 +
- 	apbdma: dma {
- 		compatible = "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1200>;
+ 	i2c at 7000c000 {
+ 		compatible = "nvidia,tegra20-i2c";
+ 		reg = <0x7000c000 0x100>;
 diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 3e4334d..d6f8e4c 100644
+index d6f8e4c..ffb035a 100644
 --- a/arch/arm/boot/dts/tegra30.dtsi
 +++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -12,6 +12,17 @@
- 		#interrupt-cells = <3>;
+@@ -134,6 +134,12 @@
+ 		#pwm-cells = <2>;
  	};
  
-+	timer at 60005000 {
-+		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
-+		reg = <0x60005000 0x400>;
-+		interrupts = <0 0 0x04
-+			      0 1 0x04
-+			      0 41 0x04
-+			      0 42 0x04
-+			      0 121 0x04
-+			      0 122 0x04>;
++	rtc {
++		compatible = "nvidia,tegra30-rtc", "nvidia,tegra20-rtc";
++		reg = <0x7000e000 0x100>;
++		interrupts = <0 2 0x04>;
 +	};
 +
- 	apbdma: dma {
- 		compatible = "nvidia,tegra30-apbdma", "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1400>;
+ 	i2c at 7000c000 {
+ 		compatible =  "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+ 		reg = <0x7000c000 0x100>;
 -- 
 1.7.0.4
