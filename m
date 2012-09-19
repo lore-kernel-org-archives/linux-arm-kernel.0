@@ -1,28 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Sep 2012 13:08:43 +0000
-Subject: [PATCH v2 07/13] misc: Versatile Express config infrastructure
-In-Reply-To: <1347977875-16855-8-git-send-email-pawel.moll@arm.com>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-8-git-send-email-pawel.moll@arm.com>
-Message-ID: <201209191308.43676.arnd@arndb.de>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 19 Sep 2012 18:51:08 +0530
+Subject: [PATCH v7 00/11] OMAP-GPMC: generic time calc, prepare for driver
+Message-ID: <cover.1348058726.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 September 2012, Pawel Moll wrote:
+Hi,
 
-> Hi Arnd,
-> 
-> As it doesn't seem to be a "bus" any more, I left it in in misc for
-> now... It looks to me like there should be some kind of place for
-> "system/soc control" drivers. Or maybe there is, and I just missed
-> it?
+This version - v7 as compared to previous version, takes care of
+rounding issues due to the usage of nanoseconds in generic timing
+routine. All calculations are now in picoseconds. Once all timings
+are calculated it is converted to nanoseconds so that calculated
+timing values are compatible with existing custom timing routines
+(this will help in reverting back to custom routines easily in case
+of any issues). And documentation has been added on gpmc timings.
+Also redundant rounding of nand timings has been removed as part of
+this series.
 
-We've discussed a generic system controller framework in the past,
-but it hasn't happened so far.  Dong Aisheng has posted a
-"syscon" driver a few times, and it could eventually merge with
-this one.
+**********************************************************************
+Abstract:
 
-For now, I'd suggest you put this driver into drivers/mfd together
-with the other part from your patch 8.
+This series provides a generic gpmc timing calculation routine. There
+were three peripherals (OneNAND, tusb6010, smc91x) using custom timing
+calculations, they are migrated to use the generic timing calculation.
 
-	Arnd
+Such a generic routine would help create a driver out of gpmc platform
+code, which would be peripheral agnostic and thus lead to DT finally.
+Input to generic timing calculation routine would be gpmc peripheral
+timings, output - translated timings that gpmc can understand. Later,
+to DT'ify, gpmc peripheral timings could be passed through DT. Input
+timings that has been used here are selected such that it represents
+those that are present in peripheral timing datasheets.
+
+Also this series contains minor cleanups that were low hanging fruits
+came across upon implementing generic timing routine. One such is
+credited to Jon Hunter, relevant patch is 1/2 of his series
+@ http://marc.info/?l=linux-omap&m=134090910321284&w=2
+
+**********************************************************************
+
+Proposed generic routine has been tested on OneNAND (async) on
+OMAP3EVM rev C (as mainline does not have the OneNAND support for this,
+local patch were used to test). For other cases of custom timing
+calculation (tusb6010, smc91x non-muxed, OneNAND sync), generic timing
+calculation routine was verified by simulating on OMAP3EVM.
+
+This series is available
+        @ git://gitorious.org/x0148406-public/linux-kernel.git gpmc-prep-v7
+and is based on
+        linux-next (next-20120918)
+
+Regards
+Afzal
+
+v7:
+        1. Use picoseconds throughout generic timing routine to prevent
+         rounding error.
+	2. Documentation on gpmc timings
+        3. Remove redundant rounding of nand timings (a new patch)
+
+v6:
+        1. Generic timing calculation, move existing users of custom
+         calculation to use the new generic one
+        2. Set OneNAND part to async mode before gpmc configuration
+        3. Move extra delay time user handling to proper patch
+         (3/10 -> 2/10)
+        4. Modify nand init for OMAP3EVM too as support got added
+v5:
+        Use flags for sync_read/write, hv, vhf
+v4:
+        Reorganize OneNAND set_sync/async functions in a better way
+v3:
+        1. Refactor OneNAND set_sync/async functions to separate out
+         timing and configurations
+        2. Handle bool type timings too
+        3. Swap patches 2 & 3 due to dependency of OneNAND change on
+         newly added bool type timings
+v2:
+        1. Make use of timing api for setting clock activation time,
+         and remove direct writing to register for clock activation.
+        2. Move ensuring that async mode in OneNAND has been setup from
+         set_sync to setup function, improve commit message
+
+Afzal Mohammed (10):
+  ARM: OMAP2+: nand: unify init functions
+  ARM: OMAP2+: nand: remove redundant rounding
+  ARM: OMAP2+: gpmc: handle additional timings
+  ARM: OMAP2+: onenand: refactor for clarity
+  ARM: OMAP2+: gpmc: find features by ip rev check
+  ARM: OMAP2+: gpmc: remove cs# in sync clk div calc
+  ARM: OMAP2+: gpmc: generic timing calculation
+  ARM: OMAP2+: onenand: generic timing calculation
+  ARM: OMAP2+: smc91x: generic timing calculation
+  ARM: OMAP2+: tusb6010: generic timing calculation
+
+Jon Hunter (1):
+  ARM: OMAP2+: GPMC: Remove unused OneNAND get_freq() platform function
+
+ Documentation/bus-devices/ti-gpmc.txt      |  77 ++++++
+ arch/arm/mach-omap2/board-devkit8000.c     |   8 +-
+ arch/arm/mach-omap2/board-flash.c          |  45 ++--
+ arch/arm/mach-omap2/board-flash.h          |   6 +-
+ arch/arm/mach-omap2/board-igep0020.c       |   2 +-
+ arch/arm/mach-omap2/board-ldp.c            |   4 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |   8 +-
+ arch/arm/mach-omap2/board-omap3evm.c       |   8 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |   8 +-
+ arch/arm/mach-omap2/board-overo.c          |   7 +-
+ arch/arm/mach-omap2/board-zoom.c           |   5 +-
+ arch/arm/mach-omap2/common-board-devices.c |  45 ----
+ arch/arm/mach-omap2/common-board-devices.h |   1 -
+ arch/arm/mach-omap2/gpmc-nand.c            |  30 +--
+ arch/arm/mach-omap2/gpmc-onenand.c         | 334 +++++++++++--------------
+ arch/arm/mach-omap2/gpmc-smc91x.c          |  43 ++--
+ arch/arm/mach-omap2/gpmc.c                 | 383 ++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/usb-tusb6010.c         | 181 ++++----------
+ arch/arm/plat-omap/include/plat/gpmc.h     | 114 +++++++--
+ arch/arm/plat-omap/include/plat/onenand.h  |   8 -
+ 20 files changed, 836 insertions(+), 481 deletions(-)
+ create mode 100644 Documentation/bus-devices/ti-gpmc.txt
+
+-- 
+1.7.12
