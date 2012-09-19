@@ -1,40 +1,86 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 19 Sep 2012 20:29:40 +0300
-Subject: [PATCH 2/4] usb: dwc3: Fix gadget pullup in SS mode
-In-Reply-To: <20120919172442.GA7784@arwen.pp.htv.fi>
-References: <1348054229-27362-1-git-send-email-kishon@ti.com>
- <1348054229-27362-3-git-send-email-kishon@ti.com>
- <20120919115306.GG3772@arwen.pp.htv.fi>
- <CAEgRx2zOVn0zV39-cuPuj4n4HRgQmywy_NY4KTe0qEgeC+NEkw@mail.gmail.com>
- <20120919160450.GA7510@arwen.pp.htv.fi>
- <CAEgRx2yXStORBknr2hoMcobMO8wFGuKr4bvzZwEQHQQcHVH76Q@mail.gmail.com>
- <20120919172442.GA7784@arwen.pp.htv.fi>
-Message-ID: <20120919172939.GC7784@arwen.pp.htv.fi>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Sep 2012 17:34:35 +0000 (UTC)
+Subject: [PATCH V3 1/8] ARM: OMAP3: Add debugss HWMOD data
+In-Reply-To: <1347290626-21164-2-git-send-email-jon-hunter@ti.com>
+References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
+ <1347290626-21164-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <alpine.DEB.2.00.1209191731270.5264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+Hi Jon
 
-On Wed, Sep 19, 2012 at 08:24:44PM +0300, Felipe Balbi wrote:
-> > > at minimum this should've come with a proper revision check anyway.
-> > >
-> > 
-> > Actually most of it is under a rev check :)
+On Mon, 10 Sep 2012, Jon Hunter wrote:
+
+> To enable PMU with runtime PM support on OMAP3 devices we need to be able to
+> dynamically enable and disable the debug sub-system at runtime. By adding HWMOD
+> data for the debug sub-system for OMAP3, we can build the PMU device using the
+> debug sub-system HWMOD and control this power domain using runtime PM.
 > 
-> fair enough.
+> Reviewed-by: Benoit Cousson <b-cousson@ti.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-one extra comment here. That revision check is not related to the
-silicon errata you mention. That revision check is there because the bit
-definition of that particular register has changed a little bit, so
-we're just handling a slightly different programming model between older
-and newer revisions.
+Isn't this patch missing MPU address ranges?  Looking at the OMAP4 TRM 
+Table 2-2 "L3_EMU Memory Space Mapping" it should cover 
+0x54000000-0x541fffff?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/b82b1a27/attachment.sig>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index c9e3820..78a0c2d 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -114,6 +114,24 @@ static struct omap_hwmod omap3xxx_iva_hwmod = {
+>  	.main_clk	= "iva2_ck",
+>  };
+>  
+> +/*
+> + * 'debugss' class
+> + * debug and emulation sub system
+> + */
+> +
+> +static struct omap_hwmod_class omap3xxx_debugss_hwmod_class = {
+> +	.name	= "debugss",
+> +};
+> +
+> +/* debugss */
+> +static struct omap_hwmod omap3xxx_debugss_hwmod = {
+> +	.name		= "debugss",
+> +	.class		= &omap3xxx_debugss_hwmod_class,
+> +	.clkdm_name	= "emu_clkdm",
+> +	.main_clk	= "emu_src_ck",
+> +	.flags		= HWMOD_NO_IDLEST,
+> +};
+> +
+>  /* timer class */
+>  static struct omap_hwmod_class_sysconfig omap3xxx_timer_1ms_sysc = {
+>  	.rev_offs	= 0x0000,
+> @@ -2093,6 +2111,13 @@ static struct omap_hwmod_ocp_if omap3xxx_mpu__l3_main = {
+>  	.user	= OCP_USER_MPU,
+>  };
+>  
+> +/* l3 -> debugss */
+> +static struct omap_hwmod_ocp_if omap3xxx_l3_main__l4_debugss = {
+> +	.master		= &omap3xxx_l3_main_hwmod,
+> +	.slave		= &omap3xxx_debugss_hwmod,
+> +	.user		= OCP_USER_MPU,
+> +};
+> +
+>  /* DSS -> l3 */
+>  static struct omap_hwmod_ocp_if omap3430es1_dss__l3 = {
+>  	.master		= &omap3430es1_dss_core_hwmod,
+> @@ -3272,6 +3297,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+>  	&omap3xxx_l3_main__l4_core,
+>  	&omap3xxx_l3_main__l4_per,
+>  	&omap3xxx_mpu__l3_main,
+> +	&omap3xxx_l3_main__l4_debugss,
+>  	&omap3xxx_l4_core__l4_wkup,
+>  	&omap3xxx_l4_core__mmc3,
+>  	&omap3_l4_core__uart1,
+> -- 
+> 1.7.9.5
+
+
+- Paul
