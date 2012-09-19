@@ -1,62 +1,61 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Sep 2012 12:34:31 +0200
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <m3a9wmgvip.fsf@pullcord.laptop.org>
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1587150.uFGRdL0s8e@amdc1227> <m3a9wmgvip.fsf@pullcord.laptop.org>
-Message-ID: <1907099.4JSZthrgh2@amdc1227>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 19 Sep 2012 14:37:35 +0400
+Subject: [RFC PATCH 08/10] ARM:davinci - migrating to use
+ davinci_common_clk_init
+In-Reply-To: <1347993342-6099-9-git-send-email-m-karicheri2@ti.com>
+References: <1347993342-6099-1-git-send-email-m-karicheri2@ti.com>
+ <1347993342-6099-9-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5059A06F.4050402@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hello.
 
-On Wednesday 19 of September 2012 06:24:46 Chris Ball wrote:
-> Hi Tomasz,
-> 
-> On Wed, Sep 19 2012, Tomasz Figa wrote:
-> > Hi Chris,
-> > 
-> > On Wednesday 19 of September 2012 01:42:01 Chris Ball wrote:
-> >> On Tue, Sep 04 2012, Tomasz Figa wrote:
-> >> > Some boards use fixed voltage regulator for vmmc supply (e.g. for
-> >> > eMMC
-> >> > memories). MMC_CAP2_BROKEN_VOLTAGE must be enabled for them to
-> >> > operate
-> >> > correctly.
-> >> 
-> >> Is there a reason we can't make this a property on the regulator
-> >> instead?> 
-> > Is there a reason we can't make this a property of the mmc subsystem?
-> > ;)
-> > 
-> > Now, seriously, could you elaborate on this a bit more? Do you mean
-> > that a regulator should provide a dummy set voltage operation that
-> > would accept any voltage?
-> 
-> Sorry for the terseness.
-> 
-> It seems like we're encoding exactly the same information twice in two
-> different subsystems -- I don't see the point, so I'd like to think
-> about how we could do better.
-> 
-> For example, if we're only concerned about fixed regulators, could we
-> just detect a fixed regulator in the driver and avoid the failing call
-> to regulator_set_voltage() directly, without needing to go via this
-> capability?  Seems like the capability doesn't tell us anything we
-> couldn't already have known.
+On 18-09-2012 22:35, Murali Karicheri wrote:
 
-We could just check if the regulator provides the capability to change the 
-voltage.
+> The common clk code uses a new function davinci_common_clk_init()
+> defined in drivers/clk/davinci/davinci-clock.c to initialize the
+> clk drivers. This function is now invoked in time.c as part of
+> davinci_timer_init(). Currently davinci_clk_init() is called from
+> davinci_common_init() which is too early to initialize common clk
+> drivers. Also include pll.h instead of clock.h in some of the source
+> files.
 
-I don't see any direct way of querying the regulator for provided 
-capabilities (correct me if I'm just blind), but calling 
-regulator_count_voltages() on the regulator and checking if the returned 
-value is 1 should be enough to assume that the regulator is fixed.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-What do you think?
+> diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
+> index 64b0f65..f854296 100644
+> --- a/arch/arm/mach-davinci/common.c
+> +++ b/arch/arm/mach-davinci/common.c
+[...]
+> @@ -106,7 +108,9 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
+>   		goto err;
+>
+>   	if (davinci_soc_info.cpu_clks) {
+> +#ifndef CONFIG_COMMON_CLK
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+    Shouldn't you enclose in theis #ifndef the whole *if* statement?
+
+>   		ret = davinci_clk_init(davinci_soc_info.cpu_clks);
+> +#endif
+>
+>   		if (ret != 0)
+>   			goto err;
+[...]
+> diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
+> index d4e9316..5c04a7c 100644
+> --- a/arch/arm/mach-davinci/sleep.S
+> +++ b/arch/arm/mach-davinci/sleep.S
+> @@ -183,6 +187,7 @@ ENDPROC(davinci_cpu_suspend)
+>    * 	r1: contains virtual base for DDR2 Power and Sleep controller (PSC)
+>    * 	r2: contains PSC number for DDR2
+>    */
+> +
+
+    Unrelated/unnecessary change?
+
+>   ENTRY(davinci_ddr_psc_config)
+>   	/* Set next state in mdctl for DDR2 */
+>   	mov	r6, #MDCTL
+
+WBR, Sergei
