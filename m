@@ -1,27 +1,40 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Thu, 20 Sep 2012 02:49:25 +0530
-Subject: [PATCH RESEND 0/5] ARM: dts: AM33XX: Add device tree data
-Message-ID: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+Date: Thu, 20 Sep 2012 02:49:26 +0530
+Subject: [PATCH RESEND v7 1/5] ARM: dts: AM33XX: Add basic pinctrl device tree
+ data
+In-Reply-To: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+References: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1348089570-16161-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree data of pinctrl, d_can, lis331dlh and tmp275 drivers
-for AM33XX family of devices. These patches were submitted earlier
-and reviewed. Re-sending to apply cleanly on linux-omap/devel-dt
-tree. These patches were tested on am33xx-evm and am335x-bone.
+Adds basic pinctrl device tree data for AM33XX family of devices.
+This patch is based on the pinctrl-single driver.
 
-AnilKumar Ch (5):
-  ARM: dts: AM33XX: Add basic pinctrl device tree data
-  ARM: dts: AM33XX: Add D_CAN device tree data
-  ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
-  ARM: dts: AM33XX: Add lis331dlh device tree data to am335x-evm
-  ARM: dts: AM33XX: Add temperature sensor device tree data to
-    am335x-evm
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- arch/arm/boot/dts/am335x-evm.dts     |   44 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi        |   27 +++++++++++++++++++++
- arch/arm/mach-omap2/clock33xx_data.c |    1 +
- 3 files changed, 72 insertions(+)
-
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index b4e3e47..894fec6 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -55,6 +55,15 @@
+ 		};
+ 	};
+ 
++	am33xx_pinmux: pinmux at 44e10800 {
++		compatible = "pinctrl-single";
++		reg = <0x44e10800 0x0238>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0x7f>;
++	};
++
+ 	/*
+ 	 * XXX: Use a flat representation of the AM33XX interconnect.
+ 	 * The real AM33XX interconnect network is quite complex.Since
 -- 
 1.7.9.5
