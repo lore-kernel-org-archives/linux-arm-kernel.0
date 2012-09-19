@@ -1,14 +1,18 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Sep 2012 08:18:59 +0900
-Subject: [GIT PULL 5/7] Samsung board for v3.7
-Message-ID: <099c01cd96bd$263a9050$72afb0f0$%kim@samsung.com>
+Date: Thu, 20 Sep 2012 08:19:15 +0900
+Subject: [GIT PULL 6/7] Samsung cleanup fimd header for v3.7
+Message-ID: <099d01cd96bd$2f625050$8e26f0f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Arnd, Olof.
 
-This is for updating non-DT Samsung board files for v3.7, there are adding
-generic PWM lookup support and some updates.
+This is for moving header file is related to fimd from platform to
+include/video.
+
+Since this touches many Samsung stuff, it is included in samsung tree and I
+requested to pull into Florian's tree and he already agreed. So its name is
+'v3.7-for-florian'.
 
 If any problems, please kindly let me know.
 
@@ -26,27 +30,42 @@ The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
 are available in the git repository at:
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/board-samsung
+v3.7-for-florian
 
-Mark Brown (2):
-      ARM: S3C64XX: Update configuration for WM5102 module on Cragganmore
-      ARM: S3C64XX: Register audio platform devices for Bells on Cragganmore
+Leela Krishna Amudala (2):
+      include/video: move fimd register headers from platform to
+include/video
+      include/video: Add register offsets for FIMD version 8
 
-Sachin Kamat (4):
-      ARM: dts: Use active low flag for gpio-keys on Origen
-      ARM: dts: Add heartbeat gpio-leds support to Origen
-      ARM: EXYNOS: Add generic PWM lookup support for SMDK4X12
-      ARM: EXYNOS: Add generic PWM lookup support for SMDKV310
-
-Tushar Behera (1):
-      ARM: EXYNOS: Use generic pwm driver in Origen board
-
- arch/arm/boot/dts/exynos4210-origen.dts      |   18 +++++++++---
- arch/arm/mach-exynos/Kconfig                 |    3 ++
- arch/arm/mach-exynos/mach-origen.c           |    6 ++++
- arch/arm/mach-exynos/mach-smdk4x12.c         |    6 ++++
- arch/arm/mach-exynos/mach-smdkv310.c         |    7 +++++
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   36
-++++++++++++++++++++++---
- arch/arm/mach-s3c64xx/mach-crag6410.c        |   12 ++++++++
- 7 files changed, 78 insertions(+), 10 deletions(-)
+ arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+ arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+ arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
+ arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
+ arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
+ arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
+--------------------
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+ drivers/video/s3c-fb.c                             |    2 +-
+ .../plat/regs-fb.h => include/video/samsung_fimd.h |  152
++++++++++++++++++--
+ 26 files changed, 165 insertions(+), 194 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+ rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
+include/video/samsung_fimd.h (73%)
