@@ -1,16 +1,15 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Sep 2012 08:18:37 +0900
-Subject: [GIT PULL 2/7] Samsung gpio for v3.7
-Message-ID: <099901cd96bd$1929fd60$4b7df820$%kim@samsung.com>
+Date: Thu, 20 Sep 2012 08:18:46 +0900
+Subject: [GIT PULL 3/7] Samsung pinctrl for v3.7
+Message-ID: <099a01cd96bd$1e0baf40$5a230dc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof
 
-This is for supporting DT gpio for Samsung S3C24XX.
-
-Since there are many changes for gpio-samsung in my tree, this has been
-included in my tree with Linus' agreement.
+This branch is for supporting pinctrl for Samsung EXYNOS. Now this can
+support EXYNOS4210 and other EXYNOS SoCs such as EXYNOS4X12 will be
+supported next time.
 
 If any problems, please kindly let me know.
 
@@ -28,12 +27,35 @@ The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
 
 are available in the git repository at:
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/gpio-samsung
+next/pinctrl-samsung
 
-Heiko Stuebner (1):
-      gpio: samsung: add devicetree init for s3c24xx arches
+Thomas Abraham (6):
+      pinctrl: add samsung pinctrl and gpiolib driver
+      pinctrl: add exynos4210 specific extensions for samsung pinctrl driver
+      gpio: exynos4: skip gpiolib registration if pinctrl driver is used
+      ARM: EXYNOS: skip wakeup interrupt setup if pinctrl driver is used
+      ARM: dts: Add pinctrl node entries for SAMSUNG EXYNOS4210 SoC
+      ARM: EXYNOS: Enable pinctrl driver support for EXYNOS4 device tree
+enabled platform
 
- .../devicetree/bindings/gpio/gpio-samsung.txt      |   43 +++++++++++++
- drivers/gpio/gpio-samsung.c                        |   63
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  196 +++++
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi          |  457 ++++++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |   37 +
+ arch/arm/mach-exynos/Kconfig                       |    2 +
+ arch/arm/mach-exynos/common.c                      |   26 +
+ drivers/gpio/gpio-samsung.c                        |   21 +
+ drivers/pinctrl/Kconfig                            |    9 +
+ drivers/pinctrl/Makefile                           |    2 +
+ drivers/pinctrl/pinctrl-exynos.c                   |  560 ++++++++++++
+ drivers/pinctrl/pinctrl-exynos.h                   |  217 +++++
+ drivers/pinctrl/pinctrl-samsung.c                  |  888
 ++++++++++++++++++++
- 2 files changed, 106 insertions(+), 0 deletions(-)
+ drivers/pinctrl/pinctrl-samsung.h                  |  239 ++++++
+ 12 files changed, 2654 insertions(+), 0 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-exynos.c
+ create mode 100644 drivers/pinctrl/pinctrl-exynos.h
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.c
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.h
