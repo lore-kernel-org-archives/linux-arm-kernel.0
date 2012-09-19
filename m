@@ -1,109 +1,75 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Sep 2012 08:20:40 +0900
-Subject: [PATCH V5] ARM: EXYNOS5: Add bus clock for FIMD
-In-Reply-To: <1347978288-27759-1-git-send-email-l.krishna@samsung.com>
-References: <1347978288-27759-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <099f01cd96bd$623d1cd0$26b75670$%kim@samsung.com>
+Date: Thu, 20 Sep 2012 08:22:30 +0900
+Subject: [PATCH 2/2] ARM: SAMSUNG: Add check for NULL in clock interface
+In-Reply-To: <CAJuYYwR9ttbL9oknv7L60GnS3U1c_MX0Qddr6fg1zh7T1LzR=w@mail.gmail.com>
+References: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
+ <CAJuYYwR9ttbL9oknv7L60GnS3U1c_MX0Qddr6fg1zh7T1LzR=w@mail.gmail.com>
+Message-ID: <09a001cd96bd$a4155820$ec400860$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leela Krishna Amudala wrote:
+Thomas Abraham wrote:
 > 
-> This patch adds the bus clock for FIMD and changes the device name for lcd
-> clock
+> On 6 September 2012 19:55, Chander Kashyap <chander.kashyap@linaro.org>
+> wrote:
+> > The clock instance parameter in Samsung clock interface is not being
+> checked
+> > for NULL pointers. Add checks for NULL pointers.
+> >
+> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> > ---
+> >  arch/arm/plat-samsung/clock.c |    8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-
+> samsung/clock.c
+> > index 65c5eca..7938fbc 100644
+> > --- a/arch/arm/plat-samsung/clock.c
+> > +++ b/arch/arm/plat-samsung/clock.c
+> > @@ -119,7 +119,7 @@ void clk_disable(struct clk *clk)
+> >
+> >  unsigned long clk_get_rate(struct clk *clk)
+> >  {
+> > -       if (IS_ERR(clk))
+> > +       if (IS_ERR_OR_NULL(clk))
+> >                 return 0;
+> >
+> >         if (clk->rate != 0)
+> > @@ -136,7 +136,7 @@ unsigned long clk_get_rate(struct clk *clk)
+> >
+> >  long clk_round_rate(struct clk *clk, unsigned long rate)
+> >  {
+> > -       if (!IS_ERR(clk) && clk->ops && clk->ops->round_rate)
+> > +       if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
+> >                 return (clk->ops->round_rate)(clk, rate);
+> >
+> >         return rate;
+> > @@ -146,7 +146,7 @@ int clk_set_rate(struct clk *clk, unsigned long
+rate)
+> >  {
+> >         int ret;
+> >
+> > -       if (IS_ERR(clk))
+> > +       if (IS_ERR_OR_NULL(clk))
+> >                 return -EINVAL;
+> >
+> >         /* We do not default just do a clk->rate = rate as
+> > @@ -175,7 +175,7 @@ int clk_set_parent(struct clk *clk, struct clk
+> *parent)
+> >  {
+> >         int ret = 0;
+> >
+> > -       if (IS_ERR(clk))
+> > +       if (IS_ERR_OR_NULL(clk) || IS_ERR_OR_NULL(parent))
+> >                 return -EINVAL;
+> >
+> >         spin_lock(&clocks_lock);
+> > --
+> > 1.7.9.5
 > 
-> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c |   32
-++++++++++++++++++++++--------
-> --
->  1 files changed, 22 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
-> exynos/clock-exynos5.c
-> index 774533c..404c53d 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
->  	.ctrlbit	= (1 << 4),
->  };
-> 
-> +static struct clk exynos5_clk_fimd1 = {
-> +	.name		= "fimd",
-> +	.devname	= "exynos5-fb.1",
-> +	.enable		= exynos5_clk_ip_disp1_ctrl,
-> +	.ctrlbit	= (1 << 0),
-> +};
-> +
->  struct clk *exynos5_clkset_group_list[] = {
->  	[0] = &clk_ext_xtal_mux,
->  	[1] = NULL,
-> @@ -1120,6 +1127,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
->  	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
->  };
-> 
-> +struct clksrc_clk exynos5_clk_sclk_fimd1 = {
-> +	.clk	= {
-> +		.name		= "sclk_fimd",
-> +		.devname	= "exynos5-fb.1",
-> +		.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
-> +		.ctrlbit	= (1 << 0),
-> +	},
-> +	.sources = &exynos5_clkset_group,
-> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
-> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
-> +};
-> +
->  static struct clksrc_clk exynos5_clksrcs[] = {
->  	{
->  		.clk	= {
-> @@ -1131,16 +1150,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
->  		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size
-> = 8 },
->  	}, {
->  		.clk	= {
-> -			.name		= "sclk_fimd",
-> -			.devname	= "s3cfb.1",
-> -			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
-> -			.ctrlbit	= (1 << 0),
-> -		},
-> -		.sources = &exynos5_clkset_group,
-> -		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift =
-> 0, .size = 4 },
-> -		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift =
-> 0, .size = 4 },
-> -	}, {
-> -		.clk	= {
->  			.name		= "aclk_266_gscl",
->  		},
->  		.sources = &clk_src_gscl_266,
-> @@ -1240,12 +1249,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
->  	&exynos5_clk_mdout_spi0,
->  	&exynos5_clk_mdout_spi1,
->  	&exynos5_clk_mdout_spi2,
-> +	&exynos5_clk_sclk_fimd1,
->  };
-> 
->  static struct clk *exynos5_clk_cdev[] = {
->  	&exynos5_clk_pdma0,
->  	&exynos5_clk_pdma1,
->  	&exynos5_clk_mdma1,
-> +	&exynos5_clk_fimd1,
->  };
-> 
->  static struct clksrc_clk *exynos5_clksrc_cdev[] = {
-> @@ -1274,6 +1285,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
->  	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
->  	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
->  	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
-> +	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
->  };
-> 
->  static unsigned long exynos5_epll_get_rate(struct clk *clk)
-> --
-> 1.7.0.4
+> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-Looks OK to me, will apply with Jingoo's ack(Or review?).
+Looks OK, will apply.
 
 Thanks.
 
