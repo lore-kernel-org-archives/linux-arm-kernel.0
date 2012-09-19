@@ -1,43 +1,39 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 19 Sep 2012 10:06:30 -0700
-Subject: [PATCH 20/24] input: rpcmouse: use __iomem pointers for MMIO
-In-Reply-To: <1347658492-11608-21-git-send-email-arnd@arndb.de>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <1347658492-11608-21-git-send-email-arnd@arndb.de>
-Message-ID: <20120919170630.GC16286@core.coreip.homeip.net>
+Date: Wed, 19 Sep 2012 10:11:26 -0700
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
+ DT and non-DT boots
+In-Reply-To: <CACRpkdbntZ2k+2mi7=nCL2RV+YcbYi=wbK2RaDKsKNKqsCxMOA@mail.gmail.com>
+References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaKa=NAObnjJyifhxyqu3Hcgj7Fxqi=bdNFqbm7V_8cSw@mail.gmail.com>
+ <20120914080347.GB3374@gmail.com>
+ <CACRpkdbntZ2k+2mi7=nCL2RV+YcbYi=wbK2RaDKsKNKqsCxMOA@mail.gmail.com>
+Message-ID: <20120919171126.GA16730@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 11:34:48PM +0200, Arnd Bergmann wrote:
-> ARM is moving to stricter checks on readl/write functions,
-> so we need to use the correct types everywhere.
+On Tue, Sep 18, 2012 at 01:22:06PM +0200, Linus Walleij wrote:
+> On Fri, Sep 14, 2012 at 10:03 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, Sep 13, 2012 at 11:35:43AM +0200, Linus Walleij wrote:
+> >>
+> >> Not having this patch in v3.6-rcN gives the following boot noise (and
+> >> the key does not work):
+> >>
+> >> ------------[ cut here ]------------
+> >> WARNING: at /home/elinwal/linux-stericsson/kernel/irq/irqdomain.c:137
+> >> irq_domain_legacy_revmap+0x20/0x48()
+> (...)
+> > I haven't tested this, but I think this patch should be pulled out
+> > of -next and pushed into the -rcs to fix the issue you see above.
+> > The real fix along with the revert to this patch also resides in
+> > -next and will be applied during the next merge window.
 > 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Dmitry, can you fix this?
+> 
+> v3.6-rc6 is regressing on us...
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+OK, I'll revert and send a pull request tonight.
 
-> ---
->  drivers/input/mouse/rpcmouse.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/mouse/rpcmouse.c b/drivers/input/mouse/rpcmouse.c
-> index 272dedd..21c60fe 100644
-> --- a/drivers/input/mouse/rpcmouse.c
-> +++ b/drivers/input/mouse/rpcmouse.c
-> @@ -42,7 +42,7 @@ static irqreturn_t rpcmouse_irq(int irq, void *dev_id)
->  
->  	x = (short) iomd_readl(IOMD_MOUSEX);
->  	y = (short) iomd_readl(IOMD_MOUSEY);
-> -	b = (short) (__raw_readl(0xe0310000) ^ 0x70);
-> +	b = (short) (__raw_readl(IOMEM(0xe0310000)) ^ 0x70);
->  
->  	dx = x - rpcmouse_lastx;
->  	dy = y - rpcmouse_lasty;
-> -- 
-> 1.7.10
-> 
+Thanks.
 
 -- 
 Dmitry
