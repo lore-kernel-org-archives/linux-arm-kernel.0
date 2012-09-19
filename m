@@ -1,64 +1,74 @@
-From: ljkenny@gmail.com (Lee Jones)
-Date: Wed, 19 Sep 2012 21:09:52 +0200
-Subject: [rtc-linux] [PATCH 1/1] drivers/rtc/rtc-ab8500.c: Revoke Device
- Tree enablement
-In-Reply-To: <20120919160302.GN28670@sortiz-mobl>
-References: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
- <1344527828-6283-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdZa-72QogrZ-P5jbDHTTX64babZo3ydjzfgC-4LWUBfMg@mail.gmail.com>
- <20120831110818.GA5962@gmail.com>
- <CACRpkdat3zj_47r7ENz7Qv3N8cNOSKDV+k5em9DjOhkNycy9gQ@mail.gmail.com>
- <CACRpkdbXwLXoWL+PS-wJ9cbztC-jWhyc=vr+98ffg70f6coaiQ@mail.gmail.com>
- <20120919160302.GN28670@sortiz-mobl>
-Message-ID: <20120919190952.GB2753@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Sep 2012 12:11:00 -0700
+Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
+ drivers/bus/
+In-Reply-To: <201209191857.57862.arnd@arndb.de>
+References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120917215128.GF11762@atomide.com>
+ <201209191857.57862.arnd@arndb.de>
+Message-ID: <20120919191059.GH11762@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Sam: do you agree?
-> I'd love to see the patch first :)
-> Could you please bounce it to me ?
+* Arnd Bergmann <arnd@arndb.de> [120919 11:59]:
+> On Monday 17 September 2012, Tony Lindgren wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
+> > > OMAP interconnect drivers are used for the interconnect error handling.
+> > > Since they are bus driver, lets move it to newly created drivers/bus.
+> > > 
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > > ---
+> > > Patch just moves OMAP interconnect drivers as is to the newly created
+> > > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
+> > > tree and test on all OMAP boards.
+> > 
+> > Great, looks like this should not conflict with other
+> > omap patches queued, so Arnd should probably take this into
+> > the bus branch:
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> It turns out that the patch actually did conflict and we now have a broken
+> omap2plus_defconfig. The patch below seems to fix it, but please verify
+> that this makes sense.
 
-I'll help. :)
+Heh a conflict caused by hard coded irqs for the error message :)
+Looks like a good fix that removes some unncecessary dependencies:
 
-Author: Lee Jones <lee.jones@linaro.org>
-Date:   Thu Aug 9 13:28:19 2012 +0100
-
-    drivers/rtc/rtc-ab8500.c: Revoke Device Tree enablement
-    
-    All AB8500 devices are now registered via MFD core, so Device Tree
-    capability is no longer required for probing. Here we pull the DT
-    match table to ensure we're no longer probed during Device Tree
-    start-up.
-    
-    CC: Alessandro Zummo <a.zummo@towertech.it>
-    CC: rtc-linux at googlegroups.com
-    Acked-by: Linus Walleij <linus.walleij@linaro.org>
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
-index bf3c2f6..2e5970f 100644
---- a/drivers/rtc/rtc-ab8500.c
-+++ b/drivers/rtc/rtc-ab8500.c
-@@ -462,16 +462,10 @@ static int __devexit ab8500_rtc_remove(struct platform_device *pdev)
-   return 0;
- }
+Acked-by: Tony Lindgren <tony@atomide.com>
  
--static const struct of_device_id ab8500_rtc_match[] = {
--	{ .compatible = "stericsson,ab8500-rtc", },
--	{}
--};
--
- static struct platform_driver ab8500_rtc_driver = {
- 	.driver = {
- 		.name = "ab8500-rtc",
- 		      .owner = THIS_MODULE,
--		      	     .of_match_table = ab8500_rtc_match,
- 			     },
- 			     .probe	= ab8500_rtc_probe,
- 			     .remove = __devexit_p(ab8500_rtc_remove),
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+> index f447e02..ab911a3 100644
+> --- a/drivers/bus/omap_l3_noc.c
+> +++ b/drivers/bus/omap_l3_noc.c
+> @@ -28,7 +28,6 @@
+>  #include <linux/kernel.h>
+>  #include <linux/slab.h>
+>  
+> -#include "soc.h"
+>  #include "omap_l3_noc.h"
+>  
+>  /*
+> @@ -191,7 +190,7 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
+>  			IRQF_DISABLED, "l3-dbg-irq", l3);
+>  	if (ret) {
+>  		pr_crit("L3: request_irq failed to register for 0x%x\n",
+> -						9 + OMAP44XX_IRQ_GIC_START);
+> +						l3->debug_irq);
+>  		goto err3;
+>  	}
+>  
+> @@ -201,7 +200,7 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
+>  			IRQF_DISABLED, "l3-app-irq", l3);
+>  	if (ret) {
+>  		pr_crit("L3: request_irq failed to register for 0x%x\n",
+> -						10 + OMAP44XX_IRQ_GIC_START);
+> +						l3->app_irq);
+>  		goto err4;
+>  	}
+>  
