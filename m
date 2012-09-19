@@ -1,86 +1,41 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Sep 2012 22:52:57 +0200
-Subject: [PATCH v4] gpio: mvebu: new gpio driver for mvebu platforms
-Message-ID: <1348087983-22309-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 19 Sep 2012 22:53:00 +0200
+Subject: [PATCH v4 3/5] arm: mvebu: use GPIO support now that a driver is
+ available
+In-Reply-To: <1348087983-22309-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1348087983-22309-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1348087983-22309-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+---
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-mvebu/include/mach/gpio.h |    1 +
+ 2 files changed, 2 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/include/mach/gpio.h
 
-This patch set adds a new GPIO driver for Marvell EBU SoCs, which aims
-at replacing the existing GPIO driver from plat-orion/gpio.c. The
-driver comes with the necessary DT changes to make it work on Armada
-370 and Armada XP, and it has been tested successfully by Sebastian
-Hesselbarth on Dove. It should also work flawlessly on other Marvell
-EBU SoCs (Kirkwood, Orion, Discovery), but this remains to be tested
-by the relevant maintainers. This isn't however a problem, as those
-older platforms need to explictly be converted over to the new pinctrl
-driver and the new gpio driver. Until that, they will happily continue
-to use the old, known-working gpio driver. So this patch set has no
-chance to break any of the existing Marvell platforms.
-
-This new driver reuses a lot of code from the existing
-plat-orion/gpio.c driver, but has a number of advantages:
-
- *) Support for Armada 370 and Armada XP
- *) It is integrated with the mvebu pinctrl driver so that GPIO pins
-    are properly muxed, and the GPIO driver knows which GPIO pins are
-    output-only or input-only. This driver has been submitted by
-    Sebastian Hesselbarth today on the LAKML.
- *) Properly placed in drivers/gpio
- *) More extensible mechanism to support platform differences. The
-    plat-orion driver uses a simple mask-offset DT property, which
-    works fine for Discovery MV78200 but not for Armada XP. The new
-    driver uses different compatible strings to identify the different
-    variants of the GPIO controllers.
-
-This patch set should be applied on top of the pinctrl-mvebu patch set
-from Sebastian Hesselbarth, as it depends on it.
-
-Changes since v3:
- * Added #interrupt-cells in both the DT binding documentation
-   example, and in the DT data for Armada 370 and XP (noticed by
-   Stephen Warren)
- * Fixed a typo on the #interrupt-cells description in the DT binding
-   description (noticed by Stephen Warren).
- * Fixed a bug in gpio_mvebu_irq_set_type() when the GPIO used was not
-   from the first bank (noticed, debugged and fix provided by Andrew
-   Lunn)
- * Added the Acked-by or Reviewed-by that were received from Rob
-   Herring and Linus Walleij on certain patches.
-
-Changes since v2:
- * Use inline functions for the register accessors, and rename them
-   lower-case since they are functions, as suggested by
-   Jean-Christophe Plagnol-Villard.
- * Use _relaxed() variants of readl/writel, as suggested by
-   Jean-Christophe Plagnol-Villard.
- * Use switch() instead of long list of if() conditions in
-   mvebu_gpio_irq_set_type(), as suggested by Jean-Christophe
-   Plagnol-Villard.
- * Add DT aliases gpio0, gpio1, gpio2, and then use of_alias_get_id()
-   to get the number of GPIO bank, and deduce the GPIO base from
-   it. We don't use automatic allocation because we really want the
-   internal SoC GPIOs to have 0-31, 32-63, 64-... numbers (while
-   automatic allocation allocates 224... for the first bank 202... for
-   the second bank, etc.). This strategy was recommended by Uwe
-   Kleine-Koenig and is already used in gpio-mxs.c.
- * Use gpio-cells = <2> instead of gpio-cells = <1>, as suggested by
-   Olof Johansson. This allows to re-use the default .xlate()
-   function, and therefore make the GPIO DT binding actually work (it
-   was broken in previous versions of this patch set).
- * Use dev_name() to fill the gpio_chip->name field, instead of
-   manually computing a name. This allows to get rid of the global
-   variable counting GPIO chips.
- * Rebase on top of the latest pinctrl work from Sebastian
-   Hesselbarth.
- * Added the Acked-by from Linus Walleij on the DT binding
-   documentation patch.
-
-Changes since v1:
- * Added fixes for Dove from Sebastian Hesselbarth, and his Tested-by
-   on the driver patch.
-
-Thanks,
-
-Thomas
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2eb3f6b..d00d1a3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -575,6 +575,7 @@ config ARCH_MVEBU
+ 	select COMMON_CLK
+ 	select PLAT_ORION
+ 	select PINCTRL
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	help
+ 	  Support for the Marvell SoC Family with device tree support
+ 
+diff --git a/arch/arm/mach-mvebu/include/mach/gpio.h b/arch/arm/mach-mvebu/include/mach/gpio.h
+new file mode 100644
+index 0000000..40a8c17
+--- /dev/null
++++ b/arch/arm/mach-mvebu/include/mach/gpio.h
+@@ -0,0 +1 @@
++/* empty */
+-- 
+1.7.9.5
