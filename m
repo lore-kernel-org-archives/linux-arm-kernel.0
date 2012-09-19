@@ -1,52 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Sep 2012 13:33:50 +0800
-Subject: [PATCH] ARM:IMX6Q:use pll2_pfd2_396m as the enfc_sel's parent
-In-Reply-To: <1347261476-9799-1-git-send-email-b32955@freescale.com>
-References: <1347261476-9799-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120919053348.GH6460@S2100-06.ap.freescale.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 19 Sep 2012 01:15:48 -0400
+Subject: [PATCH v2 1/2] mmc: atmel-mci: DMA can be used with other
+ controller
+In-Reply-To: <503F961E.5010905@yahoo.es> (Hein Tibosch's message of "Fri, 31
+ Aug 2012 00:34:38 +0800")
+References: <503F961E.5010905@yahoo.es>
+Message-ID: <m3haquk2yj.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2012 at 03:17:56PM +0800, Huang Shijie wrote:
-> The gpmi-nand driver can support the ONFI nand chip's EDO (extra data out)
-> mode in the asynchrounous mode. In the asynchrounous mode 5, the gpmi
-> needs 100MHz clock for the IO. But with the pll2_pfd0_352m, we can not
-> get the 100MHz clock.
-> 
-> So choose pll2_pfd2_396m as enfc_sel's parent.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+Hi Hein,
 
-Applied, thanks.
-
-But we really expect that clock framework can get improved to have such
-case handled in clk_set_rate() call.
-
-Shawn
-
+On Thu, Aug 30 2012, Hein Tibosch wrote:
+> After the latest changes to atmel-mci, it could not be used with
+> DMA on the AVR32 platform. This patch will allow to use DMA again
+> and it will avoid access to MCI register ATMCI_DMA.
+>
+> v2:
+> Even if the IP version is lower than v3xx and doesn't have the DMA
+> configuration register, DMA transfers can be used with a different
+> controller than the Atmel AHB DMA one. For instance, some AVR chips use 
+> the Synopsys DesignWare AHB DMA controller.
+>
+> v2: in atmci_configure_dma: check both pdata and pdata->dma_slave
+>
+>
+> Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 > ---
->  arch/arm/mach-imx/clk-imx6q.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 4233d9e..58705b6 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -440,6 +440,13 @@ int __init mx6q_clocks_init(void)
->  	clk_register_clkdev(clk[ahb], "ahb", NULL);
->  	clk_register_clkdev(clk[cko1], "cko1", NULL);
->  
-> +	/*
-> +	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
-> +	 * We can not get the 100MHz from the pll2_pfd0_352m.
-> +	 * So choose pll2_pfd2_396m as enfc_sel's parent.
-> +	 */
-> +	clk_set_parent(clk[enfc_sel], clk[pll2_pfd2_396m]);
-> +
->  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
->  		clk_prepare_enable(clk[clks_init_on[i]]);
->  
-> -- 
-> 1.7.0.4
-> 
-> 
+>  drivers/mmc/host/atmel-mci.c |   26 +++++++++++++-------------
+>  1 files changed, 13 insertions(+), 13 deletions(-)
+
+Thanks, pushed to mmc-next for 3.7.
+
+(For the future, please put the patch changelog below the "---" instead
+of above it; that way it doesn't go into the git commit history.)
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
