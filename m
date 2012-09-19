@@ -1,61 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Sep 2012 09:55:54 +0200
-Subject: [PULL] HYP-mode boot
-Message-ID: <c65993c242ac431861fb90dbd94e0057@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Sep 2012 07:59:45 +0000
+Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
+ precisely
+In-Reply-To: <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
+References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+ <20120918124918.GK2505@amd.com>
+ <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
+Message-ID: <201209190759.46174.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Wednesday 19 September 2012, Hiroshi Doyu wrote:
+> I guess that it would work. Originally I thought that using DMA-API
+> and IOMMU-API together in driver might be kind of layering violation
+> since IOMMU-API itself is used in DMA-API. Only DMA-API used in driver
+> might be cleaner. Considering that DMA API traditionally handling
+> anonymous {bus,iova} address only, introducing the concept of
+> specific address in DMA API may not be so encouraged, though.
+> 
+> It would be nice to listen how other SoCs have solved similar needs.
 
-Could you please pull the following branch into your tree? It contains the
-HYP-mode boot code, which has been posted twice on LAK, and has been
-heavily used for KVM.
+In general, I would recommend using only the IOMMU API when you have a device
+driver that needs to control the bus virtual address space and that manages
+a device that resides in its own IOMMU context. I would recommend using
+only the dma-mapping API when you have a device that lives in a shared
+bus virtual address space with other devices, and then never ask for
+a specific bus virtual address.
 
-It is based on your opcodes branch.
+Can you explain what devices you see that don't fit in one of those two
+categories?
 
-Thanks,
-
-        M.
-
-The following changes since commit
-508514ed25315dd28340000831b17535d6f772da:
-
-  ARM: 7511/1: opcodes: Opcode definitions for the Virtualization
-Extensions (2012-09-15 21:26:00 +0100)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-hyp-boot-mode-rmk
-
-Dave Martin (5):
-      ARM: virt: allow the kernel to be entered in HYP mode
-      ARM: zImage/virt: hyp mode entry support for the zImage loader
-      ARM: virt: Update documentation for hyp mode entry support
-      ARM: virt: Add boot-time diagnostics
-      ARM: virt: Add CONFIG_ARM_VIRT_EXT option
-
-Marc Zyngier (2):
-      ARM: opcodes: add __ERET/__MSR_ELR_HYP instruction encoding
-      ARM: virt: arch_timers: enable access to physical timers
-
- Documentation/arm/Booting           |   22 ++++-
- arch/arm/boot/compressed/.gitignore |    1 +
- arch/arm/boot/compressed/Makefile   |    9 ++-
- arch/arm/boot/compressed/head.S     |   71 ++++++++++-
- arch/arm/include/asm/assembler.h    |   28 +++++
- arch/arm/include/asm/opcodes-virt.h |   10 ++
- arch/arm/include/asm/ptrace.h       |    1 +
- arch/arm/include/asm/virt.h         |   69 +++++++++++
- arch/arm/kernel/Makefile            |    2 +
- arch/arm/kernel/head.S              |   14 ++-
- arch/arm/kernel/hyp-stub.S          |  223
-+++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c             |   20 +++
- arch/arm/kernel/smp.c               |    3 +
- arch/arm/mm/Kconfig                 |   17 +++
- 14 files changed, 478 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/include/asm/virt.h
- create mode 100644 arch/arm/kernel/hyp-stub.S
-
--- 
-Fast, cheap, reliable. Pick two.
+	Arnd
