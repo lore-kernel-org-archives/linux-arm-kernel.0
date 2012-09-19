@@ -1,90 +1,51 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 19 Sep 2012 08:59:14 +0200
-Subject: [PATCH v2 2/2] mmc: atmel-mci: AP700x PDC is not connected to MCI
-In-Reply-To: <m3d31ik2p0.fsf@pullcord.laptop.org>
-References: <503F9613.5060007@yahoo.es> <m3d31ik2p0.fsf@pullcord.laptop.org>
-Message-ID: <50596D42.3070709@atmel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Sep 2012 00:00:39 -0700
+Subject: [PATCH 0/5] Trim down mach includes in MSM drivers
+Message-ID: <1348038044-1790-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+This patch series trims the usage of mach includes in MSM 
+drivers. In particular it targets the msm_iomap.h header
+file and completely removes the cpu.h header file. After
+this series we only have one driver using the iomap.h file
+outside of mach-msm. Once that driver is moved to be
+a platform device we can make msm_iomap.h private to mach-msm.
 
-Le 09/19/2012 07:21 AM, Chris Ball a ?crit :
-> Hi,
->
-> On Thu, Aug 30 2012, Hein Tibosch wrote:
->> Earlier, atmel-mci was adapted to make use of the peripheral DMA
->> controller (PDC), in case normal DMA wouldn't work.
->> ( http://comments.gmane.org/gmane.linux.kernel.mmc/9403 )
->> This works OK on ARM platforms (AT91), but it broke the driver
->> for AVR32, the AP700x.
->> Although the MCI has PDC support, the connection is not done for
->> AVR chips
->>
->> This patch makes the use of PDC depend on CONFIG_AVR32
->>
->> Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
->>
->> ---
->>   drivers/mmc/host/atmel-mci-regs.h |    7 +++++++
->>   drivers/mmc/host/atmel-mci.c      |    2 +-
->>   2 files changed, 8 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
->> index ab56f7d..c97001e 100644
->> --- a/drivers/mmc/host/atmel-mci-regs.h
->> +++ b/drivers/mmc/host/atmel-mci-regs.h
->> @@ -140,6 +140,13 @@
->>   #define atmci_writel(port,reg,value)			\
->>   	__raw_writel((value), (port)->regs + reg)
->>
->> +/* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
->> +#ifdef CONFIG_AVR32
->> +#	define ATMCI_PDC_CONNECTED	0
->> +#else
->> +#	define ATMCI_PDC_CONNECTED	1
->> +#endif
->> +
->>   /*
->>    * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
->>    * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
->> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
->> index a6a5593..b8de891 100644
->> --- a/drivers/mmc/host/atmel-mci.c
->> +++ b/drivers/mmc/host/atmel-mci.c
->> @@ -2208,7 +2208,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
->>   			"version: 0x%x\n", version);
->>
->>   	host->caps.has_dma_conf_reg = 0;
->> -	host->caps.has_pdc = 1;
->> +	host->caps.has_pdc = ATMCI_PDC_CONNECTED;
->>   	host->caps.has_cfg_reg = 0;
->>   	host->caps.has_cstor_reg = 0;
->>   	host->caps.has_highspeed = 0;
->
-> Thanks, pushed to mmc-next for 3.7.
->
-> I changed the commit message text to reflect my understanding of what
-> the patch does better, from:
->    This patch makes the use of PDC depend on CONFIG_AVR32.
-> to:
->    This patch makes the use of PDC depend on !CONFIG_AVR32.
->
+This series is based on linux-next-20120917, which has the msm
+DT timer patches (the other user of cpu.h in MSM).
 
-You're right.
+Patches 2 and 3 can probably be routed the appropriate subsystem
+trees if desired. It would be good if patch 1, 4, and 5 go
+through the MSM tree, so it may be easier to just put all these
+patches through the MSM tree.
 
-> (Ludovic, perhaps you could give an ACK for this patch?)
->
+Stephen Boyd (5):
+  ARM: msm: Move dma.h #defines that are private to dma.c
+  mmc: msm_sdcc: Remove unnecessary include
+  video: msm: Remove useless mach/* includes
+  gpio: Make gpio-msm-v1 into a platform driver
+  ARM: msm: Remove unused cpu.h header file
 
-It was given for the first version but not reported in the second 
-version. So yes you can add
+ arch/arm/mach-msm/board-halibut.c    |   1 +
+ arch/arm/mach-msm/board-msm7x30.c    |   1 +
+ arch/arm/mach-msm/board-qsd8x50.c    |   1 +
+ arch/arm/mach-msm/board-trout.c      |   1 +
+ arch/arm/mach-msm/devices-msm7x00.c  |  31 +++++
+ arch/arm/mach-msm/devices-msm7x30.c  |  31 +++++
+ arch/arm/mach-msm/devices-qsd8x50.c  |  31 +++++
+ arch/arm/mach-msm/devices.h          |   4 +
+ arch/arm/mach-msm/dma.c              |  26 +++++
+ arch/arm/mach-msm/include/mach/cpu.h |  54 ---------
+ arch/arm/mach-msm/include/mach/dma.h |  26 -----
+ drivers/gpio/gpio-msm-v1.c           | 220 ++++++++++++++++++++++++-----------
+ drivers/mmc/host/msm_sdcc.c          |   1 -
+ drivers/video/msm/mddi.c             |   3 -
+ drivers/video/msm/mdp.c              |   1 -
+ drivers/video/msm/mdp_hw.h           |   1 -
+ 16 files changed, 276 insertions(+), 157 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/include/mach/cpu.h
 
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-
-Thanks
-
-Ludovic
-
-> - Chris.
->
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
