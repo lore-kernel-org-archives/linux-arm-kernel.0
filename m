@@ -1,66 +1,57 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 19 Sep 2012 18:56:00 +0200
-Subject: [PATCH 3/4] mfd: dbx500: Provide a more accurate smp_twd clock
-In-Reply-To: <20120919164231.17033.27762@nucleus>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
- <1346415691-13371-4-git-send-email-ulf.hansson@stericsson.com>
- <20120919160251.GM28670@sortiz-mobl>
- <20120919164231.17033.27762@nucleus>
-Message-ID: <20120919165600.GP28670@sortiz-mobl>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Wed, 19 Sep 2012 09:54:47 -0700
+Subject: [PATCH 07/11] tty/serial: Add kgdb_nmi driver
+In-Reply-To: <5059B200.9040706@windriver.com>
+References: <20120913150133.GA16238@lizard>
+ <1347548615-18227-7-git-send-email-anton.vorontsov@linaro.org>
+ <5059B200.9040706@windriver.com>
+Message-ID: <20120919165447.GA6316@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Wed, Sep 19, 2012 at 09:42:31AM -0700, Mike Turquette wrote:
-> Quoting Samuel Ortiz (2012-09-19 09:02:51)
-> > Hi Ulf,
-> > 
-> > On Fri, Aug 31, 2012 at 02:21:30PM +0200, Ulf Hansson wrote:
-> > > From: Michel Jaouen <michel.jaouen@stericsson.com>
-> > > 
-> > > The local timer clock is based on ARM subsystem clock. This patch
-> > > obtains a more exact value of that clock by reading PRCMU registers.
-> > > Using this increases the accuracy of the local timer events.
-> > > 
-> > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > > Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
-> > > Signed-off-by: Michel Jaouen <michel.jaouen@stericsson.com>
-> > > ---
-> > >  drivers/mfd/db8500-prcmu.c       |   42 ++++++++++++++++++++++++++++++++++++++
-> > >  drivers/mfd/dbx500-prcmu-regs.h  |    4 +++-
-> > >  include/linux/mfd/dbx500-prcmu.h |    1 +
-> > >  3 files changed, 46 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> > > index 4f74529..e7f9539 100644
-> > > --- a/drivers/mfd/db8500-prcmu.c
-> > > +++ b/drivers/mfd/db8500-prcmu.c
-> > > @@ -418,6 +418,9 @@ static struct {
-> > >  
-> > >  static atomic_t ac_wake_req_state = ATOMIC_INIT(0);
-> > >  
-> > > +/* Functions definition */
-> > > +static void compute_armss_rate(void);
-> > > +
-> > I'm not a big fan of forward declarations, but I still applied your patch to
-> > my for-next branch. Thanks.
-> > 
+On Wed, Sep 19, 2012 at 06:52:32AM -0500, Jason Wessel wrote:
+[...]
+> > --- a/drivers/tty/serial/kgdboc.c
+> > +++ b/drivers/tty/serial/kgdboc.c
+> > @@ -145,6 +145,8 @@ __setup("kgdboc=", kgdboc_option_setup);
+> >  
+> >  static void cleanup_kgdboc(void)
+> >  {
+> > +	if (kgdb_unregister_nmi_console())
+> > +		return;
+> >  	kgdboc_unregister_kbd();
+> >  	if (configured == 1)
+> >  		kgdb_unregister_io_module(&kgdboc_io_ops);
+> > @@ -198,6 +200,10 @@ do_register:
+> >  	if (err)
+> >  		goto noconfig;
+> >  
+> > +	err = kgdb_register_nmi_console();
+> > +	if (err)
+> > +		goto noconfig;
+> > +
 > 
-> Samuel,
-> 
-> Not sure if you were Cc'd on the rest of the patches in this series but
-> after some discussion (see patch #1) I took all four patches into
-> clk-next, including the MFD change.  This was done first week of
-> September.  At this point those patches have shifted into my stable
-> branch that I have promised not to rebase (for arm-soc dependencies).
-> 
-> Are you OK with me taking this patch through the clk-next branch?
-Yes, I'm fine with it.
+> Just one question on this one, what do you expect to happen, or how
+> does this work when you use a different serial port for example on a
+> board that has a real serial port and an FIQ port?   It was not
+> obvious that there was a path to check if the port you are
+> registering is an FIQ enabled port and then call the
+> kgdb_register_nmi_console at that point.
 
-Cheers,
-Samuel.
+Yes, it works perfectly fine. If the port is not FIQ-enabled (which,
+technically, can be enabled later -- it's just not implemented), then
+ttyNMI just won't able to receive data.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+The reason why I register nmi console in KGDB code (as opposite to arch
+code), is the dependcy: the port should be initialized before it can be
+used as ttyNMI. We could place the ttyNMI registration code into
+late_initcall in arch/, and check for dbg_io_ops, but that is ugly by
+itself, plus dbg_io_ops can change.
+
+But with your kgdb_arch->enable_nmi suggestion (which I'll surely
+implement), we can skip the registration at least for the cases when
+the arch doesn't have this feature.
+
+Thanks!
+
+Anton.
