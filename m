@@ -1,39 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 19 Sep 2012 11:34:17 +0300
-Subject: [PATCH v4 00/14] MFD/ASoC/Input: twl4030-audio submodule DT
- support
-In-Reply-To: <20120919002439.GB3647@sortiz-mobl>
-References: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
- <20120919002439.GB3647@sortiz-mobl>
-Message-ID: <50598389.6020600@ti.com>
+From: ananaza@iki.fi (Antti P Miettinen)
+Date: Wed, 19 Sep 2012 11:55:52 +0300
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+References: <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <20120514163909.GB13860@n2100.arm.linux.org.uk>
+ <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+ <20120515094010.GF10453@n2100.arm.linux.org.uk>
+ <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
+ <20120515101505.GG10453@n2100.arm.linux.org.uk>
+ <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
+ <20120515163618.GH13860@n2100.arm.linux.org.uk>
+ <20120515170534.GA17319@e102568-lin.cambridge.arm.com>
+Message-ID: <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> What we should do as I described, is executing the sequence:
+>
+> clear SCTRL.C
+> clean cache
+> exit coherency
 
-On 09/19/2012 03:24 AM, Samuel Ortiz wrote:
-> Hi Peter,
-> 
-> On Mon, Sep 10, 2012 at 01:46:18PM +0300, Peter Ujfalusi wrote:
->> Hello,
->>
->> Generated on top of:
->> git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git topic/omap
-> I applied the first 8 patches, but I'd like to get Mark's ACK for the rest of
-> the serie.
-> Unless you're expecting Mark to take the whole thing, in which case you can
-> add my:
-> 
-> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-> 
-> to the MFD patches.
-> Please let me know how you'd like to proceed.
+How does SCTRL.C affect TLB fetches? Especially on A9? Seems that page
+table updates do clean_dcache_area() so probably not an issue but just
+out of curiosity, are TLB fetches affected by the C bit on A9?
 
-If Mark is still OK with it I think it would be better to queue this series
-via ASoC so we can keep them in one place (also I think patch 14 needs patch 6
-in order to not break x86/x86_64 allmodconfig).
-On the other hand if they go separately (1-8 via MFD, 9-14 via ASoC) they will
-meet in linux-next where this matters the most.
-
-Thank you,
-P?ter
+--
+Antti P Miettinen
+http://www.iki.fi/~ananaza/
