@@ -1,38 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 20 Sep 2012 01:23:49 +0200
-Subject: Tracking down suspend/resume ext3/mmc issues on imx233
-In-Reply-To: <20120910163345.GB3942@thunk.org>
-References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
- <20120907060552.GL26709@S2101-09.ap.freescale.net>
- <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
- <CAKGA1bnug8nqcideOBZyLQZmiVo=G5L3aRHq4k4SNZyH132Y=g@mail.gmail.com>
- <20120910163345.GB3942@thunk.org>
-Message-ID: <20120919232349.GA24132@elf.ucw.cz>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Sep 2012 08:23:49 +0900
+Subject: [PATCH 1/2] ARM: Exynos4: Put PCM, Slimbus,
+ Spdif clocks to off state
+In-Reply-To: <CAJuYYwT443=NPZX4n2Y9TToWZ9-yH5YQyCa3iq_LRCv1XnF0WQ@mail.gmail.com>
+References: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
+ <CAJuYYwT443=NPZX4n2Y9TToWZ9-yH5YQyCa3iq_LRCv1XnF0WQ@mail.gmail.com>
+Message-ID: <09a101cd96bd$d33e4030$79bac090$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2012-09-10 12:33:45, Theodore Ts'o wrote:
-> On Mon, Sep 10, 2012 at 10:11:48AM -0500, Matt Sealey wrote:
-> > Wouldn't it be better if the root filesystem was marked as
-> > non-removable in the device tree - or in the case of a truly removable
-> > card, just marked in the MMC subsystem - and the MMC subsystem skipped
-> > the "it could be removed" for suspend/resume operations?
+Thomas Abraham wrote:
 > 
-> I agree, this makes a lot of sense.  If the root file system
-> disappears, you're toasted either way, so it's fair to assume that the
-> device on which the root file system is located should is
-> non-removable.
+> On 6 September 2012 19:46, Chander Kashyap <chander.kashyap@linaro.org>
+> wrote:
+> > The clocks for PCM, Slimbus, Spdif added to off list in order
+> > to turn them off at boot time.
+> >
+> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> > ---
+> >  arch/arm/mach-exynos/clock-exynos4.c |   19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-
+> exynos/clock-exynos4.c
+> > index 7cc5491..6a45c9a 100644
+> > --- a/arch/arm/mach-exynos/clock-exynos4.c
+> > +++ b/arch/arm/mach-exynos/clock-exynos4.c
+> > @@ -627,6 +627,25 @@ static struct clk exynos4_init_clocks_off[] = {
+> >                 .enable         = exynos4_clk_ip_peril_ctrl,
+> >                 .ctrlbit        = (1 << 21),
+> >         }, {
+> > +               .name           = "pcm",
+> > +               .devname        = "samsung-pcm.1",
+> > +               .enable         = exynos4_clk_ip_peril_ctrl,
+> > +               .ctrlbit        = (1 << 22),
+> > +       }, {
+> > +               .name           = "pcm",
+> > +               .devname        = "samsung-pcm.2",
+> > +               .enable         = exynos4_clk_ip_peril_ctrl,
+> > +               .ctrlbit        = (1 << 23),
+> > +       }, {
+> > +               .name           = "slimbus",
+> > +               .enable         = exynos4_clk_ip_peril_ctrl,
+> > +               .ctrlbit        = (1 << 25),
+> > +       }, {
+> > +               .name           = "spdif",
+> > +               .devname        = "samsung-spdif",
+> > +               .enable         = exynos4_clk_ip_peril_ctrl,
+> > +               .ctrlbit        = (1 << 26),
+> > +       }, {
+> >                 .name           = "ac97",
+> >                 .devname        = "samsung-ac97",
+> >                 .enable         = exynos4_clk_ip_peril_ctrl,
+> > --
+> > 1.7.9.5
+> 
+> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-I'm not sure I agree.
+Sangbeom, could you please check this one more?
 
-If you treat root fs as removable, you'll get "crash". You'll need to
-replay the journal, but data is safe.
+Thanks.
 
-If you treat it as non-removable, and someone manages to remove it,
-mount, and reinsert, you'll get silent data corruption.
-
-If the card is not removable, mark it as such...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
