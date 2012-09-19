@@ -1,19 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Sep 2012 11:27:08 +0800
-Subject: [PATCH] ARM: dts: imx6q-sabrelite: add usbotg pinctrl support
-In-Reply-To: <1347946741-32506-1-git-send-email-richard.zhao@freescale.com>
-References: <1347946741-32506-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120919032706.GD6460@S2100-06.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 18 Sep 2012 23:23:38 -0400
+Subject: [PATCH 16/34] ASoC: imx-ssi: remove unneeded mach/hardware.h
+ inclusion
+In-Reply-To: <201209171430.35804.arnd@arndb.de>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <1347860103-4141-17-git-send-email-shawn.guo@linaro.org>
+ <20120917114543.GG5401@opensource.wolfsonmicro.com>
+ <201209171430.35804.arnd@arndb.de>
+Message-ID: <20120919032337.GU8832@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 01:39:00PM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    2 ++
->  arch/arm/boot/dts/imx6q.dtsi          |    6 ++++++
->  2 files changed, 8 insertions(+)
-> 
-Manually applied on imx/dt-for-3.7-2.  Please check the result.
+On Mon, Sep 17, 2012 at 02:30:35PM +0000, Arnd Bergmann wrote:
+> On Monday 17 September 2012, Mark Brown wrote:
+> > On Mon, Sep 17, 2012 at 01:34:45PM +0800, Shawn Guo wrote:
 
-Shawn
+> > >  #include <linux/platform_data/asoc-imx-ssi.h>
+> > > -#include <mach/hardware.h>
+
+> > This doesn't apply - there's no platform data header for imx-ssi at the
+> > minute (and I don't see a patch in this series related to that in the
+> > series).  I checked -next and there doesn't seem to be anything via a
+> > non-ASoC tree either.
+
+> It's in my testing/platform-data series, and will be in linux-next in
+> a few days.
+
+Hrm, that seems odd - why are we adding platform data to the driver?
