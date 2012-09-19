@@ -1,133 +1,91 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Sep 2012 14:05:43 -0700
-Subject: [PATCH 04/29] ARM: OMAP1: Move board-ams-delta.h from plat to mach
+Date: Wed, 19 Sep 2012 14:05:59 -0700
+Subject: [PATCH 09/29] ARM: OMAP2+: Make am35xx.h local
 In-Reply-To: <20120919205732.28074.43697.stgit@muffinssi>
 References: <20120919205732.28074.43697.stgit@muffinssi>
-Message-ID: <20120919210543.28074.10214.stgit@muffinssi>
+Message-ID: <20120919210558.28074.81754.stgit@muffinssi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is only used by omap1.
+This can be local to mach-omap2.
 
-And to fix things properly, this should not be included
-from the drivers at all.
-
-Cc: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Artem Bityutskiy <Artem.Bityutskiy@linux.intel.com>
-Cc: linux-mtd at lists.infradead.org
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: alsa-devel at alsa-project.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/ams-delta-fiq-handler.S        |    2 +-
- arch/arm/mach-omap1/ams-delta-fiq.c                |    2 +-
- arch/arm/mach-omap1/board-ams-delta.c              |    2 +-
- arch/arm/mach-omap1/include/mach/board-ams-delta.h |    0 
- drivers/input/serio/ams_delta_serio.c              |    2 +-
- drivers/mtd/nand/ams-delta.c                       |    2 +-
- drivers/video/omap/lcd_ams_delta.c                 |    2 +-
- sound/soc/omap/ams-delta.c                         |    2 +-
- 8 files changed, 7 insertions(+), 7 deletions(-)
- rename arch/arm/{plat-omap/include/plat/board-ams-delta.h => mach-omap1/include/mach/board-ams-delta.h} (100%)
+ arch/arm/mach-omap2/am35xx-emac.c          |    2 +-
+ arch/arm/mach-omap2/am35xx.h               |    0 
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+ arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
+ arch/arm/mach-omap2/usb-musb.c             |    2 +-
+ 6 files changed, 5 insertions(+), 5 deletions(-)
+ rename arch/arm/mach-omap2/{include/mach/am35xx.h => am35xx.h} (100%)
 
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq-handler.S b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-index d2b6acc..3d1e1c2 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-+++ b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-@@ -16,7 +16,7 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- 
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
- 
- #include <mach/irqs.h>
- #include <mach/ams-delta-fiq.h>
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
-index 68e8e56..f12a12a 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq.c
-+++ b/arch/arm/mach-omap1/ams-delta-fiq.c
+diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
+index 2c90ac6..d0c54c5 100644
+--- a/arch/arm/mach-omap2/am35xx-emac.c
++++ b/arch/arm/mach-omap2/am35xx-emac.c
 @@ -19,7 +19,7 @@
- #include <linux/module.h>
- #include <linux/io.h>
+ #include <linux/davinci_emac.h>
+ #include <asm/system.h>
+ #include <plat/omap_device.h>
+-#include <mach/am35xx.h>
++#include "am35xx.h"
+ #include "control.h"
+ #include "am35xx-emac.h"
  
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
+diff --git a/arch/arm/mach-omap2/include/mach/am35xx.h b/arch/arm/mach-omap2/am35xx.h
+similarity index 100%
+rename from arch/arm/mach-omap2/include/mach/am35xx.h
+rename to arch/arm/mach-omap2/am35xx.h
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index 6e80d78..e162897 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -27,7 +27,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/platform_data/gpio-omap.h>
  
- #include <asm/fiq.h>
- 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 05af063..b9929cb 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -35,7 +35,7 @@
+-#include <mach/am35xx.h>
++#include "am35xx.h"
+ #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+index 27a5450..a749990 100644
+--- a/arch/arm/mach-omap2/board-cm-t3517.c
++++ b/arch/arm/mach-omap2/board-cm-t3517.c
+@@ -43,7 +43,7 @@
+ #include <plat/nand.h>
+ #include <plat/gpmc.h>
  
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
- #include <plat/keypad.h>
- #include <mach/mux.h>
+-#include <mach/am35xx.h>
++#include "am35xx.h"
  
-diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/mach-omap1/include/mach/board-ams-delta.h
-similarity index 100%
-rename from arch/arm/plat-omap/include/plat/board-ams-delta.h
-rename to arch/arm/mach-omap1/include/mach/board-ams-delta.h
-diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-index f5fbdf9..45887e3 100644
---- a/drivers/input/serio/ams_delta_serio.c
-+++ b/drivers/input/serio/ams_delta_serio.c
-@@ -27,7 +27,7 @@
- #include <linux/module.h>
+ #include "mux.h"
+ #include "control.h"
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 8fec2ce..61486f2 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -28,7 +28,7 @@
+ #include <plat/mcspi.h>
+ #include <plat/dmtimer.h>
  
- #include <asm/mach-types.h>
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
+-#include <mach/am35xx.h>
++#include "am35xx.h"
  
- #include <mach/ams-delta-fiq.h>
+ #include "soc.h"
+ #include "omap_hwmod_common_data.h"
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 0a592f4..51da21c 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -28,7 +28,7 @@
+ #include <plat/usb.h>
+ #include <plat/omap_device.h>
  
-diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
-index c28eec0..9e7723a 100644
---- a/drivers/mtd/nand/ams-delta.c
-+++ b/drivers/mtd/nand/ams-delta.c
-@@ -29,7 +29,7 @@
- #include <asm/io.h>
- #include <asm/sizes.h>
+-#include <mach/am35xx.h>
++#include "am35xx.h"
  
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
+ #include "mux.h"
  
- #include <mach/hardware.h>
- 
-diff --git a/drivers/video/omap/lcd_ams_delta.c b/drivers/video/omap/lcd_ams_delta.c
-index 5cca6b3..ed4cad8 100644
---- a/drivers/video/omap/lcd_ams_delta.c
-+++ b/drivers/video/omap/lcd_ams_delta.c
-@@ -27,7 +27,7 @@
- #include <linux/lcd.h>
- #include <linux/gpio.h>
- 
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
- 
- #include "omapfb.h"
- 
-diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
-index 7b18b74..98e25d5 100644
---- a/sound/soc/omap/ams-delta.c
-+++ b/sound/soc/omap/ams-delta.c
-@@ -32,7 +32,7 @@
- 
- #include <asm/mach-types.h>
- 
--#include <plat/board-ams-delta.h>
-+#include <mach/board-ams-delta.h>
- #include <plat/mcbsp.h>
- 
- #include "omap-mcbsp.h"
