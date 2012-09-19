@@ -1,54 +1,25 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 19 Sep 2012 21:23:38 +0000
-Subject: [PATCH RESEND 0/5] ARM: dts: AM33XX: Add device tree data
-In-Reply-To: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Sep 2012 21:24:31 +0000 (UTC)
+Subject: [PATCH RESEND 3/5] ARM: OMAP2+: AM33XX: Add clock entries to
+ omap_clk data
+In-Reply-To: <1348089570-16161-4-git-send-email-anilkumar@ti.com>
 References: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
-Message-ID: <B7CE1C39EBFBA0428A012975D4B2FC830B5DF78F@DNCE05.ent.ti.com>
+ <1348089570-16161-4-git-send-email-anilkumar@ti.com>
+Message-ID: <alpine.DEB.2.00.1209192124090.5264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Paul
+Hi
 
-Hi Anil,
+On Thu, 20 Sep 2012, AnilKumar Ch wrote:
 
-Thanks for the rebase / repost. I'll pulled the full series if Paul is OK with
-  ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
+> Add AM335x cpu0 clock entry to the corresponding clock data
+> file. This is useful in getting the correct mpu clock pointer
+> to change the cpu frequency in cpufreq driver.
+> 
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 
-Paul,
-Is that OK?
+Looks like this one is unrelated to the DTS changes, so I'll queue it 
+separately here for 3.7.
 
-Regards,
-Benoit
-
->
-Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 12.654.784
-
------Original Message-----
->From: AnilKumar, Chimata
->Sent: Wednesday, September 19, 2012 4:19 PM
->To: tony at atomide.com
->Cc: Cousson, Benoit; linux-arm-kernel at lists.infradead.org; linux-
->omap at vger.kernel.org; AnilKumar, Chimata
->Subject: [PATCH RESEND 0/5] ARM: dts: AM33XX: Add device tree data
->
->Add device tree data of pinctrl, d_can, lis331dlh and tmp275 drivers
->for AM33XX family of devices. These patches were submitted earlier
->and reviewed. Re-sending to apply cleanly on linux-omap/devel-dt
->tree. These patches were tested on am33xx-evm and am335x-bone.
->
->AnilKumar Ch (5):
->  ARM: dts: AM33XX: Add basic pinctrl device tree data
->  ARM: dts: AM33XX: Add D_CAN device tree data
->  ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
->  ARM: dts: AM33XX: Add lis331dlh device tree data to am335x-evm
->  ARM: dts: AM33XX: Add temperature sensor device tree data to
->    am335x-evm
->
-> arch/arm/boot/dts/am335x-evm.dts     |   44
->++++++++++++++++++++++++++++++++++
-> arch/arm/boot/dts/am33xx.dtsi        |   27 +++++++++++++++++++++
-> arch/arm/mach-omap2/clock33xx_data.c |    1 +
-> 3 files changed, 72 insertions(+)
->
->--
->1.7.9.5
+- Paul
