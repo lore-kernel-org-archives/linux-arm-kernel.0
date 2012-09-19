@@ -1,47 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 19 Sep 2012 09:31:30 +0200
-Subject: [PATCH] ARM:IMX6Q:use pll2_pfd2_396m as the enfc_sel's parent
-In-Reply-To: <20120919053348.GH6460@S2100-06.ap.freescale.net>
-References: <1347261476-9799-1-git-send-email-b32955@freescale.com>
- <20120919053348.GH6460@S2100-06.ap.freescale.net>
-Message-ID: <20120919073130.GX6180@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 19 Sep 2012 13:21:09 +0530
+Subject: [GIT PULL] ARM: OMAP5: Enable arch timer support
+Message-ID: <1348041069-947-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 01:33:50PM +0800, Shawn Guo wrote:
-> On Mon, Sep 10, 2012 at 03:17:56PM +0800, Huang Shijie wrote:
-> > The gpmi-nand driver can support the ONFI nand chip's EDO (extra data out)
-> > mode in the asynchrounous mode. In the asynchrounous mode 5, the gpmi
-> > needs 100MHz clock for the IO. But with the pll2_pfd0_352m, we can not
-> > get the 100MHz clock.
-> > 
-> > So choose pll2_pfd2_396m as enfc_sel's parent.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> 
-> Applied, thanks.
-> 
-> But we really expect that clock framework can get improved to have such
-> case handled in clk_set_rate() call.
+Tony,
 
-How do you want to archieve that? It would be possible to teach the
-clock framework to iterate over the possible parents and see what gives
-the best result, but how do we teach the clock framework that there are
-other constraints, like for example 'use this clock in low power mode
-and that one otherwise'?
+Here is the pull request which enables the architected cpu local timer
+support for OMAP5 devices.
 
-We have a similar problem with the IPU: When the LDB is used, the IPU
-pixel clock has to be switched to the LDB clock, even if other clocks
-would result in a more accurate frequency.
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 
-That's a topic for a long long discussion, I think even longer than it
-took to introduce the clock framework ;)
+  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
 
-Sascha
+are available in the git repository at:
 
+  git at github.com:SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+for you to fetch changes up to 3c7c5dab44d6c8861bc86dab924353d8d40344f8:
+
+  ARM: OMAP5: Enable arch timer support (2012-09-19 13:00:37 +0530)
+
+----------------------------------------------------------------
+Santosh Shilimkar (2):
+      ARM: OMAP: Add initialisation for the real-time counter.
+      ARM: OMAP5: Enable arch timer support
+
+ arch/arm/boot/dts/omap5.dtsi |   12 ++++++
+ arch/arm/mach-omap2/Kconfig  |    5 +++
+ arch/arm/mach-omap2/timer.c  |   97 +++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 113 insertions(+), 1 deletion(-)
