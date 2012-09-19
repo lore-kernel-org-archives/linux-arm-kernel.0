@@ -1,25 +1,55 @@
-From: avi@redhat.com (Avi Kivity)
-Date: Wed, 19 Sep 2012 15:44:14 +0300
-Subject: [PATCH 00/15] KVM/ARM Implementation
-In-Reply-To: <20120915153359.21241.86002.stgit@ubuntu>
-References: <20120915153359.21241.86002.stgit@ubuntu>
-Message-ID: <5059BE1E.2060504@redhat.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Wed, 19 Sep 2012 14:50:20 +0200
+Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
+ precisely
+In-Reply-To: <201209190759.46174.arnd@arndb.de>
+References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+ <20120918124918.GK2505@amd.com>
+ <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
+ <201209190759.46174.arnd@arndb.de>
+Message-ID: <20120919125020.GQ2505@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2012 06:34 PM, Christoffer Dall wrote:
-> The following series implements KVM support for ARM processors,
-> specifically on the Cortex A-15 platform.  We feel this is ready to be
-> merged.
+On Wed, Sep 19, 2012 at 07:59:45AM +0000, Arnd Bergmann wrote:
+> On Wednesday 19 September 2012, Hiroshi Doyu wrote:
+> > I guess that it would work. Originally I thought that using DMA-API
+> > and IOMMU-API together in driver might be kind of layering violation
+> > since IOMMU-API itself is used in DMA-API. Only DMA-API used in driver
+> > might be cleaner. Considering that DMA API traditionally handling
+> > anonymous {bus,iova} address only, introducing the concept of
+> > specific address in DMA API may not be so encouraged, though.
+> > 
+> > It would be nice to listen how other SoCs have solved similar needs.
 > 
-> Work is done in collaboration between Columbia University, Virtual Open
-> Systems and ARM/Linaro.
+> In general, I would recommend using only the IOMMU API when you have a device
+> driver that needs to control the bus virtual address space and that manages
+> a device that resides in its own IOMMU context. I would recommend using
+> only the dma-mapping API when you have a device that lives in a shared
+> bus virtual address space with other devices, and then never ask for
+> a specific bus virtual address.
 > 
+> Can you explain what devices you see that don't fit in one of those two
+> categories?
 
->From my point of view this looks ready to merge.  Once all outstanding
-comments have been addressed, please collect ACKs from the ARM
-maintainers (esp. for the non-kvm parts), and we can finally merge this.
+Well, I don't think that a driver should limit to one of these 2 APIs. A
+driver can very well use the IOMMU-API during initialization (for
+example to map the firmware to an address the device expects it to be)
+and use the DMA-API later during normal operation to exchange data with
+the device.
 
+When a device driver would only use the IOMMU-API and needs small
+DMA-able areas it has to re-implement something like the DMA-API
+(basically an address allocator) for that. So I don't see a reason why
+both can't be used in a device driver.
+
+Regards,
+
+	Joerg
 
 -- 
-error compiling committee.c: too many arguments to function
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
