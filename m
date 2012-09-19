@@ -1,49 +1,49 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 19 Sep 2012 13:43:05 +0000
-Subject: [PATCH v6 10/10] ARM: OMAP2+: tusb6010: generic timing calculation
-In-Reply-To: <20120917231001.GK11762@atomide.com>
-References: <20120824194630.GU11011@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9BA589@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9DC11D@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9DEC85@DBDE01.ent.ti.com>
- <20120906204354.GJ1303@atomide.com> <20120911184606.GN23092@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9E253B@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9E3624@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9E4DFE@DBDE01.ent.ti.com>
- <20120917225023.GJ11762@atomide.com> <20120917231001.GK11762@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E60D5@DBDE01.ent.ti.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Wed, 19 Sep 2012 06:43:54 -0700
+Subject: [PATCH 5/6] staging: drm/imx: Add devicetree binding documentation
+In-Reply-To: <20120919065240.GU6180@pengutronix.de>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+ <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
+ <5058F06C.1020409@boundarydevices.com> <20120919065240.GU6180@pengutronix.de>
+Message-ID: <5059CC1A.8000808@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 09/18/2012 11:52 PM, Sascha Hauer wrote:
+> On Tue, Sep 18, 2012 at 03:06:36PM -0700, Eric Nelson wrote:
+>> Hi Sascha,
+>>
+>> On 09/12/2012 03:31 AM, Sascha Hauer wrote:
+>>> From: Philipp Zabel<p.zabel@pengutronix.de>
+>>>
+>>> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
+>>> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+>>> ---
+>>>   .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   41 ++++++++++++++++++++
+>>>   1 file changed, 41 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+>>>
+>>> +
+>>> +example:
+>>> +
+>>> +display at di0 {
+>>> +	compatible = "fsl,imx-parallel-display";
+>>> +	edid = [edid-data];
+>>> +	crtc =<&ipu 0>;
+>>> +	interface-pix-fmt = "rgb24";
+>>> +};
+>>
+>> Do you have a working sample of [edid-data] for a parallel/LVDS/HDMI
+>> display or know a good way to produce one?
+>
+> No, we are using the of videomode helper, see
+>
+> http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg18618.html
+>
+> It is not included here to not add a dependency on it. We are trying to
+> mainline this separately.
+>
+> Sascha
+>
 
-On Tue, Sep 18, 2012 at 04:40:02, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [120917 15:54]:
-
-> > > > Can you please try with the attached patch ?
-> > 
-> > Gave it a quick try and it seemed to work.. But when I tried
-> > rebasing my patches for the cbus to keep things working with
-> > the watchdog, I ran into multiple merge conflicts with
-> > current linux next and gave up.
-> 
-> OK went back to my original branch without current linux
-> next and with the new cbus + retu driver from Aaro applied.
-> Confirmed it's now working on n800 tusb6010.
-
-Thanks for checking and confirming.
-
-> > Care to repost this series updated against current linux
-> > next?
-> > 
-> > I'm afraid I've pretty much lost track of all the patches
-> > and rather not start resolving the conflicts as I'm sure
-> > I'll break something else :)
-> 
-> You should still repost the whole updated series against
-> linux next.
-
-New updated version - v7, based over linux next has been posted.
-
-Regards
-Afzal
+Thanks Sascha.
