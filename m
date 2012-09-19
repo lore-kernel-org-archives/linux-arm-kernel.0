@@ -1,145 +1,85 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Sep 2012 15:33:45 +0200
-Subject: [RESENDING] [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe
- rather than as a device
-In-Reply-To: <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
-Message-ID: <20120919133343.GH25694@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Sep 2012 13:35:47 +0000
+Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
+In-Reply-To: <20120917212506.GB11762@atomide.com>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <20120916203850.GI4521@atomide.com> <20120917212506.GB11762@atomide.com>
+Message-ID: <201209191335.48051.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ola,
+On Monday 17 September 2012, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120916 13:39]:
+> > * Arnd Bergmann <arnd@arndb.de> [120915 13:15]:
+> > > On Saturday 15 September 2012, Tony Lindgren wrote:
+> > > > With my patches, this is now all omap1 specific and
+> > > > moved to arch/arm/mach-omap1/include/mach/hardware.h.
+> > > > It's probably easiest to just update this patch on
+> > > > top of the hardware.h changes I've done.
+> > > 
+> > > Yes, sounds good. Do you want to send a patch for that
+> > > and let me drop this one then?
+> > 
+> > Yes I can pick this one and update it against one of my
+> > branches to avoid merge conflicts.
+> 
+> This applies against mach-omap1/include/mach/hardware.h
+> with some fuzz so no issues there.
+> 
+> But I think we should not apply it as these are physical
+> addresses, not virtual addresses for omap1.
 
-As requested:
+Right, I misread what is actually going on here because the
+only driver I looked at treated the address as a virtual
+address pointer.
 
-Author: Lee Jones <lee.jones@linaro.org>
-Date:   Tue Jul 31 14:06:19 2012 +0100
+> We have IOMEM already in use for omap_read/write because of:
+> 
+> #define OMAP1_IO_ADDRESS(pa)    IOMEM((pa) - OMAP1_IO_OFFSET)
+> 
+> I think the right solution is to eventually get rid of
+> omap_read/write for omap1 also and replace them with ioremap
+> + readl/writel.
 
-    ASoC: Ux500: Initialise PCM from MSP probe rather than as a device
-    
-    The PCM is a pseudo-device. It doesn't have any of it's own registers
-    or hardware. It rather acts as a layer of abstraction for DMA
-    transfers. Hence, instead of classifying it as a device in its own
-    right, we call the initialisation from the MSP driver.
-    
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Agreed.
 
-diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-index 31c4d26..9707f4a 100644
---- a/sound/soc/ux500/mop500.c
-+++ b/sound/soc/ux500/mop500.c
-@@ -32,7 +32,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
- 		.stream_name = "ab8500_0",
- 		.cpu_dai_name = "ux500-msp-i2s.1",
- 		.codec_dai_name = "ab8500-codec-dai.0",
--		.platform_name = "ux500-pcm.0",
-+		.platform_name = "ux500-msp-i2s.1",
- 		.codec_name = "ab8500-codec.0",
- 		.init = mop500_ab8500_machine_init,
- 		.ops = mop500_ab8500_ops,
-@@ -42,7 +42,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
- 		.stream_name = "ab8500_1",
- 		.cpu_dai_name = "ux500-msp-i2s.3",
- 		.codec_dai_name = "ab8500-codec-dai.1",
--		.platform_name = "ux500-pcm.0",
-+		.platform_name = "ux500-msp-i2s.3",
- 		.codec_name = "ab8500-codec.0",
- 		.init = NULL,
- 		.ops = mop500_ab8500_ops,
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 772cb19..6afab6c 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -28,6 +28,7 @@
- 
- #include "ux500_msp_i2s.h"
- #include "ux500_msp_dai.h"
-+#include "ux500_pcm.h"
- 
- static int setup_pcm_multichan(struct snd_soc_dai *dai,
- 			struct ux500_msp_config *msp_config)
-@@ -806,11 +807,20 @@ static int __devinit ux500_msp_drv_probe(struct platform_device *pdev)
- 		goto err_init_msp;
- 	}
- 
-+	ret = ux500_pcm_register_platform(pdev);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"Error: %s: Failed to register PCM platform device!\n",
-+			__func__);
-+		goto err_reg_plat;
-+	}
-+
- 	return 0;
- 
-+err_reg_plat:
-+	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
- err_init_msp:
- 	clk_put(drvdata->clk);
--
- err_clk:
- 	devm_regulator_put(drvdata->reg_vape);
- 
-@@ -821,6 +831,8 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
- {
- 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
- 
-+	ux500_pcm_unregister_platform(pdev);
-+
- 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
- 
- 	devm_regulator_put(drvdata->reg_vape);
-diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
-index 1a04e24..894c9f4 100644
---- a/sound/soc/ux500/ux500_pcm.c
-+++ b/sound/soc/ux500/ux500_pcm.c
-@@ -282,7 +282,7 @@ static struct snd_soc_platform_driver ux500_pcm_soc_drv = {
- 	.pcm_new        = ux500_pcm_new,
- };
- 
--static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
-+int __devinit ux500_pcm_register_platform(struct platform_device *pdev)
- {
- 	int ret;
- 
-@@ -296,23 +296,12 @@ static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ux500_pcm_register_platform);
- 
--static int __devinit ux500_pcm_drv_remove(struct platform_device *pdev)
-+int __devexit ux500_pcm_unregister_platform(struct platform_device *pdev)
- {
- 	snd_soc_unregister_platform(&pdev->dev);
- 
- 	return 0;
- }
--
--static struct platform_driver ux500_pcm_driver = {
--	.driver = {
--		.name = "ux500-pcm",
--		.owner = THIS_MODULE,
--	},
--
--	.probe = ux500_pcm_drv_probe,
--	.remove = __devexit_p(ux500_pcm_drv_remove),
--};
--module_platform_driver(ux500_pcm_driver);
--
--MODULE_LICENSE("GPL v2");
-+EXPORT_SYMBOL_GPL(ux500_pcm_unregister_platform);
-diff --git a/sound/soc/ux500/ux500_pcm.h b/sound/soc/ux500/ux500_pcm.h
-index 77ed44d..76d3444 100644
---- a/sound/soc/ux500/ux500_pcm.h
-+++ b/sound/soc/ux500/ux500_pcm.h
-@@ -32,4 +32,7 @@
- #define UX500_PLATFORM_PERIODS_MAX		48
- #define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PAGE_SIZE)
- 
-+int ux500_pcm_register_platform(struct platform_device *pdev);
-+int ux500_pcm_unregister_platform(struct platform_device *pdev);
-+
- #endif
+> Or am I missing something?
+
+I did not see any new warnings for omap1, but I did see this
+on omap2plus_defconfig:
+
+drivers/watchdog/omap_wdt.c: In function 'omap_wdt_ioctl':
+drivers/watchdog/omap_wdt.c:222:4: error: passing argument 1 of '__raw_readw' makes pointer from integer without a cast [-Werror]
+arch/arm/include/asm/io.h:71:90: note: expected 'const volatile void *' but argument is of type 'unsigned int'
+
+It seems I misinterpreted this, and it's actually a bug in the watchdog
+driver that should be fixed using this patch instead (and backport it
+to stable)
+
+diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+index fceec4f..7b45802 100644
+--- a/drivers/watchdog/omap_wdt.c
++++ b/drivers/watchdog/omap_wdt.c
+@@ -218,9 +218,11 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
+ 	case WDIOC_GETSTATUS:
+ 		return put_user(0, (int __user *)arg);
+ 	case WDIOC_GETBOOTSTATUS:
++#ifdef CONFIG_ARCH_OMAP1
+ 		if (cpu_is_omap16xx())
+-			return put_user(__raw_readw(ARM_SYSST),
++			return put_user(omap_readw(ARM_SYSST),
+ 					(int __user *)arg);
++#endif
+ 		if (cpu_is_omap24xx())
+ 			return put_user(omap_prcm_get_reset_sources(),
+ 					(int __user *)arg);
+
+This bug seems to have been introduced in 2008 by 9f69e3b0c "[WATCHDOG]
+omap_wdt.c: another ioremap() fix" without anyone ever noticing and now
+got caught. Of course it should be replaced by something better when
+omap_read/write is finally getting removed.
+
+I'll drop my omap patch for now, because it's obviously wrong, and let
+you guys figure out what to do about the watchdog driver.
+
+	Arnd
