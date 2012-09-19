@@ -1,58 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Sep 2012 13:53:25 +0800
-Subject: [PATCH 6/6] staging: drm/imx: Add TODO
-In-Reply-To: <1347445874-10779-7-git-send-email-s.hauer@pengutronix.de>
-References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
- <1347445874-10779-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120919055322.GI6460@S2100-06.ap.freescale.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 19 Sep 2012 01:42:01 -0400
+Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
+ property for broken voltage quirk
+In-Reply-To: <1346748609-11115-2-git-send-email-t.figa@samsung.com> (Tomasz
+ Figa's message of "Tue, 04 Sep 2012 10:50:05 +0200")
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1346748609-11115-2-git-send-email-t.figa@samsung.com>
+Message-ID: <m38vc6k1qu.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2012 at 12:31:14PM +0200, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi,
+
+On Tue, Sep 04 2012, Tomasz Figa wrote:
+> Some boards use fixed voltage regulator for vmmc supply (e.g. for eMMC
+> memories). MMC_CAP2_BROKEN_VOLTAGE must be enabled for them to operate
+> correctly.
+>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Chris Ball <cjb@laptop.org>
+> CC: linux-mmc at vger.kernel.org
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  drivers/staging/imx-drm/TODO |   22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 drivers/staging/imx-drm/TODO
-> 
-> diff --git a/drivers/staging/imx-drm/TODO b/drivers/staging/imx-drm/TODO
-> new file mode 100644
-> index 0000000..2075646
-> --- /dev/null
-> +++ b/drivers/staging/imx-drm/TODO
-> @@ -0,0 +1,22 @@
-> +TODO:
-> +- get DRM Maintainer review for this code
-> +- Factor out more code to common helper functions
-> +- decide where to put the base driver. It is not specific to a subsystem
-> +  and would be used by DRM/KMS and media/V4L2
-> +- convert irq driver to irq_domain_add_linear
+>  Documentation/devicetree/bindings/mmc/mmc.txt | 1 +
+>  drivers/mmc/host/sdhci-s3c.c                  | 3 +++
+>  2 files changed, 4 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+> index 8a6811f..ecbde68 100644
+> --- a/Documentation/devicetree/bindings/mmc/mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+> @@ -16,6 +16,7 @@ Optional properties:
+>  - wp-inverted: when present, polarity on the wp gpio line is inverted
+>  - non-removable: non-removable slot (like eMMC)
+>  - max-frequency: maximum operating clock frequency
+> +- broken-voltage: vmmc regulator does not allow voltage control
+>  
+>  Example:
+>  
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 445910e..39715b8 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -443,6 +443,9 @@ static int __devinit sdhci_s3c_parse_dt(struct device *dev,
+>  	if (!ourhost->gpios)
+>  		return -ENOMEM;
+>  
+> +	if (of_get_property(node, "broken-voltage", 0))
+> +		pdata->host_caps2 |= MMC_CAP2_BROKEN_VOLTAGE;
 > +
-> +Missing features (not necessarily for moving out out staging):
+>  	/* get the card detection method */
+>  	if (of_get_property(node, "broken-cd", 0)) {
+>  		pdata->cd_type = S3C_SDHCI_CD_NONE;
 
-out of?
+Is there a reason we can't make this a property on the regulator instead?
 
-> +
-> +- Add KMS plane support for CRTC driver
-> +- Add LDB (LVDS Display Bridge) support
-> +- Add i.MX6 HDMI support
-> +- Add support for IC (Image converter)
-> +- Add support for CSI (CMOS Sensor interface)
-> +- Add support for VDIC (Video Deinterlacer)
-> +
-> +Many work-in-progress patches for the above features exist. Contact
-> +Sascha Hauer <kernel@pengutronix.de> if you are interested in working
-> +on a specific feature.
-> +
-> +Please send any patches to Greg Kroah-Hartman <greg@kroah.com> and
+Thanks,
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org>?
-
-> +Sascha Hauer <kernel@pengutronix.de>
-> -- 
-> 1.7.10.4
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
