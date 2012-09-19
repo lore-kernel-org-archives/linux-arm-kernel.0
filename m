@@ -1,45 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Sep 2012 18:55:39 +0000
-Subject: Adding new board to Kernel
-In-Reply-To: <CAOYb-CL9WM8wzko7CsQvYAAWKARnTkrqenBtsgchn96t=x4wyg@mail.gmail.com>
-References: <CAOYb-CL9WM8wzko7CsQvYAAWKARnTkrqenBtsgchn96t=x4wyg@mail.gmail.com>
-Message-ID: <201209191855.39859.arnd@arndb.de>
+Date: Wed, 19 Sep 2012 18:57:57 +0000
+Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
+ drivers/bus/
+In-Reply-To: <20120917215128.GF11762@atomide.com>
+References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120917215128.GF11762@atomide.com>
+Message-ID: <201209191857.57862.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 July 2012, Josenivaldo Benito Junior wrote:
-> Hi there,
+On Monday 17 September 2012, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
+> > OMAP interconnect drivers are used for the interconnect error handling.
+> > Since they are bus driver, lets move it to newly created drivers/bus.
+> > 
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> > Patch just moves OMAP interconnect drivers as is to the newly created
+> > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
+> > tree and test on all OMAP boards.
 > 
-> The Embedded Artists has a board based on ARM LPC3250 called EA3250 and
-> they provide a BSP with patch to Linux Kernel version 2.6.29.2. I am trying
-> to "up merge" this patch to Kernel v3.4 (now 3.5) and after that get it in
-> the mainstream. Although I have a working version (
-> https://github.com/jrbenito/Kernel-LPC3250) I still have doubts on how to
-> correct submit it to mainline kernel.
+> Great, looks like this should not conflict with other
+> omap patches queued, so Arnd should probably take this into
+> the bus branch:
 > 
-> -The machine type is already registered in past (
-> http://www.arm.linux.org.uk/developer/machines/list.php?id=2512) but it is
-> not in mainline. Since I shall not patch this file, how can I ask to it be
-> updated with ea3250 board information?
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Sorry for the late reply, I was just going through old unread email.
+It turns out that the patch actually did conflict and we now have a broken
+omap2plus_defconfig. The patch below seems to fix it, but please verify
+that this makes sense.
 
-The lpc32xx platform is getting converted to device tree based probing,
-which means your board will have to use a device tree file rather than
-a board number anyway, which at least solves the problem of getting back
-the assigned board number entry.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> -Could you please point me any documentation on how to add board support to
-> Linux Kernel?
-> 
-> My doubts are mainly related with process and order of files to submit I
-> shall follow. Any direction will be strongly appreciated.
-
-Please have a look at the phy3250 support in arch/arm/boot/dts/phy3250.dts
-and at the files in Documentation/devicetree.
-
-There are still a few bits missing device tree bindings, in particular the
-display and the DMA engine, but you can start with a device tree file
-that describes everything else.
-
-	Arnd
+diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+index f447e02..ab911a3 100644
+--- a/drivers/bus/omap_l3_noc.c
++++ b/drivers/bus/omap_l3_noc.c
+@@ -28,7 +28,6 @@
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ 
+-#include "soc.h"
+ #include "omap_l3_noc.h"
+ 
+ /*
+@@ -191,7 +190,7 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
+ 			IRQF_DISABLED, "l3-dbg-irq", l3);
+ 	if (ret) {
+ 		pr_crit("L3: request_irq failed to register for 0x%x\n",
+-						9 + OMAP44XX_IRQ_GIC_START);
++						l3->debug_irq);
+ 		goto err3;
+ 	}
+ 
+@@ -201,7 +200,7 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
+ 			IRQF_DISABLED, "l3-app-irq", l3);
+ 	if (ret) {
+ 		pr_crit("L3: request_irq failed to register for 0x%x\n",
+-						10 + OMAP44XX_IRQ_GIC_START);
++						l3->app_irq);
+ 		goto err4;
+ 	}
+ 
