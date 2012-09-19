@@ -1,35 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Sep 2012 08:01:23 +0000
-Subject: [PATCH 16/34] ASoC: imx-ssi: remove unneeded mach/hardware.h
- inclusion
-In-Reply-To: <20120919032337.GU8832@opensource.wolfsonmicro.com>
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <201209171430.35804.arnd@arndb.de>
- <20120919032337.GU8832@opensource.wolfsonmicro.com>
-Message-ID: <201209190801.23616.arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 19 Sep 2012 09:05:23 +0100
+Subject: [PATCH 6/6] staging: drm/imx: Add TODO
+In-Reply-To: <20120919071803.GW6180@pengutronix.de>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+ <1347445874-10779-7-git-send-email-s.hauer@pengutronix.de>
+ <20120919055322.GI6460@S2100-06.ap.freescale.net>
+ <20120919071803.GW6180@pengutronix.de>
+Message-ID: <20120919080523.GB18986@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 September 2012, Mark Brown wrote:
-> On Mon, Sep 17, 2012 at 02:30:35PM +0000, Arnd Bergmann wrote:
-> > On Monday 17 September 2012, Mark Brown wrote:
-> > > On Mon, Sep 17, 2012 at 01:34:45PM +0800, Shawn Guo wrote:
+On Wed, Sep 19, 2012 at 09:18:03AM +0200, Sascha Hauer wrote:
+> On Wed, Sep 19, 2012 at 01:53:25PM +0800, Shawn Guo wrote:
+> > On Wed, Sep 12, 2012 at 12:31:14PM +0200, Sascha Hauer wrote:
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > ---
+> > >  drivers/staging/imx-drm/TODO |   22 ++++++++++++++++++++++
+> > >  1 file changed, 22 insertions(+)
+> > >  create mode 100644 drivers/staging/imx-drm/TODO
+> > > 
+> > > diff --git a/drivers/staging/imx-drm/TODO b/drivers/staging/imx-drm/TODO
+> > > new file mode 100644
+> > > index 0000000..2075646
+> > > --- /dev/null
+> > > +++ b/drivers/staging/imx-drm/TODO
+> > > @@ -0,0 +1,22 @@
+> > > +TODO:
+> > > +- get DRM Maintainer review for this code
+> > > +- Factor out more code to common helper functions
+> > > +- decide where to put the base driver. It is not specific to a subsystem
+> > > +  and would be used by DRM/KMS and media/V4L2
+> > > +- convert irq driver to irq_domain_add_linear
+> > > +
+> > > +Missing features (not necessarily for moving out out staging):
+> > 
+> > out of?
 > 
-> > > >  #include <linux/platform_data/asoc-imx-ssi.h>
-> > > > -#include <mach/hardware.h>
+> Will fix.
 > 
-> > > This doesn't apply - there's no platform data header for imx-ssi at the
-> > > minute (and I don't see a patch in this series related to that in the
-> > > series).  I checked -next and there doesn't seem to be anything via a
-> > > non-ASoC tree either.
+> > 
+> > > +
+> > > +- Add KMS plane support for CRTC driver
+> > > +- Add LDB (LVDS Display Bridge) support
+> > > +- Add i.MX6 HDMI support
+> > > +- Add support for IC (Image converter)
+> > > +- Add support for CSI (CMOS Sensor interface)
+> > > +- Add support for VDIC (Video Deinterlacer)
+> > > +
+> > > +Many work-in-progress patches for the above features exist. Contact
+> > > +Sascha Hauer <kernel@pengutronix.de> if you are interested in working
+> > > +on a specific feature.
+> > > +
+> > > +Please send any patches to Greg Kroah-Hartman <greg@kroah.com> and
+> > 
+> > Greg Kroah-Hartman <gregkh@linuxfoundation.org>?
 > 
-> > It's in my testing/platform-data series, and will be in linux-next in
-> > a few days.
+> Hm, right. I copied this from another TODO file.
 > 
-> Hrm, that seems odd - why are we adding platform data to the driver?
+> # find drivers/staging/ -name TODO | xargs grep greg at kroah.com | wc -l
+> 20
+> 
+> Maybe Gregs address should be dropped here, he will show up in
+> get-maintainers.pl anyway.
+> 
+> Greg?
 
-We're not adding it, we just rename the header file from mach/imx.h
-to linux/platform-data/asoc-imx-ssi.h, along with 94 other header files
-that get moved to the same directory.
+Both end up in the same place, so it's not a big deal to leave my
+kroah.com address in there, but for new files, use linuxfoundation.org
+please.
 
-	Arnd
+thanks,
+
+greg k-h
