@@ -1,45 +1,47 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 19 Sep 2012 17:58:40 -0500
-Subject: [PATCH 3/3] ARM: OMAP2+: hwmod code: convert missing clockdomain
- warnings to debug messages
-In-Reply-To: <alpine.DEB.2.00.1209192247250.8278@utopia.booyaka.com>
-References: <20120918211146.16484.85893.stgit@dusk.lan>
- <20120918211251.16484.18401.stgit@dusk.lan> <5058ECAF.7010609@ti.com>
- <alpine.DEB.2.00.1209192247250.8278@utopia.booyaka.com>
-Message-ID: <505A4E20.5040903@ti.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 20 Sep 2012 08:18:19 +0900
+Subject: [PATCH] ARM: dts: use uart2 for console on smdkv310 and smdk5250
+In-Reply-To: <CAJuYYwQ0A9c_R=HzjeBCxL7E5bpw3j+64ApsCH5Uc8Q6i+HY4Q@mail.gmail.com>
+References: <052601cd94ca$058db4d0$10a91e70$%kim@samsung.com>
+ <CAJuYYwQ0A9c_R=HzjeBCxL7E5bpw3j+64ApsCH5Uc8Q6i+HY4Q@mail.gmail.com>
+Message-ID: <099701cd96bd$0e7a3dd0$2b6eb970$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Thomas Abraham wrote:
+> 
+> On 17 September 2012 17:16, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> >
+> > Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
+> >  arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> > index 1beccc8..cb01e3d 100644
+> > --- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> > +++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> > @@ -26,7 +26,7 @@
+> >         };
+> >
+> >         chosen {
+> > -               bootargs = "root=/dev/ram0 rw ramdisk=8192
+> initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc";
+> > +               bootargs = "root=/dev/ram0 rw ramdisk=8192
+> initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+> >         };
+> 
+> Dear Mr. Kim,
+> 
+> What is the reason for changing the console port to 2 for smdkv310 board?
+> 
+Since uart1 can be used for other purpose, we changed the default console
+port to use uart2 a few month ago for all of SMDKs. And if required, I will
+change it for current defconfigs.
 
-On 9/19/2012 5:48 PM, Paul Walmsley wrote:
-> Hi Beno?t,
->
-> On Tue, 18 Sep 2012, Cousson, Benoit wrote:
->
->> On 9/18/2012 4:12 PM, Paul Walmsley wrote:
->>> The decision was made a few months ago to allow struct omap_hwmod
->>> records and struct clk records to omit clockdomain information if the
->>> clockdomain is not software-controllable.  See for example commit
->>> 868c157df9721675c19729eed2c96bac6c3f1d01 ("ARM: OMAP2+: hwmod: remove
->>> prm_clkdm, cm_clkdm; allow hwmods to have no clockdomain").
->>>
->>> So convert an existing pr_warning() to a pr_debug() (regarding missing
->>> clockdomains in clocks), and add a pr_debug() for missing hwmod
->>> clockdomains.
->>
->> At some point I sent you a small RFC to still keep the message if neither
->> oh->clkdm nor oh->_clk->clkdm was there. I've never had the time to test it,
->> but that should then cover OMAP2, 3 & 4 cases.
->
-> OK let's plan to test and add something like that during the 3.8 time
-> frame... probably it should also depend on the value of clkdm_control.
-> It's not clear to me exactly what that conditional should look like...
+Thanks.
 
-OK, I was thinking of a more basic thing. If some more values have to be 
-checked it might be a little bit more tricky.
-
-Let's see that later.
-
-Thanks,
-Benoit
+K-Gene <kgene@kernel.org>
