@@ -1,40 +1,64 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 19 Sep 2012 21:51:13 +0530
-Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
- drivers/bus/
-In-Reply-To: <201209191458.00531.arnd@arndb.de>
-References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
- <20120917215128.GF11762@atomide.com> <201209191458.00531.arnd@arndb.de>
-Message-ID: <CAMQu2gyyROhnhhuD8pBviPojEr+4JJuK1hE_fg=6jOEX9Wd7Cg@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 19 Sep 2012 09:42:31 -0700
+Subject: [PATCH 3/4] mfd: dbx500: Provide a more accurate smp_twd clock
+In-Reply-To: <20120919160251.GM28670@sortiz-mobl>
+References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
+ <1346415691-13371-4-git-send-email-ulf.hansson@stericsson.com>
+ <20120919160251.GM28670@sortiz-mobl>
+Message-ID: <20120919164231.17033.27762@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 8:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 17 September 2012, Tony Lindgren wrote:
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
->> > OMAP interconnect drivers are used for the interconnect error handling.
->> > Since they are bus driver, lets move it to newly created drivers/bus.
->> >
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->> > Cc: Tony Lindgren <tony@atomide.com>
->> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > ---
->> > Patch just moves OMAP interconnect drivers as is to the newly created
->> > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
->> > tree and test on all OMAP boards.
->>
->> Great, looks like this should not conflict with other
->> omap patches queued, so Arnd should probably take this into
->> the bus branch:
->>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> Ok, added to the branch. In the future please Cc both Olof and me when submitting
-> patches for inclusion.
->
-Thanks Arnd. Sorry I missed to Cc Olof on the patch. Will take care of
-this in future.
+Quoting Samuel Ortiz (2012-09-19 09:02:51)
+> Hi Ulf,
+> 
+> On Fri, Aug 31, 2012 at 02:21:30PM +0200, Ulf Hansson wrote:
+> > From: Michel Jaouen <michel.jaouen@stericsson.com>
+> > 
+> > The local timer clock is based on ARM subsystem clock. This patch
+> > obtains a more exact value of that clock by reading PRCMU registers.
+> > Using this increases the accuracy of the local timer events.
+> > 
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
+> > Signed-off-by: Michel Jaouen <michel.jaouen@stericsson.com>
+> > ---
+> >  drivers/mfd/db8500-prcmu.c       |   42 ++++++++++++++++++++++++++++++++++++++
+> >  drivers/mfd/dbx500-prcmu-regs.h  |    4 +++-
+> >  include/linux/mfd/dbx500-prcmu.h |    1 +
+> >  3 files changed, 46 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> > index 4f74529..e7f9539 100644
+> > --- a/drivers/mfd/db8500-prcmu.c
+> > +++ b/drivers/mfd/db8500-prcmu.c
+> > @@ -418,6 +418,9 @@ static struct {
+> >  
+> >  static atomic_t ac_wake_req_state = ATOMIC_INIT(0);
+> >  
+> > +/* Functions definition */
+> > +static void compute_armss_rate(void);
+> > +
+> I'm not a big fan of forward declarations, but I still applied your patch to
+> my for-next branch. Thanks.
+> 
 
-Regards
-santosh
+Samuel,
+
+Not sure if you were Cc'd on the rest of the patches in this series but
+after some discussion (see patch #1) I took all four patches into
+clk-next, including the MFD change.  This was done first week of
+September.  At this point those patches have shifted into my stable
+branch that I have promised not to rebase (for arm-soc dependencies).
+
+Are you OK with me taking this patch through the clk-next branch?
+
+Regards,
+Mike
+
+> Cheers,
+> Samuel.
+> 
+> -- 
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
