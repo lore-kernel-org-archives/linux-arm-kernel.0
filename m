@@ -1,91 +1,155 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 19 Sep 2012 14:51:56 +0100
-Subject: [RFC PATCH v2 2/5] ARM: mm: rename jump labels in
- v7_flush_dcache_all function
-In-Reply-To: <1347986135-17979-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20120919135155.GB2111@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Sep 2012 13:52:27 +0000
+Subject: [PATCH 09/24] ARM: ixp4xx: use __iomem pointers for MMIO
+In-Reply-To: <m3ipbbdtlt.fsf@intrepid.localdomain>
+References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
+ <m3ipbbmxke.fsf@intrepid.localdomain> <m3ipbbdtlt.fsf@intrepid.localdomain>
+Message-ID: <201209191352.28034.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 05:35:32PM +0100, Lorenzo Pieralisi wrote:
-> This patch renames jump labels in v7_flush_dcache_all in order to define
-> a specific flush cache levels entry point.
+On Tuesday 18 September 2012, Krzysztof Halasa wrote:
+> Krzysztof Halasa <khc@pm.waw.pl> writes:
 > 
-> TODO: factor out the level flushing loop if considered worthwhile and
->       define the input registers requirements.
-
-In the context of this series, this patch seems to do nothing at all (?)
-
-Maybe it would make sense to defer this patch until you post something
-that uses it.
-
-Given that I have a fair expectation that you will build something useful
-on top of this in the near future, I don't have a strong feeling about
-it, though.
-
-Cheers
----Dave
-
+> >> At the moment, this patch conflicts with other patches in linux-next,
+> >> need to sort this out.
+> >
+> > Very nice, I will take care of these 3 patches.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/mm/cache-v7.S | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index d1fa2f6..140b294 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -48,7 +48,7 @@ ENTRY(v7_flush_dcache_louis)
->  	mov	r3, r3, lsr #20			@ r3 = LoUIS * 2
->  	moveq	pc, lr				@ return if level == 0
->  	mov	r10, #0				@ r10 (starting level) = 0
-> -	b	loop1				@ start flushing cache levels
-> +	b	flush_levels			@ start flushing cache levels
->  ENDPROC(v7_flush_dcache_louis)
->  
->  /*
-> @@ -67,7 +67,7 @@ ENTRY(v7_flush_dcache_all)
->  	mov	r3, r3, lsr #23			@ left align loc bit field
->  	beq	finished			@ if loc is 0, then no need to clean
->  	mov	r10, #0				@ start clean at cache level 0
-> -loop1:
-> +flush_levels:
->  	add	r2, r10, r10, lsr #1		@ work out 3x current cache level
->  	mov	r1, r0, lsr r2			@ extract cache type bits from clidr
->  	and	r1, r1, #7			@ mask of the bits for current cache only
-> @@ -89,9 +89,9 @@ loop1:
->  	clz	r5, r4				@ find bit position of way size increment
->  	ldr	r7, =0x7fff
->  	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
-> -loop2:
-> +loop1:
->  	mov	r9, r4				@ create working copy of max way size
-> -loop3:
-> +loop2:
->   ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
->   THUMB(	lsl	r6, r9, r5		)
->   THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
-> @@ -100,13 +100,13 @@ loop3:
->   THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
->  	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
->  	subs	r9, r9, #1			@ decrement the way
-> -	bge	loop3
-> -	subs	r7, r7, #1			@ decrement the index
->  	bge	loop2
-> +	subs	r7, r7, #1			@ decrement the index
-> +	bge	loop1
->  skip:
->  	add	r10, r10, #2			@ increment cache number
->  	cmp	r3, r10
-> -	bgt	loop1
-> +	bgt	flush_levels
->  finished:
->  	mov	r10, #0				@ swith back to cache level 0
->  	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
-> -- 
-> 1.7.12
-> 
-> 
+> I mean, just this one IXP4xx patch :-)
+
+Ok. I just noticed that I made a mistake in splitting up the changes between
+iop32x and ixp4xx. I've corrected this in my tree now and fixed the bug you
+pointed out, see the new version below. I'm not completely sure how to
+proceed with this. I noticed you have some patches in linux-next but haven't
+sent any pull requests yet. The merge window is getting closer, so I'd
+like to come to a conclusion with this.
+
+	Arnd
+
+8<----
+>From 13ec32f47cb42cecc9cd262c307ef9377c601007 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 14 Sep 2012 20:19:40 +0000
+Subject: [PATCH] ARM: ixp4xx: use __iomem pointers for MMIO
+
+ARM is moving to stricter checks on readl/write functions,
+so we need to use the correct types everywhere.
+
+At the moment, this patch conflicts with other patches in linux-next,
+need to sort this out.
+
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index a9f8094..fdf91a1 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -53,24 +53,24 @@ static struct clock_event_device clockevent_ixp4xx;
+  *************************************************************************/
+ static struct map_desc ixp4xx_io_desc[] __initdata = {
+ 	{	/* UART, Interrupt ctrl, GPIO, timers, NPEs, MACs, USB .... */
+-		.virtual	= IXP4XX_PERIPHERAL_BASE_VIRT,
++		.virtual	= (unsigned long)IXP4XX_PERIPHERAL_BASE_VIRT,
+ 		.pfn		= __phys_to_pfn(IXP4XX_PERIPHERAL_BASE_PHYS),
+ 		.length		= IXP4XX_PERIPHERAL_REGION_SIZE,
+ 		.type		= MT_DEVICE
+ 	}, {	/* Expansion Bus Config Registers */
+-		.virtual	= IXP4XX_EXP_CFG_BASE_VIRT,
++		.virtual	= (unsigned long)IXP4XX_EXP_CFG_BASE_VIRT,
+ 		.pfn		= __phys_to_pfn(IXP4XX_EXP_CFG_BASE_PHYS),
+ 		.length		= IXP4XX_EXP_CFG_REGION_SIZE,
+ 		.type		= MT_DEVICE
+ 	}, {	/* PCI Registers */
+-		.virtual	= IXP4XX_PCI_CFG_BASE_VIRT,
++		.virtual	= (unsigned long)IXP4XX_PCI_CFG_BASE_VIRT,
+ 		.pfn		= __phys_to_pfn(IXP4XX_PCI_CFG_BASE_PHYS),
+ 		.length		= IXP4XX_PCI_CFG_REGION_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+ #ifdef CONFIG_DEBUG_LL
+ 	{	/* Debug UART mapping */
+-		.virtual	= IXP4XX_DEBUG_UART_BASE_VIRT,
++		.virtual	= (unsigned long)IXP4XX_DEBUG_UART_BASE_VIRT,
+ 		.pfn		= __phys_to_pfn(IXP4XX_DEBUG_UART_BASE_PHYS),
+ 		.length		= IXP4XX_DEBUG_UART_REGION_SIZE,
+ 		.type		= MT_DEVICE
+diff --git a/arch/arm/mach-ixp4xx/include/mach/cpu.h b/arch/arm/mach-ixp4xx/include/mach/cpu.h
+index b2ef65d..ebc0ba3 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/cpu.h
++++ b/arch/arm/mach-ixp4xx/include/mach/cpu.h
+@@ -14,6 +14,7 @@
+ #ifndef __ASM_ARCH_CPU_H__
+ #define __ASM_ARCH_CPU_H__
+ 
++#include <linux/io.h>
+ #include <asm/cputype.h>
+ 
+ /* Processor id value in CP15 Register 0 */
+@@ -37,7 +38,7 @@
+ 
+ static inline u32 ixp4xx_read_feature_bits(void)
+ {
+-	u32 val = ~*IXP4XX_EXP_CFG2;
++	u32 val = ~__raw_readl(IXP4XX_EXP_CFG2);
+ 
+ 	if (cpu_is_ixp42x_rev_a0())
+ 		return IXP42X_FEATURE_MASK & ~(IXP4XX_FEATURE_RCOMP |
+@@ -51,7 +52,7 @@ static inline u32 ixp4xx_read_feature_bits(void)
+ 
+ static inline void ixp4xx_write_feature_bits(u32 value)
+ {
+-	*IXP4XX_EXP_CFG2 = ~value;
++	__raw_writel(~value, IXP4XX_EXP_CFG2);
+ }
+ 
+ #endif  /* _ASM_ARCH_CPU_H */
+diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+index 97c530f..eb68b61 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
++++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+@@ -49,21 +49,21 @@
+  * Expansion BUS Configuration registers
+  */
+ #define IXP4XX_EXP_CFG_BASE_PHYS	(0xC4000000)
+-#define IXP4XX_EXP_CFG_BASE_VIRT	(0xFFBFE000)
++#define IXP4XX_EXP_CFG_BASE_VIRT	IOMEM(0xFFBFE000)
+ #define IXP4XX_EXP_CFG_REGION_SIZE	(0x00001000)
+ 
+ /*
+  * PCI Config registers
+  */
+ #define IXP4XX_PCI_CFG_BASE_PHYS	(0xC0000000)
+-#define	IXP4XX_PCI_CFG_BASE_VIRT	(0xFFBFF000)
++#define	IXP4XX_PCI_CFG_BASE_VIRT	IOMEM(0xFFBFF000)
+ #define IXP4XX_PCI_CFG_REGION_SIZE	(0x00001000)
+ 
+ /*
+  * Peripheral space
+  */
+ #define IXP4XX_PERIPHERAL_BASE_PHYS	(0xC8000000)
+-#define IXP4XX_PERIPHERAL_BASE_VIRT	(0xFFBEB000)
++#define IXP4XX_PERIPHERAL_BASE_VIRT	IOMEM(0xFFBEB000)
+ #define IXP4XX_PERIPHERAL_REGION_SIZE	(0x00013000)
+ 
+ /*
+@@ -73,7 +73,7 @@
+  * aligned so that it * can be used with the low-level debug code.
+  */
+ #define	IXP4XX_DEBUG_UART_BASE_PHYS	(0xC8000000)
+-#define	IXP4XX_DEBUG_UART_BASE_VIRT	(0xffb00000)
++#define	IXP4XX_DEBUG_UART_BASE_VIRT	IOMEM(0xffb00000)
+ #define	IXP4XX_DEBUG_UART_REGION_SIZE	(0x00001000)
+ 
+ #define IXP4XX_EXP_CS0_OFFSET	0x00
+@@ -92,7 +92,7 @@
+ /*
+  * Expansion Bus Controller registers.
+  */
+-#define IXP4XX_EXP_REG(x) ((volatile u32 *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
++#define IXP4XX_EXP_REG(x) ((volatile u32 __iomem *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
+ 
+ #define IXP4XX_EXP_CS0      IXP4XX_EXP_REG(IXP4XX_EXP_CS0_OFFSET)
+ #define IXP4XX_EXP_CS1      IXP4XX_EXP_REG(IXP4XX_EXP_CS1_OFFSET)
