@@ -1,51 +1,63 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 20 Sep 2012 00:12:12 +0200
-Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
-In-Reply-To: <alpine.DEB.2.00.1209192202430.8278@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
- <201209142103.49421.rjw@sisk.pl>
- <alpine.DEB.2.00.1209192202430.8278@utopia.booyaka.com>
-Message-ID: <201209200012.12275.rjw@sisk.pl>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 19 Sep 2012 15:15:11 -0700
+Subject: [PATCHv4 8/8] ARM: OMAP3: do not delete per_clkdm autodeps during
+ idle
+In-Reply-To: <alpine.DEB.2.00.1209182241400.4747@utopia.booyaka.com> (Paul
+ Walmsley's message of "Tue, 18 Sep 2012 22:43:52 +0000 (UTC)")
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-9-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1209182156330.4747@utopia.booyaka.com>
+ <alpine.DEB.2.00.1209182241400.4747@utopia.booyaka.com>
+Message-ID: <87k3vpek28.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 20, 2012, Paul Walmsley wrote:
-> Hi
-> 
-> On Fri, 14 Sep 2012, Rafael J. Wysocki wrote:
-> 
-> > On Wednesday, September 12, 2012, Paul Walmsley wrote:
-> > > 
-> > > Remove some unnecessary plat/ includes that are interfering with multi-subarch
-> > > ARM kernels.
-> > > 
-> > > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > > Cc: Kevin Hilman <khilman@ti.com>
-> > > Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> > > Acked-by: Kevin Hilman <khilman@ti.com>
-> > 
-> > Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
-> > 
-> > > ---
-> > > 
-> > > Still awaiting some final testing here.  Rafael, was wondering if you 
-> > > would be willing to ack this so we can merge it via the OMAP tree?   
-> > > Otherwise the patch can be split into an OMAP part and a CPUFreq part that 
-> > > can go in across two merge windows.
-> > > 
-> > >  arch/arm/mach-omap2/clock2420_data.c |    1 +
-> > >  arch/arm/mach-omap2/clock2430_data.c |    1 +
-> > >  arch/arm/mach-omap2/clock3xxx_data.c |    1 +
-> > >  arch/arm/mach-omap2/clock44xx_data.c |    1 +
-> > >  drivers/cpufreq/omap-cpufreq.c       |   19 +------------------
-> > >  5 files changed, 5 insertions(+), 18 deletions(-)
-> 
-> Thanks Rafael.  Looks like you've got "cpufreq: OMAP: Check IS_ERR() 
-> instead of NULL for omap_device_get_by_hwmod_name" queued which conflicts 
-> with this patch, so will just queue the arch/arm/mach-omap2/ changes for 
-> now.  Then the drivers/cpufreq/omap-cpufreq.c part can go in during 3.8.
+Paul Walmsley <paul@pwsan.com> writes:
 
-OK
+> On Tue, 18 Sep 2012, Paul Walmsley wrote:
+>
+>> What do you think about the following patch to handle part of the i582 
+>> workaround?
+>
+> That patch was an older version; here's one that builds and boots - sorry 
+> about that.  It passed the basic PM tests here on 3730ES1.0 Beagle XM and 
+> 3730ES1.2 EVM.
+>
+> Kevin, care to ack it if you're happy with it?  We still need to get the 
+> other parts of the i582 workaround into place, of course...
+>
+>
+> - Paul
+>
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Tue, 18 Sep 2012 16:02:38 -0600
+> Subject: [PATCH] ARM: OMAP36xx: PM: apply part of the erratum i582 workaround
+>
+> On OMAP36xx chips with ES < 1.2, if the PER powerdomain goes to OSWR
+> or OFF while CORE stays at CSWR or ON, or if, upon chip wakeup from
+> OSWR or OFF, the CORE powerdomain goes ON before PER, the UART3/4
+> FIFOs and McBSP2/3 SIDETONE memories will be unusable.  This is
+> erratum i582 in the OMAP36xx Silicon Errata document.
+>
+> This patch implements one of several parts of the workaround: the
+> addition of the wakeup dependency between the PER and WKUP
+> clockdomains, such that PER will wake up at the same time CORE_L3
+> does.
+>
+> This is not a complete workaround.  For it to be complete:
+>
+> 1. the PER powerdomain's next power state must not be set to OSWR or
+>    OFF if the CORE powerdomain's next power state is set to CSWR or
+>    ON;
+>
+> 2. the UART3/4 FIFO and McBSP2/3 SIDETONE loopback tests should be run
+>    if the LASTPOWERSTATEENTERED bits for PER and CORE indicate that
+>    PER went OFF while CORE stayed on.  If loopback tests fail, then
+>    those devices will be unusable until PER and CORE can undergo a
+>    transition from ON to OSWR/OFF and back ON.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-Thanks,
-Rafael
+Acked-by: Kevin Hilman <khilman@ti.com>
