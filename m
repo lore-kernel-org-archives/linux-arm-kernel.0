@@ -1,27 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Sep 2012 21:35:06 +0000 (UTC)
-Subject: [PATCH v2 2/9] ARM: OMAP3: hwmod data: add mmu data for iva and
- isp
-In-Reply-To: <1347479152-588-3-git-send-email-omar.luna@linaro.org>
-References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
- <1347479152-588-3-git-send-email-omar.luna@linaro.org>
-Message-ID: <alpine.DEB.2.00.1209192134490.5264@utopia.booyaka.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 19 Sep 2012 16:36:46 -0500
+Subject: [PATCH RESEND 0/5] ARM: dts: AM33XX: Add device tree data
+In-Reply-To: <alpine.DEB.2.00.1209192124570.5264@utopia.booyaka.com>
+References: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+ <B7CE1C39EBFBA0428A012975D4B2FC830B5DF78F@DNCE05.ent.ti.com>
+ <alpine.DEB.2.00.1209192124570.5264@utopia.booyaka.com>
+Message-ID: <505A3AEE.8060408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Sep 2012, Omar Ramirez Luna wrote:
+On 9/19/2012 4:26 PM, Paul Walmsley wrote:
+> Hi Beno?t
+>
+> On Wed, 19 Sep 2012, Cousson, Benoit wrote:
+>
+>> Thanks for the rebase / repost. I'll pulled the full series if Paul is OK with
+>>    ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
+>>
+>> Paul,
+>> Is that OK?
+>
+> Looks to me like the clock change is unrelated to the DTS changes?  Best
+> thing would be if you could just take the DTS changes and I'll take the
+> clkdev alias change.
 
-> Add mmu hwmod data for iva and isp.
-> 
-> Due to compatibility an ifdef CONFIG_OMAP_IOMMU_IVA2 needs to be
-> propagated (previously on iommu resource info) to hwmod data in OMAP3,
-> so users of iommu and tidspbridge can avoid issues of two modules
-> managing mmu data/irqs/resets; this until tidspbridge can be migrated
-> to iommu framework.
-> 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+Good point, it can be separated.
 
-Thanks, queued for 3.7.
+> Otherwise if that doesn't work I can ack it, but there might be some
+> conflicts with other clkdev data changes.
 
-- Paul
+No problem, that's fine for me.
+
+Regards,
+Benoit
