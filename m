@@ -1,70 +1,21 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 19 Sep 2012 10:49:48 -0400
-Subject: [PATCH v2] of: dma: fix typos in generic dma binding definition
-Message-ID: <1348066188-17937-1-git-send-email-mporter@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Sep 2012 14:49:30 +0000
+Subject: [PATCH 13/16] ARM: omap: move platform_data definitions
+In-Reply-To: <5058458C.5010908@ti.com>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <201209121720.33822.arnd@arndb.de> <5058458C.5010908@ti.com>
+Message-ID: <201209191449.30935.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some semicolons were left out in the examples.
+On Tuesday 18 September 2012, Peter Ujfalusi wrote:
+> I thought I have replied to this...
+> Whichever way you prefer. I can craft a series to clean up the plat/mcbsp.h
+> usage and move the mcbsp header via ASoC tree.
+> I'm also fine if you do the move.
+> Let me know what you prefer.
+> 
 
-The #dma-channels and #dma-requests properties have a prefix
-that is, by convention, reserved for cell size properties.
-Rename those properties to dma-channels and dma-requests.
+I think I'll just keep all my patches together then, and leave this one in.
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- Documentation/devicetree/bindings/dma/dma.txt |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/dma/dma.txt b/Documentation/devicetree/bindings/dma/dma.txt
-index a4f59a5..8f504e6 100644
---- a/Documentation/devicetree/bindings/dma/dma.txt
-+++ b/Documentation/devicetree/bindings/dma/dma.txt
-@@ -13,22 +13,22 @@ Required property:
- 			more details.
- 
- Optional properties:
--- #dma-channels: 	Number of DMA channels supported by the controller.
--- #dma-requests: 	Number of DMA requests signals supported by the
-+- dma-channels: 	Number of DMA channels supported by the controller.
-+- dma-requests: 	Number of DMA requests signals supported by the
- 			controller.
- 
- Example:
- 
- 	dma: dma at 48000000 {
--		compatible = "ti,omap-sdma"
-+		compatible = "ti,omap-sdma";
- 		reg = <0x48000000 0x1000>;
- 		interrupts = <0 12 0x4
- 			      0 13 0x4
- 			      0 14 0x4
- 			      0 15 0x4>;
- 		#dma-cells = <1>;
--		#dma-channels = <32>;
--		#dma-requests = <127>;
-+		dma-channels = <32>;
-+		dma-requests = <127>;
- 	};
- 
- 
-@@ -61,7 +61,7 @@ Examples:
- 		...
- 		dmas = <&dma 2		/* read channel */
- 			&dma 3>;	/* write channel */
--		dma-names = "rx", "tx"
-+		dma-names = "rx", "tx";
- 		...
- 	};
- 
-@@ -70,7 +70,7 @@ Examples:
- 	dmas = <&dma1 5
- 		&dma2 7
- 		&dma3 2>;
--	dma-names = "rx-tx", "rx-tx", "rx-tx"
-+	dma-names = "rx-tx", "rx-tx", "rx-tx";
- 
- 3. A device with three channels, one of which has two alternatives:
- 
--- 
-1.7.9.5
+	Arnd
