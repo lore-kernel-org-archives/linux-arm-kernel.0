@@ -1,79 +1,52 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 19 Sep 2012 08:04:22 +0300
-Subject: Kernel panic - not syncing: No init found
-In-Reply-To: <1347882577.12909.YahooMailNeo@web133203.mail.ir2.yahoo.com>
-References: <1347466702.70460.YahooMailNeo@web133201.mail.ir2.yahoo.com>
- <20120915190422.GB4434@tarshish>
- <1347882577.12909.YahooMailNeo@web133203.mail.ir2.yahoo.com>
-Message-ID: <20120919050421.GB11255@sapphire.tkos.co.il>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Sep 2012 13:33:50 +0800
+Subject: [PATCH] ARM:IMX6Q:use pll2_pfd2_396m as the enfc_sel's parent
+In-Reply-To: <1347261476-9799-1-git-send-email-b32955@freescale.com>
+References: <1347261476-9799-1-git-send-email-b32955@freescale.com>
+Message-ID: <20120919053348.GH6460@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ellis,
+On Mon, Sep 10, 2012 at 03:17:56PM +0800, Huang Shijie wrote:
+> The gpmi-nand driver can support the ONFI nand chip's EDO (extra data out)
+> mode in the asynchrounous mode. In the asynchrounous mode 5, the gpmi
+> needs 100MHz clock for the IO. But with the pll2_pfd0_352m, we can not
+> get the 100MHz clock.
+> 
+> So choose pll2_pfd2_396m as enfc_sel's parent.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-On Mon, Sep 17, 2012 at 12:49:37PM +0100, Ellis Andrew wrote:
-> I have done a bit of searching around, and I'm not sure how to boot into 
-> initrmafs. Can you please point me towards some instructions on how to do 
-> this.
+Applied, thanks.
 
-See Documentation/filesystems/ramfs-rootfs-initramfs.txt in (recent) kernel 
-source tree. See also http://www.landley.net/writing/rootfs-howto.html by the 
-same author.
+But we really expect that clock framework can get improved to have such
+case handled in clk_set_rate() call.
 
-baruch
+Shawn
 
-> ________________________________
->  From: Baruch Siach <baruch@tkos.co.il>
-> To: Ellis Andrew <ajellisuk@yahoo.co.uk> 
-> Cc: "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org> 
-> Sent: Saturday, 15 September 2012, 20:04
-> Subject: Re: Kernel panic - not syncing: No init found
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 4233d9e..58705b6 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -440,6 +440,13 @@ int __init mx6q_clocks_init(void)
+>  	clk_register_clkdev(clk[ahb], "ahb", NULL);
+>  	clk_register_clkdev(clk[cko1], "cko1", NULL);
 >  
-> Hi Ellis,
+> +	/*
+> +	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
+> +	 * We can not get the 100MHz from the pll2_pfd0_352m.
+> +	 * So choose pll2_pfd2_396m as enfc_sel's parent.
+> +	 */
+> +	clk_set_parent(clk[enfc_sel], clk[pll2_pfd2_396m]);
+> +
+>  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+>  		clk_prepare_enable(clk[clks_init_on[i]]);
+>  
+> -- 
+> 1.7.0.4
 > 
-> On Wed, Sep 12, 2012 at 05:18:22PM +0100, Ellis Andrew wrote:
-> > After a lot of searching with Google I have found this is a common problem, 
-> > unfortunately none of the solutions I have found, fix the problem.
-> > 
-> > The original error I got was:
-> > 
-> > Kernel panic - not syncing: No init found.? Try passing init= option to kernel.
-> > 
-> > The command line option was:
-> > root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0
-> > 
-> > I after digging around with google, I found a suggestion which I tried, I made my command line:
-> > root=/dev/mtdblock3 rootfstype=jffs2 rw console=ttyMCS mem=64M at 0x0 init=/sbin/init panic=4
-> > 
-> > But I now get the following error:
-> > 
-> > Freeing init memory: 88K
-> > Failed to execute /sbin/init.? Attempting defaults...
-> > Kernel panic - not syncing: No init found.? Try passing init= option to kernel.
-> > 
-> > I can see that the Root drive is being mounted.
-> > 
-> > The contents of the init file is:
-> > 
-> > #!/bin/busybox ash
-> > /bin/busybox mount -t sysfs /dev/sys /sys
-> > /bin/busybox mount -t proc? /proc
-> > /bin/busybox mount -t devpts /dev/pts
-> > # Populate /dev according to /sys
-> > /bin/busybox mdev -s
-> > /bin/busybox --install -s
-> > /linuxrc
-> > exec /sbin/init "$@"?? </dev/console >/dev/console 2>&1
-> > 
-> > Does anyone have any suggestions on how to fix this please? 
 > 
-> The most common reason for this failure is that your root filesystem layout is 
-> not what you think it is. Try booting into initramfs and mounting your jffs2 
-> filesystem from there to examine it directly on your running system.
-> 
-> baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
