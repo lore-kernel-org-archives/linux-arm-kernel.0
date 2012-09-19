@@ -1,57 +1,29 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Wed, 19 Sep 2012 09:54:47 -0700
-Subject: [PATCH 07/11] tty/serial: Add kgdb_nmi driver
-In-Reply-To: <5059B200.9040706@windriver.com>
-References: <20120913150133.GA16238@lizard>
- <1347548615-18227-7-git-send-email-anton.vorontsov@linaro.org>
- <5059B200.9040706@windriver.com>
-Message-ID: <20120919165447.GA6316@lizard>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 19 Sep 2012 10:57:15 -0600
+Subject: [PATCH v2 1/2] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <20120917113423.GA28759@kroah.com>
+References: <1347880974-13615-1-git-send-email-thierry.reding@avionic-design.de>
+ <20120917113423.GA28759@kroah.com>
+Message-ID: <CAErSpo4q7KYn3bvNQ0wAXV=+PRAFH_c=MgOLOTDKgaNCjE_aXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 06:52:32AM -0500, Jason Wessel wrote:
-[...]
-> > --- a/drivers/tty/serial/kgdboc.c
-> > +++ b/drivers/tty/serial/kgdboc.c
-> > @@ -145,6 +145,8 @@ __setup("kgdboc=", kgdboc_option_setup);
-> >  
-> >  static void cleanup_kgdboc(void)
-> >  {
-> > +	if (kgdb_unregister_nmi_console())
-> > +		return;
-> >  	kgdboc_unregister_kbd();
-> >  	if (configured == 1)
-> >  		kgdb_unregister_io_module(&kgdboc_io_ops);
-> > @@ -198,6 +200,10 @@ do_register:
-> >  	if (err)
-> >  		goto noconfig;
-> >  
-> > +	err = kgdb_register_nmi_console();
-> > +	if (err)
-> > +		goto noconfig;
-> > +
-> 
-> Just one question on this one, what do you expect to happen, or how
-> does this work when you use a different serial port for example on a
-> board that has a real serial port and an FIQ port?   It was not
-> obvious that there was a path to check if the port you are
-> registering is an FIQ enabled port and then call the
-> kgdb_register_nmi_console at that point.
+On Mon, Sep 17, 2012 at 5:34 AM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Mon, Sep 17, 2012 at 01:22:53PM +0200, Thierry Reding wrote:
+>> Remove the __init annotations in order to keep pci_fixup_irqs() around
+>> after init (e.g. for hotplug). This requires the same change for the
+>> implementation of pcibios_update_irq() on all architectures. While at
+>> it, all __devinit annotations are removed as well, since they will be
+>> useless now that HOTPLUG is always on.
+>>
+>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> ---
+>> Changes in v2:
+>> - remove __init and __devinit annotations altogether
+>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Yes, it works perfectly fine. If the port is not FIQ-enabled (which,
-technically, can be enabled later -- it's just not implemented), then
-ttyNMI just won't able to receive data.
+I applied these (both 1/2 and 2/2) to my "next" branch.  Thanks!
 
-The reason why I register nmi console in KGDB code (as opposite to arch
-code), is the dependcy: the port should be initialized before it can be
-used as ttyNMI. We could place the ttyNMI registration code into
-late_initcall in arch/, and check for dbg_io_ops, but that is ugly by
-itself, plus dbg_io_ops can change.
-
-But with your kgdb_arch->enable_nmi suggestion (which I'll surely
-implement), we can skip the registration at least for the cases when
-the arch doesn't have this feature.
-
-Thanks!
-
-Anton.
+Bjorn
