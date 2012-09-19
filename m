@@ -1,51 +1,50 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 19 Sep 2012 12:22:00 +0200
-Subject: [PATCH v2 0/3] MFD/GPIO: Add twl6040 GPO driver
-In-Reply-To: <1345119195-7490-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1345119195-7490-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120919102200.GI3647@sortiz-mobl>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 19 Sep 2012 06:24:46 -0400
+Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
+ property for broken voltage quirk
+In-Reply-To: <1587150.uFGRdL0s8e@amdc1227> (Tomasz Figa's message of "Wed, 19
+ Sep 2012 12:13:14 +0200")
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1346748609-11115-2-git-send-email-t.figa@samsung.com>
+ <m38vc6k1qu.fsf@pullcord.laptop.org> <1587150.uFGRdL0s8e@amdc1227>
+Message-ID: <m3a9wmgvip.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Tomasz,
 
-On Thu, Aug 16, 2012 at 03:13:12PM +0300, Peter Ujfalusi wrote:
-> Hello,
-> 
-> Changes since v1:
-> - Removed the ti,use-gpo property from DT bindings
-> - Register the GPO driver if we booted with DT blob or in legacy if the pdata
->   for the GPO driver is present
-> - DT binding Documentation update
-> 
-> The Documentation update has reference to the twl6040.dtsi file which will be
-> created to hold the common/static properties for the twl6040.
-> To avoid cross tree merge issues later I have only included the Documentation
-> update to this series and I will send the actual .dtsi/.dts changes via
-> linux-omap. If this is not a problem.
-> 
-> The dependencies for this series are in mainline and I think this series can
-> go via GPIO if Samuel agrees with the changes.
-> 
-> Intro mail from v1:
-> 
-> The following series adds support for the GPO (General Purpose Output) on the
-> twl6040/41 audio chip.
-> The series has been tested on SDP4430, compile tested for x86_64 and x86_32 bit
-> to be sure it does not introduce build breakage.
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (3):
->   mfd: twl6040: Fix GPO mask
->   mfd: twl6040: Add twl6040-gpio child
->   gpio: Add basic support for TWL6040 GPOs
-All 3 patches applied, thanks.
+On Wed, Sep 19 2012, Tomasz Figa wrote:
+> Hi Chris,
+>
+> On Wednesday 19 of September 2012 01:42:01 Chris Ball wrote:
+>> On Tue, Sep 04 2012, Tomasz Figa wrote:
+>> > Some boards use fixed voltage regulator for vmmc supply (e.g. for eMMC
+>> > memories). MMC_CAP2_BROKEN_VOLTAGE must be enabled for them to operate
+>> > correctly.
+>>>
+>> Is there a reason we can't make this a property on the regulator instead?
+>
+> Is there a reason we can't make this a property of the mmc subsystem? ;)
+>
+> Now, seriously, could you elaborate on this a bit more? Do you mean that a 
+> regulator should provide a dummy set voltage operation that would accept 
+> any voltage?
 
-Cheers,
-Samuel.
+Sorry for the terseness.
 
+It seems like we're encoding exactly the same information twice in two
+different subsystems -- I don't see the point, so I'd like to think
+about how we could do better.
+
+For example, if we're only concerned about fixed regulators, could we
+just detect a fixed regulator in the driver and avoid the failing call
+to regulator_set_voltage() directly, without needing to go via this
+capability?  Seems like the capability doesn't tell us anything we
+couldn't already have known.
+
+Thanks,
+
+- Chris.
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
