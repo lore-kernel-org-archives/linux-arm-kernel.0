@@ -1,89 +1,47 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 19 Sep 2012 14:46:58 +0100
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20120919134658.GA2111@linaro.org>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 19 Sep 2012 09:52:23 -0400
+Subject: [PATCH] of: dma: fix typos in generic dma binding definition
+Message-ID: <1348062743-26544-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 05:35:33PM +0100, Lorenzo Pieralisi wrote:
-> In processors like A15/A7 L2 cache is unified and integrated within the
-> processor cache hierarchy, so that it is not considered an outer cache
-> anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
-> all cache levels up to Level of Coherency (LoC) that includes
-> the L2 unified cache.
-> 
-> When a single CPU is suspended (CPU idle) a complete L2 clean is not
-> required, so generic cpu_suspend code must clean the data cache using the
-> newly introduced cache LoUIS function.
+Some semicolons were left out in the examples.
 
-For patches 3-5 in this series, we know that the assumption that
-flushing LoUIS is sufficient for safely powering the CPU down is not
-valid in the general case, though we've agreed it's a sensible
-compromise for the CPU variants we know about today.
+Signed-off-by: Matt Porter <mporter@ti.com>
+---
+ Documentation/devicetree/bindings/dma/dma.txt |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-I think we do need to document this assumption, though.
-
-At this point I don't mind whether it appears in code comments or in the
-commit messages.
-
-Cheers
----Dave
-
-> 
-> The context and stack pointer (context pointer) are cleaned to main memory
-> using cache area functions that operate on MVA and guarantee that the data
-> is written back to main memory (perform cache cleaning up to the Point of
-> Coherency - PoC) so that the processor can fetch the context when the MMU
-> is off in the cpu_resume code path.
-> 
-> outer_cache management remains unchanged.
-> 
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/kernel/suspend.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-> index 1794cc3..358bca3 100644
-> --- a/arch/arm/kernel/suspend.c
-> +++ b/arch/arm/kernel/suspend.c
-> @@ -17,6 +17,8 @@ extern void cpu_resume_mmu(void);
->   */
->  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
->  {
-> +	u32 *ctx = ptr;
-> +
->  	*save_ptr = virt_to_phys(ptr);
->  
->  	/* This must correspond to the LDM in cpu_resume() assembly */
-> @@ -26,7 +28,20 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
->  
->  	cpu_do_suspend(ptr);
->  
-> -	flush_cache_all();
-> +	flush_cache_louis();
-> +
-> +	/*
-> +	 * flush_cache_louis does not guarantee that
-> +	 * save_ptr and ptr are cleaned to main memory,
-> +	 * just up to the Level of Unification Inner Shareable.
-> +	 * Since the context pointer and context itself
-> +	 * are to be retrieved with the MMU off that
-> +	 * data must be cleaned from all cache levels
-> +	 * to main memory using "area" cache primitives.
-> +	*/
-> +	__cpuc_flush_dcache_area(ctx, ptrsz);
-> +	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
-> +
->  	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
->  	outer_clean_range(virt_to_phys(save_ptr),
->  			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
-> -- 
-> 1.7.12
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/dma/dma.txt b/Documentation/devicetree/bindings/dma/dma.txt
+index a4f59a5..b4cde0b 100644
+--- a/Documentation/devicetree/bindings/dma/dma.txt
++++ b/Documentation/devicetree/bindings/dma/dma.txt
+@@ -20,7 +20,7 @@ Optional properties:
+ Example:
+ 
+ 	dma: dma at 48000000 {
+-		compatible = "ti,omap-sdma"
++		compatible = "ti,omap-sdma";
+ 		reg = <0x48000000 0x1000>;
+ 		interrupts = <0 12 0x4
+ 			      0 13 0x4
+@@ -61,7 +61,7 @@ Examples:
+ 		...
+ 		dmas = <&dma 2		/* read channel */
+ 			&dma 3>;	/* write channel */
+-		dma-names = "rx", "tx"
++		dma-names = "rx", "tx";
+ 		...
+ 	};
+ 
+@@ -70,7 +70,7 @@ Examples:
+ 	dmas = <&dma1 5
+ 		&dma2 7
+ 		&dma3 2>;
+-	dma-names = "rx-tx", "rx-tx", "rx-tx"
++	dma-names = "rx-tx", "rx-tx", "rx-tx";
+ 
+ 3. A device with three channels, one of which has two alternatives:
+ 
+-- 
+1.7.9.5
