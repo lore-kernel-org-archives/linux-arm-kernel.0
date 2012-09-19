@@ -1,58 +1,57 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 19 Sep 2012 12:50:54 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <50599F96.5040600@free-electrons.com>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <20120919031526.GC6460@S2100-06.ap.freescale.net>
- <50599F96.5040600@free-electrons.com>
-Message-ID: <201209191250.54418.marex@denx.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 19 Sep 2012 11:53:29 +0100
+Subject: [PATCH v2 08/13] mfd: Versatile Express system registers driver
+In-Reply-To: <201209181524.22620.arnd@arndb.de>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-9-git-send-email-pawel.moll@arm.com>
+ <201209181524.22620.arnd@arndb.de>
+Message-ID: <1348052009.11116.55.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
-
-> Hi Shawn,
+On Tue, 2012-09-18 at 16:24 +0100, Arnd Bergmann wrote:
+> On Tuesday 18 September 2012, Pawel Moll wrote:
+> > +The node describing a config device must refer to the sysreg node via
+> > +"arm,vexpress,config-bridge" phandle (can be also defined in the node's
+> > +parent) and relies on the board topology properties - see main vexpress
+> > +node documentation for more details. It must must also define the
+> > +following property:
+> > +- arm,vexpress-sysreg,func : must contain two cells:
+> > +  - first cell defines function number (eg. 1 for clock generator,
+> > +    2 for voltage regulators etc.)
+> > +  - device number (eg. osc 0, osc 1 etc.)
+> > +
+> > +Example:
+> > +       mcc {
+> > +               arm,vexpress,config-bridge = <&v2m_sysreg>;
+> > +
+> > +               osc at 0 {
+> > +                       compatible = "arm,vexpress-osc";
+> > +                       arm,vexpress-sysreg,func = <1 0>;
+> > +               };
+> > +       };
 > 
-> Le 19/09/2012 05:15, Shawn Guo a ?crit :
-> > On Wed, Sep 19, 2012 at 12:37:17AM +0200, Marek Vasut wrote:
-> >> Don't load the FEC MAC address from OCOTP, but use the one supplied
-> >> via device tree by U-Boot. This is the preferred way, every DT-capable
-> >> bootloader does set up "mac-address" and "local-mac-address" properties
-> >> into the DT passed to the kernel.
-> > 
-> > Ok, since you are the maintainer of m28evk board, it could be your call
-> > to do so.  While for imx28-evk, the kernel at least runs with bootlets
-> > which is not DT capable.
-> > 
-> >> Signed-off-by: Marek Vasut <marex@denx.de>
-> >> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> ---
-> >> 
-> >>  arch/arm/mach-mxs/mach-mxs.c |    2 --
-> >>  1 file changed, 2 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> >> index 170a930..71d47f5 100644
-> >> --- a/arch/arm/mach-mxs/mach-mxs.c
-> >> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> >> @@ -255,8 +255,6 @@ static void __init imx28_evk_post_init(void)
-> >> 
-> >>  static void __init m28evk_init(void)
-> >>  {
-> >> 
-> >> -	update_fec_mac_prop(OUI_DENX);
-> >> -
-> > 
-> > Since it's the only user of OUI_DENX, can we remove enum mac_oui
-> > completely and make update_fec_mac_prop a fsl specific call?
+> Why are you using a nonstandard property for the address?
+> AFAICT, the same can be expressed normally doing
 > 
-> I have a patch on the way that adds the Crystalfontz OUI for the
-> CFA-10049, so it will be quite useful to me in the future.
+>        mcc {
+> 	        #address-cells = <2>;
+> 	 	#size-cells = <0>;
+>                arm,vexpress,config-bridge = <&v2m_sysreg>;
+> 
+>                osc at 0 {
+>                        compatible = "arm,vexpress-osc";
+>                        reg = <1 0>;
+>                };
+>        };
+> 
+> which is more in line with how we represent e.g. i2c buses.
 
-Do you use U-Boot on that board?
+Yes, but I2C devices are created by of_i2c_register_devices() which
+knows how to interpret the reg property. And here, as these are normal
+platform devices now (as you suggested), the of_platform_bus_create()
+will treat it as a normal address, translate it via ranges and create
+IORESOURCE_MEM out of it... And that's what I wanted to avoid. Maybe
+unnecessarily?
 
-> Maxime
-
-Best regards,
-Marek Vasut
+Pawel
