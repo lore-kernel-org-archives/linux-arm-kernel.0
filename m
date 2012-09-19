@@ -1,31 +1,55 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 19 Sep 2012 16:02:50 +0530
-Subject: [PATCH 0/2] ARM: dts: Add subnode for ocp2scp
-Message-ID: <1348050772-27819-1-git-send-email-kishon@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Sep 2012 12:33:58 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <20120919031526.GC6460@S2100-06.ap.freescale.net>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <20120919031526.GC6460@S2100-06.ap.freescale.net>
+Message-ID: <50599F96.5040600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains a patch to explicitly add reg property
-to the ocp2scp dt node and a patch to add the subnode for ocp2scp
-(omap-usb2).
+Hi Shawn,
 
-Since the original patch series that adds ocp2scp driver and ocp2scp
-data are merged in arm-soc, I'm sending this patch series based on the
-same tree.
+Le 19/09/2012 05:15, Shawn Guo a ?crit :
+> On Wed, Sep 19, 2012 at 12:37:17AM +0200, Marek Vasut wrote:
+>> Don't load the FEC MAC address from OCOTP, but use the one supplied
+>> via device tree by U-Boot. This is the preferred way, every DT-capable
+>> bootloader does set up "mac-address" and "local-mac-address" properties
+>> into the DT passed to the kernel.
+>>
+> Ok, since you are the maintainer of m28evk board, it could be your call
+> to do so.  While for imx28-evk, the kernel at least runs with bootlets
+> which is not DT capable.
+> 
+>> Signed-off-by: Marek Vasut <marex@denx.de>
+>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> ---
+>>  arch/arm/mach-mxs/mach-mxs.c |    2 --
+>>  1 file changed, 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+>> index 170a930..71d47f5 100644
+>> --- a/arch/arm/mach-mxs/mach-mxs.c
+>> +++ b/arch/arm/mach-mxs/mach-mxs.c
+>> @@ -255,8 +255,6 @@ static void __init imx28_evk_post_init(void)
+>>  
+>>  static void __init m28evk_init(void)
+>>  {
+>> -	update_fec_mac_prop(OUI_DENX);
+>> -
+> 
+> Since it's the only user of OUI_DENX, can we remove enum mac_oui
+> completely and make update_fec_mac_prop a fsl specific call?
 
-git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+I have a patch on the way that adds the Crystalfontz OUI for the
+CFA-10049, so it will be quite useful to me in the future.
 
-But Benoit already pointed out that there's going to be merge conflicts
-as he has sent a bunch of dt data patches to linux-omap (devel-dt) tree.
-So now I'm not sure how that can be actually avoided.
+Maxime
 
-Kishon Vijay Abraham I (2):
-  ARM: dts: omap4: add *reg* property for ocp2scp
-  ARM: dts: omap: Add omap-usb2 dt data
-
- .../devicetree/bindings/bus/omap-ocp2scp.txt       |   14 ++++++++++++++
- arch/arm/boot/dts/omap4.dtsi                       |    8 +++++++-
- 2 files changed, 21 insertions(+), 1 deletion(-)
 
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
