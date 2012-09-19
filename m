@@ -1,30 +1,29 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 19 Sep 2012 02:00:54 +0200
-Subject: [PATCH 7/8] mfd: Use the AB8500's IRQ domain to convert hwirq to
- virq
-In-Reply-To: <1344527635-6163-8-git-send-email-lee.jones@linaro.org>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120919000054.GZ3647@sortiz-mobl>
+Date: Wed, 19 Sep 2012 02:24:39 +0200
+Subject: [PATCH v4 00/14] MFD/ASoC/Input: twl4030-audio submodule DT
+ support
+In-Reply-To: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1347273992-9107-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120919002439.GB3647@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Peter,
 
-On Thu, Aug 09, 2012 at 04:53:54PM +0100, Lee Jones wrote:
-> Before the AB8500 had its own IRQ domain, the IRQ handler would take
-> the fired local IRQ (hwirq) and add it to the irq_base to convert it
-> to an IRQ number which Linux would understand (virq). However, the
-> IRQ base is not always used anymore since we can make use of Linear
-> domains. It's better to use the AB8500 hwirq -> virq mapping helper
-> function to convert them instead. That's what we do here.
+On Mon, Sep 10, 2012 at 01:46:18PM +0300, Peter Ujfalusi wrote:
+> Hello,
 > 
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/ab8500-core.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-Patch applied now, thanks.
+> Generated on top of:
+> git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git topic/omap
+I applied the first 8 patches, but I'd like to get Mark's ACK for the rest of
+the serie.
+Unless you're expecting Mark to take the whole thing, in which case you can
+add my:
+
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+
+to the MFD patches.
+Please let me know how you'd like to proceed.
 
 Cheers,
 Samuel.
