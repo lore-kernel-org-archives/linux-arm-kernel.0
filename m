@@ -1,49 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Sep 2012 14:06:41 -0700
-Subject: [PATCH 29/29] ARM: OMAP2+: Make omap4-keypad.h local
-In-Reply-To: <20120919205732.28074.43697.stgit@muffinssi>
-References: <20120919205732.28074.43697.stgit@muffinssi>
-Message-ID: <20120919210641.28074.51565.stgit@muffinssi>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Thu, 20 Sep 2012 02:49:27 +0530
+Subject: [PATCH RESEND v7 2/5] ARM: dts: AM33XX: Add D_CAN device tree data
+In-Reply-To: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+References: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1348089570-16161-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This can be local to mach-omap2.
+Add Bosch D_CAN controller device tree data to AM33XX dtsi
+file by adding d_can device nodes with all the necessary
+parameters.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c            |    2 +-
- arch/arm/mach-omap2/devices.c                  |    2 +-
- arch/arm/mach-omap2/omap4-keypad.h             |    0 
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/{plat-omap/include/plat/omap4-keypad.h => mach-omap2/omap4-keypad.h} (100%)
+ arch/arm/boot/dts/am33xx.dtsi |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index dd4c88d..9066b7b 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -36,7 +36,7 @@
- #include "common.h"
- #include <plat/usb.h>
- #include <plat/mmc.h>
--#include <plat/omap4-keypad.h>
-+#include "omap4-keypad.h"
- #include <video/omapdss.h>
- #include <video/omap-panel-nokia-dsi.h>
- #include <video/omap-panel-picodlp.h>
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index f6cbcdc..24228c9 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -27,7 +27,7 @@
- #include <plat/dma.h>
- #include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
--#include <plat/omap4-keypad.h>
-+#include "omap4-keypad.h"
- 
- #include "soc.h"
- #include "common.h"
-diff --git a/arch/arm/plat-omap/include/plat/omap4-keypad.h b/arch/arm/mach-omap2/omap4-keypad.h
-similarity index 100%
-rename from arch/arm/plat-omap/include/plat/omap4-keypad.h
-rename to arch/arm/mach-omap2/omap4-keypad.h
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 894fec6..64c2efe 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -234,5 +234,23 @@
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <91>;
+ 		};
++
++		dcan0: d_can at 481cc000 {
++			compatible = "bosch,d_can";
++			ti,hwmods = "d_can0";
++			reg = <0x481cc000 0x2000>;
++			interrupts = <52>;
++			interrupt-parent = <&intc>;
++			status = "disabled";
++		};
++
++		dcan1: d_can at 481d0000 {
++			compatible = "bosch,d_can";
++			ti,hwmods = "d_can1";
++			reg = <0x481d0000 0x2000>;
++			interrupts = <55>;
++			interrupt-parent = <&intc>;
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+1.7.9.5
