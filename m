@@ -1,190 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Sep 2012 23:05:29 -0700
-Subject: [PATCH 2/3] clk: Add devm_clk_{register,unregister}()
-In-Reply-To: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
-References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1348034730-16473-3-git-send-email-sboyd@codeaurora.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 19 Sep 2012 08:52:40 +0200
+Subject: [PATCH 5/6] staging: drm/imx: Add devicetree binding documentation
+In-Reply-To: <5058F06C.1020409@boundarydevices.com>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+ <1347445874-10779-6-git-send-email-s.hauer@pengutronix.de>
+ <5058F06C.1020409@boundarydevices.com>
+Message-ID: <20120919065240.GU6180@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clock drivers can be simplified if devres takes care of
-unregistering any registered clocks along error paths. Introduce
-devm_clk_register() so that clock drivers get unregistration for
-free along with simplified error paths.
+On Tue, Sep 18, 2012 at 03:06:36PM -0700, Eric Nelson wrote:
+> Hi Sascha,
+> 
+> On 09/12/2012 03:31 AM, Sascha Hauer wrote:
+> >From: Philipp Zabel<p.zabel@pengutronix.de>
+> >
+> >Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
+> >Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+> >---
+> >  .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   41 ++++++++++++++++++++
+> >  1 file changed, 41 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+> >
+> >+
+> >+example:
+> >+
+> >+display at di0 {
+> >+	compatible = "fsl,imx-parallel-display";
+> >+	edid = [edid-data];
+> >+	crtc =<&ipu 0>;
+> >+	interface-pix-fmt = "rgb24";
+> >+};
+> 
+> Do you have a working sample of [edid-data] for a parallel/LVDS/HDMI
+> display or know a good way to produce one?
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c            | 111 +++++++++++++++++++++++++++++++++++--------
- include/linux/clk-provider.h |   2 +
- 2 files changed, 92 insertions(+), 21 deletions(-)
+No, we are using the of videomode helper, see
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 56e4495e..6852809 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -17,6 +17,7 @@
- #include <linux/list.h>
- #include <linux/slab.h>
- #include <linux/of.h>
-+#include <linux/device.h>
- 
- static DEFINE_SPINLOCK(enable_lock);
- static DEFINE_MUTEX(prepare_lock);
-@@ -1361,28 +1362,9 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
- }
- EXPORT_SYMBOL_GPL(__clk_register);
- 
--/**
-- * clk_register - allocate a new clock, register it and return an opaque cookie
-- * @dev: device that is registering this clock
-- * @hw: link to hardware-specific clock data
-- *
-- * clk_register is the primary interface for populating the clock tree with new
-- * clock nodes.  It returns a pointer to the newly allocated struct clk which
-- * cannot be dereferenced by driver code but may be used in conjuction with the
-- * rest of the clock API.  In the event of an error clk_register will return an
-- * error code; drivers must test for an error code after calling clk_register.
-- */
--struct clk *clk_register(struct device *dev, struct clk_hw *hw)
-+static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
- {
- 	int i, ret;
--	struct clk *clk;
--
--	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
--	if (!clk) {
--		pr_err("%s: could not allocate clk\n", __func__);
--		ret = -ENOMEM;
--		goto fail_out;
--	}
- 
- 	clk->name = kstrdup(hw->init->name, GFP_KERNEL);
- 	if (!clk->name) {
-@@ -1420,7 +1402,7 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
- 
- 	ret = __clk_init(dev, clk);
- 	if (!ret)
--		return clk;
-+		return 0;
- 
- fail_parent_names_copy:
- 	while (--i >= 0)
-@@ -1429,6 +1411,36 @@ fail_parent_names_copy:
- fail_parent_names:
- 	kfree(clk->name);
- fail_name:
-+	return ret;
-+}
-+
-+/**
-+ * clk_register - allocate a new clock, register it and return an opaque cookie
-+ * @dev: device that is registering this clock
-+ * @hw: link to hardware-specific clock data
-+ *
-+ * clk_register is the primary interface for populating the clock tree with new
-+ * clock nodes.  It returns a pointer to the newly allocated struct clk which
-+ * cannot be dereferenced by driver code but may be used in conjuction with the
-+ * rest of the clock API.  In the event of an error clk_register will return an
-+ * error code; drivers must test for an error code after calling clk_register.
-+ */
-+struct clk *clk_register(struct device *dev, struct clk_hw *hw)
-+{
-+	int ret;
-+	struct clk *clk;
-+
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-+	if (!clk) {
-+		pr_err("%s: could not allocate clk\n", __func__);
-+		ret = -ENOMEM;
-+		goto fail_out;
-+	}
-+
-+	ret = _clk_register(dev, hw, clk);
-+	if (!ret)
-+		return clk;
-+
- 	kfree(clk);
- fail_out:
- 	return ERR_PTR(ret);
-@@ -1444,6 +1456,63 @@ EXPORT_SYMBOL_GPL(clk_register);
- void clk_unregister(struct clk *clk) {}
- EXPORT_SYMBOL_GPL(clk_unregister);
- 
-+static void devm_clk_release(struct device *dev, void *res)
-+{
-+	clk_unregister(res);
-+}
-+
-+/**
-+ * devm_clk_register - resource managed clk_register()
-+ * @dev: device that is registering this clock
-+ * @hw: link to hardware-specific clock data
-+ *
-+ * Managed clk_register(). Clocks returned from this function are
-+ * automatically clk_unregister()ed on driver detach. See clk_register() for
-+ * more information.
-+ */
-+struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw)
-+{
-+	struct clk *clk;
-+	int ret;
-+
-+	clk = devres_alloc(devm_clk_release, sizeof(*clk), GFP_KERNEL);
-+	if (!clk)
-+		return ERR_PTR(-ENOMEM);
-+
-+	ret = _clk_register(dev, hw, clk);
-+	if (!ret) {
-+		devres_add(dev, clk);
-+	} else {
-+		devres_free(clk);
-+		clk = ERR_PTR(ret);
-+	}
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL_GPL(devm_clk_register);
-+
-+static int devm_clk_match(struct device *dev, void *res, void *data)
-+{
-+	struct clk *c = res;
-+	if (WARN_ON(!c))
-+		return 0;
-+	return c == data;
-+}
-+
-+/**
-+ * devm_clk_unregister - resource managed clk_unregister()
-+ * @clk: clock to unregister
-+ *
-+ * Deallocate a clock allocated with devm_clk_register(). Normally
-+ * this function will not need to be called and the resource management
-+ * code will ensure that the resource is freed.
-+ */
-+void devm_clk_unregister(struct device *dev, struct clk *clk)
-+{
-+	WARN_ON(devres_destroy(dev, devm_clk_release, devm_clk_match, clk));
-+}
-+EXPORT_SYMBOL(devm_clk_unregister);
-+
- /***        clk rate change notifiers        ***/
- 
- /**
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c127315..710c6cb 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -327,8 +327,10 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
-  * error code; drivers must test for an error code after calling clk_register.
-  */
- struct clk *clk_register(struct device *dev, struct clk_hw *hw);
-+struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
- 
- void clk_unregister(struct clk *clk);
-+void devm_clk_unregister(struct device *dev, struct clk *clk);
- 
- /* helper functions */
- const char *__clk_get_name(struct clk *clk);
+http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg18618.html
+
+It is not included here to not add a dependency on it. We are trying to
+mainline this separately.
+
+Sascha
+
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
