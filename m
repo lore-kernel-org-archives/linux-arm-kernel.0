@@ -1,76 +1,58 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 19 Sep 2012 01:21:31 -0400
-Subject: [PATCH v2 2/2] mmc: atmel-mci: AP700x PDC is not connected to MCI
-In-Reply-To: <503F9613.5060007@yahoo.es> (Hein Tibosch's message of "Fri, 31
- Aug 2012 00:34:27 +0800")
-References: <503F9613.5060007@yahoo.es>
-Message-ID: <m3d31ik2p0.fsf@pullcord.laptop.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Sep 2012 13:53:25 +0800
+Subject: [PATCH 6/6] staging: drm/imx: Add TODO
+In-Reply-To: <1347445874-10779-7-git-send-email-s.hauer@pengutronix.de>
+References: <1347445874-10779-1-git-send-email-s.hauer@pengutronix.de>
+ <1347445874-10779-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120919055322.GI6460@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 30 2012, Hein Tibosch wrote:
-> Earlier, atmel-mci was adapted to make use of the peripheral DMA
-> controller (PDC), in case normal DMA wouldn't work.
-> ( http://comments.gmane.org/gmane.linux.kernel.mmc/9403 )
-> This works OK on ARM platforms (AT91), but it broke the driver
-> for AVR32, the AP700x.
-> Although the MCI has PDC support, the connection is not done for
-> AVR chips
->
-> This patch makes the use of PDC depend on CONFIG_AVR32
->
-> Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
->
+On Wed, Sep 12, 2012 at 12:31:14PM +0200, Sascha Hauer wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  drivers/mmc/host/atmel-mci-regs.h |    7 +++++++
->  drivers/mmc/host/atmel-mci.c      |    2 +-
->  2 files changed, 8 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
-> index ab56f7d..c97001e 100644
-> --- a/drivers/mmc/host/atmel-mci-regs.h
-> +++ b/drivers/mmc/host/atmel-mci-regs.h
-> @@ -140,6 +140,13 @@
->  #define atmci_writel(port,reg,value)			\
->  	__raw_writel((value), (port)->regs + reg)
->  
-> +/* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
-> +#ifdef CONFIG_AVR32
-> +#	define ATMCI_PDC_CONNECTED	0
-> +#else
-> +#	define ATMCI_PDC_CONNECTED	1
-> +#endif
+>  drivers/staging/imx-drm/TODO |   22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 drivers/staging/imx-drm/TODO
+> 
+> diff --git a/drivers/staging/imx-drm/TODO b/drivers/staging/imx-drm/TODO
+> new file mode 100644
+> index 0000000..2075646
+> --- /dev/null
+> +++ b/drivers/staging/imx-drm/TODO
+> @@ -0,0 +1,22 @@
+> +TODO:
+> +- get DRM Maintainer review for this code
+> +- Factor out more code to common helper functions
+> +- decide where to put the base driver. It is not specific to a subsystem
+> +  and would be used by DRM/KMS and media/V4L2
+> +- convert irq driver to irq_domain_add_linear
 > +
->  /*
->   * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
->   * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index a6a5593..b8de891 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -2208,7 +2208,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
->  			"version: 0x%x\n", version);
->  
->  	host->caps.has_dma_conf_reg = 0;
-> -	host->caps.has_pdc = 1;
-> +	host->caps.has_pdc = ATMCI_PDC_CONNECTED;
->  	host->caps.has_cfg_reg = 0;
->  	host->caps.has_cstor_reg = 0;
->  	host->caps.has_highspeed = 0;
+> +Missing features (not necessarily for moving out out staging):
 
-Thanks, pushed to mmc-next for 3.7.
+out of?
 
-I changed the commit message text to reflect my understanding of what
-the patch does better, from:
-  This patch makes the use of PDC depend on CONFIG_AVR32.
-to:
-  This patch makes the use of PDC depend on !CONFIG_AVR32.
+> +
+> +- Add KMS plane support for CRTC driver
+> +- Add LDB (LVDS Display Bridge) support
+> +- Add i.MX6 HDMI support
+> +- Add support for IC (Image converter)
+> +- Add support for CSI (CMOS Sensor interface)
+> +- Add support for VDIC (Video Deinterlacer)
+> +
+> +Many work-in-progress patches for the above features exist. Contact
+> +Sascha Hauer <kernel@pengutronix.de> if you are interested in working
+> +on a specific feature.
+> +
+> +Please send any patches to Greg Kroah-Hartman <greg@kroah.com> and
 
-(Ludovic, perhaps you could give an ACK for this patch?)
+Greg Kroah-Hartman <gregkh@linuxfoundation.org>?
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> +Sascha Hauer <kernel@pengutronix.de>
+> -- 
+> 1.7.10.4
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
