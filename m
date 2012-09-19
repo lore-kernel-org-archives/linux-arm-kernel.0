@@ -1,271 +1,107 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Sep 2012 13:55:21 +0200
-Subject: [RFC PATCH v2 8/9] net/macb: better manage tx errors
-In-Reply-To: <cover.1348055112.git.nicolas.ferre@atmel.com>
-References: <cover.1348055112.git.nicolas.ferre@atmel.com>
-Message-ID: <ff2a419c59882c4669b774d4a1299f4d94f36085.1348055112.git.nicolas.ferre@atmel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 19 Sep 2012 14:53:10 +0300
+Subject: [PATCH 2/4] usb: dwc3: Fix gadget pullup in SS mode
+In-Reply-To: <1348054229-27362-3-git-send-email-kishon@ti.com>
+References: <1348054229-27362-1-git-send-email-kishon@ti.com>
+ <1348054229-27362-3-git-send-email-kishon@ti.com>
+Message-ID: <20120919115306.GG3772@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle all TX errors, not only underruns. TX error management is
-deferred to a dedicated workqueue.
-Reinitialize the TX ring after treating all remaining frames, and
-restart the controller when everything has been cleaned up properly.
-Napi is not stopped during this task as the driver only handles
-napi for RX for now.
-With this sequence, we do not need a special check during the xmit
-method as the packets will be caught by TX disable during workqueue
-execution.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: - modify the tx error handling: now uses a workqueue
-
 Hi,
 
-I have marked this patch as RFC because I would like feedback from David and
-Havard as both of you made comments on the previous series: did I address your 
-views on this tx error handling?
+On Wed, Sep 19, 2012 at 05:00:27PM +0530, Kishon Vijay Abraham I wrote:
+> From: Moiz Sonasath <m-sonasath@ti.com>
+> 
+> For the gadget pullup functionality to work in
+> SS mode it requires a particular sequence of
+> toggling the run-stop bit. Here is the required
+> sequence:
+> 
+> - Set DCTL[31]
+> - Clear DCTL[31]
+> - Clear OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
+> - Clear DCTL[8:5] = 0x00
+> - Set DCTL[8:5] = 0x05
+> - Wait 25 Ms
+> - Set DCTL[31]
+> - Set OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
+> 
+> Tested rigourously the gadget pull-up functionality
+> in bot HS and SS modes.
+> 
+> Signed-off-by: Moiz Sonasath <m-sonasath@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Thanks for your help.
+this needs to split into three patches:
 
+add new poweron field, implement it on omap-usb3, use it on
+dwc3/gadget.c
 
- drivers/net/ethernet/cadence/macb.c | 166 ++++++++++++++++++++++++------------
- drivers/net/ethernet/cadence/macb.h |   1 +
- 2 files changed, 113 insertions(+), 54 deletions(-)
+btw, I don't think the changes to run_stop bit are necessary and if they
+are, that'd either be a silicon errata or it would've been mentioned on
+the databook. I don't remember seeing that on the databook so I'm
+assuming that this is caused by a bad use of the PHY.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 2c4358e..cfd6d5d 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -44,6 +44,16 @@
- 
- #define MACB_RX_INT_FLAGS	(MACB_BIT(RCOMP) | MACB_BIT(RXUBR)	\
- 				 | MACB_BIT(ISR_ROVR))
-+#define MACB_TX_ERR_FLAGS	(MACB_BIT(ISR_TUND)			\
-+					| MACB_BIT(ISR_RLE)		\
-+					| MACB_BIT(TXERR))
-+#define MACB_TX_INT_FLAGS	(MACB_TX_ERR_FLAGS | MACB_BIT(TCOMP))
-+
-+/*
-+ * Graceful stop timeouts in us. We should allow up to
-+ * 1 frame time (10 Mbits/s, full-duplex, ignoring collisions)
-+ */
-+#define MACB_HALT_TIMEOUT	1230
- 
- /* Ring buffer accessors */
- static unsigned int macb_tx_ring_wrap(unsigned int index)
-@@ -335,66 +345,113 @@ static void macb_update_stats(struct macb *bp)
- 		*p += __raw_readl(reg);
- }
- 
--static void macb_tx(struct macb *bp)
-+static int macb_halt_tx(struct macb *bp)
- {
--	unsigned int tail;
--	unsigned int head;
--	u32 status;
-+	unsigned long	halt_time, timeout;
-+	u32		status;
- 
--	status = macb_readl(bp, TSR);
--	macb_writel(bp, TSR, status);
-+	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(THALT));
- 
--	netdev_vdbg(bp->dev, "macb_tx status = 0x%03lx\n", (unsigned long)status);
-+	timeout = jiffies + usecs_to_jiffies(MACB_HALT_TIMEOUT);
-+	do {
-+		halt_time = jiffies;
-+		status = macb_readl(bp, TSR);
-+		if (!(status & MACB_BIT(TGO)))
-+			return 0;
- 
--	if (status & (MACB_BIT(UND) | MACB_BIT(TSR_RLE))) {
--		int i;
--		netdev_err(bp->dev, "TX %s, resetting buffers\n",
--			   status & MACB_BIT(UND) ?
--			   "underrun" : "retry limit exceeded");
-+		usleep_range(10, 250);
-+	} while (time_before(halt_time, timeout));
- 
--		/* Transfer ongoing, disable transmitter, to avoid confusion */
--		if (status & MACB_BIT(TGO))
--			macb_writel(bp, NCR, macb_readl(bp, NCR) & ~MACB_BIT(TE));
-+	return -ETIMEDOUT;
-+}
- 
--		head = bp->tx_head;
-+static void macb_tx_error_task(struct work_struct *work)
-+{
-+	struct macb	*bp = container_of(work, struct macb, tx_error_task);
-+	struct macb_tx_skb	*tx_skb;
-+	struct sk_buff		*skb;
-+	unsigned int		tail;
- 
--		/*Mark all the buffer as used to avoid sending a lost buffer*/
--		for (i = 0; i < TX_RING_SIZE; i++)
--			bp->tx_ring[i].ctrl = MACB_BIT(TX_USED);
-+	netdev_vdbg(bp->dev, "macb_tx_error_task: t = %u, h = %u\n",
-+		    bp->tx_tail, bp->tx_head);
- 
--		/* Add wrap bit */
--		bp->tx_ring[TX_RING_SIZE - 1].ctrl |= MACB_BIT(TX_WRAP);
-+	/* Make sure nobody is trying to queue up new packets */
-+	netif_stop_queue(bp->dev);
- 
--		/* free transmit buffer in upper layer*/
--		for (tail = bp->tx_tail; tail != head; tail++) {
--			struct macb_tx_skb	*tx_skb;
--			struct sk_buff		*skb;
-+	/*
-+	 * Stop transmission now
-+	 * (in case we have just queued new packets)
-+	 */
-+	if (macb_halt_tx(bp))
-+		/* Just complain for now, reinitializing TX path can be good */
-+		netdev_err(bp->dev, "BUG: halt tx timed out\n");
- 
--			rmb();
-+	/* No need for the lock here as nobody will interrupt us anymore */
- 
--			tx_skb = macb_tx_skb(bp, tail);
--			skb = tx_skb->skb;
-+	/*
-+	 * Treat frames in TX queue including the ones that caused the error.
-+	 * Free transmit buffers in upper layer.
-+	 */
-+	for (tail = bp->tx_tail; tail != bp->tx_head; tail++) {
-+		struct macb_dma_desc	*desc;
-+		u32			ctrl;
- 
--			dma_unmap_single(&bp->pdev->dev, tx_skb->mapping,
--						skb->len, DMA_TO_DEVICE);
--			tx_skb->skb = NULL;
--			dev_kfree_skb_irq(skb);
--		}
-+		desc = macb_tx_desc(bp, tail);
-+		ctrl = desc->ctrl;
-+		tx_skb = macb_tx_skb(bp, tail);
-+		skb = tx_skb->skb;
-+
-+		if (ctrl & MACB_BIT(TX_USED)) {
-+			netdev_vdbg(bp->dev, "txerr skb %u (data %p) TX complete\n",
-+				    macb_tx_ring_wrap(tail), skb->data);
-+			bp->stats.tx_packets++;
-+			bp->stats.tx_bytes += skb->len;
-+		} else {
-+			/*
-+			 * "Buffers exhausted mid-frame" errors may only happen
-+			 * if the driver is buggy, so complain loudly about those.
-+			 * Statistics are updated by hardware.
-+			 */
-+			if (ctrl & MACB_BIT(TX_BUF_EXHAUSTED))
-+				netdev_err(bp->dev,
-+					   "BUG: TX buffers exhausted mid-frame\n");
- 
--		bp->tx_head = bp->tx_tail = 0;
-+			desc->ctrl = ctrl | MACB_BIT(TX_USED);
-+		}
- 
--		/* Enable the transmitter again */
--		if (status & MACB_BIT(TGO))
--			macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TE));
-+		dma_unmap_single(&bp->pdev->dev, tx_skb->mapping, skb->len,
-+				 DMA_TO_DEVICE);
-+		tx_skb->skb = NULL;
-+		dev_kfree_skb(skb);
- 	}
- 
--	if (!(status & MACB_BIT(COMP)))
--		/*
--		 * This may happen when a buffer becomes complete
--		 * between reading the ISR and scanning the
--		 * descriptors.  Nothing to worry about.
--		 */
--		return;
-+	/* Make descriptor updates visible to hardware */
-+	wmb();
-+
-+	/* Reinitialize the TX desc queue */
-+	macb_writel(bp, TBQP, bp->tx_ring_dma);
-+	/* Make TX ring reflect state of hardware */
-+	bp->tx_head = bp->tx_tail = 0;
-+
-+	/* Now we are ready to start transmission again */
-+	netif_wake_queue(bp->dev);
-+
-+	/* Housework before enabling TX IRQ */
-+	macb_writel(bp, TSR, macb_readl(bp, TSR));
-+	macb_writel(bp, IER, MACB_TX_INT_FLAGS);
-+}
-+
-+static void macb_tx_interrupt(struct macb *bp)
-+{
-+	unsigned int tail;
-+	unsigned int head;
-+	u32 status;
-+
-+	status = macb_readl(bp, TSR);
-+	macb_writel(bp, TSR, status);
-+
-+	netdev_vdbg(bp->dev, "macb_tx_interrupt status = 0x%03lx\n",
-+		(unsigned long)status);
- 
- 	head = bp->tx_head;
- 	for (tail = bp->tx_tail; tail != head; tail++) {
-@@ -634,9 +691,14 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
- 			}
- 		}
- 
--		if (status & (MACB_BIT(TCOMP) | MACB_BIT(ISR_TUND) |
--			    MACB_BIT(ISR_RLE)))
--			macb_tx(bp);
-+		if (unlikely(status & (MACB_TX_ERR_FLAGS))) {
-+			macb_writel(bp, IDR, MACB_TX_INT_FLAGS);
-+			schedule_work(&bp->tx_error_task);
-+			break;
-+		}
-+
-+		if (status & MACB_BIT(TCOMP))
-+			macb_tx_interrupt(bp);
- 
- 		/*
- 		 * Link change detection isn't possible with RMII, so we'll
-@@ -966,13 +1028,8 @@ static void macb_init_hw(struct macb *bp)
- 	macb_writel(bp, NCR, MACB_BIT(RE) | MACB_BIT(TE) | MACB_BIT(MPE));
- 
- 	/* Enable interrupts */
--	macb_writel(bp, IER, (MACB_BIT(RCOMP)
--			      | MACB_BIT(RXUBR)
--			      | MACB_BIT(ISR_TUND)
--			      | MACB_BIT(ISR_RLE)
--			      | MACB_BIT(TXERR)
--			      | MACB_BIT(TCOMP)
--			      | MACB_BIT(ISR_ROVR)
-+	macb_writel(bp, IER, (MACB_RX_INT_FLAGS
-+			      | MACB_TX_INT_FLAGS
- 			      | MACB_BIT(HRESP)));
- 
- }
-@@ -1417,6 +1474,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 	bp->dev = dev;
- 
- 	spin_lock_init(&bp->lock);
-+	INIT_WORK(&bp->tx_error_task, macb_tx_error_task);
- 
- 	bp->pclk = clk_get(&pdev->dev, "pclk");
- 	if (IS_ERR(bp->pclk)) {
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 5be5900..bfab8ef 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -532,6 +532,7 @@ struct macb {
- 	struct clk		*hclk;
- 	struct net_device	*dev;
- 	struct napi_struct	napi;
-+	struct work_struct	tx_error_task;
- 	struct net_device_stats	stats;
- 	union {
- 		struct macb_stats	macb;
+Why that mdelay(25) ? why 25 ms ? That's quite a long time, actually.
+
+> ---
+>  drivers/usb/dwc3/gadget.c   |   21 +++++++++++++++------
+>  drivers/usb/phy/omap-usb3.c |   16 ++++++++++++++++
+>  include/linux/usb/phy.h     |   10 +++++++++-
+>  3 files changed, 40 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
+> index 58fdfad..bcc0102 100644
+> --- a/drivers/usb/dwc3/gadget.c
+> +++ b/drivers/usb/dwc3/gadget.c
+> @@ -49,6 +49,7 @@
+>  
+>  #include <linux/usb/ch9.h>
+>  #include <linux/usb/gadget.h>
+> +#include <linux/usb/otg.h>
+>  
+>  #include "core.h"
+>  #include "gadget.h"
+> @@ -1417,19 +1418,27 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
+>  	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
+>  	if (is_on) {
+>  		if (dwc->revision <= DWC3_REVISION_187A) {
+> -			reg &= ~DWC3_DCTL_TRGTULST_MASK;
+> -			reg |= DWC3_DCTL_TRGTULST_RX_DET;
+> +			reg &= ~DWC3_DCTL_ULSTCHNGREQ_MASK;
+> +			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> +			reg |= DWC3_DCTL_ULSTCHNG_RX_DETECT;
+> +			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> +			mdelay(25);
+> +			reg |= DWC3_DCTL_RUN_STOP;
+> +			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> +			usb_phy_poweron(dwc->usb3_phy);
+>  		}
+>  
+> -		if (dwc->revision >= DWC3_REVISION_194A)
+> +		if (dwc->revision >= DWC3_REVISION_194A) {
+>  			reg &= ~DWC3_DCTL_KEEP_CONNECT;
+> -		reg |= DWC3_DCTL_RUN_STOP;
+> +			reg |= DWC3_DCTL_RUN_STOP;
+> +			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> +		}
+>  	} else {
+>  		reg &= ~DWC3_DCTL_RUN_STOP;
+> +		dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> +		usb_phy_shutdown(dwc->usb3_phy);
+>  	}
+>  
+> -	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+
+I'd prefer to hold all values on the variable and write only one.
+
 -- 
-1.7.11.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/74fd5591/attachment.sig>
