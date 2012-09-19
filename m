@@ -1,35 +1,58 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Sep 2012 12:49:50 +0200
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <m3627aguhl.fsf@pullcord.laptop.org>
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1907099.4JSZthrgh2@amdc1227> <m3627aguhl.fsf@pullcord.laptop.org>
-Message-ID: <2908357.YMzdc5AO51@amdc1227>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 19 Sep 2012 12:50:54 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <50599F96.5040600@free-electrons.com>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <20120919031526.GC6460@S2100-06.ap.freescale.net>
+ <50599F96.5040600@free-electrons.com>
+Message-ID: <201209191250.54418.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Dear Maxime Ripard,
 
-On Wednesday 19 of September 2012 06:47:02 Chris Ball wrote:
-> Hi,
+> Hi Shawn,
 > 
-> On Wed, Sep 19 2012, Tomasz Figa wrote:
-> > We could just check if the regulator provides the capability to change
-> > the voltage.
+> Le 19/09/2012 05:15, Shawn Guo a ?crit :
+> > On Wed, Sep 19, 2012 at 12:37:17AM +0200, Marek Vasut wrote:
+> >> Don't load the FEC MAC address from OCOTP, but use the one supplied
+> >> via device tree by U-Boot. This is the preferred way, every DT-capable
+> >> bootloader does set up "mac-address" and "local-mac-address" properties
+> >> into the DT passed to the kernel.
 > > 
-> > I don't see any direct way of querying the regulator for provided
-> > capabilities (correct me if I'm just blind), but calling
-> > regulator_count_voltages() on the regulator and checking if the
-> > returned
-> > value is 1 should be enough to assume that the regulator is fixed.
+> > Ok, since you are the maintainer of m28evk board, it could be your call
+> > to do so.  While for imx28-evk, the kernel at least runs with bootlets
+> > which is not DT capable.
+> > 
+> >> Signed-off-by: Marek Vasut <marex@denx.de>
+> >> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> >> Cc: Shawn Guo <shawn.guo@linaro.org>
+> >> ---
+> >> 
+> >>  arch/arm/mach-mxs/mach-mxs.c |    2 --
+> >>  1 file changed, 2 deletions(-)
+> >> 
+> >> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> >> index 170a930..71d47f5 100644
+> >> --- a/arch/arm/mach-mxs/mach-mxs.c
+> >> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> >> @@ -255,8 +255,6 @@ static void __init imx28_evk_post_init(void)
+> >> 
+> >>  static void __init m28evk_init(void)
+> >>  {
+> >> 
+> >> -	update_fec_mac_prop(OUI_DENX);
+> >> -
+> > 
+> > Since it's the only user of OUI_DENX, can we remove enum mac_oui
+> > completely and make update_fec_mac_prop a fsl specific call?
 > 
-> Sounds good, I agree.  Are you able to test that the obvious patch below
-> works on your fixed-regulator board?
+> I have a patch on the way that adds the Crystalfontz OUI for the
+> CFA-10049, so it will be quite useful to me in the future.
 
-Yes. I will report the result as soon as I test it.
+Do you use U-Boot on that board?
+
+> Maxime
 
 Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+Marek Vasut
