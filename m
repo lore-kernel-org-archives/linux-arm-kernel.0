@@ -1,138 +1,229 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 19 Sep 2012 12:06:19 +0300
-Subject: [PATCHv4 8/8] ARM: OMAP3: do not delete per_clkdm autodeps
- during idle
-In-Reply-To: <alpine.DEB.2.00.1209182156330.4747@utopia.booyaka.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-9-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1209182156330.4747@utopia.booyaka.com>
-Message-ID: <1348045579.10702.252.camel@sokoban>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Sep 2012 10:21:35 +0100
+Subject: [PATCH 02/15] ARM: Add page table and page defines needed by KVM
+In-Reply-To: <CANM98qJZBYjBh5Jqu4H_oiS+4vgVi3PNcOUP1prUApOTmhoqpQ@mail.gmail.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153443.21241.37958.stgit@ubuntu>
+ <20120918124724.GK32204@mudshark.cambridge.arm.com>
+ <CANM98qJZBYjBh5Jqu4H_oiS+4vgVi3PNcOUP1prUApOTmhoqpQ@mail.gmail.com>
+Message-ID: <20120919092134.GA22271@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-18 at 22:25 +0000, Paul Walmsley wrote:
-> Hi Tero,
+On Tue, Sep 18, 2012 at 11:01:27PM +0100, Christoffer Dall wrote:
+> On Tue, Sep 18, 2012 at 8:47 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Sep 15, 2012 at 04:34:43PM +0100, Christoffer Dall wrote:
+> >> +#define L_PTE2_SHARED                L_PTE_SHARED
+> >> +#define L_PTE2_READ          (_AT(pteval_t, 1) << 6) /* HAP[0] */
+> >> +#define L_PTE2_WRITE         (_AT(pteval_t, 1) << 7) /* HAP[1] */
+> >
+> > This is actually HAP[2:1], not HAP[1:0]. Also, can you follow what we do for
+> > stage 1 translation and name these RDONLY and WRONLY (do you even use
+> > that?).
+> >
 > 
-> just looking at the usecounting series to see what is mergeable and 
-> noticed this:
-> 
-> On Fri, 13 Jul 2012, Tero Kristo wrote:
-> 
-> > Secondly, there are multiple erratas for omap3, which say that the 
-> > wakedeps should be enabled for the PER domain, see e.g. errata i582 for 
-> > omap3630.
-> 
-> Erratum i582 mentions that a wakeup dependency needs to exist between PER 
-> and WKUP such that PER will wake when CORE_L3 does.  Our autodeps would 
-> not add this dependency; they just would attempt to add a wakeup 
-> dependency between PER and MPU/IVA2.  So we need a different mechanism.  
-> What do you think about the following patch to handle part of the i582 
-> workaround?
+> The ARM arm is actually ambiguous, B3-1335 defines it as HAP[2:1], but
+> B3-1355 defines it as HAP[1:0] and I chose the latter as it is more
+> clear to most people not knowing that for historical reasons {H}AP[0]
+> is not defined. If there's a consensus for the other choice here, then
+> I'm good with that.
 
-Yes, that looks good to me, someone will need to test it though.
+Just checked the latest ARM ARM (rev C) and "HAP[1:0]" doesn't appear anywhere
+in the document, so it looks like it's been fixed.
 
+> Also, these bits have a different meaning for stage-2, HAP[2] (ok, in
+> this case it's less misleading with bit index 2), HAP[2] actually
+> means you can write this, two clear bits means access denied, not
+> read/write, so it made more sense to me to do:
 > 
-> Also, do you have any of the other errata information handy, so we can 
-> track those down also?  I'm pretty sure we need to enable the wakeup 
-> dependency between PER and CORE also for OMAP3, but can't recall the 
-> reference.
+> prot = READ | WRITE;
+> 
+> than
+> 
+> prt = RDONLY | WRONLY; // (not mutually exclusive). See my point?
 
-GPIO errata i467 has a workaround which involves wakedeps. i582 is valid
-for omap3430 also. I am not able to find anything else regarding
-wakedeps right now, at least nothing regarding per vs core.
+If you define the bits like:
 
--Tero
+  L_PTE_S2_RDONLY	(_AT(pteval_t, 1) << 6)
+  L_PTE_S2_WRONLY	(_AT(pteval_t, 2) << 6)
 
+then I think it's fairly clear and it also matches the ARM ARM descriptions
+for the HAP permissions. You could also add L_PTE_S2_RDWR if you don't like
+orring the things elsewhere.
+
+> >
+> > It would be cleaner to separate the cacheability attributes out from here
+> > and into the cache_policies array. Then you just need L_PTE_HYP_RDONLY here.
+> >
+> 
+> ok, below is an attempt to rework all this, comments please:
 > 
 > 
-> - Paul
+> diff --git a/arch/arm/include/asm/pgtable-3level.h
+> b/arch/arm/include/asm/pgtable-3level.h
+> index 7351eee..6df235c 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -103,13 +103,19 @@
+>  #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
 > 
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Tue, 18 Sep 2012 16:02:38 -0600
-> Subject: [PATCH] ARM: OMAP36xx: PM: apply part of the erratum i582 workaround
+>  /*
+> - * 2-nd stage PTE definitions for LPAE.
+> + * 2nd stage PTE definitions for LPAE.
+>   */
+> -#define L_PTE2_SHARED		L_PTE_SHARED
+> -#define L_PTE2_READ		(_AT(pteval_t, 1) << 6)	/* HAP[0] */
+> -#define L_PTE2_WRITE		(_AT(pteval_t, 1) << 7)	/* HAP[1] */
+> -#define L_PTE2_NORM_WB		(_AT(pteval_t, 3) << 4)	/* MemAttr[3:2] */
+> -#define L_PTE2_INNER_WB		(_AT(pteval_t, 3) << 2)	/* MemAttr[1:0] */
+> +#define L_PTE_S2_SHARED		L_PTE_SHARED
+> +#define L_PTE_S2_READ		(_AT(pteval_t, 1) << 6)	  /* HAP[1] */
+> +#define L_PTE_S2_WRITE		(_AT(pteval_t, 1) << 7)	  /* HAP[2] */
+> +#define L_PTE_S2_MT_UNCACHED	(_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+> +#define L_PTE_S2_MT_WRTHROUGH	(_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+> +#define L_PTE_S2_MT_WRBACK	(_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+
+Again, just use the same names as we do for stage 1. It really makes the
+code easier to read (L_PTE_S2_MT_WRITETHROUGH etc.).
+
+> +/*
+> + * Hyp-mode PL2 PTE definitions for LPAE.
+> + */
+> +#define L_PTE_HYP		L_PTE_USER
 > 
-> On OMAP36xx chips with ES < 1.2, if the PER powerdomain goes to OSWR
-> or OFF while CORE stays at CSWR or ON, or if, upon chip wakeup from
-> OSWR or OFF, the CORE powerdomain goes ON before PER, the UART3/4
-> FIFOs and McBSP2/3 SIDETONE memories will be unusable.  This is
-> erratum i582 in the OMAP36xx Silicon Errata document.
+>  #ifndef __ASSEMBLY__
 > 
-> This patch implements one of several parts of the workaround: the
-> addition of the wakeup dependency between the PER and WKUP
-> clockdomains, such that PER will wake up at the same time CORE_L3
-> does.
+> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+> index c422f62..6ab276b 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -83,10 +83,8 @@ extern pgprot_t		pgprot_guest;
+>  #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+>  #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+>  #define PAGE_KERNEL_EXEC	pgprot_kernel
+> -#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_USER)
+> -#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE2_READ | \
+> -					  L_PTE2_NORM_WB | L_PTE2_INNER_WB | \
+> -					  L_PTE2_SHARED)
+> +#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+> +#define PAGE_KVM_GUEST		_MOD_PROT(pgprot_guest, L_PTE_S2_READ)
 > 
-> This is not a complete workaround.  For it to be complete:
+>  #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN)
+>  #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 82d0edf..3ff427b 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -476,7 +476,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm,
+> phys_addr_t guest_ipa,
 > 
-> 1. the PER powerdomain's next power state must not be set to OSWR or
->    OFF if the CORE powerdomain's next power state is set to CSWR or
->    ON;
+>  	end = (guest_ipa + size + PAGE_SIZE - 1) & PAGE_MASK;
+>  	prot = __pgprot(get_mem_type_prot_pte(MT_DEVICE) | L_PTE_USER |
+> -			L_PTE2_READ | L_PTE2_WRITE);
+> +			L_PTE_S2_READ | L_PTE_S2_WRITE);
+>  	pfn = __phys_to_pfn(pa);
 > 
-> 2. the UART3/4 FIFO and McBSP2/3 SIDETONE loopback tests should be run
->    if the LASTPOWERSTATEENTERED bits for PER and CORE indicate that
->    PER went OFF while CORE stayed on.  If loopback tests fail, then
->    those devices will be unusable until PER and CORE can undergo a
->    transition from ON to OSWR/OFF and back ON.
+>  	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+> @@ -567,7 +567,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu,
+> phys_addr_t fault_ipa,
+>  		goto out;
+>  	new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
+>  	if (writable)
+> -		pte_val(new_pte) |= L_PTE2_WRITE;
+> +		pte_val(new_pte) |= L_PTE_S2_WRITE;
+>  	coherent_icache_guest_page(vcpu->kvm, gfn);
 > 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/mach-omap2/pm.h     |    1 +
->  arch/arm/mach-omap2/pm34xx.c |   24 +++++++++++++++++++++++-
->  2 files changed, 24 insertions(+), 1 deletion(-)
+>  	spin_lock(&vcpu->kvm->arch.pgd_lock);
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index f2b6287..a06f3496 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -67,6 +67,7 @@ struct cachepolicy {
+>  	unsigned int	cr_mask;
+>  	pmdval_t	pmd;
+>  	pteval_t	pte;
+> +	pteval_t	pte_s2;
+>  };
 > 
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 686137d..67d6613 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -91,6 +91,7 @@ extern void omap3_save_scratchpad_contents(void);
->  
->  #define PM_RTA_ERRATUM_i608		(1 << 0)
->  #define PM_SDRC_WAKEUP_ERRATUM_i583	(1 << 1)
-> +#define PM_PER_MEMORIES_ERRATUM_i582	(1 << 2)
->  
->  #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
->  extern u16 pm34xx_errata;
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 05bd8f0..5e99345 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -651,7 +651,8 @@ static void __init pm_errata_configure(void)
->  		/* Enable the l2 cache toggling in sleep logic */
->  		enable_omap3630_toggle_l2_on_restore();
->  		if (omap_rev() < OMAP3630_REV_ES1_2)
-> -			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
-> +			pm34xx_errata |= (PM_SDRC_WAKEUP_ERRATUM_i583 |
-> +					  PM_PER_ERRATUM_i582);
+>  static struct cachepolicy cache_policies[] __initdata = {
+> @@ -75,26 +76,31 @@ static struct cachepolicy cache_policies[] __initdata = {
+>  		.cr_mask	= CR_W|CR_C,
+>  		.pmd		= PMD_SECT_UNCACHED,
+>  		.pte		= L_PTE_MT_UNCACHED,
+> +		.pte_s2		= L_PTE_S2_MT_UNCACHED,
+>  	}, {
+>  		.policy		= "buffered",
+>  		.cr_mask	= CR_C,
+>  		.pmd		= PMD_SECT_BUFFERED,
+>  		.pte		= L_PTE_MT_BUFFERABLE,
+> +		.pte_s2		= L_PTE_S2_MT_UNCACHED,
+>  	}, {
+>  		.policy		= "writethrough",
+>  		.cr_mask	= 0,
+>  		.pmd		= PMD_SECT_WT,
+>  		.pte		= L_PTE_MT_WRITETHROUGH,
+> +		.pte_s2		= L_PTE_S2_MT_WRTHROUGH,
+>  	}, {
+>  		.policy		= "writeback",
+>  		.cr_mask	= 0,
+>  		.pmd		= PMD_SECT_WB,
+>  		.pte		= L_PTE_MT_WRITEBACK,
+> +		.pte_s2		= L_PTE_S2_MT_WRBACK,
+>  	}, {
+>  		.policy		= "writealloc",
+>  		.cr_mask	= 0,
+>  		.pmd		= PMD_SECT_WBWA,
+>  		.pte		= L_PTE_MT_WRITEALLOC,
+> +		.pte_s2		= L_PTE_S2_MT_WRBACK,
 >  	}
->  }
->  
-> @@ -726,6 +727,27 @@ int __init omap3_pm_init(void)
->  	if (IS_PM34XX_ERRATUM(PM_RTA_ERRATUM_i608))
->  		omap3630_ctrl_disable_rta();
->  
-> +	/*
-> +	 * The UART3/4 FIFO and the sidetone memory in McBSP2/3 are
-> +	 * not correctly reset when the PER powerdomain comes back
-> +	 * from OFF or OSWR when the CORE powerdomain is kept active.
-> +	 * See OMAP36xx Erratum i582 "PER Domain reset issue after
-> +	 * Domain-OFF/OSWR Wakeup".  This wakeup dependency is not a
-> +	 * complete workaround.  The kernel must also prevent the PER
-> +	 * powerdomain from going to OSWR/OFF while the CORE
-> +	 * powerdomain is not going to OSWR/OFF.  And if PER last
-> +	 * power state was off while CORE last power state was ON, the
-> +	 * UART3/4 and McBSP2/3 SIDETONE devices need to run a
-> +	 * self-test using their loopback tests; if that fails, those
-> +	 * devices are unusable until the PER/CORE can complete a transition
-> +	 * from ON to OSWR/OFF and then back to ON.
-> +	 *
-> +	 * XXX Technically this workaround is only needed if off-mode
-> +	 * or OSWR is enabled.
-> +	 */
-> +	if (IS_PM34XX_ERRATUM(PM_PER_MEMORIES_ERRATUM_i582))
-> +		clkdm_add_wkdep(per_clkdm, wkup_clkdm);
-> +
->  	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
->  	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
->  		omap3_secure_ram_storage =
+>  };
+
+Does this still compile for classic MMU? It might be nicer to use arrays for
+the pte types instead of the extra field too -- I assume you'll want
+something similar for the pmd if/when you map stage2 translations using
+sections?
+
+> @@ -318,7 +324,7 @@ static void __init build_mem_type_table(void)
+>  {
+>  	struct cachepolicy *cp;
+>  	unsigned int cr = get_cr();
+> -	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
+> +	pteval_t user_pgprot, kern_pgprot, vecs_pgprot, guest_pgprot;
+>  	int cpu_arch = cpu_architecture();
+>  	int i;
+> 
+> @@ -430,6 +436,7 @@ static void __init build_mem_type_table(void)
+>  	 */
+>  	cp = &cache_policies[cachepolicy];
+>  	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
+> +	guest_pgprot = cp->pte_s2;
+> 
+>  	/*
+>  	 * Enable CPU-specific coherency if supported.
+> @@ -464,6 +471,7 @@ static void __init build_mem_type_table(void)
+>  			user_pgprot |= L_PTE_SHARED;
+>  			kern_pgprot |= L_PTE_SHARED;
+>  			vecs_pgprot |= L_PTE_SHARED;
+> +			guest_pgprot |= L_PTE_SHARED;
+
+If we're using L_PTE_SHARED directly, do we even need L_PTE_S2_SHARED to be
+defined?
+
+>  			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
+>  			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
+>  			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
+> @@ -518,7 +526,7 @@ static void __init build_mem_type_table(void)
+>  	pgprot_user   = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | user_pgprot);
+>  	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
+>  				 L_PTE_DIRTY | kern_pgprot);
+> -	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG);
+> +	pgprot_guest  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | guest_pgprot);
+
+We don't have L_PTE_S2_PRESENT, for example.
+
+I'll try and get on to the meat of the code at some point, but there's an
+awful lot of it and it's hard to see how it fits together.
+
+Cheers,
+
+Will
