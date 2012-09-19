@@ -1,53 +1,89 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Sep 2012 21:44:29 +0800
-Subject: [PATCH] ARM:IMX6Q:use pll2_pfd2_396m as the enfc_sel's parent
-In-Reply-To: <20120919073130.GX6180@pengutronix.de>
-References: <1347261476-9799-1-git-send-email-b32955@freescale.com>
- <20120919053348.GH6460@S2100-06.ap.freescale.net>
- <20120919073130.GX6180@pengutronix.de>
-Message-ID: <20120919134426.GA2450@S2101-09.ap.freescale.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 19 Sep 2012 14:46:58 +0100
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20120919134658.GA2111@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 09:31:30AM +0200, Sascha Hauer wrote:
-> On Wed, Sep 19, 2012 at 01:33:50PM +0800, Shawn Guo wrote:
-> > On Mon, Sep 10, 2012 at 03:17:56PM +0800, Huang Shijie wrote:
-> > > The gpmi-nand driver can support the ONFI nand chip's EDO (extra data out)
-> > > mode in the asynchrounous mode. In the asynchrounous mode 5, the gpmi
-> > > needs 100MHz clock for the IO. But with the pll2_pfd0_352m, we can not
-> > > get the 100MHz clock.
-> > > 
-> > > So choose pll2_pfd2_396m as enfc_sel's parent.
-> > > 
-> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > 
-> > Applied, thanks.
-> > 
-> > But we really expect that clock framework can get improved to have such
-> > case handled in clk_set_rate() call.
+On Tue, Sep 18, 2012 at 05:35:33PM +0100, Lorenzo Pieralisi wrote:
+> In processors like A15/A7 L2 cache is unified and integrated within the
+> processor cache hierarchy, so that it is not considered an outer cache
+> anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
+> all cache levels up to Level of Coherency (LoC) that includes
+> the L2 unified cache.
 > 
-> How do you want to archieve that?
+> When a single CPU is suspended (CPU idle) a complete L2 clean is not
+> required, so generic cpu_suspend code must clean the data cache using the
+> newly introduced cache LoUIS function.
 
-Actually, I'm relying on Mike for that, as he said a patch for that
-is under hacking [1].
+For patches 3-5 in this series, we know that the assumption that
+flushing LoUIS is sufficient for safely powering the CPU down is not
+valid in the general case, though we've agreed it's a sensible
+compromise for the CPU variants we know about today.
 
-> It would be possible to teach the
-> clock framework to iterate over the possible parents and see what gives
-> the best result, but how do we teach the clock framework that there are
-> other constraints, like for example 'use this clock in low power mode
-> and that one otherwise'?
+I think we do need to document this assumption, though.
+
+At this point I don't mind whether it appears in code comments or in the
+commit messages.
+
+Cheers
+---Dave
+
 > 
-I have no idea, and I'm not even sure Mike's patch will address such
-constraints.  Mike?
-
-Shawn
-
-> We have a similar problem with the IPU: When the LDB is used, the IPU
-> pixel clock has to be switched to the LDB clock, even if other clocks
-> would result in a more accurate frequency.
+> The context and stack pointer (context pointer) are cleaned to main memory
+> using cache area functions that operate on MVA and guarantee that the data
+> is written back to main memory (perform cache cleaning up to the Point of
+> Coherency - PoC) so that the processor can fetch the context when the MMU
+> is off in the cpu_resume code path.
 > 
-> That's a topic for a long long discussion, I think even longer than it
-> took to introduce the clock framework ;)
+> outer_cache management remains unchanged.
 > 
-
-[1] http://thread.gmane.org/gmane.linux.ports.tegra/6196/focus=6198
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/kernel/suspend.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+> index 1794cc3..358bca3 100644
+> --- a/arch/arm/kernel/suspend.c
+> +++ b/arch/arm/kernel/suspend.c
+> @@ -17,6 +17,8 @@ extern void cpu_resume_mmu(void);
+>   */
+>  void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>  {
+> +	u32 *ctx = ptr;
+> +
+>  	*save_ptr = virt_to_phys(ptr);
+>  
+>  	/* This must correspond to the LDM in cpu_resume() assembly */
+> @@ -26,7 +28,20 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+>  
+>  	cpu_do_suspend(ptr);
+>  
+> -	flush_cache_all();
+> +	flush_cache_louis();
+> +
+> +	/*
+> +	 * flush_cache_louis does not guarantee that
+> +	 * save_ptr and ptr are cleaned to main memory,
+> +	 * just up to the Level of Unification Inner Shareable.
+> +	 * Since the context pointer and context itself
+> +	 * are to be retrieved with the MMU off that
+> +	 * data must be cleaned from all cache levels
+> +	 * to main memory using "area" cache primitives.
+> +	*/
+> +	__cpuc_flush_dcache_area(ctx, ptrsz);
+> +	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
+> +
+>  	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
+>  	outer_clean_range(virt_to_phys(save_ptr),
+>  			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
+> -- 
+> 1.7.12
+> 
+> 
