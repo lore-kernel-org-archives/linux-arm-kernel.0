@@ -1,33 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Sep 2012 07:59:45 +0000
-Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
- precisely
-In-Reply-To: <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
- <20120918124918.GK2505@amd.com>
- <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
-Message-ID: <201209190759.46174.arnd@arndb.de>
+Date: Wed, 19 Sep 2012 08:01:23 +0000
+Subject: [PATCH 16/34] ASoC: imx-ssi: remove unneeded mach/hardware.h
+ inclusion
+In-Reply-To: <20120919032337.GU8832@opensource.wolfsonmicro.com>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <201209171430.35804.arnd@arndb.de>
+ <20120919032337.GU8832@opensource.wolfsonmicro.com>
+Message-ID: <201209190801.23616.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 September 2012, Hiroshi Doyu wrote:
-> I guess that it would work. Originally I thought that using DMA-API
-> and IOMMU-API together in driver might be kind of layering violation
-> since IOMMU-API itself is used in DMA-API. Only DMA-API used in driver
-> might be cleaner. Considering that DMA API traditionally handling
-> anonymous {bus,iova} address only, introducing the concept of
-> specific address in DMA API may not be so encouraged, though.
+On Wednesday 19 September 2012, Mark Brown wrote:
+> On Mon, Sep 17, 2012 at 02:30:35PM +0000, Arnd Bergmann wrote:
+> > On Monday 17 September 2012, Mark Brown wrote:
+> > > On Mon, Sep 17, 2012 at 01:34:45PM +0800, Shawn Guo wrote:
 > 
-> It would be nice to listen how other SoCs have solved similar needs.
+> > > >  #include <linux/platform_data/asoc-imx-ssi.h>
+> > > > -#include <mach/hardware.h>
+> 
+> > > This doesn't apply - there's no platform data header for imx-ssi at the
+> > > minute (and I don't see a patch in this series related to that in the
+> > > series).  I checked -next and there doesn't seem to be anything via a
+> > > non-ASoC tree either.
+> 
+> > It's in my testing/platform-data series, and will be in linux-next in
+> > a few days.
+> 
+> Hrm, that seems odd - why are we adding platform data to the driver?
 
-In general, I would recommend using only the IOMMU API when you have a device
-driver that needs to control the bus virtual address space and that manages
-a device that resides in its own IOMMU context. I would recommend using
-only the dma-mapping API when you have a device that lives in a shared
-bus virtual address space with other devices, and then never ask for
-a specific bus virtual address.
-
-Can you explain what devices you see that don't fit in one of those two
-categories?
+We're not adding it, we just rename the header file from mach/imx.h
+to linux/platform-data/asoc-imx-ssi.h, along with 94 other header files
+that get moved to the same directory.
 
 	Arnd
