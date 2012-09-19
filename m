@@ -1,35 +1,91 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 19 Sep 2012 13:57:41 +0200
-Subject: [PATCH v2 2/2] ARM: at91: add at91sam9_wdt driver to at91sam9260
-In-Reply-To: <1348055861-7857-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1348055861-7857-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1348055861-7857-3-git-send-email-fabio.porcedda@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Sep 2012 13:55:20 +0200
+Subject: [PATCH v2 7/9] net/macb: ethtool interface: add register dump feature
+In-Reply-To: <cover.1348055112.git.nicolas.ferre@atmel.com>
+References: <cover.1348055112.git.nicolas.ferre@atmel.com>
+Message-ID: <20ebfb29f6f4a84d8ba20553e2d81cd456f438de.1348055112.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on an at91sam9260 board (evk-pro3)
+Add macb_get_regs() ethtool function and its helper function:
+macb_get_regs_len().
+The version field is deduced from the IP revision which gives the
+"MACB or GEM" information. An additional version field is reserved.
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
 ---
- arch/arm/boot/dts/at91sam9260.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/net/ethernet/cadence/macb.c | 40 +++++++++++++++++++++++++++++++++++++
+ drivers/net/ethernet/cadence/macb.h |  3 +++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 66389c1..680b1c8 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -233,6 +233,12 @@
- 					trigger-external;
- 				};
- 			};
-+
-+			watchdog at fffffd40 {
-+				compatible = "atmel,at91sam9-wdt";
-+				reg = <0xfffffd40 0x10>;
-+			};
-+
- 		};
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 5758a1c..2c4358e 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -1265,9 +1265,49 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ 	return phy_ethtool_sset(phydev, cmd);
+ }
  
- 		nand0: nand at 40000000 {
++static int macb_get_regs_len(struct net_device *netdev)
++{
++	return MACB_GREGS_NBR * sizeof(u32);
++}
++
++static void macb_get_regs(struct net_device *dev, struct ethtool_regs *regs,
++			  void *p)
++{
++	struct macb *bp = netdev_priv(dev);
++	unsigned int tail, head;
++	u32 *regs_buff = p;
++
++	regs->version = (macb_readl(bp, MID) & ((1 << MACB_REV_SIZE) - 1))
++			| MACB_GREGS_VERSION;
++
++	tail = macb_tx_ring_wrap(bp->tx_tail);
++	head = macb_tx_ring_wrap(bp->tx_head);
++
++	regs_buff[0]  = macb_readl(bp, NCR);
++	regs_buff[1]  = macb_or_gem_readl(bp, NCFGR);
++	regs_buff[2]  = macb_readl(bp, NSR);
++	regs_buff[3]  = macb_readl(bp, TSR);
++	regs_buff[4]  = macb_readl(bp, RBQP);
++	regs_buff[5]  = macb_readl(bp, TBQP);
++	regs_buff[6]  = macb_readl(bp, RSR);
++	regs_buff[7]  = macb_readl(bp, IMR);
++
++	regs_buff[8]  = tail;
++	regs_buff[9]  = head;
++	regs_buff[10] = macb_tx_dma(bp, tail);
++	regs_buff[11] = macb_tx_dma(bp, head);
++
++	if (macb_is_gem(bp)) {
++		regs_buff[12] = gem_readl(bp, USRIO);
++		regs_buff[13] = gem_readl(bp, DMACFG);
++	}
++}
++
+ static const struct ethtool_ops macb_ethtool_ops = {
+ 	.get_settings		= macb_get_settings,
+ 	.set_settings		= macb_set_settings,
++	.get_regs_len		= macb_get_regs_len,
++	.get_regs		= macb_get_regs,
+ 	.get_link		= ethtool_op_get_link,
+ };
+ 
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 8a4ee2f..5be5900 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -10,6 +10,9 @@
+ #ifndef _MACB_H
+ #define _MACB_H
+ 
++#define MACB_GREGS_NBR 16
++#define MACB_GREGS_VERSION 1
++
+ /* MACB register offsets */
+ #define MACB_NCR				0x0000
+ #define MACB_NCFGR				0x0004
 -- 
 1.7.11.3
