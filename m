@@ -1,63 +1,45 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 20 Sep 2012 08:26:35 +0900
-Subject: [PATCH 3/4] arm/dts: exynos4: Add DTS file for ODROID-X
-In-Reply-To: <CAJuYYwTp00RohqKkF6+4yxq3bqW1O6NWkab29PuyEUPYTjeqgw@mail.gmail.com>
-References: <1344366725-19153-1-git-send-email-dongjin.kim@agreeyamobility.net>
- <CAJuYYwTp00RohqKkF6+4yxq3bqW1O6NWkab29PuyEUPYTjeqgw@mail.gmail.com>
-Message-ID: <09a201cd96be$35d24de0$a176e9a0$@org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Sep 2012 08:38:38 +0900
+Subject: [PATCH v3] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
+In-Reply-To: <1346905640.2573.14.camel@taehun-desktop>
+References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
+ <1346905640.2573.14.camel@taehun-desktop>
+Message-ID: <09a301cd96bf$e48b5970$ada20c50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+Taehun Kim wrote:
 > 
-> On 8 August 2012 00:42, Dongjin Kim <tobetter@gmail.com> wrote:
-> > This patch create a DTS file for ODROID-X, it desribes PMIC max77686 and
-> LED
-> > gpios base.
-> >
-> > Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
-> > ---
-> >  arch/arm/boot/dts/exynos4412-odroidx.dts |  148
-> ++++++++++++++++++++++++++++++
-> >  1 file changed, 148 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> > new file mode 100644
-> > index 0000000..b0a892b
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> > @@ -0,0 +1,148 @@
-> > +/*
-> > + * Samsung's Exynos4210 based Origen board device tree source
-> > + *
-> > + * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-> > + *             http://www.samsung.com
-> > + * Copyright (c) 2010-2011 Linaro Ltd.
-> > + *             www.linaro.org
-> > + *
-> > + * Device tree source file for Insignal's Origen board which is based
-> on
-> > + * Samsung's Exynos4210 SoC.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > +*/
-> > +
-> > +/dts-v1/;
-> > +/include/ "exynos4412.dtsi"
-> > +/include/ "max77686.dtsi"
-> > +
-> > +/ {
-> > +       model = "Hardkernel ODROID-X evaluation board based on
-> Exynos4412";
-> > +       compatible = "hardkernel,odroidx", "samsung,exynos4412";
+> - The gpio routines are changed to use the gpio_request() functions from
+>   comments of Vasily and Sylwester.
+> - The mistake of adding a character by my email client automatically is
+> fixed.
 > 
-> The compatible value "samsung,exynos4412" can be added to the
-> compatible list in mach-exynos4-dt.c file. Otherwise, this looks fine.
+> Please review this patch and apply it if do not have any problems.
 > 
-Dongjin, any updates on this?
 
-K-Gene <kgene@kernel.org>
+Taehun,
+
+Above area is for adding comments like 'This patch adds WIZnet W5300E01 board' because it will be remained in its git log and nobody want to see your old request in there. If any comments which are not related to changes just put it after '---' around your sign. It doesn't hurt your patch.
+
+And you need to update this against on for-next of my tree because some S3C2410 gpio APIs have been gone.(See the Sylwester's comments) Please re-send this.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> Signed-off-by: Taehun Kim <kth3321@gmail.com>
+> ---
+>  arch/arm/mach-s3c24xx/Kconfig         |    5 +
+>  arch/arm/mach-s3c24xx/Makefile        |    1 +
+>  arch/arm/mach-s3c24xx/mach-w5300e01.c |  193
+> +++++++++++++++++++++++++++++++++
+>  3 files changed, 199 insertions(+)
+>  create mode 100644 arch/arm/mach-s3c24xx/mach-w5300e01.c
+>  
+[snip]
