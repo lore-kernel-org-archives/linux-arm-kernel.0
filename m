@@ -1,45 +1,61 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 19 Sep 2012 13:23:33 +0530
-Subject: [GIT PULL] ARM: OMAP5: Enable arch timer support
-In-Reply-To: <1348041069-947-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1348041069-947-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAMQu2gxhOsMoaZfNkkx+j=bGCWOvGTWme-ZmEhJoAcUYDxtXcQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Sep 2012 09:55:54 +0200
+Subject: [PULL] HYP-mode boot
+Message-ID: <c65993c242ac431861fb90dbd94e0057@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(With fixed git URL)
+Russell,
 
-On Wed, Sep 19, 2012 at 1:21 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->
-> Tony,
->
-> Here is the pull request which enables the architected cpu local timer
-> support for OMAP5 devices.
->
-> The following changes since commit
-> 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
->
->   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
->
-> are available in the git repository at:
->
->   git at github.com:SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
+Could you please pull the following branch into your tree? It contains the
+HYP-mode boot code, which has been posted twice on LAK, and has been
+heavily used for KVM.
 
-git://github.com/SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
+It is based on your opcodes branch.
 
->
-> for you to fetch changes up to 3c7c5dab44d6c8861bc86dab924353d8d40344f8:
->
->   ARM: OMAP5: Enable arch timer support (2012-09-19 13:00:37 +0530)
->
-> ----------------------------------------------------------------
-> Santosh Shilimkar (2):
->       ARM: OMAP: Add initialisation for the real-time counter.
->       ARM: OMAP5: Enable arch timer support
->
->  arch/arm/boot/dts/omap5.dtsi |   12 ++++++
->  arch/arm/mach-omap2/Kconfig  |    5 +++
->  arch/arm/mach-omap2/timer.c  |   97
-> +++++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 113 insertions(+), 1 deletion(-)
+Thanks,
+
+        M.
+
+The following changes since commit
+508514ed25315dd28340000831b17535d6f772da:
+
+  ARM: 7511/1: opcodes: Opcode definitions for the Virtualization
+Extensions (2012-09-15 21:26:00 +0100)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+hyp-boot-mode-rmk
+
+Dave Martin (5):
+      ARM: virt: allow the kernel to be entered in HYP mode
+      ARM: zImage/virt: hyp mode entry support for the zImage loader
+      ARM: virt: Update documentation for hyp mode entry support
+      ARM: virt: Add boot-time diagnostics
+      ARM: virt: Add CONFIG_ARM_VIRT_EXT option
+
+Marc Zyngier (2):
+      ARM: opcodes: add __ERET/__MSR_ELR_HYP instruction encoding
+      ARM: virt: arch_timers: enable access to physical timers
+
+ Documentation/arm/Booting           |   22 ++++-
+ arch/arm/boot/compressed/.gitignore |    1 +
+ arch/arm/boot/compressed/Makefile   |    9 ++-
+ arch/arm/boot/compressed/head.S     |   71 ++++++++++-
+ arch/arm/include/asm/assembler.h    |   28 +++++
+ arch/arm/include/asm/opcodes-virt.h |   10 ++
+ arch/arm/include/asm/ptrace.h       |    1 +
+ arch/arm/include/asm/virt.h         |   69 +++++++++++
+ arch/arm/kernel/Makefile            |    2 +
+ arch/arm/kernel/head.S              |   14 ++-
+ arch/arm/kernel/hyp-stub.S          |  223
++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/setup.c             |   20 +++
+ arch/arm/kernel/smp.c               |    3 +
+ arch/arm/mm/Kconfig                 |   17 +++
+ 14 files changed, 478 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/include/asm/virt.h
+ create mode 100644 arch/arm/kernel/hyp-stub.S
+
+-- 
+Fast, cheap, reliable. Pick two.
