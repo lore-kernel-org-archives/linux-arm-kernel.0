@@ -1,86 +1,150 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Sep 2012 17:34:35 +0000 (UTC)
-Subject: [PATCH V3 1/8] ARM: OMAP3: Add debugss HWMOD data
-In-Reply-To: <1347290626-21164-2-git-send-email-jon-hunter@ti.com>
-References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
- <1347290626-21164-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1209191731270.5264@utopia.booyaka.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 19 Sep 2012 18:44:18 +0100
+Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
+Message-ID: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/vexpress-xenvm-4.2.dts |  115 ++++++++++++++++++++++++++++++
+ arch/arm/mach-vexpress/Makefile.boot     |    3 +-
+ 2 files changed, 117 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vexpress-xenvm-4.2.dts
 
-On Mon, 10 Sep 2012, Jon Hunter wrote:
-
-> To enable PMU with runtime PM support on OMAP3 devices we need to be able to
-> dynamically enable and disable the debug sub-system at runtime. By adding HWMOD
-> data for the debug sub-system for OMAP3, we can build the PMU device using the
-> debug sub-system HWMOD and control this power domain using runtime PM.
-> 
-> Reviewed-by: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-
-Isn't this patch missing MPU address ranges?  Looking at the OMAP4 TRM 
-Table 2-2 "L3_EMU Memory Space Mapping" it should cover 
-0x54000000-0x541fffff?
-
-> ---
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> index c9e3820..78a0c2d 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -114,6 +114,24 @@ static struct omap_hwmod omap3xxx_iva_hwmod = {
->  	.main_clk	= "iva2_ck",
->  };
->  
-> +/*
-> + * 'debugss' class
-> + * debug and emulation sub system
-> + */
-> +
-> +static struct omap_hwmod_class omap3xxx_debugss_hwmod_class = {
-> +	.name	= "debugss",
-> +};
-> +
-> +/* debugss */
-> +static struct omap_hwmod omap3xxx_debugss_hwmod = {
-> +	.name		= "debugss",
-> +	.class		= &omap3xxx_debugss_hwmod_class,
-> +	.clkdm_name	= "emu_clkdm",
-> +	.main_clk	= "emu_src_ck",
-> +	.flags		= HWMOD_NO_IDLEST,
-> +};
-> +
->  /* timer class */
->  static struct omap_hwmod_class_sysconfig omap3xxx_timer_1ms_sysc = {
->  	.rev_offs	= 0x0000,
-> @@ -2093,6 +2111,13 @@ static struct omap_hwmod_ocp_if omap3xxx_mpu__l3_main = {
->  	.user	= OCP_USER_MPU,
->  };
->  
-> +/* l3 -> debugss */
-> +static struct omap_hwmod_ocp_if omap3xxx_l3_main__l4_debugss = {
-> +	.master		= &omap3xxx_l3_main_hwmod,
-> +	.slave		= &omap3xxx_debugss_hwmod,
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
->  /* DSS -> l3 */
->  static struct omap_hwmod_ocp_if omap3430es1_dss__l3 = {
->  	.master		= &omap3430es1_dss_core_hwmod,
-> @@ -3272,6 +3297,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
->  	&omap3xxx_l3_main__l4_core,
->  	&omap3xxx_l3_main__l4_per,
->  	&omap3xxx_mpu__l3_main,
-> +	&omap3xxx_l3_main__l4_debugss,
->  	&omap3xxx_l4_core__l4_wkup,
->  	&omap3xxx_l4_core__mmc3,
->  	&omap3_l4_core__uart1,
-> -- 
-> 1.7.9.5
-
-
-- Paul
+diff --git a/arch/arm/boot/dts/vexpress-xenvm-4.2.dts b/arch/arm/boot/dts/vexpress-xenvm-4.2.dts
+new file mode 100644
+index 0000000..bfb802c
+--- /dev/null
++++ b/arch/arm/boot/dts/vexpress-xenvm-4.2.dts
+@@ -0,0 +1,115 @@
++/*
++ * Xen Virtual Machine for unprivileged guests
++ *
++ * Based on ARM Ltd. Versatile Express CoreTile Express (single CPU)
++ * Cortex-A15 MPCore (V2P-CA15)
++ *
++ */
++
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "XENVM-4.2";
++	compatible = "xen,xenvm-4.2", "arm,vexpress";
++	interrupt-parent = <&gic>;
++
++	chosen {
++		bootargs = "earlyprintk console=hvc0 root=/dev/xvda init=/sbin/init";
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0>;
++		};
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x08000000>;
++	};
++
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x2c001000 0x1000>,
++		      <0x2c002000 0x100>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
++	};
++
++	hypervisor {
++		compatible = "xen,xen-4.2", "xen,xen";
++		reg = <0xb0000000 0x20000>;
++		interrupts = <1 15 0xf08>;
++	};
++
++	motherboard {
++		arm,v2m-memory-map = "rs1";
++		ranges = <0 0 0x08000000 0x04000000>,
++			 <1 0 0x14000000 0x04000000>,
++			 <2 0 0x18000000 0x04000000>,
++			 <3 0 0x1c000000 0x04000000>,
++			 <4 0 0x0c000000 0x04000000>,
++			 <5 0 0x10000000 0x04000000>;
++
++		interrupt-map-mask = <0 0 63>;
++		interrupt-map = <0 0  0 &gic 0  0 4>,
++				<0 0  1 &gic 0  1 4>,
++				<0 0  2 &gic 0  2 4>,
++				<0 0  3 &gic 0  3 4>,
++				<0 0  4 &gic 0  4 4>,
++				<0 0  5 &gic 0  5 4>,
++				<0 0  6 &gic 0  6 4>,
++				<0 0  7 &gic 0  7 4>,
++				<0 0  8 &gic 0  8 4>,
++				<0 0  9 &gic 0  9 4>,
++				<0 0 10 &gic 0 10 4>,
++				<0 0 11 &gic 0 11 4>,
++				<0 0 12 &gic 0 12 4>,
++				<0 0 13 &gic 0 13 4>,
++				<0 0 14 &gic 0 14 4>,
++				<0 0 15 &gic 0 15 4>,
++				<0 0 16 &gic 0 16 4>,
++				<0 0 17 &gic 0 17 4>,
++				<0 0 18 &gic 0 18 4>,
++				<0 0 19 &gic 0 19 4>,
++				<0 0 20 &gic 0 20 4>,
++				<0 0 21 &gic 0 21 4>,
++				<0 0 22 &gic 0 22 4>,
++				<0 0 23 &gic 0 23 4>,
++				<0 0 24 &gic 0 24 4>,
++				<0 0 25 &gic 0 25 4>,
++				<0 0 26 &gic 0 26 4>,
++				<0 0 27 &gic 0 27 4>,
++				<0 0 28 &gic 0 28 4>,
++				<0 0 29 &gic 0 29 4>,
++				<0 0 30 &gic 0 30 4>,
++				<0 0 31 &gic 0 31 4>,
++				<0 0 32 &gic 0 32 4>,
++				<0 0 33 &gic 0 33 4>,
++				<0 0 34 &gic 0 34 4>,
++				<0 0 35 &gic 0 35 4>,
++				<0 0 36 &gic 0 36 4>,
++				<0 0 37 &gic 0 37 4>,
++				<0 0 38 &gic 0 38 4>,
++				<0 0 39 &gic 0 39 4>,
++				<0 0 40 &gic 0 40 4>,
++				<0 0 41 &gic 0 41 4>,
++				<0 0 42 &gic 0 42 4>;
++	};
++};
+diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
+index 318d308..5c633c5 100644
+--- a/arch/arm/mach-vexpress/Makefile.boot
++++ b/arch/arm/mach-vexpress/Makefile.boot
+@@ -7,4 +7,5 @@ initrd_phys-y	:= 0x60800000
+ dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb \
+ 				   vexpress-v2p-ca9.dtb \
+ 				   vexpress-v2p-ca15-tc1.dtb \
+-				   vexpress-v2p-ca15_a7.dtb
++				   vexpress-v2p-ca15_a7.dtb \
++				   vexpress-xenvm-4.2.dtb
+-- 
+1.7.2.5
