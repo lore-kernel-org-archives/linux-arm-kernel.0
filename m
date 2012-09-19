@@ -1,30 +1,20 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Wed, 19 Sep 2012 16:14:02 +0100
-Subject: [PATCH v2 7/9] net/macb: ethtool interface: add register dump
- feature
-In-Reply-To: <20ebfb29f6f4a84d8ba20553e2d81cd456f438de.1348055112.git.nicolas.ferre@atmel.com>
-References: <cover.1348055112.git.nicolas.ferre@atmel.com>
- <20ebfb29f6f4a84d8ba20553e2d81cd456f438de.1348055112.git.nicolas.ferre@atmel.com>
-Message-ID: <1348067642.4836.58.camel@deadeye.wl.decadent.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Sep 2012 15:26:33 +0000
+Subject: [PATCH v2] of: dma: fix typos in generic dma binding definition
+In-Reply-To: <1348066188-17937-1-git-send-email-mporter@ti.com>
+References: <1348066188-17937-1-git-send-email-mporter@ti.com>
+Message-ID: <201209191526.33642.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-09-19 at 13:55 +0200, Nicolas Ferre wrote:
-> Add macb_get_regs() ethtool function and its helper function:
-> macb_get_regs_len().
-> The version field is deduced from the IP revision which gives the
-> "MACB or GEM" information. An additional version field is reserved.
+On Wednesday 19 September 2012, Matt Porter wrote:
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
-[...]
+> Some semicolons were left out in the examples.
+> 
+> The #dma-channels and #dma-requests properties have a prefix
+> that is, by convention, reserved for cell size properties.
+> Rename those properties to dma-channels and dma-requests.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
 
-Please also send the register dump decoder for the ethtool utility once
-this series is accepted.
-
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
