@@ -1,90 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 19 Sep 2012 16:36:50 +0300
-Subject: [PATCH 17/24] ARM: OMAP: use __iomem pointers for MMIO
-In-Reply-To: <201209191335.48051.arnd@arndb.de>
-References: <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <20120916203850.GI4521@atomide.com>
- <20120917212506.GB11762@atomide.com>
- <201209191335.48051.arnd@arndb.de>
-Message-ID: <20120919133648.GB6106@arwen.pp.htv.fi>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 19 Sep 2012 13:43:05 +0000
+Subject: [PATCH v6 10/10] ARM: OMAP2+: tusb6010: generic timing calculation
+In-Reply-To: <20120917231001.GK11762@atomide.com>
+References: <20120824194630.GU11011@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9BA589@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC11D@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DEC85@DBDE01.ent.ti.com>
+ <20120906204354.GJ1303@atomide.com> <20120911184606.GN23092@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E253B@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E3624@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9E4DFE@DBDE01.ent.ti.com>
+ <20120917225023.GJ11762@atomide.com> <20120917231001.GK11762@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E60D5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 01:35:47PM +0000, Arnd Bergmann wrote:
-> On Monday 17 September 2012, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [120916 13:39]:
-> > > * Arnd Bergmann <arnd@arndb.de> [120915 13:15]:
-> > > > On Saturday 15 September 2012, Tony Lindgren wrote:
-> > > > > With my patches, this is now all omap1 specific and
-> > > > > moved to arch/arm/mach-omap1/include/mach/hardware.h.
-> > > > > It's probably easiest to just update this patch on
-> > > > > top of the hardware.h changes I've done.
-> > > > 
-> > > > Yes, sounds good. Do you want to send a patch for that
-> > > > and let me drop this one then?
-> > > 
-> > > Yes I can pick this one and update it against one of my
-> > > branches to avoid merge conflicts.
-> > 
-> > This applies against mach-omap1/include/mach/hardware.h
-> > with some fuzz so no issues there.
-> > 
-> > But I think we should not apply it as these are physical
-> > addresses, not virtual addresses for omap1.
-> 
-> Right, I misread what is actually going on here because the
-> only driver I looked at treated the address as a virtual
-> address pointer.
-> 
-> > We have IOMEM already in use for omap_read/write because of:
-> > 
-> > #define OMAP1_IO_ADDRESS(pa)    IOMEM((pa) - OMAP1_IO_OFFSET)
-> > 
-> > I think the right solution is to eventually get rid of
-> > omap_read/write for omap1 also and replace them with ioremap
-> > + readl/writel.
-> 
-> Agreed.
-> 
-> > Or am I missing something?
-> 
-> I did not see any new warnings for omap1, but I did see this
-> on omap2plus_defconfig:
-> 
-> drivers/watchdog/omap_wdt.c: In function 'omap_wdt_ioctl':
-> drivers/watchdog/omap_wdt.c:222:4: error: passing argument 1 of '__raw_readw' makes pointer from integer without a cast [-Werror]
-> arch/arm/include/asm/io.h:71:90: note: expected 'const volatile void *' but argument is of type 'unsigned int'
-> 
-> It seems I misinterpreted this, and it's actually a bug in the watchdog
-> driver that should be fixed using this patch instead (and backport it
-> to stable)
-> 
-> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-> index fceec4f..7b45802 100644
-> --- a/drivers/watchdog/omap_wdt.c
-> +++ b/drivers/watchdog/omap_wdt.c
-> @@ -218,9 +218,11 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
->  	case WDIOC_GETSTATUS:
->  		return put_user(0, (int __user *)arg);
->  	case WDIOC_GETBOOTSTATUS:
-> +#ifdef CONFIG_ARCH_OMAP1
->  		if (cpu_is_omap16xx())
-> -			return put_user(__raw_readw(ARM_SYSST),
-> +			return put_user(omap_readw(ARM_SYSST),
->  					(int __user *)arg);
-> +#endif
+Hi Tony,
 
-indeed... my bad. I agree this should be changed by something better
-though.
+On Tue, Sep 18, 2012 at 04:40:02, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120917 15:54]:
 
-cheers
+> > > > Can you please try with the attached patch ?
+> > 
+> > Gave it a quick try and it seemed to work.. But when I tried
+> > rebasing my patches for the cbus to keep things working with
+> > the watchdog, I ran into multiple merge conflicts with
+> > current linux next and gave up.
+> 
+> OK went back to my original branch without current linux
+> next and with the new cbus + retu driver from Aaro applied.
+> Confirmed it's now working on n800 tusb6010.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/730c6ca6/attachment.sig>
+Thanks for checking and confirming.
+
+> > Care to repost this series updated against current linux
+> > next?
+> > 
+> > I'm afraid I've pretty much lost track of all the patches
+> > and rather not start resolving the conflicts as I'm sure
+> > I'll break something else :)
+> 
+> You should still repost the whole updated series against
+> linux next.
+
+New updated version - v7, based over linux next has been posted.
+
+Regards
+Afzal
