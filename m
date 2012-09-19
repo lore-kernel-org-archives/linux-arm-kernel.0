@@ -1,44 +1,31 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Sep 2012 13:55:17 +0200
-Subject: [PATCH v2 4/9] net/macb: remove macb_get_drvinfo()
+Date: Wed, 19 Sep 2012 13:55:18 +0200
+Subject: [PATCH v2 5/9] net/macb: tx status is more than 8 bits now
 In-Reply-To: <cover.1348055112.git.nicolas.ferre@atmel.com>
 References: <cover.1348055112.git.nicolas.ferre@atmel.com>
-Message-ID: <3fbd9b0eb1e255eccd14ad43044e146776baa963.1348055112.git.nicolas.ferre@atmel.com>
+Message-ID: <bfe08a1f18b7f4bb248517e319b6c42f041f7351.1348055112.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function has little meaning so remove it altogether and
-let ethtool core fill in the fields automatically.
+On some revision of GEM, TSR status register has more information.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/net/ethernet/cadence/macb.c | 11 -----------
- 1 file changed, 11 deletions(-)
+ drivers/net/ethernet/cadence/macb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 2948553..31f945c 100644
+index 31f945c..e98f6fc 100644
 --- a/drivers/net/ethernet/cadence/macb.c
 +++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1217,20 +1217,9 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
- 	return phy_ethtool_sset(phydev, cmd);
- }
+@@ -310,7 +310,7 @@ static void macb_tx(struct macb *bp)
+ 	status = macb_readl(bp, TSR);
+ 	macb_writel(bp, TSR, status);
  
--static void macb_get_drvinfo(struct net_device *dev,
--			     struct ethtool_drvinfo *info)
--{
--	struct macb *bp = netdev_priv(dev);
--
--	strcpy(info->driver, bp->pdev->dev.driver->name);
--	strcpy(info->version, "$Revision: 1.14 $");
--	strcpy(info->bus_info, dev_name(&bp->pdev->dev));
--}
--
- static const struct ethtool_ops macb_ethtool_ops = {
- 	.get_settings		= macb_get_settings,
- 	.set_settings		= macb_set_settings,
--	.get_drvinfo		= macb_get_drvinfo,
- 	.get_link		= ethtool_op_get_link,
- };
+-	netdev_vdbg(bp->dev, "macb_tx status = %02lx\n", (unsigned long)status);
++	netdev_vdbg(bp->dev, "macb_tx status = 0x%03lx\n", (unsigned long)status);
  
+ 	if (status & (MACB_BIT(UND) | MACB_BIT(TSR_RLE))) {
+ 		int i;
 -- 
 1.7.11.3
