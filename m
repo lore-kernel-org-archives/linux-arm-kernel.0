@@ -1,74 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Sep 2012 15:55:08 -0600
-Subject: [PATCH] ARM: tegra: move tegra-ahb.h out of arch/arm/mach-tegra/
-Message-ID: <1348091708-6622-1-git-send-email-swarren@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Sep 2012 22:03:50 +0000 (UTC)
+Subject: [PATCH] CPUFreq: OMAP: remove unnecessary plat/ includes
+In-Reply-To: <201209142103.49421.rjw@sisk.pl>
+References: <alpine.DEB.2.00.1209120030420.9444@utopia.booyaka.com>
+ <201209142103.49421.rjw@sisk.pl>
+Message-ID: <alpine.DEB.2.00.1209192202430.8278@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi
 
-We wish to empty arch/arm/mach-tegra/include/mach/ as much as possible
-to enable single zImage. Move tegra-ahb.h to a more central location
-(suggested by Arnd, OK'd by Greg KH), and actually make tegra-ahb.c
-include the header to ensure client and provider agree on the prototype.
+On Fri, 14 Sep 2012, Rafael J. Wysocki wrote:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- drivers/amba/tegra-ahb.c                           |    1 +
- drivers/iommu/tegra-smmu.c                         |    2 +-
- .../include/mach => include/linux}/tegra-ahb.h     |    6 +++---
- 3 files changed, 5 insertions(+), 4 deletions(-)
- rename {arch/arm/mach-tegra/include/mach => include/linux}/tegra-ahb.h (86%)
+> On Wednesday, September 12, 2012, Paul Walmsley wrote:
+> > 
+> > Remove some unnecessary plat/ includes that are interfering with multi-subarch
+> > ARM kernels.
+> > 
+> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> > Acked-by: Kevin Hilman <khilman@ti.com>
+> 
+> Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
+> 
+> > ---
+> > 
+> > Still awaiting some final testing here.  Rafael, was wondering if you 
+> > would be willing to ack this so we can merge it via the OMAP tree?   
+> > Otherwise the patch can be split into an OMAP part and a CPUFreq part that 
+> > can go in across two merge windows.
+> > 
+> >  arch/arm/mach-omap2/clock2420_data.c |    1 +
+> >  arch/arm/mach-omap2/clock2430_data.c |    1 +
+> >  arch/arm/mach-omap2/clock3xxx_data.c |    1 +
+> >  arch/arm/mach-omap2/clock44xx_data.c |    1 +
+> >  drivers/cpufreq/omap-cpufreq.c       |   19 +------------------
+> >  5 files changed, 5 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
-index 0b6f0b2..bd5de08 100644
---- a/drivers/amba/tegra-ahb.c
-+++ b/drivers/amba/tegra-ahb.c
-@@ -24,6 +24,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/tegra-ahb.h>
- 
- #define DRV_NAME "tegra-ahb"
- 
-diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-index 0b4d62e..ac57b2f 100644
---- a/drivers/iommu/tegra-smmu.c
-+++ b/drivers/iommu/tegra-smmu.c
-@@ -34,12 +34,12 @@
- #include <linux/of_iommu.h>
- #include <linux/debugfs.h>
- #include <linux/seq_file.h>
-+#include <linux/tegra-ahb.h>
- 
- #include <asm/page.h>
- #include <asm/cacheflush.h>
- 
- #include <mach/iomap.h>
--#include <mach/tegra-ahb.h>
- 
- enum smmu_hwgrp {
- 	HWGRP_AFI,
-diff --git a/arch/arm/mach-tegra/include/mach/tegra-ahb.h b/include/linux/tegra-ahb.h
-similarity index 86%
-rename from arch/arm/mach-tegra/include/mach/tegra-ahb.h
-rename to include/linux/tegra-ahb.h
-index e0f8c84..f1cd075 100644
---- a/arch/arm/mach-tegra/include/mach/tegra-ahb.h
-+++ b/include/linux/tegra-ahb.h
-@@ -11,9 +11,9 @@
-  * more details.
-  */
- 
--#ifndef __MACH_TEGRA_AHB_H__
--#define __MACH_TEGRA_AHB_H__
-+#ifndef __LINUX_AHB_H__
-+#define __LINUX_AHB_H__
- 
- extern int tegra_ahb_enable_smmu(struct device_node *ahb);
- 
--#endif	/* __MACH_TEGRA_AHB_H__ */
-+#endif	/* __LINUX_AHB_H__ */
--- 
-1.7.0.4
+Thanks Rafael.  Looks like you've got "cpufreq: OMAP: Check IS_ERR() 
+instead of NULL for omap_device_get_by_hwmod_name" queued which conflicts 
+with this patch, so will just queue the arch/arm/mach-omap2/ changes for 
+now.  Then the drivers/cpufreq/omap-cpufreq.c part can go in during 3.8.
+
+- Paul
