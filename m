@@ -1,45 +1,59 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Sep 2012 08:38:38 +0900
-Subject: [PATCH v3] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
-In-Reply-To: <1346905640.2573.14.camel@taehun-desktop>
-References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
- <1346905640.2573.14.camel@taehun-desktop>
-Message-ID: <09a301cd96bf$e48b5970$ada20c50$%kim@samsung.com>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Wed, 19 Sep 2012 16:40:06 -0700
+Subject: [PATCH v8 0/11] KGDB/KDB FIQ (NMI) debugger
+Message-ID: <20120919234003.GA24143@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Taehun Kim wrote:
-> 
-> - The gpio routines are changed to use the gpio_request() functions from
->   comments of Vasily and Sylwester.
-> - The mistake of adding a character by my email client automatically is
-> fixed.
-> 
-> Please review this patch and apply it if do not have any problems.
-> 
+Hi all,
 
-Taehun,
+In v8, addressed Jason's comments:
 
-Above area is for adding comments like 'This patch adds WIZnet W5300E01 board' because it will be remained in its git log and nobody want to see your old request in there. If any comments which are not related to changes just put it after '---' around your sign. It doesn't hurt your patch.
+- Changed kgdb_enable_nmi() weak function to kgdb_arch callbck;
+- We no longer register disable_nmi command if arch does not register
+  KGDB NMI handling (i.e. not filling kgdb_arch.enable_nmi callback);
+- The same is for ttyNMI: if architecure does not provide us with
+  enable_nmi call, we don't need the tty device. Of course, there is no
+  way to tell wether a specific serial device can be used for NMI
+  debugging, as it is not serial-device specific, but specific to
+  whether IRQ can be rerouted to an NMI (for most our cases, pretty
+  much every IRQ can be rerouted, e.g. a hot-pluggable serial device on
+  a PCI bus).
+- Rebased on the latest and greatest tty-next, just in case.
 
-And you need to update this against on for-next of my tree because some S3C2410 gpio APIs have been gone.(See the Sylwester's comments) Please re-send this.
+These patches can be found in the following repo (based on tty-next):
 
-Thanks.
+	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
 
-Best regards,
-Kgene.
+Old changelogs and rationale for these patches can be found here:
+
+	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
+	v6: http://lkml.org/lkml/2012/9/10/2
+	v7: http://lkml.org/lkml/2012/9/13/367
+
+Thanks,
+
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> Signed-off-by: Taehun Kim <kth3321@gmail.com>
-> ---
->  arch/arm/mach-s3c24xx/Kconfig         |    5 +
->  arch/arm/mach-s3c24xx/Makefile        |    1 +
->  arch/arm/mach-s3c24xx/mach-w5300e01.c |  193
-> +++++++++++++++++++++++++++++++++
->  3 files changed, 199 insertions(+)
->  create mode 100644 arch/arm/mach-s3c24xx/mach-w5300e01.c
->  
-[snip]
+ arch/arm/Kconfig                    |  19 ++
+ arch/arm/common/vic.c               |  28 +++
+ arch/arm/include/asm/hardware/vic.h |   2 +
+ arch/arm/include/asm/kgdb.h         |   8 +
+ arch/arm/kernel/Makefile            |   1 +
+ arch/arm/kernel/entry-armv.S        | 167 +------------
+ arch/arm/kernel/entry-header.S      | 170 +++++++++++++
+ arch/arm/kernel/kgdb_fiq.c          | 124 +++++++++
+ arch/arm/kernel/kgdb_fiq_entry.S    |  87 +++++++
+ arch/arm/mach-versatile/Makefile    |   1 +
+ arch/arm/mach-versatile/kgdb_fiq.c  |  31 +++
+ drivers/tty/serial/Kconfig          |  19 ++
+ drivers/tty/serial/Makefile         |   1 +
+ drivers/tty/serial/amba-pl011.c     |  73 +++++-
+ drivers/tty/serial/kgdb_nmi.c       | 402 ++++++++++++++++++++++++++++++
+ drivers/tty/serial/kgdboc.c         |   9 +
+ drivers/tty/serial/serial_core.c    |  17 ++
+ include/linux/kdb.h                 |  29 ++-
+ include/linux/kgdb.h                |  13 +
+ include/linux/serial_core.h         |   1 +
+ kernel/debug/debug_core.c           |  14 +-
+ kernel/debug/kdb/kdb_main.c         |  31 +++
+ 22 files changed, 1054 insertions(+), 193 deletions(-)
