@@ -1,46 +1,36 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 20 Sep 2012 08:37:31 +1000
-Subject: [PATCH v2 2/2] PCI: Provide a default pcibios_update_irq()
-In-Reply-To: <1347880974-13615-2-git-send-email-thierry.reding@avionic-design.de>
-References: <1347880974-13615-1-git-send-email-thierry.reding@avionic-design.de>
- <1347880974-13615-2-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120920083731.b99255eb8fdeea908d34ed2f@canb.auug.org.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Sep 2012 22:48:25 +0000 (UTC)
+Subject: [PATCH 3/3] ARM: OMAP2+: hwmod code: convert missing clockdomain
+ warnings to debug messages
+In-Reply-To: <5058ECAF.7010609@ti.com>
+References: <20120918211146.16484.85893.stgit@dusk.lan>
+ <20120918211251.16484.18401.stgit@dusk.lan> <5058ECAF.7010609@ti.com>
+Message-ID: <alpine.DEB.2.00.1209192247250.8278@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Beno?t,
 
-On Mon, 17 Sep 2012 13:22:54 +0200 Thierry Reding <thierry.reding@avionic-design.de> wrote:
->
-> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> index 270ae7b..3d61ce3 100644
-> --- a/drivers/pci/setup-irq.c
-> +++ b/drivers/pci/setup-irq.c
-> @@ -17,6 +17,11 @@
->  #include <linux/ioport.h>
->  #include <linux/cache.h>
->  
-> +void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
-> +{
-> +	dev_dbg(&dev->dev, "Assigning IRQ %02d\n", irq);
-> +	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-> +}
->  
->  static void
->  pdev_fixup_irq(struct pci_dev *dev,
+On Tue, 18 Sep 2012, Cousson, Benoit wrote:
 
-Didn't we have a problem with some compiler versions when the weak
-definition was in the same file as the call (there is a call to this
-function in drivers/pci/setup-irq.c)?
+> On 9/18/2012 4:12 PM, Paul Walmsley wrote:
+> > The decision was made a few months ago to allow struct omap_hwmod
+> > records and struct clk records to omit clockdomain information if the
+> > clockdomain is not software-controllable.  See for example commit
+> > 868c157df9721675c19729eed2c96bac6c3f1d01 ("ARM: OMAP2+: hwmod: remove
+> > prm_clkdm, cm_clkdm; allow hwmods to have no clockdomain").
+> > 
+> > So convert an existing pr_warning() to a pr_debug() (regarding missing
+> > clockdomains in clocks), and add a pr_debug() for missing hwmod
+> > clockdomains.
+> 
+> At some point I sent you a small RFC to still keep the message if neither
+> oh->clkdm nor oh->_clk->clkdm was there. I've never had the time to test it,
+> but that should then cover OMAP2, 3 & 4 cases.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120920/bf1e4426/attachment-0001.sig>
+OK let's plan to test and add something like that during the 3.8 time 
+frame... probably it should also depend on the value of clkdm_control.  
+It's not clear to me exactly what that conditional should look like...
+
+
+- Paul
