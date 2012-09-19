@@ -1,45 +1,125 @@
-From: andreoloid@gmail.com (Domenico Andreoli)
-Date: Wed, 19 Sep 2012 10:54:33 +0200
-Subject: [PATCH V6] ARM: bcm2835: add stub clock driver
-In-Reply-To: <1348026973-18887-1-git-send-email-swarren@wwwdotorg.org>
-References: <1348026973-18887-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAOREObGmF9ND9Y16HkczGf0DrUULgg-Y7KRnjof97ATcpsZpmw@mail.gmail.com>
+From: m-sonasath@ti.com (Sonasath, Moiz)
+Date: Wed, 19 Sep 2012 10:02:48 -0500
+Subject: [PATCH 2/4] usb: dwc3: Fix gadget pullup in SS mode
+In-Reply-To: <20120919115306.GG3772@arwen.pp.htv.fi>
+References: <1348054229-27362-1-git-send-email-kishon@ti.com>
+ <1348054229-27362-3-git-send-email-kishon@ti.com>
+ <20120919115306.GG3772@arwen.pp.htv.fi>
+Message-ID: <CAEgRx2zOVn0zV39-cuPuj4n4HRgQmywy_NY4KTe0qEgeC+NEkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Felipe,
 
-On Sep 19, 2012 5:57 AM, "Stephen Warren" <swarren@wwwdotorg.org> wrote:
-> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-> new file mode 100644
-> index 0000000..ad65f0e
-> --- /dev/null
-> +++ b/drivers/clk/clk-bcm2835.c
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Copyright (C) 2010 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
- USA
-> + */
+On Wed, Sep 19, 2012 at 6:53 AM, Felipe Balbi <balbi@ti.com> wrote:
 
-why the copyright is of Broadcom? these files are written from scratch or
-anyway being reworked quite a bit, right?
+> Hi,
+>
+> On Wed, Sep 19, 2012 at 05:00:27PM +0530, Kishon Vijay Abraham I wrote:
+> > From: Moiz Sonasath <m-sonasath@ti.com>
+> >
+> > For the gadget pullup functionality to work in
+> > SS mode it requires a particular sequence of
+> > toggling the run-stop bit. Here is the required
+> > sequence:
+> >
+> > - Set DCTL[31]
+> > - Clear DCTL[31]
+> > - Clear OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
+> > - Clear DCTL[8:5] = 0x00
+> > - Set DCTL[8:5] = 0x05
+> > - Wait 25 Ms
+> > - Set DCTL[31]
+> > - Set OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
+> >
+> > Tested rigourously the gadget pull-up functionality
+> > in bot HS and SS modes.
+> >
+> > Signed-off-by: Moiz Sonasath <m-sonasath@ti.com>
+> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>
+> this needs to split into three patches:
+>
+> add new poweron field, implement it on omap-usb3, use it on
+> dwc3/gadget.c
+>
+> btw, I don't think the changes to run_stop bit are necessary and if they
+> are, that'd either be a silicon errata or it would've been mentioned on
+> the databook. I don't remember seeing that on the databook so I'm
+> assuming that this is caused by a bad use of the PHY.
+>
+> Why that mdelay(25) ? why 25 ms ? That's quite a long time, actually.
+>
 
-cheers,
-Domenico
+Felipe, This is infact a HW bug that the Si-Val team did accept and gave us
+this workaround sequence with the precise delay :-)
+
+Supposedly this will be fixed in ES 2.0.
+
+
+>
+> > ---
+> >  drivers/usb/dwc3/gadget.c   |   21 +++++++++++++++------
+> >  drivers/usb/phy/omap-usb3.c |   16 ++++++++++++++++
+> >  include/linux/usb/phy.h     |   10 +++++++++-
+> >  3 files changed, 40 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
+> > index 58fdfad..bcc0102 100644
+> > --- a/drivers/usb/dwc3/gadget.c
+> > +++ b/drivers/usb/dwc3/gadget.c
+> > @@ -49,6 +49,7 @@
+> >
+> >  #include <linux/usb/ch9.h>
+> >  #include <linux/usb/gadget.h>
+> > +#include <linux/usb/otg.h>
+> >
+> >  #include "core.h"
+> >  #include "gadget.h"
+> > @@ -1417,19 +1418,27 @@ static int dwc3_gadget_run_stop(struct dwc3
+> *dwc, int is_on)
+> >       reg = dwc3_readl(dwc->regs, DWC3_DCTL);
+> >       if (is_on) {
+> >               if (dwc->revision <= DWC3_REVISION_187A) {
+> > -                     reg &= ~DWC3_DCTL_TRGTULST_MASK;
+> > -                     reg |= DWC3_DCTL_TRGTULST_RX_DET;
+> > +                     reg &= ~DWC3_DCTL_ULSTCHNGREQ_MASK;
+> > +                     dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> > +                     reg |= DWC3_DCTL_ULSTCHNG_RX_DETECT;
+> > +                     dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> > +                     mdelay(25);
+> > +                     reg |= DWC3_DCTL_RUN_STOP;
+> > +                     dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> > +                     usb_phy_poweron(dwc->usb3_phy);
+> >               }
+> >
+> > -             if (dwc->revision >= DWC3_REVISION_194A)
+> > +             if (dwc->revision >= DWC3_REVISION_194A) {
+> >                       reg &= ~DWC3_DCTL_KEEP_CONNECT;
+> > -             reg |= DWC3_DCTL_RUN_STOP;
+> > +                     reg |= DWC3_DCTL_RUN_STOP;
+> > +                     dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> > +             }
+> >       } else {
+> >               reg &= ~DWC3_DCTL_RUN_STOP;
+> > +             dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+> > +             usb_phy_shutdown(dwc->usb3_phy);
+> >       }
+> >
+> > -     dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+>
+> I'd prefer to hold all values on the variable and write only one.
+>
+> --
+> balbi
+>
+
+
+
+-- 
+Regards
+Moiz Sonasath
+Android Kernel Team
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/0f63a636/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/e25a2f3a/attachment-0001.html>
