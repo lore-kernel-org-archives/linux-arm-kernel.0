@@ -1,61 +1,49 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 19 Sep 2012 14:37:35 +0400
-Subject: [RFC PATCH 08/10] ARM:davinci - migrating to use
- davinci_common_clk_init
-In-Reply-To: <1347993342-6099-9-git-send-email-m-karicheri2@ti.com>
-References: <1347993342-6099-1-git-send-email-m-karicheri2@ti.com>
- <1347993342-6099-9-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5059A06F.4050402@mvista.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 19 Sep 2012 06:47:02 -0400
+Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
+ property for broken voltage quirk
+In-Reply-To: <1907099.4JSZthrgh2@amdc1227> (Tomasz Figa's message of "Wed, 19
+ Sep 2012 12:34:31 +0200")
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1587150.uFGRdL0s8e@amdc1227> <m3a9wmgvip.fsf@pullcord.laptop.org>
+ <1907099.4JSZthrgh2@amdc1227>
+Message-ID: <m3627aguhl.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 18-09-2012 22:35, Murali Karicheri wrote:
-
-> The common clk code uses a new function davinci_common_clk_init()
-> defined in drivers/clk/davinci/davinci-clock.c to initialize the
-> clk drivers. This function is now invoked in time.c as part of
-> davinci_timer_init(). Currently davinci_clk_init() is called from
-> davinci_common_init() which is too early to initialize common clk
-> drivers. Also include pll.h instead of clock.h in some of the source
-> files.
-
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-
-> diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-> index 64b0f65..f854296 100644
-> --- a/arch/arm/mach-davinci/common.c
-> +++ b/arch/arm/mach-davinci/common.c
-[...]
-> @@ -106,7 +108,9 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
->   		goto err;
+On Wed, Sep 19 2012, Tomasz Figa wrote:
+> We could just check if the regulator provides the capability to change the 
+> voltage.
 >
->   	if (davinci_soc_info.cpu_clks) {
-> +#ifndef CONFIG_COMMON_CLK
+> I don't see any direct way of querying the regulator for provided 
+> capabilities (correct me if I'm just blind), but calling 
+> regulator_count_voltages() on the regulator and checking if the returned 
+> value is 1 should be enough to assume that the regulator is fixed.
 
-    Shouldn't you enclose in theis #ifndef the whole *if* statement?
+Sounds good, I agree.  Are you able to test that the obvious patch below
+works on your fixed-regulator board?
 
->   		ret = davinci_clk_init(davinci_soc_info.cpu_clks);
-> +#endif
->
->   		if (ret != 0)
->   			goto err;
-[...]
-> diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
-> index d4e9316..5c04a7c 100644
-> --- a/arch/arm/mach-davinci/sleep.S
-> +++ b/arch/arm/mach-davinci/sleep.S
-> @@ -183,6 +187,7 @@ ENDPROC(davinci_cpu_suspend)
->    * 	r1: contains virtual base for DDR2 Power and Sleep controller (PSC)
->    * 	r2: contains PSC number for DDR2
->    */
-> +
+Jaehoon and Adrian, can you think of any reason why we shouldn't replace
+MMC_CAP2_BROKEN_VOLTAGE with the regulator_count_voltages() call below?
+Thanks.
 
-    Unrelated/unnecessary change?
 
->   ENTRY(davinci_ddr_psc_config)
->   	/* Set next state in mdctl for DDR2 */
->   	mov	r6, #MDCTL
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 044cd01..a3cc740 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1132,7 +1132,7 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ 		 */
+ 		voltage = regulator_get_voltage(supply);
+ 
+-		if (mmc->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
++		if (regulator_count_voltages(supply) == 1)
+ 			min_uV = max_uV = voltage;
+ 
+ 		if (voltage < 0)
 
-WBR, Sergei
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
