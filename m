@@ -1,96 +1,54 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 19 Sep 2012 10:39:48 -0400
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <5059A64D.6000700@samsung.com> (Jaehoon Chung's message of "Wed,
- 19 Sep 2012 20:02:37 +0900")
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1587150.uFGRdL0s8e@amdc1227> <m3a9wmgvip.fsf@pullcord.laptop.org>
- <1907099.4JSZthrgh2@amdc1227> <m3627aguhl.fsf@pullcord.laptop.org>
- <5059A64D.6000700@samsung.com>
-Message-ID: <m3wqzqf557.fsf@pullcord.laptop.org>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 19 Sep 2012 22:40:40 +0800
+Subject: [PATCH V6 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201209191109.16529.arnd@arndb.de>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <201209172042.11860.arnd@arndb.de> <5058F35A.8040702@firmworks.com>
+ <201209191109.16529.arnd@arndb.de>
+Message-ID: <5059D968.4010709@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 9/19/2012 7:09 PM, Arnd Bergmann wrote:
+> On Tuesday 18 September 2012, Mitch Bradley wrote:
+>> There is a delicious irony here with respect to Shark.  Shark has real
+>> Open Firmware.  It's the platform that I used for the first OFW port to
+>> ARM.  We (the Shark design team) had a version of NetBSD that would run
+>> on Shark without any native drivers, calling into the Open Firmware
+>> drivers.  It was very useful for bringup.
+> 
+> Very interesting, thanks for sharing this bit of history. Are you aware
+> of other ARM systems using open firmware that we still support in Linux
+> (besides the XO-1.75)?
 
-On Wed, Sep 19 2012, Jaehoon Chung wrote:
->> On Wed, Sep 19 2012, Tomasz Figa wrote:
->>> We could just check if the regulator provides the capability to change the 
->>> voltage.
->>>
->>> I don't see any direct way of querying the regulator for provided 
->>> capabilities (correct me if I'm just blind), but calling 
->>> regulator_count_voltages() on the regulator and checking if the returned 
->>> value is 1 should be enough to assume that the regulator is fixed.
->> 
->> Sounds good, I agree.  Are you able to test that the obvious patch below
->> works on your fixed-regulator board?
->> 
->> Jaehoon and Adrian, can you think of any reason why we shouldn't replace
->> MMC_CAP2_BROKEN_VOLTAGE with the regulator_count_voltages() call below?
->> Thanks.
->
-> I think this is better than using MMC_CAP2_BROKEN_VOLTAGE.
-> I tested with this..and working fine.
+There is the successor to the XO-1.75 that we working on now.  I don't
+know of any others.  We just did a big push to convert a bunch of
+drivers to DT so we will able to use the same kernel on XO-1.75 and
+XO-4.  The conversion went pretty smoothly, but there is still a fair
+amount of testing, integration, and coordination to do.  When things get
+a bit less hectic, we'll start submitting patches.
 
-Great, here's the patch.  Jaehoon, once this is merged, maybe you could
-help remove the uses of MMC_CAP2_BROKEN_VOLTAGE from arch/arm/mach-exynos
-and arch/arm/mach-s5pv210 now that they're no longer needed?
+> 
+>> Is there ever a point when old architectures leave the Linux tree, or
+>> will people have to see grep hits from them until the end of time?
+> 
+> As long as someone is interested in keeping an architecture or driver
+> alive, it stays. If something is causing problems and we have reason
+> to assume it will never be used again with current kernels, we toss
+> them out. Russell has recently removed support for ARMv3 CPUs, but
+> some of the StrongARM targets (especially SA-1100) are still being
+> actively used, so the CPU support is not going away any time soon.
+> 
+> If you have a bunch of Shark machines for testing and would like to
+> port it over to device tree passing from its open firmware, you are
+> definitely welcome ;-)
 
-Thanks,
+I'm too busy working on new machines :-)  Old machines are an exercise
+in frustration, due to hardware that stops working over time and
+insufficient hardware resources to meet the expectations of modern
+software.  Not to mention the financial advantages of doing work that
+someone cares about ...
 
-- Chris.
-
-
-Subject: [PATCH] mmc: core: Replace MMC_CAP2_BROKEN_VOLTAGE with test for fixed regulator
-
-Before this patch, we were using MMC_CAP2_BROKEN_VOLTAGE as a way to
-avoid calling regulator_set_voltage() on a fixed regulator, but that's
-just duplicating information that already exists -- we should test
-whether the regulator is fixed directly, instead of via a capability.
-
-This patch implements that test.  We can't reclaim the capability bit
-just yet, since there are still boards in arch/arm/ that reference it;
-those references can be removed now.
-
-Reported-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Chris Ball <cjb@laptop.org>
----
- drivers/mmc/core/core.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 044cd01..6612163 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1113,7 +1113,8 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
- 		int		tmp;
- 		int		voltage;
- 
--		/* REVISIT mmc_vddrange_to_ocrmask() may have set some
-+		/*
-+		 * REVISIT mmc_vddrange_to_ocrmask() may have set some
- 		 * bits this regulator doesn't quite support ... don't
- 		 * be too picky, most cards and regulators are OK with
- 		 * a 0.1V range goof (it's a small error percentage).
-@@ -1127,12 +1128,13 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
- 			max_uV = min_uV + 100 * 1000;
- 		}
- 
--		/* avoid needless changes to this voltage; the regulator
--		 * might not allow this operation
-+		/*
-+		 * If we're using a fixed/static regulator, don't call
-+		 * regulator_set_voltage; it would fail.
- 		 */
- 		voltage = regulator_get_voltage(supply);
- 
--		if (mmc->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
-+		if (regulator_count_voltages(supply) == 1)
- 			min_uV = max_uV = voltage;
- 
- 		if (voltage < 0)
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> 
+> 	Arnd
+> 
