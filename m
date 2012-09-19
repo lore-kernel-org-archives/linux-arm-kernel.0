@@ -1,62 +1,61 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 19 Sep 2012 15:02:06 +0530
-Subject: [PATCH v3 1/3] ARM: dts: Add twl6030-usb data
-In-Reply-To: <1348047128-25692-1-git-send-email-kishon@ti.com>
-References: <1348047128-25692-1-git-send-email-kishon@ti.com>
-Message-ID: <1348047128-25692-2-git-send-email-kishon@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 19 Sep 2012 11:35:36 +0200
+Subject: [PATCH v2 1/9] ARM: OMAP: iommu: fix including iommu.h without
+ IOMMU_API selected
+In-Reply-To: <1347479152-588-2-git-send-email-omar.luna@linaro.org>
+References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
+ <1347479152-588-2-git-send-email-omar.luna@linaro.org>
+Message-ID: <2682570.BmY78BED3q@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add twl6030-usb data node in twl6030 device tree file. twl6030-usb is the
-comparator driver for USB that detects VBUS and ID events. The dt data is
-comprised of two interrupts, one for ID and one for VBUS and a phandle to the
-regulator.
+On Wednesday 12 September 2012 14:45:44 Omar Ramirez Luna wrote:
+> If included without IOMMU_API being selected it will break
+> compilation:
+> 
+> arch/arm/plat-omap/include/plat/iommu.h:
+> 	In function 'dev_to_omap_iommu':
+> arch/arm/plat-omap/include/plat/iommu.h:148:
+> 	error: 'struct dev_archdata' has no member named 'iommu'
+> 
+> This will be seen when hwmod includes iommu.h to get the
+> structure for attributes. Also needed for tidspbridge
+> incremental migration to use iommu code.
+> 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap4-panda.dts |    4 ++++
- arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
- arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
- 3 files changed, 13 insertions(+)
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 20b966e..6640fd9 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -137,3 +137,7 @@
- 	cs1-used;
- 	device-handle = <&elpida_ECB240ABACN>;
- };
-+
-+&twl_usb_comparator {
-+	usb-supply = <&vusb>;
-+};
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 94a23b3..406dab1 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -349,3 +349,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart4_pins>;
- };
-+
-+&twl_usb_comparator {
-+	usb-supply = <&vusb>;
-+};
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-index 123e2c4..9996cfc 100644
---- a/arch/arm/boot/dts/twl6030.dtsi
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -86,4 +86,9 @@
- 	clk32kg: regulator-clk32kg {
- 		compatible = "ti,twl6030-clk32kg";
- 	};
-+
-+	twl_usb_comparator: usb-comparator {
-+		compatible = "ti,twl6030-usb";
-+		interrupts = <4>, <10>;
-+	};
- };
+I had the same patch in my tree already :-)
+
+> ---
+>  arch/arm/plat-omap/include/plat/iommu.h |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/iommu.h
+> b/arch/arm/plat-omap/include/plat/iommu.h index 88be3e6..e58d571 100644
+> --- a/arch/arm/plat-omap/include/plat/iommu.h
+> +++ b/arch/arm/plat-omap/include/plat/iommu.h
+> @@ -126,6 +126,7 @@ struct omap_iommu_arch_data {
+>  	struct omap_iommu *iommu_dev;
+>  };
+> 
+> +#ifdef CONFIG_IOMMU_API
+>  /**
+>   * dev_to_omap_iommu() - retrieves an omap iommu object from a user device
+>   * @dev: iommu client device
+> @@ -136,6 +137,7 @@ static inline struct omap_iommu
+> *dev_to_omap_iommu(struct device *dev)
+> 
+>  	return arch_data->iommu_dev;
+>  }
+> +#endif
+> 
+>  /* IOMMU errors */
+>  #define OMAP_IOMMU_ERR_TLB_MISS		(1 << 0)
+
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
