@@ -1,74 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Sep 2012 12:11:00 -0700
-Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
- drivers/bus/
-In-Reply-To: <201209191857.57862.arnd@arndb.de>
-References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
- <20120917215128.GF11762@atomide.com>
- <201209191857.57862.arnd@arndb.de>
-Message-ID: <20120919191059.GH11762@atomide.com>
+From: mpthompson@gmail.com (Mike Thompson)
+Date: Wed, 19 Sep 2012 12:58:02 -0700
+Subject: [PATCH 0/4] Add PHY nofity for some i.mx SoCs
+In-Reply-To: <1347592731-12998-1-git-send-email-peter.chen@freescale.com>
+References: <1347592731-12998-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <CAEOSq-NZNo-dyEO5+hjcF9VEjbBdf0GVXcVRDC-6zThLAu+2aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120919 11:59]:
-> On Monday 17 September 2012, Tony Lindgren wrote:
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
-> > > OMAP interconnect drivers are used for the interconnect error handling.
-> > > Since they are bus driver, lets move it to newly created drivers/bus.
-> > > 
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Tony Lindgren <tony@atomide.com>
-> > > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
-> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > > ---
-> > > Patch just moves OMAP interconnect drivers as is to the newly created
-> > > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
-> > > tree and test on all OMAP boards.
-> > 
-> > Great, looks like this should not conflict with other
-> > omap patches queued, so Arnd should probably take this into
-> > the bus branch:
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> It turns out that the patch actually did conflict and we now have a broken
-> omap2plus_defconfig. The patch below seems to fix it, but please verify
-> that this makes sense.
+Tested on OLinuXino-Micro imx233 based hardware with patches applied
+against 'linux-next' branch.
 
-Heh a conflict caused by hard coded irqs for the error message :)
-Looks like a good fix that removes some unncecessary dependencies:
+Tested-by: Mike Thompson <mpthompson@gmail.com>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> index f447e02..ab911a3 100644
-> --- a/drivers/bus/omap_l3_noc.c
-> +++ b/drivers/bus/omap_l3_noc.c
-> @@ -28,7 +28,6 @@
->  #include <linux/kernel.h>
->  #include <linux/slab.h>
->  
-> -#include "soc.h"
->  #include "omap_l3_noc.h"
->  
->  /*
-> @@ -191,7 +190,7 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
->  			IRQF_DISABLED, "l3-dbg-irq", l3);
->  	if (ret) {
->  		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> -						9 + OMAP44XX_IRQ_GIC_START);
-> +						l3->debug_irq);
->  		goto err3;
->  	}
->  
-> @@ -201,7 +200,7 @@ static int __devinit omap4_l3_probe(struct platform_device *pdev)
->  			IRQF_DISABLED, "l3-app-irq", l3);
->  	if (ret) {
->  		pr_crit("L3: request_irq failed to register for 0x%x\n",
-> -						10 + OMAP44XX_IRQ_GIC_START);
-> +						l3->app_irq);
->  		goto err4;
->  	}
->  
+Mike Thompson
+
+On Thu, Sep 13, 2012 at 8:18 PM, Peter Chen <peter.chen@freescale.com> wrote:
+> At some i.mx SoCs, when controller works at host mode, the PHY
+> register needs to be changed at device connect, disconnect, bus
+> suspend and resume due to the SoC limitations.
+>
+> The phy notification should be added according to below rules:
+>
+> 1. Only set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
+> during high speed host mode.
+> 2. Do not set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
+> during the reset and speed negotiation period.
+> 3. Do not set HW_USBPHY_CTRL.ENHOSTDISCONDETECT
+> during host suspend/resume sequence.
+>
+> Please refer: i.mx23RM(page 413) for detail.
+> http://www.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf
+>
+> Freescale i.MX SoC, i.mx23, i.mx28 and i.mx6(i.mx6SL does not
+> need to follow the 3rd rule) need to follow above rules.
+>
+> The correct notification setting method should be:
+> 1. Set connect notify after the second bus reset.
+> 2. Set disconnect notify after disconnection.
+> 3. Set suspend nofity after bus goes to suspend (portsc.suspendM=1).
+> 4. Set resume notify after resume (portsc.fpr=0).
+>
+> Peter Chen (4):
+>   usb: phy: add notify_suspend/notify_resume callback
+>   usb: mxs-phy: implement notify_suspend/notify_resume callback
+>   usb: chipidea: add phy notify at suspend/resume procedure
+>   usb: refine phy notify operation during connection and disconnection
+>
+>  drivers/usb/chipidea/host.c |   75 +++++++++++++++++++++++++++++++++++++++++-
+>  drivers/usb/core/hub.c      |   14 ++++----
+>  drivers/usb/otg/mxs-phy.c   |   56 +++++++++++++++++++++++++-------
+>  include/linux/usb/phy.h     |   44 +++++++++++++++++++++----
+>  4 files changed, 161 insertions(+), 28 deletions(-)
+>
