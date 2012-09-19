@@ -1,35 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Sep 2012 23:55:33 +0000 (UTC)
-Subject: [PATCH V2 3/7] ARM: OMAP4: Add timer clock aliases for device-tree
-In-Reply-To: <1347579091-3794-4-git-send-email-jon-hunter@ti.com>
-References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
- <1347579091-3794-4-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1209192355220.14850@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Sep 2012 08:59:16 +0900
+Subject: [PATCH] ARM: EXYNOS: no duplicate mask/unmask in eint0_15
+In-Reply-To: <CAD=FV=UTa4a8wewEdqu=ZnOKe-M5Brv-ex8ZGWfkTb6fqsRB_w@mail.gmail.com>
+References: <1346944864-12434-1-git-send-email-djkurtz@chromium.org>
+ <CAD=FV=UTa4a8wewEdqu=ZnOKe-M5Brv-ex8ZGWfkTb6fqsRB_w@mail.gmail.com>
+Message-ID: <09aa01cd96c2$c6cedd00$546c9700$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Sep 2012, Jon Hunter wrote:
-
-> For OMAP4, the dmtimers are located in the Wake-up, ABE and Peripheral (PER)
-> power domains. Hence, when the dmtimer is configured to use the "timer_sys_ck"
-> as its functional clock the actual clock used is different depending on whether
-> the clock is in the Wake-up, ABE or PER domain. So when we look-up the dmtimer's
-> "timer_sys_ck" we need to specify the timer device name as well as clock alias
-> to find the right clock.
+Doug Anderson wrote:
 > 
-> Currently, the device names for the timers have the format "omap_timer.X" where
-> X is the timer instance number. When using to device tree, the format of the
-> device name created by device-tree is different and has the format
-> "<reg-address>.<device-name>" (this is assuming that the device-tree "reg"
-> property is specified). This causes the look-up for the OMAP4 "timer_sys_ck" to
-> fail. To fix this add new timer clock alias for using device-tree.
+> On Thu, Sep 6, 2012 at 8:21 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> > chained_irq_enter/exit() already mask&ack/unmask the chained interrupt.
+> > There is no need to also explicitly do it in the handler.
+> >
+> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> > ---
+> >  arch/arm/mach-exynos/common.c |    7 -------
+> >  1 files changed, 0 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
+> exynos/common.c
+> > index 4eb39cd..0a85aec 100644
+> > --- a/arch/arm/mach-exynos/common.c
+> > +++ b/arch/arm/mach-exynos/common.c
+> > @@ -965,14 +965,7 @@ static void exynos_irq_eint0_15(unsigned int irq,
+> struct irq_desc *desc)
+> >         struct irq_chip *chip = irq_get_chip(irq);
+> >
+> >         chained_irq_enter(chip, desc);
+> > -       chip->irq_mask(&desc->irq_data);
+> > -
+> > -       if (chip->irq_ack)
+> > -               chip->irq_ack(&desc->irq_data);
+> > -
+> >         generic_handle_irq(*irq_data);
+> > -
+> > -       chip->irq_unmask(&desc->irq_data);
+> >         chained_irq_exit(chip, desc);
+> >  }
+> >
+> > --
+> > 1.7.7.3
+> >
 > 
-> Please note that adding a 2nd set of clock aliases for the same clocks to only
-> temporary until device-tree migration is complete. Then we can remove the legacy
-> aliases. Hence, I have marked the legacy aliases with a "TODO" to remove them.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Acked-by: Doug Anderson <dianders@chromium.org>
 
-Thanks, queued for 3.7.
+Yes, will apply.
+Thanks.
 
-- Paul
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
