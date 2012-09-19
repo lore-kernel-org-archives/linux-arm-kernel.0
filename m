@@ -1,42 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Sep 2012 14:29:47 +0200
-Subject: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe rather
- than as a device
-In-Reply-To: <20120823125903.GA7995@opensource.wolfsonmicro.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
- <002801cd7c31$14d3d0c0$3e7b7240$@se>
- <20120820085111.GJ8450@gmail.com>
- <006d01cd7f5a$65937840$30ba68c0$@se>
- <20120823092216.GA27264@gmail.com>
- <20120823113922.GZ7995@opensource.wolfsonmicro.com>
- <20120823121936.GA1047@gmail.com>
- <20120823125903.GA7995@opensource.wolfsonmicro.com>
-Message-ID: <20120919122943.GB25479@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Sep 2012 13:30:13 +0100
+Subject: [RFC PATCH v2 1/5] ARM: mm: implement LoUIS API for cache
+ maintenance ops
+In-Reply-To: <alpine.LFD.2.02.1209181411530.28681@xanadu.home>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.02.1209181411530.28681@xanadu.home>
+Message-ID: <20120919123002.GA11497@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 01:59:04PM +0100, Mark Brown wrote:
-> On Thu, Aug 23, 2012 at 01:20:03PM +0100, Lee Jones wrote:
-> > > I say I don't understand the motivation for this change.  All the modern
-> > > DT bindings are perfectly happy handling this without an explicit shim
-> > > in the device tree to bodge things for Linux, adding them in seems like
-> > > it'd be a retrograde step.  What benefit do you believe this brings?
+On Tue, Sep 18, 2012 at 07:12:52PM +0100, Nicolas Pitre wrote:
+> On Tue, 18 Sep 2012, Lorenzo Pieralisi wrote:
 > 
-> > How do the all the other DT:ed audio drivers handle the PCM then? More
-> > importantly, how would you like to see it handled? Ola has NACKed this
-> > patch and explained why:
+> > ARM v7 architecture introduced the concept of cache levels and related
+> > control registers. New processors like A7 and A15 embed an L2 unified cache
+> > controller that becomes part of the cache level hierarchy. Some operations in
+> > the kernel like cpu_suspend and __cpu_disable do not require a flush of the
+> > entire cache hierarchy to DRAM but just the cache levels belonging to the
+> > Level of Unification Inner Shareable (LoUIS), which in most of ARM v7 systems
+> > correspond to L1.
+> >
+> > The current cache flushing API used in cpu_suspend and __cpu_disable,
+> > flush_cache_all(), ends up flushing the whole cache hierarchy since for
+> > v7 it cleans and invalidates all cache levels up to Level of Coherency
+> > (LoC) which cripples system performance when used in hot paths like hotplug
+> > and cpuidle.
+> >
+> > Therefore a new kernel cache maintenance API must be added to cope with
+> > latest ARM system requirements.
+> >
+> > This patch adds flush_cache_louis() to the ARM kernel cache maintenance API.
+> >
+> > This function cleans and invalidates all data cache levels up to the
+> > Level of Unification Inner Shareable (LoUIS) and invalidates the instruction
+> > cache for processors that support it (> v7).
+> >
+> > This patch also creates an alias of the cache LoUIS function to flush_kern_all
+> > for all processor versions prior to v7, so that the current cache flushing
+> > behaviour is unchanged for those processors.
+> >
+> > v7 cache maintenance code implements a cache LoUIS function that cleans and
+> > invalidates the D-cache up to LoUIS and invalidates the I-cache, according
+> > to the new API.
+> >
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> They instantiate the PCM driver dynamically from the DAI when it's
-> probed which is pretty much what you're patch is doing.
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-Can we have some closure on this patch please, as it's blocking the
-patch-set? I'm fairly sure the patch is doing the correct thing, as
-seconded by Mark.
+Thanks a lot for reviewing the series.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Lorenzo
