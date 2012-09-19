@@ -1,88 +1,56 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Wed, 19 Sep 2012 16:42:02 -0700
-Subject: [PATCH 11/11] ARM: versatile: Make able to use UART ports for KGDB
- FIQ debugger
-In-Reply-To: <20120919234003.GA24143@lizard>
-References: <20120919234003.GA24143@lizard>
-Message-ID: <1348098122-11041-11-git-send-email-anton.vorontsov@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Sep 2012 08:49:42 +0900
+Subject: [PATCH v2 5/5] ARM: Exynos: Add basic dts file for Samsung Trats
+ board
+In-Reply-To: <7700294.NPoOn06yTZ@flatron>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <3039444.Ol4zGlGWJ2@flatron> <24dd01cd8d6c$41586970$c4093c50$%kim@samsung.com>
+ <7700294.NPoOn06yTZ@flatron>
+Message-ID: <09a401cd96c1$70df2860$529d7920$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+Tomasz Figa wrote:
+> 
+> Hi Kgene,
+> 
+> On Saturday 08 of September 2012 11:47:15 Kukjin Kim wrote:
+> > > > > +       memory {
+> > > > > +               reg =  <0x40000000 0x20000000
+> > > > > +                       0x60000000 0x20000000>;
+> > > > > +       };
+> > > >
+> > > > Why does this have to be split. Why not have a single entry with the
+> > > > size as 0x40000000?
+> > >
+> > > The memory node corresponds to struct meminfo and each entry (with two
+> > > values) makes one struct membank defining a memory bank.
+> >
+> > Well...
+> >
+> > > I've been talking with Kyungmin about this. Originally bootloaders
+> used
+> > > to report 4 banks of 256 MiB, but it turned out that real bank
+> > > configuration on Trats is 2 banks of 512 MiB.
+> >
+> > I think, following should ok here.
+> >
+> > memory {
+> > 	reg = <0x40000000 0x40000000>;
+> > };
+> 
+> This will not boot with CONFIG_SPARSEMEM, unless maximum section size is
+> increased to 1024MiB.
+> 
+Well, see other Origen board. As I know, it works well under environment you
+said but I'm not sure about its boot-loader environment. Anyway, please
+check one more and let me know. Then, if you still have same problem, let's
+use double entries for memory temporary.
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+Thanks.
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
-
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fa10a2d..2bf83c6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -336,6 +336,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_FPGA_IRQ
- 	select ARM_TIMER_SP804
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.7.11.5
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
