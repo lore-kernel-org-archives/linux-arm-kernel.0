@@ -1,23 +1,25 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 19 Sep 2012 21:28:41 +0000
-Subject: [PATCH RESEND 0/5] ARM: dts: AM33XX: Add device tree data
-In-Reply-To: <B7CE1C39EBFBA0428A012975D4B2FC830B5DF78F@DNCE05.ent.ti.com>
-References: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
- <B7CE1C39EBFBA0428A012975D4B2FC830B5DF78F@DNCE05.ent.ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA34232@DBDE01.ent.ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Sep 2012 21:31:25 +0000 (UTC)
+Subject: [PATCH v2 3/9] ARM: OMAP4: hwmod data: add mmu hwmod for ipu
+ and dsp
+In-Reply-To: <505A370A.4090805@ti.com>
+References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
+ <1347479152-588-4-git-send-email-omar.luna@linaro.org>
+ <505A370A.4090805@ti.com>
+Message-ID: <alpine.DEB.2.00.1209192131060.5264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 02:53:38, Cousson, Benoit wrote:
-> + Paul
-> 
-> Hi Anil,
-> 
-> Thanks for the rebase / repost. I'll pulled the full series if Paul is OK with 
->   ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
-> 
+On Wed, 19 Sep 2012, Cousson, Benoit wrote:
 
-Thanks Benoit,
+> On 9/12/2012 2:45 PM, Omar Ramirez Luna wrote:
+> > Add mmu hwmod data for ipu and dsp.
+> > 
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> 
+> Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-Thanks
-AnilKumar
+Thanks, queued for 3.7.
+
+- Paul
