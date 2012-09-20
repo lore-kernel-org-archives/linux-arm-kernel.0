@@ -1,51 +1,56 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 20 Sep 2012 10:43:39 -0400
-Subject: [RFC PATCH 06/13] ARM: omap: add hsmmc am33xx specific init
+Date: Thu, 20 Sep 2012 10:43:40 -0400
+Subject: [RFC PATCH 07/13] mmc: omap_hsmmc: dma_request_slave_channel()
+ support for DT platforms
 In-Reply-To: <1348152226-13588-1-git-send-email-mporter@ti.com>
 References: <1348152226-13588-1-git-send-email-mporter@ti.com>
-Message-ID: <1348152226-13588-7-git-send-email-mporter@ti.com>
+Message-ID: <1348152226-13588-8-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM33xx requires special handling in hsmmc initialization
-platform glue.
+For platforms with DT populated, use dma_request_slave_channel()
+to acquire the DMA channel. For !DT platforms, we fall back to
+explicitly passing the omap_dma_filter_fn() to dma_request_channel().
+Once all platforms boot from DT, the dma_request_channel() path can
+be dropped.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- arch/arm/mach-omap2/hsmmc.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index a9675d8..679fb43 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -364,7 +364,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 	else
- 		mmc->slots[0].ocr_mask = c->ocr_mask;
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 3a09f93..c82d0ab 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1923,14 +1923,26 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
  
--	if (!soc_is_am35xx())
-+	if (!soc_is_am35xx() && !soc_is_am33xx())
- 		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
+-	host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
++	if (pdev->dev.of_node)
++		host->rx_chan =
++			dma_request_slave_channel(&pdev->dev, "rx");
++	else
++		host->rx_chan = dma_request_channel(mask,
++						    omap_dma_filter_fn,
++						    &rx_req);
+ 	if (!host->rx_chan) {
+ 		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+ 		ret = -ENXIO;
+ 		goto err_irq;
+ 	}
  
- 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
-@@ -387,7 +387,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 			}
- 		}
- 
--		if (soc_is_am35xx())
-+		if (soc_is_am35xx() || soc_is_am33xx())
- 			mmc->slots[0].set_power = nop_mmc_set_power;
- 
- 		/* OMAP3630 HSMMC1 supports only 4-bit */
-@@ -488,7 +488,8 @@ static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
- 	if (res < 0)
- 		goto free_mmc;
- 
--	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
-+	if (!soc_is_am33xx())
-+		omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
- 
- 	name = "omap_hsmmc";
- 	res = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
+-	host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
++	if (pdev->dev.of_node)
++		host->tx_chan =
++			dma_request_slave_channel(&pdev->dev, "tx");
++	else
++		host->tx_chan = dma_request_channel(mask,
++						    omap_dma_filter_fn,
++						    &tx_req);
+ 	if (!host->tx_chan) {
+ 		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+ 		ret = -ENXIO;
 -- 
 1.7.9.5
