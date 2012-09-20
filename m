@@ -1,36 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:28 +0200
-Subject: [PATCH 10/32] ARM: ux500: Match Power-On-Key MFD and DTS compatible
- strings
+Date: Thu, 20 Sep 2012 14:12:35 +0200
+Subject: [PATCH 17/32] ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible string found in the Power-On-Key's MFD cell matches
-the device name provided in the driver. Keeping this naming convention
-seems like a good idea, so we're changing the one found in the DTS
-file to match.
+Ensure correct probing and pass though important configuration
+options to the AB8500 CODEC driver when DT is enabled
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/dbx5x0.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index daedefe..dc290d0 100644
+index cbef6ab..f055902 100644
 --- a/arch/arm/boot/dts/dbx5x0.dtsi
 +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -374,7 +374,7 @@
+@@ -392,6 +392,12 @@
+ 					compatible = "stericsson,ab8500-debug";
  				};
  
- 				ab8500-ponkey {
--					compatible = "stericsson,ab8500-ponkey";
-+					compatible = "stericsson,ab8500-poweron-key";
- 					interrupts = <6 0x4
- 						      7 0x4>;
- 					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
++				codec: ab8500-codec {
++					compatible = "stericsson,ab8500-codec";
++
++					stericsson,earpeice-cmv = <950>; /* Units in mV. */
++				};
++
+ 				ab8500-regulators {
+ 					compatible = "stericsson,ab8500-regulator";
+ 
 -- 
 1.7.9.5
