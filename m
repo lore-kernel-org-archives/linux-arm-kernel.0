@@ -1,38 +1,35 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 20 Sep 2012 05:26:35 +0200
-Subject: [PATCH 0/2] ARM: dts: Add subnode for ocp2scp
-In-Reply-To: <1348050772-27819-1-git-send-email-kishon@ti.com>
-References: <1348050772-27819-1-git-send-email-kishon@ti.com>
-Message-ID: <505A8CEB.6010100@ti.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu, 20 Sep 2012 07:45:39 +0300
+Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
+In-Reply-To: <20120910135034.GD13076@S2101-09.ap.freescale.net>
+References: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
+ <20120910060840.GT26709@S2101-09.ap.freescale.net>
+ <504DBB10.9030702@bluegiga.com>
+ <20120910135034.GD13076@S2101-09.ap.freescale.net>
+Message-ID: <505A9F73.7090702@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On 09/19/2012 12:32 PM, Kishon Vijay Abraham I wrote:
-> This patch series contains a patch to explicitly add reg property
-> to the ocp2scp dt node and a patch to add the subnode for ocp2scp
-> (omap-usb2).
-> 
-> Since the original patch series that adds ocp2scp driver and ocp2scp
-> data are merged in arm-soc, I'm sending this patch series based on the
-> same tree.
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> 
-> But Benoit already pointed out that there's going to be merge conflicts
-> as he has sent a bunch of dt data patches to linux-omap (devel-dt) tree.
-> So now I'm not sure how that can be actually avoided.
+On 09/10/2012 04:50 PM, Shawn Guo wrote:
+> On Mon, Sep 10, 2012 at 01:04:00PM +0300, Lauri Hintsala wrote:
+>>>> @@ -187,6 +188,9 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+>>>>   {
+>>>>   	struct mxs_mmc_host *host = mmc_priv(mmc);
+>>>>
+>>>> +	if (host->broken_cd)
+>>>> +		return -ENOSYS;
+>>>> +
 
-What would you suggest?
+...
 
-I merged arm-soc/drivers/ocp2scp into my dts branch to get a proper base
-for that series, but as expected, it conflicts :-(
+> But for this patch:
+>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-So I fixed that and pulled this series on top of it.
+Any chance to get this patch for 3.7? It makes possible to use the 
+driver without a card detect signal.
 
-It is something acceptable for a pull request? We already did that in
-the past, but at that time it was not conflicting.
-
-Thanks,
-Benoit
+Regards,
+Lauri
