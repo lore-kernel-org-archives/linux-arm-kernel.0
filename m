@@ -1,33 +1,38 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 20 Sep 2012 05:21:15 +0200
-Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
-In-Reply-To: <1348047128-25692-1-git-send-email-kishon@ti.com>
-References: <1348047128-25692-1-git-send-email-kishon@ti.com>
-Message-ID: <505A8BAB.2020004@ti.com>
+Date: Thu, 20 Sep 2012 05:26:35 +0200
+Subject: [PATCH 0/2] ARM: dts: Add subnode for ocp2scp
+In-Reply-To: <1348050772-27819-1-git-send-email-kishon@ti.com>
+References: <1348050772-27819-1-git-send-email-kishon@ti.com>
+Message-ID: <505A8CEB.6010100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hi Tony,
 
-On 09/19/2012 11:32 AM, Kishon Vijay Abraham I wrote:
-> This patch series adds dt data to get MUSB working in omap4 and omap3
+On 09/19/2012 12:32 PM, Kishon Vijay Abraham I wrote:
+> This patch series contains a patch to explicitly add reg property
+> to the ocp2scp dt node and a patch to add the subnode for ocp2scp
+> (omap-usb2).
 > 
-> Changes from v2:
-> * Changes the subject of all the patches to include "ARM: dts:"
-> * Added reg property and interrupt property for "usb_otg_hs". Previously these
->   were obtained from ti,hwmods property.
-> * Rebased on
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git devel-dt
+> Since the original patch series that adds ocp2scp driver and ocp2scp
+> data are merged in arm-soc, I'm sending this patch series based on the
+> same tree.
 > 
-> Changes from v1:
-> Just removed the omap-usb2 dt data and sent that as a separate patch.
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
 > 
-> Kishon Vijay Abraham I (3):
->   ARM: dts: Add twl6030-usb data
->   ARM: dts: Add twl4030-usb data
->   ARM: dts: omap: Add usb_otg and glue data
+> But Benoit already pointed out that there's going to be merge conflicts
+> as he has sent a bunch of dt data patches to linux-omap (devel-dt) tree.
+> So now I'm not sure how that can be actually avoided.
 
-Thanks for the update. I've just pulled the series for 3.7.
+What would you suggest?
 
-Regards,
+I merged arm-soc/drivers/ocp2scp into my dts branch to get a proper base
+for that series, but as expected, it conflicts :-(
+
+So I fixed that and pulled this series on top of it.
+
+It is something acceptable for a pull request? We already did that in
+the past, but at that time it was not conflicting.
+
+Thanks,
 Benoit
