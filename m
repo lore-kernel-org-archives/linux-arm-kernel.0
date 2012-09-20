@@ -1,28 +1,20 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Sep 2012 15:10:24 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <20120920125631.GC2609@pengutronix.de>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
-Message-ID: <201209201510.24631.marex@denx.de>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Thu, 20 Sep 2012 10:13:28 -0300
+Subject: [PATCH] gpio-lpc32xx: Fix value handling of
+ gpio_direction_output()
+In-Reply-To: <1348130883-11329-1-git-send-email-stigge@antcom.de>
+References: <1348130883-11329-1-git-send-email-stigge@antcom.de>
+Message-ID: <CAAAP30GdYj-Kcb_qu4QEv-eqy5=kp0HS4V2-f4QSVhyo07xrBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+On Thu, Sep 20, 2012 at 5:48 AM, Roland Stigge <stigge@antcom.de> wrote:
+> For GPIOs of gpio-lpc32xx, gpio_direction_output() ignores the value argument
+> (initial value of output). This patch fixes this by setting the level
+> accordingly.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Pardon my tone, I wasn't exactly picky about the wording when replying.
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-[...]
-
-> > If barebox can't handle even basic DT fixup, it's broken.
-> 
-> It can. It maybe was just not needed up to now, dunno.
-
-Fix it and send patch, so this problem doesn't spread.
-
-> Regards,
-> 
->    Wolfram
-
-Best regards,
-Marek Vasut
+Nice catch.
