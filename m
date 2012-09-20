@@ -1,52 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Sep 2012 15:03:21 +0200
-Subject: [PATCH v2 0/9] net/macb: driver enhancement concerning GEM
- support, ring logic and cleanup
-In-Reply-To: <20120919.135006.394934820049386022.davem@davemloft.net>
-References: <cover.1348055112.git.nicolas.ferre@atmel.com>
- <20120919.135006.394934820049386022.davem@davemloft.net>
-Message-ID: <505B1419.2070706@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Sep 2012 15:06:30 +0200
+Subject: [GIT PULL] MOP500 Audio patches due for ASoC
+In-Reply-To: <20120920125618.GP17666@opensource.wolfsonmicro.com>
+References: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
+ <20120920125618.GP17666@opensource.wolfsonmicro.com>
+Message-ID: <20120920130630.GB2755@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2012 07:50 PM, David Miller :
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Date: Wed, 19 Sep 2012 13:55:13 +0200
-> 
->> This is an enhancement work that began several years ago. I try to catchup with
->> some performance improvement that has been implemented then by Havard.
->> The ring index logic and the TX error path modification are the biggest changes
->> but some cleanup/debugging have been added along the way.
->> The GEM revision will benefit from the Gigabit support.
->>
->> The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
->> flavors.
->>
->> v2: - modify the tx error handling: now uses a workqueue
->>     - information provided by ethtool -i were not accurate: removed
-> 
-> Don't submit patches like this.
-> 
-> When you put an RFC right in the middle of the series, it screws everything
-> up.
-> 
-> It means that I can't only apply the parts that are not RFC.
+On Thu, 20 Sep 2012, Mark Brown wrote:
 
-I will submit a v3 patch series when I am more confident about the patch
-that I have tagged as RFC...
+> On Thu, Sep 20, 2012 at 02:09:09PM +0200, Lee Jones wrote:
+> > The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+> > 
+> >   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-asoc-next
+> 
+> Pulled, thanks.
 
-And as you noted last time that I have included a modified patch in a
-series:
-"Please, when you receive feedback on your patches, you need to
-resubmit the whole patch series for review not just the patches where
-changes were asked for."
-==> I thought that it was a better idea to post the whole patch series
-so that people could figure out the context. As the TX error path is
-greatly modified, it could make senses.
+Nice! Thanks Mark.
 
-Now, is it possible to review this series as it is or should I repost
-patches? attached to the previous thread? RFC patch alone?
-
-puzzled,
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
