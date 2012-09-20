@@ -1,55 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Sep 2012 16:56:41 +0100
-Subject: [PATCH 0/4] Fix PROT_NONE page permissions when !CPU_USE_DOMAINS
-Message-ID: <1348156605-30398-1-git-send-email-will.deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Sep 2012 15:56:56 +0000
+Subject: [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <20120920145342.GI2450@S2101-09.ap.freescale.net>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920145342.GI2450@S2101-09.ap.freescale.net>
+Message-ID: <201209201556.57171.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday 20 September 2012, Shawn Guo wrote:
+> 
+> On Thu, Sep 20, 2012 at 07:39:34AM +0000, Arnd Bergmann wrote:
+> > The first five branches are scheduled to go through the arm-soc tree, so
+> > I'm fine with that. For the sound/for-3.7 branch, I'd like to know when
+> > to expect that hitting mainline. If it always gets in very early during the
+> > merge window, it's probably ok to put the imx/multi-platform patches into
+> > the same branch as the other ones in arm-soc and wait for the sound stuff
+> > to hit mainline first, otherwise I'd suggest we start a second
+> > next/multiplatform-2 branch for imx and send the first part early on
+> > but then wait with the second batch before sound gets in.
+> > 
+> It seems that we will have to go with next/multiplatform-2.  I just
+> tried to merge the series with linux-next together, and got some
+> non-trivial conflicts with media and mtd tree.  I might have to rebase
+> my series on top of these trees to sort out those conflicts.  That said,
+> I will have several dependencies outside arm-soc tree, and have to pend
+> my series until all those trees get merged into mainline.
 
-After laughing at Ben H during LPC when it emerged that the PPC PROT_NONE
-protection bits don't prevent kernel access to the protected pages, I
-looked at the ARM code and, to my dismay, found that we have the same
-problem when not using domains.
+Ok, fair enough. I think we can put it in arm-soc/for-next as a staging
+branch anyway to give it some exposure to linux-next, and then we can
+decide whether a rebase is necessary before sending it to Linus.
 
-This patch series addresses the issue with the following points worth
-noting:
-
-	- We use the last available software bit (11) for 2-level PTEs.
-	  Whilst this is somewhat of a pity, I can't think of a better
-	  reason to allocate it than to fix an outstanding bug.
-
-	- There is a horrible bug where the protection map values are
-	  currently truncated with LPAE -- that is also fixed in this
-	  series.
-
-	- We add a new L_PTE_VALID bit to allow for present, faulting
-	  pages in LPAE (where the software bits overlap with the
-	  hardware bits).
-
-Taken against -rc6 and tested for both 2 and 3 levels of page table with
-a simple application reading an mprotect(PROT_NONE) region over a pipe.
-
-All comments welcome,
-
-Will
-
-
-Will Deacon (4):
-  ARM: mm: use pteval_t to represent page protection values
-  ARM: mm: don't use the access flag permissions mechanism for classic
-    MMU
-  ARM: mm: introduce L_PTE_VALID for page table entries
-  ARM: mm: introduce present, faulting entries for PAGE_NONE
-
- arch/arm/include/asm/pgtable-2level.h |    2 ++
- arch/arm/include/asm/pgtable-3level.h |    4 +++-
- arch/arm/include/asm/pgtable.h        |   10 ++++------
- arch/arm/mm/mmu.c                     |    2 +-
- arch/arm/mm/proc-macros.S             |    4 ++++
- arch/arm/mm/proc-v7-2level.S          |   10 +++++++---
- arch/arm/mm/proc-v7-3level.S          |    5 ++++-
- 7 files changed, 25 insertions(+), 12 deletions(-)
-
--- 
-1.7.4.1
+	Arnd
