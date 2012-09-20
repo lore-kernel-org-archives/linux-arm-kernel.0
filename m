@@ -1,41 +1,72 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:47 +0200
-Subject: [PATCH 29/32] ARM: ux500: Add all encompassing sound node to the HREF
- Device Tree
+Date: Thu, 20 Sep 2012 14:12:33 +0200
+Subject: [PATCH 15/32] ARM: ux500: Pass SDI DMA information though AUX_DATA to
+ MMCI
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-30-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is where we link together all of the SoC sound components for
-a given platform. This all encompassing sound node is only found
-in the very lowest hierarchical DTS file, since the component mix may
-well change from board variant to board variant.
+There are four SDIs on the HREF, as opposed to the original two
+enabled on Snowball. To get them working we have to pass their DMA
+information in the same was as we need with the other two.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/hrefv60plus.dts |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-ux500/board-mop500-sdi.c |    4 ++--
+ arch/arm/mach-ux500/board-mop500.c     |    2 ++
+ arch/arm/mach-ux500/board-mop500.h     |    2 ++
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-index 62ba5e8..e853882 100644
---- a/arch/arm/boot/dts/hrefv60plus.dts
-+++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -62,6 +62,13 @@
- 			};
- 		};
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index 18ff781..9c8e4a9 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -152,7 +152,7 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+ };
+ #endif
  
-+		sound {
-+			compatible = "stericsson,snd-soc-mop500";
-+
-+			stericsson,cpu-dai = <&msp1 &msp3>;
-+			stericsson,audio-codec = <&codec>;
-+		};
-+
- 		msp1: msp at 80124000 {
- 			status = "okay";
- 		};
+-static struct mmci_platform_data mop500_sdi1_data = {
++struct mmci_platform_data mop500_sdi1_data = {
+ 	.ocr_mask	= MMC_VDD_29_30,
+ 	.f_max		= 50000000,
+ 	.capabilities	= MMC_CAP_4_BIT_DATA,
+@@ -189,7 +189,7 @@ static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
+ };
+ #endif
+ 
+-static struct mmci_platform_data mop500_sdi2_data = {
++struct mmci_platform_data mop500_sdi2_data = {
+ 	.ocr_mask	= MMC_VDD_165_195,
+ 	.f_max		= 50000000,
+ 	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 5d0f135..8890b19 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -736,6 +736,8 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires DMA bindings. */
+ 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
+ 	/* Requires clock name bindings. */
+ 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index d04a8e6..eb421f9 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -80,6 +80,8 @@
+ struct device;
+ struct i2c_board_info;
+ extern struct mmci_platform_data mop500_sdi0_data;
++extern struct mmci_platform_data mop500_sdi1_data;
++extern struct mmci_platform_data mop500_sdi2_data;
+ extern struct mmci_platform_data mop500_sdi4_data;
+ extern struct arm_pmu_platdata db8500_pmu_platdata;
+ 
 -- 
 1.7.9.5
