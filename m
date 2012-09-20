@@ -1,43 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Sep 2012 10:58:53 +0100
-Subject: [PATCH 1/2] arm: Add ARM ERRATA 775420 workaround
-In-Reply-To: <1347434097-7924-2-git-send-email-horms@verge.net.au>
-References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
- <1347434097-7924-2-git-send-email-horms@verge.net.au>
-Message-ID: <CAHkRjk6vbM8f=bK_GkgpDmnYh-UU_M3T9TeOj6Ti7UZB-5U2cg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Sep 2012 11:01:59 +0100
+Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
+In-Reply-To: <CANM98qL-CZT23T+MNg=EA_ieY+TJF6=F_6XpixWmfEqPN4-A7g@mail.gmail.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153436.21241.95691.stgit@ubuntu>
+ <20120918210442.GA12245@n2100.arm.linux.org.uk>
+ <CANM98qL-CZT23T+MNg=EA_ieY+TJF6=F_6XpixWmfEqPN4-A7g@mail.gmail.com>
+Message-ID: <505AE997.5030303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 September 2012 08:14, Simon Horman <horms@verge.net.au> wrote:
-> +config ARM_ERRATA_775420
-> +       bool "ARM errata: A data cache maintenance operation which aborts, might lead to deadlock"
-> +       depends on CPU_V7
-> +       help
-> +         This option enables the workaround for the 775420 Cortex-A9 (r2p2,
-> +         r2p6,r2p8,r2p10,r3p0) erratum. In case a date cache maintenance
-> +         operation aborts with MMU exception, it might cause the processor
-> +         deadlock. This workaround puts DSB before executing ISB at the
-> +         beginning of the abort exception handler.
-> +
->  endmenu
+On 18/09/12 22:53, Christoffer Dall wrote:
+> On Tue, Sep 18, 2012 at 5:04 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Sat, Sep 15, 2012 at 11:34:36AM -0400, Christoffer Dall wrote:
+>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>
+>>> The KVM hypervisor mmu code requires access to the mem_type prot_pte
+>>> field when setting up page tables pointing to a device. Unfortunately,
+>>> the mem_type structure is opaque.
+>>>
+>>> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
+>>> value.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>>
+>> Is there a reason why we need this to be exposed, along with all the
+>> page table manipulation in patch 7?
+>>
+>> Is there a reason why we can't have new MT_ types for PAGE_HYP and
+>> the HYP MT_DEVICE type (which is the same as MT_DEVICE but with
+>> PTE_USER set) and have the standard ARM/generic kernel code build
+>> those mappings?
+> 
+> For hyp mode we can do this, but we cannot do this for the cpu
+> interfaces that need to be mapped into each VM as they have each their
+> own pgd. 
 
-The only case where we can get an abort on cache maintenance is
-v7_coherent_user_range(). I don't think we have any ISB on the
-exception handling path for this function, so we could just add the
-DSB there:
+Isn't that the same problem? The HYP mode has its own pgd too. I think
+this is the main issue with the generic code. If we can come up with an
+interface that allows the generic code to work on alternative pgds, we
+could pretty much do what Russell suggests here.
 
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -211,6 +211,9 @@ ENTRY(v7_coherent_user_range)
-  * isn't mapped, fail with -EFAULT.
-  */
- 9001:
-+#ifdef CONFIG_ARM_ERRATA_775420
-+	dsb
-+#endif
- 	mov	r0, #-EFAULT
- 	mov	pc, lr
-  UNWIND(.fnend		)
-
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
