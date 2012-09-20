@@ -1,34 +1,42 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 20 Sep 2012 13:06:54 +0100
-Subject: [PATCH v2 07/13] misc: Versatile Express config infrastructure
-In-Reply-To: <201209191308.43676.arnd@arndb.de>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-8-git-send-email-pawel.moll@arm.com>
- <201209191308.43676.arnd@arndb.de>
-Message-ID: <1348142814.11116.113.camel@hornet>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Sep 2012 14:09:09 +0200
+Subject: [GIT PULL] MOP500 Audio patches due for ASoC
+Message-ID: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-09-19 at 14:08 +0100, Arnd Bergmann wrote:
-> > As it doesn't seem to be a "bus" any more, I left it in in misc for
-> > now... It looks to me like there should be some kind of place for
-> > "system/soc control" drivers. Or maybe there is, and I just missed
-> > it?
-> 
-> We've discussed a generic system controller framework in the past,
-> but it hasn't happened so far.  Dong Aisheng has posted a
-> "syscon" driver a few times, and it could eventually merge with
-> this one.
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 
-Yep, a generic framework for "random collection of stuff" would be
-useful.
+  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
 
-> For now, I'd suggest you put this driver into drivers/mfd together
-> with the other part from your patch 8.
+are available in the git repository at:
 
-Do you mean - merge it into one file? I'd rather avoid that - the time
-will come (and probably sooner than I would hope) when there will be a
-new VE generation with some other "config bridge" instead of the
-sysregs.
+  git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-asoc-next
 
-Pawe?
+for you to fetch changes up to b4cad7af6665743647f28119b689e1552326d4da:
+
+  Documentation: Define the MSP Driver Device Tree bindings (2012-09-20 09:10:59 +0200)
+
+----------------------------------------------------------------
+Lee Jones (7):
+      ASoC: Ux500: Move MSP pinctrl setup into the MSP driver
+      ASoC: Ux500: Enable MOP500 driver for Device Tree
+      ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+      ASoC: codecs: Enable AB8500 CODEC for Device Tree
+      ASoC: Ux500: Minor coding layout changes
+      Documentation: Define the MOP500 Audio Machine Driver Device Tree bindings
+      Documentation: Define the MSP Driver Device Tree bindings
+
+ .../devicetree/bindings/sound/ux500-mop500.txt     |   39 +++++++++
+ .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++
+ arch/arm/mach-ux500/board-mop500-msp.c             |   79 +----------------
+ arch/arm/mach-ux500/include/mach/msp.h             |    2 -
+ include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
+ sound/soc/codecs/ab8500-codec.c                    |   81 ++++++++++++++++++
+ sound/soc/ux500/mop500.c                           |   47 +++++++++--
+ sound/soc/ux500/ux500_msp_dai.c                    |    6 ++
+ sound/soc/ux500/ux500_msp_i2s.c                    |   89 +++++++++++++++-----
+ sound/soc/ux500/ux500_msp_i2s.h                    |    8 +-
+ 10 files changed, 292 insertions(+), 108 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/ux500-mop500.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
