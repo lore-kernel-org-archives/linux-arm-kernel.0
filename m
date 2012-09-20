@@ -1,105 +1,125 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:43 +0800
-Subject: [PATCH v2 30/34] ARM: imx: move debug macros to include/debug
+Date: Thu, 20 Sep 2012 14:45:45 +0800
+Subject: [PATCH v2 32/34] ARM: imx: remove header file mach/irqs.h
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-31-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-33-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move imx debug-macro.S over to common debug macro directory.  It
-removes the inclusion to hardware.h by hard-coding the physical
-address of uart port and copying IMX_IO_P2V from hardware.h.
+The only mach/irqs.h user outside arch/arm/mach-imx is
+sound/soc/fsl/imx-pcm-fiq.c, which refers to mxc_set_irq_fiq().
+Move the declaration into include/linux/platform_data/asoc-imx-ssi.h,
+so that we can remove mach/irqs.h includsion from imx-pcm-fiq.c.
 
-Since we will need a common solution, which might use a fixed virtual
-address for uart port across platforms, we make a copy of IMX_IO_P2V
-here as a temporary solution to enable low-level debug for imx
-multi-platform build.
+Inside arch/arm/mach-imx, the only users to mach/irqs.h are avic.c
+and tzic.c for referring to macro FIQ_START.  Let's move the macro
+into irq-common.h and get rid of mach/irqs.h completely.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: alsa-devel at alsa-project.org
 ---
- arch/arm/Kconfig.debug                             |    8 +++++
- .../mach/debug-macro.S => include/debug/imx.S}     |   33 +++++++++++++-------
- 2 files changed, 30 insertions(+), 11 deletions(-)
- rename arch/arm/{mach-imx/include/mach/debug-macro.S => include/debug/imx.S} (59%)
+ arch/arm/mach-imx/avic.c                   |    1 -
+ arch/arm/mach-imx/include/mach/irqs.h      |   21 ---------------------
+ arch/arm/mach-imx/irq-common.h             |    3 +++
+ arch/arm/mach-imx/tzic.c                   |    2 --
+ include/linux/platform_data/asoc-imx-ssi.h |    2 ++
+ sound/soc/fsl/imx-pcm-fiq.c                |    1 -
+ 6 files changed, 5 insertions(+), 25 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/include/mach/irqs.h
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index a7eb282..c813a05 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -398,6 +398,14 @@ endchoice
- config DEBUG_LL_INCLUDE
- 	string
- 	default "debug/icedcc.S" if DEBUG_ICEDCC
-+	default "debug/imx.S" if DEBUG_IMX1_UART || \
-+				 DEBUG_IMX25_UART || \
-+				 DEBUG_IMX21_IMX27_UART || \
-+				 DEBUG_IMX31_IMX35_UART || \
-+				 DEBUG_IMX51_UART || \
-+				 DEBUG_IMX50_IMX53_UART ||\
-+				 DEBUG_IMX6Q_UART2 || \
-+				 DEBUG_IMX6Q_UART4
- 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
- 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
- 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
-diff --git a/arch/arm/mach-imx/include/mach/debug-macro.S b/arch/arm/include/debug/imx.S
-similarity index 59%
-rename from arch/arm/mach-imx/include/mach/debug-macro.S
-rename to arch/arm/include/debug/imx.S
-index 761e45f..0b65d79 100644
---- a/arch/arm/mach-imx/include/mach/debug-macro.S
-+++ b/arch/arm/include/debug/imx.S
-@@ -10,27 +10,38 @@
-  * published by the Free Software Foundation.
-  *
-  */
--#include <mach/hardware.h>
+diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
+index adc64bc..0eff23e 100644
+--- a/arch/arm/mach-imx/avic.c
++++ b/arch/arm/mach-imx/avic.c
+@@ -24,7 +24,6 @@
+ #include <linux/of.h>
+ #include <asm/mach/irq.h>
+ #include <asm/exception.h>
+-#include <mach/irqs.h>
+ 
+ #include "common.h"
+ #include "hardware.h"
+diff --git a/arch/arm/mach-imx/include/mach/irqs.h b/arch/arm/mach-imx/include/mach/irqs.h
+deleted file mode 100644
+index d73f5e8..0000000
+--- a/arch/arm/mach-imx/include/mach/irqs.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- */
 -
- #ifdef CONFIG_DEBUG_IMX1_UART
--#define UART_PADDR	MX1_UART1_BASE_ADDR
-+#define UART_PADDR	0x00206000
- #elif defined (CONFIG_DEBUG_IMX25_UART)
--#define UART_PADDR	MX25_UART1_BASE_ADDR
-+#define UART_PADDR	0x43f90000
- #elif defined (CONFIG_DEBUG_IMX21_IMX27_UART)
--#define UART_PADDR	MX2x_UART1_BASE_ADDR
-+#define UART_PADDR	0x1000a000
- #elif defined (CONFIG_DEBUG_IMX31_IMX35_UART)
--#define UART_PADDR	MX3x_UART1_BASE_ADDR
-+#define UART_PADDR	0x43f90000
- #elif defined (CONFIG_DEBUG_IMX51_UART)
--#define UART_PADDR	MX51_UART1_BASE_ADDR
-+#define UART_PADDR	0x73fbc000
- #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
--#define UART_PADDR	MX53_UART1_BASE_ADDR
-+#define UART_PADDR	0x53fbc000
- #elif defined (CONFIG_DEBUG_IMX6Q_UART2)
--#define UART_PADDR	MX6Q_UART2_BASE_ADDR
-+#define UART_PADDR	0x021e8000
- #elif defined (CONFIG_DEBUG_IMX6Q_UART4)
--#define UART_PADDR	MX6Q_UART4_BASE_ADDR
-+#define UART_PADDR	0x021f0000
- #endif
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_MXC_IRQS_H__
+-#define __ASM_ARCH_MXC_IRQS_H__
+-
+-extern int imx_irq_set_priority(unsigned char irq, unsigned char prio);
+-
+-/* all normal IRQs can be FIQs */
+-#define FIQ_START	0
+-/* switch between IRQ and FIQ */
+-extern int mxc_set_irq_fiq(unsigned int irq, unsigned int type);
+-
+-#endif /* __ASM_ARCH_MXC_IRQS_H__ */
+diff --git a/arch/arm/mach-imx/irq-common.h b/arch/arm/mach-imx/irq-common.h
+index 6ccb3a1..5b2dabb 100644
+--- a/arch/arm/mach-imx/irq-common.h
++++ b/arch/arm/mach-imx/irq-common.h
+@@ -19,6 +19,9 @@
+ #ifndef __PLAT_MXC_IRQ_COMMON_H__
+ #define __PLAT_MXC_IRQ_COMMON_H__
  
--#define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
-+/*
-+ * FIXME: This is a copy of IMX_IO_P2V in hardware.h, and needs to
-+ * stay sync with that.  It's hard to maintain, and should be fixed
-+ * globally for multi-platform build to use a fixed virtual address
-+ * for low-level debug uart port across platforms.
-+ */
-+#define IMX_IO_P2V(x)	(						\
-+			(((x) & 0x80000000) >> 7) |			\
-+			(0xf4000000 +					\
-+			(((x) & 0x50000000) >> 6) +			\
-+			(((x) & 0x0b000000) >> 4) +			\
-+			(((x) & 0x000fffff))))
++/* all normal IRQs can be FIQs */
++#define FIQ_START	0
 +
-+#define UART_VADDR	IMX_IO_P2V(UART_PADDR)
+ struct mxc_extra_irq
+ {
+ 	int (*set_priority)(unsigned char irq, unsigned char prio);
+diff --git a/arch/arm/mach-imx/tzic.c b/arch/arm/mach-imx/tzic.c
+index c7625b4..9721161 100644
+--- a/arch/arm/mach-imx/tzic.c
++++ b/arch/arm/mach-imx/tzic.c
+@@ -21,8 +21,6 @@
+ #include <asm/mach/irq.h>
+ #include <asm/exception.h>
  
- 		.macro	addruart, rp, rv, tmp
- 		ldr	\rp, =UART_PADDR	@ physical
+-#include <mach/irqs.h>
+-
+ #include "common.h"
+ #include "hardware.h"
+ #include "irq-common.h"
+diff --git a/include/linux/platform_data/asoc-imx-ssi.h b/include/linux/platform_data/asoc-imx-ssi.h
+index 63f3c28..92c7fd7 100644
+--- a/include/linux/platform_data/asoc-imx-ssi.h
++++ b/include/linux/platform_data/asoc-imx-ssi.h
+@@ -17,5 +17,7 @@ struct imx_ssi_platform_data {
+ 	void (*ac97_warm_reset)(struct snd_ac97 *ac97);
+ };
+ 
++extern int mxc_set_irq_fiq(unsigned int irq, unsigned int type);
++
+ #endif /* __MACH_SSI_H */
+ 
+diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
+index 22c6130..9ffc9e6 100644
+--- a/sound/soc/fsl/imx-pcm-fiq.c
++++ b/sound/soc/fsl/imx-pcm-fiq.c
+@@ -29,7 +29,6 @@
+ 
+ #include <asm/fiq.h>
+ 
+-#include <mach/irqs.h>
+ #include <linux/platform_data/asoc-imx-ssi.h>
+ 
+ #include "imx-ssi.h"
 -- 
 1.7.9.5
