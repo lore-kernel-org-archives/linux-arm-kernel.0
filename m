@@ -1,55 +1,54 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Thu, 20 Sep 2012 09:21:16 -0400
-Subject: [PATCH 01/15] ARM: add mem_type prot_pte accessor
-In-Reply-To: <505AE997.5030303@arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153436.21241.95691.stgit@ubuntu>
- <20120918210442.GA12245@n2100.arm.linux.org.uk>
- <CANM98qL-CZT23T+MNg=EA_ieY+TJF6=F_6XpixWmfEqPN4-A7g@mail.gmail.com>
- <505AE997.5030303@arm.com>
-Message-ID: <CANM98qKt6XDxQ5tJCpuG2CxOq5qtYknjsA+isNGNUBSap0nOJw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Sep 2012 13:27:45 +0000
+Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
+In-Reply-To: <1348143533.26501.28.camel@zakaz.uk.xensource.com>
+References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1209201240110.29232@kaball.uk.xensource.com>
+ <1348143533.26501.28.camel@zakaz.uk.xensource.com>
+Message-ID: <201209201327.45802.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 6:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 18/09/12 22:53, Christoffer Dall wrote:
->> On Tue, Sep 18, 2012 at 5:04 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Sat, Sep 15, 2012 at 11:34:36AM -0400, Christoffer Dall wrote:
->>>> From: Marc Zyngier <marc.zyngier@arm.com>
->>>>
->>>> The KVM hypervisor mmu code requires access to the mem_type prot_pte
->>>> field when setting up page tables pointing to a device. Unfortunately,
->>>> the mem_type structure is opaque.
->>>>
->>>> Add an accessor (get_mem_type_prot_pte()) to retrieve the prot_pte
->>>> value.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->>>
->>> Is there a reason why we need this to be exposed, along with all the
->>> page table manipulation in patch 7?
->>>
->>> Is there a reason why we can't have new MT_ types for PAGE_HYP and
->>> the HYP MT_DEVICE type (which is the same as MT_DEVICE but with
->>> PTE_USER set) and have the standard ARM/generic kernel code build
->>> those mappings?
->>
->> For hyp mode we can do this, but we cannot do this for the cpu
->> interfaces that need to be mapped into each VM as they have each their
->> own pgd.
->
-> Isn't that the same problem? The HYP mode has its own pgd too. I think
-> this is the main issue with the generic code. If we can come up with an
-> interface that allows the generic code to work on alternative pgds, we
-> could pretty much do what Russell suggests here.
->
-Hyp mode has its own pgd, but there will only be one of them which can
-be allocated at boot and setup at boot in mmu.c
+On Thursday 20 September 2012, Ian Campbell wrote:
+> On Thu, 2012-09-20 at 12:56 +0100, Stefano Stabellini wrote:
+> > On Thu, 20 Sep 2012, Ian Campbell wrote:
+> > > On Wed, 2012-09-19 at 18:44 +0100, Stefano Stabellini wrote:
 
-This will not be the case for guest pages.  On the other hand, this
-locks us to only one user of such mappings and more users could
-potentially (I know it's a stretch) clutter mmu.c later on, which is
-why I suggest the PAGE_KVM_DEVICE approach for now, which should then
-be renamed, PAGE_S2_DEVICE probably.
+> > > > + compatible = "xen,xenvm-4.2", "arm,vexpress";
+> > > 
+> > > Is this second compatible thing actually true? We don't actually emulate
+> > > much (anything?) of what would be on a real vexpress motherboard.
+> > > 
+> > > "arm,vexpress" is used only in v2m.c and I don't think we want the
+> > > majority of that -- we don't provide any of the peripherals which it
+> > > registers.
+> > > 
+> > > I think the only things we might want out of that lot are the arch timer
+> > > and perhaps the uart0 (as a debug port).
+> > > 
+> > > I suspect we should have our own xen machine .c.
+> > > 
+> > > [...]
+> > 
+> > It is true that we are "arm,vexpress" compatible at the moment.
+> 
+> But we aren't, we don't emulate 90%+ of the actual hardware which
+> vexpress compatibility would actually imply.
+> 
+> Look in arch/arm/mach-vexpress/v2m.c, which is the only thing keyed off
+> this compat value -- it's full of stuff which we don't (and aren't going
+> to) implement.
+
+It's not much different in the end, but I think I'd rather make the
+compatible list in the device tree "xen,xenvm-4.2", "xen,xenvm" without
+listing "arm,vexpress", but then adding "xen,xenvm" to the list of
+compatible devices in the vexpress kernel code.
+
+The main difference is that if we decide to separate out the Linux
+code for Xen and vexpress later into distinct ports, we have the
+option to do that. vexpress will support multiplatform configurations
+in 3.7 anyway, so the idea of making all virtual platforms part of
+vexpress in order to be able to boot the same kernel on them is not
+all that important any more.
+
+	Arnd
