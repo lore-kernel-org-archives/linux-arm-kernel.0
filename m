@@ -1,42 +1,89 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 20 Sep 2012 09:21:48 +0200
-Subject: [PATCH v2 0/2] ARM: pci: Prepare for Tegra PCIe controller driver
-Message-ID: <1348125710-28726-1-git-send-email-thierry.reding@avionic-design.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 20 Sep 2012 09:26:12 +0200
+Subject: [PATCH V3 3/6] arm: cache-l2x0: add support for Aurora L2 cache
+ ctrl
+In-Reply-To: <20120915204257.GL12245@n2100.arm.linux.org.uk>
+References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+ <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120915204257.GL12245@n2100.arm.linux.org.uk>
+Message-ID: <505AC514.2050805@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 09/15/2012 10:42 PM, Russell King - ARM Linux wrote:> On Wed, Sep 05, 2012 at 03:44:34PM +0200, Gregory CLEMENT wrote:
+>> @@ -275,6 +281,112 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+>>  	cache_sync();
+>>  	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+>>  }
+>> +/*
+>
+> Where's the blank line?
 
-These are two patches I've been carrying in a larger series that
-converts the Tegra PCIe controller driver to a proper platform driver.
-Since the complete series didn't get much feedback, I've begun to post
-smaller subsets in an effort to get them merged more easily.
+I will fix it
 
-The first patch in this series removes the __init annotations from the
-pci_common_init() function (and pcibios_init_hw() and pcibios_swizzle()
-because they are called from the former) to make sure that they stay
-around after the init stage. This is required because the Tegra driver
-depends on regulators that become available only very late during boot
-and uses deferred probing to handle this situation. It turned out that
-this postpones the PCI bus initialization until after init, thus this
-patch.
+>
+>> + * Note that the end addresses passed to Linux primitives are
+>> + * noninclusive, while the hardware cache range operations use
+>> + * inclusive start and end addresses.
+>> + */
+>> +static unsigned long calc_range_end(unsigned long start, unsigned long end)
+>> +{
+>> +	if (!IS_ALIGNED(start, CACHE_LINE_SIZE)) {
+>> +		pr_warn("%s: start address not align on a cache line size\n",
+>> +			__func__);
+>> +		start &= ~(CACHE_LINE_SIZE-1);
+>> +	};
+>
+> No semicolon here.  But why is this check even here?
+>
+I will remove it, see below.
 
-The second patch is used to pass per-controller or per-host-bridge data
-to the driver, such that it can be associated with the corresponding
-bus. This is also required by the Tegra driver in order to pass a
-driver-private structure to the PCI bus (or more precisely the
-pci_sys_data structure associated with a bus). It is subsequently used
-to obtain the root port private data given the corresponding PCI bus.
+>> +
+>> +	if (!IS_ALIGNED(end, CACHE_LINE_SIZE)) {
+>> +		pr_warn("%s: end address not align on a cache line size\n",
+>> +			__func__);
+>> +		end = (PAGE_ALIGN(end));
+>> +	}
+>
+> And this one - and why when it fails do you align to a page not a cache
+> line?
+I guess it was a bad copy/paste. it should be
+end = ALIGN(end, CACHE_LINE_SIZE);
 
-Thierry
+But I will remove it too.
 
-Thierry Reding (2):
-  ARM: pci: Keep pci_common_init() around after init
-  ARM: pci: Allow passing per-controller private data
+>
+>> +static void aurora_inv_range(unsigned long start, unsigned long end)
+>> +{
+>> +	/*
+>> +	 * round start and end adresses up to cache line size
+>> +	 */
+>> +	start &= ~(CACHE_LINE_SIZE - 1);
+>> +	end = ALIGN(end, CACHE_LINE_SIZE);
+>> +
+>> +	/*
+>> +	 * Invalidate all full cache lines between 'start' and 'end'.
+>> +	 */
+>> +	while (start < end) {
+>> +		unsigned long range_end = calc_range_end(start, end);
+>
+> And note that you (above) guarantee that the start/end addresses are
+> cache line aligned.  It only goes wrong if your calc_range_end()
+> fails - but isn't that a matter of internal proving that your code is
+> correct, rather than lumbering all kernels with such checking?
+>
 
- arch/arm/include/asm/mach/pci.h | 1 +
- arch/arm/kernel/bios32.c        | 9 ++++++---
- 2 files changed, 7 insertions(+), 3 deletions(-)
+This part of the code was almost the same than the one in
+cache-feroceon-l2.c. In first the versions there was BUG_ON() to test
+if start and end were aligned on a cache line. Will Deacon proposed to
+fix the addresses instead of rising an oops. But in the end, we can
+just remove it, right.
+
+I am going to submit an updated series which I hope will meet your
+expectation.
 
 -- 
-1.7.12
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
