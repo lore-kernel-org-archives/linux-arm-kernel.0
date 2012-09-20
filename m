@@ -1,56 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Sep 2012 16:22:39 -0700
-Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
- drivers/bus/
-In-Reply-To: <CAMQu2gw0AmVhW+qR9GUGkUd2G+aZd9A=skTUDJiY2BMpURmSNQ@mail.gmail.com>
-References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
- <20120917215128.GF11762@atomide.com>
- <201209191857.57862.arnd@arndb.de>
- <CAMQu2gw0AmVhW+qR9GUGkUd2G+aZd9A=skTUDJiY2BMpURmSNQ@mail.gmail.com>
-Message-ID: <CAOesGMgzAiFQKpZEpXqRS+U9fxcLAemhb+MCNsn0AOffa6JiNA@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 21 Sep 2012 08:23:53 +1000
+Subject: [PATCH 0/4] Fix PROT_NONE page permissions when !CPU_USE_DOMAINS
+In-Reply-To: <20120920221215.GA1837@n2100.arm.linux.org.uk>
+References: <1348156605-30398-1-git-send-email-will.deacon@arm.com>
+ <20120920221215.GA1837@n2100.arm.linux.org.uk>
+Message-ID: <1348179833.1132.36.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 10:56 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Thu, Sep 20, 2012 at 12:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Monday 17 September 2012, Tony Lindgren wrote:
->>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
->>> > OMAP interconnect drivers are used for the interconnect error handling.
->>> > Since they are bus driver, lets move it to newly created drivers/bus.
->>> >
->>> > Cc: Arnd Bergmann <arnd@arndb.de>
->>> > Cc: Tony Lindgren <tony@atomide.com>
->>> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
->>> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> > ---
->>> > Patch just moves OMAP interconnect drivers as is to the newly created
->>> > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
->>> > tree and test on all OMAP boards.
->>>
->>> Great, looks like this should not conflict with other
->>> omap patches queued, so Arnd should probably take this into
->>> the bus branch:
->>>
->>> Acked-by: Tony Lindgren <tony@atomide.com>
->>
->> It turns out that the patch actually did conflict and we now have a broken
->> omap2plus_defconfig. The patch below seems to fix it, but please verify
->> that this makes sense.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
-> Looks correct.
->
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Thu, 2012-09-20 at 23:12 +0100, Russell King - ARM Linux wrote:
 
-I ended up applying something very similar to this and carried the
-ACKs on that, but I broke it up in two pieces; one for the
-drivers/ocp2scp branch to fix the irq numbers, and another to just
-for-next to deal with the soc.h include file (since that should
-probably have been fixed at branch merge time).
+ .../...
 
-Pushed out to for-next as well.
+> That'll make the set_pte assembly more horrid, but I guess that's the
+> price you pay for removing useful features which architecture folk don't
+> like from CPUs... and it gets more horrid because you can't encode some
+> of those bit patterns with the standard 8-bit and shift opcode
+> representation.
+> 
+> Really fun bug, but it needs more thought about how to solve it.
 
+Yeah, fun isn't it ? :-)
 
--Olof
+The x86 way to solve it is simple, though ugly ... They use a SW bit
+called "PROTNONE". A PROT_NONE page gets that instead of the HW valid
+bit and pte_present() test if any of them is set.
+
+Cheers,
+Ben.
