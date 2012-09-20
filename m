@@ -1,50 +1,58 @@
-From: bbruce@ti.com (Bruce, Becky)
-Date: Thu, 20 Sep 2012 15:03:57 +0000
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209122237080.7275@utopia.booyaka.com>
- <20120913011208.GT4257@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209131839000.23318@utopia.booyaka.com>
- <20120920000351.GI2455@linux.vnet.ibm.com>,
- <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
-Message-ID: <BF035652-91E8-4091-A883-8AB1773A7A17@ti.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Thu, 20 Sep 2012 17:10:21 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <505B1FC2.2090609@free-electrons.com>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
+ <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
+Message-ID: <20120920151021.7307C203A17@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'll give it a try on my panda later today.
+Dear Maxime,
 
-B
+In message <505B1FC2.2090609@free-electrons.com> you wrote:
+> 
+> > Fix it and send patch, so this problem doesn't spread.
+> 
+> I'm sorry, but you still miss the point.
 
-Sent from my iPhone
+I'm not so sure about this.
 
-On Sep 20, 2012, at 2:56 AM, "Paul Walmsley" <paul@pwsan.com> wrote:
+> If someone wants to use another bootloader than U-boot (or a possible
+> patched barebox), or none other than the bootlets to boot directly the
+> Linux (with an appended device tree), you will still have no way to get
+> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
 
-> Hi,
-> 
-> On Wed, 19 Sep 2012, Paul E. McKenney wrote:
-> 
->> On Thu, Sep 13, 2012 at 06:52:10PM +0000, Paul Walmsley wrote:
->> 
->>> On Wed, 12 Sep 2012, Paul E. McKenney wrote:
->> 
->>>> Subodh Nijsure (also CCed) reported something that might be similar on
->>>> ARM, and also reported that setting the following got rid of the stalls:
->>>> 
->>>>    CONFIG_CPU_IDLE=y
->>>>    CONFIG_CPU_IDLE_GOV_LADDER=y
->>>>    CONFIG_CPU_IDLE_GOV_MENU=y
->>>> 
->>>> At which point he was happy, which was good, but which also left the
->>>> underlying problem unsolved.  Do these affect your system?  If so,
->>>> do they cause a different ARM idle loop to be executed?
->>> 
->>> Will give this a try.  What board was Subodh using?
->> 
->> Any news on trying the above settings?
-> 
-> Sorry, haven't had the chance to try it yet due to the impending merge 
-> window opening.  Once things settle down I'll give it a try -- or maybe 
-> someone else can test it in the meantime.
-> 
-> 
-> - Paul
+With device tree supoort enabled, the regular way to pass the MAC
+address to a network interface (that needs one) is through the device
+tree.
+
+There are several options how such information gets there.  Boot
+loaders with built-in DT support may fill in the MAC address
+information into the DT before passing it to the Linux kernel.
+
+If your boot method does not allow such dynamic adjustment, you ould
+provide a statically configured device tree, which already includes
+the MAC address.
+
+> The kernel shouldn't rely on a particular feature of a given bootloader.
+
+100% agreed.  And it does not.  It always uses the respective
+information from the device tree.
+
+
+So when you use bootlets, all you need to do is to insert the
+respective MAC address entry to your device tree definition.
+
+Best regards,
+
+Wolfgang Denk
+
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Every program has at least one bug and can be shortened by  at  least
+one  instruction  --  from  which,  by induction, one can deduce that
+every program can be reduced to one instruction which doesn't work.
