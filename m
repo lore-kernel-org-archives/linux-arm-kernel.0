@@ -1,36 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 22:47:24 +0800
-Subject: [PATCH v2 11/34] media: mx1_camera: remove the driver
-In-Reply-To: <505B1282.5020308@redhat.com>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <1348123547-31082-12-git-send-email-shawn.guo@linaro.org>
- <505B1282.5020308@redhat.com>
-Message-ID: <20120920144722.GH2450@S2101-09.ap.freescale.net>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 20 Sep 2012 16:47:31 +0200
+Subject: [PATCH 0/2] ARM: OMAP: SmartReflex: pass device dependent data via
+ platform data
+Message-ID: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 09:56:34AM -0300, Mauro Carvalho Chehab wrote:
-> It is better to mark it as BROKEN for the next Kernel, and then to
-> move it to staging, before dropping a broken driver. That gives people
-> some time to fix it, if someone has interests on fixing the issues.
-> 
-Ok.  The driver has already been broken, and the patch marking it BROKEN
-does not necessarily need to be in this series.  I will drop the patch
-from this series and send a separate patch based on media tree for that.
+Remove the device dependent settings (cpu_is_xxx(), IP fck etc.)
+from the driver code and pass them instead via the platform
+data.
+This allows a clean separation of the driver code and the platform
+code, as required by the recent re-org of the platform data header
+files.
 
-> >  drivers/media/video/Kconfig                     |   12 -
-> >  drivers/media/video/Makefile                    |    1 -
-> >  drivers/media/video/mx1_camera.c                |  889 -----------------------
-> 
-> Btw, this conflicts with the tree renaming patches already at -staging, as
-> this driver location is elsewhere.
-> 
-mx1_camera.c is not a concern any more.  However the series touches
-mx2_camera.c and mx3_camera.c as well.  I just tested to merge the
-series with linux-next.  Strangely, git does not detect the renaming
-for automatically merging changes.
+The patch also includes a fix of the error handling path in omap_sr_probe
+to correctly de-allocate resources in case of problems. $SUBJECT requires
+this change.
 
-Do you have a stable branch for media patches that I can pull as
-dependency?
+Jean Pihet (2):
+  ARM: OMAP: SmartReflex: fix error path in init function
+  ARM: OMAP: SmartReflex: pass device dependent data via platform data
 
-Shawn
+ arch/arm/mach-omap2/sr_device.c   |   14 +++++++++
+ drivers/power/avs/smartreflex.c   |   57 +++++++++++++++---------------------
+ include/linux/power/smartreflex.h |   17 ++++++++++-
+ 3 files changed, 53 insertions(+), 35 deletions(-)
+
+-- 
+1.7.7.6
