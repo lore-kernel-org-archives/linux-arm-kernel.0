@@ -1,37 +1,54 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:35 +0200
-Subject: [PATCH 17/32] ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
+Date: Thu, 20 Sep 2012 14:12:31 +0200
+Subject: [PATCH 13/32] ARM: ux500: Add skeleton Device Tree for the HREF
+ reference board
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-14-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure correct probing and pass though important configuration
-options to the AB8500 CODEC driver when DT is enabled
+First commit applying the new Device Tree for ST-Ericsson's u8500
+based hardware reference board.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/hrefv60plus.dts |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 arch/arm/boot/dts/hrefv60plus.dts
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index cbef6ab..f055902 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -392,6 +392,12 @@
- 					compatible = "stericsson,ab8500-debug";
- 				};
- 
-+				codec: ab8500-codec {
-+					compatible = "stericsson,ab8500-codec";
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+new file mode 100644
+index 0000000..96bf8a3
+--- /dev/null
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2012 ST-Ericsson AB
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+					stericsson,earpeice-cmv = <950>; /* Units in mV. */
-+				};
++/dts-v1/;
++/include/ "dbx5x0.dtsi"
 +
- 				ab8500-regulators {
- 					compatible = "stericsson,ab8500-regulator";
- 
++/ {
++	model = "ST-Ericsson HREF platform with Device Tree";
++	compatible = "st-ericsson,hrefv60+";
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	soc-u9500 {
++
++	};
++};
 -- 
 1.7.9.5
