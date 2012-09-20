@@ -1,47 +1,30 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 20 Sep 2012 10:48:03 +0200
-Subject: [PATCH] gpio-lpc32xx: Fix value handling of gpio_direction_output()
-Message-ID: <1348130883-11329-1-git-send-email-stigge@antcom.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 20 Sep 2012 10:51:38 +0200
+Subject: [PATCH 0/6] pinctrl: samsung: Various fixes
+Message-ID: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For GPIOs of gpio-lpc32xx, gpio_direction_output() ignores the value argument
-(initial value of output). This patch fixes this by setting the level
-accordingly.
+This patch series contains various fixes of problems and nitpicks spotted when
+working on adding support for Exynos4x12. See each patch for more detailed
+information.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+TODO:
+ - setting WEINT pins to EINT function in exynos_wkup_irq_set_type
 
----
-Applies to v3.6-rc6
+Tomasz Figa (6):
+  pinctrl: exynos: Set pin function to EINT in irq_set_type of GPIO
+    EINT
+  pinctrl: exynos: Fix typos in gpio/wkup _irq_mask
+  pinctrl: exynos: Handle only unmasked wakeup interrupts
+  pinctrl: exynos: Mark exynos_irq_demux_eint as inline
+  pinctrl: exynos: Correct the detection of wakeup-eint node
+  pinctrl: samsung: Uninline samsung_pinctrl_get_soc_data
 
- drivers/gpio/gpio-lpc32xx.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/pinctrl/pinctrl-exynos.c  | 39 +++++++++++++++++++++++++++++----------
+ drivers/pinctrl/pinctrl-exynos.h  |  1 +
+ drivers/pinctrl/pinctrl-samsung.c |  2 +-
+ 3 files changed, 31 insertions(+), 11 deletions(-)
 
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -308,6 +308,7 @@ static int lpc32xx_gpio_dir_output_p012(
- {
- 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
- 
-+	__set_gpio_level_p012(group, pin, value);
- 	__set_gpio_dir_p012(group, pin, 0);
- 
- 	return 0;
-@@ -318,6 +319,7 @@ static int lpc32xx_gpio_dir_output_p3(st
- {
- 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
- 
-+	__set_gpio_level_p3(group, pin, value);
- 	__set_gpio_dir_p3(group, pin, 0);
- 
- 	return 0;
-@@ -326,6 +328,9 @@ static int lpc32xx_gpio_dir_output_p3(st
- static int lpc32xx_gpio_dir_out_always(struct gpio_chip *chip, unsigned pin,
- 	int value)
- {
-+	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-+
-+	__set_gpo_level_p3(group, pin, value);
- 	return 0;
- }
- 
+-- 
+1.7.12
