@@ -1,38 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Sep 2012 17:00:47 +0000 (UTC)
-Subject: [PATCH V3 3/8] ARM: OMAP4: Re-map the CTIs IRQs from MPU to
- DEBUGSS
-In-Reply-To: <1347290626-21164-4-git-send-email-jon-hunter@ti.com>
-References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
- <1347290626-21164-4-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1209201659470.12583@utopia.booyaka.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Sep 2012 19:01:20 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <201209201833.38960.marex@denx.de>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
+ <201209201833.38960.marex@denx.de>
+Message-ID: <505B4BE0.2030702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, 10 Sep 2012, Jon Hunter wrote:
-
-> In order to use the CTI interrupts inconjunction with the DEBUGSS we need to
-> re-map the CTI IRQs to the DEBUGSS HWMOD. The purpose for doing this is so we
-> can create a PMU device based upon the DEBUGSS HWMOD and use the CTI interrupts
-> for routing ARM PMU events for OMAP4430 devices.
+Le 20/09/2012 18:33, Marek Vasut a ?crit :
+> Dear Maxime Ripard,
 > 
-> This is based upon Benoit Cousson's patch [1].
+>> Hi Marek,
+>>
+>> Le 20/09/2012 15:10, Marek Vasut a ?crit :
+>>>>> If barebox can't handle even basic DT fixup, it's broken.
+>>>>
+>>>> It can. It maybe was just not needed up to now, dunno.
+>>>
+>>> Fix it and send patch, so this problem doesn't spread.
+>>
+>> I'm sorry, but you still miss the point.
+>>
+>> If someone wants to use another bootloader than U-boot (or a possible
+>> patched barebox), or none other than the bootlets to boot directly the
+>> Linux (with an appended device tree), you will still have no way to get
+>> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+>>
+>> The kernel shouldn't rely on a particular feature of a given bootloader.
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073319.html
+> So what do you think about this patch (skip loading from OCOTP if it's already 
+> present in DT):
 > 
-> Cc: Ming Lei <ming.lei@canonical.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> 
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 71d47f5..4f014ef 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+>                 np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
+>                 if (!np)
+>                         return;
+> +
+> +               if (of_get_property(np, "local-mac-address", NULL))
+> +                       continue;
+> +
+>                 from = np;
+>  
+>                 newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
 
-As with patch 6 of this series, setting this one aside until we can take a 
-closer look at the way we set up the CTI.
+That definitely looks like the best solution, yes.
+
+You can add my Acked-by if you want.
+
+Maxime
 
 
-- Paul
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
