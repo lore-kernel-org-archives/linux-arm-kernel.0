@@ -1,50 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Sep 2012 21:28:20 +0200
-Subject: [PATCH v4 03/10] pinctrl: mvebu: kirkwood pinctrl driver
-In-Reply-To: <201209201530.40974.arnd@arndb.de>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <50559737.8000705@gmail.com>
- <CACRpkdY-Nyn73EJLvE1RsL4hgMRm6hALtnS-eKAXU7edot2V9A@mail.gmail.com>
- <201209201530.40974.arnd@arndb.de>
-Message-ID: <CACRpkdZYr2B83e3mBmMkO8Ai3xU_QGevfbSOSNoTvK3Lz6y6mg@mail.gmail.com>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Thu, 20 Sep 2012 21:29:15 +0200
+Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
+ conditions.
+Message-ID: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 5:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Eric,
 
-> A corner case is the one where you have different versions of the same
-> IP block (e.g. the pinctrl) and the kernel cannot find out which one it
-> is by looking at registers inside it or on the parent bus, but only
-> by looking at other hardware (CPU core revision, or PCI device ID of
-> the root complex).
+========================================================
+commit b6eede112673678f8a7a1680d6ad12245443829d
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Mon Jan 11 16:17:25 2010 +0800
 
-So this is the case I'm thinking of. We have e.g. differens small flags
-through platform data depending on cpu_is_ux* in the ux500.
+    [ARM] pxa/spitz: use generic GPIO API and remove pxa_gpio_mode()
 
-Currently we modify platform data in the board files, just as we
-switch some cache handling etc as we know this or that
-ASIC has different sized cache.
+    REVISIT: change to GPIO18 is ugly, need to make sure whether that's
+    really necessary - GPIO18_RDY as an VLIO input signal - we don't
+    normally need to do such kind of trick during low power mode.
 
-> We have a precedent of at91 doing this, but I don't
-> like it too much because that still means having to change the driver
-> again if you get a new SoC with the same IP block but a different version
-> register,
+=========================================================
 
-I don't like that either.
+This GPIO18 change breaks spitz resume.
+Spitz will fail to resume from STR under these conditions:
 
-> To avoid that, I'd prefer using separate "compatible"
-> values, at least if the hardware is already described in separate .dtsi
-> files.
+1) If the AC plug is powered and plugged in, and if you suspend the machine,
+    the machine will not be able to resume if you remove the AC plug while the
+   device is suspended.
 
-So what I'm after is whether in this case statically encoding this
-onto the .dtsi files is the right thing to do, or whether the boot loader
-or kernel should runtime-modify the device tree, patching in
-the ASIC-specific info, just like device tree files can override
-properties from include files.
+2) If you connect the machine to a powered AC plug while the device is
+suspended,
+    the machine will not be able to resume.
 
-Or if this is a bad idea.
+If i comment out the call to pxa2xx_mfp_config in spitz_postsuspend(),
+my machine will
+properly resume under abovementioned conditions.
 
-Nobody is doing that right now AFAICT, but it is surely possible....
+If i understand correctly, spitz_postsuspend () configures GPIO 18
+to alternate mode 1 - RDY. However, I have no idea what RDY means or
+what this GPIO is used for.
 
-Yours,
-Linus Walleij
+Eric can you please explain what's happening here?
