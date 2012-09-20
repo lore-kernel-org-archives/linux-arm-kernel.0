@@ -1,107 +1,101 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Wed, 19 Sep 2012 18:44:25 -0700
-Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA
- more precisely
-In-Reply-To: <20120919125020.GQ2505@amd.com>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
- <20120918124918.GK2505@amd.com>
- <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
- <201209190759.46174.arnd@arndb.de> <20120919125020.GQ2505@amd.com>
-Message-ID: <401E54CE964CD94BAE1EB4A729C7087E379FDC1EEB@HQMAIL04.nvidia.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Sep 2012 10:59:24 +0900
+Subject: [PATCH V5] ARM: EXYNOS5: Add bus clock for FIMD
+In-Reply-To: <1347978288-27759-1-git-send-email-l.krishna@samsung.com>
+References: <1347978288-27759-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <006f01cd96d3$8f1004f0$ad300ed0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> When a device driver would only use the IOMMU-API and needs small DMA-
-> able areas it has to re-implement something like the DMA-API (basically an
-> address allocator) for that. So I don't see a reason why both can't be used in a
-> device driver.
-
-On Tegra, the following use cases need specific IOVA mapping.
-1. Few MMIO blocks need IOVA=PA mapping setup.
-2. CPU side loads the firmware into physical memory, which has to be
-mapped to a specific IOVA address, as  firmware is statically linked based
- on specific IOVA address. 
-
-DMA api's allow specifying only one address space per platform device.
-
-For #1, DMA API can't be used as it doesn't allow mapping specific IOVA to PA.
-IOMMU API can be used for mapping specific IOVA to PA. But, in order to use
- IOMMU API, the driver has to  dereference the dev pointer, get domain ptr,
- take lock, and allocate memory from dma_iommu_mapping.  This breaks
- the abstraction for struct device. Each device driver that need IOVA=PA has to
- do this, which is redundant.
-
-For #2, physical memory allocations alone can be done through DMA as it also 
-allocates IOVA space Implicitly. Even after allocating physical memory through
-DMA API's, it would have same problem as #1 for IOVA to PA mapping.
-
-If a fake device is expected to be created for specific IOVA allocation, then it
-may  lead to creating multiple fake devices per specific IOVA and per 
-ASID(unique IOVA address space).  As domain init would be done based on
-device name, the fake device should have the same name as of original platform
-device.
-
-If DMA API allows allocating specific IOVA address and mapping IOVA to specific PA,
- device driver don't need to know any details of struct device and specifying
- one mapping per device is enough and no  need for fake devices.
-
-Comments are much appreciated.
-
--KR
-
-
-> -----Original Message-----
-> From: Joerg Roedel [mailto:joerg.roedel at amd.com]
-> Sent: Wednesday, September 19, 2012 5:50 AM
-> To: Arnd Bergmann
-> Cc: Hiroshi Doyu; m.szyprowski at samsung.com; linux at arm.linux.org.uk;
-> minchan at kernel.org; chunsang.jeong at linaro.org; linux-
-> kernel at vger.kernel.org; subashrp at gmail.com; linaro-mm-sig at lists.linaro.org;
-> linux-mm at kvack.org; iommu at lists.linux-foundation.org; Krishna Reddy; linux-
-> tegra at vger.kernel.org; kyungmin.park at samsung.com;
-> pullip.cho at samsung.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA
-> more precisely
+On Tuesday, September 18, 2012 11:25 PM Leela Krishna Amudala wrote
 > 
-> On Wed, Sep 19, 2012 at 07:59:45AM +0000, Arnd Bergmann wrote:
-> > On Wednesday 19 September 2012, Hiroshi Doyu wrote:
-> > > I guess that it would work. Originally I thought that using DMA-API
-> > > and IOMMU-API together in driver might be kind of layering violation
-> > > since IOMMU-API itself is used in DMA-API. Only DMA-API used in
-> > > driver might be cleaner. Considering that DMA API traditionally
-> > > handling anonymous {bus,iova} address only, introducing the concept
-> > > of specific address in DMA API may not be so encouraged, though.
-> > >
-> > > It would be nice to listen how other SoCs have solved similar needs.
-> >
-> > In general, I would recommend using only the IOMMU API when you have a
-> > device driver that needs to control the bus virtual address space and
-> > that manages a device that resides in its own IOMMU context. I would
-> > recommend using only the dma-mapping API when you have a device that
-> > lives in a shared bus virtual address space with other devices, and
-> > then never ask for a specific bus virtual address.
-> >
-> > Can you explain what devices you see that don't fit in one of those
-> > two categories?
+> This patch adds the bus clock for FIMD and changes the device name for lcd clock
 > 
-> Well, I don't think that a driver should limit to one of these 2 APIs. A driver can
-> very well use the IOMMU-API during initialization (for example to map the
-> firmware to an address the device expects it to be) and use the DMA-API later
-> during normal operation to exchange data with the device.
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+
+
+> ---
+>  arch/arm/mach-exynos/clock-exynos5.c |   32 ++++++++++++++++++++++----------
+>  1 files changed, 22 insertions(+), 10 deletions(-)
 > 
-> When a device driver would only use the IOMMU-API and needs small DMA-
-> able areas it has to re-implement something like the DMA-API (basically an
-> address allocator) for that. So I don't see a reason why both can't be used in a
-> device driver.
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+> index 774533c..404c53d 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
+>  	.ctrlbit	= (1 << 4),
+>  };
 > 
-> Regards,
+> +static struct clk exynos5_clk_fimd1 = {
+> +	.name		= "fimd",
+> +	.devname	= "exynos5-fb.1",
+> +	.enable		= exynos5_clk_ip_disp1_ctrl,
+> +	.ctrlbit	= (1 << 0),
+> +};
+> +
+>  struct clk *exynos5_clkset_group_list[] = {
+>  	[0] = &clk_ext_xtal_mux,
+>  	[1] = NULL,
+> @@ -1120,6 +1127,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
+>  	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
+>  };
 > 
-> 	Joerg
+> +struct clksrc_clk exynos5_clk_sclk_fimd1 = {
+> +	.clk	= {
+> +		.name		= "sclk_fimd",
+> +		.devname	= "exynos5-fb.1",
+> +		.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+> +		.ctrlbit	= (1 << 0),
+> +	},
+> +	.sources = &exynos5_clkset_group,
+> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> +};
+> +
+>  static struct clksrc_clk exynos5_clksrcs[] = {
+>  	{
+>  		.clk	= {
+> @@ -1131,16 +1150,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+>  		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+>  	}, {
+>  		.clk	= {
+> -			.name		= "sclk_fimd",
+> -			.devname	= "s3cfb.1",
+> -			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+> -			.ctrlbit	= (1 << 0),
+> -		},
+> -		.sources = &exynos5_clkset_group,
+> -		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
+> -		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
+> -	}, {
+> -		.clk	= {
+>  			.name		= "aclk_266_gscl",
+>  		},
+>  		.sources = &clk_src_gscl_266,
+> @@ -1240,12 +1249,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
+>  	&exynos5_clk_mdout_spi0,
+>  	&exynos5_clk_mdout_spi1,
+>  	&exynos5_clk_mdout_spi2,
+> +	&exynos5_clk_sclk_fimd1,
+>  };
 > 
+>  static struct clk *exynos5_clk_cdev[] = {
+>  	&exynos5_clk_pdma0,
+>  	&exynos5_clk_pdma1,
+>  	&exynos5_clk_mdma1,
+> +	&exynos5_clk_fimd1,
+>  };
+> 
+>  static struct clksrc_clk *exynos5_clksrc_cdev[] = {
+> @@ -1274,6 +1285,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
+>  	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
+>  	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
+>  	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
+> +	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
+>  };
+> 
+>  static unsigned long exynos5_epll_get_rate(struct clk *clk)
 > --
-> AMD Operating System Research Center
-> 
-> Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach General
-> Managers: Alberto Bozzo
-> Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr.
-> 43632
+> 1.7.0.4
