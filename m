@@ -1,43 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Sep 2012 17:36:30 +0100
-Subject: [RESEND PATCH 0/3] New algorithm for ASID allocation and rollover
-In-Reply-To: <1348157770-9647-1-git-send-email-will.deacon@arm.com>
-References: <1348157770-9647-1-git-send-email-will.deacon@arm.com>
-Message-ID: <505B460E.8050909@arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 20 Sep 2012 09:38:14 -0700
+Subject: arm-soc/for-next: fixup compile after platform_data move
+Message-ID: <87obl0hcp5.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/12 17:16, Will Deacon wrote:
+Arnd, Olof,
 
-Hi Will,
+Not sure if this has been reported yet, but arm-soc/for-next now has a
+build error on omap due to the recent merge of the platform_data move
+series.
 
-> This is a resend of the patches originally posted here:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/114344.html
-> 
-> I received some minor comments in that thread, but nothing that warranted
-> any changes to the code. Due to the nature of these changes, I would
-> very much like to put these into -next for some exposure prior to merging.
-> 
-> Again, all feedback welcome.
-> 
-> Will
-> 
-> 
-> Will Deacon (3):
->   ARM: mm: remove IPI broadcasting on ASID rollover
->   ARM: mm: avoid taking ASID spinlock on fastpath
->   ARM: mm: use bitmap operations when allocating new ASIDs
-> 
->  arch/arm/include/asm/mmu.h         |   11 +--
->  arch/arm/include/asm/mmu_context.h |   82 +--------------
->  arch/arm/mm/context.c              |  207 +++++++++++++++++++-----------------
->  3 files changed, 115 insertions(+), 185 deletions(-)
+The arm-soc/next/soc branch contains the arm-soc/omap/am33xx branch
+which adds an include of "plat/mscpi.h" which has now moved.
 
-FWIW, after using this series on VE A15 (both as a host and as KVM guests):
+Below is a simple fix.
 
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
+Kevin
 
-	M.
+
+>From cae062932d1d28e499b03d31da815fc2696badfd Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@ti.com>
+Date: Thu, 20 Sep 2012 09:28:43 -0700
+Subject: [PATCH] ARM: OMAP: AM33xx hwmod: fixup SPI after platform_data move
+
+AM33xx hwmod data includes "mcspi.h" which has now been moved after
+the platform_data move.  Fix it.
+
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 22433cb..59d5c1c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -17,9 +17,9 @@
+ #include <plat/omap_hwmod.h>
+ #include <plat/cpu.h>
+ #include <linux/platform_data/gpio-omap.h>
++#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <plat/dma.h>
+ #include <plat/mmc.h>
+-#include <plat/mcspi.h>
+ #include <plat/i2c.h>
+ 
+ #include "omap_hwmod_common_data.h"
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.2
