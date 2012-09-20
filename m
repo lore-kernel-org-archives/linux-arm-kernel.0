@@ -1,842 +1,556 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:17 +0800
-Subject: [PATCH v2 04/34] ARM: imx: move platform device code into mach-imx
+Date: Thu, 20 Sep 2012 14:45:18 +0800
+Subject: [PATCH v2 05/34] ARM: imx: merge plat-mxc into mach-imx
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It moves platform device code from plat-mxc into mach-imx.  Along with
-that, header devices-common.h gets moved from plat-mxc/include/mach/
-into mach-imx/devices/.
+It's really unnecessary to have plat-mxc, and let's merge it into
+mach-imx.  It's pretty much just a bunch of file renaming and
+Kconfig/Makefile merge.
+
+To make the change less invasive, we keep using Kconfig symbol
+CONFIG_ARCH_MXC for mach-imx sub-architecture.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-imx/Kconfig                          |    2 ++
- arch/arm/mach-imx/Makefile                         |    2 ++
- arch/arm/mach-imx/devices-imx1.h                   |    2 +-
- arch/arm/mach-imx/devices-imx21.h                  |    2 +-
- arch/arm/mach-imx/devices-imx25.h                  |    2 +-
- arch/arm/mach-imx/devices-imx27.h                  |    2 +-
- arch/arm/mach-imx/devices-imx31.h                  |    2 +-
- arch/arm/mach-imx/devices-imx35.h                  |    2 +-
- arch/arm/mach-imx/devices-imx50.h                  |    2 +-
- arch/arm/mach-imx/devices-imx51.h                  |    2 +-
- arch/arm/{plat-mxc => mach-imx}/devices/Kconfig    |    0
- arch/arm/{plat-mxc => mach-imx}/devices/Makefile   |    2 ++
- .../mach => mach-imx/devices}/devices-common.h     |    0
- arch/arm/{plat-mxc => mach-imx/devices}/devices.c  |    0
- .../devices/platform-ahci-imx.c                    |    2 +-
- .../{plat-mxc => mach-imx}/devices/platform-fec.c  |    2 +-
- .../devices/platform-flexcan.c                     |    2 +-
- .../devices/platform-fsl-usb2-udc.c                |    2 +-
- .../devices/platform-gpio-mxc.c                    |    2 +-
- .../devices/platform-gpio_keys.c                   |    2 +-
- .../devices/platform-imx-dma.c                     |    2 +-
- .../devices/platform-imx-fb.c                      |    2 +-
- .../devices/platform-imx-i2c.c                     |    2 +-
- .../devices/platform-imx-keypad.c                  |    2 +-
- .../devices/platform-imx-ssi.c                     |    2 +-
- .../devices/platform-imx-uart.c                    |    2 +-
- .../devices/platform-imx2-wdt.c                    |    2 +-
- .../devices/platform-imx21-hcd.c                   |    2 +-
- .../devices/platform-imx_udc.c                     |    2 +-
- .../devices/platform-imxdi_rtc.c                   |    2 +-
- .../devices/platform-ipu-core.c                    |    2 +-
- .../devices/platform-mx1-camera.c                  |    2 +-
- .../devices/platform-mx2-camera.c                  |    2 +-
- .../devices/platform-mxc-ehci.c                    |    2 +-
- .../devices/platform-mxc-mmc.c                     |    2 +-
- .../devices/platform-mxc_nand.c                    |    2 +-
- .../devices/platform-mxc_pwm.c                     |    2 +-
- .../devices/platform-mxc_rnga.c                    |    2 +-
- .../devices/platform-mxc_rtc.c                     |    2 +-
- .../devices/platform-mxc_w1.c                      |    2 +-
- .../devices/platform-pata_imx.c                    |    2 +-
- .../devices/platform-sdhci-esdhc-imx.c             |    2 +-
- .../devices/platform-spi_imx.c                     |    2 +-
- arch/arm/mach-imx/mm-imx21.c                       |    2 +-
- arch/arm/mach-imx/mm-imx25.c                       |    2 +-
- arch/arm/mach-imx/mm-imx27.c                       |    2 +-
- arch/arm/mach-imx/mm-imx3.c                        |    2 +-
- arch/arm/mach-imx/mm-imx5.c                        |    2 +-
- arch/arm/mach-imx/pm-imx3.c                        |    2 +-
- arch/arm/plat-mxc/Kconfig                          |    2 --
- arch/arm/plat-mxc/Makefile                         |    4 +---
- 51 files changed, 50 insertions(+), 48 deletions(-)
- rename arch/arm/{plat-mxc => mach-imx}/devices/Kconfig (100%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/Makefile (98%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx/devices}/devices-common.h (100%)
- rename arch/arm/{plat-mxc => mach-imx/devices}/devices.c (100%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-ahci-imx.c (99%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-fec.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-flexcan.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-fsl-usb2-udc.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-gpio-mxc.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-gpio_keys.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-dma.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-fb.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-i2c.c (99%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-keypad.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-ssi.c (99%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-uart.c (99%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx2-wdt.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx21-hcd.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx_udc.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imxdi_rtc.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-ipu-core.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx1-camera.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx2-camera.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc-ehci.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc-mmc.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_nand.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_pwm.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_rnga.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_rtc.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_w1.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-pata_imx.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-sdhci-esdhc-imx.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-spi_imx.c (99%)
+ MAINTAINERS                                        |    1 -
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/Makefile                                  |    1 -
+ arch/arm/{plat-mxc => mach-imx}/3ds_debugboard.c   |    0
+ arch/arm/mach-imx/Kconfig                          |   80 +++++++++++++++++++
+ arch/arm/mach-imx/Makefile                         |   17 ++++
+ arch/arm/{plat-mxc => mach-imx}/avic.c             |    0
+ arch/arm/{plat-mxc => mach-imx}/cpu.c              |    0
+ arch/arm/{plat-mxc => mach-imx}/cpufreq.c          |    0
+ arch/arm/{plat-mxc => mach-imx}/cpuidle.c          |    0
+ arch/arm/{plat-mxc => mach-imx}/epit.c             |    0
+ .../{plat-mxc => mach-imx}/include/mach/common.h   |    0
+ .../{plat-mxc => mach-imx}/include/mach/cpuidle.h  |    0
+ .../include/mach/debug-macro.S                     |    0
+ .../{plat-mxc => mach-imx}/include/mach/hardware.h |    0
+ arch/arm/{plat-mxc => mach-imx}/include/mach/iim.h |    0
+ arch/arm/{plat-mxc => mach-imx}/include/mach/ipu.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/iram.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/irqs.h |    0
+ arch/arm/{plat-mxc => mach-imx}/include/mach/mx1.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx21.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx25.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx27.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx2x.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx31.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx35.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx3x.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx50.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx51.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx53.h |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/mx6q.h |    0
+ arch/arm/{plat-mxc => mach-imx}/include/mach/mxc.h |    0
+ .../{plat-mxc => mach-imx}/include/mach/timex.h    |    0
+ .../arm/{plat-mxc => mach-imx}/include/mach/ulpi.h |    0
+ .../include/mach/uncompress.h                      |    0
+ arch/arm/{plat-mxc => mach-imx}/iram_alloc.c       |    0
+ arch/arm/{plat-mxc => mach-imx}/irq-common.c       |    0
+ arch/arm/{plat-mxc => mach-imx}/irq-common.h       |    0
+ arch/arm/{plat-mxc => mach-imx}/ssi-fiq-ksym.c     |    0
+ arch/arm/{plat-mxc => mach-imx}/ssi-fiq.S          |    0
+ arch/arm/{plat-mxc => mach-imx}/system.c           |    0
+ arch/arm/{plat-mxc => mach-imx}/time.c             |    0
+ arch/arm/{plat-mxc => mach-imx}/tzic.c             |    0
+ arch/arm/{plat-mxc => mach-imx}/ulpi.c             |    0
+ arch/arm/plat-mxc/Kconfig                          |   81 --------------------
+ arch/arm/plat-mxc/Makefile                         |   20 -----
+ 46 files changed, 98 insertions(+), 104 deletions(-)
+ rename arch/arm/{plat-mxc => mach-imx}/3ds_debugboard.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/avic.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/cpu.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/cpufreq.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/cpuidle.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/epit.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/common.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/cpuidle.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/debug-macro.S (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/hardware.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/iim.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/ipu.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/iram.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/irqs.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx1.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx21.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx25.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx27.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx2x.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx31.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx35.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx3x.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx50.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx51.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx53.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mx6q.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/mxc.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/timex.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/ulpi.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/include/mach/uncompress.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/iram_alloc.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/irq-common.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/irq-common.h (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/ssi-fiq-ksym.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/ssi-fiq.S (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/system.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/time.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/tzic.c (100%)
+ rename arch/arm/{plat-mxc => mach-imx}/ulpi.c (100%)
+ delete mode 100644 arch/arm/plat-mxc/Kconfig
+ delete mode 100644 arch/arm/plat-mxc/Makefile
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 53cc13c..4aa276a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -776,7 +776,6 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ T:	git git://git.pengutronix.de/git/imx/linux-2.6.git
+ F:	arch/arm/mach-imx/
+-F:	arch/arm/plat-mxc/
+ 
+ ARM/FREESCALE IMX6
+ M:	Shawn Guo <shawn.guo@linaro.org>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 664e04d..6f82677 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1058,7 +1058,7 @@ source "arch/arm/mach-msm/Kconfig"
+ 
+ source "arch/arm/mach-mv78xx0/Kconfig"
+ 
+-source "arch/arm/plat-mxc/Kconfig"
++source "arch/arm/mach-imx/Kconfig"
+ 
+ source "arch/arm/mach-mxs/Kconfig"
+ 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 13c7943..e3859c9 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -196,7 +196,6 @@ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+-plat-$(CONFIG_ARCH_MXC)		+= mxc
+ plat-$(CONFIG_ARCH_OMAP)	+= omap
+ plat-$(CONFIG_ARCH_S3C64XX)	+= samsung
+ plat-$(CONFIG_ARCH_ZYNQ)	+= versatile
+diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/mach-imx/3ds_debugboard.c
+similarity index 100%
+rename from arch/arm/plat-mxc/3ds_debugboard.c
+rename to arch/arm/mach-imx/3ds_debugboard.c
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index d34c026..8e1d4b8 100644
+index 8e1d4b8..d626f03 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -771,3 +771,5 @@ config SOC_IMX6Q
- 	  This enables support for Freescale i.MX6 Quad processor.
+@@ -1,3 +1,54 @@
++if ARCH_MXC
++
++config MXC_IRQ_PRIOR
++	bool "Use IRQ priority"
++	help
++	  Select this if you want to use prioritized IRQ handling.
++	  This feature prevents higher priority ISR to be interrupted
++	  by lower priority IRQ even IRQF_DISABLED flag is not set.
++	  This may be useful in embedded applications, where are strong
++	  requirements for timing.
++	  Say N here, unless you have a specialized requirement.
++
++config MXC_TZIC
++	bool
++
++config MXC_AVIC
++	bool
++
++config MXC_DEBUG_BOARD
++	bool "Enable MXC debug board(for 3-stack)"
++	help
++	  The debug board is an integral part of the MXC 3-stack(PDK)
++	  platforms, it can be attached or removed from the peripheral
++	  board. On debug board, several debug devices(ethernet, UART,
++	  buttons, LEDs and JTAG) are implemented. Between the MCU and
++	  these devices, a CPLD is added as a bridge which performs
++	  data/address de-multiplexing and decode, signal level shift,
++	  interrupt control and various board functions.
++
++config HAVE_EPIT
++	bool
++
++config MXC_USE_EPIT
++	bool "Use EPIT instead of GPT"
++	depends on HAVE_EPIT
++	help
++	  Use EPIT as the system timer on systems that have it. Normally you
++	  don't have a reason to do so as the EPIT has the same features and
++	  uses the same clocks as the GPT. Anyway, on some systems the GPT
++	  may be in use for other purposes.
++
++config MXC_ULPI
++	bool
++
++config ARCH_HAS_RNGA
++	bool
++
++config IRAM_ALLOC
++	bool
++	select GENERIC_ALLOCATOR
++
+ config HAVE_IMX_GPC
+ 	bool
+ 
+@@ -110,6 +161,20 @@ config	SOC_IMX51
+ 	select PINCTRL
+ 	select PINCTRL_IMX51
+ 
++menu "Freescale MXC Implementations"
++
++choice
++	prompt "Freescale CPU family:"
++	default ARCH_IMX_V6_V7
++
++config ARCH_IMX_V4_V5
++	bool "i.MX1, i.MX21, i.MX25, i.MX27"
++	select AUTO_ZRELADDR if !ZBOOT_ROM
++	select ARM_PATCH_PHYS_VIRT
++	help
++	  This enables support for systems based on the Freescale i.MX ARMv4
++	  and ARMv5 SoCs
++
+ if ARCH_IMX_V4_V5
+ 
+ comment "MX1 platforms:"
+@@ -389,6 +454,15 @@ config MACH_IMX27_DT
  
  endif
+ 
++config ARCH_IMX_V6_V7
++	bool "i.MX3, i.MX5, i.MX6"
++	select AUTO_ZRELADDR if !ZBOOT_ROM
++	select ARM_PATCH_PHYS_VIRT
++	select MIGHT_HAVE_CACHE_L2X0
++	help
++	  This enables support for systems based on the Freescale i.MX3, i.MX5
++	  and i.MX6 family.
 +
-+source "arch/arm/mach-imx/devices/Kconfig"
+ if ARCH_IMX_V6_V7
+ 
+ comment "MX31 platforms:"
+@@ -772,4 +846,10 @@ config SOC_IMX6Q
+ 
+ endif
+ 
++endchoice
++
++endmenu
++
+ source "arch/arm/mach-imx/devices/Kconfig"
++
++endif
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 5025a9d..257893e 100644
+index 257893e..fe47b71 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -92,3 +92,5 @@ obj-$(CONFIG_MACH_MX50_RDP) += mach-mx50_rdp.o
- 
- obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
-+
-+obj-y += devices/
-diff --git a/arch/arm/mach-imx/devices-imx1.h b/arch/arm/mach-imx/devices-imx1.h
-index eb2603b..f9b5afc 100644
---- a/arch/arm/mach-imx/devices-imx1.h
-+++ b/arch/arm/mach-imx/devices-imx1.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_imx_fb_data imx1_imx_fb_data;
- #define imx1_add_imx_fb(pdata) \
-diff --git a/arch/arm/mach-imx/devices-imx21.h b/arch/arm/mach-imx/devices-imx21.h
-index e2014da..bd93932 100644
---- a/arch/arm/mach-imx/devices-imx21.h
-+++ b/arch/arm/mach-imx/devices-imx21.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_imx21_hcd_data imx21_imx21_hcd_data;
- #define imx21_add_imx21_hcd(pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx25.h b/arch/arm/mach-imx/devices-imx25.h
-index 29e9706..0d2922b 100644
---- a/arch/arm/mach-imx/devices-imx25.h
-+++ b/arch/arm/mach-imx/devices-imx25.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_fec_data imx25_fec_data;
- #define imx25_add_fec(pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-index 1c85b57..7d41e28 100644
---- a/arch/arm/mach-imx/devices-imx27.h
-+++ b/arch/arm/mach-imx/devices-imx27.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_fec_data imx27_fec_data;
- #define imx27_add_fec(pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx31.h b/arch/arm/mach-imx/devices-imx31.h
-index 20565f9..e8d1611 100644
---- a/arch/arm/mach-imx/devices-imx31.h
-+++ b/arch/arm/mach-imx/devices-imx31.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_fsl_usb2_udc_data imx31_fsl_usb2_udc_data;
- #define imx31_add_fsl_usb2_udc(pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx35.h b/arch/arm/mach-imx/devices-imx35.h
-index e45b5cb..e2675f1 100644
---- a/arch/arm/mach-imx/devices-imx35.h
-+++ b/arch/arm/mach-imx/devices-imx35.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_fec_data imx35_fec_data;
- #define imx35_add_fec(pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx50.h b/arch/arm/mach-imx/devices-imx50.h
-index 1615a6a..2c29039 100644
---- a/arch/arm/mach-imx/devices-imx50.h
-+++ b/arch/arm/mach-imx/devices-imx50.h
-@@ -18,7 +18,7 @@
-  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-  */
- 
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_imx_uart_1irq_data imx50_imx_uart_data[];
- #define imx50_add_imx_uart(id, pdata)	\
-diff --git a/arch/arm/mach-imx/devices-imx51.h b/arch/arm/mach-imx/devices-imx51.h
-index f448104..deee5ba 100644
---- a/arch/arm/mach-imx/devices-imx51.h
-+++ b/arch/arm/mach-imx/devices-imx51.h
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices/devices-common.h"
- 
- extern const struct imx_fec_data imx51_fec_data;
- #define imx51_add_fec(pdata)	\
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
-similarity index 100%
-rename from arch/arm/plat-mxc/devices/Kconfig
-rename to arch/arm/mach-imx/devices/Kconfig
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/Makefile
-rename to arch/arm/mach-imx/devices/Makefile
-index c11ac84..ff22ed1 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/mach-imx/devices/Makefile
 @@ -1,3 +1,5 @@
-+obj-y := devices.o
-+
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FSL_USB2_UDC) += platform-fsl-usb2-udc.o
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-similarity index 100%
-rename from arch/arm/plat-mxc/include/mach/devices-common.h
-rename to arch/arm/mach-imx/devices/devices-common.h
-diff --git a/arch/arm/plat-mxc/devices.c b/arch/arm/mach-imx/devices/devices.c
-similarity index 100%
-rename from arch/arm/plat-mxc/devices.c
-rename to arch/arm/mach-imx/devices/devices.c
-diff --git a/arch/arm/plat-mxc/devices/platform-ahci-imx.c b/arch/arm/mach-imx/devices/platform-ahci-imx.c
-similarity index 99%
-rename from arch/arm/plat-mxc/devices/platform-ahci-imx.c
-rename to arch/arm/mach-imx/devices/platform-ahci-imx.c
-index ade4a1c..bf7f46d 100644
---- a/arch/arm/plat-mxc/devices/platform-ahci-imx.c
-+++ b/arch/arm/mach-imx/devices/platform-ahci-imx.c
-@@ -25,7 +25,7 @@
- #include <linux/dma-mapping.h>
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_ahci_imx_data_entry_single(soc, _devid)		\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-fec.c b/arch/arm/mach-imx/devices/platform-fec.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-fec.c
-rename to arch/arm/mach-imx/devices/platform-fec.c
-index 0bae44e..e62114f 100644
---- a/arch/arm/plat-mxc/devices/platform-fec.c
-+++ b/arch/arm/mach-imx/devices/platform-fec.c
-@@ -9,7 +9,7 @@
- #include <linux/dma-mapping.h>
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_fec_data_entry_single(soc, _devid)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-flexcan.c b/arch/arm/mach-imx/devices/platform-flexcan.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-flexcan.c
-rename to arch/arm/mach-imx/devices/platform-flexcan.c
-index 4e8497a..e776d8e 100644
---- a/arch/arm/plat-mxc/devices/platform-flexcan.c
-+++ b/arch/arm/mach-imx/devices/platform-flexcan.c
-@@ -6,7 +6,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_flexcan_data_entry_single(soc, _id, _hwid, _size)		\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-fsl-usb2-udc.c
-rename to arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-index 848038f..6ecccf9 100644
---- a/arch/arm/plat-mxc/devices/platform-fsl-usb2-udc.c
-+++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-@@ -8,7 +8,7 @@
-  */
- #include <linux/dma-mapping.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_fsl_usb2_udc_data_entry_single(soc)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c b/arch/arm/mach-imx/devices/platform-gpio-mxc.c
-similarity index 96%
-rename from arch/arm/plat-mxc/devices/platform-gpio-mxc.c
-rename to arch/arm/mach-imx/devices/platform-gpio-mxc.c
-index a7919a2..26483fa 100644
---- a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
-+++ b/arch/arm/mach-imx/devices/platform-gpio-mxc.c
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- struct platform_device *__init mxc_register_gpio(char *name, int id,
- 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high)
-diff --git a/arch/arm/plat-mxc/devices/platform-gpio_keys.c b/arch/arm/mach-imx/devices/platform-gpio_keys.c
-similarity index 96%
-rename from arch/arm/plat-mxc/devices/platform-gpio_keys.c
-rename to arch/arm/mach-imx/devices/platform-gpio_keys.c
-index 1c53a53..3f87279 100644
---- a/arch/arm/plat-mxc/devices/platform-gpio_keys.c
-+++ b/arch/arm/mach-imx/devices/platform-gpio_keys.c
-@@ -17,7 +17,7 @@
-  */
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- struct platform_device *__init imx_add_gpio_keys(
- 		const struct gpio_keys_platform_data *pdata)
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/mach-imx/devices/platform-imx-dma.c
-similarity index 96%
-rename from arch/arm/plat-mxc/devices/platform-imx-dma.c
-rename to arch/arm/mach-imx/devices/platform-imx-dma.c
-index 7fa7e9c..c35c99d 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-dma.c
-@@ -6,7 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- struct platform_device __init __maybe_unused *imx_add_imx_dma(void)
- {
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-fb.c b/arch/arm/mach-imx/devices/platform-imx-fb.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-imx-fb.c
-rename to arch/arm/mach-imx/devices/platform-imx-fb.c
-index 2b0b5e0..4e6f857 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-fb.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-fb.c
-@@ -8,7 +8,7 @@
-  */
- #include <linux/dma-mapping.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx_fb_data_entry_single(soc, _size)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-i2c.c b/arch/arm/mach-imx/devices/platform-imx-i2c.c
-similarity index 99%
-rename from arch/arm/plat-mxc/devices/platform-imx-i2c.c
-rename to arch/arm/mach-imx/devices/platform-imx-i2c.c
-index 19ad580..e0c7d62 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-i2c.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx_i2c_data_entry_single(soc, _id, _hwid, _size)		\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-keypad.c b/arch/arm/mach-imx/devices/platform-imx-keypad.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-imx-keypad.c
-rename to arch/arm/mach-imx/devices/platform-imx-keypad.c
-index 479c3e9..371b1e6 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-keypad.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-keypad.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx_keypad_data_entry_single(soc, _size)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-ssi.c b/arch/arm/mach-imx/devices/platform-imx-ssi.c
-similarity index 99%
-rename from arch/arm/plat-mxc/devices/platform-imx-ssi.c
-rename to arch/arm/mach-imx/devices/platform-imx-ssi.c
-index 21c6f30..bf0c5e4 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-ssi.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-ssi.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx_ssi_data_entry(soc, _id, _hwid, _size)			\
- 	[_id] = {							\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-uart.c b/arch/arm/mach-imx/devices/platform-imx-uart.c
-similarity index 99%
-rename from arch/arm/plat-mxc/devices/platform-imx-uart.c
-rename to arch/arm/mach-imx/devices/platform-imx-uart.c
-index d390f00..e6132f2 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-uart.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-uart.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx_uart_3irq_data_entry(soc, _id, _hwid, _size)		\
- 	[_id] = {							\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c b/arch/arm/mach-imx/devices/platform-imx2-wdt.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-imx2-wdt.c
-rename to arch/arm/mach-imx/devices/platform-imx2-wdt.c
-index 5e07ef2..729c191 100644
---- a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
-+++ b/arch/arm/mach-imx/devices/platform-imx2-wdt.c
-@@ -8,7 +8,7 @@
-  */
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx2_wdt_data_entry_single(soc, _id, _hwid, _size)		\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx21-hcd.c b/arch/arm/mach-imx/devices/platform-imx21-hcd.c
-similarity index 97%
-rename from arch/arm/plat-mxc/devices/platform-imx21-hcd.c
-rename to arch/arm/mach-imx/devices/platform-imx21-hcd.c
-index 5770a42..18b9963 100644
---- a/arch/arm/plat-mxc/devices/platform-imx21-hcd.c
-+++ b/arch/arm/mach-imx/devices/platform-imx21-hcd.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx21_hcd_data_entry_single(soc)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-imx_udc.c b/arch/arm/mach-imx/devices/platform-imx_udc.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-imx_udc.c
-rename to arch/arm/mach-imx/devices/platform-imx_udc.c
-index 6fd675d..75aee0b 100644
---- a/arch/arm/plat-mxc/devices/platform-imx_udc.c
-+++ b/arch/arm/mach-imx/devices/platform-imx_udc.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imx_udc_data_entry_single(soc, _size)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-imxdi_rtc.c b/arch/arm/mach-imx/devices/platform-imxdi_rtc.c
-similarity index 96%
-rename from arch/arm/plat-mxc/devices/platform-imxdi_rtc.c
-rename to arch/arm/mach-imx/devices/platform-imxdi_rtc.c
-index 805336f..e4b22eb 100644
---- a/arch/arm/plat-mxc/devices/platform-imxdi_rtc.c
-+++ b/arch/arm/mach-imx/devices/platform-imxdi_rtc.c
-@@ -8,7 +8,7 @@
-  */
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_imxdi_rtc_data_entry_single(soc)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-ipu-core.c
-rename to arch/arm/mach-imx/devices/platform-ipu-core.c
-index d1e33cc..dc0e837 100644
---- a/arch/arm/plat-mxc/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -8,7 +8,7 @@
-  */
- #include <linux/dma-mapping.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_ipu_core_entry_single(soc)					\
- {									\
-diff --git a/arch/arm/plat-mxc/devices/platform-mx1-camera.c b/arch/arm/mach-imx/devices/platform-mx1-camera.c
-similarity index 97%
-rename from arch/arm/plat-mxc/devices/platform-mx1-camera.c
-rename to arch/arm/mach-imx/devices/platform-mx1-camera.c
-index edcc581..756b0e6 100644
---- a/arch/arm/plat-mxc/devices/platform-mx1-camera.c
-+++ b/arch/arm/mach-imx/devices/platform-mx1-camera.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mx1_camera_data_entry_single(soc, _size)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/mach-imx/devices/platform-mx2-camera.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-mx2-camera.c
-rename to arch/arm/mach-imx/devices/platform-mx2-camera.c
-index 11eace9..9ad5b2d 100644
---- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-+++ b/arch/arm/mach-imx/devices/platform-mx2-camera.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mx2_camera_data_entry_single(soc)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc-ehci.c b/arch/arm/mach-imx/devices/platform-mxc-ehci.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-mxc-ehci.c
-rename to arch/arm/mach-imx/devices/platform-mxc-ehci.c
-index 35851d8..27c8171 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc-ehci.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc-ehci.c
-@@ -8,7 +8,7 @@
-  */
- #include <linux/dma-mapping.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mxc_ehci_data_entry_single(soc, _id, hs)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c b/arch/arm/mach-imx/devices/platform-mxc-mmc.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-rename to arch/arm/mach-imx/devices/platform-mxc-mmc.c
-index 540d3a7..ce90ab0 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc-mmc.c
-@@ -8,7 +8,7 @@
-  */
- #include <linux/dma-mapping.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mxc_mmc_data_entry_single(soc, _id, _hwid, _size)		\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_nand.c b/arch/arm/mach-imx/devices/platform-mxc_nand.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-mxc_nand.c
-rename to arch/arm/mach-imx/devices/platform-mxc_nand.c
-index 1568f39..eb73b82 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_nand.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_nand.c
-@@ -8,7 +8,7 @@
-  */
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mxc_nand_data_entry_single(soc, _size)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/mach-imx/devices/platform-mxc_pwm.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-rename to arch/arm/mach-imx/devices/platform-mxc_pwm.c
-index b0c4ae2..a0551bf 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_pwm.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mxc_pwm_data_entry_single(soc, _id, _hwid, _size)		\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_rnga.c b/arch/arm/mach-imx/devices/platform-mxc_rnga.c
-similarity index 97%
-rename from arch/arm/plat-mxc/devices/platform-mxc_rnga.c
-rename to arch/arm/mach-imx/devices/platform-mxc_rnga.c
-index b4b7612..37bb23c 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_rnga.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_rnga.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- struct imx_mxc_rnga_data {
- 	resource_size_t iobase;
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_rtc.c b/arch/arm/mach-imx/devices/platform-mxc_rtc.c
-similarity index 97%
-rename from arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-rename to arch/arm/mach-imx/devices/platform-mxc_rtc.c
-index a5c9ad5..daaf979 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_rtc.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_rtc.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mxc_rtc_data_entry_single(soc)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_w1.c b/arch/arm/mach-imx/devices/platform-mxc_w1.c
-similarity index 97%
-rename from arch/arm/plat-mxc/devices/platform-mxc_w1.c
-rename to arch/arm/mach-imx/devices/platform-mxc_w1.c
-index 96fa5ea..5f972c6 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_w1.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_w1.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_mxc_w1_data_entry_single(soc)				\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-pata_imx.c b/arch/arm/mach-imx/devices/platform-pata_imx.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-pata_imx.c
-rename to arch/arm/mach-imx/devices/platform-pata_imx.c
-index 70e2f2a..3627ec8d 100644
---- a/arch/arm/plat-mxc/devices/platform-pata_imx.c
-+++ b/arch/arm/mach-imx/devices/platform-pata_imx.c
-@@ -4,7 +4,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_pata_imx_data_entry_single(soc, _size)			\
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-similarity index 98%
-rename from arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
-rename to arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-index 3793e47..772ba2d 100644
---- a/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
-+++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-@@ -7,8 +7,8 @@
-  */
- 
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
- #include <linux/platform_data/mmc-esdhc-imx.h>
-+#include "devices-common.h"
- 
- #define imx_sdhci_esdhc_imx_data_entry_single(soc, _devid, _id, hwid) \
- 	{								\
-diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/mach-imx/devices/platform-spi_imx.c
-similarity index 99%
-rename from arch/arm/plat-mxc/devices/platform-spi_imx.c
-rename to arch/arm/mach-imx/devices/platform-spi_imx.c
-index 9c50c14..63a116b 100644
---- a/arch/arm/plat-mxc/devices/platform-spi_imx.c
-+++ b/arch/arm/mach-imx/devices/platform-spi_imx.c
-@@ -7,7 +7,7 @@
-  * Free Software Foundation.
-  */
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
-+#include "devices-common.h"
- 
- #define imx_spi_imx_data_entry_single(soc, type, _devid, _id, hwid, _size) \
- 	{								\
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index 5fda681..79d94aa 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
-@@ -23,10 +23,10 @@
- #include <linux/pinctrl/machine.h>
- #include <mach/hardware.h>
- #include <mach/common.h>
--#include <mach/devices-common.h>
- #include <asm/pgtable.h>
- #include <asm/mach/map.h>
- 
-+#include "devices/devices-common.h"
- #include "iomux-v1.h"
- 
- /* MX21 memory map definition */
-diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
-index 47bde02..c8ea3aa 100644
---- a/arch/arm/mach-imx/mm-imx25.c
-+++ b/arch/arm/mach-imx/mm-imx25.c
-@@ -25,10 +25,10 @@
- #include <asm/mach/map.h>
- 
- #include <mach/common.h>
--#include <mach/devices-common.h>
- #include <mach/hardware.h>
- #include <mach/mx25.h>
- 
-+#include "devices/devices-common.h"
- #include "iomux-v3.h"
- 
- /*
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index 8d8133e..6d91808 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -23,10 +23,10 @@
- #include <linux/pinctrl/machine.h>
- #include <mach/hardware.h>
- #include <mach/common.h>
--#include <mach/devices-common.h>
- #include <asm/pgtable.h>
- #include <asm/mach/map.h>
- 
-+#include "devices/devices-common.h"
- #include "iomux-v1.h"
- 
- /* MX27 memory map definition */
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 87fb8644..6a5d4e4 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -27,10 +27,10 @@
- #include <asm/mach/map.h>
- 
- #include <mach/common.h>
--#include <mach/devices-common.h>
- #include <mach/hardware.h>
- 
- #include "crmregs-imx3.h"
-+#include "devices/devices-common.h"
- #include "iomux-v3.h"
- 
- void __iomem *mx3_ccm_base;
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index b721b79..cc1423c 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -20,8 +20,8 @@
- 
- #include <mach/hardware.h>
- #include <mach/common.h>
--#include <mach/devices-common.h>
- 
-+#include "devices/devices-common.h"
- #include "iomux-v3.h"
- 
- /*
-diff --git a/arch/arm/mach-imx/pm-imx3.c b/arch/arm/mach-imx/pm-imx3.c
-index 822103b..884dc94 100644
---- a/arch/arm/mach-imx/pm-imx3.c
-+++ b/arch/arm/mach-imx/pm-imx3.c
-@@ -11,8 +11,8 @@
- #include <linux/io.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
--#include <mach/devices-common.h>
- #include "crmregs-imx3.h"
-+#include "devices/devices-common.h"
- 
- /*
-  * Set cpu low power mode before WFI instruction. This function is called
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 2450a98..9ecaf06 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -1,7 +1,5 @@
- if ARCH_MXC
- 
--source "arch/arm/plat-mxc/devices/Kconfig"
--
- menu "Freescale MXC Implementations"
- 
- choice
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 7cc047c..e33d2d1 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Common support
--obj-y := time.o devices.o cpu.o system.o irq-common.o
 +obj-y := time.o cpu.o system.o irq-common.o
++
+ obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
+ obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
  
- obj-$(CONFIG_MXC_TZIC) += tzic.o
- obj-$(CONFIG_MXC_AVIC) += avic.o
-@@ -18,5 +18,3 @@ ifdef CONFIG_SND_IMX_SOC
- obj-y += ssi-fiq.o
- obj-y += ssi-fiq-ksym.o
- endif
+@@ -18,6 +20,21 @@ obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+ 
++obj-$(CONFIG_MXC_TZIC) += tzic.o
++obj-$(CONFIG_MXC_AVIC) += avic.o
++
++obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
++obj-$(CONFIG_MXC_ULPI) += ulpi.o
++obj-$(CONFIG_MXC_USE_EPIT) += epit.o
++obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
++obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
++obj-$(CONFIG_CPU_IDLE) += cpuidle.o
++
++ifdef CONFIG_SND_IMX_SOC
++obj-y += ssi-fiq.o
++obj-y += ssi-fiq-ksym.o
++endif
++
+ # Support for CMOS sensor interface
+ obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
+ 
+diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/mach-imx/avic.c
+similarity index 100%
+rename from arch/arm/plat-mxc/avic.c
+rename to arch/arm/mach-imx/avic.c
+diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/mach-imx/cpu.c
+similarity index 100%
+rename from arch/arm/plat-mxc/cpu.c
+rename to arch/arm/mach-imx/cpu.c
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/mach-imx/cpufreq.c
+similarity index 100%
+rename from arch/arm/plat-mxc/cpufreq.c
+rename to arch/arm/mach-imx/cpufreq.c
+diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/mach-imx/cpuidle.c
+similarity index 100%
+rename from arch/arm/plat-mxc/cpuidle.c
+rename to arch/arm/mach-imx/cpuidle.c
+diff --git a/arch/arm/plat-mxc/epit.c b/arch/arm/mach-imx/epit.c
+similarity index 100%
+rename from arch/arm/plat-mxc/epit.c
+rename to arch/arm/mach-imx/epit.c
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/mach-imx/include/mach/common.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/common.h
+rename to arch/arm/mach-imx/include/mach/common.h
+diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/mach-imx/include/mach/cpuidle.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/cpuidle.h
+rename to arch/arm/mach-imx/include/mach/cpuidle.h
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/mach-imx/include/mach/debug-macro.S
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/debug-macro.S
+rename to arch/arm/mach-imx/include/mach/debug-macro.S
+diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/mach-imx/include/mach/hardware.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/hardware.h
+rename to arch/arm/mach-imx/include/mach/hardware.h
+diff --git a/arch/arm/plat-mxc/include/mach/iim.h b/arch/arm/mach-imx/include/mach/iim.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/iim.h
+rename to arch/arm/mach-imx/include/mach/iim.h
+diff --git a/arch/arm/plat-mxc/include/mach/ipu.h b/arch/arm/mach-imx/include/mach/ipu.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/ipu.h
+rename to arch/arm/mach-imx/include/mach/ipu.h
+diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/mach-imx/include/mach/iram.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/iram.h
+rename to arch/arm/mach-imx/include/mach/iram.h
+diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/mach-imx/include/mach/irqs.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/irqs.h
+rename to arch/arm/mach-imx/include/mach/irqs.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/mach-imx/include/mach/mx1.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx1.h
+rename to arch/arm/mach-imx/include/mach/mx1.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/mach-imx/include/mach/mx21.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx21.h
+rename to arch/arm/mach-imx/include/mach/mx21.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/mach-imx/include/mach/mx25.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx25.h
+rename to arch/arm/mach-imx/include/mach/mx25.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/mach-imx/include/mach/mx27.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx27.h
+rename to arch/arm/mach-imx/include/mach/mx27.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/mach-imx/include/mach/mx2x.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx2x.h
+rename to arch/arm/mach-imx/include/mach/mx2x.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/mach-imx/include/mach/mx31.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx31.h
+rename to arch/arm/mach-imx/include/mach/mx31.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/mach-imx/include/mach/mx35.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx35.h
+rename to arch/arm/mach-imx/include/mach/mx35.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/mach-imx/include/mach/mx3x.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx3x.h
+rename to arch/arm/mach-imx/include/mach/mx3x.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx50.h b/arch/arm/mach-imx/include/mach/mx50.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx50.h
+rename to arch/arm/mach-imx/include/mach/mx50.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/mach-imx/include/mach/mx51.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx51.h
+rename to arch/arm/mach-imx/include/mach/mx51.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/mach-imx/include/mach/mx53.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx53.h
+rename to arch/arm/mach-imx/include/mach/mx53.h
+diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/mach-imx/include/mach/mx6q.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx6q.h
+rename to arch/arm/mach-imx/include/mach/mx6q.h
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/mach-imx/include/mach/mxc.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mxc.h
+rename to arch/arm/mach-imx/include/mach/mxc.h
+diff --git a/arch/arm/plat-mxc/include/mach/timex.h b/arch/arm/mach-imx/include/mach/timex.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/timex.h
+rename to arch/arm/mach-imx/include/mach/timex.h
+diff --git a/arch/arm/plat-mxc/include/mach/ulpi.h b/arch/arm/mach-imx/include/mach/ulpi.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/ulpi.h
+rename to arch/arm/mach-imx/include/mach/ulpi.h
+diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/mach-imx/include/mach/uncompress.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/uncompress.h
+rename to arch/arm/mach-imx/include/mach/uncompress.h
+diff --git a/arch/arm/plat-mxc/iram_alloc.c b/arch/arm/mach-imx/iram_alloc.c
+similarity index 100%
+rename from arch/arm/plat-mxc/iram_alloc.c
+rename to arch/arm/mach-imx/iram_alloc.c
+diff --git a/arch/arm/plat-mxc/irq-common.c b/arch/arm/mach-imx/irq-common.c
+similarity index 100%
+rename from arch/arm/plat-mxc/irq-common.c
+rename to arch/arm/mach-imx/irq-common.c
+diff --git a/arch/arm/plat-mxc/irq-common.h b/arch/arm/mach-imx/irq-common.h
+similarity index 100%
+rename from arch/arm/plat-mxc/irq-common.h
+rename to arch/arm/mach-imx/irq-common.h
+diff --git a/arch/arm/plat-mxc/ssi-fiq-ksym.c b/arch/arm/mach-imx/ssi-fiq-ksym.c
+similarity index 100%
+rename from arch/arm/plat-mxc/ssi-fiq-ksym.c
+rename to arch/arm/mach-imx/ssi-fiq-ksym.c
+diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/mach-imx/ssi-fiq.S
+similarity index 100%
+rename from arch/arm/plat-mxc/ssi-fiq.S
+rename to arch/arm/mach-imx/ssi-fiq.S
+diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/mach-imx/system.c
+similarity index 100%
+rename from arch/arm/plat-mxc/system.c
+rename to arch/arm/mach-imx/system.c
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/mach-imx/time.c
+similarity index 100%
+rename from arch/arm/plat-mxc/time.c
+rename to arch/arm/mach-imx/time.c
+diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/mach-imx/tzic.c
+similarity index 100%
+rename from arch/arm/plat-mxc/tzic.c
+rename to arch/arm/mach-imx/tzic.c
+diff --git a/arch/arm/plat-mxc/ulpi.c b/arch/arm/mach-imx/ulpi.c
+similarity index 100%
+rename from arch/arm/plat-mxc/ulpi.c
+rename to arch/arm/mach-imx/ulpi.c
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+deleted file mode 100644
+index 9ecaf06..0000000
+--- a/arch/arm/plat-mxc/Kconfig
++++ /dev/null
+@@ -1,81 +0,0 @@
+-if ARCH_MXC
 -
--obj-y += devices/
+-menu "Freescale MXC Implementations"
+-
+-choice
+-	prompt "Freescale CPU family:"
+-	default ARCH_IMX_V6_V7
+-
+-config ARCH_IMX_V4_V5
+-	bool "i.MX1, i.MX21, i.MX25, i.MX27"
+-	select AUTO_ZRELADDR if !ZBOOT_ROM
+-	select ARM_PATCH_PHYS_VIRT
+-	help
+-	  This enables support for systems based on the Freescale i.MX ARMv4
+-	  and ARMv5 SoCs
+-
+-config ARCH_IMX_V6_V7
+-	bool "i.MX3, i.MX5, i.MX6"
+-	select AUTO_ZRELADDR if !ZBOOT_ROM
+-	select ARM_PATCH_PHYS_VIRT
+-	select MIGHT_HAVE_CACHE_L2X0
+-	help
+-	  This enables support for systems based on the Freescale i.MX3, i.MX5
+-	  and i.MX6 family.
+-
+-endchoice
+-
+-source "arch/arm/mach-imx/Kconfig"
+-
+-endmenu
+-
+-config MXC_IRQ_PRIOR
+-	bool "Use IRQ priority"
+-	help
+-	  Select this if you want to use prioritized IRQ handling.
+-	  This feature prevents higher priority ISR to be interrupted
+-	  by lower priority IRQ even IRQF_DISABLED flag is not set.
+-	  This may be useful in embedded applications, where are strong
+-	  requirements for timing.
+-	  Say N here, unless you have a specialized requirement.
+-
+-config MXC_TZIC
+-	bool
+-
+-config MXC_AVIC
+-	bool
+-
+-config MXC_DEBUG_BOARD
+-	bool "Enable MXC debug board(for 3-stack)"
+-	help
+-	  The debug board is an integral part of the MXC 3-stack(PDK)
+-	  platforms, it can be attached or removed from the peripheral
+-	  board. On debug board, several debug devices(ethernet, UART,
+-	  buttons, LEDs and JTAG) are implemented. Between the MCU and
+-	  these devices, a CPLD is added as a bridge which performs
+-	  data/address de-multiplexing and decode, signal level shift,
+-	  interrupt control and various board functions.
+-
+-config HAVE_EPIT
+-	bool
+-
+-config MXC_USE_EPIT
+-	bool "Use EPIT instead of GPT"
+-	depends on HAVE_EPIT
+-	help
+-	  Use EPIT as the system timer on systems that have it. Normally you
+-	  don't have a reason to do so as the EPIT has the same features and
+-	  uses the same clocks as the GPT. Anyway, on some systems the GPT
+-	  may be in use for other purposes.
+-
+-config MXC_ULPI
+-	bool
+-
+-config ARCH_HAS_RNGA
+-	bool
+-
+-config IRAM_ALLOC
+-	bool
+-	select GENERIC_ALLOCATOR
+-
+-endif
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+deleted file mode 100644
+index e33d2d1..0000000
+--- a/arch/arm/plat-mxc/Makefile
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#
+-# Makefile for the linux kernel.
+-#
+-
+-# Common support
+-obj-y := time.o cpu.o system.o irq-common.o
+-
+-obj-$(CONFIG_MXC_TZIC) += tzic.o
+-obj-$(CONFIG_MXC_AVIC) += avic.o
+-
+-obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
+-obj-$(CONFIG_MXC_ULPI) += ulpi.o
+-obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+-obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+-obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
+-obj-$(CONFIG_CPU_IDLE) += cpuidle.o
+-ifdef CONFIG_SND_IMX_SOC
+-obj-y += ssi-fiq.o
+-obj-y += ssi-fiq-ksym.o
+-endif
 -- 
 1.7.9.5
