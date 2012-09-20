@@ -1,35 +1,38 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 20 Sep 2012 15:35:05 -0700
-Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
-In-Reply-To: <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
-References: <20120714081254.GD20018@lizard>
- <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
- <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
- <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
- <20120823122239.GA29485@lizard>
- <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
-Message-ID: <20120920223505.GA29721@lizard>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Sep 2012 22:47:25 +0000 (UTC)
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <20120920220130.GN2449@linux.vnet.ibm.com>
+References: <alpine.DEB.2.00.1209122237080.7275@utopia.booyaka.com>
+ <20120913011208.GT4257@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209131839000.23318@utopia.booyaka.com>
+ <20120920000351.GI2455@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
+ <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
+ <20120920220130.GN2449@linux.vnet.ibm.com>
+Message-ID: <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2012 at 03:48:11PM +0800, Haojian Zhuang wrote:
-> On Thu, Aug 23, 2012 at 8:22 PM, Anton Vorontsov
-> <anton.vorontsov@linaro.org> wrote:
-> > On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
-> >> Thanks for helping me to amend these patch.  I got many good
-> >> suggestions and learn a lot in this process:) BTW, you mean you will
-> >> help to amend that several minor warning with battery tree?
-> >
-> > Yup, I have these small fixups locally in my tree already, so if/once
-> > Samuel gives me an Ack for the mfd part, I'll merge it into battery git
-> > tree.
+On Thu, 20 Sep 2012, Paul E. McKenney wrote:
+
+> On Thu, Sep 20, 2012 at 09:49:13PM +0000, Bruce, Becky wrote:
+>
+> > OK, people, you can stop heckling me about "sent from my iPhone" - I'm in the wilds of rural Louisiana with really bad internet service and was trying to work on my phone (but, alas, did not notice the CC list included the entire universe).   Shame on me.
+> > 
+> > With the above set, I don't seem to see any stalls with the RCU timeout set to 60s (the default).  I left the board running for 25 minutes; I will fire it up again later and let it run for a bit longer, but usually I end up seeing the problem pretty quickly so I don't expect that to result in anything.  I also didn't see any stalls on Paul's RCU tree as of a week ago at 60s, so as far as I can tell the CPU_IDLE stuff didn't have any impact (it wasn't on when I tested Paul's tree).
+> > 
+> > If I drop the timeout to 5s as Paul M. suggested for debug a while back, I do see stalls (both with CPU_IDLE stuff and without). 
+> > 
+> > I'm using the default omap2plus config, with RCU stall info enabled and the cpu idle stuff turned on (console dump below).  This is a Panda ES 1.1 (OMAP4460)
 > 
-> Any updates?
+> Thank you for the testing, Becky!
+> 
+> Paul Walmsley, please let me know if the config below doesn't clear things
+> up for you or if there is some reason why this config is infeasible.
 
-OK, I guess I can just go ahead and apply it, the MFD changes are very
-trivial anyway. So, this is now applied (along with some fixups that
-I was talking about in my previous reply).
+Will certainly test it here once things settle down.  But I wouldn't 
+consider the use of CONFIG_CPU_IDLE to be a 'fix' until the problem can be 
+understood.  We use !CONFIG_CPU_IDLE kernels for testing here.
 
-Thank you!
 
-Anton.
+- Paul
