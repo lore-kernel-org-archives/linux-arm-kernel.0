@@ -1,43 +1,85 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:39 +0200
-Subject: [PATCH 21/32] ARM: ux500: Remove platform registration of MSP devices
+Date: Thu, 20 Sep 2012 14:12:41 +0200
+Subject: [PATCH 23/32] ARM: ux500: Add nodes for the MSP into Device Tree
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-24-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes platform device registration of all 4 MSP
-devices. It also takes care of all redundant infrastructure now
-that each of the ux500 audio components have been Device Tree
-enabled.
+This patch inserts all known MSP devices into the DBx5x0 Device Tree
+disabled and enables the two important ones for the Snowball low-cost
+development board.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-msp.c |   10 ----------
- 1 file changed, 10 deletions(-)
+ arch/arm/boot/dts/dbx5x0.dtsi  |   33 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/snowball.dts |    8 ++++++++
+ 2 files changed, 41 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
-index ddc74c5..d04f54d 100644
---- a/arch/arm/mach-ux500/board-mop500-msp.c
-+++ b/arch/arm/mach-ux500/board-mop500-msp.c
-@@ -174,16 +174,6 @@ struct msp_i2s_platform_data msp3_platform_data = {
- /* Due for removal once the MSP driver has been fully DT:ed. */
- void mop500_of_msp_init(struct device *parent)
- {
--	pr_info("Initialize MSP I2S-devices.\n");
--	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
--			   &msp0_platform_data);
--	db8500_add_msp_i2s(parent, 1, U8500_MSP1_BASE, IRQ_DB8500_MSP1,
--			   &msp1_platform_data);
--	db8500_add_msp_i2s(parent, 2, U8500_MSP2_BASE, IRQ_DB8500_MSP2,
--			   &msp2_platform_data);
--	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
--			   &msp3_platform_data);
--
- 	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
- 	platform_device_register(&ux500_pcm);
- }
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index f055902..3708a6b 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -604,6 +604,39 @@
+ 			status = "disabled";
+ 		};
+ 
++		msp0: msp at 80123000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80123000 0x1000>;
++			interrupts = <0 31 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++			status = "disabled";
++		};
++
++		msp1: msp at 80124000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80124000 0x1000>;
++			interrupts = <0 62 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++			status = "disabled";
++		};
++
++		// HDMI sound
++		msp2: msp at 80117000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80117000 0x1000>;
++			interrupts = <0 98 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++			status = "disabled";
++		};
++
++		msp3: msp at 80125000 {
++			compatible = "stericsson,ux500-msp-i2s";
++			reg = <0x80125000 0x1000>;
++			interrupts = <0 62 0x4>;
++			v-ape-supply = <&db8500_vape_reg>;
++			status = "disabled";
++		};
++
+ 		external-bus at 50000000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x50000000 0x4000000>;
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index df6fc57..fce4a00 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -83,6 +83,14 @@
+ 	};
+ 
+ 	soc-u9500 {
++		msp1: msp at 80124000 {
++			status = "okay";
++		};
++
++		msp3: msp at 80125000 {
++			status = "okay";
++		};
++
+ 		external-bus at 50000000 {
+ 			status = "okay";
+ 
 -- 
 1.7.9.5
