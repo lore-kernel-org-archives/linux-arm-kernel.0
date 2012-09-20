@@ -1,103 +1,41 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Thu, 20 Sep 2012 11:23:40 +0530
-Subject: [PATCH 2/3] ARM: EXYNOS: add device tree based discovery support
- for FIMD
-In-Reply-To: <007801cd96ed$1b408080$51c18180$%han@samsung.com>
-References: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
- <1347992531-27279-3-git-send-email-l.krishna@samsung.com>
- <007801cd96ed$1b408080$51c18180$%han@samsung.com>
-Message-ID: <CAL1wa8dj_Tm0QdbKh=xTqkvqhHu3tpuOFWRwMpiqY_1nx1Swgg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 20 Sep 2012 11:26:39 +0530
+Subject: [PATCH 1/1] drivers: bus: Move the OMAP interconnect driver to
+ drivers/bus/
+In-Reply-To: <201209191857.57862.arnd@arndb.de>
+References: <1347614434-15938-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120917215128.GF11762@atomide.com> <201209191857.57862.arnd@arndb.de>
+Message-ID: <CAMQu2gw0AmVhW+qR9GUGkUd2G+aZd9A=skTUDJiY2BMpURmSNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo Han,
+On Thu, Sep 20, 2012 at 12:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 17 September 2012, Tony Lindgren wrote:
+>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120914 02:21]:
+>> > OMAP interconnect drivers are used for the interconnect error handling.
+>> > Since they are bus driver, lets move it to newly created drivers/bus.
+>> >
+>> > Cc: Arnd Bergmann <arnd@arndb.de>
+>> > Cc: Tony Lindgren <tony@atomide.com>
+>> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> > ---
+>> > Patch just moves OMAP interconnect drivers as is to the newly created
+>> > driver/bus/* directory. Patch is generated against "arm-soc/drivers/ocp2scp"
+>> > tree and test on all OMAP boards.
+>>
+>> Great, looks like this should not conflict with other
+>> omap patches queued, so Arnd should probably take this into
+>> the bus branch:
+>>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+>
+> It turns out that the patch actually did conflict and we now have a broken
+> omap2plus_defconfig. The patch below seems to fix it, but please verify
+> that this makes sense.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+Looks correct.
 
-On Thu, Sep 20, 2012 at 10:32 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Wednesday, September 19, 2012 3:22 AM Leela Krishna Amudala wrote
->>
->> This patch adds support for device tree based discovery for Samsung's
->> display controller. Adds DRM-Fimd plat data for smdk5250
->> evt1 to the corresponding dts file
->>
->> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts |   16 ++++++++++++++++
->>  arch/arm/mach-exynos/include/mach/map.h   |    1 +
->>  arch/arm/mach-exynos/mach-exynos5-dt.c    |    2 ++
->>  3 files changed, 19 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> index 8a5e348..c8d32f5 100644
->> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> @@ -109,4 +109,20 @@
->>       spi_2: spi at 12d40000 {
->>               status = "disabled";
->>       };
->> +
->> +     lcd_fimd0: lcd_panel0 {
->> +                     lcd-htiming = <4 4 4 1280>;
->> +                     lcd-vtiming = <4 4 4 800>;
->> +                     supports-mipi-panel;
->> +     };
->> +
->> +     fimd {
->> +             samsung,fimd-display = <&lcd_fimd0>;
->> +             samsung,fimd-vidout-rgb;
->> +             samsung,fimd-inv-vclk;
->> +             samsung,fimd-frame-rate = <60>;
->> +             samsung,default-window = <0>;
->> +             samsung,fimd-win-bpp = <32>;
->> +     };
->> +
->>  };
->> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
->> index b2021bd..dd9cea3 100644
->> --- a/arch/arm/mach-exynos/include/mach/map.h
->> +++ b/arch/arm/mach-exynos/include/mach/map.h
->> @@ -174,6 +174,7 @@
->>  #define EXYNOS4_PA_MIPI_CSIS1                0x11890000
->>
->>  #define EXYNOS4_PA_FIMD0             0x11C00000
->> +#define EXYNOS5_PA_FIMD                      0x14400000
->
-> CC'ed Thomas Abraham
->
-> Please, replace EXYNOS5_PA_FIMD with EXYNOS5_PA_FIMD1.
->
-> As I mentioned before, Other Exynos5 SoCs can have 2 FIMD IPs.
-> Also, Exynos5250 uses FIMD1.
->
->
-
-As per Joonyoung Shim's comment on my previous patches I renamed it
-from EXYNOS5_PA_FIMD1 to EXYNOS5_PA_FIMD. Will change it in next
-version.
-Thanks for reviewing the patch set.
-
-Best Wishes,
-Leela Krishna Amudala.
-
->>
->>  #define EXYNOS4_PA_HSMMC(x)          (0x12510000 + ((x) * 0x10000))
->>  #define EXYNOS4_PA_DWMCI             0x12550000
->> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
->> index e707eb1..0d35d31 100644
->> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
->> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
->> @@ -64,6 +64,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
->>                               "exynos-gsc.2", NULL),
->>       OF_DEV_AUXDATA("samsung,exynos5-gsc", EXYNOS5_PA_GSC3,
->>                               "exynos-gsc.3", NULL),
->> +     OF_DEV_AUXDATA("samsung,exynos5-fimd", EXYNOS5_PA_FIMD,
->> +                             "exynos5-fb.1", NULL),
->>       {},
->>  };
->>
->> --
->> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
