@@ -1,301 +1,44 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:37 +0800
-Subject: [PATCH v2 24/34] dma: imx-dma: remove cpu_is_xxx by using
- platform_device_id
+Date: Thu, 20 Sep 2012 14:45:38 +0800
+Subject: [PATCH v2 25/34] media: mx2_camera: remove dead code in
+ mx2_camera_add_device
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-25-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-26-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It changes the driver to use platform_device_id rather than cpu_is_xxx
-to determine the controller type, and updates the platform code
-accordingly.
-
-As the result, mach/hardware.h inclusion gets removed from the driver.
+This is a piece of code becoming dead since commit 2c9ba37 ([media]
+V4L: mx2_camera: remove unsupported i.MX27 DMA mode, make EMMA
+mandatory).  It should have been removed together with the commit.
+Remove it now.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Javier Martin <javier.martin@vista-silicon.com>
-Cc: Vinod Koul <vinod.koul@linux.intel.com>
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Acked-by: Javier Martin <javier.martin@vista-silicon.com>
+Cc: linux-media at vger.kernel.org
 ---
- arch/arm/mach-imx/clk-imx1.c                 |    3 +-
- arch/arm/mach-imx/clk-imx21.c                |    4 +-
- arch/arm/mach-imx/clk-imx27.c                |    4 +-
- arch/arm/mach-imx/devices/devices-common.h   |    2 +-
- arch/arm/mach-imx/devices/platform-imx-dma.c |    4 +-
- arch/arm/mach-imx/mm-imx1.c                  |    3 +-
- arch/arm/mach-imx/mm-imx21.c                 |    3 +-
- arch/arm/mach-imx/mm-imx27.c                 |    3 +-
- drivers/dma/imx-dma.c                        |   54 +++++++++++++++++++++++---
- include/linux/platform_data/dma-imx.h        |    4 +-
- 10 files changed, 66 insertions(+), 18 deletions(-)
+ drivers/media/video/mx2_camera.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-index 6b9407b..a453e11 100644
---- a/arch/arm/mach-imx/clk-imx1.c
-+++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -83,7 +83,8 @@ int __init mx1_clocks_init(unsigned long fref)
- 			pr_err("imx1 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
+diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+index 965427f..89c7e28 100644
+--- a/drivers/media/video/mx2_camera.c
++++ b/drivers/media/video/mx2_camera.c
+@@ -441,11 +441,9 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
  
--	clk_register_clkdev(clk[dma_gate], "ahb", "imx-dma");
-+	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
-+	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
- 	clk_register_clkdev(clk[mma_gate], "mma", NULL);
- 	clk_register_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
- 	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
-diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
-index 96a4788..8aec572 100644
---- a/arch/arm/mach-imx/clk-imx21.c
-+++ b/arch/arm/mach-imx/clk-imx21.c
-@@ -163,8 +163,8 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
- 	clk_register_clkdev(clk[usb_gate], "per", "imx21-hcd.0");
- 	clk_register_clkdev(clk[usb_hclk_gate], "ahb", "imx21-hcd.0");
- 	clk_register_clkdev(clk[nfc_gate], NULL, "imx21-nand.0");
--	clk_register_clkdev(clk[dma_hclk_gate], "ahb", "imx-dma");
--	clk_register_clkdev(clk[dma_gate], "ipg", "imx-dma");
-+	clk_register_clkdev(clk[dma_hclk_gate], "ahb", "imx21-dma");
-+	clk_register_clkdev(clk[dma_gate], "ipg", "imx21-dma");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[i2c_gate], NULL, "imx21-i2c.0");
- 	clk_register_clkdev(clk[kpp_gate], NULL, "mxc-keypad");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 5ff5cf0..82cb785 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -242,8 +242,8 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
- 	clk_register_clkdev(clk[vpu_baud_gate], "per", "imx-vpu");
- 	clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "imx-vpu");
--	clk_register_clkdev(clk[dma_ahb_gate], "ahb", "imx-dma");
--	clk_register_clkdev(clk[dma_ipg_gate], "ipg", "imx-dma");
-+	clk_register_clkdev(clk[dma_ahb_gate], "ahb", "imx27-dma");
-+	clk_register_clkdev(clk[dma_ipg_gate], "ipg", "imx27-dma");
- 	clk_register_clkdev(clk[fec_ipg_gate], "ipg", "imx27-fec.0");
- 	clk_register_clkdev(clk[fec_ahb_gate], "ahb", "imx27-fec.0");
- 	clk_register_clkdev(clk[wdog_ipg_gate], NULL, "imx2-wdt.0");
-diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index a330159..7f2698c 100644
---- a/arch/arm/mach-imx/devices/devices-common.h
-+++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -311,7 +311,7 @@ struct platform_device *__init imx_add_spi_imx(
- 		const struct imx_spi_imx_data *data,
- 		const struct spi_imx_master *pdata);
+ 	csicr1 = CSICR1_MCLKEN;
  
--struct platform_device *imx_add_imx_dma(resource_size_t iobase,
-+struct platform_device *imx_add_imx_dma(char *name, resource_size_t iobase,
- 					int irq, int irq_err);
- struct platform_device *imx_add_imx_sdma(char *name,
- 	resource_size_t iobase, int irq, struct sdma_platform_data *pdata);
-diff --git a/arch/arm/mach-imx/devices/platform-imx-dma.c b/arch/arm/mach-imx/devices/platform-imx-dma.c
-index f9003e4..ccdb5dc 100644
---- a/arch/arm/mach-imx/devices/platform-imx-dma.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-dma.c
-@@ -8,7 +8,7 @@
-  */
- #include "devices-common.h"
+-	if (cpu_is_mx27()) {
++	if (cpu_is_mx27())
+ 		csicr1 |= CSICR1_PRP_IF_EN | CSICR1_FCC |
+ 			CSICR1_RXFF_LEVEL(0);
+-	} else if (cpu_is_mx27())
+-		csicr1 |= CSICR1_SOF_INTEN | CSICR1_RXFF_LEVEL(2);
  
--struct platform_device __init __maybe_unused *imx_add_imx_dma(
-+struct platform_device __init __maybe_unused *imx_add_imx_dma(char *name,
- 	resource_size_t iobase, int irq, int irq_err)
- {
- 	struct resource res[] = {
-@@ -28,7 +28,7 @@ struct platform_device __init __maybe_unused *imx_add_imx_dma(
- 	};
- 
- 	return platform_device_register_resndata(&mxc_ahb_bus,
--			"imx-dma", -1, res, ARRAY_SIZE(res), NULL, 0);
-+			name, -1, res, ARRAY_SIZE(res), NULL, 0);
- }
- 
- struct platform_device __init __maybe_unused *imx_add_imx_sdma(char *name,
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-index 9de81bf..79f6c0b 100644
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ b/arch/arm/mach-imx/mm-imx1.c
-@@ -60,6 +60,7 @@ void __init imx1_soc_init(void)
- 						MX1_GPIO_INT_PORTC, 0);
- 	mxc_register_gpio("imx1-gpio", 3, MX1_GPIO4_BASE_ADDR, SZ_256,
- 						MX1_GPIO_INT_PORTD, 0);
--	imx_add_imx_dma(MX1_DMA_BASE_ADDR, MX1_DMA_INT, MX1_DMA_ERR);
-+	imx_add_imx_dma("imx1-dma", MX1_DMA_BASE_ADDR,
-+			MX1_DMA_INT, MX1_DMA_ERR);
- 	pinctrl_provide_dummies();
- }
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index 1c29515..3b97ea6 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
-@@ -90,7 +90,8 @@ void __init imx21_soc_init(void)
- 	mxc_register_gpio("imx21-gpio", 5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
- 
- 	pinctrl_provide_dummies();
--	imx_add_imx_dma(MX21_DMA_BASE_ADDR, MX21_INT_DMACH0, 0); /* No ERR irq */
-+	imx_add_imx_dma("imx21-dma", MX21_DMA_BASE_ADDR,
-+			MX21_INT_DMACH0, 0); /* No ERR irq */
- 	platform_device_register_simple("imx21-audmux", 0, imx21_audmux_res,
- 					ARRAY_SIZE(imx21_audmux_res));
- }
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index d389f4a..91e8da8 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -91,7 +91,8 @@ void __init imx27_soc_init(void)
- 	mxc_register_gpio("imx21-gpio", 5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
- 
- 	pinctrl_provide_dummies();
--	imx_add_imx_dma(MX27_DMA_BASE_ADDR, MX27_INT_DMACH0, 0); /* No ERR irq */
-+	imx_add_imx_dma("imx27-dma", MX27_DMA_BASE_ADDR,
-+			MX27_INT_DMACH0, 0); /* No ERR irq */
- 	/* imx27 has the imx21 type audmux */
- 	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
- 					ARRAY_SIZE(imx27_audmux_res));
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index a947ce2..960c88b 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -29,7 +29,6 @@
- 
- #include <asm/irq.h>
- #include <linux/platform_data/dma-imx.h>
--#include <mach/hardware.h>
- 
- #include "dmaengine.h"
- #define IMXDMA_MAX_CHAN_DESCRIPTORS	16
-@@ -167,6 +166,12 @@ struct imxdma_channel {
- 	int				slot_2d;
- };
- 
-+enum imx_dma_type {
-+	IMX1_DMA,
-+	IMX21_DMA,
-+	IMX27_DMA,
-+};
-+
- struct imxdma_engine {
- 	struct device			*dev;
- 	struct device_dma_parameters	dma_parms;
-@@ -177,8 +182,40 @@ struct imxdma_engine {
- 	spinlock_t			lock;
- 	struct imx_dma_2d_config	slots_2d[IMX_DMA_2D_SLOTS];
- 	struct imxdma_channel		channel[IMX_DMA_CHANNELS];
-+	enum imx_dma_type		devtype;
- };
- 
-+static struct platform_device_id imx_dma_devtype[] = {
-+	{
-+		.name = "imx1-dma",
-+		.driver_data = IMX1_DMA,
-+	}, {
-+		.name = "imx21-dma",
-+		.driver_data = IMX21_DMA,
-+	}, {
-+		.name = "imx27-dma",
-+		.driver_data = IMX27_DMA,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(platform, imx_dma_devtype);
-+
-+static inline int is_imx1_dma(struct imxdma_engine *imxdma)
-+{
-+	return imxdma->devtype == IMX1_DMA;
-+}
-+
-+static inline int is_imx21_dma(struct imxdma_engine *imxdma)
-+{
-+	return imxdma->devtype == IMX21_DMA;
-+}
-+
-+static inline int is_imx27_dma(struct imxdma_engine *imxdma)
-+{
-+	return imxdma->devtype == IMX27_DMA;
-+}
-+
- static struct imxdma_channel *to_imxdma_chan(struct dma_chan *chan)
- {
- 	return container_of(chan, struct imxdma_channel, chan);
-@@ -212,7 +249,9 @@ static unsigned imx_dmav1_readl(struct imxdma_engine *imxdma, unsigned offset)
- 
- static int imxdma_hw_chain(struct imxdma_channel *imxdmac)
- {
--	if (cpu_is_mx27())
-+	struct imxdma_engine *imxdma = imxdmac->imxdma;
-+
-+	if (is_imx27_dma(imxdma))
- 		return imxdmac->hw_chaining;
- 	else
- 		return 0;
-@@ -267,7 +306,7 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
- 	imx_dmav1_writel(imxdma, imx_dmav1_readl(imxdma, DMA_CCR(channel)) |
- 			 CCR_CEN | CCR_ACRPT, DMA_CCR(channel));
- 
--	if ((cpu_is_mx21() || cpu_is_mx27()) &&
-+	if (!is_imx1_dma(imxdma) &&
- 			d->sg && imxdma_hw_chain(imxdmac)) {
- 		d->sg = sg_next(d->sg);
- 		if (d->sg) {
-@@ -436,7 +475,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 	struct imxdma_engine *imxdma = dev_id;
- 	int i, disr;
- 
--	if (cpu_is_mx21() || cpu_is_mx27())
-+	if (!is_imx1_dma(imxdma))
- 		imxdma_err_handler(irq, dev_id);
- 
- 	disr = imx_dmav1_readl(imxdma, DMA_DISR);
-@@ -967,6 +1006,8 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	if (!imxdma)
- 		return -ENOMEM;
- 
-+	imxdma->devtype = pdev->id_entry->driver_data;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	imxdma->base = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!imxdma->base)
-@@ -990,7 +1031,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	/* reset DMA module */
- 	imx_dmav1_writel(imxdma, DCR_DRST, DMA_DCR);
- 
--	if (cpu_is_mx1()) {
-+	if (is_imx1_dma(imxdma)) {
- 		ret = devm_request_irq(&pdev->dev, irq,
- 				       dma_irq_handler, 0, "DMA", imxdma);
- 		if (ret) {
-@@ -1038,7 +1079,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	for (i = 0; i < IMX_DMA_CHANNELS; i++) {
- 		struct imxdma_channel *imxdmac = &imxdma->channel[i];
- 
--		if (cpu_is_mx21() || cpu_is_mx27()) {
-+		if (!is_imx1_dma(imxdma)) {
- 			ret = devm_request_irq(&pdev->dev, irq + i,
- 					dma_irq_handler, 0, "DMA", imxdma);
- 			if (ret) {
-@@ -1118,6 +1159,7 @@ static struct platform_driver imxdma_driver = {
- 	.driver		= {
- 		.name	= "imx-dma",
- 	},
-+	.id_table	= imx_dma_devtype,
- 	.remove		= __exit_p(imxdma_remove),
- };
- 
-diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
-index 1b90803..f6d30cc 100644
---- a/include/linux/platform_data/dma-imx.h
-+++ b/include/linux/platform_data/dma-imx.h
-@@ -61,7 +61,9 @@ static inline int imx_dma_is_ipu(struct dma_chan *chan)
- static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
- {
- 	return strstr(dev_name(chan->device->dev), "sdma") ||
--		!strcmp(dev_name(chan->device->dev), "imx-dma");
-+		!strcmp(dev_name(chan->device->dev), "imx1-dma") ||
-+		!strcmp(dev_name(chan->device->dev), "imx21-dma") ||
-+		!strcmp(dev_name(chan->device->dev), "imx27-dma");
- }
- 
- #endif
+ 	pcdev->csicr1 = csicr1;
+ 	writel(pcdev->csicr1, pcdev->base_csi + CSICR1);
 -- 
 1.7.9.5
