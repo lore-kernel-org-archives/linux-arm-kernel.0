@@ -1,43 +1,32 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Sep 2012 17:03:11 +0900
-Subject: [PATCH 1/3] ARM: EXYNOS5: Add fimd node to the exynos5250 dtsi
- file
-In-Reply-To: <1347992531-27279-2-git-send-email-l.krishna@samsung.com>
-References: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
- <1347992531-27279-2-git-send-email-l.krishna@samsung.com>
-Message-ID: <008201cd9706$60e7e2e0$22b7a8a0$%han@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Sep 2012 10:13:15 +0200
+Subject: [PATCH 00/11] pinctrl: mvebu: pinctrl driver
+In-Reply-To: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkda+Kav6RGstSQ9+BCgVV+pR6ca_HmoueODYubX_xYM8Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 19, 2012 3:22 AM Leela Krishna Amudala wrote
-> 
-> This patch adds the fimd node with compatibility string, hardware address,
-> interrupt line numbers to the exynos5250 dtsi file.
-> 
-> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index b55794b..6d27ca4 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -488,4 +488,11 @@
->  		reg = <0x13e30000 0x1000>;
->  		interrupts = <0 88 0>;
->  	};
-> +
-> +	fimd {
-> +		compatible = "samsung,exynos5-drm";
+Just a minor thing here:
 
-Should it be "samsung,exynos5-fimd"?
+On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
+>  drivers/pinctrl/pinctrl-armada-370.c               |  421 +++++++++++
+>  drivers/pinctrl/pinctrl-armada-xp.c                |  466 ++++++++++++
+>  drivers/pinctrl/pinctrl-dove.c                     |  622 ++++++++++++++++
+>  drivers/pinctrl/pinctrl-kirkwood.c                 |  460 ++++++++++++
+>  drivers/pinctrl/pinctrl-mvebu.c                    |  758 ++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-mvebu.h                    |  175 +++++
 
-> +		interrupt-parent = <&combiner>;
-> +		reg = <0x14400000 0x40000>;
-> +		interrupts = <18 5>, <18 4>, <18 6>;
-> +	};
->  };
-> --
-> 1.7.0.4
+I've tried to group related implementations together, so if the first four
+are dependent we should either:
+
+1. Move all of these to the subdir drivers/pinctrl/mvebu
+2. Rename then drivers/pinctrl/pinctrl-mvebu-dove.c (etc)
+
+Either way it's NO BIG DEAL, so I will take care of this after they
+are merged unless you feel like just fixing it in-flight at this moment.
+
+Yours,
+Linus Walleij
