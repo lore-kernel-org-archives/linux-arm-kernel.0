@@ -1,72 +1,59 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Sep 2012 19:31:01 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <505B4BE0.2030702@free-electrons.com>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209201833.38960.marex@denx.de> <505B4BE0.2030702@free-electrons.com>
-Message-ID: <201209201931.01206.marex@denx.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 20 Sep 2012 18:34:32 +0100
+Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
+In-Reply-To: <20120920130114.GQ17666@opensource.wolfsonmicro.com>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
+ <20120918150212.GA12543@opensource.wolfsonmicro.com>
+ <1347983056.11116.11.camel@hornet>
+ <20120918160909.GA15587@opensource.wolfsonmicro.com>
+ <1347987819.11116.38.camel@hornet>
+ <20120919022141.GA8832@opensource.wolfsonmicro.com>
+ <1348073905.11116.80.camel@hornet>
+ <20120920130114.GQ17666@opensource.wolfsonmicro.com>
+Message-ID: <1348162472.11116.149.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
-
-> Le 20/09/2012 18:33, Marek Vasut a ?crit :
-> > Dear Maxime Ripard,
-> > 
-> >> Hi Marek,
-> >> 
-> >> Le 20/09/2012 15:10, Marek Vasut a ?crit :
-> >>>>> If barebox can't handle even basic DT fixup, it's broken.
-> >>>> 
-> >>>> It can. It maybe was just not needed up to now, dunno.
-> >>> 
-> >>> Fix it and send patch, so this problem doesn't spread.
-> >> 
-> >> I'm sorry, but you still miss the point.
-> >> 
-> >> If someone wants to use another bootloader than U-boot (or a possible
-> >> patched barebox), or none other than the bootlets to boot directly the
-> >> Linux (with an appended device tree), you will still have no way to get
-> >> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
-> >> 
-> >> The kernel shouldn't rely on a particular feature of a given bootloader.
-> > 
-> > So what do you think about this patch (skip loading from OCOTP if it's
-> > already present in DT):
-> > 
-> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> > index 71d47f5..4f014ef 100644
-> > --- a/arch/arm/mach-mxs/mach-mxs.c
-> > +++ b/arch/arm/mach-mxs/mach-mxs.c
-> > @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui
-> > oui)
-> > 
-> >                 np = of_find_compatible_node(from, NULL,
-> >                 "fsl,imx28-fec"); if (!np)
-> >                 
-> >                         return;
-> > 
-> > +
-> > +               if (of_get_property(np, "local-mac-address", NULL))
-> > +                       continue;
-> > +
-> > 
-> >                 from = np;
-> >                 
-> >                 newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
+On Thu, 2012-09-20 at 14:01 +0100, Mark Brown wrote:
+> > Actually before I finally got this mail (our mail system was playing
+> > stupid today), I came up with idea of using the power supply specified
+> > tolerance as a base to chose the step sizes. This comes down to such
+> > code (with the regulator_*_voltage_linear in the ops):
 > 
-> That definitely looks like the best solution, yes.
+> That's probably OK, though check that the numbers come out sensible
+> (people tend to work to nice round numbers).
 
-Two things I'm not sure about:
+These calculations try to maximize the range, but in most cases it's
+impossible to be exactly in line with constraints. The delta should be
+less then 1%, eg. in my test case I get:
 
-1) Use of_get_property() for this task or some other of_*() ?
-2) I'll send it as a separate patch
+A15 Vcore: override max_uV, 1050000 -> 1049990
+A15 Vcore: 800 <--> 1049 mV at 906 mV 
 
-Thanks!
+I could try to add more math to interpolate the operating points to get
+perfect match, but this sounds like a serious overkill...
 
-> You can add my Acked-by if you want.
+> > +       if (ret < 0) {
+> > +               /* No operating points defined, allow any value within range */
+> > +               struct regulation_constraints *constraints =
+> > +                               regulator->rdev->constraints;
+> > +
+> > +               return min_uV >= constraints->min_uV &&
+> > +                               max_uV <= constraints->max_uV;
+> > +       }
 > 
-> Maxime
+> I'd rather have the driver explicitly say it supports continuous
+> voltages with a flag in the descriptor (to make sure we don't end up
+> being overly optimistic because the driver wasn't well implemented) 
 
-Best regards,
-Marek Vasut
+Ok, so I see two options:
+
+1. Something like bool "regulator_desc.linear"
+
+2. A magic value for regulator_desc.n_voltages, something like
+	#define N_VOLTAGES_LINEAR (~0)
+
+Does any of them seem reasonable?
+
+Pawel
