@@ -1,43 +1,34 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 20 Sep 2012 09:08:53 -0700
-Subject: [PATCH 4/5] gpio: Make gpio-msm-v1 into a platform driver
-In-Reply-To: <CACRpkdZZ4y2TpkDAgxp38hLbsvxV3hqQ0PRjEQ1s+CXuq8TVQg@mail.gmail.com>
-References: <1348038044-1790-1-git-send-email-sboyd@codeaurora.org>
- <1348038044-1790-5-git-send-email-sboyd@codeaurora.org>
- <CACRpkdZZ4y2TpkDAgxp38hLbsvxV3hqQ0PRjEQ1s+CXuq8TVQg@mail.gmail.com>
-Message-ID: <20120920160852.GA6907@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Sep 2012 17:16:07 +0100
+Subject: [RESEND PATCH 0/3] New algorithm for ASID allocation and rollover
+Message-ID: <1348157770-9647-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 08:45:50AM +0200, Linus Walleij wrote:
-> On Wed, Sep 19, 2012 at 9:00 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > Doing this removes the dependence of this driver on the
-> > msm_iomap.h and cpu.h mach include headers provied by MSM. This
-> > is necessary to support single zImage work in the future and
-> > allows us to remove cpu.h entirely and brings us closer to
-> > removing msm_iomap.h.
-> >
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Rohit Vaswani <rvaswani@codeaurora.org>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> This must be encouraged:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Stephen, do you have a mainline-based kernel tree that can boot
-> on my DragonBoard? It's just sitting idle here... I pushed David
-> in the past, just naggin'...
+Hello,
 
-We're working on it :-)
+This is a resend of the patches originally posted here:
 
-The main thing coming that's needed are clocks.  There are some more
-things (such as regulators) that will be needed to get things like
-SD/MMC working, and that'll be next.
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/114344.html
 
-David
+I received some minor comments in that thread, but nothing that warranted
+any changes to the code. Due to the nature of these changes, I would
+very much like to put these into -next for some exposure prior to merging.
+
+Again, all feedback welcome.
+
+Will
+
+
+Will Deacon (3):
+  ARM: mm: remove IPI broadcasting on ASID rollover
+  ARM: mm: avoid taking ASID spinlock on fastpath
+  ARM: mm: use bitmap operations when allocating new ASIDs
+
+ arch/arm/include/asm/mmu.h         |   11 +--
+ arch/arm/include/asm/mmu_context.h |   82 +--------------
+ arch/arm/mm/context.c              |  207 +++++++++++++++++++-----------------
+ 3 files changed, 115 insertions(+), 185 deletions(-)
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.4.1
