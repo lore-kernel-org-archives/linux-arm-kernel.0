@@ -1,41 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Sep 2012 07:56:03 +0000 (UTC)
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <20120920000351.GI2455@linux.vnet.ibm.com>
-References: <alpine.DEB.2.00.1209122237080.7275@utopia.booyaka.com>
- <20120913011208.GT4257@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209131839000.23318@utopia.booyaka.com>
- <20120920000351.GI2455@linux.vnet.ibm.com>
-Message-ID: <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 20 Sep 2012 17:03:11 +0900
+Subject: [PATCH 1/3] ARM: EXYNOS5: Add fimd node to the exynos5250 dtsi
+ file
+In-Reply-To: <1347992531-27279-2-git-send-email-l.krishna@samsung.com>
+References: <1347992531-27279-1-git-send-email-l.krishna@samsung.com>
+ <1347992531-27279-2-git-send-email-l.krishna@samsung.com>
+Message-ID: <008201cd9706$60e7e2e0$22b7a8a0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 19 Sep 2012, Paul E. McKenney wrote:
-
-> On Thu, Sep 13, 2012 at 06:52:10PM +0000, Paul Walmsley wrote:
+On Wednesday, September 19, 2012 3:22 AM Leela Krishna Amudala wrote
 > 
-> > On Wed, 12 Sep 2012, Paul E. McKenney wrote:
->  
-> > > Subodh Nijsure (also CCed) reported something that might be similar on
-> > > ARM, and also reported that setting the following got rid of the stalls:
-> > > 
-> > > 	CONFIG_CPU_IDLE=y
-> > > 	CONFIG_CPU_IDLE_GOV_LADDER=y
-> > > 	CONFIG_CPU_IDLE_GOV_MENU=y
-> > > 
-> > > At which point he was happy, which was good, but which also left the
-> > > underlying problem unsolved.  Do these affect your system?  If so,
-> > > do they cause a different ARM idle loop to be executed?
-> > 
-> > Will give this a try.  What board was Subodh using?
+> This patch adds the fimd node with compatibility string, hardware address,
+> interrupt line numbers to the exynos5250 dtsi file.
 > 
-> Any news on trying the above settings?
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index b55794b..6d27ca4 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -488,4 +488,11 @@
+>  		reg = <0x13e30000 0x1000>;
+>  		interrupts = <0 88 0>;
+>  	};
+> +
+> +	fimd {
+> +		compatible = "samsung,exynos5-drm";
 
-Sorry, haven't had the chance to try it yet due to the impending merge 
-window opening.  Once things settle down I'll give it a try -- or maybe 
-someone else can test it in the meantime.
+Should it be "samsung,exynos5-fimd"?
 
 
-- Paul
+> +		interrupt-parent = <&combiner>;
+> +		reg = <0x14400000 0x40000>;
+> +		interrupts = <18 5>, <18 4>, <18 6>;
+> +	};
+>  };
+> --
+> 1.7.0.4
