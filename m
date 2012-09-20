@@ -1,355 +1,145 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:47 +0800
-Subject: [PATCH v2 34/34] ARM: imx: enable multi-platform build
+Date: Thu, 20 Sep 2012 14:45:46 +0800
+Subject: [PATCH v2 33/34] ARM: imx: call mxc_device_init() in soc specific
+ function
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-35-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-34-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It enables multi-platform build for imx.  With ARCH_MULTI_* options
-coming to play, ARCH_MXC becomes an user invisible option, while
-ARCH_IMX_V4_V5 and ARCH_IMX_V6_V7 get removed.  Both imx_v4_v5_defconfig
-and imx_v6_v7_defconfig get updated to adopt the changes.
+mxc_device_init() is a core_initcall function used to register devices
+for mxc_aips_bus and mxc_ahb_bus, which are needed by gpio and dma
+device registration.
 
-AUTO_ZRELADDR and ARM_PATCH_PHYS_VIRT are selected by ARCH_MXC now to
-save the duplication.
-
-Headers timex.h and uncompress.h are not needed for multi-platform
-build.  Remove them.
+Instead of being a core_initcall function, we have it called in soc
+specific initialization function before gpio and dma devices get
+registered, so that it will not be called for other platforms when
+we enable multi-platform support for imx.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/Kconfig                            |   13 ---
- arch/arm/configs/imx_v4_v5_defconfig        |    5 +-
- arch/arm/configs/imx_v6_v7_defconfig        |    3 +-
- arch/arm/mach-imx/Kconfig                   |   59 ++++++------
- arch/arm/mach-imx/include/mach/timex.h      |   22 -----
- arch/arm/mach-imx/include/mach/uncompress.h |  132 ---------------------------
- 6 files changed, 33 insertions(+), 201 deletions(-)
- delete mode 100644 arch/arm/mach-imx/include/mach/timex.h
- delete mode 100644 arch/arm/mach-imx/include/mach/uncompress.h
+ arch/arm/mach-imx/common.h          |    1 +
+ arch/arm/mach-imx/devices/devices.c |    3 +--
+ arch/arm/mach-imx/mm-imx21.c        |    2 ++
+ arch/arm/mach-imx/mm-imx25.c        |    2 ++
+ arch/arm/mach-imx/mm-imx27.c        |    2 ++
+ arch/arm/mach-imx/mm-imx3.c         |    4 ++++
+ arch/arm/mach-imx/mm-imx5.c         |    4 ++++
+ 7 files changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 6f82677..ec59a0d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -425,19 +425,6 @@ config ARCH_FOOTBRIDGE
- 	  Support for systems based on the DC21285 companion chip
- 	  ("FootBridge"), such as the Simtec CATS and the Rebel NetWinder.
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index ead9018..ef8db6b 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -79,6 +79,7 @@ extern void mxc_arch_reset_init(void __iomem *);
+ extern int mx53_revision(void);
+ extern int mx53_display_revision(void);
+ extern void imx_set_aips(void __iomem *);
++extern int mxc_device_init(void);
  
--config ARCH_MXC
--	bool "Freescale MXC/iMX-based"
--	select GENERIC_CLOCKEVENTS
--	select ARCH_REQUIRE_GPIOLIB
--	select CLKDEV_LOOKUP
--	select CLKSRC_MMIO
--	select GENERIC_IRQ_CHIP
--	select MULTI_IRQ_HANDLER
--	select SPARSE_IRQ
--	select USE_OF
--	help
--	  Support for Freescale MXC/iMX-based family of processors
--
- config ARCH_MXS
- 	bool "Freescale MXS-based"
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 78ed575..bd01244 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -17,8 +17,9 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_MXC=y
--CONFIG_ARCH_IMX_V4_V5=y
-+CONFIG_ARCH_MULTI_V4T=y
-+CONFIG_ARCH_MULTI_V5=y
-+# CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_MX1ADS=y
- CONFIG_MACH_SCB9328=y
- CONFIG_MACH_APF9328=y
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 565132d..0c149be 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -16,7 +16,8 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_MXC=y
-+CONFIG_ARCH_MULTI_V6=y
-+CONFIG_ARCH_MULTI_V7=y
- CONFIG_MACH_MX31LILLY=y
- CONFIG_MACH_MX31LITE=y
- CONFIG_MACH_PCM037=y
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index d626f03..dc75453 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -1,4 +1,20 @@
--if ARCH_MXC
-+config ARCH_MXC
-+	def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
-+	select AUTO_ZRELADDR if !ZBOOT_ROM
-+	select ARM_PATCH_PHYS_VIRT
-+	select GENERIC_CLOCKEVENTS
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
-+	select USE_OF
-+	help
-+	  Support for Freescale MXC/iMX-based family of processors
+ enum mxc_cpu_pwr_mode {
+ 	WAIT_CLOCKED,		/* wfi only */
+diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
+index 9301e07..1b37482 100644
+--- a/arch/arm/mach-imx/devices/devices.c
++++ b/arch/arm/mach-imx/devices/devices.c
+@@ -32,7 +32,7 @@ struct device mxc_ahb_bus = {
+ 	.parent		= &platform_bus,
+ };
+ 
+-static int __init mxc_device_init(void)
++int __init mxc_device_init(void)
+ {
+ 	int ret;
+ 
+@@ -45,4 +45,3 @@ static int __init mxc_device_init(void)
+ done:
+ 	return ret;
+ }
+-core_initcall(mxc_device_init);
+diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
+index 8868398..d8ccd3a 100644
+--- a/arch/arm/mach-imx/mm-imx21.c
++++ b/arch/arm/mach-imx/mm-imx21.c
+@@ -82,6 +82,8 @@ static const struct resource imx21_audmux_res[] __initconst = {
+ 
+ void __init imx21_soc_init(void)
+ {
++	mxc_device_init();
 +
-+menu "Freescale i.MX support"
-+	depends on ARCH_MXC
+ 	mxc_register_gpio("imx21-gpio", 0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+ 	mxc_register_gpio("imx21-gpio", 1, MX21_GPIO2_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+ 	mxc_register_gpio("imx21-gpio", 2, MX21_GPIO3_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
+index 9be33cd..9357707 100644
+--- a/arch/arm/mach-imx/mm-imx25.c
++++ b/arch/arm/mach-imx/mm-imx25.c
+@@ -89,6 +89,8 @@ static const struct resource imx25_audmux_res[] __initconst = {
  
- config MXC_IRQ_PRIOR
- 	bool "Use IRQ priority"
-@@ -161,21 +177,7 @@ config	SOC_IMX51
- 	select PINCTRL
- 	select PINCTRL_IMX51
- 
--menu "Freescale MXC Implementations"
--
--choice
--	prompt "Freescale CPU family:"
--	default ARCH_IMX_V6_V7
--
--config ARCH_IMX_V4_V5
--	bool "i.MX1, i.MX21, i.MX25, i.MX27"
--	select AUTO_ZRELADDR if !ZBOOT_ROM
--	select ARM_PATCH_PHYS_VIRT
--	help
--	  This enables support for systems based on the Freescale i.MX ARMv4
--	  and ARMv5 SoCs
--
--if ARCH_IMX_V4_V5
-+if ARCH_MULTI_V4T
- 
- comment "MX1 platforms:"
- config MACH_MXLADS
-@@ -204,6 +206,10 @@ config MACH_APF9328
- 	help
- 	  Say Yes here if you are using the Armadeus APF9328 development board
- 
-+endif
+ void __init imx25_soc_init(void)
+ {
++	mxc_device_init();
 +
-+if ARCH_MULTI_V5
+ 	/* i.mx25 has the i.mx35 type gpio */
+ 	mxc_register_gpio("imx35-gpio", 0, MX25_GPIO1_BASE_ADDR, SZ_16K, MX25_INT_GPIO1, 0);
+ 	mxc_register_gpio("imx35-gpio", 1, MX25_GPIO2_BASE_ADDR, SZ_16K, MX25_INT_GPIO2, 0);
+diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+index ecaa5b9..4f1be65 100644
+--- a/arch/arm/mach-imx/mm-imx27.c
++++ b/arch/arm/mach-imx/mm-imx27.c
+@@ -82,6 +82,8 @@ static const struct resource imx27_audmux_res[] __initconst = {
+ 
+ void __init imx27_soc_init(void)
+ {
++	mxc_device_init();
 +
- comment "MX21 platforms:"
+ 	/* i.mx27 has the i.mx21 type gpio */
+ 	mxc_register_gpio("imx21-gpio", 0, MX27_GPIO1_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+ 	mxc_register_gpio("imx21-gpio", 1, MX27_GPIO2_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 072b3bf..f718bf5 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -175,6 +175,8 @@ void __init imx31_soc_init(void)
  
- config MACH_MX21ADS
-@@ -454,16 +460,7 @@ config MACH_IMX27_DT
+ 	imx3_init_l2x0();
  
- endif
- 
--config ARCH_IMX_V6_V7
--	bool "i.MX3, i.MX5, i.MX6"
--	select AUTO_ZRELADDR if !ZBOOT_ROM
--	select ARM_PATCH_PHYS_VIRT
--	select MIGHT_HAVE_CACHE_L2X0
--	help
--	  This enables support for systems based on the Freescale i.MX3, i.MX5
--	  and i.MX6 family.
--
--if ARCH_IMX_V6_V7
-+if ARCH_MULTI_V6
- 
- comment "MX31 platforms:"
- 
-@@ -728,6 +725,10 @@ config MACH_VPR200
- 	  Include support for VPR200 platform. This includes specific
- 	  configurations for the board and its peripherals.
- 
-+endif
++	mxc_device_init();
 +
-+if ARCH_MULTI_V7
+ 	mxc_register_gpio("imx31-gpio", 0, MX31_GPIO1_BASE_ADDR, SZ_16K, MX31_INT_GPIO1, 0);
+ 	mxc_register_gpio("imx31-gpio", 1, MX31_GPIO2_BASE_ADDR, SZ_16K, MX31_INT_GPIO2, 0);
+ 	mxc_register_gpio("imx31-gpio", 2, MX31_GPIO3_BASE_ADDR, SZ_16K, MX31_INT_GPIO3, 0);
+@@ -271,6 +273,8 @@ void __init imx35_soc_init(void)
+ 
+ 	imx3_init_l2x0();
+ 
++	mxc_device_init();
 +
- comment "i.MX5 platforms:"
+ 	mxc_register_gpio("imx35-gpio", 0, MX35_GPIO1_BASE_ADDR, SZ_16K, MX35_INT_GPIO1, 0);
+ 	mxc_register_gpio("imx35-gpio", 1, MX35_GPIO2_BASE_ADDR, SZ_16K, MX35_INT_GPIO2, 0);
+ 	mxc_register_gpio("imx35-gpio", 2, MX35_GPIO3_BASE_ADDR, SZ_16K, MX35_INT_GPIO3, 0);
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index e739553..f92caf1 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -138,6 +138,8 @@ static const struct resource imx51_audmux_res[] __initconst = {
  
- config MACH_MX50_RDP
-@@ -846,10 +847,6 @@ config SOC_IMX6Q
+ void __init imx50_soc_init(void)
+ {
++	mxc_device_init();
++
+ 	/* i.mx50 has the i.mx35 type gpio */
+ 	mxc_register_gpio("imx35-gpio", 0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
+ 	mxc_register_gpio("imx35-gpio", 1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
+@@ -153,6 +155,8 @@ void __init imx50_soc_init(void)
  
- endif
- 
--endchoice
--
--endmenu
--
- source "arch/arm/mach-imx/devices/Kconfig"
- 
--endif
-+endmenu
-diff --git a/arch/arm/mach-imx/include/mach/timex.h b/arch/arm/mach-imx/include/mach/timex.h
-deleted file mode 100644
-index 10343d1..0000000
---- a/arch/arm/mach-imx/include/mach/timex.h
-+++ /dev/null
-@@ -1,22 +0,0 @@
--/*
-- *  Copyright (C) 1999 ARM Limited
-- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef __ASM_ARCH_MXC_TIMEX_H__
--#define __ASM_ARCH_MXC_TIMEX_H__
--
--/* Bogus value */
--#define CLOCK_TICK_RATE	12345678
--
--#endif				/* __ASM_ARCH_MXC_TIMEX_H__ */
-diff --git a/arch/arm/mach-imx/include/mach/uncompress.h b/arch/arm/mach-imx/include/mach/uncompress.h
-deleted file mode 100644
-index 477971b..0000000
---- a/arch/arm/mach-imx/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,132 +0,0 @@
--/*
-- *  arch/arm/plat-mxc/include/mach/uncompress.h
-- *
-- *  Copyright (C) 1999 ARM Limited
-- *  Copyright (C) Shane Nay (shane at minirl.com)
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#ifndef __ASM_ARCH_MXC_UNCOMPRESS_H__
--#define __ASM_ARCH_MXC_UNCOMPRESS_H__
--
--#define __MXC_BOOT_UNCOMPRESS
--
--#include <asm/mach-types.h>
--
--unsigned long uart_base;
--
--#define UART(x) (*(volatile unsigned long *)(uart_base + (x)))
--
--#define USR2 0x98
--#define USR2_TXFE (1<<14)
--#define TXR  0x40
--#define UCR1 0x80
--#define UCR1_UARTEN 1
--
--/*
-- * The following code assumes the serial port has already been
-- * initialized by the bootloader.  We search for the first enabled
-- * port in the most probable order.  If you didn't setup a port in
-- * your bootloader then nothing will appear (which might be desired).
-- *
-- * This does not append a newline
-- */
--
--static void putc(int ch)
--{
--	if (!uart_base)
--		return;
--	if (!(UART(UCR1) & UCR1_UARTEN))
--		return;
--
--	while (!(UART(USR2) & USR2_TXFE))
--		barrier();
--
--	UART(TXR) = ch;
--}
--
--static inline void flush(void)
--{
--}
--
--#define MX1_UART1_BASE_ADDR	0x00206000
--#define MX25_UART1_BASE_ADDR	0x43f90000
--#define MX2X_UART1_BASE_ADDR	0x1000a000
--#define MX3X_UART1_BASE_ADDR	0x43F90000
--#define MX3X_UART2_BASE_ADDR	0x43F94000
--#define MX3X_UART5_BASE_ADDR	0x43FB4000
--#define MX51_UART1_BASE_ADDR	0x73fbc000
--#define MX50_UART1_BASE_ADDR	0x53fbc000
--#define MX53_UART1_BASE_ADDR	0x53fbc000
--
--static __inline__ void __arch_decomp_setup(unsigned long arch_id)
--{
--	switch (arch_id) {
--	case MACH_TYPE_MX1ADS:
--	case MACH_TYPE_SCB9328:
--		uart_base = MX1_UART1_BASE_ADDR;
--		break;
--	case MACH_TYPE_MX25_3DS:
--		uart_base = MX25_UART1_BASE_ADDR;
--		break;
--	case MACH_TYPE_IMX27LITE:
--	case MACH_TYPE_MX27_3DS:
--	case MACH_TYPE_MX27ADS:
--	case MACH_TYPE_PCM038:
--	case MACH_TYPE_MX21ADS:
--	case MACH_TYPE_PCA100:
--	case MACH_TYPE_MXT_TD60:
--	case MACH_TYPE_IMX27IPCAM:
--		uart_base = MX2X_UART1_BASE_ADDR;
--		break;
--	case MACH_TYPE_MX31LITE:
--	case MACH_TYPE_ARMADILLO5X0:
--	case MACH_TYPE_MX31MOBOARD:
--	case MACH_TYPE_QONG:
--	case MACH_TYPE_MX31_3DS:
--	case MACH_TYPE_PCM037:
--	case MACH_TYPE_MX31ADS:
--	case MACH_TYPE_MX35_3DS:
--	case MACH_TYPE_PCM043:
--	case MACH_TYPE_LILLY1131:
--	case MACH_TYPE_VPR200:
--	case MACH_TYPE_EUKREA_CPUIMX35SD:
--		uart_base = MX3X_UART1_BASE_ADDR;
--		break;
--	case MACH_TYPE_MAGX_ZN5:
--		uart_base = MX3X_UART2_BASE_ADDR;
--		break;
--	case MACH_TYPE_BUG:
--		uart_base = MX3X_UART5_BASE_ADDR;
--		break;
--	case MACH_TYPE_MX51_BABBAGE:
--	case MACH_TYPE_EUKREA_CPUIMX51SD:
--	case MACH_TYPE_MX51_3DS:
--		uart_base = MX51_UART1_BASE_ADDR;
--		break;
--	case MACH_TYPE_MX50_RDP:
--		uart_base = MX50_UART1_BASE_ADDR;
--		break;
--	case MACH_TYPE_MX53_EVK:
--	case MACH_TYPE_MX53_LOCO:
--	case MACH_TYPE_MX53_SMD:
--	case MACH_TYPE_MX53_ARD:
--		uart_base = MX53_UART1_BASE_ADDR;
--		break;
--	default:
--		break;
--	}
--}
--
--#define arch_decomp_setup()	__arch_decomp_setup(arch_id)
--#define arch_decomp_wdog()
--
--#endif				/* __ASM_ARCH_MXC_UNCOMPRESS_H__ */
+ void __init imx51_soc_init(void)
+ {
++	mxc_device_init();
++
+ 	/* i.mx51 has the i.mx35 type gpio */
+ 	mxc_register_gpio("imx35-gpio", 0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_INT_GPIO1_LOW, MX51_INT_GPIO1_HIGH);
+ 	mxc_register_gpio("imx35-gpio", 1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_INT_GPIO2_LOW, MX51_INT_GPIO2_HIGH);
 -- 
 1.7.9.5
