@@ -1,97 +1,153 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 13:33:56 +0200
-Subject: [GIT PULL] Patches surrounding DT development due for ARM-SoC
-Message-ID: <20120920113356.GA17429@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 20 Sep 2012 12:39:45 +0100
+Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
+In-Reply-To: <1348135563.11116.94.camel@hornet>
+References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1348135563.11116.94.camel@hornet>
+Message-ID: <alpine.DEB.2.02.1209201235450.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+On Thu, 20 Sep 2012, Pawel Moll wrote:
+> Morning,
+> 
+> On Wed, 2012-09-19 at 18:44 +0100, Stefano Stabellini wrote:
+> > +/dts-v1/;
+> > +
+> > +/include/ "skeleton.dtsi"
+> 
+> Any particular reason to include skeleton? And I think it would be
+> better to use #address-cells = <2> and #size-cells = <2>, to be ready
+> for LPAE addresses...
 
-  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+good idea
 
-are available in the git repository at:
 
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-arm-soc-next
+> > +/ {
+> > +	model = "XENVM-4.2";
+> > +	compatible = "xen,xenvm-4.2", "arm,vexpress";
+> > +	interrupt-parent = <&gic>;
+> > +
+> > +	chosen {
+> > +		bootargs = "earlyprintk console=hvc0 root=/dev/xvda init=/sbin/init";
+> > +	};
+> > +
+> > +	cpus {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a15";
+> > +			reg = <0>;
+> > +		};
+> > +	};
+> > +
+> > +	memory {
+> 
+> Formally, it should be memory at 80000000, not that I have any strong
+> feelings about it :-)
 
-for you to fetch changes up to c164fa62b93782165f12c0e8366f7b46507edb4d:
+OK
 
-  ARM: ux500: Fix SSP register address format (2012-09-20 12:32:47 +0200)
 
-----------------------------------------------------------------
-Lee Jones (39):
-      ASoC: Ux500: Move MSP pinctrl setup into the MSP driver
-      ASoC: Ux500: Enable MOP500 driver for Device Tree
-      ASoC: Ux500: Enable ux500 MSP driver for Device Tree
-      ASoC: codecs: Enable AB8500 CODEC for Device Tree
-      ASoC: Ux500: Minor coding layout changes
-      Documentation: Define the MOP500 Audio Machine Driver Device Tree bindings
-      Documentation: Define the MSP Driver Device Tree bindings
-      ARM: ux500: Rename db8500.dtsi to dbx5x0.dtsi to encompass the u9500, u8540 and u9540
-      ARM: ux500: Clean-up temporary Device Tree enablement helpers
-      ARM: ux500: Pass PMU platform data due for Perf though AUXDATA
-      Documentation: Add the AB8500 CODEC device to the MFD AB8500 doc
-      of/irq: Create stub for of_irq_find_parent when !CONFIG_OF
-      ARM: ux500: Identify the PRCMU as an interrupt controller
-      ARM: ux500: Force AB8500 to use the GIC as its interrupt controller
-      Revert "input: ab8500-ponkey: Create AB8500 domain IRQ mapping"
-      ARM: ux500: Remove unused snowball_of_platform_devs struct
-      ARM: ux500: Match Power-On-Key MFD and DTS compatible strings
-      drivers/rtc/rtc-ab8500.c: Revoke Device Tree enablement
-      ARM: ux500: Add i2c configurations to the Device Tree for DB8500 based devices
-      ARM: ux500: Add skeleton Device Tree for the HREF reference board
-      ARM: ux500: Add UART support to the HREF Device Tree
-      ARM: ux500: Pass SDI DMA information though AUX_DATA to MMCI
-      ARM: ux500: Clean-up MSP platform code
-      ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
-      ARM: ux500: Fork MSP platform registration for step-by-step DT enablement
-      ARM: ux500: Pass MSP DMA platform data though AUXDATA
-      ARM: ux500: Stop registering the MOP500 Audio driver from platform code
-      ARM: ux500: Remove platform registration of MSP devices
-      ARM: ux500: Rename MSP board file to something more meaningful
-      ARM: ux500: Add nodes for the MSP into Device Tree
-      ARM: ux500: Add all encompassing sound node to the Snowball Device Tree
-      ARM: ux500: Stop registering Audio devices for HREF when DT is enabled
-      ARM: ux500: Stop registering I2C sub-devices for HREF when DT is enabled
-      ARM: ux500: Add all known I2C sub-device nodes to the HREF DT
-      ARM: ux500: Add nodes for the MSP into the HREF Device Tree
-      ARM: ux500: Add all encompassing sound node to the HREF Device Tree
-      ARM: ux500: Remove redundant #gpio-cell properties from Snowball DT
-      ARM: ux500: Apply tc3589x's GPIO/IRQ properties to HREF's DT
-      ARM: ux500: Fix SSP register address format
+> > +		device_type = "memory";
+> > +		reg = <0x80000000 0x08000000>;
+> > +	};
+> > +
+> > +	gic: interrupt-controller at 2c001000 {
+> > +		compatible = "arm,cortex-a9-gic";
+> > +		#interrupt-cells = <3>;
+> > +		#address-cells = <0>;
+> > +		interrupt-controller;
+> > +		reg = <0x2c001000 0x1000>,
+> > +		      <0x2c002000 0x100>;
+> > +	};
+> > +
+> > +	timer {
+> > +		compatible = "arm,armv7-timer";
+> > +		interrupts = <1 13 0xf08>,
+> > +			     <1 14 0xf08>,
+> > +			     <1 11 0xf08>,
+> > +			     <1 10 0xf08>;
+> > +	};
+> > +
+> > +	hypervisor {
+> > +		compatible = "xen,xen-4.2", "xen,xen";
+> > +		reg = <0xb0000000 0x20000>;
+> > +		interrupts = <1 15 0xf08>;
+> > +	};
+> 
+> Is this binding documented somewhere - I mean in
+> Documentation/devicetree/bindings?
 
- Documentation/devicetree/bindings/mfd/ab8500.txt   |   15 +++
- .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++++++++
- .../devicetree/bindings/sound/ux500-msp.txt        |   43 +++++++++
- arch/arm/boot/dts/{db8500.dtsi => dbx5x0.dtsi}     |   71 ++++++++++++--
- arch/arm/boot/dts/hrefv60plus.dts                  |   95 ++++++++++++++++++
- arch/arm/boot/dts/snowball.dts                     |   19 +++-
- arch/arm/mach-ux500/Makefile                       |    2 +-
- .../{board-mop500-msp.c => board-mop500-audio.c}   |  102 +++-----------------
- arch/arm/mach-ux500/board-mop500-msp.h             |   14 ---
- arch/arm/mach-ux500/board-mop500-sdi.c             |    4 +-
- arch/arm/mach-ux500/board-mop500.c                 |   39 ++++----
- arch/arm/mach-ux500/board-mop500.h                 |   11 +++
- arch/arm/mach-ux500/cpu-db8500.c                   |   10 +-
- arch/arm/mach-ux500/include/mach/msp.h             |    2 -
- drivers/input/misc/ab8500-ponkey.c                 |    4 +-
- drivers/rtc/rtc-ab8500.c                           |    6 --
- include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
- include/linux/of_irq.h                             |    5 +
- sound/soc/codecs/ab8500-codec.c                    |   81 ++++++++++++++++
- sound/soc/ux500/mop500.c                           |   47 ++++++++-
- sound/soc/ux500/ux500_msp_dai.c                    |    6 ++
- sound/soc/ux500/ux500_msp_i2s.c                    |   89 +++++++++++++----
- sound/soc/ux500/ux500_msp_i2s.h                    |    8 +-
- 23 files changed, 538 insertions(+), 180 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/ux500-mop500.txt
- create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
- rename arch/arm/boot/dts/{db8500.dtsi => dbx5x0.dtsi} (88%)
- create mode 100644 arch/arm/boot/dts/hrefv60plus.dts
- rename arch/arm/mach-ux500/{board-mop500-msp.c => board-mop500-audio.c} (66%)
- delete mode 100644 arch/arm/mach-ux500/board-mop500-msp.h
+Yes, it is: Documentation/devicetree/bindings/arm/xen.txt
+added by: http://marc.info/?l=linux-kernel&m=134790380030990&w=2
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+> > +	motherboard {
+> > +		arm,v2m-memory-map = "rs1";
+> > +		ranges = <0 0 0x08000000 0x04000000>,
+> > +			 <1 0 0x14000000 0x04000000>,
+> > +			 <2 0 0x18000000 0x04000000>,
+> > +			 <3 0 0x1c000000 0x04000000>,
+> > +			 <4 0 0x0c000000 0x04000000>,
+> > +			 <5 0 0x10000000 0x04000000>;
+> > +
+> > +		interrupt-map-mask = <0 0 63>;
+> > +		interrupt-map = <0 0  0 &gic 0  0 4>,
+> > +				<0 0  1 &gic 0  1 4>,
+> > +				<0 0  2 &gic 0  2 4>,
+> > +				<0 0  3 &gic 0  3 4>,
+> > +				<0 0  4 &gic 0  4 4>,
+> > +				<0 0  5 &gic 0  5 4>,
+> > +				<0 0  6 &gic 0  6 4>,
+> > +				<0 0  7 &gic 0  7 4>,
+> > +				<0 0  8 &gic 0  8 4>,
+> > +				<0 0  9 &gic 0  9 4>,
+> > +				<0 0 10 &gic 0 10 4>,
+> > +				<0 0 11 &gic 0 11 4>,
+> > +				<0 0 12 &gic 0 12 4>,
+> > +				<0 0 13 &gic 0 13 4>,
+> > +				<0 0 14 &gic 0 14 4>,
+> > +				<0 0 15 &gic 0 15 4>,
+> > +				<0 0 16 &gic 0 16 4>,
+> > +				<0 0 17 &gic 0 17 4>,
+> > +				<0 0 18 &gic 0 18 4>,
+> > +				<0 0 19 &gic 0 19 4>,
+> > +				<0 0 20 &gic 0 20 4>,
+> > +				<0 0 21 &gic 0 21 4>,
+> > +				<0 0 22 &gic 0 22 4>,
+> > +				<0 0 23 &gic 0 23 4>,
+> > +				<0 0 24 &gic 0 24 4>,
+> > +				<0 0 25 &gic 0 25 4>,
+> > +				<0 0 26 &gic 0 26 4>,
+> > +				<0 0 27 &gic 0 27 4>,
+> > +				<0 0 28 &gic 0 28 4>,
+> > +				<0 0 29 &gic 0 29 4>,
+> > +				<0 0 30 &gic 0 30 4>,
+> > +				<0 0 31 &gic 0 31 4>,
+> > +				<0 0 32 &gic 0 32 4>,
+> > +				<0 0 33 &gic 0 33 4>,
+> > +				<0 0 34 &gic 0 34 4>,
+> > +				<0 0 35 &gic 0 35 4>,
+> > +				<0 0 36 &gic 0 36 4>,
+> > +				<0 0 37 &gic 0 37 4>,
+> > +				<0 0 38 &gic 0 38 4>,
+> > +				<0 0 39 &gic 0 39 4>,
+> > +				<0 0 40 &gic 0 40 4>,
+> > +				<0 0 41 &gic 0 41 4>,
+> > +				<0 0 42 &gic 0 42 4>;
+> > +	};
+> > +};
+> 
+> You've lost me here... You have ranges and interrupt map, but don't
+> include motherboard file. Is it a mistake? If not, you could remove the
+> ranges and interrupt-map, but where do you get your peripherals from
+> then?
+
+There are no peripherals apart from the ones that are already described
+here (timer, gic). All the peripherals that the guest sees are virtual
+devices that show up on xenbus (a virtual bus). In order to initialize
+xenbus, the guest only needs the hypervisor node.  So I'll remove the
+ranges and interrupt-map.
