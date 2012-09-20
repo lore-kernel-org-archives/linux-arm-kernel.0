@@ -1,60 +1,25 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 20 Sep 2012 10:03:32 +0800
-Subject: [PATCH v2] mtd: atmel_nand: fix the compile error which miss
- label "err_ecc_ioremap".
-In-Reply-To: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
-References: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <505A7974.9060108@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 19 Sep 2012 21:26:05 -0400
+Subject: [PATCH 02/34] ASoC: mx27vis: retrieve gpio numbers from
+ platform_data
+In-Reply-To: <20120920011456.GC2450@S2101-09.ap.freescale.net>
+References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
+ <1347860103-4141-3-git-send-email-shawn.guo@linaro.org>
+ <20120917110741.GD5401@opensource.wolfsonmicro.com>
+ <20120920011456.GC2450@S2101-09.ap.freescale.net>
+Message-ID: <20120920012605.GD17666@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Artem
+On Thu, Sep 20, 2012 at 09:14:59AM +0800, Shawn Guo wrote:
+> On Mon, Sep 17, 2012 at 07:07:42AM -0400, Mark Brown wrote:
 
-Do you have any feedback since there is a long time about this patch?
+> > I've applied this since Javier says it fixes a bug but I'm not terribly
+> > enthused about it.
 
-Best Regards,
-Josh Wu
+> Ok.  But now we have a cross-tree dependency.  Please ensure your
+> for-3.7 branch is stable, so that I can ask arm-soc folks to pull
+> it as dependency of my series.  Or you need to create a topic branch
+> for this patch.
 
-On 9/11/2012 3:10 PM, Josh Wu wrote:
-> Add err_ecc_ioremap label to fix following errors:
-> ---8<---
->    CC      drivers/mtd/nand/atmel_nand.o
-> drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
-> drivers/mtd/nand/atmel_nand.c:1423: error: label 'err_ecc_ioremap' used but not defined
-> make[3]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
-> make[2]: *** [drivers/mtd/nand] Error 2
-> make[1]: *** [drivers/mtd] Error 2
-> make: *** [drivers] Error 2
-> --->8---
->
-> This error was introduced in b654a9a46fc2100b318050483f8c5b5d0f187303 (mtd: atmel nand: fix gpio missing request)
->
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> change logs:
->    Add detail information for the commit message.
->
->   drivers/mtd/nand/atmel_nand.c |    3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 6a5a35b..9144557 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -1399,7 +1399,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->   	if (pdev->dev.of_node) {
->   		res = atmel_of_init_port(host, pdev->dev.of_node);
->   		if (res)
-> -			goto err_nand_ioremap;
-> +			goto err_ecc_ioremap;
->   	} else {
->   		memcpy(&host->board, pdev->dev.platform_data,
->   		       sizeof(struct atmel_nand_data));
-> @@ -1560,6 +1560,7 @@ err_no_card:
->   	platform_set_drvdata(pdev, NULL);
->   	if (host->dma_chan)
->   		dma_release_channel(host->dma_chan);
-> +err_ecc_ioremap:
->   	iounmap(host->io_base);
->   err_nand_ioremap:
->   	kfree(host);
+What's the dependency here?
