@@ -1,53 +1,97 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 20 Sep 2012 11:46:08 +0200
-Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
-Message-ID: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 20 Sep 2012 11:48:23 +0200
+Subject: [PATCH] ARM: OMAP: hwmod: align the SmartReflex fck names
+Message-ID: <1348134503-28220-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Rename the smartreflex fck names:
+- for consistency and better readability,
+- for use by the SmartReflex driver, through the hwmod .main_clk
+  field.
 
-The ST Microelectronics variant of the PL011 is capable of supporting
-very high non-standard baud rates, even above 4 Mbps. However the
-uart_get_baud_rate() will not allow us to set these, so override that
-calculation on very high speeds.
-
-Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
-Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
-Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
-Signed-off-by: Matthias Locher <matthias.locher@stericsson.com>
-Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- drivers/tty/serial/amba-pl011.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/clock3xxx_data.c       |   12 ++++++------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++++----
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 32240a7..8ac1a42 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1507,10 +1507,19 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 	}
+diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+index 83bed9a..6c1bdee 100644
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -3050,8 +3050,8 @@ static struct clk traceclk_fck = {
+ /* SR clocks */
  
- 	/*
--	 * Ask the core to calculate the divisor for us.
-+	 * Override baud calculation for very high non-standard baudrates
-+	 * on the ST Micro oversampling variant. This must override the
-+	 * uart_get_baud_rate() call, because this function changes
-+	 * baudrate to the default on these baudrates.
- 	 */
--	baud = uart_get_baud_rate(port, termios, old, 0,
--				  max_baud);
-+	if (uap->vendor->oversampling &&
-+	    ((termios->c_ispeed > 4000000) ||
-+	     (termios->c_ospeed > 4000000)))
-+		baud = termios->c_ispeed;
-+	else
-+		/* Ask the core to calculate the divisor for us. */
-+		baud = uart_get_baud_rate(port, termios, old, 0,
-+					  max_baud);
+ /* SmartReflex fclk (VDD1) */
+-static struct clk sr1_fck = {
+-	.name		= "sr1_fck",
++static struct clk smartreflex_mpu_iva_fck = {
++	.name		= "smartreflex_mpu_iva_fck",
+ 	.ops		= &clkops_omap2_dflt_wait,
+ 	.parent		= &sys_ck,
+ 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+@@ -3061,8 +3061,8 @@ static struct clk sr1_fck = {
+ };
  
- 	if (baud > port->uartclk/16)
- 		quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
+ /* SmartReflex fclk (VDD2) */
+-static struct clk sr2_fck = {
+-	.name		= "sr2_fck",
++static struct clk smartreflex_core_fck = {
++	.name		= "smartreflex_core_fck",
+ 	.ops		= &clkops_omap2_dflt_wait,
+ 	.parent		= &sys_ck,
+ 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+@@ -3447,8 +3447,8 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"atclk_fck",	&atclk_fck,	CK_3XXX),
+ 	CLK(NULL,	"traceclk_src_fck", &traceclk_src_fck, CK_3XXX),
+ 	CLK(NULL,	"traceclk_fck",	&traceclk_fck,	CK_3XXX),
+-	CLK(NULL,	"sr1_fck",	&sr1_fck,	CK_34XX | CK_36XX),
+-	CLK(NULL,	"sr2_fck",	&sr2_fck,	CK_34XX | CK_36XX),
++	CLK(NULL,	"smartreflex_mpu_iva_fck",	&smartreflex_mpu_iva_fck,	CK_34XX | CK_36XX),
++	CLK(NULL,	"smartreflex_core_fck",	&smartreflex_core_fck,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"sr_l4_ick",	&sr_l4_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"secure_32k_fck", &secure_32k_fck, CK_3XXX),
+ 	CLK(NULL,	"gpt12_fck",	&gpt12_fck,	CK_3XXX),
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index c9e3820..2b2b8fc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1359,7 +1359,7 @@ static struct omap_hwmod_irq_info omap3_smartreflex_mpu_irqs[] = {
+ static struct omap_hwmod omap34xx_sr1_hwmod = {
+ 	.name		= "smartreflex_mpu_iva",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+-	.main_clk	= "sr1_fck",
++	.main_clk	= "smartreflex_mpu_iva_fck",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -1377,7 +1377,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+ static struct omap_hwmod omap36xx_sr1_hwmod = {
+ 	.name		= "smartreflex_mpu_iva",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+-	.main_clk	= "sr1_fck",
++	.main_clk	= "smartreflex_mpu_iva_fck",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -1404,7 +1404,7 @@ static struct omap_hwmod_irq_info omap3_smartreflex_core_irqs[] = {
+ static struct omap_hwmod omap34xx_sr2_hwmod = {
+ 	.name		= "smartreflex_core",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+-	.main_clk	= "sr2_fck",
++	.main_clk	= "smartreflex_core_fck",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
+@@ -1422,7 +1422,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+ static struct omap_hwmod omap36xx_sr2_hwmod = {
+ 	.name		= "smartreflex_core",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+-	.main_clk	= "sr2_fck",
++	.main_clk	= "smartreflex_core_fck",
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.prcm_reg_id = 1,
 -- 
-1.7.11.3
+1.7.7.6
