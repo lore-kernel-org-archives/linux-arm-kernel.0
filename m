@@ -1,21 +1,72 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Sep 2012 17:17:02 +0000 (UTC)
-Subject: [PATCH V3 0/8] ARM: OMAP4: Add PMU Support
-In-Reply-To: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1209201714260.12583@utopia.booyaka.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 20 Sep 2012 19:31:01 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <505B4BE0.2030702@free-electrons.com>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201833.38960.marex@denx.de> <505B4BE0.2030702@free-electrons.com>
+Message-ID: <201209201931.01206.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Maxime Ripard,
 
-Hi Jon, Will, Ming, et al.,
+> Le 20/09/2012 18:33, Marek Vasut a ?crit :
+> > Dear Maxime Ripard,
+> > 
+> >> Hi Marek,
+> >> 
+> >> Le 20/09/2012 15:10, Marek Vasut a ?crit :
+> >>>>> If barebox can't handle even basic DT fixup, it's broken.
+> >>>> 
+> >>>> It can. It maybe was just not needed up to now, dunno.
+> >>> 
+> >>> Fix it and send patch, so this problem doesn't spread.
+> >> 
+> >> I'm sorry, but you still miss the point.
+> >> 
+> >> If someone wants to use another bootloader than U-boot (or a possible
+> >> patched barebox), or none other than the bootlets to boot directly the
+> >> Linux (with an appended device tree), you will still have no way to get
+> >> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+> >> 
+> >> The kernel shouldn't rely on a particular feature of a given bootloader.
+> > 
+> > So what do you think about this patch (skip loading from OCOTP if it's
+> > already present in DT):
+> > 
+> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> > index 71d47f5..4f014ef 100644
+> > --- a/arch/arm/mach-mxs/mach-mxs.c
+> > +++ b/arch/arm/mach-mxs/mach-mxs.c
+> > @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui
+> > oui)
+> > 
+> >                 np = of_find_compatible_node(from, NULL,
+> >                 "fsl,imx28-fec"); if (!np)
+> >                 
+> >                         return;
+> > 
+> > +
+> > +               if (of_get_property(np, "local-mac-address", NULL))
+> > +                       continue;
+> > +
+> > 
+> >                 from = np;
+> >                 
+> >                 newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
+> 
+> That definitely looks like the best solution, yes.
 
-Have queued most of these for 3.7 with the exception of the OMAP4430 
-CTI-related patches (which look to me like 3.8 material) and the PM 
-runtime suspend/resume patch (which looks to me like 3.7-rc material) -- 
-assuming this series makes it in for 3.7 ... 
+Two things I'm not sure about:
 
-Apologies in advance if I broke something else in the process.
+1) Use of_get_property() for this task or some other of_*() ?
+2) I'll send it as a separate patch
 
+Thanks!
 
-- Paul
+> You can add my Acked-by if you want.
+> 
+> Maxime
+
+Best regards,
+Marek Vasut
