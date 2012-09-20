@@ -1,50 +1,66 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Sep 2012 07:13:33 +0900
-Subject: [PATCH 0/6] pinctrl: samsung: Various fixes
-In-Reply-To: <2771354.x9C40TPfJ1@amdc1227>
-References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
- <CACRpkdbTPQvGSHJU_odGFtr5snb=U+L2Yuo-AhgX55hF6V5Lqw@mail.gmail.com>
- <505B2839.1040600@samsung.com> <2771354.x9C40TPfJ1@amdc1227>
-Message-ID: <0abf01cd977d$2c9dfcf0$85d9f6d0$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Sep 2012 15:15:04 -0700
+Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data
+ via platform data
+In-Reply-To: <1348152453-30532-3-git-send-email-j-pihet@ti.com>
+References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
+ <1348152453-30532-3-git-send-email-j-pihet@ti.com>
+Message-ID: <20120920221504.GK28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Hi Kukjin,
-> 
 Hi,
 
-> On Thursday 20 of September 2012 23:29:13 Kukjin Kim wrote:
-> > On 09/20/12 19:25, Linus Walleij wrote:
-> > > On Thu, Sep 20, 2012 at 10:51 AM, Tomasz Figa<t.figa@samsung.com>
-> wrote:
-> > >> This patch series contains various fixes of problems and nitpicks
-> > >> spotted when working on adding support for Exynos4x12. See each patch
-> > >> for more detailed information.
-> > >
-> > > This all looks good, do you want me to take this into the pinctrl tree
-> > > or will it go through Samsung ARM SoC (Kyungmin)?
-> > >
-> > > In the latter case, Acked-by: Linus Walleij<linus.walleij@linaro.org>
-> > > for all, else poke me and I'll apply them.
-> >
-> > Linus, thanks for your ack and looks OK to me. Since now pinctrl-exynos
-> > driver is in my tree so let me pick this series on top of it into
-> > Samsung tree with your ack.
-> 
-> I just posted an additional last minute trivial patch which fixes another
-> typo I found.
-> 
-> Could you take it with this series?
-> 
-Sure, your "[PATCH 7/6] pinctrl: exynos: Fix wakeup IRQ domain registration
-check" is correct. I will pick that up with this series.
+* Jean Pihet <jean.pihet@newoldbits.com> [120920 07:48]:
+> --- a/drivers/power/avs/smartreflex.c
+> +++ b/drivers/power/avs/smartreflex.c
+> @@ -131,14 +131,11 @@ static void sr_set_clk_length(struct omap_sr *sr)
+>  	struct clk *sys_ck;
+>  	u32 sys_clk_speed;
+>  
+> -	if (cpu_is_omap34xx())
+> -		sys_ck = clk_get(NULL, "sys_ck");
+> -	else
+> -		sys_ck = clk_get(NULL, "sys_clkin_ck");
+> +	sys_ck = clk_get(NULL, sr->fck_name);
+>  
+>  	if (IS_ERR(sys_ck)) {
+> -		dev_err(&sr->pdev->dev, "%s: unable to get sys clk\n",
+> -			__func__);
+> +		dev_err(&sr->pdev->dev, "%s: unable to get smartreflex fck %s\n",
+> +			__func__, sr->fck_name);
+>  		return;
+>  	}
+>  
 
-Thanks.
+You should be able to make this even simpler and not have to pass
+the clock name around at all. Just do:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+syc_ck = clk_get(NULL, "fck);
+...
+
+In the driver, and add the necessary entries to the clock alias
+table. That way it's up to the SoC to set up the necessary clocks
+and the driver stays generic.
+
+> @@ -1049,6 +1039,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+>  
+>  	list_del(&sr_info->node);
+>  	iounmap(sr_info->base);
+> +	kfree(sr_info->fck_name);
+>  	kfree(sr_info->name);
+>  	kfree(sr_info);
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+Then there's no need for the kfree of the fck_name
+either.
+
+There's an example of a similar patch done for twl-core.c as commit
+defa6be1 (mfd: Fix compile for twl-core.c by removing cpu_is_omap usage)
+in current linux next, except with smartreflex you probably don't
+need to do any of the platform_device_alloc trickery like twl-core.c
+neded to get around using the i2c numbers as names.
+
+Regards,
+
+Tony
