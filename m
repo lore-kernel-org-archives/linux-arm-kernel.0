@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Sep 2012 12:36:27 +0000
-Subject: [PATCH v2 07/13] misc: Versatile Express config infrastructure
-In-Reply-To: <1348142814.11116.113.camel@hornet>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <201209191308.43676.arnd@arndb.de> <1348142814.11116.113.camel@hornet>
-Message-ID: <201209201236.28157.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 20 Sep 2012 08:37:02 -0400
+Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <20120920071822.05e00e33@skate>
+References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120920071822.05e00e33@skate>
+Message-ID: <20120920123702.GP5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 September 2012, Pawel Moll wrote:
-> > For now, I'd suggest you put this driver into drivers/mfd together
-> > with the other part from your patch 8.
+On Thu, Sep 20, 2012 at 07:18:22AM +0200, Thomas Petazzoni wrote:
+> Andrew, Jason,
 > 
-> Do you mean - merge it into one file? I'd rather avoid that - the time
-> will come (and probably sooner than I would hope) when there will be a
-> new VE generation with some other "config bridge" instead of the
-> sysregs.
+> Do you have any comments on this patch series? It has received a:
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> with the only comment being the missing DT binding documentation. And
+> therefore wanted to see if you had other comments about the patches
+> before I send a v5 that includes the requested DT binding documentation.
+> 
+> Thanks!
 
-No, just leave it at two files. We have a number of examples of mfd drivers
-that have a common part and e.g. i2c and spi based files as back-ends.
-For now, you'd just build both files together.
+I have no complaints, but I'm relying on Andrew and the list atm.
 
-	Arnd
+thx,
+
+Jason.
