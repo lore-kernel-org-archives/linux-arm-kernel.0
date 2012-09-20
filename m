@@ -1,41 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Sep 2012 08:51:37 +0200
-Subject: [PATCH 11/19] ARM: ux500: Add all known I2C sub-device nodes to
- the HREF DT
-In-Reply-To: <20120914084729.GG3374@gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-12-git-send-email-lee.jones@linaro.org>
- <CACRpkdY+t9MwWewtZzpD7i4eeTxVHNk+NxSZ1E=T-k4a0mveHg@mail.gmail.com>
- <20120914084729.GG3374@gmail.com>
-Message-ID: <CACRpkdakOF6gmckrn0apynGippb2Z-oa82eYtv6tBoKH8pKrYA@mail.gmail.com>
+Date: Thu, 20 Sep 2012 09:04:42 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+In-Reply-To: <20120920160314.b3ea668fc0766224c24bf276@canb.auug.org.au>
+References: <20120920160314.b3ea668fc0766224c24bf276@canb.auug.org.au>
+Message-ID: <CACRpkdaLr-v2CBjZsqLGx_tmthJYLscnEQhhDQrqTAQ0TVW87g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 10:47 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, Sep 10, 2012 at 04:34:15AM -0700, Linus Walleij wrote:
->> On Fri, Sep 7, 2012 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > Here we add the skeleton nodes for each of the known I2C sub-devices
->> > currently registered on ST-Ericsson's HREF Development Platform. We
->> > will fill these nodes in turn as the drivers are enabled for Device
->> > Tree.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> Can't we have it the other way around (discussing patch ordering
->> with Arnd simultaneously), so you first add the DT support to the
->> subdevices, then add the more complete nodes to the device tree?
->>
->> And if you put in a device tree like this, will these devices
->> not collide with the ones that are currently supplied from
->> the boardfiles? I'm a bit confused here, maybe I'm not smart
->> enough to understand this...
+On Thu, Sep 20, 2012 at 8:03 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-integrator/integrator_cp.c between commit 73efd53012af
+> ("ARM: 7519/1: integrator: convert platform devices to Device Tree") from
+> the arm tree and commit b7a3f8db07c1 ("ARM: integrator: use __iomem
+> pointers for MMIO") from the arm-soc tree.
 >
-> Okay, I've reordered the patch-set to address these possible issues.
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-OK sorry for delay, I've been patch-swamped...
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
+Looks correct!
+Thanks.
 Linus Walleij
