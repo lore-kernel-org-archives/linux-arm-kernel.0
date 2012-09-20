@@ -1,46 +1,77 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 20 Sep 2012 17:20:47 +0200
-Subject: [PATCH] i2c-nomadik: Fixup clock handling
-Message-ID: <1348154447-3815-1-git-send-email-ulf.hansson@stericsson.com>
+From: gclement00@gmail.com (Gregory CLEMENT)
+Date: Thu, 20 Sep 2012 17:24:11 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <20120920151021.7307C203A17@gemini.denx.de>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
+ <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
+ <20120920151021.7307C203A17@gemini.denx.de>
+Message-ID: <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philippe Begnic <philippe.begnic@stericsson.com>
+2012/9/20 Wolfgang Denk <wd@denx.de>:
+> Dear Maxime,
+>
+> In message <505B1FC2.2090609@free-electrons.com> you wrote:
+>>
+>> > Fix it and send patch, so this problem doesn't spread.
+>>
+>> I'm sorry, but you still miss the point.
+>
+> I'm not so sure about this.
+>
+>> If someone wants to use another bootloader than U-boot (or a possible
+>> patched barebox), or none other than the bootlets to boot directly the
+>> Linux (with an appended device tree), you will still have no way to get
+>> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+>
+> With device tree supoort enabled, the regular way to pass the MAC
+> address to a network interface (that needs one) is through the device
+> tree.
+>
+> There are several options how such information gets there.  Boot
+> loaders with built-in DT support may fill in the MAC address
+> information into the DT before passing it to the Linux kernel.
+>
+> If your boot method does not allow such dynamic adjustment, you ould
+> provide a statically configured device tree, which already includes
+> the MAC address.
+>
+>> The kernel shouldn't rely on a particular feature of a given bootloader.
+>
+> 100% agreed.  And it does not.  It always uses the respective
+> information from the device tree.
 
-Make sure to clk_prepare as well as clk_enable.
+I thought that device tree should provide information that we can't get
+by the hardware itslef. Here, if the hardware can provide the MAC address,
+why should we ignore it?
 
-Signed-off-by: Philippe Begnic <philippe.begnic@stericsson.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+>
+>
+> So when you use bootlets, all you need to do is to insert the
+> respective MAC address entry to your device tree definition.
+>
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 1b898b6..3eeae52 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -642,7 +642,11 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 
- 	pm_runtime_get_sync(&dev->adev->dev);
- 
--	clk_enable(dev->clk);
-+	status = clk_prepare_enable(dev->clk);
-+	if (status) {
-+		dev_err(&dev->adev->dev, "can't prepare_enable clock\n");
-+		goto out_clk;
-+	}
- 
- 	status = init_hw(dev);
- 	if (status)
-@@ -669,7 +673,8 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 	}
- 
- out:
--	clk_disable(dev->clk);
-+	clk_disable_unprepare(dev->clk);
-+out_clk:
- 	pm_runtime_put_sync(&dev->adev->dev);
- 
- 	dev->busy = false;
+
+> Best regards,
+>
+> Wolfgang Denk
+>
+> --
+> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+> HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+> Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+> Every program has at least one bug and can be shortened by  at  least
+> one  instruction  --  from  which,  by induction, one can deduce that
+> every program can be reduced to one instruction which doesn't work.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.7.10
+Gregory CLEMENT
