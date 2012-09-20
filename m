@@ -1,44 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Sep 2012 16:02:48 +0200
-Subject: [PATCH 01/10] ARM: KVM: Keep track of currently running vcpus
-In-Reply-To: <001401cd972e$f18cd1c0$d4a67540$@samsung.com>
-References: <20120915153657.21545.3972.stgit@ubuntu>
- <001401cd972e$f18cd1c0$d4a67540$@samsung.com>
-Message-ID: <13e04ac2694ba74a724c2c7a59344d2f@localhost>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 20 Sep 2012 15:11:56 +0100
+Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
+In-Reply-To: <201209201327.45802.arnd@arndb.de>
+References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1209201240110.29232@kaball.uk.xensource.com>
+ <1348143533.26501.28.camel@zakaz.uk.xensource.com>
+ <201209201327.45802.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.02.1209201501140.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2012 21:53:33 +0900, Min-gyu Kim <mingyu84.kim@samsung.com>
-wrote:
->> -----Original Message-----
->> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
->> Behalf Of Christoffer Dall
->> Sent: Sunday, September 16, 2012 12:37 AM
->> To: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> kvmarm at lists.cs.columbia.edu
->> Subject: [PATCH 01/10] ARM: KVM: Keep track of currently running vcpus
->> 
->> From: Marc Zyngier <marc.zyngier@arm.com>
->> 
->> When an interrupt occurs for the guest, it is sometimes necessary to
-find
->> out which vcpu was running at that point.
->> 
->> Keep track of which vcpu is being tun in kvm_arch_vcpu_ioctl_run(), and
->> allow the data to be retrived using either:
->> - kvm_arm_get_running_vcpu(): returns the vcpu running at this point
->>   on the current CPU. Can only be used in a non-preemptable context.
+On Thu, 20 Sep 2012, Arnd Bergmann wrote:
+> On Thursday 20 September 2012, Ian Campbell wrote:
+> > On Thu, 2012-09-20 at 12:56 +0100, Stefano Stabellini wrote:
+> > > On Thu, 20 Sep 2012, Ian Campbell wrote:
+> > > > On Wed, 2012-09-19 at 18:44 +0100, Stefano Stabellini wrote:
 > 
-> What's the purpose of kvm_arm_get_running_vcpu?
-> It seems to be enough to pass vcpu struct through function argument, 
-> and there is no caller by now.
+> > > > > + compatible = "xen,xenvm-4.2", "arm,vexpress";
+> > > > 
+> > > > Is this second compatible thing actually true? We don't actually emulate
+> > > > much (anything?) of what would be on a real vexpress motherboard.
+> > > > 
+> > > > "arm,vexpress" is used only in v2m.c and I don't think we want the
+> > > > majority of that -- we don't provide any of the peripherals which it
+> > > > registers.
+> > > > 
+> > > > I think the only things we might want out of that lot are the arch timer
+> > > > and perhaps the uart0 (as a debug port).
+> > > > 
+> > > > I suspect we should have our own xen machine .c.
+> > > > 
+> > > > [...]
+> > > 
+> > > It is true that we are "arm,vexpress" compatible at the moment.
+> > 
+> > But we aren't, we don't emulate 90%+ of the actual hardware which
+> > vexpress compatibility would actually imply.
+> > 
+> > Look in arch/arm/mach-vexpress/v2m.c, which is the only thing keyed off
+> > this compat value -- it's full of stuff which we don't (and aren't going
+> > to) implement.
+> 
+> It's not much different in the end, but I think I'd rather make the
+> compatible list in the device tree "xen,xenvm-4.2", "xen,xenvm" without
+> listing "arm,vexpress", but then adding "xen,xenvm" to the list of
+> compatible devices in the vexpress kernel code.
+> 
+> The main difference is that if we decide to separate out the Linux
+> code for Xen and vexpress later into distinct ports, we have the
+> option to do that. vexpress will support multiplatform configurations
+> in 3.7 anyway, so the idea of making all virtual platforms part of
+> vexpress in order to be able to boot the same kernel on them is not
+> all that important any more.
 
-This is also designed to be used in an interrupt handler, and is used by
-the (currently out of tree) perf code:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2012-September/003192.html
-
-Basically, you need this infrastructure when handling interrupts.
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+That's a very good idea, I'll do that.
