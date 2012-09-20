@@ -1,77 +1,38 @@
-From: gclement00@gmail.com (Gregory CLEMENT)
-Date: Thu, 20 Sep 2012 17:24:11 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <20120920151021.7307C203A17@gemini.denx.de>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
- <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
- <20120920151021.7307C203A17@gemini.denx.de>
-Message-ID: <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Sep 2012 09:27:51 -0600
+Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
+ precisely
+In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E379FDC1F2D@HQMAIL04.nvidia.com>
+References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+ <20120918124918.GK2505@amd.com>
+ <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
+ <201209190759.46174.arnd@arndb.de> <20120919125020.GQ2505@amd.com>
+ <401E54CE964CD94BAE1EB4A729C7087E379FDC1EEB@HQMAIL04.nvidia.com>
+ <505A7DB4.4090902@wwwdotorg.org>
+ <401E54CE964CD94BAE1EB4A729C7087E379FDC1F2D@HQMAIL04.nvidia.com>
+Message-ID: <505B35F7.2080201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/9/20 Wolfgang Denk <wd@denx.de>:
-> Dear Maxime,
->
-> In message <505B1FC2.2090609@free-electrons.com> you wrote:
+On 09/20/2012 12:40 AM, Krishna Reddy wrote:
+>>> On Tegra, the following use cases need specific IOVA mapping.
+>>> 1. Few MMIO blocks need IOVA=PA mapping setup.
 >>
->> > Fix it and send patch, so this problem doesn't spread.
->>
->> I'm sorry, but you still miss the point.
->
-> I'm not so sure about this.
->
->> If someone wants to use another bootloader than U-boot (or a possible
->> patched barebox), or none other than the bootlets to boot directly the
->> Linux (with an appended device tree), you will still have no way to get
->> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
->
-> With device tree supoort enabled, the regular way to pass the MAC
-> address to a network interface (that needs one) is through the device
-> tree.
->
-> There are several options how such information gets there.  Boot
-> loaders with built-in DT support may fill in the MAC address
-> information into the DT before passing it to the Linux kernel.
->
-> If your boot method does not allow such dynamic adjustment, you ould
-> provide a statically configured device tree, which already includes
-> the MAC address.
->
->> The kernel shouldn't rely on a particular feature of a given bootloader.
->
-> 100% agreed.  And it does not.  It always uses the respective
-> information from the device tree.
+>> In that case, why would we enable the IOMMU for that one device; IOMMU
+>> disabled means VA==PA, right? Perhaps isolation of the device so it can only
+>> access certain PA ranges for security?
+> 
+> The device(H/W controller) need to access few special memory blocks(IOVA==PA)
+> and DRAM as well.
 
-I thought that device tree should provide information that we can't get
-by the hardware itslef. Here, if the hardware can provide the MAC address,
-why should we ignore it?
+OK, so only /some/ of the VA space is VA==PA, and some is remapped;
+that's a little different that what you originally implied above.
 
->
->
-> So when you use bootlets, all you need to do is to insert the
-> respective MAC address entry to your device tree definition.
->
+BTW, which HW module is this; AVP/COP or something else. This sounds
+like an odd requirement.
 
+> There is also a case where frame buffer memory is passed from BootLoader to Kernel and
+> display H/W  continues to access it with IOMMU enabled. To support this, the one to one
+> mapping has to be setup before enabling IOMMU.
 
-> Best regards,
->
-> Wolfgang Denk
->
-> --
-> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-> HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-> Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-> Every program has at least one bug and can be shortened by  at  least
-> one  instruction  --  from  which,  by induction, one can deduce that
-> every program can be reduced to one instruction which doesn't work.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Gregory CLEMENT
+Yes, that makes sense.
