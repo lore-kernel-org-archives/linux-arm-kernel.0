@@ -1,55 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 19 Sep 2012 19:03:23 -0700
-Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
-In-Reply-To: <1348074288.11116.86.camel@hornet>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
- <20120918152430.GA5911@roeck-us.net>
- <1348074288.11116.86.camel@hornet>
-Message-ID: <20120920020323.GB22634@roeck-us.net>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 20 Sep 2012 10:03:32 +0800
+Subject: [PATCH v2] mtd: atmel_nand: fix the compile error which miss
+ label "err_ecc_ioremap".
+In-Reply-To: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
+References: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <505A7974.9060108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 06:04:48PM +0100, Pawel Moll wrote:
-> Hi Guenter,
-> 
-> Thanks for your quick response (and apologies about me being delayed), I
-> appreciate your time!
-> 
-> On Tue, 2012-09-18 at 16:24 +0100, Guenter Roeck wrote:
-> > and a highly unusual way of, as much as I understand of it, bypass the hwmon
-> > infrastructure as much as possible.
-> 
-> I can assure you that it wasn't my aim. Generally, my platform has a lot
-> of small "control" devices providing one sensor each. And as they are
-> separate from the device model point of view, I wanted them to be
-> logically grouped around a single hwmon device (I was actually looking
-> at the coretemp driver). But it's not a big deal, really.
-> 
-I don't think the coretemp driver does what you are doing in your driver ...
+Hi, Artem
 
-> > I don't even understand what you are trying to do, much less why you don't
-> > just use the existing infrastructure, and I don't have time to try to figure
-> > it out. Maybe Jean has time to review this driver, but not me.
-> > 
-> > So, no, for my part I don't think it would be a good idea to rush this driver
-> > into 3.7.
-> > 
-> > Really, I would suggest to submit a standard hwmon driver (there are lots of
-> > examples out there).
-> 
-> Sure thing, I'll quickly spin a simplified version and post it for
-> review.
-> 
-When you do that, please have a look at Documentation/hwmon/submitting-patches,
-specifically the "New drivers" section.
+Do you have any feedback since there is a long time about this patch?
 
-Regarding your device model, yes, it is a bit odd that you have a separate
-platform device for each sensor, especially if the vexpress is physically a
-single chip. It would be much simpler to have a single vexpress-hwmon platform
-device instead. But if you insist having such a complicated platform device
-architecture, you should not try to clean it up with a complicated and
-difficult to understand hwmon driver.
+Best Regards,
+Josh Wu
 
-Thanks,
-Guenter
+On 9/11/2012 3:10 PM, Josh Wu wrote:
+> Add err_ecc_ioremap label to fix following errors:
+> ---8<---
+>    CC      drivers/mtd/nand/atmel_nand.o
+> drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
+> drivers/mtd/nand/atmel_nand.c:1423: error: label 'err_ecc_ioremap' used but not defined
+> make[3]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
+> make[2]: *** [drivers/mtd/nand] Error 2
+> make[1]: *** [drivers/mtd] Error 2
+> make: *** [drivers] Error 2
+> --->8---
+>
+> This error was introduced in b654a9a46fc2100b318050483f8c5b5d0f187303 (mtd: atmel nand: fix gpio missing request)
+>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> change logs:
+>    Add detail information for the commit message.
+>
+>   drivers/mtd/nand/atmel_nand.c |    3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 6a5a35b..9144557 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1399,7 +1399,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+>   	if (pdev->dev.of_node) {
+>   		res = atmel_of_init_port(host, pdev->dev.of_node);
+>   		if (res)
+> -			goto err_nand_ioremap;
+> +			goto err_ecc_ioremap;
+>   	} else {
+>   		memcpy(&host->board, pdev->dev.platform_data,
+>   		       sizeof(struct atmel_nand_data));
+> @@ -1560,6 +1560,7 @@ err_no_card:
+>   	platform_set_drvdata(pdev, NULL);
+>   	if (host->dma_chan)
+>   		dma_release_channel(host->dma_chan);
+> +err_ecc_ioremap:
+>   	iounmap(host->io_base);
+>   err_nand_ioremap:
+>   	kfree(host);
