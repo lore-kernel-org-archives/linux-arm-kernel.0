@@ -1,38 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Sep 2012 14:20:55 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <20120920104758.GB2609@pengutronix.de>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209191325.50048.marex@denx.de> <20120920104758.GB2609@pengutronix.de>
-Message-ID: <201209201420.55526.marex@denx.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Sep 2012 13:28:48 +0100
+Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
+In-Reply-To: <alpine.DEB.2.02.1209201308490.29232@kaball.uk.xensource.com>
+References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1348135563.11116.94.camel@hornet>
+ <alpine.DEB.2.02.1209201235450.29232@kaball.uk.xensource.com>
+ <1348142133.11116.109.camel@hornet>
+ <alpine.DEB.2.02.1209201308490.29232@kaball.uk.xensource.com>
+Message-ID: <505B0C00.5010003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
-
-btw. Wolfram, you are getting pretty personal here. I really wanted to close 
-this thread as it was a closed issue for me, we reached agreement, can we do 
-that or take this nonsense off-list please?
-
-> Hi Marek,
+On 20/09/12 13:15, Stefano Stabellini wrote:
+> On Thu, 20 Sep 2012, Pawel Moll wrote:
+>> On Thu, 2012-09-20 at 12:39 +0100, Stefano Stabellini wrote:
+>>> There are no peripherals apart from the ones that are already described
+>>> here (timer, gic). All the peripherals that the guest sees are virtual
+>>> devices that show up on xenbus (a virtual bus). In order to initialize
+>>> xenbus, the guest only needs the hypervisor node.  So I'll remove the
+>>> ranges and interrupt-map.
+>>
+>> So all the peripherals are actually discoverable - awesome!
+>>
+>> But the fact is that the only "vexpressness" of this tree is
+>> memory at 80000000 and gic at 2c001000. The rest (not much of it ;-) is a
+>> "generic A15 platform". 
+>>
+>> I understand that you had to use some "compatible" value to get
+>> initialization code and I'm flattered ;-) by your choice of
+>> "arm,vexpress", but maybe - as suggested by others - you would be better
+>> off with generating this stuff in runtime, by whatever tool is used to
+>> instantiate the guest?
 > 
-> > I dunno what barebox is,
+> Yes, it is certainly going to be generated at run time. Does it make
+> sense to keep an example under arch/arm/boot/dts? I think so. There must
+> be other platforms that actually pass the device tree to the kernel from
+> the firmware and still have a dts in the kernel tree, right?
+> If actually there are none, it is probably best to forget about this
+> patch :)
 > 
-> You're pretty bad at lying...
+> Regarding the choice of "arm,vexpress", there was a discussion at kernel
+> summit about vexpress being the right choice as a base platform for
+> virtual machines on ARM, even though in the Xen case it means having a
+> vexpress with no peripherals.
 
-I'm still a human, I forget things ... aren't you growing paranoid Wolfram?
+I think the important thing here is that the memory map is RS1. As this
+is a (very limited) subset of a vexpress A15, it seems to make some sense.
 
-> > but it seems really crap.
-> 
-> ...and marketing, too :) Why the hate?
+I still think it is useful at have an example of such a platform in the
+tree, if only as a very minimal example.
 
-Marketing and hate has no place in here.
-
-If barebox can't handle even basic DT fixup, it's broken.
-
-> Regards,
-> 
->    Wolfram
-
-Best regards,
-Marek Vasut
+	M.
+-- 
+Jazz is not dead. It just smells funny...
