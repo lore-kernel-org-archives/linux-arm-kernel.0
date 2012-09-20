@@ -1,61 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:22 +0200
-Subject: [PATCH 04/32] Documentation: Add the AB8500 CODEC device to the MFD
- AB8500 doc
+Date: Thu, 20 Sep 2012 14:12:24 +0200
+Subject: [PATCH 06/32] ARM: ux500: Identify the PRCMU as an interrupt
+ controller
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we document the AB8500 Audio CODEC in the existing MFD AB8500 document.
+We're just about to provide the DB8500-PRCMU with its own IRQ domain,
+so that its subordinate drivers can use it as an interrupt controller.
+It's obligatory for all IRQ controllers to reference themselves as
+such from its own node in Device Tree. This patch does just that.
 
-CC: alsa-devel at alsa-project.org
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mfd/ab8500.txt |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/ab8500.txt b/Documentation/devicetree/bindings/mfd/ab8500.txt
-index 69e757a..ce83c8d 100644
---- a/Documentation/devicetree/bindings/mfd/ab8500.txt
-+++ b/Documentation/devicetree/bindings/mfd/ab8500.txt
-@@ -23,6 +23,7 @@ Device                     IRQ Names              Supply Names   Description
- ab8500-bm                :                      :              : Battery Manager
- ab8500-btemp             :                      :              : Battery Temperature
- ab8500-charger           :                      :              : Battery Charger
-+ab8500-codec             :                      :              : Audio Codec
- ab8500-fg                :                      :              : Fuel Gauge
- ab8500-gpadc             : HW_CONV_END          : vddadc       : Analogue to Digital Converter
-                            SW_CONV_END          :              :
-@@ -52,6 +53,14 @@ Optional child device properties:
-                            supplied in the interrupts property
- - <supply_name>-supply   : contains a phandle to the regulator supply node in Device Tree
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 3180a9c..04cd525 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -194,6 +194,8 @@
+ 			interrupts = <0 47 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			ranges;
  
-+Non-standard child device properties:
-+ - Audio CODEC:
-+   - stericsson,amic[1|2]-type-single-ended : Single-ended Analoge Mic (default: differential)
-+   - stericsson,amic1a-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,amic1b-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,amic2-bias-vamic1           : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,earpeice-cmv                : Earpeice voltage (only: 950 | 1100 | 1270 | 1580)
-+
- ab8500 at 5 {
-          compatible = "stericsson,ab8500";
-          reg = <5>; /* mailbox 5 is i2c */
-@@ -110,6 +119,12 @@ ab8500 at 5 {
-                 compatible = "stericsson,ab8500-pwm";
-         };
- 
-+	codec: ab8500-codec {
-+		compatible = "stericsson,ab8500-codec";
-+
-+		stericsson,earpeice-cmv = <950>; /* Units in mV. */
-+	};
-+
-         ab8500-regulators {
-                 compatible = "stericsson,ab8500-regulator";
- 
+ 			prcmu-timer-4 at 80157450 {
 -- 
 1.7.9.5
