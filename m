@@ -1,66 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 21:36:32 +0800
-Subject: [PATCH v2 00/34] i.MX multi-platform support
-In-Reply-To: <20120920124709.GN17666@opensource.wolfsonmicro.com>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <201209200739.34899.arnd@arndb.de>
- <20120920114148.GH17666@opensource.wolfsonmicro.com>
- <20120920115213.GF2450@S2101-09.ap.freescale.net>
- <20120920124709.GN17666@opensource.wolfsonmicro.com>
-Message-ID: <20120920133630.GG2450@S2101-09.ap.freescale.net>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Thu, 20 Sep 2012 08:40:23 -0500
+Subject: [PATCH v8 0/11] KGDB/KDB FIQ (NMI) debugger
+In-Reply-To: <20120919234003.GA24143@lizard>
+References: <20120919234003.GA24143@lizard>
+Message-ID: <505B1CC7.9000005@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 08:47:10AM -0400, Mark Brown wrote:
-> On Thu, Sep 20, 2012 at 07:52:15PM +0800, Shawn Guo wrote:
-> > On Thu, Sep 20, 2012 at 07:41:50AM -0400, Mark Brown wrote:
-> 
-> > > It's usually pretty early but Takashi will be on holiday this time so
-> > > I'm not sure if things might be different (he was going to send the pull
-> > > request from holiday).  I also didn't guarantee that it'll be stable
-> > > yet, can someone please tell me what the depenency is here?
-> 
-> > We need the patch to have all imx drivers mach/* inclusion free,
-> > so that we can enable multi-platform support for imx, which is the
-> > whole point of the series.
-> 
-> That doesn't answer the question.  What is the dependency - what is it
-> about this patch that something else depends on?  Your cover letters
-> just say you'd like to do this but don't mention dependencies at all and
-> when I asked the question last night you said the same thing.  I've not
-> seen the rest of the series...
-> 
-Ah, right.  You did get copied on the whole series.  So the whole point
-of patch "ASoC: mx27vis: retrieve gpio numbers from platform_data" is
-to get rid of inclusion mach/iomux-mx27.h.  This has to be done before
-we enable multi-platform support for imx, since mach/* has to be removed
-completely for multi-platform build.
+On 09/19/2012 06:40 PM, Anton Vorontsov wrote:
+> Hi all,
+>
+> In v8, addressed Jason's comments:
+>
+> - Changed kgdb_enable_nmi() weak function to kgdb_arch callbck;
+> - We no longer register disable_nmi command if arch does not register
+>   KGDB NMI handling (i.e. not filling kgdb_arch.enable_nmi callback);
+> - The same is for ttyNMI: if architecure does not provide us with
+>   enable_nmi call, we don't need the tty device. Of course, there is no
+>   way to tell wether a specific serial device can be used for NMI
+>   debugging, as it is not serial-device specific, but specific to
+>   whether IRQ can be rerouted to an NMI (for most our cases, pretty
+>   much every IRQ can be rerouted, e.g. a hot-pluggable serial device on
+>   a PCI bus).
+> - Rebased on the latest and greatest tty-next, just in case.
 
-> > If your for-3.7 is not stable anyway, I guess the easiest the way
-> 
-> It probably *is* stable but I'm not enthused about people pulling
-> unsigned tags.  I might rebase, though - I'm going to finalise the tree
-> in the next few days.
-> 
-> > to do it might be you drop the patch "ASoC: mx27vis: retrieve gpio
-> > numbers from platform_data" from your tree and I have it be part of
-> > the series to go via arm-soc tree as a whole.  (This is the original
-> > plan that I mentioned in v1 cover letter)
-> 
-> You just mentioned it as a preference (you said it's something you'd
-> like to do), please if you're doing this sort of cross tree thing be
-> explicit about what the inter-tree relationships are.  If things need to
-> go in via the same tree say so explicitly (and ideally say way this is).
-> 
-Ok, my bad.
 
-> The main reason I applied it straight away was that Javier mentioned
-> that it was a bug fix and it's near the merge window and these random
-> ARM cleanup serieses never seem to go in quickly.
+I have the kgdb regression builder running right now (it will be done in about 1 hour), and so far it picked up one new warning.
 
-The series is planned for 3.7 merge window.  Is it still possible for
-you to drop the patch from your tree to ease the process?  Or I will
-hold my pull-request to arm-soc until you tell me you have your tree
-finalized.
+drivers/tty/serial/kgdb_nmi.c: In function 'kgdb_nmi_poll_one_knock':
+drivers/tty/serial/kgdb_nmi.c:161: warning: field width should have type 'int', but argument 4 has type 'size_t'
 
-Shawn
+Jason.
