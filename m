@@ -1,10 +1,10 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:28 +0800
-Subject: [PATCH v2 15/34] ASoC: imx-ssi: remove unneeded mach/hardware.h
+Date: Thu, 20 Sep 2012 14:45:31 +0800
+Subject: [PATCH v2 18/34] watchdog: imx2_wdt: remove unneeded mach/hardware.h
  inclusion
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-16-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-19-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,23 @@ Remove it.
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: alsa-devel at alsa-project.org
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: linux-watchdog at vger.kernel.org
 ---
- sound/soc/fsl/imx-ssi.c |    1 -
+ drivers/watchdog/imx2_wdt.c |    1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-index 006f7d4..dd56644 100644
---- a/sound/soc/fsl/imx-ssi.c
-+++ b/sound/soc/fsl/imx-ssi.c
-@@ -48,7 +48,6 @@
- #include <sound/soc.h>
- 
- #include <linux/platform_data/asoc-imx-ssi.h>
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+index bcfab2b..9a45d029 100644
+--- a/drivers/watchdog/imx2_wdt.c
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -33,7 +33,6 @@
+ #include <linux/uaccess.h>
+ #include <linux/timer.h>
+ #include <linux/jiffies.h>
 -#include <mach/hardware.h>
  
- #include "imx-ssi.h"
+ #define DRIVER_NAME "imx2-wdt"
  
 -- 
 1.7.9.5
