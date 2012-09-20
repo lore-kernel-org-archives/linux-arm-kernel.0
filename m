@@ -1,48 +1,44 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Thu, 20 Sep 2012 08:57:26 -0500
-Subject: [PATCH 07/11] tty/serial: Add kgdb_nmi driver
-In-Reply-To: <1348098122-11041-7-git-send-email-anton.vorontsov@linaro.org>
-References: <20120919234003.GA24143@lizard>
- <1348098122-11041-7-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <505B20C6.5090308@windriver.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Sep 2012 16:02:48 +0200
+Subject: [PATCH 01/10] ARM: KVM: Keep track of currently running vcpus
+In-Reply-To: <001401cd972e$f18cd1c0$d4a67540$@samsung.com>
+References: <20120915153657.21545.3972.stgit@ubuntu>
+ <001401cd972e$f18cd1c0$d4a67540$@samsung.com>
+Message-ID: <13e04ac2694ba74a724c2c7a59344d2f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2012 06:41 PM, Anton Vorontsov wrote:
-> This special driver makes it possible to temporary use NMI debugger port
-> as a normal console by issuing 'nmi_console' command (assuming that the
-> port is attached to KGDB).
+On Thu, 20 Sep 2012 21:53:33 +0900, Min-gyu Kim <mingyu84.kim@samsung.com>
+wrote:
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+>> Behalf Of Christoffer Dall
+>> Sent: Sunday, September 16, 2012 12:37 AM
+>> To: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> kvmarm at lists.cs.columbia.edu
+>> Subject: [PATCH 01/10] ARM: KVM: Keep track of currently running vcpus
+>> 
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>> 
+>> When an interrupt occurs for the guest, it is sometimes necessary to
+find
+>> out which vcpu was running at that point.
+>> 
+>> Keep track of which vcpu is being tun in kvm_arch_vcpu_ioctl_run(), and
+>> allow the data to be retrived using either:
+>> - kvm_arm_get_running_vcpu(): returns the vcpu running at this point
+>>   on the current CPU. Can only be used in a non-preemptable context.
 > 
+> What's the purpose of kvm_arm_get_running_vcpu?
+> It seems to be enough to pass vcpu struct through function argument, 
+> and there is no caller by now.
 
+This is also designed to be used in an interrupt handler, and is used by
+the (currently out of tree) perf code:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2012-September/003192.html
 
-The kgdb regression compiler also does checkpatch, so the "check patch
-police" don't come chasing us let's get rid of this warning.  This
-comes with the disclaimer that I believe checkpatch is a bit overly
-agressive in the first place. :-)
+Basically, you need this infrastructure when handling interrupts.
 
-WARNING: quoted string split across lines
-#133: FILE: drivers/tty/serial/kgdb_nmi.c:36:
-+MODULE_PARM_DESC(knock, "if set to 1 (default), the special '$3#33' command "
-+                       "must be used to enter the debugger; when set to 0, "
-
----
- drivers/tty/serial/kgdb_nmi.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
---- a/drivers/tty/serial/kgdb_nmi.c
-+++ b/drivers/tty/serial/kgdb_nmi.c
-@@ -32,10 +32,10 @@
- 
- static int kgdb_nmi_knock = 1;
- module_param_named(knock, kgdb_nmi_knock, int, 0600);
--MODULE_PARM_DESC(knock, "if set to 1 (default), the special '$3#33' command "
--			"must be used to enter the debugger; when set to 0, "
--			"hitting return key is enough to enter the debugger; "
--			"when set to -1, the debugger is entered immediately "
-+MODULE_PARM_DESC(knock, "if set to 1 (default), the special '$3#33' command " \
-+			"must be used to enter the debugger; when set to 0, " \
-+			"hitting return key is enough to enter the debugger; " \
-+			"when set to -1, the debugger is entered immediately " \
- 			"upon NMI");
- 
- static char *kgdb_nmi_magic = "$3#33";
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
