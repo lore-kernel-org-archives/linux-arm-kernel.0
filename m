@@ -1,30 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Sep 2012 07:33:03 +0000
-Subject: Adding new board to Kernel
-In-Reply-To: <505AC5D6.8040702@antcom.de>
-References: <CAOYb-CL9WM8wzko7CsQvYAAWKARnTkrqenBtsgchn96t=x4wyg@mail.gmail.com>
- <201209191855.39859.arnd@arndb.de> <505AC5D6.8040702@antcom.de>
-Message-ID: <201209200733.03693.arnd@arndb.de>
+Date: Thu, 20 Sep 2012 07:39:34 +0000
+Subject: [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201209200739.34899.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 September 2012, Roland Stigge wrote:
-> On 09/19/2012 08:55 PM, Arnd Bergmann wrote:
-> >> The Embedded Artists has a board based on ARM LPC3250 called EA3250 and
-> >> they provide a BSP with patch to Linux Kernel version 2.6.29.2. I am trying
-> >> to "up merge" this patch to Kernel v3.4 (now 3.5) and after that get it in
-> >> the mainstream. Although I have a working version (
-> >> https://github.com/jrbenito/Kernel-LPC3250) I still have doubts on how to
-> >> correct submit it to mainline kernel.
-> >>
-> >> -The machine type is already registered in past (
-> >> http://www.arm.linux.org.uk/developer/machines/list.php?id=2512) but it is
-> >> not in mainline. Since I shall not patch this file, how can I ask to it be
-> >> updated with ea3250 board information?
+On Thursday 20 September 2012, Shawn Guo wrote:
 > 
-> We already have ea3250.dts in mainline since v3.5.
+> Here is the second post, which should have addressed the comments that
+> reviewers put on v1.
 > 
+> It's available on branch below.
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform-v2
+> 
+> And it's based on the following branches.
+> 
+>   calxeda/multi-plat
+>   arm-soc/multiplatform/platform-data
+>   arm-soc/multiplatform/smp_ops
+>   arm-soc/imx/cleanup
+>   arm-soc/imx/dt
+>   sound/for-3.7
+> 
+> Subsystem maintainers,
+> 
+> I plan to send the whole series for 3.7 via arm-soc tree.  Please let
+> me know if you have problem with that.  Thanks.
 
-Ah, I see.
+The first five branches are scheduled to go through the arm-soc tree, so
+I'm fine with that. For the sound/for-3.7 branch, I'd like to know when
+to expect that hitting mainline. If it always gets in very early during the
+merge window, it's probably ok to put the imx/multi-platform patches into
+the same branch as the other ones in arm-soc and wait for the sound stuff
+to hit mainline first, otherwise I'd suggest we start a second
+next/multiplatform-2 branch for imx and send the first part early on
+but then wait with the second batch before sound gets in.
 
 	Arnd
