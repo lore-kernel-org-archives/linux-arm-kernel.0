@@ -1,97 +1,62 @@
-From: m-sonasath@ti.com (Sonasath, Moiz)
-Date: Wed, 19 Sep 2012 11:50:53 -0500
-Subject: [PATCH 2/4] usb: dwc3: Fix gadget pullup in SS mode
-In-Reply-To: <20120919160450.GA7510@arwen.pp.htv.fi>
-References: <1348054229-27362-1-git-send-email-kishon@ti.com>
- <1348054229-27362-3-git-send-email-kishon@ti.com>
- <20120919115306.GG3772@arwen.pp.htv.fi>
- <CAEgRx2zOVn0zV39-cuPuj4n4HRgQmywy_NY4KTe0qEgeC+NEkw@mail.gmail.com>
- <20120919160450.GA7510@arwen.pp.htv.fi>
-Message-ID: <CAEgRx2yXStORBknr2hoMcobMO8wFGuKr4bvzZwEQHQQcHVH76Q@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 20 Sep 2012 10:53:12 +0200
+Subject: [RFC 1/6] pinctrl: exynos: Parse wakeup-eint parameters from DT
+In-Reply-To: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
+References: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1348131197-25506-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
+This patch converts the pinctrl-exynos driver to parse wakeup interrupt
+count and register offsets from device tree. It reduces the amount of
+static platform-specific data and facilitates adding further SoC
+variants to pinctrl-samsung driver.
 
-On Wed, Sep 19, 2012 at 11:04 AM, Felipe Balbi <balbi@ti.com> wrote:
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/pinctrl/pinctrl-exynos.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-> Hi,
->
-> On Wed, Sep 19, 2012 at 10:02:48AM -0500, Sonasath, Moiz wrote:
-> > Felipe,
-> >
-> > On Wed, Sep 19, 2012 at 6:53 AM, Felipe Balbi <balbi@ti.com> wrote:
-> >
-> > > Hi,
-> > >
-> > > On Wed, Sep 19, 2012 at 05:00:27PM +0530, Kishon Vijay Abraham I wrote:
-> > > > From: Moiz Sonasath <m-sonasath@ti.com>
-> > > >
-> > > > For the gadget pullup functionality to work in
-> > > > SS mode it requires a particular sequence of
-> > > > toggling the run-stop bit. Here is the required
-> > > > sequence:
-> > > >
-> > > > - Set DCTL[31]
-> > > > - Clear DCTL[31]
-> > > > - Clear OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
-> > > > - Clear DCTL[8:5] = 0x00
-> > > > - Set DCTL[8:5] = 0x05
-> > > > - Wait 25 Ms
-> > > > - Set DCTL[31]
-> > > > - Set OMAP5430_CONTROL_CORE__PHY_POWER_USB[14]
-> > > >
-> > > > Tested rigourously the gadget pull-up functionality
-> > > > in bot HS and SS modes.
-> > > >
-> > > > Signed-off-by: Moiz Sonasath <m-sonasath@ti.com>
-> > > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > >
-> > > this needs to split into three patches:
-> > >
-> > > add new poweron field, implement it on omap-usb3, use it on
-> > > dwc3/gadget.c
-> > >
-> > > btw, I don't think the changes to run_stop bit are necessary and if
-> they
-> > > are, that'd either be a silicon errata or it would've been mentioned on
-> > > the databook. I don't remember seeing that on the databook so I'm
-> > > assuming that this is caused by a bad use of the PHY.
-> > >
-> > > Why that mdelay(25) ? why 25 ms ? That's quite a long time, actually.
-> > >
-> >
-> > Felipe, This is infact a HW bug that the Si-Val team did accept and gave
-> us
-> > this workaround sequence with the precise delay :-)
-> >
-> > Supposedly this will be fixed in ES 2.0.
->
-> in that case this doesn't have to go to mainline since we're not
-> supporting ES1.0 in mainline :-)
->
-> at minimum this should've come with a proper revision check anyway.
->
-
-Actually most of it is under a rev check :)
-
-Perhaps the last: usb_phy_shutdown(dwc->usb3_phy);
-in the else part should be in
-if (dwc->revision <= DWC3_REVISION_187A) check
-
-Kishon, can you resend please?
-
->
-> --
-> balbi
->
-
-
-
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 0d01d19..575378a 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -435,6 +435,8 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	struct device_node *np;
+ 	struct exynos_weint_data *weint_data;
+ 	int idx, irq;
++	u32 val;
++	int ret;
+ 
+ 	for_each_child_of_node(dev->of_node, np) {
+ 		if (of_match_node(exynos_wkup_irq_ids, np)) {
+@@ -445,6 +447,26 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	if (!wkup_np)
+ 		return -ENODEV;
+ 
++	ret = of_property_read_u32(wkup_np, "samsung,weint-count", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->nr_wint = val;
++
++	ret = of_property_read_u32(wkup_np, "samsung,weint-con", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->weint_con = val;
++
++	ret = of_property_read_u32(wkup_np, "samsung,weint-mask", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->weint_mask = val;
++
++	ret = of_property_read_u32(wkup_np, "samsung,weint-pend", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->weint_pend = val;
++
+ 	d->wkup_irqd = irq_domain_add_linear(wkup_np, d->ctrl->nr_wint,
+ 				&exynos_wkup_irqd_ops, d);
+ 	if (!d->gpio_irqd) {
 -- 
-Regards
-Moiz Sonasath
-Android Kernel Team
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120919/3f492b5c/attachment-0001.html>
+1.7.12
