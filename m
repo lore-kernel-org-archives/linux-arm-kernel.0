@@ -1,61 +1,127 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 20 Sep 2012 10:43:42 -0400
-Subject: [RFC PATCH 09/13] mmc: omap_hsmmc: add generic DMA request support to
- the DT binding
+Date: Thu, 20 Sep 2012 10:43:43 -0400
+Subject: [RFC PATCH 10/13] spi: omap2-mcspi: dma_request_slave_channel()
+ support for DT platforms
 In-Reply-To: <1348152226-13588-1-git-send-email-mporter@ti.com>
 References: <1348152226-13588-1-git-send-email-mporter@ti.com>
-Message-ID: <1348152226-13588-10-git-send-email-mporter@ti.com>
+Message-ID: <1348152226-13588-11-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding definition is based on the generic DMA request binding.
+For platforms with DT populated, use dma_request_slave_channel()
+to acquire the DMA channel. For !DT platforms, we fall back to
+explicitly passing the omap_dma_filter_fn() to dma_request_channel().
+Once all platforms boot from DT, the dma_request_channel() path can
+be dropped.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   25 +++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+ drivers/spi/spi-omap2-mcspi.c |   68 +++++++++++++++++++++++++++++------------
+ 1 file changed, 48 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-index be76a23..d1b8932 100644
---- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-@@ -19,8 +19,28 @@ ti,dual-volt: boolean, supports dual voltage cards
- "supply-name" examples are "vmmc", "vmmc_aux" etc
- ti,non-removable: non-removable slot (like eMMC)
- ti,needs-special-reset: Requires a special softreset sequence
-+dmas: DMA controller phandle and DMA request value ordered pair
-+One tx and one rx pair is required.
-+dma-names: DMA request names. These strings correspond 1:1 with
-+the ordered pairs in dmas. The RX request must be "rx" and the
-+TX request must be "tx".
-+
-+Examples:
-+
-+[hwmod populated DMA resources]
-+
-+	mmc1: mmc at 0x4809c000 {
-+		compatible = "ti,omap4-hsmmc";
-+		reg = <0x4809c000 0x400>;
-+		ti,hwmods = "mmc1";
-+		ti,dual-volt;
-+		bus-width = <4>;
-+		vmmc-supply = <&vmmc>; /* phandle to regulator node */
-+		ti,non-removable;
-+	};
-+
-+[generic DMA request binding]
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index 9502566..1cf1072 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -104,6 +104,9 @@ struct omap2_mcspi_dma {
  
--Example:
- 	mmc1: mmc at 0x4809c000 {
- 		compatible = "ti,omap4-hsmmc";
- 		reg = <0x4809c000 0x400>;
-@@ -29,4 +49,7 @@ Example:
- 		bus-width = <4>;
- 		vmmc-supply = <&vmmc>; /* phandle to regulator node */
- 		ti,non-removable;
-+		dmas = <&edma 24
-+			&edma 25>;
-+		dma-names = "tx", "rx";
- 	};
+ 	struct completion dma_tx_completion;
+ 	struct completion dma_rx_completion;
++
++	char dma_rx_ch_name[14];
++	char dma_tx_ch_name[14];
+ };
+ 
+ /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
+@@ -798,14 +801,26 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 	sig = mcspi_dma->dma_rx_sync_dev;
+-	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++	if (spi->dev.of_node)
++		mcspi_dma->dma_rx =
++			dma_request_slave_channel(&master->dev,
++						  mcspi_dma->dma_rx_ch_name);
++	else
++		mcspi_dma->dma_rx =
++			dma_request_channel(mask, omap_dma_filter_fn, &sig);
+ 	if (!mcspi_dma->dma_rx) {
+ 		dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
+ 		return -EAGAIN;
+ 	}
+ 
+ 	sig = mcspi_dma->dma_tx_sync_dev;
+-	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++	if (spi->dev.of_node)
++		mcspi_dma->dma_tx =
++			dma_request_slave_channel(&master->dev,
++						  mcspi_dma->dma_tx_ch_name);
++	else
++		mcspi_dma->dma_tx =
++			dma_request_channel(mask, omap_dma_filter_fn, &sig);
+ 	if (!mcspi_dma->dma_tx) {
+ 		dev_err(&spi->dev, "no TX DMA engine channel for McSPI\n");
+ 		dma_release_channel(mcspi_dma->dma_rx);
+@@ -1194,29 +1209,42 @@ static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
+ 		goto free_master;
+ 
+ 	for (i = 0; i < master->num_chipselect; i++) {
+-		char dma_ch_name[14];
++		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
++		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
+ 		struct resource *dma_res;
+ 
+-		sprintf(dma_ch_name, "rx%d", i);
+-		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+-							dma_ch_name);
+-		if (!dma_res) {
+-			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
+-			status = -ENODEV;
+-			break;
+-		}
++		sprintf(dma_rx_ch_name, "rx%d", i);
++		if (!pdev->dev.of_node) {
++			dma_res =
++				platform_get_resource_byname(pdev,
++							     IORESOURCE_DMA,
++							     dma_rx_ch_name);
++			if (!dma_res) {
++				dev_dbg(&pdev->dev,
++					"cannot get DMA RX channel\n");
++				status = -ENODEV;
++				break;
++			}
+ 
+-		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
+-		sprintf(dma_ch_name, "tx%d", i);
+-		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+-							dma_ch_name);
+-		if (!dma_res) {
+-			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
+-			status = -ENODEV;
+-			break;
++			mcspi->dma_channels[i].dma_rx_sync_dev =
++				dma_res->start;
+ 		}
++		sprintf(dma_tx_ch_name, "tx%d", i);
++		if (!pdev->dev.of_node) {
++			dma_res =
++				platform_get_resource_byname(pdev,
++							     IORESOURCE_DMA,
++							     dma_tx_ch_name);
++			if (!dma_res) {
++				dev_dbg(&pdev->dev,
++					"cannot get DMA TX channel\n");
++				status = -ENODEV;
++				break;
++			}
+ 
+-		mcspi->dma_channels[i].dma_tx_sync_dev = dma_res->start;
++			mcspi->dma_channels[i].dma_tx_sync_dev =
++				dma_res->start;
++		}
+ 	}
+ 
+ 	if (status < 0)
 -- 
 1.7.9.5
