@@ -1,40 +1,50 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 20 Sep 2012 16:55:24 +0200
-Subject: [PATCH 0/6] pinctrl: samsung: Various fixes
-In-Reply-To: <505B2839.1040600@samsung.com>
-References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
- <CACRpkdbTPQvGSHJU_odGFtr5snb=U+L2Yuo-AhgX55hF6V5Lqw@mail.gmail.com>
- <505B2839.1040600@samsung.com>
-Message-ID: <2771354.x9C40TPfJ1@amdc1227>
+From: bbruce@ti.com (Bruce, Becky)
+Date: Thu, 20 Sep 2012 15:03:57 +0000
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209122237080.7275@utopia.booyaka.com>
+ <20120913011208.GT4257@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209131839000.23318@utopia.booyaka.com>
+ <20120920000351.GI2455@linux.vnet.ibm.com>,
+ <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
+Message-ID: <BF035652-91E8-4091-A883-8AB1773A7A17@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+I'll give it a try on my panda later today.
 
-On Thursday 20 of September 2012 23:29:13 Kukjin Kim wrote:
-> On 09/20/12 19:25, Linus Walleij wrote:
-> > On Thu, Sep 20, 2012 at 10:51 AM, Tomasz Figa<t.figa@samsung.com>  
-wrote:
-> >> This patch series contains various fixes of problems and nitpicks
-> >> spotted when working on adding support for Exynos4x12. See each patch
-> >> for more detailed information.
-> > 
-> > This all looks good, do you want me to take this into the pinctrl tree
-> > or will it go through Samsung ARM SoC (Kyungmin)?
-> > 
-> > In the latter case, Acked-by: Linus Walleij<linus.walleij@linaro.org>
-> > for all, else poke me and I'll apply them.
+B
+
+Sent from my iPhone
+
+On Sep 20, 2012, at 2:56 AM, "Paul Walmsley" <paul@pwsan.com> wrote:
+
+> Hi,
 > 
-> Linus, thanks for your ack and looks OK to me. Since now pinctrl-exynos
-> driver is in my tree so let me pick this series on top of it into
-> Samsung tree with your ack.
-
-I just posted an additional last minute trivial patch which fixes another 
-typo I found.
-
-Could you take it with this series?
-
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+> On Wed, 19 Sep 2012, Paul E. McKenney wrote:
+> 
+>> On Thu, Sep 13, 2012 at 06:52:10PM +0000, Paul Walmsley wrote:
+>> 
+>>> On Wed, 12 Sep 2012, Paul E. McKenney wrote:
+>> 
+>>>> Subodh Nijsure (also CCed) reported something that might be similar on
+>>>> ARM, and also reported that setting the following got rid of the stalls:
+>>>> 
+>>>>    CONFIG_CPU_IDLE=y
+>>>>    CONFIG_CPU_IDLE_GOV_LADDER=y
+>>>>    CONFIG_CPU_IDLE_GOV_MENU=y
+>>>> 
+>>>> At which point he was happy, which was good, but which also left the
+>>>> underlying problem unsolved.  Do these affect your system?  If so,
+>>>> do they cause a different ARM idle loop to be executed?
+>>> 
+>>> Will give this a try.  What board was Subodh using?
+>> 
+>> Any news on trying the above settings?
+> 
+> Sorry, haven't had the chance to try it yet due to the impending merge 
+> window opening.  Once things settle down I'll give it a try -- or maybe 
+> someone else can test it in the meantime.
+> 
+> 
+> - Paul
