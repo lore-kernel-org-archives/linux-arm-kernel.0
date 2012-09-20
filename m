@@ -1,28 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Sep 2012 14:50:47 +0100
-Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
-In-Reply-To: <1348147826.26501.47.camel@zakaz.uk.xensource.com>
-References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1348135563.11116.94.camel@hornet>
- <alpine.DEB.2.02.1209201235450.29232@kaball.uk.xensource.com>
- <1348142133.11116.109.camel@hornet>
- <alpine.DEB.2.02.1209201308490.29232@kaball.uk.xensource.com>
- <505B0C00.5010003@arm.com> <1348147826.26501.47.camel@zakaz.uk.xensource.com>
-Message-ID: <505B1F37.9040305@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Sep 2012 15:53:06 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <201209201510.24631.marex@denx.de>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
+ <201209201510.24631.marex@denx.de>
+Message-ID: <505B1FC2.2090609@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/12 14:30, Ian Campbell wrote:
-> On Thu, 2012-09-20 at 13:28 +0100, Marc Zyngier wrote:
->> I think the important thing here is that the memory map is RS1. As this
->> is a (very limited) subset of a vexpress A15, it seems to make some sense.
+Hi Marek,
+
+Le 20/09/2012 15:10, Marek Vasut a ?crit :
+>>> If barebox can't handle even basic DT fixup, it's broken.
+>>
+>> It can. It maybe was just not needed up to now, dunno.
 > 
-> Looking at arch/arm/boot/dts/vexpress-v2m-rs1.dtsi I don't think we
-> provide anything which is on rs1 though.
+> Fix it and send patch, so this problem doesn't spread.
 
-The location of both GIC and memory are RS1 "compliant" (as in "they are
-at the expected location").
+I'm sorry, but you still miss the point.
 
-	M.
+If someone wants to use another bootloader than U-boot (or a possible
+patched barebox), or none other than the bootlets to boot directly the
+Linux (with an appended device tree), you will still have no way to get
+the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+
+The kernel shouldn't rely on a particular feature of a given bootloader.
+
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
