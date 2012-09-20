@@ -1,49 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Sep 2012 18:35:56 +0100
-Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
- monitor mode
-In-Reply-To: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
-References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120920173556.GQ4654@mudshark.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 20 Sep 2012 23:09:56 +0530
+Subject: [PATCH V3 0/8] ARM: OMAP4: Add PMU Support
+In-Reply-To: <alpine.DEB.2.00.1209201714260.12583@utopia.booyaka.com>
+References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1209201714260.12583@utopia.booyaka.com>
+Message-ID: <CAMQu2gxdbbfEEGtAGBL5rxUmAPYXgE-Z8Q0mze=NFnrn+3T0QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Paul,
 
-On Thu, Sep 20, 2012 at 05:57:40PM +0100, Stephen Boyd wrote:
-> The reset value of the BCR, BVR, WCR, and WVR registers are all
-> UNKNOWN on ARMv7. Unfortunately, reset_ctrl_regs() clears these
-> registers *after* enabling monitor mode, not before, and so some
-> implementations may experience UNPREDICTABLE behavior if the
-> reset values of these registers are non-zero. Clear the
-> breakpoints before enabling monitor mode so that we don't
-> experience boot hangs/loops due to breakpoints being enabled
-> out of reset.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Thu, Sep 20, 2012 at 10:47 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Hi Jon, Will, Ming, et al.,
+>
+> Have queued most of these for 3.7 with the exception of the OMAP4430
+> CTI-related patches (which look to me like 3.8 material) and the PM
+> runtime suspend/resume patch (which looks to me like 3.7-rc material) --
+> assuming this series makes it in for 3.7 ...
+>
+Any reason CTI patches can't be taken now. In fact the CTI patches are
+on the list more time than the other ones.
 
-Aha, thanks for the patch. We should definitely zero these registers before
-enabling monitor mode. However...
+> Apologies in advance if I broke something else in the process.
+>
+Perf will remain broken on OMAP4 without CTI patches.
 
-> +/* Determine if halting mode is enabled */
-> +static int halting_mode_enabled(void)
-> +{
-> +	u32 dscr;
-> +
-> +	ARM_DBG_READ(c1, 0, dscr);
-> +
-> +	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
-> +		"halting debug mode enabled. Unable to access hardware resources.\n")) {
-> +		return -EPERM;
-> +	}
-> +	return 0;
-> +}
-
-...it looks like debug arch 7.1 defines this bit as UNKNOWN when the OS lock
-is clear, so we probably shouldn't be reading it at all. I'll pour myself a
-stiff drink and start reading the debug arch docs to work out what on Earth
-we should do.
-
-Stay tuned.
-
-Will
+Regards
+Santosh
