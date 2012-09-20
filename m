@@ -1,26 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Sep 2012 15:31:49 +0000
-Subject: linux-next: manual merge of the ixp4xx tree with the arm-soc tree
-In-Reply-To: <20120920163227.c6d8f1559b9cde971a376abf@canb.auug.org.au>
-References: <20120920163227.c6d8f1559b9cde971a376abf@canb.auug.org.au>
-Message-ID: <201209201531.50167.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Sep 2012 09:45:28 -0600
+Subject: [GIT PULL] ARM: tegra: second round of device tree changes
+Message-ID: <1348155928-12405-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 September 2012, Stephen Rothwell wrote:
-> Today's linux-next merge of the ixp4xx tree got conflicts in
-> arch/arm/mach-ixp4xx/common.c and
-> arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h between commit
-> 13ec32f47cb4 ("ARM: ixp4xx: use __iomem pointers for MMIO") from the
-> arm-soc tree and commits 43690ab7543a ("IXP4xx: Always ioremap() Queue
-> Manager MMIO region at boot") and f62736b567ff ("IXP4xx: map CPU config
-> registers within VMALLOC region") from the ixp4xx tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+This branch includes some late device tree changes for Tegra:
 
-Ok, thanks!
+A property is added to Whistler's device tree to enable the PMIC to
+act as the pm_power_off() implementation.
 
-This conflict will go away once Krzysztof's patches make it into arm-soc.
+A number of new device tree are added for boards from Avionic Design.
 
-	Arnd
+----------------------------------------------------------------
+
+The following changes since commit 44b12ef78106141574f038852d013fd3207acb23:
+
+  ARM: dt: tegra: configure power off for some boards
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-dt2
+
+for you to fetch changes up to 175f16fa38977dfed9f9fe247279516ce892fb15:
+
+  ARM: tegra: Add Avionic Design Tamonten Evaluation Carrier support
+
+----------------------------------------------------------------
+
+Stephen Warren (1):
+      ARM: dt: tegra: whistler: configure power off
+
+Thierry Reding (5):
+      ARM: tegra: dts: Add pwm label
+      ARM: tegra: Add Avionic Design Tamonten support
+      ARM: tegra: Add Avionic Design Plutux support
+      ARM: tegra: Add Avionic Design Medcom-Wide support
+      ARM: tegra: Add Avionic Design Tamonten Evaluation Carrier support
+
+ arch/arm/boot/dts/tegra20-medcom-wide.dts |   58 +++
+ arch/arm/boot/dts/tegra20-plutux.dts      |   50 +++
+ arch/arm/boot/dts/tegra20-tamonten.dtsi   |  449 ++++++++++++++++++++++++
+ arch/arm/boot/dts/tegra20-tec.dts         |   53 +++
+ arch/arm/boot/dts/tegra20-whistler.dts    |    2 +
+ arch/arm/boot/dts/tegra20.dtsi            |    2 +-
+ arch/arm/boot/dts/tegra30.dtsi            |    2 +-
+ arch/arm/mach-tegra/Makefile.boot         |    3 +
+ 8 files changed, 617 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra20-medcom-wide.dts
+ create mode 100644 arch/arm/boot/dts/tegra20-plutux.dts
+ create mode 100644 arch/arm/boot/dts/tegra20-tamonten.dtsi
+ create mode 100644 arch/arm/boot/dts/tegra20-tec.dts
