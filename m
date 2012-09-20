@@ -1,64 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Sep 2012 15:30:40 +0000
-Subject: [PATCH v4 03/10] pinctrl: mvebu: kirkwood pinctrl driver
-In-Reply-To: <CACRpkdY-Nyn73EJLvE1RsL4hgMRm6hALtnS-eKAXU7edot2V9A@mail.gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <50559737.8000705@gmail.com>
- <CACRpkdY-Nyn73EJLvE1RsL4hgMRm6hALtnS-eKAXU7edot2V9A@mail.gmail.com>
-Message-ID: <201209201530.40974.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 20 Sep 2012 17:31:31 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <20120920151021.7307C203A17@gemini.denx.de>
+ <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com>
+Message-ID: <201209201731.31598.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 September 2012, Linus Walleij wrote:
-> You found the weak spot between two consolidation tracks.
-> 
-> Getting rid of a broadcast autodetect functions from say
-> <mach/foo-id-probe.h> is nominally done by passing the data
-> to the driver as platform data instead, and only using
-> these functions in the mach-foo folder when populating
-> platform data, and thus it can be made into a local
-> header, say mach-foo/foo-id-probe.h
-> 
-> So the machine/arch code reads these registers to
-> populate the platform data and device drivers only
-> look at the platform data, which has some enum or
-> bool indicating what hardware it's running on, cool.
-> 
-> But according to the other consolidation track, platform
-> data should go into device tree bindings.
-> 
-> So the conclusion is that the DT must contain the data
-> about the platform, so it's not auto-probed by the kernel.
-> (I.e. the kernel reads no registers to figure out what hardware
-> this is, that stuff comes from the device tree.)
-> 
-> DT purists will say that the boot loader should ask the chipset
-> what it is with the same register writes and populate the
-> DT accordingly, instead of loading a precompiled blob.
-> Some may even ponder the crazy concept of amending the
-> DT in the kernel at early boot.
-> 
-> But in practice someone will give up, encode the stuff in
-> the static device tree and autoprobing of the platform
-> goes out the window.
+Dear Gregory CLEMENT,
 
-In general, I would prefer probing hardware by asking the hardware itself
-rather than duplicating the information in the device tree. We do this
-whenever we can, e.g. on PCI or USB, but we cannot normally do the same
-on embedded buses like AHB, I2C or SPI, so we have to use the device
-tree to provide some or all of the information.
+> 2012/9/20 Wolfgang Denk <wd@denx.de>:
+> > Dear Maxime,
+> > 
+> > In message <505B1FC2.2090609@free-electrons.com> you wrote:
+> >> > Fix it and send patch, so this problem doesn't spread.
+> >> 
+> >> I'm sorry, but you still miss the point.
+> > 
+> > I'm not so sure about this.
+> > 
+> >> If someone wants to use another bootloader than U-boot (or a possible
+> >> patched barebox), or none other than the bootlets to boot directly the
+> >> Linux (with an appended device tree), you will still have no way to get
+> >> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+> > 
+> > With device tree supoort enabled, the regular way to pass the MAC
+> > address to a network interface (that needs one) is through the device
+> > tree.
+> > 
+> > There are several options how such information gets there.  Boot
+> > loaders with built-in DT support may fill in the MAC address
+> > information into the DT before passing it to the Linux kernel.
+> > 
+> > If your boot method does not allow such dynamic adjustment, you ould
+> > provide a statically configured device tree, which already includes
+> > the MAC address.
+> > 
+> >> The kernel shouldn't rely on a particular feature of a given bootloader.
+> > 
+> > 100% agreed.  And it does not.  It always uses the respective
+> > information from the device tree.
+> 
+> I thought that device tree should provide information that we can't get
+> by the hardware itslef. Here, if the hardware can provide the MAC address,
+> why should we ignore it?
 
-A corner case is the one where you have different versions of the same
-IP block (e.g. the pinctrl) and the kernel cannot find out which one it
-is by looking at registers inside it or on the parent bus, but only
-by looking at other hardware (CPU core revision, or PCI device ID of
-the root complex). We have a precedent of at91 doing this, but I don't
-like it too much because that still means having to change the driver
-again if you get a new SoC with the same IP block but a different version
-register, or if the block gets reused in something (e.g. by a different
-vendor) that doesn't even have the other block that's used for
-identification. To avoid that, I'd prefer using separate "compatible"
-values, at least if the hardware is already described in separate .dtsi
-files.
+That is exactly the core problem here.
 
-	Arnd
+FTR: The FEC can not provide the MAC address, the hardware does not have any 
+EEPROM or any other means to store it's unique mac address in itself, so it must 
+be supplied from the outside (that is, DT or OCOTP or elsehow).
+
+> > So when you use bootlets, all you need to do is to insert the
+> > respective MAC address entry to your device tree definition.
+> > 
+> > 
+> > 
+> > Best regards,
+> > 
+> > Wolfgang Denk
+> > 
+> > --
+> > DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+> > HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+> > Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+> > Every program has at least one bug and can be shortened by  at  least
+> > one  instruction  --  from  which,  by induction, one can deduce that
+> > every program can be reduced to one instruction which doesn't work.
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Best regards,
+Marek Vasut
