@@ -1,59 +1,49 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 20 Sep 2012 18:34:32 +0100
-Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
-In-Reply-To: <20120920130114.GQ17666@opensource.wolfsonmicro.com>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
- <20120918150212.GA12543@opensource.wolfsonmicro.com>
- <1347983056.11116.11.camel@hornet>
- <20120918160909.GA15587@opensource.wolfsonmicro.com>
- <1347987819.11116.38.camel@hornet>
- <20120919022141.GA8832@opensource.wolfsonmicro.com>
- <1348073905.11116.80.camel@hornet>
- <20120920130114.GQ17666@opensource.wolfsonmicro.com>
-Message-ID: <1348162472.11116.149.camel@hornet>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Sep 2012 18:35:56 +0100
+Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
+ monitor mode
+In-Reply-To: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120920173556.GQ4654@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-20 at 14:01 +0100, Mark Brown wrote:
-> > Actually before I finally got this mail (our mail system was playing
-> > stupid today), I came up with idea of using the power supply specified
-> > tolerance as a base to chose the step sizes. This comes down to such
-> > code (with the regulator_*_voltage_linear in the ops):
+Hi Stephen,
+
+On Thu, Sep 20, 2012 at 05:57:40PM +0100, Stephen Boyd wrote:
+> The reset value of the BCR, BVR, WCR, and WVR registers are all
+> UNKNOWN on ARMv7. Unfortunately, reset_ctrl_regs() clears these
+> registers *after* enabling monitor mode, not before, and so some
+> implementations may experience UNPREDICTABLE behavior if the
+> reset values of these registers are non-zero. Clear the
+> breakpoints before enabling monitor mode so that we don't
+> experience boot hangs/loops due to breakpoints being enabled
+> out of reset.
 > 
-> That's probably OK, though check that the numbers come out sensible
-> (people tend to work to nice round numbers).
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-These calculations try to maximize the range, but in most cases it's
-impossible to be exactly in line with constraints. The delta should be
-less then 1%, eg. in my test case I get:
+Aha, thanks for the patch. We should definitely zero these registers before
+enabling monitor mode. However...
 
-A15 Vcore: override max_uV, 1050000 -> 1049990
-A15 Vcore: 800 <--> 1049 mV at 906 mV 
+> +/* Determine if halting mode is enabled */
+> +static int halting_mode_enabled(void)
+> +{
+> +	u32 dscr;
+> +
+> +	ARM_DBG_READ(c1, 0, dscr);
+> +
+> +	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
+> +		"halting debug mode enabled. Unable to access hardware resources.\n")) {
+> +		return -EPERM;
+> +	}
+> +	return 0;
+> +}
 
-I could try to add more math to interpolate the operating points to get
-perfect match, but this sounds like a serious overkill...
+...it looks like debug arch 7.1 defines this bit as UNKNOWN when the OS lock
+is clear, so we probably shouldn't be reading it at all. I'll pour myself a
+stiff drink and start reading the debug arch docs to work out what on Earth
+we should do.
 
-> > +       if (ret < 0) {
-> > +               /* No operating points defined, allow any value within range */
-> > +               struct regulation_constraints *constraints =
-> > +                               regulator->rdev->constraints;
-> > +
-> > +               return min_uV >= constraints->min_uV &&
-> > +                               max_uV <= constraints->max_uV;
-> > +       }
-> 
-> I'd rather have the driver explicitly say it supports continuous
-> voltages with a flag in the descriptor (to make sure we don't end up
-> being overly optimistic because the driver wasn't well implemented) 
+Stay tuned.
 
-Ok, so I see two options:
-
-1. Something like bool "regulator_desc.linear"
-
-2. A magic value for regulator_desc.n_voltages, something like
-	#define N_VOLTAGES_LINEAR (~0)
-
-Does any of them seem reasonable?
-
-Pawel
+Will
