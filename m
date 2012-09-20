@@ -1,26 +1,30 @@
-From: ljkenny@gmail.com (Lee Jones)
-Date: Thu, 20 Sep 2012 09:32:18 +0200
-Subject: Pull request question for Mark (ASoC)
-Message-ID: <20120920073218.GA10230@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Sep 2012 07:33:03 +0000
+Subject: Adding new board to Kernel
+In-Reply-To: <505AC5D6.8040702@antcom.de>
+References: <CAOYb-CL9WM8wzko7CsQvYAAWKARnTkrqenBtsgchn96t=x4wyg@mail.gmail.com>
+ <201209191855.39859.arnd@arndb.de> <505AC5D6.8040702@antcom.de>
+Message-ID: <201209200733.03693.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thursday 20 September 2012, Roland Stigge wrote:
+> On 09/19/2012 08:55 PM, Arnd Bergmann wrote:
+> >> The Embedded Artists has a board based on ARM LPC3250 called EA3250 and
+> >> they provide a BSP with patch to Linux Kernel version 2.6.29.2. I am trying
+> >> to "up merge" this patch to Kernel v3.4 (now 3.5) and after that get it in
+> >> the mainstream. Although I have a working version (
+> >> https://github.com/jrbenito/Kernel-LPC3250) I still have doubts on how to
+> >> correct submit it to mainline kernel.
+> >>
+> >> -The machine type is already registered in past (
+> >> http://www.arm.linux.org.uk/developer/machines/list.php?id=2512) but it is
+> >> not in mainline. Since I shall not patch this file, how can I ask to it be
+> >> updated with ea3250 board information?
+> 
+> We already have ea3250.dts in mainline since v3.5.
+> 
 
-I have a pull request for you, but at least one of the patches
-touches the MOP500 driver as well as ux500 platform code. If I
-split them up into for-asoc-next and for-arm-soc-next branches
-there I it will cause conflicts in arch/arm/mach-ux500/*. 
+Ah, I see.
 
-Is it okay to send the 6 patches I have for ASoC, all of which
-are encapsulated in sound/soc/ux500/ through the arm-soc tree
-with the rest of my patches please?
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
