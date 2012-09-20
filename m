@@ -1,47 +1,42 @@
-From: ananaza@iki.fi (Antti P Miettinen)
-Date: Fri, 21 Sep 2012 00:17:18 +0300
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-References: <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
- <20120515094010.GF10453@n2100.arm.linux.org.uk>
- <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
- <20120515101505.GG10453@n2100.arm.linux.org.uk>
- <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
- <20120515163618.GH13860@n2100.arm.linux.org.uk>
- <20120515170534.GA17319@e102568-lin.cambridge.arm.com>
- <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
- <20120920095431.GC4588@e102568-lin.cambridge.arm.com>
-Message-ID: <87lig4tmw1.fsf@amiettinen-lnx.nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Sep 2012 15:20:39 -0600
+Subject: [PATCH] ARM: tegra: harmony: fix ldo7 regulator-name
+Message-ID: <1348176039-6094-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> On Wed, Sep 19, 2012 at 09:55:52AM +0100, Antti P Miettinen wrote:
->> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
->> > What we should do as I described, is executing the sequence:
->> >
->> > clear SCTRL.C
->> > clean cache
->> > exit coherency
->> 
->> How does SCTRL.C affect TLB fetches? Especially on A9? Seems that page
->> table updates do clean_dcache_area() so probably not an issue but just
->> out of curiosity, are TLB fetches affected by the C bit on A9?
->
-> Yes, they are. TLB fetches cannot search the D-cache if the C bit in
-> SCTLR is clear on A9. I do not see any issue with this though, at least
-> in the power down procedure described above and in previous e-mails in
-> this thread.
->
-> Lorenzo
+From: Stephen Warren <swarren@nvidia.com>
 
-Hmm.. is the condition for cache coherence protocol then different from
-TLB lookups? If C is cleared, is the cache available for snoops by other
-cores? What happens if another core needs a dirty line in a cache that
-has C cleared?
+On Harmony, LDO7 does not feed vdd_fuse. Correct the regulator name.
+This issue was probably the result of copying Ventana's regulator setup
+when creating the Harmony .dts file. No other naming issues appear to
+exist.
 
---
-Antti P Miettinen
-http://www.iki.fi/~ananaza/
+Reported-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Arnd, Olof, any chance you could roll this into arm-soc directly rather than
+my sending another pull request? Or, I can re-do my today's dt2 pull request
+with this added if it makes it easier. Thanks.
+
+I don't expect any more patches to show up for Tegra for 3.7, unless they're
+bug-fixes for issues I haven't noticed yet.
+
+ arch/arm/boot/dts/tegra20-harmony.dts |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index b98a1b3..c3ef1ad 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -397,7 +397,7 @@
+ 				regulator at 11 {
+ 					reg = <11>;
+ 					regulator-compatible = "ldo7";
+-					regulator-name = "vdd_ldo7,avdd_hdmi,vdd_fuse";
++					regulator-name = "vdd_ldo7,avdd_hdmi";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+ 				};
+-- 
+1.7.0.4
