@@ -1,187 +1,40 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 20 Sep 2012 11:29:44 +0100
-Subject: [RFC PATCH 3/3] ARM: vexpress: configure CLCD driver device tree
- support for A9 CoreTile
-In-Reply-To: <1348070666-9153-4-git-send-email-ryan.harkin@linaro.org>
-References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
- <1348070666-9153-4-git-send-email-ryan.harkin@linaro.org>
-Message-ID: <20120920102943.GH32603@e102652-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 20 Sep 2012 11:32:12 +0100
+Subject: [RFC PATCH v2 2/5] ARM: mm: rename jump labels in
+ v7_flush_dcache_all function
+In-Reply-To: <20120919135155.GB2111@linaro.org>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919135155.GB2111@linaro.org>
+Message-ID: <20120920103212.GE4588@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 05:04:26PM +0100, Ryan Harkin wrote:
-> Configuration for the amba-clcd PL111 driver is added to the A9 CoreTile's DTS
-> file.
->
-> Configuration of the motherboard CLCD driver is removed from the DTSI files to
-> prevent duplicate CLCD drivers being registered.
->
-> A generic set of CLCD panel descriptions has been split into its own DTSI file.
-> Currently, only XVGA and VGA monitors are described.
+On Wed, Sep 19, 2012 at 02:51:56PM +0100, Dave Martin wrote:
+> On Tue, Sep 18, 2012 at 05:35:32PM +0100, Lorenzo Pieralisi wrote:
+> > This patch renames jump labels in v7_flush_dcache_all in order to define
+> > a specific flush cache levels entry point.
+> > 
+> > TODO: factor out the level flushing loop if considered worthwhile and
+> >       define the input registers requirements.
+> 
+> In the context of this series, this patch seems to do nothing at all (?)
 
-Hi Ryan,
+Agreed, it is just replacing some labels. I thought that something like:
 
-For this and [2/3] patch:
+b flush_levels
 
-Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+is clearer than:
 
+b loop1
 
->
-> Signed-off-by: Ryan Harkin <ryan.harkin@linaro.org>
-> ---
->  arch/arm/boot/dts/clcd-panels.dtsi      |   52 +++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi |    8 ++---
->  arch/arm/boot/dts/vexpress-v2m.dtsi     |    8 ++---
->  arch/arm/boot/dts/vexpress-v2p-ca9.dts  |    6 ++++
->  4 files changed, 62 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/clcd-panels.dtsi b/arch/arm/boot/dts/clcd-panels.dtsi
-> new file mode 100644
-> index 0000000..0b0ff6e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/clcd-panels.dtsi
-> @@ -0,0 +1,52 @@
-> +/*
-> + * ARM Ltd. Versatile Express
-> + *
-> + */
-> +
-> +/ {
-> +     panels {
-> +             panel at 0 {
-> +                     compatible      = "panel";
-> +                     mode            = "VGA";
-> +                     refresh         = <60>;
-> +                     xres            = <640>;
-> +                     yres            = <480>;
-> +                     pixclock        = <39721>;
-> +                     left_margin     = <40>;
-> +                     right_margin    = <24>;
-> +                     upper_margin    = <32>;
-> +                     lower_margin    = <11>;
-> +                     hsync_len       = <96>;
-> +                     vsync_len       = <2>;
-> +                     sync            = <0>;
-> +                     vmode           = "FB_VMODE_NONINTERLACED";
-> +
-> +                     tim2            = "TIM2_BCD", "TIM2_IPC";
-> +                     cntl            = "CNTL_LCDTFT", "CNTL_BGR", "CNTL_LCDVCOMP(1)";
-> +                     caps            = "CLCD_CAP_5551", "CLCD_CAP_565", "CLCD_CAP_888";
-> +                     bpp             = <16>;
-> +             };
-> +
-> +             panel at 1 {
-> +                     compatible      = "panel";
-> +                     mode            = "XVGA";
-> +                     refresh         = <60>;
-> +                     xres            = <1024>;
-> +                     yres            = <768>;
-> +                     pixclock        = <15748>;
-> +                     left_margin     = <152>;
-> +                     right_margin    = <48>;
-> +                     upper_margin    = <23>;
-> +                     lower_margin    = <3>;
-> +                     hsync_len       = <104>;
-> +                     vsync_len       = <4>;
-> +                     sync            = <0>;
-> +                     vmode           = "FB_VMODE_NONINTERLACED";
-> +
-> +                     tim2            = "TIM2_BCD", "TIM2_IPC";
-> +                     cntl            = "CNTL_LCDTFT", "CNTL_BGR", "CNTL_LCDVCOMP(1)";
-> +                     caps            = "CLCD_CAP_5551", "CLCD_CAP_565", "CLCD_CAP_888";
-> +                     bpp             = <16>;
-> +             };
-> +     };
-> +};
-> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-> index d8a827b..301d3f6 100644
-> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-> @@ -17,6 +17,8 @@
->   * CHANGES TO vexpress-v2m.dtsi!
->   */
->
-> +/include/ "clcd-panels.dtsi"
-> +
->  / {
->       aliases {
->               arm,v2m_timer = &v2m_timer01;
-> @@ -193,12 +195,6 @@
->                                      0x1a0100 0xf00>;
->                               reg-shift = <2>;
->                       };
-> -
-> -                     clcd at 1f0000 {
-> -                             compatible = "arm,pl111", "arm,primecell";
-> -                             reg = <0x1f0000 0x1000>;
-> -                             interrupts = <14>;
-> -                     };
->               };
->
->               v2m_fixed_3v3: fixedregulator at 0 {
-> diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
-> index dba53fd..43cd86f 100644
-> --- a/arch/arm/boot/dts/vexpress-v2m.dtsi
-> +++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
-> @@ -17,6 +17,8 @@
->   * CHANGES TO vexpress-v2m-rs1.dtsi!
->   */
->
-> +/include/ "clcd-panels.dtsi"
-> +
->  / {
->       aliases {
->               arm,v2m_timer = &v2m_timer01;
-> @@ -192,12 +194,6 @@
->                                      0x1a100 0xf00>;
->                               reg-shift = <2>;
->                       };
-> -
-> -                     clcd at 1f000 {
-> -                             compatible = "arm,pl111", "arm,primecell";
-> -                             reg = <0x1f000 0x1000>;
-> -                             interrupts = <14>;
-> -                     };
->               };
->
->               v2m_fixed_3v3: fixedregulator at 0 {
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> index 3f0c736..2ebb132 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> @@ -9,6 +9,8 @@
->
->  /dts-v1/;
->
-> +/memreserve/ 0x9f000000 0x01000000;
-> +
->  / {
->       model = "V2P-CA9";
->       arm,hbi = <0x191>;
-> @@ -70,6 +72,10 @@
->               compatible = "arm,pl111", "arm,primecell";
->               reg = <0x10020000 0x1000>;
->               interrupts = <0 44 4>;
-> +             mode = "XVGA";
-> +             arm,vexpress-osc = <1>;
-> +             use_dma = <1>;
-> +             framebuffer = <0x9f000000 0x01000000>;
->       };
->
->       memory-controller at 100e0000 {
-> --
-> 1.7.9.5
->
->
+If I manage to factor out the cache level flushing loop I think things
+are even better, I just did not want to change v7_flush_dcache_all, I would
+avoid doing that, unless, as I mentioned, it is considered worthwhile.
 
---
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> Maybe it would make sense to defer this patch until you post something
+> that uses it.
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+v7_flush_dcache_louis uses it, I have no problem in deferring it though.
+
+Lorenzo
