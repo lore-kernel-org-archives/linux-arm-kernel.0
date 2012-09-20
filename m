@@ -1,145 +1,196 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:35 +0800
-Subject: [PATCH v2 22/34] dma: imx-dma: use devm_kzalloc and devm_request_irq
+Date: Thu, 20 Sep 2012 14:45:36 +0800
+Subject: [PATCH v2 23/34] dma: imx-dma: retrieve MEM and IRQ from resources
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-23-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-24-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use managed functions devm_kzalloc and devm_request_irq instead to
-make the error patch simpler.
+Retrieve MEM and IRQ from resources rather than directly using the
+value by including machine header.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Vinod Koul <vinod.koul@linux.intel.com>
 ---
- drivers/dma/imx-dma.c |   54 ++++++++++++++-----------------------------------
- 1 file changed, 15 insertions(+), 39 deletions(-)
+ arch/arm/mach-imx/devices/devices-common.h   |    3 ++-
+ arch/arm/mach-imx/devices/platform-imx-dma.c |   21 ++++++++++++++--
+ arch/arm/mach-imx/mm-imx1.c                  |    2 ++
+ arch/arm/mach-imx/mm-imx21.c                 |    2 +-
+ arch/arm/mach-imx/mm-imx27.c                 |    2 +-
+ drivers/dma/imx-dma.c                        |   35 +++++++++++++++-----------
+ 6 files changed, 45 insertions(+), 20 deletions(-)
 
+diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
+index 73ae524..a330159 100644
+--- a/arch/arm/mach-imx/devices/devices-common.h
++++ b/arch/arm/mach-imx/devices/devices-common.h
+@@ -311,7 +311,8 @@ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata);
+ 
+-struct platform_device *imx_add_imx_dma(void);
++struct platform_device *imx_add_imx_dma(resource_size_t iobase,
++					int irq, int irq_err);
+ struct platform_device *imx_add_imx_sdma(char *name,
+ 	resource_size_t iobase, int irq, struct sdma_platform_data *pdata);
+ 
+diff --git a/arch/arm/mach-imx/devices/platform-imx-dma.c b/arch/arm/mach-imx/devices/platform-imx-dma.c
+index c35c99d..f9003e4 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-dma.c
++++ b/arch/arm/mach-imx/devices/platform-imx-dma.c
+@@ -8,10 +8,27 @@
+  */
+ #include "devices-common.h"
+ 
+-struct platform_device __init __maybe_unused *imx_add_imx_dma(void)
++struct platform_device __init __maybe_unused *imx_add_imx_dma(
++	resource_size_t iobase, int irq, int irq_err)
+ {
++	struct resource res[] = {
++		{
++			.start = iobase,
++			.end = iobase + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = irq,
++			.end = irq,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = irq_err,
++			.end = irq_err,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
+ 	return platform_device_register_resndata(&mxc_ahb_bus,
+-			"imx-dma", -1, NULL, 0, NULL, 0);
++			"imx-dma", -1, res, ARRAY_SIZE(res), NULL, 0);
+ }
+ 
+ struct platform_device __init __maybe_unused *imx_add_imx_sdma(char *name,
+diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
+index 118aa92..9de81bf 100644
+--- a/arch/arm/mach-imx/mm-imx1.c
++++ b/arch/arm/mach-imx/mm-imx1.c
+@@ -25,6 +25,7 @@
+ #include <mach/hardware.h>
+ 
+ #include "common.h"
++#include "devices/devices-common.h"
+ #include "iomux-v1.h"
+ 
+ static struct map_desc imx_io_desc[] __initdata = {
+@@ -59,5 +60,6 @@ void __init imx1_soc_init(void)
+ 						MX1_GPIO_INT_PORTC, 0);
+ 	mxc_register_gpio("imx1-gpio", 3, MX1_GPIO4_BASE_ADDR, SZ_256,
+ 						MX1_GPIO_INT_PORTD, 0);
++	imx_add_imx_dma(MX1_DMA_BASE_ADDR, MX1_DMA_INT, MX1_DMA_ERR);
+ 	pinctrl_provide_dummies();
+ }
+diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
+index 0c24556..1c29515 100644
+--- a/arch/arm/mach-imx/mm-imx21.c
++++ b/arch/arm/mach-imx/mm-imx21.c
+@@ -90,7 +90,7 @@ void __init imx21_soc_init(void)
+ 	mxc_register_gpio("imx21-gpio", 5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+ 
+ 	pinctrl_provide_dummies();
+-	imx_add_imx_dma();
++	imx_add_imx_dma(MX21_DMA_BASE_ADDR, MX21_INT_DMACH0, 0); /* No ERR irq */
+ 	platform_device_register_simple("imx21-audmux", 0, imx21_audmux_res,
+ 					ARRAY_SIZE(imx21_audmux_res));
+ }
+diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+index 3241314..d389f4a 100644
+--- a/arch/arm/mach-imx/mm-imx27.c
++++ b/arch/arm/mach-imx/mm-imx27.c
+@@ -91,7 +91,7 @@ void __init imx27_soc_init(void)
+ 	mxc_register_gpio("imx21-gpio", 5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+ 
+ 	pinctrl_provide_dummies();
+-	imx_add_imx_dma();
++	imx_add_imx_dma(MX27_DMA_BASE_ADDR, MX27_INT_DMACH0, 0); /* No ERR irq */
+ 	/* imx27 has the imx21 type audmux */
+ 	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
+ 					ARRAY_SIZE(imx27_audmux_res));
 diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index b90aaec..64ba65b 100644
+index 64ba65b..a947ce2 100644
 --- a/drivers/dma/imx-dma.c
 +++ b/drivers/dma/imx-dma.c
-@@ -962,7 +962,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+@@ -959,23 +959,22 @@ static void imxdma_issue_pending(struct dma_chan *chan)
+ static int __init imxdma_probe(struct platform_device *pdev)
+ 	{
+ 	struct imxdma_engine *imxdma;
++	struct resource *res;
  	int ret, i;
+-
++	int irq, irq_err;
  
- 
--	imxdma = kzalloc(sizeof(*imxdma), GFP_KERNEL);
-+	imxdma = devm_kzalloc(&pdev->dev, sizeof(*imxdma), GFP_KERNEL);
+ 	imxdma = devm_kzalloc(&pdev->dev, sizeof(*imxdma), GFP_KERNEL);
  	if (!imxdma)
  		return -ENOMEM;
  
-@@ -978,16 +978,12 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	}
+-	if (cpu_is_mx1()) {
+-		imxdma->base = MX1_IO_ADDRESS(MX1_DMA_BASE_ADDR);
+-	} else if (cpu_is_mx21()) {
+-		imxdma->base = MX21_IO_ADDRESS(MX21_DMA_BASE_ADDR);
+-	} else if (cpu_is_mx27()) {
+-		imxdma->base = MX27_IO_ADDRESS(MX27_DMA_BASE_ADDR);
+-	} else {
+-		kfree(imxdma);
+-		return 0;
+-	}
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	imxdma->base = devm_request_and_ioremap(&pdev->dev, res);
++	if (!imxdma->base)
++		return -EADDRNOTAVAIL;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
  
  	imxdma->dma_ipg = devm_clk_get(&pdev->dev, "ipg");
--	if (IS_ERR(imxdma->dma_ipg)) {
--		ret = PTR_ERR(imxdma->dma_ipg);
--		goto err_clk;
--	}
-+	if (IS_ERR(imxdma->dma_ipg))
-+		return PTR_ERR(imxdma->dma_ipg);
- 
- 	imxdma->dma_ahb = devm_clk_get(&pdev->dev, "ahb");
--	if (IS_ERR(imxdma->dma_ahb)) {
--		ret = PTR_ERR(imxdma->dma_ahb);
--		goto err_clk;
--	}
-+	if (IS_ERR(imxdma->dma_ahb))
-+		return PTR_ERR(imxdma->dma_ahb);
- 
- 	clk_prepare_enable(imxdma->dma_ipg);
- 	clk_prepare_enable(imxdma->dma_ahb);
-@@ -996,17 +992,18 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	if (IS_ERR(imxdma->dma_ipg))
+@@ -992,14 +991,20 @@ static int __init imxdma_probe(struct platform_device *pdev)
  	imx_dmav1_writel(imxdma, DCR_DRST, DMA_DCR);
  
  	if (cpu_is_mx1()) {
--		ret = request_irq(MX1_DMA_INT, dma_irq_handler, 0, "DMA", imxdma);
-+		ret = devm_request_irq(&pdev->dev, MX1_DMA_INT,
-+				       dma_irq_handler, 0, "DMA", imxdma);
+-		ret = devm_request_irq(&pdev->dev, MX1_DMA_INT,
++		ret = devm_request_irq(&pdev->dev, irq,
+ 				       dma_irq_handler, 0, "DMA", imxdma);
  		if (ret) {
  			dev_warn(imxdma->dev, "Can't register IRQ for DMA\n");
--			goto err_enable;
-+			goto err;
+ 			goto err;
  		}
  
--		ret = request_irq(MX1_DMA_ERR, imxdma_err_handler, 0, "DMA", imxdma);
-+		ret = devm_request_irq(&pdev->dev, MX1_DMA_ERR,
-+				       imxdma_err_handler, 0, "DMA", imxdma);
+-		ret = devm_request_irq(&pdev->dev, MX1_DMA_ERR,
++		irq_err = platform_get_irq(pdev, 1);
++		if (irq_err < 0) {
++			ret = irq_err;
++			goto err;
++		}
++
++		ret = devm_request_irq(&pdev->dev, irq_err,
+ 				       imxdma_err_handler, 0, "DMA", imxdma);
  		if (ret) {
  			dev_warn(imxdma->dev, "Can't register ERRIRQ for DMA\n");
--			free_irq(MX1_DMA_INT, NULL);
--			goto err_enable;
-+			goto err;
- 		}
- 	}
- 
-@@ -1037,13 +1034,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
+@@ -1034,12 +1039,12 @@ static int __init imxdma_probe(struct platform_device *pdev)
  		struct imxdma_channel *imxdmac = &imxdma->channel[i];
  
  		if (cpu_is_mx21() || cpu_is_mx27()) {
--			ret = request_irq(MX2x_INT_DMACH0 + i,
-+			ret = devm_request_irq(&pdev->dev, MX2x_INT_DMACH0 + i,
+-			ret = devm_request_irq(&pdev->dev, MX2x_INT_DMACH0 + i,
++			ret = devm_request_irq(&pdev->dev, irq + i,
  					dma_irq_handler, 0, "DMA", imxdma);
  			if (ret) {
  				dev_warn(imxdma->dev, "Can't register IRQ %d "
  					 "for DMA channel %d\n",
- 					 MX2x_INT_DMACH0 + i, i);
--				goto err_init;
-+				goto err;
+-					 MX2x_INT_DMACH0 + i, i);
++					 irq + i, i);
+ 				goto err;
  			}
  			init_timer(&imxdmac->watchdog);
- 			imxdmac->watchdog.function = &imxdma_watchdog;
-@@ -1089,46 +1086,25 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	ret = dma_async_device_register(&imxdma->dma_device);
- 	if (ret) {
- 		dev_err(&pdev->dev, "unable to register\n");
--		goto err_init;
-+		goto err;
- 	}
- 
- 	return 0;
- 
--err_init:
--
--	if (cpu_is_mx21() || cpu_is_mx27()) {
--		while (--i >= 0)
--			free_irq(MX2x_INT_DMACH0 + i, NULL);
--	} else if cpu_is_mx1() {
--		free_irq(MX1_DMA_INT, NULL);
--		free_irq(MX1_DMA_ERR, NULL);
--	}
--err_enable:
-+err:
- 	clk_disable_unprepare(imxdma->dma_ipg);
- 	clk_disable_unprepare(imxdma->dma_ahb);
--err_clk:
--	kfree(imxdma);
- 	return ret;
- }
- 
- static int __exit imxdma_remove(struct platform_device *pdev)
- {
- 	struct imxdma_engine *imxdma = platform_get_drvdata(pdev);
--	int i;
- 
-         dma_async_device_unregister(&imxdma->dma_device);
- 
--	if (cpu_is_mx21() || cpu_is_mx27()) {
--		for (i = 0; i < IMX_DMA_CHANNELS; i++)
--			free_irq(MX2x_INT_DMACH0 + i, NULL);
--	} else if cpu_is_mx1() {
--		free_irq(MX1_DMA_INT, NULL);
--		free_irq(MX1_DMA_ERR, NULL);
--	}
--
- 	clk_disable_unprepare(imxdma->dma_ipg);
- 	clk_disable_unprepare(imxdma->dma_ahb);
--	kfree(imxdma);
- 
-         return 0;
- }
 -- 
 1.7.9.5
