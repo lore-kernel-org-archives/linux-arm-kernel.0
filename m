@@ -1,61 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Sep 2012 11:23:06 -0700
-Subject: arm-soc/for-next: fixup compile after platform_data move
-In-Reply-To: <87obl0hcp5.fsf@deeprootsystems.com>
-References: <87obl0hcp5.fsf@deeprootsystems.com>
-Message-ID: <20120920182306.GG28835@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 20 Sep 2012 14:28:14 -0400 (EDT)
+Subject: [PATCH 1/4] ARM: mm: use pteval_t to represent page protection
+ values
+In-Reply-To: <1348156605-30398-2-git-send-email-will.deacon@arm.com>
+References: <1348156605-30398-1-git-send-email-will.deacon@arm.com>
+ <1348156605-30398-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1209201422230.6667@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [120920 09:39]:
-> Arnd, Olof,
-> 
-> Not sure if this has been reported yet, but arm-soc/for-next now has a
-> build error on omap due to the recent merge of the platform_data move
-> series.
-> 
-> The arm-soc/next/soc branch contains the arm-soc/omap/am33xx branch
-> which adds an include of "plat/mscpi.h" which has now moved.
-> 
-> Below is a simple fix.
-> 
-> Kevin
-> 
-> 
-> From cae062932d1d28e499b03d31da815fc2696badfd Mon Sep 17 00:00:00 2001
-> From: Kevin Hilman <khilman@ti.com>
-> Date: Thu, 20 Sep 2012 09:28:43 -0700
-> Subject: [PATCH] ARM: OMAP: AM33xx hwmod: fixup SPI after platform_data move
-> 
-> AM33xx hwmod data includes "mcspi.h" which has now been moved after
-> the platform_data move.  Fix it.
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+On Thu, 20 Sep 2012, Will Deacon wrote:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> When updating the page protection map after calculating the user_pgprot
+> value, the base protection map is temporarily stored in an unsigned long
+> type, causing truncation of the protection bits when LPAE is enabled.
+> This effectively means that calls to mprotect() will corrupt the upper
+> page attributes, clearing the XN bit unconditionally.
+> 
+> This patch uses pteval_t to store the intermediate protection values,
+> preserving the upper bits for 64-bit descriptors.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Maybe CC to stable?
+
+Are you sure there are no other occurences of this elsewhere?  
+Unfortunately, STRICT_MM_TYPECHECKS can't help here.
 
 > ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mm/mmu.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index 22433cb..59d5c1c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -17,9 +17,9 @@
->  #include <plat/omap_hwmod.h>
->  #include <plat/cpu.h>
->  #include <linux/platform_data/gpio-omap.h>
-> +#include <linux/platform_data/spi-omap2-mcspi.h>
->  #include <plat/dma.h>
->  #include <plat/mmc.h>
-> -#include <plat/mcspi.h>
->  #include <plat/i2c.h>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index c2fa21d..b68b531 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -498,7 +498,7 @@ static void __init build_mem_type_table(void)
+>  #endif
 >  
->  #include "omap_hwmod_common_data.h"
+>  	for (i = 0; i < 16; i++) {
+> -		unsigned long v = pgprot_val(protection_map[i]);
+> +		pteval_t v = pgprot_val(protection_map[i]);
+>  		protection_map[i] = __pgprot(v | user_pgprot);
+>  	}
+>  
 > -- 
-> 1.7.9.2
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.7.4.1
+> 
