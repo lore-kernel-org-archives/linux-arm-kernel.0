@@ -1,43 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:23 +0200
-Subject: [PATCH 05/32] of/irq: Create stub for of_irq_find_parent when
- !CONFIG_OF
+Date: Thu, 20 Sep 2012 14:12:28 +0200
+Subject: [PATCH 10/32] ARM: ux500: Match Power-On-Key MFD and DTS compatible
+ strings
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_irq_find_parent is a handy function to use outside the confines of
-the Open Firmware subsystem. One such use-case is when the IRQ Domain
-wishes to find an IRQ domain for a given device node. Currently it can
-not take any notice of the 'interrupt-parent' property. Instead it
-just uses the first IRQ controller as it climbs the Device Tree. If
-we were to use this as a precursor the resultant controller is more
-likely to be correct.
+The compatible string found in the Power-On-Key's MFD cell matches
+the device name provided in the driver. Keeping this naming convention
+seems like a good idea, so we're changing the one found in the DTS
+file to match.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/of_irq.h |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 1717cd9..b8e2411 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -83,6 +83,11 @@ static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
- {
- 	return 0;
- }
-+
-+static inline void *of_irq_find_parent(struct device_node *child)
-+{
-+	return NULL;
-+}
- #endif /* !CONFIG_OF */
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index daedefe..dc290d0 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -374,7 +374,7 @@
+ 				};
  
- #endif /* __OF_IRQ_H */
+ 				ab8500-ponkey {
+-					compatible = "stericsson,ab8500-ponkey";
++					compatible = "stericsson,ab8500-poweron-key";
+ 					interrupts = <6 0x4
+ 						      7 0x4>;
+ 					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
 -- 
 1.7.9.5
