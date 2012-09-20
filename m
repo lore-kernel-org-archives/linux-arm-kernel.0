@@ -1,31 +1,66 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 20 Sep 2012 14:30:26 +0100
-Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
-In-Reply-To: <505B0C00.5010003@arm.com>
-References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1348135563.11116.94.camel@hornet>
- <alpine.DEB.2.02.1209201235450.29232@kaball.uk.xensource.com>
- <1348142133.11116.109.camel@hornet>
- <alpine.DEB.2.02.1209201308490.29232@kaball.uk.xensource.com>
- <505B0C00.5010003@arm.com>
-Message-ID: <1348147826.26501.47.camel@zakaz.uk.xensource.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 20 Sep 2012 21:36:32 +0800
+Subject: [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <20120920124709.GN17666@opensource.wolfsonmicro.com>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920114148.GH17666@opensource.wolfsonmicro.com>
+ <20120920115213.GF2450@S2101-09.ap.freescale.net>
+ <20120920124709.GN17666@opensource.wolfsonmicro.com>
+Message-ID: <20120920133630.GG2450@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-20 at 13:28 +0100, Marc Zyngier wrote:
-> I think the important thing here is that the memory map is RS1. As this
-> is a (very limited) subset of a vexpress A15, it seems to make some sense.
+On Thu, Sep 20, 2012 at 08:47:10AM -0400, Mark Brown wrote:
+> On Thu, Sep 20, 2012 at 07:52:15PM +0800, Shawn Guo wrote:
+> > On Thu, Sep 20, 2012 at 07:41:50AM -0400, Mark Brown wrote:
+> 
+> > > It's usually pretty early but Takashi will be on holiday this time so
+> > > I'm not sure if things might be different (he was going to send the pull
+> > > request from holiday).  I also didn't guarantee that it'll be stable
+> > > yet, can someone please tell me what the depenency is here?
+> 
+> > We need the patch to have all imx drivers mach/* inclusion free,
+> > so that we can enable multi-platform support for imx, which is the
+> > whole point of the series.
+> 
+> That doesn't answer the question.  What is the dependency - what is it
+> about this patch that something else depends on?  Your cover letters
+> just say you'd like to do this but don't mention dependencies at all and
+> when I asked the question last night you said the same thing.  I've not
+> seen the rest of the series...
+> 
+Ah, right.  You did get copied on the whole series.  So the whole point
+of patch "ASoC: mx27vis: retrieve gpio numbers from platform_data" is
+to get rid of inclusion mach/iomux-mx27.h.  This has to be done before
+we enable multi-platform support for imx, since mach/* has to be removed
+completely for multi-platform build.
 
-Looking at arch/arm/boot/dts/vexpress-v2m-rs1.dtsi I don't think we
-provide anything which is on rs1 though.
+> > If your for-3.7 is not stable anyway, I guess the easiest the way
+> 
+> It probably *is* stable but I'm not enthused about people pulling
+> unsigned tags.  I might rebase, though - I'm going to finalise the tree
+> in the next few days.
+> 
+> > to do it might be you drop the patch "ASoC: mx27vis: retrieve gpio
+> > numbers from platform_data" from your tree and I have it be part of
+> > the series to go via arm-soc tree as a whole.  (This is the original
+> > plan that I mentioned in v1 cover letter)
+> 
+> You just mentioned it as a preference (you said it's something you'd
+> like to do), please if you're doing this sort of cross tree thing be
+> explicit about what the inter-tree relationships are.  If things need to
+> go in via the same tree say so explicitly (and ideally say way this is).
+> 
+Ok, my bad.
 
-The Xen VM environment has only a gic (via a combination of the gic
-virtualisation mode for CPU regs and emulation for the distributor), the
-arch timers and xenbus (which is the s/w bus which Xen uses to discover
-its paravirtualised peripherals).
+> The main reason I applied it straight away was that Javier mentioned
+> that it was a bug fix and it's near the merge window and these random
+> ARM cleanup serieses never seem to go in quickly.
 
-Currently we provide a very simple output only emulation of UART0,
-simply to get the debug output from the decompresser, but we want that
-to go away not get baked in.
+The series is planned for 3.7 merge window.  Is it still possible for
+you to drop the patch from your tree to ease the process?  Or I will
+hold my pull-request to arm-soc until you tell me you have your tree
+finalized.
 
-Ian.
+Shawn
