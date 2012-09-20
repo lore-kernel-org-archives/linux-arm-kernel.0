@@ -1,35 +1,18 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 20 Sep 2012 19:15:09 +0100
-Subject: [PATCH v2 04/13] regulators: Versatile Express regulator driver
-In-Reply-To: <1348162472.11116.149.camel@hornet>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <1347977875-16855-5-git-send-email-pawel.moll@arm.com>
- <20120918150212.GA12543@opensource.wolfsonmicro.com>
- <1347983056.11116.11.camel@hornet>
- <20120918160909.GA15587@opensource.wolfsonmicro.com>
- <1347987819.11116.38.camel@hornet>
- <20120919022141.GA8832@opensource.wolfsonmicro.com>
- <1348073905.11116.80.camel@hornet>
- <20120920130114.GQ17666@opensource.wolfsonmicro.com>
- <1348162472.11116.149.camel@hornet>
-Message-ID: <20120920181508.GA5102@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Sep 2012 11:17:33 -0700
+Subject: [PATCH 07/29] ARM: OMAP1: Move lcd_mipid.h from plat to mach
+In-Reply-To: <20120919210552.28074.21443.stgit@muffinssi>
+References: <20120919205732.28074.43697.stgit@muffinssi>
+ <20120919210552.28074.21443.stgit@muffinssi>
+Message-ID: <20120920181733.GF28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 06:34:32PM +0100, Pawel Moll wrote:
+* Tony Lindgren <tony@atomide.com> [120919 14:07]:
+> This is only used by omap1.
 
-> These calculations try to maximize the range, but in most cases it's
-> impossible to be exactly in line with constraints. The delta should be
-> less then 1%, eg. in my test case I get:
+This too is handled by Arnd's series already, dropping this one.
 
-No, what I mean is that we don't want steps of 343uV or something.
+Regards,
 
-> 1. Something like bool "regulator_desc.linear"
-
-> 2. A magic value for regulator_desc.n_voltages, something like
-> 	#define N_VOLTAGES_LINEAR (~0)
-
-> Does any of them seem reasonable?
-
-The former of them seems much more tasteful, though I'd go with
-continuous_volt or something, we already have linear maps.
+Tony
