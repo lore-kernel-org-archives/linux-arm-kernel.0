@@ -1,49 +1,23 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Sep 2012 11:25:14 +0100
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <20120919134658.GA2111@linaro.org>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20120919134658.GA2111@linaro.org>
-Message-ID: <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Sep 2012 12:25:32 +0200
+Subject: [PATCH 0/6] pinctrl: samsung: Various fixes
+In-Reply-To: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
+References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkdbTPQvGSHJU_odGFtr5snb=U+L2Yuo-AhgX55hF6V5Lqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 02:46:58PM +0100, Dave Martin wrote:
-> On Tue, Sep 18, 2012 at 05:35:33PM +0100, Lorenzo Pieralisi wrote:
-> > In processors like A15/A7 L2 cache is unified and integrated within the
-> > processor cache hierarchy, so that it is not considered an outer cache
-> > anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
-> > all cache levels up to Level of Coherency (LoC) that includes
-> > the L2 unified cache.
-> > 
-> > When a single CPU is suspended (CPU idle) a complete L2 clean is not
-> > required, so generic cpu_suspend code must clean the data cache using the
-> > newly introduced cache LoUIS function.
-> 
-> For patches 3-5 in this series, we know that the assumption that
-> flushing LoUIS is sufficient for safely powering the CPU down is not
-> valid in the general case, though we've agreed it's a sensible
-> compromise for the CPU variants we know about today.
+On Thu, Sep 20, 2012 at 10:51 AM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-I agree, but we should also keep in mind that there are suspend and
-hotplug finishers where platform specific code can (and should sometimes)
-carry out the required operations, if flushing to LoUIS is not sufficient.
+> This patch series contains various fixes of problems and nitpicks spotted when
+> working on adding support for Exynos4x12. See each patch for more detailed
+> information.
 
-Patch 3-5 are there to avoid carrying out heavy cache operations that
-are not needed, not to define LoUIS as a sufficient cache level for
-powering down a CPU.
+This all looks good, do you want me to take this into the pinctrl tree
+or will it go through Samsung ARM SoC (Kyungmin)?
 
-Your concern is shared, though.
+In the latter case, Acked-by: Linus Walleij <linus.walleij@linaro.org>
+for all, else poke me and I'll apply them.
 
-> 
-> I think we do need to document this assumption, though.
-> 
-> At this point I don't mind whether it appears in code comments or in the
-> commit messages.
-
-It is a fair point. I will improve comments in the code and commit logs
-for next version.
-
-Lorenzo
+Yours,
+Linus Walleij
