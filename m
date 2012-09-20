@@ -1,10 +1,10 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 20 Sep 2012 07:28:34 +0200
-Subject: [PATCH v2 1/2] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <1348055861-7857-2-git-send-email-fabio.porcedda@gmail.com>
+Date: Thu, 20 Sep 2012 07:29:28 +0200
+Subject: [PATCH v2 2/2] ARM: at91: add at91sam9_wdt driver to at91sam9260
+In-Reply-To: <1348055861-7857-3-git-send-email-fabio.porcedda@gmail.com>
 References: <1348055861-7857-1-git-send-email-fabio.porcedda@gmail.com>
- <1348055861-7857-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <20120920052834.GD17667@game.jcrosoft.org>
+ <1348055861-7857-3-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <20120920052928.GE17667@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,24 @@ On 13:57 Wed 19 Sep     , Fabio Porcedda wrote:
 > 
 > Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 > ---
->  Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 15 +++++++++++++++
->  drivers/watchdog/at91sam9_wdt.c                          | 11 +++++++++++
->  2 files changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>  arch/arm/boot/dts/at91sam9260.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> new file mode 100644
-> index 0000000..fca76fd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -0,0 +1,15 @@
-> +* Atmel Watchdog Timers
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index 66389c1..680b1c8 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -233,6 +233,12 @@
+>  					trigger-external;
+>  				};
+>  			};
 > +
-> +** at91sam9-wdt
+> +			watchdog at fffffd40 {
+disable dy default
+> +				compatible = "atmel,at91sam9-wdt";
+> +				reg = <0xfffffd40 0x10>;
+> +			};
 > +
-> +Required properties:
-> +- compatible: must be "atmel,at91sam9-wdt"
-atmel,at91sam9260-watchdog
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +Example:
-> +
-> +	watchdog at fffffd40 {
-> +		compatible = "atmel,at91sam9-wdt";
-> +		reg = <0xfffffd40 0x10>;
-> +	};
-
-you need to be able to specify the timeout too via DT
 
 Best Regards,
 J.
