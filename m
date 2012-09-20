@@ -1,47 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Sep 2012 10:35:50 +0100
-Subject: [PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
-In-Reply-To: <20120913010041.GD7622@verge.net.au>
-References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
- <1347434097-7924-3-git-send-email-horms@verge.net.au>
- <5050CD87.4020800@codeaurora.org>
- <20120913010041.GD7622@verge.net.au>
-Message-ID: <CAHkRjk500KGTeBD67YMWy2qSdaoO_=Y9WBT_Q78n9Zxgqtmo4w@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 20 Sep 2012 11:45:46 +0200
+Subject: [PATCH 1/3] serial: pl011: safeguard against impossible baudrates
+Message-ID: <1348134346-25593-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2012 02:00, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Sep 12, 2012 at 10:59:35AM -0700, Stephen Boyd wrote:
->> On 09/12/12 00:14, Simon Horman wrote:
->> > @@ -1423,6 +1423,15 @@ config ARM_ERRATA_775420
->> >           deadlock. This workaround puts DSB before executing ISB at the
->> >           beginning of the abort exception handler.
->> >
->> > +config ARM_ERRATA_782773
->> > +   bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
->> > +   depends on CPU_V7
->> > +   help
->> > +     This option enables the workaround for the 782773 Cortex-A9 (all r0,
->> > +     ,r2 and r3 revisions) erratum. It might cause MMU exception in case
->>
->> Seems to be an extra comma here.
->
-> Thanks, here is an updated version.
->
-> From: Kouei Abe <kouei.abe.cp@rms.renesas.com>
->
-> arm: Add ARM ERRATA 782773 workaround
->
-> Signed-off-by: Kouei Abe <kouei.abe.cp@rms.renesas.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I would add some text to the commit log as well, even though it
-matches the Kconfig entry.
+The PL011 generates it's bitrate from the clock to the block,
+and this in turn will be divided by a minimum of 16 (ARM PL011)
+or 8 (ST Micro PL011 derivate). Safeguard against illegal
+rates exceeding that of what the port clock can be divided
+down to.
 
-Have you hit this in practice? In general the kernel shouldn't access
-kernel virtual address corresponding to a page table that is being
-changed. For user address space it is possible but the kernel can
-handle use translation faults, even though they may be spurious.
+Since the clkdiv variable is only ever used for calculating the
+maximum baud rate, let's skip that variable and add a new
+max_baud variable instead, then use this to check limits and
+as parameter for getting the baud rate.
 
+Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
+Cc: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
+Cc: Christophe Arnal <christophe.arnal@stericsson.com>
+Cc: Matthias Locher <matthias.locher@stericsson.com>
+Cc: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d626d84..9e16ea6 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1492,18 +1492,25 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+ 	unsigned int lcr_h, old_cr;
+ 	unsigned long flags;
+-	unsigned int baud, quot, clkdiv;
++	unsigned int max_baud, baud, quot;
+ 
+ 	if (uap->vendor->oversampling)
+-		clkdiv = 8;
++		max_baud = port->uartclk / 8;
+ 	else
+-		clkdiv = 16;
++		max_baud = port->uartclk / 16;
++
++	if ((termios->c_ispeed > max_baud) ||
++	    (termios->c_ospeed > max_baud)) {
++		dev_err(port->dev,
++			"requested a baud rate > clock/mindivisor\n");
++		return;
++	}
+ 
+ 	/*
+ 	 * Ask the core to calculate the divisor for us.
+ 	 */
+ 	baud = uart_get_baud_rate(port, termios, old, 0,
+-				  port->uartclk / clkdiv);
++				  max_baud);
+ 
+ 	if (baud > port->uartclk/16)
+ 		quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
 -- 
-Catalin
+1.7.11.3
