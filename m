@@ -1,27 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Sep 2012 20:00:34 +0100
-Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
-In-Reply-To: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
-References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120920190034.GB15609@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 20 Sep 2012 20:03:42 +0100
+Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
+In-Reply-To: <50366464.4070801@metafoo.de>
+References: <36966374.2768747.1345741025741.JavaMail.root@advansee.com>
+ <50366464.4070801@metafoo.de>
+Message-ID: <20120920190342.GA13264@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 11:46:08AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The ST Microelectronics variant of the PL011 is capable of supporting
-> very high non-standard baud rates, even above 4 Mbps. However the
-> uart_get_baud_rate() will not allow us to set these, so override that
-> calculation on very high speeds.
+On Thu, Aug 23, 2012 at 07:12:04PM +0200, Lars-Peter Clausen wrote:
+> On 08/23/2012 06:57 PM, Beno??t Th??baudeau wrote:
 
-You don't explain why it doesn't.  It should in theory allow you to,
-because there's no limits within that function other than those which
-you pass in as the minimum and maximum.
+> > exists with several other PWM drivers.
 
-If your userspace hasn't been updated to use the integer baud rate
-setting mechanisms, then that could be where the problem lies.
-Alternatively, if some Bxxxx setting is not being respected by
-tty_termios_baud_rate(), that also would need fixing.
+> Since this seems to be a common pattern in a number of PWM drivers it might
+> make sense to simply add support for enabling/disabling a clk to the pwm core.
+> Or maybe just use the runtime pm API for this. This probably makes even more
+> sense and grab a reference to the pm context when the enable() is called,
+> release it when disable() is called and also grab it before calling the
+> device's config callback and release it afterward.
 
-But the fix you propose in this patch just looks wrong.
+It's a problem with IPs in general, a good proportion of modern SoCs
+need a clock supplying in order to interact with the registers on most
+of their IPs.  runtime PM is the normal way forwards, Tegra recently
+started using regmap's cache code to handle this transparently in the
+driver.
