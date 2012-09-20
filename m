@@ -1,63 +1,61 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:20 +0200
-Subject: [PATCH 02/32] ARM: ux500: Clean-up temporary Device Tree enablement
- helpers
+Date: Thu, 20 Sep 2012 14:12:22 +0200
+Subject: [PATCH 04/32] Documentation: Add the AB8500 CODEC device to the MFD
+ AB8500 doc
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we remove some of the extra overhead we introduced to make
-DT:ing the Snowball platform easier.
+Here we document the AB8500 Audio CODEC in the existing MFD AB8500 document.
 
+CC: alsa-devel at alsa-project.org
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |   10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+ Documentation/devicetree/bindings/mfd/ab8500.txt |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index db3c52d..38b7f9c 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -138,10 +138,6 @@ static struct platform_device *platform_devs[] __initdata = {
- 	&db8500_prcmu_device,
- };
+diff --git a/Documentation/devicetree/bindings/mfd/ab8500.txt b/Documentation/devicetree/bindings/mfd/ab8500.txt
+index 69e757a..ce83c8d 100644
+--- a/Documentation/devicetree/bindings/mfd/ab8500.txt
++++ b/Documentation/devicetree/bindings/mfd/ab8500.txt
+@@ -23,6 +23,7 @@ Device                     IRQ Names              Supply Names   Description
+ ab8500-bm                :                      :              : Battery Manager
+ ab8500-btemp             :                      :              : Battery Temperature
+ ab8500-charger           :                      :              : Battery Charger
++ab8500-codec             :                      :              : Audio Codec
+ ab8500-fg                :                      :              : Fuel Gauge
+ ab8500-gpadc             : HW_CONV_END          : vddadc       : Analogue to Digital Converter
+                            SW_CONV_END          :              :
+@@ -52,6 +53,14 @@ Optional child device properties:
+                            supplied in the interrupts property
+ - <supply_name>-supply   : contains a phandle to the regulator supply node in Device Tree
  
--static struct platform_device *of_platform_devs[] __initdata = {
--	&u8500_dma40_device,
--};
--
- static resource_size_t __initdata db8500_gpio_base[] = {
- 	U8500_GPIOBANK0_BASE,
- 	U8500_GPIOBANK1_BASE,
-@@ -235,7 +231,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
- struct device * __init u8500_of_init_devices(void)
- {
- 	struct device *parent;
--	int i;
++Non-standard child device properties:
++ - Audio CODEC:
++   - stericsson,amic[1|2]-type-single-ended : Single-ended Analoge Mic (default: differential)
++   - stericsson,amic1a-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
++   - stericsson,amic1b-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
++   - stericsson,amic2-bias-vamic1           : Analoge Mic wishes to use a non-standard Vamic
++   - stericsson,earpeice-cmv                : Earpeice voltage (only: 950 | 1100 | 1270 | 1580)
++
+ ab8500 at 5 {
+          compatible = "stericsson,ab8500";
+          reg = <5>; /* mailbox 5 is i2c */
+@@ -110,6 +119,12 @@ ab8500 at 5 {
+                 compatible = "stericsson,ab8500-pwm";
+         };
  
- 	parent = db8500_soc_device_init();
++	codec: ab8500-codec {
++		compatible = "stericsson,ab8500-codec";
++
++		stericsson,earpeice-cmv = <950>; /* Units in mV. */
++	};
++
+         ab8500-regulators {
+                 compatible = "stericsson,ab8500-regulator";
  
-@@ -244,8 +239,7 @@ struct device * __init u8500_of_init_devices(void)
- 	platform_device_register_data(parent,
- 		"cpufreq-u8500", -1, NULL, 0);
- 
--	for (i = 0; i < ARRAY_SIZE(of_platform_devs); i++)
--		of_platform_devs[i]->dev.parent = parent;
-+	u8500_dma40_device.dev.parent = parent;
- 
- 	/*
- 	 * Devices to be DT:ed:
-@@ -253,7 +247,7 @@ struct device * __init u8500_of_init_devices(void)
- 	 *   db8500_pmu_device   = done
- 	 *   db8500_prcmu_device = done
- 	 */
--	platform_add_devices(of_platform_devs, ARRAY_SIZE(of_platform_devs));
-+	platform_device_register(&u8500_dma40_device);
- 
- 	return parent;
- }
 -- 
 1.7.9.5
