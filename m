@@ -1,42 +1,100 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:09:09 +0200
-Subject: [GIT PULL] MOP500 Audio patches due for ASoC
-Message-ID: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
+Date: Thu, 20 Sep 2012 14:09:11 +0200
+Subject: [PATCH 2/7] ASoC: Ux500: Enable MOP500 driver for Device Tree
+In-Reply-To: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
+References: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348142956-1872-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+Here we ensure that the MOP500 audio driver will be probed during a
+Device Tree boot. We also parse the sound node to link together the
+codec, dma and the CPU-side Digital Audio Interface.
 
-  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+Acked-by: Ola Lilja <ola.o.lilja@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/ux500/mop500.c |   40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-asoc-next
-
-for you to fetch changes up to b4cad7af6665743647f28119b689e1552326d4da:
-
-  Documentation: Define the MSP Driver Device Tree bindings (2012-09-20 09:10:59 +0200)
-
-----------------------------------------------------------------
-Lee Jones (7):
-      ASoC: Ux500: Move MSP pinctrl setup into the MSP driver
-      ASoC: Ux500: Enable MOP500 driver for Device Tree
-      ASoC: Ux500: Enable ux500 MSP driver for Device Tree
-      ASoC: codecs: Enable AB8500 CODEC for Device Tree
-      ASoC: Ux500: Minor coding layout changes
-      Documentation: Define the MOP500 Audio Machine Driver Device Tree bindings
-      Documentation: Define the MSP Driver Device Tree bindings
-
- .../devicetree/bindings/sound/ux500-mop500.txt     |   39 +++++++++
- .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++
- arch/arm/mach-ux500/board-mop500-msp.c             |   79 +----------------
- arch/arm/mach-ux500/include/mach/msp.h             |    2 -
- include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
- sound/soc/codecs/ab8500-codec.c                    |   81 ++++++++++++++++++
- sound/soc/ux500/mop500.c                           |   47 +++++++++--
- sound/soc/ux500/ux500_msp_dai.c                    |    6 ++
- sound/soc/ux500/ux500_msp_i2s.c                    |   89 +++++++++++++++-----
- sound/soc/ux500/ux500_msp_i2s.h                    |    8 +-
- 10 files changed, 292 insertions(+), 108 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/ux500-mop500.txt
- create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 31c4d26..6840df7 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/spi/spi.h>
++#include <linux/of.h>
+ 
+ #include <sound/soc.h>
+ #include <sound/initval.h>
+@@ -56,8 +57,35 @@ static struct snd_soc_card mop500_card = {
+ 	.num_links = ARRAY_SIZE(mop500_dai_links),
+ };
+ 
++static int __devinit mop500_of_probe(struct platform_device *pdev,
++				struct device_node *np)
++{
++	struct device_node *codec_np, *msp_np[2];
++	int i;
++
++	msp_np[0] = of_parse_phandle(np, "stericsson,cpu-dai", 0);
++	msp_np[1] = of_parse_phandle(np, "stericsson,cpu-dai", 1);
++	codec_np  = of_parse_phandle(np, "stericsson,audio-codec", 0);
++
++	if (!(msp_np[0] && msp_np[1] && codec_np)) {
++		dev_err(&pdev->dev, "Phandle missing or invalid\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i < 2; i++) {
++		mop500_dai_links[i].cpu_of_node = msp_np[i];
++		mop500_dai_links[i].cpu_dai_name = NULL;
++		mop500_dai_links[i].codec_of_node = codec_np;
++		mop500_dai_links[i].codec_name = NULL;
++	}
++
++	snd_soc_of_parse_card_name(&mop500_card, "stericsson,card-name");
++
++	return 0;
++}
+ static int __devinit mop500_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+ 	pr_debug("%s: Enter.\n", __func__);
+@@ -66,6 +94,12 @@ static int __devinit mop500_probe(struct platform_device *pdev)
+ 
+ 	mop500_card.dev = &pdev->dev;
+ 
++	if (np) {
++		ret = mop500_of_probe(pdev, np);
++		if (ret)
++			return ret;
++	}
++
+ 	dev_dbg(&pdev->dev, "%s: Card %s: Set platform drvdata.\n",
+ 		__func__, mop500_card.name);
+ 	platform_set_drvdata(pdev, &mop500_card);
+@@ -101,10 +135,16 @@ static int __devexit mop500_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id snd_soc_mop500_match[] = {
++	{ .compatible = "stericsson,snd-soc-mop500", },
++	{},
++};
++
+ static struct platform_driver snd_soc_mop500_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = "snd-soc-mop500",
++		.of_match_table = snd_soc_mop500_match,
+ 	},
+ 	.probe = mop500_probe,
+ 	.remove = __devexit_p(mop500_remove),
+-- 
+1.7.9.5
