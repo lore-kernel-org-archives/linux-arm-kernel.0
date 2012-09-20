@@ -1,34 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Sep 2012 15:53:06 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <201209201510.24631.marex@denx.de>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
- <201209201510.24631.marex@denx.de>
-Message-ID: <505B1FC2.2090609@free-electrons.com>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Thu, 20 Sep 2012 08:57:26 -0500
+Subject: [PATCH 07/11] tty/serial: Add kgdb_nmi driver
+In-Reply-To: <1348098122-11041-7-git-send-email-anton.vorontsov@linaro.org>
+References: <20120919234003.GA24143@lizard>
+ <1348098122-11041-7-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <505B20C6.5090308@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-Le 20/09/2012 15:10, Marek Vasut a ?crit :
->>> If barebox can't handle even basic DT fixup, it's broken.
->>
->> It can. It maybe was just not needed up to now, dunno.
+On 09/19/2012 06:41 PM, Anton Vorontsov wrote:
+> This special driver makes it possible to temporary use NMI debugger port
+> as a normal console by issuing 'nmi_console' command (assuming that the
+> port is attached to KGDB).
 > 
-> Fix it and send patch, so this problem doesn't spread.
 
-I'm sorry, but you still miss the point.
 
-If someone wants to use another bootloader than U-boot (or a possible
-patched barebox), or none other than the bootlets to boot directly the
-Linux (with an appended device tree), you will still have no way to get
-the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+The kgdb regression compiler also does checkpatch, so the "check patch
+police" don't come chasing us let's get rid of this warning.  This
+comes with the disclaimer that I believe checkpatch is a bit overly
+agressive in the first place. :-)
 
-The kernel shouldn't rely on a particular feature of a given bootloader.
+WARNING: quoted string split across lines
+#133: FILE: drivers/tty/serial/kgdb_nmi.c:36:
++MODULE_PARM_DESC(knock, "if set to 1 (default), the special '$3#33' command "
++                       "must be used to enter the debugger; when set to 0, "
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+---
+ drivers/tty/serial/kgdb_nmi.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+--- a/drivers/tty/serial/kgdb_nmi.c
++++ b/drivers/tty/serial/kgdb_nmi.c
+@@ -32,10 +32,10 @@
+ 
+ static int kgdb_nmi_knock = 1;
+ module_param_named(knock, kgdb_nmi_knock, int, 0600);
+-MODULE_PARM_DESC(knock, "if set to 1 (default), the special '$3#33' command "
+-			"must be used to enter the debugger; when set to 0, "
+-			"hitting return key is enough to enter the debugger; "
+-			"when set to -1, the debugger is entered immediately "
++MODULE_PARM_DESC(knock, "if set to 1 (default), the special '$3#33' command " \
++			"must be used to enter the debugger; when set to 0, " \
++			"hitting return key is enough to enter the debugger; " \
++			"when set to -1, the debugger is entered immediately " \
+ 			"upon NMI");
+ 
+ static char *kgdb_nmi_magic = "$3#33";
