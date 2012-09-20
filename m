@@ -1,37 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Sep 2012 10:54:31 +0100
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
-References: <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
- <20120515094010.GF10453@n2100.arm.linux.org.uk>
- <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
- <20120515101505.GG10453@n2100.arm.linux.org.uk>
- <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
- <20120515163618.GH13860@n2100.arm.linux.org.uk>
- <20120515170534.GA17319@e102568-lin.cambridge.arm.com>
- <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
-Message-ID: <20120920095431.GC4588@e102568-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Sep 2012 10:58:53 +0100
+Subject: [PATCH 1/2] arm: Add ARM ERRATA 775420 workaround
+In-Reply-To: <1347434097-7924-2-git-send-email-horms@verge.net.au>
+References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
+ <1347434097-7924-2-git-send-email-horms@verge.net.au>
+Message-ID: <CAHkRjk6vbM8f=bK_GkgpDmnYh-UU_M3T9TeOj6Ti7UZB-5U2cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 09:55:52AM +0100, Antti P Miettinen wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> > What we should do as I described, is executing the sequence:
-> >
-> > clear SCTRL.C
-> > clean cache
-> > exit coherency
-> 
-> How does SCTRL.C affect TLB fetches? Especially on A9? Seems that page
-> table updates do clean_dcache_area() so probably not an issue but just
-> out of curiosity, are TLB fetches affected by the C bit on A9?
+On 12 September 2012 08:14, Simon Horman <horms@verge.net.au> wrote:
+> +config ARM_ERRATA_775420
+> +       bool "ARM errata: A data cache maintenance operation which aborts, might lead to deadlock"
+> +       depends on CPU_V7
+> +       help
+> +         This option enables the workaround for the 775420 Cortex-A9 (r2p2,
+> +         r2p6,r2p8,r2p10,r3p0) erratum. In case a date cache maintenance
+> +         operation aborts with MMU exception, it might cause the processor
+> +         deadlock. This workaround puts DSB before executing ISB at the
+> +         beginning of the abort exception handler.
+> +
+>  endmenu
 
-Yes, they are. TLB fetches cannot search the D-cache if the C bit in
-SCTLR is clear on A9. I do not see any issue with this though, at least
-in the power down procedure described above and in previous e-mails in
-this thread.
+The only case where we can get an abort on cache maintenance is
+v7_coherent_user_range(). I don't think we have any ISB on the
+exception handling path for this function, so we could just add the
+DSB there:
 
-Lorenzo
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -211,6 +211,9 @@ ENTRY(v7_coherent_user_range)
+  * isn't mapped, fail with -EFAULT.
+  */
+ 9001:
++#ifdef CONFIG_ARM_ERRATA_775420
++	dsb
++#endif
+ 	mov	r0, #-EFAULT
+ 	mov	pc, lr
+  UNWIND(.fnend		)
+
+-- 
+Catalin
