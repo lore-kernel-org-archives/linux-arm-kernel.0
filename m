@@ -1,33 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 20 Sep 2012 15:24:34 +0100
-Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
-In-Reply-To: <alpine.DEB.2.02.1209201501140.29232@kaball.uk.xensource.com>
-References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1209201240110.29232@kaball.uk.xensource.com>
- <1348143533.26501.28.camel@zakaz.uk.xensource.com>
- <201209201327.45802.arnd@arndb.de>
- <alpine.DEB.2.02.1209201501140.29232@kaball.uk.xensource.com>
-Message-ID: <1348151074.11116.126.camel@hornet>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 20 Sep 2012 23:29:13 +0900
+Subject: [PATCH 0/6] pinctrl: samsung: Various fixes
+In-Reply-To: <CACRpkdbTPQvGSHJU_odGFtr5snb=U+L2Yuo-AhgX55hF6V5Lqw@mail.gmail.com>
+References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
+ <CACRpkdbTPQvGSHJU_odGFtr5snb=U+L2Yuo-AhgX55hF6V5Lqw@mail.gmail.com>
+Message-ID: <505B2839.1040600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-20 at 15:11 +0100, Stefano Stabellini wrote:
-> On Thu, 20 Sep 2012, Arnd Bergmann wrote:
-> > It's not much different in the end, but I think I'd rather make the
-> > compatible list in the device tree "xen,xenvm-4.2", "xen,xenvm" without
-> > listing "arm,vexpress", but then adding "xen,xenvm" to the list of
-> > compatible devices in the vexpress kernel code.
+On 09/20/12 19:25, Linus Walleij wrote:
+> On Thu, Sep 20, 2012 at 10:51 AM, Tomasz Figa<t.figa@samsung.com>  wrote:
 >
-> That's a very good idea, I'll do that.
+>> This patch series contains various fixes of problems and nitpicks spotted when
+>> working on adding support for Exynos4x12. See each patch for more detailed
+>> information.
+>
+> This all looks good, do you want me to take this into the pinctrl tree
+> or will it go through Samsung ARM SoC (Kyungmin)?
+>
+> In the latter case, Acked-by: Linus Walleij<linus.walleij@linaro.org>
+> for all, else poke me and I'll apply them.
+>
+Linus, thanks for your ack and looks OK to me. Since now pinctrl-exynos 
+driver is in my tree so let me pick this series on top of it into 
+Samsung tree with your ack.
 
-Yep, this would work with me as well. And I'm sure we can make the
-"arm,vexpress,memory-map" bit unnecessary as well - have a look into it,
-and I'll help you as much as I can.
+Thanks.
 
-And then, if your "reference" DTS is to be merged, it won't be called
-vexpress-*.dts, so I will not have to decide whether to take it in or
-not :-)
-
-Cheers!
-
-Pawe?
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
