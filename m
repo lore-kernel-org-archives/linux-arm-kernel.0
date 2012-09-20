@@ -1,153 +1,25 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 20 Sep 2012 12:39:45 +0100
-Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
-In-Reply-To: <1348135563.11116.94.camel@hornet>
-References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1348135563.11116.94.camel@hornet>
-Message-ID: <alpine.DEB.2.02.1209201235450.29232@kaball.uk.xensource.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 20 Sep 2012 07:41:50 -0400
+Subject: [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <201209200739.34899.arnd@arndb.de>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+Message-ID: <20120920114148.GH17666@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2012, Pawel Moll wrote:
-> Morning,
-> 
-> On Wed, 2012-09-19 at 18:44 +0100, Stefano Stabellini wrote:
-> > +/dts-v1/;
-> > +
-> > +/include/ "skeleton.dtsi"
-> 
-> Any particular reason to include skeleton? And I think it would be
-> better to use #address-cells = <2> and #size-cells = <2>, to be ready
-> for LPAE addresses...
+On Thu, Sep 20, 2012 at 07:39:34AM +0000, Arnd Bergmann wrote:
 
-good idea
+> The first five branches are scheduled to go through the arm-soc tree, so
+> I'm fine with that. For the sound/for-3.7 branch, I'd like to know when
+> to expect that hitting mainline. If it always gets in very early during the
+> merge window, it's probably ok to put the imx/multi-platform patches into
+> the same branch as the other ones in arm-soc and wait for the sound stuff
+> to hit mainline first, otherwise I'd suggest we start a second
+> next/multiplatform-2 branch for imx and send the first part early on
+> but then wait with the second batch before sound gets in.
 
-
-> > +/ {
-> > +	model = "XENVM-4.2";
-> > +	compatible = "xen,xenvm-4.2", "arm,vexpress";
-> > +	interrupt-parent = <&gic>;
-> > +
-> > +	chosen {
-> > +		bootargs = "earlyprintk console=hvc0 root=/dev/xvda init=/sbin/init";
-> > +	};
-> > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a15";
-> > +			reg = <0>;
-> > +		};
-> > +	};
-> > +
-> > +	memory {
-> 
-> Formally, it should be memory at 80000000, not that I have any strong
-> feelings about it :-)
-
-OK
-
-
-> > +		device_type = "memory";
-> > +		reg = <0x80000000 0x08000000>;
-> > +	};
-> > +
-> > +	gic: interrupt-controller at 2c001000 {
-> > +		compatible = "arm,cortex-a9-gic";
-> > +		#interrupt-cells = <3>;
-> > +		#address-cells = <0>;
-> > +		interrupt-controller;
-> > +		reg = <0x2c001000 0x1000>,
-> > +		      <0x2c002000 0x100>;
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv7-timer";
-> > +		interrupts = <1 13 0xf08>,
-> > +			     <1 14 0xf08>,
-> > +			     <1 11 0xf08>,
-> > +			     <1 10 0xf08>;
-> > +	};
-> > +
-> > +	hypervisor {
-> > +		compatible = "xen,xen-4.2", "xen,xen";
-> > +		reg = <0xb0000000 0x20000>;
-> > +		interrupts = <1 15 0xf08>;
-> > +	};
-> 
-> Is this binding documented somewhere - I mean in
-> Documentation/devicetree/bindings?
-
-Yes, it is: Documentation/devicetree/bindings/arm/xen.txt
-added by: http://marc.info/?l=linux-kernel&m=134790380030990&w=2
-
-
-> > +	motherboard {
-> > +		arm,v2m-memory-map = "rs1";
-> > +		ranges = <0 0 0x08000000 0x04000000>,
-> > +			 <1 0 0x14000000 0x04000000>,
-> > +			 <2 0 0x18000000 0x04000000>,
-> > +			 <3 0 0x1c000000 0x04000000>,
-> > +			 <4 0 0x0c000000 0x04000000>,
-> > +			 <5 0 0x10000000 0x04000000>;
-> > +
-> > +		interrupt-map-mask = <0 0 63>;
-> > +		interrupt-map = <0 0  0 &gic 0  0 4>,
-> > +				<0 0  1 &gic 0  1 4>,
-> > +				<0 0  2 &gic 0  2 4>,
-> > +				<0 0  3 &gic 0  3 4>,
-> > +				<0 0  4 &gic 0  4 4>,
-> > +				<0 0  5 &gic 0  5 4>,
-> > +				<0 0  6 &gic 0  6 4>,
-> > +				<0 0  7 &gic 0  7 4>,
-> > +				<0 0  8 &gic 0  8 4>,
-> > +				<0 0  9 &gic 0  9 4>,
-> > +				<0 0 10 &gic 0 10 4>,
-> > +				<0 0 11 &gic 0 11 4>,
-> > +				<0 0 12 &gic 0 12 4>,
-> > +				<0 0 13 &gic 0 13 4>,
-> > +				<0 0 14 &gic 0 14 4>,
-> > +				<0 0 15 &gic 0 15 4>,
-> > +				<0 0 16 &gic 0 16 4>,
-> > +				<0 0 17 &gic 0 17 4>,
-> > +				<0 0 18 &gic 0 18 4>,
-> > +				<0 0 19 &gic 0 19 4>,
-> > +				<0 0 20 &gic 0 20 4>,
-> > +				<0 0 21 &gic 0 21 4>,
-> > +				<0 0 22 &gic 0 22 4>,
-> > +				<0 0 23 &gic 0 23 4>,
-> > +				<0 0 24 &gic 0 24 4>,
-> > +				<0 0 25 &gic 0 25 4>,
-> > +				<0 0 26 &gic 0 26 4>,
-> > +				<0 0 27 &gic 0 27 4>,
-> > +				<0 0 28 &gic 0 28 4>,
-> > +				<0 0 29 &gic 0 29 4>,
-> > +				<0 0 30 &gic 0 30 4>,
-> > +				<0 0 31 &gic 0 31 4>,
-> > +				<0 0 32 &gic 0 32 4>,
-> > +				<0 0 33 &gic 0 33 4>,
-> > +				<0 0 34 &gic 0 34 4>,
-> > +				<0 0 35 &gic 0 35 4>,
-> > +				<0 0 36 &gic 0 36 4>,
-> > +				<0 0 37 &gic 0 37 4>,
-> > +				<0 0 38 &gic 0 38 4>,
-> > +				<0 0 39 &gic 0 39 4>,
-> > +				<0 0 40 &gic 0 40 4>,
-> > +				<0 0 41 &gic 0 41 4>,
-> > +				<0 0 42 &gic 0 42 4>;
-> > +	};
-> > +};
-> 
-> You've lost me here... You have ranges and interrupt map, but don't
-> include motherboard file. Is it a mistake? If not, you could remove the
-> ranges and interrupt-map, but where do you get your peripherals from
-> then?
-
-There are no peripherals apart from the ones that are already described
-here (timer, gic). All the peripherals that the guest sees are virtual
-devices that show up on xenbus (a virtual bus). In order to initialize
-xenbus, the guest only needs the hypervisor node.  So I'll remove the
-ranges and interrupt-map.
+It's usually pretty early but Takashi will be on holiday this time so
+I'm not sure if things might be different (he was going to send the pull
+request from holiday).  I also didn't guarantee that it'll be stable
+yet, can someone please tell me what the depenency is here?
