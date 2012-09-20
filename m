@@ -1,28 +1,42 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 20 Sep 2012 13:37:45 +0100
-Subject: [PATCH v2 07/13] misc: Versatile Express config infrastructure
-In-Reply-To: <201209201236.28157.arnd@arndb.de>
-References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
- <201209191308.43676.arnd@arndb.de> <1348142814.11116.113.camel@hornet>
- <201209201236.28157.arnd@arndb.de>
-Message-ID: <1348144665.11116.114.camel@hornet>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 20 Sep 2012 13:39:58 +0100
+Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
+In-Reply-To: <1348143533.26501.28.camel@zakaz.uk.xensource.com>
+References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1348136222.26501.19.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1209201240110.29232@kaball.uk.xensource.com>
+ <1348143533.26501.28.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1209201333460.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-20 at 13:36 +0100, Arnd Bergmann wrote:
-> On Thursday 20 September 2012, Pawel Moll wrote:
-> > > For now, I'd suggest you put this driver into drivers/mfd together
-> > > with the other part from your patch 8.
-> > 
-> > Do you mean - merge it into one file? I'd rather avoid that - the time
-> > will come (and probably sooner than I would hope) when there will be a
-> > new VE generation with some other "config bridge" instead of the
-> > sysregs.
+On Thu, 20 Sep 2012, Ian Campbell wrote:
+> > Versatile Express is flexible enough to be a good base for our own
+> > virtual machine platform, especially if the maintainers keep an eye on
+> > getting everything through DT and not expecting devices just to be there
+> > ;-)
 > 
-> No, just leave it at two files. We have a number of examples of mfd drivers
-> that have a common part and e.g. i2c and spi based files as back-ends.
-> For now, you'd just build both files together.
+> Perhaps what we want is a stricter subset of the stuff in mach-vexpress
+> then. But if so then this should be expressed both in the DT and in the
+> code, not just papered over by declaring things compatible when they are
+> not.
 
-Sure thing, thanks!
+But it is already expressed in the DT, by removing all the device nodes
+we don't emulated. And it is already expressed in the code, by fully
+discovering peripherals via DT, therefore not trying to initialize
+non-present devices.
 
-Pawe?
+
+> > > > +	gic: interrupt-controller at 2c001000 {
+> > > > +		compatible = "arm,cortex-a9-gic";
+> > > 
+> > > Don't we mean "arm,cortex-a15-gic" here? That's what we actually
+> > > provide. I'm not sure how the a9 and a15 differ.
+> > 
+> > The GIC that comes with vexpress is a9 compatible.
+> 
+> The GIC which Xen emulates is the one which matters here though, and
+> that is an a15.
+
+The a15 gic is still a9 compatible. OK to be precise I am going to add
+"arm,cortex-a15-gic", but I cannot really remove "arm,cortex-a9-gic".
