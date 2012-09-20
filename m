@@ -1,101 +1,55 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 20 Sep 2012 10:59:24 +0900
-Subject: [PATCH V5] ARM: EXYNOS5: Add bus clock for FIMD
-In-Reply-To: <1347978288-27759-1-git-send-email-l.krishna@samsung.com>
-References: <1347978288-27759-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <006f01cd96d3$8f1004f0$ad300ed0$%han@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 19 Sep 2012 19:03:23 -0700
+Subject: [PATCH v2 03/13] hwmon: Versatile Express hwmon driver
+In-Reply-To: <1348074288.11116.86.camel@hornet>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-4-git-send-email-pawel.moll@arm.com>
+ <20120918152430.GA5911@roeck-us.net>
+ <1348074288.11116.86.camel@hornet>
+Message-ID: <20120920020323.GB22634@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 18, 2012 11:25 PM Leela Krishna Amudala wrote
+On Wed, Sep 19, 2012 at 06:04:48PM +0100, Pawel Moll wrote:
+> Hi Guenter,
 > 
-> This patch adds the bus clock for FIMD and changes the device name for lcd clock
+> Thanks for your quick response (and apologies about me being delayed), I
+> appreciate your time!
 > 
-> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> On Tue, 2012-09-18 at 16:24 +0100, Guenter Roeck wrote:
+> > and a highly unusual way of, as much as I understand of it, bypass the hwmon
+> > infrastructure as much as possible.
+> 
+> I can assure you that it wasn't my aim. Generally, my platform has a lot
+> of small "control" devices providing one sensor each. And as they are
+> separate from the device model point of view, I wanted them to be
+> logically grouped around a single hwmon device (I was actually looking
+> at the coretemp driver). But it's not a big deal, really.
+> 
+I don't think the coretemp driver does what you are doing in your driver ...
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+> > I don't even understand what you are trying to do, much less why you don't
+> > just use the existing infrastructure, and I don't have time to try to figure
+> > it out. Maybe Jean has time to review this driver, but not me.
+> > 
+> > So, no, for my part I don't think it would be a good idea to rush this driver
+> > into 3.7.
+> > 
+> > Really, I would suggest to submit a standard hwmon driver (there are lots of
+> > examples out there).
+> 
+> Sure thing, I'll quickly spin a simplified version and post it for
+> review.
+> 
+When you do that, please have a look at Documentation/hwmon/submitting-patches,
+specifically the "New drivers" section.
 
+Regarding your device model, yes, it is a bit odd that you have a separate
+platform device for each sensor, especially if the vexpress is physically a
+single chip. It would be much simpler to have a single vexpress-hwmon platform
+device instead. But if you insist having such a complicated platform device
+architecture, you should not try to clean it up with a complicated and
+difficult to understand hwmon driver.
 
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c |   32 ++++++++++++++++++++++----------
->  1 files changed, 22 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-> index 774533c..404c53d 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -891,6 +891,13 @@ static struct clk exynos5_clk_mdma1 = {
->  	.ctrlbit	= (1 << 4),
->  };
-> 
-> +static struct clk exynos5_clk_fimd1 = {
-> +	.name		= "fimd",
-> +	.devname	= "exynos5-fb.1",
-> +	.enable		= exynos5_clk_ip_disp1_ctrl,
-> +	.ctrlbit	= (1 << 0),
-> +};
-> +
->  struct clk *exynos5_clkset_group_list[] = {
->  	[0] = &clk_ext_xtal_mux,
->  	[1] = NULL,
-> @@ -1120,6 +1127,18 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
->  	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
->  };
-> 
-> +struct clksrc_clk exynos5_clk_sclk_fimd1 = {
-> +	.clk	= {
-> +		.name		= "sclk_fimd",
-> +		.devname	= "exynos5-fb.1",
-> +		.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
-> +		.ctrlbit	= (1 << 0),
-> +	},
-> +	.sources = &exynos5_clkset_group,
-> +	.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
-> +	.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
-> +};
-> +
->  static struct clksrc_clk exynos5_clksrcs[] = {
->  	{
->  		.clk	= {
-> @@ -1131,16 +1150,6 @@ static struct clksrc_clk exynos5_clksrcs[] = {
->  		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
->  	}, {
->  		.clk	= {
-> -			.name		= "sclk_fimd",
-> -			.devname	= "s3cfb.1",
-> -			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
-> -			.ctrlbit	= (1 << 0),
-> -		},
-> -		.sources = &exynos5_clkset_group,
-> -		.reg_src = { .reg = EXYNOS5_CLKSRC_DISP1_0, .shift = 0, .size = 4 },
-> -		.reg_div = { .reg = EXYNOS5_CLKDIV_DISP1_0, .shift = 0, .size = 4 },
-> -	}, {
-> -		.clk	= {
->  			.name		= "aclk_266_gscl",
->  		},
->  		.sources = &clk_src_gscl_266,
-> @@ -1240,12 +1249,14 @@ static struct clksrc_clk *exynos5_sysclks[] = {
->  	&exynos5_clk_mdout_spi0,
->  	&exynos5_clk_mdout_spi1,
->  	&exynos5_clk_mdout_spi2,
-> +	&exynos5_clk_sclk_fimd1,
->  };
-> 
->  static struct clk *exynos5_clk_cdev[] = {
->  	&exynos5_clk_pdma0,
->  	&exynos5_clk_pdma1,
->  	&exynos5_clk_mdma1,
-> +	&exynos5_clk_fimd1,
->  };
-> 
->  static struct clksrc_clk *exynos5_clksrc_cdev[] = {
-> @@ -1274,6 +1285,7 @@ static struct clk_lookup exynos5_clk_lookup[] = {
->  	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
->  	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
->  	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
-> +	CLKDEV_INIT("exynos5-fb.1", "lcd", &exynos5_clk_fimd1),
->  };
-> 
->  static unsigned long exynos5_epll_get_rate(struct clk *clk)
-> --
-> 1.7.0.4
+Thanks,
+Guenter
