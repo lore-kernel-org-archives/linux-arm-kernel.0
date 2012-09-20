@@ -1,129 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 20 Sep 2012 16:47:42 +0100
-Subject: [PATCH v2] arm: introduce a DTS for Xen unprivileged virtual machines
-Message-ID: <1348156062-11476-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Sep 2012 16:56:43 +0100
+Subject: [PATCH 2/4] ARM: mm: don't use the access flag permissions mechanism
+ for classic MMU
+In-Reply-To: <1348156605-30398-1-git-send-email-will.deacon@arm.com>
+References: <1348156605-30398-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1348156605-30398-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given that the xenvm machine is based on vexpress but with an extremely
-limited selection of peripherals (the guest is supposed to use virtual
-devices instead), add "xen,xenvm" to the list of compatible machines in
-mach-vexpress.
+The simplified access permissions model is not used for the classic MMU
+translation regime, so ensure that it is turned off in the sctlr prior
+to turning on address translation for ARMv7.
 
-
-Changes in v2:
-
-- remove include skeleton;
-- use #address-cells = <2> and #size-cells = <2>;
-- remove the debug bootargs;
-- use memory at 80000000 instead of memory;
-- remove the ranges and interrupt-map from the motherboard node;
-- set the machine compatible to "xen,xenvm-4.2", "xen,xenvm";
-- rename the dts file to xenvm-4.2.dts;
-- add "xen,xenvm" to the list of compatible DT strings to mach-vexpress.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/boot/dts/xenvm-4.2.dts      |   64 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-vexpress/Makefile.boot |    3 +-
- arch/arm/mach-vexpress/v2m.c         |    1 +
- 3 files changed, 67 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/xenvm-4.2.dts
+ arch/arm/mm/proc-v7-2level.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/xenvm-4.2.dts b/arch/arm/boot/dts/xenvm-4.2.dts
-new file mode 100644
-index 0000000..03d7c84
---- /dev/null
-+++ b/arch/arm/boot/dts/xenvm-4.2.dts
-@@ -0,0 +1,64 @@
-+/*
-+ * Xen Virtual Machine for unprivileged guests
-+ *
-+ * Based on ARM Ltd. Versatile Express CoreTile Express (single CPU)
-+ * Cortex-A15 MPCore (V2P-CA15)
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+/ {
-+	model = "XENVM-4.2";
-+	compatible = "xen,xenvm-4.2", "xen,xenvm";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	chosen {
-+		bootargs = "console=hvc0 root=/dev/xvda";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0 0x80000000 0 0x08000000>;
-+	};
-+
-+	gic: interrupt-controller at 2c001000 {
-+		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0 0x2c001000 0 0x1000>,
-+		      <0 0x2c002000 0 0x100>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 13 0xf08>,
-+			     <1 14 0xf08>,
-+			     <1 11 0xf08>,
-+			     <1 10 0xf08>;
-+	};
-+
-+	hypervisor {
-+		compatible = "xen,xen-4.2", "xen,xen";
-+		reg = <0 0xb0000000 0 0x20000>;
-+		interrupts = <1 15 0xf08>;
-+	};
-+
-+	motherboard {
-+		arm,v2m-memory-map = "rs1";
-+	};
-+};
-diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
-index 318d308..38dbaac 100644
---- a/arch/arm/mach-vexpress/Makefile.boot
-+++ b/arch/arm/mach-vexpress/Makefile.boot
-@@ -7,4 +7,5 @@ initrd_phys-y	:= 0x60800000
- dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb \
- 				   vexpress-v2p-ca9.dtb \
- 				   vexpress-v2p-ca15-tc1.dtb \
--				   vexpress-v2p-ca15_a7.dtb
-+				   vexpress-v2p-ca15_a7.dtb \
-+				   xenvm-4.2.dtb
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 4e567f7..9545b70 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -659,6 +659,7 @@ static void __init v2m_dt_init(void)
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index fd045e7..e37600b 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -161,11 +161,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	 *  TFR   EV X F   I D LR    S
+ 	 * .EEE ..EE PUI. .T.T 4RVI ZWRS BLDP WCAM
+ 	 * rxxx rrxx xxx0 0101 xxxx xxxx x111 xxxx < forced
+-	 *    1    0 110       0011 1100 .111 1101 < we want
++	 *   01    0 110       0011 1100 .111 1101 < we want
+ 	 */
+ 	.align	2
+ 	.type	v7_crval, #object
+ v7_crval:
+-	crval	clear=0x0120c302, mmuset=0x10c03c7d, ucset=0x00c01c7c
++	crval	clear=0x2120c302, mmuset=0x10c03c7d, ucset=0x00c01c7c
  
- const static char *v2m_dt_match[] __initconst = {
- 	"arm,vexpress",
-+	"xen,xenvm",
- 	NULL,
- };
- 
+ 	.previous
 -- 
-1.7.2.5
+1.7.4.1
