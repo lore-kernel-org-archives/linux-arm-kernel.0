@@ -1,36 +1,24 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Thu, 20 Sep 2012 22:19:40 +0200
-Subject: [PATCH 5/10] ARM: fix DMA-bounce code to allow sync from_device and
- to_device with bidirectional mappings.
+Date: Thu, 20 Sep 2012 22:19:48 +0200
+Subject: [PATCH 6/10] IXP4xx: Remove time limit for PCI TRDY to enable use of
+ slow devices.
 In-Reply-To: <m3txus4hgm.fsf@intrepid.localdomain> (Krzysztof Halasa's message
  of "Thu, 20 Sep 2012 21:33:45 +0200")
 References: <m3txus4hgm.fsf@intrepid.localdomain>
-Message-ID: <m3ipb830rn.fsf@intrepid.localdomain>
+Message-ID: <m3haqs30rf.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
-
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -375,7 +375,7 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 
- 	off = addr - buf->safe_dma_addr;
- 
--	BUG_ON(buf->direction != dir);
-+	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
- 
- 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
- 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
-@@ -415,7 +415,7 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 
- 	off = addr - buf->safe_dma_addr;
- 
--	BUG_ON(buf->direction != dir);
-+	BUG_ON(buf->direction != dir && buf->direction != DMA_BIDIRECTIONAL);
- 
- 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
- 		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -410,6 +410,7 @@ void __init ixp4xx_pci_preinit(void)
+ 		 * Enable the IO window to be way up high, at 0xfffffc00
+ 		 */
+ 		local_write_config(PCI_BASE_ADDRESS_5, 4, 0xfffffc01);
++		local_write_config(0x40, 4, 0x000080FF); /* No TRDY time limit */
+ 	} else {
+ 		printk("PCI: IXP4xx is target - No bus scan performed\n");
+ 	}
 
 -- 
 Krzysztof Halasa
