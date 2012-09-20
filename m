@@ -1,56 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 20 Sep 2012 15:11:56 +0100
-Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
-In-Reply-To: <201209201327.45802.arnd@arndb.de>
-References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1209201240110.29232@kaball.uk.xensource.com>
- <1348143533.26501.28.camel@zakaz.uk.xensource.com>
- <201209201327.45802.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.02.1209201501140.29232@kaball.uk.xensource.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 20 Sep 2012 16:24:21 +0200
+Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
+In-Reply-To: <505B1FC2.2090609@free-electrons.com>
+References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
+Message-ID: <201209201624.21756.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2012, Arnd Bergmann wrote:
-> On Thursday 20 September 2012, Ian Campbell wrote:
-> > On Thu, 2012-09-20 at 12:56 +0100, Stefano Stabellini wrote:
-> > > On Thu, 20 Sep 2012, Ian Campbell wrote:
-> > > > On Wed, 2012-09-19 at 18:44 +0100, Stefano Stabellini wrote:
-> 
-> > > > > + compatible = "xen,xenvm-4.2", "arm,vexpress";
-> > > > 
-> > > > Is this second compatible thing actually true? We don't actually emulate
-> > > > much (anything?) of what would be on a real vexpress motherboard.
-> > > > 
-> > > > "arm,vexpress" is used only in v2m.c and I don't think we want the
-> > > > majority of that -- we don't provide any of the peripherals which it
-> > > > registers.
-> > > > 
-> > > > I think the only things we might want out of that lot are the arch timer
-> > > > and perhaps the uart0 (as a debug port).
-> > > > 
-> > > > I suspect we should have our own xen machine .c.
-> > > > 
-> > > > [...]
-> > > 
-> > > It is true that we are "arm,vexpress" compatible at the moment.
-> > 
-> > But we aren't, we don't emulate 90%+ of the actual hardware which
-> > vexpress compatibility would actually imply.
-> > 
-> > Look in arch/arm/mach-vexpress/v2m.c, which is the only thing keyed off
-> > this compat value -- it's full of stuff which we don't (and aren't going
-> > to) implement.
-> 
-> It's not much different in the end, but I think I'd rather make the
-> compatible list in the device tree "xen,xenvm-4.2", "xen,xenvm" without
-> listing "arm,vexpress", but then adding "xen,xenvm" to the list of
-> compatible devices in the vexpress kernel code.
-> 
-> The main difference is that if we decide to separate out the Linux
-> code for Xen and vexpress later into distinct ports, we have the
-> option to do that. vexpress will support multiplatform configurations
-> in 3.7 anyway, so the idea of making all virtual platforms part of
-> vexpress in order to be able to boot the same kernel on them is not
-> all that important any more.
+Dear Maxime Ripard,
 
-That's a very good idea, I'll do that.
+> Hi Marek,
+> 
+> Le 20/09/2012 15:10, Marek Vasut a ?crit :
+> >>> If barebox can't handle even basic DT fixup, it's broken.
+> >> 
+> >> It can. It maybe was just not needed up to now, dunno.
+> > 
+> > Fix it and send patch, so this problem doesn't spread.
+> 
+> I'm sorry, but you still miss the point.
+
+I do see the point, I'm just trying to understand how to best avoid this issue.
+
+Let's drop the part "remove update_fec_mac_prop()" completely from this 
+discussion, that's not happening and we agree on that.
+
+> If someone wants to use another bootloader than U-boot (or a possible
+> patched barebox), or none other than the bootlets to boot directly the
+> Linux (with an appended device tree), you will still have no way to get
+> the NIC from the OCOTP
+
+I wholeheartedly agree!
+
+> and I'm sorry, but it is just wrong.
+
+I've been pondering about this issue for a while actually. Right now, the 
+update_fec_mac_prop() unconditionally overwrites the bootloader-passed setting, 
+yes or am I wrong?
+
+> The kernel shouldn't rely on a particular feature of a given bootloader.
+
+But the device tree given to the kernel should be complete, no?
+
+Best regards,
+Marek Vasut
