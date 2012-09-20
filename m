@@ -1,28 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 22:53:44 +0800
-Subject: [PATCH v2 00/34] i.MX multi-platform support
-In-Reply-To: <201209200739.34899.arnd@arndb.de>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <201209200739.34899.arnd@arndb.de>
-Message-ID: <20120920145342.GI2450@S2101-09.ap.freescale.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 20 Sep 2012 16:53:33 +0200
+Subject: [PATCH 7/6] pinctrl: exynos: Fix wakeup IRQ domain registration check
+In-Reply-To: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
+References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
+Message-ID: <2737662.uE6StcAj33@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 07:39:34AM +0000, Arnd Bergmann wrote:
-> The first five branches are scheduled to go through the arm-soc tree, so
-> I'm fine with that. For the sound/for-3.7 branch, I'd like to know when
-> to expect that hitting mainline. If it always gets in very early during the
-> merge window, it's probably ok to put the imx/multi-platform patches into
-> the same branch as the other ones in arm-soc and wait for the sound stuff
-> to hit mainline first, otherwise I'd suggest we start a second
-> next/multiplatform-2 branch for imx and send the first part early on
-> but then wait with the second batch before sound gets in.
-> 
-It seems that we will have to go with next/multiplatform-2.  I just
-tried to merge the series with linux-next together, and got some
-non-trivial conflicts with media and mtd tree.  I might have to rebase
-my series on top of these trees to sort out those conflicts.  That said,
-I will have several dependencies outside arm-soc tree, and have to pend
-my series until all those trees get merged into mainline.
+Because of a typo, incorrect field of a structure was being checked.
+This patch fixes the check to use correct field.
 
-Shawn
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ drivers/pinctrl/pinctrl-exynos.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 0d01d19..21362f4 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -447,7 +447,7 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 
+ 	d->wkup_irqd = irq_domain_add_linear(wkup_np, d->ctrl->nr_wint,
+ 				&exynos_wkup_irqd_ops, d);
+-	if (!d->gpio_irqd) {
++	if (!d->wkup_irqd) {
+ 		dev_err(dev, "wakeup irq domain allocation failed\n");
+ 		return -ENXIO;
+ 	}
+-- 
+1.7.12
