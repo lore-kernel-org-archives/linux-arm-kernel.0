@@ -1,47 +1,75 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 20 Sep 2012 10:43:37 -0400
-Subject: [RFC PATCH 04/13] dmaengine: edma: enable build for AM335x
+Date: Thu, 20 Sep 2012 10:43:38 -0400
+Subject: [RFC PATCH 05/13] dma: Add TI EDMA device tree binding
 In-Reply-To: <1348152226-13588-1-git-send-email-mporter@ti.com>
 References: <1348152226-13588-1-git-send-email-mporter@ti.com>
-Message-ID: <1348152226-13588-5-git-send-email-mporter@ti.com>
+Message-ID: <1348152226-13588-6-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable config option on OMAP and adjust the
-private EDMA API header to match the move
-of the private EDMA API out of mach-davinci/
+The binding definition is based on the generic DMA controller
+binding.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- drivers/dma/Kconfig |    2 +-
- drivers/dma/edma.c  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/dma/ti-edma.txt |   49 +++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 0351719..24cd403 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -210,7 +210,7 @@ config SIRF_DMA
- 
- config TI_EDMA
- 	tristate "TI EDMA support"
--	depends on ARCH_DAVINCI
-+	depends on ARCH_DAVINCI || ARCH_OMAP
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
- 	default n
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index fdcf079..9f8f2fa 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -24,7 +24,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
--#include <mach/edma.h>
-+#include <asm/mach/edma.h>
- 
- #include "dmaengine.h"
- #include "virt-dma.h"
+diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+new file mode 100644
+index 0000000..06402eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+@@ -0,0 +1,49 @@
++TI EDMA
++
++Required properties:
++- compatible : "ti,edma3"
++- ti,hwmods: Name of the hwmods associated to the EDMA
++- ti,edma-regions: Number of regions
++- ti,edma-slots: Number of slots
++- ti,edma-queue-tc-map: List of transfer control to queue mappings
++- ti,edma-queue-priority-map: List of queue priority mappings
++- ti,edma-default-queue: Default queue value
++
++Optional properties:
++- ti,edma-reserved-channels: List of reserved channel regions
++- ti,edma-reserved-slots: List of reserved slot regions
++
++Example:
++
++edma: edma at 49000000 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	reg = <0x49000000 0x10000>;
++	interrupt-parent = <&intc>;
++	interrupts = <12 13 14>;
++	compatible = "ti,edma3";
++	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
++	#dma-cells = <1>;
++	dma-channels = <64>;
++	ti,edma-regions = <4>;
++	ti,edma-slots = <256>;
++	ti,edma-reserved-channels = <0  2
++				     14 2
++				     26 6
++				     48 4
++				     56 8>;
++	ti,edma-reserved-slots = <0  2
++				  14 2
++				  26 6
++				  48 4
++				  56 8
++				  64 127>;
++	ti,edma-queue-tc-map = <0 0
++				1 1
++				2 2>;
++	ti,edma-queue-priority-map = <0 0
++				      1 1
++				      2 2>;
++	ti,edma-default-queue = <0>;
++};
++
 -- 
 1.7.9.5
