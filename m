@@ -1,66 +1,43 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 20 Sep 2012 09:43:44 +0200
-Subject: [PATCH v3 1/2] ARM: pci: Keep pci_common_init() around after init
-In-Reply-To: <1348127025-29461-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1348127025-29461-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1348127025-29461-2-git-send-email-thierry.reding@avionic-design.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Sep 2012 09:42:14 +0200
+Subject: [PATCH] at91ether: return PTR_ERR if call to clk_get fails
+In-Reply-To: <1348124676-6627-1-git-send-email-devendra.aaru@gmail.com>
+References: <1348124676-6627-1-git-send-email-devendra.aaru@gmail.com>
+Message-ID: <505AC8D6.5080404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using deferred driver probing, PCI host controller drivers may
-actually require this function after the init stage.
+On 09/20/2012 09:04 AM, Devendra Naga :
+> we are currently returning ENODEV, as the clk_get may give a exact
+> error code in its returned pointer, assign it to the ret by using the
+> PTR_ERR function, so that the subsequent goto label will jump to the
+> error path and clean the driver and return the error correctly.
+> 
+> Signed-off-by: Devendra Naga <devendra.aaru@gmail.com>
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
----
-Changes in v3:
-- remove __init annotation from pcibios_init_resources()
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Changes in v2:
-- remove __devinit annotation from pcibios_swizzle
-- remove __init annotations altogether
+Thanks,
 
- arch/arm/kernel/bios32.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> ---
+>  drivers/net/ethernet/cadence/at91_ether.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+> index 7788419..4e980a7 100644
+> --- a/drivers/net/ethernet/cadence/at91_ether.c
+> +++ b/drivers/net/ethernet/cadence/at91_ether.c
+> @@ -1086,7 +1086,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>  	/* Clock */
+>  	lp->ether_clk = clk_get(&pdev->dev, "ether_clk");
+>  	if (IS_ERR(lp->ether_clk)) {
+> -		res = -ENODEV;
+> +		res = PTR_ERR(lp->ether_clk);
+>  		goto err_ioumap;
+>  	}
+>  	clk_enable(lp->ether_clk);
+> 
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index b244696..2c80f36 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -389,7 +389,7 @@ EXPORT_SYMBOL(pcibios_fixup_bus);
-  * PCI standard swizzle is implemented on plug-in cards and Cardbus based
-  * PCI extenders, so it can not be ignored.
-  */
--static u8 __devinit pcibios_swizzle(struct pci_dev *dev, u8 *pin)
-+static u8 pcibios_swizzle(struct pci_dev *dev, u8 *pin)
- {
- 	struct pci_sys_data *sys = dev->sysdata;
- 	int slot, oldpin = *pin;
-@@ -424,7 +424,7 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 	return irq;
- }
- 
--static int __init pcibios_init_resources(int busnr, struct pci_sys_data *sys)
-+static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
- {
- 	int ret;
- 	struct pci_host_bridge_window *window;
-@@ -456,7 +456,7 @@ static int __init pcibios_init_resources(int busnr, struct pci_sys_data *sys)
- 	return 0;
- }
- 
--static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
-+static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- {
- 	struct pci_sys_data *sys = NULL;
- 	int ret;
-@@ -504,7 +504,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- 	}
- }
- 
--void __init pci_common_init(struct hw_pci *hw)
-+void pci_common_init(struct hw_pci *hw)
- {
- 	struct pci_sys_data *sys;
- 	LIST_HEAD(head);
+
 -- 
-1.7.12
+Nicolas Ferre
