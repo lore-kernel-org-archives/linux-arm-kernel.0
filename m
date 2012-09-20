@@ -1,63 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Sep 2012 19:01:20 +0200
+From: wd@denx.de (Wolfgang Denk)
+Date: Thu, 20 Sep 2012 19:09:28 +0200
 Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <201209201833.38960.marex@denx.de>
+In-Reply-To: <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com>
 References: <1348007837-23187-1-git-send-email-marex@denx.de>
+ <201209201420.55526.marex@denx.de> <20120920125631.GC2609@pengutronix.de>
  <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
- <201209201833.38960.marex@denx.de>
-Message-ID: <505B4BE0.2030702@free-electrons.com>
+ <20120920151021.7307C203A17@gemini.denx.de>
+ <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com>
+Message-ID: <20120920170928.1E558203A0C@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/09/2012 18:33, Marek Vasut a ?crit :
-> Dear Maxime Ripard,
-> 
->> Hi Marek,
->>
->> Le 20/09/2012 15:10, Marek Vasut a ?crit :
->>>>> If barebox can't handle even basic DT fixup, it's broken.
->>>>
->>>> It can. It maybe was just not needed up to now, dunno.
->>>
->>> Fix it and send patch, so this problem doesn't spread.
->>
->> I'm sorry, but you still miss the point.
->>
->> If someone wants to use another bootloader than U-boot (or a possible
->> patched barebox), or none other than the bootlets to boot directly the
->> Linux (with an appended device tree), you will still have no way to get
->> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
->>
->> The kernel shouldn't rely on a particular feature of a given bootloader.
-> 
-> So what do you think about this patch (skip loading from OCOTP if it's already 
-> present in DT):
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 71d47f5..4f014ef 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
->                 np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
->                 if (!np)
->                         return;
-> +
-> +               if (of_get_property(np, "local-mac-address", NULL))
-> +                       continue;
-> +
->                 from = np;
->  
->                 newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
+Dear Gregory,
 
-That definitely looks like the best solution, yes.
+In message <CADx9zJCnQCnGgvO6ui7m1buAt2S+OPyQVgyEBwt-u2ARcqh94Q@mail.gmail.com> you wrote:
+>
+> > With device tree supoort enabled, the regular way to pass the MAC
+> > address to a network interface (that needs one) is through the device
+> > tree.
+...
+> I thought that device tree should provide information that we can't get
+> by the hardware itslef. Here, if the hardware can provide the MAC address,
+> why should we ignore it?
 
-You can add my Acked-by if you want.
+That was the "that needs one" part above.
 
-Maxime
+Yet, using the DT is still the generic way to do this, and should be
+fully supported.  And assuming there might be simple bootloaders (like
+bootlets) that are not capable to write such data to any device
+specific storage, this should probably even be the default.
 
+Best regards,
+
+Wolfgang Denk
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Mirrors should reflect a little before throwing back images.
+- Jean Cocteau
