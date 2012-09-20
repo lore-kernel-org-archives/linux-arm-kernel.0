@@ -1,86 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Sep 2012 09:57:40 -0700
-Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling monitor
- mode
-Message-ID: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Sep 2012 16:59:33 +0000 (UTC)
+Subject: [PATCH V3 6/8] ARM: OMAP4: Route PMU IRQs to CTI IRQs
+In-Reply-To: <1347290626-21164-7-git-send-email-jon-hunter@ti.com>
+References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
+ <1347290626-21164-7-git-send-email-jon-hunter@ti.com>
+Message-ID: <alpine.DEB.2.00.1209201655060.12583@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset value of the BCR, BVR, WCR, and WVR registers are all
-UNKNOWN on ARMv7. Unfortunately, reset_ctrl_regs() clears these
-registers *after* enabling monitor mode, not before, and so some
-implementations may experience UNPREDICTABLE behavior if the
-reset values of these registers are non-zero. Clear the
-breakpoints before enabling monitor mode so that we don't
-experience boot hangs/loops due to breakpoints being enabled
-out of reset.
+Hi
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/hw_breakpoint.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+On Mon, 10 Sep 2012, Jon Hunter wrote:
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index ba386bd..9eac571 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -216,6 +216,20 @@ static int get_num_brps(void)
- 	return core_has_mismatch_brps() ? brps - 1 : brps;
- }
- 
-+/* Determine if halting mode is enabled */
-+static int halting_mode_enabled(void)
-+{
-+	u32 dscr;
-+
-+	ARM_DBG_READ(c1, 0, dscr);
-+
-+	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
-+		"halting debug mode enabled. Unable to access hardware resources.\n")) {
-+		return -EPERM;
-+	}
-+	return 0;
-+}
-+
- /*
-  * In order to access the breakpoint/watchpoint control registers,
-  * we must be running in debug monitor mode. Unfortunately, we can
-@@ -225,16 +239,13 @@ static int get_num_brps(void)
- static int enable_monitor_mode(void)
- {
- 	u32 dscr;
--	int ret = 0;
-+	int ret;
- 
- 	ARM_DBG_READ(c1, 0, dscr);
- 
- 	/* Ensure that halting mode is disabled. */
--	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
--		"halting debug mode enabled. Unable to access hardware resources.\n")) {
--		ret = -EPERM;
-+	if ((ret = halting_mode_enabled()))
- 		goto out;
--	}
- 
- 	/* If monitor mode is already enabled, just return. */
- 	if (dscr & ARM_DSCR_MDBGEN)
-@@ -935,7 +946,7 @@ static void reset_ctrl_regs(void *unused)
- 	isb();
- 
- reset_regs:
--	if (enable_monitor_mode())
-+	if (halting_mode_enabled())
- 		return;
- 
- 	/* We must also reset any reserved registers. */
-@@ -949,6 +960,7 @@ reset_regs:
- 		write_wb_reg(ARM_BASE_WCR + i, 0UL);
- 		write_wb_reg(ARM_BASE_WVR + i, 0UL);
- 	}
-+	enable_monitor_mode();
- }
- 
- static int __cpuinit dbg_reset_notify(struct notifier_block *self,
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> From: Ming Lei <ming.lei@canonical.com>
+> 
+> For OMAP4430 there are no dedicate PMU interrupts, however, PMU events can be
+> routed to via the CTI IRQs. This allows tools such as PERF and OPROFILE to work
+> on OMAP4430.
+> 
+> The idea is from Woodruff Richard in the disscussion about "Oprofile on
+> Pandaboard / Omap4" on pandaboard at googlegroups.com.
+> 
+> Ming's original patch was called "arm: omap4: support pmu" [1] and has been
+> renamed and modified by Jon Hunter. There main differences from the original
+> patch are ...
+> 
+> 1. Instead of only configuring the CTI interrupt once during boot, the
+>    interrupts are configured everytime the the PMU is used. The reason for this
+>    is because during power transitions the CTI logic state will be lost and so
+>    we will need to configure the interrupts everytime they are used. This is
+>    accomplished by using the PM runtime callbacks which will be called whenever
+>    the PMU is used.
+> 2. Assign the PMU events to different cross triggering channels. This prevents
+>    a single PMU event generating interrupts to both CPUs and hence can cause
+>    spurious interrupts to occur. Reported by Ming [2].
+> 
+> [1] http://marc.info/?l=linux-arm-kernel&m=132227620816504&w=2
+> [2] http://permalink.gmane.org/gmane.linux.linaro.devel/10532
+
+Spent some time with this one here.  At this point I don't think I can 
+queue it.  It's got hardcoded IRQ numbers and address information for the 
+CTI, and mixes the CTI and PMU programming.  A few months ago we might 
+have gotten away with this, but now it seems best to do this one cleanly.
+Probably the CTI control should be moved off into mach-omap2/omap4-cti.c 
+or somewhere into drivers/ if possible.  So let's revisit this for 3.8.
+
+
+- Paul
