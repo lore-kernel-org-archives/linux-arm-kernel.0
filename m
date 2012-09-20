@@ -1,36 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Sep 2012 10:32:19 +0100
+Date: Thu, 20 Sep 2012 10:35:50 +0100
 Subject: [PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
-In-Reply-To: <20120913172057.GB13739@n2100.arm.linux.org.uk>
+In-Reply-To: <20120913010041.GD7622@verge.net.au>
 References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
  <1347434097-7924-3-git-send-email-horms@verge.net.au>
  <5050CD87.4020800@codeaurora.org>
  <20120913010041.GD7622@verge.net.au>
- <20120913172057.GB13739@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk4fg5m+UztnAKmQZNpB_NF2cZv-NtQoJ4M_DcO6FYnyrA@mail.gmail.com>
+Message-ID: <CAHkRjk500KGTeBD67YMWy2qSdaoO_=Y9WBT_Q78n9Zxgqtmo4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2012 18:20, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Sep 13, 2012 at 10:00:42AM +0900, Simon Horman wrote:
->> +config ARM_ERRATA_782773
->> +     bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
->> +     depends on CPU_V7
->> +     help
->> +       This option enables the workaround for the 782773 Cortex-A9 (all r0,
->> +       r2 and r3 revisions) erratum. It might cause MMU exception in case
->> +       page table walk happens just after updating the existing
->> +       with setting page table in L1 data cache.
+On 13 September 2012 02:00, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Sep 12, 2012 at 10:59:35AM -0700, Stephen Boyd wrote:
+>> On 09/12/12 00:14, Simon Horman wrote:
+>> > @@ -1423,6 +1423,15 @@ config ARM_ERRATA_775420
+>> >           deadlock. This workaround puts DSB before executing ISB at the
+>> >           beginning of the abort exception handler.
+>> >
+>> > +config ARM_ERRATA_782773
+>> > +   bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
+>> > +   depends on CPU_V7
+>> > +   help
+>> > +     This option enables the workaround for the 782773 Cortex-A9 (all r0,
+>> > +     ,r2 and r3 revisions) erratum. It might cause MMU exception in case
+>>
+>> Seems to be an extra comma here.
 >
-> What if we're running on a SMP system where the L1 caches are mandated
-> to be in write-allocate mode?  This write will immediately cause the
-> cache line to be brought back into the cache.
+> Thanks, here is an updated version.
+>
+> From: Kouei Abe <kouei.abe.cp@rms.renesas.com>
+>
+> arm: Add ARM ERRATA 782773 workaround
+>
+> Signed-off-by: Kouei Abe <kouei.abe.cp@rms.renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
 
-Flushing the L1 cache line before being written (even though it will
-be immediately brought back into the cache) will prevent a
-micro-architectural condition that causes the erratum (the processor
-writing the page table must hit in the L1 cache).
+I would add some text to the commit log as well, even though it
+matches the Kconfig entry.
+
+Have you hit this in practice? In general the kernel shouldn't access
+kernel virtual address corresponding to a page table that is being
+changed. For user address space it is possible but the kernel can
+handle use translation faults, even though they may be spurious.
 
 -- 
 Catalin
