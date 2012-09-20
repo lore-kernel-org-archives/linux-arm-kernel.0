@@ -1,56 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 20 Sep 2012 08:59:16 +0900
-Subject: [PATCH] ARM: EXYNOS: no duplicate mask/unmask in eint0_15
-In-Reply-To: <CAD=FV=UTa4a8wewEdqu=ZnOKe-M5Brv-ex8ZGWfkTb6fqsRB_w@mail.gmail.com>
-References: <1346944864-12434-1-git-send-email-djkurtz@chromium.org>
- <CAD=FV=UTa4a8wewEdqu=ZnOKe-M5Brv-ex8ZGWfkTb6fqsRB_w@mail.gmail.com>
-Message-ID: <09aa01cd96c2$c6cedd00$546c9700$%kim@samsung.com>
+From: tytso@mit.edu (Theodore Ts'o)
+Date: Wed, 19 Sep 2012 20:01:10 -0400
+Subject: Tracking down suspend/resume ext3/mmc issues on imx233
+In-Reply-To: <20120919232349.GA24132@elf.ucw.cz>
+References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+ <20120907060552.GL26709@S2101-09.ap.freescale.net>
+ <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
+ <CAKGA1bnug8nqcideOBZyLQZmiVo=G5L3aRHq4k4SNZyH132Y=g@mail.gmail.com>
+ <20120910163345.GB3942@thunk.org>
+ <20120919232349.GA24132@elf.ucw.cz>
+Message-ID: <20120920000110.GA16672@thunk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote:
+On Thu, Sep 20, 2012 at 01:23:49AM +0200, Pavel Machek wrote:
 > 
-> On Thu, Sep 6, 2012 at 8:21 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> > chained_irq_enter/exit() already mask&ack/unmask the chained interrupt.
-> > There is no need to also explicitly do it in the handler.
-> >
-> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> > ---
-> >  arch/arm/mach-exynos/common.c |    7 -------
-> >  1 files changed, 0 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
-> exynos/common.c
-> > index 4eb39cd..0a85aec 100644
-> > --- a/arch/arm/mach-exynos/common.c
-> > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -965,14 +965,7 @@ static void exynos_irq_eint0_15(unsigned int irq,
-> struct irq_desc *desc)
-> >         struct irq_chip *chip = irq_get_chip(irq);
-> >
-> >         chained_irq_enter(chip, desc);
-> > -       chip->irq_mask(&desc->irq_data);
-> > -
-> > -       if (chip->irq_ack)
-> > -               chip->irq_ack(&desc->irq_data);
-> > -
-> >         generic_handle_irq(*irq_data);
-> > -
-> > -       chip->irq_unmask(&desc->irq_data);
-> >         chained_irq_exit(chip, desc);
-> >  }
-> >
-> > --
-> > 1.7.7.3
-> >
+> I'm not sure I agree.
 > 
-> Acked-by: Doug Anderson <dianders@chromium.org>
+> If you treat root fs as removable, you'll get "crash". You'll need to
+> replay the journal, but data is safe.
+> 
+> If you treat it as non-removable, and someone manages to remove it,
+> mount, and reinsert, you'll get silent data corruption.
 
-Yes, will apply.
-Thanks.
+We could detect this case; if the file system gets mounted, the last
+mount time will change.  So one of the things we could do is have the
+file system code freeze the file system at suspend time, so the file
+system is consistent (which will reduce the probability of data loss
+if the system never comes back up after the suspend), and save the
+last mount time and last write time in memory.  When the system comes
+back from resume, have the file system code check the last mount and
+last write time, and if they have changed, it can refuse the resume
+and abort the system to avoid data corruption.  It would require
+making ext3/ext4 suspend-aware, but it would be doable, if we really
+wanted to support this.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+						- Ted
