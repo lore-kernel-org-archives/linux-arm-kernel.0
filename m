@@ -1,42 +1,49 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 20 Sep 2012 13:39:58 +0100
-Subject: [PATCH] arm: introduce a DTS for Xen unprivileged virtual machines
-In-Reply-To: <1348143533.26501.28.camel@zakaz.uk.xensource.com>
-References: <1348076658-4511-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1348136222.26501.19.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1209201240110.29232@kaball.uk.xensource.com>
- <1348143533.26501.28.camel@zakaz.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1209201333460.29232@kaball.uk.xensource.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 20 Sep 2012 08:47:10 -0400
+Subject: [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <20120920115213.GF2450@S2101-09.ap.freescale.net>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920114148.GH17666@opensource.wolfsonmicro.com>
+ <20120920115213.GF2450@S2101-09.ap.freescale.net>
+Message-ID: <20120920124709.GN17666@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2012, Ian Campbell wrote:
-> > Versatile Express is flexible enough to be a good base for our own
-> > virtual machine platform, especially if the maintainers keep an eye on
-> > getting everything through DT and not expecting devices just to be there
-> > ;-)
-> 
-> Perhaps what we want is a stricter subset of the stuff in mach-vexpress
-> then. But if so then this should be expressed both in the DT and in the
-> code, not just papered over by declaring things compatible when they are
-> not.
+On Thu, Sep 20, 2012 at 07:52:15PM +0800, Shawn Guo wrote:
+> On Thu, Sep 20, 2012 at 07:41:50AM -0400, Mark Brown wrote:
 
-But it is already expressed in the DT, by removing all the device nodes
-we don't emulated. And it is already expressed in the code, by fully
-discovering peripherals via DT, therefore not trying to initialize
-non-present devices.
+> > It's usually pretty early but Takashi will be on holiday this time so
+> > I'm not sure if things might be different (he was going to send the pull
+> > request from holiday).  I also didn't guarantee that it'll be stable
+> > yet, can someone please tell me what the depenency is here?
 
+> We need the patch to have all imx drivers mach/* inclusion free,
+> so that we can enable multi-platform support for imx, which is the
+> whole point of the series.
 
-> > > > +	gic: interrupt-controller at 2c001000 {
-> > > > +		compatible = "arm,cortex-a9-gic";
-> > > 
-> > > Don't we mean "arm,cortex-a15-gic" here? That's what we actually
-> > > provide. I'm not sure how the a9 and a15 differ.
-> > 
-> > The GIC that comes with vexpress is a9 compatible.
-> 
-> The GIC which Xen emulates is the one which matters here though, and
-> that is an a15.
+That doesn't answer the question.  What is the dependency - what is it
+about this patch that something else depends on?  Your cover letters
+just say you'd like to do this but don't mention dependencies at all and
+when I asked the question last night you said the same thing.  I've not
+seen the rest of the series...
 
-The a15 gic is still a9 compatible. OK to be precise I am going to add
-"arm,cortex-a15-gic", but I cannot really remove "arm,cortex-a9-gic".
+> If your for-3.7 is not stable anyway, I guess the easiest the way
+
+It probably *is* stable but I'm not enthused about people pulling
+unsigned tags.  I might rebase, though - I'm going to finalise the tree
+in the next few days.
+
+> to do it might be you drop the patch "ASoC: mx27vis: retrieve gpio
+> numbers from platform_data" from your tree and I have it be part of
+> the series to go via arm-soc tree as a whole.  (This is the original
+> plan that I mentioned in v1 cover letter)
+
+You just mentioned it as a preference (you said it's something you'd
+like to do), please if you're doing this sort of cross tree thing be
+explicit about what the inter-tree relationships are.  If things need to
+go in via the same tree say so explicitly (and ideally say way this is).
+
+The main reason I applied it straight away was that Javier mentioned
+that it was a bug fix and it's near the merge window and these random
+ARM cleanup serieses never seem to go in quickly.
