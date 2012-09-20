@@ -1,27 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 20 Sep 2012 18:13:42 -0500
-Subject: [PATCHv4 7/9] arm: vt8500: doc: Add device tree bindings for
- arch-vt8500 devices
-In-Reply-To: <1345707346-9035-8-git-send-email-linux@prisktech.co.nz>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
- <1345707346-9035-8-git-send-email-linux@prisktech.co.nz>
-Message-ID: <505BA326.1030909@gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 20 Sep 2012 16:21:14 -0700
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209122237080.7275@utopia.booyaka.com>
+ <20120913011208.GT4257@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209131839000.23318@utopia.booyaka.com>
+ <20120920000351.GI2455@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
+ <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
+ <20120920220130.GN2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
+Message-ID: <20120920232114.GO2449@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 02:35 AM, Tony Prisk wrote:
-> Bindings for gpio, interrupt controller, power management controller,
-> timer, realtime clock, serial uart, ehci and uhci controllers and
-> framebuffer controllers used on the arch-vt8500 platform.
+On Thu, Sep 20, 2012 at 10:47:25PM +0000, Paul Walmsley wrote:
+> On Thu, 20 Sep 2012, Paul E. McKenney wrote:
 > 
-> Framebuffer binding also specifies a 'display' node which is required
-> for determining the lcd panel data.
+> > On Thu, Sep 20, 2012 at 09:49:13PM +0000, Bruce, Becky wrote:
+> >
+> > > OK, people, you can stop heckling me about "sent from my iPhone" - I'm in the wilds of rural Louisiana with really bad internet service and was trying to work on my phone (but, alas, did not notice the CC list included the entire universe).   Shame on me.
+> > > 
+> > > With the above set, I don't seem to see any stalls with the RCU timeout set to 60s (the default).  I left the board running for 25 minutes; I will fire it up again later and let it run for a bit longer, but usually I end up seeing the problem pretty quickly so I don't expect that to result in anything.  I also didn't see any stalls on Paul's RCU tree as of a week ago at 60s, so as far as I can tell the CPU_IDLE stuff didn't have any impact (it wasn't on when I tested Paul's tree).
+> > > 
+> > > If I drop the timeout to 5s as Paul M. suggested for debug a while back, I do see stalls (both with CPU_IDLE stuff and without). 
+> > > 
+> > > I'm using the default omap2plus config, with RCU stall info enabled and the cpu idle stuff turned on (console dump below).  This is a Panda ES 1.1 (OMAP4460)
+> > 
+> > Thank you for the testing, Becky!
+> > 
+> > Paul Walmsley, please let me know if the config below doesn't clear things
+> > up for you or if there is some reason why this config is infeasible.
+> 
+> Will certainly test it here once things settle down.  But I wouldn't 
+> consider the use of CONFIG_CPU_IDLE to be a 'fix' until the problem can be 
+> understood.  We use !CONFIG_CPU_IDLE kernels for testing here.
 
-Overall, these bindings look okay, but there is some effort to
-standardize a binding for displays:
+Fair point.  I am wondering whether there is some path into the idle
+loop that somehow avoids telling RCU that the CPU has in face entered
+idle.  There needs to be an rcu_idle_enter() call on the way to idle,
+otherwise RCU CPU stall warnings are expected behavior.
 
-http://comments.gmane.org/gmane.linux.drivers.devicetree/21386
-
-I would like to see that used rather than something custom.
-
-Rob
+							Thanx, Paul
