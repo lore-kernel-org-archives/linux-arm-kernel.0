@@ -1,31 +1,75 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 20 Sep 2012 12:05:20 -0400
-Subject: [RFC PATCH 13/13] Documentation: add schedule for removing
- private EDMA API
-In-Reply-To: <20120920155858.GA4583@opensource.wolfsonmicro.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-14-git-send-email-mporter@ti.com>
- <20120920155858.GA4583@opensource.wolfsonmicro.com>
-Message-ID: <20120920160520.GD16522@beef>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Sep 2012 17:03:37 +0100
+Subject: [RESEND PATCH 1/2] ARM: kexec: scan for dtb magic in segments
+Message-ID: <1348157018-31059-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 04:58:58PM +0100, Mark Brown wrote:
-> On Thu, Sep 20, 2012 at 10:43:46AM -0400, Matt Porter wrote:
-> 
-> >  Documentation/feature-removal-schedule.txt |   10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> 
-> We decided at kernel summit that we'd stop bothering with this, it's
-> mostly just bitrot and rarely read.  I guess the ASoC driver update
-> isn't ready yet?
+From: Matthew Leach <matthew.leach@arm.com>
 
-Ok, I'll drop this from the series.
+This patch allows a dtb to be passed to a new kernel using the kexec
+mechinism.
 
-No, I'm just getting real time now to work on the davinci-pcm dma engine
-conversion and cyclic dma support for edma. That driver is somewhat of a
-mess as it has some older platforms dependent on SRAM-based ping-pong
-buffering and that all need to be sorted during this. It is the only
-remaining blocker though for getting rid of the private API.
+When loading segments from userspace, scan each segment's first four
+bytes for the dtb magic. If this is found set the kexec_boot_atags
+parameter to the relocate_kernel code to the phyical address of this
+segment.
 
--Matt
+Reviewed-by: Simon Horman <horms@verge.net.au>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/machine_kexec.c |   23 ++++++++++++++++++++++-
+ 1 files changed, 22 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index dfcdb9f..dee34ef 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -9,6 +9,7 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <asm/pgtable.h>
++#include <linux/of_fdt.h>
+ #include <asm/pgalloc.h>
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+@@ -32,6 +33,24 @@ static atomic_t waiting_for_crash_ipi;
+ 
+ int machine_kexec_prepare(struct kimage *image)
+ {
++	struct kexec_segment *current_segment;
++	__be32 header;
++	int i, err;
++
++	/*
++	 * No segment at default ATAGs address. try to locate
++	 * a dtb using magic.
++	 */
++	for (i = 0; i < image->nr_segments; i++) {
++		current_segment = &image->segment[i];
++
++		err = get_user(header, (__be32*)current_segment->buf);
++		if (err)
++			return err;
++
++		if (be32_to_cpu(header) == OF_DT_HEADER)
++			kexec_boot_atags = current_segment->mem;
++	}
+ 	return 0;
+ }
+ 
+@@ -122,7 +141,9 @@ void machine_kexec(struct kimage *image)
+ 	kexec_start_address = image->start;
+ 	kexec_indirection_page = page_list;
+ 	kexec_mach_type = machine_arch_type;
+-	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
++	if (!kexec_boot_atags)
++		kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
++
+ 
+ 	/* copy our kernel relocation code to the control code page */
+ 	memcpy(reboot_code_buffer,
+-- 
+1.7.4.1
