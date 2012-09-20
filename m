@@ -1,36 +1,46 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 20 Sep 2012 12:47:58 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <201209191325.50048.marex@denx.de>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209191250.54418.marex@denx.de>
- <5059A660.9080302@free-electrons.com>
- <201209191325.50048.marex@denx.de>
-Message-ID: <20120920104758.GB2609@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 20 Sep 2012 12:01:19 +0100
+Subject: [RFC PATCH v2 2/5] ARM: mm: rename jump labels in
+ v7_flush_dcache_all function
+In-Reply-To: <20120920103212.GE4588@e102568-lin.cambridge.arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919135155.GB2111@linaro.org>
+ <20120920103212.GE4588@e102568-lin.cambridge.arm.com>
+Message-ID: <20120920110119.GA2117@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Thu, Sep 20, 2012 at 11:32:12AM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Sep 19, 2012 at 02:51:56PM +0100, Dave Martin wrote:
+> > On Tue, Sep 18, 2012 at 05:35:32PM +0100, Lorenzo Pieralisi wrote:
+> > > This patch renames jump labels in v7_flush_dcache_all in order to define
+> > > a specific flush cache levels entry point.
+> > > 
+> > > TODO: factor out the level flushing loop if considered worthwhile and
+> > >       define the input registers requirements.
+> > 
+> > In the context of this series, this patch seems to do nothing at all (?)
+> 
+> Agreed, it is just replacing some labels. I thought that something like:
+> 
+> b flush_levels
+> 
+> is clearer than:
+> 
+> b loop1
+> 
+> If I manage to factor out the cache level flushing loop I think things
+> are even better, I just did not want to change v7_flush_dcache_all, I would
+> avoid doing that, unless, as I mentioned, it is considered worthwhile.
+> 
+> > Maybe it would make sense to defer this patch until you post something
+> > that uses it.
+> 
+> v7_flush_dcache_louis uses it, I have no problem in deferring it though.
 
-> I dunno what barebox is,
+I don't think it's necessary to defer it -- I just wanted to understand
+whether there was some context here I wasn't aware of.
 
-You're pretty bad at lying...
-
-> but it seems really crap.
-
-...and marketing, too :) Why the hate?
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120920/c33c45d4/attachment.sig>
+Cheers
+---Dave
