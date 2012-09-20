@@ -1,98 +1,48 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 20 Sep 2012 14:57:44 +0900
-Subject: [PATCH v2 1/5] mmc: host: sdhci-s3c: Add broken-voltage DT
- property for broken voltage quirk
-In-Reply-To: <m3wqzqf557.fsf@pullcord.laptop.org>
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1587150.uFGRdL0s8e@amdc1227> <m3a9wmgvip.fsf@pullcord.laptop.org>
- <1907099.4JSZthrgh2@amdc1227> <m3627aguhl.fsf@pullcord.laptop.org>
- <5059A64D.6000700@samsung.com> <m3wqzqf557.fsf@pullcord.laptop.org>
-Message-ID: <505AB058.7060203@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 20 Sep 2012 16:03:14 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120920160314.b3ea668fc0766224c24bf276@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2012 11:39 PM, Chris Ball wrote:
-> Hi,
-> 
-> On Wed, Sep 19 2012, Jaehoon Chung wrote:
->>> On Wed, Sep 19 2012, Tomasz Figa wrote:
->>>> We could just check if the regulator provides the capability to change the 
->>>> voltage.
->>>>
->>>> I don't see any direct way of querying the regulator for provided 
->>>> capabilities (correct me if I'm just blind), but calling 
->>>> regulator_count_voltages() on the regulator and checking if the returned 
->>>> value is 1 should be enough to assume that the regulator is fixed.
->>>
->>> Sounds good, I agree.  Are you able to test that the obvious patch below
->>> works on your fixed-regulator board?
->>>
->>> Jaehoon and Adrian, can you think of any reason why we shouldn't replace
->>> MMC_CAP2_BROKEN_VOLTAGE with the regulator_count_voltages() call below?
->>> Thanks.
->>
->> I think this is better than using MMC_CAP2_BROKEN_VOLTAGE.
->> I tested with this..and working fine.
-> 
-> Great, here's the patch.  Jaehoon, once this is merged, maybe you could
-> help remove the uses of MMC_CAP2_BROKEN_VOLTAGE from arch/arm/mach-exynos
-> and arch/arm/mach-s5pv210 now that they're no longer needed?
-Right, I will remove them and send the patch.
+Hi all,
 
-Best Regards,
-Jaehoon Chung
-> 
-> Thanks,
-> 
-> - Chris.
-> 
-> 
-> Subject: [PATCH] mmc: core: Replace MMC_CAP2_BROKEN_VOLTAGE with test for fixed regulator
-> 
-> Before this patch, we were using MMC_CAP2_BROKEN_VOLTAGE as a way to
-> avoid calling regulator_set_voltage() on a fixed regulator, but that's
-> just duplicating information that already exists -- we should test
-> whether the regulator is fixed directly, instead of via a capability.
-> 
-> This patch implements that test.  We can't reclaim the capability bit
-> just yet, since there are still boards in arch/arm/ that reference it;
-> those references can be removed now.
-> 
-> Reported-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Chris Ball <cjb@laptop.org>
-> ---
->  drivers/mmc/core/core.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index 044cd01..6612163 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1113,7 +1113,8 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
->  		int		tmp;
->  		int		voltage;
->  
-> -		/* REVISIT mmc_vddrange_to_ocrmask() may have set some
-> +		/*
-> +		 * REVISIT mmc_vddrange_to_ocrmask() may have set some
->  		 * bits this regulator doesn't quite support ... don't
->  		 * be too picky, most cards and regulators are OK with
->  		 * a 0.1V range goof (it's a small error percentage).
-> @@ -1127,12 +1128,13 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
->  			max_uV = min_uV + 100 * 1000;
->  		}
->  
-> -		/* avoid needless changes to this voltage; the regulator
-> -		 * might not allow this operation
-> +		/*
-> +		 * If we're using a fixed/static regulator, don't call
-> +		 * regulator_set_voltage; it would fail.
->  		 */
->  		voltage = regulator_get_voltage(supply);
->  
-> -		if (mmc->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
-> +		if (regulator_count_voltages(supply) == 1)
->  			min_uV = max_uV = voltage;
->  
->  		if (voltage < 0)
-> 
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-integrator/integrator_cp.c between commit 73efd53012af
+("ARM: 7519/1: integrator: convert platform devices to Device Tree") from
+the arm tree and commit b7a3f8db07c1 ("ARM: integrator: use __iomem
+pointers for MMIO") from the arm-soc tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-integrator/integrator_cp.c
+index f51363e,3df5fc3..0000000
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@@ -55,7 -52,14 +55,7 @@@
+  
+  #define INTCP_PA_CLCD_BASE		0xc0000000
+  
+- #define INTCP_VA_CTRL_BASE		IO_ADDRESS(INTEGRATOR_CP_CTL_BASE)
+ -#define INTCP_VA_CIC_BASE		__io_address(INTEGRATOR_HDR_BASE + 0x40)
+ -#define INTCP_VA_PIC_BASE		__io_address(INTEGRATOR_IC_BASE)
+ -#define INTCP_VA_SIC_BASE		__io_address(INTEGRATOR_CP_SIC_BASE)
+ -
+ -#define INTCP_ETH_SIZE			0x10
+ -
++ #define INTCP_VA_CTRL_BASE		__io_address(INTEGRATOR_CP_CTL_BASE)
+  #define INTCP_FLASHPROG			0x04
+  #define CINTEGRATOR_FLASHPROG_FLVPPEN	(1 << 0)
+  #define CINTEGRATOR_FLASHPROG_FLWREN	(1 << 1)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120920/f4dd3c5c/attachment.sig>
