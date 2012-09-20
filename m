@@ -1,52 +1,43 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 20 Sep 2012 18:33:38 +0200
-Subject: [PATCH] ARM: mxs: m28evk: Disable OCOTP OUI loading
-In-Reply-To: <505B1FC2.2090609@free-electrons.com>
-References: <1348007837-23187-1-git-send-email-marex@denx.de>
- <201209201510.24631.marex@denx.de> <505B1FC2.2090609@free-electrons.com>
-Message-ID: <201209201833.38960.marex@denx.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Sep 2012 17:36:30 +0100
+Subject: [RESEND PATCH 0/3] New algorithm for ASID allocation and rollover
+In-Reply-To: <1348157770-9647-1-git-send-email-will.deacon@arm.com>
+References: <1348157770-9647-1-git-send-email-will.deacon@arm.com>
+Message-ID: <505B460E.8050909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
+On 20/09/12 17:16, Will Deacon wrote:
 
-> Hi Marek,
+Hi Will,
+
+> This is a resend of the patches originally posted here:
 > 
-> Le 20/09/2012 15:10, Marek Vasut a ?crit :
-> >>> If barebox can't handle even basic DT fixup, it's broken.
-> >> 
-> >> It can. It maybe was just not needed up to now, dunno.
-> > 
-> > Fix it and send patch, so this problem doesn't spread.
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/114344.html
 > 
-> I'm sorry, but you still miss the point.
+> I received some minor comments in that thread, but nothing that warranted
+> any changes to the code. Due to the nature of these changes, I would
+> very much like to put these into -next for some exposure prior to merging.
 > 
-> If someone wants to use another bootloader than U-boot (or a possible
-> patched barebox), or none other than the bootlets to boot directly the
-> Linux (with an appended device tree), you will still have no way to get
-> the NIC from the OCOTP, and I'm sorry, but it is just wrong.
+> Again, all feedback welcome.
 > 
-> The kernel shouldn't rely on a particular feature of a given bootloader.
+> Will
+> 
+> 
+> Will Deacon (3):
+>   ARM: mm: remove IPI broadcasting on ASID rollover
+>   ARM: mm: avoid taking ASID spinlock on fastpath
+>   ARM: mm: use bitmap operations when allocating new ASIDs
+> 
+>  arch/arm/include/asm/mmu.h         |   11 +--
+>  arch/arm/include/asm/mmu_context.h |   82 +--------------
+>  arch/arm/mm/context.c              |  207 +++++++++++++++++++-----------------
+>  3 files changed, 115 insertions(+), 185 deletions(-)
 
-So what do you think about this patch (skip loading from OCOTP if it's already 
-present in DT):
+FWIW, after using this series on VE A15 (both as a host and as KVM guests):
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 71d47f5..4f014ef 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
-                np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
-                if (!np)
-                        return;
-+
-+               if (of_get_property(np, "local-mac-address", NULL))
-+                       continue;
-+
-                from = np;
- 
-                newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 
-
-Best regards,
-Marek Vasut
+	M.
+-- 
+Jazz is not dead. It just smells funny...
