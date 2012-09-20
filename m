@@ -1,30 +1,95 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Sep 2012 14:12:43 +0200
-Subject: [PATCH 25/32] ARM: ux500: Stop registering Audio devices for HREF
- when DT is enabled
+Date: Thu, 20 Sep 2012 14:12:30 +0200
+Subject: [PATCH 12/32] ARM: ux500: Add i2c configurations to the Device Tree
+ for DB8500 based devices
 In-Reply-To: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
 References: <1348143170-2130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348143170-2130-26-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348143170-2130-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Since initial support was provided for the Nomadik I2C driver, it
+has been converted to an AMBA device. AMBA devices are probed in
+a slightly different way to other devices, so we have to identify
+them using an "arm,primecell" compatible string. As well as doing
+just that, this patch specifies which regulators the controller
+should use and requests a clock-speed. The latter is provided as
+more of an example, as it's the same as the recently changed
+default configuration.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/dbx5x0.dtsi |   25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index ab3fe2c..671229e 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -825,7 +825,6 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index dc290d0..cbef6ab 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -474,43 +474,58 @@
+ 		};
  
- 		hrefv60_sdi_init(parent);
--		mop500_audio_init(parent);
+ 		i2c at 80004000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80004000 0x1000>;
+ 			interrupts = <0 21 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
  
- 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
- 		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
+ 		i2c at 80122000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80122000 0x1000>;
+ 			interrupts = <0 22 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 80128000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80128000 0x1000>;
+ 			interrupts = <0 55 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 80110000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80110000 0x1000>;
+ 			interrupts = <0 12 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 8012a000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x8012a000 0x1000>;
+ 			interrupts = <0 51 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		ssp at 80002000 {
 -- 
 1.7.9.5
