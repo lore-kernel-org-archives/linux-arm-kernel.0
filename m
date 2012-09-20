@@ -1,72 +1,37 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Sep 2012 14:45:21 +0800
-Subject: [PATCH v2 08/34] ARM: imx: include iim.h rather than mach/iim.h
+Date: Thu, 20 Sep 2012 14:45:25 +0800
+Subject: [PATCH v2 12/34] ARM: imx: remove mach/dma-mx1-mx2.h
 In-Reply-To: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
 References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1348123547-31082-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1348123547-31082-13-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename mach-imx/include/mach/iim.h to mach-imx/iim.h, and update users
-to include iim.h rather than mach/iim.h.
+The header mach/dma-mx1-mx2.h is used nowhere.  Remove it.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-imx/cpu-imx25.c              |    3 ++-
- arch/arm/mach-imx/cpu-imx31.c              |    2 +-
- arch/arm/mach-imx/cpu-imx35.c              |    3 ++-
- arch/arm/mach-imx/{include/mach => }/iim.h |    0
- 4 files changed, 5 insertions(+), 3 deletions(-)
- rename arch/arm/mach-imx/{include/mach => }/iim.h (100%)
+ arch/arm/mach-imx/include/mach/dma-mx1-mx2.h |   10 ----------
+ 1 file changed, 10 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
 
-diff --git a/arch/arm/mach-imx/cpu-imx25.c b/arch/arm/mach-imx/cpu-imx25.c
-index 6914bcb..79d4d1c 100644
---- a/arch/arm/mach-imx/cpu-imx25.c
-+++ b/arch/arm/mach-imx/cpu-imx25.c
-@@ -12,7 +12,8 @@
- #include <linux/module.h>
- #include <linux/io.h>
- #include <mach/hardware.h>
--#include <mach/iim.h>
-+
-+#include "iim.h"
- 
- static int mx25_cpu_rev = -1;
- 
-diff --git a/arch/arm/mach-imx/cpu-imx31.c b/arch/arm/mach-imx/cpu-imx31.c
-index 9d3a91c..51c938f 100644
---- a/arch/arm/mach-imx/cpu-imx31.c
-+++ b/arch/arm/mach-imx/cpu-imx31.c
-@@ -12,9 +12,9 @@
- #include <linux/module.h>
- #include <linux/io.h>
- #include <mach/hardware.h>
--#include <mach/iim.h>
- 
- #include "common.h"
-+#include "iim.h"
- 
- static int mx31_cpu_rev = -1;
- 
-diff --git a/arch/arm/mach-imx/cpu-imx35.c b/arch/arm/mach-imx/cpu-imx35.c
-index 846e46e..8b36d3a 100644
---- a/arch/arm/mach-imx/cpu-imx35.c
-+++ b/arch/arm/mach-imx/cpu-imx35.c
-@@ -11,7 +11,8 @@
- #include <linux/module.h>
- #include <linux/io.h>
- #include <mach/hardware.h>
--#include <mach/iim.h>
-+
-+#include "iim.h"
- 
- static int mx35_cpu_rev = -1;
- 
-diff --git a/arch/arm/mach-imx/include/mach/iim.h b/arch/arm/mach-imx/iim.h
-similarity index 100%
-rename from arch/arm/mach-imx/include/mach/iim.h
-rename to arch/arm/mach-imx/iim.h
+diff --git a/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h b/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
+deleted file mode 100644
+index df5f522..0000000
+--- a/arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
++++ /dev/null
+@@ -1,10 +0,0 @@
+-#ifndef __MACH_DMA_MX1_MX2_H__
+-#define __MACH_DMA_MX1_MX2_H__
+-/*
+- * Don't use this header in new code, it will go away when all users are
+- * converted to mach/dma-v1.h
+- */
+-
+-#include <mach/dma-v1.h>
+-
+-#endif /* ifndef __MACH_DMA_MX1_MX2_H__ */
 -- 
 1.7.9.5
