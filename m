@@ -1,23 +1,21 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 20 Sep 2012 20:05:44 +0100
-Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
-In-Reply-To: <20120823190402.GA8127@avionic-0098.mockup.avionic-design.de>
-References: <36966374.2768747.1345741025741.JavaMail.root@advansee.com>
- <50366464.4070801@metafoo.de> <50366628.5020007@metafoo.de>
- <20120823190402.GA8127@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120920190544.GB13264@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Sep 2012 21:17:37 +0200
+Subject: [PATCH] i2c-nomadik: Fixup clock handling
+In-Reply-To: <1348154447-3815-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1348154447-3815-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdZZ-gNBi7EDwhXHawmzPD9dE8wo9voX-MJ7CYQ058k-Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 09:04:02PM +0200, Thierry Reding wrote:
+On Thu, Sep 20, 2012 at 5:20 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-> Using runtime PM for this sounds indeed like the most generic approach.
-> I'm not very familiar with the API, but I thought it required explicit
-> architecture or bus support (or the driver itself can provide hooks via
-> pm_ops), so it might be difficult to implement for platforms that don't
-> have working runtime PM support. I'll have to look into this some more.
+> From: Philippe Begnic <philippe.begnic@stericsson.com>
+>
+> Make sure to clk_prepare as well as clk_enable.
 
-It doesn't require explicit arch support, though many architectures
-choose to integrate their PM frameworks with it either directly or via
-power domains.  If the architecture doesn't do anything with it then it
-should just work at the driver level.
+Looks correct. xfer() is slowpatch so we might as well call
+prepare/unprepare functions there.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
