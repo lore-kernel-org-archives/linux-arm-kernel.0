@@ -1,18 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 19 Sep 2012 21:31:19 -0400
-Subject: [PATCH 1/3] clk: wm831x: Fix clk_register() error code checking
-In-Reply-To: <1348034730-16473-2-git-send-email-sboyd@codeaurora.org>
-References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
- <1348034730-16473-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120920013115.GF17666@opensource.wolfsonmicro.com>
+Date: Wed, 19 Sep 2012 21:24:34 -0400
+Subject: [PATCH 08/29] ARM: OMAP2+: Make board-zoom.h local
+In-Reply-To: <20120919210554.28074.2280.stgit@muffinssi>
+References: <20120919205732.28074.43697.stgit@muffinssi>
+ <20120919210554.28074.2280.stgit@muffinssi>
+Message-ID: <20120920012433.GC17666@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2012 at 11:05:28PM -0700, Stephen Boyd wrote:
-> clk_register() returns an ERR_PTR upon failure, not NULL. Fix
-> these error paths.
+On Wed, Sep 19, 2012 at 02:05:54PM -0700, Tony Lindgren wrote:
+> This can be local to mach-omap2 after we rip out the messed up
+> extmute stuff from board-zoom-peripherals.c that's all over
+> the place and probably does not even work because of all the
+> hardcoded GPIO numbers.
+> 
+> I also suggest ASoC gusy remove all extmute handling from
+> sound/soc/codecs/twl4030.c unless it's been tested to work
+> and implemented in a saner way.
 
 Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-this is an API change since the driver was sent which the driver didn't
-get updatd for.
+or I can apply it if that's easier.
