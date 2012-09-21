@@ -1,61 +1,76 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 21 Sep 2012 14:54:05 -0400
-Subject: [RFC PATCH 08/13] mmc: omap_hsmmc: limit max_segs with the EDMA
- DMAC
-In-Reply-To: <20120921171840.GB10409@arwen.pp.htv.fi>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-9-git-send-email-mporter@ti.com>
- <CANfBPZ81anOy8fWgKM1PgCtB4V2pEp2x1Qi4x1uPsq7QieMN5g@mail.gmail.com>
- <CANfBPZ-h7MD4X_NRYfwOmMnEyOKy0bTNNLNRmdbef2pe=2aHyg@mail.gmail.com>
- <20120921171840.GB10409@arwen.pp.htv.fi>
-Message-ID: <20120921185405.GK16522@beef>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Sep 2012 14:53:22 -0400 (EDT)
+Subject: [PATCH v3 10/17] ARM: LPAE: use phys_addr_t in switch_mm()
+In-Reply-To: <20120921184143.GH15609@n2100.arm.linux.org.uk>
+References: <1347385155-11643-1-git-send-email-cyril@ti.com>
+ <1347385155-11643-11-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1209211433110.6667@xanadu.home>
+ <20120921184143.GH15609@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1209211449150.6667@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 08:18:41PM +0300, Felipe Balbi wrote:
-> On Fri, Sep 21, 2012 at 10:47:30PM +0530, S, Venkatraman wrote:
-> > On Fri, Sep 21, 2012 at 10:45 PM, S, Venkatraman <svenkatr@ti.com> wrote:
-> > > On Thu, Sep 20, 2012 at 8:13 PM, Matt Porter <mporter@ti.com> wrote:
-> > >> The EDMA DMAC has a hardware limitation that prevents supporting
-> > >> scatter gather lists with any number of segments. Since the EDMA
-> > >> DMA Engine driver sets the maximum segments to 16, we do the
-> > >> same.
-> > >>
-> > >> Note: this can be removed once the DMA Engine API supports an
-> > >> API to query the DMAC's segment limitations.
-> > >>
-> > >
-> > > I wouldn't want to bind the properties of EDMA to omap_hsmmc as this patch
-> > > suggests. Why don't we have a max_segs property, which when explicitly specified
-> > > in DT, will override the default ?
+On Fri, 21 Sep 2012, Russell King - ARM Linux wrote:
+
+> On Fri, Sep 21, 2012 at 02:33:43PM -0400, Nicolas Pitre wrote:
+> > On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
 > > 
-> > If you are adventurous, this can be a generic mmc DT binding instead
-> > of restricting it to OMAP.
+> > > This patch modifies the switch_mm() processor functions to use phys_addr_t.
+> > > On LPAE systems, we now honor the upper 32-bits of the physical address that
+> > > is being passed in, and program these into TTBR as expected.
+> > > 
+> > > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> > > Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> > 
+> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
 > 
-> I say if it's a limitation in the DMAC, then DMAC's driver should handle
-> it, no ? Meaning that in this case you would copy from one multi-segment
-> sg into a one-segment sg and when transfer is complete, before calling
-> user's callback, copy data the other way around (?)
+> Err... you may have reviewed it but did you read it?
 
-With this DMAC, we would have to do a CPU-based copy or a series of
-smaller DMA-based 16 segment copies with completion interrupts in between.
+Sure I did.
 
-The reason the EDMA DMA Engine driver sets this limit is that we have
-a hardware limitation preventing setting up a large multi-segment
-transfer. The limitation is set by how many EDMA PaRaM slots are
-available (varies based on how the hwmod is instantiated) but on AM335x
-it's 256. You can't use all of those for just one slave device and so
-the EDMA dmaengine driver arbitrarily hardcodes (atm) 16 as the max
-any one channel can claim.  Even if you could use all of them, it's
-common for an unrestricted scatter gather transfer to exceed even our
-best case hardware limitation.
+> > > diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+> > > index f3628fb..75b5f14 100644
+> > > --- a/arch/arm/include/asm/proc-fns.h
+> > > +++ b/arch/arm/include/asm/proc-fns.h
+> > > @@ -60,7 +60,7 @@ extern struct processor {
+> > >  	/*
+> > >  	 * Set the page table
+> > >  	 */
+> > > -	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
+> > > +	void (*switch_mm)(phys_addr_t pgd_phys, struct mm_struct *mm);
+> > >  	/*
+> > >  	 * Set a possibly extended PTE.  Non-extended PTEs should
+> > >  	 * ignore 'ext'.
+> > > @@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
+> > >  extern void cpu_proc_fin(void);
+> > >  extern int cpu_do_idle(void);
+> > >  extern void cpu_dcache_clean_area(void *, int);
+> > > -extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+> > > +extern void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
+> 
+> phys_addr_t can be either 64-bit or 32-bit.  Which it ends up depends on
+> a configuration option.  If it's 32-bit, then mm is in r1, otherwise it
+> is in r2...
 
-This is a case where asking the DMA Engine driver to handle any length
-SG is going to result in a big peformance hit, since the MMC subsystem
-provides this hook for a reason, we just need the proper DMA Engine API
-to find out how to set it.
+Right.  And that configuration option is CONFIG_ARM_LPAE.
 
-So I guess I'm going to need to write up an API proposal unless Vinod
-has already been thinking about this...
+> > >  #ifdef CONFIG_MMU
+> > > -	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+> > > -	and	r3, r1, #0xff
+> > > -	mov	r3, r3, lsl #(48 - 32)		@ ASID
+> > > -	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
+> > > +	ldr	r2, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
+> 
+> which breaks this when phys_addr_t is 32-bit.
 
--Matt
+... which can't happen in this case because this code is only compiled 
+when CONFIG_ARM_LPAE=y.
+
+> Doing it this way means we have to have similar conditionals in other
+> files which make use of the 'mm' argument.
+
+No because none of the other files may ever be used when 
+CONFIG_ARM_LPAE=y.
+
+
+Nicolas
