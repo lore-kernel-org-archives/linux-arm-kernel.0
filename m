@@ -1,33 +1,128 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 21 Sep 2012 16:26:56 +0800
-Subject: [GIT PULL][for 3.6] pull request on fixes branch from arch-pxa
-Message-ID: <CAN1soZwLHZTudFVMQWaE43TPPtsGxYDZQSYfkkY1svVwbfSaUw@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 21 Sep 2012 08:27:07 +0000
+Subject: [RFC PATCH 00/13] DMA Engine support for AM33xx
+In-Reply-To: <1348152226-13588-1-git-send-email-mporter@ti.com>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8A79D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+On Thu, Sep 20, 2012 at 20:13:33, Porter, Matt wrote:
+> This series adds DMA Engine support for AM33xx, which uses
+> an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> a private API implementation (much like the situation with OMAP
+> DMA) found on the DaVinci family of SoCs.
+> 
+> There are a mind-boggling number of dependencies for this series:
+> 
+> 	- Jon Hunter's OF DMA helpers series
+> 	  https://patchwork.kernel.org/patch/1461061/
+> 	  https://patchwork.kernel.org/patch/1461051/
+> 	- Patch to address OF DMA helpers naming issues:
+> 	  https://patchwork.kernel.org/patch/1477921/
+> 	- EDMA DMA Engine wrapper driver in linux-next
+> 	  c2dde5f8f2095d7c623ff3565c1462e190272273
+> 	- EDMA DMA Engine wrapper driver bug fix:
+> 	  https://patchwork.kernel.org/patch/1474411/  
+> 	- A huge number of patches in linux-next for AM33xx boot
+> 	  (too numerous to list)
+> 
+> The approach taken is similar to how OMAP DMA is being converted to
+> DMA Engine support. With the functional EDMA private API already
+> existing in mach-davinci/dma.c, we first move that to an ARM common
+> area so it can be shared. Adding DT and runtime PM support to the
+> private EDMA API implementation allows it to run on AM33xx. AM33xx
+> *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> register EDMA DMAC with the of_dma framework and then add support
+> for calling the dma_request_slave_channel() API to both the mmc
+> and spi drivers.
+> 
+> What works? Well, with this series we now have MMC and SPI support
+> on AM33xx. The only caveat for MMC is that the mmc3 controller has
+> its events on the crossbar and is not usable right now.
+> 
+> This is tested on BeagleBone with a SPI framebuffer driver and SD
+> card.
+> 
+> After this series, the plan is to convert the last in-tree user
+> of the private EDMA API (davinci-pcm/mcasp) and then eliminate
+> the private EDMA API by folding its functionality into
+> drivers/dma/edma.c.
+> 
+> TODO:
+> 	add AM33xx crossbar support to the private EDMA API
+> 	(any EDMA events on the crossbar are not supported)
+> 
 
-Please help to merge fixes branch in arch-pxa git tree.
 
-Regards
-Haojian
+Can you please mention the base repo you have taken as starting point.
+(repo + extra patches ...).
 
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+This will help us to test the code.
 
-  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+This is because I looked at the patch 12/13 and I see that mmc
+device-node is modified. But in mainline I don?t see device 
+node for mmc (yet).
 
-are available in the git repository at:
+> Matt Porter (13):
+>   ARM: davinci: move private EDMA API to arm/common
+>   ARM: edma: remove unused transfer controller handlers
+>   ARM: edma: add DT and runtime PM support for AM335x
+>   dmaengine: edma: enable build for AM335x
+>   dma: Add TI EDMA device tree binding
+>   ARM: omap: add hsmmc am33xx specific init
+>   mmc: omap_hsmmc: dma_request_slave_channel() support for DT platforms
+>   mmc: omap_hsmmc: limit max_segs with the EDMA DMAC
+>   mmc: omap_hsmmc: add generic DMA request support to the DT binding
+>   spi: omap2-mcspi: dma_request_slave_channel() support for DT
+>     platforms
+>   spi: omap2-mcspi: add generic DMA request support to the DT binding
+>   ARM: dts: add am33xx EDMA support
+>   Documentation: add schedule for removing private EDMA API
+> 
+>  Documentation/devicetree/bindings/dma/ti-edma.txt  |   49 +
+>  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   25 +-
+>  Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +-
+>  Documentation/feature-removal-schedule.txt         |   10 +
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/boot/dts/am33xx.dtsi                      |   46 +
+>  arch/arm/common/Kconfig                            |    3 +
+>  arch/arm/common/Makefile                           |    1 +
+>  arch/arm/common/edma.c                             | 1779 ++++++++++++++++++++
+>  arch/arm/include/asm/mach/edma.h                   |  267 +++
+>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>  arch/arm/mach-davinci/devices.c                    |    3 +-
+>  arch/arm/mach-davinci/dm355.c                      |    2 +-
+>  arch/arm/mach-davinci/dm365.c                      |    2 +-
+>  arch/arm/mach-davinci/dm644x.c                     |    2 +-
+>  arch/arm/mach-davinci/dm646x.c                     |    2 +-
+>  arch/arm/mach-davinci/dma.c                        | 1588 -----------------
+>  arch/arm/mach-davinci/include/mach/asp.h           |    2 +-
+>  arch/arm/mach-davinci/include/mach/da8xx.h         |    3 +-
+>  arch/arm/mach-davinci/include/mach/edma.h          |  267 ---
+>  arch/arm/mach-davinci/include/mach/spi.h           |    2 +-
+>  arch/arm/mach-omap2/hsmmc.c                        |    7 +-
+>  arch/arm/plat-omap/Kconfig                         |    1 +
+>  drivers/dma/Kconfig                                |    2 +-
+>  drivers/dma/edma.c                                 |    2 +-
+>  drivers/mmc/host/omap_hsmmc.c                      |   26 +-
+>  drivers/spi/spi-omap2-mcspi.c                      |   68 +-
+>  27 files changed, 2296 insertions(+), 1893 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+>  create mode 100644 arch/arm/common/edma.c
+>  create mode 100644 arch/arm/include/asm/mach/edma.h
+>  delete mode 100644 arch/arm/mach-davinci/dma.c
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/edma.h
+> 
+> -- 
+> 1.7.9.5
+> 
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
 
-  git://github.com/hzhuang1/linux.git fixes
 
-for you to fetch changes up to e09a716490dbce0b9b7d132d191f1f8785cb5df2:
-
-  ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
-(2012-09-21 15:33:58 +0800)
-
-----------------------------------------------------------------
-Wei Yongjun (1):
-      ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
-
- drivers/pcmcia/pxa2xx_base.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards, 
+Gururaja
