@@ -1,49 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Sep 2012 10:35:30 +0100
-Subject: [RFC 0/3] Move some ARM header files to more appropriate locations
-Message-ID: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 21 Sep 2012 17:40:07 +0800
+Subject: [RFC 2/3] ARM: move udc_pxa2xx.h to linux/platform_data
+In-Reply-To: <E1TEzet-00077v-VD@rmk-PC.arm.linux.org.uk>
+References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+ <E1TEzet-00077v-VD@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAMPhdO_xqpqUUbSvi1zC4eT6vr0xFO-70+ieknjMWk9h0iWfHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series moves some of the misplaced ARM header files, which
-contain driver platform data, out of arch/arm/include/asm/mach
-and into include/linux/platform_data.
+On Fri, Sep 21, 2012 at 5:36 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Move the PXA2xx/IXP4xx UDC header file into linux/platform_data as it
+> only contains a driver platform data structure.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/mach/udc_pxa2xx.h   |   26 --------------------------
+>  arch/arm/mach-ixp4xx/include/mach/udc.h  |    2 +-
+>  arch/arm/mach-pxa/include/mach/udc.h     |    2 +-
+>  drivers/usb/gadget/pxa25x_udc.c          |    4 +---
+>  include/linux/platform_data/pxa2xx_udc.h |   27 +++++++++++++++++++++++++++
+>  5 files changed, 30 insertions(+), 31 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/mach/udc_pxa2xx.h
+>  create mode 100644 include/linux/platform_data/pxa2xx_udc.h
+>
+> diff --git a/arch/arm/include/asm/mach/udc_pxa2xx.h b/arch/arm/include/asm/mach/udc_pxa2xx.h
+> deleted file mode 100644
+> index ea297ac..0000000
+> --- a/arch/arm/include/asm/mach/udc_pxa2xx.h
+> +++ /dev/null
+> @@ -1,26 +0,0 @@
+> -/*
+> - * arch/arm/include/asm/mach/udc_pxa2xx.h
+> - *
+> - * This supports machine-specific differences in how the PXA2xx
+> - * USB Device Controller (UDC) is wired.
+> - *
+> - * It is set in linux/arch/arm/mach-pxa/<machine>.c or in
+> - * linux/arch/mach-ixp4xx/<machine>.c and used in
+> - * the probe routine of linux/drivers/usb/gadget/pxa2xx_udc.c
+> - */
+> -
+> -struct pxa2xx_udc_mach_info {
+> -        int  (*udc_is_connected)(void);                /* do we see host? */
+> -        void (*udc_command)(int cmd);
+> -#define        PXA2XX_UDC_CMD_CONNECT          0       /* let host see us */
+> -#define        PXA2XX_UDC_CMD_DISCONNECT       1       /* so host won't see us */
+> -
+> -       /* Boards following the design guidelines in the developer's manual,
+> -        * with on-chip GPIOs not Lubbock's weird hardware, can have a sane
+> -        * VBUS IRQ and omit the methods above.  Store the GPIO number
+> -        * here.  Note that sometimes the signals go through inverters...
+> -        */
+> -       bool    gpio_pullup_inverted;
+> -       int     gpio_pullup;                    /* high == pullup activated */
+> -};
+> -
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/udc.h b/arch/arm/mach-ixp4xx/include/mach/udc.h
+> index 80d6da2..b47cc0d 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/udc.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/udc.h
+> @@ -2,7 +2,7 @@
+>   * arch/arm/mach-ixp4xx/include/mach/udc.h
+>   *
+>   */
+> -#include <asm/mach/udc_pxa2xx.h>
+> +#include <linux/platform_data_pxa2xx_udc.h>
 
-arch/arm/include/asm/mach is supposed to be for include files
-exporting generic ARM code structures and functions to ARM platforms,
-not for platforms to export platform data definitions to the rest
-of the kernel.
+Guess a typo here, "/" instead of "_"? Otherwise looks good to me
 
-This patch series addresses three of the files: the SA11x0 serial
-driver platform data, the PXA2xx UDC driver, and the Atmel serial
-driver.  Out of those three, I ended up deleting the Atmel serial
-driver header as I could not find any user of the exported function
-and its data structure anywhere in the kernel.
-
- arch/arm/include/asm/mach/serial_at91.h            |   33 --------------------
- arch/arm/mach-ixp4xx/include/mach/udc.h            |    2 +-
- arch/arm/mach-pxa/include/mach/udc.h               |    2 +-
- arch/arm/mach-sa1100/assabet.c                     |    2 +-
- arch/arm/mach-sa1100/badge4.c                      |    2 +-
- arch/arm/mach-sa1100/cerf.c                        |    2 +-
- arch/arm/mach-sa1100/collie.c                      |    2 +-
- arch/arm/mach-sa1100/h3xxx.c                       |    2 +-
- arch/arm/mach-sa1100/hackkit.c                     |    2 +-
- arch/arm/mach-sa1100/jornada720.c                  |    2 +-
- arch/arm/mach-sa1100/lart.c                        |    2 +-
- arch/arm/mach-sa1100/nanoengine.c                  |    2 +-
- arch/arm/mach-sa1100/neponset.c                    |    2 +-
- arch/arm/mach-sa1100/pleb.c                        |    2 +-
- arch/arm/mach-sa1100/shannon.c                     |    2 +-
- arch/arm/mach-sa1100/simpad.c                      |    2 +-
- arch/avr32/include/asm/mach/serial_at91.h          |   33 --------------------
- drivers/tty/serial/atmel_serial.c                  |   18 -----------
- drivers/tty/serial/sa1100.c                        |    2 +-
- drivers/usb/gadget/pxa25x_udc.c                    |    4 +--
- .../linux/platform_data/pxa2xx_udc.h               |    5 ++-
- .../linux/platform_data/sa11x0-serial.h            |    6 ++-
- 22 files changed, 24 insertions(+), 107 deletions(-)
- delete mode 100644 arch/arm/include/asm/mach/serial_at91.h
- delete mode 100644 arch/avr32/include/asm/mach/serial_at91.h
- rename arch/arm/include/asm/mach/udc_pxa2xx.h => include/linux/platform_data/pxa2xx_udc.h (94%)
- rename arch/arm/include/asm/mach/serial_sa1100.h => include/linux/platform_data/sa11x0-serial.h (93%)
+>
+>  extern void ixp4xx_set_udc_info(struct pxa2xx_udc_mach_info *info);
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/udc.h b/arch/arm/mach-pxa/include/mach/udc.h
+> index 2f82332..9a827e3 100644
+> --- a/arch/arm/mach-pxa/include/mach/udc.h
+> +++ b/arch/arm/mach-pxa/include/mach/udc.h
+> @@ -2,7 +2,7 @@
+>   * arch/arm/mach-pxa/include/mach/udc.h
+>   *
+>   */
+> -#include <asm/mach/udc_pxa2xx.h>
+> +#include <linux/platform_data/pxa2xx_udc.h>
+>
+>  extern void pxa_set_udc_info(struct pxa2xx_udc_mach_info *info);
+>
+> diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
+> index 907ad3e..06e498d 100644
+> --- a/drivers/usb/gadget/pxa25x_udc.c
+> +++ b/drivers/usb/gadget/pxa25x_udc.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/list.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/mm.h>
+> +#include <linux/platform_data/pxa2xx_udc.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/irq.h>
+> @@ -60,9 +61,6 @@
+>  #include <mach/lubbock.h>
+>  #endif
+>
+> -#include <asm/mach/udc_pxa2xx.h>
+> -
+> -
+>  /*
+>   * This driver handles the USB Device Controller (UDC) in Intel's PXA 25x
+>   * series processors.  The UDC for the IXP 4xx series is very similar.
+> diff --git a/include/linux/platform_data/pxa2xx_udc.h b/include/linux/platform_data/pxa2xx_udc.h
+> new file mode 100644
+> index 0000000..c6c5e98
+> --- /dev/null
+> +++ b/include/linux/platform_data/pxa2xx_udc.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * This supports machine-specific differences in how the PXA2xx
+> + * USB Device Controller (UDC) is wired.
+> + *
+> + * It is set in linux/arch/arm/mach-pxa/<machine>.c or in
+> + * linux/arch/mach-ixp4xx/<machine>.c and used in
+> + * the probe routine of linux/drivers/usb/gadget/pxa2xx_udc.c
+> + */
+> +#ifndef PXA2XX_UDC_H
+> +#define PXA2XX_UDC_H
+> +
+> +struct pxa2xx_udc_mach_info {
+> +        int  (*udc_is_connected)(void);                /* do we see host? */
+> +        void (*udc_command)(int cmd);
+> +#define        PXA2XX_UDC_CMD_CONNECT          0       /* let host see us */
+> +#define        PXA2XX_UDC_CMD_DISCONNECT       1       /* so host won't see us */
+> +
+> +       /* Boards following the design guidelines in the developer's manual,
+> +        * with on-chip GPIOs not Lubbock's weird hardware, can have a sane
+> +        * VBUS IRQ and omit the methods above.  Store the GPIO number
+> +        * here.  Note that sometimes the signals go through inverters...
+> +        */
+> +       bool    gpio_pullup_inverted;
+> +       int     gpio_pullup;                    /* high == pullup activated */
+> +};
+> +
+> +#endif
+> --
+> 1.7.4.4
+>
