@@ -1,71 +1,280 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 21 Sep 2012 11:56:11 -0400
-Subject: [PATCH v3 RESEND 13/17] ARM: LPAE: factor out T1SZ and TTBR1
- computations
+Date: Fri, 21 Sep 2012 11:56:01 -0400
+Subject: [PATCH v3 RESEND 03/17] ARM: use late patch framework for phys-virt
+ patching
 In-Reply-To: <1348242975-19184-1-git-send-email-cyril@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
-Message-ID: <1348242975-19184-14-git-send-email-cyril@ti.com>
+Message-ID: <1348242975-19184-4-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the TTBR1 offset calculation and the T1SZ calculation out
-of the TTB setup assembly code.  This should not affect functionality in
-any way, but improves code readability as well as readability of subsequent
-patches in this series.
+This patch replaces the original physical offset patching implementation
+with one that uses the newly added patching framework.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/pgtable-3level-hwdef.h |   10 ++++++++++
- arch/arm/mm/proc-v7-3level.S                |   16 ++++------------
- 2 files changed, 14 insertions(+), 12 deletions(-)
+ arch/arm/Kconfig              |    1 +
+ arch/arm/include/asm/memory.h |   26 +++--------
+ arch/arm/kernel/armksyms.c    |    4 --
+ arch/arm/kernel/head.S        |   95 +++++++----------------------------------
+ arch/arm/kernel/module.c      |    5 ---
+ arch/arm/kernel/setup.c       |   12 ++++++
+ arch/arm/kernel/vmlinux.lds.S |    5 ---
+ 7 files changed, 36 insertions(+), 112 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index d795282..b501650 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -74,4 +74,14 @@
- #define PHYS_MASK_SHIFT		(40)
- #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5bfaa20..0a92735 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -193,6 +193,7 @@ config ARM_PATCH_PHYS_VIRT
+ 	default y
+ 	depends on !XIP_KERNEL && MMU
+ 	depends on !ARCH_REALVIEW || !SPARSEMEM
++	select ARM_RUNTIME_PATCH
+ 	help
+ 	  Patch phys-to-virt and virt-to-phys translation functions at
+ 	  boot and module load time according to the position of the
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 5f6ddcc..c88d98c 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -18,6 +18,8 @@
+ #include <linux/types.h>
+ #include <linux/sizes.h>
  
-+#if defined CONFIG_VMSPLIT_2G
-+#define TTBR1_OFFSET	(1 << 4)		/* skip two L1 entries */
-+#elif defined CONFIG_VMSPLIT_3G
-+#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
-+#else
-+#define TTBR1_OFFSET	0
++#include <asm/runtime-patch.h>
++
+ #ifdef CONFIG_NEED_MACH_MEMORY_H
+ #include <mach/memory.h>
+ #endif
+@@ -151,35 +153,21 @@
+ #ifndef __virt_to_phys
+ #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+ 
+-/*
+- * Constants used to force the right instruction encodings and shifts
+- * so that all we need to do is modify the 8-bit constant field.
+- */
+-#define __PV_BITS_31_24	0x81000000
+-
+-extern unsigned long __pv_phys_offset;
+-#define PHYS_OFFSET __pv_phys_offset
+-
+-#define __pv_stub(from,to,instr,type)			\
+-	__asm__("@ __pv_stub\n"				\
+-	"1:	" instr "	%0, %1, %2\n"		\
+-	"	.pushsection .pv_table,\"a\"\n"		\
+-	"	.long	1b\n"				\
+-	"	.popsection\n"				\
+-	: "=r" (to)					\
+-	: "r" (from), "I" (type))
++extern unsigned long	__pv_offset;
++extern unsigned long	__pv_phys_offset;
++#define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
+ 
+ static inline unsigned long __virt_to_phys(unsigned long x)
+ {
+ 	unsigned long t;
+-	__pv_stub(x, t, "add", __PV_BITS_31_24);
++	early_patch_imm8("add", t, x, __pv_offset, 0);
+ 	return t;
+ }
+ 
+ static inline unsigned long __phys_to_virt(unsigned long x)
+ {
+ 	unsigned long t;
+-	__pv_stub(x, t, "sub", __PV_BITS_31_24);
++	early_patch_imm8("sub", t, x, __pv_offset, 0);
+ 	return t;
+ }
+ #else
+diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+index 60d3b73..6b388f8 100644
+--- a/arch/arm/kernel/armksyms.c
++++ b/arch/arm/kernel/armksyms.c
+@@ -152,7 +152,3 @@ EXPORT_SYMBOL(mcount);
+ #endif
+ EXPORT_SYMBOL(__gnu_mcount_nc);
+ #endif
+-
+-#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+-EXPORT_SYMBOL(__pv_phys_offset);
+-#endif
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 3db960e..69a3c09 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -117,7 +117,7 @@ ENTRY(stext)
+ 	bl	__fixup_smp
+ #endif
+ #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+-	bl	__fixup_pv_table
++	bl	__fixup_pv_offsets
+ #endif
+ 	bl	__create_page_tables
+ 
+@@ -511,92 +511,29 @@ ENDPROC(fixup_smp)
+ 
+ #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+ 
+-/* __fixup_pv_table - patch the stub instructions with the delta between
+- * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
+- * can be expressed by an immediate shifter operand. The stub instruction
+- * has a form of '(add|sub) rd, rn, #imm'.
++/*
++ * __fixup_pv_offsets - update __pv_offset and __pv_phys_offset based on the
++ * runtime location of the kernel.
+  */
+ 	__HEAD
+-__fixup_pv_table:
++__fixup_pv_offsets:
+ 	adr	r0, 1f
+-	ldmia	r0, {r3-r5, r7}
++	ldmia	r0, {r3-r6}
+ 	sub	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
+-	add	r4, r4, r3	@ adjust table start address
+-	add	r5, r5, r3	@ adjust table end address
+-	add	r7, r7, r3	@ adjust __pv_phys_offset address
+-	str	r8, [r7]	@ save computed PHYS_OFFSET to __pv_phys_offset
+-	mov	r6, r3, lsr #24	@ constant for add/sub instructions
+-	teq	r3, r6, lsl #24 @ must be 16MiB aligned
+-THUMB(	it	ne		@ cross section branch )
+-	bne	__error
+-	str	r6, [r7, #4]	@ save to __pv_offset
+-	b	__fixup_a_pv_table
+-ENDPROC(__fixup_pv_table)
++	add	r4, r4, r3	@ virt_to_phys(__pv_phys_offset)
++	add	r5, r5, r3	@ virt_to_phys(__pv_offset)
++	add	r6, r6, r3	@ virt_to_phys(PAGE_OFFSET) = PHYS_OFFSET
++	str	r6, [r4]	@ save __pv_phys_offset
++	str	r3, [r5]	@ save __pv_offset
++	mov	pc, lr
++ENDPROC(__fixup_pv_offsets)
+ 
+ 	.align
+ 1:	.long	.
+-	.long	__pv_table_begin
+-	.long	__pv_table_end
+-2:	.long	__pv_phys_offset
+-
+-	.text
+-__fixup_a_pv_table:
+-#ifdef CONFIG_THUMB2_KERNEL
+-	lsls	r6, #24
+-	beq	2f
+-	clz	r7, r6
+-	lsr	r6, #24
+-	lsl	r6, r7
+-	bic	r6, #0x0080
+-	lsrs	r7, #1
+-	orrcs	r6, #0x0080
+-	orr	r6, r6, r7, lsl #12
+-	orr	r6, #0x4000
+-	b	2f
+-1:	add     r7, r3
+-	ldrh	ip, [r7, #2]
+-	and	ip, 0x8f00
+-	orr	ip, r6	@ mask in offset bits 31-24
+-	strh	ip, [r7, #2]
+-2:	cmp	r4, r5
+-	ldrcc	r7, [r4], #4	@ use branch for delay slot
+-	bcc	1b
+-	bx	lr
+-#else
+-	b	2f
+-1:	ldr	ip, [r7, r3]
+-	bic	ip, ip, #0x000000ff
+-	orr	ip, ip, r6	@ mask in offset bits 31-24
+-	str	ip, [r7, r3]
+-2:	cmp	r4, r5
+-	ldrcc	r7, [r4], #4	@ use branch for delay slot
+-	bcc	1b
+-	mov	pc, lr
++	.long	__pv_phys_offset
++	.long	__pv_offset
++	.long	PAGE_OFFSET
+ #endif
+-ENDPROC(__fixup_a_pv_table)
+-
+-ENTRY(fixup_pv_table)
+-	stmfd	sp!, {r4 - r7, lr}
+-	ldr	r2, 2f			@ get address of __pv_phys_offset
+-	mov	r3, #0			@ no offset
+-	mov	r4, r0			@ r0 = table start
+-	add	r5, r0, r1		@ r1 = table size
+-	ldr	r6, [r2, #4]		@ get __pv_offset
+-	bl	__fixup_a_pv_table
+-	ldmfd	sp!, {r4 - r7, pc}
+-ENDPROC(fixup_pv_table)
+ 
+-	.align
+-2:	.long	__pv_phys_offset
+-
+-	.data
+-	.globl	__pv_phys_offset
+-	.type	__pv_phys_offset, %object
+-__pv_phys_offset:
+-	.long	0
+-	.size	__pv_phys_offset, . - __pv_phys_offset
+-__pv_offset:
+-	.long	0
+-#endif
+ 
+ #include "head-common.S"
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 10a2922..021a940 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -317,11 +317,6 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+ 					         maps[i].txt_sec->sh_addr,
+ 					         maps[i].txt_sec->sh_size);
+ #endif
+-#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+-	s = find_mod_section(hdr, sechdrs, ".pv_table");
+-	if (s)
+-		fixup_pv_table((void *)s->sh_addr, s->sh_size);
+-#endif
+ 	s = find_mod_section(hdr, sechdrs, ".runtime.patch.table");
+ 	if (s) {
+ 		err = runtime_patch((void *)s->sh_addr, s->sh_size);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 669bbf0..59e0f57 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -152,6 +152,18 @@ static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '
+ 
+ DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
+ 
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
++
++/*
++ * These are initialized in head.S code prior to BSS getting cleared out.
++ * The initializers here prevent these from landing in the BSS section.
++ */
++unsigned long __pv_offset = 0xdeadbeef;
++unsigned long __pv_phys_offset = 0xdeadbeef;
++EXPORT_SYMBOL(__pv_phys_offset);
++
 +#endif
 +
-+#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
-+
+ /*
+  * Standard memory resources
+  */
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index ea35ca0..2080111 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -162,11 +162,6 @@ SECTIONS
+ 		__smpalt_end = .;
+ 	}
  #endif
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index c4f4251..5d93f00 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -128,18 +128,10 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	 * booting secondary CPUs would end up using TTBR1 for the identity
- 	 * mapping set up in TTBR0.
- 	 */
--	bhi	9001f				@ PHYS_OFFSET > PAGE_OFFSET?
--	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
--#if defined CONFIG_VMSPLIT_2G
--	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
--	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
--#elif defined CONFIG_VMSPLIT_3G
--	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
--	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
--#endif
--	/* CONFIG_VMSPLIT_1G does not need TTBR1 adjustment */
--9001:	mcr	p15, 0, \tmp, c2, c0, 2		@ TTB control register
--	mcrr	p15, 1, \ttbr1, \zero, c2	@ load TTBR1
-+	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
-+	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
-+	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
-+	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
- 	.endm
- 
- 	__CPUINIT
+-	.init.pv_table : {
+-		__pv_table_begin = .;
+-		*(.pv_table)
+-		__pv_table_end = .;
+-	}
+ 	.init.runtime_patch_table : {
+ 		__runtime_patch_table_begin = .;
+ 		*(.runtime.patch.table)
 -- 
 1.7.9.5
