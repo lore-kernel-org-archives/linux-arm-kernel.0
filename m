@@ -1,40 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Sep 2012 23:14:02 -0600
-Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
-In-Reply-To: <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
-References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
- <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
-Message-ID: <505BF79A.8060802@wwwdotorg.org>
+From: ido@wizery.com (Ido Yariv)
+Date: Fri, 21 Sep 2012 01:14:06 -0400
+Subject: [PATCH 1/3] [media] omap3isp: Fix compilation error in ispreg.h
+Message-ID: <1348204448-30855-1-git-send-email-ido@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2012 05:22 AM, Leela Krishna Amudala wrote:
-> This patch adds device tree based discovery support for exynos DRM-FIMD
-> driver which includes driver modification to handle platform data in
-> both the cases with DT and non-DT, Also adds the documentation for bindings.
+Commit c49f34bc ("ARM: OMAP2+ Move SoC specific headers to be local to
+mach-omap2") moved omap34xx.h to mach-omap2. This broke omap3isp, as it
+includes omap34xx.h.
 
-> diff --git a/Documentation/devicetree/bindings/drm/exynos/fimd.txt b/Documentation/devicetree/bindings/drm/exynos/fimd.txt
-...
-> + - samsung,fimd-display: This property should specify the phandle of the
-> +   display device node which holds the video interface timing with the
-> +   below mentioned properties.
-> +
-> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
-> +     horizontal timing includes four parameters in the following order.
-> +
-> +     - horizontal back porch (in number of lcd clocks)
-> +     - horizontal front porch (in number of lcd clocks)
-> +     - hsync pulse width (in number of lcd clocks)
-> +     - Display panels X resolution.
-> +
-> +   - lcd-vtiming: Specifies the vertical timing for the overlay. The
-> +     vertical timing includes four parameters in the following order.
-> +
-> +     - vertical back porch (in number of lcd lines)
-> +     - vertical front porch (in number of lcd lines)
-> +     - vsync pulse width (in number of lcd clocks)
-> +     - Display panels Y resolution.
+Instead of moving omap34xx to platform_data, simply add the two
+definitions the driver needs and remove the include altogether.
 
-Should this not use the new videomode timings that are under discussion at:
+Signed-off-by: Ido Yariv <ido@wizery.com>
+---
+ drivers/media/platform/omap3isp/ispreg.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
+diff --git a/drivers/media/platform/omap3isp/ispreg.h b/drivers/media/platform/omap3isp/ispreg.h
+index 084ea77..e2c57f3 100644
+--- a/drivers/media/platform/omap3isp/ispreg.h
++++ b/drivers/media/platform/omap3isp/ispreg.h
+@@ -27,13 +27,13 @@
+ #ifndef OMAP3_ISP_REG_H
+ #define OMAP3_ISP_REG_H
+ 
+-#include <plat/omap34xx.h>
+-
+-
+ #define CM_CAM_MCLK_HZ			172800000	/* Hz */
+ 
+ /* ISP Submodules offset */
+ 
++#define L4_34XX_BASE			0x48000000
++#define OMAP3430_ISP_BASE		(L4_34XX_BASE + 0xBC000)
++
+ #define OMAP3ISP_REG_BASE		OMAP3430_ISP_BASE
+ #define OMAP3ISP_REG(offset)		(OMAP3ISP_REG_BASE + (offset))
+ 
+-- 
+1.7.11.4
