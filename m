@@ -1,139 +1,77 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 21 Sep 2012 10:36:48 +0100
-Subject: [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
-In-Reply-To: <20120921093530.GB31374@n2100.arm.linux.org.uk>
-References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
-Message-ID: <E1TEzfE-000780-1t@rmk-PC.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Sep 2012 15:41:41 -0400
+Subject: [GIT PULL V3 1/5] ARM: Kirkwood: address decoding change for v3.7
+In-Reply-To: <20120829001129.GO19437@titan.lakedaemon.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+Message-ID: <20120921194141.GV5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definitions provided by serial_at91.h are only used by the
-atmel_serial driver, and the function that uses it is never called
-from anywhere in the kernel.  Therefore, these definitions are unused
-and/or obsolete, and can be removed.
+The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/mach/serial_at91.h   |   33 -----------------------------
- arch/avr32/include/asm/mach/serial_at91.h |   33 -----------------------------
- drivers/tty/serial/atmel_serial.c         |   18 ---------------
- 3 files changed, 0 insertions(+), 84 deletions(-)
- delete mode 100644 arch/arm/include/asm/mach/serial_at91.h
- delete mode 100644 arch/avr32/include/asm/mach/serial_at91.h
+  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
 
-diff --git a/arch/arm/include/asm/mach/serial_at91.h b/arch/arm/include/asm/mach/serial_at91.h
-deleted file mode 100644
-index ea6d063..0000000
---- a/arch/arm/include/asm/mach/serial_at91.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- *  arch/arm/include/asm/mach/serial_at91.h
-- *
-- *  Based on serial_sa1100.h  by Nicolas Pitre
-- *
-- *  Copyright (C) 2002 ATMEL Rousset
-- *
-- *  Low level machine dependent UART functions.
-- */
--
--struct uart_port;
--
--/*
-- * This is a temporary structure for registering these
-- * functions; it is intended to be discarded after boot.
-- */
--struct atmel_port_fns {
--	void	(*set_mctrl)(struct uart_port *, u_int);
--	u_int	(*get_mctrl)(struct uart_port *);
--	void	(*enable_ms)(struct uart_port *);
--	void	(*pm)(struct uart_port *, u_int, u_int);
--	int	(*set_wake)(struct uart_port *, u_int);
--	int	(*open)(struct uart_port *);
--	void	(*close)(struct uart_port *);
--};
--
--#if defined(CONFIG_SERIAL_ATMEL)
--void atmel_register_uart_fns(struct atmel_port_fns *fns);
--#else
--#define atmel_register_uart_fns(fns) do { } while (0)
--#endif
--
--
-diff --git a/arch/avr32/include/asm/mach/serial_at91.h b/arch/avr32/include/asm/mach/serial_at91.h
-deleted file mode 100644
-index 55b317a..0000000
---- a/arch/avr32/include/asm/mach/serial_at91.h
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- *  linux/include/asm-arm/mach/serial_at91.h
-- *
-- *  Based on serial_sa1100.h  by Nicolas Pitre
-- *
-- *  Copyright (C) 2002 ATMEL Rousset
-- *
-- *  Low level machine dependent UART functions.
-- */
--
--struct uart_port;
--
--/*
-- * This is a temporary structure for registering these
-- * functions; it is intended to be discarded after boot.
-- */
--struct atmel_port_fns {
--	void	(*set_mctrl)(struct uart_port *, u_int);
--	u_int	(*get_mctrl)(struct uart_port *);
--	void	(*enable_ms)(struct uart_port *);
--	void	(*pm)(struct uart_port *, u_int, u_int);
--	int	(*set_wake)(struct uart_port *, u_int);
--	int	(*open)(struct uart_port *);
--	void	(*close)(struct uart_port *);
--};
--
--#if defined(CONFIG_SERIAL_ATMEL)
--void atmel_register_uart_fns(struct atmel_port_fns *fns);
--#else
--#define atmel_register_uart_fns(fns) do { } while (0)
--#endif
--
--
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 3d7e1ee..a6134c9 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -43,7 +43,6 @@
- #include <asm/io.h>
- #include <asm/ioctls.h>
- 
--#include <asm/mach/serial_at91.h>
- #include <mach/board.h>
- 
- #ifdef CONFIG_ARM
-@@ -1513,23 +1512,6 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
- 	}
- }
- 
--/*
-- * Register board-specific modem-control line handlers.
-- */
--void __init atmel_register_uart_fns(struct atmel_port_fns *fns)
--{
--	if (fns->enable_ms)
--		atmel_pops.enable_ms = fns->enable_ms;
--	if (fns->get_mctrl)
--		atmel_pops.get_mctrl = fns->get_mctrl;
--	if (fns->set_mctrl)
--		atmel_pops.set_mctrl = fns->set_mctrl;
--	atmel_open_hook		= fns->open;
--	atmel_close_hook	= fns->close;
--	atmel_pops.pm		= fns->pm;
--	atmel_pops.set_wake	= fns->set_wake;
--}
--
- struct platform_device *atmel_default_console_device;	/* the serial console device */
- 
- #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
--- 
-1.7.4.4
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux.git kirkwood/addr_decode
+
+Thomas Petazzoni (17):
+      arm: mach-dove: use plus instead of or for address definitions
+      arm: mach-kirkwood: use plus instead of or for address definitions
+      arm: mach-mv78xx0: use plus instead of or for address definitions
+      arm: mach-orion5x: use plus instead of or for address definitions
+      arm: mach-dove: use IOMEM() for base address definitions
+      arm: mach-kirkwood: use IOMEM() for base address definitions
+      arm: mach-mv78xx0: use IOMEM() for base address definitions
+      arm: mach-orion5x: use IOMEM() for base address definitions
+      arm: mach-mvebu: use IOMEM() for base address definitions
+      arm: plat-orion: use void __iomem pointers for UART registration functions
+      arm: plat-orion: use void __iomem pointers for MPP functions
+      arm: plat-orion: use void __iomem pointers for time functions
+      arm: plat-orion: use void __iomem pointers for addr-map functions
+      arm: plat-orion: introduce PLAT_ORION_LEGACY hidden config option
+      arm: plat-orion: make bridge_virt_base non-const to support DT use case
+      arm: mvebu: add basic address decoding support to Armada 370/XP
+      arm: mvebu: add address decoding controller to the DT
+
+ arch/arm/Kconfig                                  |   13 ++-
+ arch/arm/boot/dts/armada-370-xp.dtsi              |    5 +
+ arch/arm/mach-dove/common.c                       |    8 +-
+ arch/arm/mach-dove/include/mach/bridge-regs.h     |   16 ++--
+ arch/arm/mach-dove/include/mach/dove.h            |  130 ++++++++++----------
+ arch/arm/mach-dove/irq.c                          |   10 +-
+ arch/arm/mach-dove/pcie.c                         |    6 +-
+ arch/arm/mach-kirkwood/addr-map.c                 |    3 +-
+ arch/arm/mach-kirkwood/common.c                   |   12 +-
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |   20 ++--
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h    |  116 +++++++++---------
+ arch/arm/mach-kirkwood/irq.c                      |    9 +-
+ arch/arm/mach-kirkwood/pcie.c                     |   12 +-
+ arch/arm/mach-kirkwood/ts41x-setup.c              |    3 +-
+ arch/arm/mach-mv78xx0/addr-map.c                  |    6 +-
+ arch/arm/mach-mv78xx0/common.c                    |    6 +-
+ arch/arm/mach-mv78xx0/include/mach/bridge-regs.h  |   12 +-
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h      |   88 +++++++-------
+ arch/arm/mach-mv78xx0/irq.c                       |    9 +-
+ arch/arm/mach-mv78xx0/pcie.c                      |   12 +-
+ arch/arm/mach-mvebu/Makefile                      |    2 +-
+ arch/arm/mach-mvebu/addr-map.c                    |  134 +++++++++++++++++++++
+ arch/arm/mach-mvebu/armada-370-xp.c               |    2 +-
+ arch/arm/mach-mvebu/include/mach/armada-370-xp.h  |    2 +-
+ arch/arm/mach-orion5x/addr-map.c                  |    3 +-
+ arch/arm/mach-orion5x/common.c                    |    8 +-
+ arch/arm/mach-orion5x/dns323-setup.c              |    2 +-
+ arch/arm/mach-orion5x/include/mach/bridge-regs.h  |   20 ++--
+ arch/arm/mach-orion5x/include/mach/orion5x.h      |   60 +++++-----
+ arch/arm/mach-orion5x/irq.c                       |    5 +-
+ arch/arm/mach-orion5x/pci.c                       |    6 +-
+ arch/arm/plat-orion/Makefile                      |    9 +-
+ arch/arm/plat-orion/addr-map.c                    |   11 +-
+ arch/arm/plat-orion/common.c                      |   12 +-
+ arch/arm/plat-orion/include/plat/addr-map.h       |    4 +-
+ arch/arm/plat-orion/include/plat/common.h         |    8 +-
+ arch/arm/plat-orion/include/plat/mpp.h            |    2 +-
+ arch/arm/plat-orion/include/plat/time.h           |    4 +-
+ arch/arm/plat-orion/mpp.c                         |    6 +-
+ arch/arm/plat-orion/time.c                        |    8 +-
+ 40 files changed, 474 insertions(+), 330 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/addr-map.c
