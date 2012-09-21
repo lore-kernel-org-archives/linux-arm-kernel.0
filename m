@@ -1,34 +1,62 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 21 Sep 2012 14:26:37 +0800
-Subject: [PATCH] ARM: OMAP: fix return value check in beagle_opp_init()
-Message-ID: <CAPgLHd9aJUYX_a7_iXLi5r6VEVuB0W15G9Ryw2bVzNzko2NpBA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Sep 2012 15:26:36 +0900
+Subject: [GIT PULL 4/4] Samsung DT for v3.7
+Message-ID: <505C089C.4050801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hi Arnd, Olof
 
-In case of error, the function omap_device_get_by_hwmod_name()
-returns ERR_PTR() not NULL pointer. The NULL test in the return
-value check should be replaced with IS_ERR().
+This is for updating Samsung DT for v3.7.
 
-dpatch engine is used to auto generated this patch.
-(https://github.com/weiyj/dpatch)
+But now this makes many conflicts with pinctrl dt because of moving file 
+so I'm sorting them out to avoid useless conflicts.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-omap2/board-omap3beagle.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'll re-send this soon again.
+This is jut for your information.
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 6202fc7..a548d70 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -466,7 +466,7 @@ static void __init beagle_opp_init(void)
- 		mpu_dev = omap_device_get_by_hwmod_name("mpu");
- 		iva_dev = omap_device_get_by_hwmod_name("iva");
- 
--		if (!mpu_dev || !iva_dev) {
-+		if (IS_ERR(mpu_dev) || IS_ERR(iva_dev)) {
- 			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
- 				__func__, mpu_dev, iva_dev);
- 			return;
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+
+   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/dt-samsung
+
+Kukjin Kim (1):
+       ARM: dts: use uart2 for console on smdkv310 and smdk5250
+
+Tomasz Figa (6):
+       ARM: dts: Move parts common to EXYNOS4 from exynos4210.dtsi to 
+exynos4.dtsi
+       ARM: EXYNOS: Use exynos4 prefix instead of exynos4210 on exynos4-dt
+       ARM: dts: Assume status of all optional nodes as disabled for exynos4
+       ARM: dts: Specify address and size cells for i2c controllers for 
+EXYNOS4
+       ARM: EXYNOS: Add OF compatibility lookups for EXYNOS4 i2c adapters
+       ARM: dts: Add basic dts file for Samsung Trats board
+
+Tushar Behera (1):
+       ARM: dts: Enable on-board keys as wakeup source for exynos4210-origen
+
+  arch/arm/boot/dts/exynos4.dtsi            |  248 
++++++++++++++++++++++++++++++
+  arch/arm/boot/dts/exynos4210-origen.dts   |   63 +-------
+  arch/arm/boot/dts/exynos4210-smdkv310.dts |   54 +------
+  arch/arm/boot/dts/exynos4210-trats.dts    |  237 
++++++++++++++++++++++++++++
+  arch/arm/boot/dts/exynos4210.dtsi         |  181 +---------------------
+  arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
+  arch/arm/mach-exynos/Makefile.boot        |    2 +-
+  arch/arm/mach-exynos/mach-exynos4-dt.c    |   32 +++-
+  8 files changed, 523 insertions(+), 296 deletions(-)
+  create mode 100644 arch/arm/boot/dts/exynos4.dtsi
+  create mode 100644 arch/arm/boot/dts/exynos4210-trats.dts
