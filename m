@@ -1,54 +1,69 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 21 Sep 2012 07:18:54 -0700
-Subject: [PATCH] serial: omap: fix the overrun case
-In-Reply-To: <1348222976-7241-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Fri, 21 Sep 2012 15:52:56 +0530")
-References: <1348222976-7241-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87a9wjfohd.fsf@deeprootsystems.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 21 Sep 2012 16:22:51 +0200
+Subject: [RFC PATCH 0/6] pinctrl: samsung: Convert the driver to use per-bank
+ GPIO and interrupt specifiers
+Message-ID: <1348237377-21299-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+This is a continuation of work focused on improving the pinctrl-samsung
+driver.
 
-> Overrun also causes an internal flag to be set, which disables further
-> reception. Before the next frame can
-> be received, the MPU must:
-> ? Reset the RX FIFO.
-> ? clear the internal flag.
->
-> In the uart mode a dummy read is needed. Add the same.
->
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
-> - functional testing on omap4sdp
-> - Verified idle and suspend path hits off on beagle.
+First part on which this one depends:
+[RFC 0/6] pinctrl: samsung: Remove static platform-specific data
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/12759
 
-Tested-by: Kevin Hilman <khilman@ti.com>
+This series attempts to simplify usage of the driver and fix several
+problems of current implementation, in particular:
 
-This fixes the console hang I was seeing on 3530/Overo.
+  - Simplifies GPIO pin specification in device tree by using pin
+    namespace local to pin bank instead of local to pin controller, e.g.
 
-Thanks,
+    	gpios = <&gpj0 3 0>;
 
-Kevin
+    instead of
 
->  drivers/tty/serial/omap-serial.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index a0d4460..bc22a2b 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -334,6 +334,13 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
->  static void serial_omap_rlsi(struct uart_omap_port *up, unsigned int lsr)
->  {
->  	unsigned int flag;
-> +	unsigned char ch = 0;
-> +
-> +	if (!(lsr & UART_LSR_BRK_ERROR_BITS))
-> +		return;
-> +
-> +	if (likely(lsr & UART_LSR_DR))
-> +		ch = serial_in(up, UART_RX);
->  
->  	up->port.icount.rx++;
->  	flag = TTY_NORMAL;
+	gpios = <&pinctrl0 115 0>;
+
+  - Simplifies GPIO interrupt specification in device tree by using
+    namespace local to pin bank (and equal to GPIO namespace), e.g.
+
+    	interrupt-parent = <&gpj0>;
+	interrupts = <3 0>;
+
+    instead of
+
+	interrupt-parent = <&pinctrl0>;
+	interrupts = <115 0>;
+
+  - Simplifies internal GPIO pin to bank translation thanks to
+    correspondence of particular GPIO chips to pin banks. This allows
+    to remove the (costly in case of GPIO bit-banging drivers) lookup
+    over all banks to find the one that the pin is from.
+
+Any comments are welcome.
+
+To do:
+  - Bindings documentation
+  - Per-bank interrupt specifiers for wake-up interrupts
+  - Configuration of pins used as wake-up interrupts to EINT function
+
+Tomasz Figa (6):
+  pinctrl: samsung: Hold OF node of pin bank in bank struct
+  pinctrl: samsung: Hold pointer to driver data in bank struct
+  pinctrl: exynos: Use one IRQ domain per pin bank
+  pinctrl: samsung: Do not pass gpio_chip to pin_to_reg_bank
+  pinctrl: samsung: Use one GPIO chip per pin bank
+  ARM: dts: exynos4210: Update pin bank nodes to reflect per-bank GPIO
+    chips and IRQ domains
+
+ arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi |  72 ++++++++++
+ arch/arm/boot/dts/exynos4210.dtsi               |   4 -
+ drivers/pinctrl/pinctrl-exynos.c                | 118 +++++------------
+ drivers/pinctrl/pinctrl-exynos.h                |  12 --
+ drivers/pinctrl/pinctrl-samsung.c               | 168 ++++++++++++++----------
+ drivers/pinctrl/pinctrl-samsung.h               |  18 ++-
+ 6 files changed, 220 insertions(+), 172 deletions(-)
+
+-- 
+1.7.12
