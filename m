@@ -1,76 +1,25 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 21 Sep 2012 14:53:22 -0400 (EDT)
-Subject: [PATCH v3 10/17] ARM: LPAE: use phys_addr_t in switch_mm()
-In-Reply-To: <20120921184143.GH15609@n2100.arm.linux.org.uk>
-References: <1347385155-11643-1-git-send-email-cyril@ti.com>
- <1347385155-11643-11-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1209211433110.6667@xanadu.home>
- <20120921184143.GH15609@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1209211449150.6667@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Sep 2012 11:56:29 -0700
+Subject: [PATCH v2 resend] ARM: OMAP4: twl-common: Support for
+ additional devices on i2c1 bus
+In-Reply-To: <1344345145-32125-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1344345145-32125-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120921185628.GF28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Sep 2012, Russell King - ARM Linux wrote:
-
-> On Fri, Sep 21, 2012 at 02:33:43PM -0400, Nicolas Pitre wrote:
-> > On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
-> > 
-> > > This patch modifies the switch_mm() processor functions to use phys_addr_t.
-> > > On LPAE systems, we now honor the upper 32-bits of the physical address that
-> > > is being passed in, and program these into TTBR as expected.
-> > > 
-> > > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> > > Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> > 
-> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120807 06:12]:
+> On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
+> Manufacturers can opt to use different codec than twl6040 and also can add
+> audio related IC to the bus (external amplifier for example on SDP4430).
 > 
-> Err... you may have reviewed it but did you read it?
+> Make it possible to add different set of additional devices to i2c1 bus on
+> OMAP4 boards.
 
-Sure I did.
+Sorry I guess I'm quite a bit behind with the platform related patches..
+Can you please refresh this again for arm-soc/for-next? It may be
+worth then merging this as a fix via the ASoC patches for -rc1.
 
-> > > diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-> > > index f3628fb..75b5f14 100644
-> > > --- a/arch/arm/include/asm/proc-fns.h
-> > > +++ b/arch/arm/include/asm/proc-fns.h
-> > > @@ -60,7 +60,7 @@ extern struct processor {
-> > >  	/*
-> > >  	 * Set the page table
-> > >  	 */
-> > > -	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
-> > > +	void (*switch_mm)(phys_addr_t pgd_phys, struct mm_struct *mm);
-> > >  	/*
-> > >  	 * Set a possibly extended PTE.  Non-extended PTEs should
-> > >  	 * ignore 'ext'.
-> > > @@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
-> > >  extern void cpu_proc_fin(void);
-> > >  extern int cpu_do_idle(void);
-> > >  extern void cpu_dcache_clean_area(void *, int);
-> > > -extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> > > +extern void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-> 
-> phys_addr_t can be either 64-bit or 32-bit.  Which it ends up depends on
-> a configuration option.  If it's 32-bit, then mm is in r1, otherwise it
-> is in r2...
+Regards,
 
-Right.  And that configuration option is CONFIG_ARM_LPAE.
-
-> > >  #ifdef CONFIG_MMU
-> > > -	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-> > > -	and	r3, r1, #0xff
-> > > -	mov	r3, r3, lsl #(48 - 32)		@ ASID
-> > > -	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
-> > > +	ldr	r2, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
-> 
-> which breaks this when phys_addr_t is 32-bit.
-
-... which can't happen in this case because this code is only compiled 
-when CONFIG_ARM_LPAE=y.
-
-> Doing it this way means we have to have similar conditionals in other
-> files which make use of the 'mm' argument.
-
-No because none of the other files may ever be used when 
-CONFIG_ARM_LPAE=y.
-
-
-Nicolas
+Tony
