@@ -1,26 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Sep 2012 10:26:52 +0200
-Subject: [PATCH 1/3] serial: pl011: safeguard against impossible baudrates
-In-Reply-To: <20120920185748.GA15609@n2100.arm.linux.org.uk>
-References: <1348134346-25593-1-git-send-email-linus.walleij@stericsson.com>
- <20120920185748.GA15609@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZXEnPpw6ZWuZL4Lt1qeHJJ6+WtMi41HtOb+BHiG4-+iw@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 21 Sep 2012 16:26:56 +0800
+Subject: [GIT PULL][for 3.6] pull request on fixes branch from arch-pxa
+Message-ID: <CAN1soZwLHZTudFVMQWaE43TPPtsGxYDZQSYfkkY1svVwbfSaUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 8:57 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Olof & Arnd,
 
-> uart_get_baud_rate() is there precisely to do the right thing for invalid
-> baud rates, which is to fallback to the old termios setting (and update
-> the new termios with that) if the old termios setting satisifies the
-> limits, if not it falls back to something within the limited range.
+Please help to merge fixes branch in arch-pxa git tree.
 
-Yeah, hm, passing 4800000 as max rate to this function and
-requesting 4050000 returns 4000000... (Other high baud rates
-such as 3250000 or 3000000 works fine) so there is some fishy
-bug in there we're just duct-taping around, I'll go hunt the real bug
-instead.
+Regards
+Haojian
 
-Thanks!
-Linus Walleij
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+
+  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git fixes
+
+for you to fetch changes up to e09a716490dbce0b9b7d132d191f1f8785cb5df2:
+
+  ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
+(2012-09-21 15:33:58 +0800)
+
+----------------------------------------------------------------
+Wei Yongjun (1):
+      ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
+
+ drivers/pcmcia/pxa2xx_base.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
