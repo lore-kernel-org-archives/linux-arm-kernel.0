@@ -1,46 +1,29 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 21 Sep 2012 11:44:18 -0700
-Subject: [PATCH] msm: clock: fix return value check in msm_clock_init()
-In-Reply-To: <CAPgLHd9Fx-y8oqy0Ux85AUA9fbYvJYjS=FLs7z+ivdqOVtLqhQ@mail.gmail.com>
-References: <CAPgLHd9Fx-y8oqy0Ux85AUA9fbYvJYjS=FLs7z+ivdqOVtLqhQ@mail.gmail.com>
-Message-ID: <20120921184418.GB25508@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Sep 2012 19:47:21 +0100
+Subject: [RFC PATCH 08/13] mmc: omap_hsmmc: limit max_segs with the
+ EDMA DMAC
+In-Reply-To: <CANfBPZ81anOy8fWgKM1PgCtB4V2pEp2x1Qi4x1uPsq7QieMN5g@mail.gmail.com>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+ <1348152226-13588-9-git-send-email-mporter@ti.com>
+ <CANfBPZ81anOy8fWgKM1PgCtB4V2pEp2x1Qi4x1uPsq7QieMN5g@mail.gmail.com>
+Message-ID: <20120921184721.GD31374@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 02:23:13PM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Fri, Sep 21, 2012 at 10:45:29PM +0530, S, Venkatraman wrote:
+> On Thu, Sep 20, 2012 at 8:13 PM, Matt Porter <mporter@ti.com> wrote:
+> > The EDMA DMAC has a hardware limitation that prevents supporting
+> > scatter gather lists with any number of segments. Since the EDMA
+> > DMA Engine driver sets the maximum segments to 16, we do the
+> > same.
+> >
+> > Note: this can be removed once the DMA Engine API supports an
+> > API to query the DMAC's segment limitations.
+> >
 > 
-> In case of error, the function clk_get() returns ERR_PTR() not
-> NULL pointer. The NULL test in return value check should be
-> replaced with IS_ERR().
-> 
-> dpatch engine is used to auto generated this patch.
-> (https://github.com/weiyj/dpatch)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  arch/arm/mach-msm/clock.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-> index d9145df..fd52891 100644
-> --- a/arch/arm/mach-msm/clock.c
-> +++ b/arch/arm/mach-msm/clock.c
-> @@ -148,7 +148,7 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
->  	mutex_unlock(&clocks_mutex);
->  
->  	ebi1_clk = clk_get(NULL, "ebi1_clk");
-> -	BUG_ON(ebi1_clk == NULL);
-> +	BUG_ON(IS_ERR(ebi1_clk));
+> I wouldn't want to bind the properties of EDMA to omap_hsmmc as this patch
+> suggests. Why don't we have a max_segs property, which when explicitly specified
+> in DT, will override the default ?
 
-It looks like this code is being removed entirely by a patch that just
-was sent out by Stephen Boyd.  Stephen, can you make sure that this
-gets included if this comes back, but for now I think this is already
-taken care of.
-
-Thanks,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Why not have a generic way that DMA engine can export these kinds of
+properties?
