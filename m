@@ -1,82 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Sep 2012 23:21:01 -0700
-Subject: Status of arm-soc for 3.7
-Message-ID: <CAOesGMjWcEXubD9ei+r=Xxz9KdJcFMsuk0pEN08nNsas8we3_A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Sep 2012 15:21:37 +0900
+Subject: [GIT PULL 1/4] Samsung fixes for v3.7
+Message-ID: <505C0771.7040103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First, a heads up for those of you who were planning on coming with
-late merge requests: Sorry, but we will probably hold off until 3.8.
+Hi Arnd, Olof
 
-We'll still take fixes and probably some small updates. But given all
-the moves of platform data and other code shuffling in the tree for
-this next merge window, merge conflicts and dependencies are stacking
-up quickly right now. I don't want things to get out of control in
-that area, which means no more major merges.
+This is non-critical Samsung fixes for v3.7.
 
-What's left to deal with is:
+If any problems, please kindly let me know.
 
-* smp_ops branch, since multiplatform depends on it to allow building
-more than one platform.
+Thanks.
 
-* bcmring removal hasn't been applied yet, it's not really urgent and
-the patches were line wrapped and I forgot about it before I merged
-multiplatform and, well, it can just wait until 3.8 now.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-* vt8500 device tree conversion had some comments on some of the
-bindings. Since the pull request has already come in, I'll revisit it
-if it looks like it won't be too messy to merge in.
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 
-Beyond that, let me know if you have already sent us a merge request
-that we have missed.
+   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
 
-Some quick stats:
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.7-samsung-fixes-1
 
-590 non-merge changesets are queued up through 94 branch merges, which
-is fewer patches but about the same number of merges as usual:
- 1149 files changed, 29520 insertions(+), 35466 deletions(-)
+Julia Lawall (1):
+       ARM: S3C24xx: delete double assignment
 
-The cleanup branch this release is substantial: 160 patches alone,
-with a diffstat of:
- 614 files changed, 9769 insertions(+), 20645 deletions(-)
+Kukjin Kim (1):
+       ARM: EXYNOS: fix address for EXYNOS4 MDMA1
 
+Peter Senna Tschudin (1):
+       ARM: S3C24XX: removes unnecessary semicolon
 
-Some highlights (I'm missing lots, but a few are):
+Seung-Woo Kim (1):
+       ARM: EXYNOS: fixed SYSMMU setup definition to mate parameter name
 
-One platform removal: pnx4008
-One new platform: bcm2835
-Lots of DT updates across the board this release. Tegra has removed
-all board files and gone DT-only.
-We have a new maintainer for KS8695 (Greg Ungerer) and renewed contributions.
-Qualcomm has started cleaning out some stale code from the MSM
-platforms, and begin device tree enablement for the latest families.
-Exynos4 has been converted to pinctrl and gpiolib.
-PRISM2 has DT bindings for pinctrl
-The first interrupt controller driver has been added to /drivers/irqchip
-OMAP internal bus has been added to /drivers/bus
-Lots of moves of platform_data contents into include/linux/platform_data
-Moves and removal of other mach-*/include files out of the way to
-prepare for multiplatform
-Initial multiplatform patch series from Rob Herring
+Sylwester Nawrocki (1):
+       ARM: SAMSUNG: Add missing variable declaration in 
+s3c64xx_spi1_set_platdata()
 
-
-Top 15 authors:
-
-Tony Lindgren (46)
-Arnd Bergmann (40)
-Uwe Kleine-K?nig (37)
-Rob Herring (35)
-Shawn Guo (33)
-Stephen Warren (27)
-Fabio Estevam (23)
-Stephen Boyd (20)
-Bryan Wu (18)
-Laxman Dewangan (18)
-Linus Walleij (17)
-Chao Xie (12)
-Afzal Mohammed (10)
-Igor Grinberg (9)
-Paul Walmsley (9)
-
-
--Olof
+  arch/arm/mach-exynos/include/mach/map.h    |    2 +-
+  arch/arm/mach-exynos/include/mach/sysmmu.h |    2 +-
+  arch/arm/mach-s3c24xx/mach-h1940.c         |    4 ++--
+  arch/arm/plat-samsung/devs.c               |    2 ++
+  4 files changed, 6 insertions(+), 4 deletions(-)
