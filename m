@@ -1,34 +1,37 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 21 Sep 2012 14:14:25 +0800
-Subject: [PATCH] ARM: imx: fix the return value check in imx_clk_busy_divider()
-Message-ID: <CAPgLHd-0wYjWxWrmLdc+an0RVfEicv3QBEtvsuvQtphti3phdw@mail.gmail.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Fri, 21 Sep 2012 11:50:52 +0530
+Subject: [PATCH] ARM: OMAP: convert I2C driver to PM QoS for MPU latency
+ constraints
+In-Reply-To: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
+References: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
+Message-ID: <CAM=Q2ct+6g1WR-U5e+s=ySAypnkc2SO4kKtDPmTsau+mx1HmbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thu, Sep 20, 2012 at 9:38 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
+> API to the new PM QoS API.
+> Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
+> class of PM QoS. The resulting MPU constraints are used by cpuidle to
+> decide the next power state of the MPU subsystem.
+>
+> The I2C device latency timing is derived from the FIFO size and the
+> clock speed and so is applicable to all OMAP SoCs.
+Agree thanks for doing that.
 
-In case of error, the function clk_register() returns ERR_PTR()
-no NULL pointer. The NULL test in the return value check should
-be replaced with IS_ERR().
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> ---
+> Rebased on git://git.pengutronix.de/git/wsa/linux.git, branch
+> i2c-embedded/for-next
+thanks ,
+tested with i2c tools  on omap4sdp and omap3sdp
 
-dpatch engine is used to auto generated this patch.
-(https://github.com/weiyj/dpatch)
+Acked-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-imx/clk-busy.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk-busy.c b/arch/arm/mach-imx/clk-busy.c
-index 1a7a8dd..1ab91b5 100644
---- a/arch/arm/mach-imx/clk-busy.c
-+++ b/arch/arm/mach-imx/clk-busy.c
-@@ -108,7 +108,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
- 	busy->div.hw.init = &init;
- 
- 	clk = clk_register(NULL, &busy->div.hw);
--	if (!clk)
-+	if (IS_ERR(clk))
- 		kfree(busy);
- 
- 	return clk;
+> ---
+>  arch/arm/plat-omap/i2c.c      |   21 ---------------------
+>  drivers/i2c/busses/i2c-omap.c |   32 ++++++++++++++++++--------------
+>  include/linux/i2c-omap.h      |    1 -
+>  3 files changed, 18 insertions(+), 36 deletions(-)
+>
