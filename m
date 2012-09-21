@@ -1,37 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 21 Sep 2012 09:46:09 +0200
-Subject: [PATCH V4 2/6] arm: cache-l2x0: add an optional register to
- save/restore
-In-Reply-To: <1348213574-18494-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1348213574-18494-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1348213574-18494-3-git-send-email-gregory.clement@free-electrons.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 21 Sep 2012 15:48:35 +0800
+Subject: [PATCH v5 3/3] ARM: dt: mmp-dma: add binding file
+In-Reply-To: <1347593555.19328.8.camel@apse>
+References: <1346641427-5002-1-git-send-email-zhangfei.gao@marvell.com>
+ <1346641427-5002-4-git-send-email-zhangfei.gao@marvell.com>
+ <1347590720.1943.0.camel@vkoul-udesk3>
+ <CAN1soZwu6LPOL4f3x7d31QPyox4a9gQ4GU0SKSMF7bH=Q=Z87w@mail.gmail.com>
+ <1347591499.1943.7.camel@vkoul-udesk3>
+ <1347593555.19328.8.camel@apse>
+Message-ID: <CAN1soZwHWZEzBs-EprjE34d3o+4qgVrPjAY6o5t1UoqETDFyMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
-Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
-
-Cc: Barry Song <21cnbao@gmail.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index c4c87bc..5f2c7b4 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -126,6 +126,7 @@ struct l2x0_regs {
- 	unsigned long filter_end;
- 	unsigned long prefetch_ctrl;
- 	unsigned long pwr_ctrl;
-+	unsigned long ctrl;
- };
- 
- extern struct l2x0_regs l2x0_saved_regs;
--- 
-1.7.9.5
+On Fri, Sep 14, 2012 at 11:32 AM, Zhangfei Gao <zgao6@marvell.com> wrote:
+> On Thu, 2012-09-13 at 19:58 -0700, Vinod Koul wrote:
+>> On Fri, 2012-09-14 at 10:58 +0800, Haojian Zhuang wrote:
+>> > On Fri, Sep 14, 2012 at 10:45 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+>> > > On Mon, 2012-09-03 at 11:03 +0800, Zhangfei Gao wrote:
+>> > >> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+>> > >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> > > Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
+>> > >
+>> > > I think this patch should be merged in tree having this file, possibly
+>> > > arm tree?
+>> > >
+>> >
+>> > You can merge this patch into your tree since it only appends a new file.
+>> And as I have said previously my tree or linus's tree doesn't have this
+>> file. SO this needs to go to a tree where thsi file exists
+>>
+>> >
+>> > Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>> > >>  Documentation/devicetree/bindings/dma/mmp-dma.txt |   75 +++++++++++++++++++++
+>> > >>  1 files changed, 75 insertions(+), 0 deletions(-)
+>> > >>  create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+>> > >>
+>>
+>>
+> Thanks Vinod for the BIG help.
+>
+> Arnd
+>
+> Which tree you think is suitable to take this new file?
+> Documentation/devicetree/bindings/dma/mmp-dma.txt
+>
+> Thanks
+>
+Applied in arch-pxa tree.
