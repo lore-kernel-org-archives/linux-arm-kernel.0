@@ -1,46 +1,79 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Fri, 21 Sep 2012 15:39:15 -0700
-Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
-In-Reply-To: <20120921221422.GA28670@sortiz-mobl>
-References: <20120714081254.GD20018@lizard>
- <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
- <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
- <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
- <20120823122239.GA29485@lizard>
- <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
- <20120920223505.GA29721@lizard>
- <20120921221422.GA28670@sortiz-mobl>
-Message-ID: <20120921223913.GA25603@lizard>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 21 Sep 2012 15:47:34 -0700
+Subject: [PATCH v2] PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
+ even when disabled
+Message-ID: <1348267654-30697-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 12:14:22AM +0200, Samuel Ortiz wrote:
-> > > >> Thanks for helping me to amend these patch.  I got many good
-> > > >> suggestions and learn a lot in this process:) BTW, you mean you will
-> > > >> help to amend that several minor warning with battery tree?
-> > > >
-> > > > Yup, I have these small fixups locally in my tree already, so if/once
-> > > > Samuel gives me an Ack for the mfd part, I'll merge it into battery git
-> > > > tree.
-> > > 
-> > > Any updates?
-> > 
-> > OK, I guess I can just go ahead and apply it, the MFD changes are very
-> > trivial anyway. So, this is now applied (along with some fixups that
-> > I was talking about in my previous reply).
-> Applying this patch as is will not build as the mfd_add_devices() API has
-> changed. Either you rebase your patchset on top of Linus tree or I take this
-> patch and fix the mfd_add_devices() call. Please let me know how you want to
-> proceed.
+From: Kevin Hilman <khilman@ti.com>
 
-It's not the first time this happens, and git let us fix it in a pretty
-elegant way: what I'm usually doing is just pulling Linus' tree back into
-my tree (but not rebasing), and in the merge commit I fixup the issue.
-That way things are still bisectable, and everything should work before
-and after mfd_add_devices() change.
+There are several drivers where the return value of
+pm_runtime_get_sync() is used to decide whether or not it is safe to
+access hardware and that don't provide .suspend() callbacks for system
+suspend (but may use late/noirq callbacks.)  If such a driver happens
+to call pm_runtime_get_sync() during system suspend, after the core
+has disabled runtime PM, it will get the error code and will decide
+that the hardware should not be accessed, although this may be a wrong
+conclusion, depending on the state of the device when runtime PM was
+disabled.
 
-So, it's all OK, I'll just merge Linus' -rc6 back into my tree
-(and Stephen already has a fix in linux-next).
+Drivers might work around this problem by using a test like:
 
-Thanks!
-Anton.
+   ret = pm_runtime_get_sync(dev);
+   if (!ret || (ret == -EACCES && driver_private_data(dev)->suspended)) {
+      /* access hardware */
+   }
+
+where driver_private_data(dev)->suspended is a flag set by the
+driver's .suspend() method (that would have to be added for this
+purpose).  However, that potentially would need to be done by multiple
+drivers which means quite a lot of duplicated code and bloat.
+
+To avoid that we can use the observation that the core sets
+dev->power.is_suspended before disabling runtime PM and use that
+instead of the driver's private flag.  Still, potentially many drivers
+would need to repeat that same check in quite a few places, so it's
+better to let the core do it.
+
+Then we can be a bit smarter and check whether or not runtime PM was
+disabled by the core only (disable_depth == 1) or by someone else in
+addition to the core (disable_depth > 1).  In the former case
+rpm_resume() can return 1 if the runtime PM status is RPM_ACTIVE,
+because it means the device was active when the core disabled runtime
+PM.  In the latter case it should still return -EACCES, because it
+isn't clear why runtime PM has been disabled.
+
+Tested on AM3730/Beagle-xM where a wakeup IRQ firing during the late
+suspend phase triggers runtime PM activity in the I2C driver since the
+wakeup IRQ is on an I2C-connected PMIC.
+
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+v2: 
+- major changelog rewrite, based largely on input from Rafael 
+- add check for disable_depth == 1 and move to separate if statement,
+  both suggested by Alan Stern
+    
+
+ drivers/base/power/runtime.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 7d9c1cb..d43856b 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -509,6 +509,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
+  repeat:
+ 	if (dev->power.runtime_error)
+ 		retval = -EINVAL;
++	else if (dev->power.disable_depth == 1 && dev->power.is_suspended
++		 && dev->power.runtime_status == RPM_ACTIVE)
++		retval = 1;
+ 	else if (dev->power.disable_depth > 0)
+ 		retval = -EACCES;
+ 	if (retval)
+-- 
+1.7.9.2
