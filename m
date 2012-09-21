@@ -1,36 +1,43 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 21 Sep 2012 18:16:12 +0800
-Subject: [PATCH v2] mtd: atmel_nand: fix the compile error which miss
- label "err_ecc_ioremap".
-In-Reply-To: <20120920052333.GC17667@game.jcrosoft.org>
-References: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
- <20120920052333.GC17667@game.jcrosoft.org>
-Message-ID: <505C3E6C.70309@atmel.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Fri, 21 Sep 2012 15:52:56 +0530
+Subject: [PATCH] serial: omap: fix the overrun case
+Message-ID: <1348222976-7241-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, J.C
+Overrun also causes an internal flag to be set, which disables further
+reception. Before the next frame can
+be received, the MPU must:
+? Reset the RX FIFO.
+? clear the internal flag.
 
-On 9/20/2012 1:23 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:10 Tue 11 Sep     , Josh Wu wrote:
->> Add err_ecc_ioremap label to fix following errors:
->> ---8<---
->>    CC      drivers/mtd/nand/atmel_nand.o
->> drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
->> drivers/mtd/nand/atmel_nand.c:1423: error: label 'err_ecc_ioremap' used but not defined
->> make[3]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
->> make[2]: *** [drivers/mtd/nand] Error 2
->> make[1]: *** [drivers/mtd] Error 2
->> make: *** [drivers] Error 2
->> --->8---
-> switch to devm_xxx instead this will simplify the error patch and remove patch
+In the uart mode a dummy read is needed. Add the same.
 
-understood. I will push a patch  which use devm_xxx. That should remove 
-many code of the error handling. Thanks
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+- functional testing on omap4sdp
+- Verified idle and suspend path hits off on beagle.
 
-Best Regards,
-Josh Wu
+ drivers/tty/serial/omap-serial.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
->
-> Best Regards,
-> J.
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index a0d4460..bc22a2b 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -334,6 +334,13 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
+ static void serial_omap_rlsi(struct uart_omap_port *up, unsigned int lsr)
+ {
+ 	unsigned int flag;
++	unsigned char ch = 0;
++
++	if (!(lsr & UART_LSR_BRK_ERROR_BITS))
++		return;
++
++	if (likely(lsr & UART_LSR_DR))
++		ch = serial_in(up, UART_RX);
+ 
+ 	up->port.icount.rx++;
+ 	flag = TTY_NORMAL;
+-- 
+1.7.5.4
