@@ -1,102 +1,41 @@
 From: mporter@ti.com (Matt Porter)
-Date: Fri, 21 Sep 2012 14:23:02 -0400
-Subject: [RFC PATCH 05/13] dma: Add TI EDMA device tree binding
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA8A819@DBDE01.ent.ti.com>
+Date: Fri, 21 Sep 2012 14:24:33 -0400
+Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
+ arm/common
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA8A6A9@DBDE01.ent.ti.com>
 References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-6-git-send-email-mporter@ti.com>
- <1BAFE6F6C881BF42822005164F1491C33EA8A819@DBDE01.ent.ti.com>
-Message-ID: <20120921182302.GF16522@beef>
+ <1348152226-13588-2-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA8A6A9@DBDE01.ent.ti.com>
+Message-ID: <20120921182433.GG16522@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 08:45:53AM +0000, Hebbar, Gururaja wrote:
-> On Thu, Sep 20, 2012 at 20:13:38, Porter, Matt wrote:
-> > The binding definition is based on the generic DMA controller
-> > binding.
+On Fri, Sep 21, 2012 at 07:10:52AM +0000, Hebbar, Gururaja wrote:
+> On Thu, Sep 20, 2012 at 20:13:34, Porter, Matt wrote:
+> > Move mach-davinci/dma.c to common/edma.c so it can be used
+> > by OMAP (specifically AM33xx atm) as well. This just moves
+> > the private EDMA API but does not support OMAP.
 > > 
 > > Signed-off-by: Matt Porter <mporter@ti.com>
 > > ---
-> >  Documentation/devicetree/bindings/dma/ti-edma.txt |   49 +++++++++++++++++++++
-> >  1 file changed, 49 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> > new file mode 100644
-> > index 0000000..06402eb
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> > @@ -0,0 +1,49 @@
-> > +TI EDMA
-> > +
-> > +Required properties:
-> > +- compatible : "ti,edma3"
-> > +- ti,hwmods: Name of the hwmods associated to the EDMA
-> > +- ti,edma-regions: Number of regions
-> > +- ti,edma-slots: Number of slots
-> > +- ti,edma-queue-tc-map: List of transfer control to queue mappings
-> > +- ti,edma-queue-priority-map: List of queue priority mappings
-> > +- ti,edma-default-queue: Default queue value
-> > +
-> > +Optional properties:
-> > +- ti,edma-reserved-channels: List of reserved channel regions
-> > +- ti,edma-reserved-slots: List of reserved slot regions
-> > +
-> > +Example:
-> > +
-> > +edma: edma at 49000000 {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
+> >  arch/arm/Kconfig                           |    1 +
+> >  arch/arm/common/Kconfig                    |    3 +
+> >  arch/arm/common/Makefile                   |    1 +
+> >  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
+> >  arch/arm/include/asm/mach/edma.h           |  267 +++++
+> >  arch/arm/mach-davinci/Makefile             |    2 +-
+> >  arch/arm/mach-davinci/devices.c            |    3 +-
+> >  arch/arm/mach-davinci/dm355.c              |    2 +-
+> >  arch/arm/mach-davinci/dm365.c              |    2 +-
+> >  arch/arm/mach-davinci/dm644x.c             |    2 +-
+> >  arch/arm/mach-davinci/dm646x.c             |    2 +-
+> >  arch/arm/mach-davinci/dma.c                | 1588 ----------------------------
 > 
-> address-cells & size-cells are only required when current node is a parent 
-> node & it has sibling/child nodes (that too if the child node uses "reg" 
-> property).
+> 
+> Please use ?M option, while generating patches via git-format-patch. 
+> This reduces the patch size if files are copied/renamed/moved.
 
-Ok. will drop that in v2.
+Yes, I didn't notice until the arm kernel list caught the >100k post.
+Will take care of this in v2.
 
-> 
-> 
-> > +	reg = <0x49000000 0x10000>;
-> > +	interrupt-parent = <&intc>;
-> > +	interrupts = <12 13 14>;
-> > +	compatible = "ti,edma3";
-> > +	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> > +	#dma-cells = <1>;
-> > +	dma-channels = <64>;
-> > +	ti,edma-regions = <4>;
-> > +	ti,edma-slots = <256>;
-> > +	ti,edma-reserved-channels = <0  2
-> > +				     14 2
-> > +				     26 6
-> > +				     48 4
-> > +				     56 8>;
-> > +	ti,edma-reserved-slots = <0  2
-> > +				  14 2
-> > +				  26 6
-> > +				  48 4
-> > +				  56 8
-> > +				  64 127>;
-> > +	ti,edma-queue-tc-map = <0 0
-> > +				1 1
-> > +				2 2>;
-> > +	ti,edma-queue-priority-map = <0 0
-> > +				      1 1
-> > +				      2 2>;
-> > +	ti,edma-default-queue = <0>;
-> > +};
-> > +
-> > -- 
-> > 1.7.9.5
-> > 
-> > _______________________________________________
-> > Davinci-linux-open-source mailing list
-> > Davinci-linux-open-source at linux.davincidsp.com
-> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> > 
-> 
-> 
-> Regards, 
-> Gururaja
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+-Matt
