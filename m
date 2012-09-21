@@ -1,36 +1,40 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Sep 2012 09:40:25 +0800
-Subject: [GIT PULL] imx device tree changes for 3.7 (take 2)
-Message-ID: <20120921014022.GK2450@S2101-09.ap.freescale.net>
+Date: Fri, 21 Sep 2012 10:05:10 +0800
+Subject: [PATCH] media: mx1_camera: mark the driver BROKEN
+Message-ID: <1348193110-8413-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cb32b4e0fc53ebd45708dd7aa8d7fa224e97308c:
+The mx1_camera driver has been broken for a few release cycles since
+commit 6bd0812 (dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c).
+It seems there is no one even compile tested it since then, as doing
+so will end up with the following error.
 
-  Merge tag 'imx-clk-dt-lookup' into imx/dt-for-3.7-2 (2012-09-17 15:12:28 +0800)
+  CC      drivers/media/platform/soc_camera/mx1_camera.o
+In file included from drivers/media/platform/soc_camera/mx1_camera.c:44:0:
+arch/arm/mach-imx/include/mach/dma-mx1-mx2.h:8:25: fatal error: mach/dma-v1.h: No such file or directory
 
-are available in the git repository at:
+It seems there is no one being interested in bringing it back to
+work [1] so far.  Let's mark it BROKEN.
 
+[1] https://lkml.org/lkml/2012/2/9/171
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.7-2
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/media/platform/soc_camera/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-for you to fetch changes up to cc7887c3b1a08d3900160d93df4ddda5fa7f725b:
-
-  ARM: imx6q: use pll2_pfd2_396m as the enfc_sel's parent (2012-09-19 13:30:03 +0800)
-
-----------------------------------------------------------------
-This is the second round of imx-dt patches for 3.7.  It's based on
-and imx-dt-3.7 and imx-clk-dt-lookup which have already been pulled.
-
-----------------------------------------------------------------
-Huang Shijie (1):
-      ARM: imx6q: use pll2_pfd2_396m as the enfc_sel's parent
-
-Richard Zhao (2):
-      ARM: dts: imx6q-sabrelite: add usbmisc device
-      ARM: dts: imx6q-sabrelite: add usbotg pinctrl support
-
- arch/arm/boot/dts/imx6q-sabrelite.dts |    3 +++
- arch/arm/boot/dts/imx6q.dtsi          |   19 +++++++++++++++++++
- arch/arm/mach-imx/clk-imx6q.c         |    7 +++++++
- 3 files changed, 29 insertions(+)
+diff --git a/drivers/media/platform/soc_camera/Kconfig b/drivers/media/platform/soc_camera/Kconfig
+index 9afe1e7..cb6791e 100644
+--- a/drivers/media/platform/soc_camera/Kconfig
++++ b/drivers/media/platform/soc_camera/Kconfig
+@@ -19,6 +19,7 @@ config MX1_VIDEO
+ 
+ config VIDEO_MX1
+ 	tristate "i.MX1/i.MXL CMOS Sensor Interface driver"
++	depends on BROKEN
+ 	depends on VIDEO_DEV && ARCH_MX1 && SOC_CAMERA
+ 	select FIQ
+ 	select VIDEOBUF_DMA_CONTIG
+-- 
+1.7.9.5
