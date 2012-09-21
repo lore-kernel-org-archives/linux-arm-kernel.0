@@ -1,86 +1,100 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 21 Sep 2012 14:33:43 -0400 (EDT)
-Subject: [PATCH v3 10/17] ARM: LPAE: use phys_addr_t in switch_mm()
-In-Reply-To: <1347385155-11643-11-git-send-email-cyril@ti.com>
-References: <1347385155-11643-1-git-send-email-cyril@ti.com>
- <1347385155-11643-11-git-send-email-cyril@ti.com>
-Message-ID: <alpine.LFD.2.02.1209211433110.6667@xanadu.home>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 21 Sep 2012 19:59:59 +0200
+Subject: [PATCH] RFC: serial: pl011: allow very high baudrates
+Message-ID: <1348250399-5651-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> This patch modifies the switch_mm() processor functions to use phys_addr_t.
-> On LPAE systems, we now honor the upper 32-bits of the physical address that
-> is being passed in, and program these into TTBR as expected.
-> 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+The ST Microelectronics variant of the PL011 is capable of supporting
+very high non-standard baud rates, even above 4 Mbps. Mostly this
+works, but when we try to use 4050000 baud, the code in
+tty_termios_encode_baud_rate(), which is called from
+uart_get_baud_rate() will do some fuzzy matching and "snap" the
+baudrate to 4000000 baud, which happens to be in the baud_table[].
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+However there is an encouraging comment from Alan Cox above the
+tty_termios_input_baud_rate() function stating that device
+drivers should use ->c_[io]speed directly as they are updated.
 
-> ---
->  arch/arm/include/asm/proc-fns.h |    4 ++--
->  arch/arm/mm/proc-v7-3level.S    |   17 +++++++++++++----
->  2 files changed, 15 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-> index f3628fb..75b5f14 100644
-> --- a/arch/arm/include/asm/proc-fns.h
-> +++ b/arch/arm/include/asm/proc-fns.h
-> @@ -60,7 +60,7 @@ extern struct processor {
->  	/*
->  	 * Set the page table
->  	 */
-> -	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
-> +	void (*switch_mm)(phys_addr_t pgd_phys, struct mm_struct *mm);
->  	/*
->  	 * Set a possibly extended PTE.  Non-extended PTEs should
->  	 * ignore 'ext'.
-> @@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
->  extern void cpu_proc_fin(void);
->  extern int cpu_do_idle(void);
->  extern void cpu_dcache_clean_area(void *, int);
-> -extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> +extern void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
->  #ifdef CONFIG_ARM_LPAE
->  extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
->  #else
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 8de0f1d..c4f4251 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -39,6 +39,14 @@
->  #define TTB_FLAGS_SMP	(TTB_IRGN_WBWA|TTB_S|TTB_RGN_OC_WBWA)
->  #define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_S)
->  
-> +#ifndef __ARMEB__
-> +#  define rpgdl	r0
-> +#  define rpgdh	r1
-> +#else
-> +#  define rpgdl	r1
-> +#  define rpgdh	r0
-> +#endif
-> +
->  /*
->   * cpu_v7_switch_mm(pgd_phys, tsk)
->   *
-> @@ -47,10 +55,11 @@
->   */
->  ENTRY(cpu_v7_switch_mm)
->  #ifdef CONFIG_MMU
-> -	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-> -	and	r3, r1, #0xff
-> -	mov	r3, r3, lsl #(48 - 32)		@ ASID
-> -	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
-> +	ldr	r2, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
-> +	and	r2, r2, #0xff
-> +	mov	r2, r2, lsl #(48 - 32)		@ ASID
-> +	orr	rpgdh, rpgdh, r2		@ upper 32-bits of pgd phys
-> +	mcrr	p15, 0, rpgdl, rpgdh, c2	@ set TTB 0
->  	isb
->  #endif
->  	mov	pc, lr
-> -- 
-> 1.7.9.5
-> 
+I tried this, but that requires the driver to handle a few
+odd cases such as when the ->c_ispeed and ->c_ospeed differs,
+or when they are both send it as 0 (which happens a lot in
+the kernel) so that would require pushing a lot of duplicate
+code into the driver to get the same behaviour.
+
+Here I take a middle-ground approach: if the baud rate of
+->c_ispeed and ->c_ospeed differs, or if either of them is
+zero, I still call the uart_get_baud_rate() function, but
+root the baudrate to what the block can handle at max.
+
+Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
+Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
+Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
+Signed-off-by: Matthias Locher <matthias.locher@stericsson.com>
+Signed-off-by: Rajanikanth HV <rajanikanth.hv@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+After discussing with Alan and Russell I still don't feel this
+is the right solution, but it demonstrates Russell's point of
+how intelligence (here just some checking of ->c_[io]speed,
+but you get the point) is moved out of the serial/tty core and
+out into the drivers if we do this.
+
+Maybe a new function is needed in the serial core, one that
+will just call out to serial and tty like this if the c_[io]speed
+differs or either is zero?
+---
+ drivers/tty/serial/amba-pl011.c | 30 ++++++++++++++++++++++++------
+ 1 file changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index cb9f694..778a6a5 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1492,18 +1492,36 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+ 	unsigned int lcr_h, old_cr;
+ 	unsigned long flags;
+-	unsigned int baud, quot, clkdiv;
++	unsigned int max_baud, baud, quot;
+ 
+ 	if (uap->vendor->oversampling)
+-		clkdiv = 8;
++		max_baud = port->uartclk / 8;
+ 	else
+-		clkdiv = 16;
++		max_baud = port->uartclk / 16;
+ 
+ 	/*
+-	 * Ask the core to calculate the divisor for us.
++	 * For "zero" speeds or in the case where in and output
++	 * speed differs, fall back on using the serial core to
++	 * determine applicable baudrate.
+ 	 */
+-	baud = uart_get_baud_rate(port, termios, old, 0,
+-				  port->uartclk / clkdiv);
++	if ((termios->c_ispeed != termios->c_ospeed) ||
++	    (termios->c_ispeed == 0) ||
++	    (termios->c_ospeed == 0))
++		baud = uart_get_baud_rate(port, termios, old, 0,
++					  max_baud);
++	else {
++		/*
++		 * Else we just use the requested speed from
++		 * termios. But we sanity check it so as not to
++		 * exceed hardware limits.
++		 */
++		baud = termios->c_ospeed;
++		if (baud > max_baud)
++			baud = max_baud;
++	}
++	dev_dbg(uap->port.dev, "c_ispeed: %u, c_ospeed: %u, "
++		"max_baud: %u, resulting baud rate %u bps\n",
++		termios->c_ispeed, termios->c_ospeed, max_baud, baud);
+ 
+ 	if (baud > port->uartclk/16)
+ 		quot = DIV_ROUND_CLOSEST(port->uartclk * 8, baud);
+-- 
+1.7.11.3
