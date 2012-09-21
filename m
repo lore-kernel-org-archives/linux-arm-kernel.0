@@ -1,36 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 21 Sep 2012 13:39:59 -0300
-Subject: [PATCH 01/11] ARM: defconfig: Remove CONFIG_MISC_DEVICES
-In-Reply-To: <201209211449.56906.arnd@arndb.de>
-References: <1345307035-3545-1-git-send-email-festevam@gmail.com>
- <CAOMZO5C2ihKUeQk17JOHc9VXAB3KTeQLS3OcLOiiUC8jucsexg@mail.gmail.com>
- <CAOMZO5C2rTBM6si0MUC7XWznwqwmUq5-LmFyekLab8UBVwaCFw@mail.gmail.com>
- <201209211449.56906.arnd@arndb.de>
-Message-ID: <CAOMZO5DwwxFz30hHVyUWPBwEzCD+qcoxE6ef3t758MHd72JdKw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 22 Sep 2012 00:46:26 +0800
+Subject: [alsa-devel] [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920145342.GI2450@S2101-09.ap.freescale.net>
+ <201209201556.57171.arnd@arndb.de>
+ <20120921080123.GM2450@S2101-09.ap.freescale.net>
+ <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
+Message-ID: <20120921164622.GA5394@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Olof,
 
-On Fri, Sep 21, 2012 at 11:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Sep 21, 2012 at 01:26:43AM -0700, Olof Johansson wrote:
+> I'll take a look at merging it tomorrow after I've dealt with smp_ops;
+> if it looks reasonably conflict-free I'll pull it in. We need the
+> sound dependency sorted out (or agreed upon) first though.
+> 
+I just published the branch below with this series rebased on top of
+the necessary dependant branches.
 
-> Sorry for not replying earlier. We could merge these through the
-> arm-soc tree, but I'm not actually sure if they are necessary.
->
-> For all I know, listing a nonexisting configuration option in
-> a defconfig file has no effect, and the files get recreated
-> whenever the maintainers choose to.
+  git://git.linaro.org/people/shawnguo/linux-2.6.git staging/imx-multiplatform
 
-My intention with this series is merely to provide a cleanup in the
-defconfigs, so that they do not include an non-existing configuration.
-I know it is not harmful to let the CONFIG_MISC_DEVICES there, but
-after my commit 7c5763 I think we should get rid of
-CONFIG_MISC_DEVICES completely.
+The dependant branches include:
 
-I saw that the ia64 Intel patch from this series was already applied
-into mainline and I also got some other Acks from different
-architectures.
+* arm-soc/multiplatform/platform-data
 
-Regards,
+* arm-soc/multiplatform/smp_ops
 
-Fabio Estevam
+* git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
+
+  It contains dependant patch "ASoC: mx27vis: retrieve gpio numbers
+  from platform_data"
+
+* git://git.infradead.org/mtd-2.6.git master
+
+  The series is based on this tree to solve some non-trivial conflicts
+  on mxc_nand driver.  Because mtd tree completely missed 3.6 merge
+  window, having the series base on 3.6-rc actually means 3.5 code base
+  in term of mtd support.  There are currently two cycles changes
+  accumulated on mtd, and we need to base the series on it to sort out
+  the conflicts.
+
+* git://linuxtv.org/mchehab/media-next.git master
+
+  The media tree renames mx2/mx3 camera drivers twice.  I'm not sure
+  if git merge can detect them, so I just rebased the series on media
+  tree to solve that.  The bonus point is that a number of trivial
+  conflicts with imx27-coda support on media tree gets solved as well.
+
+I'm not requesting you to pull the branch into arm-soc as a stable
+branch but staging one, because the external dependencies which might
+not be stable.  I attempt to use it for exposing the series on
+linux-next, so that we can send it to Linus for 3.7 if there is chance
+for us to (e.g. all the dependant branches hit mainline early during
+3.7 merge window).
+
+Shawn
