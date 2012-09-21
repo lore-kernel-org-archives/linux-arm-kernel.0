@@ -1,33 +1,30 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 21 Sep 2012 16:24:58 +0800
-Subject: [GIT PULL][for 3.7] pull request on dt2 branch from arch-pxa
-Message-ID: <CAN1soZxC_KovdgENmsSQcUFkK2VgirkaKKSx1=RjLhULATw=+Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Sep 2012 01:26:43 -0700
+Subject: [alsa-devel] [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <20120921080123.GM2450@S2101-09.ap.freescale.net>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920145342.GI2450@S2101-09.ap.freescale.net>
+ <201209201556.57171.arnd@arndb.de>
+ <20120921080123.GM2450@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+On Fri, Sep 21, 2012 at 1:01 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Sep 20, 2012 at 03:56:56PM +0000, Arnd Bergmann wrote:
+>> Ok, fair enough. I think we can put it in arm-soc/for-next as a staging
+>> branch anyway to give it some exposure to linux-next, and then we can
+>> decide whether a rebase is necessary before sending it to Linus.
+>>
+> I just saw the announcement from Olof - no more major merge for 3.7
+> will be accepted from now on.  Can this be an exception or should I
+> plan this for 3.8?
 
-Please help to merge dt2 branch from arch-pxa git tree.
 
-Regards
-Haojian
+I'll take a look at merging it tomorrow after I've dealt with smp_ops;
+if it looks reasonably conflict-free I'll pull it in. We need the
+sound dependency sorted out (or agreed upon) first though.
 
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 
-  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git dt2
-
-for you to fetch changes up to 37586e0b9cadd1072196c3cca8ea8559b91b1605:
-
-  ARM: dt: mmp-dma: add binding file (2012-09-21 15:51:26 +0800)
-
-----------------------------------------------------------------
-Zhangfei Gao (1):
-      ARM: dt: mmp-dma: add binding file
-
- Documentation/devicetree/bindings/dma/mmp-dma.txt |   74 +++++++++++++++++++++
- 1 file changed, 74 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+-Olof
