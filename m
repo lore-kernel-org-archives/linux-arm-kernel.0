@@ -1,24 +1,30 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Fri, 21 Sep 2012 16:36:50 +0100
-Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
-In-Reply-To: <20120921150656.GG15609@n2100.arm.linux.org.uk>
-References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
- <20120920190034.GB15609@n2100.arm.linux.org.uk>
- <CACRpkdY1ZxQoyGFO9OnKr0WYQzooxPGvZV8Gnr_YO_yT_+ddDw@mail.gmail.com>
- <20120921153710.220adb92@bob.linux.org.uk>
- <20120921145803.GF15609@n2100.arm.linux.org.uk>
- <20120921160503.53736fee@pyramind.ukuu.org.uk>
- <20120921150656.GG15609@n2100.arm.linux.org.uk>
-Message-ID: <20120921163650.0c5966e3@pyramind.ukuu.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Sep 2012 17:32:11 +0200
+Subject: [PATCH 0/3] ARM: I2C: Add device tree bindings to i2c-mux-gpio
+Message-ID: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sorry Alan, I don't think you really understand what I'm saying.
+Hi everyone,
 
-I'm taking about getting rid of the tty_termios_baud_rate() helper not
-the uart_get_baud_rate() helper. The tty one has no real purpose any more
-because we always set c_ospeed.
+This patchset adds the device tree entry to the CFA-10049 board of its i2c
+muxer. This muxer controls sub-buses that contains three Nuvoton NAU7802
+ADCs and a NXP PCA955 GPIO expander. Support for these will be added
+eventually.
 
-The uart layer one just needs some bug fixing I think.
+Thanks,
+Maxime
 
-Alan
+Maxime Ripard (3):
+  i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
+  i2c: mux: Add dt support to i2c-mux-gpio driver
+  ARM: dts: cfa10049: Add the i2c muxer buses to the CFA-10049
+
+ .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   86 ++++++++++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |   33 ++++
+ drivers/i2c/muxes/i2c-mux-gpio.c                   |  168 +++++++++++++++-----
+ 3 files changed, 244 insertions(+), 43 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+
+-- 
+1.7.9.5
