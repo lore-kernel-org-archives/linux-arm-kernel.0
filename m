@@ -1,48 +1,156 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Sep 2012 10:42:05 +0100
-Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
- arm/common
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA8AA3C@DBDE01.ent.ti.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-2-git-send-email-mporter@ti.com>
- <20120921092923.GA31374@n2100.arm.linux.org.uk>
- <1BAFE6F6C881BF42822005164F1491C33EA8AA3C@DBDE01.ent.ti.com>
-Message-ID: <20120921094205.GC31374@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 21 Sep 2012 12:39:18 +0300
+Subject: [RFC 2/3] ARM: move udc_pxa2xx.h to linux/platform_data
+In-Reply-To: <E1TEzet-00077v-VD@rmk-PC.arm.linux.org.uk>
+References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+ <E1TEzet-00077v-VD@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120921093917.GD15626@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 09:33:42AM +0000, Hebbar, Gururaja wrote:
-> On Fri, Sep 21, 2012 at 14:59:23, Russell King - ARM Linux wrote:
-> > On Thu, Sep 20, 2012 at 10:43:34AM -0400, Matt Porter wrote:
-> > > Move mach-davinci/dma.c to common/edma.c so it can be used
-> > > by OMAP (specifically AM33xx atm) as well. This just moves
-> > > the private EDMA API but does not support OMAP.
-> > > 
-> > > Signed-off-by: Matt Porter <mporter@ti.com>
-> > > ---
-> > >  arch/arm/Kconfig                           |    1 +
-> > >  arch/arm/common/Kconfig                    |    3 +
-> > >  arch/arm/common/Makefile                   |    1 +
-> > >  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
-> > >  arch/arm/include/asm/mach/edma.h           |  267 +++++
-> > 
-> > asm/mach should not be used as a dumping ground for platform header files.
-> > It is there to provide the interfaces between generic ARM architecture
-> > code and platform code.  (At least four files that are there at the
-> > moment need to be moved out of there - patch series to follow...)
+On Fri, Sep 21, 2012 at 10:36:27AM +0100, Russell King wrote:
+> Move the PXA2xx/IXP4xx UDC header file into linux/platform_data as it
+> only contains a driver platform data structure.
 > 
-> Can this be moved to include/linux/platform_data/ ?
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Here's the pertinant question: "is it platform data?"  Looking at the
-file, it appears to be internal data structures and register definitions
-for the driver itself.  Therefore, it isn't platform data, and it
-shouldn't be living separately from the driver.
+after fixing Eric's comment:
 
-If the driver itself only makes use of the data structures, the data
-structures should be defined either within the driver, or a header file
-co-located next to the driver itself.  The same goes for register
-definitions too.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-The only structure that I can find which isn't internal to the driver
-is struct edma_soc_info, struct edma_rsv_info, and the enum dma_event_q.
-Those can go to include/linux/platform_data, but the rest should not.
+> ---
+>  arch/arm/include/asm/mach/udc_pxa2xx.h   |   26 --------------------------
+>  arch/arm/mach-ixp4xx/include/mach/udc.h  |    2 +-
+>  arch/arm/mach-pxa/include/mach/udc.h     |    2 +-
+>  drivers/usb/gadget/pxa25x_udc.c          |    4 +---
+>  include/linux/platform_data/pxa2xx_udc.h |   27 +++++++++++++++++++++++++++
+>  5 files changed, 30 insertions(+), 31 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/mach/udc_pxa2xx.h
+>  create mode 100644 include/linux/platform_data/pxa2xx_udc.h
+> 
+> diff --git a/arch/arm/include/asm/mach/udc_pxa2xx.h b/arch/arm/include/asm/mach/udc_pxa2xx.h
+> deleted file mode 100644
+> index ea297ac..0000000
+> --- a/arch/arm/include/asm/mach/udc_pxa2xx.h
+> +++ /dev/null
+> @@ -1,26 +0,0 @@
+> -/*
+> - * arch/arm/include/asm/mach/udc_pxa2xx.h
+> - *
+> - * This supports machine-specific differences in how the PXA2xx
+> - * USB Device Controller (UDC) is wired.
+> - *
+> - * It is set in linux/arch/arm/mach-pxa/<machine>.c or in
+> - * linux/arch/mach-ixp4xx/<machine>.c and used in
+> - * the probe routine of linux/drivers/usb/gadget/pxa2xx_udc.c
+> - */
+> -
+> -struct pxa2xx_udc_mach_info {
+> -        int  (*udc_is_connected)(void);		/* do we see host? */
+> -        void (*udc_command)(int cmd);
+> -#define	PXA2XX_UDC_CMD_CONNECT		0	/* let host see us */
+> -#define	PXA2XX_UDC_CMD_DISCONNECT	1	/* so host won't see us */
+> -
+> -	/* Boards following the design guidelines in the developer's manual,
+> -	 * with on-chip GPIOs not Lubbock's weird hardware, can have a sane
+> -	 * VBUS IRQ and omit the methods above.  Store the GPIO number
+> -	 * here.  Note that sometimes the signals go through inverters...
+> -	 */
+> -	bool	gpio_pullup_inverted;
+> -	int	gpio_pullup;			/* high == pullup activated */
+> -};
+> -
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/udc.h b/arch/arm/mach-ixp4xx/include/mach/udc.h
+> index 80d6da2..b47cc0d 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/udc.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/udc.h
+> @@ -2,7 +2,7 @@
+>   * arch/arm/mach-ixp4xx/include/mach/udc.h
+>   *
+>   */
+> -#include <asm/mach/udc_pxa2xx.h>
+> +#include <linux/platform_data_pxa2xx_udc.h>
+>  
+>  extern void ixp4xx_set_udc_info(struct pxa2xx_udc_mach_info *info);
+>  
+> diff --git a/arch/arm/mach-pxa/include/mach/udc.h b/arch/arm/mach-pxa/include/mach/udc.h
+> index 2f82332..9a827e3 100644
+> --- a/arch/arm/mach-pxa/include/mach/udc.h
+> +++ b/arch/arm/mach-pxa/include/mach/udc.h
+> @@ -2,7 +2,7 @@
+>   * arch/arm/mach-pxa/include/mach/udc.h
+>   *
+>   */
+> -#include <asm/mach/udc_pxa2xx.h>
+> +#include <linux/platform_data/pxa2xx_udc.h>
+>  
+>  extern void pxa_set_udc_info(struct pxa2xx_udc_mach_info *info);
+>  
+> diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
+> index 907ad3e..06e498d 100644
+> --- a/drivers/usb/gadget/pxa25x_udc.c
+> +++ b/drivers/usb/gadget/pxa25x_udc.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/list.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/mm.h>
+> +#include <linux/platform_data/pxa2xx_udc.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/irq.h>
+> @@ -60,9 +61,6 @@
+>  #include <mach/lubbock.h>
+>  #endif
+>  
+> -#include <asm/mach/udc_pxa2xx.h>
+> -
+> -
+>  /*
+>   * This driver handles the USB Device Controller (UDC) in Intel's PXA 25x
+>   * series processors.  The UDC for the IXP 4xx series is very similar.
+> diff --git a/include/linux/platform_data/pxa2xx_udc.h b/include/linux/platform_data/pxa2xx_udc.h
+> new file mode 100644
+> index 0000000..c6c5e98
+> --- /dev/null
+> +++ b/include/linux/platform_data/pxa2xx_udc.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * This supports machine-specific differences in how the PXA2xx
+> + * USB Device Controller (UDC) is wired.
+> + *
+> + * It is set in linux/arch/arm/mach-pxa/<machine>.c or in
+> + * linux/arch/mach-ixp4xx/<machine>.c and used in
+> + * the probe routine of linux/drivers/usb/gadget/pxa2xx_udc.c
+> + */
+> +#ifndef PXA2XX_UDC_H
+> +#define PXA2XX_UDC_H
+> +
+> +struct pxa2xx_udc_mach_info {
+> +        int  (*udc_is_connected)(void);		/* do we see host? */
+> +        void (*udc_command)(int cmd);
+> +#define	PXA2XX_UDC_CMD_CONNECT		0	/* let host see us */
+> +#define	PXA2XX_UDC_CMD_DISCONNECT	1	/* so host won't see us */
+> +
+> +	/* Boards following the design guidelines in the developer's manual,
+> +	 * with on-chip GPIOs not Lubbock's weird hardware, can have a sane
+> +	 * VBUS IRQ and omit the methods above.  Store the GPIO number
+> +	 * here.  Note that sometimes the signals go through inverters...
+> +	 */
+> +	bool	gpio_pullup_inverted;
+> +	int	gpio_pullup;			/* high == pullup activated */
+> +};
+> +
+> +#endif
+> -- 
+> 1.7.4.4
+> 
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120921/3b22e7c9/attachment.sig>
