@@ -1,64 +1,34 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 21 Sep 2012 07:10:52 +0000
-Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
- arm/common
-In-Reply-To: <1348152226-13588-2-git-send-email-mporter@ti.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-2-git-send-email-mporter@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8A6A9@DBDE01.ent.ti.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 21 Sep 2012 15:19:09 +0800
+Subject: [PATCH] ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
+Message-ID: <CAPgLHd8ZQr2-1B2QcwO83gJNBrzw-WY1WWgWQJJCQYxirVAC2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 20:13:34, Porter, Matt wrote:
-> Move mach-davinci/dma.c to common/edma.c so it can be used
-> by OMAP (specifically AM33xx atm) as well. This just moves
-> the private EDMA API but does not support OMAP.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  arch/arm/Kconfig                           |    1 +
->  arch/arm/common/Kconfig                    |    3 +
->  arch/arm/common/Makefile                   |    1 +
->  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
->  arch/arm/include/asm/mach/edma.h           |  267 +++++
->  arch/arm/mach-davinci/Makefile             |    2 +-
->  arch/arm/mach-davinci/devices.c            |    3 +-
->  arch/arm/mach-davinci/dm355.c              |    2 +-
->  arch/arm/mach-davinci/dm365.c              |    2 +-
->  arch/arm/mach-davinci/dm644x.c             |    2 +-
->  arch/arm/mach-davinci/dm646x.c             |    2 +-
->  arch/arm/mach-davinci/dma.c                | 1588 ----------------------------
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
+In case of error, the function clk_get() returns ERR_PTR()
+and never returns NULL pointer. The NULL test in the error
+handling should be replaced with IS_ERR().
 
-Please use ?M option, while generating patches via git-format-patch. 
-This reduces the patch size if files are copied/renamed/moved.
+dpatch engine is used to auto generated this patch.
+(https://github.com/weiyj/dpatch)
 
->  arch/arm/mach-davinci/include/mach/asp.h   |    2 +-
->  arch/arm/mach-davinci/include/mach/da8xx.h |    3 +-
->  arch/arm/mach-davinci/include/mach/edma.h  |  267 -----
->  arch/arm/mach-davinci/include/mach/spi.h   |    2 +-
->  arch/arm/plat-omap/Kconfig                 |    1 +
->  17 files changed, 1872 insertions(+), 1864 deletions(-)
->  create mode 100644 arch/arm/common/edma.c
->  create mode 100644 arch/arm/include/asm/mach/edma.h
->  delete mode 100644 arch/arm/mach-davinci/dma.c
->  delete mode 100644 arch/arm/mach-davinci/include/mach/edma.h
-> 
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/pcmcia/pxa2xx_base.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-...snip...
-...snip...
-...snip...
-
->  
-> -- 
-> 1.7.9.5
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
-
-
-Regards, 
-Gururaja
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index 490bb82..cfec9dd 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -297,7 +297,7 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 	}
+ 
+ 	clk = clk_get(&dev->dev, NULL);
+-	if (!clk)
++	if (IS_ERR(clk))
+ 		return -ENODEV;
+ 
+ 	pxa2xx_drv_pcmcia_ops(ops);
