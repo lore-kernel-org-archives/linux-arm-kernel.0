@@ -1,108 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Sep 2012 22:40:57 -0600
-Subject: bcm2835: device tree for mbox-driven devices in upstream
-Message-ID: <505BEFD9.1020809@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Sep 2012 21:51:04 -0700
+Subject: [PATCH v7 00/11] OMAP-GPMC: generic time calc, prepare for driver
+In-Reply-To: <cover.1348058726.git.afzal@ti.com>
+References: <cover.1348058726.git.afzal@ti.com>
+Message-ID: <20120921045104.GU28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As background for those not familiar with the BCM2835 SoC, many aspects
-of the HW are controlled by firmware running on the VideoCore processor
-that exists alongside the ARM CPU, and communication to that core is via
-a "mailbox" interface, with SW-defined/implemented messages. The mailbox
-interface defines so-called channels, and on each channel a certain
-format of messages and protocol is expected.
+* Afzal Mohammed <afzal@ti.com> [120919 06:22]:
+> Hi,
+> 
+> This version - v7 as compared to previous version, takes care of
+> rounding issues due to the usage of nanoseconds in generic timing
+> routine. All calculations are now in picoseconds. Once all timings
+> are calculated it is converted to nanoseconds so that calculated
+> timing values are compatible with existing custom timing routines
+> (this will help in reverting back to custom routines easily in case
+> of any issues). And documentation has been added on gpmc timings.
+> Also redundant rounding of nand timings has been removed as part of
+> this series.
 
-The existing downstream rpi-split branch uses the following structure
-for regulators implemented using the firmware mailbox interface:
+I gave this series a quick test on my n800 after applying the
+two serial patches needed to get the uart to work, and it seems
+to be working just fine.
 
-vc_mbox: mbox {
-    compatible = "broadcom,bcm2835-mbox";
-    reg = <0xB880 0x40>;
-    interrupts = <0 1>;
-    #channel-cells = <1>;
-};
+Was there still some discussion on the format of the generic
+timings that's still pending? I think Jon made some comments 
+on the format?
 
-power {
-    compatible = "broadcom,bcm2835-power-mgr", "simple-bus";
-    #address-cells = <1>;
-    #size-cells = <0>;
+Regards,
 
-    /* This is assuming the old dedicated channel 0 for power */
-    broadcom,vc-mailbox = <&vc_mbox 0>;
-
-    reg_sd: regulator at 0 {
-        compatible = "broadcom,bcm2835-power-dev";
-        reg = <0>;
-    };
-
-    reg_usbhcd: regulator at 3 {
-        compatible = "broadcom,bcm2835-power-dev";
-        reg = <3>;
-    };
-};
-
-display {
-    compatible = "broadcom,bcm2835-fb";
-    /* This is assuming the old dedicated channel 1 for fb */
-    broadcom,vc-mailbox = <&vc_mbox 1>;
-};
-
-Thinking about this a bit, I see:
-
-a) A parallel between the mailbox node/device and the virtual buses used
-by hypervisors for para-virtualized devices.
-
-b) The devices that implement communication across the mailbox API are
-logically children of the mailbox device, being addressed/controlled via
-the bus.
-
-As such, I think it'd make more sense to rework the device tree along
-the following lines while upstreaming the code:
-
-vc_mbox: mbox {
-    compatible = "broadcom,bcm2835-mbox";
-    reg = <0xB880 0x40>;
-    interrupts = <0 1>;
-
-    channels {
-        #address-cells = <1>;
-        #size-cells = <0>;
-
-        channel at 2 {
-            /* This is the mbox channel ID */
-            reg = <2>;
-
-            uart {
-                /* MBOX-based virtual UART */
-                compatible = "broadcom,bcm2835-mbox-vuart";
-            };
-        };
-
-        channel at 8 {
-            /*
-             * This is the mbox channel ID. Here we assume the new
-             * property mailbox channel for most devices; see my
-             * previous email.
-             */
-            reg = <8>;
-
-            /*
-             * Multiple independant ojects may communicate over the same
-             * channel, for the protocol on some channels at least.
-             */
-            reg_sd: sd {
-                compatible = "broadcom,bcm2835-mbox-power";
-            };
-
-            reg_usbhcd: usbhcd {
-                compatible = "broadcom,bcm2835-mbox-power";
-            };
-
-            display {
-                compatible = "broadcom,bcm2835-mbox-fb";
-            };
-        };
-    };
-};
-
-Does anyone have any comments/suggestions on this?
+Tony
