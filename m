@@ -1,94 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 21 Sep 2012 14:42:12 -0400 (EDT)
-Subject: [PATCH v3 17/17] ARM: mm: clean up membank size limit checks
-In-Reply-To: <1347385155-11643-18-git-send-email-cyril@ti.com>
-References: <1347385155-11643-1-git-send-email-cyril@ti.com>
- <1347385155-11643-18-git-send-email-cyril@ti.com>
-Message-ID: <alpine.LFD.2.02.1209211441520.6667@xanadu.home>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 21 Sep 2012 11:44:18 -0700
+Subject: [PATCH] msm: clock: fix return value check in msm_clock_init()
+In-Reply-To: <CAPgLHd9Fx-y8oqy0Ux85AUA9fbYvJYjS=FLs7z+ivdqOVtLqhQ@mail.gmail.com>
+References: <CAPgLHd9Fx-y8oqy0Ux85AUA9fbYvJYjS=FLs7z+ivdqOVtLqhQ@mail.gmail.com>
+Message-ID: <20120921184418.GB25508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
-
-> This patch cleans up the highmem sanity check code by simplifying the range
-> checks with a pre-calculated size_limit.  This patch should otherwise have no
-> functional impact on behavior.
+On Fri, Sep 21, 2012 at 02:23:13PM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> This patch also removes a redundant (bank->start < vmalloc_limit) check, since
-> this is already covered by the !highmem condition.
+> In case of error, the function clk_get() returns ERR_PTR() not
+> NULL pointer. The NULL test in return value check should be
+> replaced with IS_ERR().
 > 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+> dpatch engine is used to auto generated this patch.
+> (https://github.com/weiyj/dpatch)
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > ---
->  arch/arm/mm/mmu.c |   19 +++++++++++--------
->  1 file changed, 11 insertions(+), 8 deletions(-)
+>  arch/arm/mach-msm/clock.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 6c35483..50d9df5 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -917,10 +917,15 @@ void __init sanity_check_meminfo(void)
+> diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+> index d9145df..fd52891 100644
+> --- a/arch/arm/mach-msm/clock.c
+> +++ b/arch/arm/mach-msm/clock.c
+> @@ -148,7 +148,7 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
+>  	mutex_unlock(&clocks_mutex);
 >  
->  	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
->  		struct membank *bank = &meminfo.bank[j];
-> +		phys_addr_t size_limit;
-> +
->  		*bank = meminfo.bank[i];
-> +		size_limit = bank->size;
->  
->  		if (bank->start >= vmalloc_limit)
->  			highmem = 1;
-> +		else
-> +			size_limit = vmalloc_limit - bank->start;
->  
->  		bank->highmem = highmem;
->  
-> @@ -929,8 +934,7 @@ void __init sanity_check_meminfo(void)
->  		 * Split those memory banks which are partially overlapping
->  		 * the vmalloc area greatly simplifying things later.
->  		 */
-> -		if (!highmem && bank->start < vmalloc_limit &&
-> -		    bank->size > vmalloc_limit - bank->start) {
-> +		if (!highmem && bank->size > size_limit) {
->  			if (meminfo.nr_banks >= NR_BANKS) {
->  				printk(KERN_CRIT "NR_BANKS too low, "
->  						 "ignoring high memory\n");
-> @@ -939,12 +943,12 @@ void __init sanity_check_meminfo(void)
->  					(meminfo.nr_banks - i) * sizeof(*bank));
->  				meminfo.nr_banks++;
->  				i++;
-> -				bank[1].size -= vmalloc_limit - bank->start;
-> +				bank[1].size -= size_limit;
->  				bank[1].start = vmalloc_limit;
->  				bank[1].highmem = highmem = 1;
->  				j++;
->  			}
-> -			bank->size = vmalloc_limit - bank->start;
-> +			bank->size = size_limit;
->  		}
->  #else
->  		/*
-> @@ -962,14 +966,13 @@ void __init sanity_check_meminfo(void)
->  		 * Check whether this memory bank would partially overlap
->  		 * the vmalloc area.
->  		 */
-> -		if (bank->start + bank->size > vmalloc_limit)
-> -			unsigned long newsize = vmalloc_limit - bank->start;
-> +		if (bank->size > size_limit) {
->  			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
->  			       "to -%.8llx (vmalloc region overlap).\n",
->  			       (unsigned long long)bank->start,
->  			       (unsigned long long)bank->start + bank->size - 1,
-> -			       (unsigned long long)bank->start + newsize - 1);
-> -			bank->size = newsize;
-> +			       (unsigned long long)bank->start + size_limit - 1);
-> +			bank->size = size_limit;
->  		}
->  #endif
->  		if (!bank->highmem && bank->start + bank->size > arm_lowmem_limit)
-> -- 
-> 1.7.9.5
-> 
+>  	ebi1_clk = clk_get(NULL, "ebi1_clk");
+> -	BUG_ON(ebi1_clk == NULL);
+> +	BUG_ON(IS_ERR(ebi1_clk));
+
+It looks like this code is being removed entirely by a patch that just
+was sent out by Stephen Boyd.  Stephen, can you make sure that this
+gets included if this comes back, but for now I think this is already
+taken care of.
+
+Thanks,
+David
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
