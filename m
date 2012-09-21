@@ -1,29 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Sep 2012 14:52:50 +0000
-Subject: [GIT PULL] ARM initial multi-platform support
-In-Reply-To: <20120921134532.GO2450@S2101-09.ap.freescale.net>
-References: <5053B05C.7070801@gmail.com>
- <20120921045814.GA30535@quad.lixom.net>
- <20120921134532.GO2450@S2101-09.ap.freescale.net>
-Message-ID: <201209211452.51550.arnd@arndb.de>
+Date: Fri, 21 Sep 2012 14:49:56 +0000
+Subject: [PATCH 01/11] ARM: defconfig: Remove CONFIG_MISC_DEVICES
+In-Reply-To: <CAOMZO5C2rTBM6si0MUC7XWznwqwmUq5-LmFyekLab8UBVwaCFw@mail.gmail.com>
+References: <1345307035-3545-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5C2ihKUeQk17JOHc9VXAB3KTeQLS3OcLOiiUC8jucsexg@mail.gmail.com>
+ <CAOMZO5C2rTBM6si0MUC7XWznwqwmUq5-LmFyekLab8UBVwaCFw@mail.gmail.com>
+Message-ID: <201209211449.56906.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 September 2012, Shawn Guo wrote:
-> On Thu, Sep 20, 2012 at 09:58:14PM -0700, Olof Johansson wrote:
-> > I pulled in this branch now. I created a new next/multiplatform branch that
-> > contains this branch plus one more patch to sweep new dtb targets and move
-> > them to the common file (will post that patch shortly).
-> > 
-> > To avoid the worst of the conflicts I ended up basing next/multiplatform on
-> > next/cleanup + next/dt + next/soc.
-> > 
-> > Note that I have not yet merged in the smp_ops branch (will do final
-> > sync-up with Arnd on that tomorrow), so selecting multiple targets will
-> > fail building due to duplicate symbols.
-> > 
-> We need to merge arm-soc/multiplatform/platform-data as well?
+On Friday 21 September 2012, Fabio Estevam wrote:
+> Hi Arnd,
+> 
+> On Thu, Sep 6, 2012 at 7:25 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> 
+> > I am not sure who would pick up this series.
+> >
+> > Is it possible for you to apply these patches?
+> 
+> Is this something you can help with?
+> 
 
-Yes, that's right.
+Hi Fabio,
+
+Sorry for not replying earlier. We could merge these through the
+arm-soc tree, but I'm not actually sure if they are necessary.
+
+For all I know, listing a nonexisting configuration option in
+a defconfig file has no effect, and the files get recreated
+whenever the maintainers choose to.
+
+Is there anything I am missing?
 
 	Arnd
