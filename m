@@ -1,142 +1,81 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Sep 2012 10:37:03 -0600
-Subject: [PATCH 2/3] i2c: mux: Add dt support to i2c-mux-gpio driver
-In-Reply-To: <1348241535-27754-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348241535-27754-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <505C97AF.9060701@wwwdotorg.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 21 Sep 2012 18:38:31 +0200
+Subject: [PATCH] serial: pl011: handle corruption at high clock speeds
+Message-ID: <1348245511-13732-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2012 09:32 AM, Maxime Ripard wrote:
-> Allow the i2c-mux-gpio to be used by a device tree enabled device. The
-> bindings are inspired by the one found in the i2c-mux-pinctrl driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
-> @@ -0,0 +1,86 @@
-> +GPIO-based I2C Bus Mux
-> +
-> +This binding describes an I2C bus multiplexer that uses GPIOs to
-> +route the I2C signals.
-> +
-> +                                 +-----+  +-----+
-> +                                 | dev |  | dev |
-> +    +------------------------+   +-----+  +-----+
-> +    | SoC                    |      |        |
-> +    |                   /----|------+--------+
-> +    |   +---+   +------+     | child bus A, on GPIO value set to 0
-> +    |   |I2C|---| Mux  |     |
-> +    |   +---+   +--+---+     | child bus B, on GPIO value set to 1
-> +    |              |    \----|------+--------+--------+
-> +    |   +------+   |         |      |        |        |
-> +    |   | GPIO |---+         |  +-----+  +-----+  +-----+
-> +    |   +------+             |  | dev |  | dev |  | dev |
-> +    +------------------------+  +-----+  +-----+  +-----+
+This works around a few glitches in the ST version of the PL011
+serial driver when using very high baud rates, as we do in the
+Ux500: 3, 3.25, 4 and 4.05 Mbps.
 
-The "Mux" box should be outside the SoC, since it isn't part of the SoC
-itself but something external.
+Problem Observed/rootcause:
 
-> +Required properties:
-> +- compatible: i2c-mux-gpio
-> +- i2c-parent: The phandle of the I2C bus that this multiplexer's master-side
-> +  port is connected to.
-> +
-> +Also required are:
-> +
-> +- muxer-gpios: list of gpios to use to control the muxer
+When using high baud-rates, and the baudrate*8 is getting close to
+the provided clock frequency (so a division factor close to 1), when
+using bursts of characters (so they are abutted), then it seems as if
+there is not enough time to detect the beginning of the start-bit which
+is a timing reference for the entire character, and thus the sampling
+moment of character bits is moving towards the end of each bit, instead
+of the middle.
 
-Perhaps just "mux-gpios"? Bikeshedding, I know...
+Fix:
+Increase slightly the RX baud rate of the UART above the theoretical
+baudrate by 5%. This will definitely give more margin time to the
+UART_RX to correctly sample the data at the middle of the bit period.
 
-> +* Standard I2C mux properties. See mux.txt in this directory.
-> +
-> +* I2C child bus nodes. See mux.txt in this directory.
-> +
-> +For each i2c child nodes, an I2C child bus will be created. They will
-> +be numbered based on the reg property of each nodes.
+Also fix the ages old copy-paste error in the very stressed comment,
+it's referencing the registers used in the PL010 driver rather than
+the PL011 ones.
 
-s/nodes/node/ in both of the two lines above.
+Cc: stable at kernel.org
+Cc: Bibek Basu <bibek.basu@stericsson.com>
+Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
+Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
+Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
+Signed-off-by: Matthias Locher <matthias.locher@stericsson.com>
+Signed-off-by: Rajanikanth HV <rajanikanth.hv@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This patch fell off the earlier patch series so better send it
+alone as it should go into stable.
+---
+ drivers/tty/serial/amba-pl011.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-> +Whenever an access is made to a device on a child bus, the value set
-> +in the revelant node's reg property will be outputed using the list of
-
-s/outputed/output/
-
-> +GPIOs, the first in the list holding the most-significant value.
-> +
-> +If an idle state is defined, using the idle-state (optional) property,
-
-The idle-state property isn't documented in the list of properties above.
-
-> +whenever an access is not being made to a device on a child bus, the
-> +idle value will be programmed into the GPIOs.
-> +
-> +If an idle state is not defined, the most recently used value will be
-> +left programmed into hardware whenever no access is being made of a
-> +device on a child bus.
-> +
-> +Example:
-> +	i2cmux {
-> +		compatible = "i2c-mux-gpio";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		muxer-gpios = <&gpio1 22 0 &gpio1 23 0>;
-> +		i2c-parent = <&i2c1>;
-> +
-> +		i2c at 0 {
-> +			reg = <0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		i2c at 1 {
-> +		      reg = <1>;
-> +		      #address-cells = <1>;
-> +		      #size-cells = <0>;
-> +		};
-
-The indentation above is a mix of TABs and spaces, and is inconsistent
-between nodes; just TABs would be best.
-
-> +
-> +		i2c at 2 {
-> +			reg = <2>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-
-I'm not sure it's a good idea to have example bus nodes that are empty;
-why not leave out two of the options, and put some device on each of the
-buses that is defined?
-
-
-> +		i2c at 3 {
-> +			reg = <3>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			pca9555: pca9555 at 20 {
-> +				compatible = "nxp,pca9555";
-> +				gpio-controller;
-> +				#gpio-cells = <2>;
-> +				reg = <0x20>;
-> +			};
-> +		};
-> +	};
-
-> diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
-
-> +#ifdef CONFIG_OF
-> +static int __devinit i2c_mux_gpio_probe_dt(struct gpiomux *mux,
-> +					struct platform_device *pdev)
-
-> +	mux->data->n_values = of_get_child_count(np);
-> +
-> +	values = devm_kzalloc(&pdev->dev, sizeof(*mux->data->values), GFP_KERNEL);
-
-Don't you need to multiply the size by mux->data->n_values?
-
-> +	gpios = devm_kzalloc(&pdev->dev, mux->data->n_gpios, GFP_KERNEL);
-
-Don't you need to multiple the size by sizeof(*gpios) here?
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d626d84..cb9f694 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1594,13 +1594,26 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			old_cr &= ~ST_UART011_CR_OVSFACT;
+ 	}
+ 
++	/*
++	 * Workaround for the ST Micro oversampling variants to
++	 * increase the bitrate slightly, by lowering the divisor,
++	 * to avoid delayed sampling of start bit at high speeds,
++	 * else we see data corruption.
++	 */
++	if (uap->vendor->oversampling) {
++		if (baud > 3000000 && baud < 3250000 && quot > 1)
++			quot -= 1;
++		else if (baud > 3250000 && quot > 2)
++			quot -= 2;
++	}
+ 	/* Set baud rate */
+ 	writew(quot & 0x3f, port->membase + UART011_FBRD);
+ 	writew(quot >> 6, port->membase + UART011_IBRD);
+ 
+ 	/*
+ 	 * ----------v----------v----------v----------v-----
+-	 * NOTE: MUST BE WRITTEN AFTER UARTLCR_M & UARTLCR_L
++	 * NOTE: lcrh_tx and lcrh_rx MUST BE WRITTEN AFTER
++	 * UART011_FBRD & UART011_IBRD.
+ 	 * ----------^----------^----------^----------^-----
+ 	 */
+ 	writew(lcr_h, port->membase + uap->lcrh_rx);
+-- 
+1.7.11.3
