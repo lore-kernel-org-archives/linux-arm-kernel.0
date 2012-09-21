@@ -1,28 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Sep 2012 10:48:55 +0100
-Subject: [RFC 2/3] ARM: move udc_pxa2xx.h to linux/platform_data
-In-Reply-To: <CAMPhdO_xqpqUUbSvi1zC4eT6vr0xFO-70+ieknjMWk9h0iWfHg@mail.gmail.com>
-References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
- <E1TEzet-00077v-VD@rmk-PC.arm.linux.org.uk>
- <CAMPhdO_xqpqUUbSvi1zC4eT6vr0xFO-70+ieknjMWk9h0iWfHg@mail.gmail.com>
-Message-ID: <20120921094855.GC15609@n2100.arm.linux.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 21 Sep 2012 18:16:12 +0800
+Subject: [PATCH v2] mtd: atmel_nand: fix the compile error which miss
+ label "err_ecc_ioremap".
+In-Reply-To: <20120920052333.GC17667@game.jcrosoft.org>
+References: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
+ <20120920052333.GC17667@game.jcrosoft.org>
+Message-ID: <505C3E6C.70309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 05:40:07PM +0800, Eric Miao wrote:
-> On Fri, Sep 21, 2012 at 5:36 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > diff --git a/arch/arm/mach-ixp4xx/include/mach/udc.h b/arch/arm/mach-ixp4xx/include/mach/udc.h
-> > index 80d6da2..b47cc0d 100644
-> > --- a/arch/arm/mach-ixp4xx/include/mach/udc.h
-> > +++ b/arch/arm/mach-ixp4xx/include/mach/udc.h
-> > @@ -2,7 +2,7 @@
-> >   * arch/arm/mach-ixp4xx/include/mach/udc.h
-> >   *
-> >   */
-> > -#include <asm/mach/udc_pxa2xx.h>
-> > +#include <linux/platform_data_pxa2xx_udc.h>
-> 
-> Guess a typo here, "/" instead of "_"? Otherwise looks good to me
+Hi, J.C
 
-Yea, fixed.
+On 9/20/2012 1:23 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 15:10 Tue 11 Sep     , Josh Wu wrote:
+>> Add err_ecc_ioremap label to fix following errors:
+>> ---8<---
+>>    CC      drivers/mtd/nand/atmel_nand.o
+>> drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
+>> drivers/mtd/nand/atmel_nand.c:1423: error: label 'err_ecc_ioremap' used but not defined
+>> make[3]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
+>> make[2]: *** [drivers/mtd/nand] Error 2
+>> make[1]: *** [drivers/mtd] Error 2
+>> make: *** [drivers] Error 2
+>> --->8---
+> switch to devm_xxx instead this will simplify the error patch and remove patch
+
+understood. I will push a patch  which use devm_xxx. That should remove 
+many code of the error handling. Thanks
+
+Best Regards,
+Josh Wu
+
+>
+> Best Regards,
+> J.
