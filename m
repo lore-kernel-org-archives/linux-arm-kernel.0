@@ -1,48 +1,26 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 21 Sep 2012 00:44:28 +0000 (UTC)
-Subject: [PATCH 1/2] ARM: OMAP: hwmod: partially un-reset hwmods might
- not be properly enabled
-In-Reply-To: <1345614150-25723-2-git-send-email-omar.luna@linaro.org>
+Date: Fri, 21 Sep 2012 00:45:02 +0000 (UTC)
+Subject: [PATCH 2/2] ARM: OMAP: hwmod: revise deassert sequence
+In-Reply-To: <1345614150-25723-3-git-send-email-omar.luna@linaro.org>
 References: <1345614150-25723-1-git-send-email-omar.luna@linaro.org>
- <1345614150-25723-2-git-send-email-omar.luna@linaro.org>
-Message-ID: <alpine.DEB.2.00.1209210042370.6888@utopia.booyaka.com>
+ <1345614150-25723-3-git-send-email-omar.luna@linaro.org>
+Message-ID: <alpine.DEB.2.00.1209210044300.6888@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar
+Hi
 
 On Wed, 22 Aug 2012, Omar Ramirez Luna wrote:
 
-> Some IP blocks might not be using/controlling more than one
-> reset line, this check loosens the restriction to fully use
-> hwmod framework for those drivers.
-> 
-> E.g.: ipu has reset lines: mmu_cache, cpu0 and cpu1.
-> - As of now cpu1 is not used and hence (with previous check) the
->   IP block isn't fully enabled by hwmod code.
-> - Usually ipu and dsp processors configure their mmu module first
->   and then enable the processors, this involves:
->     * Deasserting mmu reset line, and enabling the module.
->     * Deasserting cpu0 reset line, and enabling the processor.
->   The ones portrayed in this example are controlled through
->   rproc_fw_boot in drivers/remoteproc/remoteproc_core.c
-> 
-> While at it, prevent _omap4_module_disable if all the hardreset
-> lines on an IP block are not under reset.
-> 
-> This will allow the driver to:
->   a. Deassert the reset line.
->   b. Enable the hwmod through runtime PM default callbacks.
->   c. Do its usecase.
->   d. Disable hwmod through runtime PM.
->   e. Assert the reset line.
+> For a reset sequence to complete cleanly, a module needs its
+> associated clocks to be enabled, otherwise the timeout check
+> in prcm code can print a false failure (failed to hardreset)
+> that occurs because the clocks aren't powered ON and the status
+> bit checked can't transition without them.
 > 
 > Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 
-Well, I don't think this is the right long-term solution, but I'd like to 
-see this moving forward.  So this one has been queued for 3.7.  Hopefully 
-we can figure out the right thing once the PRM driver is ready (which will 
-handle the low-level hard resets).
+Queued for 3.7, with the same caveats mentioned regarding patch 1.
 
 
 - Paul
