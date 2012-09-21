@@ -1,30 +1,76 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 21 Sep 2012 15:34:39 +0800
-Subject: [PATCH] ARM: pxa: fix return value check in
- pxa2xx_drv_pcmcia_probe()
-In-Reply-To: <CAMPhdO-+7myDOLNxRs8Pi78for3g8+-npsY+EbOa+sxoW=2C1w@mail.gmail.com>
-References: <CAPgLHd8ZQr2-1B2QcwO83gJNBrzw-WY1WWgWQJJCQYxirVAC2Q@mail.gmail.com>
- <CAMPhdO-+7myDOLNxRs8Pi78for3g8+-npsY+EbOa+sxoW=2C1w@mail.gmail.com>
-Message-ID: <CAN1soZz2wuTR6QkKkr74QN3=BZVKRjQSGvh5cKpqY9bHivxvcQ@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 21 Sep 2012 09:36:51 +0200
+Subject: [PATCH] spi/imx: set the inactive state of the clock according
+ to the clock polarity
+In-Reply-To: <20120831023518.GE7726@r65073-Latitude-D630>
+References: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
+ <20120831023518.GE7726@r65073-Latitude-D630>
+Message-ID: <505C1913.1090004@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 3:30 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Fri, Sep 21, 2012 at 3:19 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
->> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->>
->> In case of error, the function clk_get() returns ERR_PTR()
->> and never returns NULL pointer. The NULL test in the error
->> handling should be replaced with IS_ERR().
->>
->> dpatch engine is used to auto generated this patch.
->> (https://github.com/weiyj/dpatch)
->>
->> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->
-> Ack
->
-Applied
+On 31.08.2012 04:35, Shawn Guo wrote:
+> Copy Uwe ...
+
+Ping ;)
+
+Any opinions on this?
 
 Thanks
-Haojian
+
+Dirk
+
+> On Fri, Aug 31, 2012 at 10:55:11AM +0200, Dirk Behme wrote:
+>> From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
+>>
+>> There are SPI devices which need a SPI clock with active low polarity and
+>> high inactive state.
+>>
+>> Add the setting of the inactive state ECSPIx_CONFIGREG:SCLK CTL
+>> according to the clock polarity ECSPIx_CONFIGREG:SCLK POL:
+>>
+>> DT without "spi-cpol" = 0 = clock active high polarity = inactive state low
+>> DT with    "spi-cpol" = 1 = clock active low  polarity = inactive state high
+>>
+>> Signed-off-by: Knut Wohlrab <knut.wohlrab@de.bosch.com>
+>> ---
+>>
+>> Question: Are there real world examples for a need of an individual setting of
+>> clock polarity/inactive state?
+> 
+> I'm less concerned about that.  We can always patch the driver when
+> the real world example occurs?
+> 
+> Regards,
+> Shawn
+> 
+>>  drivers/spi/spi-imx.c |    6 ++++--
+>>  1 files changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+>> index e834ff8..d64655b 100644
+>> --- a/drivers/spi/spi-imx.c
+>> +++ b/drivers/spi/spi-imx.c
+>> @@ -197,6 +197,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+>>  #define MX51_ECSPI_CONFIG_SCLKPOL(cs)	(1 << ((cs) +  4))
+>>  #define MX51_ECSPI_CONFIG_SBBCTRL(cs)	(1 << ((cs) +  8))
+>>  #define MX51_ECSPI_CONFIG_SSBPOL(cs)	(1 << ((cs) + 12))
+>> +#define MX51_ECSPI_CONFIG_SCLKCTL(cs)	(1 << ((cs) + 20))
+>>  
+>>  #define MX51_ECSPI_INT		0x10
+>>  #define MX51_ECSPI_INT_TEEN		(1 <<  0)
+>> @@ -287,9 +288,10 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>>  	if (config->mode & SPI_CPHA)
+>>  		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+>>  
+>> -	if (config->mode & SPI_CPOL)
+>> +	if (config->mode & SPI_CPOL) {
+>>  		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
+>> -
+>> +		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
+>> +	}
+>>  	if (config->mode & SPI_CS_HIGH)
+>>  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+>>  
+>> -- 
+>> 1.7.0.4
