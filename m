@@ -1,61 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Sep 2012 08:42:47 -0700
-Subject: [RFC PATCH 10/13] spi: omap2-mcspi:
- dma_request_slave_channel() support for DT platforms
-In-Reply-To: <201209210816.01473.arnd@arndb.de>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-11-git-send-email-mporter@ti.com>
- <20120920220931.GJ28835@atomide.com>
- <201209210816.01473.arnd@arndb.de>
-Message-ID: <20120921154247.GZ28835@atomide.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 21 Sep 2012 21:19:11 +0530
+Subject: [PATCH] ARM: dts: AM33XX: Add tsl2550 ambient light sensor DT data
+Message-ID: <1348242551-21293-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120921 02:19]:
-> On Thursday 20 September 2012, Tony Lindgren wrote:
-> > >  /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-> > > @@ -798,14 +801,26 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
-> > >       dma_cap_zero(mask);
-> > >       dma_cap_set(DMA_SLAVE, mask);
-> > >       sig = mcspi_dma->dma_rx_sync_dev;
-> > > -     mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > > +     if (spi->dev.of_node)
-> > > +             mcspi_dma->dma_rx =
-> > > +                     dma_request_slave_channel(&master->dev,
-> > > +                                               mcspi_dma->dma_rx_ch_name);
-> > > +     else
-> > > +             mcspi_dma->dma_rx =
-> > > +                     dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > >       if (!mcspi_dma->dma_rx) {
-> > >               dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
-> > >               return -EAGAIN;
-> > >       }
-> > >  
-> > 
-> > Hmm this does not look nice.. We should be able to somehow not to care about
-> > the configuration at the mcspi driver level.
-> 
-> I agree, but as far as I understand Vinod's plans, we would actually move
-> all drivers over to dma_request_slave_channel() when we have an interface
-> to register the lookup tables from platform code.
-> 
-> I think the above is ok for a transitional phase and we can remove the
-> fallback path when we have converted all platforms using this driver
-> to either use DT or move to the new style way of passing the channel
-> configuration.
+Add tsl2550 ambient light sensor DT data to am335x-evm.dts. In AM335x
+EVM tsl2550 ambient light sensor is connected to I2C2 bus. So this patch
+adds child node inside i2c2 node with i2c slave address.
 
-Can't we come up with a version of dma_request_slave_channel that works
-both ways for now:
+TAOS tsl2550 sensor with two-wire SMBus serial interface. This patch
+also reduces I2C2 clock frequency to 100KHz from 400KHz because the
+maximum clock frequency of SMBus is 100KHz.
 
-	mcspi_dma->dma_rx =
-		dma_request_slave_channel_compat(mask, omap_dma_filter_fn, &sig,
-					&master->dev, mcspi_dma->dma_rx_ch_name);
-	...			
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am335x-evm.dts |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Then it's just question of patching away two lines later on rather than
-having to add all this if else to all the drivers first, then patching
-it away again.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 3b1f313..d99aa0f 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -49,7 +49,7 @@
+ 
+ 		i2c2: i2c at 4802a000 {
+ 			status = "okay";
+-			clock-frequency = <400000>;
++			clock-frequency = <100000>;
+ 
+ 			lis331dlh: lis331dlh at 18 {
+ 				compatible = "st,lis331dlh", "st,lis3lv02d";
+@@ -79,6 +79,11 @@
+ 				st,max-limit-z = <750>;
+ 			};
+ 
++			tsl2550: tsl2550 at 39 {
++				compatible = "taos,tsl2550";
++				reg = <0x39>;
++			};
++
+ 			tmp275: tmp275 at 48 {
+ 				compatible = "ti,tmp275";
+ 				reg = <0x48>;
+-- 
+1.7.9.5
