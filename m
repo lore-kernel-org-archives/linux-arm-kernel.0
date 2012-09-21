@@ -1,63 +1,76 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sat, 22 Sep 2012 00:20:53 +0200
-Subject: [PATCH 15/19] mfd: Don't convert just one IRQ using irqdomain if
- a range is provided
-In-Reply-To: <20120917141105.GE6777@gmail.com>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <201209071337.26587.arnd@arndb.de>
- <20120907134259.GJ29601@gmail.com>
- <201209071357.27779.arnd@arndb.de>
- <20120917134550.GU3647@sortiz-mobl>
- <20120917141105.GE6777@gmail.com>
-Message-ID: <20120921222053.GC28670@sortiz-mobl>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 21 Sep 2012 18:25:28 -0400
+Subject: [PATCH v3 02/17] ARM: add self test for runtime patch mechanism
+In-Reply-To: <alpine.LFD.2.02.1209211331320.6667@xanadu.home>
+References: <1347385155-11643-1-git-send-email-cyril@ti.com>
+ <1347385155-11643-3-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1209211331320.6667@xanadu.home>
+Message-ID: <505CE958.5020808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On 9/21/2012 1:40 PM, Nicolas Pitre wrote:
+> On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
+>
+>> This patch adds basic sanity tests to ensure that the instruction patching
+>> results in valid instruction encodings.  This is done by verifying the output
+>> of the patch process against a vector of assembler generated instructions at
+>> init time.
+>>
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> ---
+>>   arch/arm/Kconfig                |   12 +++++++
+>>   arch/arm/kernel/runtime-patch.c |   75 +++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 87 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 36de4ea..bfcd29d 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -207,6 +207,18 @@ config ARM_PATCH_PHYS_VIRT
+>>   	  this feature (eg, building a kernel for a single machine) and
+>>   	  you need to shrink the kernel to the minimal size.
+>>
+>> +config ARM_RUNTIME_PATCH_TEST
+>> +	bool "Self test runtime patching mechanism" if ARM_RUNTIME_PATCH
+>> +	default y
+>
+> Here you probably want this instead:
+>
+> 	bool "Self test runtime patching mechanism"
+> 	default y
+> 	depends on ARM_RUNTIME_PATCH
+>
+> Otherwise ARM_RUNTIME_PATCH_TEST will be forced to y whenever
+> ARM_RUNTIME_PATCH is unset.  That doesn't currently affect the build
+> since the containing .c file is only compiled when ARM_RUNTIME_PATCH is
+> set but that is still not strictly right.
+>
 
-On Mon, Sep 17, 2012 at 03:11:07PM +0100, Lee Jones wrote:
-> On Mon, Sep 17, 2012 at 03:45:50PM +0200, Samuel Ortiz wrote:
-> > Hi Lee, Arnd,
-> > 
-> > On Fri, Sep 07, 2012 at 01:57:27PM +0000, Arnd Bergmann wrote:
-> > > On Friday 07 September 2012, Lee Jones wrote:
-> > > > On Fri, Sep 07, 2012 at 01:37:26PM +0000, Arnd Bergmann wrote:
-> > > > > On Friday 07 September 2012, Lee Jones wrote:
-> > > > > > On Fri, Sep 07, 2012 at 12:35:41PM +0000, Arnd Bergmann wrote:
-> > > > >
-> > > > > The examples I had seen before were all just ranges of two interrupts,
-> > > > > and in those cases it was clear that splitting them would be best.
-> > > > > 
-> > > > > In the exampled of the ab8500-gpio driver, it looks like the resource is
-> > > > > not actually being used, and the gpio driver implements its own irq_chip,
-> > > > > so maybe we can get away with not solving this problem for now.
-> > > > 
-> > > > Understood. I'd still feel more comfortable if we didn't trash the
-> > > > range. I think it would be best to show the warning, and leave the
-> > > > range for its target driver to take care - hence the patch.
-> > > > 
-> > > > ... but it's your call.
-> > > 
-> > > I'm fine with whatever Samuel sees fit here.  My personal opinion is
-> > > that leaving the range alone for the child driver to do the conversion
-> > > would be too inconsistent and only lead to confusion with driver authors.
-> > Although I agree modifying the range is not very nice from the MFD core, I
-> > also think that the actual mapping should always be handled by MFD and not
-> > depend on wether the range is a singleton or not. Moreover the semantics of
-> > leaving the range untouched meaning that we haven't done the mappings is
-> > obscure.
-> > So I'm not taking this patch, sorry Lee.
-> 
-> No problem.
-> 
-> Would it be better if we _did_ support ranges, and map all of the
-> IRQs in the range instead?
-I think that would be a reasonable solution, unless Arnd or Mark see a serious
-problem with that.
+Indeed.  Excellent.  Thanks.
 
-Cheers,
-Samuel.
+> [...]
+>> @@ -189,5 +261,8 @@ void __init runtime_patch_kernel(void)
+>>   	const void *start = &__runtime_patch_table_begin;
+>>   	const void *end   = &__runtime_patch_table_end;
+>>
+>> +#ifdef CONFIG_ARM_RUNTIME_PATCH_TEST
+>> +	runtime_patch_test();
+>> +#endif
+>>   	BUG_ON(runtime_patch(start, end - start));
+>
+> I think you shoulld have runtime_patch_test() return a possible error
+> code and use BUG_ON() with it as well.
+>
+
+Sure.  Will do in v4.
+
+> With those minor changes you can add...
+>
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+>
+
+Thanks.
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+- Cyril
