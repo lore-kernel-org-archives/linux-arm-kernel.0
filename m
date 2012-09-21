@@ -1,48 +1,40 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Fri, 21 Sep 2012 10:40:44 +0530
-Subject: [PATCH] serial: omap: Remove unnecessary checks from
- suspend/resume
-In-Reply-To: <87r4pxelje.fsf@deeprootsystems.com>
-References: <1347968154-27997-1-git-send-email-sourav.poddar@ti.com>
- <20120918113444.GG24047@arwen.pp.htv.fi>
- <CAKdam56UKpc3icL7J7+Om=5Qk_P4ckWM+XY5E+GFvXieAAxjyA@mail.gmail.com>
- <87r4pxelje.fsf@deeprootsystems.com>
-Message-ID: <CAKdam57u8qdOhgtgjgQG3r=eFB_Wsd54KzLoAtPj9GcHLz2E5A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Sep 2012 23:14:02 -0600
+Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
+References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
+ <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
+Message-ID: <505BF79A.8060802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On 09/21/2012 05:22 AM, Leela Krishna Amudala wrote:
+> This patch adds device tree based discovery support for exynos DRM-FIMD
+> driver which includes driver modification to handle platform data in
+> both the cases with DT and non-DT, Also adds the documentation for bindings.
 
-On Thu, Sep 20, 2012 at 3:13 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> "Poddar, Sourav" <sourav.poddar@ti.com> writes:
->
->> Hi Felipe,
->>
->> On Tue, Sep 18, 2012 at 5:04 PM, Felipe Balbi <balbi@ti.com> wrote:
->>> On Tue, Sep 18, 2012 at 05:05:54PM +0530, Sourav Poddar wrote:
->>>> Drop the check for "up" being valid on suspend/resume callbacks.
->>>> It should be valid always. Get rid of the "pdata" check also as
->>>> serial_omap_get_context_loss_count() checks for it.
->>>>
->>>> Tested on omap4 panda and 3630 based Beagle board.
->>>
->>> you need a blank line here. Other than that:
->>>
->>> Reviewed-by: Felipe Balbi <balbi@ti.com>
->>>
->>> ps: what kind of tests did you run, btw ?
->>>
->> Boot tested on Panda.
->> Boot and PM tested(hitiing Off) on Beagle.
->
-> What does "PM tested" mean.  hitting off in idle?  hitting off in
-> suspend?  both?
->
-Hitting off in both idle and suspend.
-> Please clarify.
->
-> Thanks,
->
-> Kevin
-~Sourav
+> diff --git a/Documentation/devicetree/bindings/drm/exynos/fimd.txt b/Documentation/devicetree/bindings/drm/exynos/fimd.txt
+...
+> + - samsung,fimd-display: This property should specify the phandle of the
+> +   display device node which holds the video interface timing with the
+> +   below mentioned properties.
+> +
+> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
+> +     horizontal timing includes four parameters in the following order.
+> +
+> +     - horizontal back porch (in number of lcd clocks)
+> +     - horizontal front porch (in number of lcd clocks)
+> +     - hsync pulse width (in number of lcd clocks)
+> +     - Display panels X resolution.
+> +
+> +   - lcd-vtiming: Specifies the vertical timing for the overlay. The
+> +     vertical timing includes four parameters in the following order.
+> +
+> +     - vertical back porch (in number of lcd lines)
+> +     - vertical front porch (in number of lcd lines)
+> +     - vsync pulse width (in number of lcd clocks)
+> +     - Display panels Y resolution.
+
+Should this not use the new videomode timings that are under discussion at:
+
+http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
