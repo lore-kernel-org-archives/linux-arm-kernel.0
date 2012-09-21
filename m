@@ -1,42 +1,38 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Fri, 21 Sep 2012 20:07:19 +0530
-Subject: [PATCH v2] serial: omap: fix the reciever line error case
-Message-ID: <1348238239-18510-1-git-send-email-shubhrajyoti@ti.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Fri, 21 Sep 2012 16:39:35 +0200
+Subject: [PATCH v2 5/5] ARM: tegra: enable brcmfmac in defconfig
+In-Reply-To: <1348217700-12309-6-git-send-email-wni@nvidia.com>
+References: <1348217700-12309-1-git-send-email-wni@nvidia.com>
+ <1348217700-12309-6-git-send-email-wni@nvidia.com>
+Message-ID: <505C7C27.2050108@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does the following
-- In case of errors if there least one data character in the RX FIFO
-read it otherwise it may stall the receiver.
+On 09/21/2012 10:55 AM, Wei Ni wrote:
+> New options enabled:
+> * CFG80211_WEXT: (dependency)
+> * BRCMFMAC: wlan driver, enable as module.
+>
+> Signed-off-by: Wei Ni <wni@nvidia.com>
+> ---
+>   arch/arm/configs/tegra_defconfig |    2 ++
+>   1 files changed, 2 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+> index adcf3c2..04b18ea 100644
+> --- a/arch/arm/configs/tegra_defconfig
+> +++ b/arch/arm/configs/tegra_defconfig
+> @@ -73,6 +73,7 @@ CONFIG_BT_BNEP=y
+>   CONFIG_BT_HIDP=y
+>   CONFIG_BT_HCIBTUSB=m
+>   CONFIG_CFG80211=y
+> +CONFIG_CFG80211_WEXT=y
 
-This is recommended in the interrupt reset method in the table 23-246 of
-the omap4 TRM.
+Any particular reason for enabling this? The driver does not 
+specifically need it. The option only allows use of WEXT dependent 
+user-space tools like iwconfig and iwlist. At least it is not needed by 
+brcmfmac driver hence it does not select it.
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-- Tested on omap4sdp.
-- pm tested hitting off in idle and suspend.
-- v2 changes update the changelogs.
-- Also remove the dummy check as FE , PE , BI and OE are the only
-receiver errors.
+You indicate there is a dependency. Could you elaborate?
 
- drivers/tty/serial/omap-serial.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index a0d4460..4fea16b 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -334,6 +334,10 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
- static void serial_omap_rlsi(struct uart_omap_port *up, unsigned int lsr)
- {
- 	unsigned int flag;
-+	unsigned char ch = 0;
-+
-+	if (likely(lsr & UART_LSR_DR))
-+		ch = serial_in(up, UART_RX);
- 
- 	up->port.icount.rx++;
- 	flag = TTY_NORMAL;
--- 
-1.7.5.4
+Gr. AvS
