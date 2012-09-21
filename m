@@ -1,40 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Sep 2012 10:05:10 +0800
-Subject: [PATCH] media: mx1_camera: mark the driver BROKEN
-Message-ID: <1348193110-8413-1-git-send-email-shawn.guo@linaro.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 21 Sep 2012 10:13:28 +0800
+Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
+ conditions.
+In-Reply-To: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
+References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
+Message-ID: <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mx1_camera driver has been broken for a few release cycles since
-commit 6bd0812 (dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c).
-It seems there is no one even compile tested it since then, as doing
-so will end up with the following error.
+On Fri, Sep 21, 2012 at 3:29 AM, Marko Kati? <dromede@gmail.com> wrote:
+> Hi Eric,
+>
+> ========================================================
+> commit b6eede112673678f8a7a1680d6ad12245443829d
+> Author: Eric Miao <eric.y.miao@gmail.com>
+> Date:   Mon Jan 11 16:17:25 2010 +0800
+>
+>     [ARM] pxa/spitz: use generic GPIO API and remove pxa_gpio_mode()
+>
+>     REVISIT: change to GPIO18 is ugly, need to make sure whether that's
+>     really necessary - GPIO18_RDY as an VLIO input signal - we don't
+>     normally need to do such kind of trick during low power mode.
+>
+> =========================================================
+>
+> This GPIO18 change breaks spitz resume.
+> Spitz will fail to resume from STR under these conditions:
+>
+> 1) If the AC plug is powered and plugged in, and if you suspend the machine,
+>     the machine will not be able to resume if you remove the AC plug while the
+>    device is suspended.
+>
+> 2) If you connect the machine to a powered AC plug while the device is
+> suspended,
+>     the machine will not be able to resume.
+>
+> If i comment out the call to pxa2xx_mfp_config in spitz_postsuspend(),
+> my machine will
+> properly resume under abovementioned conditions.
+>
+> If i understand correctly, spitz_postsuspend () configures GPIO 18
+> to alternate mode 1 - RDY. However, I have no idea what RDY means or
+> what this GPIO is used for.
+>
+> Eric can you please explain what's happening here?
 
-  CC      drivers/media/platform/soc_camera/mx1_camera.o
-In file included from drivers/media/platform/soc_camera/mx1_camera.c:44:0:
-arch/arm/mach-imx/include/mach/dma-mx1-mx2.h:8:25: fatal error: mach/dma-v1.h: No such file or directory
-
-It seems there is no one being interested in bringing it back to
-work [1] so far.  Let's mark it BROKEN.
-
-[1] https://lkml.org/lkml/2012/2/9/171
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/media/platform/soc_camera/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/media/platform/soc_camera/Kconfig b/drivers/media/platform/soc_camera/Kconfig
-index 9afe1e7..cb6791e 100644
---- a/drivers/media/platform/soc_camera/Kconfig
-+++ b/drivers/media/platform/soc_camera/Kconfig
-@@ -19,6 +19,7 @@ config MX1_VIDEO
- 
- config VIDEO_MX1
- 	tristate "i.MX1/i.MXL CMOS Sensor Interface driver"
-+	depends on BROKEN
- 	depends on VIDEO_DEV && ARCH_MX1 && SOC_CAMERA
- 	select FIQ
- 	select VIDEOBUF_DMA_CONTIG
--- 
-1.7.9.5
+I believe that was derived from the legacy code, so if you think it's
+a bug and can get a proper fix, just go with it. Note, however, if the
+code affects poodle/corgi, you may take another look and make sure
+it doesn't break the rest ones.
