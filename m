@@ -1,42 +1,59 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sat, 22 Sep 2012 00:14:22 +0200
-Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
-In-Reply-To: <20120920223505.GA29721@lizard>
-References: <20120714081254.GD20018@lizard>
- <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
- <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
- <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
- <20120823122239.GA29485@lizard>
- <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
- <20120920223505.GA29721@lizard>
-Message-ID: <20120921221422.GA28670@sortiz-mobl>
+Date: Sat, 22 Sep 2012 00:20:53 +0200
+Subject: [PATCH 15/19] mfd: Don't convert just one IRQ using irqdomain if
+ a range is provided
+In-Reply-To: <20120917141105.GE6777@gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <201209071337.26587.arnd@arndb.de>
+ <20120907134259.GJ29601@gmail.com>
+ <201209071357.27779.arnd@arndb.de>
+ <20120917134550.GU3647@sortiz-mobl>
+ <20120917141105.GE6777@gmail.com>
+Message-ID: <20120921222053.GC28670@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anton,
+Hi Lee,
 
-On Thu, Sep 20, 2012 at 03:35:05PM -0700, Anton Vorontsov wrote:
-> On Thu, Sep 13, 2012 at 03:48:11PM +0800, Haojian Zhuang wrote:
-> > On Thu, Aug 23, 2012 at 8:22 PM, Anton Vorontsov
-> > <anton.vorontsov@linaro.org> wrote:
-> > > On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
-> > >> Thanks for helping me to amend these patch.  I got many good
-> > >> suggestions and learn a lot in this process:) BTW, you mean you will
-> > >> help to amend that several minor warning with battery tree?
-> > >
-> > > Yup, I have these small fixups locally in my tree already, so if/once
-> > > Samuel gives me an Ack for the mfd part, I'll merge it into battery git
-> > > tree.
+On Mon, Sep 17, 2012 at 03:11:07PM +0100, Lee Jones wrote:
+> On Mon, Sep 17, 2012 at 03:45:50PM +0200, Samuel Ortiz wrote:
+> > Hi Lee, Arnd,
 > > 
-> > Any updates?
+> > On Fri, Sep 07, 2012 at 01:57:27PM +0000, Arnd Bergmann wrote:
+> > > On Friday 07 September 2012, Lee Jones wrote:
+> > > > On Fri, Sep 07, 2012 at 01:37:26PM +0000, Arnd Bergmann wrote:
+> > > > > On Friday 07 September 2012, Lee Jones wrote:
+> > > > > > On Fri, Sep 07, 2012 at 12:35:41PM +0000, Arnd Bergmann wrote:
+> > > > >
+> > > > > The examples I had seen before were all just ranges of two interrupts,
+> > > > > and in those cases it was clear that splitting them would be best.
+> > > > > 
+> > > > > In the exampled of the ab8500-gpio driver, it looks like the resource is
+> > > > > not actually being used, and the gpio driver implements its own irq_chip,
+> > > > > so maybe we can get away with not solving this problem for now.
+> > > > 
+> > > > Understood. I'd still feel more comfortable if we didn't trash the
+> > > > range. I think it would be best to show the warning, and leave the
+> > > > range for its target driver to take care - hence the patch.
+> > > > 
+> > > > ... but it's your call.
+> > > 
+> > > I'm fine with whatever Samuel sees fit here.  My personal opinion is
+> > > that leaving the range alone for the child driver to do the conversion
+> > > would be too inconsistent and only lead to confusion with driver authors.
+> > Although I agree modifying the range is not very nice from the MFD core, I
+> > also think that the actual mapping should always be handled by MFD and not
+> > depend on wether the range is a singleton or not. Moreover the semantics of
+> > leaving the range untouched meaning that we haven't done the mappings is
+> > obscure.
+> > So I'm not taking this patch, sorry Lee.
 > 
-> OK, I guess I can just go ahead and apply it, the MFD changes are very
-> trivial anyway. So, this is now applied (along with some fixups that
-> I was talking about in my previous reply).
-Applying this patch as is will not build as the mfd_add_devices() API has
-changed. Either you rebase your patchset on top of Linus tree or I take this
-patch and fix the mfd_add_devices() call. Please let me know how you want to
-proceed.
+> No problem.
+> 
+> Would it be better if we _did_ support ranges, and map all of the
+> IRQs in the range instead?
+I think that would be a reasonable solution, unless Arnd or Mark see a serious
+problem with that.
 
 Cheers,
 Samuel.
