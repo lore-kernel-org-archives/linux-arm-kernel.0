@@ -1,64 +1,98 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 21 Sep 2012 11:56:04 -0400
-Subject: [PATCH v3 RESEND 06/17] ARM: LPAE: use signed arithmetic for mask
- definitions
+Date: Fri, 21 Sep 2012 11:56:13 -0400
+Subject: [PATCH v3 RESEND 15/17] ARM: mm: use physical addresses in highmem
+ sanity checks
 In-Reply-To: <1348242975-19184-1-git-send-email-cyril@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
-Message-ID: <1348242975-19184-7-git-send-email-cyril@ti.com>
+Message-ID: <1348242975-19184-16-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
-unsigned long math truncates the mask at the 32-bits.  This clearly does bad
-things on PAE systems.
+This patch modifies the highmem sanity checking code to use physical addresses
+instead.  This change eliminates the wrap-around problems associated with the
+original virtual address based checks, and this simplifies the code a bit.
 
-This patch fixes this problem by defining these masks as signed quantities.
-We then rely on sign extension to do the right thing.
+The one constraint imposed here is that low physical memory must be mapped in
+a monotonically increasing fashion if there are multiple banks of memory,
+i.e., x < y must => pa(x) < pa(y).
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/page.h           |    2 +-
- arch/arm/include/asm/pgtable-3level.h |    6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mm/mmu.c |   22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index ecf9019..1e0fe08 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -13,7 +13,7 @@
- /* PAGE_SHIFT determines the page size */
- #define PAGE_SHIFT		12
- #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
--#define PAGE_MASK		(~(PAGE_SIZE-1))
-+#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 8db7c74..fcdc185 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -895,6 +895,7 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
+ void __init sanity_check_meminfo(void)
+ {
+ 	int i, j, highmem = 0;
++	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
  
- #ifndef __ASSEMBLY__
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
+@@ -904,8 +905,7 @@ void __init sanity_check_meminfo(void)
+ 			highmem = 1;
  
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index b249035..ae39d11 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -48,16 +48,16 @@
- #define PMD_SHIFT		21
+ #ifdef CONFIG_HIGHMEM
+-		if (__va(bank->start) >= vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET)
++		if (bank->start >= vmalloc_limit)
+ 			highmem = 1;
  
- #define PMD_SIZE		(1UL << PMD_SHIFT)
--#define PMD_MASK		(~(PMD_SIZE-1))
-+#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
- #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
-+#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
- 
- /*
-  * section address mask and size definitions.
-  */
- #define SECTION_SHIFT		21
- #define SECTION_SIZE		(1UL << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
-+#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
- 
- #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
- 
+ 		bank->highmem = highmem;
+@@ -914,8 +914,8 @@ void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (!highmem && __va(bank->start) < vmalloc_min &&
+-		    bank->size > vmalloc_min - __va(bank->start)) {
++		if (!highmem && bank->start < vmalloc_limit &&
++		    bank->size > vmalloc_limit - bank->start) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
+ 						 "ignoring high memory\n");
+@@ -924,12 +924,12 @@ void __init sanity_check_meminfo(void)
+ 					(meminfo.nr_banks - i) * sizeof(*bank));
+ 				meminfo.nr_banks++;
+ 				i++;
+-				bank[1].size -= vmalloc_min - __va(bank->start);
+-				bank[1].start = __pa(vmalloc_min - 1) + 1;
++				bank[1].size -= vmalloc_limit - bank->start;
++				bank[1].start = vmalloc_limit;
+ 				bank[1].highmem = highmem = 1;
+ 				j++;
+ 			}
+-			bank->size = vmalloc_min - __va(bank->start);
++			bank->size = vmalloc_limit - bank->start;
+ 		}
+ #else
+ 		bank->highmem = highmem;
+@@ -949,8 +949,7 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would entirely overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (__va(bank->start) >= vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET) {
++		if (bank->start >= vmalloc_limit) {
+ 			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+ 			       "(vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
+@@ -962,9 +961,8 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would partially overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (__va(bank->start + bank->size - 1) >= vmalloc_min ||
+-		    __va(bank->start + bank->size - 1) <= __va(bank->start)) {
+-			unsigned long newsize = vmalloc_min - __va(bank->start);
++		if (bank->start + bank->size > vmalloc_limit)
++			unsigned long newsize = vmalloc_limit - bank->start;
+ 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+ 			       "to -%.8llx (vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
 -- 
 1.7.9.5
