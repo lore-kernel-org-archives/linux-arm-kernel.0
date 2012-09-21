@@ -1,34 +1,31 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 21 Sep 2012 14:35:18 +0800
-Subject: [PATCH] clk: fix return value check in of_fixed_clk_setup()
-Message-ID: <CAPgLHd-BtGhVBHYGW1UFT9wqmnPqmuf9AWkQk6mXG7xSzWqOOA@mail.gmail.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Fri, 21 Sep 2012 18:29:54 +0530
+Subject: [PATCH V2 0/3] Add device tree based discovery support for drm-fimd
+Message-ID: <1348232397-2477-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+This patch set adds arch side support for device tree based discovery
+for drm-fimd.
 
-In case of error, the function clk_register_fixed_rate() returns
-ERR_PTR() not NULL pointer. The NULL test in the return value
-check should be replaced with IS_ERR().
+The patches are created against "for-next" branch of Kukjin Kim's tree on 3.6-rc6 at:
+ git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-dpatch engine is used to auto generated this patch.
-(https://github.com/weiyj/dpatch)
+This patchset has been tested on smdk5250 board and seen the bootup logo on LCD
+using the patchset http://www.spinics.net/lists/arm-kernel/msg193348.html which was 
+applied on inki-dae's next branch
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/clk/clk-fixed-rate.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since V1:
+	- Renamed the compatible string from "samsung,exynos5-drm" to "samsung,exynos5-fimd"
+	- Renamed the macro from EXYNOS5_PA_FIMD to EXYNOS5_PA_FIMD1
 
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index f5ec0ee..af78ed6 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -97,7 +97,7 @@ void __init of_fixed_clk_setup(struct device_node *node)
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
- 	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
--	if (clk)
-+	if (!IS_ERR(clk))
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- }
- EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
+Leela Krishna Amudala (3):
+  ARM: EXYNOS5: Add fimd node to the exynos5250 dtsi file
+  ARM: EXYNOS: add device tree based discovery support for FIMD
+  ARM: EXYNOS: Add drm-device node to the dtsi file
+
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   15 +++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |   11 +++++++++++
+ arch/arm/mach-exynos/include/mach/map.h   |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c    |    2 ++
+ 4 files changed, 29 insertions(+), 0 deletions(-)
