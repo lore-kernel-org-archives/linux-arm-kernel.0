@@ -1,33 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Sep 2012 21:51:04 -0700
-Subject: [PATCH v7 00/11] OMAP-GPMC: generic time calc, prepare for driver
-In-Reply-To: <cover.1348058726.git.afzal@ti.com>
-References: <cover.1348058726.git.afzal@ti.com>
-Message-ID: <20120921045104.GU28835@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Sep 2012 21:58:14 -0700
+Subject: [GIT PULL] ARM initial multi-platform support
+In-Reply-To: <5053B05C.7070801@gmail.com>
+References: <5053B05C.7070801@gmail.com>
+Message-ID: <20120921045814.GA30535@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [120919 06:22]:
-> Hi,
+On Fri, Sep 14, 2012 at 05:31:56PM -0500, Rob Herring wrote:
+> Arnd, Olof,
 > 
-> This version - v7 as compared to previous version, takes care of
-> rounding issues due to the usage of nanoseconds in generic timing
-> routine. All calculations are now in picoseconds. Once all timings
-> are calculated it is converted to nanoseconds so that calculated
-> timing values are compatible with existing custom timing routines
-> (this will help in reverting back to custom routines easily in case
-> of any issues). And documentation has been added on gpmc timings.
-> Also redundant rounding of nand timings has been removed as part of
-> this series.
+> Please pull initial multi-platform support. This includes the gpio.h
+> clean-up that's needed as well. Hopefully it's early enough we will see
+> a few other platforms converted over for 3.7.
+> 
+> There's a few minor changes from the last version I posted:
+> - Incorporated Jamie Iles fixes for picoxcell.
+> - Removed the now unused vexpress uncompress.h and timex.h
+> - Fixed the multiple adding of mach directories for spear and exynos.
+> - Fixed orion gpio.h includes breaking dove, kirkwood, and orion5x.
+> 
+> Rob
+> 
+> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+> 
+>   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://sources.calxeda.com/kernel/linux.git tags/multi-platform-for-3.7
+> 
+> for you to fetch changes up to 617276307cd4cdb9a95c77efaa3063695af63aa7:
+> 
+>   ARM: vexpress: convert to multi-platform (2012-09-14 12:55:09 -0500)
 
-I gave this series a quick test on my n800 after applying the
-two serial patches needed to get the uart to work, and it seems
-to be working just fine.
+I pulled in this branch now. I created a new next/multiplatform branch that
+contains this branch plus one more patch to sweep new dtb targets and move
+them to the common file (will post that patch shortly).
 
-Was there still some discussion on the format of the generic
-timings that's still pending? I think Jon made some comments 
-on the format?
+To avoid the worst of the conflicts I ended up basing next/multiplatform on
+next/cleanup + next/dt + next/soc.
 
-Regards,
+Note that I have not yet merged in the smp_ops branch (will do final
+sync-up with Arnd on that tomorrow), so selecting multiple targets will
+fail building due to duplicate symbols.
 
-Tony
+
+-Olof
