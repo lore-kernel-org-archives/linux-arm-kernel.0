@@ -1,108 +1,124 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Sep 2012 19:26:53 -0700
-Subject: [PATCH 05/10] ARM: msm: Remove custom clk_set_flags() API
+Date: Thu, 20 Sep 2012 19:26:56 -0700
+Subject: [PATCH 08/10] ARM: msm: Prepare clk_get() users in mach-msm for
+ clock-pcom driver
 In-Reply-To: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
 References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1348194419-11486-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1348194419-11486-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody is using this API upstream and it's just contributing
-cruft. Remove it so the MSM clock API is closer to the generic
-struct clock API.
+In the near future we'll be moving clock-pcom to a platform
+driver, in which case these two users of clk_get() in mach-msm
+need to be updated. Have board-trout-panel.c make the proc_comm
+call directly so that we don't have to port this board specific
+code to the driver right now and reorder the initcall order of
+dma.c so that it initializes after the clock driver probes but
+before any drivers use dma APIs.
 
-Cc: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-pcom.c       | 10 ----------
- arch/arm/mach-msm/clock.c            |  8 --------
- arch/arm/mach-msm/clock.h            |  6 ------
- arch/arm/mach-msm/include/mach/clk.h |  3 ---
- 4 files changed, 27 deletions(-)
+ arch/arm/mach-msm/Makefile            |  9 ++++++---
+ arch/arm/mach-msm/board-trout-panel.c | 19 +++++++------------
+ arch/arm/mach-msm/dma.c               |  5 ++---
+ 3 files changed, 15 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index a52c970..bb75f8e 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -85,15 +85,6 @@ static int pc_clk_set_max_rate(unsigned id, unsigned rate)
- 		return (int)id < 0 ? -EINVAL : 0;
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 17519fa..3dbae74 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -5,12 +5,15 @@ obj-$(CONFIG_DEBUG_FS) += clock-debug.o
+ obj-$(CONFIG_MSM_VIC) += irq-vic.o
+ obj-$(CONFIG_MSM_IOMMU) += devices-iommu.o
+ 
+-obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o
+-obj-$(CONFIG_ARCH_MSM7X30) += dma.o
+-obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
++obj-$(CONFIG_ARCH_MSM7X00A) += irq.o
++obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
+ 
+ obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
+ 
++obj-$(CONFIG_ARCH_MSM7X00A) += dma.o
++obj-$(CONFIG_ARCH_MSM7X30) += dma.o
++obj-$(CONFIG_ARCH_QSD8X50) += dma.o
++
+ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
+diff --git a/arch/arm/mach-msm/board-trout-panel.c b/arch/arm/mach-msm/board-trout-panel.c
+index 89bf6b4..0be703b 100644
+--- a/arch/arm/mach-msm/board-trout-panel.c
++++ b/arch/arm/mach-msm/board-trout-panel.c
+@@ -7,7 +7,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/leds.h>
+-#include <linux/clk.h>
+ #include <linux/err.h>
+ 
+ #include <asm/io.h>
+@@ -19,6 +18,7 @@
+ 
+ #include "board-trout.h"
+ #include "proc_comm.h"
++#include "clock-pcom.h"
+ #include "devices.h"
+ 
+ #define TROUT_DEFAULT_BACKLIGHT_BRIGHTNESS 255
+@@ -170,7 +170,6 @@ static struct mddi_table mddi_toshiba_init_table[] = {
+ #define INTMASK_VWAKEOUT (1U << 0)
+ 
+ 
+-static struct clk *gp_clk;
+ static int trout_new_backlight = 1;
+ static struct vreg *vreg_mddi_1v5;
+ static struct vreg *vreg_lcm_2v85;
+@@ -273,18 +272,14 @@ int __init trout_init_panel(void)
+ 	} else {
+ 		uint32_t config = PCOM_GPIO_CFG(27, 1, GPIO_OUTPUT,
+ 						GPIO_NO_PULL, GPIO_8MA);
++		uint32_t id = P_GP_CLK;
++		uint32_t rate = 19200000;
++
+ 		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, 0);
+ 
+-		gp_clk = clk_get(NULL, "gp_clk");
+-		if (IS_ERR(gp_clk)) {
+-			printk(KERN_ERR "trout_init_panel: could not get gp"
+-			       "clock\n");
+-			gp_clk = NULL;
+-		}
+-		rc = clk_set_rate(gp_clk, 19200000);
+-		if (rc)
+-			printk(KERN_ERR "trout_init_panel: set clock rate "
+-			       "failed\n");
++		msm_proc_comm(PCOM_CLKCTL_RPC_SET_RATE, &id, &rate);
++		if (id < 0)
++			pr_err("trout_init_panel: set clock rate failed\n");
+ 	}
+ 
+ 	rc = platform_device_register(&msm_device_mdp);
+diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+index 354b91d..37a4ddd 100644
+--- a/arch/arm/mach-msm/dma.c
++++ b/arch/arm/mach-msm/dma.c
+@@ -258,6 +258,7 @@ static int __init msm_init_datamover(void)
+ 	clk = clk_get(NULL, "adm_clk");
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
++	clk_prepare(clk);
+ 	msm_dmov_clk = clk;
+ 	ret = request_irq(INT_ADM_AARM, msm_datamover_irq_handler, 0, "msmdatamover", NULL);
+ 	if (ret)
+@@ -265,6 +266,4 @@ static int __init msm_init_datamover(void)
+ 	disable_irq(INT_ADM_AARM);
+ 	return 0;
  }
- 
--static int pc_clk_set_flags(unsigned id, unsigned flags)
--{
--	int rc = msm_proc_comm(PCOM_CLKCTL_RPC_SET_FLAGS, &id, &flags);
--	if (rc < 0)
--		return rc;
--	else
--		return (int)id < 0 ? -EINVAL : 0;
--}
 -
- static unsigned pc_clk_get_rate(unsigned id)
- {
- 	if (msm_proc_comm(PCOM_CLKCTL_RPC_RATE, &id, NULL))
-@@ -130,7 +121,6 @@ struct clk_ops clk_ops_pcom = {
- 	.set_rate = pc_clk_set_rate,
- 	.set_min_rate = pc_clk_set_min_rate,
- 	.set_max_rate = pc_clk_set_max_rate,
--	.set_flags = pc_clk_set_flags,
- 	.get_rate = pc_clk_get_rate,
- 	.is_enabled = pc_clk_is_enabled,
- 	.round_rate = pc_clk_round_rate,
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index d9145df..5fac2df 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -121,14 +121,6 @@ struct clk *clk_get_parent(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_get_parent);
- 
--int clk_set_flags(struct clk *clk, unsigned long flags)
--{
--	if (clk == NULL || IS_ERR(clk))
--		return -EINVAL;
--	return clk->ops->set_flags(clk->id, flags);
--}
--EXPORT_SYMBOL(clk_set_flags);
+-arch_initcall(msm_init_datamover);
 -
- /* EBI1 is the only shared clock that several clients want to vote on as of
-  * this commit. If this changes in the future, then it might be better to
-  * make clk_min_rate handle the voting or make ebi1_clk_set_min_rate more
-diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-index 2c007f6..a25ff58 100644
---- a/arch/arm/mach-msm/clock.h
-+++ b/arch/arm/mach-msm/clock.h
-@@ -21,11 +21,6 @@
- #include <linux/list.h>
- #include <mach/clk.h>
- 
--#define CLKFLAG_INVERT			0x00000001
--#define CLKFLAG_NOINVERT		0x00000002
--#define CLKFLAG_NONEST			0x00000004
--#define CLKFLAG_NORESET			0x00000008
--
- #define CLK_FIRST_AVAILABLE_FLAG	0x00000100
- #define CLKFLAG_AUTO_OFF		0x00000200
- #define CLKFLAG_MIN			0x00000400
-@@ -39,7 +34,6 @@ struct clk_ops {
- 	int (*set_rate)(unsigned id, unsigned rate);
- 	int (*set_min_rate)(unsigned id, unsigned rate);
- 	int (*set_max_rate)(unsigned id, unsigned rate);
--	int (*set_flags)(unsigned id, unsigned flags);
- 	unsigned (*get_rate)(unsigned id);
- 	unsigned (*is_enabled)(unsigned id);
- 	long (*round_rate)(unsigned id, unsigned rate);
-diff --git a/arch/arm/mach-msm/include/mach/clk.h b/arch/arm/mach-msm/include/mach/clk.h
-index e8d3842..5f1c37d 100644
---- a/arch/arm/mach-msm/include/mach/clk.h
-+++ b/arch/arm/mach-msm/include/mach/clk.h
-@@ -34,7 +34,4 @@ int clk_set_max_rate(struct clk *clk, unsigned long rate);
- /* Assert/Deassert reset to a hardware block associated with a clock */
- int clk_reset(struct clk *clk, enum clk_reset_action action);
- 
--/* Set clock-specific configuration parameters */
--int clk_set_flags(struct clk *clk, unsigned long flags);
--
- #endif
++module_init(msm_init_datamover);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
