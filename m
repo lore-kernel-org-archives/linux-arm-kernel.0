@@ -1,40 +1,37 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Fri, 21 Sep 2012 16:55:00 +0800
-Subject: [PATCH v2 5/5] ARM: tegra: enable brcmfmac in defconfig
-In-Reply-To: <1348217700-12309-1-git-send-email-wni@nvidia.com>
-References: <1348217700-12309-1-git-send-email-wni@nvidia.com>
-Message-ID: <1348217700-12309-6-git-send-email-wni@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Sep 2012 09:17:41 +0000
+Subject: [GIT PULL RESEND] arm-soc: vt8500: Convert mach-vt8500 to
+ devicetree
+In-Reply-To: <1348212797.13689.3.camel@gitbox>
+References: <1348119906.8199.3.camel@gitbox> <1348209938.1669.4.camel@gitbox>
+ <1348212797.13689.3.camel@gitbox>
+Message-ID: <201209210917.42388.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New options enabled:
-* CFG80211_WEXT: (dependency)
-* BRCMFMAC: wlan driver, enable as module.
+On Friday 21 September 2012, Tony Prisk wrote:
+> > I plan to submit a new framebuffer driver for 3.8 which could be
+> > modified to use the helper when its in 3.8 (assuming it doesn't make
+> > 3.7) - or the existing framebuffer driver could be patched to use the
+> > of_helper. I realise this creates a bit of churn on the framebuffer
+> > code, but more than likely its going to occur anyway if the new driver
+> > is accepted.
 
-Signed-off-by: Wei Ni <wni@nvidia.com>
----
- arch/arm/configs/tegra_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Slightly unrelated, but what is the state of this driver? I believe
+"modern" drivers are supposed to register as a kernel modesetting
+driver to the drivers/gpu/drm framwork rather than the traditional
+drivers/video infrastructure.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index adcf3c2..04b18ea 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -73,6 +73,7 @@ CONFIG_BT_BNEP=y
- CONFIG_BT_HIDP=y
- CONFIG_BT_HCIBTUSB=m
- CONFIG_CFG80211=y
-+CONFIG_CFG80211_WEXT=y
- CONFIG_MAC80211=y
- CONFIG_RFKILL=y
- CONFIG_RFKILL_INPUT=y
-@@ -98,6 +99,7 @@ CONFIG_USB_PEGASUS=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_BRCMFMAC=m
- CONFIG_RT2X00=y
- CONFIG_RT2800USB=m
- CONFIG_INPUT_EVDEV=y
--- 
-1.7.1
+> To clarify, I have made the following changes to try bringing the code
+> in line with the videomode_helper patch. I guess this is really a
+> question for Rob - Does this help??
+
+>From all I can tell, the vt8500 platform code in the current (v3.6)
+version is rather broken due to bitrot, and I think we should take
+your code in the fixed version unless Rob has any serious objections.
+
+You have done a great job on cleaning it up and I'd love to see this
+all working again in 3.7, even if we have to adapt the bindings
+in 3.8.
+
+	Arnd
