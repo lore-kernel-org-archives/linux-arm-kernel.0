@@ -1,126 +1,84 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Sep 2012 19:26:49 -0700
-Subject: [PATCH 01/10] usb: otg: msm: Convert to clk_prepare/unprepare
+Date: Thu, 20 Sep 2012 19:26:54 -0700
+Subject: [PATCH 06/10] ARM: msm: Remove custom clk_set_{max,min}_rate() API
 In-Reply-To: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
 References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1348194419-11486-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1348194419-11486-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add calls to clk_prepare and unprepare so that MSM can migrate to
-the common clock framework.
+There are no users of this API anymore so let's just remove it.
+If a need arises in the future we can extend the common clock API
+to handle it.
 
-Cc: Felipe Balbi <balbi@ti.com>
+Cc: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/usb/otg/msm_otg.c | 38 +++++++++++++++++++-------------------
- 1 file changed, 19 insertions(+), 19 deletions(-)
+ arch/arm/mach-msm/clock-debug.c      |  9 +--------
+ arch/arm/mach-msm/clock.c            | 12 ------------
+ arch/arm/mach-msm/include/mach/clk.h |  6 ------
+ 3 files changed, 1 insertion(+), 26 deletions(-)
 
-diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
-index 9f5fc90..2ae0639 100644
---- a/drivers/usb/otg/msm_otg.c
-+++ b/drivers/usb/otg/msm_otg.c
-@@ -514,13 +514,13 @@ static int msm_otg_suspend(struct msm_otg *motg)
- 			motg->pdata->otg_control == OTG_PMIC_CONTROL)
- 		writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
+diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
+index 4886404..c4b34d7 100644
+--- a/arch/arm/mach-msm/clock-debug.c
++++ b/arch/arm/mach-msm/clock-debug.c
+@@ -25,14 +25,7 @@ static int clock_debug_rate_set(void *data, u64 val)
+ 	struct clk *clock = data;
+ 	int ret;
  
--	clk_disable(motg->pclk);
--	clk_disable(motg->clk);
-+	clk_disable_unprepare(motg->pclk);
-+	clk_disable_unprepare(motg->clk);
- 	if (motg->core_clk)
--		clk_disable(motg->core_clk);
-+		clk_disable_unprepare(motg->core_clk);
+-	/* Only increases to max rate will succeed, but that's actually good
+-	 * for debugging purposes so we don't check for error. */
+-	if (clock->flags & CLK_MAX)
+-		clk_set_max_rate(clock, val);
+-	if (clock->flags & CLK_MIN)
+-		ret = clk_set_min_rate(clock, val);
+-	else
+-		ret = clk_set_rate(clock, val);
++	ret = clk_set_rate(clock, val);
+ 	if (ret != 0)
+ 		printk(KERN_ERR "clk_set%s_rate failed (%d)\n",
+ 			(clock->flags & CLK_MIN) ? "_min" : "", ret);
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index 5fac2df..8d07b25 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -97,18 +97,6 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
+ }
+ EXPORT_SYMBOL(clk_round_rate);
  
- 	if (!IS_ERR(motg->pclk_src))
--		clk_disable(motg->pclk_src);
-+		clk_disable_unprepare(motg->pclk_src);
+-int clk_set_min_rate(struct clk *clk, unsigned long rate)
+-{
+-	return clk->ops->set_min_rate(clk->id, rate);
+-}
+-EXPORT_SYMBOL(clk_set_min_rate);
+-
+-int clk_set_max_rate(struct clk *clk, unsigned long rate)
+-{
+-	return clk->ops->set_max_rate(clk->id, rate);
+-}
+-EXPORT_SYMBOL(clk_set_max_rate);
+-
+ int clk_set_parent(struct clk *clk, struct clk *parent)
+ {
+ 	return -ENOSYS;
+diff --git a/arch/arm/mach-msm/include/mach/clk.h b/arch/arm/mach-msm/include/mach/clk.h
+index 5f1c37d..fd4f4a7 100644
+--- a/arch/arm/mach-msm/include/mach/clk.h
++++ b/arch/arm/mach-msm/include/mach/clk.h
+@@ -25,12 +25,6 @@ enum clk_reset_action {
  
- 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
- 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
-@@ -552,12 +552,12 @@ static int msm_otg_resume(struct msm_otg *motg)
- 		return 0;
+ struct clk;
  
- 	if (!IS_ERR(motg->pclk_src))
--		clk_enable(motg->pclk_src);
-+		clk_prepare_enable(motg->pclk_src);
+-/* Rate is minimum clock rate in Hz */
+-int clk_set_min_rate(struct clk *clk, unsigned long rate);
+-
+-/* Rate is maximum clock rate in Hz */
+-int clk_set_max_rate(struct clk *clk, unsigned long rate);
+-
+ /* Assert/Deassert reset to a hardware block associated with a clock */
+ int clk_reset(struct clk *clk, enum clk_reset_action action);
  
--	clk_enable(motg->pclk);
--	clk_enable(motg->clk);
-+	clk_prepare_enable(motg->pclk);
-+	clk_prepare_enable(motg->clk);
- 	if (motg->core_clk)
--		clk_enable(motg->core_clk);
-+		clk_prepare_enable(motg->core_clk);
- 
- 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
- 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
-@@ -1468,7 +1468,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 		if (IS_ERR(motg->pclk_src))
- 			goto put_clk;
- 		clk_set_rate(motg->pclk_src, INT_MAX);
--		clk_enable(motg->pclk_src);
-+		clk_prepare_enable(motg->pclk_src);
- 	} else
- 		motg->pclk_src = ERR_PTR(-ENOENT);
- 
-@@ -1511,8 +1511,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 		goto free_regs;
- 	}
- 
--	clk_enable(motg->clk);
--	clk_enable(motg->pclk);
-+	clk_prepare_enable(motg->clk);
-+	clk_prepare_enable(motg->pclk);
- 
- 	ret = msm_hsusb_init_vddcx(motg, 1);
- 	if (ret) {
-@@ -1532,7 +1532,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 	}
- 
- 	if (motg->core_clk)
--		clk_enable(motg->core_clk);
-+		clk_prepare_enable(motg->core_clk);
- 
- 	writel(0, USB_USBINTR);
- 	writel(0, USB_OTGSC);
-@@ -1579,8 +1579,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- free_irq:
- 	free_irq(motg->irq, motg);
- disable_clks:
--	clk_disable(motg->pclk);
--	clk_disable(motg->clk);
-+	clk_disable_unprepare(motg->pclk);
-+	clk_disable_unprepare(motg->clk);
- ldo_exit:
- 	msm_hsusb_ldo_init(motg, 0);
- vddcx_exit:
-@@ -1593,7 +1593,7 @@ put_core_clk:
- 	clk_put(motg->pclk);
- put_pclk_src:
- 	if (!IS_ERR(motg->pclk_src)) {
--		clk_disable(motg->pclk_src);
-+		clk_disable_unprepare(motg->pclk_src);
- 		clk_put(motg->pclk_src);
- 	}
- put_clk:
-@@ -1643,12 +1643,12 @@ static int __devexit msm_otg_remove(struct platform_device *pdev)
- 	if (cnt >= PHY_SUSPEND_TIMEOUT_USEC)
- 		dev_err(phy->dev, "Unable to suspend PHY\n");
- 
--	clk_disable(motg->pclk);
--	clk_disable(motg->clk);
-+	clk_disable_unprepare(motg->pclk);
-+	clk_disable_unprepare(motg->clk);
- 	if (motg->core_clk)
--		clk_disable(motg->core_clk);
-+		clk_disable_unprepare(motg->core_clk);
- 	if (!IS_ERR(motg->pclk_src)) {
--		clk_disable(motg->pclk_src);
-+		clk_disable_unprepare(motg->pclk_src);
- 		clk_put(motg->pclk_src);
- 	}
- 	msm_hsusb_ldo_init(motg, 0);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
