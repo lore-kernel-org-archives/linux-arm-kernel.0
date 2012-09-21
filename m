@@ -1,42 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Sep 2012 14:23:29 +0100
-Subject: [PATCH V4 3/6] arm: cache-l2x0: add support for Aurora L2 cache
- ctrl
-In-Reply-To: <1348213574-18494-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1348213574-18494-1-git-send-email-gregory.clement@free-electrons.com>
- <1348213574-18494-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120921132329.GE24613@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 21 Sep 2012 15:41:11 +0200
+Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
+In-Reply-To: <20120920190034.GB15609@n2100.arm.linux.org.uk>
+References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
+ <20120920190034.GB15609@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdY1ZxQoyGFO9OnKr0WYQzooxPGvZV8Gnr_YO_yT_+ddDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 08:46:10AM +0100, Gregory CLEMENT wrote:
-> Aurora Cache Controller was designed to be compatible with the ARM L2
-> Cache Controller. It comes with some difference or improvement such
-> as:
-> - no cache id part number available through hardware (need to get it
->   by the DT).
-> - always write through mode available.
-> - two flavors of the controller outer cache and system cache (meaning
->   maintenance operations on L1 are broadcasted to the L2 and L2
->   performs the same operation).
-> - in outer cache mode, the cache maintenance operations are improved and
->   can be done on a range inside a page and are not limited to a cache
->   line.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
-> 
-> Cc: Barry Song <21cnbao@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
+On Thu, Sep 20, 2012 at 9:00 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Sep 20, 2012 at 11:46:08AM +0200, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> The ST Microelectronics variant of the PL011 is capable of supporting
+>> very high non-standard baud rates, even above 4 Mbps. However the
+>> uart_get_baud_rate() will not allow us to set these, so override that
+>> calculation on very high speeds.
+>
+> You don't explain why it doesn't.  It should in theory allow you to,
+> because there's no limits within that function other than those which
+> you pass in as the minimum and maximum.
 
-I reviewed this before and it hasn't got any worse since then :)
+So I looked closer: uart_get_baud_rate() in turn calls out to
+tty_termios_baud_rate() which does some fuzzy matching to the
+fix baudrate table and simply "snaps" the baudrate to the closest
+match if it is "close enough".
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+I.e. 4050000 baud is close enough to 4000000 so it will round
+off and "snap" to 4000000, whereas 3250000 baud will not
+"close enough" to 3000000 so it will not "snap" to 3000000.
 
-Will
+So we don't like that 4050000 snaps to 4000000.
+
+I wonder how to fix this ... I'm planning to do what the comment
+in tty_ioctl says:
+
+/**
+ *	tty_termios_baud_rate
+ *	@termios: termios structure
+ *
+ *	Convert termios baud rate data into a speed. This should be called
+ *	with the termios lock held if this termios is a terminal termios
+ *	structure. May change the termios data. Device drivers can call this
+ *	function but should use ->c_[io]speed directly as they are updated.
+ *
+ *	Locking: none
+ */
+
+Device drivers should use c_[io]speed directly!
+
+Alan Cox wrote this, so Alan: should I just ditch the use of
+uart_get_baud_rate() and program the divider directly from
+c_[io]speed?
+
+Yours,
+Linus Walleij
