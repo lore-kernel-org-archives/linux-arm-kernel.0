@@ -1,46 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 21 Sep 2012 10:19:45 -0600
-Subject: [PATCH v2 5/5] ARM: tegra: enable brcmfmac in defconfig
-In-Reply-To: <505C7C27.2050108@broadcom.com>
-References: <1348217700-12309-1-git-send-email-wni@nvidia.com>
- <1348217700-12309-6-git-send-email-wni@nvidia.com>
- <505C7C27.2050108@broadcom.com>
-Message-ID: <505C93A1.2040801@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Sep 2012 14:52:50 +0000
+Subject: [GIT PULL] ARM initial multi-platform support
+In-Reply-To: <20120921134532.GO2450@S2101-09.ap.freescale.net>
+References: <5053B05C.7070801@gmail.com>
+ <20120921045814.GA30535@quad.lixom.net>
+ <20120921134532.GO2450@S2101-09.ap.freescale.net>
+Message-ID: <201209211452.51550.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2012 08:39 AM, Arend van Spriel wrote:
-> On 09/21/2012 10:55 AM, Wei Ni wrote:
->> New options enabled:
->> * CFG80211_WEXT: (dependency)
->> * BRCMFMAC: wlan driver, enable as module.
->>
->> Signed-off-by: Wei Ni <wni@nvidia.com>
->> ---
->>   arch/arm/configs/tegra_defconfig |    2 ++
->>   1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/configs/tegra_defconfig
->> b/arch/arm/configs/tegra_defconfig
->> index adcf3c2..04b18ea 100644
->> --- a/arch/arm/configs/tegra_defconfig
->> +++ b/arch/arm/configs/tegra_defconfig
->> @@ -73,6 +73,7 @@ CONFIG_BT_BNEP=y
->>   CONFIG_BT_HIDP=y
->>   CONFIG_BT_HCIBTUSB=m
->>   CONFIG_CFG80211=y
->> +CONFIG_CFG80211_WEXT=y
-> 
-> Any particular reason for enabling this? The driver does not
-> specifically need it. The option only allows use of WEXT dependent
-> user-space tools like iwconfig and iwlist. At least it is not needed by
-> brcmfmac driver hence it does not select it.
-> 
-> You indicate there is a dependency. Could you elaborate?
+On Friday 21 September 2012, Shawn Guo wrote:
+> On Thu, Sep 20, 2012 at 09:58:14PM -0700, Olof Johansson wrote:
+> > I pulled in this branch now. I created a new next/multiplatform branch that
+> > contains this branch plus one more patch to sweep new dtb targets and move
+> > them to the common file (will post that patch shortly).
+> > 
+> > To avoid the worst of the conflicts I ended up basing next/multiplatform on
+> > next/cleanup + next/dt + next/soc.
+> > 
+> > Note that I have not yet merged in the smp_ops branch (will do final
+> > sync-up with Arnd on that tomorrow), so selecting multiple targets will
+> > fail building due to duplicate symbols.
+> > 
+> We need to merge arm-soc/multiplatform/platform-data as well?
 
-"Dependency" probably isn't correct.
+Yes, that's right.
 
-However, the intent of tegra_defconfig is to provide a useful
-configuration for Tegra boards. Without the ability to use
-iwconfig/iwlist, enabling the wireless driver doesn't seem useful; how
-would someone configure the wireless connection?
+	Arnd
