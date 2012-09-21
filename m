@@ -1,44 +1,119 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Sep 2012 10:49:23 +0800
-Subject: [PATCH 25/34] dma: imx-dma: remove mach/hardware.h inclusion
-In-Reply-To: <20120917075814.GO6180@pengutronix.de>
-References: <1347860103-4141-1-git-send-email-shawn.guo@linaro.org>
- <1347860103-4141-26-git-send-email-shawn.guo@linaro.org>
- <20120917075814.GO6180@pengutronix.de>
-Message-ID: <20120921024921.GL2450@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 21 Sep 2012 04:52:55 +0200
+Subject: [PATCH 2/3 V2] phy/micrel: Rename KS80xx to KSZ80xx
+In-Reply-To: <1348195976-31703-1-git-send-email-marex@denx.de>
+References: <1348195976-31703-1-git-send-email-marex@denx.de>
+Message-ID: <1348195976-31703-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 09:58:14AM +0200, Sascha Hauer wrote:
-> From 3094908fcbb4532056034539ea57042cd60abf47 Mon Sep 17 00:00:00 2001
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> Date: Mon, 17 Sep 2012 09:39:30 +0200
-> Subject: [PATCH] ARM i.MX DMA: Fixup clock lookups after platform_device_id conversion
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx1.c          |    3 ++-
->  arch/arm/mach-imx/clk-imx21.c         |    4 ++--
->  arch/arm/mach-imx/clk-imx27.c         |    4 ++--
->  include/linux/platform_data/dma-imx.h |    4 +++-
->  4 files changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-> index 7b76bc3..e8d9242 100644
-> --- a/arch/arm/mach-imx/clk-imx1.c
-> +++ b/arch/arm/mach-imx/clk-imx1.c
-> @@ -82,7 +82,8 @@ int __init mx1_clocks_init(unsigned long fref)
->  			pr_err("imx1 clk %d: register failed with %ld\n",
->  				i, PTR_ERR(clk[i]));
->  
-> -	clk_register_clkdev(clk[dma_gate], "ahb", "imx-dma");
-> +	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
-> +	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
+There is no such part as KS8001, KS8041 or KS8051. There are only
+KSZ8001, KSZ8041 and KSZ8051. Rename these parts as such to match
+the Micrel naming.
 
-I guess the clock names should be inverted?
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: David J. Choi <david.choi@micrel.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |    2 +-
+ drivers/net/phy/micrel.c     |   18 +++++++++---------
+ include/linux/micrel_phy.h   |    6 +++---
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
-Shawn
+V2: Rebase this on adjusted 1/3 patch
 
->  	clk_register_clkdev(clk[mma_gate], "mma", NULL);
->  	clk_register_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
->  	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
+NOTE: This affect one board in Linux ARM, but the change is
+      very minor it should not cause merge conflict, so if
+      this could go through net, that would be for the best.
+
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 3f29a52..fc9c8d5 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -295,7 +295,7 @@ static void __init apx4devkit_init(void)
+ 	enable_clk_enet_out();
+ 
+ 	if (IS_BUILTIN(CONFIG_PHYLIB))
+-		phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
++		phy_register_fixup_for_uid(PHY_ID_KSZ8051, MICREL_PHY_ID_MASK,
+ 					   apx4devkit_phy_fixup);
+ 
+ 	mxsfb_pdata.mode_list = apx4devkit_video_modes;
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index b5723b9..ee3147d 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -154,9 +154,9 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8041,
++	.phy_id		= PHY_ID_KSZ8041,
+ 	.phy_id_mask	= 0x00fffff0,
+-	.name		= "Micrel KS8041",
++	.name		= "Micrel KSZ8041",
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause
+ 				| SUPPORTED_Asym_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -167,9 +167,9 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8051,
++	.phy_id		= PHY_ID_KSZ8051,
+ 	.phy_id_mask	= 0x00fffff0,
+-	.name		= "Micrel KS8051",
++	.name		= "Micrel KSZ8051",
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause
+ 				| SUPPORTED_Asym_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -180,8 +180,8 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8001,
+-	.name		= "Micrel KS8001 or KS8721",
++	.phy_id		= PHY_ID_KSZ8001,
++	.name		= "Micrel KSZ8001 or KS8721",
+ 	.phy_id_mask	= 0x00ffffff,
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -227,11 +227,11 @@ MODULE_LICENSE("GPL");
+ 
+ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
+ 	{ PHY_ID_KSZ9021, 0x000ffffe },
+-	{ PHY_ID_KS8001, 0x00ffffff },
++	{ PHY_ID_KSZ8001, 0x00ffffff },
+ 	{ PHY_ID_KS8737, 0x00fffff0 },
+ 	{ PHY_ID_KSZ8021, 0x00ffffff },
+-	{ PHY_ID_KS8041, 0x00fffff0 },
+-	{ PHY_ID_KS8051, 0x00fffff0 },
++	{ PHY_ID_KSZ8041, 0x00fffff0 },
++	{ PHY_ID_KSZ8051, 0x00fffff0 },
+ 	{ }
+ };
+ 
+diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+index be7f366..d02355d 100644
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -6,10 +6,10 @@
+ #define PHY_ID_KSZ9021		0x00221610
+ #define PHY_ID_KS8737		0x00221720
+ #define PHY_ID_KSZ8021		0x00221555
+-#define PHY_ID_KS8041		0x00221510
+-#define PHY_ID_KS8051		0x00221550
++#define PHY_ID_KSZ8041		0x00221510
++#define PHY_ID_KSZ8051		0x00221550
+ /* both for ks8001 Rev. A/B, and for ks8721 Rev 3. */
+-#define PHY_ID_KS8001		0x0022161A
++#define PHY_ID_KSZ8001		0x0022161A
+ 
+ /* struct phy_device dev_flags definitions */
+ #define MICREL_PHY_50MHZ_CLK	0x00000001
+-- 
+1.7.10.4
