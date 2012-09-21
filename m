@@ -1,379 +1,234 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Sep 2012 17:32:13 +0200
-Subject: [PATCH 2/3] i2c: mux: Add dt support to i2c-mux-gpio driver
-In-Reply-To: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1348241535-27754-3-git-send-email-maxime.ripard@free-electrons.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 21 Sep 2012 16:38:45 +0100
+Subject: [PATCH v3] hwmon: Versatile Express hwmon driver
+In-Reply-To: <20120920235727.GA18860@roeck-us.net>
+References: <1348160058-13425-1-git-send-email-pawel.moll@arm.com>
+ <20120920235727.GA18860@roeck-us.net>
+Message-ID: <1348241925.11116.242.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the i2c-mux-gpio to be used by a device tree enabled device. The
-bindings are inspired by the one found in the i2c-mux-pinctrl driver.
+On Fri, 2012-09-21 at 00:57 +0100, Guenter Roeck wrote:
+> Your patch is substantially corrupted and unusable as patch file. Did you send
+> it through outlook ?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   86 +++++++++++
- drivers/i2c/muxes/i2c-mux-gpio.c                   |  158 +++++++++++++++-----
- 2 files changed, 208 insertions(+), 36 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+No, it's normal git-send-email, but it goes through Exchange mail server
+which can do stupid things with the message body (ie. change it!). Sorry
+about it, I'll send the next version from my private account to avoid
+such problems.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
-new file mode 100644
-index 0000000..f2bd120
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
-@@ -0,0 +1,86 @@
-+GPIO-based I2C Bus Mux
-+
-+This binding describes an I2C bus multiplexer that uses GPIOs to
-+route the I2C signals.
-+
-+                                 +-----+  +-----+
-+                                 | dev |  | dev |
-+    +------------------------+   +-----+  +-----+
-+    | SoC                    |      |        |
-+    |                   /----|------+--------+
-+    |   +---+   +------+     | child bus A, on GPIO value set to 0
-+    |   |I2C|---| Mux  |     |
-+    |   +---+   +--+---+     | child bus B, on GPIO value set to 1
-+    |              |    \----|------+--------+--------+
-+    |   +------+   |         |      |        |        |
-+    |   | GPIO |---+         |  +-----+  +-----+  +-----+
-+    |   +------+             |  | dev |  | dev |  | dev |
-+    +------------------------+  +-----+  +-----+  +-----+
-+
-+Required properties:
-+- compatible: i2c-mux-gpio
-+- i2c-parent: The phandle of the I2C bus that this multiplexer's master-side
-+  port is connected to.
-+
-+Also required are:
-+
-+- muxer-gpios: list of gpios to use to control the muxer
-+
-+* Standard I2C mux properties. See mux.txt in this directory.
-+
-+* I2C child bus nodes. See mux.txt in this directory.
-+
-+For each i2c child nodes, an I2C child bus will be created. They will
-+be numbered based on the reg property of each nodes.
-+
-+Whenever an access is made to a device on a child bus, the value set
-+in the revelant node's reg property will be outputed using the list of
-+GPIOs, the first in the list holding the most-significant value.
-+
-+If an idle state is defined, using the idle-state (optional) property,
-+whenever an access is not being made to a device on a child bus, the
-+idle value will be programmed into the GPIOs.
-+
-+If an idle state is not defined, the most recently used value will be
-+left programmed into hardware whenever no access is being made of a
-+device on a child bus.
-+
-+Example:
-+	i2cmux {
-+		compatible = "i2c-mux-gpio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		muxer-gpios = <&gpio1 22 0 &gpio1 23 0>;
-+		i2c-parent = <&i2c1>;
-+
-+		i2c at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c at 1 {
-+		      reg = <1>;
-+		      #address-cells = <1>;
-+		      #size-cells = <0>;
-+		};
-+
-+		i2c at 2 {
-+			reg = <2>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c at 3 {
-+			reg = <3>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			pca9555: pca9555 at 20 {
-+				compatible = "nxp,pca9555";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				reg = <0x20>;
-+			};
-+		};
-+	};
-diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
-index fbc400b..108caaa 100644
---- a/drivers/i2c/muxes/i2c-mux-gpio.c
-+++ b/drivers/i2c/muxes/i2c-mux-gpio.c
-@@ -16,26 +16,28 @@
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/gpio.h>
-+#include <linux/of_i2c.h>
-+#include <linux/of_gpio.h>
- 
- struct gpiomux {
- 	struct i2c_adapter *parent;
- 	struct i2c_adapter **adap; /* child busses */
--	struct i2c_mux_gpio_platform_data data;
-+	struct i2c_mux_gpio_platform_data *data;
- };
- 
- static void i2c_mux_gpio_set(const struct gpiomux *mux, unsigned val)
- {
- 	int i;
- 
--	for (i = 0; i < mux->data.n_gpios; i++)
--		gpio_set_value(mux->data.gpios[i], val & (1 << i));
-+	for (i = 0; i < mux->data->n_gpios; i++)
-+		gpio_set_value(mux->data->gpios[i], val & (1 << i));
- }
- 
- static int i2c_mux_gpio_select(struct i2c_adapter *adap, void *data, u32 chan)
- {
- 	struct gpiomux *mux = data;
- 
--	i2c_mux_gpio_set(mux, mux->data.values[chan]);
-+	i2c_mux_gpio_set(mux, mux->data->values[chan]);
- 
- 	return 0;
- }
-@@ -44,67 +46,146 @@ static int i2c_mux_gpio_deselect(struct i2c_adapter *adap, void *data, u32 chan)
- {
- 	struct gpiomux *mux = data;
- 
--	i2c_mux_gpio_set(mux, mux->data.idle);
-+	i2c_mux_gpio_set(mux, mux->data->idle);
- 
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static int __devinit i2c_mux_gpio_probe_dt(struct gpiomux *mux,
-+					struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *adapter_np, *child;
-+	struct i2c_adapter *adapter;
-+	unsigned *values, *gpios;
-+	int i = 0;
-+
-+	if (!np)
-+		return 0;
-+
-+	mux->data = devm_kzalloc(&pdev->dev, sizeof(*mux->data),
-+				GFP_KERNEL);
-+	if (!mux->data) {
-+		dev_err(&pdev->dev, "Cannot allocate platform_data");
-+		return -ENOMEM;
-+	}
-+
-+	adapter_np = of_parse_phandle(np, "i2c-parent", 0);
-+	if (!adapter_np) {
-+		dev_err(&pdev->dev, "Cannot parse i2c-parent\n");
-+		return -ENODEV;
-+	}
-+	adapter = of_find_i2c_adapter_by_node(adapter_np);
-+	if (!adapter) {
-+		dev_err(&pdev->dev, "Cannot find parent bus\n");
-+		return -ENODEV;
-+	}
-+	mux->data->parent = i2c_adapter_id(adapter);
-+	put_device(&adapter->dev);
-+
-+	mux->data->n_values = of_get_child_count(np);
-+
-+	values = devm_kzalloc(&pdev->dev, sizeof(*mux->data->values), GFP_KERNEL);
-+	if (!values) {
-+		dev_err(&pdev->dev, "Cannot allocate values array");
-+		return -ENOMEM;
-+	}
-+
-+	for_each_child_of_node(np, child) {
-+		of_property_read_u32(child, "reg", values + i);
-+		i++;
-+	}
-+	mux->data->values = values;
-+
-+	if (of_property_read_u32(np, "idle-state", &mux->data->idle))
-+		mux->data->idle = I2C_MUX_GPIO_NO_IDLE;
-+
-+	mux->data->n_gpios = of_gpio_named_count(np, "muxer-gpios");
-+	if (mux->data->n_gpios < 0) {
-+		dev_err(&pdev->dev, "Missing muxer-gpios property in the DT.\n");
-+		return -EINVAL;
-+	}
-+
-+	gpios = devm_kzalloc(&pdev->dev, mux->data->n_gpios, GFP_KERNEL);
-+	if (!gpios) {
-+		dev_err(&pdev->dev, "Cannot allocate gpios array");
-+		return -ENOMEM;
-+	}
-+
-+	for (i = 0; i < mux->data->n_gpios; i++)
-+		gpios[i] = of_get_named_gpio(np, "muxer-gpios", i);
-+
-+	mux->data->gpios = gpios;
-+
-+	return 0;
-+}
-+#else
-+static int __devinit i2c_mux_gpio_probe_dt(struct gpiomux *mux,
-+					struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
- {
- 	struct gpiomux *mux;
--	struct i2c_mux_gpio_platform_data *pdata;
- 	struct i2c_adapter *parent;
- 	int (*deselect) (struct i2c_adapter *, void *, u32);
- 	unsigned initial_state;
- 	int i, ret;
- 
--	pdata = pdev->dev.platform_data;
--	if (!pdata) {
--		dev_err(&pdev->dev, "Missing platform data\n");
--		return -ENODEV;
-+	mux = devm_kzalloc(&pdev->dev, sizeof(*mux), GFP_KERNEL);
-+	if (!mux) {
-+		dev_err(&pdev->dev, "Cannot allocate gpiomux structure");
-+		return -ENOMEM;
- 	}
- 
--	parent = i2c_get_adapter(pdata->parent);
-+	platform_set_drvdata(pdev, mux);
-+
-+	mux->data = pdev->dev.platform_data;
-+	if (!mux->data) {
-+		ret = i2c_mux_gpio_probe_dt(mux, pdev);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	parent = i2c_get_adapter(mux->data->parent);
- 	if (!parent) {
- 		dev_err(&pdev->dev, "Parent adapter (%d) not found\n",
--			pdata->parent);
-+			mux->data->parent);
- 		return -ENODEV;
- 	}
- 
--	mux = devm_kzalloc(&pdev->dev, sizeof(*mux), GFP_KERNEL);
--	if (!mux) {
--		ret = -ENOMEM;
--		goto alloc_failed;
--	}
--
- 	mux->parent = parent;
--	mux->data = *pdata;
- 	mux->adap = devm_kzalloc(&pdev->dev,
--				sizeof(struct i2c_adapter *) * pdata->n_values,
-+				sizeof(struct i2c_adapter *) * mux->data->n_values,
- 				GFP_KERNEL);
- 	if (!mux->adap) {
-+		dev_err(&pdev->dev, "Cannot allocate i2c_adapter structure");
- 		ret = -ENOMEM;
- 		goto alloc_failed;
- 	}
- 
--	if (pdata->idle != I2C_MUX_GPIO_NO_IDLE) {
--		initial_state = pdata->idle;
-+	if (mux->data->idle != I2C_MUX_GPIO_NO_IDLE) {
-+		initial_state = mux->data->idle;
- 		deselect = i2c_mux_gpio_deselect;
- 	} else {
--		initial_state = pdata->values[0];
-+		initial_state = mux->data->values[0];
- 		deselect = NULL;
- 	}
- 
--	for (i = 0; i < pdata->n_gpios; i++) {
--		ret = gpio_request(pdata->gpios[i], "i2c-mux-gpio");
-+	for (i = 0; i < mux->data->n_gpios; i++) {
-+		ret = gpio_request(mux->data->gpios[i], "i2c-mux-gpio");
- 		if (ret)
- 			goto err_request_gpio;
--		gpio_direction_output(pdata->gpios[i],
-+		gpio_direction_output(mux->data->gpios[i],
- 				      initial_state & (1 << i));
- 	}
- 
--	for (i = 0; i < pdata->n_values; i++) {
--		u32 nr = pdata->base_nr ? (pdata->base_nr + i) : 0;
-+	for (i = 0; i < mux->data->n_values; i++) {
-+		u32 nr = mux->data->base_nr ? (mux->data->base_nr + i) : 0;
- 
- 		mux->adap[i] = i2c_add_mux_adapter(parent, &pdev->dev, mux, nr, i,
- 						   i2c_mux_gpio_select, deselect);
-@@ -116,19 +197,17 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
- 	}
- 
- 	dev_info(&pdev->dev, "%d port mux on %s adapter\n",
--		 pdata->n_values, parent->name);
--
--	platform_set_drvdata(pdev, mux);
-+		 mux->data->n_values, parent->name);
- 
- 	return 0;
- 
- add_adapter_failed:
- 	for (; i > 0; i--)
- 		i2c_del_mux_adapter(mux->adap[i - 1]);
--	i = pdata->n_gpios;
-+	i = mux->data->n_gpios;
- err_request_gpio:
- 	for (; i > 0; i--)
--		gpio_free(pdata->gpios[i - 1]);
-+		gpio_free(mux->data->gpios[i - 1]);
- alloc_failed:
- 	i2c_put_adapter(parent);
- 
-@@ -140,11 +219,11 @@ static int __devexit i2c_mux_gpio_remove(struct platform_device *pdev)
- 	struct gpiomux *mux = platform_get_drvdata(pdev);
- 	int i;
- 
--	for (i = 0; i < mux->data.n_values; i++)
-+	for (i = 0; i < mux->data->n_values; i++)
- 		i2c_del_mux_adapter(mux->adap[i]);
- 
--	for (i = 0; i < mux->data.n_gpios; i++)
--		gpio_free(mux->data.gpios[i]);
-+	for (i = 0; i < mux->data->n_gpios; i++)
-+		gpio_free(mux->data->gpios[i]);
- 
- 	platform_set_drvdata(pdev, NULL);
- 	i2c_put_adapter(mux->parent);
-@@ -152,12 +231,19 @@ static int __devexit i2c_mux_gpio_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id i2c_mux_gpio_of_match[] __devinitconst = {
-+	{ .compatible = "i2c-mux-gpio", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, i2c_mux_gpio_of_match);
-+
- static struct platform_driver i2c_mux_gpio_driver = {
- 	.probe	= i2c_mux_gpio_probe,
- 	.remove	= __devexit_p(i2c_mux_gpio_remove),
- 	.driver	= {
- 		.owner	= THIS_MODULE,
- 		.name	= "i2c-mux-gpio",
-+		.of_match_table = of_match_ptr(i2c_mux_gpio_of_match),
- 	},
- };
- 
--- 
-1.7.9.5
+> > +static ssize_t vexpress_hwmon_name_show(struct device *dev,
+> > +             struct device_attribute *dev_attr, char *buffer)
+> > +{
+> > +     const char *compatible = of_get_property(dev->of_node, "compatible",
+> > +                     NULL);
+> > +
+> Can compatible be NULL ?
+
+No, compatible value makes the device bound with the driver. Nothing of
+this would happen without correct compatible string. And the device will
+be never successfully probed without DT node "behind it" (the
+of_match_device() below will return NULL).
+
+> > +     return sprintf(buffer, "%s\n", compatible);
+> > +}
+> > +
+> > +static ssize_t vexpress_hwmon_label_show(struct device *dev,
+> > +             struct device_attribute *dev_attr, char *buffer)
+> > +{
+> > +     const char *label = of_get_property(dev->of_node, "label", NULL);
+> > +
+> 
+> Can label be NULL (eg if missing in device tree data) ?
+> What happens if it is NULL ? 
+
+It is printed as "(null)".
+
+> Seems to me the label attribute should not exist in that case.
+
+I can do that, but I find the lack of label an error - essentially there
+is no other way of understanding the meaning of a value. The order of
+devices can be random, so no label - no idea what the value is.
+
+I will make the label property "required" in the binding documentation.
+
+> > +#define VEXPRESS_HWMON_ATTR(_name, _show, _divisor)          \
+> > +struct vexpress_hwmon_attr vexpress_hwmon_attr_##_name = {   \
+> > +     .dev_attr = __ATTR(_name, S_IRUGO, _show, NULL),        \
+> > +     .divisor = _divisor,                                    \
+> > +}
+> 
+> You should be able to use SENSOR_DEVICE_ATTR here.
+
+I didn't want to "overload" the index value for other reason, but if you
+think it's better approach I'll do that.
+
+> > +static struct of_device_id vexpress_hwmon_of_match[] = {
+> > +#if !defined(CONFIG_REGULATOR_VEXPRESS)
+> > +     {
+> > +             .compatible = "arm,vexpress-volt",
+> > +             .data = &vexpress_hwmon_group_volt,
+> > +     },
+> > +#endif
+> 
+> Just wondering - is the hwmon driver mutually exclusive with the regulator
+> driver, or can both coexist ?
+
+The device model will not let one device to be bound to two different
+drivers, so there will be a race for the device, depending on the
+initcall ordering... And the regulator driver must have "higher
+priority" then hwmon.
+
+Having said that, it seems that we could have a "generic" hwmon
+"regulator sensor" driver (as in: in1_input doing
+regulator_get_voltage()), as I think a regulator can be shared between
+consumers under certain conditions (I'd have to check this, though).
+
+> FWIW, the references to "arm,vexpress-volt" I can find on the web all do not
+> include "label", so I think you'll really have to look into what happens if
+> there is no such property.
+
+Yes, the patches you saw were prepared for the previous version of the
+driver. Last night when testing the code I spotted the (null) labels and
+updated the DTS files so the all the "volts" already have labels (I
+haven't reposted the Device Tree patches yet).
+
+> > +     {
+> > +             .compatible = "arm,vexpress-amp",
+> > +             .data = &vexpress_hwmon_group_amp,
+> > +     }, {
+> > +             .compatible = "arm,vexpress-temp",
+> > +             .data = &vexpress_hwmon_group_temp,
+> > +     }, {
+> > +             .compatible = "arm,vexpress-power",
+> > +             .data = &vexpress_hwmon_group_power,
+> > +     }, {
+> > +             .compatible = "arm,vexpress-energy",
+> > +             .data = &vexpress_hwmon_group_energy,
+> > +     },
+> > +     {}
+> > +};
+> > +MODULE_DEVICE_TABLE(of, vexpress_hwmon_of_match);
+> > +
+> 
+> Just wondering .... would the following work ?
+> 
+>         hwmon at 0 {
+>                 compatible = "arm,vexpress-hwmon";
+>                 volt at 0 {
+>                         /* Logic level voltage */
+>                         arm,vexpress-sysreg,func = <2 0>;
+>                         label = "VIO";
+>                 };
+> 
+>                 amp at 0 {
+>                         /* Total current for the two cores */
+>                         arm,vexpress-sysreg,func = <3 0>;
+>                         label = "Core current";
+>                 };
+> 
+>                 temp at 0 {
+>                         /* DCC internal temperature */
+>                         arm,vexpress-sysreg,func = <4 0>;
+>                         label = "DCC";
+>                 };
+> 
+>                 power at 0 {
+>                         /* Total power */
+>                         arm,vexpress-sysreg,func = <12 0>;
+>                         label = "Core power";
+>                 };
+> 
+>                 energy at 0 {
+>                         /* Total energy */
+>                         arm,vexpress-sysreg,func = <13 0>;
+>                         label = "Core energy";
+>                 };
+>         };
+> 
+> I am not a device tree expert, but it seems to me that you would only
+> have a single device node with this approach, and you could parse its
+> children with for_each_child_of_node().
+
+The thing is that there are other config devices, non hwmon relevant. In
+particular: clock generators ("oscillators"), reset controllers, DVI
+multiplexers etc. etc. And they are treated equally, as simple platform
+devices. And the -volt case is a good example why...
+	
+> > +static int vexpress_hwmon_probe(struct platform_device *pdev)
+> > +{
+> > +     int err;
+> > +     const struct of_device_id *match;
+> > +     struct vexpress_hwmon_data *data;
+> > +
+> > +     data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> > +     if (!data) {
+> > +             err = -ENOMEM;
+> > +             goto error_kzalloc;
+> > +     }
+> > +
+> > +     match = of_match_device(vexpress_hwmon_of_match, &pdev->dev);
+> > +     if (!match) {
+> > +             err = -EINVAL;
+> 
+> ENODEV ?
+
+Frankly speaking the "/* Invalid argument */" seems more appropriate
+here, but can do, no problem.
+
+> > +             goto error_match_device;
+> > +     }
+> > +
+> > +     data->func = vexpress_config_func_get_by_dev(&pdev->dev);
+> > +     if (!data->func) {
+> > +             err = -ENXIO;
+> 
+> ENODEV ?
+
+Again, it's "/* No such device or address */" vs "/* No such device */".
+Both fine with me, will do.
+
+> > +             goto error_get_func;
+> > +     }
+> > +
+> > +     err = sysfs_create_group(&pdev->dev.kobj, match->data);
+> > +     if (err)
+> > +             goto error_create_group;
+> > +
+> > +     data->hwmon_dev = hwmon_device_register(&pdev->dev);
+> > +     if (IS_ERR(data->hwmon_dev)) {
+> > +             err = PTR_ERR(data->hwmon_dev);
+> > +             goto error_hwmon_device_register;
+> > +     }
+> > +
+> > +     platform_set_drvdata(pdev, data);
+> > +
+> Must be set before sysfs files are created.
+
+Sure thing, thanks for spotting this.
+
+> > +     return 0;
+> > +
+> > +error_hwmon_device_register:
+> > +     sysfs_remove_group(&pdev->dev.kobj, match->data);
+> > +error_create_group:
+> > +     vexpress_config_func_put(data->func);
+> > +error_get_func:
+> > +error_match_device:
+> > +error_kzalloc:
+> 
+> Just return the error instead of using goto. No need for all those goto labels.
+
+I've heard exactly the opposite number of times (usually pointing me at
+CodingStyle ;-) but no problem, will do.
+
+> > +module_init(vexpress_hwmon_init);
+> > +module_exit(vexpress_hwmon_exit);
+> 
+> You can use module_platform_driver here.
+
+Sure, forgot about this new feature.
+
+Thanks for the review!
+
+Pawe?
