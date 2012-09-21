@@ -1,33 +1,24 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 21 Sep 2012 16:21:27 +0100
-Subject: Mismatched aliases with DMA mappings?
-Message-ID: <20120921152127.GA2106@linaro.org>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 21 Sep 2012 16:36:50 +0100
+Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
+In-Reply-To: <20120921150656.GG15609@n2100.arm.linux.org.uk>
+References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
+ <20120920190034.GB15609@n2100.arm.linux.org.uk>
+ <CACRpkdY1ZxQoyGFO9OnKr0WYQzooxPGvZV8Gnr_YO_yT_+ddDw@mail.gmail.com>
+ <20120921153710.220adb92@bob.linux.org.uk>
+ <20120921145803.GF15609@n2100.arm.linux.org.uk>
+ <20120921160503.53736fee@pyramind.ukuu.org.uk>
+ <20120921150656.GG15609@n2100.arm.linux.org.uk>
+Message-ID: <20120921163650.0c5966e3@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+> Sorry Alan, I don't think you really understand what I'm saying.
 
-I've been trying to understand whether (and if so, how) and DMA buffer
-allocation code in dma-mapping.c avoids mismatched alises in the kernel
-linear map.
+I'm taking about getting rid of the tty_termios_baud_rate() helper not
+the uart_get_baud_rate() helper. The tty one has no real purpose any more
+because we always set c_ospeed.
 
+The uart layer one just needs some bug fixing I think.
 
-I need a way of getting some uncached memory for communicating with
-temporarily noncoherent CPUs during CPU bringup/teardown.  Although
-the DMA API does not seem quite the right solution for this, nothing
-else currently feels like quite the right solution either.  Approaches
-based on memblock_steal() and on using cacheable memory with explicit
-flushing both have problems, and reserving specific physical memory
-via DT seems ugly, because we really don't care where the memory is.
-
-What is needed is something like an ioremap of anonymous memory with
-specific attributes, using largely the same infrastructure as the DMA
-API, but eliminating a mismatched alias of the allocated memory in the
-kernel linear mapping is likely to be important.
-
-Can you explain how the DMA mapping code eliminates mismatched aliases?
-I can see the attributes of new mappings being set, but currently I
-don't see how the linear map gets modified.
-
-Cheers
----Dave
+Alan
