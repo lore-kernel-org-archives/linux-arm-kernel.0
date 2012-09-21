@@ -1,34 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Sep 2012 13:19:03 +0100
-Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to
- amba-clcd driver
-In-Reply-To: <20120921114345.GE24458@pengutronix.de>
-References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
- <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
- <20120921114345.GE24458@pengutronix.de>
-Message-ID: <20120921121903.GE15609@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 21 Sep 2012 09:20:55 -0300
+Subject: [PATCH 01/11] ARM: defconfig: Remove CONFIG_MISC_DEVICES
+In-Reply-To: <CAOMZO5C2ihKUeQk17JOHc9VXAB3KTeQLS3OcLOiiUC8jucsexg@mail.gmail.com>
+References: <1345307035-3545-1-git-send-email-festevam@gmail.com>
+ <201208181808.21484.arnd@arndb.de>
+ <CAOMZO5C2ihKUeQk17JOHc9VXAB3KTeQLS3OcLOiiUC8jucsexg@mail.gmail.com>
+Message-ID: <CAOMZO5C2rTBM6si0MUC7XWznwqwmUq5-LmFyekLab8UBVwaCFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 01:43:45PM +0200, Sascha Hauer wrote:
-> We are currently discussing a common panel description for the
-> devicetree. You are invited to join in here:
-> 
-> http://comments.gmane.org/gmane.linux.drivers.devicetree/21386
-> 
-> We shouldn't add any more device specific panel descriptions.
+Hi Arnd,
 
-Just make sure that you don't end up encoding in integers in the device
-tree Linux kernel specific bitfields such as the 'sync' property above.
+On Thu, Sep 6, 2012 at 7:25 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Also, look at how the AMBA CLCD driver handles the panels with its
-capability bitmask for the colour formats - this allows the driver to
-determine what colour formats are supported, and allows platform code
-to work out how to program any MUXes for any particular panel and
-requested colour depth setting.  It also allows figuring out whether
-BGR or RGB format should be used.
+> I am not sure who would pick up this series.
+>
+> Is it possible for you to apply these patches?
 
-This is necessary because of the beweildering array of panels, muxes
-and other funky hardware which ARM Ltd like to put into their boards,
-and the fact that the LCDs tend to be entirely separate entities to
-the boards themselves.
+Is this something you can help with?
+
+Regards,
+
+Fabio Estevam
