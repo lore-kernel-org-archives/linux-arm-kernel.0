@@ -1,33 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Sep 2012 16:59:49 -0700
-Subject: [GIT PULL 6/7] Samsung cleanup fimd header for v3.7
-In-Reply-To: <099d01cd96bd$2f625050$8e26f0f0$%kim@samsung.com>
-References: <099d01cd96bd$2f625050$8e26f0f0$%kim@samsung.com>
-Message-ID: <20120920235949.GB13788@quad.lixom.net>
+Date: Thu, 20 Sep 2012 17:04:55 -0700
+Subject: [GIT PULL 1/7] Samsung cleanup for v3.7
+In-Reply-To: <099801cd96bd$15a45910$40ed0b30$%kim@samsung.com>
+References: <099801cd96bd$15a45910$40ed0b30$%kim@samsung.com>
+Message-ID: <20120921000455.GC13788@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 08:19:15AM +0900, Kukjin Kim wrote:
-> Hi Arnd, Olof.
+On Thu, Sep 20, 2012 at 08:18:31AM +0900, Kukjin Kim wrote:
+> Hi Arnd, Olof
 > 
-> This is for moving header file is related to fimd from platform to
-> include/video.
+> Here, there are cleanup patches for Samsung v3.7 and most of them are
+> related to cleanup Samsung specific gpio API.
 > 
-> Since this touches many Samsung stuff, it is included in samsung tree and I
-> requested to pull into Florian's tree and he already agreed. So its name is
-> 'v3.7-for-florian'.
+> If any problem, please kindly let me know.
 
-Hi,
-
-So, it seems like there's no need to pull this through arm-soc; there are no
-conflicts with other patches as far as I can see, and it can just go in through
-Florian's tree.
-
-Florian, if you want, you can add:
-
-Acked-by: Olof Johansson <olof@lixom.net>
-
-on the merge you do.
+Thanks, I've pulled all but the fimd header branch into arm-soc now.
 
 
 -Olof
