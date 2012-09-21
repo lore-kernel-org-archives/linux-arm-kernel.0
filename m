@@ -1,29 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Sep 2012 22:00:13 -0700
-Subject: [PATCH] ARM: highbank: call highbank_pm_init from .init_machine
-In-Reply-To: <1347893712-21819-1-git-send-email-robherring2@gmail.com>
-References: <1347893712-21819-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120921050013.GB30535@quad.lixom.net>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 21 Sep 2012 05:01:09 +0000
+Subject: [PATCH v7 00/11] OMAP-GPMC: generic time calc, prepare for driver
+In-Reply-To: <20120921045104.GU28835@atomide.com>
+References: <cover.1348058726.git.afzal@ti.com>
+ <20120921045104.GU28835@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9E6CA7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2012 at 09:55:12AM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Being a module_init call, highbank_pm_init will cause problem with
-> multi-platform build running on other platforms.  Call it from
-> .init_machine instead.
-> 
-> Reported-by: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> Arnd, Olof,
-> 
-> Can you please apply this to the multi-platform branch or I can send an updated
-> pull request if you prefer.
-> 
+Hi Tony,
 
-Applied.
+On Fri, Sep 21, 2012 at 10:21:04, Tony Lindgren wrote:
 
+> I gave this series a quick test on my n800 after applying the
+> two serial patches needed to get the uart to work, and it seems
+> to be working just fine.
+> 
+> Was there still some discussion on the format of the generic
+> timings that's still pending? I think Jon made some comments 
+> on the format?
 
--Olof
+What I deduced finally from Jon's replies was that he wanted
+more documentation on generic timings, and that has been
+added in this series.
+
+Regards
+Afzal
