@@ -1,109 +1,94 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 21 Sep 2012 11:56:03 -0400
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
+Date: Fri, 21 Sep 2012 11:56:09 -0400
+Subject: [PATCH v3 RESEND 11/17] ARM: LPAE: use 64-bit accessors for TTBR
+ registers
 In-Reply-To: <1348242975-19184-1-git-send-email-cyril@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
-Message-ID: <1348242975-19184-6-git-send-email-cyril@ti.com>
+Message-ID: <1348242975-19184-12-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for 64-bit physical addresses in virt_to_phys()
-patching.  This does not do real 64-bit add/sub, but instead patches in the
-upper 32-bits of the phys_offset directly into the output of virt_to_phys.
+This patch adds TTBR accessor macros, and modifies cpu_get_pgd() and
+the LPAE version of cpu_set_reserved_ttbr0() to use these instead.
 
-There is no corresponding change on the phys_to_virt() side, because
-computations on the upper 32-bits would be discarded anyway.
+In the process, we also fix these functions to correctly handle cases
+where the physical address lies beyond the 4G limit of 32-bit addressing.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/memory.h |   38 ++++++++++++++++++++++++++++++++++++--
- arch/arm/kernel/head.S        |    4 ++++
- arch/arm/kernel/setup.c       |    2 +-
- 3 files changed, 41 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/proc-fns.h |   24 +++++++++++++++++++-----
+ arch/arm/mm/context.c           |    9 ++-------
+ 2 files changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 88ca206..f3e8f88 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -154,13 +154,47 @@
- #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index 75b5f14..2d270b8 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -116,13 +116,27 @@ extern void cpu_resume(void);
+ #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
  
- extern unsigned long	__pv_offset;
--extern unsigned long	__pv_phys_offset;
-+extern phys_addr_t	__pv_phys_offset;
- #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
+ #ifdef CONFIG_ARM_LPAE
++
++#define cpu_get_ttbr(nr)					\
++	({							\
++		u64 ttbr;					\
++		__asm__("mrrc	p15, " #nr ", %Q0, %R0, c2"	\
++			: "=r" (ttbr)				\
++			: : );					\
++		ttbr;						\
++	})
++
++#define cpu_set_ttbr(nr, val)					\
++	do {							\
++		u64 ttbr = val;					\
++		__asm__("mcrr	p15, " #nr ", %Q0, %R0, c2"	\
++			: : "r" (ttbr)				\
++			: "cc");				\
++	} while (0)
++
+ #define cpu_get_pgd()	\
+ 	({						\
+-		unsigned long pg, pg2;			\
+-		__asm__("mrrc	p15, 0, %0, %1, c2"	\
+-			: "=r" (pg), "=r" (pg2)		\
+-			:				\
+-			: "cc");			\
++		u64 pg = cpu_get_ttbr(0);		\
+ 		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
+ 		(pgd_t *)phys_to_virt(pg);		\
+ 	})
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 4e07eec..f03437e 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -16,6 +16,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/thread_notify.h>
+ #include <asm/tlbflush.h>
++#include <asm/proc-fns.h>
  
- static inline phys_addr_t __virt_to_phys(unsigned long x)
+ static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
+ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+@@ -23,17 +24,11 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+ #ifdef CONFIG_ARM_LPAE
+ void cpu_set_reserved_ttbr0(void)
  {
--	unsigned long t;
-+	phys_addr_t t;
-+
-+#ifndef CONFIG_ARM_LPAE
- 	early_patch_imm8("add", t, x, __pv_offset, 0);
-+#else
-+	unsigned long __tmp;
-+
-+#ifndef __ARMEB__
-+#define PV_PHYS_HIGH	"(__pv_phys_offset + 4)"
-+#else
-+#define PV_PHYS_HIGH	"__pv_phys_offset"
-+#endif
-+
-+	early_patch_stub(
-+	/* type */		PATCH_IMM8,
-+	/* code */
-+		"ldr		%[tmp], =__pv_offset\n"
-+		"ldr		%[tmp], [%[tmp]]\n"
-+		"add		%Q[to], %[from], %[tmp]\n"
-+		"ldr		%[tmp], =" PV_PHYS_HIGH "\n"
-+		"ldr		%[tmp], [%[tmp]]\n"
-+		"mov		%R[to], %[tmp]\n",
-+	/* pad */		4,
-+	/* patch_data */
-+		".long		__pv_offset\n"
-+		"add		%Q[to], %[from], %[imm]\n"
-+		".long	"	PV_PHYS_HIGH "\n"
-+		"mov		%R[to], %[imm]\n",
-+	/* operands */
-+		: [to]	 "=r"	(t),
-+		  [tmp]	 "=&r"	(__tmp)
-+		: [from] "r"	(x),
-+		  [imm]	 "I"	(__IMM8),
-+			 "i"	(&__pv_offset),
-+			 "i"	(&__pv_phys_offset));
-+#endif
- 	return t;
+-	unsigned long ttbl = __pa(swapper_pg_dir);
+-	unsigned long ttbh = 0;
+-
+ 	/*
+ 	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
+ 	 * ASID is set to 0.
+ 	 */
+-	asm volatile(
+-	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"
+-	:
+-	: "r" (ttbl), "r" (ttbh));
++	cpu_set_ttbr(0, __pa(swapper_pg_dir));
+ 	isb();
  }
- 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 69a3c09..61fb8df 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -530,7 +530,11 @@ ENDPROC(__fixup_pv_offsets)
- 
- 	.align
- 1:	.long	.
-+#if defined(CONFIG_ARM_LPAE) && defined(__ARMEB__)
-+	.long	__pv_phys_offset + 4
-+#else
- 	.long	__pv_phys_offset
-+#endif
- 	.long	__pv_offset
- 	.long	PAGE_OFFSET
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 59e0f57..edb4f42 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -159,7 +159,7 @@ DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
-  * The initializers here prevent these from landing in the BSS section.
-  */
- unsigned long __pv_offset = 0xdeadbeef;
--unsigned long __pv_phys_offset = 0xdeadbeef;
-+phys_addr_t   __pv_phys_offset = 0xdeadbeef;
- EXPORT_SYMBOL(__pv_phys_offset);
- 
- #endif
+ #else
 -- 
 1.7.9.5
