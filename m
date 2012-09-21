@@ -1,71 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Sep 2012 17:16:33 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.6-rc
-Message-ID: <CAOesGMi8VYoptLeGQj7qZWUOyovX8P+409R64QHfH7=vGvCDgw@mail.gmail.com>
+Date: Thu, 20 Sep 2012 17:28:14 -0700
+Subject: [GIT PULL] ARM: add basic BCM2835 SoC and Raspberry Pi board
+ support
+In-Reply-To: <1348104718-21751-1-git-send-email-swarren@wwwdotorg.org>
+References: <1348104718-21751-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120921002814.GA15296@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Sep 19, 2012 at 07:31:58PM -0600, Stephen Warren wrote:
+> The BCM2835 is an ARM SoC from Broadcom. This patch adds very basic
+> support for this SoC; enough to boot the system into an initrd with
+> UART console, interrupt controller, timers, and a stub clock driver.
+> 
+> Also provided is a similarly basic device tree for the Raspberry Pi
+> Model B board.
+> 
+> This series was written by Simon Arlott, Chris Boot, and Dom Cobley
+> downstream, with reference to a Broadcom tree, and modified for upstream
+> and submitted by Stephen Warren.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+> 
+>   Linux 3.6-rc5
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git rpi-for-3.7
+
+Nice!
+
+I'm going to guess that you meant linux-rpi.git here since that's where I found
+a tag with the commit you're referencing in the pull request at the head. :)
+
+Pulled into bcm2835/soc and next/soc.
 
 
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+Thanks!
 
-  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/fixes-for-linus
-
-for you to fetch changes up to 23f3f0613f6172ef1f0cbb0e971adf29f1c1fe5e:
-
-  Merge tag 'imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6
-into fixes (2012-09-18 10:16:44 -0700)
-
-----------------------------------------------------------------
-
-arm-soc: bug fixes for v3.6-rc
-
-A couple of samsung clock locking fixes, at91 device tree gpio
-configuration fix and a couple more for shmobile and i.MX.
-
-All small targeted fixes.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: imx: armadillo5x0: Fix illegal register access
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: fix missing #interrupt-cells on gpio-controller
-
-Mandeep Singh Baines (1):
-      ARM: SAMSUNG: use spin_lock_irqsave() in clk_set_parent
-
-Olof Johansson (4):
-      Merge branch 'v3.6-samsung-fixes-3' of
-git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge branch 'fixes' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
-      Merge tag 'imx-fixes' of
-git://git.pengutronix.de/git/imx/linux-2.6 into fixes
-
-Sascha Hauer (1):
-      ARM i.MX25: Make timer irq work again
-
-Tetsuyuki Kobayashi (1):
-      ARM: shmobile: kzm9g: bugfix: correct mmcif interrupt settings
-
-Tushar Behera (1):
-      ARM: SAMSUNG: Use spin_lock_{irqsave,irqrestore} in clk_set_rate
-
- arch/arm/boot/dts/at91sam9260.dtsi    |  3 +++
- arch/arm/boot/dts/at91sam9263.dtsi    |  5 +++++
- arch/arm/boot/dts/at91sam9g45.dtsi    |  5 +++++
- arch/arm/boot/dts/at91sam9n12.dtsi    |  4 ++++
- arch/arm/boot/dts/at91sam9x5.dtsi     |  4 ++++
- arch/arm/mach-imx/clk-imx25.c         |  2 +-
- arch/arm/mach-imx/mach-armadillo5x0.c |  3 ++-
- arch/arm/mach-shmobile/board-kzm9g.c  |  4 ++--
- arch/arm/plat-mxc/include/mach/mx25.h |  1 +
- arch/arm/plat-samsung/clock.c         | 10 ++++++----
- 10 files changed, 33 insertions(+), 8 deletions(-)
+-Olof
