@@ -1,49 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Sep 2012 21:58:14 -0700
-Subject: [GIT PULL] ARM initial multi-platform support
-In-Reply-To: <5053B05C.7070801@gmail.com>
-References: <5053B05C.7070801@gmail.com>
-Message-ID: <20120921045814.GA30535@quad.lixom.net>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Fri, 21 Sep 2012 16:52:14 +0530
+Subject: [PATCH V6 0/2] video: drm: Add Device tree support to exynos DRM-FIMD
+Message-ID: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 05:31:56PM -0500, Rob Herring wrote:
-> Arnd, Olof,
-> 
-> Please pull initial multi-platform support. This includes the gpio.h
-> clean-up that's needed as well. Hopefully it's early enough we will see
-> a few other platforms converted over for 3.7.
-> 
-> There's a few minor changes from the last version I posted:
-> - Incorporated Jamie Iles fixes for picoxcell.
-> - Removed the now unused vexpress uncompress.h and timex.h
-> - Fixed the multiple adding of mach directories for spear and exynos.
-> - Fixed orion gpio.h includes breaking dove, kirkwood, and orion5x.
-> 
-> Rob
-> 
-> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
-> 
->   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://sources.calxeda.com/kernel/linux.git tags/multi-platform-for-3.7
-> 
-> for you to fetch changes up to 617276307cd4cdb9a95c77efaa3063695af63aa7:
-> 
->   ARM: vexpress: convert to multi-platform (2012-09-14 12:55:09 -0500)
+This patch set adds device tree support for DRM-FIMD for Samsung's Exynos5250.
+It includes parsing platform data from dts file. Also, adds the driver data
+for exynos4 and exynos5 devices.
 
-I pulled in this branch now. I created a new next/multiplatform branch that
-contains this branch plus one more patch to sweep new dtb targets and move
-them to the common file (will post that patch shortly).
+This patchset is based and tested on top of v3.6-rc4 on smdk5250 board
+Also depends on below patchset
+http://lists.freedesktop.org/archives/dri-devel/2012-August/026076.html
 
-To avoid the worst of the conflicts I ended up basing next/multiplatform on
-next/cleanup + next/dt + next/soc.
+Changes since V5:
+	- Moved the documentation file to appropriate location.
+	- Given more description in the commit message to the patch 
+	  video: drm: exynos: Add device tree support
 
-Note that I have not yet merged in the smp_ops branch (will do final
-sync-up with Arnd on that tomorrow), so selecting multiple targets will
-fail building due to duplicate symbols.
+Changes since V4:
+	- Changed the compatible string from "samsung,exynos4-fb" to
+	  "samsung,exynos4-fimd".
 
+Changes since V3:
+        - Removed the fimd version from driver data and using timing base
+          address instead
+        - Removed the drm_ prefixes to the structures and fucntions
 
--Olof
+Changes since V2:
+        - Added driver data to exynos5-drm-fimd as per Marek Szyprowski suggestion
+
+Changes since V1:
+        - Corrected typo errors and changed compatibility string
+
+Leela Krishna Amudala (2):
+  drm/exynos: add platform_device_id table and driver data for drm fimd
+  video: drm: exynos: Add device tree support
+
+ .../devicetree/bindings/drm/exynos/fimd.txt        |   80 +++++++++++
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c           |  138 +++++++++++++++++++-
+ 2 files changed, 212 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/exynos/fimd.txt
