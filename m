@@ -1,30 +1,67 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Sep 2012 17:32:11 +0200
-Subject: [PATCH 0/3] ARM: I2C: Add device tree bindings to i2c-mux-gpio
-Message-ID: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 21 Sep 2012 17:32:12 +0200
+Subject: [PATCH 1/3] i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
+In-Reply-To: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1348241535-27754-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Use the devm_kzalloc managed function to stripdown the error and remove
+code.
 
-This patchset adds the device tree entry to the CFA-10049 board of its i2c
-muxer. This muxer controls sub-buses that contains three Nuvoton NAU7802
-ADCs and a NXP PCA955 GPIO expander. Support for these will be added
-eventually.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/i2c/muxes/i2c-mux-gpio.c |   14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-Thanks,
-Maxime
-
-Maxime Ripard (3):
-  i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
-  i2c: mux: Add dt support to i2c-mux-gpio driver
-  ARM: dts: cfa10049: Add the i2c muxer buses to the CFA-10049
-
- .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   86 ++++++++++
- arch/arm/boot/dts/imx28-cfa10049.dts               |   33 ++++
- drivers/i2c/muxes/i2c-mux-gpio.c                   |  168 +++++++++++++++-----
- 3 files changed, 244 insertions(+), 43 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
-
+diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
+index 68b1f8e..fbc400b 100644
+--- a/drivers/i2c/muxes/i2c-mux-gpio.c
++++ b/drivers/i2c/muxes/i2c-mux-gpio.c
+@@ -71,7 +71,7 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++	mux = devm_kzalloc(&pdev->dev, sizeof(*mux), GFP_KERNEL);
+ 	if (!mux) {
+ 		ret = -ENOMEM;
+ 		goto alloc_failed;
+@@ -79,11 +79,12 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
+ 
+ 	mux->parent = parent;
+ 	mux->data = *pdata;
+-	mux->adap = kzalloc(sizeof(struct i2c_adapter *) * pdata->n_values,
+-			    GFP_KERNEL);
++	mux->adap = devm_kzalloc(&pdev->dev,
++				sizeof(struct i2c_adapter *) * pdata->n_values,
++				GFP_KERNEL);
+ 	if (!mux->adap) {
+ 		ret = -ENOMEM;
+-		goto alloc_failed2;
++		goto alloc_failed;
+ 	}
+ 
+ 	if (pdata->idle != I2C_MUX_GPIO_NO_IDLE) {
+@@ -128,9 +129,6 @@ add_adapter_failed:
+ err_request_gpio:
+ 	for (; i > 0; i--)
+ 		gpio_free(pdata->gpios[i - 1]);
+-	kfree(mux->adap);
+-alloc_failed2:
+-	kfree(mux);
+ alloc_failed:
+ 	i2c_put_adapter(parent);
+ 
+@@ -150,8 +148,6 @@ static int __devexit i2c_mux_gpio_remove(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 	i2c_put_adapter(mux->parent);
+-	kfree(mux->adap);
+-	kfree(mux);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
