@@ -1,46 +1,89 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Fri, 21 Sep 2012 11:16:00 -0700
-Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA
- more precisely
-In-Reply-To: <505B35F7.2080201@wwwdotorg.org>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
- <20120918124918.GK2505@amd.com>
- <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
- <201209190759.46174.arnd@arndb.de> <20120919125020.GQ2505@amd.com>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC1EEB@HQMAIL04.nvidia.com>
- <505A7DB4.4090902@wwwdotorg.org>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC1F2D@HQMAIL04.nvidia.com>
- <505B35F7.2080201@wwwdotorg.org>
-Message-ID: <401E54CE964CD94BAE1EB4A729C7087E379FDC2372@HQMAIL04.nvidia.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 21 Sep 2012 11:18:44 -0700
+Subject: [PATCH v4] hwmon: Versatile Express hwmon driver
+In-Reply-To: <1348246591-2409-1-git-send-email-mail@pawelmoll.com>
+References: <1348246591-2409-1-git-send-email-mail@pawelmoll.com>
+Message-ID: <20120921181844.GA20763@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The device(H/W controller) need to access few special memory
-> > blocks(IOVA==PA) and DRAM as well.
+On Fri, Sep 21, 2012 at 05:56:31PM +0100, Pawel Moll wrote:
+> From: Pawel Moll <pawel.moll@arm.com>
 > 
-> OK, so only /some/ of the VA space is VA==PA, and some is remapped; that's a
-> little different that what you originally implied above.
+> hwmon framework driver for Versatile Express sensors, providing
+> information about board level voltage (only when regulator driver
+> is not configured), currents, temperature and power/energy usage.
+> Labels for the values can be defined as DT properties.
 > 
-> BTW, which HW module is this; AVP/COP or something else. This sounds like an
-> odd requirement.
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  .../devicetree/bindings/hwmon/vexpress.txt         |   23 ++
+>  Documentation/hwmon/vexpress                       |   34 +++
+>  drivers/hwmon/Kconfig                              |    8 +
+>  drivers/hwmon/Makefile                             |    1 +
+>  drivers/hwmon/vexpress.c                           |  229 ++++++++++++++++++++
+>  5 files changed, 295 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwmon/vexpress.txt
+>  create mode 100644 Documentation/hwmon/vexpress
+>  create mode 100644 drivers/hwmon/vexpress.c
+> 
+[ ... ]
 
-This is not specific to ARM7. There are protected memory regions on Tegra that
-can be accessed by some controllers like display, 2D, 3D, VDE, HDA. These are
-DRAM regions configured as protected by BootRom. These memory regions
-are not exposed to and not managed by OS page allocator. The H/W controller
- accesses to these regions still to go through IOMMU.
-The IOMMU view for all the H/W controllers is not uniform on Tegra.
-Some Controllers see entire 4GB IOVA space. i.e all accesses go though IOMMU.
-Some controllers see the IOVA Space that don't overlap with MMIO space.  i.e
-The MMIO address access bypass IOMMU and directly go to MMIO space.
-Tegra IOMMU can support multiple address spaces as well. To hide controller
-Specific behavior, the drivers should take care of one to one mapping and
-remove inaccessible iova spaces in their address space's based platform device info.
+> +
+> +	err = sysfs_create_group(&pdev->dev.kobj, match->data);
+> +	if (err)
+> +		goto error;
 
-In my initial mail, I referred protected memory regions as MMIO blocks, which
-is incorrect.
+You'll need a second label for that. Since the group was not created, you can
+not delete it.
 
-
-
-
--KR
+> +
+> +	data->hwmon_dev = hwmon_device_register(&pdev->dev);
+> +	if (IS_ERR(data->hwmon_dev)) {
+> +		err = PTR_ERR(data->hwmon_dev);
+> +		goto error;
+> +	}
+> +
+> +	return 0;
+> +
+> +error:
+> +	sysfs_remove_group(&pdev->dev.kobj, match->data);
+> +	vexpress_config_func_put(data->func);
+> +	return err;
+> +}
+> +
+> +static int __devexit vexpress_hwmon_remove(struct platform_device *pdev)
+> +{
+> +	struct vexpress_hwmon_data *data = platform_get_drvdata(pdev);
+> +	const struct of_device_id *match;
+> +
+> +	hwmon_device_unregister(data->hwmon_dev);
+> +
+> +	match = of_match_device(vexpress_hwmon_of_match, &pdev->dev);
+> +	sysfs_remove_group(&pdev->dev.kobj, match->data);
+> +
+> +	vexpress_config_func_put(data->func);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver vexpress_hwmon_driver = {
+> +	.probe = vexpress_hwmon_probe,
+> +	.remove = __devexit_p(vexpress_hwmon_remove),
+> +	.driver	= {
+> +		.name = DRVNAME,
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = vexpress_hwmon_of_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(vexpress_hwmon_driver);
+> +
+> +MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
+> +MODULE_DESCRIPTION("Versatile Express hwmon sensors driver");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:vexpress-hwmon");
+> -- 
+> 1.7.9.5
+> 
+> 
