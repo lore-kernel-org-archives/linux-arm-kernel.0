@@ -1,65 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 21 Sep 2012 19:01:00 +0300
-Subject: [PATCH v2] serial: omap: fix the reciever line error case
-In-Reply-To: <1348238239-18510-1-git-send-email-shubhrajyoti@ti.com>
-References: <1348238239-18510-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120921160059.GA9886@arwen.pp.htv.fi>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Sep 2012 10:06:10 -0600
+Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <CAAQKjZN7B1spgoD+LJjDU=PDd9jFk6g7PekuiKEeKpXLT-X4UA@mail.gmail.com>
+References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
+ <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
+ <505BF79A.8060802@wwwdotorg.org>
+ <CAAQKjZN7B1spgoD+LJjDU=PDd9jFk6g7PekuiKEeKpXLT-X4UA@mail.gmail.com>
+Message-ID: <505C9072.2010204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 08:07:19PM +0530, Shubhrajyoti D wrote:
-> This patch does the following
-> - In case of errors if there least one data character in the RX FIFO
-> read it otherwise it may stall the receiver.
+On 09/21/2012 01:22 AM, Inki Dae wrote:
+> 2012/9/21 Stephen Warren <swarren@wwwdotorg.org>:
+>> On 09/21/2012 05:22 AM, Leela Krishna Amudala wrote:
+>>> This patch adds device tree based discovery support for exynos DRM-FIMD
+>>> driver which includes driver modification to handle platform data in
+>>> both the cases with DT and non-DT, Also adds the documentation for bindings.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/fimd.txt b/Documentation/devicetree/bindings/drm/exynos/fimd.txt
+>> ...
+>>> + - samsung,fimd-display: This property should specify the phandle of the
+>>> +   display device node which holds the video interface timing with the
+>>> +   below mentioned properties.
+>>> +
+>>> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
+>>> +     horizontal timing includes four parameters in the following order.
+>>> +
+>>> +     - horizontal back porch (in number of lcd clocks)
+>>> +     - horizontal front porch (in number of lcd clocks)
+>>> +     - hsync pulse width (in number of lcd clocks)
+>>> +     - Display panels X resolution.
+>>> +
+>>> +   - lcd-vtiming: Specifies the vertical timing for the overlay. The
+>>> +     vertical timing includes four parameters in the following order.
+>>> +
+>>> +     - vertical back porch (in number of lcd lines)
+>>> +     - vertical front porch (in number of lcd lines)
+>>> +     - vsync pulse width (in number of lcd clocks)
+>>> +     - Display panels Y resolution.
+>>
+>> Should this not use the new videomode timings that are under discussion at:
+>>
+>> http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
+>>
 > 
-> This is recommended in the interrupt reset method in the table 23-246 of
-> the omap4 TRM.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ok, I agree with you. then the videomode helper is going to be merged
+> to mainline(3.6)? if so, this patch should be reworked based on the
+> videomode helper.
 
-FWIW:
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> ---
-> - Tested on omap4sdp.
-> - pm tested hitting off in idle and suspend.
-> - v2 changes update the changelogs.
-> - Also remove the dummy check as FE , PE , BI and OE are the only
-> receiver errors.
-> 
->  drivers/tty/serial/omap-serial.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index a0d4460..4fea16b 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -334,6 +334,10 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
->  static void serial_omap_rlsi(struct uart_omap_port *up, unsigned int lsr)
->  {
->  	unsigned int flag;
-> +	unsigned char ch = 0;
-> +
-> +	if (likely(lsr & UART_LSR_DR))
-> +		ch = serial_in(up, UART_RX);
->  
->  	up->port.icount.rx++;
->  	flag = TTY_NORMAL;
-> -- 
-> 1.7.5.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120921/716d4245/attachment.sig>
+I think the videomode helpers would be merged for 3.7 at the very
+earliest; 3.6 is cooked already. Given there are still some comments on
+the binding, perhaps it won't happen until 3.8, but it'd be best to ask
+on that thread so that people more directly involved with the status can
+answer.
