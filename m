@@ -1,15 +1,13 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Sep 2012 15:22:18 +0900
-Subject: [GIT PULL 2/4] Samsung pinctrl-2 for v3.7
-Message-ID: <505C079A.8020801@samsung.com>
+Date: Fri, 21 Sep 2012 15:22:43 +0900
+Subject: [GIT PULL 3/4] Samsung devel for v3.7
+Message-ID: <505C07B3.2040101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof
 
-This is for fix typo and correct fucntion for Samsung pinctrl and since 
-this has a dependency with previous pinctrl branch I created this based 
-on that.
+Here is Samsung development for v3.7 and most of them are updating.
 
 If any problems, please kindly let me know.
 
@@ -21,27 +19,35 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-The following changes since commit 011527b45f8e3092e1f3192e5aea94187a6ca269:
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 
-   ARM: EXYNOS: Enable pinctrl driver support for EXYNOS4 device tree 
-enabled platform (2012-09-07 06:14:26 +0900)
+   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
 
 are available in the git repository at:
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/pinctrl-samsung-2
+next/devel-samsung
 
-Tomasz Figa (7):
-       pinctrl: exynos: Set pin function to EINT in irq_set_type of GPIO 
-EINTa
-       pinctrl: exynos: Fix typos in gpio/wkup _irq_mask
-       pinctrl: exynos: Handle only unmasked wakeup interrupts
-       pinctrl: exynos: Mark exynos_irq_demux_eint as inline
-       pinctrl: exynos: Correct the detection of wakeup-eint node
-       pinctrl: samsung: Uninline samsung_pinctrl_get_soc_data
-       pinctrl: exynos: Fix wakeup IRQ domain registration check
+Chander Kashyap (3):
+       ARM: EXYNOS: Turn off clocks for NAND, OneNAND and TSI controllers
+       ARM: EXYNOS: Put PCM, Slimbus, Spdif clocks to off state
+       ARM: SAMSUNG: Add check for NULL in clock interface
 
-  drivers/pinctrl/pinctrl-exynos.c  |   41 
-+++++++++++++++++++++++++++----------
-  drivers/pinctrl/pinctrl-exynos.h  |    1 +
-  drivers/pinctrl/pinctrl-samsung.c |    2 +-
-  3 files changed, 32 insertions(+), 12 deletions(-)
+Leela Krishna Amudala (1):
+       ARM: EXYNOS: Add bus clock for FIMD
+
+Sachin Kamat (2):
+       ARM: EXYNOS: Fix incorrect help text
+       ARM: SAMSUNG: Fix HDMI related warnings
+
+Sylwester Nawrocki (1):
+       ARM: S3C24XX: Add .get_rate callback for "camif-upll" clock
+
+  arch/arm/mach-exynos/Kconfig          |    4 ++--
+  arch/arm/mach-exynos/clock-exynos4.c  |   31 
++++++++++++++++++++++++++++++++
+  arch/arm/mach-exynos/clock-exynos5.c  |   32 
+++++++++++++++++++++++----------
+  arch/arm/mach-s3c24xx/clock-s3c2440.c |   14 ++++++++++++++
+  arch/arm/plat-samsung/clock.c         |    8 ++++----
+  arch/arm/plat-samsung/devs.c          |    3 ++-
+  6 files changed, 75 insertions(+), 17 deletions(-)
