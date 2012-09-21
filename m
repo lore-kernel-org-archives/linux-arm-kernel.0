@@ -1,314 +1,103 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 21 Sep 2012 16:22:54 +0200
-Subject: [RFC PATCH 3/6] pinctrl: exynos: Use one IRQ domain per pin bank
+Date: Fri, 21 Sep 2012 16:22:55 +0200
+Subject: [RFC PATCH 4/6] pinctrl: samsung: Do not pass gpio_chip to
+ pin_to_reg_bank
 In-Reply-To: <1348237377-21299-1-git-send-email-t.figa@samsung.com>
 References: <1348237377-21299-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1348237377-21299-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1348237377-21299-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of registering one IRQ domain for all pin banks of a pin
-controller, this patch implements registration of per-bank domains.
+The pointer to gpio_chip passed to pin_to_reg_bank utility function is
+used only to retrieve a pointer to samsung_pinctrl_drv_data structure.
 
-At a cost of a little memory overhead (~2.5KiB for all GPIO interrupts
-of Exynos4x12) it simplifies driver code and device tree sources,
-because GPIO interrupts can be now specified per banks.
-
-Example:
-	device {
-		/* ... */
-		interrupt-parent = <&gpa1>;
-		interrupts = <3 0>;
-		/* ... */
-	};
+This patch modifies the function and its users to pass a pointer to
+samsung_pinctrl_drv_data directly.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/pinctrl/pinctrl-exynos.c  | 118 +++++++++++---------------------------
- drivers/pinctrl/pinctrl-exynos.h  |  12 ----
- drivers/pinctrl/pinctrl-samsung.c |   4 +-
- drivers/pinctrl/pinctrl-samsung.h |   5 +-
- 4 files changed, 37 insertions(+), 102 deletions(-)
+ drivers/pinctrl/pinctrl-samsung.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 340bfc2..2f8427f 100644
---- a/drivers/pinctrl/pinctrl-exynos.c
-+++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -40,46 +40,46 @@ static const struct of_device_id exynos_wkup_irq_ids[] = {
- 
- static void exynos_gpio_irq_unmask(struct irq_data *irqd)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	unsigned long reg_mask = d->ctrl->geint_mask + edata->eint_offset;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_handler_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = irq_data_get_irq_chip_data(irqd);
-+	unsigned long reg_mask = d->ctrl->geint_mask + bank->eint_offset;
- 	unsigned long mask;
- 
- 	mask = readl(d->virt_base + reg_mask);
--	mask &= ~(1 << edata->pin);
-+	mask &= ~(1 << irqd->hwirq);
- 	writel(mask, d->virt_base + reg_mask);
- }
- 
- static void exynos_gpio_irq_mask(struct irq_data *irqd)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	unsigned long reg_mask = d->ctrl->geint_mask + edata->eint_offset;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_handler_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = irq_data_get_irq_chip_data(irqd);
-+	unsigned long reg_mask = d->ctrl->geint_mask + bank->eint_offset;
- 	unsigned long mask;
- 
- 	mask = readl(d->virt_base + reg_mask);
--	mask |= 1 << edata->pin;
-+	mask |= 1 << irqd->hwirq;
- 	writel(mask, d->virt_base + reg_mask);
- }
- 
- static void exynos_gpio_irq_ack(struct irq_data *irqd)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	unsigned long reg_pend = d->ctrl->geint_pend + edata->eint_offset;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_handler_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = irq_data_get_irq_chip_data(irqd);
-+	unsigned long reg_pend = d->ctrl->geint_pend + bank->eint_offset;
- 
--	writel(1 << edata->pin, d->virt_base + reg_pend);
-+	writel(1 << irqd->hwirq, d->virt_base + reg_pend);
- }
- 
- static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_handler_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = irq_data_get_irq_chip_data(irqd);
- 	struct samsung_pin_ctrl *ctrl = d->ctrl;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	struct samsung_pin_bank *bank = edata->bank;
--	unsigned int shift = EXYNOS_EINT_CON_LEN * edata->pin;
-+	unsigned int pin = irqd->hwirq;
-+	unsigned int shift = EXYNOS_EINT_CON_LEN * pin;
- 	unsigned int con, trig_type;
--	unsigned long reg_con = ctrl->geint_con + edata->eint_offset;
-+	unsigned long reg_con = ctrl->geint_con + bank->eint_offset;
- 	unsigned int mask;
- 
- 	switch (type) {
-@@ -114,7 +114,7 @@ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	writel(con, d->virt_base + reg_con);
- 
- 	reg_con = bank->pctl_offset;
--	shift = edata->pin * bank->func_width;
-+	shift = pin * bank->func_width;
- 	mask = (1 << bank->func_width) - 1;
- 
- 	con = readl(d->virt_base + reg_con);
-@@ -136,81 +136,24 @@ static struct irq_chip exynos_gpio_irq_chip = {
- 	.irq_set_type	= exynos_gpio_irq_set_type,
- };
- 
--/*
-- * given a controller-local external gpio interrupt number, prepare the handler
-- * data for it.
-- */
--static struct exynos_geint_data *exynos_get_eint_data(irq_hw_number_t hw,
--				struct samsung_pinctrl_drv_data *d)
--{
--	struct samsung_pin_bank *bank = d->ctrl->pin_banks;
--	struct exynos_geint_data *eint_data;
--	unsigned int nr_banks = d->ctrl->nr_banks, idx;
--	unsigned int irq_base = 0;
--
--	if (hw >= d->ctrl->nr_gint) {
--		dev_err(d->dev, "unsupported ext-gpio interrupt\n");
--		return NULL;
--	}
--
--	for (idx = 0; idx < nr_banks; idx++, bank++) {
--		if (bank->eint_type != EINT_TYPE_GPIO)
--			continue;
--		if ((hw >= irq_base) && (hw < (irq_base + bank->nr_pins)))
--			break;
--		irq_base += bank->nr_pins;
--	}
--
--	if (idx == nr_banks) {
--		dev_err(d->dev, "pin bank not found for ext-gpio interrupt\n");
--		return NULL;
--	}
--
--	eint_data = devm_kzalloc(d->dev, sizeof(*eint_data), GFP_KERNEL);
--	if (!eint_data) {
--		dev_err(d->dev, "no memory for eint-gpio data\n");
--		return NULL;
--	}
--
--	eint_data->bank	= bank;
--	eint_data->pin = hw - irq_base;
--	eint_data->eint_offset = bank->eint_offset;
--	return eint_data;
--}
--
- static int exynos_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 					irq_hw_number_t hw)
- {
--	struct samsung_pinctrl_drv_data *d = h->host_data;
--	struct exynos_geint_data *eint_data;
-+	struct samsung_pin_bank *b = h->host_data;
- 
--	eint_data = exynos_get_eint_data(hw, d);
--	if (!eint_data)
--		return -EINVAL;
--
--	irq_set_handler_data(virq, eint_data);
--	irq_set_chip_data(virq, h->host_data);
-+	irq_set_handler_data(virq, b);
-+	irq_set_chip_data(virq, b->drvdata);
- 	irq_set_chip_and_handler(virq, &exynos_gpio_irq_chip,
- 					handle_level_irq);
- 	set_irq_flags(virq, IRQF_VALID);
- 	return 0;
- }
- 
--static void exynos_gpio_irq_unmap(struct irq_domain *h, unsigned int virq)
--{
--	struct samsung_pinctrl_drv_data *d = h->host_data;
--	struct exynos_geint_data *eint_data;
--
--	eint_data = irq_get_handler_data(virq);
--	devm_kfree(d->dev, eint_data);
--}
--
- /*
-  * irq domain callbacks for external gpio interrupt controller.
-  */
- static const struct irq_domain_ops exynos_gpio_irqd_ops = {
- 	.map	= exynos_gpio_irq_map,
--	.unmap	= exynos_gpio_irq_unmap,
- 	.xlate	= irq_domain_xlate_twocell,
- };
- 
-@@ -229,7 +172,7 @@ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
- 		return IRQ_HANDLED;
- 	bank += (group - 1);
- 
--	virq = irq_linear_revmap(d->gpio_irqd, bank->irq_base + pin);
-+	virq = irq_linear_revmap(bank->gpio_irqd, pin);
- 	if (!virq)
- 		return IRQ_NONE;
- 	generic_handle_irq(virq);
-@@ -242,8 +185,10 @@ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
-  */
- static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
- {
-+	struct samsung_pin_bank *bank;
- 	struct device *dev = d->dev;
- 	unsigned int ret;
-+	unsigned int i;
- 
- 	if (!d->irq) {
- 		dev_err(dev, "irq number not available\n");
-@@ -257,11 +202,16 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
- 		return -ENXIO;
- 	}
- 
--	d->gpio_irqd = irq_domain_add_linear(dev->of_node, d->ctrl->nr_gint,
--				&exynos_gpio_irqd_ops, d);
--	if (!d->gpio_irqd) {
--		dev_err(dev, "gpio irq domain allocation failed\n");
--		return -ENXIO;
-+	bank = d->ctrl->pin_banks;
-+	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
-+		if (bank->eint_type != EINT_TYPE_GPIO)
-+			continue;
-+		bank->gpio_irqd = irq_domain_add_linear(bank->of_node,
-+				bank->nr_pins, &exynos_gpio_irqd_ops, bank);
-+		if (!bank->gpio_irqd) {
-+			dev_err(dev, "gpio irq domain add failed\n");
-+			return -ENXIO;
-+		}
- 	}
- 
- 	return 0;
-diff --git a/drivers/pinctrl/pinctrl-exynos.h b/drivers/pinctrl/pinctrl-exynos.h
-index a72cfc7..30aca2b 100644
---- a/drivers/pinctrl/pinctrl-exynos.h
-+++ b/drivers/pinctrl/pinctrl-exynos.h
-@@ -38,18 +38,6 @@
- #define EXYNOS_EINT_MAX_PER_BANK	8
- 
- /**
-- * struct exynos_geint_data: gpio eint specific data for irq_chip callbacks.
-- * @bank: pin bank from which this gpio interrupt originates.
-- * @pin: pin number within the bank.
-- * @eint_offset: offset to be added to the con/pend/mask register bank base.
-- */
--struct exynos_geint_data {
--	struct samsung_pin_bank	*bank;
--	u32			pin;
--	u32			eint_offset;
--};
--
--/**
-  * struct exynos_weint_data: irq specific data for all the wakeup interrupts
-  * generated by the external wakeup interrupt controller.
-  * @domain: irq domain representing the external wakeup interrupts
 diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 3f48d3f..a6c219a 100644
+index a6c219a..eadcef7 100644
 --- a/drivers/pinctrl/pinctrl-samsung.c
 +++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -899,10 +899,8 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
- 		b->drvdata = d;
- 		b->pin_base = ctrl->nr_pins;
- 		ctrl->nr_pins += b->nr_pins;
--		if (of_find_property(bank_np, "interrupt-controller", NULL)) {
--			b->irq_base = eint_cnt;
-+		if (of_find_property(bank_np, "interrupt-controller", NULL))
- 			eint_cnt += b->nr_pins;
--		}
- 		++b;
- 	}
- 
-diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index 9e30081..7dbdef9 100644
---- a/drivers/pinctrl/pinctrl-samsung.h
-+++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -109,10 +109,10 @@ struct samsung_pinctrl_drv_data;
-  * @conpdn_width: width of the sleep mode function selector bin field.
-  * @pudpdn_width: width of the sleep mode pull up/down selector bit field.
-  * @eint_type: type of the external interrupt supported by the bank.
-- * @irq_base: starting controller local irq number of the bank.
-  * @name: name to be prefixed for each pin in this pin bank.
-  * @of_node: node of pin bank in device tree
-  * @drvdata: link to controller driver data
-+ * @gpio_irqd: GPIO IRQ domain of pin bank
+@@ -255,14 +255,12 @@ static int samsung_pinmux_get_groups(struct pinctrl_dev *pctldev,
+  * given a pin number that is local to a pin controller, find out the pin bank
+  * and the register base of the pin bank.
   */
- struct samsung_pin_bank {
- 	u32		pctl_offset;
-@@ -125,11 +125,11 @@ struct samsung_pin_bank {
- 	u8		pudpdn_width;
- 	enum eint_type	eint_type;
- 	u32		eint_offset;
--	u32		irq_base;
- 	const char	*name;
+-static void pin_to_reg_bank(struct gpio_chip *gc, unsigned pin,
+-			void __iomem **reg, u32 *offset,
++static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
++			unsigned pin, void __iomem **reg, u32 *offset,
+ 			struct samsung_pin_bank **bank)
+ {
+-	struct samsung_pinctrl_drv_data *drvdata;
+ 	struct samsung_pin_bank *b;
  
- 	struct device_node *of_node;
- 	struct samsung_pinctrl_drv_data *drvdata;
-+	struct irq_domain *gpio_irqd;
- };
+-	drvdata = dev_get_drvdata(gc->dev);
+ 	b = drvdata->ctrl->pin_banks;
  
- /**
-@@ -218,7 +218,6 @@ struct samsung_pinctrl_drv_data {
- 	const struct samsung_pmx_func	*pmx_functions;
- 	unsigned int			nr_functions;
+ 	while ((pin >= b->pin_base) &&
+@@ -297,7 +295,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
+ 	 * pin function number in the config register.
+ 	 */
+ 	for (cnt = 0; cnt < drvdata->pin_groups[group].num_pins; cnt++) {
+-		pin_to_reg_bank(drvdata->gc, pins[cnt] - drvdata->ctrl->base,
++		pin_to_reg_bank(drvdata, pins[cnt] - drvdata->ctrl->base,
+ 				&reg, &pin_offset, &bank);
+ 		mask = (1 << bank->func_width) - 1;
+ 		shift = pin_offset * bank->func_width;
+@@ -334,10 +332,13 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 		struct pinctrl_gpio_range *range, unsigned offset, bool input)
+ {
+ 	struct samsung_pin_bank *bank;
++	struct samsung_pinctrl_drv_data *drvdata;
+ 	void __iomem *reg;
+ 	u32 data, pin_offset, mask, shift;
  
--	struct irq_domain		*gpio_irqd;
- 	struct irq_domain		*wkup_irqd;
+-	pin_to_reg_bank(range->gc, offset, &reg, &pin_offset, &bank);
++	drvdata = pinctrl_dev_get_drvdata(pctldev);
++
++	pin_to_reg_bank(drvdata, offset, &reg, &pin_offset, &bank);
+ 	mask = (1 << bank->func_width) - 1;
+ 	shift = pin_offset * bank->func_width;
  
- 	struct gpio_chip		*gc;
+@@ -371,7 +372,7 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
+ 	u32 cfg_value, cfg_reg;
+ 
+ 	drvdata = pinctrl_dev_get_drvdata(pctldev);
+-	pin_to_reg_bank(drvdata->gc, pin - drvdata->ctrl->base, &reg_base,
++	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base, &reg_base,
+ 					&pin_offset, &bank);
+ 
+ 	switch (cfg_type) {
+@@ -470,8 +471,11 @@ static void samsung_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
+ {
+ 	void __iomem *reg;
+ 	u32 pin_offset, data;
++	struct samsung_pinctrl_drv_data *drvdata;
+ 
+-	pin_to_reg_bank(gc, offset, &reg, &pin_offset, NULL);
++	drvdata = dev_get_drvdata(gc->dev);
++
++	pin_to_reg_bank(drvdata, offset, &reg, &pin_offset, NULL);
+ 	data = readl(reg + DAT_REG);
+ 	data &= ~(1 << pin_offset);
+ 	if (value)
+@@ -484,8 +488,11 @@ static int samsung_gpio_get(struct gpio_chip *gc, unsigned offset)
+ {
+ 	void __iomem *reg;
+ 	u32 pin_offset, data;
++	struct samsung_pinctrl_drv_data *drvdata;
++
++	drvdata = dev_get_drvdata(gc->dev);
+ 
+-	pin_to_reg_bank(gc, offset, &reg, &pin_offset, NULL);
++	pin_to_reg_bank(drvdata, offset, &reg, &pin_offset, NULL);
+ 	data = readl(reg + DAT_REG);
+ 	data >>= pin_offset;
+ 	data &= 1;
 -- 
 1.7.12
