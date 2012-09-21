@@ -1,59 +1,57 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Fri, 21 Sep 2012 17:09:56 +0530
-Subject: [PATCH] serial: omap: fix the overrun case
-In-Reply-To: <20120921110050.GC16003@arwen.pp.htv.fi>
-References: <1348222976-7241-1-git-send-email-shubhrajyoti@ti.com>
- <20120921110050.GC16003@arwen.pp.htv.fi>
-Message-ID: <CAKdam55VG8KTRZNvPgur9M-wkbD7wyJt27Jsvks=r4PNiuEGaQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 21 Sep 2012 13:43:45 +0200
+Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to amba-clcd
+ driver
+In-Reply-To: <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
+References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
+ <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
+Message-ID: <20120921114345.GE24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Wed, Sep 19, 2012 at 05:04:24PM +0100, Ryan Harkin wrote:
+> Add support to parse the display configuration from device tree.
+> 
+> If the board does not provide platform specific functions in the struct
+> clcd_board contained with the amba device info, then defaults are provided
+> by the driver.
+> 
+> The device tree configuration can either ask for a DMA setup or provide a
+> framebuffer address to be remapped into the driver.
+> 
+> Signed-off-by: Ryan Harkin <ryan.harkin@linaro.org>
+> ---
 
-On Fri, Sep 21, 2012 at 4:30 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Fri, Sep 21, 2012 at 03:52:56PM +0530, Shubhrajyoti D wrote:
->> Overrun also causes an internal flag to be set, which disables further
->> reception. Before the next frame can
->> be received, the MPU must:
->> ? Reset the RX FIFO.
->> ? clear the internal flag.
->>
->> In the uart mode a dummy read is needed. Add the same.
->
-> Very nice patch but I think commit log can be a bit more verbose.
->
-> Please make the problem a little clearer. Why do we even get that
-> interrupt fired if BRK_ERROR_BITS aren't set ?
->
-According to LSR registers, there are few other bits like RX_FIFO_E( atleast 1
-character in RX_FIFO or TX FIFO Empty), which might be the cause of an
-interrupt. ?
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->> ---
->> - functional testing on omap4sdp
->> - Verified idle and suspend path hits off on beagle.
->>
->>  drivers/tty/serial/omap-serial.c |    7 +++++++
->>  1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
->> index a0d4460..bc22a2b 100644
->> --- a/drivers/tty/serial/omap-serial.c
->> +++ b/drivers/tty/serial/omap-serial.c
->> @@ -334,6 +334,13 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
->>  static void serial_omap_rlsi(struct uart_omap_port *up, unsigned int lsr)
->>  {
->>       unsigned int flag;
->> +     unsigned char ch = 0;
->> +
->> +     if (!(lsr & UART_LSR_BRK_ERROR_BITS))
->> +             return;
->> +
->> +     if (likely(lsr & UART_LSR_DR))
->> +             ch = serial_in(up, UART_RX);
->
-> Maybe add a comment before this condition stating why this character
-> read is necessary ?
->
-> --
-> balbi
+[...]
+
+> +
+> +struct clcd_panel *getPanel(struct device_node *node)
+> +{
+> +	static struct clcd_panel panel;
+> +
+> +	panel.mode.refresh      = get_val(node, "refresh");
+> +	panel.mode.xres         = get_val(node, "xres");
+> +	panel.mode.yres         = get_val(node, "yres");
+> +	panel.mode.pixclock     = get_val(node, "pixclock");
+> +	panel.mode.left_margin  = get_val(node, "left_margin");
+> +	panel.mode.right_margin = get_val(node, "right_margin");
+> +	panel.mode.upper_margin = get_val(node, "upper_margin");
+> +	panel.mode.lower_margin = get_val(node, "lower_margin");
+> +	panel.mode.hsync_len    = get_val(node, "hsync_len");
+> +	panel.mode.vsync_len    = get_val(node, "vsync_len");
+> +	panel.mode.sync         = get_val(node, "sync");
+
+We are currently discussing a common panel description for the
+devicetree. You are invited to join in here:
+
+http://comments.gmane.org/gmane.linux.drivers.devicetree/21386
+
+We shouldn't add any more device specific panel descriptions.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
