@@ -1,24 +1,126 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 20 Sep 2012 22:22:21 -0400 (EDT)
-Subject: [PATCH] at91ether: return PTR_ERR if call to clk_get fails
-In-Reply-To: <505AC8D6.5080404@atmel.com>
-References: <1348124676-6627-1-git-send-email-devendra.aaru@gmail.com>
- <505AC8D6.5080404@atmel.com>
-Message-ID: <20120920.222221.1362666243095294465.davem@davemloft.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 20 Sep 2012 19:26:49 -0700
+Subject: [PATCH 01/10] usb: otg: msm: Convert to clk_prepare/unprepare
+In-Reply-To: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
+References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1348194419-11486-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Thu, 20 Sep 2012 09:42:14 +0200
+Add calls to clk_prepare and unprepare so that MSM can migrate to
+the common clock framework.
 
-> On 09/20/2012 09:04 AM, Devendra Naga :
->> we are currently returning ENODEV, as the clk_get may give a exact
->> error code in its returned pointer, assign it to the ret by using the
->> PTR_ERR function, so that the subsequent goto label will jump to the
->> error path and clean the driver and return the error correctly.
->> 
->> Signed-off-by: Devendra Naga <devendra.aaru@gmail.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/usb/otg/msm_otg.c | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
 
-Applied, thanks.
+diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
+index 9f5fc90..2ae0639 100644
+--- a/drivers/usb/otg/msm_otg.c
++++ b/drivers/usb/otg/msm_otg.c
+@@ -514,13 +514,13 @@ static int msm_otg_suspend(struct msm_otg *motg)
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL)
+ 		writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
+ 
+-	clk_disable(motg->pclk);
+-	clk_disable(motg->clk);
++	clk_disable_unprepare(motg->pclk);
++	clk_disable_unprepare(motg->clk);
+ 	if (motg->core_clk)
+-		clk_disable(motg->core_clk);
++		clk_disable_unprepare(motg->core_clk);
+ 
+ 	if (!IS_ERR(motg->pclk_src))
+-		clk_disable(motg->pclk_src);
++		clk_disable_unprepare(motg->pclk_src);
+ 
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+@@ -552,12 +552,12 @@ static int msm_otg_resume(struct msm_otg *motg)
+ 		return 0;
+ 
+ 	if (!IS_ERR(motg->pclk_src))
+-		clk_enable(motg->pclk_src);
++		clk_prepare_enable(motg->pclk_src);
+ 
+-	clk_enable(motg->pclk);
+-	clk_enable(motg->clk);
++	clk_prepare_enable(motg->pclk);
++	clk_prepare_enable(motg->clk);
+ 	if (motg->core_clk)
+-		clk_enable(motg->core_clk);
++		clk_prepare_enable(motg->core_clk);
+ 
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+@@ -1468,7 +1468,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 		if (IS_ERR(motg->pclk_src))
+ 			goto put_clk;
+ 		clk_set_rate(motg->pclk_src, INT_MAX);
+-		clk_enable(motg->pclk_src);
++		clk_prepare_enable(motg->pclk_src);
+ 	} else
+ 		motg->pclk_src = ERR_PTR(-ENOENT);
+ 
+@@ -1511,8 +1511,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 		goto free_regs;
+ 	}
+ 
+-	clk_enable(motg->clk);
+-	clk_enable(motg->pclk);
++	clk_prepare_enable(motg->clk);
++	clk_prepare_enable(motg->pclk);
+ 
+ 	ret = msm_hsusb_init_vddcx(motg, 1);
+ 	if (ret) {
+@@ -1532,7 +1532,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (motg->core_clk)
+-		clk_enable(motg->core_clk);
++		clk_prepare_enable(motg->core_clk);
+ 
+ 	writel(0, USB_USBINTR);
+ 	writel(0, USB_OTGSC);
+@@ -1579,8 +1579,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ free_irq:
+ 	free_irq(motg->irq, motg);
+ disable_clks:
+-	clk_disable(motg->pclk);
+-	clk_disable(motg->clk);
++	clk_disable_unprepare(motg->pclk);
++	clk_disable_unprepare(motg->clk);
+ ldo_exit:
+ 	msm_hsusb_ldo_init(motg, 0);
+ vddcx_exit:
+@@ -1593,7 +1593,7 @@ put_core_clk:
+ 	clk_put(motg->pclk);
+ put_pclk_src:
+ 	if (!IS_ERR(motg->pclk_src)) {
+-		clk_disable(motg->pclk_src);
++		clk_disable_unprepare(motg->pclk_src);
+ 		clk_put(motg->pclk_src);
+ 	}
+ put_clk:
+@@ -1643,12 +1643,12 @@ static int __devexit msm_otg_remove(struct platform_device *pdev)
+ 	if (cnt >= PHY_SUSPEND_TIMEOUT_USEC)
+ 		dev_err(phy->dev, "Unable to suspend PHY\n");
+ 
+-	clk_disable(motg->pclk);
+-	clk_disable(motg->clk);
++	clk_disable_unprepare(motg->pclk);
++	clk_disable_unprepare(motg->clk);
+ 	if (motg->core_clk)
+-		clk_disable(motg->core_clk);
++		clk_disable_unprepare(motg->core_clk);
+ 	if (!IS_ERR(motg->pclk_src)) {
+-		clk_disable(motg->pclk_src);
++		clk_disable_unprepare(motg->pclk_src);
+ 		clk_put(motg->pclk_src);
+ 	}
+ 	msm_hsusb_ldo_init(motg, 0);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
