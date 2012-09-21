@@ -1,64 +1,45 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 21 Sep 2012 14:37:29 -0400
-Subject: [RFC PATCH 10/13] spi: omap2-mcspi: dma_request_slave_channel()
- support for DT platforms
-In-Reply-To: <20120921154247.GZ28835@atomide.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-11-git-send-email-mporter@ti.com>
- <20120920220931.GJ28835@atomide.com>
- <201209210816.01473.arnd@arndb.de>
- <20120921154247.GZ28835@atomide.com>
-Message-ID: <20120921183729.GI16522@beef>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Sep 2012 12:40:35 -0600
+Subject: [RFC 0/6] pinctrl: samsung: Remove static platform-specific data
+In-Reply-To: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
+References: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
+Message-ID: <505CB4A3.9050707@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 08:42:47AM -0700, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [120921 02:19]:
-> > On Thursday 20 September 2012, Tony Lindgren wrote:
-> > > >  /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-> > > > @@ -798,14 +801,26 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
-> > > >       dma_cap_zero(mask);
-> > > >       dma_cap_set(DMA_SLAVE, mask);
-> > > >       sig = mcspi_dma->dma_rx_sync_dev;
-> > > > -     mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > > > +     if (spi->dev.of_node)
-> > > > +             mcspi_dma->dma_rx =
-> > > > +                     dma_request_slave_channel(&master->dev,
-> > > > +                                               mcspi_dma->dma_rx_ch_name);
-> > > > +     else
-> > > > +             mcspi_dma->dma_rx =
-> > > > +                     dma_request_channel(mask, omap_dma_filter_fn, &sig);
-> > > >       if (!mcspi_dma->dma_rx) {
-> > > >               dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
-> > > >               return -EAGAIN;
-> > > >       }
-> > > >  
-> > > 
-> > > Hmm this does not look nice.. We should be able to somehow not to care about
-> > > the configuration at the mcspi driver level.
-> > 
-> > I agree, but as far as I understand Vinod's plans, we would actually move
-> > all drivers over to dma_request_slave_channel() when we have an interface
-> > to register the lookup tables from platform code.
-> > 
-> > I think the above is ok for a transitional phase and we can remove the
-> > fallback path when we have converted all platforms using this driver
-> > to either use DT or move to the new style way of passing the channel
-> > configuration.
-> 
-> Can't we come up with a version of dma_request_slave_channel that works
-> both ways for now:
-> 
-> 	mcspi_dma->dma_rx =
-> 		dma_request_slave_channel_compat(mask, omap_dma_filter_fn, &sig,
-> 					&master->dev, mcspi_dma->dma_rx_ch_name);
-> 	...			
-> 
-> Then it's just question of patching away two lines later on rather than
-> having to add all this if else to all the drivers first, then patching
-> it away again.
+On 09/20/2012 02:53 AM, Tomasz Figa wrote:
+> This RFC series is a work on replacing static platform-specific data in
+> pinctrl-samsung driver with data dynamically parsed from device tree.
 
-I think that something like that is workable with the implementation
-simply checking for of_node to do the right thing.
+Hmm. I tend to think this is exactly the opposite of the correct
+direction; you end up wasting a whole ton of time during the boot
+process parsing data out of the device tree only to end up with exactly
+the same tables that you would have just put into the kernel anyway. Is
+it really likely that future SoCs will change information such as the
+width of the pullup/pulldown bitfield, but not change anything else
+that's not already in this binding. If that isn't the case, the binding
+won't be complete enough to describe any new features on future SoCs anyway.
 
--Matt
+> It aims at reducing the SoC-specific part of the driver and thus the
+> amount of modifications to driver sources when adding support for next
+> SoCs (like Exynos4x12).
+> 
+> Furthermore, moving definitions of pin banks to device tree will allow
+> to simplify GPIO and GEINT specification to a format similar to used
+> previously by gpiolib-based implementation, using a phandle to the bank
+> and pin index inside the bank, e.g.
+> 	gpios = <&gpa1 4 0>;
+> 	interrupt-parent = <&gpa1>;
+> 	interrupts = <4 0>;
+
+I don't think those two are correlated; the GPIO specifier format could
+just as easily be <bank pin> irrespective of whether the pinctrl driver
+contains SoC-specific tables or not.
+
+> Any comments are welcome.
+> 
+> TODO:
+>  - bindings documentation
+
+That's unfortunate; it would be the most interesting part to review. I
+guess I'll try to work out the binding from the examples in patch 6.
