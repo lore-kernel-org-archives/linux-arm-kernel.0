@@ -1,30 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 21 Sep 2012 21:00:02 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120816202932.GY2232@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120816202932.GY2232@pengutronix.de>
-Message-ID: <20120921190002.GU5525@pengutronix.de>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 21 Sep 2012 15:03:12 -0400
+Subject: [RFC PATCH 08/13] mmc: omap_hsmmc: limit max_segs with the EDMA
+ DMAC
+In-Reply-To: <20120921184721.GD31374@n2100.arm.linux.org.uk>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+ <1348152226-13588-9-git-send-email-mporter@ti.com>
+ <CANfBPZ81anOy8fWgKM1PgCtB4V2pEp2x1Qi4x1uPsq7QieMN5g@mail.gmail.com>
+ <20120921184721.GD31374@n2100.arm.linux.org.uk>
+Message-ID: <20120921190312.GL16522@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Sep 21, 2012 at 07:47:21PM +0100, Russell King wrote:
+> On Fri, Sep 21, 2012 at 10:45:29PM +0530, S, Venkatraman wrote:
+> > On Thu, Sep 20, 2012 at 8:13 PM, Matt Porter <mporter@ti.com> wrote:
+> > > The EDMA DMAC has a hardware limitation that prevents supporting
+> > > scatter gather lists with any number of segments. Since the EDMA
+> > > DMA Engine driver sets the maximum segments to 16, we do the
+> > > same.
+> > >
+> > > Note: this can be removed once the DMA Engine API supports an
+> > > API to query the DMAC's segment limitations.
+> > >
+> > 
+> > I wouldn't want to bind the properties of EDMA to omap_hsmmc as this patch
+> > suggests. Why don't we have a max_segs property, which when explicitly specified
+> > in DT, will override the default ?
+> 
+> Why not have a generic way that DMA engine can export these kinds of
+> properties?
 
-On Thu, Aug 16, 2012 at 10:29:32PM +0200, Uwe Kleine-K?nig wrote:
-> On Fri, Aug 03, 2012 at 12:10:11PM +0200, Uwe Kleine-K?nig wrote:
-> > the only changes compared to v5 (sent starting with Message-id:
-> > 1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
-> > are that several debug pr_infos were dropped that I missed to remove
-> > before. Thanks to Will Deacon for pointing out that problem.
-> > Furthermore I rebased (trivially) to v3.5.
-> Any feedback from your side? It would be great to get this in for 3.7
-> with some time in next before.
-What must happen to get some feed back? Is it worth to assert the stuff
-still works with 3.6-rc6?
+That's exactly what my note above is suggesting...
 
-Best regards
-Uwe
+Something along the lines of:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	struct slave_sg_caps
+	{
+		int max_segs;	/* <0 is no limit */
+	}
+
+	struct slave_sg_cap *
+	dmaengine_get_slave_sg_caps(struct dma_chan *chan);
+
+I'm sure there are or will be other characteristics worth providing to
+slave drivers.
+
+-Matt
