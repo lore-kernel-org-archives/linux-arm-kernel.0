@@ -1,46 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 21 Sep 2012 15:07:53 +0300
-Subject: [PATCH] serial: omap: fix the overrun case
-In-Reply-To: <CAKdam55VG8KTRZNvPgur9M-wkbD7wyJt27Jsvks=r4PNiuEGaQ@mail.gmail.com>
-References: <1348222976-7241-1-git-send-email-shubhrajyoti@ti.com>
- <20120921110050.GC16003@arwen.pp.htv.fi>
- <CAKdam55VG8KTRZNvPgur9M-wkbD7wyJt27Jsvks=r4PNiuEGaQ@mail.gmail.com>
-Message-ID: <20120921120752.GG16003@arwen.pp.htv.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Sep 2012 13:19:03 +0100
+Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to
+ amba-clcd driver
+In-Reply-To: <20120921114345.GE24458@pengutronix.de>
+References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
+ <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
+ <20120921114345.GE24458@pengutronix.de>
+Message-ID: <20120921121903.GE15609@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 05:09:56PM +0530, Poddar, Sourav wrote:
-> Hi Felipe,
+On Fri, Sep 21, 2012 at 01:43:45PM +0200, Sascha Hauer wrote:
+> We are currently discussing a common panel description for the
+> devicetree. You are invited to join in here:
 > 
-> On Fri, Sep 21, 2012 at 4:30 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Fri, Sep 21, 2012 at 03:52:56PM +0530, Shubhrajyoti D wrote:
-> >> Overrun also causes an internal flag to be set, which disables further
-> >> reception. Before the next frame can
-> >> be received, the MPU must:
-> >> ? Reset the RX FIFO.
-> >> ? clear the internal flag.
-> >>
-> >> In the uart mode a dummy read is needed. Add the same.
-> >
-> > Very nice patch but I think commit log can be a bit more verbose.
-> >
-> > Please make the problem a little clearer. Why do we even get that
-> > interrupt fired if BRK_ERROR_BITS aren't set ?
-> >
-> According to LSR registers, there are few other bits like RX_FIFO_E( atleast 1
-> character in RX_FIFO or TX FIFO Empty), which might be the cause of an
-> interrupt. ?
+> http://comments.gmane.org/gmane.linux.drivers.devicetree/21386
+> 
+> We shouldn't add any more device specific panel descriptions.
 
-right. In that case, is it really correct to just return if
-BRK_ERROR_BITS aren't set ? IRQ line will not toggle and we just might
-end up with an IRQ storm, right ?
+Just make sure that you don't end up encoding in integers in the device
+tree Linux kernel specific bitfields such as the 'sync' property above.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120921/902c7fce/attachment.sig>
+Also, look at how the AMBA CLCD driver handles the panels with its
+capability bitmask for the colour formats - this allows the driver to
+determine what colour formats are supported, and allows platform code
+to work out how to program any MUXes for any particular panel and
+requested colour depth setting.  It also allows figuring out whether
+BGR or RGB format should be used.
+
+This is necessary because of the beweildering array of panels, muxes
+and other funky hardware which ARM Ltd like to put into their boards,
+and the fact that the LCDs tend to be entirely separate entities to
+the boards themselves.
