@@ -1,53 +1,390 @@
-From: jrbenito@benito.qsl.br (Josenivaldo Benito Junior)
-Date: Thu, 20 Sep 2012 18:48:21 -0300
-Subject: Adding new board to Kernel
-In-Reply-To: <505AC5D6.8040702@antcom.de>
-References: <CAOYb-CL9WM8wzko7CsQvYAAWKARnTkrqenBtsgchn96t=x4wyg@mail.gmail.com>
- <201209191855.39859.arnd@arndb.de> <505AC5D6.8040702@antcom.de>
-Message-ID: <CAOYb-CKNVLEfvXRW6mMsasDkWmCxVH4cO2b-3bXEm=QDbWrEew@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 21 Sep 2012 10:36:07 +0100
+Subject: [RFC 1/3] ARM: move serial_sa1100.h header file to linux/platform_data
+In-Reply-To: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+Message-ID: <E1TEzeZ-00077r-L1@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I will check that!
+This is really driver platform data, so move it to the appropriate
+directory.
 
-thanks
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/mach/serial_sa1100.h   |   31 -------------------------
+ arch/arm/mach-sa1100/assabet.c              |    2 +-
+ arch/arm/mach-sa1100/badge4.c               |    2 +-
+ arch/arm/mach-sa1100/cerf.c                 |    2 +-
+ arch/arm/mach-sa1100/collie.c               |    2 +-
+ arch/arm/mach-sa1100/h3xxx.c                |    2 +-
+ arch/arm/mach-sa1100/hackkit.c              |    2 +-
+ arch/arm/mach-sa1100/jornada720.c           |    2 +-
+ arch/arm/mach-sa1100/lart.c                 |    2 +-
+ arch/arm/mach-sa1100/nanoengine.c           |    2 +-
+ arch/arm/mach-sa1100/neponset.c             |    2 +-
+ arch/arm/mach-sa1100/pleb.c                 |    2 +-
+ arch/arm/mach-sa1100/shannon.c              |    2 +-
+ arch/arm/mach-sa1100/simpad.c               |    2 +-
+ drivers/tty/serial/sa1100.c                 |    2 +-
+ include/linux/platform_data/sa11x0-serial.h |   33 +++++++++++++++++++++++++++
+ 16 files changed, 47 insertions(+), 45 deletions(-)
+ delete mode 100644 arch/arm/include/asm/mach/serial_sa1100.h
+ create mode 100644 include/linux/platform_data/sa11x0-serial.h
 
---*
-Josenivaldo Benito Jr.*
-*PU2LBD*
-
-*Por Aur?lio Buarque de Hollanda,  elite, do franc?s ?lite, significa ?o
-que h? de melhor em uma sociedade, minoria prestigiada, constitu?da pelos
-indiv?duos mais aptos?.
-
-
-
-On Thu, Sep 20, 2012 at 4:29 AM, Roland Stigge <stigge@antcom.de> wrote:
-
-> Hi,
->
-> On 09/19/2012 08:55 PM, Arnd Bergmann wrote:
-> >> The Embedded Artists has a board based on ARM LPC3250 called EA3250 and
-> >> they provide a BSP with patch to Linux Kernel version 2.6.29.2. I am
-> trying
-> >> to "up merge" this patch to Kernel v3.4 (now 3.5) and after that get it
-> in
-> >> the mainstream. Although I have a working version (
-> >> https://github.com/jrbenito/Kernel-LPC3250) I still have doubts on how
-> to
-> >> correct submit it to mainline kernel.
-> >>
-> >> -The machine type is already registered in past (
-> >> http://www.arm.linux.org.uk/developer/machines/list.php?id=2512) but
-> it is
-> >> not in mainline. Since I shall not patch this file, how can I ask to it
-> be
-> >> updated with ea3250 board information?
->
-> We already have ea3250.dts in mainline since v3.5.
->
-> Roland
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120920/c979272a/attachment-0001.html>
+diff --git a/arch/arm/include/asm/mach/serial_sa1100.h b/arch/arm/include/asm/mach/serial_sa1100.h
+deleted file mode 100644
+index d09064b..0000000
+--- a/arch/arm/include/asm/mach/serial_sa1100.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- *  arch/arm/include/asm/mach/serial_sa1100.h
+- *
+- *  Author: Nicolas Pitre
+- *
+- * Moved and changed lots, Russell King
+- *
+- * Low level machine dependent UART functions.
+- */
+-
+-struct uart_port;
+-struct uart_info;
+-
+-/*
+- * This is a temporary structure for registering these
+- * functions; it is intended to be discarded after boot.
+- */
+-struct sa1100_port_fns {
+-	void	(*set_mctrl)(struct uart_port *, u_int);
+-	u_int	(*get_mctrl)(struct uart_port *);
+-	void	(*pm)(struct uart_port *, u_int, u_int);
+-	int	(*set_wake)(struct uart_port *, u_int);
+-};
+-
+-#ifdef CONFIG_SERIAL_SA1100
+-void sa1100_register_uart_fns(struct sa1100_port_fns *fns);
+-void sa1100_register_uart(int idx, int port);
+-#else
+-#define sa1100_register_uart_fns(fns) do { } while (0)
+-#define sa1100_register_uart(idx,port) do { } while (0)
+-#endif
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index d673211..4a0e6b8 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/errno.h>
+ #include <linux/ioport.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/serial_core.h>
+ #include <linux/mfd/ucb1x00.h>
+ #include <linux/mtd/mtd.h>
+@@ -35,7 +36,6 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/irda.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ #include <mach/assabet.h>
+ #include <mach/mcp.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
+index b30fb99..1d60b7e 100644
+--- a/arch/arm/mach-sa1100/badge4.c
++++ b/arch/arm/mach-sa1100/badge4.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/tty.h>
+@@ -32,7 +33,6 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ #include <asm/hardware/sa1111.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <mach/badge4.h>
+ 
+diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
+index 09d7f4b..1e03937 100644
+--- a/arch/arm/mach-sa1100/cerf.c
++++ b/arch/arm/mach-sa1100/cerf.c
+@@ -13,6 +13,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/tty.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/irq.h>
+ #include <linux/mtd/mtd.h>
+@@ -25,7 +26,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <mach/cerf.h>
+ #include <mach/mcp.h>
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index ea5cff3..5d1e10c 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -21,6 +21,7 @@
+ #include <linux/kernel.h>
+ #include <linux/tty.h>
+ #include <linux/delay.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/ucb1x00.h>
+ #include <linux/mtd/mtd.h>
+@@ -40,7 +41,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <asm/hardware/scoop.h>
+ #include <asm/mach/sharpsl_param.h>
+diff --git a/arch/arm/mach-sa1100/h3xxx.c b/arch/arm/mach-sa1100/h3xxx.c
+index 63150e1..f17e738 100644
+--- a/arch/arm/mach-sa1100/h3xxx.c
++++ b/arch/arm/mach-sa1100/h3xxx.c
+@@ -17,12 +17,12 @@
+ #include <linux/mfd/htc-egpio.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/serial_core.h>
+ 
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <mach/h3xxx.h>
+ 
+diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
+index 7f86bd9..2da6d08 100644
+--- a/arch/arm/mach-sa1100/hackkit.c
++++ b/arch/arm/mach-sa1100/hackkit.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/errno.h>
+ #include <linux/cpufreq.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/serial_core.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -31,7 +32,6 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+index e3084f4..35cfc42 100644
+--- a/arch/arm/mach-sa1100/jornada720.c
++++ b/arch/arm/mach-sa1100/jornada720.c
+@@ -17,6 +17,7 @@
+ #include <linux/kernel.h>
+ #include <linux/tty.h>
+ #include <linux/delay.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/ioport.h>
+ #include <linux/mtd/mtd.h>
+@@ -30,7 +31,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
+index b775a0a..39aed9b 100644
+--- a/arch/arm/mach-sa1100/lart.c
++++ b/arch/arm/mach-sa1100/lart.c
+@@ -4,6 +4,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/tty.h>
+ 
+ #include <video/sa1100fb.h>
+@@ -15,7 +16,6 @@
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ #include <mach/mcp.h>
+ #include <mach/irqs.h>
+ 
+diff --git a/arch/arm/mach-sa1100/nanoengine.c b/arch/arm/mach-sa1100/nanoengine.c
+index 41f69d9..102e08f 100644
+--- a/arch/arm/mach-sa1100/nanoengine.c
++++ b/arch/arm/mach-sa1100/nanoengine.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/root_dev.h>
+@@ -24,7 +25,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/nanoengine.h>
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index 266db87..88be047 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -7,6 +7,7 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
+ #include <linux/serial_core.h>
+@@ -14,7 +15,6 @@
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ #include <asm/hardware/sa1111.h>
+ #include <asm/sizes.h>
+ 
+diff --git a/arch/arm/mach-sa1100/pleb.c b/arch/arm/mach-sa1100/pleb.c
+index 37fe0a0..c51bb63 100644
+--- a/arch/arm/mach-sa1100/pleb.c
++++ b/arch/arm/mach-sa1100/pleb.c
+@@ -6,6 +6,7 @@
+ #include <linux/kernel.h>
+ #include <linux/tty.h>
+ #include <linux/ioport.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
+@@ -18,7 +19,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/flash.h>
+-#include <asm/mach/serial_sa1100.h>
+ #include <mach/irqs.h>
+ 
+ #include "generic.h"
+diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
+index 5d33fc3..3dd4416 100644
+--- a/arch/arm/mach-sa1100/shannon.c
++++ b/arch/arm/mach-sa1100/shannon.c
+@@ -5,6 +5,7 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/kernel.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/tty.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -18,7 +19,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ #include <mach/mcp.h>
+ #include <mach/shannon.h>
+ #include <mach/irqs.h>
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index fbd5359..c76038e 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -9,6 +9,7 @@
+ #include <linux/proc_fs.h>
+ #include <linux/string.h>
+ #include <linux/pm.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/ucb1x00.h>
+ #include <linux/mtd/mtd.h>
+@@ -23,7 +24,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
+ #include <mach/mcp.h>
+ #include <mach/simpad.h>
+ #include <mach/irqs.h>
+diff --git a/drivers/tty/serial/sa1100.c b/drivers/tty/serial/sa1100.c
+index 2ca5959..ecc1e16 100644
+--- a/drivers/tty/serial/sa1100.c
++++ b/drivers/tty/serial/sa1100.c
+@@ -29,6 +29,7 @@
+ #include <linux/init.h>
+ #include <linux/console.h>
+ #include <linux/sysrq.h>
++#include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/tty.h>
+ #include <linux/tty_flip.h>
+@@ -39,7 +40,6 @@
+ #include <asm/irq.h>
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+-#include <asm/mach/serial_sa1100.h>
+ 
+ /* We've been assigned a range on the "Low-density serial ports" major */
+ #define SERIAL_SA1100_MAJOR	204
+diff --git a/include/linux/platform_data/sa11x0-serial.h b/include/linux/platform_data/sa11x0-serial.h
+new file mode 100644
+index 0000000..4504d5d
+--- /dev/null
++++ b/include/linux/platform_data/sa11x0-serial.h
+@@ -0,0 +1,33 @@
++/*
++ *  Author: Nicolas Pitre
++ *
++ * Moved and changed lots, Russell King
++ *
++ * Low level machine dependent UART functions.
++ */
++#ifndef SA11X0_SERIAL_H
++#define SA11X0_SERIAL_H
++
++struct uart_port;
++struct uart_info;
++
++/*
++ * This is a temporary structure for registering these
++ * functions; it is intended to be discarded after boot.
++ */
++struct sa1100_port_fns {
++	void	(*set_mctrl)(struct uart_port *, u_int);
++	u_int	(*get_mctrl)(struct uart_port *);
++	void	(*pm)(struct uart_port *, u_int, u_int);
++	int	(*set_wake)(struct uart_port *, u_int);
++};
++
++#ifdef CONFIG_SERIAL_SA1100
++void sa1100_register_uart_fns(struct sa1100_port_fns *fns);
++void sa1100_register_uart(int idx, int port);
++#else
++#define sa1100_register_uart_fns(fns) do { } while (0)
++#define sa1100_register_uart(idx,port) do { } while (0)
++#endif
++
++#endif
+-- 
+1.7.4.4
