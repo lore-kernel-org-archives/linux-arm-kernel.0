@@ -1,51 +1,56 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 21 Sep 2012 11:44:06 +0100
-Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to amba-clcd
- driver
-In-Reply-To: <CAD0U-h+Z1zQYTiEm+aKwNJa48SdHfs6-qUu4vNRwFr=mqxyXCg@mail.gmail.com>
-References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
- <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
- <20120920102453.GG32603@e102652-lin.cambridge.arm.com>
- <CAD0U-h+Z1zQYTiEm+aKwNJa48SdHfs6-qUu4vNRwFr=mqxyXCg@mail.gmail.com>
-Message-ID: <1348224246.11116.178.camel@hornet>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 21 Sep 2012 11:56:06 +0100
+Subject: [PATCH v4 03/10] pinctrl: mvebu: kirkwood pinctrl driver
+In-Reply-To: <20120920213636.2ee27d41@skate>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <50559737.8000705@gmail.com>
+ <CACRpkdY-Nyn73EJLvE1RsL4hgMRm6hALtnS-eKAXU7edot2V9A@mail.gmail.com>
+ <201209201530.40974.arnd@arndb.de>
+ <CACRpkdZYr2B83e3mBmMkO8Ai3xU_QGevfbSOSNoTvK3Lz6y6mg@mail.gmail.com>
+ <20120920213636.2ee27d41@skate>
+Message-ID: <505C47C6.3070907@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-21 at 11:35 +0100, Ryan Harkin wrote:
-> Good point.  Sorry for my ignorance, but is there a place I should put
-> such documentation?
+On 20/09/12 20:36, Thomas Petazzoni wrote:
+> Dear Linus Walleij,
+>
+> On Thu, 20 Sep 2012 21:28:20 +0200, Linus Walleij wrote:
+>
+>> So what I'm after is whether in this case statically encoding this
+>> onto the .dtsi files is the right thing to do, or whether the boot loader
+>> or kernel should runtime-modify the device tree, patching in
+>> the ASIC-specific info, just like device tree files can override
+>> properties from include files.
+>>
+>> Or if this is a bad idea.
+>>
+>> Nobody is doing that right now AFAICT, but it is surely possible....
+>
+> If I understand correctly, we would like drivers to be able to read
+> some common "system" registers to figure out which SoC variant we are
+> running on. Such feature should normally be provided by code in
+> arch/arm/mach-*/ and called by drivers, but we are trying to eliminate
+> all dependencies of driver code on architecture code, correct?
+>
+> So, wouldn't we need a small, architecture-independent, infrastructure,
+> through which architecture-specific code could "register" at boot
+> time which SoC we are running on, and drivers could query this
+> information from the common infrastructure?
+>
+> Of course, the major problem is to figure out what is the good
+> representation for this SoC identifier. Do we need a big list of SoCs
+> like we had machine IDs? A simple string? Or maybe there is just no
+> good way, and the whole idea is moot.
 
-Documentation/devicetree/bindings/fb/amba-clcd.txt :-)
+I think this is a bad idea, it means you can't try and re-use an
+older kernel on an newer SoC design which may be broadly compatible
+without changing the kernel source to add these flag checks.
 
-> When the A9 CoreTile uses the on-tile CLCD controller, it can use DMA
-> to handle the framebuffer.  DMA is not available to the motherboard
-> CLCD controller.
+I also don't like information hidden away that the user cannot see.
+Having the device specifically named allows us to see from sysfs
+exactly what we are dealing with.
 
-Uh, you probably mean that the motherboard CLCD must use the specialised
-video memory, while the one in the test chip would normally use a buffer
-allocated via the DMA API...
-
-> I was trying to keep the properties simple, but they are more complex
-> than just the two settings: use_dma and framebuffer.  If use_dma is
-> specified, the framebuffer property is not used; in this case, the
-> framebuffer is allocated by the DMA framework and the framebuffer
-> property is ignored.  If use_dma is not present or is set to <0>, the
-> code uses the framebuffer property to specify the address.
-
-I'm not sure if the "framebuffer" property is really needed, at least in
-the form you have it there now. I think I know you where you get it from
-- HDLCD driver, right? It was sort-of-needed there, because we had to
-reserve memory for the framebuffer, because you couldn't allocate big
-enough (8MB if I remember correctly) area using the DMA alloc function.
-But now, with the CMA in place it should be possible, so I believe it's
-not even necessary in that case. Simply speaking - if the driver is not
-told what address to use, it should get the memory on its own.
-
-Now, as to the motherboard CLCD... That's where you actually could use
-this property in the way you have there, to enforce the address of the
-video RAM as the framebuffer. But maybe it would be better to have a
-phandle to the video RAM node?
-
-Cheers!
-
-Pawe?
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
