@@ -1,37 +1,82 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Fri, 21 Sep 2012 11:50:52 +0530
-Subject: [PATCH] ARM: OMAP: convert I2C driver to PM QoS for MPU latency
- constraints
-In-Reply-To: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
-References: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
-Message-ID: <CAM=Q2ct+6g1WR-U5e+s=ySAypnkc2SO4kKtDPmTsau+mx1HmbA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Sep 2012 23:21:01 -0700
+Subject: Status of arm-soc for 3.7
+Message-ID: <CAOesGMjWcEXubD9ei+r=Xxz9KdJcFMsuk0pEN08nNsas8we3_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 9:38 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
-> API to the new PM QoS API.
-> Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
-> class of PM QoS. The resulting MPU constraints are used by cpuidle to
-> decide the next power state of the MPU subsystem.
->
-> The I2C device latency timing is derived from the FIFO size and the
-> clock speed and so is applicable to all OMAP SoCs.
-Agree thanks for doing that.
+First, a heads up for those of you who were planning on coming with
+late merge requests: Sorry, but we will probably hold off until 3.8.
 
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
-> Rebased on git://git.pengutronix.de/git/wsa/linux.git, branch
-> i2c-embedded/for-next
-thanks ,
-tested with i2c tools  on omap4sdp and omap3sdp
+We'll still take fixes and probably some small updates. But given all
+the moves of platform data and other code shuffling in the tree for
+this next merge window, merge conflicts and dependencies are stacking
+up quickly right now. I don't want things to get out of control in
+that area, which means no more major merges.
 
-Acked-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+What's left to deal with is:
 
-> ---
->  arch/arm/plat-omap/i2c.c      |   21 ---------------------
->  drivers/i2c/busses/i2c-omap.c |   32 ++++++++++++++++++--------------
->  include/linux/i2c-omap.h      |    1 -
->  3 files changed, 18 insertions(+), 36 deletions(-)
->
+* smp_ops branch, since multiplatform depends on it to allow building
+more than one platform.
+
+* bcmring removal hasn't been applied yet, it's not really urgent and
+the patches were line wrapped and I forgot about it before I merged
+multiplatform and, well, it can just wait until 3.8 now.
+
+* vt8500 device tree conversion had some comments on some of the
+bindings. Since the pull request has already come in, I'll revisit it
+if it looks like it won't be too messy to merge in.
+
+Beyond that, let me know if you have already sent us a merge request
+that we have missed.
+
+Some quick stats:
+
+590 non-merge changesets are queued up through 94 branch merges, which
+is fewer patches but about the same number of merges as usual:
+ 1149 files changed, 29520 insertions(+), 35466 deletions(-)
+
+The cleanup branch this release is substantial: 160 patches alone,
+with a diffstat of:
+ 614 files changed, 9769 insertions(+), 20645 deletions(-)
+
+
+Some highlights (I'm missing lots, but a few are):
+
+One platform removal: pnx4008
+One new platform: bcm2835
+Lots of DT updates across the board this release. Tegra has removed
+all board files and gone DT-only.
+We have a new maintainer for KS8695 (Greg Ungerer) and renewed contributions.
+Qualcomm has started cleaning out some stale code from the MSM
+platforms, and begin device tree enablement for the latest families.
+Exynos4 has been converted to pinctrl and gpiolib.
+PRISM2 has DT bindings for pinctrl
+The first interrupt controller driver has been added to /drivers/irqchip
+OMAP internal bus has been added to /drivers/bus
+Lots of moves of platform_data contents into include/linux/platform_data
+Moves and removal of other mach-*/include files out of the way to
+prepare for multiplatform
+Initial multiplatform patch series from Rob Herring
+
+
+Top 15 authors:
+
+Tony Lindgren (46)
+Arnd Bergmann (40)
+Uwe Kleine-K?nig (37)
+Rob Herring (35)
+Shawn Guo (33)
+Stephen Warren (27)
+Fabio Estevam (23)
+Stephen Boyd (20)
+Bryan Wu (18)
+Laxman Dewangan (18)
+Linus Walleij (17)
+Chao Xie (12)
+Afzal Mohammed (10)
+Igor Grinberg (9)
+Paul Walmsley (9)
+
+
+-Olof
