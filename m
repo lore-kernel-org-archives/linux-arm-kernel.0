@@ -1,23 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Sep 2012 21:34:40 +0100
-Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
-In-Reply-To: <20120921205603.436a0194@pyramind.ukuu.org.uk>
-References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
- <20120920190034.GB15609@n2100.arm.linux.org.uk>
- <CACRpkdY1ZxQoyGFO9OnKr0WYQzooxPGvZV8Gnr_YO_yT_+ddDw@mail.gmail.com>
- <20120921162543.1ed18775@pyramind.ukuu.org.uk>
- <CACRpkdakLAPmD0TQwe2VNhdePDuFv2KXD2U1xoP1C0axkx2p7A@mail.gmail.com>
- <20120921205603.436a0194@pyramind.ukuu.org.uk>
-Message-ID: <20120921203440.GA6796@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Sep 2012 13:46:13 -0700
+Subject: [GIT PULL] ARM: OMAP5: Enable arch timer support
+In-Reply-To: <CAMQu2gxhOsMoaZfNkkx+j=bGCWOvGTWme-ZmEhJoAcUYDxtXcQ@mail.gmail.com>
+References: <1348041069-947-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAMQu2gxhOsMoaZfNkkx+j=bGCWOvGTWme-ZmEhJoAcUYDxtXcQ@mail.gmail.com>
+Message-ID: <20120921204612.GJ28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 08:56:03PM +0100, Alan Cox wrote:
-> If you are calling TCSETS2 passing BOTHER and an actual specific speed
-> you should always be getting handed back the speed requested as it'll see
-> the BOTHER flag is present and assume the caller is smart.
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120919 00:54]:
+> (With fixed git URL)
+> 
+> On Wed, Sep 19, 2012 at 1:21 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> >
+> > Tony,
+> >
+> > Here is the pull request which enables the architected cpu local timer
+> > support for OMAP5 devices.
+> >
+> > The following changes since commit
+> > 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+> >
+> >   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git at github.com:SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
+> 
+> git://github.com/SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
 
-Is this something that should be handled by glibc?  If so, ARM for
-whatever reason still seems to use the standard TCGETS and TCSETS
-calls... at least stracing stty in ubuntu precise suggests that's
-the case.
+Thanks pulled now into devel-dt-arch-timer branch.
+
+Note that we're pretty much out of time for v3.7 merge window, so
+most likely this won't get merged until for v3.8. See message
+"Status of arm-soc for 3.7"  posted to LAKML for details.
+
+Regards,
+
+Tony
+
+> 
+> >
+> > for you to fetch changes up to 3c7c5dab44d6c8861bc86dab924353d8d40344f8:
+> >
+> >   ARM: OMAP5: Enable arch timer support (2012-09-19 13:00:37 +0530)
+> >
+> > ----------------------------------------------------------------
+> > Santosh Shilimkar (2):
+> >       ARM: OMAP: Add initialisation for the real-time counter.
+> >       ARM: OMAP5: Enable arch timer support
+> >
+> >  arch/arm/boot/dts/omap5.dtsi |   12 ++++++
+> >  arch/arm/mach-omap2/Kconfig  |    5 +++
+> >  arch/arm/mach-omap2/timer.c  |   97
+> > +++++++++++++++++++++++++++++++++++++++++-
+> >  3 files changed, 113 insertions(+), 1 deletion(-)
