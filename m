@@ -1,45 +1,67 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 21 Sep 2012 10:07:52 +0200
-Subject: [PATCH 6/6] staging: drm/imx: Add TODO
+Date: Fri, 21 Sep 2012 10:07:51 +0200
+Subject: [PATCH 5/6] staging: drm/imx: Add devicetree binding documentation
 In-Reply-To: <1348214872-28594-1-git-send-email-s.hauer@pengutronix.de>
 References: <1348214872-28594-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1348214872-28594-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1348214872-28594-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Philipp Zabel <p.zabel@pengutronix.de>
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/staging/imx-drm/TODO |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 drivers/staging/imx-drm/TODO
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   41 ++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
 
-diff --git a/drivers/staging/imx-drm/TODO b/drivers/staging/imx-drm/TODO
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
 new file mode 100644
-index 0000000..e52adc4
+index 0000000..07654f0
 --- /dev/null
-+++ b/drivers/staging/imx-drm/TODO
-@@ -0,0 +1,22 @@
-+TODO:
-+- get DRM Maintainer review for this code
-+- Factor out more code to common helper functions
-+- decide where to put the base driver. It is not specific to a subsystem
-+  and would be used by DRM/KMS and media/V4L2
-+- convert irq driver to irq_domain_add_linear
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -0,0 +1,41 @@
++Freescale i.MX IPUv3
++====================
 +
-+Missing features (not necessarily for moving out of staging):
++Required properties:
++- compatible: Should be "fsl,<chip>-ipu"
++- reg: should be register base and length as documented in the
++  datasheet
++- interrupts: Should contain sync interrupt and error interrupt,
++  in this order.
++- #crtc-cells: 1, See below
 +
-+- Add KMS plane support for CRTC driver
-+- Add LDB (LVDS Display Bridge) support
-+- Add i.MX6 HDMI support
-+- Add support for IC (Image converter)
-+- Add support for CSI (CMOS Sensor interface)
-+- Add support for VDIC (Video Deinterlacer)
++example:
 +
-+Many work-in-progress patches for the above features exist. Contact
-+Sascha Hauer <kernel@pengutronix.de> if you are interested in working
-+on a specific feature.
++ipu: ipu at 18000000 {
++	#crtc-cells = <1>;
++	compatible = "fsl,imx53-ipu";
++	reg = <0x18000000 0x080000000>;
++	interrupts = <11 10>;
++};
 +
-+Please send any patches to Greg Kroah-Hartman <gregkh@linuxfoundation.org> and
-+Sascha Hauer <kernel@pengutronix.de>
++Parallel display support
++========================
++
++Required properties:
++- compatible: Should be "fsl,imx-parallel-display"
++- crtc: the crtc this display is connected to, see below
++Optional properties:
++- interface_pix_fmt: How this display is connected to the
++  crtc. Currently supported types: "rgb24", "rgb565"
++- edid: verbatim EDID data block describing attached display.
++- ddc: phandle describing the i2c bus handling the display data
++  channel
++
++example:
++
++display at di0 {
++	compatible = "fsl,imx-parallel-display";
++	edid = [edid-data];
++	crtc = <&ipu 0>;
++	interface-pix-fmt = "rgb24";
++};
 -- 
 1.7.10.4
