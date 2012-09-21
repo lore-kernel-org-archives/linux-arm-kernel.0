@@ -1,60 +1,86 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 21 Sep 2012 14:34:46 -0400
-Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
- arm/common
-In-Reply-To: <20120921094205.GC31374@n2100.arm.linux.org.uk>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-2-git-send-email-mporter@ti.com>
- <20120921092923.GA31374@n2100.arm.linux.org.uk>
- <1BAFE6F6C881BF42822005164F1491C33EA8AA3C@DBDE01.ent.ti.com>
- <20120921094205.GC31374@n2100.arm.linux.org.uk>
-Message-ID: <20120921183446.GH16522@beef>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Sep 2012 14:33:43 -0400 (EDT)
+Subject: [PATCH v3 10/17] ARM: LPAE: use phys_addr_t in switch_mm()
+In-Reply-To: <1347385155-11643-11-git-send-email-cyril@ti.com>
+References: <1347385155-11643-1-git-send-email-cyril@ti.com>
+ <1347385155-11643-11-git-send-email-cyril@ti.com>
+Message-ID: <alpine.LFD.2.02.1209211433110.6667@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 10:42:05AM +0100, Russell King wrote:
-> On Fri, Sep 21, 2012 at 09:33:42AM +0000, Hebbar, Gururaja wrote:
-> > On Fri, Sep 21, 2012 at 14:59:23, Russell King - ARM Linux wrote:
-> > > On Thu, Sep 20, 2012 at 10:43:34AM -0400, Matt Porter wrote:
-> > > > Move mach-davinci/dma.c to common/edma.c so it can be used
-> > > > by OMAP (specifically AM33xx atm) as well. This just moves
-> > > > the private EDMA API but does not support OMAP.
-> > > > 
-> > > > Signed-off-by: Matt Porter <mporter@ti.com>
-> > > > ---
-> > > >  arch/arm/Kconfig                           |    1 +
-> > > >  arch/arm/common/Kconfig                    |    3 +
-> > > >  arch/arm/common/Makefile                   |    1 +
-> > > >  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
-> > > >  arch/arm/include/asm/mach/edma.h           |  267 +++++
-> > > 
-> > > asm/mach should not be used as a dumping ground for platform header files.
-> > > It is there to provide the interfaces between generic ARM architecture
-> > > code and platform code.  (At least four files that are there at the
-> > > moment need to be moved out of there - patch series to follow...)
-> > 
-> > Can this be moved to include/linux/platform_data/ ?
-> 
-> Here's the pertinant question: "is it platform data?"  Looking at the
-> file, it appears to be internal data structures and register definitions
-> for the driver itself.  Therefore, it isn't platform data, and it
-> shouldn't be living separately from the driver.
-> 
-> If the driver itself only makes use of the data structures, the data
-> structures should be defined either within the driver, or a header file
-> co-located next to the driver itself.  The same goes for register
-> definitions too.
-> 
-> The only structure that I can find which isn't internal to the driver
-> is struct edma_soc_info, struct edma_rsv_info, and the enum dma_event_q.
-> Those can go to include/linux/platform_data, but the rest should not.
+On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
 
-Ok, but is it ok to keep the actual private EDMA API portion in
-arch/arm/include/asm/mach/? It's not a problem to move the internal
-portions to a local include and that pdata to the appropriate place.
-We still need a place independent of mach-davinci and mach-omap2 to
-keep that portion of the include. I suppose it could be put in with
-the dmaengine wrapper's include/linux/edma.h but I hate to clutter
-that up when the private API will go away later.
+> This patch modifies the switch_mm() processor functions to use phys_addr_t.
+> On LPAE systems, we now honor the upper 32-bits of the physical address that
+> is being passed in, and program these into TTBR as expected.
+> 
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 
--Matt
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  arch/arm/include/asm/proc-fns.h |    4 ++--
+>  arch/arm/mm/proc-v7-3level.S    |   17 +++++++++++++----
+>  2 files changed, 15 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+> index f3628fb..75b5f14 100644
+> --- a/arch/arm/include/asm/proc-fns.h
+> +++ b/arch/arm/include/asm/proc-fns.h
+> @@ -60,7 +60,7 @@ extern struct processor {
+>  	/*
+>  	 * Set the page table
+>  	 */
+> -	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
+> +	void (*switch_mm)(phys_addr_t pgd_phys, struct mm_struct *mm);
+>  	/*
+>  	 * Set a possibly extended PTE.  Non-extended PTEs should
+>  	 * ignore 'ext'.
+> @@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
+>  extern void cpu_proc_fin(void);
+>  extern int cpu_do_idle(void);
+>  extern void cpu_dcache_clean_area(void *, int);
+> -extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+> +extern void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
+>  #ifdef CONFIG_ARM_LPAE
+>  extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+>  #else
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 8de0f1d..c4f4251 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -39,6 +39,14 @@
+>  #define TTB_FLAGS_SMP	(TTB_IRGN_WBWA|TTB_S|TTB_RGN_OC_WBWA)
+>  #define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_S)
+>  
+> +#ifndef __ARMEB__
+> +#  define rpgdl	r0
+> +#  define rpgdh	r1
+> +#else
+> +#  define rpgdl	r1
+> +#  define rpgdh	r0
+> +#endif
+> +
+>  /*
+>   * cpu_v7_switch_mm(pgd_phys, tsk)
+>   *
+> @@ -47,10 +55,11 @@
+>   */
+>  ENTRY(cpu_v7_switch_mm)
+>  #ifdef CONFIG_MMU
+> -	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+> -	and	r3, r1, #0xff
+> -	mov	r3, r3, lsl #(48 - 32)		@ ASID
+> -	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
+> +	ldr	r2, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
+> +	and	r2, r2, #0xff
+> +	mov	r2, r2, lsl #(48 - 32)		@ ASID
+> +	orr	rpgdh, rpgdh, r2		@ upper 32-bits of pgd phys
+> +	mcrr	p15, 0, rpgdl, rpgdh, c2	@ set TTB 0
+>  	isb
+>  #endif
+>  	mov	pc, lr
+> -- 
+> 1.7.9.5
+> 
