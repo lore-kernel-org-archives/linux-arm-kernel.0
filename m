@@ -1,41 +1,72 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 21 Sep 2012 14:24:33 -0400
-Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
- arm/common
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA8A6A9@DBDE01.ent.ti.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-2-git-send-email-mporter@ti.com>
- <1BAFE6F6C881BF42822005164F1491C33EA8A6A9@DBDE01.ent.ti.com>
-Message-ID: <20120921182433.GG16522@beef>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Sep 2012 14:30:39 -0400 (EDT)
+Subject: [PATCH v3 09/17] ARM: LPAE: use phys_addr_t for initrd location
+ and size
+In-Reply-To: <1347385155-11643-10-git-send-email-cyril@ti.com>
+References: <1347385155-11643-1-git-send-email-cyril@ti.com>
+ <1347385155-11643-10-git-send-email-cyril@ti.com>
+Message-ID: <alpine.LFD.2.02.1209211429290.6667@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 07:10:52AM +0000, Hebbar, Gururaja wrote:
-> On Thu, Sep 20, 2012 at 20:13:34, Porter, Matt wrote:
-> > Move mach-davinci/dma.c to common/edma.c so it can be used
-> > by OMAP (specifically AM33xx atm) as well. This just moves
-> > the private EDMA API but does not support OMAP.
-> > 
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > ---
-> >  arch/arm/Kconfig                           |    1 +
-> >  arch/arm/common/Kconfig                    |    3 +
-> >  arch/arm/common/Makefile                   |    1 +
-> >  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
-> >  arch/arm/include/asm/mach/edma.h           |  267 +++++
-> >  arch/arm/mach-davinci/Makefile             |    2 +-
-> >  arch/arm/mach-davinci/devices.c            |    3 +-
-> >  arch/arm/mach-davinci/dm355.c              |    2 +-
-> >  arch/arm/mach-davinci/dm365.c              |    2 +-
-> >  arch/arm/mach-davinci/dm644x.c             |    2 +-
-> >  arch/arm/mach-davinci/dm646x.c             |    2 +-
-> >  arch/arm/mach-davinci/dma.c                | 1588 ----------------------------
-> 
-> 
-> Please use ?M option, while generating patches via git-format-patch. 
-> This reduces the patch size if files are copied/renamed/moved.
+On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
 
-Yes, I didn't notice until the arm kernel list caught the >100k post.
-Will take care of this in v2.
+> From: Vitaly Andrianov <vitalya@ti.com>
+> 
+> This patch fixes the initrd setup code to use phys_addr_t instead of assuming
+> 32-bit addressing.  Without this we cannot boot on systems where initrd is
+> located above the 4G physical address limit.
+> 
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
--Matt
+Nit: please adjust the patch title.  No need for phys_addr_t on the size.
+
+
+> ---
+>  arch/arm/mm/init.c |   13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 1c5151a..87ee0ec 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -36,12 +36,13 @@
+>  
+>  #include "mm.h"
+>  
+> -static unsigned long phys_initrd_start __initdata = 0;
+> +static phys_addr_t phys_initrd_start __initdata = 0;
+>  static unsigned long phys_initrd_size __initdata = 0;
+>  
+>  static int __init early_initrd(char *p)
+>  {
+> -	unsigned long start, size;
+> +	phys_addr_t start;
+> +	unsigned long size;
+>  	char *endp;
+>  
+>  	start = memparse(p, &endp);
+> @@ -347,14 +348,14 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  	if (phys_initrd_size &&
+>  	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+> -		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",
+> -		       phys_initrd_start, phys_initrd_size);
+> +		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
+> +		       (u64)phys_initrd_start, phys_initrd_size);
+>  		phys_initrd_start = phys_initrd_size = 0;
+>  	}
+>  	if (phys_initrd_size &&
+>  	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
+> -		pr_err("INITRD: 0x%08lx+0x%08lx overlaps in-use memory region - disabling initrd\n",
+> -		       phys_initrd_start, phys_initrd_size);
+> +		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
+> +		       (u64)phys_initrd_start, phys_initrd_size);
+>  		phys_initrd_start = phys_initrd_size = 0;
+>  	}
+>  	if (phys_initrd_size) {
+> -- 
+> 1.7.9.5
+> 
