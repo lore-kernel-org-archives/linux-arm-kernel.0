@@ -1,55 +1,44 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Sep 2012 19:26:50 -0700
-Subject: [PATCH 02/10] msm_sdcc: Convert to clk_prepare/unprepare
+Date: Thu, 20 Sep 2012 19:26:52 -0700
+Subject: [PATCH 04/10] msm: iommu: Use clk_set_rate() instead of
+ clk_set_min_rate()
 In-Reply-To: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
 References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1348194419-11486-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1348194419-11486-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add calls to clk_prepare and unprepare so that MSM can migrate to
-the common clock framework.
+Calling clk_set_min_rate() is no better than just calling
+clk_set_rate() because MSM clock code already takes care of
+calling the min_rate ops if the clock really needs
+clk_set_min_rate() called on it.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mmc/host/msm_sdcc.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/iommu/msm_iommu_dev.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 1d14cda..10cc05b 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -1269,10 +1269,18 @@ msmsdcc_probe(struct platform_device *pdev)
- 		goto clk_put;
- 	}
+diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev.c
+index d344f6a..9144a6b 100644
+--- a/drivers/iommu/msm_iommu_dev.c
++++ b/drivers/iommu/msm_iommu_dev.c
+@@ -29,7 +29,6 @@
  
-+	ret = clk_prepare(host->pclk);
-+	if (ret)
-+		goto clk_put;
-+
-+	ret = clk_prepare(host->clk);
-+	if (ret)
-+		goto clk_unprepare_p;
-+
- 	/* Enable clocks */
- 	ret = msmsdcc_enable_clocks(host);
- 	if (ret)
--		goto clk_put;
-+		goto clk_unprepare;
+ #include <mach/iommu_hw-8xxx.h>
+ #include <mach/iommu.h>
+-#include <mach/clk.h>
  
- 	host->pclk_rate = clk_get_rate(host->pclk);
- 	host->clk_rate = clk_get_rate(host->clk);
-@@ -1387,6 +1395,10 @@ msmsdcc_probe(struct platform_device *pdev)
- 		free_irq(host->stat_irq, host);
-  clk_disable:
- 	msmsdcc_disable_clocks(host, 0);
-+ clk_unprepare:
-+	clk_unprepare(host->clk);
-+ clk_unprepare_p:
-+	clk_unprepare(host->pclk);
-  clk_put:
- 	clk_put(host->clk);
-  pclk_put:
+ struct iommu_ctx_iter_data {
+ 	/* input */
+@@ -168,7 +167,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 
+ 	if (!IS_ERR(iommu_clk))	{
+ 		if (clk_get_rate(iommu_clk) == 0)
+-			clk_set_min_rate(iommu_clk, 1);
++			clk_set_rate(iommu_clk, 1);
+ 
+ 		ret = clk_prepare_enable(iommu_clk);
+ 		if (ret) {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
