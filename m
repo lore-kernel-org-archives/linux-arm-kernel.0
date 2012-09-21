@@ -1,67 +1,35 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 21 Sep 2012 06:07:31 +0000
-Subject: [GIT PULL RESEND] arm-soc: vt8500: Convert mach-vt8500 to
- devicetree
-In-Reply-To: <20120920232807.GA13788@quad.lixom.net>
-References: <1348119906.8199.3.camel@gitbox>
- <20120920232807.GA13788@quad.lixom.net>
-Message-ID: <1348207824.907.5.camel@gitbox>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 21 Sep 2012 14:12:31 +0800
+Subject: [PATCH] davinci: fix return value check by using IS_ERR in
+ tnetv107x_devices_init()
+Message-ID: <CAPgLHd-xYzLwnptYpOV4HrdJyn3AZahx2VGVAVLHiEYvcj-APw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-20 at 16:28 -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Thu, Sep 20, 2012 at 05:45:06PM +1200, Tony Prisk wrote:
-> > Please disregard the last pull request - commit id's were invalid.
-> > This one is now correct.
-> > 
-> > The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
-> > 
-> >   Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.code.sf.net/p/linuxwmt/code tags/vt8500-for-next
-> > 
-> > for you to fetch changes up to 0cd5434aae73698aa4a48542bd8d1428d44820cb:
-> > 
-> >   arm: vt8500: Update arch-vt8500 to devicetree support. (2012-09-20 07:23:26 +1200)
-> > 
-> > ----------------------------------------------------------------
-> > Update mach-vt8500 to devicetree and remove non-dt code.
-> > 
-> > ----------------------------------------------------------------
-> > Tony Prisk (8):
-> >       arm: vt8500: Add device tree files for VIA/Wondermedia SoC's
-> >       rtc: vt8500: Add devicetree support for vt8500-rtc
-> >       serial: vt8500: Add devicetree support for vt8500-serial
-> >       video: vt8500: Add devicetree support for vt8500-fb and wm8505-fb
-> >       arm: vt8500: clk: Add Common Clock Framework support
-> >       arm: vt8500: doc: Add device tree bindings for arch-vt8500 devices
-> >       arm: vt8500: gpio: Devicetree support for arch-vt8500
-> >       arm: vt8500: Update arch-vt8500 to devicetree support.
-> 
-> Overall this series looks great, however I pinged Rob Herring about it
-> since I didn't see his Acked-by on the bindings patch. It sounds like he
-> has some comments on the display pieces, so unless you can break those
-> out and do everything else for 3.7, we might need to hold off until that
-> has been settled.
-> 
-> 
-> -Olof
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-This was discussed when the series was originally posted. The display
-mode binding was still floating around with V1 suggestions so I had to
-make a best-guess as to how it would end up.
+In case of error, the function clk_get() returns ERR_PTR() not
+NULL pointer. The NULL test in the error handling should be
+replaced with IS_ERR().
 
-Without it, the patch will break support for 95% of users as framebuffer
-is the only output device. 
+dpatch engine is used to auto generated this patch.
+(https://github.com/weiyj/dpatch)
 
-Given that I can't fix it as the videomode helper patch is still getting
-revisions (Last I saw v4 had outstanding queries against it) I guess it
-will have to wait until next time around.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-davinci/devices-tnetv107x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards
-
-Tony P
+diff --git a/arch/arm/mach-davinci/devices-tnetv107x.c b/arch/arm/mach-davinci/devices-tnetv107x.c
+index 29b17f7..773ab07 100644
+--- a/arch/arm/mach-davinci/devices-tnetv107x.c
++++ b/arch/arm/mach-davinci/devices-tnetv107x.c
+@@ -374,7 +374,7 @@ void __init tnetv107x_devices_init(struct tnetv107x_device_info *info)
+ 	 * complete sample conversion in time.
+ 	 */
+ 	tsc_clk = clk_get(NULL, "sys_tsc_clk");
+-	if (tsc_clk) {
++	if (!IS_ERR(tsc_clk)) {
+ 		error = clk_set_rate(tsc_clk, 5000000);
+ 		WARN_ON(error < 0);
+ 		clk_put(tsc_clk);
