@@ -1,85 +1,35 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 21 Sep 2012 08:30:28 +0200
-Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data
- via platform data
-In-Reply-To: <20120920221504.GK28835@atomide.com>
-References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
- <1348152453-30532-3-git-send-email-j-pihet@ti.com>
- <20120920221504.GK28835@atomide.com>
-Message-ID: <CAORVsuXS=zk6SEqo=qhyaAFyYQbhLA8CY9TTMMhEQtMZf7p21Q@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 21 Sep 2012 14:30:50 +0800
+Subject: [PATCH] ARM: OMAP: hsmmc: fix return value check in
+ omap_hsmmc_init_one()
+Message-ID: <CAPgLHd9RvEA1_dtaHOTCnuoboU3jcwzn_trwucu9kDqqdR1Lcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-On Fri, Sep 21, 2012 at 12:15 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Jean Pihet <jean.pihet@newoldbits.com> [120920 07:48]:
->> --- a/drivers/power/avs/smartreflex.c
->> +++ b/drivers/power/avs/smartreflex.c
->> @@ -131,14 +131,11 @@ static void sr_set_clk_length(struct omap_sr *sr)
->>       struct clk *sys_ck;
->>       u32 sys_clk_speed;
->>
->> -     if (cpu_is_omap34xx())
->> -             sys_ck = clk_get(NULL, "sys_ck");
->> -     else
->> -             sys_ck = clk_get(NULL, "sys_clkin_ck");
->> +     sys_ck = clk_get(NULL, sr->fck_name);
->>
->>       if (IS_ERR(sys_ck)) {
->> -             dev_err(&sr->pdev->dev, "%s: unable to get sys clk\n",
->> -                     __func__);
->> +             dev_err(&sr->pdev->dev, "%s: unable to get smartreflex fck %s\n",
->> +                     __func__, sr->fck_name);
->>               return;
->>       }
->>
->
-> You should be able to make this even simpler and not have to pass
-> the clock name around at all. Just do:
->
-> syc_ck = clk_get(NULL, "fck);
-> ...
-The problem is that the system has multiple instances of the
-smartreflex module, each having its own fck. On OMAP3/4 the fck's are
-derived from sys_clk via muxes and latches.
-The proposed code uses the fck's as defined in the .main_clk field of
-the hwmod entries, so that it takes the muxes and latches into account
-and also has a consistent clock naming.
+In case of error, the function omap_device_alloc() returns ERR_PTR()
+not NULL pointer. The NULL test in the return value check should
+be replaced with IS_ERR().
 
-> In the driver, and add the necessary entries to the clock alias
-> table. That way it's up to the SoC to set up the necessary clocks
-> and the driver stays generic.
-Got it. The only solution would be to use an unique fck for all
-smartreflex modules in all configurations. Is that acceptable?
+dpatch engine is used to auto generated this patch.
+(https://github.com/weiyj/dpatch)
 
->
->> @@ -1049,6 +1039,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
->>
->>       list_del(&sr_info->node);
->>       iounmap(sr_info->base);
->> +     kfree(sr_info->fck_name);
->>       kfree(sr_info->name);
->>       kfree(sr_info);
->>       mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->
-> Then there's no need for the kfree of the fck_name
-> either.
->
-> There's an example of a similar patch done for twl-core.c as commit
-> defa6be1 (mfd: Fix compile for twl-core.c by removing cpu_is_omap usage)
-> in current linux next, except with smartreflex you probably don't
-> need to do any of the platform_device_alloc trickery like twl-core.c
-> neded to get around using the i2c numbers as names.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-omap2/hsmmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks!
-
-Regards,
-Jean
-
->
-> Regards,
->
-> Tony
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index a9675d8..95179fe 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -522,7 +522,7 @@ static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
+ 	dev_set_name(&pdev->dev, "%s.%d", pdev->name, pdev->id);
+ 
+ 	od = omap_device_alloc(pdev, ohs, 1, NULL, 0);
+-	if (!od) {
++	if (IS_ERR(od)) {
+ 		pr_err("Could not allocate od for %s\n", name);
+ 		goto put_pdev;
+ 	}
