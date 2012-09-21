@@ -1,48 +1,34 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 21 Sep 2012 15:03:12 -0400
-Subject: [RFC PATCH 08/13] mmc: omap_hsmmc: limit max_segs with the EDMA
- DMAC
-In-Reply-To: <20120921184721.GD31374@n2100.arm.linux.org.uk>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-9-git-send-email-mporter@ti.com>
- <CANfBPZ81anOy8fWgKM1PgCtB4V2pEp2x1Qi4x1uPsq7QieMN5g@mail.gmail.com>
- <20120921184721.GD31374@n2100.arm.linux.org.uk>
-Message-ID: <20120921190312.GL16522@beef>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Sep 2012 21:04:38 +0200
+Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <20120921131441.GB14266@lunn.ch>
+References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120921131441.GB14266@lunn.ch>
+Message-ID: <20120921210438.0e485888@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 07:47:21PM +0100, Russell King wrote:
-> On Fri, Sep 21, 2012 at 10:45:29PM +0530, S, Venkatraman wrote:
-> > On Thu, Sep 20, 2012 at 8:13 PM, Matt Porter <mporter@ti.com> wrote:
-> > > The EDMA DMAC has a hardware limitation that prevents supporting
-> > > scatter gather lists with any number of segments. Since the EDMA
-> > > DMA Engine driver sets the maximum segments to 16, we do the
-> > > same.
-> > >
-> > > Note: this can be removed once the DMA Engine API supports an
-> > > API to query the DMAC's segment limitations.
-> > >
-> > 
-> > I wouldn't want to bind the properties of EDMA to omap_hsmmc as this patch
-> > suggests. Why don't we have a max_segs property, which when explicitly specified
-> > in DT, will override the default ?
+Dear Andrew Lunn,
+
+On Fri, 21 Sep 2012 15:14:41 +0200, Andrew Lunn wrote:
+
+> I boot tested it on a kirkwood and an orion5x. No obvious smoke, the
+> ethernet interfaces still work, etc....
 > 
-> Why not have a generic way that DMA engine can export these kinds of
-> properties?
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-That's exactly what my note above is suggesting...
+Excellent, thanks!
 
-Something along the lines of:
+I'll be posting early next week the DT binding documentation that Arnd
+has rightfully requested. I was waiting for other comments, but it
+looks like it is the only that I have received on this series, so I'll
+got ahead and sent just a separate DT binding documentation patch.
 
-	struct slave_sg_caps
-	{
-		int max_segs;	/* <0 is no limit */
-	}
+Best regards,
 
-	struct slave_sg_cap *
-	dmaengine_get_slave_sg_caps(struct dma_chan *chan);
-
-I'm sure there are or will be other characteristics worth providing to
-slave drivers.
-
--Matt
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
