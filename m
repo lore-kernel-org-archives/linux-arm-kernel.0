@@ -1,87 +1,80 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 21 Sep 2012 11:56:15 -0400
-Subject: [PATCH v3 RESEND 17/17] ARM: mm: clean up membank size limit checks
+Date: Fri, 21 Sep 2012 11:56:14 -0400
+Subject: [PATCH v3 RESEND 16/17] ARM: mm: cleanup checks for membank overlap
+ with vmalloc area
 In-Reply-To: <1348242975-19184-1-git-send-email-cyril@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
-Message-ID: <1348242975-19184-18-git-send-email-cyril@ti.com>
+Message-ID: <1348242975-19184-17-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the highmem sanity check code by simplifying the range
-checks with a pre-calculated size_limit.  This patch should otherwise have no
-functional impact on behavior.
+On Keystone platforms, physical memory is entirely outside the 32-bit
+addressible range.  Therefore, the (bank->start > ULONG_MAX) check below marks
+the entire system memory as highmem, and this causes unpleasentness all over.
 
-This patch also removes a redundant (bank->start < vmalloc_limit) check, since
-this is already covered by the !highmem condition.
+This patch eliminates the extra bank start check (against ULONG_MAX) by
+checking bank->start against the physical address corresponding to vmalloc_min
+instead.
+
+In the process, this patch also cleans up parts of the highmem sanity check
+code by removing what has now become a redundant check for banks that entirely
+overlap with the vmalloc range.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mm/mmu.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ arch/arm/mm/mmu.c |   19 +------------------
+ 1 file changed, 1 insertion(+), 18 deletions(-)
 
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e631f73..794457a 100644
+index fcdc185..e631f73 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -899,10 +899,15 @@ void __init sanity_check_meminfo(void)
- 
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+@@ -901,15 +901,12 @@ void __init sanity_check_meminfo(void)
  		struct membank *bank = &meminfo.bank[j];
-+		phys_addr_t size_limit;
-+
  		*bank = meminfo.bank[i];
-+		size_limit = bank->size;
  
+-		if (bank->start > ULONG_MAX)
+-			highmem = 1;
+-
+-#ifdef CONFIG_HIGHMEM
  		if (bank->start >= vmalloc_limit)
  			highmem = 1;
-+		else
-+			size_limit = vmalloc_limit - bank->start;
  
  		bank->highmem = highmem;
  
-@@ -911,8 +916,7 @@ void __init sanity_check_meminfo(void)
++#ifdef CONFIG_HIGHMEM
+ 		/*
  		 * Split those memory banks which are partially overlapping
  		 * the vmalloc area greatly simplifying things later.
- 		 */
--		if (!highmem && bank->start < vmalloc_limit &&
--		    bank->size > vmalloc_limit - bank->start) {
-+		if (!highmem && bank->size > size_limit) {
- 			if (meminfo.nr_banks >= NR_BANKS) {
- 				printk(KERN_CRIT "NR_BANKS too low, "
- 						 "ignoring high memory\n");
-@@ -921,12 +925,12 @@ void __init sanity_check_meminfo(void)
- 					(meminfo.nr_banks - i) * sizeof(*bank));
- 				meminfo.nr_banks++;
- 				i++;
--				bank[1].size -= vmalloc_limit - bank->start;
-+				bank[1].size -= size_limit;
- 				bank[1].start = vmalloc_limit;
- 				bank[1].highmem = highmem = 1;
- 				j++;
- 			}
--			bank->size = vmalloc_limit - bank->start;
-+			bank->size = size_limit;
+@@ -932,8 +929,6 @@ void __init sanity_check_meminfo(void)
+ 			bank->size = vmalloc_limit - bank->start;
  		}
  #else
+-		bank->highmem = highmem;
+-
  		/*
-@@ -944,14 +948,13 @@ void __init sanity_check_meminfo(void)
+ 		 * Highmem banks not allowed with !CONFIG_HIGHMEM.
+ 		 */
+@@ -946,18 +941,6 @@ void __init sanity_check_meminfo(void)
+ 		}
+ 
+ 		/*
+-		 * Check whether this memory bank would entirely overlap
+-		 * the vmalloc area.
+-		 */
+-		if (bank->start >= vmalloc_limit) {
+-			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+-			       "(vmalloc region overlap).\n",
+-			       (unsigned long long)bank->start,
+-			       (unsigned long long)bank->start + bank->size - 1);
+-			continue;
+-		}
+-
+-		/*
  		 * Check whether this memory bank would partially overlap
  		 * the vmalloc area.
  		 */
--		if (bank->start + bank->size > vmalloc_limit)
--			unsigned long newsize = vmalloc_limit - bank->start;
-+		if (bank->size > size_limit) {
- 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
- 			       "to -%.8llx (vmalloc region overlap).\n",
- 			       (unsigned long long)bank->start,
- 			       (unsigned long long)bank->start + bank->size - 1,
--			       (unsigned long long)bank->start + newsize - 1);
--			bank->size = newsize;
-+			       (unsigned long long)bank->start + size_limit - 1);
-+			bank->size = size_limit;
- 		}
- #endif
- 		if (!bank->highmem && bank->start + bank->size > arm_lowmem_limit)
 -- 
 1.7.9.5
