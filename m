@@ -1,64 +1,87 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 21 Sep 2012 11:56:07 -0400
-Subject: [PATCH v3 RESEND 09/17] ARM: LPAE: use phys_addr_t for initrd
- location and size
+Date: Fri, 21 Sep 2012 11:56:15 -0400
+Subject: [PATCH v3 RESEND 17/17] ARM: mm: clean up membank size limit checks
 In-Reply-To: <1348242975-19184-1-git-send-email-cyril@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
-Message-ID: <1348242975-19184-10-git-send-email-cyril@ti.com>
+Message-ID: <1348242975-19184-18-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch cleans up the highmem sanity check code by simplifying the range
+checks with a pre-calculated size_limit.  This patch should otherwise have no
+functional impact on behavior.
 
-This patch fixes the initrd setup code to use phys_addr_t instead of assuming
-32-bit addressing.  Without this we cannot boot on systems where initrd is
-located above the 4G physical address limit.
+This patch also removes a redundant (bank->start < vmalloc_limit) check, since
+this is already covered by the !highmem condition.
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/mm/init.c |   13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/mm/mmu.c |   19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 19ba70b..bae9d05 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -36,12 +36,13 @@
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e631f73..794457a 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -899,10 +899,15 @@ void __init sanity_check_meminfo(void)
  
- #include "mm.h"
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
++		phys_addr_t size_limit;
++
+ 		*bank = meminfo.bank[i];
++		size_limit = bank->size;
  
--static unsigned long phys_initrd_start __initdata = 0;
-+static phys_addr_t phys_initrd_start __initdata = 0;
- static unsigned long phys_initrd_size __initdata = 0;
+ 		if (bank->start >= vmalloc_limit)
+ 			highmem = 1;
++		else
++			size_limit = vmalloc_limit - bank->start;
  
- static int __init early_initrd(char *p)
- {
--	unsigned long start, size;
-+	phys_addr_t start;
-+	unsigned long size;
- 	char *endp;
+ 		bank->highmem = highmem;
  
- 	start = memparse(p, &endp);
-@@ -347,14 +348,14 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (phys_initrd_size &&
- 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",
--		       phys_initrd_start, phys_initrd_size);
-+		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-+		       (u64)phys_initrd_start, phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
- 	if (phys_initrd_size &&
- 	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08lx+0x%08lx overlaps in-use memory region - disabling initrd\n",
--		       phys_initrd_start, phys_initrd_size);
-+		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
-+		       (u64)phys_initrd_start, phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
- 	if (phys_initrd_size) {
+@@ -911,8 +916,7 @@ void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (!highmem && bank->start < vmalloc_limit &&
+-		    bank->size > vmalloc_limit - bank->start) {
++		if (!highmem && bank->size > size_limit) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
+ 						 "ignoring high memory\n");
+@@ -921,12 +925,12 @@ void __init sanity_check_meminfo(void)
+ 					(meminfo.nr_banks - i) * sizeof(*bank));
+ 				meminfo.nr_banks++;
+ 				i++;
+-				bank[1].size -= vmalloc_limit - bank->start;
++				bank[1].size -= size_limit;
+ 				bank[1].start = vmalloc_limit;
+ 				bank[1].highmem = highmem = 1;
+ 				j++;
+ 			}
+-			bank->size = vmalloc_limit - bank->start;
++			bank->size = size_limit;
+ 		}
+ #else
+ 		/*
+@@ -944,14 +948,13 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would partially overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (bank->start + bank->size > vmalloc_limit)
+-			unsigned long newsize = vmalloc_limit - bank->start;
++		if (bank->size > size_limit) {
+ 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+ 			       "to -%.8llx (vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
+ 			       (unsigned long long)bank->start + bank->size - 1,
+-			       (unsigned long long)bank->start + newsize - 1);
+-			bank->size = newsize;
++			       (unsigned long long)bank->start + size_limit - 1);
++			bank->size = size_limit;
+ 		}
+ #endif
+ 		if (!bank->highmem && bank->start + bank->size > arm_lowmem_limit)
 -- 
 1.7.9.5
