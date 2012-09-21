@@ -1,79 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 21 Sep 2012 15:47:34 -0700
-Subject: [PATCH v2] PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
- even when disabled
-Message-ID: <1348267654-30697-1-git-send-email-khilman@deeprootsystems.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 21 Sep 2012 18:49:26 -0400
+Subject: [PATCH v3 17/17] ARM: mm: clean up membank size limit checks
+In-Reply-To: <alpine.LFD.2.02.1209211441520.6667@xanadu.home>
+References: <1347385155-11643-1-git-send-email-cyril@ti.com>
+ <1347385155-11643-18-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1209211441520.6667@xanadu.home>
+Message-ID: <505CEEF6.1050205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@ti.com>
+On 9/21/2012 2:42 PM, Nicolas Pitre wrote:
+> On Tue, 11 Sep 2012, Cyril Chemparathy wrote:
+>
+>> This patch cleans up the highmem sanity check code by simplifying the range
+>> checks with a pre-calculated size_limit.  This patch should otherwise have no
+>> functional impact on behavior.
+>>
+>> This patch also removes a redundant (bank->start < vmalloc_limit) check, since
+>> this is already covered by the !highmem condition.
+>>
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+>
 
-There are several drivers where the return value of
-pm_runtime_get_sync() is used to decide whether or not it is safe to
-access hardware and that don't provide .suspend() callbacks for system
-suspend (but may use late/noirq callbacks.)  If such a driver happens
-to call pm_runtime_get_sync() during system suspend, after the core
-has disabled runtime PM, it will get the error code and will decide
-that the hardware should not be accessed, although this may be a wrong
-conclusion, depending on the state of the device when runtime PM was
-disabled.
+Thanks, Nico.
 
-Drivers might work around this problem by using a test like:
+Could you please take another peek at patch 05/17 (support 64-bit 
+virt_to_phys patching)?  You had reviewed it in an earlier posting, but 
+I've had to tweak the code to optimize the compiler generated inline 
+expansion code.
 
-   ret = pm_runtime_get_sync(dev);
-   if (!ret || (ret == -EACCES && driver_private_data(dev)->suspended)) {
-      /* access hardware */
-   }
+Patch 14/17 (accomodate >32-bit addresses for page table base) could use 
+some attention as well.  The same goes with 12/17 (define 
+ARCH_LOW_ADDRESS_LIMIT for bootmem), if you could.
 
-where driver_private_data(dev)->suspended is a flag set by the
-driver's .suspend() method (that would have to be added for this
-purpose).  However, that potentially would need to be done by multiple
-drivers which means quite a lot of duplicated code and bloat.
-
-To avoid that we can use the observation that the core sets
-dev->power.is_suspended before disabling runtime PM and use that
-instead of the driver's private flag.  Still, potentially many drivers
-would need to repeat that same check in quite a few places, so it's
-better to let the core do it.
-
-Then we can be a bit smarter and check whether or not runtime PM was
-disabled by the core only (disable_depth == 1) or by someone else in
-addition to the core (disable_depth > 1).  In the former case
-rpm_resume() can return 1 if the runtime PM status is RPM_ACTIVE,
-because it means the device was active when the core disabled runtime
-PM.  In the latter case it should still return -EACCES, because it
-isn't clear why runtime PM has been disabled.
-
-Tested on AM3730/Beagle-xM where a wakeup IRQ firing during the late
-suspend phase triggers runtime PM activity in the I2C driver since the
-wakeup IRQ is on an I2C-connected PMIC.
-
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-v2: 
-- major changelog rewrite, based largely on input from Rafael 
-- add check for disable_depth == 1 and move to separate if statement,
-  both suggested by Alan Stern
-    
-
- drivers/base/power/runtime.c |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 7d9c1cb..d43856b 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -509,6 +509,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
-  repeat:
- 	if (dev->power.runtime_error)
- 		retval = -EINVAL;
-+	else if (dev->power.disable_depth == 1 && dev->power.is_suspended
-+		 && dev->power.runtime_status == RPM_ACTIVE)
-+		retval = 1;
- 	else if (dev->power.disable_depth > 0)
- 		retval = -EACCES;
- 	if (retval)
 -- 
-1.7.9.2
+Thanks
+- Cyril
