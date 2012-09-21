@@ -1,35 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Sep 2012 19:33:42 -0700
-Subject: [PATCH 2/3] clk: Add devm_clk_{register,unregister}()
-In-Reply-To: <1348034730-16473-3-git-send-email-sboyd@codeaurora.org>
-References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
- <1348034730-16473-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <505BD206.9070600@codeaurora.org>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 21 Sep 2012 04:40:14 +0200
+Subject: [PATCH] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
+Message-ID: <1348195214-26633-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/12 23:05, Stephen Boyd wrote:
-> +void devm_clk_unregister(struct device *dev, struct clk *clk)
-> +{
-> +	WARN_ON(devres_destroy(dev, devm_clk_release, devm_clk_match, clk));
+Currently, the kernel unconditionally adds "local-mac-address" and
+"mac-address" properties under both FEC ethernet DT nodes in case
+the update_fec_mac_prop() function is called. These properties are
+loaded with MAC address compiled from vendors OUI and a per-device
+NIC saved in OCOTP storage.
 
-Hm... I guess this needs to be devres_release() instead of destroy. Can
-you squash this in or should I resend for the few character change?
+Some more advanced bootloaders do augment the DT passed to the kernel
+by these properties already. In such case, it is wrong for kernel to
+override these values.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 6852809..f02f4fe 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1509,7 +1509,7 @@ static int devm_clk_match(struct device *dev, void *res, void *data)
-  */
- void devm_clk_unregister(struct device *dev, struct clk *clk)
- {
--       WARN_ON(devres_destroy(dev, devm_clk_release, devm_clk_match, clk));
-+       WARN_ON(devres_release(dev, devm_clk_release, devm_clk_match, clk));
- }
- EXPORT_SYMBOL(devm_clk_unregister);
+Adjust the FEC MAC address loading so that in case the DT properties
+are already present in the DT passed from the bootloader, skip the
+loading from OCOTP altogether. If the DT properties are not present,
+load them from OCOTP.
+
+Note that the later case will lead to zeroed out MAC address if OCOTP
+is not programmed. This will lead to FEC not working at all.
+
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 71d47f5..3f29a52 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
+ 		if (!np)
+ 			return;
++
++		if (of_get_property(np, "local-mac-address", NULL))
++			continue;
++
+ 		from = np;
  
-
+ 		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
