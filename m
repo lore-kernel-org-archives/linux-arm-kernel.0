@@ -1,7 +1,7 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Sep 2012 22:22:05 -0600
-Subject: bcm2835: property mailbox or dedicated mailbox for upstream?
-Message-ID: <505BEB6D.2040200@wwwdotorg.org>
+Date: Thu, 20 Sep 2012 22:40:57 -0600
+Subject: bcm2835: device tree for mbox-driven devices in upstream
+Message-ID: <505BEFD9.1020809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,35 +12,97 @@ a "mailbox" interface, with SW-defined/implemented messages. The mailbox
 interface defines so-called channels, and on each channel a certain
 format of messages and protocol is expected.
 
-For some message types, there are different protocols that may be used.
-For example, both power management, framebuffer messages may be sent on
-the older dedicated channels (0, 1 respectively) or using a more
-extensible format on the "property" channel (8/9).
+The existing downstream rpi-split branch uses the following structure
+for regulators implemented using the firmware mailbox interface:
 
-I'd like to propose that for the upstream kernel, we exclusively use the
-new property mailbox for the features it supports. In general, the
-messages implemented via this protocol are much more flexible and/or
-complete than those implemented on the older dedicated channels.
+vc_mbox: mbox {
+    compatible = "broadcom,bcm2835-mbox";
+    reg = <0xB880 0x40>;
+    interrupts = <0 1>;
+    #channel-cells = <1>;
+};
 
-For example, for power management, each message deals with a single HW
-module at a time (SD, USB, etc.). This allows each regulator driver on
-the Linux side to be coded completely independently. However, the older
-dedicated channel requires a bitmask that defines the state of all HW
-modules at once, which requires code to unify all the regulator states
-together when sending messages, which make the Linux driver more complex.
+power {
+    compatible = "broadcom,bcm2835-power-mgr", "simple-bus";
+    #address-cells = <1>;
+    #size-cells = <0>;
 
-This of course would make the upstream kernel non-compatible with older
-firmwares. But, updating firmware is trivial (copy a file to your SD
-card), so this doesn't seem like too big of an issue.
+    /* This is assuming the old dedicated channel 0 for power */
+    broadcom,vc-mailbox = <&vc_mbox 0>;
 
-Does anyone disagree with this, or have any other comments?
+    reg_sd: regulator at 0 {
+        compatible = "broadcom,bcm2835-power-dev";
+        reg = <0>;
+    };
 
-BTW, are the message formats (for those messages which are defined)
-considered stable now; all future changes will be made in a
-backwards-compatible fashion?
+    reg_usbhcd: regulator at 3 {
+        compatible = "broadcom,bcm2835-power-dev";
+        reg = <3>;
+    };
+};
 
-Perhaps it would be useful to define a new message for "get protocol
-version" which would indicate major (incompatible version) and minor
-(compatible extensions such as new messages available, or extending
-existing messages with more data). Or, should this be inferred from the
-existing "get firmware version" message?
+display {
+    compatible = "broadcom,bcm2835-fb";
+    /* This is assuming the old dedicated channel 1 for fb */
+    broadcom,vc-mailbox = <&vc_mbox 1>;
+};
+
+Thinking about this a bit, I see:
+
+a) A parallel between the mailbox node/device and the virtual buses used
+by hypervisors for para-virtualized devices.
+
+b) The devices that implement communication across the mailbox API are
+logically children of the mailbox device, being addressed/controlled via
+the bus.
+
+As such, I think it'd make more sense to rework the device tree along
+the following lines while upstreaming the code:
+
+vc_mbox: mbox {
+    compatible = "broadcom,bcm2835-mbox";
+    reg = <0xB880 0x40>;
+    interrupts = <0 1>;
+
+    channels {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        channel at 2 {
+            /* This is the mbox channel ID */
+            reg = <2>;
+
+            uart {
+                /* MBOX-based virtual UART */
+                compatible = "broadcom,bcm2835-mbox-vuart";
+            };
+        };
+
+        channel at 8 {
+            /*
+             * This is the mbox channel ID. Here we assume the new
+             * property mailbox channel for most devices; see my
+             * previous email.
+             */
+            reg = <8>;
+
+            /*
+             * Multiple independant ojects may communicate over the same
+             * channel, for the protocol on some channels at least.
+             */
+            reg_sd: sd {
+                compatible = "broadcom,bcm2835-mbox-power";
+            };
+
+            reg_usbhcd: usbhcd {
+                compatible = "broadcom,bcm2835-mbox-power";
+            };
+
+            display {
+                compatible = "broadcom,bcm2835-mbox-fb";
+            };
+        };
+    };
+};
+
+Does anyone have any comments/suggestions on this?
