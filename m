@@ -1,79 +1,142 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Fri, 21 Sep 2012 09:24:19 -0700
-Subject: [PATCH 4/6] staging: drm/imx: Add i.MX IPUv3 crtc support
-In-Reply-To: <1348214872-28594-5-git-send-email-s.hauer@pengutronix.de>
-References: <1348214872-28594-1-git-send-email-s.hauer@pengutronix.de>
- <1348214872-28594-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <505C94B3.3020308@boundarydevices.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Sep 2012 10:37:03 -0600
+Subject: [PATCH 2/3] i2c: mux: Add dt support to i2c-mux-gpio driver
+In-Reply-To: <1348241535-27754-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1348241535-27754-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <505C97AF.9060701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 09/21/2012 09:32 AM, Maxime Ripard wrote:
+> Allow the i2c-mux-gpio to be used by a device tree enabled device. The
+> bindings are inspired by the one found in the i2c-mux-pinctrl driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-While testing against a video-enabled U-Boot on i.MX6, I found the issue
-below.
-
-On 09/21/2012 01:07 AM, Sascha Hauer wrote:
-> This adds a i.MX51/53/6 IPU (Image Processing Unit) KMS driver. The
-> driver has been tested on the i.MX51 babbage board, the i.MX53 LOCO
-> board and the i.MX6q sabrelite board in different clone mode and dual
-> head setups.
->
-> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
-> ---
-> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-> @@ -0,0 +1,579 @@
-> +/*
-> + * i.MX IPUv3 Graphics driver
-> + *
- >
- > <snip>
- >
-> +static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
-> +		struct ipu_client_platformdata *pdata)
-> +{
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+> @@ -0,0 +1,86 @@
+> +GPIO-based I2C Bus Mux
 > +
-> +	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
-> +			IPU_IRQ_EOF);
-
-Interrupts get enabled here
-
-> +	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
-> +			"imx_drm", ipu_crtc);
-> +	if (ret<  0) {
-> +		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
-> +		goto err_out;
-> +	}
+> +This binding describes an I2C bus multiplexer that uses GPIOs to
+> +route the I2C signals.
 > +
->
-> <snip>
->
+> +                                 +-----+  +-----+
+> +                                 | dev |  | dev |
+> +    +------------------------+   +-----+  +-----+
+> +    | SoC                    |      |        |
+> +    |                   /----|------+--------+
+> +    |   +---+   +------+     | child bus A, on GPIO value set to 0
+> +    |   |I2C|---| Mux  |     |
+> +    |   +---+   +--+---+     | child bus B, on GPIO value set to 1
+> +    |              |    \----|------+--------+--------+
+> +    |   +------+   |         |      |        |        |
+> +    |   | GPIO |---+         |  +-----+  +-----+  +-----+
+> +    |   +------+             |  | dev |  | dev |  | dev |
+> +    +------------------------+  +-----+  +-----+  +-----+
+
+The "Mux" box should be outside the SoC, since it isn't part of the SoC
+itself but something external.
+
+> +Required properties:
+> +- compatible: i2c-mux-gpio
+> +- i2c-parent: The phandle of the I2C bus that this multiplexer's master-side
+> +  port is connected to.
 > +
-> +static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
-> +		struct ipu_client_platformdata *pdata)
-> +{
-> +	int ret;
+> +Also required are:
 > +
-> +	ret = ipu_get_resources(ipu_crtc, pdata);
-> +	if (ret) {
-> +		dev_err(ipu_crtc->dev, "getting resources failed with %d.\n",
-> +				ret);
-> +		return ret;
-> +	}
+> +- muxer-gpios: list of gpios to use to control the muxer
+
+Perhaps just "mux-gpios"? Bikeshedding, I know...
+
+> +* Standard I2C mux properties. See mux.txt in this directory.
 > +
+> +* I2C child bus nodes. See mux.txt in this directory.
+> +
+> +For each i2c child nodes, an I2C child bus will be created. They will
+> +be numbered based on the reg property of each nodes.
 
-But ipu_crtc->imx_crtc gets initialized in this call, and
-ipu_irq_handler() makes use of it.
+s/nodes/node/ in both of the two lines above.
 
-The U-Boot code doesn't enable interrupts, so it's not acking
-along the way, and leaves bits set in IPU1_INT_STAT_15.
+> +Whenever an access is made to a device on a child bus, the value set
+> +in the revelant node's reg property will be outputed using the list of
 
-I found that I can get around this in U-Boot by disabling the
-LCD controller and acking all of the interrupts after disabling
-the controller, but I haven't yet figured out where to tap into 
-cleanup_before_linux().
+s/outputed/output/
 
-Regards,
+> +GPIOs, the first in the list holding the most-significant value.
+> +
+> +If an idle state is defined, using the idle-state (optional) property,
+
+The idle-state property isn't documented in the list of properties above.
+
+> +whenever an access is not being made to a device on a child bus, the
+> +idle value will be programmed into the GPIOs.
+> +
+> +If an idle state is not defined, the most recently used value will be
+> +left programmed into hardware whenever no access is being made of a
+> +device on a child bus.
+> +
+> +Example:
+> +	i2cmux {
+> +		compatible = "i2c-mux-gpio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		muxer-gpios = <&gpio1 22 0 &gpio1 23 0>;
+> +		i2c-parent = <&i2c1>;
+> +
+> +		i2c at 0 {
+> +			reg = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		i2c at 1 {
+> +		      reg = <1>;
+> +		      #address-cells = <1>;
+> +		      #size-cells = <0>;
+> +		};
+
+The indentation above is a mix of TABs and spaces, and is inconsistent
+between nodes; just TABs would be best.
+
+> +
+> +		i2c at 2 {
+> +			reg = <2>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+
+I'm not sure it's a good idea to have example bus nodes that are empty;
+why not leave out two of the options, and put some device on each of the
+buses that is defined?
 
 
-Eric
+> +		i2c at 3 {
+> +			reg = <3>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			pca9555: pca9555 at 20 {
+> +				compatible = "nxp,pca9555";
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				reg = <0x20>;
+> +			};
+> +		};
+> +	};
+
+> diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
+
+> +#ifdef CONFIG_OF
+> +static int __devinit i2c_mux_gpio_probe_dt(struct gpiomux *mux,
+> +					struct platform_device *pdev)
+
+> +	mux->data->n_values = of_get_child_count(np);
+> +
+> +	values = devm_kzalloc(&pdev->dev, sizeof(*mux->data->values), GFP_KERNEL);
+
+Don't you need to multiply the size by mux->data->n_values?
+
+> +	gpios = devm_kzalloc(&pdev->dev, mux->data->n_gpios, GFP_KERNEL);
+
+Don't you need to multiple the size by sizeof(*gpios) here?
