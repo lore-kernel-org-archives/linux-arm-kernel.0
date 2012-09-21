@@ -1,120 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 21 Sep 2012 10:00:37 +0900
-Subject: [PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
-In-Reply-To: <CAHkRjk500KGTeBD67YMWy2qSdaoO_=Y9WBT_Q78n9Zxgqtmo4w@mail.gmail.com>
-References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
- <1347434097-7924-3-git-send-email-horms@verge.net.au>
- <5050CD87.4020800@codeaurora.org>
- <20120913010041.GD7622@verge.net.au>
- <CAHkRjk500KGTeBD67YMWy2qSdaoO_=Y9WBT_Q78n9Zxgqtmo4w@mail.gmail.com>
-Message-ID: <20120921010037.GI21660@verge.net.au>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 21 Sep 2012 09:01:54 +0800
+Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
+In-Reply-To: <20120920223505.GA29721@lizard>
+References: <20120714081254.GD20018@lizard>
+ <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
+ <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
+ <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
+ <20120823122239.GA29485@lizard>
+ <CAN1soZy-O2DGH89QwhBOiR=1+cv81t779EwwcYevU68bLkMdfQ@mail.gmail.com>
+ <20120920223505.GA29721@lizard>
+Message-ID: <CAN1soZxd8yGpTRg21u4s0Gk4qc9HH2KmJcSc2yrR_QzHDGUqoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 10:35:50AM +0100, Catalin Marinas wrote:
-> On 13 September 2012 02:00, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Sep 12, 2012 at 10:59:35AM -0700, Stephen Boyd wrote:
-> >> On 09/12/12 00:14, Simon Horman wrote:
-> >> > @@ -1423,6 +1423,15 @@ config ARM_ERRATA_775420
-> >> >           deadlock. This workaround puts DSB before executing ISB at the
-> >> >           beginning of the abort exception handler.
-> >> >
-> >> > +config ARM_ERRATA_782773
-> >> > +   bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
-> >> > +   depends on CPU_V7
-> >> > +   help
-> >> > +     This option enables the workaround for the 782773 Cortex-A9 (all r0,
-> >> > +     ,r2 and r3 revisions) erratum. It might cause MMU exception in case
-> >>
-> >> Seems to be an extra comma here.
-> >
-> > Thanks, here is an updated version.
-> >
-> > From: Kouei Abe <kouei.abe.cp@rms.renesas.com>
-> >
-> > arm: Add ARM ERRATA 782773 workaround
-> >
-> > Signed-off-by: Kouei Abe <kouei.abe.cp@rms.renesas.com>
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> 
-> I would add some text to the commit log as well, even though it
-> matches the Kconfig entry.
+On Fri, Sep 21, 2012 at 6:35 AM, Anton Vorontsov
+<anton.vorontsov@linaro.org> wrote:
+> On Thu, Sep 13, 2012 at 03:48:11PM +0800, Haojian Zhuang wrote:
+>> On Thu, Aug 23, 2012 at 8:22 PM, Anton Vorontsov
+>> <anton.vorontsov@linaro.org> wrote:
+>> > On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
+>> >> Thanks for helping me to amend these patch.  I got many good
+>> >> suggestions and learn a lot in this process:) BTW, you mean you will
+>> >> help to amend that several minor warning with battery tree?
+>> >
+>> > Yup, I have these small fixups locally in my tree already, so if/once
+>> > Samuel gives me an Ack for the mfd part, I'll merge it into battery git
+>> > tree.
+>>
+>> Any updates?
+>
+> OK, I guess I can just go ahead and apply it, the MFD changes are very
+> trivial anyway. So, this is now applied (along with some fixups that
+> I was talking about in my previous reply).
+>
+> Thank you!
+>
+> Anton.
 
-Sure, an updated patch is below.
-I also reworded the text to make it easier on my eyes,
-I don't think the meaning has been altered.
+Thanks
 
-> Have you hit this in practice? In general the kernel shouldn't access
-> kernel virtual address corresponding to a page table that is being
-> changed. For user address space it is possible but the kernel can
-> handle use translation faults, even though they may be spurious.
-
-I believe that Abe-san's team have come up against this,
-I can confirm that if it is important.
-
-----------------------------------------------------------------
-From: Kouei Abe <kouei.abe.cp@rms.renesas.com>
-
-arm: Add ARM ERRATA 782773 workaround
-
-This is a workaround for Errata 782773 which effects all r0, r2 and r3
-revisions.
-
-The work-around avoids the possibility of an MMU exception in the case
-where a page table walk occurs immediately after a page table update
-that hasn't been flushed from the L1 data cache.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Kouei Abe <kouei.abe.cp@rms.renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
-
----
-
-v2
-* Reword Kconfig description
-* Add some details to changelog entry
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 48c19d4..2b76164 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1423,6 +1423,15 @@ config ARM_ERRATA_775420
- 	 to deadlock. This workaround puts DSB before executing ISB if
- 	 an abort may occur on cache maintenance.
- 
-+config ARM_ERRATA_782773
-+	bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
-+	depends on CPU_V7
-+	help
-+	  This option enables the workaround for the 782773 Cortex-A9 (all r0,
-+	  r2 and r3 revisions) erratum. It might cause MMU exception in case
-+	  page table walk happens just after updating the existing
-+	  with setting page table in L1 data cache.
-+
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index fd045e7..9207b9f 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -103,9 +103,17 @@ ENTRY(cpu_v7_set_pte_ext)
- 	tstne	r1, #L_PTE_PRESENT
- 	moveq	r3, #0
- 
-+#ifdef CONFIG_ARM_ERRATA_782773
-+	mrs	r2, cpsr			@ save cpsr
-+	cpsid	if				@ disable interrupts
-+	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
-+#endif
-  ARM(	str	r3, [r0, #2048]! )
-  THUMB(	add	r0, r0, #2048 )
-  THUMB(	str	r3, [r0] )
-+#ifdef CONFIG_ARM_ERRATA_782773
-+	msr	cpsr_c, r2			@ load cpsr
-+#endif
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
- #endif
- 	mov	pc, lr
--- 
-1.7.10.4
+Haojian
