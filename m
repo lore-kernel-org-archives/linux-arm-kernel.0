@@ -1,84 +1,120 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 21 Sep 2012 18:10:24 -0700
-Subject: [PATCH 00/10] Convert MSM to common clock framework
-In-Reply-To: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
-References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120922011024.12878.64598@nucleus>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 22 Sep 2012 03:41:48 +0200
+Subject: [PATCH 2/3 V3] phy/micrel: Rename KS80xx to KSZ80xx
+In-Reply-To: <1348278110-11603-1-git-send-email-marex@denx.de>
+References: <1348278110-11603-1-git-send-email-marex@denx.de>
+Message-ID: <1348278110-11603-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2012-09-20 19:26:48)
-> This patchset moves the existing MSM clock code and affected drivers to the
-> common clock framework. A prerequisite of moving to the common clock
-> framework is to use clk_prepare() and clk_enable() so the first
-> few patches migrate drivers to that call (clk_prepare() is a no-op on MSM
-> right now). It also removes some custom clock APIs that MSM provides
-> and finally moves the proc_comm clock code to the common struct clock.
-> 
-> This patch series will be used as the foundation of the MSM 8660/8960
-> clock code that I plan to send out soon.
-> 
-> These patches have one dependency on the devm_clk_register() function
-> which I already posted to the list[1]. They're based on linux-next-20120917.
-> 
+There is no such part as KS8001, KS8041 or KS8051. There are only
+KSZ8001, KSZ8041 and KSZ8051. Rename these parts as such to match
+the Micrel naming.
 
-Hi Stephen,
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: David J. Choi <david.choi@micrel.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |    2 +-
+ drivers/net/phy/micrel.c     |   18 +++++++++---------
+ include/linux/micrel_phy.h   |    6 +++---
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
-Thanks for sending this!  It is too much churn to take in for the 3.7
-merge window.  As such I'll put reviewing this on my TODO list, but it
-might wait until after the merge window settles down.
+V2: Rebase this on adjusted 1/3 patch
+V3: Resend, rebased on V2
 
+NOTE: This affect one board in Linux ARM, but the change is
+      very minor it should not cause merge conflict, so if
+      this could go through net, that would be for the best.
 
-Regards,
-Mike
-
-> Stephen Boyd (10):
->   usb: otg: msm: Convert to clk_prepare/unprepare
->   msm_sdcc: Convert to clk_prepare/unprepare
->   msm: iommu: Convert to clk_prepare/unprepare
->   msm: iommu: Use clk_set_rate() instead of clk_set_min_rate()
->   ARM: msm: Remove custom clk_set_flags() API
->   ARM: msm: Remove custom clk_set_{max,min}_rate() API
->   ARM: msm: Remove clock-7x30.h include file
->   ARM: msm: Prepare clk_get() users in mach-msm for clock-pcom driver
->   ARM: msm: Make proc_comm clock control into a platform driver
->   ARM: msm: Migrate to common clock framework
-> 
->  arch/arm/Kconfig                       |   1 +
->  arch/arm/mach-msm/Makefile             |  10 +-
->  arch/arm/mach-msm/board-halibut.c      |   2 +-
->  arch/arm/mach-msm/board-msm7x30.c      |   2 +-
->  arch/arm/mach-msm/board-qsd8x50.c      |   2 +-
->  arch/arm/mach-msm/board-trout-panel.c  |  19 ++--
->  arch/arm/mach-msm/board-trout.c        |   3 +-
->  arch/arm/mach-msm/clock-7x30.h         | 155 ------------------------------
->  arch/arm/mach-msm/clock-debug.c        | 130 --------------------------
->  arch/arm/mach-msm/clock-pcom.c         | 149 ++++++++++++++++++-----------
->  arch/arm/mach-msm/clock-pcom.h         |  31 +++---
->  arch/arm/mach-msm/clock.c              | 166 +--------------------------------
->  arch/arm/mach-msm/clock.h              |  51 +++-------
->  arch/arm/mach-msm/devices-msm7x00.c    |  12 ++-
->  arch/arm/mach-msm/devices-msm7x30.c    |  13 ++-
->  arch/arm/mach-msm/devices-qsd8x50.c    |  11 ++-
->  arch/arm/mach-msm/devices.h            |  15 +--
->  arch/arm/mach-msm/dma.c                |   5 +-
->  arch/arm/mach-msm/include/mach/board.h |   5 -
->  arch/arm/mach-msm/include/mach/clk.h   |   9 --
->  drivers/iommu/msm_iommu_dev.c          |  20 ++--
->  drivers/mmc/host/msm_sdcc.c            |  14 ++-
->  drivers/usb/otg/msm_otg.c              |  38 ++++----
->  23 files changed, 222 insertions(+), 641 deletions(-)
->  delete mode 100644 arch/arm/mach-msm/clock-7x30.h
->  delete mode 100644 arch/arm/mach-msm/clock-debug.c
-> 
-> [1] https://lkml.org/lkml/2012/9/19/28
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 3f29a52..fc9c8d5 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -295,7 +295,7 @@ static void __init apx4devkit_init(void)
+ 	enable_clk_enet_out();
+ 
+ 	if (IS_BUILTIN(CONFIG_PHYLIB))
+-		phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
++		phy_register_fixup_for_uid(PHY_ID_KSZ8051, MICREL_PHY_ID_MASK,
+ 					   apx4devkit_phy_fixup);
+ 
+ 	mxsfb_pdata.mode_list = apx4devkit_video_modes;
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index e84aa2f..b05d6f7 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -154,9 +154,9 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8041,
++	.phy_id		= PHY_ID_KSZ8041,
+ 	.phy_id_mask	= 0x00fffff0,
+-	.name		= "Micrel KS8041",
++	.name		= "Micrel KSZ8041",
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause
+ 				| SUPPORTED_Asym_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -167,9 +167,9 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8051,
++	.phy_id		= PHY_ID_KSZ8051,
+ 	.phy_id_mask	= 0x00fffff0,
+-	.name		= "Micrel KS8051",
++	.name		= "Micrel KSZ8051",
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause
+ 				| SUPPORTED_Asym_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -180,8 +180,8 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8001,
+-	.name		= "Micrel KS8001 or KS8721",
++	.phy_id		= PHY_ID_KSZ8001,
++	.name		= "Micrel KSZ8001 or KS8721",
+ 	.phy_id_mask	= 0x00ffffff,
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -227,11 +227,11 @@ MODULE_LICENSE("GPL");
+ 
+ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
+ 	{ PHY_ID_KSZ9021, 0x000ffffe },
+-	{ PHY_ID_KS8001, 0x00ffffff },
++	{ PHY_ID_KSZ8001, 0x00ffffff },
+ 	{ PHY_ID_KS8737, 0x00fffff0 },
+ 	{ PHY_ID_KSZ8021, 0x00ffffff },
+-	{ PHY_ID_KS8041, 0x00fffff0 },
+-	{ PHY_ID_KS8051, 0x00fffff0 },
++	{ PHY_ID_KSZ8041, 0x00fffff0 },
++	{ PHY_ID_KSZ8051, 0x00fffff0 },
+ 	{ }
+ };
+ 
+diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+index be7f366..d02355d 100644
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -6,10 +6,10 @@
+ #define PHY_ID_KSZ9021		0x00221610
+ #define PHY_ID_KS8737		0x00221720
+ #define PHY_ID_KSZ8021		0x00221555
+-#define PHY_ID_KS8041		0x00221510
+-#define PHY_ID_KS8051		0x00221550
++#define PHY_ID_KSZ8041		0x00221510
++#define PHY_ID_KSZ8051		0x00221550
+ /* both for ks8001 Rev. A/B, and for ks8721 Rev 3. */
+-#define PHY_ID_KS8001		0x0022161A
++#define PHY_ID_KSZ8001		0x0022161A
+ 
+ /* struct phy_device dev_flags definitions */
+ #define MICREL_PHY_50MHZ_CLK	0x00000001
+-- 
+1.7.10.4
