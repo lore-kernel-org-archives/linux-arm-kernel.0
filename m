@@ -1,48 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 22 Sep 2012 08:44:45 -0700
-Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
-In-Reply-To: <alpine.DEB.2.00.1209220442010.16893@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
- <20120921205322.GK28835@atomide.com>
- <20120921231039.GN28835@atomide.com>
- <alpine.DEB.2.00.1209220442010.16893@utopia.booyaka.com>
-Message-ID: <20120922154444.GQ28835@atomide.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Sat, 22 Sep 2012 17:45:12 +0200
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <20120921220302.GF2454@linux.vnet.ibm.com>
+References: <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
+ <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
+ <20120920220130.GN2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
+ <20120920232114.GO2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209211803290.8839@utopia.booyaka.com>
+ <20120921185827.GC2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209211900520.8839@utopia.booyaka.com>
+ <20120921195717.GD2454@linux.vnet.ibm.com>
+ <20120921203149.GI28835@atomide.com>
+ <20120921220302.GF2454@linux.vnet.ibm.com>
+Message-ID: <CAFTL4hy5wO9CL5_1e8U7L3Tihm_HYD6uAsda3ue-zDKFjir2Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120921 22:41]:
-> 
-> On Fri, 21 Sep 2012, Tony Lindgren wrote:
-> 
-> > * Tony Lindgren <tony@atomide.com> [120921 13:55]:
-> > 
-> > Care to base this on something more mergeable? Maybe a merge
-> > of cleanup-fixes-for-v3.7 + omap-devel-am33xx-for-v3.7?
-> 
-> While working on this, noticed that the 4430ES2 Panda test boot failed on 
-> the merge base of cleanup-fixes-for-v3.7 and omap-devel-am33xx-for-v3.7.  
-> Enabling DEBUG_LL and adding some debug revealed that the static variable 
-> 'arch_clkdm' in mach-omap2/clockdomain.c was getting overwritten between 
-> omap44xx_clockdomains_init() and the end of IRQ setup.  This was bisected 
-> down to this commit:
-> 
-> commit ec2c0825ca3183a646a24717966cc7752e8b0393
-> Author: Tony Lindgren <tony@atomide.com>
-> Date:   Mon Aug 27 17:43:01 2012 -0700
-> 
->     ARM: OMAP2+: Remove hardcoded IRQs and enable SPARSE_IRQ
->     
->     Remove hardcoded IRQs in irqs.h and related files as these
->     are no longer needed.
->     
-> ...
-> 
-> Looks to me like something is wrong with the IRQ allocation and it's 
-> corrupting memory.
+2012/9/22 Paul E. McKenney <paulmck@linux.vnet.ibm.com>:
+> On Fri, Sep 21, 2012 at 01:31:49PM -0700, Tony Lindgren wrote:
+>> * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [120921 12:58]:
+>> >
+>> > Just to make sure I understand the combinations:
+>> >
+>> > o   All stalls have happened when running a minimal userspace.
+>> > o   CONFIG_NO_HZ=n suppresses the stalls.
+>> > o   CONFIG_RCU_FAST_NO_HZ (which depends on CONFIG_NO_HZ=y) has
+>> >     no observable effect on the stalls.
+>>
+>> The reason why you may need minimal userspace is to cut down
+>> the number of timers waking up the system with NO_HZ.
+>> Booting with init=/bin/sh might also do the trick for that.
+>
+> Good point!  This does make for a very quiet system, but does not
+> reproduce the problem under kvm, even after waiting for four minutes.
+> I will leave it for more time, but it looks like I really might need to
+> ask Linaro for remote access to a Panda.
 
-Yeah I bet that's e534e871 (ARM: OMAP4: Fix array size for irq_target_cpu)
-already in mainline since -rc6.
+I have one. I'm currently installing Ubuntu on it and I'll try to
+manage to build
+a kernel and reproduce the issue.
 
-Regards,
-
-Tony
+I'll give more news soon.
