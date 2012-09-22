@@ -1,26 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 22 Sep 2012 11:43:03 -0400
-Subject: [alsa-devel] [PATCH v2 00/34] i.MX multi-platform support
-In-Reply-To: <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <201209200739.34899.arnd@arndb.de>
- <20120920145342.GI2450@S2101-09.ap.freescale.net>
- <201209201556.57171.arnd@arndb.de>
- <20120921080123.GM2450@S2101-09.ap.freescale.net>
- <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
-Message-ID: <20120922154303.GO4495@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 22 Sep 2012 08:44:45 -0700
+Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
+In-Reply-To: <alpine.DEB.2.00.1209220442010.16893@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
+ <20120921205322.GK28835@atomide.com>
+ <20120921231039.GN28835@atomide.com>
+ <alpine.DEB.2.00.1209220442010.16893@utopia.booyaka.com>
+Message-ID: <20120922154444.GQ28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 01:26:43AM -0700, Olof Johansson wrote:
+* Paul Walmsley <paul@pwsan.com> [120921 22:41]:
+> 
+> On Fri, 21 Sep 2012, Tony Lindgren wrote:
+> 
+> > * Tony Lindgren <tony@atomide.com> [120921 13:55]:
+> > 
+> > Care to base this on something more mergeable? Maybe a merge
+> > of cleanup-fixes-for-v3.7 + omap-devel-am33xx-for-v3.7?
+> 
+> While working on this, noticed that the 4430ES2 Panda test boot failed on 
+> the merge base of cleanup-fixes-for-v3.7 and omap-devel-am33xx-for-v3.7.  
+> Enabling DEBUG_LL and adding some debug revealed that the static variable 
+> 'arch_clkdm' in mach-omap2/clockdomain.c was getting overwritten between 
+> omap44xx_clockdomains_init() and the end of IRQ setup.  This was bisected 
+> down to this commit:
+> 
+> commit ec2c0825ca3183a646a24717966cc7752e8b0393
+> Author: Tony Lindgren <tony@atomide.com>
+> Date:   Mon Aug 27 17:43:01 2012 -0700
+> 
+>     ARM: OMAP2+: Remove hardcoded IRQs and enable SPARSE_IRQ
+>     
+>     Remove hardcoded IRQs in irqs.h and related files as these
+>     are no longer needed.
+>     
+> ...
+> 
+> Looks to me like something is wrong with the IRQ allocation and it's 
+> corrupting memory.
 
-> I'll take a look at merging it tomorrow after I've dealt with smp_ops;
-> if it looks reasonably conflict-free I'll pull it in. We need the
-> sound dependency sorted out (or agreed upon) first though.
+Yeah I bet that's e534e871 (ARM: OMAP4: Fix array size for irq_target_cpu)
+already in mainline since -rc6.
 
-I guess in the light of the rest of the thread it doesn't much matter
-for this merge window but I just pushed:
+Regards,
 
- git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git tags/asoc-3.7
-
-which is signed so can happily be merged elsewhere.
+Tony
