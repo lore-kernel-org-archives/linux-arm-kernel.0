@@ -1,77 +1,55 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 22 Sep 2012 15:17:14 +0200
-Subject: [PATCH 2/5] ARM: Add interface for registering and calling
- firmware-specific operations
-In-Reply-To: <20120922062322.GA6264@quad.lixom.net>
-References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
- <CAH9JG2XFVzyZH8rsBogVYRdD4dzWpKjX8JAQw0Sf7qJqgueqAg@mail.gmail.com>
- <20120922062322.GA6264@quad.lixom.net>
-Message-ID: <2370637.l5XxG4tm0Y@flatron>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Sep 2012 09:21:02 -0400
+Subject: [GIT PULL V3 2/5] ARM: Kirkwood: DT changes for v3.7
+In-Reply-To: <20120922051158.GA32245@quad.lixom.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+ <20120921194629.GW5469@titan.lakedaemon.net>
+ <20120922051158.GA32245@quad.lixom.net>
+Message-ID: <20120922132102.GC5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kyungmin,
-
-On Friday 21 of September 2012 23:23:22 Olof Johansson wrote:
-> On Sat, Sep 22, 2012 at 03:01:56PM +0900, Kyungmin Park wrote:
-> > On 9/22/12, Olof Johansson <olof@lixom.net> wrote:
-> > > On Thu, Sep 13, 2012 at 10:13:35AM +0200, Tomasz Figa wrote:
-> > >> +#define call_firmware_op(op, ...)					\
-> > >> +	((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : 0)
-> > > 
-> > > I think this will cause sparse warnings for
-> > > call_firmware_op(cpu_boot_reg) if there are no ops defined, since
-> > > the '0' isn't annotated as __iomem. And you can't annotate it since
-> > > the other function pointers don't need it.
-> > > 
-> > > I think you might be better off with stub functions as fallbacks
-> > > instead of allowing and checking for NULL here.
+On Fri, Sep 21, 2012 at 10:11:58PM -0700, Olof Johansson wrote:
+> Hi Jason,
+> 
+> On Fri, Sep 21, 2012 at 03:46:29PM -0400, Jason Cooper wrote:
+> > The following changes since commit 5b40baee4a39d96d4d6a48a2b2383982912c429b:
 > > 
-> > do you mean like this?
+> >   arm: mvebu: add address decoding controller to the DT (2012-09-21 18:05:29 +0000)
 > > 
-> > #Ifdef CONFIG_ARM_FIRMWARE
-> > #define call_firmware_op(op, ...) ((firmware_ops->op) ?
-> > firmware_ops->op(__VA_ARGS__) : 0)
-> > #else
-> > #define call_firmware_op(op, ...) do { } while (0)
-> > #endif
-> > 
-> > No problem to modify it.
+> > are available in the git repository at:
+> >   git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
 > 
-> To get the types and return values right you still need to do something
-> like:
-> 
-> #define call_firmware_op(op, ...) (firmware_ops->op(__VA_ARGS))
-> 
-> And then, in firmware.c:
-> 
-> static int default_do_idle(void)
-> {
-> 	return 0;
-> }
-> 
-> static default_cpu_boot(int cpu)
-> {
-> 	return;
-> }
-> 
-> static void __iomem *default_cpu_boot_reg(int cpu)
-> {
-> 	return (void __iomem *)0;
-> }
-> 
-> static const struct firmware_ops default_firmware_ops = {
-> 	.do_idle = default_do_idle,
-> 	.cpu_boot = default_cpu_boot,
-> 	.cpu_boot_reg = default_cpu_boot_reg,
-> }
+> Looking at this branch, it's much more than just device tree updates.
 
-Thanks for pointing this out. I will address it in next version of the 
-series.
+Ok, my thinking was they (pinctrl and gpio) were devicetree-only
+drivers, see below.
 
-Also it might be useful to be able to check if an operation was provided, 
-so maybe an unimplemented operation should return an error value (which one 
-would be the most appropriate? -ENOSYS?)? What do you think?
+> It introduces the pinctrl driver (and bindings), and the gpio driver (and
+> bindings). I think it would make more sense to break those two out to separate
+> topics, and keep the generic DT updates in this branch.
+> 
+> Also, see my comment on the EHCI binding patch. I wasn't going to ask you to
+> respin the branch to fix/drop that on its own, but if you do rebuild and split
+> this branch up you might as well delay those patches until the binding has been
+> fixed.
 
-Best regards,
-Tomasz Figa
+Ok.  I'll split out pinctrl and gpio into a kirkwood/drivers, leave the
+rest in /dt, and drop the ehci changes.  /drivers will still depend on
+/addr_decode, once you, Arnd, and Thomas work that out.  /dt should have
+no deps then.
+
+/cleanup will now depend only on /boards if we're dropping ehci for now.
+/defconfig will still only depend on /boards.
+/platform_data will still depend on everything kirkwood/*.
+
+So, I take it /boards is ok?
+
+> I'll pull in your branches under staging/* for now so they can get linux-next
+> coverage until the "real" branches come in.
+
+Okay, thanks.
+
+thx,
+
+Jason.
