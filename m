@@ -1,40 +1,95 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Sep 2012 23:08:17 -0700
-Subject: [GIT PULL][for 3.7] pull request on dt2 branch from arch-pxa
-In-Reply-To: <CAN1soZxC_KovdgENmsSQcUFkK2VgirkaKKSx1=RjLhULATw=+Q@mail.gmail.com>
-References: <CAN1soZxC_KovdgENmsSQcUFkK2VgirkaKKSx1=RjLhULATw=+Q@mail.gmail.com>
-Message-ID: <20120922060817.GJ32245@quad.lixom.net>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sat, 22 Sep 2012 08:10:48 +0200
+Subject: [PATCH] spi/imx: set the inactive state of the clock according
+ to the clock polarity
+In-Reply-To: <20120921075431.GS5525@pengutronix.de>
+References: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
+ <20120831023518.GE7726@r65073-Latitude-D630> <505C1913.1090004@de.bosch.com>
+ <20120921075431.GS5525@pengutronix.de>
+Message-ID: <505D5668.4040209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 04:24:58PM +0800, Haojian Zhuang wrote:
-> Hi Olof & Arnd,
-> 
-> Please help to merge dt2 branch from arch-pxa git tree.
-> 
-> Regards
-> Haojian
-> 
-> The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
-> 
->   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hzhuang1/linux.git dt2
-> 
-> for you to fetch changes up to 37586e0b9cadd1072196c3cca8ea8559b91b1605:
-> 
->   ARM: dt: mmp-dma: add binding file (2012-09-21 15:51:26 +0800)
-> 
-> ----------------------------------------------------------------
-> Zhangfei Gao (1):
->       ARM: dt: mmp-dma: add binding file
+On 21.09.2012 09:54, Uwe Kleine-K?nig wrote:
+> On Fri, Sep 21, 2012 at 09:36:51AM +0200, Dirk Behme wrote:
+>> On 31.08.2012 04:35, Shawn Guo wrote:
+>>> Copy Uwe ...
+> Copy our kernel mailing list ...
+>
+>> Ping ;)
+>>
+>> Any opinions on this?
+> Assuming it fixes access to a device I'm ok with your patch, but I don't
+> really feel responsible for the driver (i.e. me not acking shouldn't
+> have a negative influence on getting the patch in).
 
-What happened to the rest of this series? It makes more sense to merge the
-driver using the binding at the same time as the binding itself, so let's hold
-off until the driver is reviewed and ready to go in too (or, if you merge that
-through a different path, the binding could/should go with it there).
+Ok, thanks.
 
+I'm not so familiar with the SPI world: Who would be the best person 
+to ack this, and in case it's ok finally apply it, then?
 
--Olof
+Thanks
+
+Dirk
+
+>>> On Fri, Aug 31, 2012 at 10:55:11AM +0200, Dirk Behme wrote:
+>>>> From: Knut Wohlrab<knut.wohlrab@de.bosch.com>
+>>>>
+>>>> There are SPI devices which need a SPI clock with active low polarity and
+>>>> high inactive state.
+>>>>
+>>>> Add the setting of the inactive state ECSPIx_CONFIGREG:SCLK CTL
+>>>> according to the clock polarity ECSPIx_CONFIGREG:SCLK POL:
+>>>>
+>>>> DT without "spi-cpol" = 0 = clock active high polarity = inactive state low
+>>>> DT with    "spi-cpol" = 1 = clock active low  polarity = inactive state high
+>>>>
+>>>> Signed-off-by: Knut Wohlrab<knut.wohlrab@de.bosch.com>
+> If you forward a patch you must add your S-o-b.
+>
+>>>> ---
+>>>>
+>>>> Question: Are there real world examples for a need of an individual setting of
+>>>> clock polarity/inactive state?
+>>>
+>>> I'm less concerned about that.  We can always patch the driver when
+>>> the real world example occurs?
+> yes.
+>
+> Thanks
+> Uwe
+>
+>>>> drivers/spi/spi-imx.c |    6 ++++--
+>>>> 1 files changed, 4 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+>>>> index e834ff8..d64655b 100644
+>>>> --- a/drivers/spi/spi-imx.c
+>>>> +++ b/drivers/spi/spi-imx.c
+>>>> @@ -197,6 +197,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+>>>> #define MX51_ECSPI_CONFIG_SCLKPOL(cs)	(1<<  ((cs) +  4))
+>>>> #define MX51_ECSPI_CONFIG_SBBCTRL(cs)	(1<<  ((cs) +  8))
+>>>> #define MX51_ECSPI_CONFIG_SSBPOL(cs)	(1<<  ((cs) + 12))
+>>>> +#define MX51_ECSPI_CONFIG_SCLKCTL(cs)	(1<<  ((cs) + 20))
+>>>> #define MX51_ECSPI_INT		0x10
+>>>> #define MX51_ECSPI_INT_TEEN		(1<<   0)
+>>>> @@ -287,9 +288,10 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>>>> 	if (config->mode&  SPI_CPHA)
+>>>> 		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+>>>> -	if (config->mode&  SPI_CPOL)
+>>>> +	if (config->mode&  SPI_CPOL) {
+>>>> 		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
+>>>> -
+>>>> +		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
+>>>> +	}
+>>>> 	if (config->mode&  SPI_CS_HIGH)
+>>>> 		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+>>>> --
+>>>> 1.7.0.4
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
