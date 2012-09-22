@@ -1,77 +1,51 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sat, 22 Sep 2012 12:52:53 -0700
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <alpine.DEB.2.00.1209221813330.10663@utopia.booyaka.com>
-References: <20120920000351.GI2455@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
- <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
- <20120920220130.GN2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
- <alpine.DEB.2.00.1209211740170.8839@utopia.booyaka.com>
- <20120921212054.GE2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209212240190.31812@utopia.booyaka.com>
- <20120922000537.GH2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209221813330.10663@utopia.booyaka.com>
-Message-ID: <20120922195253.GD2934@linux.vnet.ibm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 22 Sep 2012 21:59:13 +0200
+Subject: Tracking down suspend/resume ext3/mmc issues on imx233
+In-Reply-To: <20120920000110.GA16672@thunk.org>
+References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+ <20120907060552.GL26709@S2101-09.ap.freescale.net>
+ <CAEOSq-PV+7c2nvu3uauOLJcV7WKa1jmd-df0a1H0qY5K4CM5MA@mail.gmail.com>
+ <CAKGA1bnug8nqcideOBZyLQZmiVo=G5L3aRHq4k4SNZyH132Y=g@mail.gmail.com>
+ <20120910163345.GB3942@thunk.org>
+ <20120919232349.GA24132@elf.ucw.cz>
+ <20120920000110.GA16672@thunk.org>
+Message-ID: <20120922195912.GA25644@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 06:16:15PM +0000, Paul Walmsley wrote:
-> Hi Paul
+Hi!
+
+On Wed 2012-09-19 20:01:10, Theodore Ts'o wrote:
+> On Thu, Sep 20, 2012 at 01:23:49AM +0200, Pavel Machek wrote:
+> > 
+> > I'm not sure I agree.
+> > 
+> > If you treat root fs as removable, you'll get "crash". You'll need to
+> > replay the journal, but data is safe.
+> > 
+> > If you treat it as non-removable, and someone manages to remove it,
+> > mount, and reinsert, you'll get silent data corruption.
 > 
-> On Fri, 21 Sep 2012, Paul E. McKenney wrote:
-> 
-> > I am wondering if your system somehow figured out how to start a grace
-> > period that had no RCU callbacks waiting for it.  If that happened,
-> > then a CONFIG_NO_HZ=y system could in theory get into a state where all
-> > CPUs are in dyntick-idle mode, so that none of them is doing anything
-> > to force the grace period to complete.
-> >
-> > That should be easy to diagnose, anyway.  Please see below, which
-> > includes the earlier diagnostic patch.
-> 
-> Here you go.
-> 
-> - Paul
-> 
-> [  248.902618] INFO: rcu_sched self-detected stall on CPU
-> [  248.905456]  0: (1 ticks this GP) idle=933/1/0 
-> [  248.907897]   (t=26570 jiffies g=11 c=10 q=0)
+> We could detect this case; if the file system gets mounted, the last
+> mount time will change.  So one of the things we could do is have the
+> file system code freeze the file system at suspend time, so the file
+> system is consistent (which will reduce the probability of data loss
+> if the system never comes back up after the suspend), and save the
+> last mount time and last write time in memory.  When the system comes
+> back from resume, have the file system code check the last mount and
+> last write time, and if they have changed, it can refuse the resume
+> and abort the system to avoid data corruption.  It would require
+> making ext3/ext4 suspend-aware, but it would be doable, if we really
+> wanted to support this.
 
-Bingo!!!  (q=0, in case you were wondering.  And thank you for testing this!)
+Yes please; I'd love to see this done.
 
-Strangely enough, I believe that I have inadvertently fixed this in
-my -rcu tree:
+We used to do sync() to get filesystem in consistent state, and I
+believe that these days we are doing filesystem freeze; but code
+validating the last mount time is certainly missing.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git rcu/next
-
-Nevertheless, if you get a chance to try it, I would be interested to
-hear if my guess is correct.  The trick is that a kthread drives the
-grace period in -rcu, regardless of whether or not there are callbacks.
-
-However, the backport would not be something that -stable would be happy
-with, so I will be putting together a fix for mainline.  This thing
-has been in the kernel since about 2004, not sure why you didn't hit
-it earlier.
-
-							Thanx, Paul
-
-> [  248.910339] [<c001bc90>] (unwind_backtrace+0x0/0xf0) from [<c00ad800>] (rcu_check_callbacks+0x220/0x714)
-> [  248.915527] [<c00ad800>] (rcu_check_callbacks+0x220/0x714) from [<c00532a0>] (update_process_times+0x38/0x68)
-> [  248.920928] [<c00532a0>] (update_process_times+0x38/0x68) from [<c008c9e8>] (tick_sched_timer+0x80/0xec)
-> [  248.926116] [<c008c9e8>] (tick_sched_timer+0x80/0xec) from [<c0068ed4>] (__run_hrtimer+0x7c/0x1e0)
-> [  248.930999] [<c0068ed4>] (__run_hrtimer+0x7c/0x1e0) from [<c0069cb8>] (hrtimer_interrupt+0x11c/0x2d0)
-> [  248.936035] [<c0069cb8>] (hrtimer_interrupt+0x11c/0x2d0) from [<c001a3cc>] (twd_handler+0x30/0x44)
-> [  248.940948] [<c001a3cc>] (twd_handler+0x30/0x44) from [<c00a7bd0>] (handle_percpu_devid_irq+0x90/0x13c)
-> [  248.946075] [<c00a7bd0>] (handle_percpu_devid_irq+0x90/0x13c) from [<c00a4344>] (generic_handle_irq+0x30/0x48)
-> [  248.951538] [<c00a4344>] (generic_handle_irq+0x30/0x48) from [<c0014e38>] (handle_IRQ+0x4c/0xac)
-> [  248.956329] [<c0014e38>] (handle_IRQ+0x4c/0xac) from [<c00084cc>] (gic_handle_irq+0x28/0x5c)
-> [  248.960937] [<c00084cc>] (gic_handle_irq+0x28/0x5c) from [<c04fb1a4>] (__irq_svc+0x44/0x5c)
-> [  248.965484] Exception stack(0xc0729f58 to 0xc0729fa0)
-> [  248.968231] 9f40:                                                       0003b832 00000001
-> [  248.972686] 9f60: 00000000 c074a8e8 c0728000 c07c42c8 c05065a0 c074bdc8 00000000 411fc092
-> [  248.977142] 9f80: c074bfe8 00000000 00000001 c0729fa0 0003b833 c0015130 20000113 ffffffff
-> [  248.981597] [<c04fb1a4>] (__irq_svc+0x44/0x5c) from [<c0015130>] (default_idle+0x20/0x44)
-> [  248.986083] [<c0015130>] (default_idle+0x20/0x44) from [<c001535c>] (cpu_idle+0x9c/0x114)
-> [  248.990539] [<c001535c>] (cpu_idle+0x9c/0x114) from [<c06d77b0>] (start_kernel+0x2b4/0x304)
-> 
+Looking forward,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
