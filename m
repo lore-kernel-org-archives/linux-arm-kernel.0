@@ -1,72 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Sep 2012 22:02:32 -0700
-Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
-In-Reply-To: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
-References: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CAOesGMh1x8QMNBi_xKEfZ0druiAZbafVuXEQkktwVbQODDmR8w@mail.gmail.com>
+Date: Fri, 21 Sep 2012 22:11:58 -0700
+Subject: [GIT PULL V3 2/5] ARM: Kirkwood: DT changes for v3.7
+In-Reply-To: <20120921194629.GW5469@titan.lakedaemon.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+ <20120921194629.GW5469@titan.lakedaemon.net>
+Message-ID: <20120922051158.GA32245@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jason,
 
-Sorry for the late feedback but I didn't notice this until I looked at
-the pull request from Jason.
+On Fri, Sep 21, 2012 at 03:46:29PM -0400, Jason Cooper wrote:
+> The following changes since commit 5b40baee4a39d96d4d6a48a2b2383982912c429b:
+> 
+>   arm: mvebu: add address decoding controller to the DT (2012-09-21 18:05:29 +0000)
+> 
+> are available in the git repository at:
+>   git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
 
-Please go back and revisit these bindings. I'll merge in the current
-version but they need to be fixed up.
+Looking at this branch, it's much more than just device tree updates.
 
-Also, always cc devicetree-discuss and the DT maintainers on new bindings.
+It introduces the pinctrl driver (and bindings), and the gpio driver (and
+bindings). I think it would make more sense to break those two out to separate
+topics, and keep the generic DT updates in this branch.
 
-On Sat, Sep 1, 2012 at 2:26 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Based on previous work by Michael Walle and Jason Cooper.
->
-> Made their work actually work, which required added interrupt from DT
-> and auxdata, along with setting the dma_mask, which DT does not
-> currently do.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  .../devicetree/bindings/usb/ehci-orion.txt         |   19 +++++++
->  drivers/usb/host/ehci-orion.c                      |   59 +++++++++++++++++++-
->  2 files changed, 75 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
->
-> diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-> new file mode 100644
-> index 0000000..1bd704e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-> @@ -0,0 +1,19 @@
-> +* EHCI controller, Orion Marvell variants
-> +
-> +Required properties:
-> +- compatible: must be "marvell,orion-ehci"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: The EHCI interrupt
-> +- phy-version: Can be one of:
-> +  "NA" - Don't touch the phy, something else has already configured it.
-> +  "orion5x" - PHY setup as specified by the Orion5x Errata
-> +
-> +Example:
-> +
-> +       ehci at 50000 {
-> +               compatible = "marvell,orion-ehci";
-> +               reg = <0x50000 0x1000>;
-> +               interrupts = <19>;
-> +               phy-version = "NA";
-> +       };
+Also, see my comment on the EHCI binding patch. I wasn't going to ask you to
+respin the branch to fix/drop that on its own, but if you do rebuild and split
+this branch up you might as well delay those patches until the binding has been
+fixed.
 
-This isn't an appropriate binding for phy. I know, it maps straight
-over from the platform data, but it doesn't focus on what the actual
-hardware is.
-
-A couple of options. What probably makes most sense depending on how
-other phy bindings are moving ahead is to add a phy node under the
-ehci controller for the "orion5x" case, and have an appropriate
-compatible value there. No node means the same as "NA" in the above
-binding. Alternatively, have a phy phandle that points to the phy
-device if it sits on an i2c bus, etc.
+I'll pull in your branches under staging/* for now so they can get linux-next
+coverage until the "real" branches come in.
 
 
 -Olof
