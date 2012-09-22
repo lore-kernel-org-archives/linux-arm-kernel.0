@@ -1,25 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 22 Sep 2012 10:44:55 -0300
-Subject: [PATCH] spi/imx: set the inactive state of the clock according to
- the clock polarity
-In-Reply-To: <505D5668.4040209@gmail.com>
-References: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
- <20120831023518.GE7726@r65073-Latitude-D630>
- <505C1913.1090004@de.bosch.com>
- <20120921075431.GS5525@pengutronix.de> <505D5668.4040209@gmail.com>
-Message-ID: <CAOMZO5AaaY7hv_AqH9cHT5CdVwmniBcH-wyBgzmjRdxo3FGQdA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 22 Sep 2012 11:09:58 -0400
+Subject: [PATCH v3 03/15] dmaengine: Add flags parameter to
+ dmaengine_prep_dma_cyclic()
+In-Reply-To: <1347624358-25582-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
+ <1347624358-25582-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120922150957.GH4495@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+On Fri, Sep 14, 2012 at 03:05:46PM +0300, Peter Ujfalusi wrote:
+> With this parameter added to dmaengine_prep_dma_cyclic() the API will be in
+> sync with other dmaengine_prep_*() functions.
+> The dmaengine_prep_dma_cyclic() function primarily used by audio for cyclic
+> transfer required by ALSA, we use the from audio to ask dma drivers to
+> suppress interrupts (if DMA_PREP_INTERRUPT is cleared) when it is supported
+> on the platform.
 
-On Sat, Sep 22, 2012 at 3:10 AM, Dirk Behme <dirk.behme@gmail.com> wrote:
-
-> I'm not so familiar with the SPI world: Who would be the best person to ack
-> this, and in case it's ok finally apply it, then?
-
-Mark Brown has been taking care of spi patches recently.
-
-Regards,
-
-Fabio Estevam
+Are you sure this was generated against for-3.7?  There's fuzz against
+dmaengine.h and git can't find the blobs to do resolution.  Anyway, I
+applied this and the rest of the series.
