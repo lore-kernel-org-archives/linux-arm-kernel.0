@@ -1,117 +1,128 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 22 Sep 2012 11:24:53 -0400 (EDT)
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <1348242975-19184-6-git-send-email-cyril@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
-Message-ID: <alpine.LFD.2.02.1209221124060.6667@xanadu.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 22 Sep 2012 12:27:31 -0300
+Subject: =?UTF-8?q?=5BPATCH=20v2=5D=20ASoC=3A=20eukrea-tlv320=3A=20Convert=20it=20to=20platform=20driver?=
+Message-ID: <1348327652-21567-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Sep 2012, Cyril Chemparathy wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> This patch adds support for 64-bit physical addresses in virt_to_phys()
-> patching.  This does not do real 64-bit add/sub, but instead patches in the
-> upper 32-bits of the phys_offset directly into the output of virt_to_phys.
-> 
-> There is no corresponding change on the phys_to_virt() side, because
-> computations on the upper 32-bits would be discarded anyway.
-> 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Convert eukrea-tlv320 to platform driver.
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- No changes, only CC'ed ARM kernel list as requested by Mark Brown
 
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c   |    1 +
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |    1 +
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |    1 +
+ arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c |    1 +
+ sound/soc/fsl/eukrea-tlv320.c                  |   37 ++++++++++++------------
+ 5 files changed, 23 insertions(+), 18 deletions(-)
 
-> ---
->  arch/arm/include/asm/memory.h |   38 ++++++++++++++++++++++++++++++++++++--
->  arch/arm/kernel/head.S        |    4 ++++
->  arch/arm/kernel/setup.c       |    2 +-
->  3 files changed, 41 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 88ca206..f3e8f88 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -154,13 +154,47 @@
->  #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
->  
->  extern unsigned long	__pv_offset;
-> -extern unsigned long	__pv_phys_offset;
-> +extern phys_addr_t	__pv_phys_offset;
->  #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
->  
->  static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
-> -	unsigned long t;
-> +	phys_addr_t t;
-> +
-> +#ifndef CONFIG_ARM_LPAE
->  	early_patch_imm8("add", t, x, __pv_offset, 0);
-> +#else
-> +	unsigned long __tmp;
-> +
-> +#ifndef __ARMEB__
-> +#define PV_PHYS_HIGH	"(__pv_phys_offset + 4)"
-> +#else
-> +#define PV_PHYS_HIGH	"__pv_phys_offset"
-> +#endif
-> +
-> +	early_patch_stub(
-> +	/* type */		PATCH_IMM8,
-> +	/* code */
-> +		"ldr		%[tmp], =__pv_offset\n"
-> +		"ldr		%[tmp], [%[tmp]]\n"
-> +		"add		%Q[to], %[from], %[tmp]\n"
-> +		"ldr		%[tmp], =" PV_PHYS_HIGH "\n"
-> +		"ldr		%[tmp], [%[tmp]]\n"
-> +		"mov		%R[to], %[tmp]\n",
-> +	/* pad */		4,
-> +	/* patch_data */
-> +		".long		__pv_offset\n"
-> +		"add		%Q[to], %[from], %[imm]\n"
-> +		".long	"	PV_PHYS_HIGH "\n"
-> +		"mov		%R[to], %[imm]\n",
-> +	/* operands */
-> +		: [to]	 "=r"	(t),
-> +		  [tmp]	 "=&r"	(__tmp)
-> +		: [from] "r"	(x),
-> +		  [imm]	 "I"	(__IMM8),
-> +			 "i"	(&__pv_offset),
-> +			 "i"	(&__pv_phys_offset));
-> +#endif
->  	return t;
->  }
->  
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 69a3c09..61fb8df 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -530,7 +530,11 @@ ENDPROC(__fixup_pv_offsets)
->  
->  	.align
->  1:	.long	.
-> +#if defined(CONFIG_ARM_LPAE) && defined(__ARMEB__)
-> +	.long	__pv_phys_offset + 4
-> +#else
->  	.long	__pv_phys_offset
-> +#endif
->  	.long	__pv_offset
->  	.long	PAGE_OFFSET
->  #endif
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 59e0f57..edb4f42 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -159,7 +159,7 @@ DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
->   * The initializers here prevent these from landing in the BSS section.
->   */
->  unsigned long __pv_offset = 0xdeadbeef;
-> -unsigned long __pv_phys_offset = 0xdeadbeef;
-> +phys_addr_t   __pv_phys_offset = 0xdeadbeef;
->  EXPORT_SYMBOL(__pv_phys_offset);
->  
->  #endif
-> -- 
-> 1.7.9.5
-> 
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index fd3177f..98aef57 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -348,4 +348,5 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	imx27_add_imx_keypad(&eukrea_mbimx27_keymap_data);
+ 
+ 	gpio_led_register_device(-1, &eukrea_mbimx27_gpio_led_info);
++	imx_add_platform_device("eukrea_tlv320", 0, NULL, 0, NULL, 0);
+ }
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+index dfd2da8..0b84666 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+@@ -306,4 +306,5 @@ void __init eukrea_mbimxsd25_baseboard_init(void)
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
+ 	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
++	imx_add_platform_device("eukrea_tlv320", 0, NULL, 0, NULL, 0);
+ }
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+index 6e9dd12..c6532a0 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+@@ -315,4 +315,5 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
+ 	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
++	imx_add_platform_device("eukrea_tlv320", 0, NULL, 0, NULL, 0);
+ }
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c
+index 96a24b7..8b0de30 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c
+@@ -228,4 +228,5 @@ void __init eukrea_mbimxsd51_baseboard_init(void)
+ 
+ 	gpio_led_register_device(-1, &eukrea_mbimxsd51_led_info);
+ 	imx_add_gpio_keys(&eukrea_mbimxsd51_button_data);
++	imx_add_platform_device("eukrea_tlv320", 0, NULL, 0, NULL, 0);
+ }
+diff --git a/sound/soc/fsl/eukrea-tlv320.c b/sound/soc/fsl/eukrea-tlv320.c
+index efb9ede..267d5b4 100644
+--- a/sound/soc/fsl/eukrea-tlv320.c
++++ b/sound/soc/fsl/eukrea-tlv320.c
+@@ -93,9 +93,7 @@ static struct snd_soc_card eukrea_tlv320 = {
+ 	.num_links	= 1,
+ };
+ 
+-static struct platform_device *eukrea_tlv320_snd_device;
+-
+-static int __init eukrea_tlv320_init(void)
++static int __devinit eukrea_tlv320_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 	int int_port = 0, ext_port;
+@@ -136,29 +134,32 @@ static int __init eukrea_tlv320_init(void)
+ 		return 0;
+ 	}
+ 
+-	eukrea_tlv320_snd_device = platform_device_alloc("soc-audio", -1);
+-	if (!eukrea_tlv320_snd_device)
+-		return -ENOMEM;
+-
+-	platform_set_drvdata(eukrea_tlv320_snd_device, &eukrea_tlv320);
+-	ret = platform_device_add(eukrea_tlv320_snd_device);
+-
+-	if (ret) {
+-		printk(KERN_ERR "ASoC: Platform device allocation failed\n");
+-		platform_device_put(eukrea_tlv320_snd_device);
+-	}
++	eukrea_tlv320.dev = &pdev->dev;
++	ret = snd_soc_register_card(&eukrea_tlv320);
++	if (ret)
++		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
+ 
+ 	return ret;
+ }
+ 
+-static void __exit eukrea_tlv320_exit(void)
++static int __devexit eukrea_tlv320_remove(struct platform_device *pdev)
+ {
+-	platform_device_unregister(eukrea_tlv320_snd_device);
++	snd_soc_unregister_card(&eukrea_tlv320);
++
++	return 0;
+ }
+ 
+-module_init(eukrea_tlv320_init);
+-module_exit(eukrea_tlv320_exit);
++static struct platform_driver eukrea_tlv320_driver = {
++	.driver = {
++		.name = "eukrea_tlv320",
++		.owner = THIS_MODULE,
++	},
++	.probe = eukrea_tlv320_probe,
++	.remove = __devexit_p(eukrea_tlv320_remove),};
++
++module_platform_driver(eukrea_tlv320_driver);
+ 
+ MODULE_AUTHOR("Eric B?nard <eric@eukrea.com>");
+ MODULE_DESCRIPTION("CPUIMX ALSA SoC driver");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:eukrea_tlv320");
+-- 
+1.7.9.5
