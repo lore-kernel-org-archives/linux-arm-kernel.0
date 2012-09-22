@@ -1,81 +1,77 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Sat, 22 Sep 2012 15:09:05 +0200
-Subject: [PATCH 1/3] i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
-In-Reply-To: <1348241535-27754-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348241535-27754-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120922150905.643f7604@endymion.delvare>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 22 Sep 2012 15:17:14 +0200
+Subject: [PATCH 2/5] ARM: Add interface for registering and calling
+ firmware-specific operations
+In-Reply-To: <20120922062322.GA6264@quad.lixom.net>
+References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+ <CAH9JG2XFVzyZH8rsBogVYRdD4dzWpKjX8JAQw0Sf7qJqgueqAg@mail.gmail.com>
+ <20120922062322.GA6264@quad.lixom.net>
+Message-ID: <2370637.l5XxG4tm0Y@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Sep 2012 17:32:12 +0200, Maxime Ripard wrote:
-> Use the devm_kzalloc managed function to stripdown the error and remove
-> code.
+Hi Olof, Kyungmin,
+
+On Friday 21 of September 2012 23:23:22 Olof Johansson wrote:
+> On Sat, Sep 22, 2012 at 03:01:56PM +0900, Kyungmin Park wrote:
+> > On 9/22/12, Olof Johansson <olof@lixom.net> wrote:
+> > > On Thu, Sep 13, 2012 at 10:13:35AM +0200, Tomasz Figa wrote:
+> > >> +#define call_firmware_op(op, ...)					\
+> > >> +	((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : 0)
+> > > 
+> > > I think this will cause sparse warnings for
+> > > call_firmware_op(cpu_boot_reg) if there are no ops defined, since
+> > > the '0' isn't annotated as __iomem. And you can't annotate it since
+> > > the other function pointers don't need it.
+> > > 
+> > > I think you might be better off with stub functions as fallbacks
+> > > instead of allowing and checking for NULL here.
+> > 
+> > do you mean like this?
+> > 
+> > #Ifdef CONFIG_ARM_FIRMWARE
+> > #define call_firmware_op(op, ...) ((firmware_ops->op) ?
+> > firmware_ops->op(__VA_ARGS__) : 0)
+> > #else
+> > #define call_firmware_op(op, ...) do { } while (0)
+> > #endif
+> > 
+> > No problem to modify it.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/i2c/muxes/i2c-mux-gpio.c |   14 +++++---------
->  1 file changed, 5 insertions(+), 9 deletions(-)
+> To get the types and return values right you still need to do something
+> like:
 > 
-> diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
-> index 68b1f8e..fbc400b 100644
-> --- a/drivers/i2c/muxes/i2c-mux-gpio.c
-> +++ b/drivers/i2c/muxes/i2c-mux-gpio.c
-> @@ -71,7 +71,7 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> +	mux = devm_kzalloc(&pdev->dev, sizeof(*mux), GFP_KERNEL);
->  	if (!mux) {
->  		ret = -ENOMEM;
->  		goto alloc_failed;
-> @@ -79,11 +79,12 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
->  
->  	mux->parent = parent;
->  	mux->data = *pdata;
-> -	mux->adap = kzalloc(sizeof(struct i2c_adapter *) * pdata->n_values,
-> -			    GFP_KERNEL);
-> +	mux->adap = devm_kzalloc(&pdev->dev,
-> +				sizeof(struct i2c_adapter *) * pdata->n_values,
-> +				GFP_KERNEL);
+> #define call_firmware_op(op, ...) (firmware_ops->op(__VA_ARGS))
+> 
+> And then, in firmware.c:
+> 
+> static int default_do_idle(void)
+> {
+> 	return 0;
+> }
+> 
+> static default_cpu_boot(int cpu)
+> {
+> 	return;
+> }
+> 
+> static void __iomem *default_cpu_boot_reg(int cpu)
+> {
+> 	return (void __iomem *)0;
+> }
+> 
+> static const struct firmware_ops default_firmware_ops = {
+> 	.do_idle = default_do_idle,
+> 	.cpu_boot = default_cpu_boot,
+> 	.cpu_boot_reg = default_cpu_boot_reg,
+> }
 
-Alignment is off by one here.
+Thanks for pointing this out. I will address it in next version of the 
+series.
 
->  	if (!mux->adap) {
->  		ret = -ENOMEM;
-> -		goto alloc_failed2;
-> +		goto alloc_failed;
->  	}
->  
->  	if (pdata->idle != I2C_MUX_GPIO_NO_IDLE) {
-> @@ -128,9 +129,6 @@ add_adapter_failed:
->  err_request_gpio:
->  	for (; i > 0; i--)
->  		gpio_free(pdata->gpios[i - 1]);
-> -	kfree(mux->adap);
-> -alloc_failed2:
-> -	kfree(mux);
->  alloc_failed:
->  	i2c_put_adapter(parent);
->  
-> @@ -150,8 +148,6 @@ static int __devexit i2c_mux_gpio_remove(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, NULL);
->  	i2c_put_adapter(mux->parent);
-> -	kfree(mux->adap);
-> -	kfree(mux);
->  
->  	return 0;
->  }
+Also it might be useful to be able to check if an operation was provided, 
+so maybe an unimplemented operation should return an error value (which one 
+would be the most appropriate? -ENOSYS?)? What do you think?
 
-Other than this it looks OK.
-
-Acked-by: Jean Delvare <khali@linux-fr.org>
-
-I don't know a thing about DT and ARM so I won't review the following
-patches of this series. For this reason I will not pick this one in my
-tree either, to avoid inter-tree dependencies.
-
--- 
-Jean Delvare
+Best regards,
+Tomasz Figa
