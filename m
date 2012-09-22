@@ -1,47 +1,111 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Sep 2012 22:39:02 -0700
-Subject: [PATCH 4/5] ARM: EXYNOS: Add support for Exynos secure firmware
-In-Reply-To: <3910462.8Opr7bJoeX@amdc1227>
-References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
- <1347524018-19301-5-git-send-email-t.figa@samsung.com>
- <20120916004455.GD7028@quad.lixom.net>
- <3910462.8Opr7bJoeX@amdc1227>
-Message-ID: <CAOesGMivzmbNxCeScBAhAzv+eOiF-bagLsW3WJzECaZEg5jFPg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 22 Sep 2012 05:40:52 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
+In-Reply-To: <20120921231039.GN28835@atomide.com>
+References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
+ <20120921205322.GK28835@atomide.com> <20120921231039.GN28835@atomide.com>
+Message-ID: <alpine.DEB.2.00.1209220442010.16893@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 3:10 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Olof,
->
-> On Saturday 15 of September 2012 17:44:55 Olof Johansson wrote:
->> On Thu, Sep 13, 2012 at 10:13:37AM +0200, Tomasz Figa wrote:
->> > +static void __iomem *exynos_cpu_boot_reg(int cpu)
->> > +{
->> > +   return S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
->> > +}
->>
->> This communication area in sysram should probably be seen as a part of
->> the firmware interface. It should thus be defined as part of the binding
->> instead, i.e.  through a reg property or similar there. That also would
->> make it easy to convert to using ioremap() instead of iodesc tables,
->> which always a nice thing.
->
-> The problem with SYSRAM_NS is that it might be also used in other code, not
-> related to firmware only. I don't know exactly all the use cases for it.
 
-If you don't know the use cases, and the use cases are not in the
-kernel tree that we care about here (upstream), then there's really
-nothing to worry about. It's after all just a define that's moved to
-an ioremap, if there's some out of tree code that needs the old legacy
-define then it can be added in whatever out-of-tree code that uses it.
-Right?
+On Fri, 21 Sep 2012, Tony Lindgren wrote:
 
-> Is it really a big problem or we could let it be for now, merge the patches
-> for firmware and then convert SYSRAM_NS to dynamic mapping when its
-> situation clarifies?
+> * Tony Lindgren <tony@atomide.com> [120921 13:55]:
+> 
+> Care to base this on something more mergeable? Maybe a merge
+> of cleanup-fixes-for-v3.7 + omap-devel-am33xx-for-v3.7?
 
-What do you expect is required to clarify the situation, and when do
-you expect that to happen?
+While working on this, noticed that the 4430ES2 Panda test boot failed on 
+the merge base of cleanup-fixes-for-v3.7 and omap-devel-am33xx-for-v3.7.  
+Enabling DEBUG_LL and adding some debug revealed that the static variable 
+'arch_clkdm' in mach-omap2/clockdomain.c was getting overwritten between 
+omap44xx_clockdomains_init() and the end of IRQ setup.  This was bisected 
+down to this commit:
+
+commit ec2c0825ca3183a646a24717966cc7752e8b0393
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Mon Aug 27 17:43:01 2012 -0700
+
+    ARM: OMAP2+: Remove hardcoded IRQs and enable SPARSE_IRQ
+    
+    Remove hardcoded IRQs in irqs.h and related files as these
+    are no longer needed.
+    
+...
+
+Looks to me like something is wrong with the IRQ allocation and it's 
+corrupting memory.
 
 
--Olof
+- Paul
+
+
+
+[ In the following dump, the lines beginning with 'a:' are logged at the 
+beginning of _clkdm_clk_hwmod_enable().  The number on the right 
+represents whether arch_clkdm is nonzero (1) or zero (0) ]
+
+...
+
+[    0.000000] free_area_init_node: node 0, pgdat c07af500, node_mem_map c0d0d000
+[    0.000000]   Normal zone: 1024 pages used for memmap
+[    0.000000]   Normal zone: 0 pages reserved
+[    0.000000]   Normal zone: 125696 pages, LIFO batch:31
+[    0.000000] OMAP4430 ES2.0
+[    0.000000] a: l3_instr_clkdm 1
+[    0.000000] a: l3_instr_clkdm 1
+[    0.000000] a: l3_instr_clkdm 1
+[    0.000000] a: l3_2_clkdm 1
+[    0.000000] a: l3_emif_clkdm 1
+[    0.000000] a: l3_emif_clkdm 1
+[    0.000000] a: l3_emif_clkdm 1
+[    0.000000] PERCPU: Embedded 9 pages/cpu @c1115000 s12736 r8192 d15936 u36864
+[    0.000000] pcpu-alloc: s12736 r8192 d15936 u36864 alloc=9*4096
+[    0.000000] pcpu-alloc: [0] 0 [0] 1
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 125696
+[    0.000000] Kernel command line: console=ttyO2,230400n8 vram=16M root=/dev/mmcblk0p2 rw rootfstype=ext3\
+ rootwait earlyprintk debug ignore_loglevel
+[    0.000000] PID hash table entries: 2048 (order: 1, 8192 bytes)
+[    0.000000] Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
+[    0.000000] Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
+[    0.000000] Memory: 495MB = 495MB total
+[    0.000000] Memory: 488916k/488916k available, 35372k reserved, 0K highmem
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]     vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc06d6b18   (6971 kB)
+[    0.000000]       .init : 0xc06d7000 - 0xc07261c0   ( 317 kB)
+[    0.000000]       .data : 0xc0728000 - 0xc07b1d00   ( 552 kB)
+[    0.000000]        .bss : 0xc07b1d24 - 0xc0d0c34c   (5482 kB)
+[    0.000000] Hierarchical RCU implementation.
+[    0.000000] NR_IRQS:16 nr_irqs:16 16
+[    0.000000] omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
+[    0.000000] a: mpuss_clkdm 0
+[    0.000000] ------------[ cut here ]------------
+[    0.000000] WARNING: at arch/arm/mach-omap2/omap_hwmod.c:1941 _enable+0x1bc/0x204()
+[    0.000000] omap_hwmod: mpu: could not enable clockdomain mpuss_clkdm: -22
+[    0.000000] Modules linked in:
+[    0.000000] [<c001b94c>] (unwind_backtrace+0x0/0xf0) from [<c004239c>] (warn_slowpath_common+0x4c/0x64)
+[    0.000000] [<c004239c>] (warn_slowpath_common+0x4c/0x64) from [<c0042448>] (warn_slowpath_fmt+0x30/0x4\
+0)
+[    0.000000] [<c0042448>] (warn_slowpath_fmt+0x30/0x40) from [<c00292e8>] (_enable+0x1bc/0x204)
+[    0.000000] [<c00292e8>] (_enable+0x1bc/0x204) from [<c06e2bf8>] (_setup+0x78/0x150)
+[    0.000000] [<c06e2bf8>] (_setup+0x78/0x150) from [<c06e3204>] (omap_hwmod_setup_one+0x4c/0x60)
+[    0.000000] [<c06e3204>] (omap_hwmod_setup_one+0x4c/0x60) from [<c06e31ec>] (omap_hwmod_setup_one+0x34/\
+0x60)
+[    0.000000] [<c06e31ec>] (omap_hwmod_setup_one+0x34/0x60) from [<c06e1340>] (omap_dm_timer_init_one+0x2\
+c/0x234)
+[    0.000000] [<c06e1340>] (omap_dm_timer_init_one+0x2c/0x234) from [<c06e1564>] (omap2_gp_clockevent_ini\
+t+0x1c/0x114)
+[    0.000000] [<c06e1564>] (omap2_gp_clockevent_init+0x1c/0x114) from [<c06e1808>] (omap4_timer_init+0x10\
+/0x58)
+[    0.000000] [<c06e1808>] (omap4_timer_init+0x10/0x58) from [<c06db3a0>] (time_init+0x20/0x30)
+[    0.000000] [<c06db3a0>] (time_init+0x20/0x30) from [<c06d76b0>] (start_kernel+0x1b4/0x304)
+[    0.000000] [<c06d76b0>] (start_kernel+0x1b4/0x304) from [<80008044>] (0x80008044)
+[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+[    0.000000] omap_hwmod: mpu: cannot be enabled for reset (3)
