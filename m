@@ -1,20 +1,76 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Sat, 22 Sep 2012 00:20:30 -0700
-Subject: [PATCH 2/3] clk: Add devm_clk_{register,unregister}()
-In-Reply-To: <20120922010711.12878.76877@nucleus>
-References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
- <1348034730-16473-3-git-send-email-sboyd@codeaurora.org>
- <505BD206.9070600@codeaurora.org> <20120922010711.12878.76877@nucleus>
-Message-ID: <505D66BE.8090408@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 22 Sep 2012 00:41:32 -0700
+Subject: [alsa-devel] [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <20120921165305.GB5394@S2101-09.ap.freescale.net>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920145342.GI2450@S2101-09.ap.freescale.net>
+ <201209201556.57171.arnd@arndb.de>
+ <20120921080123.GM2450@S2101-09.ap.freescale.net>
+ <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
+ <20120921164622.GA5394@S2101-09.ap.freescale.net>
+ <20120921165305.GB5394@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMiHJnt7zq19ZycxaNUD64QzLYw7o79pP-Y91-zi60ny6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/21/2012 6:07 PM, Mike Turquette wrote
-> I'm not taking any more changes for 3.7, so in the interest of me being
-> lazy can you resend with the fixup?
+Hi,
 
-Sure. I'll pick up Mark's acks too and send the whole series again.
+On Fri, Sep 21, 2012 at 9:53 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Sat, Sep 22, 2012 at 12:46:26AM +0800, Shawn Guo wrote:
+>> I just published the branch below with this series rebased on top of
+>> the necessary dependant branches.
+>>
+>>   git://git.linaro.org/people/shawnguo/linux-2.6.git staging/imx-multiplatform
+>>
+>> The dependant branches include:
+>>
+>
+> Forgot the base:
+>
+>   * arm-soc/next/multiplatform
+>
+> Shawn
+>
+>> * arm-soc/multiplatform/platform-data
+>>
+>> * arm-soc/multiplatform/smp_ops
+>>
+>> * git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
+>>
+>>   It contains dependant patch "ASoC: mx27vis: retrieve gpio numbers
+>>   from platform_data"
+>>
+>> * git://git.infradead.org/mtd-2.6.git master
+>>
+>>   The series is based on this tree to solve some non-trivial conflicts
+>>   on mxc_nand driver.  Because mtd tree completely missed 3.6 merge
+>>   window, having the series base on 3.6-rc actually means 3.5 code base
+>>   in term of mtd support.  There are currently two cycles changes
+>>   accumulated on mtd, and we need to base the series on it to sort out
+>>   the conflicts.
+>>
+>> * git://linuxtv.org/mchehab/media-next.git master
+>>
+>>   The media tree renames mx2/mx3 camera drivers twice.  I'm not sure
+>>   if git merge can detect them, so I just rebased the series on media
+>>   tree to solve that.  The bonus point is that a number of trivial
+>>   conflicts with imx27-coda support on media tree gets solved as well.
+>>
+>> I'm not requesting you to pull the branch into arm-soc as a stable
+>> branch but staging one, because the external dependencies which might
+>> not be stable.  I attempt to use it for exposing the series on
+>> linux-next, so that we can send it to Linus for 3.7 if there is chance
+>> for us to (e.g. all the dependant branches hit mainline early during
+>> 3.7 merge window).
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I've pulled this in now as staging/imx-multiplatform.
+
+As you mention, it might or might not make sense to send this up. It
+also accrued a few more merge conflicts with other branches in
+arm-soc, so we'll see how things play out.
+
+Either way, we'll for sure queue it for 3.8.
+
+
+-Olof
