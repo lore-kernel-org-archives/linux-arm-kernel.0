@@ -1,95 +1,45 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 22 Sep 2012 14:22:07 +0900
-Subject: Mismatched aliases with DMA mappings?
-In-Reply-To: <20120921152127.GA2106@linaro.org>
-References: <20120921152127.GA2106@linaro.org>
-Message-ID: <CAH9JG2XskuxgPwHwF+3SiaMWQhFMf0x3V=d=33cV1oKuppE8PA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 22 Sep 2012 10:58:18 +0530
+Subject: [GIT PULL] ARM: OMAP5: Enable arch timer support
+In-Reply-To: <20120921204612.GJ28835@atomide.com>
+References: <1348041069-947-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAMQu2gxhOsMoaZfNkkx+j=bGCWOvGTWme-ZmEhJoAcUYDxtXcQ@mail.gmail.com>
+ <20120921204612.GJ28835@atomide.com>
+Message-ID: <CAMQu2gzdd_eim8pvqznjcU_dPjo9pUW2cQ63E6WxaH5UQ+2nBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-Marek is on vacation and will back 24 Sep. he will explain it in detail.
-
-I just show how CMA addresses mismatched aliases codes.
-
-In reserve function, it declares the require memory size with base
-address. At that time it calles 'dma_contiguous_early_fixup()'. it
-just registered address and size.
-
-void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
-{
-        dma_mmu_remap[dma_mmu_remap_num].base = base;
-        dma_mmu_remap[dma_mmu_remap_num].size = size;
-        dma_mmu_remap_num++;
-}
-
-These registerd base and size will be remap at dma_contiguous_remap
-function at paging_init.
-
-void __init dma_contiguous_remap(void)
-{
-        int i;
-        for (i = 0; i < dma_mmu_remap_num; i++) {
-                phys_addr_t start = dma_mmu_remap[i].base;
-                phys_addr_t end = start + dma_mmu_remap[i].size;
-                struct map_desc map;
-                unsigned long addr;
-
-                if (end > arm_lowmem_limit)
-                        end = arm_lowmem_limit;
-                if (start >= end)
-                        continue;
-
-                map.pfn = __phys_to_pfn(start);
-                map.virtual = __phys_to_virt(start);
-                map.length = end - start;
-                map.type = MT_MEMORY_DMA_READY;
-
-                /*
-                 * Clear previous low-memory mapping
-                 */
-                for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
-                     addr += PMD_SIZE)
-                        pmd_clear(pmd_off_k(addr));
-
-                iotable_init(&map, 1);
-        }
-}
-
-Thank you,
-Kyungmin Park
-
-On 9/22/12, Dave Martin <dave.martin@linaro.org> wrote:
-> Hi Marek,
+On Sat, Sep 22, 2012 at 2:16 AM, Tony Lindgren <tony@atomide.com> wrote:
 >
-> I've been trying to understand whether (and if so, how) and DMA buffer
-> allocation code in dma-mapping.c avoids mismatched alises in the kernel
-> linear map.
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120919 00:54]:
+> > (With fixed git URL)
+> >
+> > On Wed, Sep 19, 2012 at 1:21 PM, Santosh Shilimkar
+> > <santosh.shilimkar@ti.com> wrote:
+> > >
+> > > Tony,
+> > >
+> > > Here is the pull request which enables the architected cpu local timer
+> > > support for OMAP5 devices.
+> > >
+> > > The following changes since commit
+> > > 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+> > >
+> > >   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+> > >
+> > > are available in the git repository at:
+> > >
+> > >   git at github.com:SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
+> >
+> > git://github.com/SantoshShilimkar/linux.git for_3.7/omap5_arch_timer
 >
+> Thanks pulled now into devel-dt-arch-timer branch.
 >
-> I need a way of getting some uncached memory for communicating with
-> temporarily noncoherent CPUs during CPU bringup/teardown.  Although
-> the DMA API does not seem quite the right solution for this, nothing
-> else currently feels like quite the right solution either.  Approaches
-> based on memblock_steal() and on using cacheable memory with explicit
-> flushing both have problems, and reserving specific physical memory
-> via DT seems ugly, because we really don't care where the memory is.
+> Note that we're pretty much out of time for v3.7 merge window, so
+> most likely this won't get merged until for v3.8. See message
+> "Status of arm-soc for 3.7"  posted to LAKML for details.
 >
-> What is needed is something like an ioremap of anonymous memory with
-> specific attributes, using largely the same infrastructure as the DMA
-> API, but eliminating a mismatched alias of the allocated memory in the
-> kernel linear mapping is likely to be important.
->
-> Can you explain how the DMA mapping code eliminates mismatched aliases?
-> I can see the attributes of new mappings being set, but currently I
-> don't see how the linear map gets modified.
->
-> Cheers
-> ---Dave
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+OK. Thanks for heads up.
+
+Regards
+Santosh
