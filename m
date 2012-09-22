@@ -1,117 +1,143 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Sat, 22 Sep 2012 17:41:24 -0400
-Subject: [PATCH v3 RESEND 01/17] ARM: add mechanism for late code patching
-In-Reply-To: <alpine.LFD.2.02.1209221037561.6667@xanadu.home>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-2-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1209221037561.6667@xanadu.home>
-Message-ID: <505E3084.80307@ti.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sat, 22 Sep 2012 14:59:23 -0700
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <20120922201043.GE2934@linux.vnet.ibm.com>
+References: <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
+ <20120920220130.GN2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
+ <20120920232114.GO2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209211803290.8839@utopia.booyaka.com>
+ <20120921185827.GC2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209211900520.8839@utopia.booyaka.com>
+ <20120921195717.GD2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209221836070.10663@utopia.booyaka.com>
+ <20120922201043.GE2934@linux.vnet.ibm.com>
+Message-ID: <20120922215923.GA13161@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/12 11:10, Nicolas Pitre wrote:
-> On Fri, 21 Sep 2012, Cyril Chemparathy wrote:
->
->> The original phys_to_virt/virt_to_phys patching implementation relied on early
->> patching prior to MMU initialization.  On PAE systems running out of >4G
->> address space, this would have entailed an additional round of patching after
->> switching over to the high address space.
->>
->> The approach implemented here conceptually extends the original PHYS_OFFSET
->> patching implementation with the introduction of "early" patch stubs.  Early
->> patch code is required to be functional out of the box, even before the patch
->> is applied.  This is implemented by inserting functional (but inefficient)
->> load code into the .runtime.patch.code init section.  Having functional code
->> out of the box then allows us to defer the init time patch application until
->> later in the init sequence.
->>
->> In addition to fitting better with our need for physical address-space
->> switch-over, this implementation should be somewhat more extensible by virtue
->> of its more readable (and hackable) C implementation.  This should prove
->> useful for other similar init time specialization needs, especially in light
->> of our multi-platform kernel initiative.
->>
->> This code has been boot tested in both ARM and Thumb-2 modes on an ARMv7
->> (Cortex-A8) device.
->>
->> Note: the obtuse use of stringified symbols in patch_stub() and
->> early_patch_stub() is intentional.  Theoretically this should have been
->> accomplished with formal operands passed into the asm block, but this requires
->> the use of the 'c' modifier for instantiating the long (e.g. .long %c0).
->> However, the 'c' modifier has been found to ICE certain versions of GCC, and
->> therefore we resort to stringified symbols here.
->>
->> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->> Reviewed-by: Nicolas Pitre <nico@linaro.org>
->
-> There is another problem with this.
->
-> [...]
->> diff --git a/arch/arm/include/asm/runtime-patch.h b/arch/arm/include/asm/runtime-patch.h
->> new file mode 100644
->> index 0000000..366444d
->> --- /dev/null
->> +++ b/arch/arm/include/asm/runtime-patch.h
->> @@ -0,0 +1,208 @@
->> +/*
->> + * arch/arm/include/asm/runtime-patch.h
->> + * Note: this file should not be included by non-asm/.h files
->> + *
->> + * Copyright 2012 Texas Instruments, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#ifndef __ASM_ARM_RUNTIME_PATCH_H
->> +#define __ASM_ARM_RUNTIME_PATCH_H
->> +
->> +#include <linux/stringify.h>
->> +
->> +#ifndef __ASSEMBLY__
->> +
->> +#ifdef CONFIG_ARM_RUNTIME_PATCH
->> +
->> +struct patch_info {
->> +	void		*insn;
->> +	u16		 type;
->> +	u8		 insn_size;
->> +	u8		 data_size;
->> +	u32		 data[0];
->> +};
->
-> This causes the following compilation error:
->
->    CC      sound/core/pcm.o
-> In file included from sound/core/pcm.c:293:0:
-> include/linux/soundcard.h:223:8: error: redefinition of 'struct patch_info'
-> arch/arm/include/asm/runtime-patch.h:28:8: note: originally defined here
-> make[2]: *** [sound/core/pcm.o] Error 1
->
-> The problem is that asm/runtime-patch.h gets included by asm/memory.h
-> and asm/memory.h is included by almost the entire kernel. Something like
-> "struct patch_info" is a bit too generic a name to be exported to the
-> world as the likelihood of a name collision with some private definition
-> in a driver or the like is rather high.
->
-> In that context it might be worth moving everything that is not required
-> for the patch stub definitions out of asm/runtime-patch.h.  For example,
-> the definition of struct patch_info, struct patch_info_imm8,
-> patch_next() and patch_data() could be moved to runtime-patch.c directly
-> instead.  And then patch_stub() should be renamed to
-> runtime_patch_stub(), early_patch_stub() to early_runtime_patch_stub(),
-> patch_imm8() to runtime_patch_imm8(), etc.  Even the __IMM8 symbol name
-> is rather weak for kernel wide scope.
->
+On Sat, Sep 22, 2012 at 01:10:43PM -0700, Paul E. McKenney wrote:
+> On Sat, Sep 22, 2012 at 06:42:08PM +0000, Paul Walmsley wrote:
+> > On Fri, 21 Sep 2012, Paul E. McKenney wrote:
+> > 
+> > > Could you please point me to a recipe for creating a minimal userspace?
+> > > Just in case it is the userspac erather than the architecture/hardware
+> > > that makes the difference.
+> > 
+> > Tony's suggestion is pretty good.  Note that there may also be differences 
+> > in kernel timers -- either between x86 and ARM architectures, or loaded 
+> > device drivers -- that may confound the problem.
+> 
+> For example, there must be at least one RCU callback outstanding after
+> the boot sequence quiets down.  Of course, the last time I tried Tony's
+> approach, I was doing it on top of my -rcu stack, so am retrying on
+> v3.6-rc6.
+> 
+> > > Just to make sure I understand the combinations:
+> > > 
+> > > o	All stalls have happened when running a minimal userspace.
+> > > o	CONFIG_NO_HZ=n suppresses the stalls.
+> > > o	CONFIG_RCU_FAST_NO_HZ (which depends on CONFIG_NO_HZ=y) has
+> > > 	no observable effect on the stalls.
+> > > 
+> > > Did I get that right, or am I missing a combination?
+> > 
+> > That's correct.
+> > 
+> > > Indeed, rcu_idle_gp_timer_func() is a bit strange in that it is 
+> > > cancelled upon exit from idle, and therefore should (almost) never 
+> > > actually execute. Its sole purpose is to wake up the CPU.  ;-)
+> > 
+> > Right.  Just curious, what would wake up the kernel from idle to handle a 
+> > grace period expiration when CONFIG_RCU_FAST_NO_HZ=n?  On a very idle 
+> > system, the time between timer ticks could potentially be several tens of 
+> > seconds.
+> 
+> If CONFIG_RCU_FAST_NO_HZ=n, then CPUs with RCU callbacks are not permitted
+> to shut off the scheduling-clock tick, so any CPU with RCU callbacks will
+> be awakened every jiffy.  The problem is that there appears to be a way
+> to get an RCU grace period started without any CPU having any callbacks,
+> which, as you surmise, would result in all the CPUs going to sleep and
+> the grace period never ending.  So if a CPU is awakened for any reason
+> after this everlasting grace period has extended for more than a minute,
+> the first thing that CPU will do is print an RCU CPU stall warning.
+> 
+> I believe that I see how to prevent callback-free grace periods from
+> ever starting.  (Famous last words...)
 
-Thanks for trying this out.  I'll take this up in the next rev.
+And here is a patch.  I am still having trouble reproducing the problem,
+but figured that I should avoid serializing things.
 
--- Cyril.
+							Thanx, Paul
+
+------------------------------------------------------------------------
+
+ b/kernel/rcutree.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+rcu: Fix day-one dyntick-idle stall-warning bug
+
+Each grace period is supposed to have at least one callback waiting
+for that grace period to complete.  However, if CONFIG_NO_HZ=n, an
+extra callback-free grace period is no big problem -- it will chew up
+a tiny bit of CPU time, but it will complete normally.  In contrast,
+CONFIG_NO_HZ=y kernels have the potential for all the CPUs to go to
+sleep indefinitely, in turn indefinitely delaying completion of the
+callback-free grace period.  Given that nothing is waiting on this grace
+period, this is also not a problem.
+
+Unless RCU CPU stall warnings are also enabled, as they are in recent
+kernels.  In this case, if a CPU wakes up after at least one minute
+of inactivity, an RCU CPU stall warning will result.  The reason that
+no one noticed until quite recently is that most systems have enough
+OS noise that they will never remain absolutely idle for a full minute.
+But there are some embedded systems with cut-down userspace configurations
+that get into this mode quite easily.
+
+All this begs the question of exactly how a callback-free grace period
+gets started in the first place.  This can happen due to the fact that
+CPUs do not necessarily agree on which grace period is in progress.
+If a CPU still believes that the grace period that just completed is
+still ongoing, it will believe that it has callbacks that need to wait
+for another grace period, never mind the fact that the grace period
+that they were waiting for just completed.  This CPU can therefore
+erroneously decide to start a new grace period.
+
+Once this CPU notices that the earlier grace period completed, it will
+invoke its callbacks.  It then won't have any callbacks left.  If no
+other CPU has any callbacks, we now have a callback-free grace period.
+
+This commit therefore makes CPUs check more carefully before starting a
+new grace period.  This new check relies on an array of tail pointers
+into each CPU's list of callbacks.  If the CPU is up to date on which
+grace periods have completed, it checks to see if any callbacks follow
+the RCU_DONE_TAIL segment, otherwise it checks to see if any callbacks
+follow the RCU_WAIT_TAIL segment.  The reason that this works is that
+the RCU_WAIT_TAIL segment will be promoted to the RCU_DONE_TAIL segment
+as soon as the CPU figures out that the old grace period has ended.
+
+This change is to cpu_needs_another_gp(), which is called in a number
+of places.  The only one that really matters is in rcu_start_gp(), where
+the root rcu_node structure's ->lock is held, which prevents any
+other CPU from starting or completing a grace period, so that the
+comparison that determines whether the CPU is missing the completion
+of a grace period is stable.
+
+Signed-off-by: Paul E. McKenney <paul.mckenney@linaro.org>
+Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+
+diff --git a/kernel/rcutree.c b/kernel/rcutree.c
+index f280e54..f7bcd9e 100644
+--- a/kernel/rcutree.c
++++ b/kernel/rcutree.c
+@@ -305,7 +305,9 @@ cpu_has_callbacks_ready_to_invoke(struct rcu_data *rdp)
+ static int
+ cpu_needs_another_gp(struct rcu_state *rsp, struct rcu_data *rdp)
+ {
+-	return *rdp->nxttail[RCU_DONE_TAIL] && !rcu_gp_in_progress(rsp);
++	return *rdp->nxttail[RCU_DONE_TAIL +
++			     ACCESS_ONCE(rsp->completed) != rdp->completed] &&
++	       !rcu_gp_in_progress(rsp);
+ }
+ 
+ /*
