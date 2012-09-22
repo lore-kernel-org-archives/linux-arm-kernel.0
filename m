@@ -1,44 +1,112 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 22 Sep 2012 22:25:59 +0000 (UTC)
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <20120922215923.GA13161@linux.vnet.ibm.com>
-References: <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
- <20120920220130.GN2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
- <20120920232114.GO2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209211803290.8839@utopia.booyaka.com>
- <20120921185827.GC2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209211900520.8839@utopia.booyaka.com>
- <20120921195717.GD2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209221836070.10663@utopia.booyaka.com>
- <20120922201043.GE2934@linux.vnet.ibm.com>
- <20120922215923.GA13161@linux.vnet.ibm.com>
-Message-ID: <alpine.DEB.2.00.1209222223080.22590@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Sep 2012 18:29:10 -0400
+Subject: [GIT PULL V5 0/7] ARM: kirkwood/dove/mvebu changes for v3.7
+In-Reply-To: <20120922213642.GA10355@quad.lixom.net>
+References: <20120922171554.GE5469@titan.lakedaemon.net>
+ <20120922213642.GA10355@quad.lixom.net>
+Message-ID: <20120922222910.GM5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 Sep 2012, Paul E. McKenney wrote:
+On Sat, Sep 22, 2012 at 02:36:42PM -0700, Olof Johansson wrote:
+> On Sat, Sep 22, 2012 at 01:15:54PM -0400, Jason Cooper wrote:
+> > Arnd, Olof,
+> > 
+> > Changes from V3/V4 (only one pullrq reached V4).
+> >  - split kirkwood/dt into /dt and /drivers.
+> >  - /drivers now holds pinctrl and gpio
+> >  - dropped ehci-orion dt bindings until next window
+> >  - reworked dependency matrix
+> > 
+> > Dep tree:
+> > 
+> >         /--kirkwood/addr_decode--kirkwood/drivers
+> >         |
+> >         |--kirkwood/dt--kirkwood/cleanup--kirkwood/platform_data
+> >         |                                /
+> >         /                 /-------------/
+> > v3.6-rc5--kirkwood/boards-|
+> >                           \--kirkwood/defconfig
+> 
+> Thanks for reorganizing the branches so quickly!
 
-> And here is a patch.  I am still having trouble reproducing the problem,
-> but figured that I should avoid serializing things.
+No problem.  I'm starting to get the hang of it.
 
-Thanks, testing this now on v3.6-rc6.  One question though about the patch 
-description:
+> If there's one thing I would request next time is to try to get
+> the cleanup branch closer to the base, and for example including the
+> annotation cleanups from the addr_decode branch in it. But it's not a big
+> deal this time around since I ended up doing things a little different
+> at our end.
 
-> All this begs the question of exactly how a callback-free grace period
-> gets started in the first place.  This can happen due to the fact that
-> CPUs do not necessarily agree on which grace period is in progress.
-> If a CPU still believes that the grace period that just completed is
-> still ongoing, it will believe that it has callbacks that need to wait
-> for another grace period, never mind the fact that the grace period
-> that they were waiting for just completed.  This CPU can therefore
-> erroneously decide to start a new grace period.
+Must be a mis-understanding on my end.  The one patch in /cleanup
+depended on a patch in /dt.  Is there a better name for a branch topic
+like that?  Or, should I have just included that patch in /dt?  It was
+just removing unneeded includes.
 
-Doesn't this imply that this bug would only affect multi-CPU systems?  
+> So, I've done something that we normally try to avoid, and merged all
+> of these branches into one branch in arm-soc as late/kirkwood, that is
+> based on next/cleanup and next/multiplatform.
+> 
+> The main reason for this is that there's a bunch of minor conflicts
+> with the sweeping changes that went across the tree, and sorting them
+> all out in one place is easier than doing it in multiple places. We'll
+> end up merging kirkwood after the other branches but there shouldn't be
+> any significant risk of it not making it in since there are no external
+> dependencies that will hold us up.
 
-The recent tests here have been on Pandaboard, which is dual-CPU, but my 
-recollection is that I also observed the warnings on a single-core 
-Beagleboard.  Will re-test.
+I'm glad we held off on cache-l2x0. ;-)
 
+> This's not something we want to do often, since it defeats the purpose
+> of how we organize our tree to show common efforts across platforms.
+> 
+> To have avoided this, you should probably have used some of the cleanup
+> branches from arm-soc as starting points of your branches. For example the
+> cleanup pieces of addr_decode branch conflicts with the cleanup/io-pci
+> in arm-soc, so using the cleanup/io-pci branch as base would have
+> allowed you to resolve the conflicts when applying the patches.
 
-- Paul
+I was going to try doing this tonight, but you beat me to it. ;-)  For
+future reference, you mean:
+
+$ git checkout -b kirkwood/addr_decode v3.6-rc5
+$ git remote update arm-soc
+$ git merge arm-soc/cleanup/io-pci
+$ git am ...
+
+right?
+
+> Also, if you want to get a feel for what we will have to do at our end to
+> resolve merge conflicts in your branches when you send us pull requests,
+> feel free to do trial-merges of your branches into our for-next branch. Some
+> other maintainers do this as a heads up and gives us their preference of
+> conflict resolution.
+
+Ahh, I merged mine together to check for conflicts, I'll take it all the
+way next time.
+
+> Does that makes sense? Apologies for going back and forth a bit on this, we've
+> had a bit more across-all-platforms sweeping changes than usual this release
+> cycle so things have been a bit more complex than in a while.
+
+No problem at all, thanks for being patient with me.
+
+> I have done basic build testing of the Marvell configs to make sure that things
+> pass cleanly, and did one small fixup patch at the top of late/kirkwood to fix
+> one problem.
+> 
+> The one area where I'd like you to double-check my work and make sure that
+> things aren't broken is on the PCI stuff: There were changes in the pci
+> cleanup branch of how the IO is mapped, and some of the memory layouts
+> were modified and required fixups between that and the annotation cleanup
+> in the addr_decode branch.
+
+Andrew, Thomas, Sebastian, do you guys have some time to test?  I'll hit
+Dreamplug for kirkwood, can you guys cover orion5x, dove, and mvebu?
+
+arm-soc/late/kirkwood boots on Dreamplug, so
+
+Tested-By: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
