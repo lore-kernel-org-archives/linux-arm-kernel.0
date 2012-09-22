@@ -1,40 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 22 Sep 2012 17:34:32 +0800
-Subject: [alsa-devel] [PATCH v2 00/34] i.MX multi-platform support
-In-Reply-To: <CAOesGMg+FvoVmiCee5hhe+_ZtBpvsnsi2N3vvLmZz1Tq3pOBWw@mail.gmail.com>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <201209200739.34899.arnd@arndb.de>
- <20120920145342.GI2450@S2101-09.ap.freescale.net>
- <201209201556.57171.arnd@arndb.de>
- <20120921080123.GM2450@S2101-09.ap.freescale.net>
- <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
- <20120921164622.GA5394@S2101-09.ap.freescale.net>
- <20120921165305.GB5394@S2101-09.ap.freescale.net>
- <CAOesGMiHJnt7zq19ZycxaNUD64QzLYw7o79pP-Y91-zi60ny6g@mail.gmail.com>
- <CAOesGMg+FvoVmiCee5hhe+_ZtBpvsnsi2N3vvLmZz1Tq3pOBWw@mail.gmail.com>
-Message-ID: <20120922093430.GC5394@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Sep 2012 11:06:05 +0100
+Subject: [PATCH 0/3] Introduce devm_clk_register()
+In-Reply-To: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
+References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120922100604.GI15609@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 01:09:27AM -0700, Olof Johansson wrote:
-> > I've pulled this in now as staging/imx-multiplatform.
-> >
-> > As you mention, it might or might not make sense to send this up. It
-> > also accrued a few more merge conflicts with other branches in
-> > arm-soc, so we'll see how things play out.
-> >
-> > Either way, we'll for sure queue it for 3.8.
+On Tue, Sep 18, 2012 at 11:05:27PM -0700, Stephen Boyd wrote:
+> The first patch in this series fixes error checking in the wm831x clock
+> driver and is here to prevent context conflicts in the third patch.
+> I split it out in case it needed to merge sooner rather than later.
 > 
-> Hmm. Pulling it in gives me a few new build errors, in particular on
-> the configs that Russell use to build test omap3, as well as one of
-> his vexpress configs. So I dropped it again for now.
-> 
-> Let's have the current contents sit in linux-next for at least one
-> release before we bring in anything more, especially since it brings
-> in dependencies on external trees, and it also has a handful of new
-> merge conflicts. We're already exposing Stephen Rothwell to more merge
-> conflicts than I'm entirely comfortable with.
-> 
-Ok.  I will rebase the series against 3.7-rc1 and then send you then.
+> The goal of this series is to add devm_clk_register() so I can use it in
+> some MSM clock code I'm sending out in the near future. The second 
+> patch adds the API and the third patch moves over an existing user of
+> clk_unregister() to the devm API.
 
-Shawn
+Can we guarantee that the clocks are unused when the module is removed?
+If we can't make that guarantee, then devm_* should not be used here,
+and instead there should be refcounting done in the clocks (that's what
+the __clk_get() and __clk_put() hooks are there for.)
