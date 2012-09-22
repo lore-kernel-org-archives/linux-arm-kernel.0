@@ -1,36 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Sep 2012 22:11:58 -0700
-Subject: [GIT PULL V3 2/5] ARM: Kirkwood: DT changes for v3.7
-In-Reply-To: <20120921194629.GW5469@titan.lakedaemon.net>
+Date: Fri, 21 Sep 2012 22:17:25 -0700
+Subject: [GIT PULL V3 4/5] ARM: Kirkwood: cleanup for v3.7
+In-Reply-To: <20120921195714.GY5469@titan.lakedaemon.net>
 References: <20120829001129.GO19437@titan.lakedaemon.net>
- <20120921194629.GW5469@titan.lakedaemon.net>
-Message-ID: <20120922051158.GA32245@quad.lixom.net>
+ <20120921195714.GY5469@titan.lakedaemon.net>
+Message-ID: <20120922051725.GB32245@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Fri, Sep 21, 2012 at 03:46:29PM -0400, Jason Cooper wrote:
-> The following changes since commit 5b40baee4a39d96d4d6a48a2b2383982912c429b:
+On Fri, Sep 21, 2012 at 03:57:14PM -0400, Jason Cooper wrote:
 > 
->   arm: mvebu: add address decoding controller to the DT (2012-09-21 18:05:29 +0000)
-> 
-> are available in the git repository at:
->   git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
+> NOTE:  This branch depends on both kirkwood/boards and kirkwood/dt (and,
+> by extension, kirkwood/addr_decode).  Some of that got pulled into this
+> summary (kirkwood/boards).  Is this correct?  Sould I be basing the
+> pullreq on v3.6-rc5?  That would summarize all three branches.  Doesn't
+> seem as useful.
 
-Looking at this branch, it's much more than just device tree updates.
+What I tend to do in these cases is that I merge the dependent branches into
+a temporary working branch, then merge in the "new" branch on top, and get the
+diffstat from the last merge there.
 
-It introduces the pinctrl driver (and bindings), and the gpio driver (and
-bindings). I think it would make more sense to break those two out to separate
-topics, and keep the generic DT updates in this branch.
+It also looks like the base for this branch is something that is not a full
+-rc, please only base your branches on -rcs since that makes merge history much
+cleaner and easier to deal with on our side.
 
-Also, see my comment on the EHCI binding patch. I wasn't going to ask you to
-respin the branch to fix/drop that on its own, but if you do rebuild and split
-this branch up you might as well delay those patches until the binding has been
-fixed.
+So, for example:
 
-I'll pull in your branches under staging/* for now so they can get linux-next
-coverage until the "real" branches come in.
+git checkout v3.6-rc5
+git merge kirkwood/boards
+git merge kirkwood/dt
+
+And then you can use that HEAD as the reference in request-pull.
 
 
 -Olof
