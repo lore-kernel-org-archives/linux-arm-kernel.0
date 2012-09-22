@@ -1,67 +1,80 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sat, 22 Sep 2012 13:10:44 -0700
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <alpine.DEB.2.00.1209221836070.10663@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209200753450.3801@utopia.booyaka.com>
- <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
- <20120920220130.GN2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
- <20120920232114.GO2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209211803290.8839@utopia.booyaka.com>
- <20120921185827.GC2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209211900520.8839@utopia.booyaka.com>
- <20120921195717.GD2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209221836070.10663@utopia.booyaka.com>
-Message-ID: <20120922201043.GE2934@linux.vnet.ibm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 22 Sep 2012 14:36:42 -0700
+Subject: [GIT PULL V5 0/7] ARM: kirkwood/dove/mvebu changes for v3.7
+In-Reply-To: <20120922171554.GE5469@titan.lakedaemon.net>
+References: <20120922171554.GE5469@titan.lakedaemon.net>
+Message-ID: <20120922213642.GA10355@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 06:42:08PM +0000, Paul Walmsley wrote:
-> On Fri, 21 Sep 2012, Paul E. McKenney wrote:
+On Sat, Sep 22, 2012 at 01:15:54PM -0400, Jason Cooper wrote:
+> Arnd, Olof,
 > 
-> > Could you please point me to a recipe for creating a minimal userspace?
-> > Just in case it is the userspac erather than the architecture/hardware
-> > that makes the difference.
+> Changes from V3/V4 (only one pullrq reached V4).
+>  - split kirkwood/dt into /dt and /drivers.
+>  - /drivers now holds pinctrl and gpio
+>  - dropped ehci-orion dt bindings until next window
+>  - reworked dependency matrix
 > 
-> Tony's suggestion is pretty good.  Note that there may also be differences 
-> in kernel timers -- either between x86 and ARM architectures, or loaded 
-> device drivers -- that may confound the problem.
-
-For example, there must be at least one RCU callback outstanding after
-the boot sequence quiets down.  Of course, the last time I tried Tony's
-approach, I was doing it on top of my -rcu stack, so am retrying on
-v3.6-rc6.
-
-> > Just to make sure I understand the combinations:
-> > 
-> > o	All stalls have happened when running a minimal userspace.
-> > o	CONFIG_NO_HZ=n suppresses the stalls.
-> > o	CONFIG_RCU_FAST_NO_HZ (which depends on CONFIG_NO_HZ=y) has
-> > 	no observable effect on the stalls.
-> > 
-> > Did I get that right, or am I missing a combination?
+> Dep tree:
 > 
-> That's correct.
-> 
-> > Indeed, rcu_idle_gp_timer_func() is a bit strange in that it is 
-> > cancelled upon exit from idle, and therefore should (almost) never 
-> > actually execute. Its sole purpose is to wake up the CPU.  ;-)
-> 
-> Right.  Just curious, what would wake up the kernel from idle to handle a 
-> grace period expiration when CONFIG_RCU_FAST_NO_HZ=n?  On a very idle 
-> system, the time between timer ticks could potentially be several tens of 
-> seconds.
+>         /--kirkwood/addr_decode--kirkwood/drivers
+>         |
+>         |--kirkwood/dt--kirkwood/cleanup--kirkwood/platform_data
+>         |                                /
+>         /                 /-------------/
+> v3.6-rc5--kirkwood/boards-|
+>                           \--kirkwood/defconfig
 
-If CONFIG_RCU_FAST_NO_HZ=n, then CPUs with RCU callbacks are not permitted
-to shut off the scheduling-clock tick, so any CPU with RCU callbacks will
-be awakened every jiffy.  The problem is that there appears to be a way
-to get an RCU grace period started without any CPU having any callbacks,
-which, as you surmise, would result in all the CPUs going to sleep and
-the grace period never ending.  So if a CPU is awakened for any reason
-after this everlasting grace period has extended for more than a minute,
-the first thing that CPU will do is print an RCU CPU stall warning.
+Thanks for reorganizing the branches so quickly!
 
-I believe that I see how to prevent callback-free grace periods from
-ever starting.  (Famous last words...)
+If there's one thing I would request next time is to try to get
+the cleanup branch closer to the base, and for example including the
+annotation cleanups from the addr_decode branch in it. But it's not a big
+deal this time around since I ended up doing things a little different
+at our end.
 
-							Thanx, Paul
+So, I've done something that we normally try to avoid, and merged all
+of these branches into one branch in arm-soc as late/kirkwood, that is
+based on next/cleanup and next/multiplatform.
+
+The main reason for this is that there's a bunch of minor conflicts
+with the sweeping changes that went across the tree, and sorting them
+all out in one place is easier than doing it in multiple places. We'll
+end up merging kirkwood after the other branches but there shouldn't be
+any significant risk of it not making it in since there are no external
+dependencies that will hold us up.
+
+This's not something we want to do often, since it defeats the purpose
+of how we organize our tree to show common efforts across platforms.
+
+To have avoided this, you should probably have used some of the cleanup
+branches from arm-soc as starting points of your branches. For example the
+cleanup pieces of addr_decode branch conflicts with the cleanup/io-pci
+in arm-soc, so using the cleanup/io-pci branch as base would have
+allowed you to resolve the conflicts when applying the patches.
+
+Also, if you want to get a feel for what we will have to do at our end to
+resolve merge conflicts in your branches when you send us pull requests,
+feel free to do trial-merges of your branches into our for-next branch. Some
+other maintainers do this as a heads up and gives us their preference of
+conflict resolution.
+
+Does that makes sense? Apologies for going back and forth a bit on this, we've
+had a bit more across-all-platforms sweeping changes than usual this release
+cycle so things have been a bit more complex than in a while.
+
+
+
+I have done basic build testing of the Marvell configs to make sure that things
+pass cleanly, and did one small fixup patch at the top of late/kirkwood to fix
+one problem.
+
+The one area where I'd like you to double-check my work and make sure that
+things aren't broken is on the PCI stuff: There were changes in the pci
+cleanup branch of how the IO is mapped, and some of the memory layouts
+were modified and required fixups between that and the annotation cleanup
+in the addr_decode branch.
+
+
+-Olof
