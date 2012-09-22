@@ -1,36 +1,95 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Sep 2012 22:17:25 -0700
-Subject: [GIT PULL V3 4/5] ARM: Kirkwood: cleanup for v3.7
-In-Reply-To: <20120921195714.GY5469@titan.lakedaemon.net>
-References: <20120829001129.GO19437@titan.lakedaemon.net>
- <20120921195714.GY5469@titan.lakedaemon.net>
-Message-ID: <20120922051725.GB32245@quad.lixom.net>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Sat, 22 Sep 2012 14:22:07 +0900
+Subject: Mismatched aliases with DMA mappings?
+In-Reply-To: <20120921152127.GA2106@linaro.org>
+References: <20120921152127.GA2106@linaro.org>
+Message-ID: <CAH9JG2XskuxgPwHwF+3SiaMWQhFMf0x3V=d=33cV1oKuppE8PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 03:57:14PM -0400, Jason Cooper wrote:
-> 
-> NOTE:  This branch depends on both kirkwood/boards and kirkwood/dt (and,
-> by extension, kirkwood/addr_decode).  Some of that got pulled into this
-> summary (kirkwood/boards).  Is this correct?  Sould I be basing the
-> pullreq on v3.6-rc5?  That would summarize all three branches.  Doesn't
-> seem as useful.
+Hi Dave,
 
-What I tend to do in these cases is that I merge the dependent branches into
-a temporary working branch, then merge in the "new" branch on top, and get the
-diffstat from the last merge there.
+Marek is on vacation and will back 24 Sep. he will explain it in detail.
 
-It also looks like the base for this branch is something that is not a full
--rc, please only base your branches on -rcs since that makes merge history much
-cleaner and easier to deal with on our side.
+I just show how CMA addresses mismatched aliases codes.
 
-So, for example:
+In reserve function, it declares the require memory size with base
+address. At that time it calles 'dma_contiguous_early_fixup()'. it
+just registered address and size.
 
-git checkout v3.6-rc5
-git merge kirkwood/boards
-git merge kirkwood/dt
+void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
+{
+        dma_mmu_remap[dma_mmu_remap_num].base = base;
+        dma_mmu_remap[dma_mmu_remap_num].size = size;
+        dma_mmu_remap_num++;
+}
 
-And then you can use that HEAD as the reference in request-pull.
+These registerd base and size will be remap at dma_contiguous_remap
+function at paging_init.
 
+void __init dma_contiguous_remap(void)
+{
+        int i;
+        for (i = 0; i < dma_mmu_remap_num; i++) {
+                phys_addr_t start = dma_mmu_remap[i].base;
+                phys_addr_t end = start + dma_mmu_remap[i].size;
+                struct map_desc map;
+                unsigned long addr;
 
--Olof
+                if (end > arm_lowmem_limit)
+                        end = arm_lowmem_limit;
+                if (start >= end)
+                        continue;
+
+                map.pfn = __phys_to_pfn(start);
+                map.virtual = __phys_to_virt(start);
+                map.length = end - start;
+                map.type = MT_MEMORY_DMA_READY;
+
+                /*
+                 * Clear previous low-memory mapping
+                 */
+                for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
+                     addr += PMD_SIZE)
+                        pmd_clear(pmd_off_k(addr));
+
+                iotable_init(&map, 1);
+        }
+}
+
+Thank you,
+Kyungmin Park
+
+On 9/22/12, Dave Martin <dave.martin@linaro.org> wrote:
+> Hi Marek,
+>
+> I've been trying to understand whether (and if so, how) and DMA buffer
+> allocation code in dma-mapping.c avoids mismatched alises in the kernel
+> linear map.
+>
+>
+> I need a way of getting some uncached memory for communicating with
+> temporarily noncoherent CPUs during CPU bringup/teardown.  Although
+> the DMA API does not seem quite the right solution for this, nothing
+> else currently feels like quite the right solution either.  Approaches
+> based on memblock_steal() and on using cacheable memory with explicit
+> flushing both have problems, and reserving specific physical memory
+> via DT seems ugly, because we really don't care where the memory is.
+>
+> What is needed is something like an ioremap of anonymous memory with
+> specific attributes, using largely the same infrastructure as the DMA
+> API, but eliminating a mismatched alias of the allocated memory in the
+> kernel linear mapping is likely to be important.
+>
+> Can you explain how the DMA mapping code eliminates mismatched aliases?
+> I can see the attributes of new mappings being set, but currently I
+> don't see how the linear map gets modified.
+>
+> Cheers
+> ---Dave
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
