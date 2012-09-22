@@ -1,47 +1,87 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 22 Sep 2012 12:17:27 +0200
-Subject: [PATCH 4/6] staging: drm/imx: Add i.MX IPUv3 crtc support
-In-Reply-To: <505C94B3.3020308@boundarydevices.com>
-References: <1348214872-28594-1-git-send-email-s.hauer@pengutronix.de>
- <1348214872-28594-5-git-send-email-s.hauer@pengutronix.de>
- <505C94B3.3020308@boundarydevices.com>
-Message-ID: <20120922101727.GG1322@pengutronix.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 22 Sep 2012 13:25:10 +0200
+Subject: [PATCH v2] PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
+ even when disabled
+In-Reply-To: <1348267654-30697-1-git-send-email-khilman@deeprootsystems.com>
+References: <1348267654-30697-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <201209221325.10889.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On Fri, Sep 21, 2012 at 09:24:19AM -0700, Eric Nelson wrote:
-> Hi Sascha,
+On Saturday, September 22, 2012, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@ti.com>
 > 
-> While testing against a video-enabled U-Boot on i.MX6, I found the issue
-> below.
+> There are several drivers where the return value of
+> pm_runtime_get_sync() is used to decide whether or not it is safe to
+> access hardware and that don't provide .suspend() callbacks for system
+> suspend (but may use late/noirq callbacks.)  If such a driver happens
+> to call pm_runtime_get_sync() during system suspend, after the core
+> has disabled runtime PM, it will get the error code and will decide
+> that the hardware should not be accessed, although this may be a wrong
+> conclusion, depending on the state of the device when runtime PM was
+> disabled.
 > 
-
-[...]
-
+> Drivers might work around this problem by using a test like:
 > 
-> But ipu_crtc->imx_crtc gets initialized in this call, and
-> ipu_irq_handler() makes use of it.
+>    ret = pm_runtime_get_sync(dev);
+>    if (!ret || (ret == -EACCES && driver_private_data(dev)->suspended)) {
+>       /* access hardware */
+>    }
 > 
-> The U-Boot code doesn't enable interrupts, so it's not acking
-> along the way, and leaves bits set in IPU1_INT_STAT_15.
+> where driver_private_data(dev)->suspended is a flag set by the
+> driver's .suspend() method (that would have to be added for this
+> purpose).  However, that potentially would need to be done by multiple
+> drivers which means quite a lot of duplicated code and bloat.
 > 
-> I found that I can get around this in U-Boot by disabling the
-> LCD controller and acking all of the interrupts after disabling
-> the controller, but I haven't yet figured out where to tap into
-> cleanup_before_linux().
+> To avoid that we can use the observation that the core sets
+> dev->power.is_suspended before disabling runtime PM and use that
+> instead of the driver's private flag.  Still, potentially many drivers
+> would need to repeat that same check in quite a few places, so it's
+> better to let the core do it.
+> 
+> Then we can be a bit smarter and check whether or not runtime PM was
+> disabled by the core only (disable_depth == 1) or by someone else in
+> addition to the core (disable_depth > 1).  In the former case
+> rpm_resume() can return 1 if the runtime PM status is RPM_ACTIVE,
+> because it means the device was active when the core disabled runtime
+> PM.  In the latter case it should still return -EACCES, because it
+> isn't clear why runtime PM has been disabled.
+> 
+> Tested on AM3730/Beagle-xM where a wakeup IRQ firing during the late
+> suspend phase triggers runtime PM activity in the I2C driver since the
+> wakeup IRQ is on an I2C-connected PMIC.
+> 
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> v2: 
+> - major changelog rewrite, based largely on input from Rafael 
+> - add check for disable_depth == 1 and move to separate if statement,
+>   both suggested by Alan Stern
 
-Passing over an enabled IPU from the bootloader to the kernel is
-(currently) not a supported usecase, so U-Boot should indeed disable it.
-That said, the kernel driver should make sure the IPU is sufficiently
-configured before the interrupts are enabled, so this seems to be a bug
-that deserves fixing.
+OK, this looks good to me, thanks!
 
-Sascha
+Alan, what do you think?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Rafael
+
+
+>  drivers/base/power/runtime.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 7d9c1cb..d43856b 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -509,6 +509,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
+>   repeat:
+>  	if (dev->power.runtime_error)
+>  		retval = -EINVAL;
+> +	else if (dev->power.disable_depth == 1 && dev->power.is_suspended
+> +		 && dev->power.runtime_status == RPM_ACTIVE)
+> +		retval = 1;
+>  	else if (dev->power.disable_depth > 0)
+>  		retval = -EACCES;
+>  	if (retval)
+> 
