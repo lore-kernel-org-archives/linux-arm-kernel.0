@@ -1,39 +1,32 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 22 Sep 2012 13:54:36 +0100
-Subject: [PATCH] ARM: pxa2xx: Remove EXPERIMENTAL dependency from spi-pxa2xx
- driver
-Message-ID: <505DB50C.4050206@yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Sep 2012 13:57:37 +0100
+Subject: [PATCH] arm: add SDIV/UDIV emulation for ARMv7 processors
+In-Reply-To: <1348314563-8436-1-git-send-email-murzin.v@gmail.com>
+References: <1348314563-8436-1-git-send-email-murzin.v@gmail.com>
+Message-ID: <20120922125737.GJ15609@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI_PXA2XX config option has had an EXPERIMENTAL dependency since it
-was first added in 2006. Since there seem to have been no changes to the
-spi-pxa2xx driver since February 2011 other than tree sweeps, this patch
-removes the EXPERIMENTAL dependency in the expectation that the
-spi-pxa2xx driver is now stable.
+On Sat, Sep 22, 2012 at 03:49:23PM +0400, Vladimir Murzin wrote:
+> The Virtualization Extensions introduce the requirement for an ARMv7-A
+> implementation to include SDIV and UDIV.  Any implementation of the
+> Virtualization Extensions must include the SDIV and UDIV instructions
+> in the Thumb and ARM instruction sets.
+> 
+> In an ARMv7-A implementation that does not include the Virtualization
+> Extensions, it is IMPLEMENTATION DEFINED whether:
+>  *  SDIV and UDIV are not implemented
+>  *  SDIV and UDIV are implemented only in the Thumb instruction set
+>  *  SDIV and UDIV are implemented in the Thumb and ARM instruction sets.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
+We don't want to do emulation of instructions in the kernel because it's
+slow.  It's far better for userspace to figure this stuff out itself and
+select appropriate libraries and instructions to use than to have the CPU
+take an exception, have to save a lot of state, and then emulate the
+instruction.
 
-The motivation for this patch was to remove the EXPERIMENTAL option from
-the hx4700 platform config: SPI_PXA2XX is the only option which is still
-EXPERIMENTAL.
+We learnt that with the old FPA emulation code.  We're not making the same
+mistake again.
 
-  drivers/spi/Kconfig |    2 +-
-  1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 5f84b55..357be93 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -284,7 +284,7 @@ config SPI_PPC4xx
-
-  config SPI_PXA2XX
-  	tristate "PXA2xx SSP SPI master"
--	depends on (ARCH_PXA || (X86_32 && PCI)) && EXPERIMENTAL
-+	depends on (ARCH_PXA || (X86_32 && PCI))
-  	select PXA_SSP if ARCH_PXA
-  	help
-  	  This enables using a PXA2xx or Sodaville SSP port as a SPI master
--- 
-1.7.8.6
+If there's a problem with that, the folk to complain to are at ARM Ltd
+for this "implementation defined" madness when it comes to instructions.
