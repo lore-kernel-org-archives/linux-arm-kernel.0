@@ -1,46 +1,72 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Sep 2012 21:48:36 -0400
-Subject: [GIT PULL V4 4a/5] ARM: Kirkwood: cleanup for v3.7
-In-Reply-To: <20120921195714.GY5469@titan.lakedaemon.net>
-References: <20120829001129.GO19437@titan.lakedaemon.net>
- <20120921195714.GY5469@titan.lakedaemon.net>
-Message-ID: <20120922014836.GA5469@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Sep 2012 22:02:32 -0700
+Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
+In-Reply-To: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
+References: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
+Message-ID: <CAOesGMh1x8QMNBi_xKEfZ0druiAZbafVuXEQkktwVbQODDmR8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi,
 
-Of course, the best ideas hit after you relax.  I am sending a V4 of
-this pullrq split into two.
+Sorry for the late feedback but I didn't notice this until I looked at
+the pull request from Jason.
 
- * This does not affect the other branches at all
- * this separates out the platform_data conversion for kirkwood so that
-   if it conflicts with others, you can drop it easily.
+Please go back and revisit these bindings. I'll merge in the current
+version but they need to be fixed up.
 
-So, this pullrq (a) is just cleanup.  pullrq (b) is platform_data only
-and nothing else in the series of pullrq's depends on it.  Use it, drop
-it, doesn't matter.  I sincerely hope that helps.
+Also, always cc devicetree-discuss and the DT maintainers on new bindings.
 
-thx,
+On Sat, Sep 1, 2012 at 2:26 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> Based on previous work by Michael Walle and Jason Cooper.
+>
+> Made their work actually work, which required added interrupt from DT
+> and auxdata, along with setting the dma_mask, which DT does not
+> currently do.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  .../devicetree/bindings/usb/ehci-orion.txt         |   19 +++++++
+>  drivers/usb/host/ehci-orion.c                      |   59 +++++++++++++++++++-
+>  2 files changed, 75 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
+> new file mode 100644
+> index 0000000..1bd704e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
+> @@ -0,0 +1,19 @@
+> +* EHCI controller, Orion Marvell variants
+> +
+> +Required properties:
+> +- compatible: must be "marvell,orion-ehci"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: The EHCI interrupt
+> +- phy-version: Can be one of:
+> +  "NA" - Don't touch the phy, something else has already configured it.
+> +  "orion5x" - PHY setup as specified by the Orion5x Errata
+> +
+> +Example:
+> +
+> +       ehci at 50000 {
+> +               compatible = "marvell,orion-ehci";
+> +               reg = <0x50000 0x1000>;
+> +               interrupts = <19>;
+> +               phy-version = "NA";
+> +       };
 
-Jason.
+This isn't an appropriate binding for phy. I know, it maps straight
+over from the platform data, but it doesn't focus on what the actual
+hardware is.
 
-The following changes since commit 68fa6eb9d0dd41b1bb72bade6f6307193b18fbd1:
+A couple of options. What probably makes most sense depending on how
+other phy bindings are moving ahead is to add a phy node under the
+ehci controller for the "orion5x" case, and have an appropriate
+compatible value there. No node means the same as "NA" in the above
+binding. Alternatively, have a phy phandle that points to the phy
+device if it sits on an i2c bus, etc.
 
-  Merge branch 'kirkwood/boards' into kirkwood/cleanup (2012-09-21 18:54:20 +0000)
 
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git kirkwood/cleanup
-
-Jamie Lentin (1):
-      ARM: kirkwood: Trim excess #includes in board-dnskw.c
-
-Jason Cooper (1):
-      ARM: Kirkwood: ehci now specified in kirkwood.dtsi.  remove legacy platform init
-
- arch/arm/mach-kirkwood/board-dnskw.c          |    9 ---------
- arch/arm/mach-kirkwood/board-dockstar.c       |    1 -
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
- arch/arm/mach-kirkwood/board-km_kirkwood.c    |    1 -
- 4 files changed, 0 insertions(+), 13 deletions(-)
+-Olof
