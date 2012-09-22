@@ -1,23 +1,65 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Sat, 22 Sep 2012 15:22:50 +0200
-Subject: [PATCH 1/3] i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
-In-Reply-To: <1348241535-27754-2-git-send-email-maxime.ripard@free-electrons.com>
- (Maxime Ripard's message of "Fri, 21 Sep 2012 17:32:12 +0200")
-References: <1348241535-27754-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348241535-27754-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <87sjaachud.fsf@macbook.be.48ers.dk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 22 Sep 2012 18:52:46 +0530
+Subject: [PATCH] ARM: OMAP4+: wakeupgen: fix memory corruption
+In-Reply-To: <alpine.DEB.2.00.1209220732400.23491@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209220732400.23491@utopia.booyaka.com>
+Message-ID: <CAMQu2gyW4Dp0tVWab60no57XH1LOUb+jzo7xLDNjwBk8UNU+uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+Paul,
 
- Maxime> Use the devm_kzalloc managed function to stripdown the error and remove
- Maxime> code.
+On Sat, Sep 22, 2012 at 1:41 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+>
+> Fix a memory corruption bug caused by commit
+> 247c445c0fbd52c77e497ff5bfcf0dceb8afea8d ("ARM: OMAP5: Add the
+> WakeupGen IP updates") and commit
+> ec2c0825ca3183a646a24717966cc7752e8b0393 ("ARM: OMAP2+: Remove
+> hardcoded IRQs and enable SPARSE_IRQ").
+>
+> The first commit, in the OMAP4+ wakeupgen code, has an implicit
+> dependency on !SPARSE_IRQ.  It allocates a static array with NR_IRQS
+> elements, then proceeds to iterate over 128 or 160 elements of
+> that array, clearing them to zero.
+>
+> The second commit switched OMAP2+ to use sparse IRQs, but missed the
+> NR_IRQS reference in the wakeupgen code.  Before the second commit,
+> NR_IRQS was 474 on OMAP4430; but afterwards, it became 16.
+>
+> This resulted in the wakeupgen code allocating a 16 element array, and
+> then attempting to write to 128 or 160 of those elements, depending on the
+> type of SoC.  This trashed a chunk of whatever was allocated after the
+> array.
+>
+> The immediate manifestation was a set of boot warnings similar to the
+> following:
+>
+>    WARNING: at arch/arm/mach-omap2/omap_hwmod.c:1941 _enable+0x1bc/0x204()
+>    omap_hwmod: mpu: could not enable clockdomain mpuss_clkdm: -22
+>    ...
+>
+> since it blew away arch_clkdm.  Ultimately the kernel crashed during boot.
+>
+> Fix the problem in the OMAP4+ wakeupgen code by removing the reference to
+> NR_IRQS, allocating a larger array, and warning if the iteration is larger
+> than the array.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> Applies on arm-soc omap/cleanup-sparseirq and should ideally be merged
+> there before the 3.7 merge window.
+>
+The issue is already fixed by commit e534e87 {ARM: OMAP4: Fix array size for
+irq_target_cpu} in mainline. The fix got merged after 3.6-rc5 tag and hence
+not appearing in the 'omap/cleanup-sparseirq' branch which seems to be based
+of 3.6-rc5.
 
- Maxime> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+If you merge 3.6-rc6 tag or the latest mainline with omap/cleanup-sparseirq, the
+issue should go away. So from 3.7 merge window point of view, the fix is already
+in place.
 
-Besides the comment of Jean - 
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
--- 
-Bye, Peter Korsgaard
+Regards
+Santosh
