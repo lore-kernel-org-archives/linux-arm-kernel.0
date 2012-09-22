@@ -1,74 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Sep 2012 17:18:21 +0900
-Subject: [GIT PULL 4/4] Samsung DT for v3.7
-In-Reply-To: <505C089C.4050801@samsung.com>
-References: <505C089C.4050801@samsung.com>
-Message-ID: <505C22CD.9030401@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 21 Sep 2012 22:52:09 -0700
+Subject: [PATCH 0/5] ARM: EXYNOS: Add secure firmware support
+In-Reply-To: <CAH9JG2VFk5ZRCHDxwj6L0jEhAkwHx_MwWcYFw5g=+8cvEiZGPg@mail.gmail.com>
+References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+ <32882618.QIYkyWltBx@amdc1227>
+ <CAH9JG2VFk5ZRCHDxwj6L0jEhAkwHx_MwWcYFw5g=+8cvEiZGPg@mail.gmail.com>
+Message-ID: <20120922055209.GE32245@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/12 15:26, Kukjin Kim wrote:
-> Hi Arnd, Olof
->
-> This is for updating Samsung DT for v3.7.
->
-> But now this makes many conflicts with pinctrl dt because of moving file
-> so I'm sorting them out to avoid useless conflicts.
->
-> I'll re-send this soon again.
-> This is jut for your information.
->
-I created following branch which is merged on top of Samsung pinctrl and 
-board branches already are pulled into arm-soc.
+On Fri, Sep 21, 2012 at 05:39:41PM +0900, Kyungmin Park wrote:
+> On 9/19/12, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi,
+> >
+> > On Thursday 13 of September 2012 10:13:33 Tomasz Figa wrote:
+> >> Some Exynos-based boards are running with secure firmware running in
+> >> TrustZone secure world, which changes the way some things have to be
+> >> initialized.
+> >>
+> >> This series adds support for specifying firmware operations, implements
+> >> some firmware operations for Exynos secure firmware and adds a method of
+> >> enabling secure firmware operations on Exynos-based boards through board
+> >> file and device tree.
+> >>
+> >> This is a continuation of the patch series by Kyungmin Park:
+> >> [PATCH v5 1/2] ARM: Make a compile firmware conditionally
+> >> http://thread.gmane.org/gmane.linux.ports.arm.kernel/183607
+> >> [PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
+> >> http://thread.gmane.org/gmane.linux.ports.arm.kernel/183608/focus=184109
+> >>
+> >> Tomasz Figa (5):
+> >>   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+> >>   ARM: Add interface for registering and calling firmware-specific
+> >>     operations
+> >>   ARM: EXYNOS: Add support for secure monitor calls
+> >>   ARM: EXYNOS: Add support for Exynos secure firmware
+> >>   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+> >>
+> >>  .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
+> >>  arch/arm/common/Makefile                           |  2 +
+> >>  arch/arm/common/firmware.c                         | 18 ++++++++
+> >>  arch/arm/include/asm/firmware.h                    | 30 +++++++++++++
+> >>  arch/arm/mach-exynos/Makefile                      |  6 +++
+> >>  arch/arm/mach-exynos/common.c                      | 34 ++++++++++++++
+> >>  arch/arm/mach-exynos/common.h                      |  2 +
+> >>  arch/arm/mach-exynos/exynos-smc.S                  | 22 +++++++++
+> >>  arch/arm/mach-exynos/firmware.c                    | 52
+> >> ++++++++++++++++++++++ arch/arm/mach-exynos/include/mach/map.h
+> >>  |  3 ++
+> >>  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+> >>  arch/arm/mach-exynos/platsmp.c                     |  8 ++++
+> >>  arch/arm/mach-exynos/smc.h                         | 31 +++++++++++++
+> >>  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+> >>  14 files changed, 218 insertions(+)
+> >>  create mode 100644 arch/arm/common/firmware.c
+> >>  create mode 100644 arch/arm/include/asm/firmware.h
+> >>  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+> >>  create mode 100644 arch/arm/mach-exynos/firmware.c
+> >>  create mode 100644 arch/arm/mach-exynos/smc.h
+> >
+> > Any further comments for this series? Maybe we could merge it for 3.7?
+> >
+> Hi Arnd, Olof,
+> Can you merge it for 3.7? If exynos implementation still has issues,
+> it's okay only merge firmware implementation.
+> 
+> Can you give your opinions?
 
-This includes moving common exynos4 dt for supporting other exynos4xxxx 
-SoCs easily and adding exynos43210-trats board support and some updates.
+Hi,
 
-Please pull from:
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/dt-samsung-new
+There are still a few open questions to resolve on this before I think it
+can be merged. And it doesn't make much sense to merge the infrastructure
+without at least the first user of it.
 
-If any problems, please kindly let me know.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> The following changes since commit
-> 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
->
-> Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
->
-> are available in the git repository at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/dt-samsung
->
-> Kukjin Kim (1):
-> ARM: dts: use uart2 for console on smdkv310 and smdk5250
->
-> Tomasz Figa (6):
-> ARM: dts: Move parts common to EXYNOS4 from exynos4210.dtsi to exynos4.dtsi
-> ARM: EXYNOS: Use exynos4 prefix instead of exynos4210 on exynos4-dt
-> ARM: dts: Assume status of all optional nodes as disabled for exynos4
-> ARM: dts: Specify address and size cells for i2c controllers for EXYNOS4
-> ARM: EXYNOS: Add OF compatibility lookups for EXYNOS4 i2c adapters
-> ARM: dts: Add basic dts file for Samsung Trats board
->
-> Tushar Behera (1):
-> ARM: dts: Enable on-board keys as wakeup source for exynos4210-origen
->
-> arch/arm/boot/dts/exynos4.dtsi | 248 +++++++++++++++++++++++++++++
-> arch/arm/boot/dts/exynos4210-origen.dts | 63 +-------
-> arch/arm/boot/dts/exynos4210-smdkv310.dts | 54 +------
-> arch/arm/boot/dts/exynos4210-trats.dts | 237 +++++++++++++++++++++++++++
-> arch/arm/boot/dts/exynos4210.dtsi | 181 +---------------------
-> arch/arm/boot/dts/exynos5250-smdk5250.dts | 2 +-
-> arch/arm/mach-exynos/Makefile.boot | 2 +-
-> arch/arm/mach-exynos/mach-exynos4-dt.c | 32 +++-
-> 8 files changed, 523 insertions(+), 296 deletions(-)
-> create mode 100644 arch/arm/boot/dts/exynos4.dtsi
-> create mode 100644 arch/arm/boot/dts/exynos4210-trats.dts
+-Olof
