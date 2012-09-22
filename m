@@ -1,65 +1,68 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 22 Sep 2012 18:52:46 +0530
-Subject: [PATCH] ARM: OMAP4+: wakeupgen: fix memory corruption
-In-Reply-To: <alpine.DEB.2.00.1209220732400.23491@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209220732400.23491@utopia.booyaka.com>
-Message-ID: <CAMQu2gyW4Dp0tVWab60no57XH1LOUb+jzo7xLDNjwBk8UNU+uQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Sep 2012 09:31:28 -0400
+Subject: [GIT PULL V3 4/5] ARM: Kirkwood: cleanup for v3.7
+In-Reply-To: <20120922051725.GB32245@quad.lixom.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+ <20120921195714.GY5469@titan.lakedaemon.net>
+ <20120922051725.GB32245@quad.lixom.net>
+Message-ID: <20120922133128.GD5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On Fri, Sep 21, 2012 at 10:17:25PM -0700, Olof Johansson wrote:
+> On Fri, Sep 21, 2012 at 03:57:14PM -0400, Jason Cooper wrote:
+> > 
+> > NOTE:  This branch depends on both kirkwood/boards and kirkwood/dt (and,
+> > by extension, kirkwood/addr_decode).  Some of that got pulled into this
+> > summary (kirkwood/boards).  Is this correct?  Sould I be basing the
+> > pullreq on v3.6-rc5?  That would summarize all three branches.  Doesn't
+> > seem as useful.
+> 
+> What I tend to do in these cases is that I merge the dependent branches into
+> a temporary working branch, then merge in the "new" branch on top, and get the
+> diffstat from the last merge there.
+> 
+> It also looks like the base for this branch is something that is not a full
+> -rc, please only base your branches on -rcs since that makes merge history much
+> cleaner and easier to deal with on our side.
+> 
+> So, for example:
+> 
+> git checkout v3.6-rc5
+> git merge kirkwood/boards
+> git merge kirkwood/dt
 
-On Sat, Sep 22, 2012 at 1:41 PM, Paul Walmsley <paul@pwsan.com> wrote:
->
->
-> Fix a memory corruption bug caused by commit
-> 247c445c0fbd52c77e497ff5bfcf0dceb8afea8d ("ARM: OMAP5: Add the
-> WakeupGen IP updates") and commit
-> ec2c0825ca3183a646a24717966cc7752e8b0393 ("ARM: OMAP2+: Remove
-> hardcoded IRQs and enable SPARSE_IRQ").
->
-> The first commit, in the OMAP4+ wakeupgen code, has an implicit
-> dependency on !SPARSE_IRQ.  It allocates a static array with NR_IRQS
-> elements, then proceeds to iterate over 128 or 160 elements of
-> that array, clearing them to zero.
->
-> The second commit switched OMAP2+ to use sparse IRQs, but missed the
-> NR_IRQS reference in the wakeupgen code.  Before the second commit,
-> NR_IRQS was 474 on OMAP4430; but afterwards, it became 16.
->
-> This resulted in the wakeupgen code allocating a 16 element array, and
-> then attempting to write to 128 or 160 of those elements, depending on the
-> type of SoC.  This trashed a chunk of whatever was allocated after the
-> array.
->
-> The immediate manifestation was a set of boot warnings similar to the
-> following:
->
->    WARNING: at arch/arm/mach-omap2/omap_hwmod.c:1941 _enable+0x1bc/0x204()
->    omap_hwmod: mpu: could not enable clockdomain mpuss_clkdm: -22
->    ...
->
-> since it blew away arch_clkdm.  Ultimately the kernel crashed during boot.
->
-> Fix the problem in the OMAP4+ wakeupgen code by removing the reference to
-> NR_IRQS, allocating a larger array, and warning if the iteration is larger
-> than the array.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Applies on arm-soc omap/cleanup-sparseirq and should ideally be merged
-> there before the 3.7 merge window.
->
-The issue is already fixed by commit e534e87 {ARM: OMAP4: Fix array size for
-irq_target_cpu} in mainline. The fix got merged after 3.6-rc5 tag and hence
-not appearing in the 'omap/cleanup-sparseirq' branch which seems to be based
-of 3.6-rc5.
+Yes, that's exactly what I did.  My mistake was in my request-pull
+command.  I based it on kirkwood/dt, which then caused it to list
+kirkwood/boards (or, swap /dt and /boards, doesn't matter, either way is
+wrong) along with the /cleanup.  Using a base of FIRSTPATCH^ seems to
+work much better for generating the diffstat.  See my V4 of this pullrq.
 
-If you merge 3.6-rc6 tag or the latest mainline with omap/cleanup-sparseirq, the
-issue should go away. So from 3.7 merge window point of view, the fix is already
-in place.
+So for V4 /cleanup:
 
-Regards
-Santosh
+$ git request-pull fe525da^ mvebu-infradead-pub kirkwood/cleanup
+The following changes since commit 68fa6eb9d0dd41b1bb72bade6f6307193b18fbd1:
+
+  Merge branch 'kirkwood/boards' into kirkwood/cleanup (2012-09-21 18:54:20 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git kirkwood/cleanup
+
+Jamie Lentin (1):
+      ARM: kirkwood: Trim excess #includes in board-dnskw.c
+
+Jason Cooper (1):
+      ARM: Kirkwood: ehci now specified in kirkwood.dtsi.  remove legacy platform init
+
+ arch/arm/mach-kirkwood/board-dnskw.c          |    9 ---------
+ arch/arm/mach-kirkwood/board-dockstar.c       |    1 -
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
+ arch/arm/mach-kirkwood/board-km_kirkwood.c    |    1 -
+ 4 files changed, 0 insertions(+), 13 deletions(-)
+
+Obviously, this will be changing as soon as I rework /dt, drop ehci, etc.
+
+thx,
+
+Jason.
