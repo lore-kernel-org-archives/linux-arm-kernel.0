@@ -1,40 +1,26 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 22 Sep 2012 11:33:32 -0400 (EDT)
-Subject: [PATCH v2] PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
- even when disabled
-In-Reply-To: <201209221325.10889.rjw@sisk.pl>
-Message-ID: <Pine.LNX.4.44L0.1209221131320.7497-100000@netrider.rowland.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 22 Sep 2012 11:43:03 -0400
+Subject: [alsa-devel] [PATCH v2 00/34] i.MX multi-platform support
+In-Reply-To: <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
+References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
+ <201209200739.34899.arnd@arndb.de>
+ <20120920145342.GI2450@S2101-09.ap.freescale.net>
+ <201209201556.57171.arnd@arndb.de>
+ <20120921080123.GM2450@S2101-09.ap.freescale.net>
+ <CAOesGMi6CbvFikycJVdE8W-DxLD3W7+CyScz+YT103dxR31U9g@mail.gmail.com>
+Message-ID: <20120922154303.GO4495@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 Sep 2012, Rafael J. Wysocki wrote:
+On Fri, Sep 21, 2012 at 01:26:43AM -0700, Olof Johansson wrote:
 
-> On Saturday, September 22, 2012, Kevin Hilman wrote:
+> I'll take a look at merging it tomorrow after I've dealt with smp_ops;
+> if it looks reasonably conflict-free I'll pull it in. We need the
+> sound dependency sorted out (or agreed upon) first though.
 
-> OK, this looks good to me, thanks!
-> 
-> Alan, what do you think?
-> 
-> Rafael
+I guess in the light of the rest of the thread it doesn't much matter
+for this merge window but I just pushed:
 
-> > --- a/drivers/base/power/runtime.c
-> > +++ b/drivers/base/power/runtime.c
-> > @@ -509,6 +509,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
-> >   repeat:
-> >  	if (dev->power.runtime_error)
-> >  		retval = -EINVAL;
-> > +	else if (dev->power.disable_depth == 1 && dev->power.is_suspended
-> > +		 && dev->power.runtime_status == RPM_ACTIVE)
-> > +		retval = 1;
-> >  	else if (dev->power.disable_depth > 0)
-> >  		retval = -EACCES;
-> >  	if (retval)
+ git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git tags/asoc-3.7
 
-Well, I'd prefer the indentation on the continuation line to be 
-different from the indentation of the following line, and I'd prefer 
-to have a comment explaining the reason for the exception.
-
-But these are only matters of taste; the implementation itself looks 
-good.
-
-Alan Stern
+which is signed so can happily be merged elsewhere.
