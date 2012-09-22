@@ -1,26 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 22 Sep 2012 11:33:14 -0400
-Subject: [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120922153313.GN4495@opensource.wolfsonmicro.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 22 Sep 2012 11:33:32 -0400 (EDT)
+Subject: [PATCH v2] PM / Runtime: let rpm_resume() succeed if RPM_ACTIVE,
+ even when disabled
+In-Reply-To: <201209221325.10889.rjw@sisk.pl>
+Message-ID: <Pine.LNX.4.44L0.1209221131320.7497-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
+On Sat, 22 Sep 2012, Rafael J. Wysocki wrote:
 
-> +config SND_DAVINCI_HAVE_SRAM
-> +	bool
-> +	default y if ARCH_DAVINCI=y
-> +	default n if ARCH_OMAP=y
-> +
+> On Saturday, September 22, 2012, Kevin Hilman wrote:
 
-I've been sitting on this mostly since it seems like a step back from
-multi-platform kernels (which is where we're trying to get to) and I've
-been trying to decide what the best approach is.  I'm thinking that we
-do want a generic API for allocating this stuff, it's a fairly generic
-feature (there's TCMs as well).  
+> OK, this looks good to me, thanks!
+> 
+> Alan, what do you think?
+> 
+> Rafael
 
-Adding ifdefs like this does just doesn't seem good.
+> > --- a/drivers/base/power/runtime.c
+> > +++ b/drivers/base/power/runtime.c
+> > @@ -509,6 +509,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
+> >   repeat:
+> >  	if (dev->power.runtime_error)
+> >  		retval = -EINVAL;
+> > +	else if (dev->power.disable_depth == 1 && dev->power.is_suspended
+> > +		 && dev->power.runtime_status == RPM_ACTIVE)
+> > +		retval = 1;
+> >  	else if (dev->power.disable_depth > 0)
+> >  		retval = -EACCES;
+> >  	if (retval)
+
+Well, I'd prefer the indentation on the continuation line to be 
+different from the indentation of the following line, and I'd prefer 
+to have a comment explaining the reason for the exception.
+
+But these are only matters of taste; the implementation itself looks 
+good.
+
+Alan Stern
