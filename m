@@ -1,83 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 22 Sep 2012 08:11:25 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP4+: wakeupgen: fix memory corruption
-Message-ID: <alpine.DEB.2.00.1209220732400.23491@utopia.booyaka.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 22 Sep 2012 10:20:41 +0200
+Subject: [GIT PULL V3 1/5] ARM: Kirkwood: address decoding change for v3.7
+In-Reply-To: <20120922052904.GC32245@quad.lixom.net>
+References: <20120829001129.GO19437@titan.lakedaemon.net>
+ <20120921194141.GV5469@titan.lakedaemon.net>
+ <20120922052904.GC32245@quad.lixom.net>
+Message-ID: <20120922102041.5ef27c5b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Olof Johansson,
 
-Fix a memory corruption bug caused by commit
-247c445c0fbd52c77e497ff5bfcf0dceb8afea8d ("ARM: OMAP5: Add the
-WakeupGen IP updates") and commit
-ec2c0825ca3183a646a24717966cc7752e8b0393 ("ARM: OMAP2+: Remove
-hardcoded IRQs and enable SPARSE_IRQ").
+On Fri, 21 Sep 2012 22:29:04 -0700, Olof Johansson wrote:
 
-The first commit, in the OMAP4+ wakeupgen code, has an implicit
-dependency on !SPARSE_IRQ.  It allocates a static array with NR_IRQS
-elements, then proceeds to iterate over 128 or 160 elements of
-that array, clearing them to zero.
+> This branch has pretty massive merge conflicts with cleanup/io-pci
+> and other branches, in particular due to the large number of
+> conflicting cleanup patches.
+> 
+> It'd be better to focus on just the address decoding pieces in this
+> branch, and move the cleanups to a separate branch. Given the state
+> of affairs w.r.t. conflicts for the cleanups, saving those for 3.8
+> might be a better idea.
+> 
+> I mentioned in one of the other comments to a patch in this series
+> that I was going to pull this in as staging/* and get linux-next
+> coverage, but these conflicts are more than what I want to deal with
+> now -- so I'll hold off pulling these in after all.
 
-The second commit switched OMAP2+ to use sparse IRQs, but missed the
-NR_IRQS reference in the wakeupgen code.  Before the second commit,
-NR_IRQS was 474 on OMAP4430; but afterwards, it became 16.
+This is really surprising. Those cleanups were explicitly requested by
+Arnd Bergmann during the review process of my address decoding patch
+set. The earlier version of this patch set was only doing address
+decoding changes, not the IOMEM() cleanup. And Arnd requested the
+IOMEM() cleanup to be done as a pre-requisite to the address decoding
+changes. I've therefore spent two days last week doing these cleanups
+and retesting the address decoding changes, and now you're telling us
+exactly the opposite of what Arnd said two weeks ago?
 
-This resulted in the wakeupgen code allocating a 16 element array, and
-then attempting to write to 128 or 160 of those elements, depending on the
-type of SoC.  This trashed a chunk of whatever was allocated after the
-array.
+I'm sorry but that doesn't really fair here.
 
-The immediate manifestation was a set of boot warnings similar to the
-following:
+Best regards,
 
-   WARNING: at arch/arm/mach-omap2/omap_hwmod.c:1941 _enable+0x1bc/0x204()
-   omap_hwmod: mpu: could not enable clockdomain mpuss_clkdm: -22
-   ...
-
-since it blew away arch_clkdm.  Ultimately the kernel crashed during boot.
-
-Fix the problem in the OMAP4+ wakeupgen code by removing the reference to
-NR_IRQS, allocating a larger array, and warning if the iteration is larger
-than the array.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-Applies on arm-soc omap/cleanup-sparseirq and should ideally be merged 
-there before the 3.7 merge window.
-
-Test logs are here:
-
-   http://www.pwsan.com/omap/testlogs/broken_sparseirq_fix_3.7/20120922012656/
-
- arch/arm/mach-omap2/omap-wakeupgen.c |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index b54427d..869f16c 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -47,7 +47,7 @@
- static void __iomem *wakeupgen_base;
- static void __iomem *sar_base;
- static DEFINE_SPINLOCK(wakeupgen_lock);
--static unsigned int irq_target_cpu[NR_IRQS];
-+static unsigned int irq_target_cpu[MAX_IRQS];
- static unsigned int irq_banks = MAX_NR_REG_BANKS;
- static unsigned int max_irqs = MAX_IRQS;
- static unsigned int omap_secure_apis;
-@@ -446,6 +446,12 @@ int __init omap_wakeupgen_init(void)
- 	 * GIC code has necessary hooks in place.
- 	 */
- 
-+	/*
-+	 * If you see this warning, then the subsequent loop just
-+	 * corrupted some memory
-+	 */
-+	WARN_ON(max_irqs > ARRAY_SIZE(irq_target_cpu));
-+
- 	/* Associate all the IRQs to boot CPU like GIC init does. */
- 	for (i = 0; i < max_irqs; i++)
- 		irq_target_cpu[i] = boot_cpu;
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
