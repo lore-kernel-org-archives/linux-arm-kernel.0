@@ -1,33 +1,282 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 22 Sep 2012 13:41:28 +0200
-Subject: [RFC 2/3] ARM: move udc_pxa2xx.h to linux/platform_data
-In-Reply-To: <20120921094855.GC15609@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 21 Sep 2012 10:48:55 +0100")
-References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
- <E1TEzet-00077v-VD@rmk-PC.arm.linux.org.uk>
- <CAMPhdO_xqpqUUbSvi1zC4eT6vr0xFO-70+ieknjMWk9h0iWfHg@mail.gmail.com>
- <20120921094855.GC15609@n2100.arm.linux.org.uk>
-Message-ID: <m3haqqthcn.fsf@intrepid.localdomain>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Sat, 22 Sep 2012 15:49:23 +0400
+Subject: [PATCH] arm: add SDIV/UDIV emulation for ARMv7 processors
+Message-ID: <1348314563-8436-1-git-send-email-murzin.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+The Virtualization Extensions introduce the requirement for an ARMv7-A
+implementation to include SDIV and UDIV.  Any implementation of the
+Virtualization Extensions must include the SDIV and UDIV instructions
+in the Thumb and ARM instruction sets.
 
->> > --- a/arch/arm/mach-ixp4xx/include/mach/udc.h
->> > +++ b/arch/arm/mach-ixp4xx/include/mach/udc.h
->> > @@ -2,7 +2,7 @@
->> >   * arch/arm/mach-ixp4xx/include/mach/udc.h
->> >   *
->> >   */
->> > -#include <asm/mach/udc_pxa2xx.h>
->> > +#include <linux/platform_data_pxa2xx_udc.h>
->> 
->> Guess a typo here, "/" instead of "_"? Otherwise looks good to me
->
-> Yea, fixed.
+In an ARMv7-A implementation that does not include the Virtualization
+Extensions, it is IMPLEMENTATION DEFINED whether:
+ *  SDIV and UDIV are not implemented
+ *  SDIV and UDIV are implemented only in the Thumb instruction set
+ *  SDIV and UDIV are implemented in the Thumb and ARM instruction sets.
 
-The ixp4xx part looks good to me too.
-Acked-by: Krzysztof Halasa <khc@pm.waw.pl>
+This patch adds a handler to trap and emulate unimplemented SDIV and
+UDIV instructions in ARM and Thumb modes. Also some basic statistic is
+exported via /proc/cpu/idiv_emulation
 
--- 
-Krzysztof Ha?asa
+Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+---
+ arch/arm/kernel/Makefile       |    1 +
+ arch/arm/kernel/idiv_emulate.c |  194 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig            |   26 ++++++
+ 3 files changed, 221 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/kernel/idiv_emulate.c
+
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 7ad2d5c..057a630 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -62,6 +62,7 @@ obj-$(CONFIG_OF)		+= devtree.o
+ obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
+ obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
+ CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
++obj-$(CONFIG_IDIV_EMULATE)	+= idiv_emulate.o
+ obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ 
+ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+diff --git a/arch/arm/kernel/idiv_emulate.c b/arch/arm/kernel/idiv_emulate.c
+new file mode 100644
+index 0000000..f021d0e
+--- /dev/null
++++ b/arch/arm/kernel/idiv_emulate.c
+@@ -0,0 +1,195 @@
++/*
++ * linux/arch/arm/kernel/idiv_emulate.c
++ *
++ * This code is based on swp_emulate.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Implements emulation of the SDIV/UDIV instructions. They are defined for
++ * ARMv7-R and ARMv7-M profiles (in Thumb state only) and are UNDEFINED in the
++ * ARMv7-A profile. SDIV/UDIV are present by default on Cortex-A15.
++ *
++ * This emulation allow using integer divide instructions in case hardware is
++ * not presented
++ *
++ *  Syntax of SDIV/UDIV instructions: SDIV/UDIV<c> <Rd>,<Rn>,<Rm>
++ *  Where: Rd  = the destination register.
++ *	   Rn  = the register that contains the dividend.
++ *	   Rm  = the register that contains the divisor.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/proc_fs.h>
++#include <linux/sched.h>
++#include <linux/syscalls.h>
++#include <linux/perf_event.h>
++
++#include <asm/opcodes.h>
++#include <asm/traps.h>
++#include <asm/uaccess.h>
++
++/*
++ * Macros/defines for extracting register numbers from instruction.
++ */
++#define EXTRACT_REG_NUM(instruction, offset) \
++	(((instruction) & (0xf << (offset))) >> (offset))
++
++/*
++ * Offsets for ARM mode
++ */
++#define RD_OFFSET  16
++#define RN_OFFSET  0
++#define RM_OFFSET  8
++
++/*
++ * Offsets for Thumb mode
++ */
++#define RD_T_OFFSET  8
++#define RN_T_OFFSET  16
++#define RM_T_OFFSET  0
++
++#define TYPE_OF_DIV (1 << 21)
++
++static unsigned long sdivcounter;
++static unsigned long udivcounter;
++static pid_t         previous_pid;
++
++#ifdef CONFIG_PROC_FS
++static int proc_read_status(char *page, char **start, off_t off, int count,
++			    int *eof, void *data)
++{
++	char *p = page;
++	int len;
++
++	p += sprintf(p, "Emulated UDIV:\t\t%lu\n", udivcounter);
++	p += sprintf(p, "Emulated SDIV:\t\t%lu\n", sdivcounter);
++	if (previous_pid != 0)
++		p += sprintf(p, "Last process:\t\t%d\n", previous_pid);
++
++	len = (p - page) - off;
++	if (len < 0)
++		len = 0;
++
++	*eof = (len <= count) ? 1 : 0;
++	*start = page + off;
++
++	return len;
++}
++#endif
++
++static u32 emulate_udiv(u32 n, u32 base)
++{
++	udivcounter++;
++
++	return n/base;
++}
++
++static s32 emulate_sdiv(s32 n, s32  base)
++{
++	sdivcounter++;
++
++	return n/base;
++}
++
++static int idiv_handler(struct pt_regs *regs, unsigned int instr)
++{
++	long dividend, divisor, dest, res;
++
++	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->ARM_pc);
++
++	res = arm_check_condition(instr, regs->ARM_cpsr);
++
++	switch (res) {
++	case ARM_OPCODE_CONDTEST_PASS:
++		break;
++	case ARM_OPCODE_CONDTEST_FAIL:
++		/* Condition failed - return to next instruction */
++		regs->ARM_pc += 4;
++		return 0;
++	case ARM_OPCODE_CONDTEST_UNCOND:
++		if (!thumb_mode(regs))
++			return -EFAULT;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	if (current->pid != previous_pid) {
++		pr_debug("\"%s\" (%ld) uses idiv instruction\n",
++			 current->comm, (unsigned long)current->pid);
++		previous_pid = current->pid;
++	}
++
++	if (!thumb_mode(regs)) {
++		dividend = regs->uregs[EXTRACT_REG_NUM(instr, RN_OFFSET)];
++		divisor = regs->uregs[EXTRACT_REG_NUM(instr, RM_OFFSET)];
++		dest = EXTRACT_REG_NUM(instr, RD_OFFSET);
++	} else {
++		dividend = regs->uregs[EXTRACT_REG_NUM(instr, RN_T_OFFSET)];
++		divisor = regs->uregs[EXTRACT_REG_NUM(instr, RM_T_OFFSET)];
++		dest = EXTRACT_REG_NUM(instr, RD_T_OFFSET);
++	}
++
++/*
++ * In an ARMv7-A profile implementation that supports the SDIV and UDIV
++ * instructions, divide-by-zero always returns a zero result.
++ * In fact, integer division emulation provided by gcc lib has already handle
++ * division by zero case sending the signal to the caused process. Emulate this
++ * behavior here as well.
++ */
++	if (!divisor) {
++		siginfo_t info;
++
++		info.si_code = FPE_INTDIV;
++		info.si_signo = SIGFPE;
++		info.si_errno = 0;
++
++		arm_notify_die("Division by zero", regs, &info, 0, 0);
++
++		goto out;
++	}
++
++	if (instr & TYPE_OF_DIV)
++		res = emulate_udiv((u32)dividend, (u32)divisor);
++	else
++		res = emulate_sdiv((s32)dividend, (s32)divisor);
++
++	regs->ARM_pc += 4;
++	regs->uregs[dest] = res;
++
++out:
++	return 0;
++}
++
++static struct undef_hook idiv_hook = {
++	.instr_mask = 0x0310f010,
++	.instr_val  = 0x0310f010,
++	.cpsr_mask  = MODE_MASK,
++	.cpsr_val   = USR_MODE,
++	.fn	    = idiv_handler
++};
++
++static int __init idiv_emulation_init(void)
++{
++#ifdef CONFIG_PROC_FS
++	struct proc_dir_entry *res;
++
++	res = create_proc_entry("cpu/idiv_emulation", S_IRUGO, NULL);
++
++	if (!res)
++		return -ENOMEM;
++
++	res->read_proc = proc_read_status;
++#endif /* CONFIG_PROC_FS */
++
++	pr_notice("Registering SDIV/UDIV emulation handler\n");
++
++	register_undef_hook(&idiv_hook);
++
++	return 0;
++}
++
++late_initcall(idiv_emulation_init);
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 101b968..8e2fa94 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -651,6 +651,32 @@ config SWP_EMULATE
+ 
+ 	  If unsure, say Y.
+ 
++config IDIV_EMULATE
++	bool "Emulate SDIV/UDIV instructions"
++	depends on !CPU_USE_DOMAINS && CPU_V7
++	select HAVE_PROC_CPU if PROC_FS
++	default y if SMP
++	help
++
++	  The Virtualization Extensions introduce the requirement for an
++	  ARMv7-A implementation to include SDIV and UDIV.  Any
++	  implementation of the Virtualization Extensions must include
++	  the SDIV and UDIV instructions in the Thumb and ARM
++	  instruction sets.
++
++	  In an ARMv7-A implementation that does not include the
++	  Virtualization Extensions, it is IMPLEMENTATION DEFINED whether:
++	  *  SDIV and UDIV are not implemented
++	  *  SDIV and UDIV are implemented only in the Thumb instruction set
++	  *  SDIV and UDIV are implemented in the Thumb and ARM
++	  instruction sets.
++
++	  This option allows to handle exeptions due to unimplemented
++	  SDIV and UDIV instructions in ARM and Thumb modes.
++
++	  If unsure, say Y.
++
++
+ config CPU_BIG_ENDIAN
+ 	bool "Build big-endian kernel"
+ 	depends on ARCH_SUPPORTS_BIG_ENDIAN
+--
+1.7.8.6
