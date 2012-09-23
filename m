@@ -1,40 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 23 Sep 2012 12:35:24 +0000
-Subject: vt8500: multiplatform for 3.8
-In-Reply-To: <1348372670.28422.6.camel@gitbox>
-References: <1348372670.28422.6.camel@gitbox>
-Message-ID: <201209231235.24679.arnd@arndb.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 23 Sep 2012 15:41:15 +0300
+Subject: [PATCH v2] mtd: atmel_nand: fix the compile error which miss
+ label "err_ecc_ioremap".
+In-Reply-To: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
+References: <1347347412-24214-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1348404075.1889.1.camel@kyv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 23 September 2012, Tony Prisk wrote:
-> I just took a cursory look over the work required for enabling
-> multiplatform support for v3.8 for arch-vt8500.
-> 
-> There are 2 files I don't know what to do with in
-> arch-vt8500/include/mach:
-> 
-> 1) entry-macro.S
-> Contains some low-level irq macro's.
+On Tue, 2012-09-11 at 15:10 +0800, Josh Wu wrote:
+> Add err_ecc_ioremap label to fix following errors:
+> ---8<--- 
+>   CC      drivers/mtd/nand/atmel_nand.o
+> drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
+> drivers/mtd/nand/atmel_nand.c:1423: error: label 'err_ecc_ioremap' used but not defined
+> make[3]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
+> make[2]: *** [drivers/mtd/nand] Error 2
+> make[1]: *** [drivers/mtd] Error 2
+> make: *** [drivers] Error 2
+> --->8---
 
-The solution is to enable CONFIG_MULTI_IRQ_HANDLER (implied in
-CONFIG_MULTIPLATFORM), and implement the same code in C, and then
-set the .handle_irq callback in the your machine descriptor
-to this function.
- 
-> 2) irqs.h
-> Only contains '#define NR_IRQS 128' so I thought it would be easy enough
-> to get rid of, but it looks like I need to enable SPARSE_IRQ to drop it,
-> which will require some coding - what exactly is SPARSE_IRQ and what's
-> required to make it work?
+Pushed to l2-mtd.git, thanks!
 
-SPARSE_IRQ (in combination with IRQDOMAIN) removes the direct mapping
-between hardware IRQ numbers and Linux IRQ numbers. You already have
-IRQ domain support in the irq driver. If all IRQ numbers are parsed
-from the device tree, you can convert this from legacy to linear domain
-to cut the last ties (the local irq_cnt variable) and just set SPARSE_IRQ
-without reserving any legacy interrupts. Some platforms put an nr_irqs
-variable into the machine descriptor as an intermediate step, but I think
-you don't even need that.
-
-	Arnd
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120923/26001d36/attachment.sig>
