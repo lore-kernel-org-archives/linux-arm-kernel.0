@@ -1,64 +1,119 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 23 Sep 2012 16:18:38 -0300
-Subject: [PATCH v2] ARM: dts: imx28-evk: Use pinctrl for gpio-led
-Message-ID: <1348427918-19143-1-git-send-email-festevam@gmail.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Sun, 23 Sep 2012 19:26:05 +0000
+Subject: [PATCH V2 0/5] arm: samsung: Move FIMD headers to include/video/
+In-Reply-To: <1d5a01cd8115$7251eb40$56f5c1c0$%kim@samsung.com>
+References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
+ <02f701cd6f8d$5ca3e850$15ebb8f0$%kim@samsung.com> <5018FDF6.4020205@gmx.de>
+ <1d5a01cd8115$7251eb40$56f5c1c0$%kim@samsung.com>
+Message-ID: <505F624D.6020909@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 08/23/2012 09:55 AM, Kukjin Kim wrote:
+> Florian Tobias Schandinat wrote:
+>>
+>> On 08/01/2012 02:28 AM, Kukjin Kim wrote:
+>>> Leela Krishna Amudala wrote:
+>>>>
+>>>> This patchset moves the contents of regs-fb-v4.h and regs-fb.h from
+>> arch
+>>>> side
+>>>> to include/video/samsung_fimd.h
+>>>>
+>>>> This patchset is created and rebased against master branch of torvalds
+>>>> tree.
+>>>> Tested on smdk5250 board, build tested for other boards.
+>>>>
+>>> (Cc'ed Florian Tobias Schandinat)
+>>>
+>>> Yeah, since it's merge window, this series could be created against on
+>>> mainline. And IMO, would be helpful to us if this series could be sent
+>> to
+>>> upstream via samsung tree after reviewing, because this touches too many
+>>> files in samsung tree and just adds include/video/samsung_fimd.h. But
+>> I'm
+>>> not sure the added inclusion will be used in other file of
+> drivers/video.
+>> If
+>>> so, I can provide some topic branch can be merged into Florian's tree.
+>>> Florian, how about?
+>>
+>> Using a topic branch to merge it in both trees sounds like a good plan
+>> to me.
+>>
+> Florian,
+> 
+> Please pull following topic branch we talked. I already merged it into my
+> -next.
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.7-for-florian
+> 
+> Note, I applied Leela's V4 patches not this V2 series.
 
-Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led driver 
-has pinctrl support, so setup the gpio led pin via pinctrl and avoid the 
-following warning:
+Merged, just as I wrote in another thread. Took a bit longer as I was
+writing my thesis...
 
-leds-gpio leds.12: pins are not configured from the driver
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-Place "pinctrl-0 = <&led_pin_gpio3_5>" into "leds" level,
-now the warning is not shown anymore.
-- 
- arch/arm/boot/dts/imx28-evk.dts |   13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+Best regards,
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index a0ad71c..2da316e 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -76,7 +76,6 @@
- 						0x20c3 /* MX28_PAD_SSP1_SCK__GPIO_2_12 */
- 						0x31c3 /* MX28_PAD_PWM3__GPIO_3_28 */
- 						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
--						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
- 						0x3083 /* MX28_PAD_AUART2_RX__GPIO_3_8 */
- 						0x3093 /* MX28_PAD_AUART2_TX__GPIO_3_9 */
- 					>;
-@@ -85,6 +84,16 @@
- 					fsl,pull-up = <0>;
- 				};
- 
-+				led_pin_gpio3_5: led_gpio3_5 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
- 				gpmi_pins_evk: gpmi-nand-evk at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
-@@ -288,6 +297,8 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_gpio3_5>;
- 
- 		user {
- 			label = "Heartbeat";
--- 
-1.7.9.5
+Florian Tobias Schandinat
+
+> 
+> If any problems, please kindly let me know.
+> 
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+> 
+>   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.7-for-florian
+> 
+> Leela Krishna Amudala (2):
+>       include/video: move fimd register headers from platform to
+> include/video
+>       include/video: Add register offsets for FIMD version 8
+> 
+>  arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+>  arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+>  arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
+>  arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
+>  arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
+>  arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+>  arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+>  arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+>  arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
+>  arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+>  arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+>  arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
+> --------------------
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+>  drivers/video/s3c-fb.c                             |    2 +-
+>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  152
+> +++++++++++++++++--
+>  26 files changed, 165 insertions(+), 194 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+>  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
+> include/video/samsung_fimd.h (73%)
+> 
+> 
