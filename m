@@ -1,108 +1,134 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 22 Sep 2012 13:36:46 -0400
-Subject: [GIT PULL V5 7/7] ARM: kirkwood drivers changes for v3.7
-In-Reply-To: <20120922171554.GE5469@titan.lakedaemon.net>
-References: <20120922171554.GE5469@titan.lakedaemon.net>
-Message-ID: <20120922173646.GL5469@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 22 Sep 2012 22:25:20 -0700
+Subject: [GIT PULL] Patches surrounding DT development due for ARM-SoC
+In-Reply-To: <20120920113356.GA17429@gmail.com>
+References: <20120920113356.GA17429@gmail.com>
+Message-ID: <CAK-hmcQn4dsb5_JLASZ8fZdBL-3n6jEt6RxbJxyDfyGegAbKTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depends:
- - Based on v3.6-rc5
- - kirkwood/addr_decode
+Hi Lee,
 
-New drivers:
- - pinctrl (dove, kirkwood, mvebu)
- - gpio (mvebu)
+In the future, please send pull requests to arm at kernel.org for arm-soc. Or,
+if you prefer individual email addresses instead of the alias, please send
+them to olof at lixom.net and not my gmail address -- chances are I won't see
+them or forget about them, which is what happened here. :-)
 
-Conflicts:
- - kirkwood/boards (arch/arm/Kconfig)
-    - keep MIGHT_HAVE_PCI
-    - keep PLAT_ORION_LEGACY over PLAT_ORION
-    - allow add USB_ARCH_HAS_EHCI
-
-Resolution should look like this:
-
-config ARCH_DOVE
-        bool "Marvell Dove"
-        select CPU_V7
-        select ARCH_REQUIRE_GPIOLIB
-        select GENERIC_CLOCKEVENTS
-        select MIGHT_HAVE_PCI
-        select NEED_MACH_IO_H
-        select PLAT_ORION_LEGACY
-        select USB_ARCH_HAS_EHCI
-        help
-          Support for the Marvell Dove SoC 88AP510
+Nicely contained and no merge conflicts makes me happy right now. Pulled
+into ux500/dt and next/dt.
 
 
-The following changes since commit 5b40baee4a39d96d4d6a48a2b2383982912c429b:
+Thanks!
 
-  arm: mvebu: add address decoding controller to the DT (2012-09-21 18:05:29 +0000)
+-Olof
 
-are available in the git repository at:
-  git://git.infradead.org/users/jcooper/linux.git kirkwood/drivers
+On Thu, Sep 20, 2012 at 4:33 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Sebastian Hesselbarth (3):
-      pinctrl: mvebu: pinctrl driver core
-      pinctrl: mvebu: dove pinctrl driver
-      pinctrl: mvebu: kirkwood pinctrl driver
-
-Thomas Petazzoni (12):
-      pinctrl: mvebu: add pinctrl driver for Armada 370
-      pinctrl: mvebu: add pinctrl driver for Armada XP
-      ARM: mvebu: Add pinctrl support to Armada XP SoCs
-      ARM: mvebu: Add pinctrl support to Armada 370 SoC
-      ARM: mvebu: adjust Armada XP evaluation board DTS
-      arm: mvebu: split Kconfig options for Armada 370 and XP
-      arm: mvebu: select the pinctrl drivers for Armada 370 and Armada XP platforms
-      gpio: introduce gpio-mvebu driver for Marvell SoCs
-      Documentation: add description of DT binding for the gpio-mvebu driver
-      arm: mvebu: use GPIO support now that a driver is available
-      arm: mvebu: add DT information for GPIO banks on Armada 370 and XP
-      arm: mvebu: add gpio support in defconfig
-
- .../devicetree/bindings/gpio/gpio-mvebu.txt        |   53 ++
- .../pinctrl/marvell,armada-370-pinctrl.txt         |   95 +++
- .../bindings/pinctrl/marvell,armada-xp-pinctrl.txt |  100 +++
- .../bindings/pinctrl/marvell,dove-pinctrl.txt      |   72 ++
- .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |  279 ++++++++
- .../bindings/pinctrl/marvell,mvebu-pinctrl.txt     |   46 ++
- arch/arm/Kconfig                                   |    2 +
- arch/arm/boot/dts/armada-370.dtsi                  |   44 ++
- arch/arm/boot/dts/armada-xp-db.dts                 |    4 +-
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   57 ++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   70 ++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   70 ++
- arch/arm/configs/mvebu_defconfig                   |    2 +
- arch/arm/mach-mvebu/Kconfig                        |   18 +-
- arch/arm/mach-mvebu/include/mach/gpio.h            |    1 +
- drivers/gpio/Kconfig                               |    6 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-mvebu.c                          |  679 ++++++++++++++++++
- drivers/pinctrl/Kconfig                            |   22 +
- drivers/pinctrl/Makefile                           |    5 +
- drivers/pinctrl/pinctrl-armada-370.c               |  421 +++++++++++
- drivers/pinctrl/pinctrl-armada-xp.c                |  468 ++++++++++++
- drivers/pinctrl/pinctrl-dove.c                     |  620 ++++++++++++++++
- drivers/pinctrl/pinctrl-kirkwood.c                 |  472 ++++++++++++
- drivers/pinctrl/pinctrl-mvebu.c                    |  754 ++++++++++++++++++++
- drivers/pinctrl/pinctrl-mvebu.h                    |  192 +++++
- 26 files changed, 4548 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/armada-xp-mv78230.dtsi
- create mode 100644 arch/arm/boot/dts/armada-xp-mv78260.dtsi
- create mode 100644 arch/arm/boot/dts/armada-xp-mv78460.dtsi
- create mode 100644 arch/arm/mach-mvebu/include/mach/gpio.h
- create mode 100644 drivers/gpio/gpio-mvebu.c
- create mode 100644 drivers/pinctrl/pinctrl-armada-370.c
- create mode 100644 drivers/pinctrl/pinctrl-armada-xp.c
- create mode 100644 drivers/pinctrl/pinctrl-dove.c
- create mode 100644 drivers/pinctrl/pinctrl-kirkwood.c
- create mode 100644 drivers/pinctrl/pinctrl-mvebu.c
- create mode 100644 drivers/pinctrl/pinctrl-mvebu.h
+> The following changes since commit
+> 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
+>
+>   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-arm-soc-next
+>
+> for you to fetch changes up to c164fa62b93782165f12c0e8366f7b46507edb4d:
+>
+>   ARM: ux500: Fix SSP register address format (2012-09-20 12:32:47 +0200)
+>
+> ----------------------------------------------------------------
+> Lee Jones (39):
+>       ASoC: Ux500: Move MSP pinctrl setup into the MSP driver
+>       ASoC: Ux500: Enable MOP500 driver for Device Tree
+>       ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+>       ASoC: codecs: Enable AB8500 CODEC for Device Tree
+>       ASoC: Ux500: Minor coding layout changes
+>       Documentation: Define the MOP500 Audio Machine Driver Device Tree
+> bindings
+>       Documentation: Define the MSP Driver Device Tree bindings
+>       ARM: ux500: Rename db8500.dtsi to dbx5x0.dtsi to encompass the
+> u9500, u8540 and u9540
+>       ARM: ux500: Clean-up temporary Device Tree enablement helpers
+>       ARM: ux500: Pass PMU platform data due for Perf though AUXDATA
+>       Documentation: Add the AB8500 CODEC device to the MFD AB8500 doc
+>       of/irq: Create stub for of_irq_find_parent when !CONFIG_OF
+>       ARM: ux500: Identify the PRCMU as an interrupt controller
+>       ARM: ux500: Force AB8500 to use the GIC as its interrupt controller
+>       Revert "input: ab8500-ponkey: Create AB8500 domain IRQ mapping"
+>       ARM: ux500: Remove unused snowball_of_platform_devs struct
+>       ARM: ux500: Match Power-On-Key MFD and DTS compatible strings
+>       drivers/rtc/rtc-ab8500.c: Revoke Device Tree enablement
+>       ARM: ux500: Add i2c configurations to the Device Tree for DB8500
+> based devices
+>       ARM: ux500: Add skeleton Device Tree for the HREF reference board
+>       ARM: ux500: Add UART support to the HREF Device Tree
+>       ARM: ux500: Pass SDI DMA information though AUX_DATA to MMCI
+>       ARM: ux500: Clean-up MSP platform code
+>       ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
+>       ARM: ux500: Fork MSP platform registration for step-by-step DT
+> enablement
+>       ARM: ux500: Pass MSP DMA platform data though AUXDATA
+>       ARM: ux500: Stop registering the MOP500 Audio driver from platform
+> code
+>       ARM: ux500: Remove platform registration of MSP devices
+>       ARM: ux500: Rename MSP board file to something more meaningful
+>       ARM: ux500: Add nodes for the MSP into Device Tree
+>       ARM: ux500: Add all encompassing sound node to the Snowball Device
+> Tree
+>       ARM: ux500: Stop registering Audio devices for HREF when DT is
+> enabled
+>       ARM: ux500: Stop registering I2C sub-devices for HREF when DT is
+> enabled
+>       ARM: ux500: Add all known I2C sub-device nodes to the HREF DT
+>       ARM: ux500: Add nodes for the MSP into the HREF Device Tree
+>       ARM: ux500: Add all encompassing sound node to the HREF Device Tree
+>       ARM: ux500: Remove redundant #gpio-cell properties from Snowball DT
+>       ARM: ux500: Apply tc3589x's GPIO/IRQ properties to HREF's DT
+>       ARM: ux500: Fix SSP register address format
+>
+>  Documentation/devicetree/bindings/mfd/ab8500.txt   |   15 +++
+>  .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++++++++
+>  .../devicetree/bindings/sound/ux500-msp.txt        |   43 +++++++++
+>  arch/arm/boot/dts/{db8500.dtsi => dbx5x0.dtsi}     |   71 ++++++++++++--
+>  arch/arm/boot/dts/hrefv60plus.dts                  |   95
+> ++++++++++++++++++
+>  arch/arm/boot/dts/snowball.dts                     |   19 +++-
+>  arch/arm/mach-ux500/Makefile                       |    2 +-
+>  .../{board-mop500-msp.c => board-mop500-audio.c}   |  102
+> +++-----------------
+>  arch/arm/mach-ux500/board-mop500-msp.h             |   14 ---
+>  arch/arm/mach-ux500/board-mop500-sdi.c             |    4 +-
+>  arch/arm/mach-ux500/board-mop500.c                 |   39 ++++----
+>  arch/arm/mach-ux500/board-mop500.h                 |   11 +++
+>  arch/arm/mach-ux500/cpu-db8500.c                   |   10 +-
+>  arch/arm/mach-ux500/include/mach/msp.h             |    2 -
+>  drivers/input/misc/ab8500-ponkey.c                 |    4 +-
+>  drivers/rtc/rtc-ab8500.c                           |    6 --
+>  include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
+>  include/linux/of_irq.h                             |    5 +
+>  sound/soc/codecs/ab8500-codec.c                    |   81 ++++++++++++++++
+>  sound/soc/ux500/mop500.c                           |   47 ++++++++-
+>  sound/soc/ux500/ux500_msp_dai.c                    |    6 ++
+>  sound/soc/ux500/ux500_msp_i2s.c                    |   89
+> +++++++++++++----
+>  sound/soc/ux500/ux500_msp_i2s.h                    |    8 +-
+>  23 files changed, 538 insertions(+), 180 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/sound/ux500-mop500.txt
+>  create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
+>  rename arch/arm/boot/dts/{db8500.dtsi => dbx5x0.dtsi} (88%)
+>  create mode 100644 arch/arm/boot/dts/hrefv60plus.dts
+>  rename arch/arm/mach-ux500/{board-mop500-msp.c => board-mop500-audio.c}
+> (66%)
+>  delete mode 100644 arch/arm/mach-ux500/board-mop500-msp.h
+>
+> --
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120922/904e49f6/attachment-0001.html>
