@@ -1,27 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 23 Sep 2012 15:58:26 -0300
-Subject: [PATCH] ARM: dts: imx28-evk: Use pinctrl for gpio-led
-In-Reply-To: <1348423277-10740-1-git-send-email-festevam@gmail.com>
-References: <1348423277-10740-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5C8bCZuCJG=jCdE1=nwL-XN+jEpdbD4wrCNByf9KKyCgg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 23 Sep 2012 12:09:33 -0700
+Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
+In-Reply-To: <alpine.DEB.2.00.1209220211090.8626@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
+ <20120921205322.GK28835@atomide.com>
+ <20120921231039.GN28835@atomide.com>
+ <alpine.DEB.2.00.1209220002290.6510@utopia.booyaka.com>
+ <20120922002111.GP28835@atomide.com>
+ <alpine.DEB.2.00.1209220211090.8626@utopia.booyaka.com>
+Message-ID: <20120923190933.GS28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+* Paul Walmsley <paul@pwsan.com> [120922 10:48]:
+> On Fri, 21 Sep 2012, Tony Lindgren wrote:
+> 
+> > Hmm I wonder what's causing it then? There must be something
+> > else in tmp-merge at commit abfee61f that causes the problems.
+> > Maybe try to merge with that commit and see what you get?
+> 
+> Probably the merge with the clock patches was causing trouble.
+> 
+> > That commit can't be used as a base though as that's temporary
+> > most likely.. But we can create a base to use out of the
+> > branches once we know them, you can do it yourself too.
+> 
+> Your tmp-merge contains branch/tag merges that haven't yet gone upstream 
+> to arm-soc.  I don't know which of those merges you consider stable (aside 
+> from the upstream ones, obviously).  For this one it looks like the clock 
+> patches were the ones causing the merge trouble.  So since that series 
+> also came from me and is unmerged, will just merge the clock and hwmod 
+> patches into a new pull request on v3.6-rc6 + cleanup-fixes-for-v3.7 + 
+> omap-devel-am33xx-for-v3.7.  Hopefully that will work for you...
 
-On Sun, Sep 23, 2012 at 3:01 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led driver
-> has pinctrl support, so setup the gpio led pin via pinctrl and avoid the
-> following warning:
->
-> leds-gpio leds.12: pins are not configured from the driver
+Well tmp-merge is a merge of the upstream branches, but the branch
+itself is temporary. The issue here is that's it's too messy to get
+your branch merged currently because of the various merge conflicts with
+other branches. Trying to merge in your updated branch for testing
+into tmp-merge with the other branches produces:
 
-Ops, I still see the warning. Please discard this patch.
+CONFLICT (content): Merge conflict in drivers/spi/spi-omap2-mcspi.c
+CONFLICT (content): Merge conflict in arch/arm/mach-omap2/omap_hwmod.c
+CONFLICT (content): Merge conflict in arch/arm/mach-omap2/gpmc.c
+CONFLICT (content): Merge conflict in arch/arm/mach-omap2/devices.c
+CONFLICT (content): Merge conflict in arch/arm/mach-omap2/clkt_dpll.c
+CONFLICT (content): Merge conflict in arch/arm/mach-omap2/clkt_clksel.c
+CONFLICT (content): Merge conflict in arch/arm/mach-omap2/clkt34xx_dpll3m2.c
 
-Will sent v2 soon.
+It seems to be conflicting with your own formatting changes,
+am33xx changes, PMU changes and RNG changes. Sounds like we're
+safest to wait for -rc1 to for the dependencies to clear?
 
 Regards,
 
-Fabio Estevam
+Tony
