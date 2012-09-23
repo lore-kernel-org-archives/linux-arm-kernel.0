@@ -1,62 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 23 Sep 2012 14:06:38 -0700
-Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
-In-Reply-To: <20120923190933.GS28835@atomide.com>
-References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
- <20120921205322.GK28835@atomide.com>
- <20120921231039.GN28835@atomide.com>
- <alpine.DEB.2.00.1209220002290.6510@utopia.booyaka.com>
- <20120922002111.GP28835@atomide.com>
- <alpine.DEB.2.00.1209220211090.8626@utopia.booyaka.com>
- <20120923190933.GS28835@atomide.com>
-Message-ID: <20120923210638.GT28835@atomide.com>
+From: ananaza@iki.fi (Antti P Miettinen)
+Date: Mon, 24 Sep 2012 00:32:06 +0300
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+References: <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <20120514163909.GB13860@n2100.arm.linux.org.uk>
+ <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+ <20120515094010.GF10453@n2100.arm.linux.org.uk>
+ <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
+ <20120515101505.GG10453@n2100.arm.linux.org.uk>
+ <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
+ <20120515163618.GH13860@n2100.arm.linux.org.uk>
+ <20120515170534.GA17319@e102568-lin.cambridge.arm.com>
+ <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
+ <20120920095431.GC4588@e102568-lin.cambridge.arm.com>
+ <87lig4tmw1.fsf@amiettinen-lnx.nvidia.com>
+Message-ID: <874nmowhm1.fsf@amiettinen-lnx.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120923 12:11]:
-> * Paul Walmsley <paul@pwsan.com> [120922 10:48]:
-> > On Fri, 21 Sep 2012, Tony Lindgren wrote:
-> > 
-> > > Hmm I wonder what's causing it then? There must be something
-> > > else in tmp-merge at commit abfee61f that causes the problems.
-> > > Maybe try to merge with that commit and see what you get?
-> > 
-> > Probably the merge with the clock patches was causing trouble.
-> > 
-> > > That commit can't be used as a base though as that's temporary
-> > > most likely.. But we can create a base to use out of the
-> > > branches once we know them, you can do it yourself too.
-> > 
-> > Your tmp-merge contains branch/tag merges that haven't yet gone upstream 
-> > to arm-soc.  I don't know which of those merges you consider stable (aside 
-> > from the upstream ones, obviously).  For this one it looks like the clock 
-> > patches were the ones causing the merge trouble.  So since that series 
-> > also came from me and is unmerged, will just merge the clock and hwmod 
-> > patches into a new pull request on v3.6-rc6 + cleanup-fixes-for-v3.7 + 
-> > omap-devel-am33xx-for-v3.7.  Hopefully that will work for you...
-> 
-> Well tmp-merge is a merge of the upstream branches, but the branch
-> itself is temporary. The issue here is that's it's too messy to get
-> your branch merged currently because of the various merge conflicts with
-> other branches. Trying to merge in your updated branch for testing
-> into tmp-merge with the other branches produces:
-> 
-> CONFLICT (content): Merge conflict in drivers/spi/spi-omap2-mcspi.c
-> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/omap_hwmod.c
-> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/gpmc.c
-> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/devices.c
-> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/clkt_dpll.c
-> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/clkt_clksel.c
-> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/clkt34xx_dpll3m2.c
-> 
-> It seems to be conflicting with your own formatting changes,
-> am33xx changes, PMU changes and RNG changes. Sounds like we're
-> safest to wait for -rc1 to for the dependencies to clear?
+Antti P Miettinen <ananaza@iki.fi> writes:
+> Hmm.. is the condition for cache coherence protocol then different from
+> TLB lookups? If C is cleared, is the cache available for snoops by other
+> cores? What happens if another core needs a dirty line in a cache that
+> has C cleared?
 
-Or maybe it's possible to split the series into smaller chunks
-that can be pulled in to the existing branches without causing
-new merge conflicts?
- 
-> Regards,
-> 
-> Tony
+Sorry - looks like you already answered this:
+> 2) as long as they are taking part in coherency (SMP bit set in ACTLR), all
+>    Cortex-A cores in a MP configuration with the SCTLR.C bit set can hit in
+>    the cache of a CPU that runs with the C bit cleared in SCTLR
+
+So other cores apparently can search the cache that has C bit
+cleared. The only clarification I still would need is whether this
+searching applies to also TLB fetches by other cores. So when you say:
+> .. TLB fetches cannot search the D-cache if the C bit in
+> SCTLR is clear on A9. ..
+
+you meant TLB fethes by the core that has it's C bit cleared. The TLB
+fetches by other cores will still search the cache just like any other
+coherence searches?
+
+--
+Antti P Miettinen
+http://www.iki.fi/~ananaza/
