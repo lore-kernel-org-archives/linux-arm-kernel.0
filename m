@@ -1,37 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 24 Sep 2012 10:34:07 -0700
-Subject: [PATCH] USB: ohci-at91: fix null pointer in
- ohci_hcd_at91_overcurrent_irq
-In-Reply-To: <50600F5F.7030307@atmel.com>
-References: <1348433760-2818-1-git-send-email-joachim.eastwood@jotron.com>
- <50600F5F.7030307@atmel.com>
-Message-ID: <20120924173407.GE32691@kroah.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 24 Sep 2012 19:37:39 +0200
+Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
+In-Reply-To: <20120924163716.GR5469@titan.lakedaemon.net>
+References: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
+ <20120924163716.GR5469@titan.lakedaemon.net>
+Message-ID: <20120924173739.GG14266@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 09:44:31AM +0200, Nicolas Ferre wrote:
-> > This patches fixed the issue by adding the gpio valid check.
+On Mon, Sep 24, 2012 at 12:37:16PM -0400, Jason Cooper wrote:
+> On Mon, Sep 24, 2012 at 07:54:33AM +0200, Andrew Lunn wrote:
+> > Some Orion5x devices allocate their coherent buffers from atomic
+> > context. Increase size of atomic coherent pool to make sure such the
+> > allocations won't fail during boot.
 > > 
-> > Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 > 
-> Thanks a *lot* Joachim for having chased this bug!
-> 
-> Alan, Greg, this one is 3.6 last minute material... I Hope that it can
-> make it!
-> 
-> > ---
-> > 
-> > Note: If 6fffb77c goes into stable please either include this patch also or
-> > fold it into 6fffb77c to avoid regressions.
-> 
-> Absolutely, I have tagged the faulty patch:
->     Cc: Stable <stable@vger.kernel.org> [3.4+]
-> 
-> So it can be good if this one can follow the same path.
+> btw - we should take this to it's logical conclusion and have Sebastian
+> check Dove.  Sebastian?
 
-I'll queue this up for 3.7 and have it backported to 3.6.1 as it's a bit
-late for 3.6 for me right now.
+I did think about that. It probably hits if you have two sata
+devices. However, all current Dove machines have just one.
 
-greg k-h
+	 Andrew
