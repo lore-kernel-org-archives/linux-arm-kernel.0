@@ -1,42 +1,47 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 25 Sep 2012 02:07:44 +1000
-Subject: linux-next: Tree for Sept 24 (irqchip)
-In-Reply-To: <50607E99.6040303@xenotime.net>
-References: <20120925005328.f748dfa3d077cebb345a4291@canb.auug.org.au>
- <50607E99.6040303@xenotime.net>
-Message-ID: <20120925020744.cc5beb9e65473605e5ca2240@canb.auug.org.au>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 24 Sep 2012 11:08:29 -0500
+Subject: [PATCH V3 8/8] ARM: OMAP2+: PMU: Add QoS constraint
+In-Reply-To: <alpine.DEB.2.00.1209201705570.12583@utopia.booyaka.com>
+References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
+ <1347290626-21164-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1209201705570.12583@utopia.booyaka.com>
+Message-ID: <5060857D.5030005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+Hi Paul,
 
-On Mon, 24 Sep 2012 08:39:05 -0700 Randy Dunlap <rdunlap@xenotime.net> wrote:
->
-> On 09/24/2012 07:53 AM, Stephen Rothwell wrote:
+On 09/20/2012 12:14 PM, Paul Walmsley wrote:
+> Hi
 > 
-> > Today was a train wreck, with lots of new conflicts across several trees
-> > and a few build failures as well.
+> On Mon, 10 Sep 2012, Jon Hunter wrote:
 > 
-> I agree.  I mostly get this:
+>> When CPU-idle is enabled, the MPU sub-system will transition to low power
+>> states during idle periods. If the PMU is active and the MPU sub-system
+>> transitions to a low power state, such as retention, then the PMU context
+>> will be lost and PMU events will stop. To prevent this from happening add a
+>> QoS constraint whenever PMU is active to prevent the MPU sub-system from
+>> transitioning to a low power state.
+>>
+>> By default the PMU QoS constraint is set to -1 so it will not prevent any low
+>> power states and when the PMU is enabled, it is set to 0, so that only C-state
+>> C0 is allowed. I plan to re-visit this and relax the constraint to allow some
+>> low power states, but for now I just wish to ensure PMU is working.
+>>
+>> Cc: Ming Lei <ming.lei@canonical.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 > 
-> drivers/Kconfig:157: can't open file "drivers/irqchip/Kconfig"
-> 
-> i.e., no such file.
-> 
-> How does this happen?  :(
-> 
-> who handles irqchip?
+> This one looks like 3.7-rc material, due to the dependency on Will's PMU 
+> runtime PM adaptation series, which is unfortunately not yet in the 
+> stable merge base that I need to use to send these upstream.  Jon, care to 
+> update and re-send this one after Linus merges the other PMU patches?
 
-Hmm, commit 89214f009c1d ("ARM: bcm2835: add interrupt controller
-driver") from the arm-soc tree adds that file as an empty file (I have
-the empty file in my tree).  Nothing adds anything to it.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120925/a43debdc/attachment.sig>
+Yes no problem. Will send out during the 3.7-rc.
+
+Cheers
+Jon
