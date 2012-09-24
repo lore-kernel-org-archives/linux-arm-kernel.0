@@ -1,29 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 24 Sep 2012 18:33:30 +0000 (UTC)
-Subject: [PATCH] ARM: am33xx: clk: Update clkdev table to add mcasp alias
-In-Reply-To: <1348509399-3391-1-git-send-email-hvaibhav@ti.com>
-References: <1348509399-3391-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1209241832430.24053@utopia.booyaka.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 25 Sep 2012 00:01:31 +0530
+Subject: [PATCH v2] ARM: OMAP2+: Add am335x evm and bone targets to common
+ Makefile
+Message-ID: <1348511491-455-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Sep 2012, Vaibhav Hiremath wrote:
+This adds am335x-evm and am335x-bone dtb targets to
+'make dtbs', just like other platforms.
 
-> After Rajendra's common-clock preparation series,
-> commit (a1978ef4da1 - ARM: omap: hwmod: get rid of
-> all omap_clk_get_by_name usage) the clkdev table need to
-> update with an entry for clocks used by hwmod to have
-> clock name same as the alias.
-> 
-> Without this, the clk_get() in omap_hwmod would fail.
-> 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+Changes from V1:
+	- Move target to common Makefile instead of
+	  the per-platform file.
 
-Tony, if you want to take this, it's
+ arch/arm/boot/dts/Makefile |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
-
-otherwise we'll wait for -rc1.
-
-
-- Paul
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d4ad2df..6f2dae8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -75,7 +75,9 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap4-pandaES.dtb \
+ 	omap4-var_som.dtb \
+ 	omap4-sdp.dtb \
+-	omap5-evm.dtb
++	omap5-evm.dtb \
++	am335x-evm.dtb \
++	am335x-bone.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+--
+1.7.0.4
