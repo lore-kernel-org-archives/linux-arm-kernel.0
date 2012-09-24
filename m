@@ -1,29 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Sep 2012 11:56:21 -0400 (EDT)
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <20120924151305.GA14198@arm.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924151305.GA14198@arm.com>
-Message-ID: <alpine.LFD.2.02.1209241152540.6667@xanadu.home>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 24 Sep 2012 10:57:50 -0500
+Subject: [PATCH V3 1/8] ARM: OMAP3: Add debugss HWMOD data
+In-Reply-To: <alpine.DEB.2.00.1209201653020.12583@utopia.booyaka.com>
+References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
+ <1347290626-21164-2-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1209191731270.5264@utopia.booyaka.com>
+ <alpine.DEB.2.00.1209201653020.12583@utopia.booyaka.com>
+Message-ID: <506082FE.8000705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Sep 2012, Catalin Marinas wrote:
+Hi Paul,
 
-> On Fri, Sep 21, 2012 at 04:56:03PM +0100, Cyril Chemparathy wrote:
-> > This patch adds support for 64-bit physical addresses in virt_to_phys()
-> > patching.  This does not do real 64-bit add/sub, but instead patches in the
-> > upper 32-bits of the phys_offset directly into the output of virt_to_phys.
+On 09/20/2012 12:13 PM, Paul Walmsley wrote:
+> On Wed, 19 Sep 2012, Paul Walmsley wrote:
 > 
-> So this assumes that for the kernel linear mapping, all the physical
-> addresses have the same upper 32-bit. That's a good optimisation but I
-> haven't seen this check when calculating lowmem in sanity_check_meminfo.
-> Someone may build platform with memory starting at 3GB and going across
-> the 4GB limit.
+>> On Mon, 10 Sep 2012, Jon Hunter wrote:
+>>
+>>> To enable PMU with runtime PM support on OMAP3 devices we need to be able to
+>>> dynamically enable and disable the debug sub-system at runtime. By adding HWMOD
+>>> data for the debug sub-system for OMAP3, we can build the PMU device using the
+>>> debug sub-system HWMOD and control this power domain using runtime PM.
+>>>
+>>> Reviewed-by: Benoit Cousson <b-cousson@ti.com>
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>
+>> Isn't this patch missing MPU address ranges?  Looking at the OMAP4 TRM 
+>> Table 2-2 "L3_EMU Memory Space Mapping" it should cover 
+>> 0x54000000-0x541fffff?
+> 
+> Looks like Jon is out of the office at the moment.  So this one has been 
+> updated locally to add the _OMAP3_ address space from the TRM (my earlier 
+> message referred incorrectly to the OMAP4 address space).  Updated patch 
+> below.
 
-Good point.  We better get an early warning if that happens.
+Thanks for catching that. Was not needed for PMU use-case but I should
+have added that for other use-cases.
 
-
-Nicolas
+Cheers
+Jon
