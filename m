@@ -1,39 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2012 14:25:52 -0700
-Subject: [GIT PULL 3/3] omap arch timer late changes for v3.7 merge window
-In-Reply-To: <pull-1348521952-285145>
-Message-ID: <mailman.15.1348521989.1458.linux-arm-kernel@lists.infradead.org>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Mon, 24 Sep 2012 14:25:26 -0700
+Subject: [PATCH v8 0/11] KGDB/KDB FIQ (NMI) debugger
+In-Reply-To: <506039F1.2040108@windriver.com>
+References: <20120919234003.GA24143@lizard> <505B1CC7.9000005@windriver.com>
+ <506039F1.2040108@windriver.com>
+Message-ID: <20120924212523.GA31823@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3fe05bd9980df7207a35b4841a94dc2875e86960:
+On Mon, Sep 24, 2012 at 05:46:09AM -0500, Jason Wessel wrote: [...]
+> You can add my ack to the series, for what you have in:
+> "git://git.infradead.org/users/cbou/linux-nmi-kdb.git master", and then
+> drop a pull request to Greg for the next merge window.  Thank you for
+> your hard work through all the revisions of this code and this slick new
+> feature.
+> 
+> Acked-by: Jason Wessel <jason.wessel@windriver.com>
 
-  Merge tag 'v3.6-rc6' into devel-dt (2012-09-24 11:42:13 -0700)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/devel-dt-arch-timer-for-v3.7
-
-for you to fetch changes up to ef8fe6fee16f178cd80cf11b21565bca95b80182:
-
-  Merge branch 'devel-dt-arch-timer' into devel-dt (2012-09-24 11:42:24 -0700)
-
-----------------------------------------------------------------
-
-Few late patches to enable arch timer for omap5
-using device tree.
-
-----------------------------------------------------------------
-Santosh Shilimkar (2):
-      ARM: OMAP: Add initialisation for the real-time counter.
-      ARM: OMAP5: Enable arch timer support
-
-Tony Lindgren (2):
-      Merge branch 'for_3.7/omap5_arch_timer' of git://github.com/SantoshShilimkar/linux into devel-dt-arch-timer
-      Merge branch 'devel-dt-arch-timer' into devel-dt
-
- arch/arm/boot/dts/omap5.dtsi |   12 ++++++
- arch/arm/mach-omap2/Kconfig  |    5 +++
- arch/arm/mach-omap2/timer.c  |   97 +++++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 113 insertions(+), 1 deletion(-)
+Great! Much thanks for your reviews, Jason!
