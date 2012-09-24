@@ -1,101 +1,113 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 26 Sep 2012 10:51:51 -0500
-Subject: [PATCH V2 7/7] ARM: OMAP: Add DT support for timer driver
-In-Reply-To: <1347579091-3794-8-git-send-email-jon-hunter@ti.com>
-References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
- <1347579091-3794-8-git-send-email-jon-hunter@ti.com>
-Message-ID: <50632497.2070103@ti.com>
+From: mahalakshmi.m@jasmin-infotech.com (mahalakshmi.m)
+Date: Mon, 24 Sep 2012 19:22:42 +0530
+Subject: i2c_transfer using 8bit register address
+Message-ID: <006001cd9a5b$de7c1e30$9b745a90$@m@jasmin-infotech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On 09/13/2012 06:31 PM, Jon Hunter wrote:
-> In order to add device-tree support to the timer driver the following changes
-> were made ...
-> 
-> 1. Allocate system timers (used for clock-events and clock-source) based upon
->    timer properties rather than using an hard-coded timer instance ID. To allow
->    this a new helper function called omap_dmtimer_find_by_property() has been
->    added for finding a timer with the particular properties in the device-tree
->    blob. Please note that this is an internal helper function for system timers
->    only to find a timer in the device-tree blob. This cannot be used by device
->    drivers, another API has been added for that (see below). Timers that are
->    allocated for system timers are dynamically disabled at boot time by adding
->    a status property with the value "disabled" to the timer's device-tree node.
-> 
->    Please note that when allocating system timers we now pass a timer ID and
->    timer property. The timer ID is only be used for allocating a timer when
->    booting without device-tree. Once device-tree migration is complete, all
->    the timer ID references will be removed.
-> 
-> 2. If DT blob is present, then let device-tree create the timer devices
->    dynamically.
-> 
-> 3. When device-tree is present the "id" field in the platform_device structure
->    (pdev->id) is initialised to -1 and hence cannot be used to identify a timer
->    instance. Due to this the following changes were made ...
->    a). The API omap_dm_timer_request_specific() is not supported when using
->        device-tree, because it uses the device ID to request a specific timer.
->        This function will return an error if called when device-tree is present.
->        Users of this API should use omap_dm_timer_request_by_cap() instead.
->    b). When removing the DMTIMER driver, the timer "id" was used to identify the
->        timer instance. The remove function has been modified to use the device
->        name instead of the "id".
-> 
-> 4. When device-tree is present the platform_data structure will be NULL and so
->    check for this.
-> 
-> 5. The OMAP timer device tree binding has the following optional parameters ...
->    a). ti,timer-alwon  --> Timer is in an always-on power domain
->    b). ti,timer-dsp    --> Timer can generate an interrupt to the on-chip DSP
->    c). ti,timer-pwm    --> Timer can generate a PWM output
->    d). ti,timer-secure --> Timer is reserved on a secure OMAP device
->    Search for the above parameters and set the appropriate timer attribute
->    flags.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c  |   96 +++++++++++++++++++++++++++++++++---------
->  arch/arm/plat-omap/dmtimer.c |   41 +++++++++++++++---
->  2 files changed, 112 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 60d43c8..d1c7771 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -58,16 +58,20 @@
->  #define OMAP3_32K_SOURCE	"omap_32k_fck"
->  #define OMAP4_32K_SOURCE	"sys_32k_ck"
->  
-> +#define TIMER_PROP_ALWON	"ti,timer-alwon"
-> +
+ 
 
-I see you made the following comment [1] here ...
+I am trying to send 8 bit register address using i2c_transfer.My code is as
+follows.
 
-"It would be easier to follow the code if you use the strings directly
-(and you do in some places)."
+ 
 
-I could avoid the above definition.
+static int My_Read(void *dev, u16 reg, u32 len,
 
->  #ifdef CONFIG_OMAP_32K_TIMER
->  #define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
->  #define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
->  #define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
->  #define OMAP3_SECURE_TIMER	12
-> +#define TIMER_PROP_SECURE	"ti,timer-secure"
->  #else
->  #define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
->  #define OMAP3_CLKEV_SOURCE	OMAP3_MPU_SOURCE
->  #define OMAP4_CLKEV_SOURCE	OMAP4_MPU_SOURCE
->  #define OMAP3_SECURE_TIMER	1
-> +#define TIMER_PROP_SECURE	TIMER_PROP_ALWON
->  #endif
+                                 u16 *data, u32 endian)
 
-Are you ok, with having the TIMER_PROP_SECURE definition or would you
-prefer I handle this differently? This is dependent on the kernel config.
+{
 
-Cheers
-Jon
+        struct i2c_client *client = dev;
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/84458/focus=84982
+        struct i2c_msg msg[2];
+
+        u16 block_data;
+
+        int ret, icnt;
+
+        unsigned char u8_RetryCnt = 0;
+
+ 
+
+        msg[0].addr = client->addr;
+
+        msg[0].flags = client->flags & I2C_M_TEN;
+
+        msg[0].len = 2;
+
+        msg[0].buf = (char *)&block_data;
+
+ 
+
+        msg[1].addr = client->addr;
+
+        msg[1].flags = client->flags & I2C_M_TEN;
+
+        msg[1].flags |= I2C_M_RD;
+
+        msg[1].len = len ;
+
+        msg[1].buf = (char *)data;
+
+ 
+
+                ret = i2c_transfer(client->adapter, msg, 2);
+
+}
+
+ 
+
+Where the register address " reg"  is for example 0x08. I want to read a
+8bit register address 0x08. 
+
+ 
+
+My confusion is that since  i2c_msg structure has u16 is it possible to send
+0x08.Will I need to send as 0x0008.
+
+ 
+
+struct i2c_msg {
+
+  __u16 addr;
+
+  __u16 flags;
+
+#define I2C_M_TEN              0x0010
+
+#define I2C_M_RD               0x0001
+
+#define I2C_M_NOSTART          0x4000
+
+#define I2C_M_REV_DIR_ADDR     0x2000
+
+#define I2C_M_IGNORE_NAK       0x1000
+
+#define I2C_M_NO_RD_ACK               0x0800
+
+#define I2C_M_RECV_LEN         0x0400
+
+  __u16 len;
+
+  __u8 * buf;
+
+};  
+
+ 
+
+Kindly provide ur views.
+
+ 
+
+Thanks & Regards,
+
+Maha
+
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/9c6d1390/attachment-0001.html>
