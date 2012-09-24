@@ -1,45 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Sep 2012 20:17:36 +0100
-Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
- monitor mode
-In-Reply-To: <5060A0C8.5040501@codeaurora.org>
-References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
- <20120920173556.GQ4654@mudshark.cambridge.arm.com>
- <20120924171934.GE5522@mudshark.cambridge.arm.com>
- <5060A0C8.5040501@codeaurora.org>
-Message-ID: <20120924191736.GA31118@mudshark.cambridge.arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 24 Sep 2012 19:21:11 +0000 (UTC)
+Subject: OMAP baseline test results for v3.6-rc7
+Message-ID: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 07:04:56PM +0100, Stephen Boyd wrote:
-> On 09/24/12 10:19, Will Deacon wrote:
-> > Ok, I've pushed a bunch of patches to my hw-breakpoint branch (head commit
-> > 55cb726797c7). I'll post them to the list after the merge window, but please
-> > do take them for a spin if you get a chance.
-> >
-> 
-> Sure, I'll try them later today. I would say just send them out so
-> people can add tested and reviewed tags. Otherwise we should all start
-> planning week long vacations every 7 to 8 weeks to coincide with the
-> merge window.
 
-I like the idea of that! However, it's more that most people are worrying
-about getting their trees into shape rather than reviewing new code at
-the moment, so I suspect that posting it now will go largely un-noticed
-and I don't think this is a critical fix (see below).
+Here are some basic OMAP boot and power management test results for 
+v3.6-rc6:
 
-> Also, it would be nice if we could fix this in 3.7 or even 3.6. Booting
-> on an MSM8660 is very fragile right now and this patch fixes it for me.
+   http://www.pwsan.com/omap/testlogs/test_v3.6-rc6/20120918101040/
 
-Whilst I appreciate that it solves your problem, I'm *really* wary about
-changing this stuff without giving it a thorough airing beforehand. The
-debug reset path is extremely error-prone and its behaviour is tangled
-up with the state of various external signals into the core, meaning that
-different platforms with the same CPU can take different paths at runtime.
+Some observations:
 
-I can definitely CC stable once we're happy with this, but I'd rather
-avoid rushing the patches in before 3.8.
+Boot tests:
 
-Cheers,
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see 
+http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
 
-Will
+* 3517EVM & CM-T3517: boot hangs               
+  - Probably due to the use of NFS root; there are likely some Kconfig,
+    board file, and PM issues with EMAC
+
+PM tests:
+
+* 37xx EVM: CORE not entering dynamic off-idle
+  - Cause unknown; dynamic retention-idle seems to work; system suspend to 
+    off works
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock gate ("debug ignore_loglevel")
+  - Not shown in the current test logs; cause unknown
+
+* 4430ES2 Panda: UART corruption during long transmit buffers
+  - Presumably due to either a missing hardware workaround or a bug in
+    the OMAP serial driver
+
+Other:
+
+* RCU stall messages appear if boards are booted into a minimal userspace
+  and left to sit for a few minutes
+  - Fixed by http://marc.info/?l=linux-arm-kernel&m=134835120600590&w=2
+
+
+Changes from v3.6-rc6 (test 20120918101040):
+(see http://www.pwsan.com/omap/testlogs/test_v3.6-rc6/20120918101040/ )
+
+- Added comments about RCU stalls, appearing since at least v3.6-rc3
+
+- Updated CM-T3517 "USB OTG" (really IPSS) comment
+
+object size (delta in bytes from test_v3.6-rc6 (5698bd757d55b1bb87edd1a9744ab09c142abfc2)):
+  text 	  data 	   bss 	 total 	kernel
+  -328 	   +72 	     0 	  -256 	2430_testconfig
+   -16 	   +16 	     0 	     0 	5912osk_testconfig
+  -376 	   +72 	     0 	  -304 	am33xx_testconfig
+   +64 	   +32 	     0 	   +96 	n800_b_testconfig
+   +80 	   +64 	     0 	  +144 	n800_multi_omap2xxx
+   +80 	   +32 	     0 	  +112 	n800_testconfig
+   +72 	   +80 	     0 	  +152 	omap1510_defconfig
+   +40 	   +16 	     0 	   +56 	omap1_defconfig
+   +80 	   +64 	     0 	  +144 	omap2_4_testconfig
+  -376 	   +40 	     0 	  -336 	omap2plus_defconfig
+  -376 	   +72 	     0 	  -304 	omap2plus_defconfig_cpupm
+   +20 	   +72 	     0 	   +92 	omap2plus_no_pm
+   +20 	    +8 	     0 	   +28 	omap3_4_testconfig
+  +140 	   +72 	     0 	  +212 	omap3_testconfig
+   +20 	   +40 	     0 	   +60 	omap4_testconfig
+   -40 	   +72 	     0 	   +32 	rmk_omap3430_ldp_oldconfig
+  -200 	    +8 	     0 	  -192 	rmk_omap4430_sdp_oldconfig
+
+
+
+- Paul
