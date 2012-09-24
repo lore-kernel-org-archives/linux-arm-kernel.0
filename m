@@ -1,42 +1,52 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 24 Sep 2012 16:46:08 +0100
-Subject: [GIT PULL] Versatile Express clk
-Message-ID: <1348501568.27071.5.camel@hornet>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 24 Sep 2012 11:50:02 -0400
+Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd tree
+In-Reply-To: <20120924193934.76d4feafb689b265ff49c5c3@canb.auug.org.au>
+References: <20120924193934.76d4feafb689b265ff49c5c3@canb.auug.org.au>
+Message-ID: <20120924155002.GP5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Mon, Sep 24, 2012 at 07:39:34PM +1000, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/mtd/nand/orion_nand.c between commit 11a3910e730e ("mtd:
+> orion_nand: remove <mach/hardware.h> include") from the l2-mtd tree and
+> commit c02cecb92ed4 ("ARM: orion: move platform_data definitions") from
+> the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-Would you be so kind and pull the VE clocking stuff? They are rebased on
-top of Linus' Realview patch.
+The change below is correct, thanks.
 
-Thanks!
+thx,
 
-Pawel
+Jason.
+
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc drivers/mtd/nand/orion_nand.c
+> index 9ee436d,131b58a..0000000
+> --- a/drivers/mtd/nand/orion_nand.c
+> +++ b/drivers/mtd/nand/orion_nand.c
+> @@@ -21,7 -21,8 +21,7 @@@
+>   #include <linux/err.h>
+>   #include <asm/io.h>
+>   #include <asm/sizes.h>
+> - #include <plat/orion_nand.h>
+>  -#include <mach/hardware.h>
+> + #include <linux/platform_data/mtd-orion_nand.h>
+>   
+>   static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+>   {
 
 
-The following changes since commit b9f8a0f8e255919bdcfb96a8d50d1523233a458a:
 
-  clk: convert ARM RealView to common clk (2012-09-24 16:28:29 +0100)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git clk-v3.6-rc7
-
-for you to fetch changes up to b262f1ed394218f9327b72e7d1d17a5e62074be0:
-
-  clk: Common clocks implementation for Versatile Express (2012-09-24 16:28:30 +0100)
-
-----------------------------------------------------------------
-Pawel Moll (2):
-      clk: Versatile Express clock generators ("osc") driver
-      clk: Common clocks implementation for Versatile Express
-
- arch/arm/include/asm/hardware/sp810.h    |    2 +
- drivers/clk/Kconfig                      |    8 +-
- drivers/clk/versatile/Makefile           |    2 +
- drivers/clk/versatile/clk-vexpress-osc.c |  150 ++++++++++++++++++++++++++++++
- drivers/clk/versatile/clk-vexpress.c     |  142 ++++++++++++++++++++++++++++
- 5 files changed, 301 insertions(+), 3 deletions(-)
- create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
- create mode 100644 drivers/clk/versatile/clk-vexpress.c
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
