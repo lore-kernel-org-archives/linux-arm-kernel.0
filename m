@@ -1,134 +1,203 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 22 Sep 2012 22:25:20 -0700
-Subject: [GIT PULL] Patches surrounding DT development due for ARM-SoC
-In-Reply-To: <20120920113356.GA17429@gmail.com>
-References: <20120920113356.GA17429@gmail.com>
-Message-ID: <CAK-hmcQn4dsb5_JLASZ8fZdBL-3n6jEt6RxbJxyDfyGegAbKTA@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 24 Sep 2012 12:04:15 +0300
+Subject: How to specify IOMMU'able devices in DT (was: [RFC 0/5] ARM:
+ dma-mapping: New dma_map_ops to control IOVA more precisely)
+In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E379FDC2372@HQMAIL04.nvidia.com>
+References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
+ <20120918124918.GK2505@amd.com>
+ <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
+ <201209190759.46174.arnd@arndb.de> <20120919125020.GQ2505@amd.com>
+ <401E54CE964CD94BAE1EB4A729C7087E379FDC1EEB@HQMAIL04.nvidia.com>
+ <505A7DB4.4090902@wwwdotorg.org>
+ <401E54CE964CD94BAE1EB4A729C7087E379FDC1F2D@HQMAIL04.nvidia.com>
+ <505B35F7.2080201@wwwdotorg.org>
+ <401E54CE964CD94BAE1EB4A729C7087E379FDC2372@HQMAIL04.nvidia.com>
+Message-ID: <20120924120415.8e6929a34c422185a98d3f82@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Fri, 21 Sep 2012 20:16:00 +0200
+Krishna Reddy <vdumpa@nvidia.com> wrote:
 
-In the future, please send pull requests to arm at kernel.org for arm-soc. Or,
-if you prefer individual email addresses instead of the alias, please send
-them to olof at lixom.net and not my gmail address -- chances are I won't see
-them or forget about them, which is what happened here. :-)
+> > > The device(H/W controller) need to access few special memory
+> > > blocks(IOVA==PA) and DRAM as well.
+> >
+> > OK, so only /some/ of the VA space is VA==PA, and some is remapped; that's a
+> > little different that what you originally implied above.
+> >
+> > BTW, which HW module is this; AVP/COP or something else. This sounds like an
+> > odd requirement.
+>
+> This is not specific to ARM7. There are protected memory regions on Tegra that
+> can be accessed by some controllers like display, 2D, 3D, VDE, HDA. These are
+> DRAM regions configured as protected by BootRom. These memory regions
+> are not exposed to and not managed by OS page allocator. The H/W controller
+>  accesses to these regions still to go through IOMMU.
+> The IOMMU view for all the H/W controllers is not uniform on Tegra.
+> Some Controllers see entire 4GB IOVA space. i.e all accesses go though IOMMU.
+> Some controllers see the IOVA Space that don't overlap with MMIO space.  i.e
+> The MMIO address access bypass IOMMU and directly go to MMIO space.
+> Tegra IOMMU can support multiple address spaces as well. To hide controller
+> Specific behavior, the drivers should take care of one to one mapping and
+> remove inaccessible iova spaces in their address space's based platform device info.
 
-Nicely contained and no merge conflicts makes me happy right now. Pulled
-into ux500/dt and next/dt.
+The above is also related to another issue,
+    how to specify IOMMU'able devices in DT.
 
+As mentioned above, some IOVA mapping may be unique to some devices,
+and the number of IOMMU'able device are quite many nowadays, a few
+dozen in Tegra30 now. Basically they are seen as just normal platform
+devices from CPU even if they belong to different busses in H/W. IOW, their
+IOMMU'ability just depend on a platfrom bus from _S/W_ POV. Doing each
+registration(create a map & attach device) in board files isn't so
+nice. Currently we register them at "platform_device_add()" at once
+with just a HACK(*1), but this could/should be done based on the info
+passed from DT. For tegra, those parameter could be, "ASID" and
+"address range"(start, size, alignment). For example in DT:
 
-Thanks!
+deviceA {
+                      "start"     "size"   "align"
+          iommu = <0x12340000 0x00400000 0x0000000>;   # exclusively specify "start" or "align"
+          iommu = <0x00000000 0x00400000 0x0010000>;
+          iommu = <0x12340000 0x00040000 0x12380000 0x00040000>; # "start", "size" could be repeated...
+	  asid = 3; # if needed
 
--Olof
+or
+          dma_range = <0x12340000 0x00400000 0x0000000>; # if iommu is considered as one implementation of dma.....
+};
 
-On Thu, Sep 20, 2012 at 4:33 AM, Lee Jones <lee.jones@linaro.org> wrote:
+Is there any way to specify each IOMMU'able _platform device_ and
+specify its map in DT?
 
-> The following changes since commit
-> 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
->
->   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-arm-soc-next
->
-> for you to fetch changes up to c164fa62b93782165f12c0e8366f7b46507edb4d:
->
->   ARM: ux500: Fix SSP register address format (2012-09-20 12:32:47 +0200)
->
-> ----------------------------------------------------------------
-> Lee Jones (39):
->       ASoC: Ux500: Move MSP pinctrl setup into the MSP driver
->       ASoC: Ux500: Enable MOP500 driver for Device Tree
->       ASoC: Ux500: Enable ux500 MSP driver for Device Tree
->       ASoC: codecs: Enable AB8500 CODEC for Device Tree
->       ASoC: Ux500: Minor coding layout changes
->       Documentation: Define the MOP500 Audio Machine Driver Device Tree
-> bindings
->       Documentation: Define the MSP Driver Device Tree bindings
->       ARM: ux500: Rename db8500.dtsi to dbx5x0.dtsi to encompass the
-> u9500, u8540 and u9540
->       ARM: ux500: Clean-up temporary Device Tree enablement helpers
->       ARM: ux500: Pass PMU platform data due for Perf though AUXDATA
->       Documentation: Add the AB8500 CODEC device to the MFD AB8500 doc
->       of/irq: Create stub for of_irq_find_parent when !CONFIG_OF
->       ARM: ux500: Identify the PRCMU as an interrupt controller
->       ARM: ux500: Force AB8500 to use the GIC as its interrupt controller
->       Revert "input: ab8500-ponkey: Create AB8500 domain IRQ mapping"
->       ARM: ux500: Remove unused snowball_of_platform_devs struct
->       ARM: ux500: Match Power-On-Key MFD and DTS compatible strings
->       drivers/rtc/rtc-ab8500.c: Revoke Device Tree enablement
->       ARM: ux500: Add i2c configurations to the Device Tree for DB8500
-> based devices
->       ARM: ux500: Add skeleton Device Tree for the HREF reference board
->       ARM: ux500: Add UART support to the HREF Device Tree
->       ARM: ux500: Pass SDI DMA information though AUX_DATA to MMCI
->       ARM: ux500: Clean-up MSP platform code
->       ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
->       ARM: ux500: Fork MSP platform registration for step-by-step DT
-> enablement
->       ARM: ux500: Pass MSP DMA platform data though AUXDATA
->       ARM: ux500: Stop registering the MOP500 Audio driver from platform
-> code
->       ARM: ux500: Remove platform registration of MSP devices
->       ARM: ux500: Rename MSP board file to something more meaningful
->       ARM: ux500: Add nodes for the MSP into Device Tree
->       ARM: ux500: Add all encompassing sound node to the Snowball Device
-> Tree
->       ARM: ux500: Stop registering Audio devices for HREF when DT is
-> enabled
->       ARM: ux500: Stop registering I2C sub-devices for HREF when DT is
-> enabled
->       ARM: ux500: Add all known I2C sub-device nodes to the HREF DT
->       ARM: ux500: Add nodes for the MSP into the HREF Device Tree
->       ARM: ux500: Add all encompassing sound node to the HREF Device Tree
->       ARM: ux500: Remove redundant #gpio-cell properties from Snowball DT
->       ARM: ux500: Apply tc3589x's GPIO/IRQ properties to HREF's DT
->       ARM: ux500: Fix SSP register address format
->
->  Documentation/devicetree/bindings/mfd/ab8500.txt   |   15 +++
->  .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++++++++
->  .../devicetree/bindings/sound/ux500-msp.txt        |   43 +++++++++
->  arch/arm/boot/dts/{db8500.dtsi => dbx5x0.dtsi}     |   71 ++++++++++++--
->  arch/arm/boot/dts/hrefv60plus.dts                  |   95
-> ++++++++++++++++++
->  arch/arm/boot/dts/snowball.dts                     |   19 +++-
->  arch/arm/mach-ux500/Makefile                       |    2 +-
->  .../{board-mop500-msp.c => board-mop500-audio.c}   |  102
-> +++-----------------
->  arch/arm/mach-ux500/board-mop500-msp.h             |   14 ---
->  arch/arm/mach-ux500/board-mop500-sdi.c             |    4 +-
->  arch/arm/mach-ux500/board-mop500.c                 |   39 ++++----
->  arch/arm/mach-ux500/board-mop500.h                 |   11 +++
->  arch/arm/mach-ux500/cpu-db8500.c                   |   10 +-
->  arch/arm/mach-ux500/include/mach/msp.h             |    2 -
->  drivers/input/misc/ab8500-ponkey.c                 |    4 +-
->  drivers/rtc/rtc-ab8500.c                           |    6 --
->  include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
->  include/linux/of_irq.h                             |    5 +
->  sound/soc/codecs/ab8500-codec.c                    |   81 ++++++++++++++++
->  sound/soc/ux500/mop500.c                           |   47 ++++++++-
->  sound/soc/ux500/ux500_msp_dai.c                    |    6 ++
->  sound/soc/ux500/ux500_msp_i2s.c                    |   89
-> +++++++++++++----
->  sound/soc/ux500/ux500_msp_i2s.h                    |    8 +-
->  23 files changed, 538 insertions(+), 180 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/sound/ux500-mop500.txt
->  create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
->  rename arch/arm/boot/dts/{db8500.dtsi => dbx5x0.dtsi} (88%)
->  create mode 100644 arch/arm/boot/dts/hrefv60plus.dts
->  rename arch/arm/mach-ux500/{board-mop500-msp.c => board-mop500-audio.c}
-> (66%)
->  delete mode 100644 arch/arm/mach-ux500/board-mop500-msp.h
->
-> --
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120922/904e49f6/attachment-0001.html>
+The above ASID may be specific to Tegra, though. If we can specify the
+above info in DT and the info is passed to kernel, some platform
+common code would register them as IOMMU'able device automatically. It
+would be really covenient if this is done in platform_device/IOMMU
+common code. If the above attribute is implemented specific to
+Tegra/platform, we have to call attach_device quite many times
+somewhere in device initializations.
+
+Any comment would be really appreciated.
+
+*1:
+>From dd4dd6532d705c7bba0914b54c819d8d735c2fad Mon Sep 17 00:00:00 2001
+From: Hiroshi Doyu <hdoyu@nvidia.com>
+Date: Thu, 22 Mar 2012 16:06:27 +0200
+Subject: [RFC 1/1] platform: IOMMU'able platform_device w/
+ PLATFORM_ENABLE_IOMMU
+
+Introduced a new kernel config option, PLATFORM_ENABLE_IOMMU. With
+this, all platform devices can be converted to be IOMMU'able if
+platform_bus has non-null dma_iommu_map, where H/Ws always see its IO
+virtual address and virt_to_phys() doesn't work from H/W POV.
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mm/dma-mapping.c |    7 +++++++
+ drivers/base/Kconfig      |    4 ++++
+ drivers/base/platform.c   |   17 +++++++++++++++--
+ drivers/iommu/Kconfig     |    2 +-
+ include/linux/device.h    |    5 ++++-
+ 5 files changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 242289f..28ca7c2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1899,6 +1899,13 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+ 	mapping->order = order;
+ 	spin_lock_init(&mapping->lock);
+
++#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
++	if (WARN_ON(bus->map))
++		goto err3;
++
++	bus->map = mapping;
++#endif
++
+ 	mapping->domain = iommu_domain_alloc(bus);
+ 	if (!mapping->domain)
+ 		goto err3;
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index 3df339c..0f45311 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -308,4 +308,8 @@ config CMA_AREAS
+
+ endif
+
++config PLATFORM_ENABLE_IOMMU
++        bool "Make platform devices iommuable"
++	depends on IOMMU_API
++
+ endmenu
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index a1a7225..9eae3be 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -21,6 +21,8 @@
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
+
++#include <asm/dma-iommu.h>
++
+ #include "base.h"
+
+ #define to_platform_driver(drv)	(container_of((drv), struct platform_driver, \
+@@ -305,8 +307,19 @@ int platform_device_add(struct platform_device *pdev)
+ 		 dev_name(&pdev->dev), dev_name(pdev->dev.parent));
+
+ 	ret = device_add(&pdev->dev);
+-	if (ret == 0)
+-		return ret;
++	if (ret)
++		goto failed;
++
++#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
++	if (platform_bus_type.map && !pdev->dev.archdata.mapping) {
++		ret = arm_iommu_attach_device(&pdev->dev,
++					      platform_bus_type.map);
++		if (ret)
++			goto failed;
++	}
++#endif
++
++	return 0;
+
+  failed:
+ 	while (--i >= 0) {
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index b736809..8b7eca1 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -164,7 +164,7 @@ config TEGRA_IOMMU_SMMU
+
+ config TEGRA_IOMMU_SMMU_LINEAR
+ 	bool "Physical RAM IOVA Liner Mapping Support"
+-	depends on TEGRA_IOMMU_SMMU
++	depends on TEGRA_IOMMU_SMMU && !PLATFORM_ENABLE_IOMMU
+ 	default y
+ 	help
+ 	  Enables support for linear mapping between physical address
+diff --git a/include/linux/device.h b/include/linux/device.h
+index e339929..3dcb501 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -35,6 +35,7 @@ struct subsys_private;
+ struct bus_type;
+ struct device_node;
+ struct iommu_ops;
++struct dma_iommu_mapping;
+
+ struct bus_attribute {
+ 	struct attribute	attr;
+@@ -106,7 +107,9 @@ struct bus_type {
+ 	const struct dev_pm_ops *pm;
+
+ 	struct iommu_ops *iommu_ops;
+-
++#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
++	struct dma_iommu_mapping *map;
++#endif
+ 	struct subsys_private *p;
+ };
