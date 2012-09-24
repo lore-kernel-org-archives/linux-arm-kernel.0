@@ -1,35 +1,50 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 24 Sep 2012 23:26:39 +0530
-Subject: [PATCH] ARM: am33xx: clk: Update clkdev table to add mcasp alias
-Message-ID: <1348509399-3391-1-git-send-email-hvaibhav@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 24 Sep 2012 11:04:56 -0700
+Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
+ monitor mode
+In-Reply-To: <20120924171934.GE5522@mudshark.cambridge.arm.com>
+References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+ <20120920173556.GQ4654@mudshark.cambridge.arm.com>
+ <20120924171934.GE5522@mudshark.cambridge.arm.com>
+Message-ID: <5060A0C8.5040501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After Rajendra's common-clock preparation series,
-commit (a1978ef4da1 - ARM: omap: hwmod: get rid of
-all omap_clk_get_by_name usage) the clkdev table need to
-update with an entry for clocks used by hwmod to have
-clock name same as the alias.
+On 09/24/12 10:19, Will Deacon wrote:
+> On Thu, Sep 20, 2012 at 06:35:56PM +0100, Will Deacon wrote:
+>> On Thu, Sep 20, 2012 at 05:57:40PM +0100, Stephen Boyd wrote:
+>>> +/* Determine if halting mode is enabled */
+>>> +static int halting_mode_enabled(void)
+>>> +{
+>>> +	u32 dscr;
+>>> +
+>>> +	ARM_DBG_READ(c1, 0, dscr);
+>>> +
+>>> +	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
+>>> +		"halting debug mode enabled. Unable to access hardware resources.\n")) {
+>>> +		return -EPERM;
+>>> +	}
+>>> +	return 0;
+>>> +}
+>> ...it looks like debug arch 7.1 defines this bit as UNKNOWN when the OS lock
+>> is clear, so we probably shouldn't be reading it at all. I'll pour myself a
+>> stiff drink and start reading the debug arch docs to work out what on Earth
+>> we should do.
+>>
+>> Stay tuned.
+> Ok, I've pushed a bunch of patches to my hw-breakpoint branch (head commit
+> 55cb726797c7). I'll post them to the list after the merge window, but please
+> do take them for a spin if you get a chance.
+>
 
-Without this, the clk_get() in omap_hwmod would fail.
+Sure, I'll try them later today. I would say just send them out so
+people can add tested and reviewed tags. Otherwise we should all start
+planning week long vacations every 7 to 8 weeks to coincide with the
+merge window.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
----
- arch/arm/mach-omap2/clock33xx_data.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Also, it would be nice if we could fix this in 3.7 or even 3.6. Booting
+on an MSM8660 is very fragile right now and this patch fixes it for me.
 
-diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
-index b87b88c..114ab4b 100644
---- a/arch/arm/mach-omap2/clock33xx_data.c
-+++ b/arch/arm/mach-omap2/clock33xx_data.c
-@@ -1035,6 +1035,8 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk,	CK_AM33XX),
- 	CLK("davinci-mcasp.0",  NULL,           &mcasp0_fck,    CK_AM33XX),
- 	CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
-+	CLK(NULL,	"mcasp0_fck",		&mcasp0_fck,	CK_AM33XX),
-+	CLK(NULL,	"mcasp1_fck",		&mcasp1_fck,	CK_AM33XX),
- 	CLK("NULL",	"mmc2_fck",		&mmc2_fck,	CK_AM33XX),
- 	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
- 	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
 -- 
-1.7.0.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
