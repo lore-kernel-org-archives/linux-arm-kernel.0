@@ -1,190 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2012 09:29:48 -0700
-Subject: [PATCH] ARM: OMAP: convert I2C driver to PM QoS for MPU
- latency constraints
-In-Reply-To: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
-References: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
-Message-ID: <20120924162947.GD28835@atomide.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 24 Sep 2012 17:31:46 +0100
+Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
+ patching
+In-Reply-To: <1348242975-19184-6-git-send-email-cyril@ti.com>
+References: <1348242975-19184-1-git-send-email-cyril@ti.com>
+ <1348242975-19184-6-git-send-email-cyril@ti.com>
+Message-ID: <20120924163146.GD2122@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jean Pihet <jean.pihet@newoldbits.com> [120920 09:09]:
-> Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
-> API to the new PM QoS API.
-> Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
-> class of PM QoS. The resulting MPU constraints are used by cpuidle to
-> decide the next power state of the MPU subsystem.
+On Fri, Sep 21, 2012 at 11:56:03AM -0400, Cyril Chemparathy wrote:
+> This patch adds support for 64-bit physical addresses in virt_to_phys()
+> patching.  This does not do real 64-bit add/sub, but instead patches in the
+> upper 32-bits of the phys_offset directly into the output of virt_to_phys.
 > 
-> The I2C device latency timing is derived from the FIFO size and the
-> clock speed and so is applicable to all OMAP SoCs.
+> There is no corresponding change on the phys_to_virt() side, because
+> computations on the upper 32-bits would be discarded anyway.
 > 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-
-Good to see this, probably should have an ack from
-Kevin Hilman for this. Other than that it's best to
-merge this via the i2c tree:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 > ---
-> Rebased on git://git.pengutronix.de/git/wsa/linux.git, branch
-> i2c-embedded/for-next
-> ---
->  arch/arm/plat-omap/i2c.c      |   21 ---------------------
->  drivers/i2c/busses/i2c-omap.c |   32 ++++++++++++++++++--------------
->  include/linux/i2c-omap.h      |    1 -
->  3 files changed, 18 insertions(+), 36 deletions(-)
+>  arch/arm/include/asm/memory.h |   38 ++++++++++++++++++++++++++++++++++++--
+>  arch/arm/kernel/head.S        |    4 ++++
+>  arch/arm/kernel/setup.c       |    2 +-
+>  3 files changed, 41 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-> index 40bc06a..d29a2cc 100644
-> --- a/arch/arm/plat-omap/i2c.c
-> +++ b/arch/arm/plat-omap/i2c.c
-> @@ -26,7 +26,6 @@
->  #include <linux/kernel.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
-> -#include <linux/i2c-omap.h>
->  #include <linux/slab.h>
->  #include <linux/err.h>
->  #include <linux/clk.h>
-> @@ -34,7 +33,6 @@
->  #include <mach/irqs.h>
->  #include <plat/mux.h>
->  #include <plat/i2c.h>
-> -#include <plat/omap-pm.h>
->  #include <plat/omap_device.h>
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 88ca206..f3e8f88 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -154,13 +154,47 @@
+>  #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
 >  
->  #define OMAP_I2C_SIZE		0x3f
-> @@ -130,16 +128,6 @@ static inline int omap1_i2c_add_bus(int bus_id)
+>  extern unsigned long	__pv_offset;
+> -extern unsigned long	__pv_phys_offset;
+> +extern phys_addr_t	__pv_phys_offset;
+>  #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
 >  
->  
->  #ifdef CONFIG_ARCH_OMAP2PLUS
-> -/*
-> - * XXX This function is a temporary compatibility wrapper - only
-> - * needed until the I2C driver can be converted to call
-> - * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
-> - */
-> -static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
-> -{
-> -	omap_pm_set_max_mpu_wakeup_lat(dev, t);
-> -}
-> -
->  static inline int omap2_i2c_add_bus(int bus_id)
+>  static inline phys_addr_t __virt_to_phys(unsigned long x)
 >  {
->  	int l;
-> @@ -171,15 +159,6 @@ static inline int omap2_i2c_add_bus(int bus_id)
->  	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
->  	pdata->flags = dev_attr->flags;
->  
-> -	/*
-> -	 * When waiting for completion of a i2c transfer, we need to
-> -	 * set a wake up latency constraint for the MPU. This is to
-> -	 * ensure quick enough wakeup from idle, when transfer
-> -	 * completes.
-> -	 * Only omap3 has support for constraints
-> -	 */
-> -	if (cpu_is_omap34xx())
-> -		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
->  	pdev = omap_device_build(name, bus_id, oh, pdata,
->  			sizeof(struct omap_i2c_bus_platform_data),
->  			NULL, 0, 0);
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 0b02543..db31eae 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -43,6 +43,7 @@
->  #include <linux/slab.h>
->  #include <linux/i2c-omap.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/pm_qos.h>
->  
->  /* I2C controller revisions */
->  #define OMAP_I2C_OMAP1_REV_2		0x20
-> @@ -186,9 +187,8 @@ struct omap_i2c_dev {
->  	int			reg_shift;      /* bit shift for I2C register addresses */
->  	struct completion	cmd_complete;
->  	struct resource		*ioarea;
-> -	u32			latency;	/* maximum mpu wkup latency */
-> -	void			(*set_mpu_wkup_lat)(struct device *dev,
-> -						    long latency);
-> +	u32			latency;	/* maximum MPU wkup latency */
-> +	struct pm_qos_request	pm_qos_request;
->  	u32			speed;		/* Speed of bus in kHz */
->  	u32			dtrev;		/* extra revision from DT */
->  	u32			flags;
-> @@ -494,9 +494,7 @@ static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
->  		dev->b_hw = 1; /* Enable hardware fixes */
->  
->  	/* calculate wakeup latency constraint for MPU */
-> -	if (dev->set_mpu_wkup_lat != NULL)
-> -		dev->latency = (1000000 * dev->threshold) /
-> -			(1000 * dev->speed / 8);
-> +	dev->latency = (1000000 * dev->threshold) / (1000 * dev->speed / 8);
->  }
->  
->  /*
-> @@ -631,8 +629,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  	if (r < 0)
->  		goto out;
->  
-> -	if (dev->set_mpu_wkup_lat != NULL)
-> -		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
-> +	/*
-> +	 * When waiting for completion of a i2c transfer, we need to
-> +	 * set a wake up latency constraint for the MPU. This is to
-> +	 * ensure quick enough wakeup from idle, when transfer
-> +	 * completes.
-> +	 */
-> +	if (dev->latency)
-> +		pm_qos_add_request(&dev->pm_qos_request,
-> +				   PM_QOS_CPU_DMA_LATENCY,
-> +				   dev->latency);
->  
->  	for (i = 0; i < num; i++) {
->  		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
-> @@ -640,8 +646,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  			break;
->  	}
->  
-> -	if (dev->set_mpu_wkup_lat != NULL)
-> -		dev->set_mpu_wkup_lat(dev->dev, -1);
-> +	if (dev->latency)
-> +		pm_qos_remove_request(&dev->pm_qos_request);
->  
->  	if (r == 0)
->  		r = num;
-> @@ -1098,7 +1104,6 @@ omap_i2c_probe(struct platform_device *pdev)
->  	} else if (pdata != NULL) {
->  		dev->speed = pdata->clkrate;
->  		dev->flags = pdata->flags;
-> -		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
->  		dev->dtrev = pdata->rev;
->  	}
->  
-> @@ -1154,9 +1159,8 @@ omap_i2c_probe(struct platform_device *pdev)
->  			dev->b_hw = 1; /* Enable hardware fixes */
->  
->  		/* calculate wakeup latency constraint for MPU */
-> -		if (dev->set_mpu_wkup_lat != NULL)
-> -			dev->latency = (1000000 * dev->fifo_size) /
-> -				       (1000 * dev->speed / 8);
-> +		dev->latency = (1000000 * dev->fifo_size) /
-> +			       (1000 * dev->speed / 8);
->  	}
->  
->  	/* reset ASAP, clearing any IRQs */
-> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-> index 92a0dc7..df804ba 100644
-> --- a/include/linux/i2c-omap.h
-> +++ b/include/linux/i2c-omap.h
-> @@ -34,7 +34,6 @@ struct omap_i2c_bus_platform_data {
->  	u32		clkrate;
->  	u32		rev;
->  	u32		flags;
-> -	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
->  };
->  
->  #endif
-> -- 
-> 1.7.7.6
-> 
+> -	unsigned long t;
+> +	phys_addr_t t;
+> +
+> +#ifndef CONFIG_ARM_LPAE
+>  	early_patch_imm8("add", t, x, __pv_offset, 0);
+> +#else
+> +	unsigned long __tmp;
+> +
+> +#ifndef __ARMEB__
+> +#define PV_PHYS_HIGH	"(__pv_phys_offset + 4)"
+> +#else
+> +#define PV_PHYS_HIGH	"__pv_phys_offset"
+> +#endif
+> +
+> +	early_patch_stub(
+> +	/* type */		PATCH_IMM8,
+> +	/* code */
+> +		"ldr		%[tmp], =__pv_offset\n"
+> +		"ldr		%[tmp], [%[tmp]]\n"
+> +		"add		%Q[to], %[from], %[tmp]\n"
+> +		"ldr		%[tmp], =" PV_PHYS_HIGH "\n"
+> +		"ldr		%[tmp], [%[tmp]]\n"
+> +		"mov		%R[to], %[tmp]\n",
+> +	/* pad */		4,
+> +	/* patch_data */
+> +		".long		__pv_offset\n"
+> +		"add		%Q[to], %[from], %[imm]\n"
+> +		".long	"	PV_PHYS_HIGH "\n"
+> +		"mov		%R[to], %[imm]\n",
+> +	/* operands */
+> +		: [to]	 "=r"	(t),
+> +		  [tmp]	 "=&r"	(__tmp)
+> +		: [from] "r"	(x),
+> +		  [imm]	 "I"	(__IMM8),
+> +			 "i"	(&__pv_offset),
+> +			 "i"	(&__pv_phys_offset));
+
+So, the actual offset we can apply is:
+
+__pv_phys_offset + __pv_offset
+
+where:
+
+ * the high 32 bits of the address being fixed up are assumed to be 0
+   (true, because the kernel is initially always fixed up to an address
+   range <4GB)
+
+ * the low 32 bits of __pv_phys_offset are assumed to be 0 (?)
+
+ * the full offset is of the form
+
+        ([..0..]XX[..0..] << 32) | [..0..]YY[..0..] 
+
+Is this intentional?  It seems like a rather weird constraint...  but
+it may be sensible.  PAGE_OFFSET is probably 0xc0000000 or 0x80000000,
+(so YY can handle that) and the actual RAM above 4GB will likely be
+huge and aligned on some enormous boundary in such situations (so that
+XX can handle that).
+
+So long as the low RAM alias is not misaligned relative to the high alias
+on a finer granularity than 16MB (so that YY = (PAGE_OFFSET +/- the
+misalignment) is still a legal immediate), I guess there should not be a
+problem.
+
+[...]
+
+Cheers
+---Dave
