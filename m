@@ -1,79 +1,156 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 24 Sep 2012 13:14:51 +0200
-Subject: How to specify IOMMU'able devices in DT (was: [RFC 0/5] ARM:
- dma-mapping: New dma_map_ops to control IOVA more precisely)
-In-Reply-To: <20120924124452.41070ed2ee9944d930cffffc@nvidia.com>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
- <20120918124918.GK2505@amd.com>
- <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
- <201209190759.46174.arnd@arndb.de> <20120919125020.GQ2505@amd.com>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC1EEB@HQMAIL04.nvidia.com>
- <505A7DB4.4090902@wwwdotorg.org>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC1F2D@HQMAIL04.nvidia.com>
- <505B35F7.2080201@wwwdotorg.org>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC2372@HQMAIL04.nvidia.com>
- <20120924120415.8e6929a34c422185a98d3f82@nvidia.com>
- <1348478881.2467.27.camel@dabdike>
- <20120924124452.41070ed2ee9944d930cffffc@nvidia.com>
-Message-ID: <054901cd9a45$db1a7ea0$914f7be0$%szyprowski@samsung.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 24 Sep 2012 11:26:55 +0000
+Subject: [RFC PATCH 00/13] DMA Engine support for AM33xx
+In-Reply-To: <20120921182211.GE16522@beef>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA8A79D@DBDE01.ent.ti.com>
+ <20120921182211.GE16522@beef>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8E07D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Monday, September 24, 2012 11:45 AM Hiroshi Doyu wrote:
-
-> On Mon, 24 Sep 2012 11:28:01 +0200
-> James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
+On Fri, Sep 21, 2012 at 23:52:11, Porter, Matt wrote:
+> On Fri, Sep 21, 2012 at 08:27:07AM +0000, Hebbar, Gururaja wrote:
+> > On Thu, Sep 20, 2012 at 20:13:33, Porter, Matt wrote:
+> > > This series adds DMA Engine support for AM33xx, which uses
+> > > an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> > > a private API implementation (much like the situation with OMAP
+> > > DMA) found on the DaVinci family of SoCs.
+> > > 
+> > > There are a mind-boggling number of dependencies for this series:
+> > > 
+> > > 	- Jon Hunter's OF DMA helpers series
+> > > 	  https://patchwork.kernel.org/patch/1461061/
+> > > 	  https://patchwork.kernel.org/patch/1461051/
+> > > 	- Patch to address OF DMA helpers naming issues:
+> > > 	  https://patchwork.kernel.org/patch/1477921/
+> > > 	- EDMA DMA Engine wrapper driver in linux-next
+> > > 	  c2dde5f8f2095d7c623ff3565c1462e190272273
+> > > 	- EDMA DMA Engine wrapper driver bug fix:
+> > > 	  https://patchwork.kernel.org/patch/1474411/  
+> > > 	- A huge number of patches in linux-next for AM33xx boot
+> > > 	  (too numerous to list)
+> > > 
+> > > The approach taken is similar to how OMAP DMA is being converted to
+> > > DMA Engine support. With the functional EDMA private API already
+> > > existing in mach-davinci/dma.c, we first move that to an ARM common
+> > > area so it can be shared. Adding DT and runtime PM support to the
+> > > private EDMA API implementation allows it to run on AM33xx. AM33xx
+> > > *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> > > register EDMA DMAC with the of_dma framework and then add support
+> > > for calling the dma_request_slave_channel() API to both the mmc
+> > > and spi drivers.
+> > > 
+> > > What works? Well, with this series we now have MMC and SPI support
+> > > on AM33xx. The only caveat for MMC is that the mmc3 controller has
+> > > its events on the crossbar and is not usable right now.
+> > > 
+> > > This is tested on BeagleBone with a SPI framebuffer driver and SD
+> > > card.
+> > > 
+> > > After this series, the plan is to convert the last in-tree user
+> > > of the private EDMA API (davinci-pcm/mcasp) and then eliminate
+> > > the private EDMA API by folding its functionality into
+> > > drivers/dma/edma.c.
+> > > 
+> > > TODO:
+> > > 	add AM33xx crossbar support to the private EDMA API
+> > > 	(any EDMA events on the crossbar are not supported)
+> > > 
+> > 
+> > 
+> > Can you please mention the base repo you have taken as starting point.
+> > (repo + extra patches ...).
 > 
-> > On Mon, 2012-09-24 at 12:04 +0300, Hiroshi Doyu wrote:
-> > > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > > index a1a7225..9eae3be 100644
-> > > --- a/drivers/base/platform.c
-> > > +++ b/drivers/base/platform.c
-> > > @@ -21,6 +21,8 @@
-> > >  #include <linux/slab.h>
-> > >  #include <linux/pm_runtime.h>
-> > >
-> > > +#include <asm/dma-iommu.h>
-> > > +
-> > >  #include "base.h"
-> > >
-> > >  #define to_platform_driver(drv)        (container_of((drv), struct
-> > > platform_driver, \
-> > > @@ -305,8 +307,19 @@ int platform_device_add(struct platform_device
-> > > *pdev)
-> > >                  dev_name(&pdev->dev), dev_name(pdev->dev.parent));
-> > >
-> > >         ret = device_add(&pdev->dev);
-> > > -       if (ret == 0)
-> > > -               return ret;
-> > > +       if (ret)
-> > > +               goto failed;
-> > > +
-> > > +#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
-> > > +       if (platform_bus_type.map && !pdev->dev.archdata.mapping) {
-> > > +               ret = arm_iommu_attach_device(&pdev->dev,
-> > > +                                             platform_bus_type.map);
-> > > +               if (ret)
-> > > +                       goto failed;
-> >
-> > This is horrible ... you're adding an architecture specific callback
-> > into our generic code; that's really a no-no.  If the concept of
-> > CONFIG_PLATFORM_ENABE_IOMMU is useful to more than just arm, then this
-> > could become a generic callback.
+> It's mainline 3.6-rc6 and you can see the complete set of patches
+> at https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
+> after commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2
+
+
+Thanks for the link. However, I was looking for the mainline kernel repo/branch
+That you first used as baseline. 
+
 > 
-> As mentioned in the original, this is a heck to explain what is
-> needed. I am looking for some generic solution for how to specify
-> IOMMU info for each platform devices. I'm guessing that some other SoC
-> may have the similar requirements on the above. As you mentioned, this
-> solution should be a generic, not arch specific.
+> > This will help us to test the code.
+> > 
+> > This is because I looked at the patch 12/13 and I see that mmc
+> > device-node is modified. But in mainline I don?t see device 
+> > node for mmc (yet).
+> 
+> Oops. You'll need e62a3333ae450bcdefbe22229d7bc277ae0ef645 and
+> fe97304557d2c6f7d0aaf1ea028ea48ffca366a9 which I forgot to include
+> in this series. I'll have them in for v2.
+> 
+> -Matt
+> 
+> > > Matt Porter (13):
+> > >   ARM: davinci: move private EDMA API to arm/common
+> > >   ARM: edma: remove unused transfer controller handlers
+> > >   ARM: edma: add DT and runtime PM support for AM335x
+> > >   dmaengine: edma: enable build for AM335x
+> > >   dma: Add TI EDMA device tree binding
+> > >   ARM: omap: add hsmmc am33xx specific init
+> > >   mmc: omap_hsmmc: dma_request_slave_channel() support for DT platforms
+> > >   mmc: omap_hsmmc: limit max_segs with the EDMA DMAC
+> > >   mmc: omap_hsmmc: add generic DMA request support to the DT binding
+> > >   spi: omap2-mcspi: dma_request_slave_channel() support for DT
+> > >     platforms
+> > >   spi: omap2-mcspi: add generic DMA request support to the DT binding
+> > >   ARM: dts: add am33xx EDMA support
+> > >   Documentation: add schedule for removing private EDMA API
+> > > 
+> > >  Documentation/devicetree/bindings/dma/ti-edma.txt  |   49 +
+> > >  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   25 +-
+> > >  Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +-
+> > >  Documentation/feature-removal-schedule.txt         |   10 +
+> > >  arch/arm/Kconfig                                   |    1 +
+> > >  arch/arm/boot/dts/am33xx.dtsi                      |   46 +
+> > >  arch/arm/common/Kconfig                            |    3 +
+> > >  arch/arm/common/Makefile                           |    1 +
+> > >  arch/arm/common/edma.c                             | 1779 ++++++++++++++++++++
+> > >  arch/arm/include/asm/mach/edma.h                   |  267 +++
+> > >  arch/arm/mach-davinci/Makefile                     |    2 +-
+> > >  arch/arm/mach-davinci/devices.c                    |    3 +-
+> > >  arch/arm/mach-davinci/dm355.c                      |    2 +-
+> > >  arch/arm/mach-davinci/dm365.c                      |    2 +-
+> > >  arch/arm/mach-davinci/dm644x.c                     |    2 +-
+> > >  arch/arm/mach-davinci/dm646x.c                     |    2 +-
+> > >  arch/arm/mach-davinci/dma.c                        | 1588 -----------------
+> > >  arch/arm/mach-davinci/include/mach/asp.h           |    2 +-
+> > >  arch/arm/mach-davinci/include/mach/da8xx.h         |    3 +-
+> > >  arch/arm/mach-davinci/include/mach/edma.h          |  267 ---
+> > >  arch/arm/mach-davinci/include/mach/spi.h           |    2 +-
+> > >  arch/arm/mach-omap2/hsmmc.c                        |    7 +-
+> > >  arch/arm/plat-omap/Kconfig                         |    1 +
+> > >  drivers/dma/Kconfig                                |    2 +-
+> > >  drivers/dma/edma.c                                 |    2 +-
+> > >  drivers/mmc/host/omap_hsmmc.c                      |   26 +-
+> > >  drivers/spi/spi-omap2-mcspi.c                      |   68 +-
+> > >  27 files changed, 2296 insertions(+), 1893 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+> > >  create mode 100644 arch/arm/common/edma.c
+> > >  create mode 100644 arch/arm/include/asm/mach/edma.h
+> > >  delete mode 100644 arch/arm/mach-davinci/dma.c
+> > >  delete mode 100644 arch/arm/mach-davinci/include/mach/edma.h
+> > > 
+> > > -- 
+> > > 1.7.9.5
+> > > 
+> > > _______________________________________________
+> > > Davinci-linux-open-source mailing list
+> > > Davinci-linux-open-source at linux.davincidsp.com
+> > > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> > > 
+> > 
+> > 
+> > Regards, 
+> > Gururaja
+> > _______________________________________________
+> > Davinci-linux-open-source mailing list
+> > Davinci-linux-open-source at linux.davincidsp.com
+> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
 
-Please read more about bus notifiers. IMHO a good example is provided in 
-the following thread:
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg12238.html
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Regards, 
+Gururaja
