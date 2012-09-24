@@ -1,118 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Sep 2012 12:51:42 -0400 (EDT)
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <20120924163146.GD2122@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Sep 2012 17:51:46 +0100
+Subject: [PATCH v3 RESEND 08/17] ARM: LPAE: use phys_addr_t in
+ free_memmap()
+In-Reply-To: <50608D3D.2010106@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924163146.GD2122@linaro.org>
-Message-ID: <alpine.LFD.2.02.1209241236480.6667@xanadu.home>
+ <1348242975-19184-9-git-send-email-cyril@ti.com>
+ <20120924132942.GD23298@arm.com>
+ <20120924134145.GB26454@n2100.arm.linux.org.uk>
+ <506077BE.6000600@ti.com>
+ <20120924152220.GE26454@n2100.arm.linux.org.uk>
+ <50608D3D.2010106@ti.com>
+Message-ID: <20120924165145.GD14198@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Sep 2012, Dave Martin wrote:
-
-> On Fri, Sep 21, 2012 at 11:56:03AM -0400, Cyril Chemparathy wrote:
-> > This patch adds support for 64-bit physical addresses in virt_to_phys()
-> > patching.  This does not do real 64-bit add/sub, but instead patches in the
-> > upper 32-bits of the phys_offset directly into the output of virt_to_phys.
-> > 
-> > There is no corresponding change on the phys_to_virt() side, because
-> > computations on the upper 32-bits would be discarded anyway.
-> > 
-> > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> > ---
-> >  arch/arm/include/asm/memory.h |   38 ++++++++++++++++++++++++++++++++++++--
-> >  arch/arm/kernel/head.S        |    4 ++++
-> >  arch/arm/kernel/setup.c       |    2 +-
-> >  3 files changed, 41 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > index 88ca206..f3e8f88 100644
-> > --- a/arch/arm/include/asm/memory.h
-> > +++ b/arch/arm/include/asm/memory.h
-> > @@ -154,13 +154,47 @@
-> >  #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
-> >  
-> >  extern unsigned long	__pv_offset;
-> > -extern unsigned long	__pv_phys_offset;
-> > +extern phys_addr_t	__pv_phys_offset;
-> >  #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
-> >  
-> >  static inline phys_addr_t __virt_to_phys(unsigned long x)
-> >  {
-> > -	unsigned long t;
-> > +	phys_addr_t t;
-> > +
-> > +#ifndef CONFIG_ARM_LPAE
-> >  	early_patch_imm8("add", t, x, __pv_offset, 0);
-> > +#else
-> > +	unsigned long __tmp;
-> > +
-> > +#ifndef __ARMEB__
-> > +#define PV_PHYS_HIGH	"(__pv_phys_offset + 4)"
-> > +#else
-> > +#define PV_PHYS_HIGH	"__pv_phys_offset"
-> > +#endif
-> > +
-> > +	early_patch_stub(
-> > +	/* type */		PATCH_IMM8,
-> > +	/* code */
-> > +		"ldr		%[tmp], =__pv_offset\n"
-> > +		"ldr		%[tmp], [%[tmp]]\n"
-> > +		"add		%Q[to], %[from], %[tmp]\n"
-> > +		"ldr		%[tmp], =" PV_PHYS_HIGH "\n"
-> > +		"ldr		%[tmp], [%[tmp]]\n"
-> > +		"mov		%R[to], %[tmp]\n",
-> > +	/* pad */		4,
-> > +	/* patch_data */
-> > +		".long		__pv_offset\n"
-> > +		"add		%Q[to], %[from], %[imm]\n"
-> > +		".long	"	PV_PHYS_HIGH "\n"
-> > +		"mov		%R[to], %[imm]\n",
-> > +	/* operands */
-> > +		: [to]	 "=r"	(t),
-> > +		  [tmp]	 "=&r"	(__tmp)
-> > +		: [from] "r"	(x),
-> > +		  [imm]	 "I"	(__IMM8),
-> > +			 "i"	(&__pv_offset),
-> > +			 "i"	(&__pv_phys_offset));
+On Mon, Sep 24, 2012 at 05:41:33PM +0100, Cyril Chemparathy wrote:
+> On 9/24/2012 11:22 AM, Russell King - ARM Linux wrote:
+> > On Mon, Sep 24, 2012 at 11:09:50AM -0400, Cyril Chemparathy wrote:
+> >> On 9/24/2012 9:41 AM, Russell King - ARM Linux wrote:
+> >>> On Mon, Sep 24, 2012 at 02:29:42PM +0100, Catalin Marinas wrote:
+> >>>> This function also calls free_bootmem() which takes unsigned long. Are
+> >>>> patches sent separately for this or we just ignore holes in memmap?
+> >>>> There are other calls to free_bootmem() or reserve_bootmem(), do they
+> >>>> just work with the high phys addresses?
+> >>>
+> >>> Bootmem only deals with physical addresses which fit within the size
+> >>> of an 'unsigned long'.  Unfortunately, the bootmem API is a mess of
+> >>> 'unsigned long' physical addresses and PFNs.
+> >>>
+> >>> Years ago there was a patch to make it use only PFNs but other changes
+> >>> resulted in that patch being thrown away.
+> >>>
+> >>
+> >> A separate patch has been posted for bootmem (see [1]).
+> >>
+> >> Tejun suggested that we'd be better off moving entirely to memblock
+> >> instead (see [2]).
+> >
+> > Yes we should, but that's not as easy as typing a few words in an email.
+> > When I tried it when I integrated memblock into our boot sequence, I
+> > found that sparsemem wouldn't work without bootmem being in place.
+> >
+> > It may be that things have now moved on, and we can just eliminate
+> > bootmem once and for all, but that's something I've not looked at for
+> > quite some time.
+> >
 > 
-> So, the actual offset we can apply is:
-> 
-> __pv_phys_offset + __pv_offset
-> 
-> where:
-> 
->  * the high 32 bits of the address being fixed up are assumed to be 0
->    (true, because the kernel is initially always fixed up to an address
->    range <4GB)
+> It appears to be not that hard actually... Or maybe I'm totally missing 
+> your point.  Could it be that you last looked at this prior to the 
+> nobootmem compatibility stuff being added in?
 
-The fixed up address is a virtual address.  So yes, by definition it 
-must be <4GB on ARM32.
+I was just trying the same :)
 
->  * the low 32 bits of __pv_phys_offset are assumed to be 0 (?)
+> +static unsigned long free_all_lowmem(void)
 
-It is typically representable with a shifted 8 bit immediate but not 
-necessarily 0, just like on platforms without LPAE.
+I don't think that's needed. free_all_bootmem() in mm/nobootmem.c takes
+care of freeing lowmem but it has a different notion of max_low_pfn. So
+this hunk did the trick:
 
->  * the full offset is of the form
-> 
->         ([..0..]XX[..0..] << 32) | [..0..]YY[..0..] 
-> 
-> Is this intentional?  It seems like a rather weird constraint...  but
-> it may be sensible.  PAGE_OFFSET is probably 0xc0000000 or 0x80000000,
-> (so YY can handle that) and the actual RAM above 4GB will likely be
-> huge and aligned on some enormous boundary in such situations (so that
-> XX can handle that).
-> 
-> So long as the low RAM alias is not misaligned relative to the high alias
-> on a finer granularity than 16MB (so that YY = (PAGE_OFFSET +/- the
-> misalignment) is still a legal immediate), I guess there should not be a
-> problem.
+@@ -420,8 +366,8 @@ void __init bootmem_init(void)
+ 	 * Note: max_low_pfn and max_pfn reflect the number of _pages_ in
+ 	 * the system, not the maximum PFN.
+ 	 */
+-	max_low_pfn = max_low - PHYS_PFN_OFFSET;
+-	max_pfn = max_high - PHYS_PFN_OFFSET;
++	max_low_pfn = max_low;
++	max_pfn = max_high;
+ }
+ 
+ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
 
-There are already similar constraints for the current 
-ARM_PATCH_PHYS_VIRT code.  So nothing really new here.
-
-
-Nicolas
+-- 
+Catalin
