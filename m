@@ -1,66 +1,41 @@
-From: ricardo.neri@ti.com (Ricardo Neri)
-Date: Mon, 24 Sep 2012 18:36:01 -0500
-Subject: [alsa-devel] [PATCH v3 00/15] ASoC: OMAP: Convert to use dmaengine
-In-Reply-To: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5060EE61.1000902@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 24 Sep 2012 19:45:18 -0400
+Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
+In-Reply-To: <5060E9BA.7010806@gmail.com>
+References: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
+ <20120924163716.GR5469@titan.lakedaemon.net>
+ <20120924173739.GG14266@lunn.ch> <5060E9BA.7010806@gmail.com>
+Message-ID: <20120924234518.GU5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Mark,
+On Tue, Sep 25, 2012 at 01:16:10AM +0200, Sebastian Hesselbarth wrote:
+> On 09/24/2012 07:37 PM, Andrew Lunn wrote:
+> >On Mon, Sep 24, 2012 at 12:37:16PM -0400, Jason Cooper wrote:
+> >>On Mon, Sep 24, 2012 at 07:54:33AM +0200, Andrew Lunn wrote:
+> >>>Some Orion5x devices allocate their coherent buffers from atomic
+> >>>context. Increase size of atomic coherent pool to make sure such the
+> >>>allocations won't fail during boot.
+> >>>
+> >>>Signed-off-by: Andrew Lunn<andrew@lunn.ch>
+> >>
+> >>Acked-by: Jason Cooper<jason@lakedaemon.net>
+> >>
+> >>btw - we should take this to it's logical conclusion and have Sebastian
+> >>check Dove.  Sebastian?
+> >
+> >I did think about that. It probably hits if you have two sata
+> >devices. However, all current Dove machines have just one.
+> 
+> I did boot arm-soc/for-next on Cubox and looks like 256k pool for atomic
+> coherent allocations is enough. I booted with sata, sdhci0, eth0, i2c0,
+> spi0, and both pcie ports forced on without any pcie devices attached.
 
-On 09/14/2012 07:05 AM, Peter Ujfalusi wrote:
-> Hello,
->
-> Changes since v2:
-> - As it has been discussed the no_wakeup parameter has been replaced with flags
->    for the dmaengine APIs
->
-> Changes since v1:
-> - Support for pause/resume for OMAP audio via dmaengine
-> - dmaengine: support for NO_PERIOD_WAKEUP in cyclic mode
->   - OMAP to keep supporting NO_PERIOD_WAKEUP for audio
->   - Other plaforms can also try to enable this mode since we have now generic
->     interface to do so.
->
-> This series will switch the OMAP audio to use dmaengine.
-> The final patch which does the switch was based on Russell King's earlier patch.
->
-> The first 10 patch is to prepare the OMAP audio drivers for a smooth change to
-> dmaengine:
-> - sDMA FRAME sync mode is removed and replaced with PACKET mode
-> - dai drivers no longer need to configure sDMA sync mode
-> - dai drivers does not need to specify the DMA word length - with the exception
->    of the omap-hdmi driver which requires 32bit word length regardless of the
->    audio format in use
-> - the McPDM driver used (to my surprise) hackish way of getting the DMA channel
->    and address - via defines from some header files
->
-> After the conversion OMAP audio support should have the same features as before,
-> no regressions expected.
->
-> I have tested the series on:
-> - BeagleBoard (audio via McBSP):
->   - aplay/arecord. In element mode and in threshold mode with different period
->     sizes
->   - mplayer -ao alsa: for direct ALSA access
->   - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
-> - OMAP4 Blaze (audio via McPDM and DMIC)
->   - aplay/arecord
->   - mplayer -ao alsa: for direct ALSA access
->   - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
->
-> The patches has been generated against:
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
->
-> Janusz: Can you retest this series on OMAP1 to be sure I have not broken it?
-> Ricardo: Can you test the omap-hmdi if it is still working?
+Thanks for testing, Sebastian.
 
-I tested these changes from Mark's for-3.7 branch. HDMI audio is working 
-fine after applying patch 03. Such patch is missing in Mark's branch and 
-this causes a build break with omap2plus_defconfig. Not sure if this is 
-expected, Most likely not.
+Andrew, I'll put this into a late/fixes branch for arm-soc and send it
+on up.
 
-Tested-by: Ricardo Neri <ricardo.neri@ti.com>
+thx,
 
-Ricardo
+Jason.
