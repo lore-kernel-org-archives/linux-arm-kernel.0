@@ -1,53 +1,45 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Mon, 24 Sep 2012 21:05:11 +0200
-Subject: [PATCH] arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
-In-Reply-To: <20120924171858.GG28835@atomide.com>
-References: <1341325242-17638-1-git-send-email-yegorslists@googlemail.com>
- <20120924171858.GG28835@atomide.com>
-Message-ID: <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Sep 2012 20:17:36 +0100
+Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
+ monitor mode
+In-Reply-To: <5060A0C8.5040501@codeaurora.org>
+References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+ <20120920173556.GQ4654@mudshark.cambridge.arm.com>
+ <20120924171934.GE5522@mudshark.cambridge.arm.com>
+ <5060A0C8.5040501@codeaurora.org>
+Message-ID: <20120924191736.GA31118@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 7:18 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * yegorslists at googlemail.com <yegorslists@googlemail.com> [120703 07:26]:
->> From: Yegor Yefremov <yegorslists@googlemail.com>
->>
->> FORCE_MAX_ZONEORDER of 12 is needed to allocation more than 4MB
->> of consistent DMA memory (da8xx frame buffer driver).
->
-> Sorry for the delay on this one, looks like this one is
-> still valid. I'll apply it.
+On Mon, Sep 24, 2012 at 07:04:56PM +0100, Stephen Boyd wrote:
+> On 09/24/12 10:19, Will Deacon wrote:
+> > Ok, I've pushed a bunch of patches to my hw-breakpoint branch (head commit
+> > 55cb726797c7). I'll post them to the list after the merge window, but please
+> > do take them for a spin if you get a chance.
+> >
+> 
+> Sure, I'll try them later today. I would say just send them out so
+> people can add tested and reviewed tags. Otherwise we should all start
+> planning week long vacations every 7 to 8 weeks to coincide with the
+> merge window.
 
-Thanks.
+I like the idea of that! However, it's more that most people are worrying
+about getting their trees into shape rather than reviewing new code at
+the moment, so I suspect that posting it now will go largely un-noticed
+and I don't think this is a critical fix (see below).
 
-Yegor
+> Also, it would be nice if we could fix this in 3.7 or even 3.6. Booting
+> on an MSM8660 is very fragile right now and this patch fixes it for me.
 
->> Signed-off-by: Dejan Gacnik <dejan.gacnik@gmail.com>
->> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
->> ---
->>  arch/arm/Kconfig |    5 +++--
->>  1 files changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index e876819..ff14c1e 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1725,8 +1725,9 @@ config HW_PERF_EVENTS
->>  source "mm/Kconfig"
->>
->>  config FORCE_MAX_ZONEORDER
->> -     int "Maximum zone order" if ARCH_SHMOBILE
->> -     range 11 64 if ARCH_SHMOBILE
->> +     int "Maximum zone order"
->> +     depends on ARCH_SHMOBILE || SOC_AM33XX
->> +     range 11 64 if ARCH_SHMOBILE || SOC_AM33XX
->>       default "9" if SA1111
->>       default "11"
->>       help
->> --
->> 1.7.7
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Whilst I appreciate that it solves your problem, I'm *really* wary about
+changing this stuff without giving it a thorough airing beforehand. The
+debug reset path is extremely error-prone and its behaviour is tangled
+up with the state of various external signals into the core, meaning that
+different platforms with the same CPU can take different paths at runtime.
+
+I can definitely CC stable once we're happy with this, but I'd rather
+avoid rushing the patches in before 3.8.
+
+Cheers,
+
+Will
