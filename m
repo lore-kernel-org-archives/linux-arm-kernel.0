@@ -1,23 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Sep 2012 21:55:51 +0200
-Subject: [PATCH] gpio-lpc32xx: Fix value handling of
- gpio_direction_output()
-In-Reply-To: <1348130883-11329-1-git-send-email-stigge@antcom.de>
-References: <1348130883-11329-1-git-send-email-stigge@antcom.de>
-Message-ID: <CACRpkdZo5kR+Tyhos_StEFZbw3WHF_RFRknHjtU2Pz4XpFTZCA@mail.gmail.com>
+Date: Mon, 24 Sep 2012 21:57:26 +0200
+Subject: [PATCH 7/6] pinctrl: exynos: Fix wakeup IRQ domain registration
+ check
+In-Reply-To: <2737662.uE6StcAj33@amdc1227>
+References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
+ <2737662.uE6StcAj33@amdc1227>
+Message-ID: <CACRpkdYkVicrUk-H2Tx=tCDRxquq2B=n6O5UNZ8QoXLfMEDV=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 10:48 AM, Roland Stigge <stigge@antcom.de> wrote:
+On Thu, Sep 20, 2012 at 4:53 PM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-> For GPIOs of gpio-lpc32xx, gpio_direction_output() ignores the value argument
-> (initial value of output). This patch fixes this by setting the level
-> accordingly.
+> Because of a typo, incorrect field of a structure was being checked.
+> This patch fixes the check to use correct field.
 >
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 
-Applied with Alexandre's ACK, should go into stable right?
-So tagging this with Cc: stable and sending for the -rc:s.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
+I assume you'll take this through the Samsung tree.
+
+Yours,
 Linus Walleij
