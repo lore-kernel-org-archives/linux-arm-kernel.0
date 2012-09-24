@@ -1,88 +1,28 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 24 Sep 2012 14:28:00 -0700
-Subject: [PATCH 11/11] ARM: versatile: Make able to use UART ports for KGDB
- FIQ debugger
-In-Reply-To: <20120924212648.GA27605@lizard>
-References: <20120924212648.GA27605@lizard>
-Message-ID: <1348522080-32629-11-git-send-email-anton.vorontsov@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 24 Sep 2012 21:38:12 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: Fix PMU interrupt definitions
+In-Reply-To: <1348522362-912-1-git-send-email-jon-hunter@ti.com>
+References: <1348522362-912-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <alpine.DEB.2.00.1209242137120.3221@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+On Mon, 24 Sep 2012, Jon Hunter wrote:
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+> Commit 7d7e1eb (ARM: OMAP2+: Prepare for irqs.h removal) and commit ec2c082
+> (ARM: OMAP2+: Remove hardcoded IRQs and enable SPARSE_IRQ) updated the way
+> interrupts for OMAP2/3 devices are defined in the HWMOD data structures to
+> being an index plus a fixed offset (defined by OMAP_INTC_START). The definition
+> of the PMU interrupts on OMAP2/3 devices is missing the OMAP_INTC_START offset
+> and so this is causing the allocation of PMU interrupts to fail on OMAP2/3
+> devices. So add the offset to fix this.
+> 
+> This is patch is based upon the Tony's master branch for OMAP.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+Thanks, looks like I missed that when the patch was rebased.  Queued into 
+devel-late-fixes.
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fa10a2d..2bf83c6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -336,6 +336,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_FPGA_IRQ
- 	select ARM_TIMER_SP804
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.7.12
+- Paul
