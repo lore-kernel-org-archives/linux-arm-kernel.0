@@ -1,65 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Sep 2012 11:53:45 +0200
-Subject: [PATCH 3/3] ARM: dts: cfa10049: Add the i2c muxer buses to the
- CFA-10049
-In-Reply-To: <1348480425-13848-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 24 Sep 2012 11:53:43 +0200
+Subject: [PATCH 1/3] i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
+In-Reply-To: <1348474926-12763-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1348474926-12763-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348480425-13848-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1348480425-13848-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1348480425-13848-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to add the 3 Nuvoton NAU7802 ADCs and the NXP PCA9555
-GPIO expander eventually.
+Use the devm_kzalloc managed function to stripdown the error and remove
+code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Jean Delvare <khali@linux-fr.org>
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 ---
- arch/arm/boot/dts/imx28-cfa10049.dts |   33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ drivers/i2c/muxes/i2c-mux-gpio.c |   14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index a9288fb..9a55632 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -76,6 +76,39 @@
- 				status = "okay";
- 			};
+diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
+index 68b1f8e..ecb1d69 100644
+--- a/drivers/i2c/muxes/i2c-mux-gpio.c
++++ b/drivers/i2c/muxes/i2c-mux-gpio.c
+@@ -71,7 +71,7 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
-+			i2cmux {
-+				compatible = "i2c-mux-gpio";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
-+				i2c-parent = <&i2c1>;
-+
-+				i2c at 0 {
-+					reg = <0>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+				};
-+
-+				i2c at 1 {
-+				      reg = <1>;
-+				      #address-cells = <1>;
-+				      #size-cells = <0>;
-+				};
-+
-+				i2c at 2 {
-+					reg = <2>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+				};
-+
-+				i2c at 3 {
-+					reg = <3>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+				};
-+			};
-+
- 			usbphy1: usbphy at 8007e000 {
- 				status = "okay";
- 			};
+-	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++	mux = devm_kzalloc(&pdev->dev, sizeof(*mux), GFP_KERNEL);
+ 	if (!mux) {
+ 		ret = -ENOMEM;
+ 		goto alloc_failed;
+@@ -79,11 +79,12 @@ static int __devinit i2c_mux_gpio_probe(struct platform_device *pdev)
+ 
+ 	mux->parent = parent;
+ 	mux->data = *pdata;
+-	mux->adap = kzalloc(sizeof(struct i2c_adapter *) * pdata->n_values,
+-			    GFP_KERNEL);
++	mux->adap = devm_kzalloc(&pdev->dev,
++				 sizeof(*mux->adap) * pdata->n_values,
++				 GFP_KERNEL);
+ 	if (!mux->adap) {
+ 		ret = -ENOMEM;
+-		goto alloc_failed2;
++		goto alloc_failed;
+ 	}
+ 
+ 	if (pdata->idle != I2C_MUX_GPIO_NO_IDLE) {
+@@ -128,9 +129,6 @@ add_adapter_failed:
+ err_request_gpio:
+ 	for (; i > 0; i--)
+ 		gpio_free(pdata->gpios[i - 1]);
+-	kfree(mux->adap);
+-alloc_failed2:
+-	kfree(mux);
+ alloc_failed:
+ 	i2c_put_adapter(parent);
+ 
+@@ -150,8 +148,6 @@ static int __devexit i2c_mux_gpio_remove(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 	i2c_put_adapter(mux->parent);
+-	kfree(mux->adap);
+-	kfree(mux);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
