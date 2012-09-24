@@ -1,38 +1,28 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 24 Sep 2012 16:39:11 +0200
-Subject: [PATCH 4/5] ARM: EXYNOS: Add support for Exynos secure firmware
-In-Reply-To: <20120916004455.GD7028@quad.lixom.net>
-References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
- <1347524018-19301-5-git-send-email-t.figa@samsung.com>
- <20120916004455.GD7028@quad.lixom.net>
-Message-ID: <1503070.mCpo7P41ro@amdc1227>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 24 Sep 2012 16:43:16 +0200
+Subject: [PATCH 0/3] clk: ux500: Set sdmmc clock to 100MHz
+Message-ID: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-On Saturday 15 of September 2012 17:44:55 Olof Johansson wrote:
-> On Thu, Sep 13, 2012 at 10:13:37AM +0200, Tomasz Figa wrote:
-> > +static void __iomem *exynos_cpu_boot_reg(int cpu)
-> > +{
-> > +	return S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-> > +}
-> 
-> This communication area in sysram should probably be seen as a part of
-> the firmware interface. It should thus be defined as part of the binding
-> instead, i.e.  through a reg property or similar there. That also would
-> make it easy to convert to using ioremap() instead of iodesc tables,
-> which always a nice thing.
+The reason behind this change is that we would like to enable all
+the mmc/sd/sdio features from a hardware perspective (ARM PL18x).
+It is then required that the frequency must be 100MHz.
 
-I have tried to get around the need of statical mapping for SYSRAM, but the 
-firmware has to be initialized very early, before low level L2x0 cache 
-initialization (which is an early initcall, so it has to be in init_early 
-machine callback) and at that time ioremap is not available yet.
+Ulf Hansson (3):
+  mfd: dbx500: Export prmcu_request_ape_opp_100_voltage
+  clk: ux500: Support prcmu ape opp voltage clock
+  clk: ux500: Update sdmmc clock to 100MHz for u8500
 
-I think we should just allow this additional static mapping, I don't see 
-any sane way of mapping it dynamically, at least at the moment.
+ drivers/clk/ux500/clk-prcmu.c    |   55 ++++++++++++++++++++++++++++++++++++++
+ drivers/clk/ux500/clk.h          |    6 +++++
+ drivers/clk/ux500/u8500_clk.c    |    5 ++--
+ drivers/mfd/db8500-prcmu.c       |    4 +--
+ include/linux/mfd/db8500-prcmu.h |    4 +--
+ include/linux/mfd/dbx500-prcmu.h |   10 +++++++
+ 6 files changed, 78 insertions(+), 6 deletions(-)
 
-Best regards,
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
+1.7.10
