@@ -1,39 +1,22 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 24 Sep 2012 17:09:32 +0100
-Subject: [PATCH v4] hwmon: Versatile Express hwmon driver
-In-Reply-To: <20120924155947.GA14060@roeck-us.net>
-References: <1348246591-2409-1-git-send-email-mail@pawelmoll.com>
- <20120924155947.GA14060@roeck-us.net>
-Message-ID: <1348502972.27071.16.camel@hornet>
+Date: Mon, 24 Sep 2012 17:10:34 +0100
+Subject: [GIT PULL] Veratile Express updates for v3.7
+In-Reply-To: <20120924160448.GB5522@mudshark.cambridge.arm.com>
+References: <1348501980.27071.8.camel@hornet>
+ <20120924160448.GB5522@mudshark.cambridge.arm.com>
+Message-ID: <1348503034.27071.17.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-09-24 at 16:59 +0100, Guenter Roeck wrote:
-> On Fri, Sep 21, 2012 at 05:56:31PM +0100, Pawel Moll wrote:
-> > From: Pawel Moll <pawel.moll@arm.com>
+On Mon, 2012-09-24 at 17:04 +0100, Will Deacon wrote:
+> On Mon, Sep 24, 2012 at 04:53:00PM +0100, Pawel Moll wrote:
+> > Hi Arnd, Ofof,
 > > 
-> > hwmon framework driver for Versatile Express sensors, providing
-> > information about board level voltage (only when regulator driver
-> > is not configured), currents, temperature and power/energy usage.
-> > Labels for the values can be defined as DT properties.
-> > 
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > Would you be so kind to pull the updates for Versatile Express based on
+> > v3.6-rc7 discussed over the last couple of weeks?
 > 
-> After my concern was clarified ...
-> 
-> Acked-by: Guenter Roeck <linux@roeck-us.net>
+> I think you have a typo in the subject -- it should say 3.8 :)
 
-Thanks a lot!
+Whichever is possible :-)
 
-> I assume this will go upstream through the arm tree ?
-
-I was planning to push the subsystem patches (hwmon, regulator etc.)
-through respective maintainers, so through your tree - the driver
-depends on VEXPRESS_CONFIG so won't cause any build issues before the
-infrastructure is in place. Of course if you'd rather see it go through
-arm-soc, I'll add it to that branch. Just let me know what is your
-preference.
-
-Cheers!
-
-Pawel
+Pawe?
