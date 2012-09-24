@@ -1,47 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 23 Sep 2012 20:04:13 -0700
-Subject: [GIT PULL] ARM: OMAP2+: PRCM/runtime PM patches for 3.7
-In-Reply-To: <alpine.DEB.2.00.1209240058530.31370@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209240058530.31370@utopia.booyaka.com>
-Message-ID: <20120924030413.GX28835@atomide.com>
+From: chanho0207@gmail.com (Chanho Min)
+Date: Mon, 24 Sep 2012 12:06:19 +0900
+Subject: [PATCH] ARM: gic: fix irq affinity mismatch.
+Message-ID: <CAOAMb1DEKrgjtq-xRB+Qy1+_8D-G+6g2v9QSLMisVNbKa8+jSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120923 18:01]:
-> Hi Tony
-> 
-> The following changes since commit 1e2ee2a60df5c3ab74dd1c9155fb01b5bc6f807d:
-> 
->   Merge tag 'omap-devel-am33xx-for-v3.7' into test_v3.6-rc6_ocb3.7_cff3.7_odaf3.7 (2012-09-23 17:16:04 -0600)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-b-c-2-for-3.7
-> 
-> for you to fetch changes up to 76a5d9bfc42d60e9a672e0cae776157a60970f4e:
-> 
->   ARM: OMAP4460/4470: PMU: Enable PMU for OMAP4460/70 (2012-09-23 17:28:30 -0600)
-> 
-> ----------------------------------------------------------------
-> OMAP patches intended for the 3.7 merge window:
-> 
-> - Runtime PM conversions for the GPMC and RNG IP blocks
-> - Preparation patches for the OMAP common clock framework conversion
-> - clkdev alias additions required by other drivers
-> - Performance Monitoring Unit (PMU) support for OMAP2, 3, and non-4430 OMAP4
-> - OMAP hwmod code and data improvements
-> - Preparation patches for the IOMMU runtime PM conversion
-> - Preparation patches for OMAP4 full-chip retention support
-> 
-> Based on a merge of v3.6-rc6, the omap-cleanup-b-for-3.7 tag
-> (7852ec0536ca39cefffc6301dc77f8ae55592926),the cleanup-fixes-for-v3.7
-> tag (de6ca33a96a6bf61fcb91d3d399703e19ead9d1e), and the
-> omap-devel-am33xx-for-v3.7 tag
-> (11964f53eb4d9ce59a058be9999d9cfcb1ced878), due to dependencies.
+Even if we set affinity to multiple cpus via procfs, gic_set_affinity
+allows to set one target only. But, '/proc/irq/xxx/smp_affinity' shows
+as we are successful in the setting of multiple affinity. Thus irq_data->
+affinity mismatches with the GICD_ITARGETSRs.
 
-Thanks, yeah this one works. Pulled into devel-late branch.
+fix it as bellows.
+- Set the default affinity to the boot cpu in gic_dist_init. thereafter,
+irq_data->affinity will be set to default 1-bit affinity.
+- Even if we write multiple bits to smp_affinity, both irq_data and gic
+register will be set one cpu. procfs will show 1 bit affinity as well.
 
-Regards,
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm/common/gic.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Tony
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index aa52699..fb8ac8e 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -249,6 +249,12 @@ static int gic_set_affinity(struct irq_data *d,
+const struct cpumask *mask_val,
+ 	writel_relaxed(val | bit, reg);
+ 	raw_spin_unlock(&irq_controller_lock);
+
++	if (cpumask_next_and(cpu, mask_val, cpu_present_mask) < nr_cpu_ids) {
++		cpumask_clear(d->affinity);
++		cpumask_set_cpu(cpu, d->affinity);
++		return IRQ_SET_MASK_OK_NOCOPY;
++	}
++
+ 	return IRQ_SET_MASK_OK;
+ }
+ #endif
+@@ -355,6 +361,12 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	cpumask |= cpumask << 8;
+ 	cpumask |= cpumask << 16;
+
++#ifdef CONFIG_SMP
++	/* Set the default affinity to the boot cpu. */
++	cpumask_clear(irq_default_affinity);
++	cpumask_set_cpu(cpu, irq_default_affinity);
++#endif
++
+ 	writel_relaxed(0, base + GIC_DIST_CTRL);
+
+ 	/*
+-- 
+1.7.9.5
