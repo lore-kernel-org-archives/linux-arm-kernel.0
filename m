@@ -1,37 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Sep 2012 15:16:54 +0100
-Subject: [PATCH v3 RESEND 12/17] ARM: LPAE: define
- ARCH_LOW_ADDRESS_LIMIT for bootmem
-In-Reply-To: <1348242975-19184-13-git-send-email-cyril@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-13-git-send-email-cyril@ti.com>
-Message-ID: <20120924141654.GH23298@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Sep 2012 15:26:29 +0100
+Subject: GIC affinity and edge trigger
+In-Reply-To: <CC811D74.ECFF%wbarak@gmail.com>
+References: <CC811D74.ECFF%wbarak@gmail.com>
+Message-ID: <50606D95.8070109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 04:56:10PM +0100, Cyril Chemparathy wrote:
-> This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
-> On PAE systems, the absence of this override causes bootmem to incorrectly
-> limit itself to 32-bit addressable physical memory.
-> 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> ---
->  arch/arm/include/asm/memory.h |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index f3e8f88..19221c2 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -315,6 +315,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
->  #define arch_is_coherent()		0
->  #endif
->  
-> +#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
+On 20/09/12 17:22, Barak Wasserstrom wrote:
+> Hello,
+> I'm currently using linux kernel 2.6.38 with SMP enabled.
+> I have an interrupt which is a pulse and therefore I set the trigger to positive edge.
+> Due to the fact that each CPU sees its own GIC distributor memory space, only the CPU that executed request_irq has the trigger type set to positive edge, while the others remain level.
 
-It looks like mm/bootmem.c casts this to unsigned long anyway, so the
-patch doesn't have any effect on its own.
+This seem to imply that your interrupt is a PPI, and not a SPI. If this
+is the case, you cannot use request_irq on such an interrupt. 2.6.38 is
+pretty ancient though, and doesn't have any support for
+request_percpu_irq and co. How are you configuring/requesting this
+interrupt?
 
+> Moreover, gic_set_cpu always defines the GIC distributor target to be CPU0.
+
+For a PPI, the concept of "target" is pretty minimal, and is always the
+CPU this PPI is connected to.
+
+> So only CPU0 target is enabled + trigger is set to edge only for one CPU and thus not always do I get the interrupt.
+> Can you please help me understand what I'm doing wrong, or misunderstand?
+
+Please clarify whether you're using a PPI or an SPI. The above is not
+clear enough to give you a straight answer.
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
