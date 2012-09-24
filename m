@@ -1,50 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 23 Sep 2012 19:30:31 -0700
-Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
-In-Reply-To: <alpine.DEB.2.00.1209240102290.31370@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
- <20120921205322.GK28835@atomide.com>
- <20120921231039.GN28835@atomide.com>
- <alpine.DEB.2.00.1209220002290.6510@utopia.booyaka.com>
- <20120922002111.GP28835@atomide.com>
- <alpine.DEB.2.00.1209220211090.8626@utopia.booyaka.com>
- <20120923190933.GS28835@atomide.com>
- <20120923210638.GT28835@atomide.com>
- <alpine.DEB.2.00.1209240102290.31370@utopia.booyaka.com>
-Message-ID: <20120924023031.GW28835@atomide.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 24 Sep 2012 02:44:35 +0000
+Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
+ arm/common
+In-Reply-To: <1348152226-13588-2-git-send-email-mporter@ti.com>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+ <1348152226-13588-2-git-send-email-mporter@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8D0DF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120923 18:09]:
-> On Sun, 23 Sep 2012, Tony Lindgren wrote:
+On Thu, Sep 20, 2012 at 20:13:34, Porter, Matt wrote:
+> Move mach-davinci/dma.c to common/edma.c so it can be used
+> by OMAP (specifically AM33xx atm) as well. This just moves
+> the private EDMA API but does not support OMAP.
 > 
-> > Or maybe it's possible to split the series into smaller chunks
-> > that can be pulled in to the existing branches without causing
-> > new merge conflicts?
-> 
-> Well here's what I did, hopefully it's suitable.  Built a tag with all of 
-> the clock and hwmod/runtime PM patches together, and based it on v3.6-rc6 
-> + omap-cleanup-b-for-3.7 + cleanup-fixes-for-v3.7 + 
-> omap-devel-am33xx-for-v3.7.  All of these are upstream.
-> 
-> Then I did a test merge with your commit 
-> 219e2d6f43760509a0f0a084e8aa4711efb78c56:
-> 
->   git checkout -b temp_tmlind_merge
->   git reset --hard 219e2d6f43760509a0f0a084e8aa4711efb78c56
->   git merge omap-devel-b-c-2-for-3.7
-> 
-> There are two conflicts, both trivial, and the patch below is how they got 
-> resolved here.
-> 
-> Then probably you'll want to add Santosh's branch back in on top of that.
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/Kconfig                           |    1 +
+>  arch/arm/common/Kconfig                    |    3 +
+>  arch/arm/common/Makefile                   |    1 +
+>  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
+>  arch/arm/include/asm/mach/edma.h           |  267 +++++
+>  arch/arm/mach-davinci/Makefile             |    2 +-
+>  arch/arm/mach-davinci/devices.c            |    3 +-
+>  arch/arm/mach-davinci/dm355.c              |    2 +-
+>  arch/arm/mach-davinci/dm365.c              |    2 +-
+>  arch/arm/mach-davinci/dm644x.c             |    2 +-
+>  arch/arm/mach-davinci/dm646x.c             |    2 +-
+>  arch/arm/mach-davinci/dma.c                | 1588 ----------------------------
 
-OK thanks, that should work. The nasty merge conflicts seem to have been
-caused by mostly commit df3d17e0 (ARM: pmu: remove arm_pmu_type enumeration)
-that easily causes a nasty mis-merge of omap_init_pmu() and omap_init_rng()
-without removing omap_init_pmu() which your patches move to a different
-location.
 
-Regards,
+>  arch/arm/mach-davinci/include/mach/asp.h   |    2 +-
 
-Tony
+This will clash with patch "ASoC/ARM: Davinci: McASP: split asp header
+into platform and audio specific" queued in ASoC tree by Mark Brown 
+tree (Auio - ASoC Tree)
+
+I forgot to mention this last time.  Sorry
+
+>  arch/arm/mach-davinci/include/mach/da8xx.h |    3 +-
+>  arch/arm/mach-davinci/include/mach/edma.h  |  267 -----
+>  arch/arm/mach-davinci/include/mach/spi.h   |    2 +-
+>  arch/arm/plat-omap/Kconfig                 |    1 +
+>  17 files changed, 1872 insertions(+), 1864 deletions(-)
+>  create mode 100644 arch/arm/common/edma.c
+>  create mode 100644 arch/arm/include/asm/mach/edma.h
+>  delete mode 100644 arch/arm/mach-davinci/dma.c
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/edma.h
+> 
+...snip...
+...snip...
+
+
+Regards, 
+Gururaja
