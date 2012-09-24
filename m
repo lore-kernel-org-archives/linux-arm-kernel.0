@@ -1,112 +1,98 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 24 Sep 2012 15:33:45 -0700
-Subject: [PATCH 05/10] ARM: msm: Remove custom clk_set_flags() API
-In-Reply-To: <1348194419-11486-6-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 24 Sep 2012 15:37:27 -0700
+Subject: [PATCH 06/10] ARM: msm: Remove custom clk_set_{max,min}_rate() API
+In-Reply-To: <1348194419-11486-7-git-send-email-sboyd@codeaurora.org>
 References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
- <1348194419-11486-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5060DFC9.1000207@codeaurora.org>
+ <1348194419-11486-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5060E0A7.7090409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/20/2012 07:26 PM, Stephen Boyd wrote:
-> Nobody is using this API upstream and it's just contributing
-> cruft. Remove it so the MSM clock API is closer to the generic
-> struct clock API.
+> There are no users of this API anymore so let's just remove it.
+> If a need arises in the future we can extend the common clock API
+> to handle it.
 >
 > Cc: Saravana Kannan<skannan@codeaurora.org>
 > Signed-off-by: Stephen Boyd<sboyd@codeaurora.org>
 > ---
->   arch/arm/mach-msm/clock-pcom.c       | 10 ----------
->   arch/arm/mach-msm/clock.c            |  8 --------
->   arch/arm/mach-msm/clock.h            |  6 ------
->   arch/arm/mach-msm/include/mach/clk.h |  3 ---
->   4 files changed, 27 deletions(-)
+>   arch/arm/mach-msm/clock-debug.c      |  9 +--------
+>   arch/arm/mach-msm/clock.c            | 12 ------------
+>   arch/arm/mach-msm/include/mach/clk.h |  6 ------
+>   3 files changed, 1 insertion(+), 26 deletions(-)
 >
-> diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-> index a52c970..bb75f8e 100644
-> --- a/arch/arm/mach-msm/clock-pcom.c
-> +++ b/arch/arm/mach-msm/clock-pcom.c
-> @@ -85,15 +85,6 @@ static int pc_clk_set_max_rate(unsigned id, unsigned rate)
->   		return (int)id<  0 ? -EINVAL : 0;
->   }
+> diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
+> index 4886404..c4b34d7 100644
+> --- a/arch/arm/mach-msm/clock-debug.c
+> +++ b/arch/arm/mach-msm/clock-debug.c
+> @@ -25,14 +25,7 @@ static int clock_debug_rate_set(void *data, u64 val)
+>   	struct clk *clock = data;
+>   	int ret;
 >
-> -static int pc_clk_set_flags(unsigned id, unsigned flags)
-> -{
-> -	int rc = msm_proc_comm(PCOM_CLKCTL_RPC_SET_FLAGS,&id,&flags);
-> -	if (rc<  0)
-> -		return rc;
+> -	/* Only increases to max rate will succeed, but that's actually good
+> -	 * for debugging purposes so we don't check for error. */
+> -	if (clock->flags&  CLK_MAX)
+> -		clk_set_max_rate(clock, val);
+> -	if (clock->flags&  CLK_MIN)
+> -		ret = clk_set_min_rate(clock, val);
 > -	else
-> -		return (int)id<  0 ? -EINVAL : 0;
-> -}
-> -
->   static unsigned pc_clk_get_rate(unsigned id)
->   {
->   	if (msm_proc_comm(PCOM_CLKCTL_RPC_RATE,&id, NULL))
-> @@ -130,7 +121,6 @@ struct clk_ops clk_ops_pcom = {
->   	.set_rate = pc_clk_set_rate,
->   	.set_min_rate = pc_clk_set_min_rate,
->   	.set_max_rate = pc_clk_set_max_rate,
-> -	.set_flags = pc_clk_set_flags,
->   	.get_rate = pc_clk_get_rate,
->   	.is_enabled = pc_clk_is_enabled,
->   	.round_rate = pc_clk_round_rate,
+> -		ret = clk_set_rate(clock, val);
+> +	ret = clk_set_rate(clock, val);
+
+This was done to handle the difference in behavior of the remote 
+processor on a per clock basis, but I agree that it's best to remove it 
+now and added it back later if needed. And even if it's needed, I don't 
+anticipate the need for changes to the common clock framework to deal 
+with this.
+
+Acked-by: Saravana Kannan <skannan@codeaurora.org>
+
+-Saravana
+
+>   	if (ret != 0)
+>   		printk(KERN_ERR "clk_set%s_rate failed (%d)\n",
+>   			(clock->flags&  CLK_MIN) ? "_min" : "", ret);
 > diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-> index d9145df..5fac2df 100644
+> index 5fac2df..8d07b25 100644
 > --- a/arch/arm/mach-msm/clock.c
 > +++ b/arch/arm/mach-msm/clock.c
-> @@ -121,14 +121,6 @@ struct clk *clk_get_parent(struct clk *clk)
+> @@ -97,18 +97,6 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
 >   }
->   EXPORT_SYMBOL(clk_get_parent);
+>   EXPORT_SYMBOL(clk_round_rate);
 >
-> -int clk_set_flags(struct clk *clk, unsigned long flags)
+> -int clk_set_min_rate(struct clk *clk, unsigned long rate)
 > -{
-> -	if (clk == NULL || IS_ERR(clk))
-> -		return -EINVAL;
-> -	return clk->ops->set_flags(clk->id, flags);
+> -	return clk->ops->set_min_rate(clk->id, rate);
 > -}
-> -EXPORT_SYMBOL(clk_set_flags);
+> -EXPORT_SYMBOL(clk_set_min_rate);
 > -
->   /* EBI1 is the only shared clock that several clients want to vote on as of
->    * this commit. If this changes in the future, then it might be better to
->    * make clk_min_rate handle the voting or make ebi1_clk_set_min_rate more
-> diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-> index 2c007f6..a25ff58 100644
-> --- a/arch/arm/mach-msm/clock.h
-> +++ b/arch/arm/mach-msm/clock.h
-> @@ -21,11 +21,6 @@
->   #include<linux/list.h>
->   #include<mach/clk.h>
->
-> -#define CLKFLAG_INVERT			0x00000001
-> -#define CLKFLAG_NOINVERT		0x00000002
-> -#define CLKFLAG_NONEST			0x00000004
-> -#define CLKFLAG_NORESET			0x00000008
+> -int clk_set_max_rate(struct clk *clk, unsigned long rate)
+> -{
+> -	return clk->ops->set_max_rate(clk->id, rate);
+> -}
+> -EXPORT_SYMBOL(clk_set_max_rate);
 > -
->   #define CLK_FIRST_AVAILABLE_FLAG	0x00000100
->   #define CLKFLAG_AUTO_OFF		0x00000200
->   #define CLKFLAG_MIN			0x00000400
-> @@ -39,7 +34,6 @@ struct clk_ops {
->   	int (*set_rate)(unsigned id, unsigned rate);
->   	int (*set_min_rate)(unsigned id, unsigned rate);
->   	int (*set_max_rate)(unsigned id, unsigned rate);
-> -	int (*set_flags)(unsigned id, unsigned flags);
->   	unsigned (*get_rate)(unsigned id);
->   	unsigned (*is_enabled)(unsigned id);
->   	long (*round_rate)(unsigned id, unsigned rate);
+>   int clk_set_parent(struct clk *clk, struct clk *parent)
+>   {
+>   	return -ENOSYS;
 > diff --git a/arch/arm/mach-msm/include/mach/clk.h b/arch/arm/mach-msm/include/mach/clk.h
-> index e8d3842..5f1c37d 100644
+> index 5f1c37d..fd4f4a7 100644
 > --- a/arch/arm/mach-msm/include/mach/clk.h
 > +++ b/arch/arm/mach-msm/include/mach/clk.h
-> @@ -34,7 +34,4 @@ int clk_set_max_rate(struct clk *clk, unsigned long rate);
+> @@ -25,12 +25,6 @@ enum clk_reset_action {
+>
+>   struct clk;
+>
+> -/* Rate is minimum clock rate in Hz */
+> -int clk_set_min_rate(struct clk *clk, unsigned long rate);
+> -
+> -/* Rate is maximum clock rate in Hz */
+> -int clk_set_max_rate(struct clk *clk, unsigned long rate);
+> -
 >   /* Assert/Deassert reset to a hardware block associated with a clock */
 >   int clk_reset(struct clk *clk, enum clk_reset_action action);
 >
-> -/* Set clock-specific configuration parameters */
-> -int clk_set_flags(struct clk *clk, unsigned long flags);
-> -
->   #endif
 
-Acked-by: Saravana Kannan <skannan@codeaurora.org>
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
