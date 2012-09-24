@@ -1,50 +1,23 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 24 Sep 2012 18:30:49 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the sound tree
-Message-ID: <20120924183049.44bc374d9dc8b8504e504d99@canb.auug.org.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Sep 2012 09:35:30 +0100
+Subject: [PATCH] ARM: gic: fix irq affinity mismatch.
+In-Reply-To: <CAOAMb1DEKrgjtq-xRB+Qy1+_8D-G+6g2v9QSLMisVNbKa8+jSA@mail.gmail.com>
+References: <CAOAMb1DEKrgjtq-xRB+Qy1+_8D-G+6g2v9QSLMisVNbKa8+jSA@mail.gmail.com>
+Message-ID: <20120924083530.GM15609@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Sep 24, 2012 at 12:06:19PM +0900, Chanho Min wrote:
+> Even if we set affinity to multiple cpus via procfs, gic_set_affinity
+> allows to set one target only. But, '/proc/irq/xxx/smp_affinity' shows
+> as we are successful in the setting of multiple affinity. Thus irq_data->
+> affinity mismatches with the GICD_ITARGETSRs.
+> 
+> fix it as bellows.
+> - Set the default affinity to the boot cpu in gic_dist_init. thereafter,
+> irq_data->affinity will be set to default 1-bit affinity.
+> - Even if we write multiple bits to smp_affinity, both irq_data and gic
+> register will be set one cpu. procfs will show 1 bit affinity as well.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-davinci/include/mach/da8xx.h between commit 896f66b7de29
-(ASoC/ARM: Davinci: McASP: split asp header into platform and audio
-specific"") from the sound tree and commit ec2a0833e515 ("ARM: davinci:
-move platform_data definitions") from the arm-soc tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-davinci/include/mach/da8xx.h
-index c74a6ab,33e78ae..0000000
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@@ -20,11 -19,12 +20,11 @@@
-  
-  #include <mach/serial.h>
-  #include <mach/edma.h>
-- #include <mach/i2c.h>
-- #include <mach/mmc.h>
-- #include <mach/usb.h>
- -#include <mach/asp.h>
-  #include <mach/pm.h>
-- #include <mach/spi.h>
-+ #include <linux/platform_data/i2c-davinci.h>
-+ #include <linux/platform_data/mmc-davinci.h>
-+ #include <linux/platform_data/usb-davinci.h>
-+ #include <linux/platform_data/spi-davinci.h>
-  
-  extern void __iomem *da8xx_syscfg0_base;
-  extern void __iomem *da8xx_syscfg1_base;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/5b911ac5/attachment.sig>
+This has come up before.  There is no requirement to make the affinity
+mask reflect back to userspace what the hardware is doing.  So, NAK.
