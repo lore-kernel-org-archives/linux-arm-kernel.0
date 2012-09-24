@@ -1,29 +1,65 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 24 Sep 2012 19:53:05 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
-Message-ID: <20120924195305.588277e94ce701abc5e5a6c5@canb.auug.org.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Sep 2012 11:53:45 +0200
+Subject: [PATCH 3/3] ARM: dts: cfa10049: Add the i2c muxer buses to the
+ CFA-10049
+In-Reply-To: <1348480425-13848-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1348474926-12763-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1348480425-13848-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1348480425-13848-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This will allow to add the 3 Nuvoton NAU7802 ADCs and the NXP PCA9555
+GPIO expander eventually.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/video/omap/lcd_ams_delta.c between commit 9586778de558 ("OMAPFB1:
-remove unnecessary includes") from the  tree and commit e27e35ec735f
-("ARM: OMAP1: Move board-ams-delta.h from plat to mach") from the arm-soc
-tree.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10049.dts |   33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-The latter removed a superset of the former (as far as include files is
-concerned), so I used that and can carry the fix as necessary (no action
-is required).
-
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index a9288fb..9a55632 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -76,6 +76,39 @@
+ 				status = "okay";
+ 			};
+ 
++			i2cmux {
++				compatible = "i2c-mux-gpio";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
++				i2c-parent = <&i2c1>;
++
++				i2c at 0 {
++					reg = <0>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				i2c at 1 {
++				      reg = <1>;
++				      #address-cells = <1>;
++				      #size-cells = <0>;
++				};
++
++				i2c at 2 {
++					reg = <2>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				i2c at 3 {
++					reg = <3>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++				};
++			};
++
+ 			usbphy1: usbphy at 8007e000 {
+ 				status = "okay";
+ 			};
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/9d60f4eb/attachment.sig>
+1.7.9.5
