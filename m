@@ -1,29 +1,23 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 24 Sep 2012 19:51:57 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP: hwmod/PMU/PRCM patches for 3.7
-In-Reply-To: <20120924023031.GW28835@atomide.com>
-References: <alpine.DEB.2.00.1209210103140.6888@utopia.booyaka.com>
- <20120921205322.GK28835@atomide.com> <20120921231039.GN28835@atomide.com>
- <alpine.DEB.2.00.1209220002290.6510@utopia.booyaka.com>
- <20120922002111.GP28835@atomide.com>
- <alpine.DEB.2.00.1209220211090.8626@utopia.booyaka.com>
- <20120923190933.GS28835@atomide.com> <20120923210638.GT28835@atomide.com>
- <alpine.DEB.2.00.1209240102290.31370@utopia.booyaka.com>
- <20120924023031.GW28835@atomide.com>
-Message-ID: <alpine.DEB.2.00.1209241950370.25811@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Sep 2012 21:55:51 +0200
+Subject: [PATCH] gpio-lpc32xx: Fix value handling of
+ gpio_direction_output()
+In-Reply-To: <1348130883-11329-1-git-send-email-stigge@antcom.de>
+References: <1348130883-11329-1-git-send-email-stigge@antcom.de>
+Message-ID: <CACRpkdZo5kR+Tyhos_StEFZbw3WHF_RFRknHjtU2Pz4XpFTZCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Sep 2012, Tony Lindgren wrote:
+On Thu, Sep 20, 2012 at 10:48 AM, Roland Stigge <stigge@antcom.de> wrote:
 
-> OK thanks, that should work. The nasty merge conflicts seem to have been
-> caused by mostly commit df3d17e0 (ARM: pmu: remove arm_pmu_type enumeration)
-> that easily causes a nasty mis-merge of omap_init_pmu() and omap_init_rng()
-> without removing omap_init_pmu() which your patches move to a different
-> location.
+> For GPIOs of gpio-lpc32xx, gpio_direction_output() ignores the value argument
+> (initial value of output). This patch fixes this by setting the level
+> accordingly.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-OK thanks.  From now on, will make sure that merge window pull requests 
-are based on any upstream cleanup series that affect the same code.
+Applied with Alexandre's ACK, should go into stable right?
+So tagging this with Cc: stable and sending for the -rc:s.
 
-
-- Paul
+Thanks,
+Linus Walleij
