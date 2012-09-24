@@ -1,66 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Sep 2012 22:52:38 +0100
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <alpine.LFD.2.02.1209241709200.6667@xanadu.home>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924151305.GA14198@arm.com>
- <alpine.LFD.2.02.1209241152540.6667@xanadu.home> <5060C9C6.8080900@ti.com>
- <alpine.LFD.2.02.1209241709200.6667@xanadu.home>
-Message-ID: <CAHkRjk74aHMNZxOVgsQo-NTm33ALZPVeiPAP5amCdBdF4-yjWw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 24 Sep 2012 21:54:00 +0000 (UTC)
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <20120922231733.GI2934@linux.vnet.ibm.com>
+References: <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
+ <20120920220130.GN2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
+ <alpine.DEB.2.00.1209211740170.8839@utopia.booyaka.com>
+ <20120921212054.GE2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209212240190.31812@utopia.booyaka.com>
+ <20120922000537.GH2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209221813330.10663@utopia.booyaka.com>
+ <20120922195253.GD2934@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209222214120.22590@utopia.booyaka.com>
+ <20120922231733.GI2934@linux.vnet.ibm.com>
+Message-ID: <alpine.DEB.2.00.1209242142490.4521@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 September 2012 22:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 24 Sep 2012, Cyril Chemparathy wrote:
->
->> On 9/24/2012 11:56 AM, Nicolas Pitre wrote:
->> > On Mon, 24 Sep 2012, Catalin Marinas wrote:
->> >
->> > > On Fri, Sep 21, 2012 at 04:56:03PM +0100, Cyril Chemparathy wrote:
->> > > > This patch adds support for 64-bit physical addresses in virt_to_phys()
->> > > > patching.  This does not do real 64-bit add/sub, but instead patches in
->> > > > the
->> > > > upper 32-bits of the phys_offset directly into the output of
->> > > > virt_to_phys.
->> > >
->> > > So this assumes that for the kernel linear mapping, all the physical
->> > > addresses have the same upper 32-bit. That's a good optimisation but I
->> > > haven't seen this check when calculating lowmem in sanity_check_meminfo.
->> > > Someone may build platform with memory starting at 3GB and going across
->> > > the 4GB limit.
->> >
->> > Good point.  We better get an early warning if that happens.
->> >
->>
->> Thanks.
->>
->> I'm thinking of splitting the bank at the 32-bit boundary in such an event,
->> assuming that the remaining memory should be usable as highmem.
->
-> No.  That's not the point here.
->
-> Let's suppose a system with 1GB of physical RAM starting at 0xe0000000.
->
-> In this case there is no need for highmem.  However the v2p patching
-> code in the LPAE case assumes the high bits of a physical address are
-> always the same which wouldn't be the case in this hypothetical example.
->
-> We want to make sure the kernel won't boot if a system with physical RAM
-> crossing the 4GB address mark is encountered.
+On Sat, 22 Sep 2012, Paul E. McKenney wrote:
 
-I think that's too restrictive. The case with 1 or 2GB below 4GB limit
-and the rest of the RAM above is a valid one. For such configurations
-we just limit the lowmem to the memory within 4GB and leave the rest
-as highmem. Another example is with RAM between 6GB and 10GB.
+> On Sat, Sep 22, 2012 at 10:20:19PM +0000, Paul Walmsley wrote:
+> > On Sat, 22 Sep 2012, Paul E. McKenney wrote:
+> >
+> > > This thing has been in the kernel since about 2004, not sure why you 
+> > > didn't hit it earlier.
+> > 
+> > One other data point in that regard - noticed the warnings don't appear 
+> > when the board is booted with:
+> > 
+> > commit 4fa3b6cb1bc8c14b81b4c8ffdfd3f2500a7e9367
+> > Author: Paul E. McKenney <paul.mckenney@linaro.org>
+> > Date:   Tue Jun 5 15:53:53 2012 -0700
+> > 
+> >     rcu: Fix qlen_lazy breakage
+> 
+> You lost me on this one.  This is already in mainline, so if you were
+> using (say) 3.6-rc6, you would already have this commit applied.
 
-So we can consider lowmem all the addresses with the same upper 32-bit
-as the start of the first memory block.
+If I check out a kernel at this commit 
+4fa3b6cb1bc8c14b81b4c8ffdfd3f2500a7e9367 + the 
+zero-callback-in-tickless-idle diagnostic patch, build and boot it, then 
+the stall warnings don't appear (in 25 minutes of testing).
 
-Of course, if the lowmem turns out to be very small because of a weird
-address, the kernel will probably fail shortly anyway but I don't
-think we'll have such configurations.
+Messages from the diagnostic patch indicate that the kernel is entering 
+idle during a grace period with no RCU callbacks, though.
 
--- 
-Catalin
+This is not a big deal and does not need any further attention.  Just 
+wanted to place a time boundary on the point when these messages started 
+appearing.  (It is unlikely to be an optimal bound: i.e., there are 
+probably later commits where the warnings also don't appear.)
+
+
+- Paul
