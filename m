@@ -1,21 +1,28 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 24 Sep 2012 10:39:41 +0530
-Subject: [PATCH v4 2/3] ARM: omap: hwmod: get rid of all
- omap_clk_get_by_name usage
-In-Reply-To: <alpine.DEB.2.00.1209221852590.10663@utopia.booyaka.com>
-References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
- <1346230576-20004-3-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1209221852590.10663@utopia.booyaka.com>
-Message-ID: <505FEB15.3010008@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 24 Sep 2012 07:23:01 +0200
+Subject: [GIT PULL V5 0/7] ARM: kirkwood/dove/mvebu changes for v3.7
+In-Reply-To: <20120922171554.GE5469@titan.lakedaemon.net>
+References: <20120922171554.GE5469@titan.lakedaemon.net>
+Message-ID: <20120924052301.GE14266@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 23 September 2012 12:25 AM, Paul Walmsley wrote:
-> Updated this one to include several missing clock aliases and to fix a bug
-> it introduced with omap_96m_alwon_fck_3630; modified patch below.
+Hi Arnd, Olof, Jason.
 
-Thanks Paul, for the updates and the fix. Updated patch looks good to
-me.
+I tested arm-soc/late/kirkwood on an orion5x board. There is an
+unrelated problem, which i should of really seen earlier....
 
-regards,
-Rajendra
+ERROR: 256 KiB atomic DMA coherent pool is too small!
+Please increase it with coherent_pool= kernel parameter!
+
+We had the same problem with kirkwood. I will submit a patch against
+3.6-rc7. Is there still time for that? Otherwise it would be good to
+have in 3.7 and cc: stable so 3.6.1 gets the fix.
+
+When i increase the coherent pool size on the command line, it boots
+O.K. I don't have any PCI devices on this board, but the two root
+controllers are listed by lspci.
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+	   Andrew
