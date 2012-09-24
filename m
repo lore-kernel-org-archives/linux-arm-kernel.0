@@ -1,55 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Sep 2012 12:37:16 -0400
-Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
-In-Reply-To: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
-References: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20120924163716.GR5469@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Sep 2012 10:42:53 -0600
+Subject: linux-next: Tree for Sept 24 (irqchip)
+In-Reply-To: <20120925020744.cc5beb9e65473605e5ca2240@canb.auug.org.au>
+References: <20120925005328.f748dfa3d077cebb345a4291@canb.auug.org.au>
+ <50607E99.6040303@xenotime.net>
+ <20120925020744.cc5beb9e65473605e5ca2240@canb.auug.org.au>
+Message-ID: <50608D8D.4060506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 07:54:33AM +0200, Andrew Lunn wrote:
-> Some Orion5x devices allocate their coherent buffers from atomic
-> context. Increase size of atomic coherent pool to make sure such the
-> allocations won't fail during boot.
+On 09/24/2012 10:07 AM, Stephen Rothwell wrote:
+> Hi Randy,
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-btw - we should take this to it's logical conclusion and have Sebastian
-check Dove.  Sebastian?
-
-thx,
-
-Jason.
-
-> ---
->  arch/arm/mach-orion5x/common.c |    7 +++++++
->  1 file changed, 7 insertions(+)
+> On Mon, 24 Sep 2012 08:39:05 -0700 Randy Dunlap
+> <rdunlap@xenotime.net> wrote:
+>> 
+>> On 09/24/2012 07:53 AM, Stephen Rothwell wrote:
+>> 
+>>> Today was a train wreck, with lots of new conflicts across
+>>> several trees and a few build failures as well.
+>> 
+>> I agree.  I mostly get this:
+>> 
+>> drivers/Kconfig:157: can't open file "drivers/irqchip/Kconfig"
+>> 
+>> i.e., no such file.
+>> 
+>> How does this happen?  :(
+>> 
+>> who handles irqchip?
 > 
-> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-> index 410291c..a6cd14a 100644
-> --- a/arch/arm/mach-orion5x/common.c
-> +++ b/arch/arm/mach-orion5x/common.c
-> @@ -204,6 +204,13 @@ void __init orion5x_wdt_init(void)
->  void __init orion5x_init_early(void)
->  {
->  	orion_time_set_base(TIMER_VIRT_BASE);
-> +
-> +	/*
-> +	 * Some Orion5x devices allocate their coherent buffers from atomic
-> +	 * context. Increase size of atomic coherent pool to make sure such
-> +	 * the allocations won't fail.
-> +	 */
-> +	init_dma_coherent_pool_size(SZ_1M);
->  }
->  
->  int orion5x_tclk;
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Hmm, commit 89214f009c1d ("ARM: bcm2835: add interrupt controller 
+> driver") from the arm-soc tree adds that file as an empty file (I
+> have the empty file in my tree).  Nothing adds anything to it.
+
+That's odd. I just checked out next-20120924, and that (empty) file
+does appear on my disk as expected. Do some versions of git not handle
+creating empty files?
+
+Note that IIRC the Kconfig file is required, because otherwise the
+build process won't recurse into drivers/irqchip/ and hence code won't
+be linked into the kernel image.
+
+The file is empty because the Makefile there keys of
+CONFIG_ARCH_BCM2835 and hence doesn't need drivers/irqchip/Kconfig to
+define any new Kconfig variables.
