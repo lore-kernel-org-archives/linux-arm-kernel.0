@@ -1,100 +1,39 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Sep 2012 16:43:17 +0200
-Subject: [PATCH 1/3] mfd: dbx500: Export prmcu_request_ape_opp_100_voltage
+Date: Mon, 24 Sep 2012 16:43:19 +0200
+Subject: [PATCH 3/3] clk: ux500: Update sdmmc clock to 100MHz for u8500
 In-Reply-To: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1348497799-32143-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1348497799-32143-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-This function needs to be exported to let clients be able to
-request the ape opp 100 voltage.
+For u8500 and using 100MHz as the frequency also requires the ape opp 100
+voltage, thus use the prcmu_opp_volt_scalable clock type.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c       |    4 ++--
- include/linux/mfd/db8500-prcmu.h |    4 ++--
- include/linux/mfd/dbx500-prcmu.h |   10 ++++++++++
- 3 files changed, 14 insertions(+), 4 deletions(-)
+ drivers/clk/ux500/u8500_clk.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index e7f9539..0b8e0a0 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -1167,12 +1167,12 @@ int db8500_prcmu_get_ape_opp(void)
- }
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index ca4a25e..7bebf1f 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -170,10 +170,11 @@ void u8500_clk_init(void)
+ 	clk_register_clkdev(clk, NULL, "mtu0");
+ 	clk_register_clkdev(clk, NULL, "mtu1");
  
- /**
-- * prcmu_request_ape_opp_100_voltage - Request APE OPP 100% voltage
-+ * db8500_prcmu_request_ape_opp_100_voltage - Request APE OPP 100% voltage
-  * @enable: true to request the higher voltage, false to drop a request.
-  *
-  * Calls to this function to enable and disable requests must be balanced.
-  */
--int prcmu_request_ape_opp_100_voltage(bool enable)
-+int db8500_prcmu_request_ape_opp_100_voltage(bool enable)
- {
- 	int r = 0;
- 	u8 header;
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index b82f6ee..6ee4247 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -515,7 +515,6 @@ enum romcode_read prcmu_get_rc_p2a(void);
- enum ap_pwrst prcmu_get_xp70_current_state(void);
- bool prcmu_has_arm_maxopp(void);
- struct prcmu_fw_version *prcmu_get_fw_version(void);
--int prcmu_request_ape_opp_100_voltage(bool enable);
- int prcmu_release_usb_wakeup_state(void);
- void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
- 	struct prcmu_auto_pm_config *idle);
-@@ -564,6 +563,7 @@ int db8500_prcmu_set_arm_opp(u8 opp);
- int db8500_prcmu_get_arm_opp(void);
- int db8500_prcmu_set_ape_opp(u8 opp);
- int db8500_prcmu_get_ape_opp(void);
-+int db8500_prcmu_request_ape_opp_100_voltage(bool enable);
- int db8500_prcmu_set_ddr_opp(u8 opp);
- int db8500_prcmu_get_ddr_opp(void);
+-	clk = clk_reg_prcmu_gate("sdmmcclk", NULL, PRCMU_SDMMCCLK, CLK_IS_ROOT);
++	clk = clk_reg_prcmu_opp_volt_scalable("sdmmcclk", NULL, PRCMU_SDMMCCLK,
++					100000000,
++					CLK_IS_ROOT|CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdmmc");
  
-@@ -610,7 +610,7 @@ static inline int db8500_prcmu_get_ape_opp(void)
- 	return APE_100_OPP;
- }
- 
--static inline int prcmu_request_ape_opp_100_voltage(bool enable)
-+static inline int db8500_prcmu_request_ape_opp_100_voltage(bool enable)
- {
- 	return 0;
- }
-diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
-index c410d99..c202d6c 100644
---- a/include/linux/mfd/dbx500-prcmu.h
-+++ b/include/linux/mfd/dbx500-prcmu.h
-@@ -336,6 +336,11 @@ static inline int prcmu_get_ape_opp(void)
- 	return db8500_prcmu_get_ape_opp();
- }
- 
-+static inline int prcmu_request_ape_opp_100_voltage(bool enable)
-+{
-+	return db8500_prcmu_request_ape_opp_100_voltage(enable);
-+}
-+
- static inline void prcmu_system_reset(u16 reset_code)
- {
- 	return db8500_prcmu_system_reset(reset_code);
-@@ -507,6 +512,11 @@ static inline int prcmu_get_ape_opp(void)
- 	return APE_100_OPP;
- }
- 
-+static inline int prcmu_request_ape_opp_100_voltage(bool enable)
-+{
-+	return 0;
-+}
-+
- static inline int prcmu_set_arm_opp(u8 opp)
- {
- 	return 0;
+-
+ 	clk = clk_reg_prcmu_scalable("dsi_pll", "hdmiclk",
+ 				PRCMU_PLLDSI, 0, CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, "dsihs2", "mcde");
 -- 
 1.7.10
