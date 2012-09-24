@@ -1,80 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Sep 2012 13:38:05 -0700
-Subject: [PATCHv2 3/3] clk: wm831x: Use devm_clk_register() to simplify code
-In-Reply-To: <1348519085-5888-1-git-send-email-sboyd@codeaurora.org>
-References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
- <1348519085-5888-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1348519085-5888-3-git-send-email-sboyd@codeaurora.org>
+From: michael@walle.cc (Michael Walle)
+Date: Mon, 24 Sep 2012 22:49:02 +0200
+Subject: [PATCH] ARM: kirkwood: fix LEDs names for lsxl boards
+Message-ID: <1348519742-20126-1-git-send-email-michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move this driver to use devm_clk_register() to simplify some
-error paths and reduce lines of code.
+Don't use the specific board name in a the common device tree include file.
+Instead use the common name 'lsxl'.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Michael Walle <michael@walle.cc>
 ---
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-v2: No changes
-
- drivers/clk/clk-wm831x.c | 30 +++++++-----------------------
- 1 file changed, 7 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-index eb1afaf..db4fbf2 100644
---- a/drivers/clk/clk-wm831x.c
-+++ b/drivers/clk/clk-wm831x.c
-@@ -370,43 +370,27 @@ static __devinit int wm831x_clk_probe(struct platform_device *pdev)
- 	clkdata->xtal_ena = ret & WM831X_XTAL_ENA;
+diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+index 8ac51c0..a1dd36d 100644
+--- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
++++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+@@ -67,28 +67,28 @@
+ 		compatible = "gpio-leds";
  
- 	clkdata->xtal_hw.init = &wm831x_xtal_init;
--	clkdata->xtal = clk_register(&pdev->dev, &clkdata->xtal_hw);
-+	clkdata->xtal = devm_clk_register(&pdev->dev, &clkdata->xtal_hw);
- 	if (IS_ERR(clkdata->xtal))
- 		return PTR_ERR(clkdata->xtal);
+ 		led at 1 {
+-			label = "lschlv2:blue:func";
++			label = "lsxl:blue:func";
+ 			gpios = <&gpio1 4 1>;
+ 		};
  
- 	clkdata->fll_hw.init = &wm831x_fll_init;
--	clkdata->fll = clk_register(&pdev->dev, &clkdata->fll_hw);
--	if (IS_ERR(clkdata->fll)) {
--		ret = PTR_ERR(clkdata->fll);
--		goto err_xtal;
--	}
-+	clkdata->fll = devm_clk_register(&pdev->dev, &clkdata->fll_hw);
-+	if (IS_ERR(clkdata->fll))
-+		return PTR_ERR(clkdata->fll);
+ 		led at 2 {
+-			label = "lschlv2:red:alarm";
++			label = "lsxl:red:alarm";
+ 			gpios = <&gpio1 5 1>;
+ 		};
  
- 	clkdata->clkout_hw.init = &wm831x_clkout_init;
--	clkdata->clkout = clk_register(&pdev->dev, &clkdata->clkout_hw);
--	if (IS_ERR(clkdata->clkout)) {
--		ret = PTR_ERR(clkdata->clkout);
--		goto err_fll;
--	}
-+	clkdata->clkout = devm_clk_register(&pdev->dev, &clkdata->clkout_hw);
-+	if (IS_ERR(clkdata->clkout))
-+		return PTR_ERR(clkdata->clkout);
+ 		led at 3 {
+-			label = "lschlv2:amber:info";
++			label = "lsxl:amber:info";
+ 			gpios = <&gpio1 6 1>;
+ 		};
  
- 	dev_set_drvdata(&pdev->dev, clkdata);
+ 		led at 4 {
+-			label = "lschlv2:blue:power";
++			label = "lsxl:blue:power";
+ 			gpios = <&gpio1 7 1>;
+ 			linux,default-trigger = "default-on";
+ 		};
  
- 	return 0;
--
--err_fll:
--	clk_unregister(clkdata->fll);
--err_xtal:
--	clk_unregister(clkdata->xtal);
--	return ret;
- }
- 
- static int __devexit wm831x_clk_remove(struct platform_device *pdev)
- {
--	struct wm831x_clk *clkdata = dev_get_drvdata(&pdev->dev);
--
--	clk_unregister(clkdata->clkout);
--	clk_unregister(clkdata->fll);
--	clk_unregister(clkdata->xtal);
--
- 	return 0;
- }
- 
+ 		led at 5 {
+-			label = "lschlv2:red:func";
++			label = "lsxl:red:func";
+ 			gpios = <&gpio1 16 1>;
+ 		};
+ 	};
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.2.5
