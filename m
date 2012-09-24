@@ -1,51 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Sep 2012 23:06:31 +0100
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <5060C9C6.8080900@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924151305.GA14198@arm.com>
- <alpine.LFD.2.02.1209241152540.6667@xanadu.home> <5060C9C6.8080900@ti.com>
-Message-ID: <20120924220631.GI26454@n2100.arm.linux.org.uk>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 24 Sep 2012 17:25:47 -0500
+Subject: [PATCH V6 2/2] dmaengine: add helper function to request a slave
+ DMA channel
+In-Reply-To: <1347938035.1943.162.camel@vkoul-udesk3>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
+ <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
+ <20120917223619.GC12445@n2100.arm.linux.org.uk>
+ <1347938035.1943.162.camel@vkoul-udesk3>
+Message-ID: <5060DDEB.4000600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 04:59:50PM -0400, Cyril Chemparathy wrote:
-> I'm thinking of splitting the bank at the 32-bit boundary in such an  
-> event, assuming that the remaining memory should be usable as highmem.
+Hi Vinod,
 
-I'd say, don't make it any more complicated than it has to be.  Don't
-overdesign, especially in this area, and from what I read in this
-thread, that's the danger here.
+On 09/17/2012 10:13 PM, Vinod Koul wrote:
+> On Mon, 2012-09-17 at 23:36 +0100, Russell King - ARM Linux wrote:
+>>>
+>>> I believe that Jon is on vacation this week, so if this is the only issue
+>>> holding up the merge, maybe you can change this in his patch directly, or
+>>> I can send an updated version if you prefer.
+>>
+>> I worry that too much is going on here too quickly.  We have some people
+>> working on changing the way DMA engine selects channels.  Meanwhile we
+>> have other people trying to create an OF DMA engine API.
+>>
+>> It seems that Vinod's working on a way for platforms to specify bindings
+>> to the DMA engine code, and the DMA engine code itself selects the
+>> appropriate channel.  This patch, on the other hand, introduces a set of
+>> translation functions which need to be provided by platform code,
+>> which returns the dma_chan pointer.
+>>
+>> This sounds like a recipe for a total abortion of interfaces.  Only one
+>> of those two activities should be going on at any one time, or if they
+>> have to occur, they need coordination so that the we don't end up with
+>> two totally different schemes.
+>>
+>> In the mad rush to DTify everything, don't make hasty decisions, because
+>> it is very difficult to change it later - especially something like this
+>> which defines how DT encodes this information.
+> We discussed this in KS and IMHO we need to merge these two approaches.
+> 
+> For DT bindings, I think the binding itself shouldn't change based on my
+> work but I would like these same bindings to help build the DMA engine
+> code mappings.
+> 
+> Now would it make sense to NOT merge these changes for 3.7 and postpone
+> to 3.8. I can host these patches on a topic branch and merge them when
+> we are ready. I plan to spend some good amount of time on my work this
+> week so we should be ready pretty soon.
+> One these changes are merged, users can start moving to this scheme.
 
-For the time being, we have two classes of systems: those where they
-have a decent amount of RAM located below the 4GB mark, and yours which
-have all their RAM above the 4GB mark - and again a decent size
-contained within any naturally aligned 4GB chunk of the address space.
+I just wanted to see how things are progressing your side. Did you
+create a topic branch for this? If so let me know where I can find it, I
+did not find a branch on your infradead git tree.
 
-So, at the moment making the restriction that the top 32-bits of the
-address space is constant _is_ the right thing to do.
+I wanted to pull in the latest patches for some testing.
 
-And given that, I'd suggest that we reduce the size of these changes.
-We don't need to go and rewrite the P2V patching stuff - we can merely
-extend it.
-
-The p->v translation can work just fine by ignoring the top 32-bits and
-adding the offset, as is done today.
-
-The v->p translation can also work in the reverse way, except that we
-need to set the high order bits.  That can be done with a mov or movw
-instruction, which the v:p patching code _can_ recognise and do the
-appropriate thing.
-
-And let's not forget that the range over which the v:p translation has
-to work is just the lowmem only, which on most normal configurations
-is no more than 1GB.  Though that can be resolved if the high-order
-bits need to change by doing this in the v->p translation:
-
-	movw	%hi, #0xVWXY		@ fixup
-	adds	%lo, %lo, #offset	@ fixup
-	adc	%hi, %hi, #0
-
-_if_ we need to.
+Cheers
+Jon
