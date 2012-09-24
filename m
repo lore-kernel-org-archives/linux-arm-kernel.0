@@ -1,70 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 24 Sep 2012 09:32:05 +0200
-Subject: [PATCH] rtc: i.MX dryice: Add devicetree support
-Message-ID: <1348471925-30677-1-git-send-email-s.hauer@pengutronix.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Sep 2012 17:32:53 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the sound tree
+Message-ID: <20120924173253.ffdff508e51d05f667b76bde@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree probing, fixing some whitespace damage along the way.
+Hi all,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- Documentation/devicetree/bindings/rtc/imx-di.txt |   21 +++++++++++++++++++++
- drivers/rtc/rtc-imxdi.c                          |   12 +++++++++---
- 2 files changed, 30 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/imx-di.txt
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-davinci/dm355.c between commit 896f66b7de29 ("ASoC/ARM:
+Davinci: McASP: split asp header into platform and audio specific") from
+the sound tree and commit ec2a0833e515 ("ARM: davinci: move platform_data
+definitions") from the arm-soc tree.
 
-diff --git a/Documentation/devicetree/bindings/rtc/imx-di.txt b/Documentation/devicetree/bindings/rtc/imx-di.txt
-new file mode 100644
-index 0000000..635a753
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/imx-di.txt
-@@ -0,0 +1,21 @@
-+* i.MX25 dryice Real Time Clock controller
-+
-+This RTC is part of the i.MX25 dryice module. Documentation for this
-+unit is not publically available. This binding only makes use of the
-+RTC.
-+
-+Required properties:
-+- compatible: should be "fsl,imx25-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+Optional properties:
-+- interrupts: interrupt source for the dryice module
-+
-+Example:
-+
-+	dryice at 53ffc000 {
-+		compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
-+		reg = <0x53ffc000 0x4000>;
-+		interrupts = <25>;
-+	};
-diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index 891cd6c..b2fe920 100644
---- a/drivers/rtc/rtc-imxdi.c
-+++ b/drivers/rtc/rtc-imxdi.c
-@@ -493,11 +493,17 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id of_dryice_rtc_match[] = {
-+	{ .compatible = "fsl,imx25-rtc", },
-+	{ },
-+};
-+
- static struct platform_driver dryice_rtc_driver = {
- 	.driver = {
--		   .name = "imxdi_rtc",
--		   .owner = THIS_MODULE,
--		   },
-+		.name = "imxdi_rtc",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_dryice_rtc_match,
-+	},
- 	.remove = __devexit_p(dryice_rtc_remove),
- };
- 
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
 -- 
-1.7.10.4
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-davinci/dm355.c
+index e47a3f0,adbde33..0000000
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@@ -26,7 -26,8 +26,7 @@@
+  #include <mach/time.h>
+  #include <mach/serial.h>
+  #include <mach/common.h>
+- #include <mach/spi.h>
+ -#include <mach/asp.h>
++ #include <linux/platform_data/spi-davinci.h>
+  #include <mach/gpio-davinci.h>
+  
+  #include "davinci.h"
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/601e8db2/attachment.sig>
