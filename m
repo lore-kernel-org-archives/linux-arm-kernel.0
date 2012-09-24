@@ -1,35 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Sep 2012 10:22:03 +0200
-Subject: [PATCHv2 0/3] ARM: I2C: Add device tree bindings to i2c-mux-gpio
-Message-ID: <1348474926-12763-1-git-send-email-maxime.ripard@free-electrons.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Sep 2012 18:26:56 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the sound tree
+Message-ID: <20120924182656.c0daf6d68a9d1447ace4bf8a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Hi all,
 
-This patchset adds the device tree entry to the CFA-10049 board of its i2c
-muxer. This muxer controls sub-buses that contains three Nuvoton NAU7802
-ADCs and a NXP PCA955 GPIO expander. Support for these will be added
-eventually.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-davinci/dm365.c between commit 896f66b7de29 ("ASoC/ARM:
+Davinci: McASP: split asp header into platform and audio specific") from
+the  tree and commit ec2a0833e515 ("ARM: davinci: move platform_data
+definitions") from the arm-soc tree.
 
-Thanks,
-Maxime
-
-Changes from v1:
-  - Fixed indentation in patch 1
-  - Fixed arrays allocation for the dt bindings
-  - Various fixes in the documentation
-
-Maxime Ripard (3):
-  i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
-  i2c: mux: Add dt support to i2c-mux-gpio driver
-  ARM: dts: cfa10049: Add the i2c muxer buses to the CFA-10049
-
- .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   81 +++++++++
- arch/arm/boot/dts/imx28-cfa10049.dts               |   33 ++++
- drivers/i2c/muxes/i2c-mux-gpio.c                   |  172 +++++++++++++++-----
- 3 files changed, 243 insertions(+), 43 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-1.7.9.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-davinci/dm365.c
+index f473745,719e22f..0000000
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@@ -29,8 -29,9 +29,8 @@@
+  #include <mach/time.h>
+  #include <mach/serial.h>
+  #include <mach/common.h>
+- #include <mach/keyscan.h>
+- #include <mach/spi.h>
+ -#include <mach/asp.h>
++ #include <linux/platform_data/keyscan-davinci.h>
++ #include <linux/platform_data/spi-davinci.h>
+  #include <mach/gpio-davinci.h>
+  
+  #include "davinci.h"
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/bdea21d7/attachment.sig>
