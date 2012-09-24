@@ -1,93 +1,99 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 24 Sep 2012 16:28:30 +0200
-Subject: [PATCH 3/6] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
+Date: Mon, 24 Sep 2012 16:28:31 +0200
+Subject: [PATCH 4/6] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
 In-Reply-To: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
 References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1348496913-25422-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1348496913-25422-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4412 uses different information register for each core. This patch
-adjusts the bring-up code to take that into account.
+On TrustZone-enabled boards the non-secure SYSRAM is used for secondary
+CPU bring-up, so add a mapping for it.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/platsmp.c | 29 +++++++++++++++++++++++------
- 1 file changed, 23 insertions(+), 6 deletions(-)
+ arch/arm/mach-exynos/common.c                | 34 ++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h      |  3 +++
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  1 +
+ 3 files changed, 38 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 36c3984..a7f4031 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,8 +34,21 @@
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 4eb39cd..ddec3d5 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -214,6 +214,33 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
+ 	},
+ };
  
- extern void exynos4_secondary_startup(void);
- 
--#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--				S5P_INFORM5 : S5P_VA_SYSRAM)
-+static inline void __iomem *cpu_boot_reg_base(void)
-+{
-+	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-+		return S5P_INFORM5;
-+	return S5P_VA_SYSRAM;
-+}
++static struct map_desc exynos4210_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS4210_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
 +
-+static inline void __iomem *cpu_boot_reg(int cpu)
-+{
-+	void __iomem *boot_reg;
-+	boot_reg = cpu_boot_reg_base();
-+	if (soc_is_exynos4412())
-+		boot_reg += 4*cpu;
-+	return boot_reg;
-+}
- 
- /*
-  * control for which core is the next to come out of the secondary
-@@ -89,6 +102,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
-+	unsigned long phys_cpu = cpu_logical_map(cpu);
- 
- 	/*
- 	 * Set synchronisation state between this boot processor
-@@ -104,7 +118,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * Note that "pen_release" is the hardware CPU ID, whereas
- 	 * "cpu" is Linux's internal ID.
- 	 */
--	write_pen_release(cpu_logical_map(cpu));
-+	write_pen_release(phys_cpu);
- 
- 	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
- 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-@@ -138,7 +152,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		smp_rmb();
- 
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+							cpu_boot_reg(phys_cpu));
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
- 		if (pen_release == -1)
-@@ -186,6 +200,8 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	int i;
++static struct map_desc exynos4x12_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS4x12_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
 +
- 	if (!soc_is_exynos5250())
- 		scu_enable(scu_base_addr());
++static struct map_desc exynos5250_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS5250_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
+ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+@@ -321,6 +348,13 @@ static void __init exynos4_map_io(void)
+ 	else
+ 		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
  
-@@ -195,6 +211,7 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+	for (i = 1; i < max_cpus; ++i)
-+		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+					cpu_boot_reg(cpu_logical_map(i)));
- }
++	if (soc_is_exynos4210())
++		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
++	if (soc_is_exynos4212() || soc_is_exynos4412())
++		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
++	if (soc_is_exynos5250())
++		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
++
+ 	/* initialize device information early */
+ 	exynos4_default_sdhci0();
+ 	exynos4_default_sdhci1();
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index c72b675..f4a8ac3 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -26,6 +26,9 @@
+ #define EXYNOS4_PA_SYSRAM0		0x02025000
+ #define EXYNOS4_PA_SYSRAM1		0x02020000
+ #define EXYNOS5_PA_SYSRAM		0x02020000
++#define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
++#define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
++#define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
+ 
+ #define EXYNOS4_PA_FIMC0		0x11800000
+ #define EXYNOS4_PA_FIMC1		0x11810000
+diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+index c2d7bda..c186786 100644
+--- a/arch/arm/plat-samsung/include/plat/map-s5p.h
++++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+@@ -22,6 +22,7 @@
+ #define S5P_VA_GPIO3		S3C_ADDR(0x02280000)
+ 
+ #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
++#define S5P_VA_SYSRAM_NS	S3C_ADDR(0x02410000)
+ #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
+ #define S5P_VA_DMC1		S3C_ADDR(0x02480000)
+ #define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
 -- 
 1.7.12
