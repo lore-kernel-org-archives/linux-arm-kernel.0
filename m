@@ -1,25 +1,21 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Sep 2012 13:06:58 +0800
-Subject: [PATCH] spi/imx: set the inactive state of the clock according
- to the clock polarity
-In-Reply-To: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20120924050655.GA27291@S2101-09.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 24 Sep 2012 10:39:41 +0530
+Subject: [PATCH v4 2/3] ARM: omap: hwmod: get rid of all
+ omap_clk_get_by_name usage
+In-Reply-To: <alpine.DEB.2.00.1209221852590.10663@utopia.booyaka.com>
+References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
+ <1346230576-20004-3-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1209221852590.10663@utopia.booyaka.com>
+Message-ID: <505FEB15.3010008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 10:55:11AM +0200, Dirk Behme wrote:
-> From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
-> 
-> There are SPI devices which need a SPI clock with active low polarity and
-> high inactive state.
-> 
-> Add the setting of the inactive state ECSPIx_CONFIGREG:SCLK CTL
-> according to the clock polarity ECSPIx_CONFIGREG:SCLK POL:
-> 
-> DT without "spi-cpol" = 0 = clock active high polarity = inactive state low
-> DT with    "spi-cpol" = 1 = clock active low  polarity = inactive state high
-> 
-> Signed-off-by: Knut Wohlrab <knut.wohlrab@de.bosch.com>
+On Sunday 23 September 2012 12:25 AM, Paul Walmsley wrote:
+> Updated this one to include several missing clock aliases and to fix a bug
+> it introduced with omap_96m_alwon_fck_3630; modified patch below.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Thanks Paul, for the updates and the fix. Updated patch looks good to
+me.
+
+regards,
+Rajendra
