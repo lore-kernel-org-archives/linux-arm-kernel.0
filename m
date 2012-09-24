@@ -1,56 +1,121 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 24 Sep 2012 02:44:35 +0000
-Subject: [RFC PATCH 01/13] ARM: davinci: move private EDMA API to
- arm/common
-In-Reply-To: <1348152226-13588-2-git-send-email-mporter@ti.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-2-git-send-email-mporter@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8D0DF@DBDE01.ent.ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Sep 2012 04:58:50 +0200
+Subject: [PATCH 2/3 V4] phy/micrel: Rename KS80xx to KSZ80xx
+In-Reply-To: <1348455531-24371-1-git-send-email-marex@denx.de>
+References: <1348455531-24371-1-git-send-email-marex@denx.de>
+Message-ID: <1348455531-24371-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 20:13:34, Porter, Matt wrote:
-> Move mach-davinci/dma.c to common/edma.c so it can be used
-> by OMAP (specifically AM33xx atm) as well. This just moves
-> the private EDMA API but does not support OMAP.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  arch/arm/Kconfig                           |    1 +
->  arch/arm/common/Kconfig                    |    3 +
->  arch/arm/common/Makefile                   |    1 +
->  arch/arm/common/edma.c                     | 1588 ++++++++++++++++++++++++++++
->  arch/arm/include/asm/mach/edma.h           |  267 +++++
->  arch/arm/mach-davinci/Makefile             |    2 +-
->  arch/arm/mach-davinci/devices.c            |    3 +-
->  arch/arm/mach-davinci/dm355.c              |    2 +-
->  arch/arm/mach-davinci/dm365.c              |    2 +-
->  arch/arm/mach-davinci/dm644x.c             |    2 +-
->  arch/arm/mach-davinci/dm646x.c             |    2 +-
->  arch/arm/mach-davinci/dma.c                | 1588 ----------------------------
+There is no such part as KS8001, KS8041 or KS8051. There are only
+KSZ8001, KSZ8041 and KSZ8051. Rename these parts as such to match
+the Micrel naming.
 
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: David J. Choi <david.choi@micrel.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |    2 +-
+ drivers/net/phy/micrel.c     |   18 +++++++++---------
+ include/linux/micrel_phy.h   |    6 +++---
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
->  arch/arm/mach-davinci/include/mach/asp.h   |    2 +-
+V2: Rebase this on adjusted 1/3 patch
+V3: Resend, rebased on V2
+V4: Resend, rebased on V3 (with no changes)
 
-This will clash with patch "ASoC/ARM: Davinci: McASP: split asp header
-into platform and audio specific" queued in ASoC tree by Mark Brown 
-tree (Auio - ASoC Tree)
+NOTE: This affect one board in Linux ARM, but the change is
+      very minor it should not cause merge conflict, so if
+      this could go through net, that would be for the best.
 
-I forgot to mention this last time.  Sorry
-
->  arch/arm/mach-davinci/include/mach/da8xx.h |    3 +-
->  arch/arm/mach-davinci/include/mach/edma.h  |  267 -----
->  arch/arm/mach-davinci/include/mach/spi.h   |    2 +-
->  arch/arm/plat-omap/Kconfig                 |    1 +
->  17 files changed, 1872 insertions(+), 1864 deletions(-)
->  create mode 100644 arch/arm/common/edma.c
->  create mode 100644 arch/arm/include/asm/mach/edma.h
->  delete mode 100644 arch/arm/mach-davinci/dma.c
->  delete mode 100644 arch/arm/mach-davinci/include/mach/edma.h
-> 
-...snip...
-...snip...
-
-
-Regards, 
-Gururaja
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 3f29a52..fc9c8d5 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -295,7 +295,7 @@ static void __init apx4devkit_init(void)
+ 	enable_clk_enet_out();
+ 
+ 	if (IS_BUILTIN(CONFIG_PHYLIB))
+-		phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
++		phy_register_fixup_for_uid(PHY_ID_KSZ8051, MICREL_PHY_ID_MASK,
+ 					   apx4devkit_phy_fixup);
+ 
+ 	mxsfb_pdata.mode_list = apx4devkit_video_modes;
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index e8e00dc..2165d5f 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -154,9 +154,9 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8041,
++	.phy_id		= PHY_ID_KSZ8041,
+ 	.phy_id_mask	= 0x00fffff0,
+-	.name		= "Micrel KS8041",
++	.name		= "Micrel KSZ8041",
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause
+ 				| SUPPORTED_Asym_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -167,9 +167,9 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8051,
++	.phy_id		= PHY_ID_KSZ8051,
+ 	.phy_id_mask	= 0x00fffff0,
+-	.name		= "Micrel KS8051",
++	.name		= "Micrel KSZ8051",
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause
+ 				| SUPPORTED_Asym_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -180,8 +180,8 @@ static struct phy_driver ksphy_driver[] = {
+ 	.config_intr	= kszphy_config_intr,
+ 	.driver		= { .owner = THIS_MODULE,},
+ }, {
+-	.phy_id		= PHY_ID_KS8001,
+-	.name		= "Micrel KS8001 or KS8721",
++	.phy_id		= PHY_ID_KSZ8001,
++	.name		= "Micrel KSZ8001 or KS8721",
+ 	.phy_id_mask	= 0x00ffffff,
+ 	.features	= (PHY_BASIC_FEATURES | SUPPORTED_Pause),
+ 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+@@ -227,11 +227,11 @@ MODULE_LICENSE("GPL");
+ 
+ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
+ 	{ PHY_ID_KSZ9021, 0x000ffffe },
+-	{ PHY_ID_KS8001, 0x00ffffff },
++	{ PHY_ID_KSZ8001, 0x00ffffff },
+ 	{ PHY_ID_KS8737, 0x00fffff0 },
+ 	{ PHY_ID_KSZ8021, 0x00ffffff },
+-	{ PHY_ID_KS8041, 0x00fffff0 },
+-	{ PHY_ID_KS8051, 0x00fffff0 },
++	{ PHY_ID_KSZ8041, 0x00fffff0 },
++	{ PHY_ID_KSZ8051, 0x00fffff0 },
+ 	{ }
+ };
+ 
+diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+index be7f366..d02355d 100644
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -6,10 +6,10 @@
+ #define PHY_ID_KSZ9021		0x00221610
+ #define PHY_ID_KS8737		0x00221720
+ #define PHY_ID_KSZ8021		0x00221555
+-#define PHY_ID_KS8041		0x00221510
+-#define PHY_ID_KS8051		0x00221550
++#define PHY_ID_KSZ8041		0x00221510
++#define PHY_ID_KSZ8051		0x00221550
+ /* both for ks8001 Rev. A/B, and for ks8721 Rev 3. */
+-#define PHY_ID_KS8001		0x0022161A
++#define PHY_ID_KSZ8001		0x0022161A
+ 
+ /* struct phy_device dev_flags definitions */
+ #define MICREL_PHY_50MHZ_CLK	0x00000001
+-- 
+1.7.10.4
