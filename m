@@ -1,55 +1,51 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 24 Sep 2012 15:00:23 -0700
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <alpine.DEB.2.00.1209242142490.4521@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
- <alpine.DEB.2.00.1209211740170.8839@utopia.booyaka.com>
- <20120921212054.GE2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209212240190.31812@utopia.booyaka.com>
- <20120922000537.GH2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209221813330.10663@utopia.booyaka.com>
- <20120922195253.GD2934@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209222214120.22590@utopia.booyaka.com>
- <20120922231733.GI2934@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209242142490.4521@utopia.booyaka.com>
-Message-ID: <20120924220023.GG2477@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Sep 2012 23:06:31 +0100
+Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
+ patching
+In-Reply-To: <5060C9C6.8080900@ti.com>
+References: <1348242975-19184-1-git-send-email-cyril@ti.com>
+ <1348242975-19184-6-git-send-email-cyril@ti.com>
+ <20120924151305.GA14198@arm.com>
+ <alpine.LFD.2.02.1209241152540.6667@xanadu.home> <5060C9C6.8080900@ti.com>
+Message-ID: <20120924220631.GI26454@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 09:54:00PM +0000, Paul Walmsley wrote:
-> On Sat, 22 Sep 2012, Paul E. McKenney wrote:
-> 
-> > On Sat, Sep 22, 2012 at 10:20:19PM +0000, Paul Walmsley wrote:
-> > > On Sat, 22 Sep 2012, Paul E. McKenney wrote:
-> > >
-> > > > This thing has been in the kernel since about 2004, not sure why you 
-> > > > didn't hit it earlier.
-> > > 
-> > > One other data point in that regard - noticed the warnings don't appear 
-> > > when the board is booted with:
-> > > 
-> > > commit 4fa3b6cb1bc8c14b81b4c8ffdfd3f2500a7e9367
-> > > Author: Paul E. McKenney <paul.mckenney@linaro.org>
-> > > Date:   Tue Jun 5 15:53:53 2012 -0700
-> > > 
-> > >     rcu: Fix qlen_lazy breakage
-> > 
-> > You lost me on this one.  This is already in mainline, so if you were
-> > using (say) 3.6-rc6, you would already have this commit applied.
-> 
-> If I check out a kernel at this commit 
-> 4fa3b6cb1bc8c14b81b4c8ffdfd3f2500a7e9367 + the 
-> zero-callback-in-tickless-idle diagnostic patch, build and boot it, then 
-> the stall warnings don't appear (in 25 minutes of testing).
-> 
-> Messages from the diagnostic patch indicate that the kernel is entering 
-> idle during a grace period with no RCU callbacks, though.
-> 
-> This is not a big deal and does not need any further attention.  Just 
-> wanted to place a time boundary on the point when these messages started 
-> appearing.  (It is unlikely to be an optimal bound: i.e., there are 
-> probably later commits where the warnings also don't appear.)
+On Mon, Sep 24, 2012 at 04:59:50PM -0400, Cyril Chemparathy wrote:
+> I'm thinking of splitting the bank at the 32-bit boundary in such an  
+> event, assuming that the remaining memory should be usable as highmem.
 
-Ah, got it, thank you!
+I'd say, don't make it any more complicated than it has to be.  Don't
+overdesign, especially in this area, and from what I read in this
+thread, that's the danger here.
 
-							Thanx, Paul
+For the time being, we have two classes of systems: those where they
+have a decent amount of RAM located below the 4GB mark, and yours which
+have all their RAM above the 4GB mark - and again a decent size
+contained within any naturally aligned 4GB chunk of the address space.
+
+So, at the moment making the restriction that the top 32-bits of the
+address space is constant _is_ the right thing to do.
+
+And given that, I'd suggest that we reduce the size of these changes.
+We don't need to go and rewrite the P2V patching stuff - we can merely
+extend it.
+
+The p->v translation can work just fine by ignoring the top 32-bits and
+adding the offset, as is done today.
+
+The v->p translation can also work in the reverse way, except that we
+need to set the high order bits.  That can be done with a mov or movw
+instruction, which the v:p patching code _can_ recognise and do the
+appropriate thing.
+
+And let's not forget that the range over which the v:p translation has
+to work is just the lowmem only, which on most normal configurations
+is no more than 1GB.  Though that can be resolved if the high-order
+bits need to change by doing this in the v->p translation:
+
+	movw	%hi, #0xVWXY		@ fixup
+	adds	%lo, %lo, #offset	@ fixup
+	adc	%hi, %hi, #0
+
+_if_ we need to.
