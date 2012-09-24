@@ -1,30 +1,53 @@
-From: ryan.harkin@linaro.org (Ryan Harkin)
-Date: Mon, 24 Sep 2012 08:07:54 +0100
-Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to amba-clcd
- driver
-In-Reply-To: <20120921121903.GE15609@n2100.arm.linux.org.uk>
-References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
- <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
- <20120921114345.GE24458@pengutronix.de>
- <20120921121903.GE15609@n2100.arm.linux.org.uk>
-Message-ID: <CAD0U-hKviTANE+88vh_UUkXijJOxpM3gXmgQW4oOegMnav9Zqg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 24 Sep 2012 09:13:53 +0200
+Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
+In-Reply-To: <CAOesGMh1x8QMNBi_xKEfZ0druiAZbafVuXEQkktwVbQODDmR8w@mail.gmail.com>
+References: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
+ <CAOesGMh1x8QMNBi_xKEfZ0druiAZbafVuXEQkktwVbQODDmR8w@mail.gmail.com>
+Message-ID: <20120924071353.GA27099@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for all the comments.
+> > +Required properties:
+> > +- compatible: must be "marvell,orion-ehci"
+> > +- reg: physical base address of the controller and length of memory mapped
+> > +  region.
+> > +- interrupts: The EHCI interrupt
+> > +- phy-version: Can be one of:
+> > +  "NA" - Don't touch the phy, something else has already configured it.
+> > +  "orion5x" - PHY setup as specified by the Orion5x Errata
+> > +
+> > +Example:
+> > +
+> > +       ehci at 50000 {
+> > +               compatible = "marvell,orion-ehci";
+> > +               reg = <0x50000 0x1000>;
+> > +               interrupts = <19>;
+> > +               phy-version = "NA";
+> > +       };
+> 
+> This isn't an appropriate binding for phy. I know, it maps straight
+> over from the platform data, but it doesn't focus on what the actual
+> hardware is.
+> 
+> A couple of options. What probably makes most sense depending on how
+> other phy bindings are moving ahead is to add a phy node under the
+> ehci controller for the "orion5x" case, and have an appropriate
+> compatible value there. No node means the same as "NA" in the above
+> binding. Alternatively, have a phy phandle that points to the phy
+> device if it sits on an i2c bus, etc.
 
-Pawel, good point about the framebuffer.  Fixing this will also
-address one of Russell's concerns.  I don't know how to use a phandle,
-so I have some reading to do.
+I Olaf
 
-Russell, all good points and exactly the type of feedback I needed.
-I'll re-work your suggestions into my code and re-post a V2 of the
-patches.
+Could i suggest a third option:
 
-Sascha, I see your point.  I'll work on the feedback above first
-before getting to looking at how to handle the thread you linked to.
+I just drop USB phy configuration all together.  Only mach-orion5x
+needs this and nobody has shown any interest in moving mach-orion5x to
+DT. So i would just hard code it to "NA".
 
-Thanks all,
+If anybody does show interest in DT for orion5x, we can add a phy node
+under ehci as a pure extension which does not affect backward
+compatibility.
 
-Regards,
-Ryan.
+	Thanks
+		Andrew
