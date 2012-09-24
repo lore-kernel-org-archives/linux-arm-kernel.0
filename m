@@ -1,49 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Sep 2012 00:16:19 +0100
-Subject: [PATCH] arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
-In-Reply-To: <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
-References: <1341325242-17638-1-git-send-email-yegorslists@googlemail.com>
- <20120924171858.GG28835@atomide.com>
- <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
-Message-ID: <20120924231619.GA28941@n2100.arm.linux.org.uk>
+From: ricardo.neri@ti.com (Ricardo Neri)
+Date: Mon, 24 Sep 2012 18:36:01 -0500
+Subject: [alsa-devel] [PATCH v3 00/15] ASoC: OMAP: Convert to use dmaengine
+In-Reply-To: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1347624358-25582-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5060EE61.1000902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 09:05:11PM +0200, Yegor Yefremov wrote:
-> On Mon, Sep 24, 2012 at 7:18 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * yegorslists at googlemail.com <yegorslists@googlemail.com> [120703 07:26]:
-> >> From: Yegor Yefremov <yegorslists@googlemail.com>
-> >>
-> >> FORCE_MAX_ZONEORDER of 12 is needed to allocation more than 4MB
-> >> of consistent DMA memory (da8xx frame buffer driver).
-> >
-> > Sorry for the delay on this one, looks like this one is
-> > still valid. I'll apply it.
-> 
-> Thanks.
-> 
-> Yegor
-> 
-> >> Signed-off-by: Dejan Gacnik <dejan.gacnik@gmail.com>
-> >> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> >> ---
-> >>  arch/arm/Kconfig |    5 +++--
-> >>  1 files changed, 3 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index e876819..ff14c1e 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -1725,8 +1725,9 @@ config HW_PERF_EVENTS
-> >>  source "mm/Kconfig"
-> >>
-> >>  config FORCE_MAX_ZONEORDER
-> >> -     int "Maximum zone order" if ARCH_SHMOBILE
-> >> -     range 11 64 if ARCH_SHMOBILE
-> >> +     int "Maximum zone order"
-> >> +     depends on ARCH_SHMOBILE || SOC_AM33XX
-> >> +     range 11 64 if ARCH_SHMOBILE || SOC_AM33XX
-> >>       default "9" if SA1111
-> >>       default "11"
+Hi Peter, Mark,
 
-NAK.  This patch breaks SA1111 platforms.  To see why, read the patch.
+On 09/14/2012 07:05 AM, Peter Ujfalusi wrote:
+> Hello,
+>
+> Changes since v2:
+> - As it has been discussed the no_wakeup parameter has been replaced with flags
+>    for the dmaengine APIs
+>
+> Changes since v1:
+> - Support for pause/resume for OMAP audio via dmaengine
+> - dmaengine: support for NO_PERIOD_WAKEUP in cyclic mode
+>   - OMAP to keep supporting NO_PERIOD_WAKEUP for audio
+>   - Other plaforms can also try to enable this mode since we have now generic
+>     interface to do so.
+>
+> This series will switch the OMAP audio to use dmaengine.
+> The final patch which does the switch was based on Russell King's earlier patch.
+>
+> The first 10 patch is to prepare the OMAP audio drivers for a smooth change to
+> dmaengine:
+> - sDMA FRAME sync mode is removed and replaced with PACKET mode
+> - dai drivers no longer need to configure sDMA sync mode
+> - dai drivers does not need to specify the DMA word length - with the exception
+>    of the omap-hdmi driver which requires 32bit word length regardless of the
+>    audio format in use
+> - the McPDM driver used (to my surprise) hackish way of getting the DMA channel
+>    and address - via defines from some header files
+>
+> After the conversion OMAP audio support should have the same features as before,
+> no regressions expected.
+>
+> I have tested the series on:
+> - BeagleBoard (audio via McBSP):
+>   - aplay/arecord. In element mode and in threshold mode with different period
+>     sizes
+>   - mplayer -ao alsa: for direct ALSA access
+>   - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
+> - OMAP4 Blaze (audio via McPDM and DMIC)
+>   - aplay/arecord
+>   - mplayer -ao alsa: for direct ALSA access
+>   - mplayer -ao pulse: via PulseAudio to test NO_PERIOD_WAKEUP feature
+>
+> The patches has been generated against:
+> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-3.7
+>
+> Janusz: Can you retest this series on OMAP1 to be sure I have not broken it?
+> Ricardo: Can you test the omap-hmdi if it is still working?
+
+I tested these changes from Mark's for-3.7 branch. HDMI audio is working 
+fine after applying patch 03. Such patch is missing in Mark's branch and 
+this causes a build break with omap2plus_defconfig. Not sure if this is 
+expected, Most likely not.
+
+Tested-by: Ricardo Neri <ricardo.neri@ti.com>
+
+Ricardo
