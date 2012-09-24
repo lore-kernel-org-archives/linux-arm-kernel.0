@@ -1,178 +1,95 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 24 Sep 2012 12:24:48 +0300
-Subject: [PATCH v3] ARM: OMAP4: twl-common: Support for additional devices on
- i2c1 bus
-Message-ID: <1348478688-5737-1-git-send-email-peter.ujfalusi@ti.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Mon, 24 Sep 2012 14:53:49 +0530
+Subject: [PATCH] lis3lv02d: fix some comments specific to lis331dlh driver
+Message-ID: <1348478629-16983-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
-Manufacturers can opt to use different codec than twl6040 and also can add
-audio related IC to the bus (external amplifier for example on SDP4430).
+Fix some minor problems in comments of lis331dlh driver
+  * correct comments with respect to 2G sensitivity
+  * correct typo lis3331dlh mistake to lis331dlh
+  * add comment to say only 2G range is supported
+  * change the function name from lis3lv02d_read_16 to
+    lis331dlh_read_data.
+  * update i2c_device_id table entry to maintaine consistancy
+  * update sensor display message
 
-Make it possible to add different set of additional devices to i2c1 bus on
-OMAP4 boards.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
-Hi Tony,
+This patch is created based on Eric Piel's review comments on
+"lis3lv02d: Add STMicroelectronics lis331dlh digital accelerometer"
+v2 patch.
 
-I have refreshed the patch on top of arm-soc/for-next branch. Would it be
-possible to queue this patch via arm-soc so it will be in 3.7-rc1 already?
-Originally this patch was sent for 3.6...
+ drivers/misc/lis3lv02d/lis3lv02d.c     |   13 +++++++------
+ drivers/misc/lis3lv02d/lis3lv02d.h     |    2 +-
+ drivers/misc/lis3lv02d/lis3lv02d_i2c.c |    2 +-
+ 3 files changed, 9 insertions(+), 8 deletions(-)
 
-Regards,
-Peter
-
- arch/arm/mach-omap2/board-4430sdp.c    | 12 +++++++++--
- arch/arm/mach-omap2/board-omap4panda.c | 12 +++++++++--
- arch/arm/mach-omap2/twl-common.c       | 37 ++++++++++------------------------
- arch/arm/mach-omap2/twl-common.h       |  3 ++-
- 4 files changed, 33 insertions(+), 31 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 6fe9079..7c1a662 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -545,6 +545,14 @@ static struct twl6040_platform_data twl6040_data = {
- 	.audpwron_gpio	= 127,
- };
+diff --git a/drivers/misc/lis3lv02d/lis3lv02d.c b/drivers/misc/lis3lv02d/lis3lv02d.c
+index 026021e..67fe4a1 100644
+--- a/drivers/misc/lis3lv02d/lis3lv02d.c
++++ b/drivers/misc/lis3lv02d/lis3lv02d.c
+@@ -82,9 +82,10 @@
+ #define LIS3_SENSITIVITY_8B		(18 * LIS3_ACCURACY)
  
-+static struct i2c_board_info __initdata sdp4430_i2c_1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("twl6040", 0x4b),
-+		.irq = OMAP44XX_IRQ_SYS_2N,
-+		.platform_data = &twl6040_data,
-+	},
-+};
-+
- static struct twl4030_platform_data sdp4430_twldata = {
- 	/* Regulators */
- 	.vusim		= &sdp4430_vusim,
-@@ -578,8 +586,8 @@ static int __init omap4_i2c_init(void)
- 			TWL_COMMON_REGULATOR_CLK32KG |
- 			TWL_COMMON_REGULATOR_V1V8 |
- 			TWL_COMMON_REGULATOR_V2V1);
--	omap4_pmic_init("twl6030", &sdp4430_twldata,
--			&twl6040_data, 119 + OMAP44XX_IRQ_GIC_START);
-+	omap4_pmic_init("twl6030", &sdp4430_twldata, sdp4430_i2c_1_boardinfo,
-+			ARRAY_SIZE(sdp4430_i2c_1_boardinfo));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
- 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
- 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 8ebb16c..eb7a9a8 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -264,6 +264,14 @@ static struct twl6040_platform_data twl6040_data = {
- 	.audpwron_gpio	= 127,
- };
- 
-+static struct i2c_board_info __initdata panda_i2c_1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("twl6040", 0x4b),
-+		.irq = OMAP44XX_IRQ_SYS_2N,
-+		.platform_data = &twl6040_data,
-+	},
-+};
-+
- /* Panda board uses the common PMIC configuration */
- static struct twl4030_platform_data omap4_panda_twldata;
- 
-@@ -291,8 +299,8 @@ static int __init omap4_panda_i2c_init(void)
- 			TWL_COMMON_REGULATOR_CLK32KG |
- 			TWL_COMMON_REGULATOR_V1V8 |
- 			TWL_COMMON_REGULATOR_V2V1);
--	omap4_pmic_init("twl6030", &omap4_panda_twldata,
--			&twl6040_data, 119 + OMAP44XX_IRQ_GIC_START);
-+	omap4_pmic_init("twl6030", &omap4_panda_twldata, panda_i2c_1_boardinfo,
-+			ARRAY_SIZE(panda_i2c_1_boardinfo));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
- 	/*
- 	 * Bus 3 is attached to the DVI port where devices like the pico DLP
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 040f480..e279732 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -40,16 +40,6 @@ static struct i2c_board_info __initdata pmic_i2c_board_info = {
- 	.flags		= I2C_CLIENT_WAKE,
- };
- 
--static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
--	{
--		.addr		= 0x48,
--		.flags		= I2C_CLIENT_WAKE,
--	},
--	{
--		I2C_BOARD_INFO("twl6040", 0x4b),
--	},
--};
--
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- static int twl_set_voltage(void *data, int target_uV)
- {
-@@ -79,30 +69,25 @@ void __init omap_pmic_init(int bus, u32 clkrate,
- 
- void __init omap4_pmic_init(const char *pmic_type,
- 		    struct twl4030_platform_data *pmic_data,
--		    struct twl6040_platform_data *twl6040_data, int twl6040_irq)
-+		    struct i2c_board_info *devices, int nr_devices)
- {
- 	/* PMIC part*/
- 	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
--	strncpy(omap4_i2c1_board_info[0].type, pmic_type,
--		sizeof(omap4_i2c1_board_info[0].type));
--	omap4_i2c1_board_info[0].irq = 7 + OMAP44XX_IRQ_GIC_START;
--	omap4_i2c1_board_info[0].platform_data = pmic_data;
--
--	/* TWL6040 audio IC part */
--	omap4_i2c1_board_info[1].irq = twl6040_irq;
--	omap4_i2c1_board_info[1].platform_data = twl6040_data;
--
--	omap_register_i2c_bus(1, 400, omap4_i2c1_board_info, 2);
-+	omap_pmic_init(1, 400, pmic_type, OMAP44XX_IRQ_SYS_1N, pmic_data);
- 
-+	/* Register additional devices on i2c1 bus if needed */
-+	if (devices)
-+		i2c_register_board_info(1, devices, nr_devices);
+ /*
+- * LIS3331DLH spec says 1LSBs corresponds 4G/1024 -> 1LSB is 1000/1024 mG.
+- * Sensitivity values for +/-2G, outdata in 12 bits for +/-2G scale. so 4
+- * bits adjustment is required
++ * LIS331DLH spec says 1LSBs corresponds 4G/4096 -> 1LSB is 1000/1024 mG.
++ * Below macros defines sensitivity values for +/-2G. Dataout bits for
++ * +/-2G range is 12 bits so 4 bits adjustment must be done to get 12bit
++ * data from 16bit value. Currently this driver supports only 2G range.
+  */
+ #define LIS3DLH_SENSITIVITY_2G		((LIS3_ACCURACY * 1000) / 1024)
+ #define SHIFT_ADJ_2G			4
+@@ -145,7 +146,7 @@ static s16 lis3lv02d_read_12(struct lis3lv02d *lis3, int reg)
  }
  
- void __init omap_pmic_late_init(void)
+ /* 12bits for 2G range, 13 bits for 4G range and 14 bits for 8G range */
+-static s16 lis3lv02d_read_16(struct lis3lv02d *lis3, int reg)
++static s16 lis331dlh_read_data(struct lis3lv02d *lis3, int reg)
  {
--	/* Init the OMAP TWL parameters (if PMIC has been registered) */
--	if (pmic_i2c_board_info.irq)
--		omap3_twl_init();
--	if (omap4_i2c1_board_info[0].irq)
--		omap4_twl_init();
-+	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-+	if (!pmic_i2c_board_info.irq)
-+		return;
-+
-+	omap3_twl_init();
-+	omap4_twl_init();
- }
+ 	u8 lo, hi;
+ 	int v;
+@@ -1135,8 +1136,8 @@ int lis3lv02d_init_device(struct lis3lv02d *lis3)
+ 		lis3->scale = LIS3_SENSITIVITY_8B;
+ 		break;
+ 	case WAI_3DLH:
+-		pr_info("16 bits 3DLH sensor found\n");
+-		lis3->read_data = lis3lv02d_read_16;
++		pr_info("16 bits lis331dlh sensor found\n");
++		lis3->read_data = lis331dlh_read_data;
+ 		lis3->mdps_max_val = 2048; /* 12 bits for 2G */
+ 		lis3->shift_adj = SHIFT_ADJ_2G;
+ 		lis3->pwron_delay = LIS3_PWRON_DELAY_WAI_8B;
+diff --git a/drivers/misc/lis3lv02d/lis3lv02d.h b/drivers/misc/lis3lv02d/lis3lv02d.h
+index b5505fa..c439c82 100644
+--- a/drivers/misc/lis3lv02d/lis3lv02d.h
++++ b/drivers/misc/lis3lv02d/lis3lv02d.h
+@@ -104,9 +104,9 @@ enum lis3_who_am_i {
+ };
  
- #if defined(CONFIG_ARCH_OMAP3)
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index d109c09..2256efe 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -32,6 +32,7 @@
+ enum lis3_type {
++	LIS3LV02D,
+ 	LIS3DC,
+ 	HP3DC,
+-	LIS3LV02D,
+ 	LIS2302D,
+ 	LIS331DLF,
+ 	LIS331DLH,
+diff --git a/drivers/misc/lis3lv02d/lis3lv02d_i2c.c b/drivers/misc/lis3lv02d/lis3lv02d_i2c.c
+index 43e3f29..02104a9 100644
+--- a/drivers/misc/lis3lv02d/lis3lv02d_i2c.c
++++ b/drivers/misc/lis3lv02d/lis3lv02d_i2c.c
+@@ -252,7 +252,7 @@ static int lis3_i2c_runtime_resume(struct device *dev)
+ #endif /* CONFIG_PM_RUNTIME */
  
- struct twl4030_platform_data;
- struct twl6040_platform_data;
-+struct i2c_board_info;
- 
- void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
- 		    struct twl4030_platform_data *pmic_data);
-@@ -51,7 +52,7 @@ static inline void omap3_pmic_init(const char *pmic_type,
- 
- void omap4_pmic_init(const char *pmic_type,
- 		    struct twl4030_platform_data *pmic_data,
--		    struct twl6040_platform_data *audio_data, int twl6040_irq);
-+		    struct i2c_board_info *devices, int nr_devices);
- 
- void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 			   u32 pdata_flags, u32 regulators_flags);
+ static const struct i2c_device_id lis3lv02d_id[] = {
+-	{"lis3lv02d", 0 },
++	{"lis3lv02d", LIS3LV02D},
+ 	{"lis331dlh", LIS331DLH},
+ 	{}
+ };
 -- 
-1.7.12
+1.7.9.5
