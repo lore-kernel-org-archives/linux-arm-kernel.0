@@ -1,46 +1,53 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 24 Sep 2012 21:00:47 +0200
-Subject: [PATCH 2/2] ARM i.MX25: Add devicetree
-In-Reply-To: <1348468841-4331-3-git-send-email-s.hauer@pengutronix.de>
-References: <1348468841-4331-1-git-send-email-s.hauer@pengutronix.de>
- <1348468841-4331-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120924190046.GA4439@tarshish>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Mon, 24 Sep 2012 21:05:11 +0200
+Subject: [PATCH] arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
+In-Reply-To: <20120924171858.GG28835@atomide.com>
+References: <1341325242-17638-1-git-send-email-yegorslists@googlemail.com>
+ <20120924171858.GG28835@atomide.com>
+Message-ID: <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, Sep 24, 2012 at 7:18 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * yegorslists at googlemail.com <yegorslists@googlemail.com> [120703 07:26]:
+>> From: Yegor Yefremov <yegorslists@googlemail.com>
+>>
+>> FORCE_MAX_ZONEORDER of 12 is needed to allocation more than 4MB
+>> of consistent DMA memory (da8xx frame buffer driver).
+>
+> Sorry for the delay on this one, looks like this one is
+> still valid. I'll apply it.
 
-On Mon, Sep 24, 2012 at 08:40:40AM +0200, Sascha Hauer wrote:
-> This adds a i.MX25 dtsi file along with the i.MX25 clock tree
-> documentation. The devicetree should be fairly complete for:
-> 
-> - uart
-> - fec
-> - i2c
-> - spi
-> - pwm
-> - nand
-> - gpio
-> - wdog
-> - esdhc
-> - flexcan
-> 
-> The more exotic devices currently miss clock bindings.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
+Thanks.
 
-[...]
+Yegor
 
-> +The clock consumer should specify the desired clock by having the clock
-> +ID in its "clocks" phandle cell.  The following is a full list of i.MX6Q
-> +clocks and IDs.
-
-s/i.MX6Q/i.MX25/
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>> Signed-off-by: Dejan Gacnik <dejan.gacnik@gmail.com>
+>> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+>> ---
+>>  arch/arm/Kconfig |    5 +++--
+>>  1 files changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index e876819..ff14c1e 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1725,8 +1725,9 @@ config HW_PERF_EVENTS
+>>  source "mm/Kconfig"
+>>
+>>  config FORCE_MAX_ZONEORDER
+>> -     int "Maximum zone order" if ARCH_SHMOBILE
+>> -     range 11 64 if ARCH_SHMOBILE
+>> +     int "Maximum zone order"
+>> +     depends on ARCH_SHMOBILE || SOC_AM33XX
+>> +     range 11 64 if ARCH_SHMOBILE || SOC_AM33XX
+>>       default "9" if SA1111
+>>       default "11"
+>>       help
+>> --
+>> 1.7.7
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
