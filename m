@@ -1,115 +1,62 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Sep 2012 16:43:18 +0200
-Subject: [PATCH 2/3] clk: ux500: Support prcmu ape opp voltage clock
-In-Reply-To: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1348497799-32143-3-git-send-email-ulf.hansson@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Sep 2012 15:45:31 +0100
+Subject: [PATCH v3 RESEND 13/17] ARM: LPAE: factor out T1SZ and TTBR1
+ computations
+In-Reply-To: <1348242975-19184-14-git-send-email-cyril@ti.com>
+References: <1348242975-19184-1-git-send-email-cyril@ti.com>
+ <1348242975-19184-14-git-send-email-cyril@ti.com>
+Message-ID: <20120924144531.GI23298@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Sep 21, 2012 at 04:56:11PM +0100, Cyril Chemparathy wrote:
+> This patch moves the TTBR1 offset calculation and the T1SZ calculation out
+> of the TTB setup assembly code.  This should not affect functionality in
+> any way, but improves code readability as well as readability of subsequent
+> patches in this series.
+> 
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/include/asm/pgtable-3level-hwdef.h |   10 ++++++++++
+>  arch/arm/mm/proc-v7-3level.S                |   16 ++++------------
+>  2 files changed, 14 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+> index d795282..b501650 100644
+> --- a/arch/arm/include/asm/pgtable-3level-hwdef.h
+> +++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+> @@ -74,4 +74,14 @@
+>  #define PHYS_MASK_SHIFT		(40)
+>  #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
+>  
+> +#if defined CONFIG_VMSPLIT_2G
+> +#define TTBR1_OFFSET	(1 << 4)		/* skip two L1 entries */
 
-Some scalable prcmu clocks needs to be handled in conjuction with the
-ape opp 100 voltage. A new prcmu clock type clk_prcmu_opp_volt_scalable
-is implemented to handle this.
+I know that was my code but I'm wondering why the (1<<4) rather than
+just a plain 16.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/clk/ux500/clk-prcmu.c |   55 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/ux500/clk.h       |    6 +++++
- 2 files changed, 61 insertions(+)
+> +#elif defined CONFIG_VMSPLIT_3G
+> +#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
+> +#else
+> +#define TTBR1_OFFSET	0
+> +#endif
+> +
+> +#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
 
-diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-index 930cdfe..04577ca 100644
---- a/drivers/clk/ux500/clk-prcmu.c
-+++ b/drivers/clk/ux500/clk-prcmu.c
-@@ -133,6 +133,40 @@ out_error:
- 		hw->init->name);
- }
- 
-+static int clk_prcmu_opp_volt_prepare(struct clk_hw *hw)
-+{
-+	int err;
-+	struct clk_prcmu *clk = to_clk_prcmu(hw);
-+
-+	err = prcmu_request_ape_opp_100_voltage(true);
-+	if (err) {
-+		pr_err("clk_prcmu: %s failed to request APE OPP VOLT for %s.\n",
-+			__func__, hw->init->name);
-+		return err;
-+	}
-+
-+	err = prcmu_request_clock(clk->cg_sel, true);
-+	if (err)
-+		prcmu_request_ape_opp_100_voltage(false);
-+
-+	return err;
-+}
-+
-+static void clk_prcmu_opp_volt_unprepare(struct clk_hw *hw)
-+{
-+	struct clk_prcmu *clk = to_clk_prcmu(hw);
-+
-+	if (prcmu_request_clock(clk->cg_sel, false))
-+		goto out_error;
-+	if (prcmu_request_ape_opp_100_voltage(false))
-+		goto out_error;
-+	return;
-+
-+out_error:
-+	pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
-+		hw->init->name);
-+}
-+
- static struct clk_ops clk_prcmu_scalable_ops = {
- 	.prepare = clk_prcmu_prepare,
- 	.unprepare = clk_prcmu_unprepare,
-@@ -167,6 +201,17 @@ static struct clk_ops clk_prcmu_opp_gate_ops = {
- 	.recalc_rate = clk_prcmu_recalc_rate,
- };
- 
-+static struct clk_ops clk_prcmu_opp_volt_scalable_ops = {
-+	.prepare = clk_prcmu_opp_volt_prepare,
-+	.unprepare = clk_prcmu_opp_volt_unprepare,
-+	.enable = clk_prcmu_enable,
-+	.disable = clk_prcmu_disable,
-+	.is_enabled = clk_prcmu_is_enabled,
-+	.recalc_rate = clk_prcmu_recalc_rate,
-+	.round_rate = clk_prcmu_round_rate,
-+	.set_rate = clk_prcmu_set_rate,
-+};
-+
- static struct clk *clk_reg_prcmu(const char *name,
- 				 const char *parent_name,
- 				 u8 cg_sel,
-@@ -250,3 +295,13 @@ struct clk *clk_reg_prcmu_opp_gate(const char *name,
- 	return clk_reg_prcmu(name, parent_name, cg_sel, 0, flags,
- 			&clk_prcmu_opp_gate_ops);
- }
-+
-+struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
-+					    const char *parent_name,
-+					    u8 cg_sel,
-+					    unsigned long rate,
-+					    unsigned long flags)
-+{
-+	return clk_reg_prcmu(name, parent_name, cg_sel, rate, flags,
-+			&clk_prcmu_opp_volt_scalable_ops);
-+}
-diff --git a/drivers/clk/ux500/clk.h b/drivers/clk/ux500/clk.h
-index 836d7d1..f36eeed 100644
---- a/drivers/clk/ux500/clk.h
-+++ b/drivers/clk/ux500/clk.h
-@@ -45,4 +45,10 @@ struct clk *clk_reg_prcmu_opp_gate(const char *name,
- 				   u8 cg_sel,
- 				   unsigned long flags);
- 
-+struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
-+					    const char *parent_name,
-+					    u8 cg_sel,
-+					    unsigned long rate,
-+					    unsigned long flags);
-+
- #endif /* __UX500_CLK_H */
+You could also move the comment about TxSZ in proc-v7-3level.S, it makes
+it easier to figure out why TTBR1_SIZE is defined this way.
+
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -128,18 +128,10 @@ ENDPROC(cpu_v7_set_pte_ext)
+>  	 * booting secondary CPUs would end up using TTBR1 for the identity
+>  	 * mapping set up in TTBR0.
+>  	 */
+
+Higher up in this file there is a cmp with a "branch below" comment. You
+should remove that as well since the 9001 branch was removed.
+
 -- 
-1.7.10
+Catalin
