@@ -1,36 +1,115 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 24 Sep 2012 10:04:07 +0200
-Subject: [PATCH] video: Remove pnx4008 driver
-In-Reply-To: <505F6436.3050009@gmx.de>
-References: <1345991001-32462-1-git-send-email-stigge@antcom.de>
- <1345991001-32462-2-git-send-email-stigge@antcom.de>
- <505F6436.3050009@gmx.de>
-Message-ID: <506013F7.20404@antcom.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Sep 2012 09:11:46 +0100
+Subject: [PATCH 1/1] mfd: Provide the PRCMU with its own IRQ domain
+Message-ID: <1348474306-25155-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The PRCMU has its own USB, Thermal, GPIO, Modem, HSI and RTC drivers,
+amongst other things. This patch allows those subordinate devices to
+use it as an interrupt controller as and when they are DT enabled.
 
-On 09/23/2012 09:34 PM, Florian Tobias Schandinat wrote:
-> On 08/26/2012 02:23 PM, Roland Stigge wrote:
->> This patch removes the video driver for pnx4008. The architecture is being
->> removed via the arm-soc tree.
->>
->> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> Applied as it doesn't make sense to keep it around if there is no
-> architecture left that can use it. Though I didn't get any technical
-> reason why the architecture is removed at all, just reasons why it might
-> be okay to do so. But it doesn't matter as I don't have to decide this
-> anyway.
+CC: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c |   48 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 35 insertions(+), 13 deletions(-)
 
-Right, there are no formal technical reasons, except that we are forward
-porting this architecture+video driver for years now without any
-indication that the changes were actually tested successfully. No known
-current users, even in the development community. And it takes resources
-developing the related architecture lpc32xx because of drivers shared
-between the two.
-
-Thanks,
-
-Roland
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 0e63cdd..9d51585 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -270,6 +270,8 @@ static struct {
+ 	struct prcmu_fw_version version;
+ } fw_info;
+ 
++static struct irq_domain *db8500_irq_domain;
++
+ /*
+  * This vector maps irq numbers to the bits in the bit field used in
+  * communication with the PRCMU firmware.
+@@ -2583,7 +2585,7 @@ static void prcmu_irq_mask(struct irq_data *d)
+ 
+ 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+-	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
++	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->hwirq];
+ 
+ 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+@@ -2597,7 +2599,7 @@ static void prcmu_irq_unmask(struct irq_data *d)
+ 
+ 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+-	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
++	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->hwirq];
+ 
+ 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+@@ -2637,9 +2639,37 @@ static char *fw_project_name(u8 project)
+ 	}
+ }
+ 
++static int db8500_irq_map(struct irq_domain *d, unsigned int virq,
++				irq_hw_number_t hwirq)
++{
++	irq_set_chip_and_handler(virq, &prcmu_irq_chip,
++				handle_simple_irq);
++	set_irq_flags(virq, IRQF_VALID);
++
++	return 0;
++}
++
++static struct irq_domain_ops db8500_irq_ops = {
++        .map    = db8500_irq_map,
++        .xlate  = irq_domain_xlate_twocell,
++};
++
++static int db8500_irq_init(struct device_node *np)
++{
++	db8500_irq_domain = irq_domain_add_legacy(
++		np, NUM_PRCMU_WAKEUPS, IRQ_PRCMU_BASE,
++		0, &db8500_irq_ops, NULL);
++
++	if (!db8500_irq_domain) {
++		pr_err("Failed to create irqdomain\n");
++		return -ENOSYS;
++	}
++
++	return 0;
++}
++
+ void __init db8500_prcmu_early_init(void)
+ {
+-	unsigned int i;
+ 	if (cpu_is_u8500v2()) {
+ 		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+ 
+@@ -2683,16 +2713,6 @@ void __init db8500_prcmu_early_init(void)
+ 	init_completion(&mb5_transfer.work);
+ 
+ 	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
+-
+-	/* Initalize irqs. */
+-	for (i = 0; i < NUM_PRCMU_WAKEUPS; i++) {
+-		unsigned int irq;
+-
+-		irq = IRQ_PRCMU_BASE + i;
+-		irq_set_chip_and_handler(irq, &prcmu_irq_chip,
+-					 handle_simple_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+-	}
+ }
+ 
+ static void __init init_prcm_registers(void)
+@@ -2999,6 +3019,8 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ 		goto no_irq_return;
+ 	}
+ 
++	db8500_irq_init(np);
++
+ 	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
+ 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+ 			db8500_prcmu_devs[i].platform_data = ab8500_platdata;
+-- 
+1.7.9.5
