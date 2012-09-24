@@ -1,32 +1,34 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 24 Sep 2012 16:43:49 -0500
+Date: Mon, 24 Sep 2012 16:45:06 -0500
 Subject: [PATCH V3 0/8] ARM: OMAP4: Add PMU Support
-In-Reply-To: <alpine.DEB.2.00.1209201714260.12583@utopia.booyaka.com>
+In-Reply-To: <20120920210932.GB22307@mudshark.cambridge.arm.com>
 References: <1347290626-21164-1-git-send-email-jon-hunter@ti.com>
  <alpine.DEB.2.00.1209201714260.12583@utopia.booyaka.com>
-Message-ID: <5060D415.1040603@ti.com>
+ <20120920210932.GB22307@mudshark.cambridge.arm.com>
+Message-ID: <5060D462.4040209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Will,
 
-On 09/20/2012 12:17 PM, Paul Walmsley wrote:
+On 09/20/2012 04:09 PM, Will Deacon wrote:
+> On Thu, Sep 20, 2012 at 06:17:02PM +0100, Paul Walmsley wrote:
+>>
+>> Hi Jon, Will, Ming, et al.,
 > 
-> Hi Jon, Will, Ming, et al.,
+> Hi Paul,
 > 
-> Have queued most of these for 3.7 with the exception of the OMAP4430 
-> CTI-related patches (which look to me like 3.8 material) and the PM 
-> runtime suspend/resume patch (which looks to me like 3.7-rc material) -- 
-> assuming this series makes it in for 3.7 ... 
+>> Have queued most of these for 3.7 with the exception of the OMAP4430 
+>> CTI-related patches (which look to me like 3.8 material) and the PM 
+>> runtime suspend/resume patch (which looks to me like 3.7-rc material) -- 
+>> assuming this series makes it in for 3.7 ... 
 > 
-> Apologies in advance if I broke something else in the process.
+> Ok, thanks for queueing what you did.
+> 
+> Jon -- could you pick the pieces up from what's left please and shout if
+> you need anything from me?
 
-Looks good. Nothing you broke, but I just posted one fix for PMU
-interrupts on OMAP2/3 [1]. With this PMU on Tony's master branch is
-working fine on OMAP2420 and OMAP3430. I have also verified that PMU is
-working on OMAP4460 too.
+Yes will do.
 
 Cheers
 Jon
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.omap/85294
