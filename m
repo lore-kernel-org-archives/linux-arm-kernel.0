@@ -1,67 +1,74 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 24 Sep 2012 12:44:52 +0300
-Subject: How to specify IOMMU'able devices in DT (was: [RFC 0/5] ARM:
- dma-mapping: New dma_map_ops to control IOVA more precisely)
-In-Reply-To: <1348478881.2467.27.camel@dabdike>
-References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
- <20120918124918.GK2505@amd.com>
- <20120919095843.d1db155e0f085f4fcf64ea32@nvidia.com>
- <201209190759.46174.arnd@arndb.de> <20120919125020.GQ2505@amd.com>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC1EEB@HQMAIL04.nvidia.com>
- <505A7DB4.4090902@wwwdotorg.org>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC1F2D@HQMAIL04.nvidia.com>
- <505B35F7.2080201@wwwdotorg.org>
- <401E54CE964CD94BAE1EB4A729C7087E379FDC2372@HQMAIL04.nvidia.com>
- <20120924120415.8e6929a34c422185a98d3f82@nvidia.com>
- <1348478881.2467.27.camel@dabdike>
-Message-ID: <20120924124452.41070ed2ee9944d930cffffc@nvidia.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Sep 2012 19:49:21 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the fbdev tree
+Message-ID: <20120924194921.9c277f5048627c74708ba1ce@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi all,
 
-On Mon, 24 Sep 2012 11:28:01 +0200
-James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
+Today's linux-next merge of the arm-soc tree got conflicts in
+drivers/video/msm/mddi.c, drivers/video/msm/mdp.c and
+drivers/video/msm/mdp_hw.h between commit 8abf0b31e161 ("video: msm:
+Remove useless mach/* includes") from the fbdev tree and commit
+1ef21f6343ff ("ARM: msm: move platform_data definitions") from the
+arm-soc tree.
 
-> On Mon, 2012-09-24 at 12:04 +0300, Hiroshi Doyu wrote:
-> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > index a1a7225..9eae3be 100644
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -21,6 +21,8 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/pm_runtime.h>
-> > 
-> > +#include <asm/dma-iommu.h>
-> > +
-> >  #include "base.h"
-> > 
-> >  #define to_platform_driver(drv)        (container_of((drv), struct
-> > platform_driver, \
-> > @@ -305,8 +307,19 @@ int platform_device_add(struct platform_device
-> > *pdev)
-> >                  dev_name(&pdev->dev), dev_name(pdev->dev.parent));
-> > 
-> >         ret = device_add(&pdev->dev);
-> > -       if (ret == 0)
-> > -               return ret;
-> > +       if (ret)
-> > +               goto failed;
-> > +
-> > +#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
-> > +       if (platform_bus_type.map && !pdev->dev.archdata.mapping) {
-> > +               ret = arm_iommu_attach_device(&pdev->dev,
-> > +                                             platform_bus_type.map);
-> > +               if (ret)
-> > +                       goto failed;
-> 
-> This is horrible ... you're adding an architecture specific callback
-> into our generic code; that's really a no-no.  If the concept of
-> CONFIG_PLATFORM_ENABE_IOMMU is useful to more than just arm, then this
-> could become a generic callback.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-As mentioned in the original, this is a heck to explain what is
-needed. I am looking for some generic solution for how to specify
-IOMMU info for each platform devices. I'm guessing that some other SoC
-may have the similar requirements on the above. As you mentioned, this
-solution should be a generic, not arch specific.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/video/msm/mddi.c
+index d43e178,bf73f04..0000000
+--- a/drivers/video/msm/mddi.c
++++ b/drivers/video/msm/mddi.c
+@@@ -26,7 -26,10 +26,7 @@@
+  #include <linux/clk.h>
+  #include <linux/io.h>
+  #include <linux/sched.h>
+- #include <mach/msm_fb.h>
+ -#include <mach/msm_iomap.h>
+ -#include <mach/irqs.h>
+ -#include <mach/board.h>
++ #include <linux/platform_data/video-msm_fb.h>
+  #include "mddi_hw.h"
+  
+  #define FLAG_DISABLE_HIBERNATION 0x0001
+diff --cc drivers/video/msm/mdp.c
+index 7570908,d1f881e..0000000
+--- a/drivers/video/msm/mdp.c
++++ b/drivers/video/msm/mdp.c
+@@@ -25,7 -25,8 +25,7 @@@
+  #include <linux/major.h>
+  #include <linux/slab.h>
+  
+- #include <mach/msm_fb.h>
+ -#include <mach/msm_iomap.h>
++ #include <linux/platform_data/video-msm_fb.h>
+  #include <linux/platform_device.h>
+  #include <linux/export.h>
+  
+diff --cc drivers/video/msm/mdp_hw.h
+index 2a84137,a0bacf5..0000000
+--- a/drivers/video/msm/mdp_hw.h
++++ b/drivers/video/msm/mdp_hw.h
+@@@ -15,7 -15,8 +15,7 @@@
+  #ifndef _MDP_HW_H_
+  #define _MDP_HW_H_
+  
+- #include <mach/msm_fb.h>
+ -#include <mach/msm_iomap.h>
++ #include <linux/platform_data/video-msm_fb.h>
+  
+  struct mdp_info {
+  	struct mdp_device mdp_dev;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/e3c58b8f/attachment.sig>
