@@ -1,28 +1,27 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Sep 2012 15:58:11 +0200
-Subject: [PATCH] rtc: kconfig: Fixup dependency for ab8500
-Message-ID: <1348495091-23564-1-git-send-email-ulf.hansson@stericsson.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Mon, 24 Sep 2012 09:57:51 -0400
+Subject: [PATCH v3 RESEND 04/17] ARM: LPAE: use phys_addr_t on virt <-->
+ phys conversion
+In-Reply-To: <20120924130920.GA23298@arm.com>
+References: <1348242975-19184-1-git-send-email-cyril@ti.com>
+ <1348242975-19184-5-git-send-email-cyril@ti.com>
+ <20120924130920.GA23298@arm.com>
+Message-ID: <506066DF.1070809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On 09/24/12 09:09, Catalin Marinas wrote:
+> On Fri, Sep 21, 2012 at 04:56:02PM +0100, Cyril Chemparathy wrote:
+>> This patch fixes up the types used when converting back and forth between
+>> physical and virtual addresses.
+>>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/rtc/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+Thanks, Catalin.
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 9476456..e069f17 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -738,6 +738,7 @@ config RTC_DRV_AB3100
- config RTC_DRV_AB8500
- 	tristate "ST-Ericsson AB8500 RTC"
- 	depends on AB8500_CORE
-+	select RTC_INTF_DEV
- 	select RTC_INTF_DEV_UIE_EMUL
- 	help
- 	  Select this to enable the ST-Ericsson AB8500 power management IC RTC
--- 
-1.7.10
+-- Cyril.
