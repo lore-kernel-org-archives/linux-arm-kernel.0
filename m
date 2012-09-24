@@ -1,45 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Sep 2012 21:35:24 +0100
-Subject: [PATCH 0/3] Introduce devm_clk_register()
-In-Reply-To: <5060C09A.6080706@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 24 Sep 2012 13:38:03 -0700
+Subject: [PATCHv2 1/3] clk: wm831x: Fix clk_register() error code checking
+In-Reply-To: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
 References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
- <20120922100604.GI15609@n2100.arm.linux.org.uk>
- <5060C09A.6080706@codeaurora.org>
-Message-ID: <20120924203524.GH26454@n2100.arm.linux.org.uk>
+Message-ID: <1348519085-5888-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 01:20:42PM -0700, Stephen Boyd wrote:
-> On 09/22/12 03:06, Russell King - ARM Linux wrote:
-> > On Tue, Sep 18, 2012 at 11:05:27PM -0700, Stephen Boyd wrote:
-> >> The first patch in this series fixes error checking in the wm831x clock
-> >> driver and is here to prevent context conflicts in the third patch.
-> >> I split it out in case it needed to merge sooner rather than later.
-> >>
-> >> The goal of this series is to add devm_clk_register() so I can use it in
-> >> some MSM clock code I'm sending out in the near future. The second 
-> >> patch adds the API and the third patch moves over an existing user of
-> >> clk_unregister() to the devm API.
-> > Can we guarantee that the clocks are unused when the module is removed?
-> > If we can't make that guarantee, then devm_* should not be used here,
-> > and instead there should be refcounting done in the clocks (that's what
-> > the __clk_get() and __clk_put() hooks are there for.)
-> 
-> We could guarantee that when clk_unregister() is actually implemented.
-> __clk_get() would need to forward a call to the module providing the
-> clock via try_module_get(). Similarly we would call module_put() in
-> __clk_put(). That would prevent unbinding the driver from the device via
-> module removal.
+clk_register() returns an ERR_PTR upon failure, not NULL. Fix
+these error paths.
 
-Strangely enough... mach-integrator's clkdev.h... precisely because it
-has a module which may provide a clock.
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-static inline int __clk_get(struct clk *clk)
-{
-        return try_module_get(clk->owner);
-}
+v2: No changes
 
-static inline void __clk_put(struct clk *clk)
-{
-        module_put(clk->owner);
-}
+ drivers/clk/clk-wm831x.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
+index e7b7765..eb1afaf 100644
+--- a/drivers/clk/clk-wm831x.c
++++ b/drivers/clk/clk-wm831x.c
+@@ -371,20 +371,20 @@ static __devinit int wm831x_clk_probe(struct platform_device *pdev)
+ 
+ 	clkdata->xtal_hw.init = &wm831x_xtal_init;
+ 	clkdata->xtal = clk_register(&pdev->dev, &clkdata->xtal_hw);
+-	if (!clkdata->xtal)
+-		return -EINVAL;
++	if (IS_ERR(clkdata->xtal))
++		return PTR_ERR(clkdata->xtal);
+ 
+ 	clkdata->fll_hw.init = &wm831x_fll_init;
+ 	clkdata->fll = clk_register(&pdev->dev, &clkdata->fll_hw);
+-	if (!clkdata->fll) {
+-		ret = -EINVAL;
++	if (IS_ERR(clkdata->fll)) {
++		ret = PTR_ERR(clkdata->fll);
+ 		goto err_xtal;
+ 	}
+ 
+ 	clkdata->clkout_hw.init = &wm831x_clkout_init;
+ 	clkdata->clkout = clk_register(&pdev->dev, &clkdata->clkout_hw);
+-	if (!clkdata->clkout) {
+-		ret = -EINVAL;
++	if (IS_ERR(clkdata->clkout)) {
++		ret = PTR_ERR(clkdata->clkout);
+ 		goto err_fll;
+ 	}
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
