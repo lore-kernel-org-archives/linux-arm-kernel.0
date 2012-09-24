@@ -1,24 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Sep 2012 21:57:26 +0200
-Subject: [PATCH 7/6] pinctrl: exynos: Fix wakeup IRQ domain registration
- check
-In-Reply-To: <2737662.uE6StcAj33@amdc1227>
-References: <1348131104-24828-1-git-send-email-t.figa@samsung.com>
- <2737662.uE6StcAj33@amdc1227>
-Message-ID: <CACRpkdYkVicrUk-H2Tx=tCDRxquq2B=n6O5UNZ8QoXLfMEDV=g@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 24 Sep 2012 16:00:52 -0400 (EDT)
+Subject: [PATCH 2/3 V4] phy/micrel: Rename KS80xx to KSZ80xx
+In-Reply-To: <1348455531-24371-2-git-send-email-marex@denx.de>
+References: <1348455531-24371-1-git-send-email-marex@denx.de>
+ <1348455531-24371-2-git-send-email-marex@denx.de>
+Message-ID: <20120924.160052.285061448957302082.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2012 at 4:53 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+From: Marek Vasut <marex@denx.de>
+Date: Mon, 24 Sep 2012 04:58:50 +0200
 
-> Because of a typo, incorrect field of a structure was being checked.
-> This patch fixes the check to use correct field.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> There is no such part as KS8001, KS8041 or KS8051. There are only
+> KSZ8001, KSZ8041 and KSZ8051. Rename these parts as such to match
+> the Micrel naming.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-I assume you'll take this through the Samsung tree.
-
-Yours,
-Linus Walleij
+Applied.
