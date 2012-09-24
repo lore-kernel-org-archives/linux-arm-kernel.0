@@ -1,49 +1,63 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 24 Sep 2012 21:49:57 +0400
-Subject: [PATCH] GPIO: Add support for GPIO on CLPS711X-target platform
-In-Reply-To: <CACRpkdZEh1sg5h5-uzpsYwxYM5W47q-1hk4sS3=dQQLaVUC1Vw@mail.gmail.com>
-References: <1345635383-12224-1-git-send-email-shc_work@mail.ru>
- <CACRpkdZrcBLz+sg-AwWnBD0SA697uWQzocUYnbC1nPYG14LYyA@mail.gmail.com>
- <20120824074552.97d32478.shc_work@mail.ru>
- <CACRpkdZEh1sg5h5-uzpsYwxYM5W47q-1hk4sS3=dQQLaVUC1Vw@mail.gmail.com>
-Message-ID: <20120924214957.6999df72.shc_work@mail.ru>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Sep 2012 11:48:28 -0600
+Subject: [PATCH v2 5/5] ARM: tegra: enable brcmfmac in defconfig
+In-Reply-To: <505CBA6E.3030304@broadcom.com>
+References: <1348217700-12309-1-git-send-email-wni@nvidia.com>
+ <1348217700-12309-6-git-send-email-wni@nvidia.com>
+ <505C7C27.2050108@broadcom.com> <505C93A1.2040801@wwwdotorg.org>
+ <505CBA6E.3030304@broadcom.com>
+Message-ID: <50609CEC.1050001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 1 Sep 2012 00:44:10 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+On 09/21/2012 01:05 PM, Arend van Spriel wrote:
+> On 09/21/2012 06:19 PM, Stephen Warren wrote:
+>> On 09/21/2012 08:39 AM, Arend van Spriel wrote:
+>>> On 09/21/2012 10:55 AM, Wei Ni wrote:
+>>>> New options enabled:
+>>>> * CFG80211_WEXT: (dependency)
+>>>> * BRCMFMAC: wlan driver, enable as module.
+>>>>
+>>>> Signed-off-by: Wei Ni <wni@nvidia.com>
+>>>> ---
+>>>>    arch/arm/configs/tegra_defconfig |    2 ++
+>>>>    1 files changed, 2 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/configs/tegra_defconfig
+>>>> b/arch/arm/configs/tegra_defconfig
+>>>> index adcf3c2..04b18ea 100644
+>>>> --- a/arch/arm/configs/tegra_defconfig
+>>>> +++ b/arch/arm/configs/tegra_defconfig
+>>>> @@ -73,6 +73,7 @@ CONFIG_BT_BNEP=y
+>>>>    CONFIG_BT_HIDP=y
+>>>>    CONFIG_BT_HCIBTUSB=m
+>>>>    CONFIG_CFG80211=y
+>>>> +CONFIG_CFG80211_WEXT=y
+>>>
+>>> Any particular reason for enabling this? The driver does not
+>>> specifically need it. The option only allows use of WEXT dependent
+>>> user-space tools like iwconfig and iwlist. At least it is not needed by
+>>> brcmfmac driver hence it does not select it.
+>>>
+>>> You indicate there is a dependency. Could you elaborate?
+>>
+>> "Dependency" probably isn't correct.
+>>
+>> However, the intent of tegra_defconfig is to provide a useful
+>> configuration for Tegra boards. Without the ability to use
+>> iwconfig/iwlist, enabling the wireless driver doesn't seem useful; how
+>> would someone configure the wireless connection?
+> 
+> Let me explain. CFG80211 provides a netlink api called NL80211 which is
+> favorable over WEXT api. In user-space the iw tool is replacing iwconfig
+> and iwlist. Also wpa_supplicant has support for both wext and nl80211.
+> 
+> CFG80211_WEXT basically provides an adaptation/compatibility layer that
+> allows user-space tools to interact with cfg80211 drivers. However, it
+> is intended to be phased out so I would not recommend putting it in a
+> defconfig.
 
-> > ...
-> >> > +static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
-> >> > +{
-> >> > +       int ret;
-> >> > +       struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-> >> > +
-> >> > +       mutex_lock(&gpio->lock);
-> >> > +       ret = clps_readb(gpio_clps711x_port_dataaddr(chip)) & (1 << offset);
-> >> > +       mutex_unlock(&gpio->lock);
-> >> > +
-> >> > +       return !!ret;
-> >> > +}
-...
-> > This will break the whole concept of this platform. All the CPU registers
-> > are in one particular area, and therefore access to the registers of all
-> > the drivers performed using the macro.
-> > Maybe just add a short comment?
-> It does not break if you pass the offset CLPS711X_VIRT_BASE as
-> a memory resource and reference from that, e.g.:
-...
-> If you do this, you should no longer need to include
-> <mach/hardware.h> (or something more is wrong...)
-I plan in the future to remove the macros clps_read/write, and while the time
-to do an override for ports in the header mach/gpio.h.
-Passing of resources to the driver still seems superfluous, in any case
-I changed the code, so please comment on the new version, which will post today.
-
-> BTW I cannot see where this patch adds the platform device
-> named "gpio-clps711x"? Are you intending to do this later?
-Yes, I forgot about it in the previous version. The new version of the code
-is different and it is no longer necessary.
-
--- 
-Alexander Shiyan <shc_work@mail.ru>
+OK, I suppose that I'd expect to use a given kernel's defconfig with a
+fairly recent distro, so switching to "iw" is reasonable, and so
+removing that defconfig entry is reasonable. I'll just remove that line
+when applying these patches unless there's any other need for a re-spin.
