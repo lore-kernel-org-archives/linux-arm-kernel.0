@@ -1,47 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 24 Sep 2012 09:05:08 +0200
-Subject: [PATCH] ARM: dma-mapping: Fix potential memory leak in
- atomic_pool_init()
-In-Reply-To: <1347858583-13338-1-git-send-email-sachin.kamat@linaro.org>
-References: <1347858583-13338-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <049301cd9a22$f0b8c960$d22a5c20$%szyprowski@samsung.com>
+From: ryan.harkin@linaro.org (Ryan Harkin)
+Date: Mon, 24 Sep 2012 08:07:54 +0100
+Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to amba-clcd
+ driver
+In-Reply-To: <20120921121903.GE15609@n2100.arm.linux.org.uk>
+References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
+ <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
+ <20120921114345.GE24458@pengutronix.de>
+ <20120921121903.GE15609@n2100.arm.linux.org.uk>
+Message-ID: <CAD0U-hKviTANE+88vh_UUkXijJOxpM3gXmgQW4oOegMnav9Zqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Thanks for all the comments.
 
-On Monday, September 17, 2012 7:10 AM Sachin Kamat wrote:
+Pawel, good point about the framebuffer.  Fixing this will also
+address one of Russell's concerns.  I don't know how to use a phandle,
+so I have some reading to do.
 
-> When either of __alloc_from_contiguous or __alloc_remap_buffer fails
-> to provide a valid pointer, allocated memory is freed up and an error
-> is returned. 'pages' was however not freed before returning error.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->  arch/arm/mm/dma-mapping.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 546a3e8..477a2d2 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -367,6 +367,8 @@ static int __init atomic_pool_init(void)
->  		       (unsigned)pool->size / 1024);
->  		return 0;
->  	}
-> +
-> +	kfree(pages);
->  no_pages:
->  	kfree(bitmap);
->  no_bitmap:
-> --
-> 1.7.4.1
+Russell, all good points and exactly the type of feedback I needed.
+I'll re-work your suggestions into my code and re-post a V2 of the
+patches.
 
-Applied to my fixes-for-3.6 branch. Thanks for spotting this issue!
+Sascha, I see your point.  I'll work on the feedback above first
+before getting to looking at how to handle the thread you linked to.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Thanks all,
+
+Regards,
+Ryan.
