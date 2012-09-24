@@ -1,72 +1,99 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Sep 2012 18:32:22 -0400 (EDT)
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <CAHkRjk74aHMNZxOVgsQo-NTm33ALZPVeiPAP5amCdBdF4-yjWw@mail.gmail.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924151305.GA14198@arm.com>
- <alpine.LFD.2.02.1209241152540.6667@xanadu.home> <5060C9C6.8080900@ti.com>
- <alpine.LFD.2.02.1209241709200.6667@xanadu.home>
- <CAHkRjk74aHMNZxOVgsQo-NTm33ALZPVeiPAP5amCdBdF4-yjWw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1209241826260.6667@xanadu.home>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 24 Sep 2012 15:32:29 -0700
+Subject: [PATCH 03/10] msm: iommu: Convert to clk_prepare/unprepare
+In-Reply-To: <1348194419-11486-4-git-send-email-sboyd@codeaurora.org>
+References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
+ <1348194419-11486-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5060DF7D.9000305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Sep 2012, Catalin Marinas wrote:
+On 09/20/2012 07:26 PM, Stephen Boyd wrote:
+> Add calls to clk_prepare and unprepare so that MSM can migrate to
+> the common clock framework. We never unprepare the clocks until
+> driver remove because the clocks are enabled and disabled in irq
+> context. Finer grained power management is possible in the future
+> via runtime power management techniques.
+>
+> Signed-off-by: Stephen Boyd<sboyd@codeaurora.org>
+> ---
+>   drivers/iommu/msm_iommu_dev.c | 17 ++++++++++-------
+>   1 file changed, 10 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev.c
+> index 8e8fb07..d344f6a 100644
+> --- a/drivers/iommu/msm_iommu_dev.c
+> +++ b/drivers/iommu/msm_iommu_dev.c
+> @@ -160,7 +160,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>   		goto fail;
+>   	}
+>
+> -	ret = clk_enable(iommu_pclk);
+> +	ret = clk_prepare_enable(iommu_pclk);
+>   	if (ret)
+>   		goto fail_enable;
+>
+> @@ -170,7 +170,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>   		if (clk_get_rate(iommu_clk) == 0)
+>   			clk_set_min_rate(iommu_clk, 1);
+>
+> -		ret = clk_enable(iommu_clk);
+> +		ret = clk_prepare_enable(iommu_clk);
+>   		if (ret) {
+>   			clk_put(iommu_clk);
+>   			goto fail_pclk;
+> @@ -261,7 +261,7 @@ fail_clk:
+>   		clk_put(iommu_clk);
+>   	}
+>   fail_pclk:
+> -	clk_disable(iommu_pclk);
+> +	clk_disable_unprepare(iommu_pclk);
+>   fail_enable:
+>   	clk_put(iommu_pclk);
+>   fail:
+> @@ -275,8 +275,11 @@ static int msm_iommu_remove(struct platform_device *pdev)
+>
+>   	drv = platform_get_drvdata(pdev);
+>   	if (drv) {
+> -		if (drv->clk)
+> +		if (drv->clk) {
+> +			clk_unprepare(drv->clk);
+>   			clk_put(drv->clk);
+> +		}
+> +		clk_unprepare(drv->pclk);
 
-> On 24 September 2012 22:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Mon, 24 Sep 2012, Cyril Chemparathy wrote:
-> >
-> >> On 9/24/2012 11:56 AM, Nicolas Pitre wrote:
-> >> > On Mon, 24 Sep 2012, Catalin Marinas wrote:
-> >> >
-> >> > > On Fri, Sep 21, 2012 at 04:56:03PM +0100, Cyril Chemparathy wrote:
-> >> > > > This patch adds support for 64-bit physical addresses in virt_to_phys()
-> >> > > > patching.  This does not do real 64-bit add/sub, but instead patches in
-> >> > > > the
-> >> > > > upper 32-bits of the phys_offset directly into the output of
-> >> > > > virt_to_phys.
-> >> > >
-> >> > > So this assumes that for the kernel linear mapping, all the physical
-> >> > > addresses have the same upper 32-bit. That's a good optimisation but I
-> >> > > haven't seen this check when calculating lowmem in sanity_check_meminfo.
-> >> > > Someone may build platform with memory starting at 3GB and going across
-> >> > > the 4GB limit.
-> >> >
-> >> > Good point.  We better get an early warning if that happens.
-> >> >
-> >>
-> >> Thanks.
-> >>
-> >> I'm thinking of splitting the bank at the 32-bit boundary in such an event,
-> >> assuming that the remaining memory should be usable as highmem.
-> >
-> > No.  That's not the point here.
-> >
-> > Let's suppose a system with 1GB of physical RAM starting at 0xe0000000.
-> >
-> > In this case there is no need for highmem.  However the v2p patching
-> > code in the LPAE case assumes the high bits of a physical address are
-> > always the same which wouldn't be the case in this hypothetical example.
-> >
-> > We want to make sure the kernel won't boot if a system with physical RAM
-> > crossing the 4GB address mark is encountered.
-> 
-> I think that's too restrictive. The case with 1 or 2GB below 4GB limit
-> and the rest of the RAM above is a valid one.
+Are these changes right? Every other clk API change in this patch is 
+using the combined prepare_enable/disable_unprepare() calls. So, when 
+would we end up at this location with the clocks prepared but not enabled?
 
-Valid: sure.  Likely: probably not.  That would complicate address 
-decoding in hardware for little gain.
+Also, what if the device gets probed and then immediately removed. Will 
+it work correctly?
 
-> For such configurations
-> we just limit the lowmem to the memory within 4GB and leave the rest
-> as highmem.
+-Saravana
 
-We don't want to limit lowmem.  The lowmem is very precious memory and 
-we want to maximize its size.  In that case it is probably best to 
-implement a real patchable 64-bit addition rather than artificially 
-restricting the lowmem size.
+>   		clk_put(drv->pclk);
+>   		memset(drv, 0, sizeof(*drv));
+>   		kfree(drv);
+> @@ -314,14 +317,14 @@ static int msm_iommu_ctx_probe(struct platform_device *pdev)
+>   	INIT_LIST_HEAD(&ctx_drvdata->attached_elm);
+>   	platform_set_drvdata(pdev, ctx_drvdata);
+>
+> -	ret = clk_enable(drvdata->pclk);
+> +	ret = clk_prepare_enable(drvdata->pclk);
+>   	if (ret)
+>   		goto fail;
+>
+>   	if (drvdata->clk) {
+> -		ret = clk_enable(drvdata->clk);
+> +		ret = clk_prepare_enable(drvdata->clk);
+>   		if (ret) {
+> -			clk_disable(drvdata->pclk);
+> +			clk_disable_unprepare(drvdata->pclk);
+>   			goto fail;
+>   		}
+>   	}
 
 
-Nicolas
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
