@@ -1,108 +1,93 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 24 Sep 2012 16:28:29 +0200
-Subject: [PATCH 2/6] ARM: EXYNOS: Add support for secure monitor calls
+Date: Mon, 24 Sep 2012 16:28:30 +0200
+Subject: [PATCH 3/6] ARM: EXYNOS: Add support for secondary CPU bring-up on
+ Exynos4412
 In-Reply-To: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
 References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1348496913-25422-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1348496913-25422-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards use secure monitor calls to communicate with secure
-firmware.
+Exynos4412 uses different information register for each core. This patch
+adjusts the bring-up code to take that into account.
 
-This patch adds exynos_smc function which uses smc assembly instruction
-to do secure monitor calls.
-
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/Makefile     |  5 +++++
- arch/arm/mach-exynos/exynos-smc.S | 22 ++++++++++++++++++++++
- arch/arm/mach-exynos/smc.h        | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+)
- create mode 100644 arch/arm/mach-exynos/exynos-smc.S
- create mode 100644 arch/arm/mach-exynos/smc.h
+ arch/arm/mach-exynos/platsmp.c | 29 +++++++++++++++++++++++------
+ 1 file changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 9b58024..5c1de47 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 36c3984..a7f4031 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -34,8 +34,21 @@
  
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ extern void exynos4_secondary_startup(void);
  
-+obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
+-#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-				S5P_INFORM5 : S5P_VA_SYSRAM)
++static inline void __iomem *cpu_boot_reg_base(void)
++{
++	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
++		return S5P_INFORM5;
++	return S5P_VA_SYSRAM;
++}
 +
-+plus_sec := $(call as-instr,.arch_extension sec,+sec)
-+AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-+
- # machine support
++static inline void __iomem *cpu_boot_reg(int cpu)
++{
++	void __iomem *boot_reg;
++	boot_reg = cpu_boot_reg_base();
++	if (soc_is_exynos4412())
++		boot_reg += 4*cpu;
++	return boot_reg;
++}
  
- obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
-diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
-new file mode 100644
-index 0000000..2e27aa3
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-smc.S
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2012 Samsung Electronics.
-+ *
-+ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ /*
+  * control for which core is the next to come out of the secondary
+@@ -89,6 +102,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
++	unsigned long phys_cpu = cpu_logical_map(cpu);
+ 
+ 	/*
+ 	 * Set synchronisation state between this boot processor
+@@ -104,7 +118,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Note that "pen_release" is the hardware CPU ID, whereas
+ 	 * "cpu" is Linux's internal ID.
+ 	 */
+-	write_pen_release(cpu_logical_map(cpu));
++	write_pen_release(phys_cpu);
+ 
+ 	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
+ 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+@@ -138,7 +152,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		smp_rmb();
+ 
+ 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+-			CPU1_BOOT_REG);
++							cpu_boot_reg(phys_cpu));
+ 		gic_raise_softirq(cpumask_of(cpu), 1);
+ 
+ 		if (pen_release == -1)
+@@ -186,6 +200,8 @@ void __init smp_init_cpus(void)
+ 
+ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	int i;
 +
-+#include <linux/linkage.h>
-+
-+/*
-+ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
-+ */
-+
-+ENTRY(exynos_smc)
-+	stmfd	sp!, {r4-r11, lr}
-+	dsb
-+	smc	#0
-+	ldmfd	sp!, {r4-r11, pc}
-+ENDPROC(exynos_smc)
-diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
-new file mode 100644
-index 0000000..e972390
---- /dev/null
-+++ b/arch/arm/mach-exynos/smc.h
-@@ -0,0 +1,31 @@
-+/*
-+ *  Copyright (c) 2012 Samsung Electronics.
-+ *
-+ * EXYNOS - SMC Call
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_EXYNOS_SMC_H
-+#define __ASM_ARCH_EXYNOS_SMC_H
-+
-+#define SMC_CMD_INIT            (-1)
-+#define SMC_CMD_INFO            (-2)
-+/* For Power Management */
-+#define SMC_CMD_SLEEP           (-3)
-+#define SMC_CMD_CPU1BOOT        (-4)
-+#define SMC_CMD_CPU0AFTR        (-5)
-+/* For CP15 Access */
-+#define SMC_CMD_C15RESUME       (-11)
-+/* For L2 Cache Access */
-+#define SMC_CMD_L2X0CTRL        (-21)
-+#define SMC_CMD_L2X0SETUP1      (-22)
-+#define SMC_CMD_L2X0SETUP2      (-23)
-+#define SMC_CMD_L2X0INVALL      (-24)
-+#define SMC_CMD_L2X0DEBUG       (-25)
-+
-+extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
-+
-+#endif
+ 	if (!soc_is_exynos5250())
+ 		scu_enable(scu_base_addr());
+ 
+@@ -195,6 +211,7 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * until it receives a soft interrupt, and then the
+ 	 * secondary CPU branches to this address.
+ 	 */
+-	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+-			CPU1_BOOT_REG);
++	for (i = 1; i < max_cpus; ++i)
++		__raw_writel(virt_to_phys(exynos4_secondary_startup),
++					cpu_boot_reg(cpu_logical_map(i)));
+ }
 -- 
 1.7.12
