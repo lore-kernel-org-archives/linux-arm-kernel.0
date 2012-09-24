@@ -1,82 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Sep 2012 15:05:15 +0100
-Subject: [PATCH v3 RESEND 10/17] ARM: LPAE: use phys_addr_t in switch_mm()
-In-Reply-To: <1348242975-19184-11-git-send-email-cyril@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-11-git-send-email-cyril@ti.com>
-Message-ID: <20120924140515.GF23298@arm.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 24 Sep 2012 16:10:17 +0200
+Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data
+ via platform data
+In-Reply-To: <20120921190710.GG28835@atomide.com>
+References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
+ <1348152453-30532-3-git-send-email-j-pihet@ti.com>
+ <20120920221504.GK28835@atomide.com>
+ <CAORVsuXS=zk6SEqo=qhyaAFyYQbhLA8CY9TTMMhEQtMZf7p21Q@mail.gmail.com>
+ <20120921190710.GG28835@atomide.com>
+Message-ID: <CAORVsuWs=sZVHjCDxw35h+sa6pt1Nu8VoZ8MJdimAzoy0ywZTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 04:56:08PM +0100, Cyril Chemparathy wrote:
-> This patch modifies the switch_mm() processor functions to use phys_addr_t.
-> On LPAE systems, we now honor the upper 32-bits of the physical address that
-> is being passed in, and program these into TTBR as expected.
-> 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> ---
->  arch/arm/include/asm/proc-fns.h |    4 ++--
->  arch/arm/mm/proc-v7-3level.S    |   17 +++++++++++++----
->  2 files changed, 15 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-> index f3628fb..75b5f14 100644
-> --- a/arch/arm/include/asm/proc-fns.h
-> +++ b/arch/arm/include/asm/proc-fns.h
-> @@ -60,7 +60,7 @@ extern struct processor {
->  	/*
->  	 * Set the page table
->  	 */
-> -	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
-> +	void (*switch_mm)(phys_addr_t pgd_phys, struct mm_struct *mm);
->  	/*
->  	 * Set a possibly extended PTE.  Non-extended PTEs should
->  	 * ignore 'ext'.
-> @@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
->  extern void cpu_proc_fin(void);
->  extern int cpu_do_idle(void);
->  extern void cpu_dcache_clean_area(void *, int);
-> -extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> +extern void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
->  #ifdef CONFIG_ARM_LPAE
->  extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
->  #else
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 8de0f1d..c4f4251 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -39,6 +39,14 @@
->  #define TTB_FLAGS_SMP	(TTB_IRGN_WBWA|TTB_S|TTB_RGN_OC_WBWA)
->  #define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_S)
->  
-> +#ifndef __ARMEB__
-> +#  define rpgdl	r0
-> +#  define rpgdh	r1
-> +#else
-> +#  define rpgdl	r1
-> +#  define rpgdh	r0
-> +#endif
-> +
->  /*
->   * cpu_v7_switch_mm(pgd_phys, tsk)
->   *
-> @@ -47,10 +55,11 @@
->   */
->  ENTRY(cpu_v7_switch_mm)
->  #ifdef CONFIG_MMU
-> -	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-> -	and	r3, r1, #0xff
-> -	mov	r3, r3, lsl #(48 - 32)		@ ASID
-> -	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
-> +	ldr	r2, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
-> +	and	r2, r2, #0xff
-> +	mov	r2, r2, lsl #(48 - 32)		@ ASID
-> +	orr	rpgdh, rpgdh, r2		@ upper 32-bits of pgd phys
+Hi Tony,
 
-Can you do:
+On Fri, Sep 21, 2012 at 9:07 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Jean Pihet <jean.pihet@newoldbits.com> [120920 23:31]:
+>> On Fri, Sep 21, 2012 at 12:15 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> >
+>> > You should be able to make this even simpler and not have to pass
+>> > the clock name around at all. Just do:
+>> >
+>> > syc_ck = clk_get(NULL, "fck);
+>> > ...
+>> The problem is that the system has multiple instances of the
+>> smartreflex module, each having its own fck. On OMAP3/4 the fck's are
+>> derived from sys_clk via muxes and latches.
+>> The proposed code uses the fck's as defined in the .main_clk field of
+>> the hwmod entries, so that it takes the muxes and latches into account
+>> and also has a consistent clock naming.
+>
+> If the same system has multiple clocks, then you could have them matched
+> by the smartreflex driver instance number.
+>
+> Or if you mean different source clocks for various omaps, then
+> you just need to set multiple aliases for those clocks.
+>
+>> > In the driver, and add the necessary entries to the clock alias
+>> > table. That way it's up to the SoC to set up the necessary clocks
+>> > and the driver stays generic.
+>> Got it. The only solution would be to use an unique fck for all
+>> smartreflex modules in all configurations. Is that acceptable?
+>
+> Hmm maybe I don't follow you, but sounds like you just need to
+> use the driver instance like we do for timers:
+>
+> $ grep omap_timer arch/arm/mach-omap2/clock*data*.c
+> arch/arm/mach-omap2/clock44xx_data.c:   CLK("omap_timer.1",     "timer_sys_ck", &sys_clkin_ck,  CK_443X),
+> arch/arm/mach-omap2/clock44xx_data.c:   CLK("omap_timer.2",     "timer_sys_ck", &sys_clkin_ck,  CK_443X),
+> arch/arm/mach-omap2/clock44xx_data.c:   CLK("omap_timer.3",     "timer_sys_ck", &sys_clkin_ck,  CK_443X),
+> ...
+Ok.
 
-	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)
+I have a new version that implements this, re-submitting in a bit.
 
--- 
-Catalin
+>
+> If you need multiple clocks for a driver instance, then they
+> typically are just "fck" and "ick".
+>
+> Regards,
+>
+> Tony
+
+Thanks,
+Jean
