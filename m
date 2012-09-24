@@ -1,153 +1,38 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 24 Sep 2012 16:35:52 +0200
-Subject: [PATCH] ARM: OMAP: hwmod: align the SmartReflex fck names
-In-Reply-To: <1348134503-28220-1-git-send-email-j-pihet@ti.com>
-References: <1348134503-28220-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1348497352-6464-1-git-send-email-j-pihet@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 24 Sep 2012 16:39:11 +0200
+Subject: [PATCH 4/5] ARM: EXYNOS: Add support for Exynos secure firmware
+In-Reply-To: <20120916004455.GD7028@quad.lixom.net>
+References: <1347524018-19301-1-git-send-email-t.figa@samsung.com>
+ <1347524018-19301-5-git-send-email-t.figa@samsung.com>
+ <20120916004455.GD7028@quad.lixom.net>
+Message-ID: <1503070.mCpo7P41ro@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the smartreflex fck names for consistency and better readability;
-rename the clock aliases for use by the SmartReflex driver, with the
-"smartreflex.%d" format.
+Hi Olof,
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/clock33xx_data.c       |   12 ++++++------
- arch/arm/mach-omap2/clock3xxx_data.c       |   12 ++++++------
- arch/arm/mach-omap2/clock44xx_data.c       |    6 +++---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++++----
- 4 files changed, 19 insertions(+), 19 deletions(-)
+On Saturday 15 of September 2012 17:44:55 Olof Johansson wrote:
+> On Thu, Sep 13, 2012 at 10:13:37AM +0200, Tomasz Figa wrote:
+> > +static void __iomem *exynos_cpu_boot_reg(int cpu)
+> > +{
+> > +	return S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> > +}
+> 
+> This communication area in sysram should probably be seen as a part of
+> the firmware interface. It should thus be defined as part of the binding
+> instead, i.e.  through a reg property or similar there. That also would
+> make it easy to convert to using ioremap() instead of iodesc tables,
+> which always a nice thing.
 
-diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
-index 25bbcc7..a328f12 100644
---- a/arch/arm/mach-omap2/clock33xx_data.c
-+++ b/arch/arm/mach-omap2/clock33xx_data.c
-@@ -548,16 +548,16 @@ static struct clk mcasp1_fck = {
- 	.recalc		= &followparent_recalc,
- };
- 
--static struct clk smartreflex0_fck = {
--	.name		= "smartreflex0_fck",
-+static struct clk smartreflex_mpu_fck = {
-+	.name		= "smartreflex_mpu_fck",
- 	.clkdm_name	= "l4_wkup_clkdm",
- 	.parent		= &sys_clkin_ck,
- 	.ops		= &clkops_null,
- 	.recalc		= &followparent_recalc,
- };
- 
--static struct clk smartreflex1_fck = {
--	.name		= "smartreflex1_fck",
-+static struct clk smartreflex_core_fck = {
-+	.name		= "smartreflex_core_fck",
- 	.clkdm_name	= "l4_wkup_clkdm",
- 	.parent		= &sys_clkin_ck,
- 	.ops		= &clkops_null,
-@@ -1034,8 +1034,8 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
- 	CLK("NULL",	"mmc2_fck",		&mmc2_fck,	CK_AM33XX),
- 	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
--	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
--	CLK(NULL,	"smartreflex1_fck",	&smartreflex1_fck,	CK_AM33XX),
-+	CLK(NULL,	"smartreflex.0",	&smartreflex_mpu_fck,	CK_AM33XX),
-+	CLK(NULL,	"smartreflex.1",	&smartreflex_core_fck,	CK_AM33XX),
- 	CLK(NULL,	"gpt1_fck",		&timer1_fck,	CK_AM33XX),
- 	CLK(NULL,	"gpt2_fck",		&timer2_fck,	CK_AM33XX),
- 	CLK(NULL,	"gpt3_fck",		&timer3_fck,	CK_AM33XX),
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 83bed9a..a197cf2 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3050,8 +3050,8 @@ static struct clk traceclk_fck = {
- /* SR clocks */
- 
- /* SmartReflex fclk (VDD1) */
--static struct clk sr1_fck = {
--	.name		= "sr1_fck",
-+static struct clk smartreflex_mpu_iva_fck = {
-+	.name		= "smartreflex_mpu_iva_fck",
- 	.ops		= &clkops_omap2_dflt_wait,
- 	.parent		= &sys_ck,
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
-@@ -3061,8 +3061,8 @@ static struct clk sr1_fck = {
- };
- 
- /* SmartReflex fclk (VDD2) */
--static struct clk sr2_fck = {
--	.name		= "sr2_fck",
-+static struct clk smartreflex_core_fck = {
-+	.name		= "smartreflex_core_fck",
- 	.ops		= &clkops_omap2_dflt_wait,
- 	.parent		= &sys_ck,
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
-@@ -3447,8 +3447,8 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK(NULL,	"atclk_fck",	&atclk_fck,	CK_3XXX),
- 	CLK(NULL,	"traceclk_src_fck", &traceclk_src_fck, CK_3XXX),
- 	CLK(NULL,	"traceclk_fck",	&traceclk_fck,	CK_3XXX),
--	CLK(NULL,	"sr1_fck",	&sr1_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"sr2_fck",	&sr2_fck,	CK_34XX | CK_36XX),
-+	CLK(NULL,	"smartreflex.0",	&smartreflex_mpu_iva_fck,	CK_34XX | CK_36XX),
-+	CLK(NULL,	"smartreflex.1",	&smartreflex_core_fck,	CK_34XX | CK_36XX),
- 	CLK(NULL,	"sr_l4_ick",	&sr_l4_ick,	CK_34XX | CK_36XX),
- 	CLK(NULL,	"secure_32k_fck", &secure_32k_fck, CK_3XXX),
- 	CLK(NULL,	"gpt12_fck",	&gpt12_fck,	CK_3XXX),
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index d7f55e4..9cc1112 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -3224,9 +3224,9 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"slimbus2_fclk_0",		&slimbus2_fclk_0,	CK_443X),
- 	CLK(NULL,	"slimbus2_slimbus_clk",		&slimbus2_slimbus_clk,	CK_443X),
- 	CLK(NULL,	"slimbus2_fck",			&slimbus2_fck,	CK_443X),
--	CLK(NULL,	"smartreflex_core_fck",		&smartreflex_core_fck,	CK_443X),
--	CLK(NULL,	"smartreflex_iva_fck",		&smartreflex_iva_fck,	CK_443X),
--	CLK(NULL,	"smartreflex_mpu_fck",		&smartreflex_mpu_fck,	CK_443X),
-+	CLK(NULL,	"smartreflex.0",		&smartreflex_core_fck,	CK_443X),
-+	CLK(NULL,	"smartreflex.1",		&smartreflex_iva_fck,	CK_443X),
-+	CLK(NULL,	"smartreflex.2",		&smartreflex_mpu_fck,	CK_443X),
- 	CLK(NULL,	"timer1_fck",			&timer1_fck,	CK_443X),
- 	CLK(NULL,	"timer10_fck",			&timer10_fck,	CK_443X),
- 	CLK(NULL,	"timer11_fck",			&timer11_fck,	CK_443X),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index c9e3820..2b2b8fc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1359,7 +1359,7 @@ static struct omap_hwmod_irq_info omap3_smartreflex_mpu_irqs[] = {
- static struct omap_hwmod omap34xx_sr1_hwmod = {
- 	.name		= "smartreflex_mpu_iva",
- 	.class		= &omap34xx_smartreflex_hwmod_class,
--	.main_clk	= "sr1_fck",
-+	.main_clk	= "smartreflex_mpu_iva_fck",
- 	.prcm		= {
- 		.omap2 = {
- 			.prcm_reg_id = 1,
-@@ -1377,7 +1377,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
- static struct omap_hwmod omap36xx_sr1_hwmod = {
- 	.name		= "smartreflex_mpu_iva",
- 	.class		= &omap36xx_smartreflex_hwmod_class,
--	.main_clk	= "sr1_fck",
-+	.main_clk	= "smartreflex_mpu_iva_fck",
- 	.prcm		= {
- 		.omap2 = {
- 			.prcm_reg_id = 1,
-@@ -1404,7 +1404,7 @@ static struct omap_hwmod_irq_info omap3_smartreflex_core_irqs[] = {
- static struct omap_hwmod omap34xx_sr2_hwmod = {
- 	.name		= "smartreflex_core",
- 	.class		= &omap34xx_smartreflex_hwmod_class,
--	.main_clk	= "sr2_fck",
-+	.main_clk	= "smartreflex_core_fck",
- 	.prcm		= {
- 		.omap2 = {
- 			.prcm_reg_id = 1,
-@@ -1422,7 +1422,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
- static struct omap_hwmod omap36xx_sr2_hwmod = {
- 	.name		= "smartreflex_core",
- 	.class		= &omap36xx_smartreflex_hwmod_class,
--	.main_clk	= "sr2_fck",
-+	.main_clk	= "smartreflex_core_fck",
- 	.prcm		= {
- 		.omap2 = {
- 			.prcm_reg_id = 1,
+I have tried to get around the need of statical mapping for SYSRAM, but the 
+firmware has to be initialized very early, before low level L2x0 cache 
+initialization (which is an early initcall, so it has to be in init_early 
+machine callback) and at that time ioremap is not available yet.
+
+I think we should just allow this additional static mapping, I don't see 
+any sane way of mapping it dynamically, at least at the moment.
+
+Best regards,
 -- 
-1.7.7.6
+Tomasz Figa
+Samsung Poland R&D Center
