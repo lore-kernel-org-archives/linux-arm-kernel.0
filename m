@@ -1,34 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 25 Sep 2012 01:16:10 +0200
-Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
-In-Reply-To: <20120924173739.GG14266@lunn.ch>
-References: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
- <20120924163716.GR5469@titan.lakedaemon.net> <20120924173739.GG14266@lunn.ch>
-Message-ID: <5060E9BA.7010806@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Sep 2012 00:16:19 +0100
+Subject: [PATCH] arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
+In-Reply-To: <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
+References: <1341325242-17638-1-git-send-email-yegorslists@googlemail.com>
+ <20120924171858.GG28835@atomide.com>
+ <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
+Message-ID: <20120924231619.GA28941@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2012 07:37 PM, Andrew Lunn wrote:
-> On Mon, Sep 24, 2012 at 12:37:16PM -0400, Jason Cooper wrote:
->> On Mon, Sep 24, 2012 at 07:54:33AM +0200, Andrew Lunn wrote:
->>> Some Orion5x devices allocate their coherent buffers from atomic
->>> context. Increase size of atomic coherent pool to make sure such the
->>> allocations won't fail during boot.
->>>
->>> Signed-off-by: Andrew Lunn<andrew@lunn.ch>
->>
->> Acked-by: Jason Cooper<jason@lakedaemon.net>
->>
->> btw - we should take this to it's logical conclusion and have Sebastian
->> check Dove.  Sebastian?
->
-> I did think about that. It probably hits if you have two sata
-> devices. However, all current Dove machines have just one.
+On Mon, Sep 24, 2012 at 09:05:11PM +0200, Yegor Yefremov wrote:
+> On Mon, Sep 24, 2012 at 7:18 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * yegorslists at googlemail.com <yegorslists@googlemail.com> [120703 07:26]:
+> >> From: Yegor Yefremov <yegorslists@googlemail.com>
+> >>
+> >> FORCE_MAX_ZONEORDER of 12 is needed to allocation more than 4MB
+> >> of consistent DMA memory (da8xx frame buffer driver).
+> >
+> > Sorry for the delay on this one, looks like this one is
+> > still valid. I'll apply it.
+> 
+> Thanks.
+> 
+> Yegor
+> 
+> >> Signed-off-by: Dejan Gacnik <dejan.gacnik@gmail.com>
+> >> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> >> ---
+> >>  arch/arm/Kconfig |    5 +++--
+> >>  1 files changed, 3 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index e876819..ff14c1e 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -1725,8 +1725,9 @@ config HW_PERF_EVENTS
+> >>  source "mm/Kconfig"
+> >>
+> >>  config FORCE_MAX_ZONEORDER
+> >> -     int "Maximum zone order" if ARCH_SHMOBILE
+> >> -     range 11 64 if ARCH_SHMOBILE
+> >> +     int "Maximum zone order"
+> >> +     depends on ARCH_SHMOBILE || SOC_AM33XX
+> >> +     range 11 64 if ARCH_SHMOBILE || SOC_AM33XX
+> >>       default "9" if SA1111
+> >>       default "11"
 
-Jason, Andrew,
-
-I did boot arm-soc/for-next on Cubox and looks like 256k pool for atomic
-coherent allocations is enough. I booted with sata, sdhci0, eth0, i2c0,
-spi0, and both pcie ports forced on without any pcie devices attached.
-
-Sebastian
+NAK.  This patch breaks SA1111 platforms.  To see why, read the patch.
