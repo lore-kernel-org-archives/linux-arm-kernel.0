@@ -1,27 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 24 Sep 2012 19:37:39 +0200
-Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
-In-Reply-To: <20120924163716.GR5469@titan.lakedaemon.net>
-References: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
- <20120924163716.GR5469@titan.lakedaemon.net>
-Message-ID: <20120924173739.GG14266@lunn.ch>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 24 Sep 2012 10:40:54 -0700
+Subject: [PATCH] ARM: dtb: move all dtb targets to common Makefile
+In-Reply-To: <1348203840-23559-1-git-send-email-olof@lixom.net>
+References: <1348203840-23559-1-git-send-email-olof@lixom.net>
+Message-ID: <20120924174054.GA8290@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 12:37:16PM -0400, Jason Cooper wrote:
-> On Mon, Sep 24, 2012 at 07:54:33AM +0200, Andrew Lunn wrote:
-> > Some Orion5x devices allocate their coherent buffers from atomic
-> > context. Increase size of atomic coherent pool to make sure such the
-> > allocations won't fail during boot.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On Thu, Sep 20, 2012 at 10:04:00PM -0700, Olof Johansson wrote:
+> Since the dtb targets have moved to arch/arm/boot/dts/Makefile, sweep
+> the platforms that have had new targets added recently and move them over.
 > 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> While I was at it, I also made the dtb generation more generic, i.e. if
+> the platform is enabled then all dtbs for that platform will be created.
 > 
-> btw - we should take this to it's logical conclusion and have Sebastian
-> check Dove.  Sebastian?
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: David Brown <davidb@codeaurora.com>
+> Cc: Barry Song <Baohua.Song@csr.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+> 
+> Already applied to next/multiplatform.
+> 
+>  arch/arm/mach-msm/Makefile.boot      |  3 ---
 
-I did think about that. It probably hits if you have two sata
-devices. However, all current Dove machines have just one.
+Acked-by: David Brown <davidb@codeaurora.org>
 
-	 Andrew
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
