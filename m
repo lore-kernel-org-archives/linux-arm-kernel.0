@@ -1,36 +1,22 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 24 Sep 2012 07:54:33 +0200
-Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
-Message-ID: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
+Date: Mon, 24 Sep 2012 07:58:12 +0200
+Subject: [GIT PULL V5 0/7] ARM: kirkwood/dove/mvebu changes for v3.7
+In-Reply-To: <CAOesGMj6HBMFWr+3RfEmEg8GvRvPU5QguOhyiMD=cUftR5Opmw@mail.gmail.com>
+References: <20120922171554.GE5469@titan.lakedaemon.net>
+ <20120924052301.GE14266@lunn.ch>
+ <CAOesGMj6HBMFWr+3RfEmEg8GvRvPU5QguOhyiMD=cUftR5Opmw@mail.gmail.com>
+Message-ID: <20120924055812.GF14266@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Orion5x devices allocate their coherent buffers from atomic
-context. Increase size of atomic coherent pool to make sure such the
-allocations won't fail during boot.
+> > We had the same problem with kirkwood. I will submit a patch against
+> > 3.6-rc7. Is there still time for that? Otherwise it would be good to
+> > have in 3.7 and cc: stable so 3.6.1 gets the fix.
+> 
+> There's still some time, Linus just tagged -rc7 so we will have
+> somewhere between a few days and maybe a week until final 3.6.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-orion5x/common.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+I just sent the patch to the list. It is the same change that was made
+to kirkwood.
 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 410291c..a6cd14a 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -204,6 +204,13 @@ void __init orion5x_wdt_init(void)
- void __init orion5x_init_early(void)
- {
- 	orion_time_set_base(TIMER_VIRT_BASE);
-+
-+	/*
-+	 * Some Orion5x devices allocate their coherent buffers from atomic
-+	 * context. Increase size of atomic coherent pool to make sure such
-+	 * the allocations won't fail.
-+	 */
-+	init_dma_coherent_pool_size(SZ_1M);
- }
- 
- int orion5x_tclk;
--- 
-1.7.10.4
+	   Andrew
