@@ -1,108 +1,54 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 24 Sep 2012 17:31:46 +0100
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <1348242975-19184-6-git-send-email-cyril@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
-Message-ID: <20120924163146.GD2122@linaro.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Sep 2012 09:35:01 -0700
+Subject: [GIT PULL] Versatile Express clk
+In-Reply-To: <1348501568.27071.5.camel@hornet>
+References: <1348501568.27071.5.camel@hornet>
+Message-ID: <20120924163501.12878.34717@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 11:56:03AM -0400, Cyril Chemparathy wrote:
-> This patch adds support for 64-bit physical addresses in virt_to_phys()
-> patching.  This does not do real 64-bit add/sub, but instead patches in the
-> upper 32-bits of the phys_offset directly into the output of virt_to_phys.
+Quoting Pawel Moll (2012-09-24 08:46:08)
+> Hi Mike,
 > 
-> There is no corresponding change on the phys_to_virt() side, because
-> computations on the upper 32-bits would be discarded anyway.
+> Would you be so kind and pull the VE clocking stuff? They are rebased on
+> top of Linus' Realview patch.
 > 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> ---
->  arch/arm/include/asm/memory.h |   38 ++++++++++++++++++++++++++++++++++++--
->  arch/arm/kernel/head.S        |    4 ++++
->  arch/arm/kernel/setup.c       |    2 +-
->  3 files changed, 41 insertions(+), 3 deletions(-)
+
+Hi Pawell,
+
+I had not planned on taking any more changes for 3.7.  I'm happy to take
+these patches for 3.8.
+
+Regards,
+Mike
+
+> Thanks!
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 88ca206..f3e8f88 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -154,13 +154,47 @@
->  #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
->  
->  extern unsigned long	__pv_offset;
-> -extern unsigned long	__pv_phys_offset;
-> +extern phys_addr_t	__pv_phys_offset;
->  #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
->  
->  static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
-> -	unsigned long t;
-> +	phys_addr_t t;
-> +
-> +#ifndef CONFIG_ARM_LPAE
->  	early_patch_imm8("add", t, x, __pv_offset, 0);
-> +#else
-> +	unsigned long __tmp;
-> +
-> +#ifndef __ARMEB__
-> +#define PV_PHYS_HIGH	"(__pv_phys_offset + 4)"
-> +#else
-> +#define PV_PHYS_HIGH	"__pv_phys_offset"
-> +#endif
-> +
-> +	early_patch_stub(
-> +	/* type */		PATCH_IMM8,
-> +	/* code */
-> +		"ldr		%[tmp], =__pv_offset\n"
-> +		"ldr		%[tmp], [%[tmp]]\n"
-> +		"add		%Q[to], %[from], %[tmp]\n"
-> +		"ldr		%[tmp], =" PV_PHYS_HIGH "\n"
-> +		"ldr		%[tmp], [%[tmp]]\n"
-> +		"mov		%R[to], %[tmp]\n",
-> +	/* pad */		4,
-> +	/* patch_data */
-> +		".long		__pv_offset\n"
-> +		"add		%Q[to], %[from], %[imm]\n"
-> +		".long	"	PV_PHYS_HIGH "\n"
-> +		"mov		%R[to], %[imm]\n",
-> +	/* operands */
-> +		: [to]	 "=r"	(t),
-> +		  [tmp]	 "=&r"	(__tmp)
-> +		: [from] "r"	(x),
-> +		  [imm]	 "I"	(__IMM8),
-> +			 "i"	(&__pv_offset),
-> +			 "i"	(&__pv_phys_offset));
-
-So, the actual offset we can apply is:
-
-__pv_phys_offset + __pv_offset
-
-where:
-
- * the high 32 bits of the address being fixed up are assumed to be 0
-   (true, because the kernel is initially always fixed up to an address
-   range <4GB)
-
- * the low 32 bits of __pv_phys_offset are assumed to be 0 (?)
-
- * the full offset is of the form
-
-        ([..0..]XX[..0..] << 32) | [..0..]YY[..0..] 
-
-Is this intentional?  It seems like a rather weird constraint...  but
-it may be sensible.  PAGE_OFFSET is probably 0xc0000000 or 0x80000000,
-(so YY can handle that) and the actual RAM above 4GB will likely be
-huge and aligned on some enormous boundary in such situations (so that
-XX can handle that).
-
-So long as the low RAM alias is not misaligned relative to the high alias
-on a finer granularity than 16MB (so that YY = (PAGE_OFFSET +/- the
-misalignment) is still a legal immediate), I guess there should not be a
-problem.
-
-[...]
-
-Cheers
----Dave
+> Pawel
+> 
+> 
+> The following changes since commit b9f8a0f8e255919bdcfb96a8d50d1523233a458a:
+> 
+>   clk: convert ARM RealView to common clk (2012-09-24 16:28:29 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/pawelmoll/linux.git clk-v3.6-rc7
+> 
+> for you to fetch changes up to b262f1ed394218f9327b72e7d1d17a5e62074be0:
+> 
+>   clk: Common clocks implementation for Versatile Express (2012-09-24 16:28:30 +0100)
+> 
+> ----------------------------------------------------------------
+> Pawel Moll (2):
+>       clk: Versatile Express clock generators ("osc") driver
+>       clk: Common clocks implementation for Versatile Express
+> 
+>  arch/arm/include/asm/hardware/sp810.h    |    2 +
+>  drivers/clk/Kconfig                      |    8 +-
+>  drivers/clk/versatile/Makefile           |    2 +
+>  drivers/clk/versatile/clk-vexpress-osc.c |  150 ++++++++++++++++++++++++++++++
+>  drivers/clk/versatile/clk-vexpress.c     |  142 ++++++++++++++++++++++++++++
+>  5 files changed, 301 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
+>  create mode 100644 drivers/clk/versatile/clk-vexpress.c
