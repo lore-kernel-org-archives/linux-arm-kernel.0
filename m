@@ -1,54 +1,190 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2012 09:19:45 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the
- omap_dss2 tree
-In-Reply-To: <1348492306.2361.48.camel@deskari>
-References: <20120924195305.588277e94ce701abc5e5a6c5@canb.auug.org.au>
- <201209241243.39462.arnd@arndb.de>
- <1348492306.2361.48.camel@deskari>
-Message-ID: <20120924161944.GC28835@atomide.com>
+Date: Mon, 24 Sep 2012 09:29:48 -0700
+Subject: [PATCH] ARM: OMAP: convert I2C driver to PM QoS for MPU
+ latency constraints
+In-Reply-To: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
+References: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
+Message-ID: <20120924162947.GD28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [120924 06:12]:
-> Hi Arnd,
+* Jean Pihet <jean.pihet@newoldbits.com> [120920 09:09]:
+> Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
+> API to the new PM QoS API.
+> Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
+> class of PM QoS. The resulting MPU constraints are used by cpuidle to
+> decide the next power state of the MPU subsystem.
 > 
-> On Mon, 2012-09-24 at 12:43 +0000, Arnd Bergmann wrote:
-> > On Monday 24 September 2012, Stephen Rothwell wrote:
-> > > Today's linux-next merge of the arm-soc tree got a conflict in
-> > > drivers/video/omap/lcd_ams_delta.c between commit 9586778de558 ("OMAPFB1:
-> > > remove unnecessary includes") from the  tree and commit e27e35ec735f
-> > > ("ARM: OMAP1: Move board-ams-delta.h from plat to mach") from the arm-soc
-> > > tree.
-> > > 
-> > > The latter removed a superset of the former (as far as include files is
-> > > concerned), so I used that and can carry the fix as necessary (no action
-> > > is required).
-> > > 
-> > 
-> > Hi Stephen,
-> > 
-> > I looked at all your reports and your fixes are looking good to me.
-> > 
-> > I'm already building all ARM defconfigs now and have fixup patches for the
-> > instances that went wrong or introduced new warnings, I'll do that again
-> > on top of today's linux-next tree.
-> > 
-> > The merge window is going to be fun with all those conflicts, but I don't
-> > have a better idea either.
+> The I2C device latency timing is derived from the FIFO size and the
+> clock speed and so is applicable to all OMAP SoCs.
 > 
-> If there's a stable branch for the OMAP platform changes, I could merge
-> it to omapdss tree and fix the conflicts. But if I've understood right,
-> Linus doesn't really like merges just for the sake of fixing conflicts.
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+
+Good to see this, probably should have an ack from
+Kevin Hilman for this. Other than that it's best to
+merge this via the i2c tree:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+> Rebased on git://git.pengutronix.de/git/wsa/linux.git, branch
+> i2c-embedded/for-next
+> ---
+>  arch/arm/plat-omap/i2c.c      |   21 ---------------------
+>  drivers/i2c/busses/i2c-omap.c |   32 ++++++++++++++++++--------------
+>  include/linux/i2c-omap.h      |    1 -
+>  3 files changed, 18 insertions(+), 36 deletions(-)
 > 
-> So far all the omapdss conflicts seem trivial, though.
-
-Trivial ones should be OK, but maybe you find something
-minimal with the following to find tags that you can pull
-into your branch make things easier:
-
-$ git log --pretty=oneline --merges v3.6-rc7..arm-soc/for-next arch/arm/*omap*/* | grep "Merge tag" | grep omap
-
-Regards,
-
-Tony
+> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+> index 40bc06a..d29a2cc 100644
+> --- a/arch/arm/plat-omap/i2c.c
+> +++ b/arch/arm/plat-omap/i2c.c
+> @@ -26,7 +26,6 @@
+>  #include <linux/kernel.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c.h>
+> -#include <linux/i2c-omap.h>
+>  #include <linux/slab.h>
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+> @@ -34,7 +33,6 @@
+>  #include <mach/irqs.h>
+>  #include <plat/mux.h>
+>  #include <plat/i2c.h>
+> -#include <plat/omap-pm.h>
+>  #include <plat/omap_device.h>
+>  
+>  #define OMAP_I2C_SIZE		0x3f
+> @@ -130,16 +128,6 @@ static inline int omap1_i2c_add_bus(int bus_id)
+>  
+>  
+>  #ifdef CONFIG_ARCH_OMAP2PLUS
+> -/*
+> - * XXX This function is a temporary compatibility wrapper - only
+> - * needed until the I2C driver can be converted to call
+> - * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
+> - */
+> -static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
+> -{
+> -	omap_pm_set_max_mpu_wakeup_lat(dev, t);
+> -}
+> -
+>  static inline int omap2_i2c_add_bus(int bus_id)
+>  {
+>  	int l;
+> @@ -171,15 +159,6 @@ static inline int omap2_i2c_add_bus(int bus_id)
+>  	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
+>  	pdata->flags = dev_attr->flags;
+>  
+> -	/*
+> -	 * When waiting for completion of a i2c transfer, we need to
+> -	 * set a wake up latency constraint for the MPU. This is to
+> -	 * ensure quick enough wakeup from idle, when transfer
+> -	 * completes.
+> -	 * Only omap3 has support for constraints
+> -	 */
+> -	if (cpu_is_omap34xx())
+> -		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+>  	pdev = omap_device_build(name, bus_id, oh, pdata,
+>  			sizeof(struct omap_i2c_bus_platform_data),
+>  			NULL, 0, 0);
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 0b02543..db31eae 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -43,6 +43,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/i2c-omap.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/pm_qos.h>
+>  
+>  /* I2C controller revisions */
+>  #define OMAP_I2C_OMAP1_REV_2		0x20
+> @@ -186,9 +187,8 @@ struct omap_i2c_dev {
+>  	int			reg_shift;      /* bit shift for I2C register addresses */
+>  	struct completion	cmd_complete;
+>  	struct resource		*ioarea;
+> -	u32			latency;	/* maximum mpu wkup latency */
+> -	void			(*set_mpu_wkup_lat)(struct device *dev,
+> -						    long latency);
+> +	u32			latency;	/* maximum MPU wkup latency */
+> +	struct pm_qos_request	pm_qos_request;
+>  	u32			speed;		/* Speed of bus in kHz */
+>  	u32			dtrev;		/* extra revision from DT */
+>  	u32			flags;
+> @@ -494,9 +494,7 @@ static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
+>  		dev->b_hw = 1; /* Enable hardware fixes */
+>  
+>  	/* calculate wakeup latency constraint for MPU */
+> -	if (dev->set_mpu_wkup_lat != NULL)
+> -		dev->latency = (1000000 * dev->threshold) /
+> -			(1000 * dev->speed / 8);
+> +	dev->latency = (1000000 * dev->threshold) / (1000 * dev->speed / 8);
+>  }
+>  
+>  /*
+> @@ -631,8 +629,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  	if (r < 0)
+>  		goto out;
+>  
+> -	if (dev->set_mpu_wkup_lat != NULL)
+> -		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
+> +	/*
+> +	 * When waiting for completion of a i2c transfer, we need to
+> +	 * set a wake up latency constraint for the MPU. This is to
+> +	 * ensure quick enough wakeup from idle, when transfer
+> +	 * completes.
+> +	 */
+> +	if (dev->latency)
+> +		pm_qos_add_request(&dev->pm_qos_request,
+> +				   PM_QOS_CPU_DMA_LATENCY,
+> +				   dev->latency);
+>  
+>  	for (i = 0; i < num; i++) {
+>  		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
+> @@ -640,8 +646,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  			break;
+>  	}
+>  
+> -	if (dev->set_mpu_wkup_lat != NULL)
+> -		dev->set_mpu_wkup_lat(dev->dev, -1);
+> +	if (dev->latency)
+> +		pm_qos_remove_request(&dev->pm_qos_request);
+>  
+>  	if (r == 0)
+>  		r = num;
+> @@ -1098,7 +1104,6 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	} else if (pdata != NULL) {
+>  		dev->speed = pdata->clkrate;
+>  		dev->flags = pdata->flags;
+> -		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+>  		dev->dtrev = pdata->rev;
+>  	}
+>  
+> @@ -1154,9 +1159,8 @@ omap_i2c_probe(struct platform_device *pdev)
+>  			dev->b_hw = 1; /* Enable hardware fixes */
+>  
+>  		/* calculate wakeup latency constraint for MPU */
+> -		if (dev->set_mpu_wkup_lat != NULL)
+> -			dev->latency = (1000000 * dev->fifo_size) /
+> -				       (1000 * dev->speed / 8);
+> +		dev->latency = (1000000 * dev->fifo_size) /
+> +			       (1000 * dev->speed / 8);
+>  	}
+>  
+>  	/* reset ASAP, clearing any IRQs */
+> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+> index 92a0dc7..df804ba 100644
+> --- a/include/linux/i2c-omap.h
+> +++ b/include/linux/i2c-omap.h
+> @@ -34,7 +34,6 @@ struct omap_i2c_bus_platform_data {
+>  	u32		clkrate;
+>  	u32		rev;
+>  	u32		flags;
+> -	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
+>  };
+>  
+>  #endif
+> -- 
+> 1.7.7.6
+> 
