@@ -1,9 +1,11 @@
 From: mahalakshmi.m@jasmin-infotech.com (mahalakshmi.m)
-Date: Mon, 24 Sep 2012 19:22:42 +0530
-Subject: i2c_transfer using 8bit register address
-Message-ID: <006001cd9a5b$de7c1e30$9b745a90$@m@jasmin-infotech.com>
+Date: Mon, 24 Sep 2012 19:28:45 +0530
+Subject: 8bit i2c register address
+Message-ID: <006c01cd9a5c$b67bd550$23737ff0$@m@jasmin-infotech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+ 
 
 Hi,
 
@@ -14,7 +16,7 @@ follows.
 
  
 
-static int My_Read(void *dev, u16 reg, u32 len,
+static int My_Read(void *dev, u8 reg, u32 len,
 
                                  u16 *data, u32 endian)
 
@@ -38,7 +40,7 @@ static int My_Read(void *dev, u16 reg, u32 len,
 
         msg[0].len = 2;
 
-        msg[0].buf = (char *)&block_data;
+        msg[0].buf = (char *)&reg;
 
  
 
@@ -110,4 +112,4 @@ Maha
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/9c6d1390/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/ddea0d5b/attachment-0001.html>
