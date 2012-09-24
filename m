@@ -1,68 +1,35 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 24 Sep 2012 18:56:53 +0100
-Subject: [RFC] regulator: core: Support for continuous voltage range
-Message-ID: <1348509414-21261-1-git-send-email-pawel.moll@arm.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 24 Sep 2012 23:26:39 +0530
+Subject: [PATCH] ARM: am33xx: clk: Update clkdev table to add mcasp alias
+Message-ID: <1348509399-3391-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some regulators can set any voltage within the constraints range,
-not being limited to specified operating points.
+After Rajendra's common-clock preparation series,
+commit (a1978ef4da1 - ARM: omap: hwmod: get rid of
+all omap_clk_get_by_name usage) the clkdev table need to
+update with an entry for clocks used by hwmod to have
+clock name same as the alias.
 
-This patch makes it possible to describe such regulator and makes
-the regulator_is_supported_voltage() function behave correctly.
+Without this, the clk_get() in omap_hwmod would fail.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 ---
- drivers/regulator/core.c         |    5 +++++
- include/linux/regulator/driver.h |    3 +++
- 2 files changed, 8 insertions(+)
+ arch/arm/mach-omap2/clock33xx_data.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Hi Mark,
-
-This is roughly what we discussed last week. Alternatively, it could be
-also a "universal" unsigned regulator_desc.flags field with #define
-REGULATOR_FLAG_CONTINUOUS_VOLTAGE_RAGE 0x1.
-
-Regards
-
-Pawel
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 4838531..808928a 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1947,6 +1947,11 @@ int regulator_is_supported_voltage(struct regulator *regulator,
- 			return ret;
- 	}
- 
-+	/* Any voltage within constrains range is fine? */
-+	if (rdev->desc->continuous_voltage_range)
-+		return min_uV >= rdev->constraints->min_uV &&
-+				max_uV <= rdev->constraints->max_uV;
-+
- 	ret = regulator_count_voltages(regulator);
- 	if (ret < 0)
- 		return ret;
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index bac4c87..2f915b9 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -171,6 +171,8 @@ enum regulator_type {
-  * @type: Indicates if the regulator is a voltage or current regulator.
-  * @owner: Module providing the regulator, used for refcounting.
-  *
-+ * @continuous_voltage_range: Indicates if the regulator can set any
-+ *                            voltage within constrains range.
-  * @n_voltages: Number of selectors available for ops.list_voltage().
-  *
-  * @min_uV: Voltage given by the lowest selector (if linear mapping)
-@@ -189,6 +191,7 @@ struct regulator_desc {
- 	const char *name;
- 	const char *supply_name;
- 	int id;
-+	bool continuous_voltage_range;
- 	unsigned n_voltages;
- 	struct regulator_ops *ops;
- 	int irq;
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index b87b88c..114ab4b 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1035,6 +1035,8 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk,	CK_AM33XX),
+ 	CLK("davinci-mcasp.0",  NULL,           &mcasp0_fck,    CK_AM33XX),
+ 	CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
++	CLK(NULL,	"mcasp0_fck",		&mcasp0_fck,	CK_AM33XX),
++	CLK(NULL,	"mcasp1_fck",		&mcasp1_fck,	CK_AM33XX),
+ 	CLK("NULL",	"mmc2_fck",		&mmc2_fck,	CK_AM33XX),
+ 	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
+ 	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
 -- 
-1.7.9.5
+1.7.0.4
