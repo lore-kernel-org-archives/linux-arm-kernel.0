@@ -1,37 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Sep 2012 15:26:29 +0100
-Subject: GIC affinity and edge trigger
-In-Reply-To: <CC811D74.ECFF%wbarak@gmail.com>
-References: <CC811D74.ECFF%wbarak@gmail.com>
-Message-ID: <50606D95.8070109@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 24 Sep 2012 16:28:27 +0200
+Subject: [PATCH v2 0/6] ARM: EXYNOS: Add secure firmware support
+Message-ID: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/12 17:22, Barak Wasserstrom wrote:
-> Hello,
-> I'm currently using linux kernel 2.6.38 with SMP enabled.
-> I have an interrupt which is a pulse and therefore I set the trigger to positive edge.
-> Due to the fact that each CPU sees its own GIC distributor memory space, only the CPU that executed request_irq has the trigger type set to positive edge, while the others remain level.
+Some Exynos-based boards are running with secure firmware running in
+TrustZone secure world, which changes the way some things have to be
+initialized.
 
-This seem to imply that your interrupt is a PPI, and not a SPI. If this
-is the case, you cannot use request_irq on such an interrupt. 2.6.38 is
-pretty ancient though, and doesn't have any support for
-request_percpu_irq and co. How are you configuring/requesting this
-interrupt?
+This series adds support for specifying firmware operations, implements
+some firmware operations for Exynos secure firmware and adds a method of
+enabling secure firmware operations on Exynos-based boards through board
+file and device tree.
 
-> Moreover, gic_set_cpu always defines the GIC distributor target to be CPU0.
+Changes since v1
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12583/focus=12820
+  - Changed return types of all operations to int
+  - Defined all operations to return 0 on success, -ENOSYS when not
+    implemented or appropriate error code on error
 
-For a PPI, the concept of "target" is pretty minimal, and is always the
-CPU this PPI is connected to.
+Tomasz Figa (6):
+  ARM: Add interface for registering and calling firmware-specific
+    operations
+  ARM: EXYNOS: Add support for secure monitor calls
+  ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
+  ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+  ARM: EXYNOS: Add support for Exynos secure firmware
+  ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
 
-> So only CPU0 target is enabled + trigger is set to edge only for one CPU and thus not always do I get the interrupt.
-> Can you please help me understand what I'm doing wrong, or misunderstand?
+ .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
+ arch/arm/common/Makefile                           |  2 +
+ arch/arm/common/firmware.c                         | 18 ++++++++
+ arch/arm/include/asm/firmware.h                    | 31 +++++++++++++
+ arch/arm/mach-exynos/Makefile                      |  6 +++
+ arch/arm/mach-exynos/common.c                      | 34 ++++++++++++++
+ arch/arm/mach-exynos/common.h                      |  2 +
+ arch/arm/mach-exynos/exynos-smc.S                  | 22 +++++++++
+ arch/arm/mach-exynos/firmware.c                    | 54 ++++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h            |  3 ++
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+ arch/arm/mach-exynos/platsmp.c                     | 36 ++++++++++++---
+ arch/arm/mach-exynos/smc.h                         | 31 +++++++++++++
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+ 14 files changed, 243 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/common/firmware.c
+ create mode 100644 arch/arm/include/asm/firmware.h
+ create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+ create mode 100644 arch/arm/mach-exynos/firmware.c
+ create mode 100644 arch/arm/mach-exynos/smc.h
 
-Please clarify whether you're using a PPI or an SPI. The above is not
-clear enough to give you a straight answer.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+1.7.12
