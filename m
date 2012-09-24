@@ -1,37 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2012 11:49:24 -0700
-Subject: [PATCH] ARM: am33xx: clk: Update clkdev table to add mcasp alias
-In-Reply-To: <alpine.DEB.2.00.1209241832430.24053@utopia.booyaka.com>
-References: <1348509399-3391-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1209241832430.24053@utopia.booyaka.com>
-Message-ID: <20120924184924.GI28835@atomide.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 24 Sep 2012 21:00:47 +0200
+Subject: [PATCH 2/2] ARM i.MX25: Add devicetree
+In-Reply-To: <1348468841-4331-3-git-send-email-s.hauer@pengutronix.de>
+References: <1348468841-4331-1-git-send-email-s.hauer@pengutronix.de>
+ <1348468841-4331-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120924190046.GA4439@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120924 11:34]:
-> On Mon, 24 Sep 2012, Vaibhav Hiremath wrote:
-> 
-> > After Rajendra's common-clock preparation series,
-> > commit (a1978ef4da1 - ARM: omap: hwmod: get rid of
-> > all omap_clk_get_by_name usage) the clkdev table need to
-> > update with an entry for clocks used by hwmod to have
-> > clock name same as the alias.
-> > 
-> > Without this, the clk_get() in omap_hwmod would fail.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> Tony, if you want to take this, it's
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> otherwise we'll wait for -rc1.
+Hi Sascha,
 
-Please just go ahead and queue it as a fix.
+On Mon, Sep 24, 2012 at 08:40:40AM +0200, Sascha Hauer wrote:
+> This adds a i.MX25 dtsi file along with the i.MX25 clock tree
+> documentation. The devicetree should be fairly complete for:
+> 
+> - uart
+> - fec
+> - i2c
+> - spi
+> - pwm
+> - nand
+> - gpio
+> - wdog
+> - esdhc
+> - flexcan
+> 
+> The more exotic devices currently miss clock bindings.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
 
-We should get a fixes branch in before -rc1 is tagged
-so -rc1 works for us.
+[...]
 
-Regards,
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  The following is a full list of i.MX6Q
+> +clocks and IDs.
 
-Tony
+s/i.MX6Q/i.MX25/
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
