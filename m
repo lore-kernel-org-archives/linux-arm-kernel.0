@@ -1,41 +1,129 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Sep 2012 16:22:20 +0100
-Subject: [PATCH v3 RESEND 08/17] ARM: LPAE: use phys_addr_t in
- free_memmap()
-In-Reply-To: <506077BE.6000600@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-9-git-send-email-cyril@ti.com>
- <20120924132942.GD23298@arm.com>
- <20120924134145.GB26454@n2100.arm.linux.org.uk> <506077BE.6000600@ti.com>
-Message-ID: <20120924152220.GE26454@n2100.arm.linux.org.uk>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 24 Sep 2012 08:35:14 -0700
+Subject: [PATCH 2/3] clk: ux500: Support prcmu ape opp voltage clock
+In-Reply-To: <1348497799-32143-3-git-send-email-ulf.hansson@stericsson.com>
+References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348497799-32143-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20120924153514.12878.47739@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 11:09:50AM -0400, Cyril Chemparathy wrote:
-> On 9/24/2012 9:41 AM, Russell King - ARM Linux wrote:
->> On Mon, Sep 24, 2012 at 02:29:42PM +0100, Catalin Marinas wrote:
->>> This function also calls free_bootmem() which takes unsigned long. Are
->>> patches sent separately for this or we just ignore holes in memmap?
->>> There are other calls to free_bootmem() or reserve_bootmem(), do they
->>> just work with the high phys addresses?
->>
->> Bootmem only deals with physical addresses which fit within the size
->> of an 'unsigned long'.  Unfortunately, the bootmem API is a mess of
->> 'unsigned long' physical addresses and PFNs.
->>
->> Years ago there was a patch to make it use only PFNs but other changes
->> resulted in that patch being thrown away.
->>
->
-> A separate patch has been posted for bootmem (see [1]).
->
-> Tejun suggested that we'd be better off moving entirely to memblock  
-> instead (see [2]).
+Quoting Ulf Hansson (2012-09-24 07:43:18)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> Some scalable prcmu clocks needs to be handled in conjuction with the
+> ape opp 100 voltage. A new prcmu clock type clk_prcmu_opp_volt_scalable
+> is implemented to handle this.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/clk/ux500/clk-prcmu.c |   55 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/ux500/clk.h       |    6 +++++
+>  2 files changed, 61 insertions(+)
+> 
+> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+> index 930cdfe..04577ca 100644
+> --- a/drivers/clk/ux500/clk-prcmu.c
+> +++ b/drivers/clk/ux500/clk-prcmu.c
+> @@ -133,6 +133,40 @@ out_error:
+>                 hw->init->name);
+>  }
+>  
+> +static int clk_prcmu_opp_volt_prepare(struct clk_hw *hw)
+> +{
+> +       int err;
+> +       struct clk_prcmu *clk = to_clk_prcmu(hw);
+> +
+> +       err = prcmu_request_ape_opp_100_voltage(true);
+> +       if (err) {
+> +               pr_err("clk_prcmu: %s failed to request APE OPP VOLT for %s.\n",
+> +                       __func__, hw->init->name);
+> +               return err;
+> +       }
+> +
+> +       err = prcmu_request_clock(clk->cg_sel, true);
+> +       if (err)
+> +               prcmu_request_ape_opp_100_voltage(false);
+> +
+> +       return err;
+> +}
+> +
+> +static void clk_prcmu_opp_volt_unprepare(struct clk_hw *hw)
+> +{
+> +       struct clk_prcmu *clk = to_clk_prcmu(hw);
+> +
+> +       if (prcmu_request_clock(clk->cg_sel, false))
+> +               goto out_error;
+> +       if (prcmu_request_ape_opp_100_voltage(false))
+> +               goto out_error;
+> +       return;
+> +
+> +out_error:
+> +       pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
+> +               hw->init->name);
+> +}
 
-Yes we should, but that's not as easy as typing a few words in an email.
-When I tried it when I integrated memblock into our boot sequence, I
-found that sparsemem wouldn't work without bootmem being in place.
+Hello Ulf,
 
-It may be that things have now moved on, and we can just eliminate
-bootmem once and for all, but that's something I've not looked at for
-quite some time.
+I was hoping to use the rate-change notifiers for voltage scaling, as in
+my clk reentrancy/dvfs RFCs.  Using prepare/unprepare to set voltage for
+non-scalable clocks is probably OK; do you plan to scale voltage when
+your clocks change rate?  If so then you will need more than just
+prepare/unprepare.
+
+Regards,
+Mike
+
+> +
+>  static struct clk_ops clk_prcmu_scalable_ops = {
+>         .prepare = clk_prcmu_prepare,
+>         .unprepare = clk_prcmu_unprepare,
+> @@ -167,6 +201,17 @@ static struct clk_ops clk_prcmu_opp_gate_ops = {
+>         .recalc_rate = clk_prcmu_recalc_rate,
+>  };
+>  
+> +static struct clk_ops clk_prcmu_opp_volt_scalable_ops = {
+> +       .prepare = clk_prcmu_opp_volt_prepare,
+> +       .unprepare = clk_prcmu_opp_volt_unprepare,
+> +       .enable = clk_prcmu_enable,
+> +       .disable = clk_prcmu_disable,
+> +       .is_enabled = clk_prcmu_is_enabled,
+> +       .recalc_rate = clk_prcmu_recalc_rate,
+> +       .round_rate = clk_prcmu_round_rate,
+> +       .set_rate = clk_prcmu_set_rate,
+> +};
+> +
+>  static struct clk *clk_reg_prcmu(const char *name,
+>                                  const char *parent_name,
+>                                  u8 cg_sel,
+> @@ -250,3 +295,13 @@ struct clk *clk_reg_prcmu_opp_gate(const char *name,
+>         return clk_reg_prcmu(name, parent_name, cg_sel, 0, flags,
+>                         &clk_prcmu_opp_gate_ops);
+>  }
+> +
+> +struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
+> +                                           const char *parent_name,
+> +                                           u8 cg_sel,
+> +                                           unsigned long rate,
+> +                                           unsigned long flags)
+> +{
+> +       return clk_reg_prcmu(name, parent_name, cg_sel, rate, flags,
+> +                       &clk_prcmu_opp_volt_scalable_ops);
+> +}
+> diff --git a/drivers/clk/ux500/clk.h b/drivers/clk/ux500/clk.h
+> index 836d7d1..f36eeed 100644
+> --- a/drivers/clk/ux500/clk.h
+> +++ b/drivers/clk/ux500/clk.h
+> @@ -45,4 +45,10 @@ struct clk *clk_reg_prcmu_opp_gate(const char *name,
+>                                    u8 cg_sel,
+>                                    unsigned long flags);
+>  
+> +struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
+> +                                           const char *parent_name,
+> +                                           u8 cg_sel,
+> +                                           unsigned long rate,
+> +                                           unsigned long flags);
+> +
+>  #endif /* __UX500_CLK_H */
+> -- 
+> 1.7.10
