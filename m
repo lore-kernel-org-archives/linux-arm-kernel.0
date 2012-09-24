@@ -1,253 +1,255 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 24 Sep 2012 21:55:52 +0400
-Subject: [PATCH v2] GPIO: Add support for GPIO on CLPS711X-target platform
-Message-ID: <1348509352-19278-1-git-send-email-shc_work@mail.ru>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 24 Sep 2012 18:56:54 +0100
+Subject: [PATCH v3] regulator: Versatile Express regulator driver
+In-Reply-To: <1348509414-21261-1-git-send-email-pawel.moll@arm.com>
+References: <1348509414-21261-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1348509414-21261-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLPS711X CPUs provide some GPIOs for use in the system. This
-driver provides support for these via gpiolib. Due to platform
-limitations, driver does not support interrupts, only inputs and
-outputs.
+Implementation of the regulator framework driver for the
+Versatile Express voltage control. Devices without
+voltage constraints (ie. "regulator-[min|max]-microvolt"
+properties in the DT node) are treated as fixed (or rather
+read-only) regulators.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/Kconfig                           |    1 +
- arch/arm/mach-clps711x/include/mach/gpio.h |   27 +++++
- drivers/gpio/Kconfig                       |    4 +
- drivers/gpio/Makefile                      |    1 +
- drivers/gpio/gpio-clps711x.c               |  150 ++++++++++++++++++++++++++++
- 5 files changed, 183 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
- create mode 100644 drivers/gpio/gpio-clps711x.c
+ .../devicetree/bindings/regulator/vexpress.txt     |   32 +++++
+ drivers/regulator/Kconfig                          |    7 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/vexpress.c                       |  146 ++++++++++++++++++++
+ 4 files changed, 186 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/vexpress.txt
+ create mode 100644 drivers/regulator/vexpress.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2f88d8d..e73bf9d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -384,6 +384,7 @@ config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
- 	select CPU_ARM720T
- 	select ARCH_USES_GETTIMEOFFSET
-+	select ARCH_REQUIRE_GPIOLIB
- 	select NEED_MACH_MEMORY_H
- 	help
- 	  Support for Cirrus Logic 711x/721x/731x based boards.
-diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
+Hi Mark,
+
+This is an updated version of the VE driver, depending on the continuous
+voltage range change instead of the linear mapping. I've also added the
+DT node documentation.
+
+Pawel
+
+diff --git a/Documentation/devicetree/bindings/regulator/vexpress.txt b/Documentation/devicetree/bindings/regulator/vexpress.txt
 new file mode 100644
-index 0000000..ce75d06
+index 0000000..d775f72
 --- /dev/null
-+++ b/arch/arm/mach-clps711x/include/mach/gpio.h
-@@ -0,0 +1,27 @@
++++ b/Documentation/devicetree/bindings/regulator/vexpress.txt
+@@ -0,0 +1,32 @@
++Versatile Express voltage regulators
++------------------------------------
++
++Requires node properties:
++- "compatible" value: "arm,vexpress-volt"
++- "arm,vexpress-sysreg,func" when controlled via vexpress-sysreg
++  (see Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
++  for more details)
++
++Required regulator properties:
++- "regulator-name"
++- "regulator-always-on"
++
++Optional regulator properties:
++- "regulator-min-microvolt"
++- "regulator-max-microvolt"
++
++See Documentation/devicetree/bindings/regulator/regulator.txt
++for more details about the regulator properties.
++
++When no "regulator-[min|max]-microvolt" properties are defined,
++the device is treated as fixed (or rather "read-only") regulator.
++
++Example:
++	volt at 0 {
++		compatible = "arm,vexpress-volt";
++		arm,vexpress-sysreg,func = <2 0>;
++		regulator-name = "Cores";
++		regulator-min-microvolt = <800000>;
++		regulator-max-microvolt = <1050000>;
++		regulator-always-on;
++	};
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 4e932cc..a823951 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -404,6 +404,13 @@ config REGULATOR_TWL4030
+ 	  This driver supports the voltage regulators provided by
+ 	  this family of companion chips.
+ 
++config REGULATOR_VEXPRESS
++	tristate "Versatile Express regulators"
++	depends on VEXPRESS_CONFIG
++	help
++	  This driver provides support for voltage regulators available
++	  on the ARM Ltd's Versatile Express platform.
++
+ config REGULATOR_WM831X
+ 	tristate "Wolfson Microelectronics WM831x PMIC regulators"
+ 	depends on MFD_WM831X
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 3342615..0d4e10f 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -55,6 +55,7 @@ obj-$(CONFIG_REGULATOR_TPS6586X) += tps6586x-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS65910) += tps65910-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS65912) += tps65912-regulator.o
+ obj-$(CONFIG_REGULATOR_TWL4030) += twl-regulator.o
++obj-$(CONFIG_REGULATOR_VEXPRESS) += vexpress.o
+ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-dcdc.o
+ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-isink.o
+ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-ldo.o
+diff --git a/drivers/regulator/vexpress.c b/drivers/regulator/vexpress.c
+new file mode 100644
+index 0000000..1702945
+--- /dev/null
++++ b/drivers/regulator/vexpress.c
+@@ -0,0 +1,146 @@
 +/*
-+ *  This file contains the CLPS711X GPIO definitions.
-+ *
-+ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-+ *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
 + */
 +
-+/* Simple helper for convert port & pin to GPIO number */
-+#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
++#define DRVNAME "vexpress-regulator"
++#define pr_fmt(fmt) DRVNAME ": " fmt
 +
-+/* Temporaty definitions for GPIO-ports */
-+/* Will be removed after remove clps_read(write) macros */
-+#include <mach/hardware.h>
-+#define _PADR	((u32)CLPS711X_VIRT_BASE + PADR)
-+#define _PBDR	((u32)CLPS711X_VIRT_BASE + PBDR)
-+#define _PCDR	((u32)CLPS711X_VIRT_BASE + PCDR)
-+#define _PDDR	((u32)CLPS711X_VIRT_BASE + PDDR)
-+#define _PADDR	((u32)CLPS711X_VIRT_BASE + PADDR)
-+#define _PBDDR	((u32)CLPS711X_VIRT_BASE + PBDDR)
-+#define _PCDDR	((u32)CLPS711X_VIRT_BASE + PCDDR)
-+#define _PDDDR	((u32)CLPS711X_VIRT_BASE + PDDDR)
-+#define _PEDR	((u32)CLPS711X_VIRT_BASE + PEDR)
-+#define _PEDDR	((u32)CLPS711X_VIRT_BASE + PEDDR)
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index ba7926f5..636eda6 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -91,6 +91,10 @@ config GPIO_MAX730X
- 
- comment "Memory mapped GPIO drivers:"
- 
-+config GPIO_CLPS711X
-+	def_bool y
-+	depends on ARCH_CLPS711X
-+
- config GPIO_GENERIC_PLATFORM
- 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
- 	select GPIO_GENERIC
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 153cace..6a41f79 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
- obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
- obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
- obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
-+obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
- obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
- obj-$(CONFIG_GPIO_DA9052)	+= gpio-da9052.o
- obj-$(CONFIG_ARCH_DAVINCI)	+= gpio-davinci.o
-diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
-new file mode 100644
-index 0000000..71aca8c
---- /dev/null
-+++ b/drivers/gpio/gpio-clps711x.c
-@@ -0,0 +1,150 @@
-+/*
-+ *  CLPS711X GPIO driver
-+ *
-+ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/gpio.h>
++#include <linux/device.h>
++#include <linux/err.h>
 +#include <linux/module.h>
-+#include <linux/spinlock.h>
-+#include <linux/platform_device.h>
++#include <linux/of_device.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/of_regulator.h>
++#include <linux/vexpress.h>
 +
-+#define CLPS711X_GPIO_PORTS	5
-+#define CLPS711X_GPIO_NAME	"gpio-clps711x"
-+
-+struct clps711x_gpio {
-+	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
-+	spinlock_t		lock;
++struct vexpress_regulator {
++	struct regulator_desc desc;
++	struct regulator_dev *regdev;
++	struct vexpress_config_func *func;
 +};
 +
-+static const u32 clps711x_ports[] = {
-+	_PADR, _PBDR, _PCDR, _PDDR, _PEDR,
-+};
-+
-+static const u32 clps711x_pdirs[] = {
-+	_PADDR, _PBDDR, _PCDDR, _PDDDR, _PEDDR,
-+};
-+
-+static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
++static int vexpress_regulator_get_voltage(struct regulator_dev *regdev)
 +{
-+	return !!readb(clps711x_ports[chip->base / 8]) & (1 << offset);
++	struct vexpress_regulator *reg = rdev_get_drvdata(regdev);
++	u32 uV;
++	int err = vexpress_config_read(reg->func, 0, &uV);
++
++	return err ? err : uV;
 +}
 +
-+static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
-+			      int value)
++static int vexpress_regulator_set_voltage(struct regulator_dev *regdev,
++		int min_uV, int max_uV, unsigned *selector)
 +{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++	struct vexpress_regulator *reg = rdev_get_drvdata(regdev);
 +
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_ports[chip->base / 8]) & ~(1 << offset);
-+	if (value)
-+		tmp |= 1 << offset;
-+	writeb(tmp, clps711x_ports[chip->base / 8]);
-+	spin_unlock_irqrestore(&gpio->lock, flags);
++	return vexpress_config_write(reg->func, 0, min_uV);
 +}
 +
-+static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++static struct regulator_ops vexpress_regulator_ops_ro = {
++	.get_voltage = vexpress_regulator_get_voltage,
++};
 +
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_pdirs[chip->base / 8]) & ~(1 << offset);
-+	writeb(tmp, clps711x_pdirs[chip->base / 8]);
-+	spin_unlock_irqrestore(&gpio->lock, flags);
++static struct regulator_ops vexpress_regulator_ops = {
++	.get_voltage = vexpress_regulator_get_voltage,
++	.set_voltage = vexpress_regulator_set_voltage,
++};
++
++static int vexpress_regulator_probe(struct platform_device *pdev)
++{
++	int err;
++	struct vexpress_regulator *reg;
++	struct regulator_init_data *init_data;
++	struct regulator_config config = { };
++
++	reg = devm_kzalloc(&pdev->dev, sizeof(*reg), GFP_KERNEL);
++	if (!reg) {
++		err = -ENOMEM;
++		goto error_kzalloc;
++	}
++
++	reg->func = vexpress_config_func_get_by_dev(&pdev->dev);
++	if (!reg->func) {
++		err = -ENXIO;
++		goto error_get_func;
++	}
++
++	reg->desc.name = dev_name(&pdev->dev);
++	reg->desc.type = REGULATOR_VOLTAGE;
++	reg->desc.owner = THIS_MODULE;
++	reg->desc.continuous_voltage_range = true;
++
++	init_data = of_get_regulator_init_data(&pdev->dev, pdev->dev.of_node);
++	if (!init_data) {
++		err = -EINVAL;
++		goto error_get_regulator_init_data;
++	}
++
++	init_data->constraints.apply_uV = 0;
++	if (init_data->constraints.min_uV && init_data->constraints.max_uV)
++		reg->desc.ops = &vexpress_regulator_ops;
++	else
++		reg->desc.ops = &vexpress_regulator_ops_ro;
++
++	config.dev = &pdev->dev;
++	config.init_data = init_data;
++	config.driver_data = reg;
++	config.of_node = pdev->dev.of_node;
++
++	reg->regdev = regulator_register(&reg->desc, &config);
++	if (IS_ERR(reg->regdev)) {
++		err = PTR_ERR(reg->regdev);
++		goto error_regulator_register;
++	}
++
++	platform_set_drvdata(pdev, reg);
++
++	return 0;
++
++error_regulator_register:
++error_get_regulator_init_data:
++	vexpress_config_func_put(reg->func);
++error_get_func:
++error_kzalloc:
++	return err;
++}
++
++static int __devexit vexpress_regulator_remove(struct platform_device *pdev)
++{
++	struct vexpress_regulator *reg = platform_get_drvdata(pdev);
++
++	vexpress_config_func_put(reg->func);
++	regulator_unregister(reg->regdev);
 +
 +	return 0;
 +}
 +
-+static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
-+				       int value)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_pdirs[chip->base / 8]) | (1 << offset);
-+	writeb(tmp, clps711x_pdirs[chip->base / 8]);
-+	tmp = readb(clps711x_ports[chip->base / 8]) & ~(1 << offset);
-+	if (value)
-+		tmp |= 1 << offset;
-+	writeb(tmp, clps711x_ports[chip->base / 8]);
-+	spin_unlock_irqrestore(&gpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+struct clps711x_gpio_port {
-+	char	*name;
-+	int	nr;
++static struct of_device_id vexpress_regulator_of_match[] = {
++	{ .compatible = "arm,vexpress-volt", },
 +};
 +
-+static const struct clps711x_gpio_port
-+		    clps711x_gpio_ports[CLPS711X_GPIO_PORTS] __initconst = {
-+	{ "PORTA", 8, },
-+	{ "PORTB", 8, },
-+	{ "PORTC", 8, },
-+	{ "PORTD", 8, },
-+	{ "PORTE", 3, }
++static struct platform_driver vexpress_regulator_driver = {
++	.probe = vexpress_regulator_probe,
++	.remove = __devexit_p(vexpress_regulator_remove),
++	.driver	= {
++		.name = DRVNAME,
++		.owner = THIS_MODULE,
++		.of_match_table = vexpress_regulator_of_match,
++	},
 +};
 +
-+static int __init gpio_clps711x_init(void)
-+{
-+	int i;
-+	struct platform_device *pdev;
-+	struct clps711x_gpio *gpio;
++module_platform_driver(vexpress_regulator_driver);
 +
-+	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
-+	if (!pdev) {
-+		pr_err("Cannot create platform device: %s\n",
-+		       CLPS711X_GPIO_NAME);
-+		return -ENOMEM;
-+	}
-+
-+	platform_device_add(pdev);
-+
-+	gpio = kzalloc(sizeof(struct clps711x_gpio), GFP_KERNEL);
-+	if (!gpio) {
-+		dev_err(&pdev->dev, "GPIO allocating memory error\n");
-+		platform_device_del(pdev);
-+		platform_device_put(pdev);
-+		return -ENOMEM;
-+	}
-+
-+	platform_set_drvdata(pdev, gpio);
-+
-+	spin_lock_init(&gpio->lock);
-+
-+	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
-+		gpio->chip[i].owner		= THIS_MODULE;
-+		gpio->chip[i].dev		= &pdev->dev;
-+		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
-+		gpio->chip[i].base		= i * 8;
-+		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
-+		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
-+		gpio->chip[i].get		= gpio_clps711x_get;
-+		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
-+		gpio->chip[i].set		= gpio_clps711x_set;
-+		gpiochip_add(&gpio->chip[i]);
-+	}
-+
-+	dev_info(&pdev->dev, "GPIO driver initialized\n");
-+
-+	return 0;
-+}
-+arch_initcall(gpio_clps711x_init);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-+MODULE_DESCRIPTION("CLPS711X GPIO driver");
++MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
++MODULE_DESCRIPTION("Versatile Express regulator");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:vexpress-regulator");
 -- 
-1.7.8.6
+1.7.9.5
