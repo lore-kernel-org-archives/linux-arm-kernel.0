@@ -1,52 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 24 Sep 2012 17:20:41 -0400 (EDT)
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <5060C9C6.8080900@ti.com>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924151305.GA14198@arm.com>
- <alpine.LFD.2.02.1209241152540.6667@xanadu.home> <5060C9C6.8080900@ti.com>
-Message-ID: <alpine.LFD.2.02.1209241709200.6667@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Sep 2012 14:25:52 -0700
+Subject: [GIT PULL 2/3] omap platform and board related late patches for v3.7
+ merge window
+In-Reply-To: <pull-1348521952-285145>
+Message-ID: <mailman.14.1348521962.1458.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Sep 2012, Cyril Chemparathy wrote:
+The following changes since commit 0e70156de4c8465bfb8cb45cdc1bbc2fa474ce14:
 
-> On 9/24/2012 11:56 AM, Nicolas Pitre wrote:
-> > On Mon, 24 Sep 2012, Catalin Marinas wrote:
-> > 
-> > > On Fri, Sep 21, 2012 at 04:56:03PM +0100, Cyril Chemparathy wrote:
-> > > > This patch adds support for 64-bit physical addresses in virt_to_phys()
-> > > > patching.  This does not do real 64-bit add/sub, but instead patches in
-> > > > the
-> > > > upper 32-bits of the phys_offset directly into the output of
-> > > > virt_to_phys.
-> > > 
-> > > So this assumes that for the kernel linear mapping, all the physical
-> > > addresses have the same upper 32-bit. That's a good optimisation but I
-> > > haven't seen this check when calculating lowmem in sanity_check_meminfo.
-> > > Someone may build platform with memory starting at 3GB and going across
-> > > the 4GB limit.
-> > 
-> > Good point.  We better get an early warning if that happens.
-> > 
-> 
-> Thanks.
-> 
-> I'm thinking of splitting the bank at the 32-bit boundary in such an event,
-> assuming that the remaining memory should be usable as highmem.
+  ARM: OMAP2+: Make omap4-keypad.h local (2012-09-20 15:04:04 -0700)
 
-No.  That's not the point here.
+are available in the git repository at:
 
-Let's suppose a system with 1GB of physical RAM starting at 0xe0000000.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-late-v2-for-v3.7
 
-In this case there is no need for highmem.  However the v2p patching 
-code in the LPAE case assumes the high bits of a physical address are 
-always the same which wouldn't be the case in this hypothetical example.
+for you to fetch changes up to ead53717d9ab28c942b9adf66f8c02442dbfbc8a:
 
-We want to make sure the kernel won't boot if a system with physical RAM 
-crossing the 4GB address mark is encountered.
+  arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX (2012-09-24 10:32:39 -0700)
 
+----------------------------------------------------------------
+These board and platform related patches have been posted
+quite a while ago but have somehow fallen though the cracks
+as most of the focus has been making things to work with
+device tree. As the first patch depends on sparse IRQ
+related removal of irqs.h and related header moves, these
+are based on omap-cleanup-local-headers-for-v3.7 tag.
 
-Nicolas
+----------------------------------------------------------------
+AnilKumar Ch (1):
+      ARM: OMAP2+: serial: Change MAX_HSUART_PORTS to 6
+
+Peter Ujfalusi (1):
+      ARM: OMAP4: twl-common: Support for additional devices on i2c1 bus
+
+Yegor Yefremov (1):
+      arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
+
+ arch/arm/Kconfig                              |    5 ++--
+ arch/arm/mach-omap2/board-4430sdp.c           |   12 ++++++--
+ arch/arm/mach-omap2/board-omap4panda.c        |   12 ++++++--
+ arch/arm/mach-omap2/twl-common.c              |   37 ++++++++-----------------
+ arch/arm/mach-omap2/twl-common.h              |    3 +-
+ arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
+ 6 files changed, 37 insertions(+), 34 deletions(-)
