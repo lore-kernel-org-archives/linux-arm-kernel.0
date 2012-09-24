@@ -1,40 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Sep 2012 15:00:52 +0000
-Subject: [PATCH v3 1/1] arm: introduce a DTS for Xen unprivileged virtual
- machines
-In-Reply-To: <1348483574-7901-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <1348483574-7901-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <201209241500.53229.arnd@arndb.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 24 Sep 2012 18:06:27 +0300
+Subject: [PATCH v3 1/2] ARM: Remove bcmring NAND driver
+In-Reply-To: <1348263626-3087-2-git-send-email-csd@broadcom.com>
+References: <1348263626-3087-1-git-send-email-csd@broadcom.com>
+ <1348263626-3087-2-git-send-email-csd@broadcom.com>
+Message-ID: <1348499187.4880.66.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 September 2012, Stefano Stabellini wrote:
-> Given that the xenvm machine is based on vexpress but with an extremely
-> limited selection of peripherals (the guest is supposed to use virtual
-> devices instead), add "xen,xenvm" to the list of compatible machines in
-> mach-vexpress.
+On Fri, 2012-09-21 at 14:40 -0700, Christian Daudt wrote:
+> This driver is being removed as part of the cleanup of the bcmring
+> SoC from mainline as it is no longer maintained.
 > 
-> 
-> Changes in v3:
-> 
-> - add comments to mark fields that are likely to be changed by the
-> hypervisor.
-> 
-> 
-> Changes in v2:
-> 
-> - remove include skeleton;
-> - use #address-cells = <2> and #size-cells = <2>;
-> - remove the debug bootargs;
-> - use memory at 80000000 instead of memory;
-> - remove the ranges and interrupt-map from the motherboard node;
-> - set the machine compatible to "xen,xenvm-4.2", "xen,xenvm";
-> - rename the dts file to xenvm-4.2.dts;
-> - add "xen,xenvm" to the list of compatible DT strings to mach-vexpress.
-> 
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Pawel Moll <pawel.moll@arm.com> (v2m changes)
-> CC: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Jiandong Zheng <jdzheng@broadcom.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Pushed this patch to l2-mtd.git. But if you decide to merge it via
+Arnd's tree (probably better idea) - let me know, I'll drop it.
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120924/8db93cc8/attachment-0001.sig>
