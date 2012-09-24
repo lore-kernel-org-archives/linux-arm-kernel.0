@@ -1,24 +1,26 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Sep 2012 16:13:05 +0100
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <1348242975-19184-6-git-send-email-cyril@ti.com>
+Date: Mon, 24 Sep 2012 16:17:26 +0100
+Subject: [PATCH v3 RESEND 14/17] ARM: LPAE: accomodate >32-bit
+ addresses for page table base
+In-Reply-To: <1348242975-19184-15-git-send-email-cyril@ti.com>
 References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
-Message-ID: <20120924151305.GA14198@arm.com>
+ <1348242975-19184-15-git-send-email-cyril@ti.com>
+Message-ID: <20120924151726.GB14198@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 04:56:03PM +0100, Cyril Chemparathy wrote:
-> This patch adds support for 64-bit physical addresses in virt_to_phys()
-> patching.  This does not do real 64-bit add/sub, but instead patches in the
-> upper 32-bits of the phys_offset directly into the output of virt_to_phys.
+On Fri, Sep 21, 2012 at 04:56:12PM +0100, Cyril Chemparathy wrote:
+> This patch redefines the early boot time use of the R4 register to steal a few
+> low order bits (ARCH_PGD_SHIFT bits) on LPAE systems.  This allows for up to
+> 38-bit physical addresses.
 
-So this assumes that for the kernel linear mapping, all the physical
-addresses have the same upper 32-bit. That's a good optimisation but I
-haven't seen this check when calculating lowmem in sanity_check_meminfo.
-Someone may build platform with memory starting at 3GB and going across
-the 4GB limit.
+That's fine. We figured out that on the vexpress with A15 and sparsemem
+enabled could only use 36-bit because of section number stored in the
+top bits of page->flags.
+
+An alternative to this patch could be to always patch in the upper
+32-bit of phys_offset like you do in virt_to_phys(). We know that pgd is
+always lowmem.
 
 -- 
 Catalin
