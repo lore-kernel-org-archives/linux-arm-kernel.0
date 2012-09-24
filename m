@@ -1,18 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Sep 2012 17:04:48 +0100
-Subject: [GIT PULL] Veratile Express updates for v3.7
-In-Reply-To: <1348501980.27071.8.camel@hornet>
-References: <1348501980.27071.8.camel@hornet>
-Message-ID: <20120924160448.GB5522@mudshark.cambridge.arm.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 25 Sep 2012 02:07:44 +1000
+Subject: linux-next: Tree for Sept 24 (irqchip)
+In-Reply-To: <50607E99.6040303@xenotime.net>
+References: <20120925005328.f748dfa3d077cebb345a4291@canb.auug.org.au>
+ <50607E99.6040303@xenotime.net>
+Message-ID: <20120925020744.cc5beb9e65473605e5ca2240@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 04:53:00PM +0100, Pawel Moll wrote:
-> Hi Arnd, Ofof,
+Hi Randy,
+
+On Mon, 24 Sep 2012 08:39:05 -0700 Randy Dunlap <rdunlap@xenotime.net> wrote:
+>
+> On 09/24/2012 07:53 AM, Stephen Rothwell wrote:
 > 
-> Would you be so kind to pull the updates for Versatile Express based on
-> v3.6-rc7 discussed over the last couple of weeks?
+> > Today was a train wreck, with lots of new conflicts across several trees
+> > and a few build failures as well.
+> 
+> I agree.  I mostly get this:
+> 
+> drivers/Kconfig:157: can't open file "drivers/irqchip/Kconfig"
+> 
+> i.e., no such file.
+> 
+> How does this happen?  :(
+> 
+> who handles irqchip?
 
-I think you have a typo in the subject -- it should say 3.8 :)
-
-Will
+Hmm, commit 89214f009c1d ("ARM: bcm2835: add interrupt controller
+driver") from the arm-soc tree adds that file as an empty file (I have
+the empty file in my tree).  Nothing adds anything to it.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120925/a43debdc/attachment.sig>
