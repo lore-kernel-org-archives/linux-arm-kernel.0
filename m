@@ -1,198 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2012 10:34:07 -0700
-Subject: [PATCH v3] ARM: OMAP4: twl-common: Support for additional
- devices on i2c1 bus
-In-Reply-To: <20120924154315.GY28835@atomide.com>
-References: <1348478688-5737-1-git-send-email-peter.ujfalusi@ti.com>
- <20120924154315.GY28835@atomide.com>
-Message-ID: <20120924173407.GH28835@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 24 Sep 2012 11:34:12 -0600
+Subject: [RFC 0/6] pinctrl: samsung: Remove static platform-specific data
+In-Reply-To: <3531529.1enE84BHSJ@flatron>
+References: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
+ <505CB4A3.9050707@wwwdotorg.org> <3531529.1enE84BHSJ@flatron>
+Message-ID: <50609994.8040005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120924 08:44]:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120924 02:24]:
-> > On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
-> > Manufacturers can opt to use different codec than twl6040 and also can add
-> > audio related IC to the bus (external amplifier for example on SDP4430).
-> > 
-> > Make it possible to add different set of additional devices to i2c1 bus on
-> > OMAP4 boards.
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > ---
-> > Hi Tony,
-> > 
-> > I have refreshed the patch on top of arm-soc/for-next branch. Would it be
-> > possible to queue this patch via arm-soc so it will be in 3.7-rc1 already?
-> > Originally this patch was sent for 3.6...
+On 09/21/2012 01:31 PM, Tomasz Figa wrote:
+> On Friday 21 of September 2012 12:40:35 Stephen Warren wrote:
+>> On 09/20/2012 02:53 AM, Tomasz Figa wrote:
+>>> This RFC series is a work on replacing static platform-specific data in
+>>> pinctrl-samsung driver with data dynamically parsed from device tree.
+...
+>>> It aims at reducing the SoC-specific part of the driver and thus the
+>>> amount of modifications to driver sources when adding support for next
+>>> SoCs (like Exynos4x12).
+>>>
+>>> Furthermore, moving definitions of pin banks to device tree will allow
+>>> to simplify GPIO and GEINT specification to a format similar to used
+>>> previously by gpiolib-based implementation, using a phandle to the bank
+>>> and pin index inside the bank, e.g.
+>>>
+>>> 	gpios = <&gpa1 4 0>;
+>>> 	interrupt-parent = <&gpa1>;
+>>> 	interrupts = <4 0>;
+>>
+>> I don't think those two are correlated; the GPIO specifier format could
+>> just as easily be <bank pin> irrespective of whether the pinctrl driver
+>> contains SoC-specific tables or not.
 > 
-> Yes sorry the platform code has been been badly ignored
-> lately.. Let's see if we can still get it in now that there's
-> -rc7 tagged.
+> Correct me if I'm wrong, but each bank needs to have its own subnode to be 
+> able to address pins like this. That was the starting point of the whole 
+> series and the idea that if all the banks (which are SoC-specific) have to 
+> be defined anyway, maybe it wouldn't be too bad to put all the SoC-specific 
+> parameters there too.
 
-I've updated this for the sparse IRQ changes that remove irqs.h.
-Updated patch below.
+If you write your own custom .xlate function, I think you can do
+basically anything you want; all of the following are possible, I believe:
 
-Tony
+a) Single DT node covering all banks, with GPIO specifier being <n>
+where n is some linearized GPIO ID across all banks.
 
+b) Single DT node covering all banks, with GPIO specifier being <b n>
+where b is the bank number, and n is the GPIO ID within the bank (xlate
+would presumably calculate "(b * MAX_GPIOS_PER_BANK) + n" and up with
+the same data as in (a) above.
 
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Date: Mon, 24 Sep 2012 12:24:48 +0300
-Subject: [PATCH] ARM: OMAP4: twl-common: Support for additional devices on
- i2c1 bus
+c) One DT node per bank, one gpio_chip registered per node, with the
+GPIO specifier being <n> where n is the GPIO ID within the bank the
+phandle points at.
 
-On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
-Manufacturers can opt to use different codec than twl6040 and also can add
-audio related IC to the bus (external amplifier for example on SDP4430).
-
-Make it possible to add different set of additional devices to i2c1 bus on
-OMAP4 boards.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-[tony at atomide.com: updated for removal of irqs.h]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index e82098f..749ce96 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -545,6 +545,14 @@ static struct twl6040_platform_data twl6040_data = {
- 	.audpwron_gpio	= 127,
- };
- 
-+static struct i2c_board_info __initdata sdp4430_i2c_1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("twl6040", 0x4b),
-+		.irq = 119 + OMAP44XX_IRQ_GIC_START,
-+		.platform_data = &twl6040_data,
-+	},
-+};
-+
- static struct twl4030_platform_data sdp4430_twldata = {
- 	/* Regulators */
- 	.vusim		= &sdp4430_vusim,
-@@ -578,8 +586,8 @@ static int __init omap4_i2c_init(void)
- 			TWL_COMMON_REGULATOR_CLK32KG |
- 			TWL_COMMON_REGULATOR_V1V8 |
- 			TWL_COMMON_REGULATOR_V2V1);
--	omap4_pmic_init("twl6030", &sdp4430_twldata,
--			&twl6040_data, 119 + OMAP44XX_IRQ_GIC_START);
-+	omap4_pmic_init("twl6030", &sdp4430_twldata, sdp4430_i2c_1_boardinfo,
-+			ARRAY_SIZE(sdp4430_i2c_1_boardinfo));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
- 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
- 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 45fe2d3..7b592d3 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -264,6 +264,14 @@ static struct twl6040_platform_data twl6040_data = {
- 	.audpwron_gpio	= 127,
- };
- 
-+static struct i2c_board_info __initdata panda_i2c_1_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("twl6040", 0x4b),
-+		.irq = 119 + OMAP44XX_IRQ_GIC_START,
-+		.platform_data = &twl6040_data,
-+	},
-+};
-+
- /* Panda board uses the common PMIC configuration */
- static struct twl4030_platform_data omap4_panda_twldata;
- 
-@@ -291,8 +299,8 @@ static int __init omap4_panda_i2c_init(void)
- 			TWL_COMMON_REGULATOR_CLK32KG |
- 			TWL_COMMON_REGULATOR_V1V8 |
- 			TWL_COMMON_REGULATOR_V2V1);
--	omap4_pmic_init("twl6030", &omap4_panda_twldata,
--			&twl6040_data, 119 + OMAP44XX_IRQ_GIC_START);
-+	omap4_pmic_init("twl6030", &omap4_panda_twldata, panda_i2c_1_boardinfo,
-+			ARRAY_SIZE(panda_i2c_1_boardinfo));
- 	omap_register_i2c_bus(2, 400, NULL, 0);
- 	/*
- 	 * Bus 3 is attached to the DVI port where devices like the pico DLP
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 99be94e..af93acc 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -40,16 +40,6 @@ static struct i2c_board_info __initdata pmic_i2c_board_info = {
- 	.flags		= I2C_CLIENT_WAKE,
- };
- 
--static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
--	{
--		.addr		= 0x48,
--		.flags		= I2C_CLIENT_WAKE,
--	},
--	{
--		I2C_BOARD_INFO("twl6040", 0x4b),
--	},
--};
--
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- static int twl_set_voltage(void *data, int target_uV)
- {
-@@ -79,30 +69,25 @@ void __init omap_pmic_init(int bus, u32 clkrate,
- 
- void __init omap4_pmic_init(const char *pmic_type,
- 		    struct twl4030_platform_data *pmic_data,
--		    struct twl6040_platform_data *twl6040_data, int twl6040_irq)
-+		    struct i2c_board_info *devices, int nr_devices)
- {
- 	/* PMIC part*/
- 	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
--	strncpy(omap4_i2c1_board_info[0].type, pmic_type,
--		sizeof(omap4_i2c1_board_info[0].type));
--	omap4_i2c1_board_info[0].irq = 7 + OMAP44XX_IRQ_GIC_START;
--	omap4_i2c1_board_info[0].platform_data = pmic_data;
--
--	/* TWL6040 audio IC part */
--	omap4_i2c1_board_info[1].irq = twl6040_irq;
--	omap4_i2c1_board_info[1].platform_data = twl6040_data;
--
--	omap_register_i2c_bus(1, 400, omap4_i2c1_board_info, 2);
-+	omap_pmic_init(1, 400, pmic_type, 7 + OMAP44XX_IRQ_GIC_START, pmic_data);
- 
-+	/* Register additional devices on i2c1 bus if needed */
-+	if (devices)
-+		i2c_register_board_info(1, devices, nr_devices);
- }
- 
- void __init omap_pmic_late_init(void)
- {
--	/* Init the OMAP TWL parameters (if PMIC has been registered) */
--	if (pmic_i2c_board_info.irq)
--		omap3_twl_init();
--	if (omap4_i2c1_board_info[0].irq)
--		omap4_twl_init();
-+	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-+	if (!pmic_i2c_board_info.irq)
-+		return;
-+
-+	omap3_twl_init();
-+	omap4_twl_init();
- }
- 
- #if defined(CONFIG_ARCH_OMAP3)
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index d109c09..2256efe 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -32,6 +32,7 @@
- 
- struct twl4030_platform_data;
- struct twl6040_platform_data;
-+struct i2c_board_info;
- 
- void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
- 		    struct twl4030_platform_data *pmic_data);
-@@ -51,7 +52,7 @@ static inline void omap3_pmic_init(const char *pmic_type,
- 
- void omap4_pmic_init(const char *pmic_type,
- 		    struct twl4030_platform_data *pmic_data,
--		    struct twl6040_platform_data *audio_data, int twl6040_irq);
-+		    struct i2c_board_info *devices, int nr_devices);
- 
- void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 			   u32 pdata_flags, u32 regulators_flags);
+d) One DT node per bank, all contained within a single parent DT node,
+one gpio_chip registered per node (one for each bank node, and one for
+the parent node), with GPIO phandles pointing at the parent node, with
+GPIO specifier in the format of either (a) or (b) above, and the
+top-level node's .xlate returning a different gpio_chip (for one of the
+child bank-specific nodes) rather than the parent chip. At least, IIRC,
+Grant Likely was going to extend a gpio_chip's .xlate to be able to
+return a different chip; I'm not sure if that was implemented yet or not.
