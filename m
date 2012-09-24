@@ -1,63 +1,253 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 24 Sep 2012 11:48:28 -0600
-Subject: [PATCH v2 5/5] ARM: tegra: enable brcmfmac in defconfig
-In-Reply-To: <505CBA6E.3030304@broadcom.com>
-References: <1348217700-12309-1-git-send-email-wni@nvidia.com>
- <1348217700-12309-6-git-send-email-wni@nvidia.com>
- <505C7C27.2050108@broadcom.com> <505C93A1.2040801@wwwdotorg.org>
- <505CBA6E.3030304@broadcom.com>
-Message-ID: <50609CEC.1050001@wwwdotorg.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Mon, 24 Sep 2012 21:55:52 +0400
+Subject: [PATCH v2] GPIO: Add support for GPIO on CLPS711X-target platform
+Message-ID: <1348509352-19278-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2012 01:05 PM, Arend van Spriel wrote:
-> On 09/21/2012 06:19 PM, Stephen Warren wrote:
->> On 09/21/2012 08:39 AM, Arend van Spriel wrote:
->>> On 09/21/2012 10:55 AM, Wei Ni wrote:
->>>> New options enabled:
->>>> * CFG80211_WEXT: (dependency)
->>>> * BRCMFMAC: wlan driver, enable as module.
->>>>
->>>> Signed-off-by: Wei Ni <wni@nvidia.com>
->>>> ---
->>>>    arch/arm/configs/tegra_defconfig |    2 ++
->>>>    1 files changed, 2 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/configs/tegra_defconfig
->>>> b/arch/arm/configs/tegra_defconfig
->>>> index adcf3c2..04b18ea 100644
->>>> --- a/arch/arm/configs/tegra_defconfig
->>>> +++ b/arch/arm/configs/tegra_defconfig
->>>> @@ -73,6 +73,7 @@ CONFIG_BT_BNEP=y
->>>>    CONFIG_BT_HIDP=y
->>>>    CONFIG_BT_HCIBTUSB=m
->>>>    CONFIG_CFG80211=y
->>>> +CONFIG_CFG80211_WEXT=y
->>>
->>> Any particular reason for enabling this? The driver does not
->>> specifically need it. The option only allows use of WEXT dependent
->>> user-space tools like iwconfig and iwlist. At least it is not needed by
->>> brcmfmac driver hence it does not select it.
->>>
->>> You indicate there is a dependency. Could you elaborate?
->>
->> "Dependency" probably isn't correct.
->>
->> However, the intent of tegra_defconfig is to provide a useful
->> configuration for Tegra boards. Without the ability to use
->> iwconfig/iwlist, enabling the wireless driver doesn't seem useful; how
->> would someone configure the wireless connection?
-> 
-> Let me explain. CFG80211 provides a netlink api called NL80211 which is
-> favorable over WEXT api. In user-space the iw tool is replacing iwconfig
-> and iwlist. Also wpa_supplicant has support for both wext and nl80211.
-> 
-> CFG80211_WEXT basically provides an adaptation/compatibility layer that
-> allows user-space tools to interact with cfg80211 drivers. However, it
-> is intended to be phased out so I would not recommend putting it in a
-> defconfig.
+The CLPS711X CPUs provide some GPIOs for use in the system. This
+driver provides support for these via gpiolib. Due to platform
+limitations, driver does not support interrupts, only inputs and
+outputs.
 
-OK, I suppose that I'd expect to use a given kernel's defconfig with a
-fairly recent distro, so switching to "iw" is reasonable, and so
-removing that defconfig entry is reasonable. I'll just remove that line
-when applying these patches unless there's any other need for a re-spin.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/Kconfig                           |    1 +
+ arch/arm/mach-clps711x/include/mach/gpio.h |   27 +++++
+ drivers/gpio/Kconfig                       |    4 +
+ drivers/gpio/Makefile                      |    1 +
+ drivers/gpio/gpio-clps711x.c               |  150 ++++++++++++++++++++++++++++
+ 5 files changed, 183 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
+ create mode 100644 drivers/gpio/gpio-clps711x.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2f88d8d..e73bf9d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -384,6 +384,7 @@ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select CPU_ARM720T
+ 	select ARCH_USES_GETTIMEOFFSET
++	select ARCH_REQUIRE_GPIOLIB
+ 	select NEED_MACH_MEMORY_H
+ 	help
+ 	  Support for Cirrus Logic 711x/721x/731x based boards.
+diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
+new file mode 100644
+index 0000000..ce75d06
+--- /dev/null
++++ b/arch/arm/mach-clps711x/include/mach/gpio.h
+@@ -0,0 +1,27 @@
++/*
++ *  This file contains the CLPS711X GPIO definitions.
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++/* Simple helper for convert port & pin to GPIO number */
++#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
++
++/* Temporaty definitions for GPIO-ports */
++/* Will be removed after remove clps_read(write) macros */
++#include <mach/hardware.h>
++#define _PADR	((u32)CLPS711X_VIRT_BASE + PADR)
++#define _PBDR	((u32)CLPS711X_VIRT_BASE + PBDR)
++#define _PCDR	((u32)CLPS711X_VIRT_BASE + PCDR)
++#define _PDDR	((u32)CLPS711X_VIRT_BASE + PDDR)
++#define _PADDR	((u32)CLPS711X_VIRT_BASE + PADDR)
++#define _PBDDR	((u32)CLPS711X_VIRT_BASE + PBDDR)
++#define _PCDDR	((u32)CLPS711X_VIRT_BASE + PCDDR)
++#define _PDDDR	((u32)CLPS711X_VIRT_BASE + PDDDR)
++#define _PEDR	((u32)CLPS711X_VIRT_BASE + PEDR)
++#define _PEDDR	((u32)CLPS711X_VIRT_BASE + PEDDR)
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index ba7926f5..636eda6 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -91,6 +91,10 @@ config GPIO_MAX730X
+ 
+ comment "Memory mapped GPIO drivers:"
+ 
++config GPIO_CLPS711X
++	def_bool y
++	depends on ARCH_CLPS711X
++
+ config GPIO_GENERIC_PLATFORM
+ 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
+ 	select GPIO_GENERIC
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 153cace..6a41f79 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
+ obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
++obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
+ obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
+ obj-$(CONFIG_GPIO_DA9052)	+= gpio-da9052.o
+ obj-$(CONFIG_ARCH_DAVINCI)	+= gpio-davinci.o
+diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
+new file mode 100644
+index 0000000..71aca8c
+--- /dev/null
++++ b/drivers/gpio/gpio-clps711x.c
+@@ -0,0 +1,150 @@
++/*
++ *  CLPS711X GPIO driver
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/gpio.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/platform_device.h>
++
++#define CLPS711X_GPIO_PORTS	5
++#define CLPS711X_GPIO_NAME	"gpio-clps711x"
++
++struct clps711x_gpio {
++	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
++	spinlock_t		lock;
++};
++
++static const u32 clps711x_ports[] = {
++	_PADR, _PBDR, _PCDR, _PDDR, _PEDR,
++};
++
++static const u32 clps711x_pdirs[] = {
++	_PADDR, _PBDDR, _PCDDR, _PDDDR, _PEDDR,
++};
++
++static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
++{
++	return !!readb(clps711x_ports[chip->base / 8]) & (1 << offset);
++}
++
++static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
++			      int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_ports[chip->base / 8]) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_ports[chip->base / 8]);
++	spin_unlock_irqrestore(&gpio->lock, flags);
++}
++
++static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdirs[chip->base / 8]) & ~(1 << offset);
++	writeb(tmp, clps711x_pdirs[chip->base / 8]);
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
++				       int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdirs[chip->base / 8]) | (1 << offset);
++	writeb(tmp, clps711x_pdirs[chip->base / 8]);
++	tmp = readb(clps711x_ports[chip->base / 8]) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_ports[chip->base / 8]);
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++struct clps711x_gpio_port {
++	char	*name;
++	int	nr;
++};
++
++static const struct clps711x_gpio_port
++		    clps711x_gpio_ports[CLPS711X_GPIO_PORTS] __initconst = {
++	{ "PORTA", 8, },
++	{ "PORTB", 8, },
++	{ "PORTC", 8, },
++	{ "PORTD", 8, },
++	{ "PORTE", 3, }
++};
++
++static int __init gpio_clps711x_init(void)
++{
++	int i;
++	struct platform_device *pdev;
++	struct clps711x_gpio *gpio;
++
++	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
++	if (!pdev) {
++		pr_err("Cannot create platform device: %s\n",
++		       CLPS711X_GPIO_NAME);
++		return -ENOMEM;
++	}
++
++	platform_device_add(pdev);
++
++	gpio = kzalloc(sizeof(struct clps711x_gpio), GFP_KERNEL);
++	if (!gpio) {
++		dev_err(&pdev->dev, "GPIO allocating memory error\n");
++		platform_device_del(pdev);
++		platform_device_put(pdev);
++		return -ENOMEM;
++	}
++
++	platform_set_drvdata(pdev, gpio);
++
++	spin_lock_init(&gpio->lock);
++
++	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
++		gpio->chip[i].owner		= THIS_MODULE;
++		gpio->chip[i].dev		= &pdev->dev;
++		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
++		gpio->chip[i].base		= i * 8;
++		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
++		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
++		gpio->chip[i].get		= gpio_clps711x_get;
++		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
++		gpio->chip[i].set		= gpio_clps711x_set;
++		gpiochip_add(&gpio->chip[i]);
++	}
++
++	dev_info(&pdev->dev, "GPIO driver initialized\n");
++
++	return 0;
++}
++arch_initcall(gpio_clps711x_init);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
++MODULE_DESCRIPTION("CLPS711X GPIO driver");
+-- 
+1.7.8.6
