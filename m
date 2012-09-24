@@ -1,54 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Sep 2012 09:35:01 -0700
-Subject: [GIT PULL] Versatile Express clk
-In-Reply-To: <1348501568.27071.5.camel@hornet>
-References: <1348501568.27071.5.camel@hornet>
-Message-ID: <20120924163501.12878.34717@nucleus>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 24 Sep 2012 12:37:16 -0400
+Subject: [PATCH] ARM: Orion5x: Fix too small coherent pool.
+In-Reply-To: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
+References: <1348466073-22726-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20120924163716.GR5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pawel Moll (2012-09-24 08:46:08)
-> Hi Mike,
+On Mon, Sep 24, 2012 at 07:54:33AM +0200, Andrew Lunn wrote:
+> Some Orion5x devices allocate their coherent buffers from atomic
+> context. Increase size of atomic coherent pool to make sure such the
+> allocations won't fail during boot.
 > 
-> Would you be so kind and pull the VE clocking stuff? They are rebased on
-> top of Linus' Realview patch.
-> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Hi Pawell,
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-I had not planned on taking any more changes for 3.7.  I'm happy to take
-these patches for 3.8.
+btw - we should take this to it's logical conclusion and have Sebastian
+check Dove.  Sebastian?
 
-Regards,
-Mike
+thx,
 
-> Thanks!
+Jason.
+
+> ---
+>  arch/arm/mach-orion5x/common.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> Pawel
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index 410291c..a6cd14a 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -204,6 +204,13 @@ void __init orion5x_wdt_init(void)
+>  void __init orion5x_init_early(void)
+>  {
+>  	orion_time_set_base(TIMER_VIRT_BASE);
+> +
+> +	/*
+> +	 * Some Orion5x devices allocate their coherent buffers from atomic
+> +	 * context. Increase size of atomic coherent pool to make sure such
+> +	 * the allocations won't fail.
+> +	 */
+> +	init_dma_coherent_pool_size(SZ_1M);
+>  }
+>  
+>  int orion5x_tclk;
+> -- 
+> 1.7.10.4
 > 
 > 
-> The following changes since commit b9f8a0f8e255919bdcfb96a8d50d1523233a458a:
-> 
->   clk: convert ARM RealView to common clk (2012-09-24 16:28:29 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/pawelmoll/linux.git clk-v3.6-rc7
-> 
-> for you to fetch changes up to b262f1ed394218f9327b72e7d1d17a5e62074be0:
-> 
->   clk: Common clocks implementation for Versatile Express (2012-09-24 16:28:30 +0100)
-> 
-> ----------------------------------------------------------------
-> Pawel Moll (2):
->       clk: Versatile Express clock generators ("osc") driver
->       clk: Common clocks implementation for Versatile Express
-> 
->  arch/arm/include/asm/hardware/sp810.h    |    2 +
->  drivers/clk/Kconfig                      |    8 +-
->  drivers/clk/versatile/Makefile           |    2 +
->  drivers/clk/versatile/clk-vexpress-osc.c |  150 ++++++++++++++++++++++++++++++
->  drivers/clk/versatile/clk-vexpress.c     |  142 ++++++++++++++++++++++++++++
->  5 files changed, 301 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
->  create mode 100644 drivers/clk/versatile/clk-vexpress.c
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
