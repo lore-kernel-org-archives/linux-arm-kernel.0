@@ -1,24 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Sep 2012 15:53:11 +0800
-Subject: [PATCH 3/3] mmc: esdhc i.MX: Support 8bit mode
-In-Reply-To: <m3k3vilety.fsf@pullcord.laptop.org>
-References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-4-git-send-email-s.hauer@pengutronix.de>
- <20120925071505.GG27291@S2101-09.ap.freescale.net>
- <20120925072714.GY1322@pengutronix.de>
- <20120925073317.GI27291@S2101-09.ap.freescale.net>
- <20120925073808.GZ1322@pengutronix.de>
- <m3k3vilety.fsf@pullcord.laptop.org>
-Message-ID: <20120925075309.GL27291@S2101-09.ap.freescale.net>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 25 Sep 2012 09:53:54 +0200
+Subject: [PATCH RESEND] gpio-lpc32xx: Fix value handling of
+ gpio_direction_output()
+Message-ID: <1348559634-15337-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 03:52:09AM -0400, Chris Ball wrote:
-> We could also break the stalemate by just changing the common spec to
-> have bus-width become optional, default 4.  It's not going to break the
-> code of anyone who's been treating it as required.  I don't think there
-> there was a principled reason behind making it required.
-> 
-That would be the best :)
+For GPIOs of gpio-lpc32xx, gpio_direction_output() ignores the value argument
+(initial value of output). This patch fixes this by setting the level
+accordingly.
 
-Shawn
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+
+---
+Applies to v3.6-rc7
+
+ drivers/gpio/gpio-lpc32xx.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -308,6 +308,7 @@ static int lpc32xx_gpio_dir_output_p012(
+ {
+ 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+ 
++	__set_gpio_level_p012(group, pin, value);
+ 	__set_gpio_dir_p012(group, pin, 0);
+ 
+ 	return 0;
+@@ -318,6 +319,7 @@ static int lpc32xx_gpio_dir_output_p3(st
+ {
+ 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+ 
++	__set_gpio_level_p3(group, pin, value);
+ 	__set_gpio_dir_p3(group, pin, 0);
+ 
+ 	return 0;
+@@ -326,6 +328,9 @@ static int lpc32xx_gpio_dir_output_p3(st
+ static int lpc32xx_gpio_dir_out_always(struct gpio_chip *chip, unsigned pin,
+ 	int value)
+ {
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	__set_gpo_level_p3(group, pin, value);
+ 	return 0;
+ }
+ 
