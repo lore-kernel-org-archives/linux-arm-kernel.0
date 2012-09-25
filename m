@@ -1,51 +1,54 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 25 Sep 2012 10:10:57 +0200
-Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
-References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
- <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <20120925081057.GH17667@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Sep 2012 09:14:49 +0100
+Subject: [PATCH] arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
+In-Reply-To: <506165CA.7070406@visionsystems.de>
+References: <1341325242-17638-1-git-send-email-yegorslists@googlemail.com>
+ <20120924171858.GG28835@atomide.com>
+ <CAGm1_ks_GvSTH8DJ6d3R5OjPNEOhQ39hNo4grg1Pn-NqFX5VKQ@mail.gmail.com>
+ <20120924231619.GA28941@n2100.arm.linux.org.uk>
+ <20120925003758.GP28835@atomide.com> <506165CA.7070406@visionsystems.de>
+Message-ID: <20120925081449.GF31374@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:28 Tue 25 Sep     , Fabio Porcedda wrote:
-> Tested on an at91sam9260 board (evk-pro3)
-> 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> ---
->  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
->  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
->  2 files changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> new file mode 100644
-> index 0000000..724fad1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -0,0 +1,19 @@
-> +* Atmel Watchdog Timers
-> +
-> +** at91sam9-wdt
-> +
-> +Required properties:
-> +- compatible: must be "atmel,at91sam9-wdt".
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +Optional properties:
-> +- heartbeat: contains the watchdog heartbeats in seconds.
-> +
-> +Example:
-> +
-> +	watchdog at fffffd40 {
-> +		compatible = "atmel,at91sam9-wdt";
-for the secind time atmel,at91sam9260-watchdog
+On Tue, Sep 25, 2012 at 10:05:30AM +0200, Yegor Yefremov wrote:
+> How should I change the patch to make it proper? SA1111 is broken anyway:
 
-you need to put the first soc that use it in the compatible
-> +		reg = <0xfffffd40 0x10>;
-> +		heartbeat = <10>;
-need put second in the property name so need to read the doc
+No it isn't.  This is what it produces _today_, and has done for the last
+5-10 years without modification
 
-Best Regards,
-J.
+# CONFIG_CLEANCACHE is not set
+# CONFIG_FRONTSWAP is not set
+CONFIG_FORCE_MAX_ZONEORDER=9
+CONFIG_LEDS=y
+CONFIG_LEDS_CPU=y
+
+> config FORCE_MAX_ZONEORDER
+>         int "Maximum zone order" if ARCH_SHMOBILE
+>         range 11 64 if ARCH_SHMOBILE
+>         default "9" if SA1111
+>         default "11"
+> 
+> AFAIK if ARCH_SHMOBILE defines dependency on ARCH_SHMOBILE,
+
+No it doens't.
+
+	int "Maximum zone order" if ARCH_SHMOBILE
+
+is far from being the same as:
+
+	int "Maximum zone order"
+	depends on ARCH_SHMOBILE
+
+The former defines a condition upon which the option is offered in GUIs -
+or to put it another way, it defines the visibility of the option.
+
+The latter defines a dependency which must be met for the option to be
+both visible and appear in the resulting configuration file.
+
+> so SA1111 won't be evaluated (at least if I select SA1111
+
+And did you check that SA1111 remains selected?  I bet you didn't.  Or
+maybe you tested your patched version.  Whatever.  The original works,
+and has been known to work for years.  Your patch breaks it.  It's
+really as simple as that.
