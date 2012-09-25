@@ -1,286 +1,239 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Sep 2012 12:32:36 +0300
-Subject: [PATCHv5 01/10] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add recursive
- usecount tracking
+Date: Tue, 25 Sep 2012 12:32:38 +0300
+Subject: [PATCHv5 03/10] ARM: OMAP3: add manual control for mpu / core pwrdm
+ usecounting
 In-Reply-To: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
 References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1348565565-14744-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1348565565-14744-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the usecount tracking for omap3+, previously the
-usecount numbers were rather bogus and were not really useful for
-any purpose. Now usecount numbers track the number of really active
-clients on each domain. This patch also adds support for usecount
-tracking on powerdomain level and autoidle flag for clocks that
-are hardware controlled and should be skipped in usecount
-calculations.
+mpu / core powerdomain usecounts are now statically increased
+by 1 during MPU activity. This allows the domains to reflect
+actual usage, and will allow the usecount to reach 0 just before
+all CPUs are ready to idle. Proper powerdomain usecounts are
+propageted to voltagedomain level also, and will allow vc
+callbacks to be triggered at right point of time.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/clkt_iclk.c         |   21 ++++++++++++++++++
- arch/arm/mach-omap2/clockdomain.c       |   15 ++++++++++++-
- arch/arm/mach-omap2/dpll3xxx.c          |   19 ++++++++++++++++
- arch/arm/mach-omap2/powerdomain.c       |   35 +++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h       |    4 +++
- arch/arm/plat-omap/clock.c              |    6 +++++
- arch/arm/plat-omap/include/plat/clock.h |    2 +
- 7 files changed, 101 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/common.h              |    6 ++
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   72 ++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap-smp.c            |    2 +
+ arch/arm/mach-omap2/pm34xx.c              |   21 ++++++++
+ 4 files changed, 100 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt_iclk.c b/arch/arm/mach-omap2/clkt_iclk.c
-index 3d43fba..1afc599 100644
---- a/arch/arm/mach-omap2/clkt_iclk.c
-+++ b/arch/arm/mach-omap2/clkt_iclk.c
-@@ -21,6 +21,7 @@
- #include "clock2xxx.h"
- #include "cm2xxx_3xxx.h"
- #include "cm-regbits-24xx.h"
-+#include "clockdomain.h"
- 
- /* Private functions */
- 
-@@ -34,6 +35,16 @@ void omap2_clkt_iclk_allow_idle(struct clk *clk)
- 	v = __raw_readl((__force void __iomem *)r);
- 	v |= (1 << clk->enable_bit);
- 	__raw_writel(v, (__force void __iomem *)r);
-+
-+	/* Remove this clock from parent clockdomain usecounts */
-+	if (clk->usecount && clk->clkdm)
-+		clkdm_clk_disable(clk->clkdm, clk);
-+
-+	/*
-+	 * Mark as autoidle, so we continue to ignore this clock in
-+	 * parent clkdm usecount calculations
-+	 */
-+	clk->autoidle = true;
- }
- 
- /* XXX */
-@@ -46,6 +57,16 @@ void omap2_clkt_iclk_deny_idle(struct clk *clk)
- 	v = __raw_readl((__force void __iomem *)r);
- 	v &= ~(1 << clk->enable_bit);
- 	__raw_writel(v, (__force void __iomem *)r);
-+
-+	/*
-+	 * Disable autoidle flag so further clkdm usecounts take this
-+	 * clock into account
-+	 */
-+	clk->autoidle = false;
-+
-+	/* Add clock back to parent clockdomain usecount */
-+	if (clk->usecount && clk->clkdm)
-+		clkdm_clk_enable(clk->clkdm, clk);
- }
- 
- /* Public data */
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 8664f5a..8c8518c 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -910,6 +910,7 @@ bool clkdm_in_hwsup(struct clockdomain *clkdm)
- static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 6ea837a..a445a02 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -292,6 +292,8 @@ extern int omap4_finish_suspend(unsigned long cpu_state);
+ extern void omap4_cpu_resume(void);
+ extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
+ extern u32 omap4_mpuss_read_prev_context_state(void);
++extern void omap4_pm_cpu_online(void);
++extern void omap4_pm_cpu_offline(void);
+ #else
+ static inline int omap4_enter_lowpower(unsigned int cpu,
+ 					unsigned int power_state)
+@@ -323,6 +325,10 @@ static inline u32 omap4_mpuss_read_prev_context_state(void)
  {
- 	unsigned long flags;
-+	int usecount;
- 
- 	if (!clkdm || !arch_clkdm || !arch_clkdm->clkdm_clk_enable)
- 		return -EINVAL;
-@@ -919,11 +920,14 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
- 	 * should be called for every clock instance or hwmod that is
- 	 * enabled, so the clkdm can be force woken up.
- 	 */
--	if ((atomic_inc_return(&clkdm->usecount) > 1) && autodeps)
-+	usecount = atomic_inc_return(&clkdm->usecount);
-+	if (usecount > 1 && autodeps)
- 		return 0;
- 
- 	spin_lock_irqsave(&clkdm->lock, flags);
- 	arch_clkdm->clkdm_clk_enable(clkdm);
-+	if (usecount == 1)
-+		pwrdm_clkdm_enable(clkdm->pwrdm.ptr);
- 	pwrdm_state_switch(clkdm->pwrdm.ptr);
- 	spin_unlock_irqrestore(&clkdm->lock, flags);
- 
-@@ -949,6 +953,7 @@ static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm)
- 
- 	spin_lock_irqsave(&clkdm->lock, flags);
- 	arch_clkdm->clkdm_clk_disable(clkdm);
-+	pwrdm_clkdm_disable(clkdm->pwrdm.ptr);
- 	pwrdm_state_switch(clkdm->pwrdm.ptr);
- 	spin_unlock_irqrestore(&clkdm->lock, flags);
- 
-@@ -981,6 +986,10 @@ int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
- 	if (!clk)
- 		return -EINVAL;
- 
-+	/* If autoidle clock, do not update clkdm usecounts */
-+	if (clk->autoidle)
-+		return 0;
-+
- 	return _clkdm_clk_hwmod_enable(clkdm);
+ 	return 0;
  }
- 
-@@ -1007,6 +1016,10 @@ int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
- 	if (!clk)
- 		return -EINVAL;
- 
-+	/* If autoidle clock, do not update clkdm usecounts */
-+	if (clk->autoidle)
-+		return 0;
 +
- 	return _clkdm_clk_hwmod_disable(clkdm);
- }
- 
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index b9c8d2f..da660d2 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -34,6 +34,7 @@
- #include "clock.h"
- #include "cm2xxx_3xxx.h"
- #include "cm-regbits-34xx.h"
-+#include "clockdomain.h"
- 
- /* CM_AUTOIDLE_PLL*.AUTO_* bit values */
- #define DPLL_AUTOIDLE_DISABLE			0x0
-@@ -571,6 +572,15 @@ void omap3_dpll_allow_idle(struct clk *clk)
- 	v |= DPLL_AUTOIDLE_LOW_POWER_STOP << __ffs(dd->autoidle_mask);
- 	__raw_writel(v, dd->autoidle_reg);
- 
-+	/* Remove this clock from parent clockdomain usecounts */
-+	if (clk->usecount && clk->clkdm)
-+		clkdm_clk_disable(clk->clkdm, clk);
++static inline void omap4_pm_cpu_online(void) { }
 +
-+	/*
-+	 * Mark as autoidle, so we continue to ignore this clock in
-+	 * parent clkdm usecount calculations
-+	 */
-+	clk->autoidle = true;
- }
++static inline void omap4_pm_cpu_offline(void) { }
+ #endif
+ 
+ struct omap_sdrc_params;
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 230bdcd..0ad2337 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -72,8 +72,9 @@ struct omap4_cpu_pm_info {
+ };
+ 
+ static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
+-static struct powerdomain *mpuss_pd;
++static struct powerdomain *mpuss_pd, *core_pd;
+ static void __iomem *sar_base;
++static atomic_t __initdata init_cpu_online_count;
+ 
+ /*
+  * Program the wakeup routine address for the CPU0 and CPU1
+@@ -216,6 +217,50 @@ static void save_l2x0_context(void)
+ #endif
  
  /**
-@@ -600,6 +610,15 @@ void omap3_dpll_deny_idle(struct clk *clk)
- 	v |= DPLL_AUTOIDLE_DISABLE << __ffs(dd->autoidle_mask);
- 	__raw_writel(v, dd->autoidle_reg);
- 
-+	/*
-+	 * Disable autoidle flag so further clkdm usecounts take this
-+	 * clock into account
-+	 */
-+	clk->autoidle = false;
-+
-+	/* Add clock back to parent clockdomain usecount */
-+	if (clk->usecount && clk->clkdm)
-+		clkdm_clk_enable(clk->clkdm, clk);
- }
- 
- /* Clock control for DPLL outputs */
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index d6daa81..ba49029 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -1466,6 +1466,41 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
- 	return ret;
- }
- 
-+/**
-+ * pwrdm_clkdm_enable - increment powerdomain usecount
-+ * @pwrdm: struct powerdomain *
++ * omap4_pm_cpu_online - increase the number of online CPUs
 + *
-+ * Increases the usecount for a powerdomain. Called from clockdomain
-+ * code once a clockdomain becomes active.
++ * This function increases the usecounts for MPU and CORE powerdomains,
++ * which allows the domains to properly reflect usage with online CPUs
++ * also. CORE powerdomain usecount is increased, as MPU is using memories,
++ * which are powered through CORE powerdomain (SDRAM). If this function is
++ * called before PM init has completed (mpuss_pd / core_pd are not defined),
++ * a temporary init time variable is increased instead; its contents
++ * will be moved to the powerdomain usecounts once PM init completes.
 + */
-+void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
++void omap4_pm_cpu_online(void)
 +{
-+	if (!pwrdm)
++	if (!mpuss_pd || !core_pd) {
++		atomic_inc(&init_cpu_online_count);
 +		return;
++	}
 +
-+	atomic_inc(&pwrdm->usecount);
++	pwrdm_clkdm_enable(mpuss_pd);
++	pwrdm_clkdm_enable(core_pd);
 +}
 +
 +/**
-+ * pwrdm_clkdm_disable - decrease powerdomain usecount
-+ * @pwrdm: struct powerdomain *
++ * omap4_pm_cpu_offline - decrease the number of online CPUs
 + *
-+ * Decreases the usecount for a powerdomain. Called from clockdomain
-+ * code once a clockdomain usecount reaches zero, i.e. it is ready to
-+ * idle.
++ * This function decreases the usecounts for MPU and CORE powerdomains,
++ * which allows the domains to properly reflect usage with online CPUs
++ * also. CORE powerdomain usecount is decreased, as MPU is using memories,
++ * which are powered through CORE powerdomain (SDRAM). If this function is
++ * called before PM init has completed (mpuss_pd / core_pd are not defined),
++ * a temporary init time variable is increased instead; its contents
++ * will be moved to the powerdomain usecounts once PM init completes.
 + */
-+void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
++void omap4_pm_cpu_offline(void)
 +{
-+	int val;
-+
-+	if (!pwrdm)
++	if (!mpuss_pd || !core_pd) {
++		atomic_dec(&init_cpu_online_count);
 +		return;
++	}
 +
-+	val = atomic_dec_return(&pwrdm->usecount);
-+
-+	WARN_ON(val < 0);
++	pwrdm_clkdm_disable(mpuss_pd);
++	pwrdm_clkdm_disable(core_pd);
 +}
 +
- int pwrdm_pre_transition(struct powerdomain *pwrdm)
- {
- 	if (pwrdm)
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index dcd2315..1bad255 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -92,6 +92,9 @@ int pwrdm_state_switch(struct powerdomain *pwrdm);
- int pwrdm_pre_transition(struct powerdomain *pwrdm);
- int pwrdm_post_transition(struct powerdomain *pwrdm);
++/**
+  * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
+  * The purpose of this function is to manage low power programming
+  * of OMAP4 MPUSS subsystem
+@@ -274,11 +319,17 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	scu_pwrst_prepare(cpu, power_state);
+ 	l2x0_pwrst_prepare(cpu, save_state);
  
-+void pwrdm_clkdm_enable(struct powerdomain *pwrdm);
-+void pwrdm_clkdm_disable(struct powerdomain *pwrdm);
++	/* Decrement usecounts for MPU and CORE pd as we are entering idle */
++	omap4_pm_cpu_offline();
 +
- int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
- bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
+ 	/*
+ 	 * Call low level function  with targeted low power state.
+ 	 */
+ 	cpu_suspend(save_state, omap4_finish_suspend);
  
-@@ -209,6 +212,7 @@ struct powerdomain {
- 	unsigned state_counter[PWRDM_MAX_FUNC_PWRSTS];
- 	unsigned ret_logic_off_counter;
- 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
-+	atomic_t usecount;
++	/* Increment usecounts for MPU and CORE pd as we are leaving idle */
++	omap4_pm_cpu_online();
++
+ 	/*
+ 	 * Restore the CPUx power state to ON otherwise CPUx
+ 	 * power domain can transitions to programmed low power
+@@ -315,6 +366,8 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ 	set_cpu_wakeup_addr(cpu, virt_to_phys(pm_info->secondary_startup));
+ 	scu_pwrst_prepare(cpu, power_state);
  
- 	const u8 pwrstctrl_offs;
- 	const u8 pwrstst_offs;
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 706b7e2..d657d39 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -282,6 +282,12 @@ int clk_register(struct clk *clk)
- 		list_add(&clk->sibling, &root_clks);
++	omap4_pm_cpu_offline();
++
+ 	/*
+ 	 * CPU never retuns back if targeted power state is OFF mode.
+ 	 * CPU ONLINE follows normal CPU ONLINE ptah via
+@@ -322,6 +375,8 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ 	 */
+ 	omap4_finish_suspend(cpu_state);
  
- 	list_add(&clk->node, &clocks);
++	omap4_pm_cpu_online();
++
+ 	set_cpu_next_pwrst(cpu, PWRDM_FUNC_PWRST_ON);
+ 	return 0;
+ }
+@@ -386,9 +441,24 @@ int __init omap4_mpuss_init(void)
+ 		pr_err("Failed to lookup MPUSS power domain\n");
+ 		return -ENODEV;
+ 	}
++	core_pd = pwrdm_lookup("core_pwrdm");
++	if (!core_pd) {
++		pr_err("Failed to lookup CORE power domain\n");
++		return -ENODEV;
++	}
+ 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+ 	mpuss_clear_prev_logic_pwrst();
+ 
++	/* Notify pwrdm usecounters about active CPU */
++	omap4_pm_cpu_online();
++
 +	/*
-+	 * If clock has no ops, it is handled by hardware and thus will
-+	 * idle automatically
++	 * If CPUs became online / offline during init time, push
++	 * the pending counter updates also.
 +	 */
-+	if (clk->ops == &clkops_null)
-+		clk->autoidle = true;
- 	if (clk->init)
- 		clk->init(clk);
- 	mutex_unlock(&clocks_mutex);
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index 656b986..3b5acea 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -206,6 +206,7 @@ struct dpll_data {
-  * @init: fn ptr to do clock-specific initialization
-  * @enable_bit: bitshift to write to enable/disable the clock (see @enable_reg)
-  * @usecount: number of users that have requested this clock to be enabled
-+ * @autoidle: indicates hardware controlled clock (not used in domain usecounts)
-  * @fixed_div: when > 0, this clock's rate is its parent's rate / @fixed_div
-  * @flags: see "struct clk.flags possibilities" above
-  * @clksel_reg: for clksel clks, register va containing src/divisor select
-@@ -252,6 +253,7 @@ struct clk {
- 	void			(*init)(struct clk *);
- 	u8			enable_bit;
- 	s8			usecount;
-+	bool			autoidle;
- 	u8			fixed_div;
- 	u8			flags;
- #ifdef CONFIG_ARCH_OMAP2PLUS
++	while (atomic_dec_return(&init_cpu_online_count) >= 0)
++		omap4_pm_cpu_online();
++
+ 	/* Save device type on scratchpad for low level code to use */
+ 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+ 		__raw_writel(1, sar_base + OMAP_TYPE_OFFSET);
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index b9738e2..f296e35 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -71,6 +71,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	 */
+ 	gic_secondary_init(0);
+ 
++	omap4_pm_cpu_online();
++
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 5b6505f..7a423f7 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -294,6 +294,14 @@ void omap_sram_idle(void)
+ 	omap3_intc_prepare_idle();
+ 
+ 	/*
++	 * CPU going offline, update pwrdm counters. Core pwrdm
++	 * count is decreased as MPU is using SDRAM which resides
++	 * under core pwrdm.
++	 */
++	pwrdm_clkdm_disable(mpu_pwrdm);
++	pwrdm_clkdm_disable(core_pwrdm);
++
++	/*
+ 	 * On EMU/HS devices ROM code restores a SRDC value
+ 	 * from scratchpad which has automatic self refresh on timeout
+ 	 * of AUTO_CNT = 1 enabled. This takes care of erratum ID i443.
+@@ -324,6 +332,12 @@ void omap_sram_idle(void)
+ 	    core_next_state == PWRDM_FUNC_PWRST_OFF)
+ 		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
+ 
++	/*
++	 * CPU is coming back online, increase pwrdm usecounts
++	 */
++	pwrdm_clkdm_enable(mpu_pwrdm);
++	pwrdm_clkdm_enable(core_pwrdm);
++
+ 	/* CORE */
+ 	if (core_next_state < PWRDM_FUNC_PWRST_ON) {
+ 		core_prev_state = pwrdm_read_prev_fpwrst(core_pwrdm);
+@@ -718,6 +732,13 @@ int __init omap3_pm_init(void)
+ 	omap_pm_suspend = omap3_pm_suspend;
+ #endif
+ 
++	/*
++	 * CPU online, increase pwrdm usecounts for MPU and CORE domains.
++	 * MPU is using memory subsystem which resides in CORE domain.
++	 */
++	pwrdm_clkdm_enable(mpu_pwrdm);
++	pwrdm_clkdm_enable(core_pwrdm);
++
+ 	arm_pm_idle = omap3_pm_idle;
+ 	omap3_idle_init();
+ 
 -- 
 1.7.4.1
