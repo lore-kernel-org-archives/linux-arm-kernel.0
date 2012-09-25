@@ -1,27 +1,149 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 25 Sep 2012 20:00:12 +0100
-Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
-In-Reply-To: <CACRpkdbjsbUJqMgKt1CyBMmCxMAMz0hhwxzn3T6MdTyYGymjLg@mail.gmail.com>
-References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
- <20120920190034.GB15609@n2100.arm.linux.org.uk>
- <CACRpkdY1ZxQoyGFO9OnKr0WYQzooxPGvZV8Gnr_YO_yT_+ddDw@mail.gmail.com>
- <20120921162543.1ed18775@pyramind.ukuu.org.uk>
- <CACRpkdakLAPmD0TQwe2VNhdePDuFv2KXD2U1xoP1C0axkx2p7A@mail.gmail.com>
- <20120921205603.436a0194@pyramind.ukuu.org.uk>
- <CACRpkdbjsbUJqMgKt1CyBMmCxMAMz0hhwxzn3T6MdTyYGymjLg@mail.gmail.com>
-Message-ID: <20120925200012.6576167f@pyramind.ukuu.org.uk>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 25 Sep 2012 13:59:31 -0500
+Subject: [PATCH] of: dma: fix potential deadlock when requesting a slave
+ channel
+Message-ID: <1348599571-29546-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> OK sorry for getting this backwards, so I was under the impression that
-> BOTHER was an internal detail of the TTY layer, not to be or:ed on
-> and passed in from the outside.
+In the latest version of the OF dma handlers I added support (rather hastily)
+to exhaustively search for an available dma slave channel, for the use-case
+where we have alternative slave channels that can be used. In the current
+implementation a deadlock scenario can occur causing the CPU to loop forever.
+The scenario is as follows ...
 
-BOTHER is a speed setting like the other Bxxx values - it's an external
-API.
+1. There are alternative channels avaialble
+2. The first channel that is found by calling of_dma_find_channel() is not
+   available and so the call to the xlate function returns NULL. In this case
+   we will call of_dma_find_channel() again but we will return the same channel
+   that we found the first time and hence, again the xlate will return NULL and
+   we will loop here forever.
 
-> 
-> Then everything makes perfect sense, I'll try to patch the caller
-> instead for this "bug" and see what happens. Probably it JustWorks...
+Fix this potential deadlock by just using a single for-loop and not a for-loop
+nested in a do-while loop. This change also replaces the function
+of_dma_find_channel() with of_dma_match_channel() which performs a simple check
+to see if a DMA channel matches the name specified.
 
-Cool
+I have tested this implementation on an OMAP4 panda board by adding a dummy
+DMA specifier, that will cause the xlate function to return NULL, to the
+beginning of a list of DMA specifiers for a DMA client.
+
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ drivers/of/dma.c |   60 +++++++++++++++++++++++++++---------------------------
+ 1 file changed, 30 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/of/dma.c b/drivers/of/dma.c
+index 19ad37c..4bed490 100644
+--- a/drivers/of/dma.c
++++ b/drivers/of/dma.c
+@@ -108,37 +108,32 @@ void of_dma_controller_free(struct device_node *np)
+ EXPORT_SYMBOL_GPL(of_dma_controller_free);
+ 
+ /**
+- * of_dma_find_channel - Find a DMA channel by name
++ * of_dma_match_channel - Check if a DMA specifier matches name
+  * @np:		device node to look for DMA channels
+- * @name:	name of desired channel
++ * @name:	channel name to be matched
++ * @index:	index of DMA specifier in list of DMA specifiers
+  * @dma_spec:	pointer to DMA specifier as found in the device tree
+  *
+- * Find a DMA channel by the name. Returns 0 on success or appropriate
+- * errno value on error.
++ * Check if the DMA specifier pointed to by the index in a list of DMA
++ * specifiers, matches the name provided. Returns 0 if the name matches and
++ * a valid pointer to the DMA specifier is found. Otherwise returns -ENODEV.
+  */
+-static int of_dma_find_channel(struct device_node *np, char *name,
+-			       struct of_phandle_args *dma_spec)
++static int of_dma_match_channel(struct device_node *np, char *name, int index,
++				struct of_phandle_args *dma_spec)
+ {
+-	int count, i;
+ 	const char *s;
+ 
+-	count = of_property_count_strings(np, "dma-names");
+-	if (count < 0)
+-		return count;
++	if (of_property_read_string_index(np, "dma-names", index, &s))
++		return -ENODEV;
+ 
+-	for (i = 0; i < count; i++) {
+-		if (of_property_read_string_index(np, "dma-names", i, &s))
+-			continue;
++	if (strcmp(name, s))
++		return -ENODEV;
+ 
+-		if (strcmp(name, s))
+-			continue;
++	if (of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
++				       dma_spec))
++		return -ENODEV;
+ 
+-		if (!of_parse_phandle_with_args(np, "dmas", "#dma-cells", i,
+-						dma_spec))
+-			return 0;
+-	}
+-
+-	return -ENODEV;
++	return 0;
+ }
+ 
+ /**
+@@ -154,19 +149,22 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 	struct of_phandle_args	dma_spec;
+ 	struct of_dma		*ofdma;
+ 	struct dma_chan		*chan;
+-	int			r;
++	int			count, i;
+ 
+ 	if (!np || !name) {
+ 		pr_err("%s: not enough information provided\n", __func__);
+ 		return NULL;
+ 	}
+ 
+-	do {
+-		r = of_dma_find_channel(np, name, &dma_spec);
+-		if (r) {
+-			pr_err("%s: can't find DMA channel\n", np->full_name);
+-			return NULL;
+-		}
++	count = of_property_count_strings(np, "dma-names");
++	if (count < 0) {
++		pr_err("%s: dma-names property missing or empty\n", __func__);
++		return NULL;
++	}
++
++	for (i = 0; i < count; i++) {
++		if (of_dma_match_channel(np, name, i, &dma_spec))
++			continue;
+ 
+ 		ofdma = of_dma_find_controller(dma_spec.np);
+ 		if (!ofdma) {
+@@ -185,9 +183,11 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 
+ 		of_node_put(dma_spec.np);
+ 
+-	} while (!chan);
++		if (chan)
++			return chan;
++	}
+ 
+-	return chan;
++	return NULL;
+ }
+ 
+ /**
+-- 
+1.7.9.5
