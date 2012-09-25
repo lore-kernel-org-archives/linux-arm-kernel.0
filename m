@@ -1,77 +1,37 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Sep 2012 19:33:46 +0300
-Subject: [PATCHv7 14/21] ARM: OMAP3+: voltage: remove unused volt_setup_time
- parameter
+Date: Tue, 25 Sep 2012 19:33:47 +0300
+Subject: [PATCHv7 15/21] ARM: OMAP4: vc: fix channel configuration
 In-Reply-To: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
 References: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1348590833-12335-15-git-send-email-t-kristo@ti.com>
+Message-ID: <1348590833-12335-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed as the ramp times are calculated from
-voltage deltas + slew rates.
+RACEN bit should only be set if the voltage and command register addresses
+are the same.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_twl.c |    5 -----
- arch/arm/mach-omap2/voltage.h  |    1 -
- 2 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/vc.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 188f210..ecae989 100644
---- a/arch/arm/mach-omap2/omap_twl.c
-+++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -141,7 +141,6 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
- static struct omap_voltdm_pmic omap3_mpu_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12500,
--	.volt_setup_time	= 0xfff,
- 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
-@@ -158,7 +157,6 @@ static struct omap_voltdm_pmic omap3_mpu_pmic = {
- static struct omap_voltdm_pmic omap3_core_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12500,
--	.volt_setup_time        = 0xfff,
- 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
-@@ -175,7 +173,6 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
- static struct omap_voltdm_pmic omap4_mpu_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
--	.volt_setup_time	= 0,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-@@ -193,7 +190,6 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
- static struct omap_voltdm_pmic omap4_iva_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
--	.volt_setup_time	= 0,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-@@ -211,7 +207,6 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
- static struct omap_voltdm_pmic omap4_core_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
--	.volt_setup_time	= 0,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 01ab2e5..106a240 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -140,7 +140,6 @@ struct voltagedomain {
- struct omap_voltdm_pmic {
- 	int slew_rate;
- 	int step_size;
--	u16 volt_setup_time;
- 	u16 i2c_slave_addr;
- 	u16 volt_reg_addr;
- 	u16 cmd_reg_addr;
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 2ca00bc..a63c53a 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -695,9 +695,12 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
+ 		voltdm->rmw(vc->smps_cmdra_mask,
+ 			    vc->cmd_reg_addr << __ffs(vc->smps_cmdra_mask),
+ 			    vc->smps_cmdra_reg);
+-		vc->cfg_channel |= vc_cfg_bits->rac | vc_cfg_bits->racen;
++		vc->cfg_channel |= vc_cfg_bits->rac;
+ 	}
+ 
++	if (vc->cmd_reg_addr == vc->volt_reg_addr)
++		vc->cfg_channel |= vc_cfg_bits->racen;
++
+ 	/* Set up the on, inactive, retention and off voltage */
+ 	on_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->on);
+ 	onlp_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->onlp);
 -- 
 1.7.4.1
