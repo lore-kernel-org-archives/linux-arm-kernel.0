@@ -1,30 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 25 Sep 2012 18:52:55 +0100
-Subject: [PATCHv2 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <1346844964-24839-1-git-send-email-sourav.poddar@ti.com>
-References: <1346844964-24839-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20120925175255.GA13823@sirena.org.uk>
+From: mmayer@broadcom.com (Markus Mayer)
+Date: Tue, 25 Sep 2012 10:58:08 -0700
+Subject: [PATCH 0/1] Fix segfault in DTC
+In-Reply-To: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
+References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
+Message-ID: <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 05:06:04PM +0530, Sourav Poddar wrote:
+As suggested on linux-arm-kernel, I am copying devicetree-discuss, as well
+as David and Jon on this thread. Please let me know your thoughts.
 
-> +static struct regmap_config smsc_regmap_config = {
-> +		.reg_bits = 8,
-> +		.val_bits = 8,
-> +		.max_register = SMSC_MAX_REGISTER - 1;
-> +		.cache_type = REGCACHE_COMPRESSED,
-> +};
+Regards,
+-Markus
 
-That definition of max_register looks wrong - why are we subtracting 1
-from a macro called MAX_REGISTER to get it?
+Markus Mayer (1):
+  Fix segfault in dtc when empty input file is given.
 
-Indentation here is a bit odd too.
+ scripts/dtc/treesource.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-> +static int smsc_i2c_remove(struct i2c_client *i2c)
-> +{
-> +	return 0;
-> +}
-
-Remove empty functions.
+-- 
+1.7.5.4
