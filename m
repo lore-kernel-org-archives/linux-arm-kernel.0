@@ -1,57 +1,74 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 24 Sep 2012 23:53:31 -0300
-Subject: [PATCH] ARM: mxs_defconfig: Improve USB related support
-Message-ID: <1348541611-15717-1-git-send-email-festevam@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Sep 2012 20:31:36 -0700
+Subject: [GIT PULL 2/3] omap platform and board related late patches
+ for v3.7 merge window
+In-Reply-To: <20120925003953.GQ28835@atomide.com>
+References: <pull-1348521952-285145> <E1TGGAI-0000D1-T0@merlin.infradead.org>
+ <20120925003953.GQ28835@atomide.com>
+Message-ID: <20120925033136.GS28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+* Tony Lindgren <tony@atomide.com> [120924 17:41]:
+> * Tony Lindgren <tony@atomide.com> [120924 14:30]:
+> > The following changes since commit 0e70156de4c8465bfb8cb45cdc1bbc2fa474ce14:
+> > 
+> >   ARM: OMAP2+: Make omap4-keypad.h local (2012-09-20 15:04:04 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-late-v2-for-v3.7
+> > 
+> > for you to fetch changes up to ead53717d9ab28c942b9adf66f8c02442dbfbc8a:
+> > 
+> >   arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX (2012-09-24 10:32:39 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > These board and platform related patches have been posted
+> > quite a while ago but have somehow fallen though the cracks
+> > as most of the focus has been making things to work with
+> > device tree. As the first patch depends on sparse IRQ
+> > related removal of irqs.h and related header moves, these
+> > are based on omap-cleanup-local-headers-for-v3.7 tag.
+> 
+> Let's scrap this pull request, Russell noted that Yegor's patch
+> breaks sa1111.
 
-Select the following USB related options:
+Here's the updated pull request with just the top patch dropped.
 
-- USB Video Class (webcam)
-- USB Ethernet adapter
-- Native language support (needed for mounting USB pen drives, for example)
+Tony
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |   10 ++++++++++
- 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 048aaca..da51790 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -61,6 +61,8 @@ CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- CONFIG_ENC28J60=y
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
- # CONFIG_WLAN is not set
-@@ -106,6 +108,10 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
- CONFIG_SND_SOC_SGTL5000=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_MEDIA_USB_SUPPORT=y
-+CONFIG_USB_VIDEO_CLASS=y
- CONFIG_FB=y
- CONFIG_FB_MXS=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
-@@ -158,6 +164,10 @@ CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_15=y
- CONFIG_PRINTK_TIME=y
- CONFIG_FRAME_WARN=2048
- CONFIG_MAGIC_SYSRQ=y
--- 
-1.7.9.5
+The following changes since commit 0e70156de4c8465bfb8cb45cdc1bbc2fa474ce14:
+
+  ARM: OMAP2+: Make omap4-keypad.h local (2012-09-20 15:04:04 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-late-v3-for-v3.7
+
+for you to fetch changes up to cfc55bcc1f78395872d41c50f6a3129c4b42289e:
+
+  ARM: OMAP2+: serial: Change MAX_HSUART_PORTS to 6 (2012-09-24 10:32:39 -0700)
+
+----------------------------------------------------------------
+These board and platform related patches have been posted
+quite a while ago but have somehow fallen though the cracks
+as most of the focus has been making things to work with
+device tree. As the first patch depends on sparse IRQ
+related removal of irqs.h and related header moves, these
+are based on omap-cleanup-local-headers-for-v3.7 tag.
+
+----------------------------------------------------------------
+AnilKumar Ch (1):
+      ARM: OMAP2+: serial: Change MAX_HSUART_PORTS to 6
+
+Peter Ujfalusi (1):
+      ARM: OMAP4: twl-common: Support for additional devices on i2c1 bus
+
+ arch/arm/mach-omap2/board-4430sdp.c           |   12 ++++++--
+ arch/arm/mach-omap2/board-omap4panda.c        |   12 ++++++--
+ arch/arm/mach-omap2/twl-common.c              |   37 ++++++++-----------------
+ arch/arm/mach-omap2/twl-common.h              |    3 +-
+ arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
+ 5 files changed, 34 insertions(+), 32 deletions(-)
