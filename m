@@ -1,128 +1,273 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 25 Sep 2012 10:49:11 -0600
-Subject: [RFC 6/6] ARM: dts: exynos4210: Add platform-specific descriptions
- for pin controllers
-In-Reply-To: <40868705.kP2fEHozCi@amdc1227>
-References: <1348131197-25506-1-git-send-email-t.figa@samsung.com>
- <7891903.Qpoh0EJCQr@flatron> <5060E95E.5030601@wwwdotorg.org>
- <40868705.kP2fEHozCi@amdc1227>
-Message-ID: <5061E087.6030801@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Sep 2012 18:00:31 +0100
+Subject: [PATCH 10/15] KVM: ARM: World-switch implementation
+In-Reply-To: <20120915153533.21241.82489.stgit@ubuntu>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153533.21241.82489.stgit@ubuntu>
+Message-ID: <20120925170031.GF28728@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 03:37 AM, Tomasz Figa wrote:
-> Hi Stephen,
+On Sat, Sep 15, 2012 at 04:35:33PM +0100, Christoffer Dall wrote:
+> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> index 1429d89..cd8fc86 100644
+> --- a/arch/arm/kernel/asm-offsets.c
+> +++ b/arch/arm/kernel/asm-offsets.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/mm.h>
+>  #include <linux/dma-mapping.h>
+> +#include <linux/kvm_host.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/glue-df.h>
+>  #include <asm/glue-pf.h>
+> @@ -144,5 +145,48 @@ int main(void)
+>    DEFINE(DMA_BIDIRECTIONAL,    DMA_BIDIRECTIONAL);
+>    DEFINE(DMA_TO_DEVICE,                DMA_TO_DEVICE);
+>    DEFINE(DMA_FROM_DEVICE,      DMA_FROM_DEVICE);
+> +#ifdef CONFIG_KVM_ARM_HOST
+> +  DEFINE(VCPU_KVM,             offsetof(struct kvm_vcpu, kvm));
+> +  DEFINE(VCPU_MIDR,            offsetof(struct kvm_vcpu, arch.midr));
+> +  DEFINE(VCPU_MPIDR,           offsetof(struct kvm_vcpu, arch.cp15[c0_MPIDR]));
+> +  DEFINE(VCPU_CSSELR,          offsetof(struct kvm_vcpu, arch.cp15[c0_CSSELR]));
+> +  DEFINE(VCPU_SCTLR,           offsetof(struct kvm_vcpu, arch.cp15[c1_SCTLR]));
+> +  DEFINE(VCPU_CPACR,           offsetof(struct kvm_vcpu, arch.cp15[c1_CPACR]));
+> +  DEFINE(VCPU_TTBR0,           offsetof(struct kvm_vcpu, arch.cp15[c2_TTBR0]));
+> +  DEFINE(VCPU_TTBR1,           offsetof(struct kvm_vcpu, arch.cp15[c2_TTBR1]));
+> +  DEFINE(VCPU_TTBCR,           offsetof(struct kvm_vcpu, arch.cp15[c2_TTBCR]));
+> +  DEFINE(VCPU_DACR,            offsetof(struct kvm_vcpu, arch.cp15[c3_DACR]));
+> +  DEFINE(VCPU_DFSR,            offsetof(struct kvm_vcpu, arch.cp15[c5_DFSR]));
+> +  DEFINE(VCPU_IFSR,            offsetof(struct kvm_vcpu, arch.cp15[c5_IFSR]));
+> +  DEFINE(VCPU_ADFSR,           offsetof(struct kvm_vcpu, arch.cp15[c5_ADFSR]));
+> +  DEFINE(VCPU_AIFSR,           offsetof(struct kvm_vcpu, arch.cp15[c5_AIFSR]));
+> +  DEFINE(VCPU_DFAR,            offsetof(struct kvm_vcpu, arch.cp15[c6_DFAR]));
+> +  DEFINE(VCPU_IFAR,            offsetof(struct kvm_vcpu, arch.cp15[c6_IFAR]));
+> +  DEFINE(VCPU_PRRR,            offsetof(struct kvm_vcpu, arch.cp15[c10_PRRR]));
+> +  DEFINE(VCPU_NMRR,            offsetof(struct kvm_vcpu, arch.cp15[c10_NMRR]));
+> +  DEFINE(VCPU_VBAR,            offsetof(struct kvm_vcpu, arch.cp15[c12_VBAR]));
+> +  DEFINE(VCPU_CID,             offsetof(struct kvm_vcpu, arch.cp15[c13_CID]));
+> +  DEFINE(VCPU_TID_URW,         offsetof(struct kvm_vcpu, arch.cp15[c13_TID_URW]));
+> +  DEFINE(VCPU_TID_URO,         offsetof(struct kvm_vcpu, arch.cp15[c13_TID_URO]));
+> +  DEFINE(VCPU_TID_PRIV,                offsetof(struct kvm_vcpu, arch.cp15[c13_TID_PRIV]));
+
+Could you instead define an offset for arch.cp15, then use scaled offsets
+from that in the assembly code?
+
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 8a87fc7..087f9d1 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -41,6 +41,7 @@
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <asm/kvm_emulate.h>
 > 
-> On Monday 24 of September 2012 17:14:38 Stephen Warren wrote:
->> On 09/24/2012 03:31 PM, Tomasz Figa wrote:
->>> On Monday 24 of September 2012 11:42:15 Stephen Warren wrote:
->>>> On 09/21/2012 01:54 PM, Tomasz Figa wrote:
->>>>> On Friday 21 of September 2012 12:56:41 Stephen Warren wrote:
->>>>>> On 09/20/2012 02:53 AM, Tomasz Figa wrote:
->>>>>>> The patch "pinctrl: samsung: Parse pin banks from DT" introduced
->>>>>>> platform-specific data parsing from DT.
->>>>>>>
->>>>>>> This patch adds all necessary nodes and properties to exynos4210
->>>>>>> device
->>>>>>> tree sources.
->>>>>>>
->>>>>>> +++ b/arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
->>>>>>>
->>>>>>> +			samsung,pctl-offset = <0x000>;
->>>>>>> +			samsung,pin-bank = "gpa0";
->>>>>>> +			samsung,pin-count = <8>;
->>>>>>> +			samsung,func-width = <4>;
->>>>>>> +			samsung,pud-width = <2>;
->>>>>>> +			samsung,drv-width = <2>;
->>>>>>> +			samsung,conpdn-width = <2>;
->>>>>>> +			samsung,pudpdn-width = <2>;
-...
-> Hmm, could you elaborate on the idea of using mask instead of field widths? 
-
-For background: With e.g.:
-
-samsung,func-width = <4>;
-samsung,pud-width = <2>;
-samsung,drv-width = <2>;
-
-How do you know if the layout is:
-
-bits:    7-4  | 3-2 | 1-0
-meaning: func | pud | drv
-
-or:
-
-bits:    7-6 | 5-4 | 3-0  |
-meaning: drv | pud | func |
-
-or:
-
-bits:    15-12 | 13-8   | 7-6 | 5-3    | 2-1 | 0
-meaning: func  | unused | pud | unused | drv | unused
-
-I suppose what you're saying is that for all currently extant Samsung
-SoCs, there's some rule that defines this; perhaps the fields are always
-in order MSB to LSB func, pud, drv, and there are never any unused bits
-between the fields? If so, I suppose that's reasonable, even if it does
-restrict the binding's ability to support any unanticipated future SoC
-register layout changes.
-
-> I don't see how this could be better and there is an additional drawback of 
-> having to calculate width and pos from every mask.
-
-With the DT properties just defining "width", the driver still has to
-calculate the pos from every width by adding up the widths of all fields
-lower in the register, right? Or, does each field always start at a
-hard-coded bit position?
-
-Anyway, you could completely avoid this question by using masks instead:
-
-samsung,func-mask = <0xf0>;
-samsung,pud-mask = <0xc>;
-samsung,drv-mask = <0x3>;
-
-The mask defines exactly which bits are included in the register field,
-so it implicitly defines both the position and width of the field.
-
-Finding the shift/size is very easy. I believe Tony Lindgren's generic
-pinctrl already does this along these lines. Very roughly:
-
-func_pos = ffs(func_mask);
-func_width = ffs(~(func_mask >> func_pos));
-
-> Anyway, back to your concern, the values that are written to the bit fields 
-> specified by those bindings are arbitrary SoC-specific values anyway, so 
-> if, for example, we get a SoC with following register layout:
+>  #ifdef REQUIRES_VIRT
+>  __asm__(".arch_extension       virt");
+> @@ -50,6 +51,10 @@ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+>  static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
+>  static unsigned long hyp_default_vectors;
 > 
-> bits:    7 | 6 - 4  | 3 | 2 - 0
-> meaning: 0 | func 1 | 0 | func 0
+> +/* The VMID used in the VTTBR */
+> +static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+> +static u8 kvm_next_vmid;
+> +static DEFINE_SPINLOCK(kvm_vmid_lock);
 > 
-> or
+>  int kvm_arch_hardware_enable(void *garbage)
+>  {
+> @@ -273,6 +278,7 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
+>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  {
+>         vcpu->cpu = cpu;
+> +       vcpu->arch.vfp_host = this_cpu_ptr(kvm_host_vfp_state);
+>  }
 > 
-> bits:    7 - 5  | 4 | 3 - 1  | 0
-> meaning: func 1 | 0 | func 0 | 0
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+> @@ -305,12 +311,169 @@ int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 > 
-> we can easily define the width as 4 and use appropriate 4-bit function 
-> values with zeroes on reserved positions.
+>  int kvm_arch_vcpu_in_guest_mode(struct kvm_vcpu *v)
+>  {
+> +       return v->mode == IN_GUEST_MODE;
+> +}
+> +
+> +static void reset_vm_context(void *info)
+> +{
+> +       __kvm_flush_vm_context();
+> +}
+> +
+> +/**
+> + * need_new_vmid_gen - check that the VMID is still valid
+> + * @kvm: The VM's VMID to checkt
+> + *
+> + * return true if there is a new generation of VMIDs being used
+> + *
+> + * The hardware supports only 256 values with the value zero reserved for the
+> + * host, so we check if an assigned value belongs to a previous generation,
+> + * which which requires us to assign a new value. If we're the first to use a
+> + * VMID for the new generation, we must flush necessary caches and TLBs on all
+> + * CPUs.
+> + */
+> +static bool need_new_vmid_gen(struct kvm *kvm)
+> +{
+> +       return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
+> +}
+> +
+> +/**
+> + * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
+> + * @kvm        The guest that we are about to run
+> + *
+> + * Called from kvm_arch_vcpu_ioctl_run before entering the guest to ensure the
+> + * VM has a valid VMID, otherwise assigns a new one and flushes corresponding
+> + * caches and TLBs.
+> + */
+> +static void update_vttbr(struct kvm *kvm)
+> +{
+> +       phys_addr_t pgd_phys;
+> +
+> +       if (!need_new_vmid_gen(kvm))
+> +               return;
+> +
+> +       spin_lock(&kvm_vmid_lock);
+> +
+> +       /* First user of a new VMID generation? */
+> +       if (unlikely(kvm_next_vmid == 0)) {
+> +               atomic64_inc(&kvm_vmid_gen);
+> +               kvm_next_vmid = 1;
+> +
+> +               /*
+> +                * On SMP we know no other CPUs can use this CPU's or
+> +                * each other's VMID since the kvm_vmid_lock blocks
+> +                * them from reentry to the guest.
+> +                */
+> +               on_each_cpu(reset_vm_context, NULL, 1);
 
-The problem with that is that if the datasheet documents "func" values
-of 0, 1, 2, 3, whereas your driver expects values that are shifted left
-one bit in order to fit into the field, the DT would need to contain 0,
-2, 4, 6. So, the DT values then don't match the documentation, which
-would end up being confusing.
+Why on_each_cpu? The maintenance operations should be broadcast, right?
 
->> I forget, do you actually have multiple different SoCs right now (or in
->> the near future where the HW design is known now for certain even if the
->> chip isn't available) that have different values for all these *-width
->> properties and hence can be represented just using this binding and
->> without altering the driver at all? If so, I suppose the original
->> binding is at least useful (although I would certainly still request to
->> use *-mask instead of *-width properties).
+> +       }
+> +
+> +       kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+> +       kvm->arch.vmid = kvm_next_vmid;
+> +       kvm_next_vmid++;
+> +
+> +       /* update vttbr to be used with the new vmid */
+> +       pgd_phys = virt_to_phys(kvm->arch.pgd);
+> +       kvm->arch.vttbr = pgd_phys & ((1LLU << 40) - 1)
+> +                         & ~((2 << VTTBR_X) - 1);
+> +       kvm->arch.vttbr |= (u64)(kvm->arch.vmid) << 48;
+> +
+> +       spin_unlock(&kvm_vmid_lock);
+> +}
+
+This smells like a watered-down version of the ASID allocator. Now, I can't
+really see much code sharing going on here, but perhaps your case is
+simpler... do you anticipate running more than 255 VMs in parallel? If not,
+then you could just invalidate the relevant TLB entries on VM shutdown and
+avoid the rollover case.
+
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index edf9ed5..cc9448b 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -23,6 +23,12 @@
+>  #include <asm/asm-offsets.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_arm.h>
+> +#include <asm/vfpmacros.h>
+> +
+> +#define VCPU_USR_REG(_reg_nr)  (VCPU_USR_REGS + (_reg_nr * 4))
+> +#define VCPU_USR_SP            (VCPU_USR_REG(13))
+> +#define VCPU_FIQ_REG(_reg_nr)  (VCPU_FIQ_REGS + (_reg_nr * 4))
+> +#define VCPU_FIQ_SPSR          (VCPU_FIQ_REG(7))
 > 
-> The binding I proposed covers all Samsung SoCs currently available, 
-> starting from s3c24xx, through s3c64xx (except 4bit2 bank type, with two 
-> function registers), to the whole Exynos series, including latest Exynos5.
+>         .text
+>         .align  PAGE_SHIFT
+> @@ -34,7 +40,33 @@ __kvm_hyp_code_start:
+>  @  Flush per-VMID TLBs
+>  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-OK, the HW is nice and consistent then. In that case, the binding is
-probably reasonable. Hopefully the HW designers are aware they shouldn't
-randomly break the uniformity!
+This comment syntax crops up a few times in your .S files but doesn't match
+anything currently under arch/arm/. Please can you follow what we do there
+and use /* */ ?
+
+>  ENTRY(__kvm_tlb_flush_vmid)
+> +       hvc     #0                      @ Switch to Hyp mode
+> +       push    {r2, r3}
+> +
+> +       add     r0, r0, #KVM_VTTBR
+> +       ldrd    r2, r3, [r0]
+> +       mcrr    p15, 6, r2, r3, c2      @ Write VTTBR
+> +       isb
+> +       mcr     p15, 0, r0, c8, c3, 0   @ TLBIALLIS (rt ignored)
+> +       dsb
+> +       isb
+> +       mov     r2, #0
+> +       mov     r3, #0
+> +       mcrr    p15, 6, r2, r3, c2      @ Back to VMID #0
+> +       isb
+
+Do you need this isb, given that you're about to do an hvc?
+
+> +       pop     {r2, r3}
+> +       hvc     #0                      @ Back to SVC
+>         bx      lr
+>  ENDPROC(__kvm_tlb_flush_vmid)
+> 
+> @@ -42,26 +74,702 @@ ENDPROC(__kvm_tlb_flush_vmid)
+>  @  Flush TLBs and instruction caches of current CPU for all VMIDs
+>  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+> 
+> +/*
+> + * void __kvm_flush_vm_context(void);
+> + */
+>  ENTRY(__kvm_flush_vm_context)
+> +       hvc     #0                      @ switch to hyp-mode
+> +
+> +       mov     r0, #0                  @ rn parameter for c15 flushes is SBZ
+> +       mcr     p15, 4, r0, c8, c7, 4   @ Invalidate Non-secure Non-Hyp TLB
+> +       mcr     p15, 0, r0, c7, c5, 0   @ Invalidate instruction caches
+> +       dsb
+> +       isb
+
+Likewise.
+
+> +       hvc     #0                      @ switch back to svc-mode, see hyp_svc
+>         bx      lr
+>  ENDPROC(__kvm_flush_vm_context)
+> 
+> +/* These are simply for the macros to work - value don't have meaning */
+> +.equ usr, 0
+> +.equ svc, 1
+> +.equ abt, 2
+> +.equ und, 3
+> +.equ irq, 4
+> +.equ fiq, 5
+> +
+> +.macro store_mode_state base_reg, mode
+> +       .if \mode == usr
+> +       mrs     r2, SP_usr
+> +       mov     r3, lr
+> +       stmdb   \base_reg!, {r2, r3}
+> +       .elseif \mode != fiq
+> +       mrs     r2, SP_\mode
+> +       mrs     r3, LR_\mode
+> +       mrs     r4, SPSR_\mode
+> +       stmdb   \base_reg!, {r2, r3, r4}
+> +       .else
+> +       mrs     r2, r8_fiq
+> +       mrs     r3, r9_fiq
+> +       mrs     r4, r10_fiq
+> +       mrs     r5, r11_fiq
+> +       mrs     r6, r12_fiq
+> +       mrs     r7, SP_fiq
+> +       mrs     r8, LR_fiq
+> +       mrs     r9, SPSR_fiq
+> +       stmdb   \base_reg!, {r2-r9}
+> +       .endif
+> +.endm
+
+Perhaps you could stick the assembly macros into a separate file, like we do
+in assembler.h, so the code is more readable and they can be reused if
+need-be?
+
+Will
