@@ -1,67 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Sep 2012 08:17:55 -0700
-Subject: [PATCH V2] ARM: OMAP: counter: add locking to
- read_persistent_clock
-In-Reply-To: <CAJ7qFSd89Ry9KmHSqB+r9YVZxjUA55MsW4RUBf6=8FSTzxOFsA@mail.gmail.com>
-References: <1347434081-11469-1-git-send-email-r.sricharan@ti.com>
- <87d31bj5jq.fsf@deeprootsystems.com>
- <20120925012243.GR28835@atomide.com>
- <CAJ7qFSd89Ry9KmHSqB+r9YVZxjUA55MsW4RUBf6=8FSTzxOFsA@mail.gmail.com>
-Message-ID: <20120925151755.GA4840@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 25 Sep 2012 23:18:52 +0800
+Subject: [PATCH V2] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
+In-Reply-To: <201209251651.59967.marex@denx.de>
+References: <1348572738-9743-1-git-send-email-marex@denx.de>
+ <201209251540.18719.marex@denx.de>
+ <20120925143720.GF14216@S2101-09.ap.freescale.net>
+ <201209251651.59967.marex@denx.de>
+Message-ID: <20120925151849.GG14216@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* R, Sricharan <r.sricharan@ti.com> [120925 00:44]:
-> Hi Tony,
+On Tue, Sep 25, 2012 at 04:51:59PM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
 > 
-> [snip..]
+> > Sorry, I just dropped the patch, and you need to convince me that the
+> > patch is actually needed to fix a bug.
+> > 
+> > On Tue, Sep 25, 2012 at 03:40:18PM +0200, Marek Vasut wrote:
+> > > Dear Shawn Guo,
+> > > 
+> > > > On Tue, Sep 25, 2012 at 01:32:18PM +0200, Marek Vasut wrote:
+> > > > > Currently, the kernel unconditionally adds "local-mac-address" and
+> > > > > "mac-address" properties under both FEC ethernet DT nodes in case
+> > > > > the update_fec_mac_prop() function is called. These properties are
+> > > > > loaded with MAC address compiled from vendors OUI and a per-device
+> > > > > NIC saved in OCOTP storage.
+> > 
+> > The function update_fec_mac_prop is only called for imx28-evk and m28evk
+> > boards which are known having valid/unique MAC address programmed in
+> > OCOTP.
 > 
-> >> > index dbf1e03..2bc51fb 100644
-> >> > --- a/arch/arm/plat-omap/counter_32k.c
-> >> > +++ b/arch/arm/plat-omap/counter_32k.c
-> >> > @@ -55,22 +55,29 @@ static u32 notrace omap_32k_read_sched_clock(void)
-> >> >   * nsecs and adds to a monotonically increasing timespec.
-> >> >   */
-> >> >  static struct timespec persistent_ts;
-> >> > -static cycles_t cycles, last_cycles;
-> >> > +static cycles_t cycles;
-> >> >  static unsigned int persistent_mult, persistent_shift;
-> >> > +static DEFINE_SPINLOCK(read_persistent_clock_lock);
-> >> > +
-> >> >  static void omap_read_persistent_clock(struct timespec *ts)
-> >> >  {
-> >> >     unsigned long long nsecs;
-> >> > -   cycles_t delta;
-> >> > -   struct timespec *tsp = &persistent_ts;
-> >> > +   cycles_t last_cycles;
-> >> > +   unsigned long flags;
-> >> > +
-> >> > +   spin_lock_irqsave(&read_persistent_clock_lock, flags);
-> >> >
-> >> >     last_cycles = cycles;
-> >> >     cycles = sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
-> >> > -   delta = cycles - last_cycles;
-> >> >
-> >> > -   nsecs = clocksource_cyc2ns(delta, persistent_mult, persistent_shift);
-> >> > +   nsecs = clocksource_cyc2ns(cycles - last_cycles,
-> >> > +                                   persistent_mult, persistent_shift);
-> >
-> > ..I think there's another bug here where cycles - last_cycles
-> > returns wrong value when the timer wraps around as cycles_t is
-> > 64 bits and the counter is 32 bits. It seems it's been there
-> > since when the read_persistent_clock was added with commit
-> > d92cfcbe (OMAP: timekeeping: time should not stop during suspend)?
-> >
-> > It seems that after this patch cycles should not be cycles_t
-> > but u32, and the result of cycles - last_cycles should also
-> > be u32.
-> >
->  cycles_t is defined as  typedef unsigned long cycles_t;
->  Am i missing something here ?
+> Actually I disabled it on m28, since the OCOTP is not always programmed. The 
+> board is shipped with blank OCOTP.
 
-Oh right, cycles_t is unsigned long, it's OK then. Must
-have grepped for it from some other arch.
+Then removing the call to update_fec_mac_prop for m28 is enough.
 
-Regards,
+> The imx28-evk is shipped with blank OCOTP as 
+> well, no?
+> 
+No.  imx28-evk is shipped with MAC programmed into OCOTP.
 
-Tony
+> > In that case, shouldn't we always read MAC from OCOTP instead
+> > of trusting the "local-mac-address" property from device tree, which
+> > might stand a chance that it's not valid or unique?
+> 
+> Definitelly not. If the bootloader doesn't pass correct local-mac-address 
+> property, the bootloader is broken and it is not our problem (any invalid DT 
+> passed from bootloader is not our problem and is not fixed by us ... most of the 
+> time).
+
+It is our problem.  We shouldn't trust bootloader on that whenever it's
+possible for ourselves to figure it out.  You can say "hey bootloader,
+this is your problem not ours", but FEC driver in kernel is not working.
+Isn't it a problem for kernel when FEC is not working?
+
+> On the other hand:
+> 
+> 1) if it doesn't pass any local-mac-address property, it is safe to read from 
+> OCOTP (this is the case of bootlets) to fill in the blank with at least 
+> something ... even though if the OCOTP is empty, FEC won't work anyway.
+> 
+> 2) if the bootloader does pass a local-mac-address property, then it is 
+> intentional and it can be later overriden anyway by "ifconfig ... hw ether" if 
+> needed .
+> 
+> If the bootloader does pass such information, it is either sourced from OCOTP 
+> (in which case it might fall back to 1) and pass nothing ) or elsewhere, in 
+> which case it's 2) and the bootloader has obviously better knowledge of the 
+> hardware than we do.
+> 
+> I firmly disagree with force-overriding the DT properties, since esp. in case of 
+> development kits, it doesn't give the users the freedom to program their OCOTP 
+> the way they need it to.
+> 
+> Also, the users don't have freedom to frob with their MAC address easily -- when 
+> the OCOTP isn't programmed yet, their FEC won't work, for example in case of NFS 
+> root filesystem, this is a problem. With this patch, you don't have the problem.
+> 
+Please bear in mind, we only call update_fec_mac_prop for boards that
+are known having MAC programmed in OCOTP.
+
+Shawn
