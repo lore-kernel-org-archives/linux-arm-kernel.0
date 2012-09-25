@@ -1,71 +1,77 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 25 Sep 2012 13:55:19 +0100
-Subject: [PATCH v3 RESEND 05/17] ARM: LPAE: support 64-bit virt_to_phys
- patching
-In-Reply-To: <alpine.LFD.2.02.1209241849070.6667@xanadu.home>
-References: <1348242975-19184-1-git-send-email-cyril@ti.com>
- <1348242975-19184-6-git-send-email-cyril@ti.com>
- <20120924151305.GA14198@arm.com>
- <alpine.LFD.2.02.1209241152540.6667@xanadu.home>
- <5060C9C6.8080900@ti.com>
- <alpine.LFD.2.02.1209241709200.6667@xanadu.home>
- <CAHkRjk74aHMNZxOVgsQo-NTm33ALZPVeiPAP5amCdBdF4-yjWw@mail.gmail.com>
- <alpine.LFD.2.02.1209241826260.6667@xanadu.home>
- <20120924224021.GJ26454@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1209241849070.6667@xanadu.home>
-Message-ID: <20120925125519.GA2330@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 25 Sep 2012 13:57:58 +0100
+Subject: [GIT PULL] ARM: cache flushing LoUIS API
+Message-ID: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 06:55:25PM -0400, Nicolas Pitre wrote:
-> On Mon, 24 Sep 2012, Russell King - ARM Linux wrote:
-> 
-> > On Mon, Sep 24, 2012 at 06:32:22PM -0400, Nicolas Pitre wrote:
-> > > We don't want to limit lowmem.  The lowmem is very precious memory and 
-> > > we want to maximize its size.  In that case it is probably best to 
-> > > implement a real patchable 64-bit addition rather than artificially 
-> > > restricting the lowmem size.
-> > 
-> > You don't need to.  You can solve the V->P translation like this:
-> > 
-> >         movw    %hi, #0xVWXY            @ fixup
-> >         adds    %lo, %lo, #offset       @ fixup
-> >         adc     %hi, %hi, #0
-> 
-> That's exactly what I mean when I say a real 64-bit addition.  Despite 
-> one of the arguments being a 32 bit value, the overflow needs to be 
-> carried to the high part.
-> 
-> > which is probably the simplest way to do the fixup - keep the existing
-> > fixup code, and add support for that movw instruction.  And that will
-> > work across any 4GB boundary just fine (we won't have more than 4GB of
-> > virtual address space on a 32-bit CPU anyway, so we only have to worry
-> > about one carry.)
-> 
-> Exactly.
-> 
-> > And the P->V translation is truncating anyway, so that is just:
-> > 
-> > 	sub	%lo, %lo, #offset
-> > 
-> > and nothing more.
-> 
-> Yes, that's what the posted code does already.
+Hi Russell,
 
-Taking a step back, this is all feeling very complex.  Do we actually need
-to solve the P2V patching problem for this platform?
+I know it is coming quite late in the cycle but please consider pulling
+the patch series implementing the new cache maintenance LoUIS API, since
+it provides a stepping stone to implementing power management on upcoming
+A15 and A7 based platforms, leaving functionality for earlier processor
+versions unchanged.
 
+It has been tested on:
 
-For 32-bit platforms, especially pre-v6, small TLBs and caches, lack of
-branch prediction etc. may make the performance boost from P2V patching
-more significant, but I have some doubts about whether it is really
-worth it for more heavyweight v7+LPAE platforms.
+- OMAP4/5
+  # suspend/hotplug and CPU idle
+- iMX6q
+  # suspend and hotplug
+- TC2 big.LITTLE testchip
+  # CPU idle
 
-Would it be worth trying a simple macro implementation that reads a
-global variable for this case, and investigating the performance impact?
+Thanks,
+Lorenzo
 
-For realistic workloads running on newer CPUs, I suspect that any costs
-from this may disappear into the noise...
+The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 
-Cheers
----Dave
+  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-2.6-lp.git cache-louis
+
+for you to fetch changes up to 6323fa2256baa73d6a960ee57ec086b66aeecd0b:
+
+  ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API (2012-09-25 11:20:26 +0100)
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (4):
+      ARM: mm: implement LoUIS API for cache maintenance ops
+      ARM: mm: rename jump labels in v7_flush_dcache_all function
+      ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+      ARM: kernel: update __cpu_disable to use cache LoUIS maintenance API
+
+Santosh Shilimkar (1):
+      ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API
+
+ arch/arm/include/asm/cacheflush.h | 15 ++++++++++++
+ arch/arm/include/asm/glue-cache.h |  1 +
+ arch/arm/kernel/smp.c             |  5 +++-
+ arch/arm/kernel/suspend.c         | 17 +++++++++++++-
+ arch/arm/mm/cache-fa.S            |  3 +++
+ arch/arm/mm/cache-v3.S            |  3 +++
+ arch/arm/mm/cache-v4.S            |  3 +++
+ arch/arm/mm/cache-v4wb.S          |  3 +++
+ arch/arm/mm/cache-v4wt.S          |  3 +++
+ arch/arm/mm/cache-v6.S            |  3 +++
+ arch/arm/mm/cache-v7.S            | 48 ++++++++++++++++++++++++++++++++++-----
+ arch/arm/mm/proc-arm1020.S        |  3 +++
+ arch/arm/mm/proc-arm1020e.S       |  3 +++
+ arch/arm/mm/proc-arm1022.S        |  3 +++
+ arch/arm/mm/proc-arm1026.S        |  3 +++
+ arch/arm/mm/proc-arm920.S         |  3 +++
+ arch/arm/mm/proc-arm922.S         |  3 +++
+ arch/arm/mm/proc-arm925.S         |  3 +++
+ arch/arm/mm/proc-arm926.S         |  3 +++
+ arch/arm/mm/proc-arm940.S         |  3 +++
+ arch/arm/mm/proc-arm946.S         |  3 +++
+ arch/arm/mm/proc-feroceon.S       |  3 +++
+ arch/arm/mm/proc-macros.S         |  1 +
+ arch/arm/mm/proc-mohawk.S         |  3 +++
+ arch/arm/mm/proc-v7.S             |  2 +-
+ arch/arm/mm/proc-xsc3.S           |  3 +++
+ arch/arm/mm/proc-xscale.S         |  3 +++
+ 27 files changed, 140 insertions(+), 9 deletions(-)
