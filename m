@@ -1,63 +1,100 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Sep 2012 16:02:38 +0200
-Subject: [PATCH 3/3] ARM: dts: cfa10049: Add the i2c muxer buses to the
- CFA-10049
-In-Reply-To: <5060497D.9090104@mvista.com>
-References: <1348474926-12763-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348480425-13848-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348480425-13848-3-git-send-email-maxime.ripard@free-electrons.com>
- <5060497D.9090104@mvista.com>
-Message-ID: <5061B97E.2090005@free-electrons.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 25 Sep 2012 17:17:56 +0300
+Subject: [PATCHv5 00/10] ARM: OMAP: PM usecounting changes
+In-Reply-To: <5061A22B.1030603@ti.com>
+References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
+ <506186E9.7070908@ti.com> <1348574001.10702.291.camel@sokoban>
+ <5061A22B.1030603@ti.com>
+Message-ID: <1348582676.10702.302.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-Le 24/09/2012 13:52, Sergei Shtylyov a ?crit :
-> On 24-09-2012 13:53, Maxime Ripard wrote:
+On Tue, 2012-09-25 at 17:53 +0530, Rajendra Nayak wrote:
+> On Tuesday 25 September 2012 05:23 PM, Tero Kristo wrote:
+> > On Tue, 2012-09-25 at 15:56 +0530, Rajendra Nayak wrote:
+> >> Hi Tero,
+> >>
+> >> On Tuesday 25 September 2012 03:02 PM, Tero Kristo wrote:
+> >>> Hi,
+> >>>
+> >>> Changes compared to previous version:
+> >>
+> >> Did you get a chance to look at the issue I reported about autodeps?
+> >> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg72876.html
+> >
+> > Not really, I didn't think that bug report was meant for me, I kind of
+> > thought it only happened with your set. But now looking at your email in
+> > detail, I guess you are saying there is a bug in this code (the one that
+> > touches iclk stuff), which causes the USB / DSS domains to follow
+> > MPU/CORE, is that right?
 > 
->> This will allow to add the 3 Nuvoton NAU7802 ADCs and the NXP PCA9555
->> GPIO expander eventually.
+> Yes, basically the autodeps remain set, even while the module is not in
+> use at all, which causes them to come in and out of sleep along with MPU.
+
+Actually I think I accidentally fixed this problem with the latest rev,
+due to the fact that I am using generic clkdm_clk_enable / disable calls
+from iclk now.
+
+I also just tested this (while fixing the complaint from Russell), and
+it looks like both USB and DSS pwrdms are remaining nicely idle on
+OMAP3.
+
+-Tero
+
 > 
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>   arch/arm/boot/dts/imx28-cfa10049.dts |   33
->> +++++++++++++++++++++++++++++++++
->>   1 file changed, 33 insertions(+)
+> >
+> > -Tero
+> >
+> >>
+> >> regards,
+> >> Rajendra
+> >>
+> >>>
+> >>> - Fixed OMAP4 support (patches 7-10)
+> >>> - Dropped debugging support from this set for now
+> >>> - Rebased on top of 3.6-rc5 + func-pwrst + omap4-ret code
+> >>>     (omap4 support easier to test with these)
+> >>> - Patch #1:
+> >>>     * dropped clkdm_usecount_inc / clkdm_usecount_dec APIs
+> >>>     * clkdm_clk_enable / disable are used now instead
+> >>>     * some code ordering changed for the new setup to work properly
+> >>>     * changed BUG_ON calls to WARN_ON
+> >>> - Patch #2:
+> >>>     * added spinlock for protecting voltdm callbacks
+> >>>     * pwrdm lock extended to protect pwrdm callbacks
+> >>> - Patch #3:
+> >>>     * dropped generic API call for the cpu pwrdm idle / wakeup
+> >>>     * instead use pwrdm_clkdm_enable / disable calls directly from PM code
+> >>>     * omap4 support fixed to work properly with SMP, added omap4 specific
+> >>>       CPU pwrdm idle / wakeup calls for this purpose
+> >>> - Patch #4:
+> >>>     * no changes
+> >>>     * added 'Reviewed-by' tag for Rajendra
+> >>> - Patch #5:
+> >>>     * no changes, just rebase
+> >>> - Patch #6:
+> >>>     * no changes
+> >>>
+> >>> Tested with OMAP3 beagle, omap4460 GP panda + omap4430 EMU blaze boards.
+> >>>
+> >>> I will be posting new versions for the voltdm fixes + auto retention +
+> >>> panda board tps6236x support code later on today, which are based on top
+> >>> of this set.
+> >>>
+> >>> Branch also available here:
+> >>>
+> >>> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+> >>> branch: mainline-3.6-rc5-pwrdm-changes-v5
+> >>>
+> >>> -Tero
+> >>>
+> >>>
+> >>> --
+> >>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> >>> the body of a message to majordomo at vger.kernel.org
+> >>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>>
+> >>
+> >
+> >
 > 
->> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts
->> b/arch/arm/boot/dts/imx28-cfa10049.dts
->> index a9288fb..9a55632 100644
->> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
->> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
->> @@ -76,6 +76,39 @@
->>                   status = "okay";
->>               };
->>
->> +            i2cmux {
->> +                compatible = "i2c-mux-gpio";
->> +                #address-cells = <1>;
->> +                #size-cells = <0>;
->> +                mux-gpios = <&gpio1 22 0 &gpio1 23 0>;
->> +                i2c-parent = <&i2c1>;
->> +
->> +                i2c at 0 {
->> +                    reg = <0>;
->> +                    #address-cells = <1>;
->> +                    #size-cells = <0>;
-> 
->    If you don't have any subnodes the above to props have no sense.
-
-I will use them with subnodes eventually, with the 3 ADCs and the GPIO
-expander. So these nodes won't be left empty.
-
-On another hand, I can add these props when I'll add the devices, I have
-no strong opinion here.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
