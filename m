@@ -1,39 +1,75 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Sep 2012 08:15:04 +0200
-Subject: [PATCH 1/3] mmc: sdhci: rename platform_8bit_width to
- platform_bus_width
-In-Reply-To: <50611862.7010201@samsung.com>
-References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-2-git-send-email-s.hauer@pengutronix.de>
- <50611862.7010201@samsung.com>
-Message-ID: <20120925061504.GV1322@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 25 Sep 2012 14:23:08 +0800
+Subject: [PATCH 2/2] ARM i.MX25: Add devicetree
+In-Reply-To: <1348468841-4331-3-git-send-email-s.hauer@pengutronix.de>
+References: <1348468841-4331-1-git-send-email-s.hauer@pengutronix.de>
+ <1348468841-4331-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120925062306.GE27291@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 11:35:14AM +0900, Jaehoon Chung wrote:
-> On 09/24/2012 04:22 PM, Sascha Hauer wrote:
-> >  	/*
-> >  	 * If your platform has 8-bit width support but is not a v3 controller,
-> >  	 * or if it requires special setup code, you should implement that in
-> > -	 * platform_8bit_width().
-> > +	 * platform_bus_width().
-> >  	 */
-> > -	if (host->ops->platform_8bit_width)
-> > -		host->ops->platform_8bit_width(host, ios->bus_width);
-> > -	else {
-> > +	if (host->ops->platform_bus_width) {
-> > +		host->ops->platform_bus_width(host, ios->bus_width);
-> > +	} else {
-> Why add the brackets?
+On Mon, Sep 24, 2012 at 08:40:40AM +0200, Sascha Hauer wrote:
+> This adds a i.MX25 dtsi file along with the i.MX25 clock tree
+> documentation. The devicetree should be fairly complete for:
+> 
+> - uart
+> - fec
+> - i2c
+> - spi
+> - pwm
+> - nand
+> - gpio
+> - wdog
+> - esdhc
+> - flexcan
+> 
+> The more exotic devices currently miss clock bindings.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Took the chance to cleanup the codingstyle when changing these lines
-anyway.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Sascha
+A couple of trivial comments below though.
+
+<snip>
+
+> +			i2c1: i2c at 43f80000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx25-i2c", "fsl,imx1-i2c";
+
+When the series gets rebased on imx multi-platform branch, the property
+needs to be:
+
+				compatible = "fsl,imx25-i2c", "fsl,imx21-i2c";
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +				reg = <0x43f80000 0x4000>;
+> +				clocks = <&clks 46>;
+> +				clock-names = "";
+> +				interrupts = <3>;
+> +				status = "disabled";
+> +			};
+
+<snip>
+
+> +		nand at bb000000 {
+
+We can add a EMI node being parent of NAND to show how nand connects
+to SoC.
+
+Shawn
+
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			compatible = "fsl,imx25-nand";
+> +			reg = <0xbb000000 0x2000>;
+> +			interrupts = <33>;
+> +			status = "disabled";
+> +		};
+> +	};
+> +};
+> -- 
+> 1.7.10.4
+> 
