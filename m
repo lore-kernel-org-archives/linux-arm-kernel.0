@@ -1,306 +1,160 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Sep 2012 19:33:51 +0300
-Subject: [PATCHv7 19/21] ARM: OMAP3+: PM: introduce a central pmic control
+Date: Tue, 25 Sep 2012 19:33:53 +0300
+Subject: [PATCHv7 21/21] ARM: OMAP4: vc: auto retention support
 In-Reply-To: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
 References: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1348590833-12335-20-git-send-email-t-kristo@ti.com>
+Message-ID: <1348590833-12335-22-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+This patch adds callbacks for the voltdm sleep / wakeups, which are now
+used for enabling / disabling auto retention voltage control. Once a
+voltage domain is ready to idle, its auto retention mode is enabled.
 
-Since we are starting to use multiple PMICs in various combinations,
-use the existing .omap_chip = OMAP_CHIP_INIT() to mark the
-structures we are interested in using per OMAP device we
-are currently running on. This mapping is based on the default
-device recommendations from TI. Boards using custom PMICs now
-have an opportunity to register their own custom mapping.
-
-With this we no longer need omap4_twl_init and omap3_twl_int
-instead we introduce a registration mechanism which is PMIC
-generic and move twl implementation to use the same. This allows
-for future OMAP4460 support where there is a mixture of
-PMIC combinations used.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[t-kristo at ti.com: moved code under twl-common, other minor cleanups]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_twl.c   |   81 ++++++++++++++++++++++----------------
- arch/arm/mach-omap2/pm.h         |    9 +---
- arch/arm/mach-omap2/twl-common.c |   58 +++++++++++++++++++++++++--
- arch/arm/mach-omap2/twl-common.h |   27 +++++++++++++
- 4 files changed, 129 insertions(+), 46 deletions(-)
+ arch/arm/mach-omap2/prm-regbits-44xx.h |    5 +++
+ arch/arm/mach-omap2/vc.c               |   52 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/vc.h               |    4 ++
+ arch/arm/mach-omap2/vc44xx_data.c      |    6 ++++
+ 4 files changed, 67 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 7ff9667..f6ee038 100644
---- a/arch/arm/mach-omap2/omap_twl.c
-+++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -19,8 +19,8 @@
- #include <linux/i2c/twl.h>
+diff --git a/arch/arm/mach-omap2/prm-regbits-44xx.h b/arch/arm/mach-omap2/prm-regbits-44xx.h
+index 3cb247b..15b9599 100644
+--- a/arch/arm/mach-omap2/prm-regbits-44xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-44xx.h
+@@ -81,6 +81,11 @@
+ #define OMAP4430_AIPOFF_MASK						(1 << 8)
  
- #include "voltage.h"
--
- #include "pm.h"
-+#include "twl-common.h"
+ /* Used by PRM_VOLTCTRL */
++#define OMAP4430_AUTO_CTRL_VDD_DISABLED					0
++#define OMAP4430_AUTO_CTRL_VDD_SLEEP					1
++#define OMAP4430_AUTO_CTRL_VDD_RET					2
++
++/* Used by PRM_VOLTCTRL */
+ #define OMAP4430_AUTO_CTRL_VDD_CORE_L_SHIFT				0
+ #define OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK				(0x3 << 0)
  
- #define OMAP3_SRI2C_SLAVE_ADDR		0x12
- #define OMAP3_VDD_MPU_SR_CONTROL_REG	0x00
-@@ -170,7 +170,7 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
- 	.uv_to_vsel		= twl4030_uv_to_vsel,
- };
- 
--static struct omap_voltdm_pmic omap4_mpu_pmic = {
-+static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
-@@ -188,7 +188,7 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
- 	.uv_to_vsel		= twl6030_uv_to_vsel,
- };
- 
--static struct omap_voltdm_pmic omap4_iva_pmic = {
-+static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
-@@ -206,7 +206,7 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
- 	.uv_to_vsel		= twl6030_uv_to_vsel,
- };
- 
--static struct omap_voltdm_pmic omap4_core_pmic = {
-+static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
-@@ -224,31 +224,9 @@ static struct omap_voltdm_pmic omap4_core_pmic = {
- 	.uv_to_vsel		= twl6030_uv_to_vsel,
- };
- 
--int __init omap4_twl_init(void)
-+static int __init twl_set_sr(struct voltagedomain *voltdm)
- {
--	struct voltagedomain *voltdm;
--
--	if (!cpu_is_omap44xx())
--		return -ENODEV;
--
--	voltdm = voltdm_lookup("mpu");
--	omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
--
--	voltdm = voltdm_lookup("iva");
--	omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
--
--	voltdm = voltdm_lookup("core");
--	omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
--
--	return 0;
--}
--
--int __init omap3_twl_init(void)
--{
--	struct voltagedomain *voltdm;
--
--	if (!cpu_is_omap34xx())
--		return -ENODEV;
-+	int r = 0;
- 
- 	/*
- 	 * The smartreflex bit on twl4030 specifies if the setting of voltage
-@@ -260,15 +238,50 @@ int __init omap3_twl_init(void)
- 	 * voltage scaling will not function on TWL over I2C_SR.
- 	 */
- 	if (!twl_sr_enable_autoinit)
--		omap3_twl_set_sr_bit(true);
-+		r = omap3_twl_set_sr_bit(true);
- 
--	voltdm = voltdm_lookup("mpu_iva");
--	omap_voltage_register_pmic(voltdm, &omap3_mpu_pmic);
-+	return r;
-+}
- 
--	voltdm = voltdm_lookup("core");
--	omap_voltage_register_pmic(voltdm, &omap3_core_pmic);
-+static __initdata struct omap_pmic_map omap_twl_map[] = {
-+	{
-+		.name = "mpu_iva",
-+		.cpu = PMIC_CPU_OMAP3,
-+		.pmic_data = &omap3_mpu_pmic,
-+		.special_action = twl_set_sr,
-+	},
-+	{
-+		.name = "core",
-+		.cpu = PMIC_CPU_OMAP3,
-+		.pmic_data = &omap3_core_pmic,
-+	},
-+	{
-+		.name = "mpu",
-+		.cpu = PMIC_CPU_OMAP4430,
-+		.pmic_data = &twl6030_vcore1_pmic,
-+	},
-+	{
-+		.name = "core",
-+		.cpu = PMIC_CPU_OMAP4430,
-+		.pmic_data = &twl6030_vcore3_pmic,
-+	},
-+	{
-+		.name = "core",
-+		.cpu = PMIC_CPU_OMAP4460,
-+		.pmic_data = &twl6030_vcore1_pmic,
-+	},
-+	{
-+		.name = "iva",
-+		.cpu = PMIC_CPU_OMAP44XX,
-+		.pmic_data = &twl6030_vcore2_pmic,
-+	},
-+	/* Terminator */
-+	{ .name = NULL, .pmic_data = NULL},
-+};
- 
--	return 0;
-+int __init omap_twl_init(void)
-+{
-+	return omap_pmic_register_data(omap_twl_map);
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index d217bbf..c607a0c 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -568,11 +568,63 @@ static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
+ 	__raw_writel(val, OMAP4_SCRM_CLKSETUPTIME);
  }
- 
- /**
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index d070ac6..26ac43c 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -122,15 +122,10 @@ static inline void omap_enable_smartreflex_on_init(void) {}
- #endif
- 
- #ifdef CONFIG_TWL4030_CORE
--extern int omap3_twl_init(void);
--extern int omap4_twl_init(void);
-+extern int omap_twl_init(void);
- extern int omap3_twl_set_sr_bit(bool enable);
- #else
--static inline int omap3_twl_init(void)
--{
--	return -EINVAL;
--}
--static inline int omap4_twl_init(void)
-+static inline int omap_twl_init(void)
- {
- 	return -EINVAL;
- }
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index db5ff66..4a9ca89 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -97,11 +97,7 @@ void __init omap4_pmic_init(const char *pmic_type,
- 
- void __init omap_pmic_late_init(void)
- {
--	/* Init the OMAP TWL parameters (if PMIC has been registered) */
--	if (pmic_i2c_board_info.irq)
--		omap3_twl_init();
--	if (omap4_i2c1_board_info[0].irq)
--		omap4_twl_init();
-+	omap_twl_init();
- }
- 
- #if defined(CONFIG_ARCH_OMAP3)
-@@ -538,3 +534,55 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 		pmic_data->v2v1 = &omap4_v2v1_idata;
- }
- #endif /* CONFIG_ARCH_OMAP4 */
-+
-+/**
-+ * omap_pmic_register_data() - Register the PMIC information to OMAP mapping
-+ * @omap_pmic_maps:    array ending with a empty element representing the maps
-+ */
-+int __init omap_pmic_register_data(struct omap_pmic_map *map)
-+{
-+	struct voltagedomain *voltdm;
-+	int r;
-+
-+	if (!map)
-+		return 0;
-+
-+	while (map->name) {
-+		if (cpu_is_omap34xx() && !(map->cpu & PMIC_CPU_OMAP3))
-+			goto next;
-+
-+		if (cpu_is_omap443x() && !(map->cpu & PMIC_CPU_OMAP4430))
-+			goto next;
-+
-+		if (cpu_is_omap446x() && !(map->cpu & PMIC_CPU_OMAP4460))
-+			goto next;
-+
-+		voltdm = voltdm_lookup(map->name);
-+		if (IS_ERR_OR_NULL(voltdm)) {
-+			pr_err("%s: unable to find map %s\n", __func__,
-+				map->name);
-+			goto next;
-+		}
-+		if (IS_ERR_OR_NULL(map->pmic_data)) {
-+			pr_warn("%s: domain[%s] has no pmic data\n",
-+					__func__, map->name);
-+			goto next;
-+		}
-+
-+		r = omap_voltage_register_pmic(voltdm, map->pmic_data);
-+		if (r) {
-+			pr_warn("%s: domain[%s] register returned %d\n",
-+					__func__, map->name, r);
-+			goto next;
-+		}
-+		if (map->special_action) {
-+			r = map->special_action(voltdm);
-+			WARN(r, "%s: domain[%s] action returned %d\n", __func__,
-+				map->name, r);
-+		}
-+next:
-+		map++;
-+	}
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index 8fe71cf..c501b55 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -2,6 +2,7 @@
- #define __OMAP_PMIC_COMMON__
- 
- #include <plat/irqs.h>
-+#include "voltage.h"
- 
- #define TWL_COMMON_PDATA_USB		(1 << 0)
- #define TWL_COMMON_PDATA_BCI		(1 << 1)
-@@ -59,4 +60,30 @@ void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- void omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 			   u32 pdata_flags, u32 regulators_flags);
  
 +/**
-+ * struct omap_pmic_map - Describe the OMAP PMIC data for OMAP
-+ * @name:		name of the voltage domain
-+ * @pmic_data:		pmic data associated with it
-+ * @cpu:		CPUs this PMIC data is valid for
-+ * @special_action:	callback for any specific action to take for that map
++ * omap4_vc_sleep - voltagedomain sleep entry callback
++ * @voltdm: domain which is entering idle
 + *
-+ * Since we support multiple PMICs each potentially functioning on multiple
-+ * OMAP devices, we describe the parameters in a map allowing us to reuse the
-+ * data as necessary.
++ * This function is called once a voltagedomain is ready to enter idle.
++ * Sets up AUTO_RET / AUTO_SLEEP command to be sent through the I2C
++ * to the PMIC.
 + */
-+struct omap_pmic_map {
-+	char			*name;
-+	struct omap_voltdm_pmic	*pmic_data;
-+	u32			cpu;
-+	int			(*special_action)(struct voltagedomain *);
-+};
++static void omap4_vc_sleep(struct voltagedomain *voltdm)
++{
++	u32 val;
++	u32 voltctrl;
 +
-+#define PMIC_CPU_OMAP3		(1 << 0)
-+#define PMIC_CPU_OMAP4430	(1 << 1)
-+#define PMIC_CPU_OMAP4460	(1 << 2)
-+#define PMIC_CPU_OMAP44XX	(PMIC_CPU_OMAP4430 | PMIC_CPU_OMAP4460)
++	switch (voltdm->target_state) {
++	case PWRDM_POWER_OFF:
++	case PWRDM_POWER_RET:
++		val = OMAP4430_AUTO_CTRL_VDD_RET;
++		break;
++	default:
++		val = OMAP4430_AUTO_CTRL_VDD_SLEEP;
++		break;
++	}
++	voltctrl = voltdm->read(OMAP4_PRM_VOLTCTRL_OFFSET);
 +
-+extern int omap_pmic_register_data(struct omap_pmic_map *map);
-+extern void omap_pmic_data_init(void);
++	voltctrl &= ~(u32)voltdm->vc->voltctrl_mask;
 +
- #endif /* __OMAP_PMIC_COMMON__ */
++	voltctrl |= val << voltdm->vc->voltctrl_shift;
++
++	voltdm->write(voltctrl, OMAP4_PRM_VOLTCTRL_OFFSET);
++}
++
++/**
++ * omap4_vc_wakeup - voltagedomain wakeup callback
++ * @voltdm: domain which is leaving idle
++ *
++ * This function is called once a voltagedomain is becoming active.
++ * Disables AUTO_RET / AUTO_SLEEP for the domain.
++ */
++static void omap4_vc_wakeup(struct voltagedomain *voltdm)
++{
++	u32 voltctrl;
++
++	voltctrl = voltdm->read(OMAP4_PRM_VOLTCTRL_OFFSET);
++
++	voltctrl &= ~(u32)voltdm->vc->voltctrl_mask;
++
++	voltdm->write(voltctrl, OMAP4_PRM_VOLTCTRL_OFFSET);
++}
++
+ /* OMAP4 specific voltage init functions */
+ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
+ {
+ 	omap4_set_timings(voltdm, true);
+ 	omap4_set_timings(voltdm, false);
++
++	voltdm->sleep = omap4_vc_sleep;
++	voltdm->wakeup = omap4_vc_wakeup;
+ }
+ 
+ struct i2c_init_data {
+diff --git a/arch/arm/mach-omap2/vc.h b/arch/arm/mach-omap2/vc.h
+index 91c8d75..8357d57 100644
+--- a/arch/arm/mach-omap2/vc.h
++++ b/arch/arm/mach-omap2/vc.h
+@@ -79,6 +79,8 @@ struct omap_vc_common {
+  * @smps_cmdra_reg: Offset of PRM_VC_SMPS_CMD_RA reg from PRM start
+  * @cfg_channel_reg: VC channel configuration register
+  * @cfg_channel_sa_shift: bit shift for slave address cfg_channel register
++ * @voltctrl_shift: bit shift for voltctrl register field
++ * @voltctrl_mask: bit mask for voltctrl register field
+  * @flags: VC channel-specific flags (optional)
+  */
+ struct omap_vc_channel {
+@@ -100,6 +102,8 @@ struct omap_vc_channel {
+ 	u8 smps_cmdra_reg;
+ 	u8 cfg_channel_reg;
+ 	u8 cfg_channel_sa_shift;
++	u8 voltctrl_shift;
++	u8 voltctrl_mask;
+ 	u8 flags;
+ };
+ 
+diff --git a/arch/arm/mach-omap2/vc44xx_data.c b/arch/arm/mach-omap2/vc44xx_data.c
+index 085e5d6..a003a1f 100644
+--- a/arch/arm/mach-omap2/vc44xx_data.c
++++ b/arch/arm/mach-omap2/vc44xx_data.c
+@@ -59,6 +59,8 @@ struct omap_vc_channel omap4_vc_mpu = {
+ 	.smps_volra_mask = OMAP4430_VOLRA_VDD_MPU_L_MASK,
+ 	.smps_cmdra_mask = OMAP4430_CMDRA_VDD_MPU_L_MASK,
+ 	.cfg_channel_sa_shift = OMAP4430_SA_VDD_MPU_L_SHIFT,
++	.voltctrl_shift = OMAP4430_AUTO_CTRL_VDD_MPU_L_SHIFT,
++	.voltctrl_mask = OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK,
+ };
+ 
+ struct omap_vc_channel omap4_vc_iva = {
+@@ -72,6 +74,8 @@ struct omap_vc_channel omap4_vc_iva = {
+ 	.smps_volra_mask = OMAP4430_VOLRA_VDD_IVA_L_MASK,
+ 	.smps_cmdra_mask = OMAP4430_CMDRA_VDD_IVA_L_MASK,
+ 	.cfg_channel_sa_shift = OMAP4430_SA_VDD_IVA_L_SHIFT,
++	.voltctrl_shift = OMAP4430_AUTO_CTRL_VDD_IVA_L_SHIFT,
++	.voltctrl_mask = OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
+ };
+ 
+ struct omap_vc_channel omap4_vc_core = {
+@@ -85,6 +89,8 @@ struct omap_vc_channel omap4_vc_core = {
+ 	.smps_volra_mask = OMAP4430_VOLRA_VDD_CORE_L_MASK,
+ 	.smps_cmdra_mask = OMAP4430_CMDRA_VDD_CORE_L_MASK,
+ 	.cfg_channel_sa_shift = OMAP4430_SA_VDD_CORE_L_SHIFT,
++	.voltctrl_shift = OMAP4430_AUTO_CTRL_VDD_CORE_L_SHIFT,
++	.voltctrl_mask = OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
+ };
+ 
+ /*
 -- 
 1.7.4.1
