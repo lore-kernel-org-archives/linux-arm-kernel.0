@@ -1,43 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Sep 2012 11:45:25 +0200
-Subject: [PATCH 3/3] mmc: esdhc i.MX: Support 8bit mode
-In-Reply-To: <20120925085040.GA14216@S2101-09.ap.freescale.net>
-References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-4-git-send-email-s.hauer@pengutronix.de>
- <20120925071505.GG27291@S2101-09.ap.freescale.net>
- <20120925072714.GY1322@pengutronix.de>
- <20120925073317.GI27291@S2101-09.ap.freescale.net>
- <20120925073808.GZ1322@pengutronix.de>
- <20120925074548.GJ27291@S2101-09.ap.freescale.net>
- <20120925080525.GA1322@pengutronix.de>
- <20120925085040.GA14216@S2101-09.ap.freescale.net>
-Message-ID: <20120925094525.GC1322@pengutronix.de>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Tue, 25 Sep 2012 11:45:17 +0200
+Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <20120925081057.GH17667@game.jcrosoft.org>
+References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
+ <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
+ <20120925081057.GH17667@game.jcrosoft.org>
+Message-ID: <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 04:50:52PM +0800, Shawn Guo wrote:
-> On Tue, Sep 25, 2012 at 10:05:25AM +0200, Sascha Hauer wrote:
-> > Ok, how about this:
-> > 
-> > - I add a bus-width = <4> property to all i.MX dtsi files
-> > - we merge the patch adding bus-width as an optional property
-> > - Make the bus-width option mandatory in the next step.
-> > 
-> > This way we can merge the mmc related patches through the mmc tree and
-> > the dts changes through arm-soc.
-> > 
-> Sounds good to me.  How the last step should be done will depend
-> on the common spec.  Per Chris, there are already two drivers
-> implementing the property as optional.  Not sure if Chris will change
-> spec to have the property defined as optional (probably default to 1?).
+On Tue, Sep 25, 2012 at 10:10 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 09:28 Tue 25 Sep     , Fabio Porcedda wrote:
+>> Tested on an at91sam9260 board (evk-pro3)
+>>
+>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> ---
+>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>>  2 files changed, 40 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> new file mode 100644
+>> index 0000000..724fad1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> @@ -0,0 +1,19 @@
+>> +* Atmel Watchdog Timers
+>> +
+>> +** at91sam9-wdt
+>> +
+>> +Required properties:
+>> +- compatible: must be "atmel,at91sam9-wdt".
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +  region.
+>> +
+>> +Optional properties:
+>> +- heartbeat: contains the watchdog heartbeats in seconds.
+>> +
+>> +Example:
+>> +
+>> +     watchdog at fffffd40 {
+>> +             compatible = "atmel,at91sam9-wdt";
+> for the secind time atmel,at91sam9260-watchdog
 
-It won't hurt if we add the property now for all i.MX. Then Chris is
-free to do whatever he wants (at least from the i.MX perspective)
+Ok, i will fix this.
 
-Sascha
+> you need to put the first soc that use it in the compatible
+>> +             reg = <0xfffffd40 0x10>;
+>> +             heartbeat = <10>;
+> need put second in the property name so need to read the doc
 
+I didn't found any example about a property with "second" in the name.
+Which It's best "heartbeat-seconds", "heartbeat-sec" or "heartbeat-s" ?
+
+> Best Regards,
+> J.
+
+
+Thanks for the review and my best regards
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Fabio Porcedda
