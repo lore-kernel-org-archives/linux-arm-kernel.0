@@ -1,90 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Sep 2012 16:10:12 +0100
-Subject: [PATCH] ARM: ux500: Fix initialisation order for UIBs
-Message-ID: <1348585812-32073-1-git-send-email-lee.jones@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Sep 2012 08:17:55 -0700
+Subject: [PATCH V2] ARM: OMAP: counter: add locking to
+ read_persistent_clock
+In-Reply-To: <CAJ7qFSd89Ry9KmHSqB+r9YVZxjUA55MsW4RUBf6=8FSTzxOFsA@mail.gmail.com>
+References: <1347434081-11469-1-git-send-email-r.sricharan@ti.com>
+ <87d31bj5jq.fsf@deeprootsystems.com>
+ <20120925012243.GR28835@atomide.com>
+ <CAJ7qFSd89Ry9KmHSqB+r9YVZxjUA55MsW4RUBf6=8FSTzxOFsA@mail.gmail.com>
+Message-ID: <20120925151755.GA4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An earlier change prevented User Interface Boards (UIBs) from being
-initialised on boards which did not support them. This change had
-the undesired effect of reordering the UIB initialisation calls with
-I2C registration. Here we ensure UIBs are only setup after all
-required infrastructure is already in place.
+* R, Sricharan <r.sricharan@ti.com> [120925 00:44]:
+> Hi Tony,
+> 
+> [snip..]
+> 
+> >> > index dbf1e03..2bc51fb 100644
+> >> > --- a/arch/arm/plat-omap/counter_32k.c
+> >> > +++ b/arch/arm/plat-omap/counter_32k.c
+> >> > @@ -55,22 +55,29 @@ static u32 notrace omap_32k_read_sched_clock(void)
+> >> >   * nsecs and adds to a monotonically increasing timespec.
+> >> >   */
+> >> >  static struct timespec persistent_ts;
+> >> > -static cycles_t cycles, last_cycles;
+> >> > +static cycles_t cycles;
+> >> >  static unsigned int persistent_mult, persistent_shift;
+> >> > +static DEFINE_SPINLOCK(read_persistent_clock_lock);
+> >> > +
+> >> >  static void omap_read_persistent_clock(struct timespec *ts)
+> >> >  {
+> >> >     unsigned long long nsecs;
+> >> > -   cycles_t delta;
+> >> > -   struct timespec *tsp = &persistent_ts;
+> >> > +   cycles_t last_cycles;
+> >> > +   unsigned long flags;
+> >> > +
+> >> > +   spin_lock_irqsave(&read_persistent_clock_lock, flags);
+> >> >
+> >> >     last_cycles = cycles;
+> >> >     cycles = sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
+> >> > -   delta = cycles - last_cycles;
+> >> >
+> >> > -   nsecs = clocksource_cyc2ns(delta, persistent_mult, persistent_shift);
+> >> > +   nsecs = clocksource_cyc2ns(cycles - last_cycles,
+> >> > +                                   persistent_mult, persistent_shift);
+> >
+> > ..I think there's another bug here where cycles - last_cycles
+> > returns wrong value when the timer wraps around as cycles_t is
+> > 64 bits and the counter is 32 bits. It seems it's been there
+> > since when the read_persistent_clock was added with commit
+> > d92cfcbe (OMAP: timekeeping: time should not stop during suspend)?
+> >
+> > It seems that after this patch cycles should not be cycles_t
+> > but u32, and the result of cycles - last_cycles should also
+> > be u32.
+> >
+>  cycles_t is defined as  typedef unsigned long cycles_t;
+>  Am i missing something here ?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |   10 +---------
- arch/arm/mach-ux500/cpu.c          |    2 ++
- 2 files changed, 3 insertions(+), 9 deletions(-)
+Oh right, cycles_t is unsigned long, it's OK then. Must
+have grepped for it from some other arch.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 5eb5ea1..4eedf1c 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -639,8 +639,6 @@ static void __init mop500_init_machine(void)
- 
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
--
--	mop500_uib_init();
- }
- 
- static void __init snowball_init_machine(void)
-@@ -705,8 +703,6 @@ static void __init hrefv60_init_machine(void)
- 
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
--
--	mop500_uib_init();
- }
- 
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
-@@ -739,7 +735,7 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
- 	.timer		= &ux500_timer,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= snowball_init_machine,
--	.init_late	= ux500_init_late,
-+	.init_late	= NULL,
- MACHINE_END
- 
- #ifdef CONFIG_MACH_UX500_DT
-@@ -829,8 +825,6 @@ static void __init u8500_init_machine(void)
- 		i2c_register_board_info(2, mop500_i2c2_devices,
- 					ARRAY_SIZE(mop500_i2c2_devices));
- 
--		mop500_uib_init();
--
- 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
- 		/*
- 		 * The HREFv60 board removed a GPIO expander and routed
-@@ -840,8 +834,6 @@ static void __init u8500_init_machine(void)
- 		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
- 		platform_add_devices(mop500_platform_devs,
- 				ARRAY_SIZE(mop500_platform_devs));
--
--		mop500_uib_init();
- 	}
- 
- 	/* This board has full regulator constraints */
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index e2360e7..ab2ca7d 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -26,6 +26,7 @@
- #include <mach/devices.h>
- 
- #include "clock.h"
-+#include "board-mop500.h"
- 
- void __iomem *_PRCMU_BASE;
- 
-@@ -77,6 +78,7 @@ void __init ux500_init_late(void)
- {
- 	clk_debugfs_init();
- 	clk_init_smp_twd_cpufreq();
-+	mop500_uib_init();
- }
- 
- static const char * __init ux500_get_machine(void)
--- 
-1.7.9.5
+Regards,
+
+Tony
