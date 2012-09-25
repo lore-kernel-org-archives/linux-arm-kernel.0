@@ -1,33 +1,28 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 25 Sep 2012 09:56:13 +0200
-Subject: [PATCH 1/2] gpio-lpc32xx: Add GPI_28
-Message-ID: <1348559774-15484-1-git-send-email-stigge@antcom.de>
+Date: Tue, 25 Sep 2012 09:56:14 +0200
+Subject: [PATCH 2/2] gpio: Document device_node's det_debounce
+In-Reply-To: <1348559774-15484-1-git-send-email-stigge@antcom.de>
+References: <1348559774-15484-1-git-send-email-stigge@antcom.de>
+Message-ID: <1348559774-15484-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing gpi28 to the list of GPIOs in the GPI P3 "chip".
-
-NOTE: This patch depends on incrementing LPC32XX_GPI_P3_MAX.  When applied
-without the respective mach-lpc32xx patch (merged via arm-soc.git), gcc will
-give a warning about "excess elements in array initializer" but this doesn't
-harm.
+This patch adds documentation for set_debounce in struct device_node.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h |    2 +-
- drivers/gpio/gpio-lpc32xx.c                       |    3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ include/asm-generic/gpio.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -113,7 +113,8 @@ static const char *gpi_p3_names[LPC32XX_
- 	 NULL,    NULL,    NULL,   "gpi15",
- 	"gpi16", "gpi17", "gpi18", "gpi19",
- 	"gpi20", "gpi21", "gpi22", "gpi23",
--	"gpi24", "gpi25", "gpi26", "gpi27"
-+	"gpi24", "gpi25", "gpi26", "gpi27",
-+	"gpi28"
- };
- 
- static const char *gpo_p3_names[LPC32XX_GPO_P3_MAX] = {
+--- linux-2.6.orig/include/asm-generic/gpio.h
++++ linux-2.6/include/asm-generic/gpio.h
+@@ -60,6 +60,8 @@ struct device_node;
+  * @get: returns value for signal "offset"; for output signals this
+  *	returns either the value actually sensed, or zero
+  * @direction_output: configures signal "offset" as output, or returns error
++ * @set_debounce: optional hook for setting debounce time for specified gpio in
++ *      interrupt triggered gpio chips
+  * @set: assigns output value for signal "offset"
+  * @to_irq: optional hook supporting non-static gpio_to_irq() mappings;
+  *	implementation may not sleep
