@@ -1,69 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Sep 2012 20:02:10 +0000
-Subject: [PATCH 5/6] ARM: dove: Remove watchdog from DT
-In-Reply-To: <CABLWKA9NjX0+cQZGBOGus99fFkcpwjPxnhmsBuZBz50VbxXyvw@mail.gmail.com>
-References: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <201209251233.09060.arnd@arndb.de>
- <CABLWKA9NjX0+cQZGBOGus99fFkcpwjPxnhmsBuZBz50VbxXyvw@mail.gmail.com>
-Message-ID: <201209252002.11301.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 25 Sep 2012 14:05:28 -0600
+Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
+In-Reply-To: <1348603151.5565.20@snotra>
+References: <1348603151.5565.20@snotra>
+Message-ID: <50620E88.4@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 September 2012, sebastien requiem wrote:
-> On Tue, Sep 25, 2012 at 2:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 25 September 2012, Arnd Bergmann wrote:
-> >> On Tuesday 25 September 2012, Andrew Lunn wrote:
-> >> > > Regarding mv78xx0, I agree that I'm not sure what to do. The number of
-> >> > > supported platforms is small. Should we simply mark mv78xx0 deprecated
-> >> > > now, wait a few release cycles to see if anyone shows up, and see what
-> >> > > to do at this point?
-> >>
-> >> We should let Sebastien Requiem comment. He is the only person outside of
-> >> Marvell who has contributed a board file for mv78xx0. If he's interested in
-> >> keeping it alive, he's hopefully also able to find the time to test the
-> >> devicetree version of that platform in mach-mvebu. Similarly, if anyone
-> >> has the MASA reference design, that one could be moved over to mach-mvebu
-> >> first.
-> >>
-> >> There is a much smaller user base for mv78xx0 than for orion5x, so as long
-> >> as we can keep the support working with DT, we can throw out the legacy
-> >> code much faster than for orion. If it doesn't get put into mach-mvebu
-> >> and you can't find anyone who has hardware to test on, you could also
-> >> stop maintaining it and leave it to bitrot, but I wouldn't just remove it
-> >> on a fast track then.
-> >
-> > The address I used for Sebastien appears to be dead. Maybe this one still
-> > works.
+On 09/25/2012 01:59 PM, Scott Wood wrote:
+> On 09/25/2012 02:51:27 PM, Mark Brown wrote:
+>> On Tue, Sep 25, 2012 at 02:35:46PM -0500, Scott Wood wrote:
+>>
+>> > Do you have an example of where you'd actually benefit from this?
+>> > I'd think most things could either be done reasonably well with
+>> > what's built into DTC (see what we've done in
+>> > arch/powerpc/boot/dts/fsl), or would need math expression support in
+>> > DTC (or has that been added?).
+>>
+>> The constant example is the magic numbers we need to embed into DTs for
+>> things like interrupt modes, making them human readable would be a real
+>> win.
 > 
-> Yes, this one works. Sorry for not having updated my email address.
-> 
-> I would be happy to convert the mv78xx0 platform to DT (and also do
-> the monkey work). My knowledge is quite limited regarding the recent changes
-> but I am sure that some of you could help me in the process.
-> 
-> Moreover, I still have a board to test at home.
+> Wasn't there a patch for named constant support in dtc a while back?
+> Hmm:
+> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-January/011184.html
 
-Ok, excellent!
+Yes. There has basically been zero traction on that front. I'm trying to
+push a scheme that requires minimal changes to dtc itself in the hope
+that will move /something/ forward at greater than zero speed.
 
-If you want to start looking into things, I suggest you follow the
-examples from the mach-dove directory, which is similar to mv78xx0 in
-that it also has only a small number of boards that are supported,
-and we can convert them all at the same time, rather than supporting
-both methods in parallel as we do for orion5x and kirkwood.
+> I'm not sure that going down the CPP path is better than the possibility
+> of named constants having a different syntax from macros/functions.
 
-The basic idea is to start with a DT_START_MACHINE section that will
-end up being used for all machines and just initializes all the
-devices that you have on your machine, but also calls of_platform_populate.
-Then you can gradually move over one device at a time from being
-statically initialized to being added to a board description in
-arch/arm/boot/dts/*.dts.
-
-One thing that seems to be special about mv78xx0 (though not the wxl
-in particular) is that we can have Linux running in two instances on
-either core of the machine and just give it a few of the devices.
-I think this can be handled nicely with DT by having a .dtsi include
-file that actually describes all of the machine but marks most of the
-devices as disabled, and then have different .dts files including
-the main file and selectively enabling the parts that are used there.
-
-	Arnd
+I've come around to thinking that using something external to dtc is
+actually very advantageous. The main benefit here is that a C-syntax
+(well, cpp-syntax) header file can be included by both DT code and C
+code, and hence there's no need to duplicate the constant definitions.
+Equally, this way, anyone is free to go ahead and use whatever tools
+they want for the pre-processing; as long as a valid DT comes out the
+end of it, dtc can eat it. This gives us flexibility to change solutions
+without having to change dtc. Plus, we don't all have to be
+language-lawyers and invent yet another language inside dtc; all the
+parts are already written for us, except for a tiny amount of glue.
