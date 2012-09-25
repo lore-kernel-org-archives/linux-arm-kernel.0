@@ -1,29 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Sep 2012 20:00:13 -0400
-Subject: [GIT PULL] orion5x late fixes for v3.6 (or v3.7 if too late)
-Message-ID: <20120925000013.GV5469@titan.lakedaemon.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 25 Sep 2012 02:02:12 +0200
+Subject: [PATCH 0/6] Dove fixes for arm-soc/for-next
+Message-ID: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+With the current speed of changes within arm kernel tree, there
+have been some issues related to the mach-dove DT support patches
+introduced lately. This patch set keeps up with the changes between
+initial patch submission and current status of arm-soc/for-next.
 
-Depends:
- - Based on v3.6-rc7
+Sebastian Hesselbarth (6):
+  ARM: dove: Add pcie clock support
+  ARM: dove: Fix tauros2 device tree init
+  ARM: dove: Fix clock names of sata and gbe
+  ARM: dove: Restructure SoC device tree descriptor
+  ARM: dove: Remove watchdog from DT
+  ARM: dove: Add crypto engine to DT
 
-This same fix was applied to v3.6 earlier in the release cycle for
-kirkwood.  orion5x suffers from the same problem.
+ arch/arm/boot/dts/dove.dtsi |   49 ++++++++++++++++++++++++++++---------------
+ arch/arm/mach-dove/common.c |    8 +++----
+ arch/arm/mach-dove/pcie.c   |    5 +++++
+ 3 files changed, 41 insertions(+), 21 deletions(-)
 
-No problem if it's too late for v3.6.  We can apply it to v3.7-rc1 and
-then apply it to stable v3.6.1.
-
-The following changes since commit 979570e02981d4a8fc20b3cc8fd651856c98ee9d:
-
-  Linux 3.6-rc7 (2012-09-23 18:10:57 -0700)
-
-are available in the git repository at:
-  git://git.infradead.org/users/jcooper/linux.git kirkwood/late-fixes
-
-Andrew Lunn (1):
-      ARM: Orion5x: Fix too small coherent pool.
-
- arch/arm/mach-orion5x/common.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+-- 
+1.7.10.4
