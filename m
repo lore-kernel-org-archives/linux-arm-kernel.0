@@ -1,35 +1,24 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 25 Sep 2012 14:59:11 -0500
-Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
-In-Reply-To: <20120925195127.GA19350@sirena.org.uk> (from
- broonie@opensource.wolfsonmicro.com on Tue Sep 25 14:51:27 2012)
-Message-ID: <1348603151.5565.20@snotra>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Sep 2012 22:00:43 +0200
+Subject: [PATCH] ARM: ux500: Move regulator-name properties out to board
+ DTS files
+In-Reply-To: <1348573074-11481-1-git-send-email-lee.jones@linaro.org>
+References: <1348573074-11481-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZrAMkzgauHLgas7SYxQb_ycgsOvKrMnAz5Z1yzX1-BjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 02:51:27 PM, Mark Brown wrote:
-> On Tue, Sep 25, 2012 at 02:35:46PM -0500, Scott Wood wrote:
-> 
-> > Do you have an example of where you'd actually benefit from this?
-> > I'd think most things could either be done reasonably well with
-> > what's built into DTC (see what we've done in
-> > arch/powerpc/boot/dts/fsl), or would need math expression support in
-> > DTC (or has that been added?).
-> 
-> The constant example is the magic numbers we need to embed into DTs  
-> for
-> things like interrupt modes, making them human readable would be a  
-> real
-> win.
+On Tue, Sep 25, 2012 at 1:37 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Wasn't there a patch for named constant support in dtc a while back?
-Hmm:  
-https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-January/011184.html
+> Regulator supply names should be allocated by board rather than
+> per SoC, as the same SoC could be wired differently on varying
+> hardware. Here we push all regulator-name allocation out to the
+> dbx5x0 subordinate board files; HREF and Snowball.
+>
+> Requested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I'm not sure that going down the CPP path is better than the  
-possibility of named constants having a different syntax from  
-macros/functions.  It would be one thing if someone were actively  
-working on the latter, but this paralysis seems to be a case of the  
-perfect being the enemy of the good.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--Scott
+Thanks,
+Linus Walleij
