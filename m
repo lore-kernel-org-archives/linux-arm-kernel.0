@@ -1,45 +1,88 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 25 Sep 2012 03:22:04 +0200
-Subject: [PATCH 2/6] ARM: dove: Fix tauros2 device tree init
-In-Reply-To: <1348531338-16624-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1348531338-16624-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5061073C.4010002@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Sep 2012 18:22:44 -0700
+Subject: [PATCH V2] ARM: OMAP: counter: add locking to
+ read_persistent_clock
+In-Reply-To: <87d31bj5jq.fsf@deeprootsystems.com>
+References: <1347434081-11469-1-git-send-email-r.sricharan@ti.com>
+ <87d31bj5jq.fsf@deeprootsystems.com>
+Message-ID: <20120925012243.GR28835@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 02:02 AM, Sebastian Hesselbarth wrote:
-> During the review process of dove DT patches, Tauros2 cache
-> init call was changed and DT support added. This patch fixes
-> the call to Tauros2 init and adds a DT node. Moreover, plat/irq.h
-> include was missing from mach-dove/common.c.
- > ...
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index b37bef1..343a4bc 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -32,6 +32,7 @@
->   #include<linux/irq.h>
->   #include<plat/time.h>
->   #include<linux/platform_data/usb-ehci-orion.h>
-> +#include<plat/irq.h>
->   #include<plat/common.h>
->   #include<plat/addr-map.h>
->   #include "common.h"
-> @@ -399,7 +400,7 @@ static void __init dove_dt_init(void)
->   		(dove_tclk + 499999) / 1000000);
->
->   #ifdef CONFIG_CACHE_TAUROS2
-> -	tauros2_init();
-> +	tauros2_init(0);
->   #endif
->   	dove_setup_cpu_mbus();
->
+* Kevin Hilman <khilman@deeprootsystems.com> [120924 17:44]:
+> R Sricharan <r.sricharan@ti.com> writes:
+> 
+> > From: Colin Cross <ccross@android.com>
+> >
+> > read_persistent_clock uses a global variable, use a spinlock to
+> > ensure non-atomic updates to the variable don't overlap and cause
+> > time to move backwards.
+> >
+> > Signed-off-by: Colin Cross <ccross@android.com>
+> > Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> 
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> 
+> Tony, this should probably be queued up for v3.7-rc and flagged for stable.
 
-I thought about the importance of the individual patches and
-except 2/6 all can wait for the next release cycle if too late.
+Yes I can see that happening. But then in addition..
 
-But 2/6 is important because the change in tauros2_init
-breaks build on dove.
+> > ---
+> >  [V2] Added signed-off-by and looped in "linux-arm-kernel" list
+> >
+> >  arch/arm/plat-omap/counter_32k.c |   21 ++++++++++++++-------
+> >  1 file changed, 14 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+> > index dbf1e03..2bc51fb 100644
+> > --- a/arch/arm/plat-omap/counter_32k.c
+> > +++ b/arch/arm/plat-omap/counter_32k.c
+> > @@ -55,22 +55,29 @@ static u32 notrace omap_32k_read_sched_clock(void)
+> >   * nsecs and adds to a monotonically increasing timespec.
+> >   */
+> >  static struct timespec persistent_ts;
+> > -static cycles_t cycles, last_cycles;
+> > +static cycles_t cycles;
+> >  static unsigned int persistent_mult, persistent_shift;
+> > +static DEFINE_SPINLOCK(read_persistent_clock_lock);
+> > +
+> >  static void omap_read_persistent_clock(struct timespec *ts)
+> >  {
+> >  	unsigned long long nsecs;
+> > -	cycles_t delta;
+> > -	struct timespec *tsp = &persistent_ts;
+> > +	cycles_t last_cycles;
+> > +	unsigned long flags;
+> > +
+> > +	spin_lock_irqsave(&read_persistent_clock_lock, flags);
+> >  
+> >  	last_cycles = cycles;
+> >  	cycles = sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
+> > -	delta = cycles - last_cycles;
+> >  
+> > -	nsecs = clocksource_cyc2ns(delta, persistent_mult, persistent_shift);
+> > +	nsecs = clocksource_cyc2ns(cycles - last_cycles,
+> > +					persistent_mult, persistent_shift);
 
-Sebastian
+..I think there's another bug here where cycles - last_cycles
+returns wrong value when the timer wraps around as cycles_t is
+64 bits and the counter is 32 bits. It seems it's been there
+since when the read_persistent_clock was added with commit
+d92cfcbe (OMAP: timekeeping: time should not stop during suspend)?
+
+It seems that after this patch cycles should not be cycles_t
+but u32, and the result of cycles - last_cycles should also
+be u32.
+
+> > +	timespec_add_ns(&persistent_ts, nsecs);
+> > +
+> > +	*ts = persistent_ts;
+> >  
+> > -	timespec_add_ns(tsp, nsecs);
+> > -	*ts = *tsp;
+> > +	spin_unlock_irqrestore(&read_persistent_clock_lock, flags);
+> >  }
+
+Regards,
+
+Tony
