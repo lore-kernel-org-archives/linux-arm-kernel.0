@@ -1,99 +1,73 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Tue, 25 Sep 2012 15:26:06 +0530
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <20120925092118.GJ31374@n2100.arm.linux.org.uk>
-References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
- <CAKdam572krJZcayRdJ_AciCUZH3LuzD9yoHenhxrB6j9xDZ6JQ@mail.gmail.com>
- <20120925083029.GG31374@n2100.arm.linux.org.uk>
- <20120925083118.GI9137@arwen.pp.htv.fi>
- <20120925091228.GI31374@n2100.arm.linux.org.uk>
- <20120925091112.GK9137@arwen.pp.htv.fi>
- <20120925092118.GJ31374@n2100.arm.linux.org.uk>
-Message-ID: <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 25 Sep 2012 11:56:26 +0200
+Subject: [PATCH v2] rtc: i.MX dryice: Add devicetree support
+Message-ID: <1348566986-9603-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add devicetree probing, fixing some whitespace damage along the way.
 
-On Tue, Sep 25, 2012 at 2:51 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Sep 25, 2012 at 12:11:14PM +0300, Felipe Balbi wrote:
->> On Tue, Sep 25, 2012 at 10:12:28AM +0100, Russell King - ARM Linux wrote:
->> > On Tue, Sep 25, 2012 at 11:31:20AM +0300, Felipe Balbi wrote:
->> > > On Tue, Sep 25, 2012 at 09:30:29AM +0100, Russell King - ARM Linux wrote:
->> > > > How is this happening?  I think that needs proper investigation - or if
->> > > > it's had more investigation, then the results needs to be included in
->> > > > the commit description so that everyone can understand the issue here.
->> > > >
->> > > > We should not be resuming a device which hasn't been suspended.  Maybe
->> > > > the runtime PM enable sequence is wrong, and that's what should be fixed
->> > > > instead?
->> > > >
->> > > > This sequence in the probe() function:
->> > > >
->> > > >         pm_runtime_irq_safe(&pdev->dev);
->> > > >         pm_runtime_enable(&pdev->dev);
->> > > >         pm_runtime_get_sync(&pdev->dev);
->> > > >
->> > > > would enable runtime PM while the s/w state indicates that it's disabled,
->> > > > and then that pm_runtime_get_sync() will want to resume the device.  See
->> > > > the section "5. Runtime PM Initialization, Device Probing and Removal"
->> > > > in Documentation/power/runtime_pm.txt, specifically the second paragraph
->> > > > of that section.
->> > >
->> > > that was tested. It worked in pandaboard but didn't work on beagleboard
->> > > XM. Sourav tried to start a discussion about that, but it simply died...
->> > >
->> > > In any case, pm_runtime_get_sync() in probe will always call
->> > > runtime_resume callback, right ?
->> >
->> > Well, if the runtime PM state says it's suspended, and then you enable
->> > runtime PM, the first call to pm_runtime_get_sync() will trigger a resume
->> > attempt.  The patch description is complaining about resume events without
->> > there being a preceding suspend event.
->> >
->> > This could well be why.
->>
->> that's most likely, of course. But should we cause a regression to
->> beagleboard XM because of that ?
->
-> What would cause a regression on beagleboard XM?  I have not suggested
-> any change other than more investigation of the issue and a fuller patch
-> description - yet you're screaming (idiotically IMHO) that mere
-> investigation would break beagleboard.
->
-> Well, if it's _that_ fragile, that mere investigation of this issue by
-> someone elsewhere on the planet would break your beagleboard, maybe it
-> deserves to be broken!
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
 
-The issue was observed at serial init itself in the N800 board and the
-log does not
-show up much.
-http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/boot/2420n800/2420n800_log.txt
- What we thought the problem might be with n800 is that it tries to
-resume when it didn't suspend before.
+changes since v1:
 
-There are two ways through which we thought of handling this issue:
+- document 'intrerrupts' property as mandatory, because the driver needs it.
 
-a) set device as active before enabling pm (which will prevent
+ Documentation/devicetree/bindings/rtc/imx-di.txt |   19 +++++++++++++++++++
+ drivers/rtc/rtc-imxdi.c                          |   12 +++++++++---
+ 2 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/imx-di.txt
 
-pm_runtime_set_active(dev);
-pm_runtime_enable(dev);
-
-OR
-
-b) adding a "suspended" flag to struct omap_uart_port which gets set on
-suspend and cleared on resume. Then on resume you can check:
-
-if (!up->suspended)
-        return 0;
-
-But using "pm_runtime_set_active" approach breaks things even on
-beagle board xm,  though
-it works fine on Panda.
-Therefore, we used the "suspended" flag approach.
-
-So. I just wanted to get some feedback from community about how using
-"pm_runtime_set_active"
-behaves differently in omap3 and omap4.
+diff --git a/Documentation/devicetree/bindings/rtc/imx-di.txt b/Documentation/devicetree/bindings/rtc/imx-di.txt
+new file mode 100644
+index 0000000..42b92b5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/imx-di.txt
+@@ -0,0 +1,19 @@
++* i.MX25 dryice Real Time Clock controller
++
++This RTC is part of the i.MX25 dryice module. Documentation for this
++unit is not publically available. This binding only makes use of the
++RTC.
++
++Required properties:
++- compatible: should be "fsl,imx25-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: interrupt source for the dryice module
++
++Example:
++
++	dryice at 53ffc000 {
++		compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
++		reg = <0x53ffc000 0x4000>;
++		interrupts = <25>;
++	};
+diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+index 891cd6c..b2fe920 100644
+--- a/drivers/rtc/rtc-imxdi.c
++++ b/drivers/rtc/rtc-imxdi.c
+@@ -493,11 +493,17 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id of_dryice_rtc_match[] = {
++	{ .compatible = "fsl,imx25-rtc", },
++	{ },
++};
++
+ static struct platform_driver dryice_rtc_driver = {
+ 	.driver = {
+-		   .name = "imxdi_rtc",
+-		   .owner = THIS_MODULE,
+-		   },
++		.name = "imxdi_rtc",
++		.owner = THIS_MODULE,
++		.of_match_table = of_dryice_rtc_match,
++	},
+ 	.remove = __devexit_p(dryice_rtc_remove),
+ };
+ 
+-- 
+1.7.10.4
