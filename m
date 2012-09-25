@@ -1,68 +1,84 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Sep 2012 12:00:30 +0200
-Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
-References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
- <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
- <20120925081057.GH17667@game.jcrosoft.org>
- <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
-Message-ID: <506180BE.6000603@atmel.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Tue, 25 Sep 2012 15:36:20 +0530
+Subject: [PATCH 1/5] drivers: usb: phy: add a new driver for omap usb2 phy
+In-Reply-To: <50605CFB.5090402@gmail.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-2-git-send-email-kishon@ti.com>
+ <50605CFB.5090402@gmail.com>
+Message-ID: <CAAe_U6+2Vxd8F_JMafm41+0SnZSrZCa_9VKRbdB200BUHw5vEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 11:45 AM, Fabio Porcedda :
-> On Tue, Sep 25, 2012 at 10:10 AM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
->> On 09:28 Tue 25 Sep     , Fabio Porcedda wrote:
->>> Tested on an at91sam9260 board (evk-pro3)
->>>
->>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
->>> ---
->>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
->>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
->>>  2 files changed, 40 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->>> new file mode 100644
->>> index 0000000..724fad1
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->>> @@ -0,0 +1,19 @@
->>> +* Atmel Watchdog Timers
->>> +
->>> +** at91sam9-wdt
->>> +
->>> +Required properties:
->>> +- compatible: must be "atmel,at91sam9-wdt".
->>> +- reg: physical base address of the controller and length of memory mapped
->>> +  region.
->>> +
->>> +Optional properties:
->>> +- heartbeat: contains the watchdog heartbeats in seconds.
->>> +
->>> +Example:
->>> +
->>> +     watchdog at fffffd40 {
->>> +             compatible = "atmel,at91sam9-wdt";
->> for the secind time atmel,at91sam9260-watchdog
-> 
-> Ok, i will fix this.
-> 
->> you need to put the first soc that use it in the compatible
->>> +             reg = <0xfffffd40 0x10>;
->>> +             heartbeat = <10>;
->> need put second in the property name so need to read the doc
-> 
-> I didn't found any example about a property with "second" in the name.
-> Which It's best "heartbeat-seconds", "heartbeat-sec" or "heartbeat-s" ?
+Hi,
 
-I think that, as it is indicated in the documentation, we should not
-worry too much about that... but "heartbeat" and "heartbeat-s" is ok
-with me.
+On Mon, Sep 24, 2012 at 6:45 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 09/06/2012 09:57 AM, Kishon Vijay Abraham I wrote:
+>> All phy related programming like enabling/disabling the clocks, powering
+>> on/off the phy is taken care of by this driver. It is also used for OTG
+>> related functionality like srp.
+>>
+>> This also includes device tree support for usb2 phy driver and
+>> the documentation with device tree binding information is updated.
+>>
+>> Currently writing to control module register is taken care in this
+>> driver which will be removed once the control module driver is in place.
+>>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/usb-phy.txt |   17 ++
+>>  drivers/usb/phy/Kconfig                           |    9 +
+>>  drivers/usb/phy/Makefile                          |    1 +
+>>  drivers/usb/phy/omap-usb2.c                       |  271 +++++++++++++++++++++
+>>  include/linux/usb/omap_usb.h                      |   46 ++++
+>>  include/linux/usb/phy_companion.h                 |   34 +++
+>>  6 files changed, 378 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-phy.txt
+>>  create mode 100644 drivers/usb/phy/omap-usb2.c
+>>  create mode 100644 include/linux/usb/omap_usb.h
+>>  create mode 100644 include/linux/usb/phy_companion.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> new file mode 100644
+>> index 0000000..80d4148
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>
+> This is a very generic name...
+>
+>> @@ -0,0 +1,17 @@
+>> +USB PHY
+>> +
+>> +OMAP USB2 PHY
+>> +
+>> +Required properties:
+>> + - compatible: Should be "ti,omap-usb2"
+>
+> ...for a specific phy. However, I do think a generic binding to describe
+> host ctrlr to phy connections is needed.
+>
+>> + - reg : Address and length of the register set for the device. Also
+>> +add the address of control module dev conf register until a driver for
+>> +control module is added
+>
+> The dts should describe the h/w, not what you need for the current
+> driver. The 2nd reg field does not belong here.
 
-Maybe people @ devicetree-discuss have an advice for this?
+Indeed. This was discussed and agreed upon as a interim solution till
+we have a control module driver in place to write to the control
+module register.
+>
+>> +
+>> +This is usually a subnode of ocp2scp to which it is connected.
+>
+> How is usb port to phy connection described?
+Currently the usb controller to phy connection is established only by
+type. We have a couple of patches being currently discussed in the
+list to establish the connection by phandle.
 
-Bye,
--- 
-Nicolas Ferre
+https://patchwork.kernel.org/patch/1457801/ (Generic PHY Framework:
+devm_of_phy_get())
+http://www.spinics.net/lists/linux-usb/msg69547.html
+
+Thanks
+Kishon
