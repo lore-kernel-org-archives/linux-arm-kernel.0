@@ -1,35 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Sep 2012 12:33:08 +0000
-Subject: [PATCH 5/6] ARM: dove: Remove watchdog from DT
-In-Reply-To: <201209251120.54255.arnd@arndb.de>
-References: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20120925103141.GG27099@lunn.ch> <201209251120.54255.arnd@arndb.de>
-Message-ID: <201209251233.09060.arnd@arndb.de>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Tue, 25 Sep 2012 08:38:31 -0400
+Subject: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+In-Reply-To: <000101cd9b0e$78934fe0$69b9efa0$@samsung.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153552.21241.8656.stgit@ubuntu>
+ <000101cd9b0e$78934fe0$69b9efa0$@samsung.com>
+Message-ID: <CANM98qLuY3G6bBBnK+GJtEVZMRYX+Bk+bKh-bEQq0r7RyX9Nuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 September 2012, Arnd Bergmann wrote:
-> On Tuesday 25 September 2012, Andrew Lunn wrote:
-> > > Regarding mv78xx0, I agree that I'm not sure what to do. The number of
-> > > supported platforms is small. Should we simply mark mv78xx0 deprecated
-> > > now, wait a few release cycles to see if anyone shows up, and see what
-> > > to do at this point?
-> 
-> We should let Sebastien Requiem comment. He is the only person outside of
-> Marvell who has contributed a board file for mv78xx0. If he's interested in
-> keeping it alive, he's hopefully also able to find the time to test the
-> devicetree version of that platform in mach-mvebu. Similarly, if anyone
-> has the MASA reference design, that one could be moved over to mach-mvebu
-> first.
-> 
-> There is a much smaller user base for mv78xx0 than for orion5x, so as long
-> as we can keep the support working with DT, we can throw out the legacy
-> code much faster than for orion. If it doesn't get put into mach-mvebu
-> and you can't find anyone who has hardware to test on, you could also
-> stop maintaining it and leave it to bitrot, but I wouldn't just remove it
-> on a fast track then.
+>> +
+>> +     /*
+>> +      * If this is a write fault (think COW) we need to make sure the
+>> +      * existing page, which other CPUs might still read, doesn't go
+>> away
+>> +      * from under us, by calling gfn_to_pfn_prot(write_fault=true).
+>> +      * Therefore, we call gfn_to_pfn_prot(write_fault=false), which
+>> will
+>> +      * pin the existing page, then we get a new page for the user space
+>> +      * pte and map this in the stage-2 table where we also make sure to
+>> +      * flush the TLB for the VM, if there was an existing entry (the
+>> entry
+>> +      * was updated setting the write flag to the potentially new page).
+>> +      */
+>> +     if (fault_status == FSC_PERM) {
+>> +             pfn_existing = gfn_to_pfn_prot(vcpu->kvm, gfn, false, NULL);
+>> +             if (is_error_pfn(pfn_existing))
+>> +                     return -EFAULT;
+>> +     }
+>> +
+>> +     pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+>> +     if (is_error_pfn(pfn)) {
+>> +             ret = -EFAULT;
+>> +             goto out_put_existing;
+>> +     }
+>> +
+>> +     /* We need minimum second+third level pages */
+>> +     ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+>> +     if (ret)
+>> +             goto out;
+>> +     new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
+>> +     if (writable)
+>> +             pte_val(new_pte) |= L_PTE2_WRITE;
+>> +     coherent_icache_guest_page(vcpu->kvm, gfn);
+>
+> why don't you flush icache only when guest has mapped executable page
+> as __sync_icache_dcache function does currently?
+>
+>
 
-The address I used for Sebastien appears to be dead. Maybe this one still
-works.
+because we don't know if the guest will map the page executable. The
+guest may read the page through a normal load, which causes the fault,
+and subsequently execute it (even possible through different guest
+mappings). The only way to see this happening would be to mark all
+pages as non-executable and catch the fault when it occurs -
+unfortunately the HPFAR which gives us the IPA is not populated on
+execute never faults, so we would have to translate the PC's va to ipa
+using cp15 functionality when this happens, which is then also racy
+with other CPUs. So the question is really if this will even be an
+optimization, but it's definitely something that requires further
+investigation.
 
-	Arnd
+-Christoffer
