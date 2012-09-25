@@ -1,149 +1,64 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 25 Sep 2012 13:59:31 -0500
-Subject: [PATCH] of: dma: fix potential deadlock when requesting a slave
- channel
-Message-ID: <1348599571-29546-1-git-send-email-jon-hunter@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 25 Sep 2012 13:06:35 -0600
+Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
+Message-ID: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the latest version of the OF dma handlers I added support (rather hastily)
-to exhaustively search for an available dma slave channel, for the use-case
-where we have alternative slave channels that can be used. In the current
-implementation a deadlock scenario can occur causing the CPU to loop forever.
-The scenario is as follows ...
+From: Stephen Warren <swarren@nvidia.com>
 
-1. There are alternative channels avaialble
-2. The first channel that is found by calling of_dma_find_channel() is not
-   available and so the call to the xlate function returns NULL. In this case
-   we will call of_dma_find_channel() again but we will return the same channel
-   that we found the first time and hence, again the xlate will return NULL and
-   we will loop here forever.
+This series adds some build rules to run cpp on *.dts-cpp prior to
+invoking dtc, and converts Tegra to the new rule as an example. What do
+people think?
 
-Fix this potential deadlock by just using a single for-loop and not a for-loop
-nested in a do-while loop. This change also replaces the function
-of_dma_find_channel() with of_dma_match_channel() which performs a simple check
-to see if a DMA channel matches the name specified.
+I assume that you've applied the dtc patches I sent yesterday. They
+aren't in this series. See:
 
-I have tested this implementation on an OMAP4 panda board by adding a dummy
-DMA specifier, that will cause the xlate function to return NULL, to the
-beginning of a list of DMA specifiers for a DMA client.
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020182.html
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020183.html
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020181.html
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
+Note: those patches are against upstream dtc. If you wish to test this
+series, apply the dtc patches to upstream dtc, build it, and copy the
+resultant dtc binary over the top of scripts/dtc/dtc.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- drivers/of/dma.c |   60 +++++++++++++++++++++++++++---------------------------
- 1 file changed, 30 insertions(+), 30 deletions(-)
+Stephen Warren (3):
+  kbuild: introduce cmd_dtc_cpp
+  ARM: use cmd_dtc_cpp for compilation of *.dts-cpp to *.dtb
+  ARM: tegra: compile all DT files with cpp
 
-diff --git a/drivers/of/dma.c b/drivers/of/dma.c
-index 19ad37c..4bed490 100644
---- a/drivers/of/dma.c
-+++ b/drivers/of/dma.c
-@@ -108,37 +108,32 @@ void of_dma_controller_free(struct device_node *np)
- EXPORT_SYMBOL_GPL(of_dma_controller_free);
- 
- /**
-- * of_dma_find_channel - Find a DMA channel by name
-+ * of_dma_match_channel - Check if a DMA specifier matches name
-  * @np:		device node to look for DMA channels
-- * @name:	name of desired channel
-+ * @name:	channel name to be matched
-+ * @index:	index of DMA specifier in list of DMA specifiers
-  * @dma_spec:	pointer to DMA specifier as found in the device tree
-  *
-- * Find a DMA channel by the name. Returns 0 on success or appropriate
-- * errno value on error.
-+ * Check if the DMA specifier pointed to by the index in a list of DMA
-+ * specifiers, matches the name provided. Returns 0 if the name matches and
-+ * a valid pointer to the DMA specifier is found. Otherwise returns -ENODEV.
-  */
--static int of_dma_find_channel(struct device_node *np, char *name,
--			       struct of_phandle_args *dma_spec)
-+static int of_dma_match_channel(struct device_node *np, char *name, int index,
-+				struct of_phandle_args *dma_spec)
- {
--	int count, i;
- 	const char *s;
- 
--	count = of_property_count_strings(np, "dma-names");
--	if (count < 0)
--		return count;
-+	if (of_property_read_string_index(np, "dma-names", index, &s))
-+		return -ENODEV;
- 
--	for (i = 0; i < count; i++) {
--		if (of_property_read_string_index(np, "dma-names", i, &s))
--			continue;
-+	if (strcmp(name, s))
-+		return -ENODEV;
- 
--		if (strcmp(name, s))
--			continue;
-+	if (of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
-+				       dma_spec))
-+		return -ENODEV;
- 
--		if (!of_parse_phandle_with_args(np, "dmas", "#dma-cells", i,
--						dma_spec))
--			return 0;
--	}
--
--	return -ENODEV;
-+	return 0;
- }
- 
- /**
-@@ -154,19 +149,22 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
- 	struct of_phandle_args	dma_spec;
- 	struct of_dma		*ofdma;
- 	struct dma_chan		*chan;
--	int			r;
-+	int			count, i;
- 
- 	if (!np || !name) {
- 		pr_err("%s: not enough information provided\n", __func__);
- 		return NULL;
- 	}
- 
--	do {
--		r = of_dma_find_channel(np, name, &dma_spec);
--		if (r) {
--			pr_err("%s: can't find DMA channel\n", np->full_name);
--			return NULL;
--		}
-+	count = of_property_count_strings(np, "dma-names");
-+	if (count < 0) {
-+		pr_err("%s: dma-names property missing or empty\n", __func__);
-+		return NULL;
-+	}
-+
-+	for (i = 0; i < count; i++) {
-+		if (of_dma_match_channel(np, name, i, &dma_spec))
-+			continue;
- 
- 		ofdma = of_dma_find_controller(dma_spec.np);
- 		if (!ofdma) {
-@@ -185,9 +183,11 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
- 
- 		of_node_put(dma_spec.np);
- 
--	} while (!chan);
-+		if (chan)
-+			return chan;
-+	}
- 
--	return chan;
-+	return NULL;
- }
- 
- /**
--- 
-1.7.9.5
+ arch/arm/boot/Makefile                             |    3 ++
+ arch/arm/boot/dts/skeleton.dtsi-cpp                |   13 +++++++
+ ...tegra20-harmony.dts => tegra20-harmony.dts-cpp} |   10 +++---
+ ...medcom-wide.dts => tegra20-medcom-wide.dts-cpp} |    4 +-
+ .../{tegra20-paz00.dts => tegra20-paz00.dts-cpp}   |   14 ++++----
+ .../{tegra20-plutux.dts => tegra20-plutux.dts-cpp} |    4 +-
+ ...gra20-seaboard.dts => tegra20-seaboard.dts-cpp} |   22 ++++++------
+ ...a20-tamonten.dtsi => tegra20-tamonten.dtsi-cpp} |    8 ++--
+ .../dts/{tegra20-tec.dts => tegra20-tec.dts-cpp}   |    4 +-
+ ...a20-trimslice.dts => tegra20-trimslice.dts-cpp} |    2 +-
+ ...tegra20-ventana.dts => tegra20-ventana.dts-cpp} |   10 +++---
+ ...gra20-whistler.dts => tegra20-whistler.dts-cpp} |    8 ++--
+ .../boot/dts/{tegra20.dtsi => tegra20.dtsi-cpp}    |   30 +++++++++---------
+ ...0-cardhu-a02.dts => tegra30-cardhu-a02.dts-cpp} |    6 ++--
+ ...0-cardhu-a04.dts => tegra30-cardhu-a04.dts-cpp} |    6 ++--
+ ...tegra30-cardhu.dtsi => tegra30-cardhu.dtsi-cpp} |   12 +++---
+ .../boot/dts/{tegra30.dtsi => tegra30.dtsi-cpp}    |   34 ++++++++++----------
+ scripts/Makefile.lib                               |    3 ++
+ 18 files changed, 106 insertions(+), 87 deletions(-)
+ create mode 100644 arch/arm/boot/dts/skeleton.dtsi-cpp
+ rename arch/arm/boot/dts/{tegra20-harmony.dts => tegra20-harmony.dts-cpp} (98%)
+ rename arch/arm/boot/dts/{tegra20-medcom-wide.dts => tegra20-medcom-wide.dts-cpp} (95%)
+ rename arch/arm/boot/dts/{tegra20-paz00.dts => tegra20-paz00.dts-cpp} (98%)
+ rename arch/arm/boot/dts/{tegra20-plutux.dts => tegra20-plutux.dts-cpp} (94%)
+ rename arch/arm/boot/dts/{tegra20-seaboard.dts => tegra20-seaboard.dts-cpp} (98%)
+ rename arch/arm/boot/dts/{tegra20-tamonten.dtsi => tegra20-tamonten.dtsi-cpp} (98%)
+ rename arch/arm/boot/dts/{tegra20-tec.dts => tegra20-tec.dts-cpp} (94%)
+ rename arch/arm/boot/dts/{tegra20-trimslice.dts => tegra20-trimslice.dts-cpp} (99%)
+ rename arch/arm/boot/dts/{tegra20-ventana.dts => tegra20-ventana.dts-cpp} (98%)
+ rename arch/arm/boot/dts/{tegra20-whistler.dts => tegra20-whistler.dts-cpp} (99%)
+ rename arch/arm/boot/dts/{tegra20.dtsi => tegra20.dtsi-cpp} (93%)
+ rename arch/arm/boot/dts/{tegra30-cardhu-a02.dts => tegra30-cardhu-a02.dts-cpp} (96%)
+ rename arch/arm/boot/dts/{tegra30-cardhu-a04.dts => tegra30-cardhu-a04.dts-cpp} (96%)
+ rename arch/arm/boot/dts/{tegra30-cardhu.dtsi => tegra30-cardhu.dtsi-cpp} (98%)
+ rename arch/arm/boot/dts/{tegra30.dtsi => tegra30.dtsi-cpp} (93%)
