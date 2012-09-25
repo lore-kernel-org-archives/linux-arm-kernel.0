@@ -1,48 +1,92 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 25 Sep 2012 17:00:26 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <5061C3FE.7050400@arm.com>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120816202932.GY2232@pengutronix.de>
- <20120921190002.GU5525@pengutronix.de> <5061C3FE.7050400@arm.com>
-Message-ID: <20120925150026.GG21730@pengutronix.de>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 26 Sep 2012 00:03:44 +0900
+Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <2368486.hLKA5vLF0M@avalon>
+References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
+ <505C9072.2010204@wwwdotorg.org>
+ <CAAQKjZMZBDpKinZkDUX7CU4yTXmu9GrP1+OiZJKW4Gx1BTno3Q@mail.gmail.com>
+ <2368486.hLKA5vLF0M@avalon>
+Message-ID: <CAAQKjZN++zZ9cfNCB21TeQwPZgFVU-Cmo9ZhVwaaMz+HO2vHig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Sep 25, 2012 at 03:47:26PM +0100, Jonathan Austin wrote:
-> On 21/09/12 20:00, Uwe Kleine-K?nig wrote:
-> > On Thu, Aug 16, 2012 at 10:29:32PM +0200, Uwe Kleine-K?nig wrote:
-> >> On Fri, Aug 03, 2012 at 12:10:11PM +0200, Uwe Kleine-K?nig wrote:
-> >>> the only changes compared to v5 (sent starting with Message-id:
-> >>> 1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
-> >>> are that several debug pr_infos were dropped that I missed to remove
-> >>> before. Thanks to Will Deacon for pointing out that problem.
-> >>> Furthermore I rebased (trivially) to v3.5.
-> >> Any feedback from your side? It would be great to get this in for 3.7
-> >> with some time in next before.
-> > What must happen to get some feed back? Is it worth to assert the stuff
-> > still works with 3.6-rc6?
-> 
-> I hope to have a chance to look at these towards the end of the week...
-> 
-> Looking at the patch series at a very superficial level, I wonder why
-> you've chosen not to include any Kconfig/NVIC support at this stage,
-> especially as you've posted some before and there appears to be
-> something (presumably) working in your efm32 branch...
+2012/9/25 Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
+> On Monday 24 September 2012 21:35:46 Inki Dae wrote:
+>> 2012/9/22 Stephen Warren <swarren@wwwdotorg.org>:
+>> > On 09/21/2012 01:22 AM, Inki Dae wrote:
+>> >> 2012/9/21 Stephen Warren <swarren@wwwdotorg.org>:
+>> >>> On 09/21/2012 05:22 AM, Leela Krishna Amudala wrote:
+>> >>>> This patch adds device tree based discovery support for exynos DRM-FIMD
+>> >>>> driver which includes driver modification to handle platform data in
+>> >>>> both the cases with DT and non-DT, Also adds the documentation for
+>> >>>> bindings.
+>> >>>>
+>> >>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/fimd.txt
+>> >>>> b/Documentation/devicetree/bindings/drm/exynos/fimd.txt>>>
+>> >>> ...
+>> >>>
+>> >>>> + - samsung,fimd-display: This property should specify the phandle of
+>> >>>> the
+>> >>>> +   display device node which holds the video interface timing with the
+>> >>>> +   below mentioned properties.
+>> >>>> +
+>> >>>> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
+>> >>>> +     horizontal timing includes four parameters in the following
+>> >>>> order.
+>> >>>> +
+>> >>>> +     - horizontal back porch (in number of lcd clocks)
+>> >>>> +     - horizontal front porch (in number of lcd clocks)
+>> >>>> +     - hsync pulse width (in number of lcd clocks)
+>> >>>> +     - Display panels X resolution.
+>> >>>> +
+>> >>>> +   - lcd-vtiming: Specifies the vertical timing for the overlay. The
+>> >>>> +     vertical timing includes four parameters in the following order.
+>> >>>> +
+>> >>>> +     - vertical back porch (in number of lcd lines)
+>> >>>> +     - vertical front porch (in number of lcd lines)
+>> >>>> +     - vsync pulse width (in number of lcd clocks)
+>> >>>> +     - Display panels Y resolution.
+>> >>>
+>> >>> Should this not use the new videomode timings that are under discussion
+>> >>> at:
+>> >>>
+>> >>> http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
+>> >>
+>> >> ok, I agree with you. then the videomode helper is going to be merged
+>> >> to mainline(3.6)? if so, this patch should be reworked based on the
+>> >> videomode helper.
+>> >
+>> > I think the videomode helpers would be merged for 3.7 at the very
+>> > earliest; 3.6 is cooked already. Given there are still some comments on
+>> > the binding, perhaps it won't happen until 3.8, but it'd be best to ask
+>> > on that thread so that people more directly involved with the status can
+>> > answer.
+>>
+>> as I mentioned before, it's better to use videomode helper instead but
+>> for this, we should wait for that the videomode helper are merged to
+>> mainline so I think it's better to merge it as is and then modify it
+>> for videomode helper to be used later.
 >
-> It would be a shame to spend time on merging the basic support if there
-> are issues that mean the interrupt support won't follow.
-I plan to expand common/gic.c for interrupt support. Currently I don't
-do much though because getting feedback and the changes into mainline is
-quite hard and I don't want to spend time now and hear later that I did
-it wrong or something. So I put my efforts on hold and only ping from
-time to time.  :-(
+> Aren't DT bindings considered as an ABI, and required to be supported more or
+> less forever ? If you merge this DT binding you'll have to keep supporting it.
+> That's why DT bindings should not be rushed in.
+>
 
-Best regards
-Uwe
+is ABI required for DT binding?  I know DT binding parses just lcd
+timing data from device tree file so ABI isn't needed. but when it
+comes to DT, I'm novice yet so there may be my missing point. could
+you tell me why DT bindings are considered as an ABI? if there is my
+missing point, will consider it again.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Inki Dae
+
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
