@@ -1,78 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Sep 2012 14:41:53 +0800
-Subject: [PATCH 2/3] mmc: esdhc i.MX: Fix version register read
-In-Reply-To: <1348471345-30785-3-git-send-email-s.hauer@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 25 Sep 2012 08:44:43 +0200
+Subject: [PATCH] mmc: sdhci / i.MX esdhc buswidth patches
+In-Reply-To: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
 References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120925064151.GF27291@S2101-09.ap.freescale.net>
+Message-ID: <20120925064443.GA8655@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 09:22:24AM +0200, Sascha Hauer wrote:
-> The i.MX ESDHC controller version register is a mess:
+On Mon, Sep 24, 2012 at 09:22:22AM +0200, Sascha Hauer wrote:
+> The first patch is a generic sdhci driver cleanup change, the others
+> are i.MX specific, adding 8bit bus support and fix version register
+> readout.
 > 
-> - i.MX25 has a v1 controller which identifies itself as v2
-> - i.MX6Q has a v3 controller which identifies itself as v4
-> - i.MX35,51,53 have v2 controllers which identify themselves correctly
+> Sascha
 > 
-> Additionally on i.MX the register is located at offset 0xfc instead of
-> 0xfe. The i.MX6 had a quirk around it which converted v4 into v3. Instead
+> ----------------------------------------------------------------
+> Sascha Hauer (3):
+>       mmc: sdhci: rename platform_8bit_width to platform_bus_width
+>       mmc: esdhc i.MX: Fix version register read
+>       mmc: esdhc i.MX: Support 8bit mode
 
-Ah, I added the quirk for i.MX6 without noticing that other SoCs have
-the similar problem.
+Whole series:
 
-> of reading the real version register, all other SoCs used to return
-> the value from 0xfe which contains 0x0 for all SoCs, so all controllers
-> except i.MX6q were identified as version v1.
-> 
-> This patch fixes this by returning the version based on the devtype
-> data leaving the useless version register untouched.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index e23f813..4fe7312 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -237,15 +237,20 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
->  
->  static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
->  {
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> +
->  	if (unlikely(reg == SDHCI_HOST_VERSION)) {
-> -		u16 val = readw(host->ioaddr + (reg ^ 2));
-> -		/*
-> -		 * uSDHC supports SDHCI v3.0, but it's encoded as value
-> -		 * 0x3 in host controller version register, which violates
-> -		 * SDHCI_SPEC_300 definition.  Work it around here.
-> -		 */
-> -		if ((val & SDHCI_SPEC_VER_MASK) == 3)
-> -			return --val;
-> +		switch (imx_data->devtype) {
-> +		case IMX25_ESDHC:
-> +			return SDHCI_SPEC_100;
-> +		case IMX35_ESDHC:
-> +		case IMX51_ESDHC:
-> +		case IMX53_ESDHC:
-> +			return SDHCI_SPEC_200;
-> +		case IMX6Q_USDHC:
-> +			return SDHCI_SPEC_300;
-> +		}
->  	}
->  
->  	return readw(host->ioaddr + reg);
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120925/9d27a5b4/attachment.sig>
