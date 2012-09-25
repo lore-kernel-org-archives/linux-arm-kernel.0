@@ -1,62 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2012 17:39:53 -0700
-Subject: [GIT PULL 2/3] omap platform and board related late patches
- for v3.7 merge window
-In-Reply-To: <E1TGGAI-0000D1-T0@merlin.infradead.org>
-References: <pull-1348521952-285145> <E1TGGAI-0000D1-T0@merlin.infradead.org>
-Message-ID: <20120925003953.GQ28835@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 24 Sep 2012 17:43:21 -0700
+Subject: [PATCH V2] ARM: OMAP: counter: add locking to
+ read_persistent_clock
+In-Reply-To: <1347434081-11469-1-git-send-email-r.sricharan@ti.com>
+ (R. Sricharan's message of "Wed, 12 Sep 2012 12:44:41 +0530")
+References: <1347434081-11469-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <87d31bj5jq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120924 14:30]:
-> The following changes since commit 0e70156de4c8465bfb8cb45cdc1bbc2fa474ce14:
-> 
->   ARM: OMAP2+: Make omap4-keypad.h local (2012-09-20 15:04:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-board-late-v2-for-v3.7
-> 
-> for you to fetch changes up to ead53717d9ab28c942b9adf66f8c02442dbfbc8a:
-> 
->   arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX (2012-09-24 10:32:39 -0700)
-> 
-> ----------------------------------------------------------------
-> These board and platform related patches have been posted
-> quite a while ago but have somehow fallen though the cracks
-> as most of the focus has been making things to work with
-> device tree. As the first patch depends on sparse IRQ
-> related removal of irqs.h and related header moves, these
-> are based on omap-cleanup-local-headers-for-v3.7 tag.
+R Sricharan <r.sricharan@ti.com> writes:
 
-Let's scrap this pull request, Russell noted that Yegor's patch
-breaks sa1111.
+> From: Colin Cross <ccross@android.com>
+>
+> read_persistent_clock uses a global variable, use a spinlock to
+> ensure non-atomic updates to the variable don't overlap and cause
+> time to move backwards.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
 
-Regards,
+Acked-by: Kevin Hilman <khilman@ti.com>
 
-Tony
- 
-> ----------------------------------------------------------------
-> AnilKumar Ch (1):
->       ARM: OMAP2+: serial: Change MAX_HSUART_PORTS to 6
-> 
-> Peter Ujfalusi (1):
->       ARM: OMAP4: twl-common: Support for additional devices on i2c1 bus
-> 
-> Yegor Yefremov (1):
->       arm: make FORCE_MAX_ZONEORDER configurable for TI AM33XX
+Tony, this should probably be queued up for v3.7-rc and flagged for stable.
 
+Thanks,
 
- 
->  arch/arm/Kconfig                              |    5 ++--
->  arch/arm/mach-omap2/board-4430sdp.c           |   12 ++++++--
->  arch/arm/mach-omap2/board-omap4panda.c        |   12 ++++++--
->  arch/arm/mach-omap2/twl-common.c              |   37 ++++++++-----------------
->  arch/arm/mach-omap2/twl-common.h              |    3 +-
->  arch/arm/plat-omap/include/plat/omap-serial.h |    2 +-
->  6 files changed, 37 insertions(+), 34 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Kevin
+
+> ---
+>  [V2] Added signed-off-by and looped in "linux-arm-kernel" list
+>
+>  arch/arm/plat-omap/counter_32k.c |   21 ++++++++++++++-------
+>  1 file changed, 14 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+> index dbf1e03..2bc51fb 100644
+> --- a/arch/arm/plat-omap/counter_32k.c
+> +++ b/arch/arm/plat-omap/counter_32k.c
+> @@ -55,22 +55,29 @@ static u32 notrace omap_32k_read_sched_clock(void)
+>   * nsecs and adds to a monotonically increasing timespec.
+>   */
+>  static struct timespec persistent_ts;
+> -static cycles_t cycles, last_cycles;
+> +static cycles_t cycles;
+>  static unsigned int persistent_mult, persistent_shift;
+> +static DEFINE_SPINLOCK(read_persistent_clock_lock);
+> +
+>  static void omap_read_persistent_clock(struct timespec *ts)
+>  {
+>  	unsigned long long nsecs;
+> -	cycles_t delta;
+> -	struct timespec *tsp = &persistent_ts;
+> +	cycles_t last_cycles;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&read_persistent_clock_lock, flags);
+>  
+>  	last_cycles = cycles;
+>  	cycles = sync32k_cnt_reg ? __raw_readl(sync32k_cnt_reg) : 0;
+> -	delta = cycles - last_cycles;
+>  
+> -	nsecs = clocksource_cyc2ns(delta, persistent_mult, persistent_shift);
+> +	nsecs = clocksource_cyc2ns(cycles - last_cycles,
+> +					persistent_mult, persistent_shift);
+> +
+> +	timespec_add_ns(&persistent_ts, nsecs);
+> +
+> +	*ts = persistent_ts;
+>  
+> -	timespec_add_ns(tsp, nsecs);
+> -	*ts = *tsp;
+> +	spin_unlock_irqrestore(&read_persistent_clock_lock, flags);
+>  }
+>  
+>  /**
