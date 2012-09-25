@@ -1,93 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Sep 2012 11:59:13 +0100
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
-References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
- <CAKdam572krJZcayRdJ_AciCUZH3LuzD9yoHenhxrB6j9xDZ6JQ@mail.gmail.com>
- <20120925083029.GG31374@n2100.arm.linux.org.uk>
- <20120925083118.GI9137@arwen.pp.htv.fi>
- <20120925091228.GI31374@n2100.arm.linux.org.uk>
- <20120925091112.GK9137@arwen.pp.htv.fi>
- <20120925092118.GJ31374@n2100.arm.linux.org.uk>
- <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
-Message-ID: <20120925105913.GM31374@n2100.arm.linux.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 25 Sep 2012 13:01:46 +0200
+Subject: [PATCH] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
+In-Reply-To: <20120925051424.GB27291@S2101-09.ap.freescale.net>
+References: <1348195214-26633-1-git-send-email-marex@denx.de>
+ <20120925051424.GB27291@S2101-09.ap.freescale.net>
+Message-ID: <201209251301.46486.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right, let's get this thread back onto a constructive footing and try
-to understand the problems here.
+Dear Shawn Guo,
 
-On Tue, Sep 25, 2012 at 03:26:06PM +0530, Poddar, Sourav wrote:
-> The issue was observed at serial init itself in the N800 board and the
-> log does not show up much.
-> http://www.pwsan.com/omap/testlogs/test_tty_next_e36851d0/20120910020323/boot/2420n800/2420n800_log.txt
-
-Right, so output stops when ttyO2 is initialized.
-
-> What we thought the problem might be with n800 is that it tries to
-> resume when it didn't suspend before.
+> On Fri, Sep 21, 2012 at 04:40:14AM +0200, Marek Vasut wrote:
+> > Currently, the kernel unconditionally adds "local-mac-address" and
+> > "mac-address" properties under both FEC ethernet DT nodes in case
+> > the update_fec_mac_prop() function is called. These properties are
+> > loaded with MAC address compiled from vendors OUI and a per-device
+> > NIC saved in OCOTP storage.
+> > 
+> > Some more advanced bootloaders do augment the DT passed to the kernel
+> > by these properties already. In such case, it is wrong for kernel to
+> > override these values.
+> > 
+> > Adjust the FEC MAC address loading so that in case the DT properties
+> > are already present in the DT passed from the bootloader, skip the
+> > loading from OCOTP altogether. If the DT properties are not present,
+> > load them from OCOTP.
+> > 
+> > Note that the later case will lead to zeroed out MAC address if OCOTP
+> > is not programmed. This will lead to FEC not working at all.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > 
+> >  arch/arm/mach-mxs/mach-mxs.c |    4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> > index 71d47f5..3f29a52 100644
+> > --- a/arch/arm/mach-mxs/mach-mxs.c
+> > +++ b/arch/arm/mach-mxs/mach-mxs.c
+> > @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui
+> > oui)
+> > 
+> >  		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
+> >  		if (!np)
+> >  		
+> >  			return;
+> > 
+> > +
+> > +		if (of_get_property(np, "local-mac-address", NULL))
+> > +			continue;
+> > +
 > 
-> There are two ways through which we thought of handling this issue:
-> 
-> a) set device as active before enabling pm (which will prevent
-> 
-> pm_runtime_set_active(dev);
-> pm_runtime_enable(dev);
-> 
-> OR
-> 
-> b) adding a "suspended" flag to struct omap_uart_port which gets set on
-> suspend and cleared on resume. Then on resume you can check:
-> 
-> if (!up->suspended)
->         return 0;
-> 
-> But using "pm_runtime_set_active" approach breaks things even on
-> beagle board xm, though it works fine on Panda.
+> The block should be put after "from" assignment below.
 
-Right, so now the question becomes - what is different on the Beagle Board
-that prevents solution (a) from working - or put it another way, have we
-uncovered _another_ bug.
+Can you please elaborate why would that be necessary?
 
-For N800, for ttyO0 and ttyO1 which aren't in use, it may be correct.
-We don't know for certain.  For ttyO2, the port is clearly already in
-use as it's being used for console output.  So that means it's _not_
-in suspended state, and therefore the initial runtime PM state is
-wrong.
-
-For Beagleboard - who knows, we have no information on that.  All we
-know is that your (a) sequence causes a regression.
-
-Anyway, let's analyse the code paths.  What is pm_runtime_get_sync()
-doing?  Well, it calls __pm_runtime_resume(, RPM_GET_PUT).  That alters
-the parent device's state (which doesn't matter for this, as the platform
-device is a child of the main platform device, which has no runtime PM.)
-
-It then calls the resume callback (from the pm domain/type/class/bus/
-driver) and then does an idle check.
-
-OMAP devices have a pm domain, so this is the candidate for the callback
-at this level, which gets us into _od_runtime_resume().  This calls
-omap_device_enable() before then moving on to the driver's runtime resume
-method, and at that point the runtime PM resume is complete.
-
-So, with your (a) solution, what's different is that we omit calling
-omap_device_enable().  Therefore, my hunch is the reason that Beagleboard
-doesn't work is because it doesn't like missing that call.
-
-I bet if you do this:
-
-	omap_device_enable(dev);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
-
-that this will solve your problem, and Beagleboard will continue working.
-
-What we have is a mismatch in both your case, and the Beagleboard case,
-between the real state of the hardware, the runtime PM state, and the
-OMAP hwmod state, and the above should bring all those states entirely
-into line with each other for _every_ case.  It doesn't need any hacks
-to prevent resume callbacks without prior suspends (which, incidentally,
-the runtime PM core already guarantees provided you get the initial
-state correct.)
+Best regards,
+Marek Vasut
