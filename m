@@ -1,86 +1,58 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 25 Sep 2012 17:53:07 +0530
-Subject: [PATCHv5 00/10] ARM: OMAP: PM usecounting changes
-In-Reply-To: <1348574001.10702.291.camel@sokoban>
-References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
- <506186E9.7070908@ti.com> <1348574001.10702.291.camel@sokoban>
-Message-ID: <5061A22B.1030603@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Sep 2012 12:28:25 +0000
+Subject: [PATCH 5/6] ARM: dove: Remove watchdog from DT
+In-Reply-To: <87haqmgw6n.fsf@lebrac.rtp-net.org>
+References: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201209251120.54255.arnd@arndb.de> <87haqmgw6n.fsf@lebrac.rtp-net.org>
+Message-ID: <201209251228.25752.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 September 2012 05:23 PM, Tero Kristo wrote:
-> On Tue, 2012-09-25 at 15:56 +0530, Rajendra Nayak wrote:
->> Hi Tero,
->>
->> On Tuesday 25 September 2012 03:02 PM, Tero Kristo wrote:
->>> Hi,
->>>
->>> Changes compared to previous version:
->>
->> Did you get a chance to look at the issue I reported about autodeps?
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg72876.html
->
-> Not really, I didn't think that bug report was meant for me, I kind of
-> thought it only happened with your set. But now looking at your email in
-> detail, I guess you are saying there is a bug in this code (the one that
-> touches iclk stuff), which causes the USB / DSS domains to follow
-> MPU/CORE, is that right?
+On Tuesday 25 September 2012, Arnaud Patard wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> >
+> > The next step would be to label mach-orion5x as deprecated in Kconfig for
+> > a release and change the help text so it tells people to move to mach-mvebu
+> > and submit dts files.
+> >
+> 
+> You seem to imply that every user of mach-orion5x can write a dts
+> file. Please don't forget that afaik some users are using the kernel
+> provided by their $distribution, so if it gets broken it may be noticed
+> months later. Moreover, this kind of user won't notice the Kconfig info
+> as all they'll get is a binary.
 
-Yes, basically the autodeps remain set, even while the module is not in
-use at all, which causes them to come in and out of sleep along with MPU.
+The hard part is finding those users. Once we know who they are, we can
+either try to help out by writing a dts file and letting them test it,
+or by assisting them in the process to write one themselves.
 
->
-> -Tero
->
->>
->> regards,
->> Rajendra
->>
->>>
->>> - Fixed OMAP4 support (patches 7-10)
->>> - Dropped debugging support from this set for now
->>> - Rebased on top of 3.6-rc5 + func-pwrst + omap4-ret code
->>>     (omap4 support easier to test with these)
->>> - Patch #1:
->>>     * dropped clkdm_usecount_inc / clkdm_usecount_dec APIs
->>>     * clkdm_clk_enable / disable are used now instead
->>>     * some code ordering changed for the new setup to work properly
->>>     * changed BUG_ON calls to WARN_ON
->>> - Patch #2:
->>>     * added spinlock for protecting voltdm callbacks
->>>     * pwrdm lock extended to protect pwrdm callbacks
->>> - Patch #3:
->>>     * dropped generic API call for the cpu pwrdm idle / wakeup
->>>     * instead use pwrdm_clkdm_enable / disable calls directly from PM code
->>>     * omap4 support fixed to work properly with SMP, added omap4 specific
->>>       CPU pwrdm idle / wakeup calls for this purpose
->>> - Patch #4:
->>>     * no changes
->>>     * added 'Reviewed-by' tag for Rajendra
->>> - Patch #5:
->>>     * no changes, just rebase
->>> - Patch #6:
->>>     * no changes
->>>
->>> Tested with OMAP3 beagle, omap4460 GP panda + omap4430 EMU blaze boards.
->>>
->>> I will be posting new versions for the voltdm fixes + auto retention +
->>> panda board tps6236x support code later on today, which are based on top
->>> of this set.
->>>
->>> Branch also available here:
->>>
->>> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
->>> branch: mainline-3.6-rc5-pwrdm-changes-v5
->>>
->>> -Tero
->>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>
->
->
+You certainly make a good point about users that just get pre-built
+binaries. Do you think we can find them by printing a warning
+message from the kernel that points to some wiki page with instructions
+of how to contact people and let us know what they are using?
+
+In case of Debian, would it be possible to use an old kernel (say, 3.7)
+for as long as people need to run the with the old board files, while
+at the same time moving on with 3.8 and later kernels to support only
+the ones that are converted to a single binary and DT booting?
+
+> > We should let Sebastien Requiem comment. He is the only person outside of
+> > Marvell who has contributed a board file for mv78xx0. If he's interested in
+> > keeping it alive, he's hopefully also able to find the time to test the
+> > devicetree version of that platform in mach-mvebu. Similarly, if anyone
+> > has the MASA reference design, that one could be moved over to mach-mvebu
+> > first.
+> 
+> There are some mv78xx0 (BP) dev boards used in Debian infrastructure, so
+> at least, would nice to not break mv78xx0 support.
+
+Ah, very good to know. Do you know who has access to those machines
+and is willing to help out with testing? Debian is probably the party
+that benefits the most from the work to move mv78xx0/kirkwood/orion5x
+into a single kernel together with iop32x, versatile and vt8500, so
+hopefully they can help out in with the process to get there.
+
+We should certainly make sure we don't remove those machines as long
+as Debian supports them.
+
+	Arnd
