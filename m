@@ -1,15 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 25 Sep 2012 02:02:17 +0200
-Subject: [PATCH 5/6] ARM: dove: Remove watchdog from DT
+Date: Tue, 25 Sep 2012 02:02:18 +0200
+Subject: [PATCH 6/6] ARM: dove: Add crypto engine to DT
 In-Reply-To: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1348531338-16624-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1348531338-16624-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog on dove requires an interrupt that is not yet
-available on DT. Therefore, the watchdog DT node is removed
-until the corresponding chained intc is available.
+Make use of DT support for the crypto engine on dove and remove
+the obsolete init call.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -22,24 +21,40 @@ Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/dove.dtsi |    5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/dove.dtsi |    9 +++++++++
+ arch/arm/mach-dove/common.c |    1 -
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 792bab0..c59c529 100644
+index c59c529..5a00022 100644
 --- a/arch/arm/boot/dts/dove.dtsi
 +++ b/arch/arm/boot/dts/dove.dtsi
-@@ -67,11 +67,6 @@
+@@ -145,5 +145,14 @@
+ 			nr-ports = <1>;
  			status = "disabled";
  		};
++
++		crypto: crypto at 30000 {
++			compatible = "marvell,orion-crypto";
++			reg = <0x30000 0x10000>,
++			      <0xc8000000 0x800>;
++			reg-names = "regs", "sram";
++			interrupts = <31>;
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index ffec26f..f723fe1 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -416,7 +416,6 @@ static void __init dove_dt_init(void)
+ 	dove_ehci0_init();
+ 	dove_ehci1_init();
+ 	dove_pcie_init(1, 1);
+-	dove_crypto_init();
  
--		wdt: wdt at 20300 {
--			compatible = "marvell,orion-wdt";
--			reg = <0x20300 0x28>;
--		};
--
- 		gpio0: gpio at d0400 {
- 			compatible = "marvell,orion-gpio";
- 			#gpio-cells = <2>;
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     dove_auxdata_lookup, NULL);
 -- 
 1.7.10.4
