@@ -1,68 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Sep 2012 15:02:35 +0300
-Subject: [PATCHv5 02/10] ARM: OMAP3+: voltage: add support for
- voltagedomain usecounts
-In-Reply-To: <20120925094100.GK31374@n2100.arm.linux.org.uk>
-References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
- <1348565565-14744-3-git-send-email-t-kristo@ti.com>
- <20120925094100.GK31374@n2100.arm.linux.org.uk>
-Message-ID: <1348574555.10702.298.camel@sokoban>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 25 Sep 2012 07:18:57 -0500
+Subject: [PATCH v6 1/5] usb: phy: samsung: Introducing usb phy driver
+ for hsotg
+In-Reply-To: <CAD6zSYOABTwTGXgFwGwLX-NhjDjDvtqUDVYTMGDng3nuTgLeZg@mail.gmail.com>
+References: <1347886484-16064-1-git-send-email-p.paneri@samsung.com>
+ <1347886484-16064-2-git-send-email-p.paneri@samsung.com>
+ <50605A69.2070201@gmail.com>
+ <CAD6zSYOABTwTGXgFwGwLX-NhjDjDvtqUDVYTMGDng3nuTgLeZg@mail.gmail.com>
+Message-ID: <5061A131.9010905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-09-25 at 10:41 +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 25, 2012 at 12:32:37PM +0300, Tero Kristo wrote:
-> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> > index ba49029..ca54aec 100644
-> > --- a/arch/arm/mach-omap2/powerdomain.c
-> > +++ b/arch/arm/mach-omap2/powerdomain.c
-> > @@ -1475,10 +1477,16 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
-> >   */
-> >  void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
-> >  {
-> > +	unsigned long flags;
-> > +
-> >  	if (!pwrdm)
-> >  		return;
-> >  
-> > -	atomic_inc(&pwrdm->usecount);
-> > +	if (atomic_inc_return(&pwrdm->usecount) == 1) {
-> > +		spin_lock_irqsave(&pwrdm->lock, flags);
-> > +		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
-> > +		spin_unlock_irqrestore(&pwrdm->lock, flags);
-> > +	}
+On 09/25/2012 06:23 AM, Praveen Paneri wrote:
+> Hi Rob,
 > 
-> This looks like the classic "I like atomic types because they have magic
-> properties" brain-deadness.
+> On Mon, Sep 24, 2012 at 6:34 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 09/17/2012 07:54 AM, Praveen Paneri wrote:
+>>> This driver uses usb_phy interface to interact with s3c-hsotg. Supports
+>>> phy_init and phy_shutdown functions to enable/disable phy. Tested with
+>>> smdk6410 and smdkv310. More SoCs can be brought under later.
+>>>
+>>> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
+>>> Acked-by: Heiko Stuebner <heiko@sntech.de>
+>>> ---
+>>>  .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
+>>>  drivers/usb/phy/Kconfig                            |    8 +
+>>>  drivers/usb/phy/Makefile                           |    1 +
+>>>  drivers/usb/phy/samsung-usbphy.c                   |  360 ++++++++++++++++++++
+>>>  include/linux/platform_data/samsung-usbphy.h       |   27 ++
+>>>  5 files changed, 405 insertions(+), 0 deletions(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+>>>  create mode 100644 drivers/usb/phy/samsung-usbphy.c
+>>>  create mode 100644 include/linux/platform_data/samsung-usbphy.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+>>> new file mode 100644
+>>> index 0000000..fefd9c8
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+>>> @@ -0,0 +1,9 @@
+>>> +* Samsung's usb phy transceiver
+>>> +
+>>> +The Samsung's phy transceiver is used for controlling usb otg phy for
+>>> +s3c-hsotg usb device controller.
+>>> +
+>>> +Required properties:
+>>> +- compatible : should be "samsung,exynos4210-usbphy"
+>>> +- reg : base physical address of the phy registers and length of memory mapped
+>>> +     region.
+>>
+>> What's missing here is describing the connection of phys to host
+>> controllers. We've got several people adding usb phy bindings and need
+>> to define them in a common way.
+> yes! it just covers the generic binding. I will update it accordingly
+> as the generic phy framework takes its final shape.
 
-Hi Russell,
+That sounds like the wrong way to define a binding... Figuring out how
+to describe the h/w should not be dependent on changes in the kernel.
+Bindings are an ABI and should not be evolving.
 
-Thats a good catch, I was actually thinking about this sequence myself
-also, but decided to leave it as is here due to similarity with the
-existing code in mach-omap2/clockdomain.c, see e.g.
-_clkdm_clk_hwmod_enable. Maybe those parts should be fixed also...?
-
-> 
-> What would happen to users of this if you had this sequence:
-> 
-> pwrdm->usecount starts off as 1.
-> 
-> Thread0				Thread1
-> atomic_inc_return() (returns 1)
-> 				atomic_inc_return() (returns 2)
-> 				starts using stuff in power domain
-> spin_lock_irqsave()
-> voltdm_pwrdm_enable()
-> spin_unlock_irqrestore()
-> 
-> ?
-
-That as such wouldn't break anything, as the callback isn't doing
-anything too critical, but yes, for the sequencing of events it is bad.
-The alternate implementation I was thinking was to drop the atomic_t and
-just use an int for the usecount, and protect the usecount also with the
-spinlock. However, there might be some performance issues if this is
-done (but I think it is actually better than having some rather
-mysterious bugs instead.)
-
--Tero
+Rob
