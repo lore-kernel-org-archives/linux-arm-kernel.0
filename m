@@ -1,48 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Sep 2012 10:41:00 +0100
-Subject: [PATCHv5 02/10] ARM: OMAP3+: voltage: add support for
- voltagedomain usecounts
-In-Reply-To: <1348565565-14744-3-git-send-email-t-kristo@ti.com>
-References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
- <1348565565-14744-3-git-send-email-t-kristo@ti.com>
-Message-ID: <20120925094100.GK31374@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 25 Sep 2012 11:45:25 +0200
+Subject: [PATCH 3/3] mmc: esdhc i.MX: Support 8bit mode
+In-Reply-To: <20120925085040.GA14216@S2101-09.ap.freescale.net>
+References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
+ <1348471345-30785-4-git-send-email-s.hauer@pengutronix.de>
+ <20120925071505.GG27291@S2101-09.ap.freescale.net>
+ <20120925072714.GY1322@pengutronix.de>
+ <20120925073317.GI27291@S2101-09.ap.freescale.net>
+ <20120925073808.GZ1322@pengutronix.de>
+ <20120925074548.GJ27291@S2101-09.ap.freescale.net>
+ <20120925080525.GA1322@pengutronix.de>
+ <20120925085040.GA14216@S2101-09.ap.freescale.net>
+Message-ID: <20120925094525.GC1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 12:32:37PM +0300, Tero Kristo wrote:
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index ba49029..ca54aec 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -1475,10 +1477,16 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
->   */
->  void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
->  {
-> +	unsigned long flags;
-> +
->  	if (!pwrdm)
->  		return;
->  
-> -	atomic_inc(&pwrdm->usecount);
-> +	if (atomic_inc_return(&pwrdm->usecount) == 1) {
-> +		spin_lock_irqsave(&pwrdm->lock, flags);
-> +		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
-> +		spin_unlock_irqrestore(&pwrdm->lock, flags);
-> +	}
+On Tue, Sep 25, 2012 at 04:50:52PM +0800, Shawn Guo wrote:
+> On Tue, Sep 25, 2012 at 10:05:25AM +0200, Sascha Hauer wrote:
+> > Ok, how about this:
+> > 
+> > - I add a bus-width = <4> property to all i.MX dtsi files
+> > - we merge the patch adding bus-width as an optional property
+> > - Make the bus-width option mandatory in the next step.
+> > 
+> > This way we can merge the mmc related patches through the mmc tree and
+> > the dts changes through arm-soc.
+> > 
+> Sounds good to me.  How the last step should be done will depend
+> on the common spec.  Per Chris, there are already two drivers
+> implementing the property as optional.  Not sure if Chris will change
+> spec to have the property defined as optional (probably default to 1?).
 
-This looks like the classic "I like atomic types because they have magic
-properties" brain-deadness.
+It won't hurt if we add the property now for all i.MX. Then Chris is
+free to do whatever he wants (at least from the i.MX perspective)
 
-What would happen to users of this if you had this sequence:
+Sascha
 
-pwrdm->usecount starts off as 1.
-
-Thread0				Thread1
-atomic_inc_return() (returns 1)
-				atomic_inc_return() (returns 2)
-				starts using stuff in power domain
-spin_lock_irqsave()
-voltdm_pwrdm_enable()
-spin_unlock_irqrestore()
-
-?
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
