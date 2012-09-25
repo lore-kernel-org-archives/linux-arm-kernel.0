@@ -1,21 +1,17 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Sep 2012 13:50:16 +0800
-Subject: [PATCH v2] ARM: dts: imx28-evk: Use pinctrl for gpio-led
-In-Reply-To: <1348427918-19143-1-git-send-email-festevam@gmail.com>
-References: <1348427918-19143-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120925055014.GC27291@S2101-09.ap.freescale.net>
+Date: Tue, 25 Sep 2012 14:00:22 +0800
+Subject: [PATCH 1/2] ARM i.MX25: Add devicetree support
+In-Reply-To: <1348468841-4331-2-git-send-email-s.hauer@pengutronix.de>
+References: <1348468841-4331-1-git-send-email-s.hauer@pengutronix.de>
+ <1348468841-4331-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120925060019.GD27291@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 23, 2012 at 04:18:38PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, Sep 24, 2012 at 08:40:39AM +0200, Sascha Hauer wrote:
+> This adds a i.MX25 dt machine descriptor and changes the clock
+> support to optionally initialize from dt.
 > 
-> Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led driver 
-> has pinctrl support, so setup the gpio led pin via pinctrl and avoid the 
-> following warning:
-> 
-> leds-gpio leds.12: pins are not configured from the driver
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Queued for 3.8, thanks.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
