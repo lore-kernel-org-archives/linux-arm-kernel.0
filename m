@@ -1,38 +1,59 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 25 Sep 2012 10:05:01 +0530
-Subject: [PATCH V6 2/2] dmaengine: add helper function to request a
- slave DMA channel
-In-Reply-To: <5060DDEB.4000600@ti.com>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
- <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
- <20120917223619.GC12445@n2100.arm.linux.org.uk>
- <1347938035.1943.162.camel@vkoul-udesk3>  <5060DDEB.4000600@ti.com>
-Message-ID: <1348547701.1943.190.camel@vkoul-udesk3>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 25 Sep 2012 13:14:26 +0800
+Subject: [PATCH] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
+In-Reply-To: <1348195214-26633-1-git-send-email-marex@denx.de>
+References: <1348195214-26633-1-git-send-email-marex@denx.de>
+Message-ID: <20120925051424.GB27291@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-09-24 at 17:25 -0500, Jon Hunter wrote:
-> > For DT bindings, I think the binding itself shouldn't change based on my
-> > work but I would like these same bindings to help build the DMA engine
-> > code mappings.
-> > 
-> > Now would it make sense to NOT merge these changes for 3.7 and postpone
-> > to 3.8. I can host these patches on a topic branch and merge them when
-> > we are ready. I plan to spend some good amount of time on my work this
-> > week so we should be ready pretty soon.
-> > One these changes are merged, users can start moving to this scheme.
+On Fri, Sep 21, 2012 at 04:40:14AM +0200, Marek Vasut wrote:
+> Currently, the kernel unconditionally adds "local-mac-address" and
+> "mac-address" properties under both FEC ethernet DT nodes in case
+> the update_fec_mac_prop() function is called. These properties are
+> loaded with MAC address compiled from vendors OUI and a per-device
+> NIC saved in OCOTP storage.
 > 
-> I just wanted to see how things are progressing your side. Did you
-> create a topic branch for this? If so let me know where I can find it, I
-> did not find a branch on your infradead git tree.
+> Some more advanced bootloaders do augment the DT passed to the kernel
+> by these properties already. In such case, it is wrong for kernel to
+> override these values.
 > 
-> I wanted to pull in the latest patches for some testing. 
-Sorry for delay, I had everything ready, but couldn't manage to commit
-and push. I have pushed to topic/dmaengine_dt, it is pushing out now...
+> Adjust the FEC MAC address loading so that in case the DT properties
+> are already present in the DT passed from the bootloader, skip the
+> loading from OCOTP altogether. If the DT properties are not present,
+> load them from OCOTP.
+> 
+> Note that the later case will lead to zeroed out MAC address if OCOTP
+> is not programmed. This will lead to FEC not working at all.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-mxs/mach-mxs.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 71d47f5..3f29a52 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+>  		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
+>  		if (!np)
+>  			return;
+> +
+> +		if (of_get_property(np, "local-mac-address", NULL))
+> +			continue;
+> +
 
-This has your two patches, my fix for build breakage, and Matt's typo
-patch. This is based on my next.
+The block should be put after "from" assignment below.
 
--- 
-~Vinod
+>  		from = np;
+
+Shawn
+
+>  
+>  		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
+> -- 
+> 1.7.10.4
+> 
