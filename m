@@ -1,73 +1,46 @@
-From: mmayer@broadcom.com (Markus Mayer)
-Date: Tue, 25 Sep 2012 10:58:09 -0700
-Subject: [PATCH 1/1] Fix segfault in DTC
-In-Reply-To: <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
-References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
-Message-ID: <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Tue, 25 Sep 2012 23:31:07 +0530
+Subject: [PATCHv2 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <20120925175255.GA13823@sirena.org.uk>
+References: <1346844964-24839-1-git-send-email-sourav.poddar@ti.com>
+ <20120925175255.GA13823@sirena.org.uk>
+Message-ID: <CAKdam576mtUpe0UdFPCiB_9OVv4pVOc=fw5Qs-1TeGmkEmw8Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prior to this change, an empty input file would cause a segfault, because
-yylloc had never been initialized. There was never any characters for the
-lexer to match, so YY_USER_ACTION was never executed before the parse error
-was detected.
+Hi,
 
-When the parser printed the error message, it tried to include the name of
-the file, but the structure holding the file name (yylloc.file, referenced
-as pos->file) had never been initialized.
+On Tue, Sep 25, 2012 at 11:22 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Sep 05, 2012 at 05:06:04PM +0530, Sourav Poddar wrote:
+>
+>> +static struct regmap_config smsc_regmap_config = {
+>> +             .reg_bits = 8,
+>> +             .val_bits = 8,
+>> +             .max_register = SMSC_MAX_REGISTER - 1;
+>> +             .cache_type = REGCACHE_COMPRESSED,
+>> +};
+>
+> That definition of max_register looks wrong - why are we subtracting 1
+> from a macro called MAX_REGISTER to get it?
+>
+Yes, my bad.
+Actually, I have define in .h file something like this..
+#define SMSC_MAX_REG                                    (SMSC_VEN_ID_H
++ 1) where
+SMSC_VEN_ID_H is the last register address which this chip supports.
 
-Without the fix:
-
-$ ./dtc /dev/null
-DTC: dts->dts  on file "/dev/null"
-Segmentation fault (core dumped)
-
-$ gdb dtc core
-Program terminated with signal 11, Segmentation fault.
-    at scripts/dtc/srcpos.c:194
-194			fname = pos->file->name;
-(gdb) bt
-    at scripts/dtc/srcpos.c:194
-    fmt=0x40d769 "%s", va=0x7fffbf027148) at scripts/dtc/srcpos.c:220
-    at scripts/dtc/dtc-parser.tab.c:1920
-    at scripts/dtc/treesource.c:38
-    at scripts/dtc/dtc.c:203
-(gdb) p *pos
-$1 = {first_line = 0, first_column = 0, last_line = 0, last_column = 0,
-  file = 0x0}
-
-With the fix:
-
-$ ./dtc /dev/null
-DTC: dts->dts  on file "/dev/null"
-Error: /dev/null:1.1 syntax error
-FATAL ERROR: Unable to parse input tree
-
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
----
- scripts/dtc/treesource.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/scripts/dtc/treesource.c b/scripts/dtc/treesource.c
-index c09aafa..b461b88 100644
---- a/scripts/dtc/treesource.c
-+++ b/scripts/dtc/treesource.c
-@@ -29,11 +29,15 @@ int treesource_error;
- 
- struct boot_info *dt_from_source(const char *fname)
- {
-+	extern YYLTYPE yylloc;
+I think I should directly assign max_address to SMSC_VEN_ID_H.   ?
 +
- 	the_boot_info = NULL;
- 	treesource_error = 0;
- 
- 	srcfile_push(fname);
- 	yyin = current_srcfile->f;
-+	/* Initialize yylloc->file to avoid segfault on empty input */
-+	srcpos_update(&yylloc, NULL, 0);
- 
- 	if (yyparse() != 0)
- 		die("Unable to parse input tree\n");
--- 
-1.7.5.4
++
+> Indentation here is a bit odd too.
+>
+Will rectify.
+>> +static int smsc_i2c_remove(struct i2c_client *i2c)
+>> +{
+>> +     return 0;
+>> +}
+>
+> Remove empty functions.
+Ok.
