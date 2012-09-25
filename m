@@ -1,115 +1,87 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 25 Sep 2012 17:35:00 +0200
-Subject: [PATCH V2] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
-In-Reply-To: <20120925151849.GG14216@S2101-09.ap.freescale.net>
-References: <1348572738-9743-1-git-send-email-marex@denx.de>
- <201209251651.59967.marex@denx.de>
- <20120925151849.GG14216@S2101-09.ap.freescale.net>
-Message-ID: <201209251735.00883.marex@denx.de>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Tue, 25 Sep 2012 17:35:54 +0200
+Subject: [PATCH v2] hvc_dcc : add support to armv4 and armv5 core
+In-Reply-To: <201209031257.28213.arnd@arndb.de>
+References: <1346413645-4593-1-git-send-email-castet.matthieu@free.fr>
+ <5040EAF7.9010003@codeaurora.org> <201209031257.28213.arnd@arndb.de>
+Message-ID: <5061CF5A.2030201@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Arnd Bergmann a ?crit :
+> On Friday 31 August 2012, Stephen Boyd wrote:
+>>> +static int hvc_dcc_put_chars_v6(uint32_t vt, const char *buf, int count)
+>>> +{
+>>> +     int i;
+>>> +
+>>> +     for (i = 0; i < count; i++) {
+>>> +             while (__dcc_getstatus_v6() & DCC_STATUS_TX_V6)
+>>> +                     cpu_relax();
+>>> +
+>>> +             __dcc_putchar_v6(buf[i]);
+>>> +     }
+>>> +
+>>> +     return count;
+>>> +}
+>> It's unfortunate that the main logic is duplicated. I wonder if we could
+>> push the runtime decision slightly lower into the accessor functions
+>> instead and make some new functions dcc_tx_busy() and dcc_rx_busy() or
+>> something. Then these loops stay the same.
+The code is so small (30 asm + 30 C code) that I wonder if worth adding
+complexity in the code.
+Also calling cpu_architecture isn't free and if the want to put the runtime
+decision into the hot path, this means we need to cache the result.
 
-> On Tue, Sep 25, 2012 at 04:51:59PM +0200, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > Sorry, I just dropped the patch, and you need to convince me that the
-> > > patch is actually needed to fix a bug.
-> > > 
-> > > On Tue, Sep 25, 2012 at 03:40:18PM +0200, Marek Vasut wrote:
-> > > > Dear Shawn Guo,
-> > > > 
-> > > > > On Tue, Sep 25, 2012 at 01:32:18PM +0200, Marek Vasut wrote:
-> > > > > > Currently, the kernel unconditionally adds "local-mac-address"
-> > > > > > and "mac-address" properties under both FEC ethernet DT nodes in
-> > > > > > case the update_fec_mac_prop() function is called. These
-> > > > > > properties are loaded with MAC address compiled from vendors OUI
-> > > > > > and a per-device NIC saved in OCOTP storage.
-> > > 
-> > > The function update_fec_mac_prop is only called for imx28-evk and
-> > > m28evk boards which are known having valid/unique MAC address
-> > > programmed in OCOTP.
-> > 
-> > Actually I disabled it on m28, since the OCOTP is not always programmed.
-> > The board is shipped with blank OCOTP.
 > 
-> Then removing the call to update_fec_mac_prop for m28 is enough.
-
-It is not. We do not want to loost OCOTP completely. I would actually like to 
-add the call back, with this patch in that would be possible and fine solution.
-
-> > The imx28-evk is shipped with blank OCOTP as
-> > well, no?
+> Agreed. Ideally, you should be able to get the code to be compiled into
+> the same binary as before for ARMv6+. If only the inline assembly differs,
+> you can do something like
 > 
-> No.  imx28-evk is shipped with MAC programmed into OCOTP.
-
-Does that not limit the users of that kit then ?
-
-> > > In that case, shouldn't we always read MAC from OCOTP instead
-> > > of trusting the "local-mac-address" property from device tree, which
-> > > might stand a chance that it's not valid or unique?
-> > 
-> > Definitelly not. If the bootloader doesn't pass correct local-mac-address
-> > property, the bootloader is broken and it is not our problem (any invalid
-> > DT passed from bootloader is not our problem and is not fixed by us ...
-> > most of the time).
+> static inline char __dcc_getchar(void)
+> {
+>         char __c;
 > 
-> It is our problem.  We shouldn't trust bootloader on that whenever it's
-> possible for ourselves to figure it out.
-
-Correct. You can not reliably figure out the MAC address. See, on sparc (this is 
-where DT came from), it was all about relying on bootloader to pass the proper 
-data to kernel.
-
-> You can say "hey bootloader, this is your problem not ours"
-
-If it mangles the DT? You are right, it is not our problem, we can not do 
-anything about it.
-
-My understanding of your claim is like saying that you can't trust the 
-"interrupts" property of GPMI nand controller ... because you can figure out the 
-value from the CPU ID. If bootloader mangles this part, you will also override 
-it in kernel?
-
-> , but FEC driver in kernel is not working.
-> Isn't it a problem for kernel when FEC is not working?
-
-But the _main_ question here is not about working vs. not-working . The point of 
-this patch is to make OCOTP recommended, but overridable via _standard_ means. 
-Thus giving users more freedom!
-
-> > On the other hand:
-> > 
-> > 1) if it doesn't pass any local-mac-address property, it is safe to read
-> > from OCOTP (this is the case of bootlets) to fill in the blank with at
-> > least something ... even though if the OCOTP is empty, FEC won't work
-> > anyway.
-> > 
-> > 2) if the bootloader does pass a local-mac-address property, then it is
-> > intentional and it can be later overriden anyway by "ifconfig ... hw
-> > ether" if needed .
-> > 
-> > If the bootloader does pass such information, it is either sourced from
-> > OCOTP (in which case it might fall back to 1) and pass nothing ) or
-> > elsewhere, in which case it's 2) and the bootloader has obviously better
-> > knowledge of the hardware than we do.
-> > 
-> > I firmly disagree with force-overriding the DT properties, since esp. in
-> > case of development kits, it doesn't give the users the freedom to
-> > program their OCOTP the way they need it to.
-> > 
-> > Also, the users don't have freedom to frob with their MAC address easily
-> > -- when the OCOTP isn't programmed yet, their FEC won't work, for
-> > example in case of NFS root filesystem, this is a problem. With this
-> > patch, you don't have the problem.
+>         if (__LINUX_ARM_ARCH >= 6)
+> 		asm volatile("mrc p14, 0, %0, c0, c5, 0 @ read comms data reg"
+> 	                : "=r" (__c));
+> 	else
+> 		asm volatile ("mrc p14, 0, %0, c1, c0  @ read comms data reg"
+> 			: "=r" (ret));
+>         isb();
 > 
-> Please bear in mind, we only call update_fec_mac_prop for boards that
-> are known having MAC programmed in OCOTP.
+>         return __c;
+> }
+> 
+> 	Arnd
+> 
+Yes doing that will be great!
 
-Agreed, now we do. This can change (I would like to see it change).
+But Alan wanted "all be runtime handled".
 
-> Shawn
+May be we can do something like:
 
-Best regards,
-Marek Vasut
+
+static int cpu_arch;
+
+static inline char __dcc_getchar(void)
+{
+         char __c;
+
+         if (cpu_arch >= 6)
+ 		asm volatile("mrc p14, 0, %0, c0, c5, 0 @ read comms data reg"
+ 	                : "=r" (__c));
+ 	else
+ 		asm volatile ("mrc p14, 0, %0, c1, c0  @ read comms data reg"
+ 			: "=r" (ret));
+         isb();
+
+         return __c;
+}
+
+static int __init hvc_dcc_console_init(void)
+{
+	cpu_arch = cpu_architecture();
+...
+
+}
+Matthieu
