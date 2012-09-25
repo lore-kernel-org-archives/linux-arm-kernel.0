@@ -1,73 +1,68 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Sep 2012 11:56:26 +0200
-Subject: [PATCH v2] rtc: i.MX dryice: Add devicetree support
-Message-ID: <1348566986-9603-1-git-send-email-s.hauer@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 25 Sep 2012 12:00:30 +0200
+Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
+References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
+ <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
+ <20120925081057.GH17667@game.jcrosoft.org>
+ <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
+Message-ID: <506180BE.6000603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree probing, fixing some whitespace damage along the way.
+On 09/25/2012 11:45 AM, Fabio Porcedda :
+> On Tue, Sep 25, 2012 at 10:10 AM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+>> On 09:28 Tue 25 Sep     , Fabio Porcedda wrote:
+>>> Tested on an at91sam9260 board (evk-pro3)
+>>>
+>>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>>> ---
+>>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>>>  2 files changed, 40 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> new file mode 100644
+>>> index 0000000..724fad1
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> @@ -0,0 +1,19 @@
+>>> +* Atmel Watchdog Timers
+>>> +
+>>> +** at91sam9-wdt
+>>> +
+>>> +Required properties:
+>>> +- compatible: must be "atmel,at91sam9-wdt".
+>>> +- reg: physical base address of the controller and length of memory mapped
+>>> +  region.
+>>> +
+>>> +Optional properties:
+>>> +- heartbeat: contains the watchdog heartbeats in seconds.
+>>> +
+>>> +Example:
+>>> +
+>>> +     watchdog at fffffd40 {
+>>> +             compatible = "atmel,at91sam9-wdt";
+>> for the secind time atmel,at91sam9260-watchdog
+> 
+> Ok, i will fix this.
+> 
+>> you need to put the first soc that use it in the compatible
+>>> +             reg = <0xfffffd40 0x10>;
+>>> +             heartbeat = <10>;
+>> need put second in the property name so need to read the doc
+> 
+> I didn't found any example about a property with "second" in the name.
+> Which It's best "heartbeat-seconds", "heartbeat-sec" or "heartbeat-s" ?
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
+I think that, as it is indicated in the documentation, we should not
+worry too much about that... but "heartbeat" and "heartbeat-s" is ok
+with me.
 
-changes since v1:
+Maybe people @ devicetree-discuss have an advice for this?
 
-- document 'intrerrupts' property as mandatory, because the driver needs it.
-
- Documentation/devicetree/bindings/rtc/imx-di.txt |   19 +++++++++++++++++++
- drivers/rtc/rtc-imxdi.c                          |   12 +++++++++---
- 2 files changed, 28 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/imx-di.txt
-
-diff --git a/Documentation/devicetree/bindings/rtc/imx-di.txt b/Documentation/devicetree/bindings/rtc/imx-di.txt
-new file mode 100644
-index 0000000..42b92b5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/imx-di.txt
-@@ -0,0 +1,19 @@
-+* i.MX25 dryice Real Time Clock controller
-+
-+This RTC is part of the i.MX25 dryice module. Documentation for this
-+unit is not publically available. This binding only makes use of the
-+RTC.
-+
-+Required properties:
-+- compatible: should be "fsl,imx25-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: interrupt source for the dryice module
-+
-+Example:
-+
-+	dryice at 53ffc000 {
-+		compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
-+		reg = <0x53ffc000 0x4000>;
-+		interrupts = <25>;
-+	};
-diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index 891cd6c..b2fe920 100644
---- a/drivers/rtc/rtc-imxdi.c
-+++ b/drivers/rtc/rtc-imxdi.c
-@@ -493,11 +493,17 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id of_dryice_rtc_match[] = {
-+	{ .compatible = "fsl,imx25-rtc", },
-+	{ },
-+};
-+
- static struct platform_driver dryice_rtc_driver = {
- 	.driver = {
--		   .name = "imxdi_rtc",
--		   .owner = THIS_MODULE,
--		   },
-+		.name = "imxdi_rtc",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_dryice_rtc_match,
-+	},
- 	.remove = __devexit_p(dryice_rtc_remove),
- };
- 
+Bye,
 -- 
-1.7.10.4
+Nicolas Ferre
