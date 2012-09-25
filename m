@@ -1,49 +1,33 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 25 Sep 2012 09:53:54 +0200
-Subject: [PATCH RESEND] gpio-lpc32xx: Fix value handling of
- gpio_direction_output()
-Message-ID: <1348559634-15337-1-git-send-email-stigge@antcom.de>
+Date: Tue, 25 Sep 2012 09:56:13 +0200
+Subject: [PATCH 1/2] gpio-lpc32xx: Add GPI_28
+Message-ID: <1348559774-15484-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For GPIOs of gpio-lpc32xx, gpio_direction_output() ignores the value argument
-(initial value of output). This patch fixes this by setting the level
-accordingly.
+This patch adds the missing gpi28 to the list of GPIOs in the GPI P3 "chip".
+
+NOTE: This patch depends on incrementing LPC32XX_GPI_P3_MAX.  When applied
+without the respective mach-lpc32xx patch (merged via arm-soc.git), gcc will
+give a warning about "excess elements in array initializer" but this doesn't
+harm.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
 ---
-Applies to v3.6-rc7
-
- drivers/gpio/gpio-lpc32xx.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h |    2 +-
+ drivers/gpio/gpio-lpc32xx.c                       |    3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
 --- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
 +++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -308,6 +308,7 @@ static int lpc32xx_gpio_dir_output_p012(
- {
- 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+@@ -113,7 +113,8 @@ static const char *gpi_p3_names[LPC32XX_
+ 	 NULL,    NULL,    NULL,   "gpi15",
+ 	"gpi16", "gpi17", "gpi18", "gpi19",
+ 	"gpi20", "gpi21", "gpi22", "gpi23",
+-	"gpi24", "gpi25", "gpi26", "gpi27"
++	"gpi24", "gpi25", "gpi26", "gpi27",
++	"gpi28"
+ };
  
-+	__set_gpio_level_p012(group, pin, value);
- 	__set_gpio_dir_p012(group, pin, 0);
- 
- 	return 0;
-@@ -318,6 +319,7 @@ static int lpc32xx_gpio_dir_output_p3(st
- {
- 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
- 
-+	__set_gpio_level_p3(group, pin, value);
- 	__set_gpio_dir_p3(group, pin, 0);
- 
- 	return 0;
-@@ -326,6 +328,9 @@ static int lpc32xx_gpio_dir_output_p3(st
- static int lpc32xx_gpio_dir_out_always(struct gpio_chip *chip, unsigned pin,
- 	int value)
- {
-+	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-+
-+	__set_gpo_level_p3(group, pin, value);
- 	return 0;
- }
- 
+ static const char *gpo_p3_names[LPC32XX_GPO_P3_MAX] = {
