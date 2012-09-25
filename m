@@ -1,88 +1,59 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 25 Sep 2012 13:01:55 +0200
-Subject: [PATCH] ARM: ux500: 8500: update I2C sleep states pinctrl
-Message-ID: <1348570915-3116-1-git-send-email-linus.walleij@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Sep 2012 12:07:03 +0100
+Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
+ suspended.
+In-Reply-To: <20120925103652.GN9137@arwen.pp.htv.fi>
+References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
+ <CAKdam572krJZcayRdJ_AciCUZH3LuzD9yoHenhxrB6j9xDZ6JQ@mail.gmail.com>
+ <20120925083029.GG31374@n2100.arm.linux.org.uk>
+ <20120925083118.GI9137@arwen.pp.htv.fi>
+ <20120925091228.GI31374@n2100.arm.linux.org.uk>
+ <20120925091112.GK9137@arwen.pp.htv.fi>
+ <20120925092118.GJ31374@n2100.arm.linux.org.uk>
+ <20120925094815.GL9137@arwen.pp.htv.fi>
+ <20120925102958.GL31374@n2100.arm.linux.org.uk>
+ <20120925103652.GN9137@arwen.pp.htv.fi>
+Message-ID: <20120925110703.GN31374@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+On Tue, Sep 25, 2012 at 01:37:03PM +0300, Felipe Balbi wrote:
+> On Tue, Sep 25, 2012 at 11:29:58AM +0100, Russell King - ARM Linux wrote:
+> > Because you are accusing me of potentially breaking your beagleboard
+> > for merely suggesting further investigation and a better commit message.
+> 
+> Where did I accuse you of anyting ? I just mentioned we experienced a
+> regression with beagleboard XM when using pm_runtime_set_active().
 
-This defines the proper sleep states for all the I2C pins of
-the MOP500 DB8500 ASIC setting.
+I quote:
+:> But should we cause a regression to beagleboard XM because of that ?
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Requesting ARM SoC ACKs to take this through pinctrl for
-ease-of-merge going forward, as dependecies are in there.
----
- arch/arm/mach-ux500/board-mop500-pins.c | 30 ++++++++++++++++++++----------
- 1 file changed, 20 insertions(+), 10 deletions(-)
+I say again: I was _only_ suggesting further investigation, yet you
+were mouthing off about causing a regression to beagleboard "because
+of that", effectively saying that no, we should not do any further
+investigation and this is the only fix.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 722523c..099369e 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -30,7 +30,6 @@ static enum custom_pin_cfg_t pinsfor;
- #define BIAS(a,b) static unsigned long a[] = { b }
- 
- BIAS(pd, PIN_PULL_DOWN);
--BIAS(slpm_gpio_nopull, PIN_SLPM_GPIO|PIN_SLPM_INPUT_NOPULL);
- BIAS(in_nopull, PIN_INPUT_NOPULL);
- BIAS(in_nopull_slpm_nowkup, PIN_INPUT_NOPULL|PIN_SLPM_WAKEUP_DISABLE);
- BIAS(in_pu, PIN_INPUT_PULLUP);
-@@ -55,12 +54,16 @@ BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_
- BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
- BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_in_nopull_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- 
- /* We use these to define hog settings that are always done on boot */
- #define DB8500_MUX_HOG(group,func) \
- 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-db8500", group, func)
- #define DB8500_PIN_HOG(pin,conf) \
- 	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-db8500", pin, conf)
-+#define DB8500_PIN_SLEEP(pin, conf, dev) \
-+	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500",	\
-+			    pin, conf)
- 
- /* These are default states associated with device and changed runtime */
- #define DB8500_MUX(group,func,dev) \
-@@ -160,19 +163,26 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
- 	/* Mux in LCD VSI1 and pull it up for MCDE HDMI output */
- 	DB8500_MUX("lcdvsi1_a_1", "lcd", "av8100-hdmi"),
--	/* Mux in I2C blocks, put pins into GPIO in sleepmode no pull-up */
-+	/* Mux in i2c0 block, default state */
- 	DB8500_MUX("i2c0_a_1", "i2c0", "nmk-i2c.0"),
--	DB8500_PIN("GPIO147_C15", slpm_gpio_nopull, "nmk-i2c.0"),
--	DB8500_PIN("GPIO148_B16", slpm_gpio_nopull, "nmk-i2c.0"),
-+	/* i2c0 sleep state */
-+	DB8500_PIN_SLEEP("GPIO147_C15", slpm_in_nopull_wkup_pdis, "nmk-i2c.0"), /* SDA */
-+	DB8500_PIN_SLEEP("GPIO148_B16", slpm_in_nopull_wkup_pdis, "nmk-i2c.0"), /* SCL */
-+	/* Mux in i2c1 block, default state  */
- 	DB8500_MUX("i2c1_b_2", "i2c1", "nmk-i2c.1"),
--	DB8500_PIN("GPIO16_AD3", slpm_gpio_nopull, "nmk-i2c.1"),
--	DB8500_PIN("GPIO17_AD4", slpm_gpio_nopull, "nmk-i2c.1"),
-+	/* i2c1 sleep state */
-+	DB8500_PIN_SLEEP("GPIO16_AD3", slpm_in_nopull_wkup_pdis, "nmk-i2c.1"), /* SDA */
-+	DB8500_PIN_SLEEP("GPIO17_AD4", slpm_in_nopull_wkup_pdis, "nmk-i2c.1"), /* SCL */
-+	/* Mux in i2c2 block, default state  */
- 	DB8500_MUX("i2c2_b_2", "i2c2", "nmk-i2c.2"),
--	DB8500_PIN("GPIO10_AF5", slpm_gpio_nopull, "nmk-i2c.2"),
--	DB8500_PIN("GPIO11_AG4", slpm_gpio_nopull, "nmk-i2c.2"),
-+	/* i2c2 sleep state */
-+	DB8500_PIN_SLEEP("GPIO10_AF5", slpm_in_nopull_wkup_pdis, "nmk-i2c.2"), /* SDA */
-+	DB8500_PIN_SLEEP("GPIO11_AG4", slpm_in_nopull_wkup_pdis, "nmk-i2c.2"), /* SCL */
-+	/* Mux in i2c3 block, default state  */
- 	DB8500_MUX("i2c3_c_2", "i2c3", "nmk-i2c.3"),
--	DB8500_PIN("GPIO229_AG7", slpm_gpio_nopull, "nmk-i2c.3"),
--	DB8500_PIN("GPIO230_AF7", slpm_gpio_nopull, "nmk-i2c.3"),
-+	/* i2c3 sleep state */
-+	DB8500_PIN_SLEEP("GPIO229_AG7", slpm_in_nopull_wkup_pdis, "nmk-i2c.3"), /* SDA */
-+	DB8500_PIN_SLEEP("GPIO230_AF7", slpm_in_nopull_wkup_pdis, "nmk-i2c.3"), /* SCL */
- 	/* Mux in SDI0 (here called MC0) used for removable MMC/SD/SDIO cards */
- 	DB8500_MUX("mc0_a_1", "mc0", "sdi0"),
- 	DB8500_PIN("GPIO18_AC2", out_hi, "sdi0"), /* CMDDIR */
--- 
-1.7.11.3
+> To add extra info, here you go:
+
+Finally, something constructive.
+
+> We pinged Paul and asked if he had seen that before, he had no
+> pointers... Because Documentation/power/runtime_pm.txt was using a
+> mystruct->is_suspended flag, we just decided to follow the same
+> "design" since no-one was able to suggest why pm_runtime_set_active()
+> was breaking beagleXM nor how it was supposed to actually work.
+> 
+> Reading the code: pm_runtime_set_active() would tell pm_runtime core
+> the device is actually active by setting runtime_status to RPM_ACTIVE,
+> thus the following pm_runtime_get_sync() wouldn't actually call
+> runtime_resume() callback, but it would increment usage_counter.
+> 
+> I can't see why this would fail on beagleXM, but it does and we'd like
+> to hear in which situations this could fail...
+
+Well, I've just spent five minutes analysing the code paths - which I
+hadn't looked at before - and I've pointed out what's probably causing
+the problem for Beagle.  I think you owe me an appology over your
+aggressive attitude towards my suggestions that there needed to be
+some further investigation.
