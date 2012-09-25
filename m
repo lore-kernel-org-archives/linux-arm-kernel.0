@@ -1,118 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Sep 2012 11:40:12 +0200
-Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
-References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
- <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <50617BFC.1000903@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Sep 2012 10:41:00 +0100
+Subject: [PATCHv5 02/10] ARM: OMAP3+: voltage: add support for
+ voltagedomain usecounts
+In-Reply-To: <1348565565-14744-3-git-send-email-t-kristo@ti.com>
+References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
+ <1348565565-14744-3-git-send-email-t-kristo@ti.com>
+Message-ID: <20120925094100.GK31374@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 09:28 AM, Fabio Porcedda :
-> Tested on an at91sam9260 board (evk-pro3)
-> 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> ---
->  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
->  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
->  2 files changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> new file mode 100644
-> index 0000000..724fad1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -0,0 +1,19 @@
-> +* Atmel Watchdog Timers
-> +
-> +** at91sam9-wdt
-> +
-> +Required properties:
-> +- compatible: must be "atmel,at91sam9-wdt".
-
-As Jean-Christophe said, you should use the complete name of the fist
-SoC that used this WDT version:
-
-So please change all compatibility strings to:
-
-atmel,at91sam9260-wdt
-
-
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +Optional properties:
-> +- heartbeat: contains the watchdog heartbeats in seconds.
-> +
-> +Example:
-> +
-> +	watchdog at fffffd40 {
-> +		compatible = "atmel,at91sam9-wdt";
-> +		reg = <0xfffffd40 0x10>;
-> +		heartbeat = <10>;
-> +	};
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 05e1be8..56b8836 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -32,6 +32,7 @@
->  #include <linux/timer.h>
->  #include <linux/bitops.h>
->  #include <linux/uaccess.h>
-> +#include <linux/of.h>
->  
->  #include "at91sam9_wdt.h"
->  
-> @@ -254,6 +255,14 @@ static struct miscdevice at91wdt_miscdev = {
->  	.fops		= &at91wdt_fops,
->  };
->  
-> +static inline void __init at91wdt_probe_dt(struct device_node *node)
-> +{
-> +	if (!node)
-> +		return;
-> +
-> +	of_property_read_u32(node, "heartbeat", &heartbeat);
-> +}
-> +
->  static int __init at91wdt_probe(struct platform_device *pdev)
+On Tue, Sep 25, 2012 at 12:32:37PM +0300, Tero Kristo wrote:
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index ba49029..ca54aec 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -1475,10 +1477,16 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
+>   */
+>  void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
 >  {
->  	struct resource	*r;
-> @@ -272,6 +281,8 @@ static int __init at91wdt_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> +	at91wdt_probe_dt(pdev->dev.of_node);
+> +	unsigned long flags;
 > +
->  	/* Set watchdog */
->  	res = at91_wdt_settimeout(ms_to_ticks(WDT_HW_TIMEOUT * 1000));
->  	if (res)
-> @@ -302,11 +313,21 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
->  	return res;
->  }
+>  	if (!pwrdm)
+>  		return;
 >  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id at91_wdt_dt_ids[] = {
-> +	{ .compatible = "atmel,at91sam9-wdt" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-> +#endif
-> +
->  static struct platform_driver at91wdt_driver = {
->  	.remove		= __exit_p(at91wdt_remove),
->  	.driver		= {
->  		.name	= "at91_wdt",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(at91_wdt_dt_ids),
->  	},
->  };
->  
-> 
+> -	atomic_inc(&pwrdm->usecount);
+> +	if (atomic_inc_return(&pwrdm->usecount) == 1) {
+> +		spin_lock_irqsave(&pwrdm->lock, flags);
+> +		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
+> +		spin_unlock_irqrestore(&pwrdm->lock, flags);
+> +	}
 
-Otherwise, looks ok...
+This looks like the classic "I like atomic types because they have magic
+properties" brain-deadness.
 
--- 
-Nicolas Ferre
+What would happen to users of this if you had this sequence:
+
+pwrdm->usecount starts off as 1.
+
+Thread0				Thread1
+atomic_inc_return() (returns 1)
+				atomic_inc_return() (returns 2)
+				starts using stuff in power domain
+spin_lock_irqsave()
+voltdm_pwrdm_enable()
+spin_unlock_irqrestore()
+
+?
