@@ -1,35 +1,39 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 25 Sep 2012 10:25:08 +0200
-Subject: [GIT PULL] ARM: LPC32xx: DTS updates #2
-Message-ID: <50616A64.8040600@antcom.de>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Tue, 25 Sep 2012 01:26:24 -0700
+Subject: [PATCH 23/29] PCI, arm: kill pci_root_buses
+In-Reply-To: <1348561590-28067-1-git-send-email-yinghai@kernel.org>
+References: <1348561590-28067-1-git-send-email-yinghai@kernel.org>
+Message-ID: <1348561590-28067-24-git-send-email-yinghai@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Signed-off-by: Yinghai Lu <yinghai@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/kernel/bios32.c |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
 
-this is a second round of mach-lpc32xx specific updates for 3.7, below
-the dts branch. Only one patch for adjusting phy3250.dts.
-
-Thanks,
-
-Roland
-
-
-The following changes since commit 25b3ab6c7e39e42245d98c27d25d9902baec7b65:
-
-  ARM: LPC32xx: Extend dts for EA3250 board (2012-09-06 11:40:48 +0200)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/dts
-
-for you to fetch changes up to 07c7e12ca7e32e942d2c42dd67329c5fc3886b07:
-
-  ARM: LPC32xx: LED fix in PHY3250 DTS file (2012-09-25 10:11:41 +0200)
-
-----------------------------------------------------------------
-Roland Stigge (1):
-      ARM: LPC32xx: LED fix in PHY3250 DTS file
-
- arch/arm/boot/dts/phy3250.dts |   12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 9cf16b8..83b7cdc 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -56,13 +56,10 @@ static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, in
+ 
+ void pcibios_report_status(u_int status_mask, int warn)
+ {
+-	struct list_head *l;
++	struct pci_host_bridge *host_bridge = NULL;
+ 
+-	list_for_each(l, &pci_root_buses) {
+-		struct pci_bus *bus = pci_bus_b(l);
+-
+-		pcibios_bus_report_status(bus, status_mask, warn);
+-	}
++	for_each_pci_host_bridge(host_bridge)
++		pcibios_bus_report_status(host_bridge->bus, status_mask, warn);
+ }
+ 
+ /*
+-- 
+1.7.7
