@@ -1,59 +1,288 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Sep 2012 19:05:37 +0300
-Subject: [PATCHv6 06/11] ARM: OMAP: clockdomain: add support for preventing
- autodep delete
+Date: Tue, 25 Sep 2012 19:05:33 +0300
+Subject: [PATCHv6 02/11] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add recursive
+ usecount tracking
 In-Reply-To: <1348589142-11983-1-git-send-email-t-kristo@ti.com>
 References: <1348589142-11983-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1348589142-11983-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1348589142-11983-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clockdomains bug out if their autodeps are deleted before idle.
-This happens namely with OMAP3 PER domain, it will bug out if it
-doesn't have wakedeps enabled when it enters off-mode. This patch
-adds support for new flag 'CLKDM_NO_AUTODEP_DISABLE' which does this.
+This patch fixes the usecount tracking for omap3+, previously the
+usecount numbers were rather bogus and were not really useful for
+any purpose. Now usecount numbers track the number of really active
+clients on each domain. This patch also adds support for usecount
+tracking on powerdomain level and autoidle flag for clocks that
+are hardware controlled and should be skipped in usecount
+calculations.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain.c |    3 +++
- arch/arm/mach-omap2/clockdomain.h |    4 ++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/clkt_iclk.c         |   21 ++++++++++++++++++
+ arch/arm/mach-omap2/clockdomain.c       |   16 +++++++++++++-
+ arch/arm/mach-omap2/dpll3xxx.c          |   19 ++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.c       |   35 +++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h       |    4 +++
+ arch/arm/plat-omap/clock.c              |    6 +++++
+ arch/arm/plat-omap/include/plat/clock.h |    2 +
+ 7 files changed, 102 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/clkt_iclk.c b/arch/arm/mach-omap2/clkt_iclk.c
+index 3d43fba..1afc599 100644
+--- a/arch/arm/mach-omap2/clkt_iclk.c
++++ b/arch/arm/mach-omap2/clkt_iclk.c
+@@ -21,6 +21,7 @@
+ #include "clock2xxx.h"
+ #include "cm2xxx_3xxx.h"
+ #include "cm-regbits-24xx.h"
++#include "clockdomain.h"
+ 
+ /* Private functions */
+ 
+@@ -34,6 +35,16 @@ void omap2_clkt_iclk_allow_idle(struct clk *clk)
+ 	v = __raw_readl((__force void __iomem *)r);
+ 	v |= (1 << clk->enable_bit);
+ 	__raw_writel(v, (__force void __iomem *)r);
++
++	/* Remove this clock from parent clockdomain usecounts */
++	if (clk->usecount && clk->clkdm)
++		clkdm_clk_disable(clk->clkdm, clk);
++
++	/*
++	 * Mark as autoidle, so we continue to ignore this clock in
++	 * parent clkdm usecount calculations
++	 */
++	clk->autoidle = true;
+ }
+ 
+ /* XXX */
+@@ -46,6 +57,16 @@ void omap2_clkt_iclk_deny_idle(struct clk *clk)
+ 	v = __raw_readl((__force void __iomem *)r);
+ 	v &= ~(1 << clk->enable_bit);
+ 	__raw_writel(v, (__force void __iomem *)r);
++
++	/*
++	 * Disable autoidle flag so further clkdm usecounts take this
++	 * clock into account
++	 */
++	clk->autoidle = false;
++
++	/* Add clock back to parent clockdomain usecount */
++	if (clk->usecount && clk->clkdm)
++		clkdm_clk_enable(clk->clkdm, clk);
+ }
+ 
+ /* Public data */
 diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 7715353..4f01c8f 100644
+index 173905d..7715353 100644
 --- a/arch/arm/mach-omap2/clockdomain.c
 +++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -201,6 +201,9 @@ void _clkdm_del_autodeps(struct clockdomain *clkdm)
- 	if (!autodeps || clkdm->flags & CLKDM_NO_AUTODEPS)
- 		return;
+@@ -910,6 +910,7 @@ bool clkdm_in_hwsup(struct clockdomain *clkdm)
+ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
+ {
+ 	unsigned long flags;
++	int usecount;
  
-+	if (clkdm->flags & CLKDM_NO_AUTODEP_DISABLE)
+ 	if (!clkdm || !arch_clkdm || !arch_clkdm->clkdm_clk_enable)
+ 		return -EINVAL;
+@@ -921,12 +922,16 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
+ 	 * should be called for every clock instance or hwmod that is
+ 	 * enabled, so the clkdm can be force woken up.
+ 	 */
+-	if ((atomic_inc_return(&clkdm->usecount) > 1) && autodeps) {
++	usecount = atomic_inc_return(&clkdm->usecount);
++
++	if (usecount > 1 && autodeps) {
+ 		spin_unlock_irqrestore(&clkdm->lock, flags);
+ 		return 0;
+ 	}
+ 
+ 	arch_clkdm->clkdm_clk_enable(clkdm);
++	if (usecount == 1)
++		pwrdm_clkdm_enable(clkdm->pwrdm.ptr);
+ 	pwrdm_state_switch(clkdm->pwrdm.ptr);
+ 	spin_unlock_irqrestore(&clkdm->lock, flags);
+ 
+@@ -956,6 +961,7 @@ static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm)
+ 	}
+ 
+ 	arch_clkdm->clkdm_clk_disable(clkdm);
++	pwrdm_clkdm_disable(clkdm->pwrdm.ptr);
+ 	pwrdm_state_switch(clkdm->pwrdm.ptr);
+ 	spin_unlock_irqrestore(&clkdm->lock, flags);
+ 
+@@ -988,6 +994,10 @@ int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
+ 	if (!clk)
+ 		return -EINVAL;
+ 
++	/* If autoidle clock, do not update clkdm usecounts */
++	if (clk->autoidle)
++		return 0;
++
+ 	return _clkdm_clk_hwmod_enable(clkdm);
+ }
+ 
+@@ -1014,6 +1024,10 @@ int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
+ 	if (!clk)
+ 		return -EINVAL;
+ 
++	/* If autoidle clock, do not update clkdm usecounts */
++	if (clk->autoidle)
++		return 0;
++
+ 	return _clkdm_clk_hwmod_disable(clkdm);
+ }
+ 
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index b9c8d2f..da660d2 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -34,6 +34,7 @@
+ #include "clock.h"
+ #include "cm2xxx_3xxx.h"
+ #include "cm-regbits-34xx.h"
++#include "clockdomain.h"
+ 
+ /* CM_AUTOIDLE_PLL*.AUTO_* bit values */
+ #define DPLL_AUTOIDLE_DISABLE			0x0
+@@ -571,6 +572,15 @@ void omap3_dpll_allow_idle(struct clk *clk)
+ 	v |= DPLL_AUTOIDLE_LOW_POWER_STOP << __ffs(dd->autoidle_mask);
+ 	__raw_writel(v, dd->autoidle_reg);
+ 
++	/* Remove this clock from parent clockdomain usecounts */
++	if (clk->usecount && clk->clkdm)
++		clkdm_clk_disable(clk->clkdm, clk);
++
++	/*
++	 * Mark as autoidle, so we continue to ignore this clock in
++	 * parent clkdm usecount calculations
++	 */
++	clk->autoidle = true;
+ }
+ 
+ /**
+@@ -600,6 +610,15 @@ void omap3_dpll_deny_idle(struct clk *clk)
+ 	v |= DPLL_AUTOIDLE_DISABLE << __ffs(dd->autoidle_mask);
+ 	__raw_writel(v, dd->autoidle_reg);
+ 
++	/*
++	 * Disable autoidle flag so further clkdm usecounts take this
++	 * clock into account
++	 */
++	clk->autoidle = false;
++
++	/* Add clock back to parent clockdomain usecount */
++	if (clk->usecount && clk->clkdm)
++		clkdm_clk_enable(clk->clkdm, clk);
+ }
+ 
+ /* Clock control for DPLL outputs */
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index d6daa81..ba49029 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -1466,6 +1466,41 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
+ 	return ret;
+ }
+ 
++/**
++ * pwrdm_clkdm_enable - increment powerdomain usecount
++ * @pwrdm: struct powerdomain *
++ *
++ * Increases the usecount for a powerdomain. Called from clockdomain
++ * code once a clockdomain becomes active.
++ */
++void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
++{
++	if (!pwrdm)
 +		return;
 +
- 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
- 		if (IS_ERR(autodep->clkdm.ptr))
- 			continue;
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 5601dc1..9b8733e 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -34,6 +34,9 @@
-  * CLKDM_ACTIVE_WITH_MPU: The PRCM guarantees that this clockdomain is
-  *     active whenever the MPU is active.  True for interconnects and
-  *     the WKUP clockdomains.
-+ * CLKDM_NO_AUTODEP_DISABLE: Prevent clockdomain code from deleting autodeps.
-+ *     Needed for PER domain on omap3, as it will bug out with off-mode if
-+ *     wakedeps are removed.
-  */
- #define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
- #define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
-@@ -41,6 +44,7 @@
- #define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
- #define CLKDM_NO_AUTODEPS			(1 << 4)
- #define CLKDM_ACTIVE_WITH_MPU			(1 << 5)
-+#define CLKDM_NO_AUTODEP_DISABLE		(1 << 6)
++	atomic_inc(&pwrdm->usecount);
++}
++
++/**
++ * pwrdm_clkdm_disable - decrease powerdomain usecount
++ * @pwrdm: struct powerdomain *
++ *
++ * Decreases the usecount for a powerdomain. Called from clockdomain
++ * code once a clockdomain usecount reaches zero, i.e. it is ready to
++ * idle.
++ */
++void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
++{
++	int val;
++
++	if (!pwrdm)
++		return;
++
++	val = atomic_dec_return(&pwrdm->usecount);
++
++	WARN_ON(val < 0);
++}
++
+ int pwrdm_pre_transition(struct powerdomain *pwrdm)
+ {
+ 	if (pwrdm)
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index dcd2315..1bad255 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -92,6 +92,9 @@ int pwrdm_state_switch(struct powerdomain *pwrdm);
+ int pwrdm_pre_transition(struct powerdomain *pwrdm);
+ int pwrdm_post_transition(struct powerdomain *pwrdm);
  
- #define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
- #define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
++void pwrdm_clkdm_enable(struct powerdomain *pwrdm);
++void pwrdm_clkdm_disable(struct powerdomain *pwrdm);
++
+ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
+ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
+ 
+@@ -209,6 +212,7 @@ struct powerdomain {
+ 	unsigned state_counter[PWRDM_MAX_FUNC_PWRSTS];
+ 	unsigned ret_logic_off_counter;
+ 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
++	atomic_t usecount;
+ 
+ 	const u8 pwrstctrl_offs;
+ 	const u8 pwrstst_offs;
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 706b7e2..d657d39 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -282,6 +282,12 @@ int clk_register(struct clk *clk)
+ 		list_add(&clk->sibling, &root_clks);
+ 
+ 	list_add(&clk->node, &clocks);
++	/*
++	 * If clock has no ops, it is handled by hardware and thus will
++	 * idle automatically
++	 */
++	if (clk->ops == &clkops_null)
++		clk->autoidle = true;
+ 	if (clk->init)
+ 		clk->init(clk);
+ 	mutex_unlock(&clocks_mutex);
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 656b986..3b5acea 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -206,6 +206,7 @@ struct dpll_data {
+  * @init: fn ptr to do clock-specific initialization
+  * @enable_bit: bitshift to write to enable/disable the clock (see @enable_reg)
+  * @usecount: number of users that have requested this clock to be enabled
++ * @autoidle: indicates hardware controlled clock (not used in domain usecounts)
+  * @fixed_div: when > 0, this clock's rate is its parent's rate / @fixed_div
+  * @flags: see "struct clk.flags possibilities" above
+  * @clksel_reg: for clksel clks, register va containing src/divisor select
+@@ -252,6 +253,7 @@ struct clk {
+ 	void			(*init)(struct clk *);
+ 	u8			enable_bit;
+ 	s8			usecount;
++	bool			autoidle;
+ 	u8			fixed_div;
+ 	u8			flags;
+ #ifdef CONFIG_ARCH_OMAP2PLUS
 -- 
 1.7.4.1
