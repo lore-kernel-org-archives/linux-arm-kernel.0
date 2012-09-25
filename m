@@ -1,52 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Sep 2012 14:29:48 -0300
-Subject: [PATCH] ARM: mxs_defconfig: Improve USB related support
-In-Reply-To: <20120925080024.GM27291@S2101-09.ap.freescale.net>
-References: <1348541611-15717-1-git-send-email-festevam@gmail.com>
- <20120925080024.GM27291@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5CXgF-tpFsw_s1UFY7yPdJhcwckMo6Mc_zPQsO-Dgh_7w@mail.gmail.com>
+From: castet.matthieu@free.fr (matthieu castet)
+Date: Tue, 25 Sep 2012 19:37:44 +0200
+Subject: [PATCH v2] hvc_dcc : add support to armv4 and armv5 core
+In-Reply-To: <201209251544.57998.arnd@arndb.de>
+References: <1346413645-4593-1-git-send-email-castet.matthieu@free.fr>
+ <201209031257.28213.arnd@arndb.de> <5061CF5A.2030201@parrot.com>
+ <201209251544.57998.arnd@arndb.de>
+Message-ID: <20120925193744.655059d5@mat-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Le Tue, 25 Sep 2012 15:44:57 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-On Tue, Sep 25, 2012 at 5:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Sep 24, 2012 at 11:53:31PM -0300, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Select the following USB related options:
->>
->> - USB Video Class (webcam)
->> - USB Ethernet adapter
->> - Native language support (needed for mounting USB pen drives, for example)
->
-> I do not want defconfig/zImage get bloated by these features for
-> particular applications.  We should try to maintain a minimum feature
-> set that takes care of mxs building and testing coverage.  Anything
-> more than that can just be selected by custom configuration.
+> 
+> It's not possible to build a kernel that runs on ARMv5 (or below) and
+> also on ARMv6 (or above), so the effect would be exactly the same.
+> While we are putting a lot of effort into making all sorts of ARMv6
+> and ARMv7 based systems work with the same kernel binary, it's highly
+> unlikely we would ever need the above to be runtime selected, because
+> there are a lot of other differences at assembly level.
+> 
+I know but Alan was not happy with the static version with ifdef [1]
+[2]. That why a dynamic version was done.
 
-I didn't mean to bloat mxs_defconfig with these settings.
 
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=
+Matthieu
 
-are needed by mx23-olinuxino so that we can have network support and
-can use NFS with this board.
 
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_1
+[1]
+> > There are no plans to ever make it possible; there are too many
+> > significant differences between ARMv4, v5 architectures and
+> > ARMv6,v7 architectures to warrant making this runtime selectable.  
+> 
+> Then bury this crap in platform files please not in the drivers/tty
+> layer code. Make it a platform driver provided callback or something.
+> 
+> Alan
 
-is very useful, so that you can actually mount a USB media. We have
-these options in imx_v4_v5_defconfig and imx_v6_v7_defconfig.
-
-If you are not happy with the USB webcam config options, then I can remove it.
-
-Is it OK to send a v2 with USBNET and Language support only?
-
-Just trying to make it easier for the end users.
-
-Regards,
-
-Fabio Estevam
+[2]
+> > I posted a new v2 patch that make the selection dynamic.  
+> 
+> Thanks - fine with that one - or with burying it in headers etc in
+> the arm subdirs.
