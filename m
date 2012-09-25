@@ -1,32 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 25 Sep 2012 16:50:52 +0800
-Subject: [PATCH 3/3] mmc: esdhc i.MX: Support 8bit mode
-In-Reply-To: <20120925080525.GA1322@pengutronix.de>
-References: <1348471345-30785-1-git-send-email-s.hauer@pengutronix.de>
- <1348471345-30785-4-git-send-email-s.hauer@pengutronix.de>
- <20120925071505.GG27291@S2101-09.ap.freescale.net>
- <20120925072714.GY1322@pengutronix.de>
- <20120925073317.GI27291@S2101-09.ap.freescale.net>
- <20120925073808.GZ1322@pengutronix.de>
- <20120925074548.GJ27291@S2101-09.ap.freescale.net>
- <20120925080525.GA1322@pengutronix.de>
-Message-ID: <20120925085040.GA14216@S2101-09.ap.freescale.net>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 25 Sep 2012 10:56:01 +0200
+Subject: [RESEND PATCH] rtc: kconfig: Fixup dependency for ab8500
+Message-ID: <1348563361-4395-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 10:05:25AM +0200, Sascha Hauer wrote:
-> Ok, how about this:
-> 
-> - I add a bus-width = <4> property to all i.MX dtsi files
-> - we merge the patch adding bus-width as an optional property
-> - Make the bus-width option mandatory in the next step.
-> 
-> This way we can merge the mmc related patches through the mmc tree and
-> the dts changes through arm-soc.
-> 
-Sounds good to me.  How the last step should be done will depend
-on the common spec.  Per Chris, there are already two drivers
-implementing the property as optional.  Not sure if Chris will change
-spec to have the property defined as optional (probably default to 1?).
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Shawn
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/rtc/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 9476456..e069f17 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -738,6 +738,7 @@ config RTC_DRV_AB3100
+ config RTC_DRV_AB8500
+ 	tristate "ST-Ericsson AB8500 RTC"
+ 	depends on AB8500_CORE
++	select RTC_INTF_DEV
+ 	select RTC_INTF_DEV_UIE_EMUL
+ 	help
+ 	  Select this to enable the ST-Ericsson AB8500 power management IC RTC
+-- 
+1.7.10
