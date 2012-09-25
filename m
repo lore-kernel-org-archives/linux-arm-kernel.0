@@ -1,41 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 25 Sep 2012 13:16:40 -0700
-Subject: [PATCH 03/10] msm: iommu: Convert to clk_prepare/unprepare
-In-Reply-To: <5060DF7D.9000305@codeaurora.org>
-References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
- <1348194419-11486-4-git-send-email-sboyd@codeaurora.org>
- <5060DF7D.9000305@codeaurora.org>
-Message-ID: <50621128.5040805@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 25 Sep 2012 16:55:56 -0500
+Subject: [PATCH] ARM: GIC: dont warn on pre-allocated IRQ descs
+In-Reply-To: <CACRpkdbJ828orOkXUnjuJh1iHA8Fe3AuuQRiQiYt0XFuvsWO=w@mail.gmail.com>
+References: <1348600794-2395-1-git-send-email-linus.walleij@stericsson.com>
+ <506205E4.4050803@gmail.com>
+ <CACRpkdbJ828orOkXUnjuJh1iHA8Fe3AuuQRiQiYt0XFuvsWO=w@mail.gmail.com>
+Message-ID: <5062286C.2080907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/12 15:32, Saravana Kannan wrote:
->> @@ -275,8 +275,11 @@ static int msm_iommu_remove(struct
->> platform_device *pdev)
+On 09/25/2012 03:08 PM, Linus Walleij wrote:
+> On Tue, Sep 25, 2012 at 9:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 09/25/2012 02:19 PM, Linus Walleij wrote:
+> 
+>>> The allocation will succeed if the platform define .nr_irqs
+>>> to 0 as an ideal device tree platform would do, but I think it
+>>> is a bit thick to require that every platform that wants to
+>>> use sparse IRQs must first or simultaneously switch to
+>>> device tree. So make this to a simple pr_debug().
 >>
->>       drv = platform_get_drvdata(pdev);
->>       if (drv) {
->> -        if (drv->clk)
->> +        if (drv->clk) {
->> +            clk_unprepare(drv->clk);
->>               clk_put(drv->clk);
->> +        }
->> +        clk_unprepare(drv->pclk);
->
->
-> Are these changes right? Every other clk API change in this patch is
-> using the combined prepare_enable/disable_unprepare() calls. So, when
-> would we end up at this location with the clocks prepared but not
-> enabled?
->
-> Also, what if the device gets probed and then immediately removed.
-> Will it work correctly?
->
+>> It's not a matter of switching to DT or not. It is a matter of whether
+>> an irq_chip allocates it's descriptors or not either directly or
+>> indirectly via irqdomain.
+> 
+> Yeah OK that's true.
+> 
+>> The gic does this, so it is secondary
+>> controllers which are the problem. A platform could allocate the ranges
+>> needed for those controllers and leave a hole for the gic to allocate.
+>>
+>> A prefer to leave this so platforms get fixed.
+> 
+> Since the core kernel will allocate .nr_irqs on boot I guess
+> this means you have to define the machine's .nr_irqs to
+> zero or atleast < 16 so it doesn't overlap with those the
+> GIC wants to use.
 
-It should work correctly. If you look at the bottom of msm_iommu_probe()
-you see that it call clk_disable() and doesn't unprepare the clock. So
-if the driver is unbound the clocks should be disabled but still prepared.
+I believe the default of 0 causes NR_IRQS_LEGACY to be used which is
+what we want.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> So I'll try that, and ad-hoc allocate descriptors needed
+> above that range for drivers that are not yet allocating
+> their descriptors ...
+> 
+> One question though: the real fix is obviously for all
+> drivers exposing an irqchip to allocate its descriptors
+> dynamically with exlicit alloc_descs() or using the
+> linear irq domain instead of relying on pre-allocated
+> descriptors.
+> 
+> Should we patch all drivers to spit out similar warnings
+> then?
+
+If you are bored with nothing else to do... Might as well fix them if
+you can find them all.
+
+Of course if you follow my previous suggestion, that would be a red flag
+that you aren't fixing the irq_chip and we should reject the change. :)
+
+Rob
+
+> 
+> Yours,
+> Linus Walleij
+> 
