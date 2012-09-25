@@ -1,40 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Sep 2012 09:30:29 +0100
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <CAKdam572krJZcayRdJ_AciCUZH3LuzD9yoHenhxrB6j9xDZ6JQ@mail.gmail.com>
-References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
- <CAKdam572krJZcayRdJ_AciCUZH3LuzD9yoHenhxrB6j9xDZ6JQ@mail.gmail.com>
-Message-ID: <20120925083029.GG31374@n2100.arm.linux.org.uk>
+Date: Tue, 25 Sep 2012 09:32:45 +0100
+Subject: [PATCH v2] arm: make FORCE_MAX_ZONEORDER configurable for TI
+ AM33XX
+In-Reply-To: <1348561590-13361-1-git-send-email-yegorslists@googlemail.com>
+References: <1348561590-13361-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <20120925083245.GH31374@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 01:52:03PM +0530, Poddar, Sourav wrote:
-> Hi Greg,
+On Tue, Sep 25, 2012 at 10:26:30AM +0200, yegorslists at googlemail.com wrote:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
 > 
-> Ping on this?
-> 
-> On Tue, Sep 18, 2012 at 6:10 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
-> > Greg's tty-next is not booting on 2420 based N800. The failure is
-> > observed at serial init itself. The reason might be that n800 tries to
-> > resume even though it is not suspended before.
+> FORCE_MAX_ZONEORDER of 12 is needed to allocation more than 4MB
+> of consistent DMA memory (da8xx frame buffer driver).
 
-How is this happening?  I think that needs proper investigation - or if
-it's had more investigation, then the results needs to be included in
-the commit description so that everyone can understand the issue here.
+Okay, so the patch description says "This needs to be 12 on this platform".
 
-We should not be resuming a device which hasn't been suspended.  Maybe
-the runtime PM enable sequence is wrong, and that's what should be fixed
-instead?  
+>  config FORCE_MAX_ZONEORDER
+> -	int "Maximum zone order" if ARCH_SHMOBILE
+> -	range 11 64 if ARCH_SHMOBILE
+> +	int "Maximum zone order" if ARCH_SHMOBILE || SOC_AM33XX
+> +	range 11 64 if ARCH_SHMOBILE || SOC_AM33XX
 
-This sequence in the probe() function:
+but you leave it up to the user to select something that may not be
+suitable.  Wouldn't _just_ adding:
 
-        pm_runtime_irq_safe(&pdev->dev);
-        pm_runtime_enable(&pdev->dev);
-        pm_runtime_get_sync(&pdev->dev);
+	default "12" if SOC_AM33XX
 
-would enable runtime PM while the s/w state indicates that it's disabled,
-and then that pm_runtime_get_sync() will want to resume the device.  See
-the section "5. Runtime PM Initialization, Device Probing and Removal"
-in Documentation/power/runtime_pm.txt, specifically the second paragraph
-of that section.
+after the "range", and making no other changes be good enough and match
+what the patch description says?
