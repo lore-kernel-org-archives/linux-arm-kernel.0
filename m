@@ -1,77 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 25 Sep 2012 13:57:58 +0100
-Subject: [GIT PULL] ARM: cache flushing LoUIS API
-Message-ID: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 25 Sep 2012 15:03:45 +0200
+Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <CAAQKjZMZBDpKinZkDUX7CU4yTXmu9GrP1+OiZJKW4Gx1BTno3Q@mail.gmail.com>
+References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
+ <505C9072.2010204@wwwdotorg.org>
+ <CAAQKjZMZBDpKinZkDUX7CU4yTXmu9GrP1+OiZJKW4Gx1BTno3Q@mail.gmail.com>
+Message-ID: <2368486.hLKA5vLF0M@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Monday 24 September 2012 21:35:46 Inki Dae wrote:
+> 2012/9/22 Stephen Warren <swarren@wwwdotorg.org>:
+> > On 09/21/2012 01:22 AM, Inki Dae wrote:
+> >> 2012/9/21 Stephen Warren <swarren@wwwdotorg.org>:
+> >>> On 09/21/2012 05:22 AM, Leela Krishna Amudala wrote:
+> >>>> This patch adds device tree based discovery support for exynos DRM-FIMD
+> >>>> driver which includes driver modification to handle platform data in
+> >>>> both the cases with DT and non-DT, Also adds the documentation for
+> >>>> bindings.
+> >>>> 
+> >>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/fimd.txt
+> >>>> b/Documentation/devicetree/bindings/drm/exynos/fimd.txt>>> 
+> >>> ...
+> >>> 
+> >>>> + - samsung,fimd-display: This property should specify the phandle of
+> >>>> the
+> >>>> +   display device node which holds the video interface timing with the
+> >>>> +   below mentioned properties.
+> >>>> +
+> >>>> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
+> >>>> +     horizontal timing includes four parameters in the following
+> >>>> order.
+> >>>> +
+> >>>> +     - horizontal back porch (in number of lcd clocks)
+> >>>> +     - horizontal front porch (in number of lcd clocks)
+> >>>> +     - hsync pulse width (in number of lcd clocks)
+> >>>> +     - Display panels X resolution.
+> >>>> +
+> >>>> +   - lcd-vtiming: Specifies the vertical timing for the overlay. The
+> >>>> +     vertical timing includes four parameters in the following order.
+> >>>> +
+> >>>> +     - vertical back porch (in number of lcd lines)
+> >>>> +     - vertical front porch (in number of lcd lines)
+> >>>> +     - vsync pulse width (in number of lcd clocks)
+> >>>> +     - Display panels Y resolution.
+> >>> 
+> >>> Should this not use the new videomode timings that are under discussion
+> >>> at:
+> >>> 
+> >>> http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
+> >> 
+> >> ok, I agree with you. then the videomode helper is going to be merged
+> >> to mainline(3.6)? if so, this patch should be reworked based on the
+> >> videomode helper.
+> > 
+> > I think the videomode helpers would be merged for 3.7 at the very
+> > earliest; 3.6 is cooked already. Given there are still some comments on
+> > the binding, perhaps it won't happen until 3.8, but it'd be best to ask
+> > on that thread so that people more directly involved with the status can
+> > answer.
+> 
+> as I mentioned before, it's better to use videomode helper instead but
+> for this, we should wait for that the videomode helper are merged to
+> mainline so I think it's better to merge it as is and then modify it
+> for videomode helper to be used later.
 
-I know it is coming quite late in the cycle but please consider pulling
-the patch series implementing the new cache maintenance LoUIS API, since
-it provides a stepping stone to implementing power management on upcoming
-A15 and A7 based platforms, leaving functionality for earlier processor
-versions unchanged.
+Aren't DT bindings considered as an ABI, and required to be supported more or 
+less forever ? If you merge this DT binding you'll have to keep supporting it. 
+That's why DT bindings should not be rushed in.
 
-It has been tested on:
+-- 
+Regards,
 
-- OMAP4/5
-  # suspend/hotplug and CPU idle
-- iMX6q
-  # suspend and hotplug
-- TC2 big.LITTLE testchip
-  # CPU idle
-
-Thanks,
-Lorenzo
-
-The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
-
-  Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-lp.git cache-louis
-
-for you to fetch changes up to 6323fa2256baa73d6a960ee57ec086b66aeecd0b:
-
-  ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API (2012-09-25 11:20:26 +0100)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (4):
-      ARM: mm: implement LoUIS API for cache maintenance ops
-      ARM: mm: rename jump labels in v7_flush_dcache_all function
-      ARM: kernel: update cpu_suspend code to use cache LoUIS operations
-      ARM: kernel: update __cpu_disable to use cache LoUIS maintenance API
-
-Santosh Shilimkar (1):
-      ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API
-
- arch/arm/include/asm/cacheflush.h | 15 ++++++++++++
- arch/arm/include/asm/glue-cache.h |  1 +
- arch/arm/kernel/smp.c             |  5 +++-
- arch/arm/kernel/suspend.c         | 17 +++++++++++++-
- arch/arm/mm/cache-fa.S            |  3 +++
- arch/arm/mm/cache-v3.S            |  3 +++
- arch/arm/mm/cache-v4.S            |  3 +++
- arch/arm/mm/cache-v4wb.S          |  3 +++
- arch/arm/mm/cache-v4wt.S          |  3 +++
- arch/arm/mm/cache-v6.S            |  3 +++
- arch/arm/mm/cache-v7.S            | 48 ++++++++++++++++++++++++++++++++++-----
- arch/arm/mm/proc-arm1020.S        |  3 +++
- arch/arm/mm/proc-arm1020e.S       |  3 +++
- arch/arm/mm/proc-arm1022.S        |  3 +++
- arch/arm/mm/proc-arm1026.S        |  3 +++
- arch/arm/mm/proc-arm920.S         |  3 +++
- arch/arm/mm/proc-arm922.S         |  3 +++
- arch/arm/mm/proc-arm925.S         |  3 +++
- arch/arm/mm/proc-arm926.S         |  3 +++
- arch/arm/mm/proc-arm940.S         |  3 +++
- arch/arm/mm/proc-arm946.S         |  3 +++
- arch/arm/mm/proc-feroceon.S       |  3 +++
- arch/arm/mm/proc-macros.S         |  1 +
- arch/arm/mm/proc-mohawk.S         |  3 +++
- arch/arm/mm/proc-v7.S             |  2 +-
- arch/arm/mm/proc-xsc3.S           |  3 +++
- arch/arm/mm/proc-xscale.S         |  3 +++
- 27 files changed, 140 insertions(+), 9 deletions(-)
+Laurent Pinchart
