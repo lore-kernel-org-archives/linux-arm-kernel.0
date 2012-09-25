@@ -1,84 +1,56 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Tue, 25 Sep 2012 15:36:20 +0530
-Subject: [PATCH 1/5] drivers: usb: phy: add a new driver for omap usb2 phy
-In-Reply-To: <50605CFB.5090402@gmail.com>
-References: <1346943430-18236-1-git-send-email-kishon@ti.com>
- <1346943430-18236-2-git-send-email-kishon@ti.com>
- <50605CFB.5090402@gmail.com>
-Message-ID: <CAAe_U6+2Vxd8F_JMafm41+0SnZSrZCa_9VKRbdB200BUHw5vEQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 25 Sep 2012 12:06:58 +0200
+Subject: [PATCH 1/2] video: Add support for the Solomon SSD1307 OLED
+ Controller
+In-Reply-To: <505C73D1.7030800@free-electrons.com>
+References: <1348158800-23039-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1348158800-23039-2-git-send-email-maxime.ripard@free-electrons.com>
+ <505C73D1.7030800@free-electrons.com>
+Message-ID: <50618242.2070302@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Florian,
 
-On Mon, Sep 24, 2012 at 6:45 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 09/06/2012 09:57 AM, Kishon Vijay Abraham I wrote:
->> All phy related programming like enabling/disabling the clocks, powering
->> on/off the phy is taken care of by this driver. It is also used for OTG
->> related functionality like srp.
+Le 21/09/2012 16:04, Maxime Ripard a ?crit :
+> Le 20/09/2012 18:33, Maxime Ripard a ?crit :
+>> This patch adds support for the Solomon SSD1307 OLED
+>> controller found on the Crystalfontz CFA10036 board.
 >>
->> This also includes device tree support for usb2 phy driver and
->> the documentation with device tree binding information is updated.
+>> This controller can drive a display with a resolution up
+>> to 128x39 and can operate over I2C or SPI.
 >>
->> Currently writing to control module register is taken care in this
->> driver which will be removed once the control module driver is in place.
+>> The current driver has only been tested on the CFA-10036,
+>> that is using this controller over I2C to driver a 96x16
+>> OLED screen.
 >>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/usb/usb-phy.txt |   17 ++
->>  drivers/usb/phy/Kconfig                           |    9 +
->>  drivers/usb/phy/Makefile                          |    1 +
->>  drivers/usb/phy/omap-usb2.c                       |  271 +++++++++++++++++++++
->>  include/linux/usb/omap_usb.h                      |   46 ++++
->>  include/linux/usb/phy_companion.h                 |   34 +++
->>  6 files changed, 378 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/usb/usb-phy.txt
->>  create mode 100644 drivers/usb/phy/omap-usb2.c
->>  create mode 100644 include/linux/usb/omap_usb.h
->>  create mode 100644 include/linux/usb/phy_companion.h
->>
->> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
->> new file mode 100644
->> index 0000000..80d4148
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
->
-> This is a very generic name...
->
->> @@ -0,0 +1,17 @@
->> +USB PHY
->> +
->> +OMAP USB2 PHY
->> +
->> +Required properties:
->> + - compatible: Should be "ti,omap-usb2"
->
-> ...for a specific phy. However, I do think a generic binding to describe
-> host ctrlr to phy connections is needed.
->
->> + - reg : Address and length of the register set for the device. Also
->> +add the address of control module dev conf register until a driver for
->> +control module is added
->
-> The dts should describe the h/w, not what you need for the current
-> driver. The 2nd reg field does not belong here.
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Cc: Brian Lilly <brian@crystalfontz.com>
+> 
+> Would you consider merging this patch or review it?
+> It has been around for quite some time now and has not received any
+> comments for at least the 2 last versions, so I guess there is not much
+> left holding it back (unless, of course, if you have some comments to
+> address), and I really would like to have it in 3.7.
 
-Indeed. This was discussed and agreed upon as a interim solution till
-we have a control module driver in place to write to the control
-module register.
->
->> +
->> +This is usually a subnode of ocp2scp to which it is connected.
->
-> How is usb port to phy connection described?
-Currently the usb controller to phy connection is established only by
-type. We have a couple of patches being currently discussed in the
-list to establish the connection by phandle.
+I guess we missed the 3.7 merge here. That's no big deal, but I sent the
+patch series on a regular basis, starting 07/17 (sent new versions on
+07/31, 08/23, 09/05 and 09/20), addressed all the issues that were
+raised, and never got any feedback from you, either positive or
+negative. The patches affecting the MX28 device trees have already been
+merged by Shawn Guo into its tree, so only the driver and the bindings
+remain to be merged. So I'm kind of lost on what should I do here?
 
-https://patchwork.kernel.org/patch/1457801/ (Generic PHY Framework:
-devm_of_phy_get())
-http://www.spinics.net/lists/linux-usb/msg69547.html
+Is it because I have an obviously broken driver or you don't have enough
+time, or you don't want to merge drivers for such type of low resolution
+controllers, or any other reason?
 
-Thanks
-Kishon
+Thanks for your answer,
+Maxime
+
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
