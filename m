@@ -1,62 +1,86 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Sep 2012 07:18:57 -0500
-Subject: [PATCH v6 1/5] usb: phy: samsung: Introducing usb phy driver
- for hsotg
-In-Reply-To: <CAD6zSYOABTwTGXgFwGwLX-NhjDjDvtqUDVYTMGDng3nuTgLeZg@mail.gmail.com>
-References: <1347886484-16064-1-git-send-email-p.paneri@samsung.com>
- <1347886484-16064-2-git-send-email-p.paneri@samsung.com>
- <50605A69.2070201@gmail.com>
- <CAD6zSYOABTwTGXgFwGwLX-NhjDjDvtqUDVYTMGDng3nuTgLeZg@mail.gmail.com>
-Message-ID: <5061A131.9010905@gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 25 Sep 2012 17:53:07 +0530
+Subject: [PATCHv5 00/10] ARM: OMAP: PM usecounting changes
+In-Reply-To: <1348574001.10702.291.camel@sokoban>
+References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
+ <506186E9.7070908@ti.com> <1348574001.10702.291.camel@sokoban>
+Message-ID: <5061A22B.1030603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 06:23 AM, Praveen Paneri wrote:
-> Hi Rob,
-> 
-> On Mon, Sep 24, 2012 at 6:34 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On 09/17/2012 07:54 AM, Praveen Paneri wrote:
->>> This driver uses usb_phy interface to interact with s3c-hsotg. Supports
->>> phy_init and phy_shutdown functions to enable/disable phy. Tested with
->>> smdk6410 and smdkv310. More SoCs can be brought under later.
->>>
->>> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
->>> Acked-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
->>>  .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
->>>  drivers/usb/phy/Kconfig                            |    8 +
->>>  drivers/usb/phy/Makefile                           |    1 +
->>>  drivers/usb/phy/samsung-usbphy.c                   |  360 ++++++++++++++++++++
->>>  include/linux/platform_data/samsung-usbphy.h       |   27 ++
->>>  5 files changed, 405 insertions(+), 0 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->>>  create mode 100644 drivers/usb/phy/samsung-usbphy.c
->>>  create mode 100644 include/linux/platform_data/samsung-usbphy.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->>> new file mode 100644
->>> index 0000000..fefd9c8
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->>> @@ -0,0 +1,9 @@
->>> +* Samsung's usb phy transceiver
->>> +
->>> +The Samsung's phy transceiver is used for controlling usb otg phy for
->>> +s3c-hsotg usb device controller.
->>> +
->>> +Required properties:
->>> +- compatible : should be "samsung,exynos4210-usbphy"
->>> +- reg : base physical address of the phy registers and length of memory mapped
->>> +     region.
+On Tuesday 25 September 2012 05:23 PM, Tero Kristo wrote:
+> On Tue, 2012-09-25 at 15:56 +0530, Rajendra Nayak wrote:
+>> Hi Tero,
 >>
->> What's missing here is describing the connection of phys to host
->> controllers. We've got several people adding usb phy bindings and need
->> to define them in a common way.
-> yes! it just covers the generic binding. I will update it accordingly
-> as the generic phy framework takes its final shape.
+>> On Tuesday 25 September 2012 03:02 PM, Tero Kristo wrote:
+>>> Hi,
+>>>
+>>> Changes compared to previous version:
+>>
+>> Did you get a chance to look at the issue I reported about autodeps?
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg72876.html
+>
+> Not really, I didn't think that bug report was meant for me, I kind of
+> thought it only happened with your set. But now looking at your email in
+> detail, I guess you are saying there is a bug in this code (the one that
+> touches iclk stuff), which causes the USB / DSS domains to follow
+> MPU/CORE, is that right?
 
-That sounds like the wrong way to define a binding... Figuring out how
-to describe the h/w should not be dependent on changes in the kernel.
-Bindings are an ABI and should not be evolving.
+Yes, basically the autodeps remain set, even while the module is not in
+use at all, which causes them to come in and out of sleep along with MPU.
 
-Rob
+>
+> -Tero
+>
+>>
+>> regards,
+>> Rajendra
+>>
+>>>
+>>> - Fixed OMAP4 support (patches 7-10)
+>>> - Dropped debugging support from this set for now
+>>> - Rebased on top of 3.6-rc5 + func-pwrst + omap4-ret code
+>>>     (omap4 support easier to test with these)
+>>> - Patch #1:
+>>>     * dropped clkdm_usecount_inc / clkdm_usecount_dec APIs
+>>>     * clkdm_clk_enable / disable are used now instead
+>>>     * some code ordering changed for the new setup to work properly
+>>>     * changed BUG_ON calls to WARN_ON
+>>> - Patch #2:
+>>>     * added spinlock for protecting voltdm callbacks
+>>>     * pwrdm lock extended to protect pwrdm callbacks
+>>> - Patch #3:
+>>>     * dropped generic API call for the cpu pwrdm idle / wakeup
+>>>     * instead use pwrdm_clkdm_enable / disable calls directly from PM code
+>>>     * omap4 support fixed to work properly with SMP, added omap4 specific
+>>>       CPU pwrdm idle / wakeup calls for this purpose
+>>> - Patch #4:
+>>>     * no changes
+>>>     * added 'Reviewed-by' tag for Rajendra
+>>> - Patch #5:
+>>>     * no changes, just rebase
+>>> - Patch #6:
+>>>     * no changes
+>>>
+>>> Tested with OMAP3 beagle, omap4460 GP panda + omap4430 EMU blaze boards.
+>>>
+>>> I will be posting new versions for the voltdm fixes + auto retention +
+>>> panda board tps6236x support code later on today, which are based on top
+>>> of this set.
+>>>
+>>> Branch also available here:
+>>>
+>>> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+>>> branch: mainline-3.6-rc5-pwrdm-changes-v5
+>>>
+>>> -Tero
+>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>
+>
+>
