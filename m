@@ -1,40 +1,49 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 25 Sep 2012 14:35:46 -0500
-Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
-In-Reply-To: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org> (from
- swarren@wwwdotorg.org on Tue Sep 25 14:06:35 2012)
-References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1348601746.5565.18@snotra>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 25 Sep 2012 21:43:39 +0200
+Subject: PXA PWM possible regression after 3.5: backlight remains off
+ after resume
+In-Reply-To: <505F5151.5070506@yahoo.com> (Paul Parsons's message of "Sun, 23
+ Sep 2012 19:13:37 +0100")
+References: <505F28B8.1030701@yahoo.com>
+ <20120923172232.GA1293@avionic-0098.mockup.avionic-design.de>
+ <505F5151.5070506@yahoo.com>
+Message-ID: <87ehlpzy50.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 02:06:35 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This series adds some build rules to run cpp on *.dts-cpp prior to
-> invoking dtc, and converts Tegra to the new rule as an example. What  
-> do
-> people think?
-> 
-> I assume that you've applied the dtc patches I sent yesterday. They
-> aren't in this series. See:
-> 
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020182.html
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020183.html
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020181.html
-> 
-> Note: those patches are against upstream dtc. If you wish to test this
-> series, apply the dtc patches to upstream dtc, build it, and copy the
-> resultant dtc binary over the top of scripts/dtc/dtc.
-> 
-> Stephen Warren (3):
->   kbuild: introduce cmd_dtc_cpp
->   ARM: use cmd_dtc_cpp for compilation of *.dts-cpp to *.dtb
->   ARM: tegra: compile all DT files with cpp
+Paul Parsons <lost.distance@yahoo.com> writes:
 
-Do you have an example of where you'd actually benefit from this?  I'd  
-think most things could either be done reasonably well with what's  
-built into DTC (see what we've done in arch/powerpc/boot/dts/fsl), or  
-would need math expression support in DTC (or has that been added?).
+> The same failure is also present in 3.6-rc1.
+>
+> Just to be clear, are you saying that drivers/pwm/pwm-pxa.c should
+> include suspend/resume handlers like in drivers/pwm/pwm-samsung.c ?
+>
+> Agreed that it is possible that recent changes exposed a latent bug
+> somewhere, and that turning the backlight on after resume should never
+> have worked.
 
--Scott
+Hi Paul,
+
+I checked on the mioa701 board (see [1]).
+On my board, the backlight if fully driven by PXA PWM0, and the suspend/resume
+is working perfectly.
+
+So I don't thing anything is needed for suspend/resume wrt PWM (empirically).
+
+Cheers.
+
+-- 
+Robert
+
+[1]
+$ cat /sys/class/backlight/pwm-backlight/actual_brightness 
+50
+$ cat /sys/class/backlight/pwm-backlight/actual_brightness 
+50
+$ echo 90 > /sys/class/backlight/pwm-backlight/brightness        
+$ echo mem > /sys/power/state 
+$ 
+$ cat /sys/class/backlight/pwm-backlight/actual_brightness 
+90
+$ uname -a
+Linux mioa701 3.6.0-rc6+ #26 PREEMPT Sat Sep 22 22:08:41 CEST 2012 armv5tel unknown
