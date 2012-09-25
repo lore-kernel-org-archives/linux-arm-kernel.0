@@ -1,92 +1,33 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 26 Sep 2012 00:03:44 +0900
-Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
-In-Reply-To: <2368486.hLKA5vLF0M@avalon>
-References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
- <505C9072.2010204@wwwdotorg.org>
- <CAAQKjZMZBDpKinZkDUX7CU4yTXmu9GrP1+OiZJKW4Gx1BTno3Q@mail.gmail.com>
- <2368486.hLKA5vLF0M@avalon>
-Message-ID: <CAAQKjZN++zZ9cfNCB21TeQwPZgFVU-Cmo9ZhVwaaMz+HO2vHig@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 25 Sep 2012 16:05:26 +0100
+Subject: [PATCH] ARM: S3C64XX: Add more Glenfarclas module ID strings
+Message-ID: <1348585527-5059-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/9/25 Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
-> On Monday 24 September 2012 21:35:46 Inki Dae wrote:
->> 2012/9/22 Stephen Warren <swarren@wwwdotorg.org>:
->> > On 09/21/2012 01:22 AM, Inki Dae wrote:
->> >> 2012/9/21 Stephen Warren <swarren@wwwdotorg.org>:
->> >>> On 09/21/2012 05:22 AM, Leela Krishna Amudala wrote:
->> >>>> This patch adds device tree based discovery support for exynos DRM-FIMD
->> >>>> driver which includes driver modification to handle platform data in
->> >>>> both the cases with DT and non-DT, Also adds the documentation for
->> >>>> bindings.
->> >>>>
->> >>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/fimd.txt
->> >>>> b/Documentation/devicetree/bindings/drm/exynos/fimd.txt>>>
->> >>> ...
->> >>>
->> >>>> + - samsung,fimd-display: This property should specify the phandle of
->> >>>> the
->> >>>> +   display device node which holds the video interface timing with the
->> >>>> +   below mentioned properties.
->> >>>> +
->> >>>> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
->> >>>> +     horizontal timing includes four parameters in the following
->> >>>> order.
->> >>>> +
->> >>>> +     - horizontal back porch (in number of lcd clocks)
->> >>>> +     - horizontal front porch (in number of lcd clocks)
->> >>>> +     - hsync pulse width (in number of lcd clocks)
->> >>>> +     - Display panels X resolution.
->> >>>> +
->> >>>> +   - lcd-vtiming: Specifies the vertical timing for the overlay. The
->> >>>> +     vertical timing includes four parameters in the following order.
->> >>>> +
->> >>>> +     - vertical back porch (in number of lcd lines)
->> >>>> +     - vertical front porch (in number of lcd lines)
->> >>>> +     - vsync pulse width (in number of lcd clocks)
->> >>>> +     - Display panels Y resolution.
->> >>>
->> >>> Should this not use the new videomode timings that are under discussion
->> >>> at:
->> >>>
->> >>> http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
->> >>
->> >> ok, I agree with you. then the videomode helper is going to be merged
->> >> to mainline(3.6)? if so, this patch should be reworked based on the
->> >> videomode helper.
->> >
->> > I think the videomode helpers would be merged for 3.7 at the very
->> > earliest; 3.6 is cooked already. Given there are still some comments on
->> > the binding, perhaps it won't happen until 3.8, but it'd be best to ask
->> > on that thread so that people more directly involved with the status can
->> > answer.
->>
->> as I mentioned before, it's better to use videomode helper instead but
->> for this, we should wait for that the videomode helper are merged to
->> mainline so I think it's better to merge it as is and then modify it
->> for videomode helper to be used later.
->
-> Aren't DT bindings considered as an ABI, and required to be supported more or
-> less forever ? If you merge this DT binding you'll have to keep supporting it.
-> That's why DT bindings should not be rushed in.
->
+No bindings for the devices yet, just names.
 
-is ABI required for DT binding?  I know DT binding parses just lcd
-timing data from device tree file so ABI isn't needed. but when it
-comes to DT, I'm novice yet so there may be my missing point. could
-you tell me why DT bindings are considered as an ABI? if there is my
-missing point, will consider it again.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Thanks,
-Inki Dae
-
-> --
-> Regards,
->
-> Laurent Pinchart
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 4e3fe57..3364fab 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -227,6 +227,12 @@ static __devinitdata const struct {
+ 	{ .id = 0x01, .name = "1250-EV1 Springbank" },
+ 	{ .id = 0x02, .name = "1251-EV1 Jura" },
+ 	{ .id = 0x03, .name = "1252-EV1 Glenlivet" },
++	{ .id = 0x06, .name = "WM8997-6721-CS96-EV1 Lapraoig" },
++	{ .id = 0x07, .name = "WM5110-6271 Deanston" },
++	{ .id = 0x08, .name = "WM8903-6102 Tamdhu" },
++	{ .id = 0x09, .name = "WM1811A-6305 Adelphi" },
++	{ .id = 0x0a, .name = "WM8996-6272 Blackadder" },
++	{ .id = 0x0b, .name = "WM8994-6235 Benromach" },
+ 	{ .id = 0x11, .name = "6249-EV2 Glenfarclas", },
+ 	{ .id = 0x14, .name = "6271-EV1 Lochnagar" },
+ 	{ .id = 0x15, .name = "6320-EV1 Bells",
+-- 
+1.7.10.4
