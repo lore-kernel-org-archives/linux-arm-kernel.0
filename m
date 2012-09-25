@@ -1,59 +1,45 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Sep 2012 12:32:40 +0300
-Subject: [PATCHv5 05/10] ARM: OMAP: clockdomain: add support for preventing
- autodep delete
+Date: Tue, 25 Sep 2012 12:32:41 +0300
+Subject: [PATCHv5 06/10] ARM: OMAP3: do not delete per_clkdm autodeps during
+ idle
 In-Reply-To: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
 References: <1348565565-14744-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1348565565-14744-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1348565565-14744-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clockdomains bug out if their autodeps are deleted before idle.
-This happens namely with OMAP3 PER domain, it will bug out if it
-doesn't have wakedeps enabled when it enters off-mode. This patch
-adds support for new flag 'CLKDM_NO_AUTODEP_DISABLE' which does this.
+Previously, PER clock domain was always enabled, as the usecounts
+for this domain incorrectly always showed positive value. On HW
+level though, the domain enters idle as it is set in HW supervised
+mode. Now, when the usecounts reflect real values, PER domain
+will be put to HWSUP sleep mode, which means its autodeps are deleted.
+Removing wakedeps for PER domain will cause multiple problems.
+First of all, coming back from idle, PER domain remains idle as the
+wakedeps have been disabled for the domain, and this causes a crash
+with the GPIO code, as the resume code attempts to access domain
+which is not active. Just enabling the interface clocks for the GPIO
+does not help, as they are autoidled and don't bring the domain out
+of idle. Secondly, there are multiple erratas for omap3, which say
+that the wakedeps should be enabled for the PER domain, see e.g.
+errata i582 for omap3630.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain.c |    3 +++
- arch/arm/mach-omap2/clockdomain.h |    4 ++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 8c8518c..2fa433a 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -201,6 +201,9 @@ void _clkdm_del_autodeps(struct clockdomain *clkdm)
- 	if (!autodeps || clkdm->flags & CLKDM_NO_AUTODEPS)
- 		return;
- 
-+	if (clkdm->flags & CLKDM_NO_AUTODEP_DISABLE)
-+		return;
-+
- 	for (autodep = autodeps; autodep->clkdm.ptr; autodep++) {
- 		if (IS_ERR(autodep->clkdm.ptr))
- 			continue;
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 5601dc1..9b8733e 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -34,6 +34,9 @@
-  * CLKDM_ACTIVE_WITH_MPU: The PRCM guarantees that this clockdomain is
-  *     active whenever the MPU is active.  True for interconnects and
-  *     the WKUP clockdomains.
-+ * CLKDM_NO_AUTODEP_DISABLE: Prevent clockdomain code from deleting autodeps.
-+ *     Needed for PER domain on omap3, as it will bug out with off-mode if
-+ *     wakedeps are removed.
-  */
- #define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
- #define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
-@@ -41,6 +44,7 @@
- #define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
- #define CLKDM_NO_AUTODEPS			(1 << 4)
- #define CLKDM_ACTIVE_WITH_MPU			(1 << 5)
-+#define CLKDM_NO_AUTODEP_DISABLE		(1 << 6)
- 
- #define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
- #define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
+diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+index 56089c4..3b3c524 100644
+--- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
+@@ -370,7 +370,7 @@ static struct clockdomain usbhost_am35x_clkdm = {
+ static struct clockdomain per_clkdm = {
+ 	.name		= "per_clkdm",
+ 	.pwrdm		= { .name = "per_pwrdm" },
+-	.flags		= CLKDM_CAN_HWSUP_SWSUP,
++	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_NO_AUTODEP_DISABLE,
+ 	.dep_bit	= OMAP3430_EN_PER_SHIFT,
+ 	.wkdep_srcs	= per_wkdeps,
+ 	.sleepdep_srcs	= per_sleepdeps,
 -- 
 1.7.4.1
