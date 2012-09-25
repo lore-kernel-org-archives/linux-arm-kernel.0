@@ -1,62 +1,88 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 25 Sep 2012 13:01:46 +0200
-Subject: [PATCH] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
-In-Reply-To: <20120925051424.GB27291@S2101-09.ap.freescale.net>
-References: <1348195214-26633-1-git-send-email-marex@denx.de>
- <20120925051424.GB27291@S2101-09.ap.freescale.net>
-Message-ID: <201209251301.46486.marex@denx.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 25 Sep 2012 13:01:55 +0200
+Subject: [PATCH] ARM: ux500: 8500: update I2C sleep states pinctrl
+Message-ID: <1348570915-3116-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-> On Fri, Sep 21, 2012 at 04:40:14AM +0200, Marek Vasut wrote:
-> > Currently, the kernel unconditionally adds "local-mac-address" and
-> > "mac-address" properties under both FEC ethernet DT nodes in case
-> > the update_fec_mac_prop() function is called. These properties are
-> > loaded with MAC address compiled from vendors OUI and a per-device
-> > NIC saved in OCOTP storage.
-> > 
-> > Some more advanced bootloaders do augment the DT passed to the kernel
-> > by these properties already. In such case, it is wrong for kernel to
-> > override these values.
-> > 
-> > Adjust the FEC MAC address loading so that in case the DT properties
-> > are already present in the DT passed from the bootloader, skip the
-> > loading from OCOTP altogether. If the DT properties are not present,
-> > load them from OCOTP.
-> > 
-> > Note that the later case will lead to zeroed out MAC address if OCOTP
-> > is not programmed. This will lead to FEC not working at all.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > 
-> >  arch/arm/mach-mxs/mach-mxs.c |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> > index 71d47f5..3f29a52 100644
-> > --- a/arch/arm/mach-mxs/mach-mxs.c
-> > +++ b/arch/arm/mach-mxs/mach-mxs.c
-> > @@ -175,6 +175,10 @@ static void __init update_fec_mac_prop(enum mac_oui
-> > oui)
-> > 
-> >  		np = of_find_compatible_node(from, NULL, "fsl,imx28-fec");
-> >  		if (!np)
-> >  		
-> >  			return;
-> > 
-> > +
-> > +		if (of_get_property(np, "local-mac-address", NULL))
-> > +			continue;
-> > +
-> 
-> The block should be put after "from" assignment below.
+This defines the proper sleep states for all the I2C pins of
+the MOP500 DB8500 ASIC setting.
 
-Can you please elaborate why would that be necessary?
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Requesting ARM SoC ACKs to take this through pinctrl for
+ease-of-merge going forward, as dependecies are in there.
+---
+ arch/arm/mach-ux500/board-mop500-pins.c | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
 
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index 722523c..099369e 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -30,7 +30,6 @@ static enum custom_pin_cfg_t pinsfor;
+ #define BIAS(a,b) static unsigned long a[] = { b }
+ 
+ BIAS(pd, PIN_PULL_DOWN);
+-BIAS(slpm_gpio_nopull, PIN_SLPM_GPIO|PIN_SLPM_INPUT_NOPULL);
+ BIAS(in_nopull, PIN_INPUT_NOPULL);
+ BIAS(in_nopull_slpm_nowkup, PIN_INPUT_NOPULL|PIN_SLPM_WAKEUP_DISABLE);
+ BIAS(in_pu, PIN_INPUT_PULLUP);
+@@ -55,12 +54,16 @@ BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_
+ BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
+ BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_in_nopull_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ 
+ /* We use these to define hog settings that are always done on boot */
+ #define DB8500_MUX_HOG(group,func) \
+ 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-db8500", group, func)
+ #define DB8500_PIN_HOG(pin,conf) \
+ 	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-db8500", pin, conf)
++#define DB8500_PIN_SLEEP(pin, conf, dev) \
++	PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500",	\
++			    pin, conf)
+ 
+ /* These are default states associated with device and changed runtime */
+ #define DB8500_MUX(group,func,dev) \
+@@ -160,19 +163,26 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
+ 	/* Mux in LCD VSI1 and pull it up for MCDE HDMI output */
+ 	DB8500_MUX("lcdvsi1_a_1", "lcd", "av8100-hdmi"),
+-	/* Mux in I2C blocks, put pins into GPIO in sleepmode no pull-up */
++	/* Mux in i2c0 block, default state */
+ 	DB8500_MUX("i2c0_a_1", "i2c0", "nmk-i2c.0"),
+-	DB8500_PIN("GPIO147_C15", slpm_gpio_nopull, "nmk-i2c.0"),
+-	DB8500_PIN("GPIO148_B16", slpm_gpio_nopull, "nmk-i2c.0"),
++	/* i2c0 sleep state */
++	DB8500_PIN_SLEEP("GPIO147_C15", slpm_in_nopull_wkup_pdis, "nmk-i2c.0"), /* SDA */
++	DB8500_PIN_SLEEP("GPIO148_B16", slpm_in_nopull_wkup_pdis, "nmk-i2c.0"), /* SCL */
++	/* Mux in i2c1 block, default state  */
+ 	DB8500_MUX("i2c1_b_2", "i2c1", "nmk-i2c.1"),
+-	DB8500_PIN("GPIO16_AD3", slpm_gpio_nopull, "nmk-i2c.1"),
+-	DB8500_PIN("GPIO17_AD4", slpm_gpio_nopull, "nmk-i2c.1"),
++	/* i2c1 sleep state */
++	DB8500_PIN_SLEEP("GPIO16_AD3", slpm_in_nopull_wkup_pdis, "nmk-i2c.1"), /* SDA */
++	DB8500_PIN_SLEEP("GPIO17_AD4", slpm_in_nopull_wkup_pdis, "nmk-i2c.1"), /* SCL */
++	/* Mux in i2c2 block, default state  */
+ 	DB8500_MUX("i2c2_b_2", "i2c2", "nmk-i2c.2"),
+-	DB8500_PIN("GPIO10_AF5", slpm_gpio_nopull, "nmk-i2c.2"),
+-	DB8500_PIN("GPIO11_AG4", slpm_gpio_nopull, "nmk-i2c.2"),
++	/* i2c2 sleep state */
++	DB8500_PIN_SLEEP("GPIO10_AF5", slpm_in_nopull_wkup_pdis, "nmk-i2c.2"), /* SDA */
++	DB8500_PIN_SLEEP("GPIO11_AG4", slpm_in_nopull_wkup_pdis, "nmk-i2c.2"), /* SCL */
++	/* Mux in i2c3 block, default state  */
+ 	DB8500_MUX("i2c3_c_2", "i2c3", "nmk-i2c.3"),
+-	DB8500_PIN("GPIO229_AG7", slpm_gpio_nopull, "nmk-i2c.3"),
+-	DB8500_PIN("GPIO230_AF7", slpm_gpio_nopull, "nmk-i2c.3"),
++	/* i2c3 sleep state */
++	DB8500_PIN_SLEEP("GPIO229_AG7", slpm_in_nopull_wkup_pdis, "nmk-i2c.3"), /* SDA */
++	DB8500_PIN_SLEEP("GPIO230_AF7", slpm_in_nopull_wkup_pdis, "nmk-i2c.3"), /* SCL */
+ 	/* Mux in SDI0 (here called MC0) used for removable MMC/SD/SDIO cards */
+ 	DB8500_MUX("mc0_a_1", "mc0", "sdi0"),
+ 	DB8500_PIN("GPIO18_AC2", out_hi, "sdi0"), /* CMDDIR */
+-- 
+1.7.11.3
