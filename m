@@ -1,39 +1,91 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 25 Sep 2012 15:47:26 +0100
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120921190002.GU5525@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120816202932.GY2232@pengutronix.de> <20120921190002.GU5525@pengutronix.de>
-Message-ID: <5061C3FE.7050400@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 25 Sep 2012 16:51:59 +0200
+Subject: [PATCH V2] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
+In-Reply-To: <20120925143720.GF14216@S2101-09.ap.freescale.net>
+References: <1348572738-9743-1-git-send-email-marex@denx.de>
+ <201209251540.18719.marex@denx.de>
+ <20120925143720.GF14216@S2101-09.ap.freescale.net>
+Message-ID: <201209251651.59967.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Dear Shawn Guo,
 
-On 21/09/12 20:00, Uwe Kleine-K?nig wrote:
-
-> Hello,
+> Sorry, I just dropped the patch, and you need to convince me that the
+> patch is actually needed to fix a bug.
 > 
-> On Thu, Aug 16, 2012 at 10:29:32PM +0200, Uwe Kleine-K?nig wrote:
->> On Fri, Aug 03, 2012 at 12:10:11PM +0200, Uwe Kleine-K?nig wrote:
->>> the only changes compared to v5 (sent starting with Message-id:
->>> 1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
->>> are that several debug pr_infos were dropped that I missed to remove
->>> before. Thanks to Will Deacon for pointing out that problem.
->>> Furthermore I rebased (trivially) to v3.5.
->> Any feedback from your side? It would be great to get this in for 3.7
->> with some time in next before.
-> What must happen to get some feed back? Is it worth to assert the stuff
-> still works with 3.6-rc6?
+> On Tue, Sep 25, 2012 at 03:40:18PM +0200, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > On Tue, Sep 25, 2012 at 01:32:18PM +0200, Marek Vasut wrote:
+> > > > Currently, the kernel unconditionally adds "local-mac-address" and
+> > > > "mac-address" properties under both FEC ethernet DT nodes in case
+> > > > the update_fec_mac_prop() function is called. These properties are
+> > > > loaded with MAC address compiled from vendors OUI and a per-device
+> > > > NIC saved in OCOTP storage.
+> 
+> The function update_fec_mac_prop is only called for imx28-evk and m28evk
+> boards which are known having valid/unique MAC address programmed in
+> OCOTP.
 
-I hope to have a chance to look at these towards the end of the week...
+Actually I disabled it on m28, since the OCOTP is not always programmed. The 
+board is shipped with blank OCOTP. The imx28-evk is shipped with blank OCOTP as 
+well, no?
 
-Looking at the patch series at a very superficial level, I wonder why
-you've chosen not to include any Kconfig/NVIC support at this stage,
-especially as you've posted some before and there appears to be
-something (presumably) working in your efm32 branch...
+> In that case, shouldn't we always read MAC from OCOTP instead
+> of trusting the "local-mac-address" property from device tree, which
+> might stand a chance that it's not valid or unique?
 
-It would be a shame to spend time on merging the basic support if there
-are issues that mean the interrupt support won't follow.
+Definitelly not. If the bootloader doesn't pass correct local-mac-address 
+property, the bootloader is broken and it is not our problem (any invalid DT 
+passed from bootloader is not our problem and is not fixed by us ... most of the 
+time). On the other hand:
 
-Jonny
+1) if it doesn't pass any local-mac-address property, it is safe to read from 
+OCOTP (this is the case of bootlets) to fill in the blank with at least 
+something ... even though if the OCOTP is empty, FEC won't work anyway.
+
+2) if the bootloader does pass a local-mac-address property, then it is 
+intentional and it can be later overriden anyway by "ifconfig ... hw ether" if 
+needed .
+
+If the bootloader does pass such information, it is either sourced from OCOTP 
+(in which case it might fall back to 1) and pass nothing ) or elsewhere, in 
+which case it's 2) and the bootloader has obviously better knowledge of the 
+hardware than we do.
+
+I firmly disagree with force-overriding the DT properties, since esp. in case of 
+development kits, it doesn't give the users the freedom to program their OCOTP 
+the way they need it to.
+
+Also, the users don't have freedom to frob with their MAC address easily -- when 
+the OCOTP isn't programmed yet, their FEC won't work, for example in case of NFS 
+root filesystem, this is a problem. With this patch, you don't have the problem.
+
+> Shawn
+> 
+> > > > Some more advanced bootloaders do augment the DT passed to the kernel
+> > > > by these properties already. In such case, it is wrong for kernel to
+> > > > override these values.
+> > > > 
+> > > > Adjust the FEC MAC address loading so that in case the DT properties
+> > > > are already present in the DT passed from the bootloader, skip the
+> > > > loading from OCOTP altogether. If the DT properties are not present,
+> > > > load them from OCOTP.
+> > > > 
+> > > > Note that the later case will lead to zeroed out MAC address if OCOTP
+> > > > is not programmed. This will lead to FEC not working at all.
+> > > > 
+> > > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > 
+> > > Queued for 3.8, thanks.
+> > 
+> > Ain't this a bugfix? So maybe CC stable etc. ?
+> > 
+> > Best regards,
+> > Marek Vasut
+
+Best regards,
+Marek Vasut
