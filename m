@@ -1,66 +1,204 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Sep 2012 16:55:56 -0500
-Subject: [PATCH] ARM: GIC: dont warn on pre-allocated IRQ descs
-In-Reply-To: <CACRpkdbJ828orOkXUnjuJh1iHA8Fe3AuuQRiQiYt0XFuvsWO=w@mail.gmail.com>
-References: <1348600794-2395-1-git-send-email-linus.walleij@stericsson.com>
- <506205E4.4050803@gmail.com>
- <CACRpkdbJ828orOkXUnjuJh1iHA8Fe3AuuQRiQiYt0XFuvsWO=w@mail.gmail.com>
-Message-ID: <5062286C.2080907@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 25 Sep 2012 16:46:50 -0600
+Subject: [RFC PATCH 1/3] ARM: move ICEDCC uncompress.h to common location
+In-Reply-To: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
+References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1348613212-21897-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 03:08 PM, Linus Walleij wrote:
-> On Tue, Sep 25, 2012 at 9:28 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On 09/25/2012 02:19 PM, Linus Walleij wrote:
-> 
->>> The allocation will succeed if the platform define .nr_irqs
->>> to 0 as an ideal device tree platform would do, but I think it
->>> is a bit thick to require that every platform that wants to
->>> use sparse IRQs must first or simultaneously switch to
->>> device tree. So make this to a simple pr_debug().
->>
->> It's not a matter of switching to DT or not. It is a matter of whether
->> an irq_chip allocates it's descriptors or not either directly or
->> indirectly via irqdomain.
-> 
-> Yeah OK that's true.
-> 
->> The gic does this, so it is secondary
->> controllers which are the problem. A platform could allocate the ranges
->> needed for those controllers and leave a hole for the gic to allocate.
->>
->> A prefer to leave this so platforms get fixed.
-> 
-> Since the core kernel will allocate .nr_irqs on boot I guess
-> this means you have to define the machine's .nr_irqs to
-> zero or atleast < 16 so it doesn't overlap with those the
-> GIC wants to use.
+From: Stephen Warren <swarren@nvidia.com>
 
-I believe the default of 0 causes NR_IRQS_LEGACY to be used which is
-what we want.
+Create a common location for uncompress.h, and select the included debug
+macro file using config option.
 
-> So I'll try that, and ad-hoc allocate descriptors needed
-> above that range for drivers that are not yet allocating
-> their descriptors ...
-> 
-> One question though: the real fix is obviously for all
-> drivers exposing an irqchip to allocate its descriptors
-> dynamically with exlicit alloc_descs() or using the
-> linear irq domain instead of relying on pre-allocated
-> descriptors.
-> 
-> Should we patch all drivers to spit out similar warnings
-> then?
+This does the same for uncompress.h as a recent patch for debug-macro.S,
+which was based on a suggestion by Russell King and implemented by Rob
+Herring.
 
-If you are bored with nothing else to do... Might as well fix them if
-you can find them all.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/Kconfig.debug                     |   10 ++++
+ arch/arm/boot/compressed/misc.c            |   64 +---------------------------
+ arch/arm/include/debug/icedcc-uncompress.h |   61 ++++++++++++++++++++++++++
+ arch/arm/include/debug/none-uncompress.h   |    3 +
+ 4 files changed, 75 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm/include/debug/icedcc-uncompress.h
+ create mode 100644 arch/arm/include/debug/none-uncompress.h
 
-Of course if you follow my previous suggestion, that would be a red flag
-that you aren't fixing the irq_chip and we should reject the change. :)
-
-Rob
-
-> 
-> Yours,
-> Linus Walleij
-> 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857..0daec3d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -420,6 +420,16 @@ config DEBUG_LL_INCLUDE
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+ 	default "mach/debug-macro.S"
+ 
++config UNCOMPRESS_INCLUDE
++	string
++	default "debug/icedcc-uncompress.h" if DEBUG_ICEDCC
++	default "debug/none-uncompress.h" if ARCH_MULTIPLATFORM || \
++		DEBUG_HIGHBANK_UART || DEBUG_MVEBU_UART || \
++		DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
++		DEBUG_VEXPRESS_UART0_DETECT || DEBUG_VEXPRESS_UART0_CA9 || \
++		DEBUG_VEXPRESS_UART0_RS1
++	default "mach/uncompress.h"
++
+ config EARLY_PRINTK
+ 	bool "Early printk"
+ 	depends on DEBUG_LL
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index df89983..afbdb3f 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -25,69 +25,7 @@ unsigned int __machine_arch_type;
+ static void putstr(const char *ptr);
+ extern void error(char *x);
+ 
+-#ifdef CONFIG_ARCH_MULTIPLATFORM
+-static inline void putc(int c) {}
+-static inline void flush(void) {}
+-static inline void arch_decomp_setup(void) {}
+-#else
+-#include <mach/uncompress.h>
+-#endif
+-
+-#ifdef CONFIG_DEBUG_ICEDCC
+-
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
+-
+-static void icedcc_putc(int ch)
+-{
+-	int status, i = 0x4000000;
+-
+-	do {
+-		if (--i < 0)
+-			return;
+-
+-		asm volatile ("mrc p14, 0, %0, c0, c1, 0" : "=r" (status));
+-	} while (status & (1 << 29));
+-
+-	asm("mcr p14, 0, %0, c0, c5, 0" : : "r" (ch));
+-}
+-
+-
+-#elif defined(CONFIG_CPU_XSCALE)
+-
+-static void icedcc_putc(int ch)
+-{
+-	int status, i = 0x4000000;
+-
+-	do {
+-		if (--i < 0)
+-			return;
+-
+-		asm volatile ("mrc p14, 0, %0, c14, c0, 0" : "=r" (status));
+-	} while (status & (1 << 28));
+-
+-	asm("mcr p14, 0, %0, c8, c0, 0" : : "r" (ch));
+-}
+-
+-#else
+-
+-static void icedcc_putc(int ch)
+-{
+-	int status, i = 0x4000000;
+-
+-	do {
+-		if (--i < 0)
+-			return;
+-
+-		asm volatile ("mrc p14, 0, %0, c0, c0, 0" : "=r" (status));
+-	} while (status & 2);
+-
+-	asm("mcr p14, 0, %0, c1, c0, 0" : : "r" (ch));
+-}
+-
+-#endif
+-
+-#define putc(ch)	icedcc_putc(ch)
+-#endif
++#include CONFIG_UNCOMPRESS_INCLUDE
+ 
+ static void putstr(const char *ptr)
+ {
+diff --git a/arch/arm/include/debug/icedcc-uncompress.h b/arch/arm/include/debug/icedcc-uncompress.h
+new file mode 100644
+index 0000000..b505241
+--- /dev/null
++++ b/arch/arm/include/debug/icedcc-uncompress.h
+@@ -0,0 +1,61 @@
++/*
++ * Decompressor debug output routines for ICEDCC
++ *
++ * Extracted from misc.c, which is by:
++ * Modified for ARM Linux by Russell King
++ * Nicolas Pitre <nico@visuaide.com>
++ */
++
++#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
++
++static void putc(int ch)
++{
++	int status, i = 0x4000000;
++
++	do {
++		if (--i < 0)
++			return;
++
++		asm volatile ("mrc p14, 0, %0, c0, c1, 0" : "=r" (status));
++	} while (status & (1 << 29));
++
++	asm("mcr p14, 0, %0, c0, c5, 0" : : "r" (ch));
++}
++
++
++#elif defined(CONFIG_CPU_XSCALE)
++
++static void putc(int ch)
++{
++	int status, i = 0x4000000;
++
++	do {
++		if (--i < 0)
++			return;
++
++		asm volatile ("mrc p14, 0, %0, c14, c0, 0" : "=r" (status));
++	} while (status & (1 << 28));
++
++	asm("mcr p14, 0, %0, c8, c0, 0" : : "r" (ch));
++}
++
++#else
++
++static void putc(int ch)
++{
++	int status, i = 0x4000000;
++
++	do {
++		if (--i < 0)
++			return;
++
++		asm volatile ("mrc p14, 0, %0, c0, c0, 0" : "=r" (status));
++	} while (status & 2);
++
++	asm("mcr p14, 0, %0, c1, c0, 0" : : "r" (ch));
++}
++
++#endif
++
++static inline void flush(void) {}
++static inline void arch_decomp_setup(void) {}
+diff --git a/arch/arm/include/debug/none-uncompress.h b/arch/arm/include/debug/none-uncompress.h
+new file mode 100644
+index 0000000..e19955d
+--- /dev/null
++++ b/arch/arm/include/debug/none-uncompress.h
+@@ -0,0 +1,3 @@
++static inline void putc(int c) {}
++static inline void flush(void) {}
++static inline void arch_decomp_setup(void) {}
+-- 
+1.7.0.4
