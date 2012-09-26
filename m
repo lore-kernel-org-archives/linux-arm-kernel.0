@@ -1,75 +1,57 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 27 Sep 2012 07:47:46 +0800
-Subject: [BUG] Deferred probing in driver model is racy,
- resulting in lost probes
-In-Reply-To: <20120926202321.GD30938@n2100.arm.linux.org.uk>
-References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
- <CACVXFVPahbFVEP4p2Z9-TvjQ52tUCMuDeLx0X6GP5t0h5gEV8g@mail.gmail.com>
- <20120916082510.GN12245@n2100.arm.linux.org.uk>
- <CACVXFVOZ=4HFAy38q_8ZUjOPffcv_mMTi7KCdh3HcX=MCLw5SQ@mail.gmail.com>
- <20120926200833.GA14340@kroah.com>
- <20120926202321.GD30938@n2100.arm.linux.org.uk>
-Message-ID: <CACVXFVPnpQ6yHiDaoo_CPG7oSEq+ZzxpmTgQv55-tRRyaavDfA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 26 Sep 2012 16:49:41 -0700
+Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
+In-Reply-To: <20120924071353.GA27099@lunn.ch>
+References: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
+ <CAOesGMh1x8QMNBi_xKEfZ0druiAZbafVuXEQkktwVbQODDmR8w@mail.gmail.com>
+ <20120924071353.GA27099@lunn.ch>
+Message-ID: <20120926234941.GA6567@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 4:23 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Sep 26, 2012 at 01:08:33PM -0700, Greg Kroah-Hartman wrote:
->> On Sun, Sep 16, 2012 at 09:24:43PM +0800, Ming Lei wrote:
->> > diff --git a/drivers/base/bus.c b/drivers/base/bus.c
->> > index 181ed26..17d7437 100644
->> > --- a/drivers/base/bus.c
->> > +++ b/drivers/base/bus.c
->> > @@ -714,12 +714,12 @@ int bus_add_driver(struct device_driver *drv)
->> >     if (error)
->> >             goto out_unregister;
->> >
->> > +   klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
->> >     if (drv->bus->p->drivers_autoprobe) {
->> >             error = driver_attach(drv);
->> >             if (error)
->> >                     goto out_unregister;
->> >     }
->> > -   klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
->> >     module_add_driver(drv->owner, drv);
->> >
->> >     error = driver_create_file(drv, &driver_attr_uevent);
->> >
->> >
->> >
->>
->> Did the above patch ever prove to solve the issue or not?
->
-> To be honest, I've not bothered to test the above patch, and now when I
-> look at it, I notice it's broken - in that on error it will corrupt the
-> driver list.  Take a look at the error path.
->
-> priv is drv->p.  We add priv->knode_bus to the driver list.  If
-> driver_attach() returns an error, then we go to out_unregister, which
+On Mon, Sep 24, 2012 at 09:13:53AM +0200, Andrew Lunn wrote:
+> > > +Required properties:
+> > > +- compatible: must be "marvell,orion-ehci"
+> > > +- reg: physical base address of the controller and length of memory mapped
+> > > +  region.
+> > > +- interrupts: The EHCI interrupt
+> > > +- phy-version: Can be one of:
+> > > +  "NA" - Don't touch the phy, something else has already configured it.
+> > > +  "orion5x" - PHY setup as specified by the Orion5x Errata
+> > > +
+> > > +Example:
+> > > +
+> > > +       ehci at 50000 {
+> > > +               compatible = "marvell,orion-ehci";
+> > > +               reg = <0x50000 0x1000>;
+> > > +               interrupts = <19>;
+> > > +               phy-version = "NA";
+> > > +       };
+> > 
+> > This isn't an appropriate binding for phy. I know, it maps straight
+> > over from the platform data, but it doesn't focus on what the actual
+> > hardware is.
+> > 
+> > A couple of options. What probably makes most sense depending on how
+> > other phy bindings are moving ahead is to add a phy node under the
+> > ehci controller for the "orion5x" case, and have an appropriate
+> > compatible value there. No node means the same as "NA" in the above
+> > binding. Alternatively, have a phy phandle that points to the phy
+> > device if it sits on an i2c bus, etc.
+> 
+> I Olaf
+> 
+> Could i suggest a third option:
+> 
+> I just drop USB phy configuration all together.  Only mach-orion5x
+> needs this and nobody has shown any interest in moving mach-orion5x to
+> DT. So i would just hard code it to "NA".
+> 
+> If anybody does show interest in DT for orion5x, we can add a phy node
+> under ehci as a pure extension which does not affect backward
+> compatibility.
 
-In fact, driver_attach() always returns zero, so it does __not__ affect
-your test.
+Yeah, that works too.
 
-I knew the failure shouldn't be handled in theory because the probe
-failure on one device should not cause failure of driver_register, and
-it should be fixed, IMO.
 
-> does:
->
-> out_unregister:
->         kobject_put(&priv->kobj);
->         kfree(drv->p);
->         drv->p = NULL;
->
-> thereby freeing the node we just added to the driver list without first
-> removing it.
->
-> I suspect it will fix the problem, but let's get the patch to be correct
-> before it gets tested...
-
-Trust me, please go ahead to test and it doesn't affect it...
-
-Thanks,
--- 
-Ming Lei
+-Olof
