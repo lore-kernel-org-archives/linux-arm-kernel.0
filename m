@@ -1,52 +1,50 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 26 Sep 2012 14:05:16 +0800
-Subject: [GIT PULL][for 3.6] pull request on fixes branch from arch-pxa
-In-Reply-To: <20120922061240.GK32245@quad.lixom.net>
-References: <CAN1soZwLHZTudFVMQWaE43TPPtsGxYDZQSYfkkY1svVwbfSaUw@mail.gmail.com>
- <20120922061240.GK32245@quad.lixom.net>
-Message-ID: <CAN1soZyn3J3a4e+MerKr_Sycjvp4+bCr3EtxHgwgtut-HEepoQ@mail.gmail.com>
+Date: Wed, 26 Sep 2012 14:07:30 +0800
+Subject: [PATCH v2] ARM: pxa2xx: Remove EXPERIMENTAL dependency from
+ spi-pxa2xx driver
+In-Reply-To: <505DB82C.5030205@yahoo.com>
+References: <505DB82C.5030205@yahoo.com>
+Message-ID: <CAN1soZzTgU6vvLvOdk1YoqcejRkRq8-4+CjGkUKjAZvhX=+NBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 2:12 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Sep 21, 2012 at 04:26:56PM +0800, Haojian Zhuang wrote:
->> Hi Olof & Arnd,
->>
->> Please help to merge fixes branch in arch-pxa git tree.
->>
->> Regards
->> Haojian
->>
->> The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
->>
->>   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
->>
->> are available in the git repository at:
->>
->>   git://github.com/hzhuang1/linux.git fixes
->>
->> for you to fetch changes up to e09a716490dbce0b9b7d132d191f1f8785cb5df2:
->>
->>   ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
->> (2012-09-21 15:33:58 +0800)
->>
->> ----------------------------------------------------------------
->> Wei Yongjun (1):
->>       ARM: pxa: fix return value check in pxa2xx_drv_pcmcia_probe()
+On Sat, Sep 22, 2012 at 9:07 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> The SPI_PXA2XX config option has had an EXPERIMENTAL dependency since it
+> was first added in 2006. Since there seem to have been no changes to the
+> spi-pxa2xx driver since February 2011 other than tree sweeps, this patch
+> removes the EXPERIMENTAL dependency in the expectation that the
+> spi-pxa2xx driver is now stable.
 >
-> Hi,
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> ---
 >
-> This doesn't look critical for 3.6, since the bug has been there a long time.
-> I'll queue it up in next/fixes-non-critical for 3.7 instead.
+> V2: Removed excess parentheses.
 >
-> If you disagree, let me know and I'll consider sending it up sooner.
+> The motivation for this patch was to remove the EXPERIMENTAL option from
+> the hx4700 platform config: SPI_PXA2XX is the only option which is still
+> EXPERIMENTAL.
 >
+>  drivers/spi/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> Thanks,
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 5f84b55..d49b836 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -284,7 +284,7 @@ config SPI_PPC4xx
 >
-> -Olof
+>  config SPI_PXA2XX
+>         tristate "PXA2xx SSP SPI master"
+> -       depends on (ARCH_PXA || (X86_32 && PCI)) && EXPERIMENTAL
+> +       depends on ARCH_PXA || (X86_32 && PCI)
+>         select PXA_SSP if ARCH_PXA
+>         help
+>           This enables using a PXA2xx or Sodaville SSP port as a SPI master
+> --
+> 1.7.8.6
+>
 
-I'm OK to merge it into 3.7.
+Applied
 
 Thanks
 Haojian
