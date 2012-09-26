@@ -1,42 +1,46 @@
 From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 26 Sep 2012 03:02:58 +0100
-Subject: PXA PWM possible regression after 3.5: backlight remains off
- after resume
-In-Reply-To: <87ehlpzy50.fsf@free.fr>
-References: <505F28B8.1030701@yahoo.com>
- <20120923172232.GA1293@avionic-0098.mockup.avionic-design.de>
- <505F5151.5070506@yahoo.com> <87ehlpzy50.fsf@free.fr>
-Message-ID: <50626252.3050405@yahoo.com>
+Date: Wed, 26 Sep 2012 03:17:02 +0100
+Subject: [PATCH] ARM: pxa: hx4700: Fix backlight PWM device number
+In-Reply-To: <5062652A.8070603@yahoo.com>
+References: <5062652A.8070603@yahoo.com>
+Message-ID: <5062659E.6030104@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/12 20:43, Robert Jarzmik wrote:
-> Paul Parsons <lost.distance@yahoo.com> writes:
->
->> The same failure is also present in 3.6-rc1.
->>
->> Just to be clear, are you saying that drivers/pwm/pwm-pxa.c should
->> include suspend/resume handlers like in drivers/pwm/pwm-samsung.c ?
->>
->> Agreed that it is possible that recent changes exposed a latent bug
->> somewhere, and that turning the backlight on after resume should never
->> have worked.
->
-> Hi Paul,
->
-> I checked on the mioa701 board (see [1]).
-> On my board, the backlight if fully driven by PXA PWM0, and the suspend/resume
-> is working perfectly.
->
-> So I don't thing anything is needed for suspend/resume wrt PWM (empirically).
+Recent changes to PXA PWM support changed the PXA27X PWM device
+numbering scheme.
 
-You're right. I belatedly reached the same conclusion after I noticed
-that only the pwm-samsung driver included any suspend/resume handlers:
-the other drivers can't all be broken!
+The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
+the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
+numbering scheme:
 
-Fortunately I have just identified the problem: the PXA27X PWM device
-numbering scheme has changed, breaking the hx4700 platform and probably
-other PXA27X platforms which use PWM1 or PWM2.
+Address		Hardware	3.5 pwm_id	3.6-rc1 pwm_id
+0x40b00000	PWM0		0		0
+0x40b00010	PWM2		2		1
+0x40c00000	PWM1		1		2
+0x40c00010	PWM3		3		3
 
-Regards,
-Paul
+The hx4700 backlight uses PWM1 at 0x40c00000. Consequently the pwm_id
+must be changed from 1 to 2.
+
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: Thierry Reding <thierry.reding@avionic-design.de>
+---
+  arch/arm/mach-pxa/hx4700.c |    2 +-
+  1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index e631198..3720f99 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -556,7 +556,7 @@ static struct platform_device hx4700_lcd = {
+   */
+
+  static struct platform_pwm_backlight_data backlight_data = {
+-	.pwm_id         = 1,
++	.pwm_id         = 2,	/* PWM1 */
+  	.max_brightness = 200,
+  	.dft_brightness = 100,
+  	.pwm_period_ns  = 30923,
+-- 
+1.7.8.6
