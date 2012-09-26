@@ -1,35 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 26 Sep 2012 10:47:05 +0900
-Subject: [PATCH v4 0/3] ARM: Exynos: Add support for MSHC controller
-In-Reply-To: <1346238072-7324-1-git-send-email-thomas.abraham@linaro.org>
-References: <1346238072-7324-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <135f01cd9b88$d557efe0$8007cfa0$%kim@samsung.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 26 Sep 2012 03:02:58 +0100
+Subject: PXA PWM possible regression after 3.5: backlight remains off
+ after resume
+In-Reply-To: <87ehlpzy50.fsf@free.fr>
+References: <505F28B8.1030701@yahoo.com>
+ <20120923172232.GA1293@avionic-0098.mockup.avionic-design.de>
+ <505F5151.5070506@yahoo.com> <87ehlpzy50.fsf@free.fr>
+Message-ID: <50626252.3050405@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> This patch series adds Exynos5250 platform support for MSHC controllers.
-> 
-> Thomas Abraham (3):
->   ARM: Samsung: Add support for MSHC controller clocks
->   ARM: Exynos5: Add AUXDATA support for MSHC controllers
->   ARM: dts: Add nodes for dw_mmc controllers for Samsung Exynos5250
-> platforms
-> 
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |   55
-> +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5250.dtsi         |   32 +++++++++++++++++
->  arch/arm/mach-exynos/clock-exynos5.c      |   45 ++++++++---------------
->  arch/arm/mach-exynos/include/mach/map.h   |    4 ++
->  arch/arm/mach-exynos/mach-exynos5-dt.c    |    8 ++++
->  5 files changed, 115 insertions(+), 29 deletions(-)
+On 25/09/12 20:43, Robert Jarzmik wrote:
+> Paul Parsons <lost.distance@yahoo.com> writes:
+>
+>> The same failure is also present in 3.6-rc1.
+>>
+>> Just to be clear, are you saying that drivers/pwm/pwm-pxa.c should
+>> include suspend/resume handlers like in drivers/pwm/pwm-samsung.c ?
+>>
+>> Agreed that it is possible that recent changes exposed a latent bug
+>> somewhere, and that turning the backlight on after resume should never
+>> have worked.
+>
+> Hi Paul,
+>
+> I checked on the mioa701 board (see [1]).
+> On my board, the backlight if fully driven by PXA PWM0, and the suspend/resume
+> is working perfectly.
+>
+> So I don't thing anything is needed for suspend/resume wrt PWM (empirically).
 
-Applied this series.
-Thanks.
+You're right. I belatedly reached the same conclusion after I noticed
+that only the pwm-samsung driver included any suspend/resume handlers:
+the other drivers can't all be broken!
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Fortunately I have just identified the problem: the PXA27X PWM device
+numbering scheme has changed, breaking the hx4700 platform and probably
+other PXA27X platforms which use PWM1 or PWM2.
+
+Regards,
+Paul
