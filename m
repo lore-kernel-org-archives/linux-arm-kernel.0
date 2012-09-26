@@ -1,49 +1,23 @@
-From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Wed, 26 Sep 2012 16:54:06 +0530
-Subject: [PATCH 1/2] spi:pl022: Disable/Enable functional clock from
- suspend/resume
-In-Reply-To: <1348658647-25975-1-git-send-email-vipulkumar.samar@st.com>
-References: <1348658647-25975-1-git-send-email-vipulkumar.samar@st.com>
-Message-ID: <1348658647-25975-2-git-send-email-vipulkumar.samar@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Sep 2012 13:35:23 +0200
+Subject: [PATCH] ARM: ux500: Fix initialisation order for UIBs
+In-Reply-To: <1348585812-32073-1-git-send-email-lee.jones@linaro.org>
+References: <1348585812-32073-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYJZO8m1xHYS2DHYk3sbeoG4izTyLk6rP96AqX9hM=z8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPI functional clock must be disalble/enable in non RTPM suspend/resume
-hooks. Currently it is only done for RTPM cases.
+On Tue, Sep 25, 2012 at 5:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-This patch add support to disable/enbale clock for conventional
-suspend/resume calls.
+> An earlier change prevented User Interface Boards (UIBs) from being
+> initialised on boards which did not support them. This change had
+> the undesired effect of reordering the UIB initialisation calls with
+> I2C registration. Here we ensure UIBs are only setup after all
+> required infrastructure is already in place.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
----
- drivers/spi/spi-pl022.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index f2a80ff..09fb09e 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2310,6 +2310,8 @@ static int pl022_suspend(struct device *dev)
- 	}
- 
- 	dev_dbg(dev, "suspended\n");
-+	clk_disable(pl022->clk);
-+
- 	return 0;
- }
- 
-@@ -2318,6 +2320,12 @@ static int pl022_resume(struct device *dev)
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
- 	int ret;
- 
-+	ret = clk_enable(pl022->clk);
-+	if (ret) {
-+		dev_err(dev, "could not enable SSP/SPI bus clock\n");
-+		return ret;
-+	}
-+
- 	/* Start the queue running */
- 	ret = spi_master_resume(pl022->master);
- 	if (ret)
--- 
-1.7.10
+Yours,
+Linus Walleij
