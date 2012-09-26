@@ -1,33 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2012 14:49:48 +0000
-Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
-In-Reply-To: <506315A6.3090300@am.sony.com>
-References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
- <201209261417.18883.arnd@arndb.de> <506315A6.3090300@am.sony.com>
-Message-ID: <201209261449.48468.arnd@arndb.de>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Wed, 26 Sep 2012 16:53:56 +0200
+Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <20120925104901.GI17667@game.jcrosoft.org>
+References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
+ <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
+ <20120925081057.GH17667@game.jcrosoft.org>
+ <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
+ <506180BE.6000603@atmel.com> <20120925104901.GI17667@game.jcrosoft.org>
+Message-ID: <CAHkwnC8kObpXZ5E_RutH+ciYxC5_7FruFA4Zr+AmVX7TKDtFmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 September 2012, Tim Bird wrote:
-> My main issue is to avoid requiring the loading of
-> drivers and features that are not required for a
-> platform, if the platform does not need it (or the
-> developer chooses to omit it).  I may have mis-read
-> this thread, but it sounded like the uncompress
-> code was going to be moved to a common area and
-> not be configurable.
+On Tue, Sep 25, 2012 at 12:49 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 12:00 Tue 25 Sep     , Nicolas Ferre wrote:
+>> On 09/25/2012 11:45 AM, Fabio Porcedda :
+>> > On Tue, Sep 25, 2012 at 10:10 AM, Jean-Christophe PLAGNIOL-VILLARD
+>> > <plagnioj@jcrosoft.com> wrote:
+>> >> On 09:28 Tue 25 Sep     , Fabio Porcedda wrote:
+>> >>> Tested on an at91sam9260 board (evk-pro3)
+>> >>>
+>> >>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> >>> ---
+>> >>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>> >>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>> >>>  2 files changed, 40 insertions(+)
+>> >>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> >>>
+>> >>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> >>> new file mode 100644
+>> >>> index 0000000..724fad1
+>> >>> --- /dev/null
+>> >>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> >>> @@ -0,0 +1,19 @@
+>> >>> +* Atmel Watchdog Timers
+>> >>> +
+>> >>> +** at91sam9-wdt
+>> >>> +
+>> >>> +Required properties:
+>> >>> +- compatible: must be "atmel,at91sam9-wdt".
+>> >>> +- reg: physical base address of the controller and length of memory mapped
+>> >>> +  region.
+>> >>> +
+>> >>> +Optional properties:
+>> >>> +- heartbeat: contains the watchdog heartbeats in seconds.
+>> >>> +
+>> >>> +Example:
+>> >>> +
+>> >>> +     watchdog at fffffd40 {
+>> >>> +             compatible = "atmel,at91sam9-wdt";
+>> >> for the secind time atmel,at91sam9260-watchdog
+>> >
+>> > Ok, i will fix this.
+>> >
+>> >> you need to put the first soc that use it in the compatible
+>> >>> +             reg = <0xfffffd40 0x10>;
+>> >>> +             heartbeat = <10>;
+>> >> need put second in the property name so need to read the doc
+>> >
+>> > I didn't found any example about a property with "second" in the name.
+>> > Which It's best "heartbeat-seconds", "heartbeat-sec" or "heartbeat-s" ?
+>>
+>> I think that, as it is indicated in the documentation, we should not
+>> worry too much about that... but "heartbeat" and "heartbeat-s" is ok
+>> with me.
+>>
+>> Maybe people @ devicetree-discuss have an advice for this?
+> for i2c-gpio mandatory as example cf discussion with Jean and Russell
 
-The suggestion was to move it into a different location, but you
-still would only have one version of it, even for a multiplatform
-kernel, so no code growth there.
+Russell King - ARM Linux linux at arm.linux.org.uk
+Mon Feb 20 08:51:06 EST 2012
+> I'm saying that's a completely absurd proposal, as the proposal is
+> for two opaque numeric properties with different units.  At least
+> make the units the same, or as Karol said, incorporate the units
+> into the property names.
 
-Right now, a multiplatform kernel has no way of debugging the
-decompressor using console output, so it's actually /smaller/
-than a single-platform kernel, but also less capable.
+If i understand correctly the issue was that two different units where used for
+the same device.
+IMHO there is no problem if only one unit is used in the same device.
 
-Stephen's patches are a way to bring that feature back for
-platforms that are converted to multiplatform, but such a kernel
-would still only work on a single platform, even if it has
-all the actual kernel code enabled to support others.
-
-	Arnd
+Best regards
+-- 
+Fabio Porcedda
