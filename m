@@ -1,46 +1,45 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Wed, 26 Sep 2012 17:21:24 -0500
-Subject: [PATCH v2 0/2] OMAP: mailbox initial device tree support
-In-Reply-To: <1347494898-16671-4-git-send-email-omar.luna@linaro.org>
-References: <1347494898-16671-1-git-send-email-omar.luna@linaro.org>
- <1347494898-16671-4-git-send-email-omar.luna@linaro.org>
-Message-ID: <CALLhW=4d8zxekkeGr1S52aGbufyk-vGeE9REYhDSt8pnap_Dxw@mail.gmail.com>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Wed, 26 Sep 2012 15:32:59 -0700
+Subject: [PATCH 08/11] ARM: Move some macros from entry-armv to
+ entry-header
+In-Reply-To: <50637C24.90206@codeaurora.org>
+References: <20120924212648.GA27605@lizard>
+ <1348522080-32629-8-git-send-email-anton.vorontsov@linaro.org>
+ <50637C24.90206@codeaurora.org>
+Message-ID: <20120926223258.GA5768@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Wed, Sep 26, 2012 at 03:05:24PM -0700, Stephen Boyd wrote:
+> > Just move the macros into header file as we would want to use them for
+> > KGDB FIQ entry code.
+> >
+> > The following macros were moved:
+> >
+> >  - svc_entry
+> >  - usr_entry
+> >  - kuser_cmpxchg_check
+> >  - vector_stub
+> >
+> > To make kuser_cmpxchg_check actually work across different files, we
+> > also have to make kuser_cmpxchg64_fixup global.
+> >
+> > Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+> 
+> Why can't we put the fiq entry code from the next patch into
+> entry-armv.S? Sorry if this has been asked before but I don't see any
+> reasoning in the commit text.
 
-On 12 September 2012 19:08, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
-> To allow mailbox driver to function with device tree.
->
-> Tested in OMAP4 and OMAP3. OMAP2 untested.
->
-> Patch: arm/dts: OMAP2+: Add mailbox nodes, was Acked by Benoit
-> however it seems it wasn't picked up, so resend.
->
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69121.html
->
-> Patch: OMAP: mailbox: add device tree support, there wasn't an
-> opposition other than to cleanup the driver too, however I got
-> quite some patches to send before continuing the cleanup.
->
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69338.html
->
-> Omar Ramirez Luna (2):
->   OMAP: mailbox: add device tree support
->   arm/dts: OMAP2+: Add mailbox nodes
->
->  .../devicetree/bindings/arm/omap/mailbox.txt       |    9 +++++++++
->  arch/arm/boot/dts/omap2.dtsi                       |    5 +++++
->  arch/arm/boot/dts/omap3.dtsi                       |    5 +++++
->  arch/arm/boot/dts/omap4.dtsi                       |    5 +++++
->  arch/arm/mach-omap2/devices.c                      |    3 +++
->  arch/arm/mach-omap2/mailbox.c                      |   12 ++++++++++++
->  6 files changed, 39 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/mailbox.txt
+Thanks for taking a look!
 
-Ping. I'm in the understanding that these go through your tree, am I right?
+This is a prerequisite to just logically separate KGDB FIQ code from the
+entry code.
 
-Regards,
+Or to put it the other way around: KGDB FIQ is just another user of the
+FIQs, nothing quite special in it to put it alongside the entry code. :-)
 
-Omar
+But if Russell or other folks feel that having KGDB FIQ asm code in
+entry-armv.S makes sense, I'd definitely do this.
+
+Thanks,
+Anton.
