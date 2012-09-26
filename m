@@ -1,55 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Sep 2012 15:45:00 +0100
-Subject: [PATCH V4 3/6] arm: cache-l2x0: add support for Aurora L2
- cache ctrl
-In-Reply-To: <1348213574-18494-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1348213574-18494-1-git-send-email-gregory.clement@free-electrons.com>
- <1348213574-18494-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120926144500.GB30938@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Sep 2012 14:49:48 +0000
+Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
+In-Reply-To: <506315A6.3090300@am.sony.com>
+References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
+ <201209261417.18883.arnd@arndb.de> <506315A6.3090300@am.sony.com>
+Message-ID: <201209261449.48468.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 09:46:10AM +0200, Gregory CLEMENT wrote:
->  arch/arm/include/asm/hardware/cache-aurora-l2.h |   55 ++++++
+On Wednesday 26 September 2012, Tim Bird wrote:
+> My main issue is to avoid requiring the loading of
+> drivers and features that are not required for a
+> platform, if the platform does not need it (or the
+> developer chooses to omit it).  I may have mis-read
+> this thread, but it sounded like the uncompress
+> code was going to be moved to a common area and
+> not be configurable.
 
-Will anything apart from cache-l2x0.c make use of this header file?
-If not, it should be in arch/arm/mm.  I've said this many a time on
-list that header files containing private definitions should be
-co-located with their users.
+The suggestion was to move it into a different location, but you
+still would only have one version of it, even for a multiplatform
+kernel, so no code growth there.
 
-Apart from that, and a few cosmetic additional unnecessary blank
-lines, I think this is fine.  Relevant bits of the patch are below.
+Right now, a multiplatform kernel has no way of debugging the
+decompressor using console output, so it's actually /smaller/
+than a single-platform kernel, but also less capable.
 
-> +static unsigned long calc_range_end(unsigned long start, unsigned long end)
-> +{
-> +	/*
-> +	 * Limit the number of cache lines processed at once,
-> +	 * since cache range operations stall the CPU pipeline
-> +	 * until completion.
-> +	 */
-> +
-> +	if (end > start + MAX_RANGE_SIZE)
-...
-> +static void aurora_flush_range(unsigned long start, unsigned long end)
-> +{
-> +	if (!l2_wt_override) {
-> +		start &= ~(CACHE_LINE_SIZE - 1);
-> +		end = ALIGN(end, CACHE_LINE_SIZE);
-> +		while (start != end) {
-> +			unsigned long range_end = calc_range_end(start, end);
-> +			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
-> +					AURORA_FLUSH_RANGE_REG);
-> +			start = range_end;
-> +		}
-> +	}
-> +}
-> +
-> +
-> +
->  static void l2x0_disable(void)
-...
->  		if (data->setup)
->  			data->setup(np, &aux_val, &aux_mask);
-> +
-> +
-> +		/* For aurora cache in no outer mode select the
+Stephen's patches are a way to bring that feature back for
+platforms that are converted to multiplatform, but such a kernel
+would still only work on a single platform, even if it has
+all the actual kernel code enabled to support others.
+
+	Arnd
