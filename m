@@ -1,32 +1,81 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 26 Sep 2012 15:23:44 +0300
-Subject: [PATCHv7 17/21] ARM: OMAP4: TWL: enable high speed mode for PMIC
- communication
-In-Reply-To: <1348661188.1956.1.camel@sokoban>
-References: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
- <1348590833-12335-18-git-send-email-t-kristo@ti.com>
- <5062E95C.6050903@ti.com> <1348661188.1956.1.camel@sokoban>
-Message-ID: <5062F3D0.6040300@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Sep 2012 14:38:15 +0200
+Subject: [PATCH 2/2] ARM: ABMA: Disable/Enable interface clock from
+ suspend/resume
+In-Reply-To: <1348658647-25975-3-git-send-email-vipulkumar.samar@st.com>
+References: <1348658647-25975-1-git-send-email-vipulkumar.samar@st.com>
+ <1348658647-25975-3-git-send-email-vipulkumar.samar@st.com>
+Message-ID: <CACRpkdY_reBeOpyzxdjh9hsc1n_Ff7p5KFBA0Ysys_zDv3WtrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2012 03:06 PM, Tero Kristo wrote:
-> On Wed, 2012-09-26 at 14:39 +0300, Peter Ujfalusi wrote:
->> Hi Tero,
->>
->> On 09/25/2012 07:33 PM, Tero Kristo wrote:
->>> With the new parameters, I2C can now be put to high speed mode for
->>> better performance.
->>
->> We have twl6040 on the same bus. have you tried this with audio enabled?
->> twl6040 is in standard mode (up to 100 kbps) after power up...
-> 
-> No, I don't have capability to try out audio. Can you give it a shot and
-> see what happens? Otherwise we probably just have to drop this patch out
-> for now.
+On Wed, Sep 26, 2012 at 1:24 PM, Vipul Kumar Samar
+<vipulkumar.samar@st.com> wrote:
 
-Just compiled your mainline-3.6-rc5-omap-auto-ret-v7 branch with audio.
-Works fine on my Blaze.
+> AMBA devices interface clock is disabled in RTPM suspend/resume hooks
+> but not in conventional hooks.
+>
+> This patch adds support to disable/enable clock for conventional
+> suspend/resume calls.
+(...)
+> +       struct amba_device *pcdev = to_amba_device(dev);
+>         int ret = 0;
+>
+>         if (!drv)
+> @@ -132,16 +133,27 @@ static int amba_pm_suspend(struct device *dev)
+>                 ret = amba_legacy_suspend(dev, PMSG_SUSPEND);
+>         }
+>
+> +       if (!ret)
+> +               clk_disable(pcdev->pclk);
+> +
+>         return ret;
+>  }
 
--- 
-P?ter
+You're not accounting for the case where pcdev->pclk
+is an error pointer (as happens if pclk lookup fails at
+probe).
+
+I think you can simplify some of the code using
+the external accessors from <linux/amba/bus.h>:
+
+amba_pclk_enable();
+amba_pclk_disable();
+
+But:
+
+Again this is a case where you have a race between runtime
+suspend/resume and ordinary suspend/resume.
+
+These ordinary suspend/resume operations should probably
+wait for runtime suspend to happen *first* if and only if
+runtime PM is enabled, and then the block will be gated
+off. So we really need to figure out how we can make sure
+that this happens.
+
+If just ordinary PM is enabled, the above makes sense but in
+that case I think we should have that #ifdef:ed as an alternative
+or something.
+
+So something like:
+
+suspend():
+#ifdef CONFIG_PM_RUNTIME
+   /* Wait for runtime PM to hammer down the pclk */
+#elif CONFIG_PM
+   amba_pclk_disable();
+#endif
+
+resume():
+#if defined(CONFIG_PM) && !defined(CONFIG_PM_RUNTIME)
+  amba_pclk_enable();
+#endif
+  /* Let runtime PM lazily enable the clock when needed */
+
+To complicate things further the bus operations can be
+overridden by e.g. voltage domains. In this case we (ux500)
+have choosen to call out to the AMBA level to make sure
+semantics are preserved.
+
+Yours,
+Linus Walleij
