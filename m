@@ -1,64 +1,42 @@
-From: jangra.pankaj9@gmail.com (Pankaj Jangra)
-Date: Thu, 27 Sep 2012 00:17:56 +0530
-Subject: [PATCH 10/10] ARM: msm: Migrate to common clock framework
-In-Reply-To: <1348194419-11486-11-git-send-email-sboyd@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Sep 2012 11:48:25 -0700
+Subject: [PATCH 01/10] usb: otg: msm: Convert to clk_prepare/unprepare
+In-Reply-To: <CADTbHxoFeYWPJpYTN85kBeF=kv2v1yDioJW-upzn1RcwVT_sKw@mail.gmail.com>
 References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
- <1348194419-11486-11-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CADTbHxpOJ+5xMQ8NkntQtFezwsryzvMDBx8eroNjzfp_5b0DfQ@mail.gmail.com>
+ <1348194419-11486-2-git-send-email-sboyd@codeaurora.org>
+ <CADTbHxoFeYWPJpYTN85kBeF=kv2v1yDioJW-upzn1RcwVT_sKw@mail.gmail.com>
+Message-ID: <50634DF9.5010608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 09/26/12 09:58, Pankaj Jangra wrote:
+> On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
+>> index 9f5fc90..2ae0639 100644
+>> --- a/drivers/usb/otg/msm_otg.c
+>> +++ b/drivers/usb/otg/msm_otg.c
+>> @@ -514,13 +514,13 @@ static int msm_otg_suspend(struct msm_otg *motg)
+>>                         motg->pdata->otg_control == OTG_PMIC_CONTROL)
+>>                 writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
+>>
+>> -       clk_disable(motg->pclk);
+>> -       clk_disable(motg->clk);
+>> +       clk_disable_unprepare(motg->pclk);
+>> +       clk_disable_unprepare(motg->clk);
+>>         if (motg->core_clk)
+>> -               clk_disable(motg->core_clk);
+>> +               clk_disable_unprepare(motg->core_clk);
+>>
+> I was under assumption that system suspend/resume might be called from
+> the interrupt context. If that is case then its not appropriate to
+> call clk_prepare/unprepare here right? or my understanding is not correct????
 
-On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Well we call disable_irq() at the top of this suspend function so I
+suspect your understanding is incorrect. disable_irq() can call
+schedule(). There are also a bunch of regulator calls in
+msm_hsusb_ldo_set_mode() that this suspend function calls (almost all
+regulator calls grab a mutex).
 
-> -static int pc_clk_set_rate(unsigned id, unsigned rate)
-> +static int pc_clk_set_rate(struct clk_hw *hw, unsigned long new_rate,
-> +                          unsigned long p_rate)
->  {
-> -       /* The rate _might_ be rounded off to the nearest KHz value by the
-> +       struct clk_pcom *p = to_clk_pcom(hw);
-> +       unsigned id = p->id, rate = new_rate;
-> +       int rc;
-> +
-> +       /*
-> +        * The rate _might_ be rounded off to the nearest KHz value by the
->          * remote function. So a return value of 0 doesn't necessarily mean
->          * that the exact rate was set successfully.
->          */
-> -       int rc = msm_proc_comm(PCOM_CLKCTL_RPC_SET_RATE, &id, &rate);
-> -       if (rc < 0)
-> -               return rc;
-> -       else
-> -               return (int)id < 0 ? -EINVAL : 0;
-> -}
-> -
-> -static int pc_clk_set_min_rate(unsigned id, unsigned rate)
-> -{
-> -       int rc = msm_proc_comm(PCOM_CLKCTL_RPC_MIN_RATE, &id, &rate);
-> -       if (rc < 0)
-> -               return rc;
-> +       if (p->flags & CLKFLAG_MIN)
-> +               rc = msm_proc_comm(PCOM_CLKCTL_RPC_MIN_RATE, &id, &rate);
-
-You are missing if condition here checking the rc ?
-
->         else
-> -               return (int)id < 0 ? -EINVAL : 0;
-> -}
-> -
-> -static int pc_clk_set_max_rate(unsigned id, unsigned rate)
-> -{
-> -       int rc = msm_proc_comm(PCOM_CLKCTL_RPC_MAX_RATE, &id, &rate);
-
-and else here i think for the MIN_FLAG if check.
-
-> +               rc = msm_proc_comm(PCOM_CLKCTL_RPC_SET_RATE, &id, &rate);
->         if (rc < 0)
->                 return rc;
->         else
->                 return (int)id < 0 ? -EINVAL : 0;
->  }
->
---
-Pankaj Jangra
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
