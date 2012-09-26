@@ -1,72 +1,52 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Wed, 26 Sep 2012 11:10:48 +0530
-Subject: [PATCH 4/4] usb: phy: omap-usb2: enable 960Mhz clock for omap5
-In-Reply-To: <20120919115647.GI3772@arwen.pp.htv.fi>
-References: <1348054229-27362-1-git-send-email-kishon@ti.com>
- <1348054229-27362-5-git-send-email-kishon@ti.com>
- <20120919115647.GI3772@arwen.pp.htv.fi>
-Message-ID: <CAAe_U6Kr8t1=T7MGMjAe+1n6S-NncypnPkXYqA2_FtVK=uxULA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 26 Sep 2012 14:04:36 +0800
+Subject: [GIT PULL][for 3.7] pull request on dt2 branch from arch-pxa
+In-Reply-To: <20120922060817.GJ32245@quad.lixom.net>
+References: <CAN1soZxC_KovdgENmsSQcUFkK2VgirkaKKSx1=RjLhULATw=+Q@mail.gmail.com>
+ <20120922060817.GJ32245@quad.lixom.net>
+Message-ID: <CAN1soZwArV88LU=p1mu5UQKjd0zVPTkM5azDrPvBFXRtL+8FfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Sep 19, 2012 at 5:26 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, Sep 19, 2012 at 05:00:29PM +0530, Kishon Vijay Abraham I wrote:
->> "usb_otg_ss_refclk960m" is needed by usb2 phy present in omap5. For
->> omap4, the clk_get of this clock will fail since it does not have this
->> clock.
+On Sat, Sep 22, 2012 at 2:08 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Sep 21, 2012 at 04:24:58PM +0800, Haojian Zhuang wrote:
+>> Hi Olof & Arnd,
 >>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/usb/usb-phy.txt |    3 +++
->>  drivers/usb/phy/omap-usb2.c                       |   28 ++++++++++++++++++++-
->>  2 files changed, 30 insertions(+), 1 deletion(-)
+>> Please help to merge dt2 branch from arch-pxa git tree.
 >>
->> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
->> index 7c5fd89..d5626de 100644
->> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
->> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
->> @@ -24,6 +24,9 @@ Required properties:
->>  add the address of control module phy power register until a driver for
->>  control module is added
+>> Regards
+>> Haojian
 >>
->> +Optional properties:
->> + - has960mhzclk: should be added if the phy needs 960mhz clock
->> +
->>  This is usually a subnode of ocp2scp to which it is connected.
+>> The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
 >>
->>  usb3phy at 4a084400 {
->> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
->> index d36c282..d6612ba 100644
->> --- a/drivers/usb/phy/omap-usb2.c
->> +++ b/drivers/usb/phy/omap-usb2.c
->> @@ -146,6 +146,7 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
->>       struct omap_usb                 *phy;
->>       struct usb_otg                  *otg;
->>       struct resource                 *res;
->> +     struct device_node              *np = pdev->dev.of_node;
+>>   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
 >>
->>       phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
->>       if (!phy) {
->> @@ -190,6 +191,15 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
->>       }
->>       clk_prepare(phy->wkupclk);
+>> are available in the git repository at:
 >>
->> +     if (of_property_read_bool(np, "has960mhzclk")) {
->> +             phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
->> +             if (IS_ERR(phy->optclk)) {
->> +                     dev_err(&pdev->dev, "unable to get refclk960m\n");
->> +                     return PTR_ERR(phy->optclk);
->> +             }
->> +             clk_prepare(phy->optclk);
->> +     }
+>>   git://github.com/hzhuang1/linux.git dt2
+>>
+>> for you to fetch changes up to 37586e0b9cadd1072196c3cca8ea8559b91b1605:
+>>
+>>   ARM: dt: mmp-dma: add binding file (2012-09-21 15:51:26 +0800)
+>>
+>> ----------------------------------------------------------------
+>> Zhangfei Gao (1):
+>>       ARM: dt: mmp-dma: add binding file
 >
-> instead, can't you just always try to get the clock but ignore the error
-> if it fails ?
+> What happened to the rest of this series? It makes more sense to merge the
+> driver using the binding at the same time as the binding itself, so let's hold
+> off until the driver is reviewed and ready to go in too (or, if you merge that
+> through a different path, the binding could/should go with it there).
+>
+>
+> -Olof
 
-This clock is needed for usb2 to work in dwc3 (omap5). So we have to
-report the error in case we dont get the clock no?
+Vinod merges the rest of the patch series into his dma tree except for this one.
+I have to merge this one.
 
-Thanks
-Kishon
+http://www.spinics.net/lists/arm-kernel/msg195141.html
+
+Would you like to merge it into arm-soc tree?
+
+Regards
+Haojian
