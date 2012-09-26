@@ -1,62 +1,42 @@
-From: jangra.pankaj9@gmail.com (Pankaj Jangra)
-Date: Wed, 26 Sep 2012 23:33:30 +0530
-Subject: [PATCH 09/10] ARM: msm: Make proc_comm clock control into a
- platform driver
-In-Reply-To: <1348194419-11486-10-git-send-email-sboyd@codeaurora.org>
-References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
- <1348194419-11486-10-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CADTbHxoNdmAWaZ1dDYz_8zFr6xDxp8NYHPGF_WjYbeTWLmuMQw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Sep 2012 19:03:49 +0100
+Subject: [PATCH v6 0/3] Updated Cortex-M3 series
+In-Reply-To: <20120925150026.GG21730@pengutronix.de>
+References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120816202932.GY2232@pengutronix.de>
+ <20120921190002.GU5525@pengutronix.de> <5061C3FE.7050400@arm.com>
+ <20120925150026.GG21730@pengutronix.de>
+Message-ID: <20120926180349.GF15578@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Uwe,
 
-Its good  you started moving the msm to common clock framework.:)
-I hope msm's codeaurora tree will also be moved to CCF soon. :)
+On Tue, Sep 25, 2012 at 04:00:26PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Sep 25, 2012 at 03:47:26PM +0100, Jonathan Austin wrote:
+> > Looking at the patch series at a very superficial level, I wonder why
+> > you've chosen not to include any Kconfig/NVIC support at this stage,
+> > especially as you've posted some before and there appears to be
+> > something (presumably) working in your efm32 branch...
+> >
+> > It would be a shame to spend time on merging the basic support if there
+> > are issues that mean the interrupt support won't follow.
+> I plan to expand common/gic.c for interrupt support. Currently I don't
+> do much though because getting feedback and the changes into mainline is
+> quite hard and I don't want to spend time now and hear later that I did
+> it wrong or something. So I put my efforts on hold and only ping from
+> time to time.  :-(
 
-On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> To move closer to the generic struct clock framework move the
-> proc_comm based clock code to a platform driver. The data
-> describing the struct clks still live in the devices-$ARCH file,
-> but the clock initialization is done at driver binding time.
->
-> Cc: Saravana Kannan <skannan@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-Reviewed-by: Pankaj Jangra<jangra.pankaj9@gmail.com>
+My personal view is that merging the code without support for interrupts is
+fairly pointless, so the nvic code should certainly be included. I
+wouldn't worry too much about merging it with gic.c initially. That can come
+later, especially as we'll need to prise the gic into drivers/ at some point
+(it should be shared with arm64).
 
->  arch/arm/mach-msm/board-halibut.c      |  2 +-
->  arch/arm/mach-msm/board-msm7x30.c      |  2 +-
->  arch/arm/mach-msm/board-qsd8x50.c      |  2 +-
->  arch/arm/mach-msm/board-trout.c        |  3 +--
->  arch/arm/mach-msm/clock-pcom.c         | 23 +++++++++++++++++++++--
->  arch/arm/mach-msm/clock-pcom.h         |  5 +++++
->  arch/arm/mach-msm/clock.c              |  2 +-
->  arch/arm/mach-msm/clock.h              |  3 +++
->  arch/arm/mach-msm/devices-msm7x00.c    | 12 ++++++++++--
->  arch/arm/mach-msm/devices-msm7x30.c    | 11 +++++++++--
->  arch/arm/mach-msm/devices-qsd8x50.c    | 11 +++++++++--
->  arch/arm/mach-msm/devices.h            | 15 +++------------
->  arch/arm/mach-msm/include/mach/board.h |  5 -----
->  13 files changed, 65 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
-> index 6ce542e..3c8cfe4 100644
-> --- a/arch/arm/mach-msm/board-halibut.c
-> +++ b/arch/arm/mach-msm/board-halibut.c
-> @@ -59,6 +59,7 @@ static struct platform_device smc91x_device = {
->  };
+I think one reason for the lack of feedback is the inability for people to
+run this code themselves. I believe Jonny was trying to get started with an
+FPGA / simulation, but some hardware would be great if there's any available...
 
-> +
-> +static int __devinit msm_clock_pcom_probe(struct platform_device *pdev)
-> +{
-> +       struct pcom_clk_pdata *pdata = pdev->dev.platform_data;
+Cheers,
 
-Should'nt it be const struct?
-
-> +       msm_clock_init(pdata->lookup, pdata->num_lookups);
-> +       return 0;
-> +}
-> +
---
-Pankaj Jangra
+Will
