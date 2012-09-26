@@ -1,55 +1,52 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 26 Sep 2012 16:27:25 -0700
-Subject: [PATCH v2 0/2] OMAP: mailbox initial device tree support
-In-Reply-To: <CALLhW=4d8zxekkeGr1S52aGbufyk-vGeE9REYhDSt8pnap_Dxw@mail.gmail.com>
-References: <1347494898-16671-1-git-send-email-omar.luna@linaro.org>
- <1347494898-16671-4-git-send-email-omar.luna@linaro.org>
- <CALLhW=4d8zxekkeGr1S52aGbufyk-vGeE9REYhDSt8pnap_Dxw@mail.gmail.com>
-Message-ID: <50638F5D.8070508@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Sep 2012 20:27:35 -0300
+Subject: [PATCH 1/3] ARM: dts: imx53-qsb: Use pinctrl for gpio-led
+Message-ID: <1348702057-2351-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 9/26/2012 3:21 PM, Omar Ramirez Luna wrote:
-> Hi Benoit,
->
-> On 12 September 2012 19:08, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
->> To allow mailbox driver to function with device tree.
->>
->> Tested in OMAP4 and OMAP3. OMAP2 untested.
->>
->> Patch: arm/dts: OMAP2+: Add mailbox nodes, was Acked by Benoit
->> however it seems it wasn't picked up, so resend.
->>
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69121.html
->>
->> Patch: OMAP: mailbox: add device tree support, there wasn't an
->> opposition other than to cleanup the driver too, however I got
->> quite some patches to send before continuing the cleanup.
->>
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69338.html
->>
->> Omar Ramirez Luna (2):
->>    OMAP: mailbox: add device tree support
->>    arm/dts: OMAP2+: Add mailbox nodes
->>
->>   .../devicetree/bindings/arm/omap/mailbox.txt       |    9 +++++++++
->>   arch/arm/boot/dts/omap2.dtsi                       |    5 +++++
->>   arch/arm/boot/dts/omap3.dtsi                       |    5 +++++
->>   arch/arm/boot/dts/omap4.dtsi                       |    5 +++++
->>   arch/arm/mach-omap2/devices.c                      |    3 +++
->>   arch/arm/mach-omap2/mailbox.c                      |   12 ++++++++++++
->>   6 files changed, 39 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/omap/mailbox.txt
->
-> Ping. I'm in the understanding that these go through your tree, am I right?
+Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led driver 
+has pinctrl support, so setup the gpio led pin via pinctrl and avoid the 
+following warning:
 
-Since it is too late for 3.7, you should probably do two more things:
-- move the mailbox driver outside mach-omap2
-- move the nr_mbox information in the driver as well instead of the 
-hwmod for the DT boot.
+leds-gpio leds.2: pins are not configured from the driver
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx53-qsb.dts |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Regards,
-Benoit
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 08948af..5bae4c7 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -60,10 +60,16 @@
+ 							697  0x80000000	/* MX53_PAD_EIM_DA12__GPIO3_12 */
+ 							701  0x80000000	/* MX53_PAD_EIM_DA13__GPIO3_13 */
+ 							868  0x80000000	/* MX53_PAD_PATA_DA_0__GPIO7_6 */
++						>;
++					};
++
++					led_pin_gpio7_7: led_gpio7_7 at 0 {
++						fsl,pins = <
+ 							873  0x80000000	/* MX53_PAD_PATA_DA_1__GPIO7_7 */
+ 						>;
+ 					};
+ 				};
++
+ 			};
+ 
+ 			uart1: serial at 53fbc000 {
+@@ -216,6 +222,8 @@
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pin_gpio7_7>;
+ 
+ 		user {
+ 			label = "Heartbeat";
+-- 
+1.7.9.5
