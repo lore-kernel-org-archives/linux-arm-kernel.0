@@ -1,46 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Sep 2012 10:06:04 +0200
-Subject: [PATCH 3/3] serial: pl011: allow very high baudrates
-In-Reply-To: <CACRpkdbjsbUJqMgKt1CyBMmCxMAMz0hhwxzn3T6MdTyYGymjLg@mail.gmail.com>
-References: <1348134368-25663-1-git-send-email-linus.walleij@stericsson.com>
- <20120920190034.GB15609@n2100.arm.linux.org.uk>
- <CACRpkdY1ZxQoyGFO9OnKr0WYQzooxPGvZV8Gnr_YO_yT_+ddDw@mail.gmail.com>
- <20120921162543.1ed18775@pyramind.ukuu.org.uk>
- <CACRpkdakLAPmD0TQwe2VNhdePDuFv2KXD2U1xoP1C0axkx2p7A@mail.gmail.com>
- <20120921205603.436a0194@pyramind.ukuu.org.uk>
- <CACRpkdbjsbUJqMgKt1CyBMmCxMAMz0hhwxzn3T6MdTyYGymjLg@mail.gmail.com>
-Message-ID: <CACRpkda5rwpsiu4+wuXOCwHjnKZpAywGNJNRmPHtBHrcRUUzXg@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 26 Sep 2012 11:17:52 +0300
+Subject: [PATCH v2 0/9] add EDO feature for gpmi-nand driver
+In-Reply-To: <1347519480-31106-1-git-send-email-b32955@freescale.com>
+References: <1347519480-31106-1-git-send-email-b32955@freescale.com>
+Message-ID: <1348647472.24309.34.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 8:48 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Sep 21, 2012 at 9:56 PM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
->>
->> Caller passes BOTHER and actual bit rate - we return BOTHER and a bit
->> rate
->>
->> Caller does not pass BOTHER (may not be TCGETS2 aware) we snap to the
->> nearest Bfoo rate if within 5% otherwise we return BOTHER based rates.
->
-> OK sorry for getting this backwards, so I was under the impression that
-> BOTHER was an internal detail of the TTY layer, not to be or:ed on
-> and passed in from the outside.
+On Thu, 2012-09-13 at 14:57 +0800, Huang Shijie wrote:
+> The ONFI nand supports the EDO (extended data out) feature in 
+> asynchronous mode when the host controller(such as gpmi-nand)
+> uses a tRC of less then 30ns.
+> 
+> The gpmi can supports this EDO feature.
+> This patch set adds the EDO support the gpmi-nand driver.
 
-OK not I got it working thusly:
+I did not review this deeply, but the speed improvements are impressive
+and patches look good, so pushed to l2-mtd.git, thanks!
 
-/*
- * Make sure the core will not snap baudrate to something
- * "close to" requested rate by setting the BOTHER
- * (baud rate other) flag.
- */
-tty->termios->c_cflag &= ~CBAUD;
-tty->termios->c_cflag |= BOTHER | (BOTHER >> IBSHIFT);
-tty_encode_baud_rate(tty, baud, baud);
 
-There are no in-kernel consumers doing this wicked thing so
-mailing it here for reference.
-
-Hope I got it right now...
-
-Yours,
-Linus Walleij
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120926/02e85c15/attachment.sig>
