@@ -1,65 +1,160 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Wed, 26 Sep 2012 11:24:44 +0300
-Subject: [GIT PULL] ARM: LPC32xx: core update
-In-Reply-To: <5052FE40.2030305@antcom.de>
-References: <50488FD6.4080402@antcom.de> <201209131155.16756.arnd@arndb.de>
- <5052FE40.2030305@antcom.de>
-Message-ID: <1348647884.24309.35.camel@sauron.fi.intel.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 26 Sep 2012 08:26:19 +0000
+Subject: [RFC PATCH 00/13] DMA Engine support for AM33xx
+In-Reply-To: <20120921182211.GE16522@beef>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA8A79D@DBDE01.ent.ti.com>
+ <20120921182211.GE16522@beef>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8FDA9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-14 at 11:52 +0200, Roland Stigge wrote:
-> Hi Arnd,
-> 
-> On 13/09/12 13:55, Arnd Bergmann wrote:
-> > On Thursday 06 September 2012, Roland Stigge wrote:
-> >>       ARM: LPC32xx: Provide DMA filter callbacks via platform data
+On Fri, Sep 21, 2012 at 23:52:11, Porter, Matt wrote:
+> On Fri, Sep 21, 2012 at 08:27:07AM +0000, Hebbar, Gururaja wrote:
+> > On Thu, Sep 20, 2012 at 20:13:33, Porter, Matt wrote:
+> > > This series adds DMA Engine support for AM33xx, which uses
+> > > an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> > > a private API implementation (much like the situation with OMAP
+> > > DMA) found on the DaVinci family of SoCs.
+> > > 
+> > > There are a mind-boggling number of dependencies for this series:
+> > > 
+> > > 	- Jon Hunter's OF DMA helpers series
+> > > 	  https://patchwork.kernel.org/patch/1461061/
+> > > 	  https://patchwork.kernel.org/patch/1461051/
+> > > 	- Patch to address OF DMA helpers naming issues:
+> > > 	  https://patchwork.kernel.org/patch/1477921/
+> > > 	- EDMA DMA Engine wrapper driver in linux-next
+> > > 	  c2dde5f8f2095d7c623ff3565c1462e190272273
+> > > 	- EDMA DMA Engine wrapper driver bug fix:
+> > > 	  https://patchwork.kernel.org/patch/1474411/  
+> > > 	- A huge number of patches in linux-next for AM33xx boot
+> > > 	  (too numerous to list)
+> > > 
+> > > The approach taken is similar to how OMAP DMA is being converted to
+> > > DMA Engine support. With the functional EDMA private API already
+> > > existing in mach-davinci/dma.c, we first move that to an ARM common
+> > > area so it can be shared. Adding DT and runtime PM support to the
+> > > private EDMA API implementation allows it to run on AM33xx. AM33xx
+> > > *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> > > register EDMA DMAC with the of_dma framework and then add support
+> > > for calling the dma_request_slave_channel() API to both the mmc
+> > > and spi drivers.
+> > > 
+> > > What works? Well, with this series we now have MMC and SPI support
+> > > on AM33xx. The only caveat for MMC is that the mmc3 controller has
+> > > its events on the crossbar and is not usable right now.
+> > > 
+> > > This is tested on BeagleBone with a SPI framebuffer driver and SD
+> > > card.
+> > > 
+> > > After this series, the plan is to convert the last in-tree user
+> > > of the private EDMA API (davinci-pcm/mcasp) and then eliminate
+> > > the private EDMA API by folding its functionality into
+> > > drivers/dma/edma.c.
+> > > 
+> > > TODO:
+> > > 	add AM33xx crossbar support to the private EDMA API
+> > > 	(any EDMA events on the crossbar are not supported)
+> > > 
 > > 
-> > This patch results in build errors in the for-next branch with lpc32xx_defconfig:
 > > 
-> > arch/arm/mach-lpc32xx/phy3250.c:40:35: fatal error: linux/mtd/lpc32xx_slc.h: No such file or directory
-> > arch/arm/mach-lpc32xx/phy3250.c:41:35: fatal error: linux/mtd/lpc32xx_mlc.h: No such file or directory
-> > arch/arm/mach-lpc32xx/phy3250.c:226:15: error: variable 'lpc32xx_slc_data' has initializer but incomplete type
-> > arch/arm/mach-lpc32xx/phy3250.c:227:2: error: unknown field 'dma_filter' specified in initializer
-> > arch/arm/mach-lpc32xx/phy3250.c:227:2: error: excess elements in struct initializer [-Werror]
-> > arch/arm/mach-lpc32xx/phy3250.c:227:2: error: (near initialization for 'lpc32xx_slc_data') [-Werror]
-> > arch/arm/mach-lpc32xx/phy3250.c:230:15: error: variable 'lpc32xx_mlc_data' has initializer but incomplete type
-> > arch/arm/mach-lpc32xx/phy3250.c:231:2: error: unknown field 'dma_filter' specified in initializer
-> > arch/arm/mach-lpc32xx/phy3250.c:231:2: error: excess elements in struct initializer [-Werror]
-> > arch/arm/mach-lpc32xx/phy3250.c:231:2: error: (near initialization for 'lpc32xx_mlc_data') [-Werror]
+> > Can you please mention the base repo you have taken as starting point.
+> > (repo + extra patches ...).
+> 
+> It's mainline 3.6-rc6 and you can see the complete set of patches
+> at https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
+> after commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2
+> 
+> > This will help us to test the code.
 > > 
-> > It seems that we're missing a dependency. Which tree did the patch to add
-> > these go through? Can we add that to the same branch in arm-soc?
+> > This is because I looked at the patch 12/13 and I see that mmc
+> > device-node is modified. But in mainline I don?t see device 
+> > node for mmc (yet).
 > 
-> Right - there is a dependency on l2-mtd.git here.
+> Oops. You'll need e62a3333ae450bcdefbe22229d7bc277ae0ef645 and
+> fe97304557d2c6f7d0aaf1ea028ea48ffca366a9 which I forgot to include
+> in this series. I'll have them in for v2.
+
+Yesterday I tested edma patches on latest linux-next/master + merge of 
+linux-omap/for_3.7/dts_part2. Below are my observations
+
+1. baseline = linux-next/master + merge of linux-omap/for_3.7/dts_part2
+2. on top of above branch, I applied patches [1-9]/13 of your edma 
+   patches
+3. few patches required trivial changes before applying
+4. Applied dma of patches as you mentioned
+5. add custom patch (ARM: CUSTOM: Build a uImage with dtb already 
+   appended)
+   From https://github.com/hvaibhav/am335x-linux/commit/
+        7e72f5ed4b702c9373d19f7626f07ae31a381d53#arch/arm/Makefile
+
+6. Modified 9/13 patch to apply properly on latest am33xx.dtsi.
+	a. Edma portion as it is
+	b. mmc portion as below
+		mmc1: mmc at 48060000 {
+			compatible = "ti,omap3-hsmmc";
+			ti,hwmods = "mmc1";
+			ti,dual-volt;
+			ti,needs-special-reset;
+			bus-width = <4>;
+			vmmc-supply = <&vmmc_reg>;
+			dmas = <&edma 24
+				&edma 25>;
+			dma-names = "tx", "rx";
+		};
+	c. added mmc pinmux as-well
+
+7. make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm distclean
+   make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm 
+   omap2plus_defconfig
+
+8. enabled TI_EDMA from menuconfig (since it was not enabled for 
+   omap2plus_defconfig
+
+9. make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm uImage
+   make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm 
+   uImage-dtb.am335x-evm
+
+With above changes, edma probe was failing at request_mem_region() 
+Inside linux-next/arch/arm/common/edma.c --> edma_probe()
+
+I had to modify edma_probe as below
+
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index f337f81..efe2673 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1589,11 +1589,11 @@ static int __init edma_probe(struct platform_device *pdev)
+        for (j = 0; j < EDMA_MAX_CC; j++) {
+                if (node) {
+                        int err;
+-                       err = of_address_to_resource(node, 0, &res[j]);
++                       err = of_address_to_resource(node, j, &res[j]);
+                        if (err) {
+                                dev_err(dev,
+                                        "unable to find 'reg' property\n");
+-                               return -EIO;
++                               //return -EIO;
+                        }
+                        r[j] = &res[j];
+
+
+
+With this I was able to boot on am335x-evm and do a successful MMC 
+copy-md5sum-compare test.
+
+I believe you are looking into above issue in your v2 version.
+
 > 
-> Since they didn't request pull for 3.6, there is quite some stuff
-> pending in their tree (but I wonder why it isn't already part of
-> linux-next, so the above error at least shouldn't occur in linux-next).
+> -Matt
+> 
 
-It is in linux-next:
+...snip...
+...snip...
+...snip...
 
-[dedekind at sauron linux-next (master)]$ git log --format='%h %an %s' drivers/mtd/ | grep Stigge
-562dec8 Roland Stigge mtd: lpc32xx_mlc: Cleanup after DT-only conversion
-ad978ee Roland Stigge mtd: lpc32xx_slc: Cleanup after DT-only conversion
-7359e4c Roland Stigge mtd: lpc32xx_mlc: Make driver independent of AMBA DMA engine driver
-fa5eae7 Roland Stigge mtd: lpc32xx_slc: Make driver independent of AMBA DMA engine driver
-79f9df7 Roland Stigge mtd: lpc32xx_mlc: Adjust to pl08x DMA interface changes
-314a156 Roland Stigge mtd: lpc32xx_slc: Adjust to pl08x DMA interface changes
-70f7cb7 Roland Stigge mtd: add LPC32xx MLC NAND driver
-d5842ab Roland Stigge mtd: lpc32xx_slc: Make probe() return -EPROBE_DEFER if necessary
-21535ab Roland Stigge mtd: lpc32xx_slc: Use of_get_named_gpio()
-2944a44 Roland Stigge mtd: add LPC32xx SLC NAND driver
-9d7b4b5 Roland Stigge [MTD] [NAND] Fix refactoring of EDB7312 hwcontrol function.
-4a32cfa Roland Stigge [MTD] [NAND] Fix refactoring of EDB7312 hwcontrol function.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120926/56636377/attachment.sig>
+Regards, 
+Gururaja
