@@ -1,43 +1,43 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 26 Sep 2012 13:32:10 +0900
-Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
-In-Reply-To: <20120925153109.GA8834@sirena.org.uk>
-References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
- <505C9072.2010204@wwwdotorg.org>
- <CAAQKjZMZBDpKinZkDUX7CU4yTXmu9GrP1+OiZJKW4Gx1BTno3Q@mail.gmail.com>
- <2368486.hLKA5vLF0M@avalon>
- <CAAQKjZN++zZ9cfNCB21TeQwPZgFVU-Cmo9ZhVwaaMz+HO2vHig@mail.gmail.com>
- <20120925153109.GA8834@sirena.org.uk>
-Message-ID: <CAAQKjZNRJHuA4+B-tP5vTaDfmMMxC+VKLDJU4gtpvtu=srzgAg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 26 Sep 2012 14:57:56 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the fbdev tree
+Message-ID: <20120926145756.e00474c7d2f1a4734c10fb0e@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/9/26 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> On Wed, Sep 26, 2012 at 12:03:44AM +0900, Inki Dae wrote:
->> 2012/9/25 Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
->
->> > Aren't DT bindings considered as an ABI, and required to be supported more or
->> > less forever ? If you merge this DT binding you'll have to keep supporting it.
->> > That's why DT bindings should not be rushed in.
->
->> is ABI required for DT binding?  I know DT binding parses just lcd
->> timing data from device tree file so ABI isn't needed. but when it
->> comes to DT, I'm novice yet so there may be my missing point. could
->> you tell me why DT bindings are considered as an ABI? if there is my
->> missing point, will consider it again.
->
-> It's supposed to be possible to ship a DT with a board and then boot any
-> OS or OS version on the board.  If the meaning of the DT keeps changing
-> then this becomes impossible, you need to keep changing the DT when you
-> change the thing that parses it (rendering the whole exercise pointless).
->
+Hi all,
 
-thank you for your comments. got it. DT is built as an binary(dtb) and
-the dtb file should be re-used without any modifications. will keep
-this patch until the videomode helper will be merged to mainline so
-that this could be modified based on videomode helper later.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/video/msm/mdp_hw.h between commit 8abf0b31e161 ("video: msm:
+Remove useless mach/* includes") from the fbdev tree and commit
+1ef21f6343ff ("ARM: msm: move platform_data definitions") from the
+arm-soc tree.
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/video/msm/mdp_hw.h
+index 2a84137,a0bacf5..0000000
+--- a/drivers/video/msm/mdp_hw.h
++++ b/drivers/video/msm/mdp_hw.h
+@@@ -15,7 -15,8 +15,7 @@@
+  #ifndef _MDP_HW_H_
+  #define _MDP_HW_H_
+  
+- #include <mach/msm_fb.h>
+ -#include <mach/msm_iomap.h>
++ #include <linux/platform_data/video-msm_fb.h>
+  
+  struct mdp_info {
+  	struct mdp_device mdp_dev;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120926/ada6c5eb/attachment.sig>
