@@ -1,19 +1,56 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Wed, 26 Sep 2012 13:57:50 -0700
-Subject: [PATCH v9 0/11] KGDB/KDB FIQ (NMI) debugger
-In-Reply-To: <20120926205420.GA2510@kroah.com>
-References: <20120924212648.GA27605@lizard> <20120926205420.GA2510@kroah.com>
-Message-ID: <20120926205749.GA2219@lizard>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Wed, 26 Sep 2012 23:26:39 +0200
+Subject: [PATCH V6] ARM: bcm2835: add stub clock driver
+In-Reply-To: <5059EF86.8060902@wwwdotorg.org>
+References: <1348026973-18887-1-git-send-email-swarren@wwwdotorg.org>
+ <CAOREObGmF9ND9Y16HkczGf0DrUULgg-Y7KRnjof97ATcpsZpmw@mail.gmail.com>
+ <5059EF86.8060902@wwwdotorg.org>
+Message-ID: <20120926212639.GA20182@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 01:54:20PM -0700, Greg Kroah-Hartman wrote:
-> On Mon, Sep 24, 2012 at 02:26:50PM -0700, Anton Vorontsov wrote:
-> > Here comes v9...
+On Wed, Sep 19, 2012 at 10:15:02AM -0600, Stephen Warren wrote:
+> On 09/19/2012 02:54 AM, Domenico Andreoli wrote:
+> > Hi Stephen,
 > > 
-> > Greg, patches 1-7 have gotten all the needed acks from Alan and Jason, so
-> > it would be awesome if you could apply them to your tty-next tree.
+> > On Sep 19, 2012 5:57 AM, "Stephen Warren" <swarren@wwwdotorg.org
+> > <mailto:swarren@wwwdotorg.org>> wrote:
+> >> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+> >> new file mode 100644
+> >> index 0000000..ad65f0e
+> >> --- /dev/null
+> >> +++ b/drivers/clk/clk-bcm2835.c
+> >> @@ -0,0 +1,58 @@
+> >> +/*
+> >> + * Copyright (C) 2010 Broadcom
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License as published by
+> >> + * the Free Software Foundation; either version 2 of the License, or
+> >> + * (at your option) any later version.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + *
+> >> + * You should have received a copy of the GNU General Public License
+> >> + * along with this program; if not, write to the Free Software
+> >> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+> >  02111-1307  USA
+> >> + */
+> > 
+> > why the copyright is of Broadcom? these files are written from scratch
+> > or anyway being reworked quite a bit, right?
 > 
-> All 7 patches of these are now applied, thanks.
+> The original code in Simon's branch has this (c) message so I maintained
+> it. I honestly don't know whether Simon wrote this patch from scratch or
+> derived it from Broadcom code.
+> 
+> Given the rework I did, I suppose I should have added my (c) on this
+> patchset too though; I can fix that up locally before sending the pull
+> request unless you have objections.
 
-Thanks a lot, Greg!
+No objections for sure. Thanks.
+
+Domenico
