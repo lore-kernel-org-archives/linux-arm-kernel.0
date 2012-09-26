@@ -1,90 +1,63 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 26 Sep 2012 21:27:20 +0300
-Subject: [PATCH 4/4] usb: phy: omap-usb2: enable 960Mhz clock for omap5
-In-Reply-To: <CAAe_U6Kr8t1=T7MGMjAe+1n6S-NncypnPkXYqA2_FtVK=uxULA@mail.gmail.com>
-References: <1348054229-27362-1-git-send-email-kishon@ti.com>
- <1348054229-27362-5-git-send-email-kishon@ti.com>
- <20120919115647.GI3772@arwen.pp.htv.fi>
- <CAAe_U6Kr8t1=T7MGMjAe+1n6S-NncypnPkXYqA2_FtVK=uxULA@mail.gmail.com>
-Message-ID: <20120926182719.GA10326@arwen.pp.htv.fi>
+From: stanhu@gmail.com (Stan Hu)
+Date: Wed, 26 Sep 2012 11:34:27 -0700
+Subject: [PATCH 1/1] ARM: Add option to configure output line for McSPI driver
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1348684467-5707-1-git-send-email-stanhu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+McSPI driver previously assumed that D0 was input (MISO) and D1 was output (MOSI).
+This forces the hardware designer to wire all SPI peripherals in this way when
+it should be a software configuration option.
 
-On Wed, Sep 26, 2012 at 11:10:48AM +0530, ABRAHAM, KISHON VIJAY wrote:
-> Hi,
-> 
-> On Wed, Sep 19, 2012 at 5:26 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Wed, Sep 19, 2012 at 05:00:29PM +0530, Kishon Vijay Abraham I wrote:
-> >> "usb_otg_ss_refclk960m" is needed by usb2 phy present in omap5. For
-> >> omap4, the clk_get of this clock will fail since it does not have this
-> >> clock.
-> >>
-> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/usb/usb-phy.txt |    3 +++
-> >>  drivers/usb/phy/omap-usb2.c                       |   28 ++++++++++++++++++++-
-> >>  2 files changed, 30 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
-> >> index 7c5fd89..d5626de 100644
-> >> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
-> >> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
-> >> @@ -24,6 +24,9 @@ Required properties:
-> >>  add the address of control module phy power register until a driver for
-> >>  control module is added
-> >>
-> >> +Optional properties:
-> >> + - has960mhzclk: should be added if the phy needs 960mhz clock
-> >> +
-> >>  This is usually a subnode of ocp2scp to which it is connected.
-> >>
-> >>  usb3phy at 4a084400 {
-> >> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
-> >> index d36c282..d6612ba 100644
-> >> --- a/drivers/usb/phy/omap-usb2.c
-> >> +++ b/drivers/usb/phy/omap-usb2.c
-> >> @@ -146,6 +146,7 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
-> >>       struct omap_usb                 *phy;
-> >>       struct usb_otg                  *otg;
-> >>       struct resource                 *res;
-> >> +     struct device_node              *np = pdev->dev.of_node;
-> >>
-> >>       phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
-> >>       if (!phy) {
-> >> @@ -190,6 +191,15 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
-> >>       }
-> >>       clk_prepare(phy->wkupclk);
-> >>
-> >> +     if (of_property_read_bool(np, "has960mhzclk")) {
-> >> +             phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
-> >> +             if (IS_ERR(phy->optclk)) {
-> >> +                     dev_err(&pdev->dev, "unable to get refclk960m\n");
-> >> +                     return PTR_ERR(phy->optclk);
-> >> +             }
-> >> +             clk_prepare(phy->optclk);
-> >> +     }
-> >
-> > instead, can't you just always try to get the clock but ignore the error
-> > if it fails ?
-> 
-> This clock is needed for usb2 to work in dwc3 (omap5). So we have to
-> report the error in case we dont get the clock no?
+Signed-off-by: Stan Hu <stanhu@gmail.com>
+---
+ arch/arm/plat-omap/include/plat/mcspi.h |    2 ++
+ drivers/spi/spi-omap2-mcspi.c           |   11 +++++++++--
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-sure, but you don't need to bail out. Print a warning message such as:
-
-dev_dbg(&pdev->dev, "couldn't get refclk960m, trying without\n");
-
-or something similar. Then you don't need to add this has960mhzclk flag
-to dts files.
-
+diff --git a/arch/arm/plat-omap/include/plat/mcspi.h b/arch/arm/plat-omap/include/plat/mcspi.h
+index a357eb2..0a6b790 100644
+--- a/arch/arm/plat-omap/include/plat/mcspi.h
++++ b/arch/arm/plat-omap/include/plat/mcspi.h
+@@ -18,6 +18,8 @@ struct omap2_mcspi_dev_attr {
+ 
+ struct omap2_mcspi_device_config {
+ 	unsigned turbo_mode:1;
++	/* 1 -> [D0 = MOSI, D1 = MISO], otherwise vice versa */
++	unsigned d0_is_output:1;
+ };
+ 
+ #endif
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index b2fb141..1853527 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -717,6 +717,7 @@ static int omap2_mcspi_setup_transfer(struct spi_device *spi,
+ 		struct spi_transfer *t)
+ {
+ 	struct omap2_mcspi_cs *cs = spi->controller_state;
++	struct omap2_mcspi_device_config *cd = spi->controller_data;
+ 	struct omap2_mcspi *mcspi;
+ 	struct spi_master *spi_cntrl;
+ 	u32 l = 0, div = 0;
+@@ -742,8 +743,14 @@ static int omap2_mcspi_setup_transfer(struct spi_device *spi,
+ 	/* standard 4-wire master mode:  SCK, MOSI/out, MISO/in, nCS
+ 	 * REVISIT: this controller could support SPI_3WIRE mode.
+ 	 */
+-	l &= ~(OMAP2_MCSPI_CHCONF_IS|OMAP2_MCSPI_CHCONF_DPE1);
+-	l |= OMAP2_MCSPI_CHCONF_DPE0;
++	l &= ~(OMAP2_MCSPI_CHCONF_IS|
++		OMAP2_MCSPI_CHCONF_DPE0|OMAP2_MCSPI_CHCONF_DPE1);
++
++	/* set input selection for D0 and D1 */
++	if (cd->d0_is_output)
++		l |= OMAP2_MCSPI_CHCONF_IS|OMAP2_MCSPI_CHCONF_DPE1;
++	else
++		l |= OMAP2_MCSPI_CHCONF_DPE0;
+ 
+ 	/* wordlength */
+ 	l &= ~OMAP2_MCSPI_CHCONF_WL_MASK;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120926/c4feacfe/attachment-0001.sig>
+1.7.9.5
