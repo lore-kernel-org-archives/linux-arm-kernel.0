@@ -1,68 +1,46 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 26 Sep 2012 10:35:08 +1000
-Subject: [PATCH 1/1] Fix segfault in DTC
-In-Reply-To: <50624393.30607@broadcom.com>
-References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
- <20120925233054.GL9800@truffula.fritz.box>
- <50624393.30607@broadcom.com>
-Message-ID: <20120926003508.GB31993@truffula.fritz.box>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 26 Sep 2012 10:46:01 +0900
+Subject: [PATCH V2 3/3] ARM: EXYNOS: Add drm-device node to the dtsi file
+In-Reply-To: <1348232397-2477-4-git-send-email-l.krishna@samsung.com>
+References: <1348232397-2477-1-git-send-email-l.krishna@samsung.com>
+ <1348232397-2477-4-git-send-email-l.krishna@samsung.com>
+Message-ID: <135e01cd9b88$aea81140$0bf833c0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 04:51:47PM -0700, Markus Mayer wrote:
-> On 25/09/2012 16:30, David Gibson wrote:
-> >On Tue, Sep 25, 2012 at 10:58:09AM -0700, Markus Mayer wrote:
-> >>Prior to this change, an empty input file would cause a segfault, because
-> >>yylloc had never been initialized. There was never any characters for the
-> >>lexer to match, so YY_USER_ACTION was never executed before the parse error
-> >>was detected.
-> >>
-> >>When the parser printed the error message, it tried to include the name of
-> >>the file, but the structure holding the file name (yylloc.file, referenced
-> >>as pos->file) had never been initialized.
-> >>
-> >>Without the fix:
-> >>
-> >>$ ./dtc /dev/null
-> >>DTC: dts->dts  on file "/dev/null"
-> >>Segmentation fault (core dumped)
-> >>
-> >>$ gdb dtc core
-> >>Program terminated with signal 11, Segmentation fault.
-> >>     at scripts/dtc/srcpos.c:194
-> >>194			fname = pos->file->name;
-> >>(gdb) bt
-> >>     at scripts/dtc/srcpos.c:194
-> >>     fmt=0x40d769 "%s", va=0x7fffbf027148) at scripts/dtc/srcpos.c:220
-> >>     at scripts/dtc/dtc-parser.tab.c:1920
-> >>     at scripts/dtc/treesource.c:38
-> >>     at scripts/dtc/dtc.c:203
-> >>(gdb) p *pos
-> >>$1 = {first_line = 0, first_column = 0, last_line = 0, last_column = 0,
-> >>   file = 0x0}
-> >
-> >Which dtc version did you observe this with?  I'm unable to reproduce
-> >the SEGV with current git.
+Leela Krishna Amudala wrote:
 > 
-> That was
+> This patch adds platform drm-device node to the dtsi file
 > 
-> $ cat version_gen.h
-> #define DTC_VERSION "DTC 1.2.0-g37c0b6a0"
+> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> from
-> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git. In
-> other words, the DTC used by the Linux 3.6-rc series.
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index 6401c94..f0cc06d 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -495,4 +495,8 @@
+>  		reg = <0x14400000 0x40000>;
+>  		interrupts = <18 5>, <18 4>, <18 6>;
+>  	};
+> +
+> +	drm-device {
+> +		compatible = "samsung,exynos-drm-device";
+> +	};
+>  };
+> --
 
-Ah, ok.  Patches to dtc should be made against the upstream version at
-git://git.jdl.com/software/dtc.git.  In this case the bug was already
-fixed there, in commit a6e6c60e3a97a6b3a033cd052bb3740fd53cbf4c.
+Please check below comments from Thomas Abraham and I agree with his
+opinion.
 
-I think we're overdue to update the kernel copy of dtc from upstream.
+There cannot be a node that represents a virtual device. Device tree should
+ideally describe the hardware but the above node does not represent a
+hardware device. The creation of the platform device instance for the above
+device should handled inside the kernel code.
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+Thanks.
+
+K-Gene <kgene@kernel.org>
