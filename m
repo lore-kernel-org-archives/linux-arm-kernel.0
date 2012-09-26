@@ -1,53 +1,50 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 26 Sep 2012 11:39:56 +0100
-Subject: [PATCH] ARM: pxa: hx4700: Fix backlight PWM device number
-In-Reply-To: <CA+E=qVfnjQJrrW-5jYzt8yxEH7t3merHzPH2RVAjD0GbcviTgw@mail.gmail.com>
-References: <5062652A.8070603@yahoo.com> <5062659E.6030104@yahoo.com>
- <CA+E=qVfnjQJrrW-5jYzt8yxEH7t3merHzPH2RVAjD0GbcviTgw@mail.gmail.com>
-Message-ID: <5062DB7C.5050203@yahoo.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 26 Sep 2012 12:44:05 +0200
+Subject: [PATCH v3] ARM: i.MX35: Add kernel oftree support
+In-Reply-To: <1348652369-16649-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1348652369-16649-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120926104405.GM1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vasily,
+Hi Uwe,
 
-On 26/09/12 07:40, Vasily Khoruzhick wrote:
-> On Wed, Sep 26, 2012 at 5:17 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
->> Recent changes to PXA PWM support changed the PXA27X PWM device
->> numbering scheme.
->>
->> The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
->> the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
->> numbering scheme:
->>
->> Address         Hardware        3.5 pwm_id      3.6-rc1 pwm_id
->> 0x40b00000      PWM0            0               0
->> 0x40b00010      PWM2            2               1
->> 0x40c00000      PWM1            1               2
->> 0x40c00010      PWM3            3               3
->
-> Looks very weird to me. Maybe it would be better to fix pwm numbering
-> scheme to prevent breakage of
-> other machines?
+Some points:
 
-I thought the same thing. However the code doesn't make it easy:
+- Can we have a more complete devicetree? For the i.MX27 I posted a
+  devicetree containing the nodes I need, I wouldn't do that again.
+  During creating the i.MX25   devicetree I realized that it's actually
+  not much work to make it (nearly) complete. It'll save us from patching
+  this file frequently. I am missing nodes at least for the GPT and CCM.
+  These are currently not used, but I think we'll need them soon.
+- Can we have devicetree clock lookups like Shawn has done for the i.MX6
+  (and me for the i.MX25)?
 
-1. The definition of pwm_id values moved from the pwm_probe() in
-arch/arm/plat-pxa/pwm.c to pwmchip_add() in drivers/pwm/core.c.
-Changing the latter generic code would impact all of the PWM drivers,
-not just the PXA PWM driver.
+On Wed, Sep 26, 2012 at 11:39:29AM +0200, Uwe Kleine-K?nig wrote:
+> +			gpio3: gpio at 0x53fa4000 {
+> +				compatible = "fsl,imx35-gpio", "fsl,imx31-gpio";
+> +				reg = <0x53fa4000 0x4000>;
+> +				interrupts = <56>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			esdhc1: esdhc at 53fb4000 {
+> +				compatible = "fsl,mx35-sdhc";
+> +				reg = <0x53fb4000 0x4000>;
+> +				interrupts = <7>;
+> +				status = "disabled";
+> +			};
 
-2. Changing just the PXA PWM driver would require its pwm_ops handlers
-(config(), enable(), disable()) to quietly translate between PWM1 and
-PWM2 devices. However PWM1 and PWM2 are on different chips (i.e.
-pwm_chip structures). So what would the driver do when there is only
-one chip? i.e.:
-a) Between the first and second calls to pwm_probe().
-b) Between the first and second calls to pwm_remove().
-And in any case quietly translating between PWM1 and PWM2 just doesn't
-seem like a good idea: sooner or later it will quietly break the
-generic code.
+Please add a bus-width = <4> property to the esdhc units. It's the default
+right now, but this property might become mandatory.
 
-On balance it seemed preferable to change the platform code.
+Sascha
 
-Regards,
-Paul
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
