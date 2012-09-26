@@ -1,45 +1,35 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Wed, 26 Sep 2012 15:32:59 -0700
-Subject: [PATCH 08/11] ARM: Move some macros from entry-armv to
- entry-header
-In-Reply-To: <50637C24.90206@codeaurora.org>
-References: <20120924212648.GA27605@lizard>
- <1348522080-32629-8-git-send-email-anton.vorontsov@linaro.org>
- <50637C24.90206@codeaurora.org>
-Message-ID: <20120926223258.GA5768@lizard>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 27 Sep 2012 09:21:10 +1000
+Subject: [GIT PULL] ep93xx-fixes for 3.7
+Message-ID: <50638DE6.8010801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 03:05:24PM -0700, Stephen Boyd wrote:
-> > Just move the macros into header file as we would want to use them for
-> > KGDB FIQ entry code.
-> >
-> > The following macros were moved:
-> >
-> >  - svc_entry
-> >  - usr_entry
-> >  - kuser_cmpxchg_check
-> >  - vector_stub
-> >
-> > To make kuser_cmpxchg_check actually work across different files, we
-> > also have to make kuser_cmpxchg64_fixup global.
-> >
-> > Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
-> 
-> Why can't we put the fiq entry code from the next patch into
-> entry-armv.S? Sorry if this has been asked before but I don't see any
-> reasoning in the commit text.
+The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
-Thanks for taking a look!
+  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 
-This is a prerequisite to just logically separate KGDB FIQ code from the
-entry code.
+are available in the git repository at:
 
-Or to put it the other way around: KGDB FIQ is just another user of the
-FIQs, nothing quite special in it to put it alongside the entry code. :-)
+  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.7
 
-But if Russell or other folks feel that having KGDB FIQ asm code in
-entry-armv.S makes sense, I'd definitely do this.
+for you to fetch changes up to e4d4a9027877593d80d71e8a93e39670b1881627:
 
-Thanks,
-Anton.
+  ARM: ep93xx: Move ts72xx.h out of include/mach (2012-09-17 09:09:08 +1000)
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: ep93xx: use __iomem pointers for MMIO
+
+Axel Lin (1):
+      ARM: ep93xx: Fix build error due to 'SZ_32M' undeclared
+
+Ryan Mallon (1):
+      ARM: ep93xx: Move ts72xx.h out of include/mach
+
+ arch/arm/mach-ep93xx/adssphere.c                 |    1 +
+ arch/arm/mach-ep93xx/gesbc9312.c                 |    1 +
+ arch/arm/mach-ep93xx/ts72xx.c                    |   12 ++++++------
+ arch/arm/mach-ep93xx/{include/mach => }/ts72xx.h |   10 +++++-----
+ 4 files changed, 13 insertions(+), 11 deletions(-)
+ rename arch/arm/mach-ep93xx/{include/mach => }/ts72xx.h (89%)
