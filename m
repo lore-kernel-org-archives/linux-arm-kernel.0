@@ -1,37 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Sep 2012 20:27:37 -0300
-Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Add DA9052 regulator support
-In-Reply-To: <1348702057-2351-1-git-send-email-festevam@gmail.com>
-References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
-Message-ID: <1348702057-2351-3-git-send-email-festevam@gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 27 Sep 2012 07:47:46 +0800
+Subject: [BUG] Deferred probing in driver model is racy,
+ resulting in lost probes
+In-Reply-To: <20120926202321.GD30938@n2100.arm.linux.org.uk>
+References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
+ <CACVXFVPahbFVEP4p2Z9-TvjQ52tUCMuDeLx0X6GP5t0h5gEV8g@mail.gmail.com>
+ <20120916082510.GN12245@n2100.arm.linux.org.uk>
+ <CACVXFVOZ=4HFAy38q_8ZUjOPffcv_mMTi7KCdh3HcX=MCLw5SQ@mail.gmail.com>
+ <20120926200833.GA14340@kroah.com>
+ <20120926202321.GD30938@n2100.arm.linux.org.uk>
+Message-ID: <CACVXFVPnpQ6yHiDaoo_CPG7oSEq+ZzxpmTgQv55-tRRyaavDfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Sep 27, 2012 at 4:23 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Sep 26, 2012 at 01:08:33PM -0700, Greg Kroah-Hartman wrote:
+>> On Sun, Sep 16, 2012 at 09:24:43PM +0800, Ming Lei wrote:
+>> > diff --git a/drivers/base/bus.c b/drivers/base/bus.c
+>> > index 181ed26..17d7437 100644
+>> > --- a/drivers/base/bus.c
+>> > +++ b/drivers/base/bus.c
+>> > @@ -714,12 +714,12 @@ int bus_add_driver(struct device_driver *drv)
+>> >     if (error)
+>> >             goto out_unregister;
+>> >
+>> > +   klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
+>> >     if (drv->bus->p->drivers_autoprobe) {
+>> >             error = driver_attach(drv);
+>> >             if (error)
+>> >                     goto out_unregister;
+>> >     }
+>> > -   klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
+>> >     module_add_driver(drv->owner, drv);
+>> >
+>> >     error = driver_create_file(drv, &driver_attr_uevent);
+>> >
+>> >
+>> >
+>>
+>> Did the above patch ever prove to solve the issue or not?
+>
+> To be honest, I've not bothered to test the above patch, and now when I
+> look at it, I notice it's broken - in that on error it will corrupt the
+> driver list.  Take a look at the error path.
+>
+> priv is drv->p.  We add priv->knode_bus to the driver list.  If
+> driver_attach() returns an error, then we go to out_unregister, which
 
-Add DA9052 regulator support.
- 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+In fact, driver_attach() always returns zero, so it does __not__ affect
+your test.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 66aa7a6..67620d6 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -142,10 +142,12 @@ CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
-+CONFIG_MFD_DA9052_I2C=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_DA9052=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
+I knew the failure shouldn't be handled in theory because the probe
+failure on one device should not cause failure of driver_register, and
+it should be fixed, IMO.
+
+> does:
+>
+> out_unregister:
+>         kobject_put(&priv->kobj);
+>         kfree(drv->p);
+>         drv->p = NULL;
+>
+> thereby freeing the node we just added to the driver list without first
+> removing it.
+>
+> I suspect it will fix the problem, but let's get the patch to be correct
+> before it gets tested...
+
+Trust me, please go ahead to test and it doesn't affect it...
+
+Thanks,
 -- 
-1.7.9.5
+Ming Lei
