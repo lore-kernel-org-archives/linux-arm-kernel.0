@@ -1,160 +1,155 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 26 Sep 2012 08:26:19 +0000
-Subject: [RFC PATCH 00/13] DMA Engine support for AM33xx
-In-Reply-To: <20120921182211.GE16522@beef>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1BAFE6F6C881BF42822005164F1491C33EA8A79D@DBDE01.ent.ti.com>
- <20120921182211.GE16522@beef>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA8FDA9@DBDE01.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 26 Sep 2012 10:28:27 +0200
+Subject: [PATCH 6/6] spi: atmel: add dt property for DMA configuration
+ for sam9x5 and sam9n12
+In-Reply-To: <1348642261-27554-7-git-send-email-wenyou.yang@atmel.com>
+References: <1348642261-27554-1-git-send-email-wenyou.yang@atmel.com>
+ <1348642261-27554-7-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <5062BCAB.1050405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 23:52:11, Porter, Matt wrote:
-> On Fri, Sep 21, 2012 at 08:27:07AM +0000, Hebbar, Gururaja wrote:
-> > On Thu, Sep 20, 2012 at 20:13:33, Porter, Matt wrote:
-> > > This series adds DMA Engine support for AM33xx, which uses
-> > > an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> > > a private API implementation (much like the situation with OMAP
-> > > DMA) found on the DaVinci family of SoCs.
-> > > 
-> > > There are a mind-boggling number of dependencies for this series:
-> > > 
-> > > 	- Jon Hunter's OF DMA helpers series
-> > > 	  https://patchwork.kernel.org/patch/1461061/
-> > > 	  https://patchwork.kernel.org/patch/1461051/
-> > > 	- Patch to address OF DMA helpers naming issues:
-> > > 	  https://patchwork.kernel.org/patch/1477921/
-> > > 	- EDMA DMA Engine wrapper driver in linux-next
-> > > 	  c2dde5f8f2095d7c623ff3565c1462e190272273
-> > > 	- EDMA DMA Engine wrapper driver bug fix:
-> > > 	  https://patchwork.kernel.org/patch/1474411/  
-> > > 	- A huge number of patches in linux-next for AM33xx boot
-> > > 	  (too numerous to list)
-> > > 
-> > > The approach taken is similar to how OMAP DMA is being converted to
-> > > DMA Engine support. With the functional EDMA private API already
-> > > existing in mach-davinci/dma.c, we first move that to an ARM common
-> > > area so it can be shared. Adding DT and runtime PM support to the
-> > > private EDMA API implementation allows it to run on AM33xx. AM33xx
-> > > *only* boots using DT so we leverage Jon's generic DT DMA helpers to
-> > > register EDMA DMAC with the of_dma framework and then add support
-> > > for calling the dma_request_slave_channel() API to both the mmc
-> > > and spi drivers.
-> > > 
-> > > What works? Well, with this series we now have MMC and SPI support
-> > > on AM33xx. The only caveat for MMC is that the mmc3 controller has
-> > > its events on the crossbar and is not usable right now.
-> > > 
-> > > This is tested on BeagleBone with a SPI framebuffer driver and SD
-> > > card.
-> > > 
-> > > After this series, the plan is to convert the last in-tree user
-> > > of the private EDMA API (davinci-pcm/mcasp) and then eliminate
-> > > the private EDMA API by folding its functionality into
-> > > drivers/dma/edma.c.
-> > > 
-> > > TODO:
-> > > 	add AM33xx crossbar support to the private EDMA API
-> > > 	(any EDMA events on the crossbar are not supported)
-> > > 
-> > 
-> > 
-> > Can you please mention the base repo you have taken as starting point.
-> > (repo + extra patches ...).
+On 09/26/2012 08:51 AM, Wenyou Yang :
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+
+This is not mainline material: we have a DMA-DT API, now.
+
+> ---
+>  arch/arm/boot/dts/at91sam9n12.dtsi |    2 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi  |    4 +++
+>  drivers/spi/spi-atmel.c            |   55 +++++++++++++++++++++++++++++++++++-
+>  3 files changed, 60 insertions(+), 1 deletion(-)
 > 
-> It's mainline 3.6-rc6 and you can see the complete set of patches
-> at https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
-> after commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index c6868a2..b51f94d 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -98,6 +98,7 @@
+>  				compatible = "atmel,at91sam9g45-dma";
+>  				reg = <0xffffec00 0x200>;
+>  				interrupts = <20 4 0>;
+> +				#dma-cells = <1>;
+>  			};
+>  
+>  			pioA: gpio at fffff400 {
+> @@ -197,6 +198,7 @@
+>  				has_dma_support = <1>;
+>  				has_pdc_support = <0>;
+>  				is_ver2 = <1>;
+> +				dma = <&dma 0x10002212>;
+>  				status = "disabled";
+>  			};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index f124473..ee46cb7 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -100,12 +100,14 @@
+>  				compatible = "atmel,at91sam9g45-dma";
+>  				reg = <0xffffec00 0x200>;
+>  				interrupts = <20 4 0>;
+> +				#dma-cells = <1>;
+>  			};
+>  
+>  			dma1: dma-controller at ffffee00 {
+>  				compatible = "atmel,at91sam9g45-dma";
+>  				reg = <0xffffee00 0x200>;
+>  				interrupts = <21 4 0>;
+> +				#dma-cells = <1>;
+>  			};
+>  
+>  			pioA: gpio at fffff400 {
+> @@ -248,6 +250,7 @@
+>  				has_dma_support = <1>;
+>  				has_pdc_support = <0>;
+>  				is_ver2 = <1>;
+> +				dma = <&dma0 0x10002212>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -265,6 +268,7 @@
+>  				has_dma_support = <1>;
+>  				has_pdc_support = <0>;
+>  				is_ver2 = <1>;
+> +				dma = <&dma1 0x10002212>;
+>  				status = "disabled";
+>  			};
+>  		};
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 9930438..ad19423 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -1436,6 +1436,57 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+>  	kfree(asd);
+>  }
+>  
+> +static int at91_spi_of_init(struct device_node *np,
+> +			struct at_dma_slave *atslave)
+> +{
+> +	struct of_phandle_args  dma_spec;
+> +	struct device_node      *dmac_np;
+> +	struct platform_device  *dmac_pdev;
+> +	const __be32            *nbcells;
+> +	int                     ret;
+> +
+> +	ret = of_parse_phandle_with_args(np, "dma", "#dma-cells", 0, &dma_spec);
+> +	if (ret || !dma_spec.np) {
+> +		pr_err("%s: can't parse dma property (%d)\n",
+> +						np->full_name, ret);
+> +		goto err0;
+> +	}
+> +	dmac_np = dma_spec.np;
+> +
+> +	/* check property format */
+> +	nbcells = of_get_property(dmac_np, "#dma-cells", NULL);
+> +	if (!nbcells) {
+> +		pr_err("%s: #dma-cells property is required\n", np->full_name);
+> +		ret = -EINVAL;
+> +		goto err1;
+> +	}
+> +
+> +	if (dma_spec.args_count != be32_to_cpup(nbcells)
+> +			|| dma_spec.args_count != 1) {
+> +		pr_err("%s: wrong #dma-cells for %s\n",
+> +				np->full_name, dmac_np->full_name);
+> +		ret = -EINVAL;
+> +		goto err1;
+> +	}
+> +
+> +	dmac_pdev = of_find_device_by_node(dmac_np);
+> +	if (!dmac_pdev) {
+> +		pr_err("%s: unable to find pdev from DMA controller\n",
+> +				dmac_np->full_name);
+> +		ret = -EINVAL;
+> +		goto err1;
+> +	}
+> +
+> +	atslave->dma_dev = &dmac_pdev->dev;
+> +	atslave->cfg = dma_spec.args[0];
+> +
+> +err1:
+> +	of_node_put(dma_spec.np);
+> +err0:
+> +	pr_debug("%s exited with status %d\n", __func__, ret);
+> +	return ret;
+> +}
+> +
+>  static int of_get_atmel_spi_data(struct device_node *np, struct atmel_spi *as)
+>  {
+>  	const __be32	*val;
+> @@ -1540,7 +1591,9 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+>  		goto out_unmap_regs;
+>  
+>  	if (as->data.has_dma_support) {
+> -		if (atmel_spi_configure_dma(as) == 0)
+> +		if ((at91_spi_of_init(pdev->dev.of_node,
+> +				&as->data.dma_slave) == 0)
+> +				&& (atmel_spi_configure_dma(as) == 0))
+>  			as->use_dma = true;
+>  	} else if (as->data.has_pdc_support)
+>  		as->use_pdc = true;
 > 
-> > This will help us to test the code.
-> > 
-> > This is because I looked at the patch 12/13 and I see that mmc
-> > device-node is modified. But in mainline I don?t see device 
-> > node for mmc (yet).
-> 
-> Oops. You'll need e62a3333ae450bcdefbe22229d7bc277ae0ef645 and
-> fe97304557d2c6f7d0aaf1ea028ea48ffca366a9 which I forgot to include
-> in this series. I'll have them in for v2.
-
-Yesterday I tested edma patches on latest linux-next/master + merge of 
-linux-omap/for_3.7/dts_part2. Below are my observations
-
-1. baseline = linux-next/master + merge of linux-omap/for_3.7/dts_part2
-2. on top of above branch, I applied patches [1-9]/13 of your edma 
-   patches
-3. few patches required trivial changes before applying
-4. Applied dma of patches as you mentioned
-5. add custom patch (ARM: CUSTOM: Build a uImage with dtb already 
-   appended)
-   From https://github.com/hvaibhav/am335x-linux/commit/
-        7e72f5ed4b702c9373d19f7626f07ae31a381d53#arch/arm/Makefile
-
-6. Modified 9/13 patch to apply properly on latest am33xx.dtsi.
-	a. Edma portion as it is
-	b. mmc portion as below
-		mmc1: mmc at 48060000 {
-			compatible = "ti,omap3-hsmmc";
-			ti,hwmods = "mmc1";
-			ti,dual-volt;
-			ti,needs-special-reset;
-			bus-width = <4>;
-			vmmc-supply = <&vmmc_reg>;
-			dmas = <&edma 24
-				&edma 25>;
-			dma-names = "tx", "rx";
-		};
-	c. added mmc pinmux as-well
-
-7. make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm distclean
-   make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm 
-   omap2plus_defconfig
-
-8. enabled TI_EDMA from menuconfig (since it was not enabled for 
-   omap2plus_defconfig
-
-9. make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm uImage
-   make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm 
-   uImage-dtb.am335x-evm
-
-With above changes, edma probe was failing at request_mem_region() 
-Inside linux-next/arch/arm/common/edma.c --> edma_probe()
-
-I had to modify edma_probe as below
 
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index f337f81..efe2673 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1589,11 +1589,11 @@ static int __init edma_probe(struct platform_device *pdev)
-        for (j = 0; j < EDMA_MAX_CC; j++) {
-                if (node) {
-                        int err;
--                       err = of_address_to_resource(node, 0, &res[j]);
-+                       err = of_address_to_resource(node, j, &res[j]);
-                        if (err) {
-                                dev_err(dev,
-                                        "unable to find 'reg' property\n");
--                               return -EIO;
-+                               //return -EIO;
-                        }
-                        r[j] = &res[j];
-
-
-
-With this I was able to boot on am335x-evm and do a successful MMC 
-copy-md5sum-compare test.
-
-I believe you are looking into above issue in your v2 version.
-
-> 
-> -Matt
-> 
-
-...snip...
-...snip...
-...snip...
-
-
-Regards, 
-Gururaja
+-- 
+Nicolas Ferre
