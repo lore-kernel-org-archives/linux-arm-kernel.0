@@ -1,63 +1,33 @@
-From: devendra.aaru@gmail.com (devendra.aaru)
-Date: Wed, 26 Sep 2012 14:17:46 -0400
-Subject: dead code in arch/arm/common/scoop.c
-Message-ID: <CAHdPZaP0GePFxtknrUuhMG6rMXyZUkqJfgLe6+FMMAUK4adozw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Sep 2012 11:18:21 -0700
+Subject: [PATCH 07/10] ARM: msm: Remove clock-7x30.h include file
+In-Reply-To: <CADTbHxqrPmnOHqqYyskC32bN269k-_pgk-+czwf7zLCs70ESzA@mail.gmail.com>
+References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
+ <1348194419-11486-8-git-send-email-sboyd@codeaurora.org>
+ <CADTbHxqrPmnOHqqYyskC32bN269k-_pgk-+czwf7zLCs70ESzA@mail.gmail.com>
+Message-ID: <506346ED.3020900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 09/26/12 10:51, Pankaj Jangra wrote:
+> On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
+>> index 09b4f14..1597d43 100644
+>> --- a/arch/arm/mach-msm/devices-msm7x30.c
+>> +++ b/arch/arm/mach-msm/devices-msm7x30.c
+>> @@ -146,7 +146,6 @@ struct clk_lookup msm_clocks_7x30[] = {
+>>         CLK_PCOM("grp_2d_pclk", GRP_2D_P_CLK,   NULL, 0),
+>>         CLK_PCOM("grp_clk",     GRP_3D_CLK,     NULL, 0),
+>>         CLK_PCOM("grp_pclk",    GRP_3D_P_CLK,   NULL, 0),
+>> -       CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,    NULL, 0),
+>>         CLK_PCOM("hdmi_clk",    HDMI_CLK,       NULL, 0),
+>>         CLK_PCOM("imem_clk",    IMEM_CLK,       NULL, OFF),
+> I suppose you forget to remove the include header clock-7x30.h from
+> this file. :)
 
-First of all sorry to disturb you all with my silly questions,
+Thanks, fixed. BTW, you could have trimmed this mail down so I didn't
+have to scroll to the bottom.
 
-While looking at the scoop_probe in arch/arm/common/scoop.c, i found a
-code path which will never run, please correct me if i am wrong,
-
-
-code path: from arch/arm/common/scoop.c
-
-
-@line  = 179 scoop_probe
-.........
-
-@line = 212
-        iowrite16(inf->io_out & 0xffff, devptr->base + SCOOP_GPWR);
-
-        devptr->suspend_clr = inf->suspend_clr;
-        devptr->suspend_set = inf->suspend_set;
-
-        devptr->gpio.base = -1;
-
-        if (inf->gpio_base != 0) {
-                devptr->gpio.label = dev_name(&pdev->dev);
-                devptr->gpio.base = inf->gpio_base;
-                devptr->gpio.ngpio = 12; /* PA11 = 0, PA12 = 1, etc.
-up to PA22 = 11 */
-                devptr->gpio.set = scoop_gpio_set;
-                devptr->gpio.get = scoop_gpio_get;
-                devptr->gpio.direction_input = scoop_gpio_direction_input;
-                devptr->gpio.direction_output = scoop_gpio_direction_output;
-
-                ret = gpiochip_add(&devptr->gpio);
-                if (ret)
-                        goto err_gpio;
-        }
-
-        return 0;
-
-/////------------- This execution path will never trigger to run --------/////
-
-@line 235:
-        if (devptr->gpio.base != -1)
-                temp = gpiochip_remove(&devptr->gpio);
-////------------------------------------------------------------------------------/////
-
-err_gpio:
-        platform_set_drvdata(pdev, NULL);
-err_ioremap:
-        iounmap(devptr->base);
-        kfree(devptr);
-
-
-i dont think we should move err_gpio to just below return 0.
-
-thanks,
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
