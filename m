@@ -1,25 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 26 Sep 2012 16:56:41 -0700
-Subject: [PATCH] ARM: ux500: 8500: update I2C sleep states pinctrl
-In-Reply-To: <1348570915-3116-1-git-send-email-linus.walleij@stericsson.com>
-References: <1348570915-3116-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120926235641.GB6567@quad.lixom.net>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 27 Sep 2012 01:59:29 +0200
+Subject: [PATCH 1/3] ARM: dts: imx53-qsb: Use pinctrl for gpio-led
+In-Reply-To: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+Message-ID: <201209270159.29809.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 01:01:55PM +0200, Linus Walleij wrote:
-> From: Patrice Chotard <patrice.chotard@stericsson.com>
+Dear Fabio Estevam,
+
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> This defines the proper sleep states for all the I2C pins of
-> the MOP500 DB8500 ASIC setting.
+> Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led
+> driver has pinctrl support, so setup the gpio led pin via pinctrl and
+> avoid the following warning:
 > 
-> Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> leds-gpio leds.2: pins are not configured from the driver
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Reviewed-by: Marek Vasut <marex@denx.de>
+
 > ---
-> Requesting ARM SoC ACKs to take this through pinctrl for
-> ease-of-merge going forward, as dependecies are in there.
+>  arch/arm/boot/dts/imx53-qsb.dts |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-qsb.dts
+> b/arch/arm/boot/dts/imx53-qsb.dts index 08948af..5bae4c7 100644
+> --- a/arch/arm/boot/dts/imx53-qsb.dts
+> +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> @@ -60,10 +60,16 @@
+>  							697  0x80000000	/* 
+MX53_PAD_EIM_DA12__GPIO3_12 */
+>  							701  0x80000000	/* 
+MX53_PAD_EIM_DA13__GPIO3_13 */
+>  							868  0x80000000	/* 
+MX53_PAD_PATA_DA_0__GPIO7_6 */
+> +						>;
+> +					};
+> +
+> +					led_pin_gpio7_7: led_gpio7_7 at 0 {
+> +						fsl,pins = <
+>  							873  0x80000000	/* 
+MX53_PAD_PATA_DA_1__GPIO7_7 */
+> 
+>  						>;
+> 
+>  					};
+>  				};
+> +
+>  			};
+> 
+>  			uart1: serial at 53fbc000 {
+> @@ -216,6 +222,8 @@
+> 
+>  	leds {
+>  		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pin_gpio7_7>;
+> 
+>  		user {
+>  			label = "Heartbeat";
 
-Acked-by: Olof Johansson <olof@lixom.net>
-
-
--Olof
+Best regards,
+Marek Vasut
