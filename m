@@ -1,84 +1,50 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 26 Sep 2012 17:21:36 +0200
-Subject: [PATCH v3] serial: pl011: handle corruption at high clock speeds
-Message-ID: <1348672896-6005-1-git-send-email-linus.walleij@stericsson.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Wed, 26 Sep 2012 17:33:00 +0200
+Subject: [PATCH] spi/pl022: Simplify use of runtime pm
+Message-ID: <1348673580-17265-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-This works around a few glitches in the ST version of the PL011
-serial driver when using very high baud rates, as we do in the
-Ux500: 3, 3.25, 4 and 4.05 Mbps.
-
-Problem Observed/rootcause:
-
-When using high baud-rates, and the baudrate*8 is getting close to
-the provided clock frequency (so a division factor close to 1), when
-using bursts of characters (so they are abutted), then it seems as if
-there is not enough time to detect the beginning of the start-bit which
-is a timing reference for the entire character, and thus the sampling
-moment of character bits is moving towards the end of each bit, instead
-of the middle.
-
-Fix:
-Increase slightly the RX baud rate of the UART above the theoretical
-baudrate by 5%. This will definitely give more margin time to the
-UART_RX to correctly sample the data at the middle of the bit period.
-
-Also fix the ages old copy-paste error in the very stressed comment,
-it's referencing the registers used in the PL010 driver rather than
-the PL011 ones.
-
-Cc: stable at kernel.org
-Cc: Bibek Basu <bibek.basu@stericsson.com>
-Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
-Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
-Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
-Signed-off-by: Matthias Locher <matthias.locher@stericsson.com>
-Signed-off-by: Rajanikanth HV <rajanikanth.hv@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
-ChangeLog v2->v3:
-- Actually commit the v2 changes...
-ChangeLog v1->v2:
-- Use >= comparison for 3 Mbaud, add some parenthesis to make the
-  logical expressions crystal clear.
----
- drivers/tty/serial/amba-pl011.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ drivers/spi/spi-pl022.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d626d84..25508c7 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1594,13 +1594,26 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 			old_cr &= ~ST_UART011_CR_OVSFACT;
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index f8568b4..e51a026 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2188,8 +2188,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
+ 	       adev->res.start, pl022->virtbase);
+ 
+-	pm_runtime_resume(dev);
+-
+ 	pl022->clk = clk_get(&adev->dev, NULL);
+ 	if (IS_ERR(pl022->clk)) {
+ 		status = PTR_ERR(pl022->clk);
+@@ -2250,10 +2248,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 		pm_runtime_set_autosuspend_delay(dev,
+ 			platform_info->autosuspend_delay);
+ 		pm_runtime_use_autosuspend(dev);
+-		pm_runtime_put_autosuspend(dev);
+-	} else {
+-		pm_runtime_put(dev);
  	}
++	pm_runtime_put(dev);
++
+ 	return 0;
  
-+	/*
-+	 * Workaround for the ST Micro oversampling variants to
-+	 * increase the bitrate slightly, by lowering the divisor,
-+	 * to avoid delayed sampling of start bit at high speeds,
-+	 * else we see data corruption.
-+	 */
-+	if (uap->vendor->oversampling) {
-+		if ((baud >= 3000000) && (baud < 3250000) && (quot > 1))
-+			quot -= 1;
-+		else if ((baud > 3250000) && (quot > 2))
-+			quot -= 2;
-+	}
- 	/* Set baud rate */
- 	writew(quot & 0x3f, port->membase + UART011_FBRD);
- 	writew(quot >> 6, port->membase + UART011_IBRD);
- 
- 	/*
- 	 * ----------v----------v----------v----------v-----
--	 * NOTE: MUST BE WRITTEN AFTER UARTLCR_M & UARTLCR_L
-+	 * NOTE: lcrh_tx and lcrh_rx MUST BE WRITTEN AFTER
-+	 * UART011_FBRD & UART011_IBRD.
- 	 * ----------^----------^----------^----------^-----
- 	 */
- 	writew(lcr_h, port->membase + uap->lcrh_rx);
+  err_spi_register:
+@@ -2302,7 +2299,6 @@ pl022_remove(struct amba_device *adev)
+ 	clk_disable(pl022->clk);
+ 	clk_unprepare(pl022->clk);
+ 	clk_put(pl022->clk);
+-	pm_runtime_disable(&adev->dev);
+ 	iounmap(pl022->virtbase);
+ 	amba_release_regions(adev);
+ 	tasklet_disable(&pl022->pump_transfers);
 -- 
-1.7.11.3
+1.7.10
