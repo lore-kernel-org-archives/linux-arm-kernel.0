@@ -1,84 +1,77 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 26 Sep 2012 16:53:56 +0200
-Subject: [PATCH v3 1/2] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <20120925104901.GI17667@game.jcrosoft.org>
-References: <1348558114-31750-1-git-send-email-fabio.porcedda@gmail.com>
- <1348558114-31750-2-git-send-email-fabio.porcedda@gmail.com>
- <20120925081057.GH17667@game.jcrosoft.org>
- <CAHkwnC_=i7mEv99xU6HcFpEfC6eeumcZDWrBq2_qdv=rDf3E1g@mail.gmail.com>
- <506180BE.6000603@atmel.com> <20120925104901.GI17667@game.jcrosoft.org>
-Message-ID: <CAHkwnC8kObpXZ5E_RutH+ciYxC5_7FruFA4Zr+AmVX7TKDtFmA@mail.gmail.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 26 Sep 2012 15:59:52 +0100
+Subject: [PATCH v2] ARM: pxa: hx4700: Fix backlight PWM device number
+Message-ID: <50631868.3000205@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 12:49 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 12:00 Tue 25 Sep     , Nicolas Ferre wrote:
->> On 09/25/2012 11:45 AM, Fabio Porcedda :
->> > On Tue, Sep 25, 2012 at 10:10 AM, Jean-Christophe PLAGNIOL-VILLARD
->> > <plagnioj@jcrosoft.com> wrote:
->> >> On 09:28 Tue 25 Sep     , Fabio Porcedda wrote:
->> >>> Tested on an at91sam9260 board (evk-pro3)
->> >>>
->> >>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
->> >>> ---
->> >>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
->> >>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
->> >>>  2 files changed, 40 insertions(+)
->> >>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> >>>
->> >>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> >>> new file mode 100644
->> >>> index 0000000..724fad1
->> >>> --- /dev/null
->> >>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->> >>> @@ -0,0 +1,19 @@
->> >>> +* Atmel Watchdog Timers
->> >>> +
->> >>> +** at91sam9-wdt
->> >>> +
->> >>> +Required properties:
->> >>> +- compatible: must be "atmel,at91sam9-wdt".
->> >>> +- reg: physical base address of the controller and length of memory mapped
->> >>> +  region.
->> >>> +
->> >>> +Optional properties:
->> >>> +- heartbeat: contains the watchdog heartbeats in seconds.
->> >>> +
->> >>> +Example:
->> >>> +
->> >>> +     watchdog at fffffd40 {
->> >>> +             compatible = "atmel,at91sam9-wdt";
->> >> for the secind time atmel,at91sam9260-watchdog
->> >
->> > Ok, i will fix this.
->> >
->> >> you need to put the first soc that use it in the compatible
->> >>> +             reg = <0xfffffd40 0x10>;
->> >>> +             heartbeat = <10>;
->> >> need put second in the property name so need to read the doc
->> >
->> > I didn't found any example about a property with "second" in the name.
->> > Which It's best "heartbeat-seconds", "heartbeat-sec" or "heartbeat-s" ?
->>
->> I think that, as it is indicated in the documentation, we should not
->> worry too much about that... but "heartbeat" and "heartbeat-s" is ok
->> with me.
->>
->> Maybe people @ devicetree-discuss have an advice for this?
-> for i2c-gpio mandatory as example cf discussion with Jean and Russell
+Recent changes to PXA PWM support changed the PXA27X PWM device
+numbering scheme.
 
-Russell King - ARM Linux linux at arm.linux.org.uk
-Mon Feb 20 08:51:06 EST 2012
-> I'm saying that's a completely absurd proposal, as the proposal is
-> for two opaque numeric properties with different units.  At least
-> make the units the same, or as Karol said, incorporate the units
-> into the property names.
+The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
+the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
+numbering scheme:
 
-If i understand correctly the issue was that two different units where used for
-the same device.
-IMHO there is no problem if only one unit is used in the same device.
+Address		Hardware	3.5 pwm_id	3.6-rc1 pwm_id
+0x40b00000	PWM0		0		0
+0x40b00010	PWM2		2		1
+0x40c00000	PWM1		1		2
+0x40c00010	PWM3		3		3
 
-Best regards
+The hx4700 backlight uses PWM1 at 0x40c00000. Consequently the pwm_id
+must be changed from 1 to 2.
+
+This patch fixes the backlight PWM device number and at the same time
+moves from the legacy PWM API (pwm_id) to the new PWM API (pwm_lookup).
+
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: Thierry Reding <thierry.reding@avionic-design.de>
+---
+
+V2: Switch from legacy PWM API to new PWM API.
+
+  arch/arm/mach-pxa/hx4700.c |    8 +++++++-
+  1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index e631198..d66f9f9 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -28,6 +28,7 @@
+  #include <linux/mfd/asic3.h>
+  #include <linux/mtd/physmap.h>
+  #include <linux/pda_power.h>
++#include <linux/pwm.h>
+  #include <linux/pwm_backlight.h>
+  #include <linux/regulator/driver.h>
+  #include <linux/regulator/gpio-regulator.h>
+@@ -556,7 +557,7 @@ static struct platform_device hx4700_lcd = {
+   */
+
+  static struct platform_pwm_backlight_data backlight_data = {
+-	.pwm_id         = 1,
++	.pwm_id         = -1,	/* Superseded by pwm_lookup */
+  	.max_brightness = 200,
+  	.dft_brightness = 100,
+  	.pwm_period_ns  = 30923,
+@@ -571,6 +572,10 @@ static struct platform_device backlight = {
+  	},
+  };
+
++static struct pwm_lookup hx4700_pwm_lookup[] = {
++	PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL),
++};
++
+  /*
+   * USB "Transceiver"
+   */
+@@ -872,6 +877,7 @@ static void __init hx4700_init(void)
+  	pxa_set_stuart_info(NULL);
+
+  	platform_add_devices(devices, ARRAY_SIZE(devices));
++	pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
+
+  	pxa_set_ficp_info(&ficp_info);
+  	pxa27x_set_i2c_power_info(NULL);
 -- 
-Fabio Porcedda
+1.7.8.6
