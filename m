@@ -1,26 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 26 Sep 2012 18:11:49 +0100
-Subject: [PATCH V5 3/6] arm: cache-l2x0: add support for Aurora L2 cache
- ctrl
-In-Reply-To: <1348675370-16359-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1348675370-16359-1-git-send-email-gregory.clement@free-electrons.com>
- <1348675370-16359-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 26 Sep 2012 19:18:07 +0200
+Subject: [PATCH] pinctrl/nomadik: allocate IRQ descriptors dynamically
+Message-ID: <1348679887-2135-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 September 2012 17:02, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> +static void aurora_pa_range(unsigned long start, unsigned long end,
-> +                       unsigned long offset)
-> +{
-> +       unsigned long flags;
-> +
-> +       raw_spin_lock_irqsave(&l2x0_lock, flags);
-> +       writel(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
-> +       writel(end, l2x0_base + offset);
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Just use writel_relaxed() here for consistency and possible deadlock avoidance.
+This allocates the IRQ descriptors for the Nomadik pin controller
+dynamically so that we don't have to rely on some other mechanism
+doing it, and moving a step closer to a linear IRQ domain.
 
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 3dde653..29921d1 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1185,6 +1185,8 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 	struct clk *clk;
+ 	int secondary_irq;
+ 	void __iomem *base;
++	int irq_start;
++	int irq_base;
+ 	int irq;
+ 	int ret;
+ 
+@@ -1288,9 +1290,22 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 
+ 	platform_set_drvdata(dev, nmk_chip);
+ 
++	/*
++	 * Allocate descriptors and IRQ domain using the legacy model, this
++	 * should eventually be replaced with a linear IRQ domain as we get
++	 * independent from the irq numbers with the switch to device tree.
++	 */
++	irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
++	irq_base = irq_alloc_descs(irq_start, 0, NMK_GPIO_PER_CHIP,
++				   numa_node_id());
++	if (IS_ERR_VALUE(irq_base)) {
++		WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
++		     irq_start);
++		irq_base = irq_start;
++	}
+ 	nmk_chip->domain = irq_domain_add_legacy(np, NMK_GPIO_PER_CHIP,
+-						NOMADIK_GPIO_TO_IRQ(pdata->first_gpio),
+-						0, &nmk_gpio_irq_simple_ops, nmk_chip);
++				irq_base, 0,
++				&nmk_gpio_irq_simple_ops, nmk_chip);
+ 	if (!nmk_chip->domain) {
+ 		dev_err(&dev->dev, "failed to create irqdomain\n");
+ 		ret = -ENOSYS;
 -- 
-Catalin
+1.7.11.3
