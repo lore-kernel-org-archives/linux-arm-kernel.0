@@ -1,48 +1,38 @@
 From: jangra.pankaj9@gmail.com (Pankaj Jangra)
-Date: Thu, 27 Sep 2012 00:22:19 +0530
-Subject: [PATCH 01/10] usb: otg: msm: Convert to clk_prepare/unprepare
-In-Reply-To: <50634DF9.5010608@codeaurora.org>
+Date: Thu, 27 Sep 2012 00:24:11 +0530
+Subject: [PATCH 07/10] ARM: msm: Remove clock-7x30.h include file
+In-Reply-To: <506346ED.3020900@codeaurora.org>
 References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
- <1348194419-11486-2-git-send-email-sboyd@codeaurora.org>
- <CADTbHxoFeYWPJpYTN85kBeF=kv2v1yDioJW-upzn1RcwVT_sKw@mail.gmail.com>
- <50634DF9.5010608@codeaurora.org>
-Message-ID: <CADTbHxr7Drfg4iRqFyLkwq1ALUABp96tSrO2w9L1s851P+Z5Sg@mail.gmail.com>
+ <1348194419-11486-8-git-send-email-sboyd@codeaurora.org>
+ <CADTbHxqrPmnOHqqYyskC32bN269k-_pgk-+czwf7zLCs70ESzA@mail.gmail.com>
+ <506346ED.3020900@codeaurora.org>
+Message-ID: <CADTbHxrRBg8GnciN2SyzBrQrc2Y3aXmJKbT7SZq8-QMfw4vgoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 12:18 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 09/26/12 09:58, Pankaj Jangra wrote:
->> On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
->>> index 9f5fc90..2ae0639 100644
->>> --- a/drivers/usb/otg/msm_otg.c
->>> +++ b/drivers/usb/otg/msm_otg.c
->>> @@ -514,13 +514,13 @@ static int msm_otg_suspend(struct msm_otg *motg)
->>>                         motg->pdata->otg_control == OTG_PMIC_CONTROL)
->>>                 writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
->>>
->>> -       clk_disable(motg->pclk);
->>> -       clk_disable(motg->clk);
->>> +       clk_disable_unprepare(motg->pclk);
->>> +       clk_disable_unprepare(motg->clk);
->>>         if (motg->core_clk)
->>> -               clk_disable(motg->core_clk);
->>> +               clk_disable_unprepare(motg->core_clk);
->>>
->> I was under assumption that system suspend/resume might be called from
->> the interrupt context. If that is case then its not appropriate to
->> call clk_prepare/unprepare here right? or my understanding is not correct????
->
-> Well we call disable_irq() at the top of this suspend function so I
-> suspect your understanding is incorrect. disable_irq() can call
-> schedule(). There are also a bunch of regulator calls in
-> msm_hsusb_ldo_set_mode() that this suspend function calls (almost all
-> regulator calls grab a mutex).
+Hi,
 
-Ok, might be i am worng because in acpuclock driver of msm on
-codeaurora tree, i have seen in commit text saying that it can be
-called from suspend/resume in interrupt context .
-So i was assuming that. Any way thanks.
+On Wed, Sep 26, 2012 at 11:48 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 09/26/12 10:51, Pankaj Jangra wrote:
+>> On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
+>>> index 09b4f14..1597d43 100644
+>>> --- a/arch/arm/mach-msm/devices-msm7x30.c
+>>> +++ b/arch/arm/mach-msm/devices-msm7x30.c
+>>> @@ -146,7 +146,6 @@ struct clk_lookup msm_clocks_7x30[] = {
+>>>         CLK_PCOM("grp_2d_pclk", GRP_2D_P_CLK,   NULL, 0),
+>>>         CLK_PCOM("grp_clk",     GRP_3D_CLK,     NULL, 0),
+>>>         CLK_PCOM("grp_pclk",    GRP_3D_P_CLK,   NULL, 0),
+>>> -       CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,    NULL, 0),
+>>>         CLK_PCOM("hdmi_clk",    HDMI_CLK,       NULL, 0),
+>>>         CLK_PCOM("imem_clk",    IMEM_CLK,       NULL, OFF),
+>> I suppose you forget to remove the include header clock-7x30.h from
+>> this file. :)
+>
+> Thanks, fixed. BTW, you could have trimmed this mail down so I didn't
+> have to scroll to the bottom.
+>
+ah, i think mistakenly i forgot. Next time will keep in mind..:)
 
 --
 Pankaj Jangra
