@@ -1,41 +1,62 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Wed, 26 Sep 2012 15:10:58 +0200
-Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
-In-Reply-To: <201209261205.01351.arnd@arndb.de>
-References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
- <201209261038.36223.arnd@arndb.de>
- <20120926104421.GA7040@n2100.arm.linux.org.uk>
- <201209261205.01351.arnd@arndb.de>
-Message-ID: <20120926131058.GA9891@glitch>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Wed, 26 Sep 2012 13:44:12 +0000
+Subject: [linux-keystone] Re: [PATCH v1 01/12] clk: davinci - add Main
+ PLL clock driver
+In-Reply-To: <CACRpkdbpZ+dxoCq7Ky=EMDR2uDX10vyn3-P+V6iN8mwWCof+HQ@mail.gmail.com>
+References: <1348525213-18987-1-git-send-email-m-karicheri2@ti.com>
+ <1348525213-18987-2-git-send-email-m-karicheri2@ti.com>
+ <CACRpkdbpZ+dxoCq7Ky=EMDR2uDX10vyn3-P+V6iN8mwWCof+HQ@mail.gmail.com>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B7041E9CCC@DFLE12.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 12:05:01PM +0000, Arnd Bergmann wrote:
-> On Wednesday 26 September 2012, Russell King - ARM Linux wrote:
-> > That rubbishes the idea of a single kernel though, which is to give
-> > distros a single kernel image that they can boot on different ARM
-> > platforms.
-> > 
-> > They want a single kernel binary that works everywhere, not one which
-> > they need to select the right binary to work on platform X.  Yes, the
-> > internal uncompressed bulk may be the same, but it would require
-> > distros to carry around N different kernel images for N different
-> > platforms.
-> 
-> Right. It still helps the distros ensure that they only have a single
-> configuration and a single binary to test, which I expect is their main
-> interest, but keeping multiple copies of the same binary with different
-> headers is a bit silly, I agree.
-> 
-> On PowerPC, we have a similar problem, and the way that distros usually
-> deal with that is to do the final link of the zImage from the post-install
-> stage of their rpm or deb packages, depending on the platform they are
-> on. In the same stage, they also link in the newly created initrd and
-> the device tree blob if necessary.
+>> -----Original Message-----
+>> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+>> Sent: Wednesday, September 26, 2012 7:11 AM
+>> To: Karicheri, Muralidharan
+>> Cc: mturquette at linaro.org; arnd at arndb.de; akpm at linux-foundation.org;
+>> shawn.guo at linaro.org; rob.herring at calxeda.com; viresh.linux at gmail.com; linux-
+>> kernel at vger.kernel.org; Nori, Sekhar; Hilman, Kevin; linux at arm.linux.org.uk; davinci-
+>> linux-open-source at linux.davincidsp.com; linux-arm-kernel at lists.infradead.org; linux-
+>> keystone at list.ti.com - Linux developers for Keystone family of devices (May contain non-
+>> TIers); linux-c6x-dev at linux-c6x.org; Chemparathy, Cyril
+>> Subject: [linux-keystone] Re: [PATCH v1 01/12] clk: davinci - add Main PLL clock driver
+>> 
+>> On Tue, Sep 25, 2012 at 12:20 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+>> 
+>> > +struct clk_davinci_pll_data {
+>> > +       /* physical addresses set by platform code */
+>> > +       u32 phy_pllm;
+>> > +       /* if PLL has a prediv register this should be non zero */
+>> > +       u32 phy_prediv;
+>> > +       /* if PLL has a postdiv register this should be non zero */
+>> > +       u32 phy_postdiv;
+>> > +       /* mapped addresses. should be initialized by  */
+>> > +       void __iomem *pllm;
+>> > +       void __iomem *prediv;
+>> > +       void __iomem *postdiv;
+>> > +       u32 pllm_mask;
+>> > +       u32 prediv_mask;
+>> > +       u32 postdiv_mask;
+>> > +       u32 num;
+>> > +       /* framework flags */
+>> > +       u32 flags;
+>> > +       /* pll flags */
+>> > +       u32 pll_flags;
+>> > +       u32 fixed_prediv;       /* use this value for prediv */
+>> > +       u32 pllm_multiplier;    /* multiply PLLM by this factor. By default
+>> > +                                * most SOC set this to zero that translates
+>> > +                                * to a multiplier of 1 and incrementer of 1.
+>> > +                                * To override default, set this factor */
+>> > +};
+>> 
+>> OMG this commenting style hurt my eyes ;-)
+>> 
+>> Please use good old kerneldoc above the struct instead.
+>> 
+>> Yours,
+>> Linus Walleij
 
-Wouldn't help to have a sort of generic console driver in the decompressor
-accepting some regs and masks provided by DT? This would fit most of the
-uarts around, would be totally generic and multi-platform friendly.
+Sure! I will fix these in my next revision.
 
-Regards,
-Domenico
+Murali
