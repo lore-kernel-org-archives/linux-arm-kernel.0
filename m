@@ -1,71 +1,98 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Wed, 26 Sep 2012 23:40:57 +0200
-Subject: [PATCH 0/2] fix and improvement of flush(_kernel)_dcache_page()
-Message-ID: <1348695659-27603-1-git-send-email-gmbnomis@gmail.com>
+Date: Wed, 26 Sep 2012 23:40:58 +0200
+Subject: [PATCH V2 1/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <1348695659-27603-1-git-send-email-gmbnomis@gmail.com>
+References: <1348695659-27603-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1348695659-27603-2-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit f8b63c1 made flush_kernel_dcache_page() a no-op assuming that
+the pages it needs to handle are kernel mapped only.  However, for
+example when doing direct I/O, pages with user space mappings may
+occur.
 
-another attempt to fix the regression caused by patch f8b63c1 "ARM:
-6382/1" in 2.6.37 (see [2]).  The problem occurs on VIVT (and
-probably VIPT aliasing) cache architectures for drivers that use
-flush_kernel_dcache_page().  For example, 3.6-rc6 (as any kernel
-beginning with 2.6.37) on kirkwood using mv_cesa produces data
-corruption when using direct I/O:
+Thus, do lazy flushing like in flush_dcache_page() if there are no user
+space mappings.  Otherwise, flush the kernel cache lines directly.
 
-~# cryptsetup luksOpen /dev/sda2 c_sda2
-Enter passphrase for /dev/sda2: 
-~# dd if=/dev/mapper/c_sda2 iflag=direct bs=4k count=16 2>/dev/null | sha1sum 
-9ae4997ec85ad9b7ab4b10341e42ace80f0ea5d6  -
-~# dd if=/dev/mapper/c_sda2 bs=4k count=16 2>/dev/null | sha1sum
-ca39c5d4950b3704eff952c48e383bf1db20532e  -
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
 
-(The mv_cesa driver uses the scatterlist memory iterator, which uses
-flush_kernel_dcache_page() before kunmap()).
+Changes in v2:
+- flush_kernel_dcache_page() follows flush_dcache_page() now, except that it
+  does not flush the user mappings
 
-As described in [1], both flush_dcache_page() and
-flush_kernel_dcache_page() need to handle the following cases:
-- page cache pages with no user space mapping
-- page cache pages with user space mapping(s)
-- flush the kernel mapping of anonymous pages
+ arch/arm/include/asm/cacheflush.h |    4 ++++
+ arch/arm/mm/flush.c               |   39 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+)
 
-The last one is contradictory to documentation for flush_dcache_page(),
-but many uses in the kernel require it (drivers use it to flush
-modifications via the kernel mapping).
-
-In the proposed patch the implementation of flush_kernel_dcache_page()
-follows the one of flush_dcache_page(), but only flushes the kernel
-mapping, not the user mapping(s).
-
-The second patch optimizes these two functions for non-aliasing VIPT
-caches.  On these the flush of the kernel mapping for the anon case is
-actually not needed.  It may be needed to ensure I/D coherency, but
-this can be handled by __sync_icache_dcache() later and more
-effectively (similar to arm64, see [3]).  Thus, we should be lazy as
-well here and just clear the PG_dcache_clean bit.
-
-I could only test this on kirkwood (ARMv5, VIVT) and raspberry pi
-BCM2835 (ARMv6, PIPT / VIPT nonaliasing data cache).  More testing
-would probably be a good thing...  Especially, I could not test the
-non-aliasing cache case with a real driver using
-flush_kernel_dcache_page() (mv_cesa on dove could be a test case for
-this).
-
-- Simon
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/113908.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101795.html
-[3] https://lkml.org/lkml/2012/9/12/121
-
-Simon Baatz (2):
-  ARM: Handle user space mapped pages in flush_kernel_dcache_page
-  ARM: remove unnecessary flush of anon pages in
-    flush(_kernel)_dcache_page()
-
- arch/arm/include/asm/cacheflush.h |    4 ++
- arch/arm/mm/flush.c               |   83 +++++++++++++++++++++++++++++--------
- 2 files changed, 70 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index e4448e1..eca955f 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -307,6 +307,10 @@ static inline void flush_anon_page(struct vm_area_struct *vma,
+ #define ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
+ static inline void flush_kernel_dcache_page(struct page *page)
+ {
++	extern void __flush_kernel_dcache_page(struct page *);
++	/* highmem pages are always flushed upon kunmap already */
++	if (!PageHighMem(page))
++		__flush_kernel_dcache_page(page);
+ }
+ 
+ #define flush_dcache_mmap_lock(mapping) \
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 40ca11e..982db2f 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -192,6 +192,45 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 				page->index << PAGE_CACHE_SHIFT);
+ }
+ 
++/*
++ * Ensure cache coherency for the kernel mapping of this page.
++ *
++ * If the page only exists in the page cache and there are no user
++ * space mappings, we can be lazy and remember that we may have dirty
++ * kernel cache lines for later.  Otherwise, we need to flush the
++ * dirty kernel cache lines directly.
++ *
++ * Note that we disable the lazy flush for SMP configurations where
++ * the cache maintenance operations are not automatically broadcasted.
++ *
++ * We can assume that the page is no high mem page, see
++ * flush_kernel_dcache_page.
++ */
++void __flush_kernel_dcache_page(struct page *page)
++{
++	struct address_space *mapping;
++
++	/*
++	 * The zero page is never written to, so never has any dirty
++	 * cache lines, and therefore never needs to be flushed.
++	 */
++	if (page == ZERO_PAGE(0))
++		return;
++
++	mapping = page_mapping(page);
++
++	if (!cache_ops_need_broadcast() &&
++	    mapping && !mapping_mapped(mapping))
++		clear_bit(PG_dcache_clean, &page->flags);
++	else {
++		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
++		if (mapping && !cache_is_vivt())
++			__flush_icache_all();
++		set_bit(PG_dcache_clean, &page->flags);
++	}
++}
++EXPORT_SYMBOL(__flush_kernel_dcache_page);
++
+ static void __flush_dcache_aliases(struct address_space *mapping, struct page *page)
+ {
+ 	struct mm_struct *mm = current->active_mm;
 -- 
 1.7.9.5
