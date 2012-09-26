@@ -1,44 +1,92 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 26 Sep 2012 22:06:09 +0200
-Subject: DA9053 support on mx53qsb
-In-Reply-To: <3551104.eUMCmD9aXl@wuerfel>
-References: <CAOMZO5BGGOJCVrF_NZP+gXg7wfKnKv7287Xqo=J_NfsMc=HeDg@mail.gmail.com>
- <3551104.eUMCmD9aXl@wuerfel>
-Message-ID: <201209262206.09534.marex@denx.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 26 Sep 2012 13:08:33 -0700
+Subject: [BUG] Deferred probing in driver model is racy, resulting in
+ lost probes
+In-Reply-To: <CACVXFVOZ=4HFAy38q_8ZUjOPffcv_mMTi7KCdh3HcX=MCLw5SQ@mail.gmail.com>
+References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
+ <CACVXFVPahbFVEP4p2Z9-TvjQ52tUCMuDeLx0X6GP5t0h5gEV8g@mail.gmail.com>
+ <20120916082510.GN12245@n2100.arm.linux.org.uk>
+ <CACVXFVOZ=4HFAy38q_8ZUjOPffcv_mMTi7KCdh3HcX=MCLw5SQ@mail.gmail.com>
+Message-ID: <20120926200833.GA14340@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-> On Wednesday 26 September 2012 16:59:11 Fabio Estevam wrote:
-> > da9052 1-0048: DA9052 ADC IRQ failed ret=-22  ----> fails here
-> > BUCK1: 500 <--> 2075 mV at 1250 mV at 3000 mA
-> > BUCK2: 925 <--> 2075 mV at 1350 mV at 1500 mA
-> > BUCK3: 925 <--> 2500 mV at 1500 mV at 1500 mA
-> > BUCK4: at 2475 mV at 1500 mA
-> > LDO1: at 1300 mV
-> > LDO2: at 1300 mV
-> > LDO3: at 3300 mV
-> > LDO4: 1725 <--> 1800 mV at 2775 mV
-> > LDO5: 1200 <--> 1800 mV at 1300 mV
-> > LDO6: 1750 <--> 3300 mV at 1300 mV
-> > LDO7: 1750 <--> 3300 mV at 2750 mV
-> > LDO8: 1200 <--> 3600 mV at 1800 mV
-> > LDO9: 1250 <--> 3600 mV at 1500 mV
-> > LDO10: 1200 <--> 3600 mV at 1300 mV
-> > ....
-> > 
-> > LDO10: disabling
-> > LDO9: disabling
-> > LDO8: disabling
-> > ?????????? (and then hangs here).
-> > 
-> > Any suggestions as to what I am missing?
+On Sun, Sep 16, 2012 at 09:24:43PM +0800, Ming Lei wrote:
+> On Sun, Sep 16, 2012 at 4:25 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >
+> > It isn't.  As I said, it's a race condition due to lack of locking - the
+> > driver hasn't been added to the list of drivers at this point:
+> >
+> > int bus_add_driver(struct device_driver *drv)
+> > {
+> > ...
+> >         if (drv->bus->p->drivers_autoprobe) {
+> >                 error = driver_attach(drv);
+> >                 if (error)
+> >                         goto out_unregister;
+> >         }
+> >         klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
+> > ...
+> > }
+> >
+> > Notice that the attaching is done _before_ the driver is added to the
+> > bus driver list.
 > 
-> Maybe the pmic device gets created from DT before the GPIO controller
-> registers the IRQ domain.
+> Yes, it is a problem since a new device may be added to bus
+> and bus_probe_device() may not see the new added driver.
+> 
+> So looks klist_add_tail() should complete before driver_attach()
+> inside bus_add_driver().
+> 
+> The attached one line change should fix the problem because the
+> below way can guarantee that no probe(dev) may be lost.
+> 
+> 
+> CPU0				CPU1
+> driver_register
+> 	...
+> 	write(bus->driver_list)
+> 	smp_mb()
+> 	read(bus->device_list)
+> 	...
+> 				device_add
+> 					/* bus_add_device */	
+> 					write(bus->device_list)
+> 					smp_mb()
+> 					/* bus_probe_device*/
+> 					read(bus->driver_list)
+> 
+> And the smp_mb() has been implicit by UNLOCK+LOCK
+> of 'klist' according to 'VARIETIES OF MEMORY BARRIER' part
+> of Documentation/memory-barriers.txt.
+> 
+> Could you test the below patch to see if it can fix your problem?
+> 
+> diff --git a/drivers/base/bus.c b/drivers/base/bus.c
+> index 181ed26..17d7437 100644
+> --- a/drivers/base/bus.c
+> +++ b/drivers/base/bus.c
+> @@ -714,12 +714,12 @@ int bus_add_driver(struct device_driver *drv)
+>  	if (error)
+>  		goto out_unregister;
+> 
+> +	klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
+>  	if (drv->bus->p->drivers_autoprobe) {
+>  		error = driver_attach(drv);
+>  		if (error)
+>  			goto out_unregister;
+>  	}
+> -	klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers);
+>  	module_add_driver(drv->owner, drv);
+> 
+>  	error = driver_create_file(drv, &driver_attr_uevent);
+> 
+> 
+> 
 
-And misconfiguring the PMIC kills the CPU, thus the hang.
+Did the above patch ever prove to solve the issue or not?
 
-Best regards,
-Marek Vasut
+thanks,
+
+greg k-h
