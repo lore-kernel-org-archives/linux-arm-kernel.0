@@ -1,160 +1,41 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 26 Sep 2012 09:01:52 -0400
-Subject: [RFC PATCH 00/13] DMA Engine support for AM33xx
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA8FDA9@DBDE01.ent.ti.com>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1BAFE6F6C881BF42822005164F1491C33EA8A79D@DBDE01.ent.ti.com>
- <20120921182211.GE16522@beef>
- <1BAFE6F6C881BF42822005164F1491C33EA8FDA9@DBDE01.ent.ti.com>
-Message-ID: <20120926130152.GB5641@beef>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Wed, 26 Sep 2012 15:10:58 +0200
+Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
+In-Reply-To: <201209261205.01351.arnd@arndb.de>
+References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
+ <201209261038.36223.arnd@arndb.de>
+ <20120926104421.GA7040@n2100.arm.linux.org.uk>
+ <201209261205.01351.arnd@arndb.de>
+Message-ID: <20120926131058.GA9891@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 08:26:19AM +0000, Hebbar, Gururaja wrote:
-> On Fri, Sep 21, 2012 at 23:52:11, Porter, Matt wrote:
-> > On Fri, Sep 21, 2012 at 08:27:07AM +0000, Hebbar, Gururaja wrote:
-> > > On Thu, Sep 20, 2012 at 20:13:33, Porter, Matt wrote:
-> > > > This series adds DMA Engine support for AM33xx, which uses
-> > > > an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> > > > a private API implementation (much like the situation with OMAP
-> > > > DMA) found on the DaVinci family of SoCs.
-> > > > 
-> > > > There are a mind-boggling number of dependencies for this series:
-> > > > 
-> > > > 	- Jon Hunter's OF DMA helpers series
-> > > > 	  https://patchwork.kernel.org/patch/1461061/
-> > > > 	  https://patchwork.kernel.org/patch/1461051/
-> > > > 	- Patch to address OF DMA helpers naming issues:
-> > > > 	  https://patchwork.kernel.org/patch/1477921/
-> > > > 	- EDMA DMA Engine wrapper driver in linux-next
-> > > > 	  c2dde5f8f2095d7c623ff3565c1462e190272273
-> > > > 	- EDMA DMA Engine wrapper driver bug fix:
-> > > > 	  https://patchwork.kernel.org/patch/1474411/  
-> > > > 	- A huge number of patches in linux-next for AM33xx boot
-> > > > 	  (too numerous to list)
-> > > > 
-> > > > The approach taken is similar to how OMAP DMA is being converted to
-> > > > DMA Engine support. With the functional EDMA private API already
-> > > > existing in mach-davinci/dma.c, we first move that to an ARM common
-> > > > area so it can be shared. Adding DT and runtime PM support to the
-> > > > private EDMA API implementation allows it to run on AM33xx. AM33xx
-> > > > *only* boots using DT so we leverage Jon's generic DT DMA helpers to
-> > > > register EDMA DMAC with the of_dma framework and then add support
-> > > > for calling the dma_request_slave_channel() API to both the mmc
-> > > > and spi drivers.
-> > > > 
-> > > > What works? Well, with this series we now have MMC and SPI support
-> > > > on AM33xx. The only caveat for MMC is that the mmc3 controller has
-> > > > its events on the crossbar and is not usable right now.
-> > > > 
-> > > > This is tested on BeagleBone with a SPI framebuffer driver and SD
-> > > > card.
-> > > > 
-> > > > After this series, the plan is to convert the last in-tree user
-> > > > of the private EDMA API (davinci-pcm/mcasp) and then eliminate
-> > > > the private EDMA API by folding its functionality into
-> > > > drivers/dma/edma.c.
-> > > > 
-> > > > TODO:
-> > > > 	add AM33xx crossbar support to the private EDMA API
-> > > > 	(any EDMA events on the crossbar are not supported)
-> > > > 
-> > > 
-> > > 
-> > > Can you please mention the base repo you have taken as starting point.
-> > > (repo + extra patches ...).
+On Wed, Sep 26, 2012 at 12:05:01PM +0000, Arnd Bergmann wrote:
+> On Wednesday 26 September 2012, Russell King - ARM Linux wrote:
+> > That rubbishes the idea of a single kernel though, which is to give
+> > distros a single kernel image that they can boot on different ARM
+> > platforms.
 > > 
-> > It's mainline 3.6-rc6 and you can see the complete set of patches
-> > at https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
-> > after commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2
-> > 
-> > > This will help us to test the code.
-> > > 
-> > > This is because I looked at the patch 12/13 and I see that mmc
-> > > device-node is modified. But in mainline I don?t see device 
-> > > node for mmc (yet).
-> > 
-> > Oops. You'll need e62a3333ae450bcdefbe22229d7bc277ae0ef645 and
-> > fe97304557d2c6f7d0aaf1ea028ea48ffca366a9 which I forgot to include
-> > in this series. I'll have them in for v2.
+> > They want a single kernel binary that works everywhere, not one which
+> > they need to select the right binary to work on platform X.  Yes, the
+> > internal uncompressed bulk may be the same, but it would require
+> > distros to carry around N different kernel images for N different
+> > platforms.
 > 
-> Yesterday I tested edma patches on latest linux-next/master + merge of 
-> linux-omap/for_3.7/dts_part2. Below are my observations
+> Right. It still helps the distros ensure that they only have a single
+> configuration and a single binary to test, which I expect is their main
+> interest, but keeping multiple copies of the same binary with different
+> headers is a bit silly, I agree.
 > 
-> 1. baseline = linux-next/master + merge of linux-omap/for_3.7/dts_part2
-> 2. on top of above branch, I applied patches [1-9]/13 of your edma 
->    patches
-> 3. few patches required trivial changes before applying
-> 4. Applied dma of patches as you mentioned
-> 5. add custom patch (ARM: CUSTOM: Build a uImage with dtb already 
->    appended)
->    From https://github.com/hvaibhav/am335x-linux/commit/
->         7e72f5ed4b702c9373d19f7626f07ae31a381d53#arch/arm/Makefile
+> On PowerPC, we have a similar problem, and the way that distros usually
+> deal with that is to do the final link of the zImage from the post-install
+> stage of their rpm or deb packages, depending on the platform they are
+> on. In the same stage, they also link in the newly created initrd and
+> the device tree blob if necessary.
 
-Alternatively you can run a current u-boot master build for am335x and
-the appended dtb is no longer required.
+Wouldn't help to have a sort of generic console driver in the decompressor
+accepting some regs and masks provided by DT? This would fit most of the
+uarts around, would be totally generic and multi-platform friendly.
 
-> 6. Modified 9/13 patch to apply properly on latest am33xx.dtsi.
-> 	a. Edma portion as it is
-> 	b. mmc portion as below
-> 		mmc1: mmc at 48060000 {
-> 			compatible = "ti,omap3-hsmmc";
-> 			ti,hwmods = "mmc1";
-> 			ti,dual-volt;
-> 			ti,needs-special-reset;
-> 			bus-width = <4>;
-> 			vmmc-supply = <&vmmc_reg>;
-> 			dmas = <&edma 24
-> 				&edma 25>;
-> 			dma-names = "tx", "rx";
-> 		};
-> 	c. added mmc pinmux as-well
-> 
-> 7. make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm distclean
->    make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm 
->    omap2plus_defconfig
-> 
-> 8. enabled TI_EDMA from menuconfig (since it was not enabled for 
->    omap2plus_defconfig
-> 
-> 9. make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm uImage
->    make CROSS_COMPILE=arm-arago-linux-gnueabi- ARCH=arm 
->    uImage-dtb.am335x-evm
-> 
-> With above changes, edma probe was failing at request_mem_region() 
-> Inside linux-next/arch/arm/common/edma.c --> edma_probe()
-> 
-> I had to modify edma_probe as below
-> 
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index f337f81..efe2673 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -1589,11 +1589,11 @@ static int __init edma_probe(struct platform_device *pdev)
->         for (j = 0; j < EDMA_MAX_CC; j++) {
->                 if (node) {
->                         int err;
-> -                       err = of_address_to_resource(node, 0, &res[j]);
-> +                       err = of_address_to_resource(node, j, &res[j]);
->                         if (err) {
->                                 dev_err(dev,
->                                         "unable to find 'reg' property\n");
-> -                               return -EIO;
-> +                               //return -EIO;
->                         }
->                         r[j] = &res[j];
-
-Hrm, looks like a dts issue if it can't find the reg resource on your
-integration of this. In any case, I'll look at it in v2.
-
-> With this I was able to boot on am335x-evm and do a successful MMC 
-> copy-md5sum-compare test.
-
-Great! Thanks for testing this.
-
-> I believe you are looking into above issue in your v2 version.
-
-Yes.
-
--Matt
+Regards,
+Domenico
