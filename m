@@ -1,53 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 26 Sep 2012 21:27:59 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120926180349.GF15578@mudshark.cambridge.arm.com>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120816202932.GY2232@pengutronix.de>
- <20120921190002.GU5525@pengutronix.de> <5061C3FE.7050400@arm.com>
- <20120925150026.GG21730@pengutronix.de>
- <20120926180349.GF15578@mudshark.cambridge.arm.com>
-Message-ID: <20120926192759.GC19685@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Sep 2012 16:59:11 -0300
+Subject: DA9053 support on mx53qsb
+Message-ID: <CAOMZO5BGGOJCVrF_NZP+gXg7wfKnKv7287Xqo=J_NfsMc=HeDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi,
 
-On Wed, Sep 26, 2012 at 07:03:49PM +0100, Will Deacon wrote:
-> On Tue, Sep 25, 2012 at 04:00:26PM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Sep 25, 2012 at 03:47:26PM +0100, Jonathan Austin wrote:
-> > > Looking at the patch series at a very superficial level, I wonder why
-> > > you've chosen not to include any Kconfig/NVIC support at this stage,
-> > > especially as you've posted some before and there appears to be
-> > > something (presumably) working in your efm32 branch...
-> > >
-> > > It would be a shame to spend time on merging the basic support if there
-> > > are issues that mean the interrupt support won't follow.
-> > I plan to expand common/gic.c for interrupt support. Currently I don't
-> > do much though because getting feedback and the changes into mainline is
-> > quite hard and I don't want to spend time now and hear later that I did
-> > it wrong or something. So I put my efforts on hold and only ping from
-> > time to time.  :-(
-> 
-> My personal view is that merging the code without support for interrupts is
-> fairly pointless, so the nvic code should certainly be included. I
-> wouldn't worry too much about merging it with gic.c initially. That can come
-That would be ok for me, too.
-> later, especially as we'll need to prise the gic into drivers/ at some point
-> (it should be shared with arm64).
-> 
-> I think one reason for the lack of feedback is the inability for people to
-> run this code themselves. I believe Jonny was trying to get started with an
-> FPGA / simulation, but some hardware would be great if there's any available...
-I think you can order the efm32 devboard[1] via the usual channels.
-I don't know if Energymicro has interest to give out some boards into
-the community at an reduced price. I will ask.
+I am trying to enable Dialog DA9053 on mx53qsb and did the following:
 
-Best regards
-Uwe
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 5bae4c7..f3c71e5 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -60,6 +60,7 @@
+ 							697  0x80000000	/* MX53_PAD_EIM_DA12__GPIO3_12 */
+ 							701  0x80000000	/* MX53_PAD_EIM_DA13__GPIO3_13 */
+ 							868  0x80000000	/* MX53_PAD_PATA_DA_0__GPIO7_6 */
++							1149 0x80000000 /* MX53_PAD_GPIO_16__GPIO7_11 */
+ 						>;
+ 					};
 
-[1] http://www.energymicro.com/tools/efm32-giant-gecko-development-kit
+@@ -106,6 +107,8 @@
+ 				pmic: dialog at 48 {
+ 					compatible = "dlg,da9053-aa", "dlg,da9052";
+ 					reg = <0x48>;
++					interrupt-parent = <&gpio7>;
++					interrupts = <11 0x8>; /* low-level active IRQ at GPIO7_11 */
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ 					regulators {
+ 						buck0 {
+--
+
+and this is what I get:
+...
+
+da9052 1-0048: DA9052 ADC IRQ failed ret=-22  ----> fails here
+BUCK1: 500 <--> 2075 mV at 1250 mV at 3000 mA
+BUCK2: 925 <--> 2075 mV at 1350 mV at 1500 mA
+BUCK3: 925 <--> 2500 mV at 1500 mV at 1500 mA
+BUCK4: at 2475 mV at 1500 mA
+LDO1: at 1300 mV
+LDO2: at 1300 mV
+LDO3: at 3300 mV
+LDO4: 1725 <--> 1800 mV at 2775 mV
+LDO5: 1200 <--> 1800 mV at 1300 mV
+LDO6: 1750 <--> 3300 mV at 1300 mV
+LDO7: 1750 <--> 3300 mV at 2750 mV
+LDO8: 1200 <--> 3600 mV at 1800 mV
+LDO9: 1250 <--> 3600 mV at 1500 mV
+LDO10: 1200 <--> 3600 mV at 1300 mV
+....
+
+LDO10: disabling
+LDO9: disabling
+LDO8: disabling
+?????????? (and then hangs here).
+
+Any suggestions as to what I am missing?
+
+Thanks,
+
+Fabio Estevam
