@@ -1,42 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Sep 2012 11:48:25 -0700
-Subject: [PATCH 01/10] usb: otg: msm: Convert to clk_prepare/unprepare
-In-Reply-To: <CADTbHxoFeYWPJpYTN85kBeF=kv2v1yDioJW-upzn1RcwVT_sKw@mail.gmail.com>
-References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
- <1348194419-11486-2-git-send-email-sboyd@codeaurora.org>
- <CADTbHxoFeYWPJpYTN85kBeF=kv2v1yDioJW-upzn1RcwVT_sKw@mail.gmail.com>
-Message-ID: <50634DF9.5010608@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 26 Sep 2012 14:48:07 -0400
+Subject: [PATCH V5] Add support for Aurora L2 Cache Controller
+In-Reply-To: <50633007.7050808@free-electrons.com>
+References: <1348675370-16359-1-git-send-email-gregory.clement@free-electrons.com>
+ <5063286C.9070502@free-electrons.com>
+ <20120926162407.GN5469@titan.lakedaemon.net>
+ <50633007.7050808@free-electrons.com>
+Message-ID: <20120926184807.GO5469@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/12 09:58, Pankaj Jangra wrote:
-> On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
->> index 9f5fc90..2ae0639 100644
->> --- a/drivers/usb/otg/msm_otg.c
->> +++ b/drivers/usb/otg/msm_otg.c
->> @@ -514,13 +514,13 @@ static int msm_otg_suspend(struct msm_otg *motg)
->>                         motg->pdata->otg_control == OTG_PMIC_CONTROL)
->>                 writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
->>
->> -       clk_disable(motg->pclk);
->> -       clk_disable(motg->clk);
->> +       clk_disable_unprepare(motg->pclk);
->> +       clk_disable_unprepare(motg->clk);
->>         if (motg->core_clk)
->> -               clk_disable(motg->core_clk);
->> +               clk_disable_unprepare(motg->core_clk);
->>
-> I was under assumption that system suspend/resume might be called from
-> the interrupt context. If that is case then its not appropriate to
-> call clk_prepare/unprepare here right? or my understanding is not correct????
+On Wed, Sep 26, 2012 at 06:40:39PM +0200, Gregory CLEMENT wrote:
+> On 09/26/2012 06:24 PM, Jason Cooper wrote:
+> > On Wed, Sep 26, 2012 at 06:08:12PM +0200, Gregory CLEMENT wrote:
+> >>> Changelog:
+> >>> V4 -> V5:
+> >>> - Rebased L2 pach set onto v3.6-rc7.
+> >>> - The header file cache-aurora-l2.h was co-located with its only user:
+> >>>   moved from arch/arm/include/asm/hardware/ to arch/arm/mm/.
+> >>> - Removed additional unnecessary blank lines in cache-l2x0.c.
+> >>>
+> >> Russell,
+> >>
+> >> will you take the all series from the git repository ? As the
+> >> last patches have been already acked-by Arnd and were initially pulled
+> >> by Jason Cooper, I think there should be no problem to get the whole
+> >> series.
+> >>
+> >> Now if you only want to take the first three patches, will you pull
+> >> them from the git repository or do you prefer that I submit them
+> >> through your patch system?
+> > 
+> > Russell,
+> > 
+> > If you're ok with it, I can take the whole series (incl 1,2,3) through
+> > my tree.  Or, split it up as we did before (arch/arm/mm changes through
+> > you, all else through us).
+> > 
+> > Gregory,
+> > 
+> > I'm inclined to make this v3.8 material, especially if pushing it
+> > through two different trees.  Do you have any objection?
+> 
+> Well I have pushed this series a long time ago and I have hopped it
+> would have been part of the v3.7.
 
-Well we call disable_irq() at the top of this suspend function so I
-suspect your understanding is incorrect. disable_irq() can call
-schedule(). There are also a bunch of regulator calls in
-msm_hsusb_ldo_set_mode() that this suspend function calls (almost all
-regulator calls grab a mutex).
+It really hinges on if Russell is ok with keeping the series together.
+I'd really prefer not to cause the dependency headache this late in the
+release cycle.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+So, if Russell is ok with me taking the whole series, v3.7.  If not,
+v3.8.  Fair enough?
+
+thx,
+
+Jason.
