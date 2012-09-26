@@ -1,28 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Sep 2012 16:10:23 +0100
-Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
-In-Reply-To: <201209261449.48468.arnd@arndb.de>
-References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
- <201209261417.18883.arnd@arndb.de> <506315A6.3090300@am.sony.com>
- <201209261449.48468.arnd@arndb.de>
-Message-ID: <20120926151023.GC30938@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 26 Sep 2012 17:21:36 +0200
+Subject: [PATCH v3] serial: pl011: handle corruption at high clock speeds
+Message-ID: <1348672896-6005-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 02:49:48PM +0000, Arnd Bergmann wrote:
-> Right now, a multiplatform kernel has no way of debugging the
-> decompressor using console output, so it's actually /smaller/
-> than a single-platform kernel, but also less capable.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Err, are you sure about all your details above?  You do realise when
-debugging is disabled there is no debug code included anywhere in the
-decompressor?
+This works around a few glitches in the ST version of the PL011
+serial driver when using very high baud rates, as we do in the
+Ux500: 3, 3.25, 4 and 4.05 Mbps.
 
-I think what you're referring to is not the debug output, but the normal
-decompressor output.  (The "Decompressing Linux..." message is not
-debug output.)
+Problem Observed/rootcause:
 
-Let's be a little more clear about what "less capable" means - it will
-be unable to report any errors that occur during the decompression.
-What that means is that you'll end up with mere silence should an
-error occur.
+When using high baud-rates, and the baudrate*8 is getting close to
+the provided clock frequency (so a division factor close to 1), when
+using bursts of characters (so they are abutted), then it seems as if
+there is not enough time to detect the beginning of the start-bit which
+is a timing reference for the entire character, and thus the sampling
+moment of character bits is moving towards the end of each bit, instead
+of the middle.
+
+Fix:
+Increase slightly the RX baud rate of the UART above the theoretical
+baudrate by 5%. This will definitely give more margin time to the
+UART_RX to correctly sample the data at the middle of the bit period.
+
+Also fix the ages old copy-paste error in the very stressed comment,
+it's referencing the registers used in the PL010 driver rather than
+the PL011 ones.
+
+Cc: stable at kernel.org
+Cc: Bibek Basu <bibek.basu@stericsson.com>
+Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
+Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
+Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
+Signed-off-by: Matthias Locher <matthias.locher@stericsson.com>
+Signed-off-by: Rajanikanth HV <rajanikanth.hv@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Actually commit the v2 changes...
+ChangeLog v1->v2:
+- Use >= comparison for 3 Mbaud, add some parenthesis to make the
+  logical expressions crystal clear.
+---
+ drivers/tty/serial/amba-pl011.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d626d84..25508c7 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1594,13 +1594,26 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			old_cr &= ~ST_UART011_CR_OVSFACT;
+ 	}
+ 
++	/*
++	 * Workaround for the ST Micro oversampling variants to
++	 * increase the bitrate slightly, by lowering the divisor,
++	 * to avoid delayed sampling of start bit at high speeds,
++	 * else we see data corruption.
++	 */
++	if (uap->vendor->oversampling) {
++		if ((baud >= 3000000) && (baud < 3250000) && (quot > 1))
++			quot -= 1;
++		else if ((baud > 3250000) && (quot > 2))
++			quot -= 2;
++	}
+ 	/* Set baud rate */
+ 	writew(quot & 0x3f, port->membase + UART011_FBRD);
+ 	writew(quot >> 6, port->membase + UART011_IBRD);
+ 
+ 	/*
+ 	 * ----------v----------v----------v----------v-----
+-	 * NOTE: MUST BE WRITTEN AFTER UARTLCR_M & UARTLCR_L
++	 * NOTE: lcrh_tx and lcrh_rx MUST BE WRITTEN AFTER
++	 * UART011_FBRD & UART011_IBRD.
+ 	 * ----------^----------^----------^----------^-----
+ 	 */
+ 	writew(lcr_h, port->membase + uap->lcrh_rx);
+-- 
+1.7.11.3
