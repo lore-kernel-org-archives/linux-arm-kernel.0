@@ -1,42 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Sep 2012 19:03:49 +0100
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120925150026.GG21730@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120816202932.GY2232@pengutronix.de>
- <20120921190002.GU5525@pengutronix.de> <5061C3FE.7050400@arm.com>
- <20120925150026.GG21730@pengutronix.de>
-Message-ID: <20120926180349.GF15578@mudshark.cambridge.arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Sep 2012 11:14:21 -0700
+Subject: [PATCH 08/10] ARM: msm: Prepare clk_get() users in mach-msm for
+ clock-pcom driver
+In-Reply-To: <CADTbHxrQQ9GQKm1Xd3gn4eLu=uKvkdHRvBYDq0iRLiJwy+1amw@mail.gmail.com>
+References: <1348194419-11486-1-git-send-email-sboyd@codeaurora.org>
+ <1348194419-11486-9-git-send-email-sboyd@codeaurora.org>
+ <CADTbHxrQQ9GQKm1Xd3gn4eLu=uKvkdHRvBYDq0iRLiJwy+1amw@mail.gmail.com>
+Message-ID: <506345FD.8010609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On 09/26/12 10:35, Pankaj Jangra wrote:
+> Hi,
+>
+> On Fri, Sep 21, 2012 at 7:56 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> In the near future we'll be moving clock-pcom to a platform
+>> driver, in which case these two users of clk_get() in mach-msm
+>> need to be updated. Have board-trout-panel.c make the proc_comm
+>> call directly so that we don't have to port this board specific
+>> code to the driver right now and reorder the initcall order of
+>> dma.c so that it initializes after the clock driver probes but
+>> before any drivers use dma APIs.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/mach-msm/Makefile            |  9 ++++++---
+>>  arch/arm/mach-msm/board-trout-panel.c | 19 +++++++------------
+>>  arch/arm/mach-msm/dma.c               |  5 ++---
+>>  3 files changed, 15 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+>> index 17519fa..3dbae74 100644
+>> --- a/arch/arm/mach-msm/Makefile
+>> +++ b/arch/arm/mach-msm/Makefile
+>> @@ -5,12 +5,15 @@ obj-$(CONFIG_DEBUG_FS) += clock-debug.o
+>>  obj-$(CONFIG_MSM_VIC) += irq-vic.o
+>>  obj-$(CONFIG_MSM_IOMMU) += devices-iommu.o
+>>
+>> -obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o
+>> -obj-$(CONFIG_ARCH_MSM7X30) += dma.o
+>> -obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
+>> +obj-$(CONFIG_ARCH_MSM7X00A) += irq.o
+>> +obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
+>>
+>>  obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
+>>
+>> +obj-$(CONFIG_ARCH_MSM7X00A) += dma.o
+>> +obj-$(CONFIG_ARCH_MSM7X30) += dma.o
+>> +obj-$(CONFIG_ARCH_QSD8X50) += dma.o
+>> +
+> I did not understand what is the need of this change in Makefile?
 
-On Tue, Sep 25, 2012 at 04:00:26PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Sep 25, 2012 at 03:47:26PM +0100, Jonathan Austin wrote:
-> > Looking at the patch series at a very superficial level, I wonder why
-> > you've chosen not to include any Kconfig/NVIC support at this stage,
-> > especially as you've posted some before and there appears to be
-> > something (presumably) working in your efm32 branch...
-> >
-> > It would be a shame to spend time on merging the basic support if there
-> > are issues that mean the interrupt support won't follow.
-> I plan to expand common/gic.c for interrupt support. Currently I don't
-> do much though because getting feedback and the changes into mainline is
-> quite hard and I don't want to spend time now and hear later that I did
-> it wrong or something. So I put my efforts on hold and only ping from
-> time to time.  :-(
+Quoted from commit text:
 
-My personal view is that merging the code without support for interrupts is
-fairly pointless, so the nvic code should certainly be included. I
-wouldn't worry too much about merging it with gic.c initially. That can come
-later, especially as we'll need to prise the gic into drivers/ at some point
-(it should be shared with arm64).
+reorder the initcall order of
+dma.c so that it initializes after the clock driver probes but
+before any drivers use dma APIs.
 
-I think one reason for the lack of feedback is the inability for people to
-run this code themselves. I believe Jonny was trying to get started with an
-FPGA / simulation, but some hardware would be great if there's any available...
 
-Cheers,
-
-Will
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
