@@ -1,153 +1,85 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Sep 2012 10:28:27 +0200
-Subject: [PATCH 6/6] spi: atmel: add dt property for DMA configuration
- for sam9x5 and sam9n12
-In-Reply-To: <1348642261-27554-7-git-send-email-wenyou.yang@atmel.com>
+Date: Wed, 26 Sep 2012 10:32:06 +0200
+Subject: [PATCH 3/6] ARM: at91: add clocks for spi DT entries
+In-Reply-To: <1348642261-27554-4-git-send-email-wenyou.yang@atmel.com>
 References: <1348642261-27554-1-git-send-email-wenyou.yang@atmel.com>
- <1348642261-27554-7-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <5062BCAB.1050405@atmel.com>
+ <1348642261-27554-4-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <5062BD86.3070401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2012 08:51 AM, Wenyou Yang :
+On 09/26/2012 08:50 AM, Wenyou Yang :
 > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-
-This is not mainline material: we have a DMA-DT API, now.
-
 > ---
->  arch/arm/boot/dts/at91sam9n12.dtsi |    2 ++
->  arch/arm/boot/dts/at91sam9x5.dtsi  |    4 +++
->  drivers/spi/spi-atmel.c            |   55 +++++++++++++++++++++++++++++++++++-
->  3 files changed, 60 insertions(+), 1 deletion(-)
+>  arch/arm/mach-at91/at91sam9260.c |    2 ++
+>  arch/arm/mach-at91/at91sam9g45.c |    2 ++
+>  arch/arm/mach-at91/at91sam9n12.c |    2 ++
+>  arch/arm/mach-at91/at91sam9x5.c  |    3 +++
+>  4 files changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index c6868a2..b51f94d 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -98,6 +98,7 @@
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
->  				interrupts = <20 4 0>;
-> +				#dma-cells = <1>;
->  			};
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 30c7f26..90d38a8 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -227,6 +227,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
+>  	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
+>  	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi0_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "fffac000.spi", &spi1_clk),
+>  	/* fake hclk clock */
+>  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+>  	CLKDEV_CON_ID("pioA", &pioA_clk),
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index ef6cedd..9d0ec1c 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -254,6 +254,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
+>  	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
+>  	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
+>  	/* fake hclk clock */
+>  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
+>  	CLKDEV_CON_ID("pioA", &pioA_clk),
+> diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+> index 0849466..21b264b 100644
+> --- a/arch/arm/mach-at91/at91sam9n12.c
+> +++ b/arch/arm/mach-at91/at91sam9n12.c
+> @@ -169,6 +169,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
+>  	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
+>  	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+>  	CLKDEV_CON_ID("pioA", &pioAB_clk),
+>  	CLKDEV_CON_ID("pioB", &pioAB_clk),
+>  	CLKDEV_CON_ID("pioC", &pioCD_clk),
+> diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+> index 477cf9d..b6f3a92 100644
+> --- a/arch/arm/mach-at91/at91sam9x5.c
+> +++ b/arch/arm/mach-at91/at91sam9x5.c
+> @@ -16,6 +16,7 @@
+>  #include <mach/at91_pmc.h>
+>  #include <mach/cpu.h>
+>  #include <mach/board.h>
+> +#include <mach/gpio.h>
+
+What is the purpose of this line in this patch?
+
 >  
->  			pioA: gpio at fffff400 {
-> @@ -197,6 +198,7 @@
->  				has_dma_support = <1>;
->  				has_pdc_support = <0>;
->  				is_ver2 = <1>;
-> +				dma = <&dma 0x10002212>;
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index f124473..ee46cb7 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -100,12 +100,14 @@
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
->  				interrupts = <20 4 0>;
-> +				#dma-cells = <1>;
->  			};
->  
->  			dma1: dma-controller at ffffee00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffee00 0x200>;
->  				interrupts = <21 4 0>;
-> +				#dma-cells = <1>;
->  			};
->  
->  			pioA: gpio at fffff400 {
-> @@ -248,6 +250,7 @@
->  				has_dma_support = <1>;
->  				has_pdc_support = <0>;
->  				is_ver2 = <1>;
-> +				dma = <&dma0 0x10002212>;
->  				status = "disabled";
->  			};
->  
-> @@ -265,6 +268,7 @@
->  				has_dma_support = <1>;
->  				has_pdc_support = <0>;
->  				is_ver2 = <1>;
-> +				dma = <&dma1 0x10002212>;
->  				status = "disabled";
->  			};
->  		};
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 9930438..ad19423 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -1436,6 +1436,57 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->  	kfree(asd);
->  }
->  
-> +static int at91_spi_of_init(struct device_node *np,
-> +			struct at_dma_slave *atslave)
-> +{
-> +	struct of_phandle_args  dma_spec;
-> +	struct device_node      *dmac_np;
-> +	struct platform_device  *dmac_pdev;
-> +	const __be32            *nbcells;
-> +	int                     ret;
-> +
-> +	ret = of_parse_phandle_with_args(np, "dma", "#dma-cells", 0, &dma_spec);
-> +	if (ret || !dma_spec.np) {
-> +		pr_err("%s: can't parse dma property (%d)\n",
-> +						np->full_name, ret);
-> +		goto err0;
-> +	}
-> +	dmac_np = dma_spec.np;
-> +
-> +	/* check property format */
-> +	nbcells = of_get_property(dmac_np, "#dma-cells", NULL);
-> +	if (!nbcells) {
-> +		pr_err("%s: #dma-cells property is required\n", np->full_name);
-> +		ret = -EINVAL;
-> +		goto err1;
-> +	}
-> +
-> +	if (dma_spec.args_count != be32_to_cpup(nbcells)
-> +			|| dma_spec.args_count != 1) {
-> +		pr_err("%s: wrong #dma-cells for %s\n",
-> +				np->full_name, dmac_np->full_name);
-> +		ret = -EINVAL;
-> +		goto err1;
-> +	}
-> +
-> +	dmac_pdev = of_find_device_by_node(dmac_np);
-> +	if (!dmac_pdev) {
-> +		pr_err("%s: unable to find pdev from DMA controller\n",
-> +				dmac_np->full_name);
-> +		ret = -EINVAL;
-> +		goto err1;
-> +	}
-> +
-> +	atslave->dma_dev = &dmac_pdev->dev;
-> +	atslave->cfg = dma_spec.args[0];
-> +
-> +err1:
-> +	of_node_put(dma_spec.np);
-> +err0:
-> +	pr_debug("%s exited with status %d\n", __func__, ret);
-> +	return ret;
-> +}
-> +
->  static int of_get_atmel_spi_data(struct device_node *np, struct atmel_spi *as)
->  {
->  	const __be32	*val;
-> @@ -1540,7 +1591,9 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
->  		goto out_unmap_regs;
->  
->  	if (as->data.has_dma_support) {
-> -		if (atmel_spi_configure_dma(as) == 0)
-> +		if ((at91_spi_of_init(pdev->dev.of_node,
-> +				&as->data.dma_slave) == 0)
-> +				&& (atmel_spi_configure_dma(as) == 0))
->  			as->use_dma = true;
->  	} else if (as->data.has_pdc_support)
->  		as->use_pdc = true;
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -231,6 +232,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
+>  	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
+>  	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
+> +	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+>  	CLKDEV_CON_ID("pioA", &pioAB_clk),
+>  	CLKDEV_CON_ID("pioB", &pioAB_clk),
+>  	CLKDEV_CON_ID("pioC", &pioCD_clk),
 > 
 
 
