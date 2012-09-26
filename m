@@ -1,34 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Sep 2012 18:08:12 +0200
-Subject: [PATCH V5] Add support for Aurora L2 Cache Controller
-In-Reply-To: <1348675370-16359-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1348675370-16359-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <5063286C.9070502@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Sep 2012 11:11:40 -0500
+Subject: [PATCH V2 7/7] ARM: OMAP: Add DT support for timer driver
+In-Reply-To: <50632497.2070103@ti.com>
+References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
+ <1347579091-3794-8-git-send-email-jon-hunter@ti.com>
+ <50632497.2070103@ti.com>
+Message-ID: <5063293C.1080404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Changelog:
-> V4 -> V5:
-> - Rebased L2 pach set onto v3.6-rc7.
-> - The header file cache-aurora-l2.h was co-located with its only user:
->   moved from arch/arm/include/asm/hardware/ to arch/arm/mm/.
-> - Removed additional unnecessary blank lines in cache-l2x0.c.
+On 09/26/2012 10:51 AM, Jon Hunter wrote:
+> Hi Rob,
+
+
+
+>>  #define OMAP3_32K_SOURCE	"omap_32k_fck"
+>>  #define OMAP4_32K_SOURCE	"sys_32k_ck"
+>>  
+>> +#define TIMER_PROP_ALWON	"ti,timer-alwon"
+>> +
 > 
-Russell,
+> I see you made the following comment [1] here ...
+> 
+> "It would be easier to follow the code if you use the strings directly
+> (and you do in some places)."
+> 
+> I could avoid the above definition.
+> 
+>>  #ifdef CONFIG_OMAP_32K_TIMER
+>>  #define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
+>>  #define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
+>>  #define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
+>>  #define OMAP3_SECURE_TIMER	12
+>> +#define TIMER_PROP_SECURE	"ti,timer-secure"
+>>  #else
+>>  #define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
+>>  #define OMAP3_CLKEV_SOURCE	OMAP3_MPU_SOURCE
+>>  #define OMAP4_CLKEV_SOURCE	OMAP4_MPU_SOURCE
+>>  #define OMAP3_SECURE_TIMER	1
+>> +#define TIMER_PROP_SECURE	TIMER_PROP_ALWON
+>>  #endif
+> 
+> Are you ok, with having the TIMER_PROP_SECURE definition or would you
+> prefer I handle this differently? This is dependent on the kernel config.\
 
-will you take the all series from the git repository ? As the
-last patches have been already acked-by Arnd and were initially pulled
-by Jason Cooper, I think there should be no problem to get the whole
-series.
+Yes, that's fine.
 
-Now if you only want to take the first three patches, will you pull
-them from the git repository or do you prefer that I submit them
-through your patch system?
-
-Thanks,
-
-Gregory
+Rob
 
 > 
-> The git branch aurora-L2-cache-ctrl is visible at
-> https://github.com/MISL-EBU-System-SW/mainline-public.git
+> Cheers
+> Jon
+> 
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.omap/84458/focus=84982
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
