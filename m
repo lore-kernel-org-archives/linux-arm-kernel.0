@@ -1,81 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Sep 2012 14:38:15 +0200
-Subject: [PATCH 2/2] ARM: ABMA: Disable/Enable interface clock from
+Date: Wed, 26 Sep 2012 14:41:56 +0200
+Subject: [PATCH 1/2] spi:pl022: Disable/Enable functional clock from
  suspend/resume
-In-Reply-To: <1348658647-25975-3-git-send-email-vipulkumar.samar@st.com>
+In-Reply-To: <20120926121946.GO4428@opensource.wolfsonmicro.com>
 References: <1348658647-25975-1-git-send-email-vipulkumar.samar@st.com>
- <1348658647-25975-3-git-send-email-vipulkumar.samar@st.com>
-Message-ID: <CACRpkdY_reBeOpyzxdjh9hsc1n_Ff7p5KFBA0Ysys_zDv3WtrA@mail.gmail.com>
+ <1348658647-25975-2-git-send-email-vipulkumar.samar@st.com>
+ <CACRpkdampxUw0=NO6cs679C-r0_AnPEaTYVc+GppRkKGn32p-w@mail.gmail.com>
+ <20120926121946.GO4428@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdZLUUXw5TDwTqtP10YaRHEuHNHq9gMY-YSNeZ+21=cZRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 1:24 PM, Vipul Kumar Samar
-<vipulkumar.samar@st.com> wrote:
-
-> AMBA devices interface clock is disabled in RTPM suspend/resume hooks
-> but not in conventional hooks.
+On Wed, Sep 26, 2012 at 2:19 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Sep 26, 2012 at 02:17:36PM +0200, Linus Walleij wrote:
+>> On Wed, Sep 26, 2012 at 1:24 PM, Vipul Kumar Samar
 >
-> This patch adds support to disable/enable clock for conventional
-> suspend/resume calls.
+>> > SPI functional clock must be disalble/enable in non RTPM suspend/resume
+>> > hooks. Currently it is only done for RTPM cases.
+>
+>> > This patch add support to disable/enbale clock for conventional
+>> > suspend/resume calls.
+>
+>> Cross dependency between runtime suspend/resume and
+>> common suspend/resume. Oh the horror ...
+>
+> This should be fine, we runtime resume before we suspend.
 (...)
-> +       struct amba_device *pcdev = to_amba_device(dev);
->         int ret = 0;
->
->         if (!drv)
-> @@ -132,16 +133,27 @@ static int amba_pm_suspend(struct device *dev)
->                 ret = amba_legacy_suspend(dev, PMSG_SUSPEND);
->         }
->
-> +       if (!ret)
-> +               clk_disable(pcdev->pclk);
-> +
->         return ret;
->  }
+> This was clarified at some point relatively recently with the above
+> (which is essentially the same as the solution you describe).
 
-You're not accounting for the case where pcdev->pclk
-is an error pointer (as happens if pclk lookup fails at
-probe).
+Oh. How come that whenever I poke my nose into this stuff I
+feel like a compleat n00b X-D
 
-I think you can simplify some of the code using
-the external accessors from <linux/amba/bus.h>:
-
-amba_pclk_enable();
-amba_pclk_disable();
-
-But:
-
-Again this is a case where you have a race between runtime
-suspend/resume and ordinary suspend/resume.
-
-These ordinary suspend/resume operations should probably
-wait for runtime suspend to happen *first* if and only if
-runtime PM is enabled, and then the block will be gated
-off. So we really need to figure out how we can make sure
-that this happens.
-
-If just ordinary PM is enabled, the above makes sense but in
-that case I think we should have that #ifdef:ed as an alternative
-or something.
-
-So something like:
-
-suspend():
-#ifdef CONFIG_PM_RUNTIME
-   /* Wait for runtime PM to hammer down the pclk */
-#elif CONFIG_PM
-   amba_pclk_disable();
-#endif
-
-resume():
-#if defined(CONFIG_PM) && !defined(CONFIG_PM_RUNTIME)
-  amba_pclk_enable();
-#endif
-  /* Let runtime PM lazily enable the clock when needed */
-
-To complicate things further the bus operations can be
-overridden by e.g. voltage domains. In this case we (ux500)
-have choosen to call out to the AMBA level to make sure
-semantics are preserved.
+Can you point me to the relevant posts/doc so I can read up on
+it, would be much appreciated!
 
 Yours,
 Linus Walleij
