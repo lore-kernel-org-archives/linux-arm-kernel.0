@@ -1,43 +1,72 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 26 Sep 2012 14:57:56 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the fbdev tree
-Message-ID: <20120926145756.e00474c7d2f1a4734c10fb0e@canb.auug.org.au>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Wed, 26 Sep 2012 11:10:48 +0530
+Subject: [PATCH 4/4] usb: phy: omap-usb2: enable 960Mhz clock for omap5
+In-Reply-To: <20120919115647.GI3772@arwen.pp.htv.fi>
+References: <1348054229-27362-1-git-send-email-kishon@ti.com>
+ <1348054229-27362-5-git-send-email-kishon@ti.com>
+ <20120919115647.GI3772@arwen.pp.htv.fi>
+Message-ID: <CAAe_U6Kr8t1=T7MGMjAe+1n6S-NncypnPkXYqA2_FtVK=uxULA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/video/msm/mdp_hw.h between commit 8abf0b31e161 ("video: msm:
-Remove useless mach/* includes") from the fbdev tree and commit
-1ef21f6343ff ("ARM: msm: move platform_data definitions") from the
-arm-soc tree.
+On Wed, Sep 19, 2012 at 5:26 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Sep 19, 2012 at 05:00:29PM +0530, Kishon Vijay Abraham I wrote:
+>> "usb_otg_ss_refclk960m" is needed by usb2 phy present in omap5. For
+>> omap4, the clk_get of this clock will fail since it does not have this
+>> clock.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/usb-phy.txt |    3 +++
+>>  drivers/usb/phy/omap-usb2.c                       |   28 ++++++++++++++++++++-
+>>  2 files changed, 30 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> index 7c5fd89..d5626de 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> @@ -24,6 +24,9 @@ Required properties:
+>>  add the address of control module phy power register until a driver for
+>>  control module is added
+>>
+>> +Optional properties:
+>> + - has960mhzclk: should be added if the phy needs 960mhz clock
+>> +
+>>  This is usually a subnode of ocp2scp to which it is connected.
+>>
+>>  usb3phy at 4a084400 {
+>> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
+>> index d36c282..d6612ba 100644
+>> --- a/drivers/usb/phy/omap-usb2.c
+>> +++ b/drivers/usb/phy/omap-usb2.c
+>> @@ -146,6 +146,7 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
+>>       struct omap_usb                 *phy;
+>>       struct usb_otg                  *otg;
+>>       struct resource                 *res;
+>> +     struct device_node              *np = pdev->dev.of_node;
+>>
+>>       phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+>>       if (!phy) {
+>> @@ -190,6 +191,15 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
+>>       }
+>>       clk_prepare(phy->wkupclk);
+>>
+>> +     if (of_property_read_bool(np, "has960mhzclk")) {
+>> +             phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
+>> +             if (IS_ERR(phy->optclk)) {
+>> +                     dev_err(&pdev->dev, "unable to get refclk960m\n");
+>> +                     return PTR_ERR(phy->optclk);
+>> +             }
+>> +             clk_prepare(phy->optclk);
+>> +     }
+>
+> instead, can't you just always try to get the clock but ignore the error
+> if it fails ?
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+This clock is needed for usb2 to work in dwc3 (omap5). So we have to
+report the error in case we dont get the clock no?
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/video/msm/mdp_hw.h
-index 2a84137,a0bacf5..0000000
---- a/drivers/video/msm/mdp_hw.h
-+++ b/drivers/video/msm/mdp_hw.h
-@@@ -15,7 -15,8 +15,7 @@@
-  #ifndef _MDP_HW_H_
-  #define _MDP_HW_H_
-  
-- #include <mach/msm_fb.h>
- -#include <mach/msm_iomap.h>
-+ #include <linux/platform_data/video-msm_fb.h>
-  
-  struct mdp_info {
-  	struct mdp_device mdp_dev;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120926/ada6c5eb/attachment.sig>
+Thanks
+Kishon
