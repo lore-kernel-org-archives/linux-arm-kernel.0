@@ -1,87 +1,82 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 26 Sep 2012 10:32:06 +0200
-Subject: [PATCH 3/6] ARM: at91: add clocks for spi DT entries
-In-Reply-To: <1348642261-27554-4-git-send-email-wenyou.yang@atmel.com>
-References: <1348642261-27554-1-git-send-email-wenyou.yang@atmel.com>
- <1348642261-27554-4-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <5062BD86.3070401@atmel.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 26 Sep 2012 10:50:12 +0200
+Subject: [PATCH v2] serial: pl011: handle corruption at high clock speeds
+Message-ID: <1348649412-25812-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2012 08:50 AM, Wenyou Yang :
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->  arch/arm/mach-at91/at91sam9260.c |    2 ++
->  arch/arm/mach-at91/at91sam9g45.c |    2 ++
->  arch/arm/mach-at91/at91sam9n12.c |    2 ++
->  arch/arm/mach-at91/at91sam9x5.c  |    3 +++
->  4 files changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 30c7f26..90d38a8 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -227,6 +227,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
->  	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
->  	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi0_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "fffac000.spi", &spi1_clk),
->  	/* fake hclk clock */
->  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index ef6cedd..9d0ec1c 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -254,6 +254,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
->  	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
->  	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
->  	/* fake hclk clock */
->  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-> index 0849466..21b264b 100644
-> --- a/arch/arm/mach-at91/at91sam9n12.c
-> +++ b/arch/arm/mach-at91/at91sam9n12.c
-> @@ -169,6 +169,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
->  	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
->  	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
->  	CLKDEV_CON_ID("pioA", &pioAB_clk),
->  	CLKDEV_CON_ID("pioB", &pioAB_clk),
->  	CLKDEV_CON_ID("pioC", &pioCD_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-> index 477cf9d..b6f3a92 100644
-> --- a/arch/arm/mach-at91/at91sam9x5.c
-> +++ b/arch/arm/mach-at91/at91sam9x5.c
-> @@ -16,6 +16,7 @@
->  #include <mach/at91_pmc.h>
->  #include <mach/cpu.h>
->  #include <mach/board.h>
-> +#include <mach/gpio.h>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-What is the purpose of this line in this patch?
+This works around a few glitches in the ST version of the PL011
+serial driver when using very high baud rates, as we do in the
+Ux500: 3, 3.25, 4 and 4.05 Mbps.
 
->  
->  #include "soc.h"
->  #include "generic.h"
-> @@ -231,6 +232,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
->  	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
->  	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
-> +	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
->  	CLKDEV_CON_ID("pioA", &pioAB_clk),
->  	CLKDEV_CON_ID("pioB", &pioAB_clk),
->  	CLKDEV_CON_ID("pioC", &pioCD_clk),
-> 
+Problem Observed/rootcause:
 
+When using high baud-rates, and the baudrate*8 is getting close to
+the provided clock frequency (so a division factor close to 1), when
+using bursts of characters (so they are abutted), then it seems as if
+there is not enough time to detect the beginning of the start-bit which
+is a timing reference for the entire character, and thus the sampling
+moment of character bits is moving towards the end of each bit, instead
+of the middle.
 
+Fix:
+Increase slightly the RX baud rate of the UART above the theoretical
+baudrate by 5%. This will definitely give more margin time to the
+UART_RX to correctly sample the data at the middle of the bit period.
+
+Also fix the ages old copy-paste error in the very stressed comment,
+it's referencing the registers used in the PL010 driver rather than
+the PL011 ones.
+
+Cc: stable at kernel.org
+Cc: Bibek Basu <bibek.basu@stericsson.com>
+Cc: Par-Gunnar Hjalmdahl <par-gunnar.hjalmdahl@stericsson.com>
+Signed-off-by: Guillaume Jaunet <guillaume.jaunet@stericsson.com>
+Signed-off-by: Christophe Arnal <christophe.arnal@stericsson.com>
+Signed-off-by: Matthias Locher <matthias.locher@stericsson.com>
+Signed-off-by: Rajanikanth HV <rajanikanth.hv@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Use >= comparison for 3 Mbaud, add some parenthesis to make the
+  logical expressions crystal clear.
+---
+ drivers/tty/serial/amba-pl011.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d626d84..cb9f694 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1594,13 +1594,26 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			old_cr &= ~ST_UART011_CR_OVSFACT;
+ 	}
+ 
++	/*
++	 * Workaround for the ST Micro oversampling variants to
++	 * increase the bitrate slightly, by lowering the divisor,
++	 * to avoid delayed sampling of start bit at high speeds,
++	 * else we see data corruption.
++	 */
++	if (uap->vendor->oversampling) {
++		if (baud > 3000000 && baud < 3250000 && quot > 1)
++			quot -= 1;
++		else if (baud > 3250000 && quot > 2)
++			quot -= 2;
++	}
+ 	/* Set baud rate */
+ 	writew(quot & 0x3f, port->membase + UART011_FBRD);
+ 	writew(quot >> 6, port->membase + UART011_IBRD);
+ 
+ 	/*
+ 	 * ----------v----------v----------v----------v-----
+-	 * NOTE: MUST BE WRITTEN AFTER UARTLCR_M & UARTLCR_L
++	 * NOTE: lcrh_tx and lcrh_rx MUST BE WRITTEN AFTER
++	 * UART011_FBRD & UART011_IBRD.
+ 	 * ----------^----------^----------^----------^-----
+ 	 */
+ 	writew(lcr_h, port->membase + uap->lcrh_rx);
 -- 
-Nicolas Ferre
+1.7.11.3
