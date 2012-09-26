@@ -1,23 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Sep 2012 13:35:23 +0200
-Subject: [PATCH] ARM: ux500: Fix initialisation order for UIBs
-In-Reply-To: <1348585812-32073-1-git-send-email-lee.jones@linaro.org>
-References: <1348585812-32073-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYJZO8m1xHYS2DHYk3sbeoG4izTyLk6rP96AqX9hM=z8Q@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 26 Sep 2012 14:39:08 +0300
+Subject: [PATCHv7 17/21] ARM: OMAP4: TWL: enable high speed mode for PMIC
+ communication
+In-Reply-To: <1348590833-12335-18-git-send-email-t-kristo@ti.com>
+References: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
+ <1348590833-12335-18-git-send-email-t-kristo@ti.com>
+Message-ID: <5062E95C.6050903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 5:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi Tero,
 
-> An earlier change prevented User Interface Boards (UIBs) from being
-> initialised on boards which did not support them. This change had
-> the undesired effect of reordering the UIB initialisation calls with
-> I2C registration. Here we ensure UIBs are only setup after all
-> required infrastructure is already in place.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 09/25/2012 07:33 PM, Tero Kristo wrote:
+> With the new parameters, I2C can now be put to high speed mode for
+> better performance.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+We have twl6040 on the same bus. have you tried this with audio enabled?
+twl6040 is in standard mode (up to 100 kbps) after power up...
 
-Yours,
-Linus Walleij
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_twl.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+> index 611cb63..7ff9667 100644
+> --- a/arch/arm/mach-omap2/omap_twl.c
+> +++ b/arch/arm/mach-omap2/omap_twl.c
+> @@ -218,6 +218,7 @@ static struct omap_voltdm_pmic omap4_core_pmic = {
+>  	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+>  	.volt_reg_addr		= OMAP4_VDD_CORE_SR_VOLT_REG,
+>  	.cmd_reg_addr		= OMAP4_VDD_CORE_SR_CMD_REG,
+> +	.i2c_high_speed		= true,
+>  	.i2c_pad_load		= 3,
+>  	.vsel_to_uv		= twl6030_vsel_to_uv,
+>  	.uv_to_vsel		= twl6030_uv_to_vsel,
+> 
+
+
+-- 
+P?ter
