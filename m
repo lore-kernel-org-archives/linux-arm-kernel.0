@@ -1,147 +1,37 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Sep 2012 20:27:36 -0300
-Subject: [PATCH 2/3] ARM: dts: imx53-qsb: Make DA9053 regulator functional
+Date: Wed, 26 Sep 2012 20:27:37 -0300
+Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Add DA9052 regulator support
 In-Reply-To: <1348702057-2351-1-git-send-email-festevam@gmail.com>
 References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
-Message-ID: <1348702057-2351-2-git-send-email-festevam@gmail.com>
+Message-ID: <1348702057-2351-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Setup the GPIO7_11 pin as interrupt to the DA9053 and also rename the regulator nodes
-so that they match with the datasheet.
-
-This allows probing of DA9053 to succeed.
-
+Add DA9052 regulator support.
+ 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx53-qsb.dts |   54 ++++++++++++++++++++++++++-------------
- 1 file changed, 36 insertions(+), 18 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 5bae4c7..7be2e82 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -60,6 +60,7 @@
- 							697  0x80000000	/* MX53_PAD_EIM_DA12__GPIO3_12 */
- 							701  0x80000000	/* MX53_PAD_EIM_DA13__GPIO3_13 */
- 							868  0x80000000	/* MX53_PAD_PATA_DA_0__GPIO7_6 */
-+							1149 0x80000000 /* MX53_PAD_GPIO_16__GPIO7_11 */
- 						>;
- 					};
- 
-@@ -106,76 +107,93 @@
- 				pmic: dialog at 48 {
- 					compatible = "dlg,da9053-aa", "dlg,da9052";
- 					reg = <0x48>;
-+					interrupt-parent = <&gpio7>;
-+					interrupts = <11 0x8>; /* low-level active IRQ at GPIO7_11 */
- 
- 					regulators {
--						buck0 {
-+						buck1_reg: buck1 {
- 							regulator-min-microvolt = <500000>;
- 							regulator-max-microvolt = <2075000>;
-+							regulator-always-on;
- 						};
- 
--						buck1 {
-+						buck2_reg: buck2 {
- 							regulator-min-microvolt = <500000>;
- 							regulator-max-microvolt = <2075000>;
-+							regulator-always-on;
- 						};
- 
--						buck2 {
-+						buck3_reg: buck3 {
- 							regulator-min-microvolt = <925000>;
- 					                regulator-max-microvolt = <2500000>;
-+							regulator-always-on;
- 						};
- 
--						buck3 {
-+						buck4_reg: buck4 {
- 							regulator-min-microvolt = <925000>;
- 					                regulator-max-microvolt = <2500000>;
-+							regulator-always-on;
- 						};
- 
--						ldo4 {
-+						ldo1_reg: ldo1 {
- 							regulator-min-microvolt = <600000>;
- 							regulator-max-microvolt = <1800000>;
-+							regulator-boot-on;
-+							regulator-always-on;
- 						};
- 
--						ldo5 {
-+						ldo2_reg: ldo2 {
-+							regulator-min-microvolt = <600000>;
-+							regulator-max-microvolt = <1800000>;
-+							regulator-always-on;
-+						};
-+
-+						ldo3_reg: ldo3 {
- 							regulator-min-microvolt = <600000>;
- 					                regulator-max-microvolt = <1800000>;
-+							regulator-always-on;
- 						};
- 
--						ldo6 {
-+						ldo4_reg: ldo4 {
- 							regulator-min-microvolt = <1725000>;
- 					                regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
- 						};
- 
--						ldo7 {
-+						ldo5_reg: ldo5 {
- 							regulator-min-microvolt = <1725000>;
- 					                regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
- 						};
- 
--						ldo8 {
-+						ldo6_reg: ldo6 {
- 							regulator-min-microvolt = <1200000>;
- 					                regulator-max-microvolt = <3600000>;
-+							regulator-always-on;
- 						};
- 
--						ldo9 {
-+						ldo7_reg: ldo7 {
- 							regulator-min-microvolt = <1200000>;
- 					                regulator-max-microvolt = <3600000>;
-+							regulator-always-on;
- 						};
- 
--						ldo10 {
-+						ldo8_reg: ldo8 {
- 							regulator-min-microvolt = <1200000>;
- 					                regulator-max-microvolt = <3600000>;
-+							regulator-always-on;
- 						};
- 
--						ldo11 {
-+						ldo9_reg: ldo9 {
- 							regulator-min-microvolt = <1200000>;
- 					                regulator-max-microvolt = <3600000>;
-+							regulator-always-on;
- 						};
- 
--						ldo12 {
-+						ldo10_reg: ldo10 {
- 							regulator-min-microvolt = <1250000>;
- 					                regulator-max-microvolt = <3650000>;
--						};
--
--						ldo13 {
--							regulator-min-microvolt = <1200000>;
--					                regulator-max-microvolt = <3600000>;
-+							regulator-always-on;
- 						};
- 					};
- 				};
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 66aa7a6..67620d6 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -142,10 +142,12 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
++CONFIG_MFD_DA9052_I2C=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_MFD_MC13XXX_I2C=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_DA9052=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_MEDIA_SUPPORT=y
 -- 
 1.7.9.5
