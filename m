@@ -1,40 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Sep 2012 14:41:56 +0200
-Subject: [PATCH 1/2] spi:pl022: Disable/Enable functional clock from
- suspend/resume
-In-Reply-To: <20120926121946.GO4428@opensource.wolfsonmicro.com>
-References: <1348658647-25975-1-git-send-email-vipulkumar.samar@st.com>
- <1348658647-25975-2-git-send-email-vipulkumar.samar@st.com>
- <CACRpkdampxUw0=NO6cs679C-r0_AnPEaTYVc+GppRkKGn32p-w@mail.gmail.com>
- <20120926121946.GO4428@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdZLUUXw5TDwTqtP10YaRHEuHNHq9gMY-YSNeZ+21=cZRg@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 26 Sep 2012 15:01:04 +0200
+Subject: [PATCH] pinctrl: clarify idle vs sleep states
+Message-ID: <1348664464-12079-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 2:19 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Sep 26, 2012 at 02:17:36PM +0200, Linus Walleij wrote:
->> On Wed, Sep 26, 2012 at 1:24 PM, Vipul Kumar Samar
->
->> > SPI functional clock must be disalble/enable in non RTPM suspend/resume
->> > hooks. Currently it is only done for RTPM cases.
->
->> > This patch add support to disable/enbale clock for conventional
->> > suspend/resume calls.
->
->> Cross dependency between runtime suspend/resume and
->> common suspend/resume. Oh the horror ...
->
-> This should be fine, we runtime resume before we suspend.
-(...)
-> This was clarified at some point relatively recently with the above
-> (which is essentially the same as the solution you describe).
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Oh. How come that whenever I poke my nose into this stuff I
-feel like a compleat n00b X-D
+This pure documentation fix tries to align the "idle" and
+"sleep" pin states to the idle and suspend states from
+runtime PM.
 
-Can you point me to the relevant posts/doc so I can read up on
-it, would be much appreciated!
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/pinctrl/pinctrl-state.h | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/include/linux/pinctrl/pinctrl-state.h b/include/linux/pinctrl/pinctrl-state.h
+index 634608dc..2dbf71d 100644
+--- a/include/linux/pinctrl/pinctrl-state.h
++++ b/include/linux/pinctrl/pinctrl-state.h
+@@ -6,13 +6,15 @@
+  * @PINCTRL_STATE_DEFAULT: the state the pinctrl handle shall be put
+  *	into as default, usually this means the pins are up and ready to
+  *	be used by the device driver. This state is commonly used by
+- *	hogs to configure muxing and pins at boot.
++ *	hogs to configure muxing and pins at boot, and also as a state
++ *	to go into when returning from sleep and idle in
++ *	.pm_runtime_resume() or ordinary .resume() for example.
+  * @PINCTRL_STATE_IDLE: the state the pinctrl handle shall be put into
+  *	when the pins are idle. Could typically be set from a
+- *	pm_runtime_suspend() operation.
++ *	pm_runtime_idle() operation.
+  * @PINCTRL_STATE_SLEEP: the state the pinctrl handle shall be put into
+  *	when the pins are sleeping. Could typically be set from a
+- *	common suspend() function.
++ *	common pm_runtime_suspend() or ordinary .suspend() function.
+  */
+ #define PINCTRL_STATE_DEFAULT "default"
+ #define PINCTRL_STATE_IDLE "idle"
+-- 
+1.7.11.3
