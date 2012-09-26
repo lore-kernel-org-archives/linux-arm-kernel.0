@@ -1,50 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 26 Sep 2012 12:44:05 +0200
-Subject: [PATCH v3] ARM: i.MX35: Add kernel oftree support
-In-Reply-To: <1348652369-16649-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1348652369-16649-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120926104405.GM1322@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Sep 2012 11:44:22 +0100
+Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
+In-Reply-To: <201209261038.36223.arnd@arndb.de>
+References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
+ <201209261038.36223.arnd@arndb.de>
+Message-ID: <20120926104421.GA7040@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Wed, Sep 26, 2012 at 10:38:36AM +0000, Arnd Bergmann wrote:
+> On Tuesday 25 September 2012, Stephen Warren wrote:
+> > 
+> > From: Stephen Warren <swarren@nvidia.com>
+> > 
+> > Tegra's uncompress and debug-macro.S communicate to each-other. Hence,
+> > we can't be left without uncompress.h in a multi-platform enabled kernel,
+> > or we'll lose features. This series allows uncompress.h to be used in a
+> > multi-platform kernel, restores the mvebu uncompress.h, and finally moves
+> > the Tegra debug macros into the common location. The series as mainly an
+> > RFC due to the outstanding question of where to put Tegra's <mach/iomap.h>
+> > in the final patch.
+> 
+> 
+> To follow up on the IRC discussion we had yesterday leading to this patch
+> set, I had another idea of how to handle the same: Since the decompressor
+> code is actually fairly separate from the kernel, we could also build
+> multiple versions of it, and link in the same compressed vmlinux.
 
-Some points:
+That rubbishes the idea of a single kernel though, which is to give
+distros a single kernel image that they can boot on different ARM
+platforms.
 
-- Can we have a more complete devicetree? For the i.MX27 I posted a
-  devicetree containing the nodes I need, I wouldn't do that again.
-  During creating the i.MX25   devicetree I realized that it's actually
-  not much work to make it (nearly) complete. It'll save us from patching
-  this file frequently. I am missing nodes at least for the GPT and CCM.
-  These are currently not used, but I think we'll need them soon.
-- Can we have devicetree clock lookups like Shawn has done for the i.MX6
-  (and me for the i.MX25)?
-
-On Wed, Sep 26, 2012 at 11:39:29AM +0200, Uwe Kleine-K?nig wrote:
-> +			gpio3: gpio at 0x53fa4000 {
-> +				compatible = "fsl,imx35-gpio", "fsl,imx31-gpio";
-> +				reg = <0x53fa4000 0x4000>;
-> +				interrupts = <56>;
-> +				gpio-controller;
-> +				#gpio-cells = <2>;
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
-> +			};
-> +
-> +			esdhc1: esdhc at 53fb4000 {
-> +				compatible = "fsl,mx35-sdhc";
-> +				reg = <0x53fb4000 0x4000>;
-> +				interrupts = <7>;
-> +				status = "disabled";
-> +			};
-
-Please add a bus-width = <4> property to the esdhc units. It's the default
-right now, but this property might become mandatory.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+They want a single kernel binary that works everywhere, not one which
+they need to select the right binary to work on platform X.  Yes, the
+_internal_ uncompressed bulk may be the same, but it would require
+distros to carry around N different kernel images for N different
+platforms.
