@@ -1,54 +1,23 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 27 Sep 2012 09:17:14 -0700
-Subject: [PATCH] USB: ohci-at91: fix null pointer in
- ohci_hcd_at91_overcurrent_irq
-In-Reply-To: <506415CD.5070004@atmel.com>
-References: <1348433760-2818-1-git-send-email-joachim.eastwood@jotron.com>
- <50600F5F.7030307@atmel.com> <20120924173407.GE32691@kroah.com>
- <50617DFB.3070405@atmel.com> <20120925134050.GC15419@kroah.com>
- <506415CD.5070004@atmel.com>
-Message-ID: <20120927161714.GA2444@kroah.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 27 Sep 2012 17:18:15 +0100
+Subject: [PATCH 2/3] ARM: dts: imx53-qsb: Make DA9053 regulator functional
+In-Reply-To: <201209270229.54462.marex@denx.de>
+References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+ <201209270200.57482.marex@denx.de>
+ <CAOMZO5Bi7gMH4RE047-uxc5bhz_UuQpLArpOSMae03U08tebxA@mail.gmail.com>
+ <201209270229.54462.marex@denx.de>
+Message-ID: <20120927161815.GB4428@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 11:01:01AM +0200, Nicolas Ferre wrote:
-> On 09/25/2012 03:40 PM, Greg KH :
-> > On Tue, Sep 25, 2012 at 11:48:43AM +0200, Nicolas Ferre wrote:
-> >> On 09/24/2012 07:34 PM, Greg KH :
-> >>> On Mon, Sep 24, 2012 at 09:44:31AM +0200, Nicolas Ferre wrote:
-> >>>>> This patches fixed the issue by adding the gpio valid check.
-> >>>>>
-> >>>>> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
-> >>>>
-> >>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>>
-> >>>> Thanks a *lot* Joachim for having chased this bug!
-> >>>>
-> >>>> Alan, Greg, this one is 3.6 last minute material... I Hope that it can
-> >>>> make it!
-> >>>>
-> >>>>> ---
-> >>>>>
-> >>>>> Note: If 6fffb77c goes into stable please either include this patch also or
-> >>>>> fold it into 6fffb77c to avoid regressions.
-> >>>>
-> >>>> Absolutely, I have tagged the faulty patch:
-> >>>>     Cc: Stable <stable@vger.kernel.org> [3.4+]
-> >>>>
-> >>>> So it can be good if this one can follow the same path.
-> >>>
-> >>> I'll queue this up for 3.7 and have it backported to 3.6.1 as it's a bit
-> >>> late for 3.6 for me right now.
-> >>
-> >> Ah, too bad! The kernel Oops may affect several AT91 SoC... Can't we
-> >> push it with the help of Andrew Morton for late material?
-> > 
-> > 3.6.1 is really too late for you?  What does one week buy you?
-> 
-> Well, even if I appreciate a lot the stable tree ;-) , I find it a
-> little bit annoying to know in advance that next Linus' release will
-> contain a fatal bug for AT91 SoCs.
+On Thu, Sep 27, 2012 at 02:29:54AM +0200, Marek Vasut wrote:
+> Dear Fabio Estevam,
 
-Ok, fair enough, I'll dig this out and get it to Linus later today...
+> > Looking at the mx53qsb/DA9053 board schematics I cannot see any of
+> > these supplies that can be turned-off, and that's why I kept the
+> > 'always-on' flag.
 
-greg k-h
+> I agree, let's see what Mark has to say. I believe your approach is valid.
+
+Sorry, I'm missing some context on the discussion here so I'm not usre
+what the question is.
