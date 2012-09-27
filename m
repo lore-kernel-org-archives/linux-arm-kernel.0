@@ -1,44 +1,45 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Thu, 27 Sep 2012 19:35:43 +0200
-Subject: [PATCH 2/2] ARM: remove unnecessary flush of anon pages in
- flush(_kernel)_dcache_page()
-In-Reply-To: <20120927122327.GA26188@arm.com>
-References: <1348695659-27603-1-git-send-email-gmbnomis@gmail.com>
- <1348695659-27603-3-git-send-email-gmbnomis@gmail.com>
- <20120927122327.GA26188@arm.com>
-Message-ID: <20120927173543.GA20442@schnuecks.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 27 Sep 2012 19:40:33 +0200
+Subject: [RFC PATCH 1/3] kbuild: introduce cmd_dtc_cpp
+In-Reply-To: <50647330.9030306@wwwdotorg.org>
+References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
+ <1348599998-2729-2-git-send-email-swarren@wwwdotorg.org>
+ <20120927054438.GM17667@game.jcrosoft.org>
+ <50647330.9030306@wwwdotorg.org>
+Message-ID: <20120927174033.GU17667@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Thu, Sep 27, 2012 at 01:23:28PM +0100, Catalin Marinas wrote:
-> On Wed, Sep 26, 2012 at 10:40:59PM +0100, Simon Baatz wrote:
-> > On non-aliasing VIPT D-caches, there is no need to flush the kernel
-> > mapping of anon pages in flush_kernel_dcache_page() and
-> > flush_dcache_page() directly.  If the page is mapped as executable
-> > later, the necessary D/I-cache flush will be done in
-> > __sync_icache_dcache().
-> > 
-> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
+On 09:39 Thu 27 Sep     , Stephen Warren wrote:
+> On 09/26/2012 11:44 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 13:06 Tue 25 Sep     , Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> cmd_dtc_cpp runs the C pre-processor on the input .dts file before
+> >> passing it to dtc for final compilation. This allows used of #define
+> >> within the .dts file.
+> >>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >>  scripts/Makefile.lib |    3 +++
+> >>  1 files changed, 3 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> >> index 0be6f11..e3a149e 100644
+> >> --- a/scripts/Makefile.lib
+> >> +++ b/scripts/Makefile.lib
+> >> @@ -266,6 +266,9 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
+> >>  quiet_cmd_dtc = DTC     $@
+> >>  cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile) $<
+> >>  
+> >> +quiet_cmd_dtc_cpp = DTC+CPP $@
+> >> +cmd_dtc_cpp = $(CC) -E -Wp,-MD,$(depfile) -xc $< | $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -
+> >
+> > this should go to Makefile.build
 > 
-> I would suggest you make this patch the first one rather than
-> introducing __flush_kernel_dcache_page() and subsequently replacing its
-> code.
+> Hmm. Consistency with the existing cmd_dtc right above would dictate
+> otherwise.
+no build command go to Makefile.build aside with makefile target
 
-The reason for this structure is that I did not want to mix the bug
-fix (which may qualify for stable) with the improvement.  If I do the
-patches the other way around and only the bug fix patch will be
-picked for stable, flush_dcache_page() and flush_kernel_dcache_page()
-will have different logic in which cases to flush.  We know that the
-current logic is solid, we don't have much evidence for the logic of
-the proposed improvement.
-
->From this point of view, I find the current structure cleaner, but I
-have no strong opinion about this.  If we can't apply that particular
-patch for stable anyway or you still think it is better the other way
-around, I can change that of course.
-
-- Simon
+Best Regards,
+J.
