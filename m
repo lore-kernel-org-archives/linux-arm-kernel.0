@@ -1,38 +1,76 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 27 Sep 2012 09:13:13 +0200
-Subject: [PATCH 2/6] spi: atmel: add dmaengine and dt support
-In-Reply-To: <20120926070511.GI21730@pengutronix.de>
-References: <1348642261-27554-1-git-send-email-wenyou.yang@atmel.com>
- <1348642261-27554-3-git-send-email-wenyou.yang@atmel.com>
- <20120926070511.GI21730@pengutronix.de>
-Message-ID: <CACQ1gAi_e2nJNQv6TP1_F8b9ZHa9=F34gCB4nK7mH0Gvk0JhuQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 27 Sep 2012 09:31:28 +0200
+Subject: [PATCH V5] Add support for Aurora L2 Cache Controller
+In-Reply-To: <20120926184807.GO5469@titan.lakedaemon.net>
+References: <1348675370-16359-1-git-send-email-gregory.clement@free-electrons.com>
+ <5063286C.9070502@free-electrons.com>
+ <20120926162407.GN5469@titan.lakedaemon.net>
+ <50633007.7050808@free-electrons.com>
+ <20120926184807.GO5469@titan.lakedaemon.net>
+Message-ID: <506400D0.2030906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/26/2012 08:48 PM, Jason Cooper wrote:
+> On Wed, Sep 26, 2012 at 06:40:39PM +0200, Gregory CLEMENT wrote:
+>> On 09/26/2012 06:24 PM, Jason Cooper wrote:
+>>> On Wed, Sep 26, 2012 at 06:08:12PM +0200, Gregory CLEMENT wrote:
+>>>>> Changelog:
+>>>>> V4 -> V5:
+>>>>> - Rebased L2 pach set onto v3.6-rc7.
+>>>>> - The header file cache-aurora-l2.h was co-located with its only user:
+>>>>>   moved from arch/arm/include/asm/hardware/ to arch/arm/mm/.
+>>>>> - Removed additional unnecessary blank lines in cache-l2x0.c.
+>>>>>
+>>>> Russell,
+>>>>
+>>>> will you take the all series from the git repository ? As the
+>>>> last patches have been already acked-by Arnd and were initially pulled
+>>>> by Jason Cooper, I think there should be no problem to get the whole
+>>>> series.
+>>>>
+>>>> Now if you only want to take the first three patches, will you pull
+>>>> them from the git repository or do you prefer that I submit them
+>>>> through your patch system?
+>>>
+>>> Russell,
+>>>
+>>> If you're ok with it, I can take the whole series (incl 1,2,3) through
+>>> my tree.  Or, split it up as we did before (arch/arm/mm changes through
+>>> you, all else through us).
+>>>
+>>> Gregory,
+>>>
+>>> I'm inclined to make this v3.8 material, especially if pushing it
+>>> through two different trees.  Do you have any objection?
+>>
+>> Well I have pushed this series a long time ago and I have hopped it
+>> would have been part of the v3.7.
+> 
+> It really hinges on if Russell is ok with keeping the series together.
+> I'd really prefer not to cause the dependency headache this late in the
+> release cycle.
+> 
+> So, if Russell is ok with me taking the whole series, v3.7.  If not,
+> v3.8.  Fair enough?
 
-2012/9/26 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> On Wed, Sep 26, 2012 at 02:50:57PM +0800, Wenyou Yang wrote:
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> I don't remember ever having touched the spi-atmel driver, so I'm pretty
-> sure I never gave my S-o-b for anything in this patch. Please reread
-> Documentation/SubmittingPatches and double check you understood what
-> Signed-off-by means before resubmitting this patch with all wrong
-> S-o-b's removed.
+Yes I don't want to overload you so late in the release cycle.
+Thanks for you effort
 
-By the way, what is the correct way to send a patch based on other's work ?
-If I believe Documentation/SubmittingPatches, only the sender should
-add his S-o-b.
-But if you want to give credit to the original author(s), what's the best way ?
-IMHO, I would CC them, let them add their
-s-o-b/ack-b/nack-b/whatever-b if they want, and maybe add something
-like that in the file header :
-/*
- * based on the original work of ...
- */
-Or in the commit message itself
-Is that right ?
+> 
+> thx,
+> 
+> Jason.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
