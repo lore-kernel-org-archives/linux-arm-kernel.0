@@ -1,121 +1,109 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 27 Sep 2012 17:26:18 +0200
-Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform
- conversion
-In-Reply-To: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
-References: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120927172618.7ba233f0@skate>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Sep 2012 16:26:28 +0100
+Subject: [kvmarm] [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+In-Reply-To: <000901cd9c5d$cc53fbc0$64fbf340$@samsung.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153552.21241.8656.stgit@ubuntu>
+ <000101cd9b0e$78934fe0$69b9efa0$@samsung.com>
+ <CANM98qLuY3G6bBBnK+GJtEVZMRYX+Bk+bKh-bEQq0r7RyX9Nuw@mail.gmail.com>
+ <000901cd9c5d$cc53fbc0$64fbf340$@samsung.com>
+Message-ID: <50647024.2070307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob Herring,
-
-On Thu, 27 Sep 2012 10:10:12 -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 27/09/12 04:11, Min-gyu Kim wrote:
 > 
-> Moving ARCH_MVEBU for multi-platform support caused several breakages
-> in recently added addr-map and pinctrl support for mvebu. This adds
-> the necessary selects and include paths to fix the build.
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/mach-mvebu/Kconfig  |    2 ++
->  arch/arm/mach-mvebu/Makefile |    3 ++-
->  arch/arm/plat-orion/Makefile |    1 +
->  3 files changed, 5 insertions(+), 1 deletion(-)
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+>> Behalf Of Christoffer Dall
+>> Sent: Tuesday, September 25, 2012 9:39 PM
+>> To: Min-gyu Kim
+>> Cc: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> kvmarm at lists.cs.columbia.edu; ???
+>> Subject: Re: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+>>
+>>>> +
+>>>> +     /*
+>>>> +      * If this is a write fault (think COW) we need to make sure the
+>>>> +      * existing page, which other CPUs might still read, doesn't go
+>>>> away
+>>>> +      * from under us, by calling gfn_to_pfn_prot(write_fault=true).
+>>>> +      * Therefore, we call gfn_to_pfn_prot(write_fault=false), which
+>>>> will
+>>>> +      * pin the existing page, then we get a new page for the user
+>> space
+>>>> +      * pte and map this in the stage-2 table where we also make sure
+>> to
+>>>> +      * flush the TLB for the VM, if there was an existing entry
+>>>> + (the
+>>>> entry
+>>>> +      * was updated setting the write flag to the potentially new
+> page).
+>>>> +      */
+>>>> +     if (fault_status == FSC_PERM) {
+>>>> +             pfn_existing = gfn_to_pfn_prot(vcpu->kvm, gfn, false,
+> NULL);
+>>>> +             if (is_error_pfn(pfn_existing))
+>>>> +                     return -EFAULT;
+>>>> +     }
+>>>> +
+>>>> +     pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+>>>> +     if (is_error_pfn(pfn)) {
+>>>> +             ret = -EFAULT;
+>>>> +             goto out_put_existing;
+>>>> +     }
+>>>> +
+>>>> +     /* We need minimum second+third level pages */
+>>>> +     ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+>>>> +     if (ret)
+>>>> +             goto out;
+>>>> +     new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
+>>>> +     if (writable)
+>>>> +             pte_val(new_pte) |= L_PTE2_WRITE;
+>>>> +     coherent_icache_guest_page(vcpu->kvm, gfn);
+>>>
+>>> why don't you flush icache only when guest has mapped executable page
+>>> as __sync_icache_dcache function does currently?
+>>>
+>>>
+>>
+>> because we don't know if the guest will map the page executable. The guest
+>> may read the page through a normal load, which causes the fault, and
+>> subsequently execute it (even possible through different guest mappings).
+>> The only way to see this happening would be to mark all pages as non-
+>> executable and catch the fault when it occurs - unfortunately the HPFAR
+>> which gives us the IPA is not populated on execute never faults, so we
+>> would have to translate the PC's va to ipa using cp15 functionality when
+>> this happens, which is then also racy with other CPUs. So the question is
+>> really if this will even be an optimization, but it's definitely something
+>> that requires further investigation.
 > 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 26a817d..416d46e 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -6,6 +6,8 @@ config ARCH_MVEBU
->  	select GENERIC_IRQ_CHIP
->  	select IRQ_DOMAIN
->  	select MULTI_IRQ_HANDLER
-> +	select PINCTRL
+> OK. I understand your point.
+> 
+> But if guest maps a page for execution, guest will flush Icache
+> from __sync_icache_dcache. Then coherent_icache_guest_page doesn't seem to
+> be
+> necessary again. One thing I'm not sure in this case is when guest maps
+> for kernel executable page(module loading) and it reuses the kernel
+> executable page
+> from host(module unloading). But in that case, I think it is possible to
+> reduce 
+> the number of flush by limiting the address range for flush.
 
-This select was already part added as a part of:
+I think you're missing the major point:
+When the guest maps a page for execution, it knows it has to synchronize
+Icache and Dcache. But the guest never knows when we swap out a page
+because of memory pressure.
 
-commit 7e8d941567c99a03390154a7bb116d1b03db82b3
-Author: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date:   Thu Sep 13 17:41:43 2012 +0200
+When the guest eventually faults that page back in, chances are it will
+be a different physical page, and the cache content may be inconsistent.
+We must then sync Icache/Dcache for this page.
 
-    pinctrl: mvebu: pinctrl driver core
-    
-    This patch adds a pinctrl driver core for Marvell SoCs plus DT
-    binding documentation. This core driver will be used by SoC family
-    specific drivers, i.e. Armada XP, Armada 370, Dove, Kirkwood, aso.
-    
-    Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-    Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-    Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-    Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-    Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
-    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-    
-    Conflicts:
-    
-        arch/arm/Kconfig
+Now, as Christoffer mentioned, there's a number of schemes we could
+potentially use to mitigate this effect (using the XN bit in the Stage2
+page tables), but it remains to be seen how effective it will be.
 
-which was requested for pull from the kirkwood/drivers branch of Jason
-Cooper repository. If it is no longer there, then it is a merge
-conflict resolution mistake.
-
-> +	select PLAT_ORION
-
-This other select was already added as a part of:
-
-commit abcda1dc3e23366c8543b372e9bf4e9086d5cca1
-Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date:   Tue Sep 11 14:27:27 2012 +0200
-
-    arm: plat-orion: introduce PLAT_ORION_LEGACY hidden config option
-    
-    Until now, the PLAT_ORION configuration option was common to all the
-    Marvell EBU SoCs, and selecting this option had the effect of enabling
-    the MPP code, GPIO code, address decoding and PCIe code from
-    plat-orion, as well as providing access to driver-specific header
-    files from plat-orion/include.
-    
-    However, the Armada 370 and XP SoCs will not use the MPP and GPIO code
-    (instead some proper pinctrl and gpio drivers are in preparation), and
-    generally, we want to move away from plat-orion and instead have
-    everything in mach-mvebu.
-    
-    That said, in the mean time, we want to leverage the driver-specific
-    headers as well as the address decoding code, so we introduce
-    PLAT_ORION_LEGACY. The older Marvell SoCs need to select
-    PLAT_ORION_LEGACY, while the newer Marvell SoCs need to select
-    PLAT_ORION. Of course, when PLAT_ORION_LEGACY is selected, it
-    automatically selects PLAT_ORION.
-    
-    Then, with just PLAT_ORION, you have the address decoding code plus
-    the driver-specific headers. If you add PLAT_ORION_LEGACY to this, you
-    gain the old MPP, GPIO and PCIe code.
-    
-    Again, this is only a temporary solution until we make all Marvell EBU
-    platforms converge into the mach-mvebu directory. This solution avoids
-    duplicating the existing address decoding code into mach-mvebu.
-    
-    Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-    Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-    Acked-by: Arnd Bergmann <arnd@arndb.de>
-    Tested-by: Andrew Lunn <andrew@lunn.ch>
-    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-
-Coming from the kirkwood/addr_decode branch of Jason Cooper repository.
-
-So it looks strange that you don't have both selects.
-
-Otherwise, for the rest of patch:
-
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+	M.
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
