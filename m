@@ -1,41 +1,65 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Thu, 27 Sep 2012 15:11:08 +0530
-Subject: [RFC PATCH 08/13] mmc: omap_hsmmc: limit max_segs with the
- EDMA DMAC
-In-Reply-To: <20120921184721.GD31374@n2100.arm.linux.org.uk>
-References: <1348152226-13588-1-git-send-email-mporter@ti.com>
- <1348152226-13588-9-git-send-email-mporter@ti.com>
- <CANfBPZ81anOy8fWgKM1PgCtB4V2pEp2x1Qi4x1uPsq7QieMN5g@mail.gmail.com>
- <20120921184721.GD31374@n2100.arm.linux.org.uk>
-Message-ID: <1348738868.1648.13.camel@vkoul-udesk3>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Sep 2012 10:50:35 +0100
+Subject: [PATCH] ARM:CPUIDLE: Fix wrongly used idle control counter
+In-Reply-To: <BD54883EA7DE8B41A61B7E723561C711139F5FA938@sc-vexch3.marvell.com>
+References: <1348727761-16485-1-git-send-email-fwu@marvell.com>
+ <20120927085315.GA14358@n2100.arm.linux.org.uk>
+ <BD54883EA7DE8B41A61B7E723561C711139F5FA938@sc-vexch3.marvell.com>
+Message-ID: <20120927095035.GB14358@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-09-21 at 19:47 +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 21, 2012 at 10:45:29PM +0530, S, Venkatraman wrote:
-> > On Thu, Sep 20, 2012 at 8:13 PM, Matt Porter <mporter@ti.com> wrote:
-> > > The EDMA DMAC has a hardware limitation that prevents supporting
-> > > scatter gather lists with any number of segments. Since the EDMA
-> > > DMA Engine driver sets the maximum segments to 16, we do the
-> > > same.
-> > >
-> > > Note: this can be removed once the DMA Engine API supports an
-> > > API to query the DMAC's segment limitations.
-> > >
-> > 
-> > I wouldn't want to bind the properties of EDMA to omap_hsmmc as this patch
-> > suggests. Why don't we have a max_segs property, which when explicitly specified
-> > in DT, will override the default ?
+On Thu, Sep 27, 2012 at 02:19:49AM -0700, Fan Wu wrote:
+> Thanks a lot for reviewing. 
 > 
-> Why not have a generic way that DMA engine can export these kinds of
-> properties?
-We discussed this at KS. I was of opinion that  DMA engine should export
-controller and channel capabilities as part of the channel it returns.
+> So, you mean it is driver's responsibility to make sure the "disable
+> and enable" function are paired before using it, which I think is
+> NOT OK for current code. 
 
-Some folks had an opinion that they already know how to use controller
-so may not be very helpful, but if it is going to help (which I think),
-i have a patch for this :)
+It is, and always has been.
 
+> 1. If we want different users have chance to sync about the counter, 
+> 	I think we may try the following ways
+> 		1). add one interface (like exported function) for other
+>		 modules or driver to get the current counter value .
 
--- 
-~Vinod
+That is broken.
+
+> 		2). add constraint in "enable and disable" function to
+>		 avoid the possible situation that the counter is
+>		 less/more than "0".
+
+Err what?
+
+> 2. If we want the "nohlt" is OK for every driver and module without
+> sync or similar operation,
+> 	We may just remove "enable and disable" interface directly,
+> which will cause the "nohlt" change will only be the init interface
+> and cannot be changed any more after kernel bootup.
+
+WTF.
+
+No.  Look, it is _VERY_ simple.
+
+Drivers must _not_ call enable_hlt() without first having called
+disable_hlt() - and the number of enable_hlt()s must _NEVER_ be more
+than the number of times you've called disable_hlt().
+
+That's exactly the same with other subsystems - eg, you must not call
+enable_irq() without having first called disable_irq(), and you must
+not call enable_irq() more times than you've called disable_irq().
+
+It is senseless to export the nohlt count - doing so will _create_ bugs
+because if a driver were to ever use this value (which is a cumulative
+value) then it can call enable_hlt() more times than it's called
+disable_hlt() because of the interaction with another driver.
+
+When drivers comply with the interface, the "nohlt" command line argument
+works - it calls disable_hlt() once without a following enable_hlt(),
+which means that hlt (or rather, putting the CPU into a low power mode)
+is disabled at boot time and never enabled.
+
+So, if you have a driver which is calling enable_hlt() without first
+having called disable_hlt(), fix that driver.  There is nothing wrong
+in the generic ARM code, and the generic ARM code can't help you work
+around the broken driver.
