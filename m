@@ -1,53 +1,44 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 27 Sep 2012 15:13:59 +0200
-Subject: [PATCH 3/4] pinctrl/nomadik: use simple or linear IRQ domain
-Message-ID: <1348751639-17457-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 27 Sep 2012 15:13:35 +0200
+Subject: [PATCH 1/4] pinctrl/nomadik: use irq_find_mapping()
+Message-ID: <1348751615-17379-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This alters the Nomadik pinctrl driver to:
-
-- Call irqdomain_add_linear() for the DT case so we get
-  all independent from IRQ numbers in this case.
-- Call irqdomain_add_simple() for the legacy case, which
-  allocates the IRQ descriptors for the Nomadik pin controller
-  dynamically.
+The code was using a homegrown method of looking up the offset
+from the irq domain, not to be encouraged. Use the proper
+irq_find_mapping() call instead.
 
 Cc: Lee Jones <lee.jones@linaro.org>
 Cc: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/pinctrl-nomadik.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ drivers/pinctrl/pinctrl-nomadik.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index e031c84..6aab107 100644
+index 3dde653..e031c84 100644
 --- a/drivers/pinctrl/pinctrl-nomadik.c
 +++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1286,9 +1286,19 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+@@ -826,16 +826,14 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+ {
+ 	struct nmk_gpio_chip *nmk_chip;
+ 	struct irq_chip *host_chip = irq_get_chip(irq);
+-	unsigned int first_irq;
  
- 	platform_set_drvdata(dev, nmk_chip);
+ 	chained_irq_enter(host_chip, desc);
  
--	nmk_chip->domain = irq_domain_add_legacy(np, NMK_GPIO_PER_CHIP,
--						NOMADIK_GPIO_TO_IRQ(pdata->first_gpio),
--						0, &nmk_gpio_irq_simple_ops, nmk_chip);
-+	if (np) {
-+		/* The DT case will just grab a set of IRQ numbers */
-+		nmk_chip->domain = irq_domain_add_linear(np, NMK_GPIO_PER_CHIP,
-+				&nmk_gpio_irq_simple_ops, nmk_chip);
-+	} else {
-+		/* Non-DT legacy mode, use hardwired IRQ numbers */
-+		int irq_start;
-+
-+		irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
-+		nmk_chip->domain = irq_domain_add_simple(NULL,
-+				NMK_GPIO_PER_CHIP, irq_start,
-+				&nmk_gpio_irq_simple_ops, nmk_chip);
-+	}
- 	if (!nmk_chip->domain) {
- 		dev_err(&dev->dev, "failed to create irqdomain\n");
- 		ret = -ENOSYS;
+ 	nmk_chip = irq_get_handler_data(irq);
+-	first_irq = nmk_chip->domain->revmap_data.legacy.first_irq;
+ 	while (status) {
+ 		int bit = __ffs(status);
+ 
+-		generic_handle_irq(first_irq + bit);
++		generic_handle_irq(irq_find_mapping(nmk_chip->domain, bit));
+ 		status &= ~BIT(bit);
+ 	}
+ 
 -- 
 1.7.11.3
