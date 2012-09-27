@@ -1,28 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Sep 2012 07:48:50 +0200
-Subject: [PATCH 2/2] gpio: samsung: Fix input mode setting function for
- GPIO int
-In-Reply-To: <000101cd9c63$ecb606a0$c62213e0$@com>
-References: <000101cd9c63$ecb606a0$c62213e0$@com>
-Message-ID: <CACRpkdZuED59F2FfewXNxBeYauZEaXUxUiY5GHJDxdQvzxGtZA@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 27 Sep 2012 15:48:51 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120927154851.4ec680a2d4a9c4999db5b39d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 5:55 AM, Eunki Kim <eunki_kim@samsung.com> wrote:
+Hi all,
 
-> This patch makes GPIO pin to INTERRUPT mode or INPUT mode according
-> to bitmap_gpio_int. When the related bit of bitmap_gpio_int is set,
-> it makes GPIO pin to INTERRUPT mode instrad of INPUT mode in the
-> samsung_gpiolib_4bit_input function.
->
-> Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/include/asm/timex.h between commit 56942fec06ef ("ARM: 7538/1:
+delay: add registration mechanism for delay timer sources") from the arm
+tree and commit 387798b37c8d ("ARM: initial multiplatform support") from
+the arm-soc tree.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Are you taking this into the Samsung tree or shall I merge it
-into my GPIO tree? In the latter case I need an ACK from
-some Samsung maintainer.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Yours,
-Linus Walleij
+diff --cc arch/arm/include/asm/timex.h
+index 9acc135,963342a..0000000
+--- a/arch/arm/include/asm/timex.h
++++ b/arch/arm/include/asm/timex.h
+@@@ -12,9 -12,19 +12,13 @@@
+  #ifndef _ASMARM_TIMEX_H
+  #define _ASMARM_TIMEX_H
+  
+ -#include <asm/arch_timer.h>
++ #ifdef CONFIG_ARCH_MULTIPLATFORM
++ #define CLOCK_TICK_RATE 1000000
++ #else
+  #include <mach/timex.h>
++ #endif
+  
+  typedef unsigned long cycles_t;
+ -
+ -#ifdef ARCH_HAS_READ_CURRENT_TIMER
+  #define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
+ -#else
+ -#define get_cycles()	(0)
+ -#endif
+  
+  #endif
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120927/156292f6/attachment.sig>
