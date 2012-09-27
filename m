@@ -1,104 +1,165 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Thu, 27 Sep 2012 16:03:21 -0300
-Subject: [PATCH v2 27/34] media: mx2_camera: remove cpu_is_xxx by using
- platform_device_id
-In-Reply-To: <1348123547-31082-28-git-send-email-shawn.guo@linaro.org>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <1348123547-31082-28-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120927160321.56420910@redhat.com>
+From: mchehab@infradead.org (Mauro Carvalho Chehab)
+Date: Thu, 27 Sep 2012 16:22:35 -0300
+Subject: [PATCH 3/3] arm: omap: Move iommu/iovmm headers to platform_data
+In-Reply-To: <1348204448-30855-3-git-send-email-ido@wizery.com>
+References: <1348204448-30855-1-git-send-email-ido@wizery.com>
+ <1348204448-30855-3-git-send-email-ido@wizery.com>
+Message-ID: <20120927162235.0676d449@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 20 Sep 2012 14:45:40 +0800
-Shawn Guo <shawn.guo@linaro.org> escreveu:
+Em Fri, 21 Sep 2012 01:14:08 -0400
+Ido Yariv <ido@wizery.com> escreveu:
 
-> It changes the driver to use platform_device_id rather than cpu_is_xxx
-> to determine the controller type, and updates the platform code
-> accordingly.
+> Move iommu/iovmm headers from plat/ to platform_data/ as part of the
+> single zImage work.
 > 
-> As the result, mach/hardware.h inclusion gets removed from the driver.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Tested-by: Javier Martin <javier.martin@vista-silicon.com>
-> Cc: linux-media at vger.kernel.org
+> Signed-off-by: Ido Yariv <ido@wizery.com>
 > ---
->  arch/arm/mach-imx/clk-imx25.c                   |    6 +-
->  arch/arm/mach-imx/clk-imx27.c                   |    6 +-
->  arch/arm/mach-imx/devices/devices-common.h      |    1 +
->  arch/arm/mach-imx/devices/platform-mx2-camera.c |   12 +--
->  drivers/media/video/mx2_camera.c                |   95 +++++++++++++++++------
+>  arch/arm/mach-omap2/devices.c                                       | 2 +-
+>  arch/arm/mach-omap2/iommu2.c                                        | 2 +-
+>  arch/arm/mach-omap2/omap-iommu.c                                    | 2 +-
+>  drivers/iommu/omap-iommu-debug.c                                    | 4 ++--
+>  drivers/iommu/omap-iommu.c                                          | 2 +-
+>  drivers/iommu/omap-iovmm.c                                          | 4 ++--
 
-As most of the changes are at drivers/media, and you got Arnd's ack, it makes sense
-to merge it via my tree.
+>  drivers/media/platform/omap3isp/isp.h                               | 5 +++--
+>  drivers/media/platform/omap3isp/ispvideo.c                          | 6 ++++--
 
-However, even after fixing the media patch (that got renamed on 3.6),
-the patch doesn't apply:
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-$ quilt push
-Applying patch patches/lmml_14534_v2_27_34_media_mx2_camera_remove_cpu_is_xxx_by_using_platform_device_id.patch
-patching file arch/arm/mach-imx/clk-imx25.c
-Hunk #1 succeeded at 232 (offset 1 line).
-patching file arch/arm/mach-imx/clk-imx27.c
-Hunk #1 succeeded at 223 (offset -1 lines).
-Hunk #2 succeeded at 250 with fuzz 1 (offset -1 lines).
-can't find file to patch at input line 82
-Perhaps you used the wrong -p or --strip option?
-The text leading up to this was:
---------------------------
-|diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-|index 7f2698c..8112a1a 100644
-|--- a/arch/arm/mach-imx/devices/devices-common.h
-|+++ b/arch/arm/mach-imx/devices/devices-common.h
---------------------------
-No file to patch.  Skipping patch.
-1 out of 1 hunk ignored
-can't find file to patch at input line 94
-Perhaps you used the wrong -p or --strip option?
-The text leading up to this was:
---------------------------
-|diff --git a/arch/arm/mach-imx/devices/platform-mx2-camera.c b/arch/arm/mach-imx/devices/platform-mx2-camera.c
-|index 9ad5b2d..b88877d 100644
-|--- a/arch/arm/mach-imx/devices/platform-mx2-camera.c
-|+++ b/arch/arm/mach-imx/devices/platform-mx2-camera.c
---------------------------
-No file to patch.  Skipping patch.
-3 out of 3 hunks ignored
-patching file drivers/media/platform/soc_camera/mx2_camera.c
-Hunk #1 FAILED at 41.
-Hunk #6 succeeded at 467 (offset 28 lines).
-Hunk #7 succeeded at 499 (offset 28 lines).
-Hunk #8 succeeded at 575 (offset 28 lines).
-Hunk #9 succeeded at 584 (offset 28 lines).
-Hunk #10 succeeded at 669 (offset 28 lines).
-Hunk #11 succeeded at 688 (offset 28 lines).
-Hunk #12 succeeded at 745 (offset 28 lines).
-Hunk #13 succeeded at 868 (offset 28 lines).
-Hunk #14 succeeded at 963 (offset 28 lines).
-Hunk #15 succeeded at 1115 (offset 28 lines).
-Hunk #16 succeeded at 1424 (offset 40 lines).
-Hunk #17 succeeded at 1758 (offset 40 lines).
-Hunk #18 succeeded at 1809 (offset 40 lines).
-Hunk #19 succeeded at 1818 (offset 40 lines).
-Hunk #20 succeeded at 1835 (offset 40 lines).
-Hunk #21 succeeded at 1855 (offset 40 lines).
-Hunk #22 succeeded at 1873 (offset 40 lines).
-Hunk #23 succeeded at 1887 (offset 40 lines).
-1 out of 23 hunks FAILED -- rejects in file drivers/media/platform/soc_camera/mx2_camera.c
+>  .../plat/iommu.h => include/linux/platform_data/iommu-omap.h        | 0
+>  .../plat/iovmm.h => include/linux/platform_data/iovmm-omap.h        | 0
+>  10 files changed, 15 insertions(+), 12 deletions(-)
+>  rename arch/arm/plat-omap/include/plat/iommu.h => include/linux/platform_data/iommu-omap.h (100%)
+>  rename arch/arm/plat-omap/include/plat/iovmm.h => include/linux/platform_data/iovmm-omap.h (100%)
+> 
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 1bb2e92..5bde5c2 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -126,7 +126,7 @@ static struct platform_device omap2cam_device = {
+>  
+>  #if defined(CONFIG_IOMMU_API)
+>  
+> -#include <plat/iommu.h>
+> +#include <linux/platform_data/iommu-omap.h>
+>  
+>  static struct resource omap3isp_resources[] = {
+>  	{
+> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
+> index eefc379..cab7acc 100644
+> --- a/arch/arm/mach-omap2/iommu2.c
+> +++ b/arch/arm/mach-omap2/iommu2.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/stringify.h>
+>  
+> -#include <plat/iommu.h>
+> +#include <linux/platform_data/iommu-omap.h>
+>  
+>  /*
+>   * omap2 architecture specific register bit definitions
+> diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+> index df298d4..a6a4ff8 100644
+> --- a/arch/arm/mach-omap2/omap-iommu.c
+> +++ b/arch/arm/mach-omap2/omap-iommu.c
+> @@ -13,7 +13,7 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  
+> -#include <plat/iommu.h>
+> +#include <linux/platform_data/iommu-omap.h>
+>  
+>  #include "soc.h"
+>  #include "common.h"
+> diff --git a/drivers/iommu/omap-iommu-debug.c b/drivers/iommu/omap-iommu-debug.c
+> index f55fc5d..e6ee7c2 100644
+> --- a/drivers/iommu/omap-iommu-debug.c
+> +++ b/drivers/iommu/omap-iommu-debug.c
+> @@ -19,8 +19,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/debugfs.h>
+>  
+> -#include <plat/iommu.h>
+> -#include <plat/iovmm.h>
+> +#include <linux/platform_data/iommu-omap.h>
+> +#include <linux/platform_data/iovmm-omap.h>
+>  
+>  #include <plat/iopgtable.h>
+>  
+> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> index d0b1234..298ca19 100644
+> --- a/drivers/iommu/omap-iommu.c
+> +++ b/drivers/iommu/omap-iommu.c
+> @@ -24,7 +24,7 @@
+>  
+>  #include <asm/cacheflush.h>
+>  
+> -#include <plat/iommu.h>
+> +#include <linux/platform_data/iommu-omap.h>
+>  
+>  #include <plat/iopgtable.h>
+>  
+> diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
+> index 2e10c3e..ade7c6c 100644
+> --- a/drivers/iommu/omap-iovmm.c
+> +++ b/drivers/iommu/omap-iovmm.c
+> @@ -21,8 +21,8 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/mach/map.h>
+>  
+> -#include <plat/iommu.h>
+> -#include <plat/iovmm.h>
+> +#include <linux/platform_data/iommu-omap.h>
+> +#include <linux/platform_data/iovmm-omap.h>
+>  
+>  #include <plat/iopgtable.h>
+>  
+> diff --git a/drivers/media/platform/omap3isp/isp.h b/drivers/media/platform/omap3isp/isp.h
+> index 8be7487..62c76f9 100644
+> --- a/drivers/media/platform/omap3isp/isp.h
+> +++ b/drivers/media/platform/omap3isp/isp.h
+> @@ -34,8 +34,9 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/wait.h>
+>  #include <linux/iommu.h>
+> -#include <plat/iommu.h>
+> -#include <plat/iovmm.h>
+> +
+> +#include <linux/platform_data/iommu-omap.h>
+> +#include <linux/platform_data/iovmm-omap.h>
+>  
+>  #include "ispstat.h"
+>  #include "ispccdc.h"
+> diff --git a/drivers/media/platform/omap3isp/ispvideo.c b/drivers/media/platform/omap3isp/ispvideo.c
+> index 3a5085e..1093f07 100644
+> --- a/drivers/media/platform/omap3isp/ispvideo.c
+> +++ b/drivers/media/platform/omap3isp/ispvideo.c
+> @@ -34,8 +34,10 @@
+>  #include <linux/vmalloc.h>
+>  #include <media/v4l2-dev.h>
+>  #include <media/v4l2-ioctl.h>
+> -#include <plat/iommu.h>
+> -#include <plat/iovmm.h>
+> +
+> +#include <linux/platform_data/iommu-omap.h>
+> +#include <linux/platform_data/iovmm-omap.h>
+> +
+>  #include <plat/omap-pm.h>
+>  
+>  #include "ispvideo.h"
+> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/include/linux/platform_data/iommu-omap.h
+> similarity index 100%
+> rename from arch/arm/plat-omap/include/plat/iommu.h
+> rename to include/linux/platform_data/iommu-omap.h
+> diff --git a/arch/arm/plat-omap/include/plat/iovmm.h b/include/linux/platform_data/iovmm-omap.h
+> similarity index 100%
+> rename from arch/arm/plat-omap/include/plat/iovmm.h
+> rename to include/linux/platform_data/iovmm-omap.h
 
-It seems that it depends on some stuff that got merged via the arm tree.
 
-Not sure what would the better way to handle that, as applying it via -arm
-will likely generate conflicts when merging from both trees upstream.
 
-If this change is not urgent, maybe it would be better to apply it after
-the end of the merge window, via either one of the trees.
 
-Arnd,
-
-What do you think?
-
-Regards,
+Cheers,
 Mauro
