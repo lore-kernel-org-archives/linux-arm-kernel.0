@@ -1,44 +1,38 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 27 Sep 2012 06:57:49 +0000
-Subject: [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <20120922153313.GN4495@opensource.wolfsonmicro.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA92A1D@DBDE01.ent.ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 27 Sep 2012 09:13:13 +0200
+Subject: [PATCH 2/6] spi: atmel: add dmaengine and dt support
+In-Reply-To: <20120926070511.GI21730@pengutronix.de>
+References: <1348642261-27554-1-git-send-email-wenyou.yang@atmel.com>
+ <1348642261-27554-3-git-send-email-wenyou.yang@atmel.com>
+ <20120926070511.GI21730@pengutronix.de>
+Message-ID: <CACQ1gAi_e2nJNQv6TP1_F8b9ZHa9=F34gCB4nK7mH0Gvk0JhuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 21:03:14, Mark Brown wrote:
-> On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
-> 
-> > +config SND_DAVINCI_HAVE_SRAM
-> > +	bool
-> > +	default y if ARCH_DAVINCI=y
-> > +	default n if ARCH_OMAP=y
-> > +
-> 
-> I've been sitting on this mostly since it seems like a step back from
-> multi-platform kernels (which is where we're trying to get to) and I've
-> been trying to decide what the best approach is.  I'm thinking that we
-> do want a generic API for allocating this stuff, it's a fairly generic
-> feature (there's TCMs as well).  
-> 
-> Adding ifdefs like this does just doesn't seem good.
-> 
+Hi,
 
-I have no knowledge about multi-platform builds yet.
+2012/9/26 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Wed, Sep 26, 2012 at 02:50:57PM +0800, Wenyou Yang wrote:
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> I don't remember ever having touched the spi-atmel driver, so I'm pretty
+> sure I never gave my S-o-b for anything in this patch. Please reread
+> Documentation/SubmittingPatches and double check you understood what
+> Signed-off-by means before resubmitting this patch with all wrong
+> S-o-b's removed.
 
-Currently this driver is shared between OMAP & DaVinci and both of them 
-doesn't exist in single image build.
-
-There was a effort done for this SRAM Consolidation [1] but it didn't progress.
-Hence I took this approach as a time-being/workaround. This was we can get 
-affected platforms (like AM335x) get going/working.
-
-
-[1]. http://patchwork.ozlabs.org/patch/104059/
-
-Regards, 
-Gururaja
+By the way, what is the correct way to send a patch based on other's work ?
+If I believe Documentation/SubmittingPatches, only the sender should
+add his S-o-b.
+But if you want to give credit to the original author(s), what's the best way ?
+IMHO, I would CC them, let them add their
+s-o-b/ack-b/nack-b/whatever-b if they want, and maybe add something
+like that in the file header :
+/*
+ * based on the original work of ...
+ */
+Or in the commit message itself
+Is that right ?
