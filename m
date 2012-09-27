@@ -1,66 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Sep 2012 23:27:11 +0100
-Subject: [GIT PULL] ARM: cache flushing LoUIS API
-In-Reply-To: <20120927161552.GA5001@e102568-lin.cambridge.arm.com>
-References: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
- <20120927114805.GC14358@n2100.arm.linux.org.uk>
- <20120927161552.GA5001@e102568-lin.cambridge.arm.com>
-Message-ID: <20120927222711.GA7916@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 27 Sep 2012 15:48:42 -0700
+Subject: [PATCH 1/5] drivers: usb: phy: add a new driver for omap usb2 phy
+In-Reply-To: <506461A0.4050103@gmail.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-2-git-send-email-kishon@ti.com>
+ <50605CFB.5090402@gmail.com>
+ <CAAe_U6+2Vxd8F_JMafm41+0SnZSrZCa_9VKRbdB200BUHw5vEQ@mail.gmail.com>
+ <506461A0.4050103@gmail.com>
+Message-ID: <5064D7CA.1070909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 05:15:52PM +0100, Lorenzo Pieralisi wrote:
-> Russell,
-> 
-> Do you think it is sufficient/proper or you see other issues ?
-> 
-> If it is ok I can fold it into the series and prepare a new pull request.
+On 9/27/2012 7:24 AM, Rob Herring wrote:
+> On 09/25/2012 05:06 AM, ABRAHAM, KISHON VIJAY wrote:
+>> Hi,
+>>
+>> On Mon, Sep 24, 2012 at 6:45 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> On 09/06/2012 09:57 AM, Kishon Vijay Abraham I wrote:
+>>>> All phy related programming like enabling/disabling the clocks, powering
+>>>> on/off the phy is taken care of by this driver. It is also used for OTG
+>>>> related functionality like srp.
+>>>>
+>>>> This also includes device tree support for usb2 phy driver and
+>>>> the documentation with device tree binding information is updated.
+>>>>
+>>>> Currently writing to control module register is taken care in this
+>>>> driver which will be removed once the control module driver is in place.
+>>>>
+>>>> Cc: Felipe Balbi <balbi@ti.com>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>>   Documentation/devicetree/bindings/usb/usb-phy.txt |   17 ++
+>>>>   drivers/usb/phy/Kconfig                           |    9 +
+>>>>   drivers/usb/phy/Makefile                          |    1 +
+>>>>   drivers/usb/phy/omap-usb2.c                       |  271 +++++++++++++++++++++
+>>>>   include/linux/usb/omap_usb.h                      |   46 ++++
+>>>>   include/linux/usb/phy_companion.h                 |   34 +++
+>>>>   6 files changed, 378 insertions(+)
+>>>>   create mode 100644 Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>>   create mode 100644 drivers/usb/phy/omap-usb2.c
+>>>>   create mode 100644 include/linux/usb/omap_usb.h
+>>>>   create mode 100644 include/linux/usb/phy_companion.h
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>> new file mode 100644
+>>>> index 0000000..80d4148
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>
+>>> This is a very generic name...
+>>>
+>>>> @@ -0,0 +1,17 @@
+>>>> +USB PHY
+>>>> +
+>>>> +OMAP USB2 PHY
+>>>> +
+>>>> +Required properties:
+>>>> + - compatible: Should be "ti,omap-usb2"
+>>>
+>>> ...for a specific phy. However, I do think a generic binding to describe
+>>> host ctrlr to phy connections is needed.
+>>>
+>>>> + - reg : Address and length of the register set for the device. Also
+>>>> +add the address of control module dev conf register until a driver for
+>>>> +control module is added
+>>>
+>>> The dts should describe the h/w, not what you need for the current
+>>> driver. The 2nd reg field does not belong here.
+>>
+>> Indeed. This was discussed and agreed upon as a interim solution till
+>> we have a control module driver in place to write to the control
+>> module register.
+>
+> Discussed where and agreed by who? I for one do not agree.
 
-Looks fine to me.
+Yeah, what was tolerated was the addition of that address inside hwmod 
+data, but I do agree that it should not go into DTS.
 
-> 
-> Thanks a lot for your help and sorry again.
-> Lorenzo
-> 
-> -- >8 --
-> Subject: [PATCH] ARM: mm: fix cache LoUIS API for xscale and feroceon
-> 
-> Some architectures like xscale and feroceon have cache API variants that
-> map cache flushing functions as aliases to the base architecture.
-> This patch adds the required aliases to complete the implementation of
-> cache flushing LoUIS API.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/mm/proc-feroceon.S | 1 +
->  arch/arm/mm/proc-xscale.S   | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-> index 85e5e3b..4106b09 100644
-> --- a/arch/arm/mm/proc-feroceon.S
-> +++ b/arch/arm/mm/proc-feroceon.S
-> @@ -434,6 +434,7 @@ ENDPROC(feroceon_dma_unmap_area)
->  	range_alias flush_icache_all
->  	range_alias flush_user_cache_all
->  	range_alias flush_kern_cache_all
-> +	range_alias flush_kern_cache_louis
->  	range_alias flush_user_cache_range
->  	range_alias coherent_kern_range
->  	range_alias coherent_user_range
-> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> index b5ea31d..2551036 100644
-> --- a/arch/arm/mm/proc-xscale.S
-> +++ b/arch/arm/mm/proc-xscale.S
-> @@ -442,6 +442,7 @@ ENDPROC(xscale_dma_unmap_area)
->  	a0_alias flush_icache_all
->  	a0_alias flush_user_cache_all
->  	a0_alias flush_kern_cache_all
-> +	a0_alias flush_kern_cache_louis
->  	a0_alias flush_user_cache_range
->  	a0_alias coherent_kern_range
->  	a0_alias coherent_user_range
-> -- 
-> 1.7.12
-> 
-> 
+Regards,
+Benoit
