@@ -1,26 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 27 Sep 2012 07:50:21 +0200
-Subject: [PATCH v4 2/2] ARM: at91: add at91sam9_wdt driver to
- at91sam926x, at91sam9g45
-In-Reply-To: <1348568704-28304-3-git-send-email-fabio.porcedda@gmail.com>
-References: <1348568704-28304-1-git-send-email-fabio.porcedda@gmail.com>
- <1348568704-28304-3-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <20120927055021.GO17667@game.jcrosoft.org>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 27 Sep 2012 13:54:01 +0800
+Subject: [PATCH] ARM: imx: fix return value check in imx3_init_l2x0()
+Message-ID: <CAPgLHd8Rma5fSWPtjvLr18TEmmC=8kOjmSJtneO0Ecd1bvOrcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:25 Tue 25 Sep     , Fabio Porcedda wrote:
-> Enable the driver for the evk-pro3 board.
-> 
-> Tested on an at91sam9260 board (evk-pro3).
-> 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> ---
->  arch/arm/boot/dts/at91sam9260.dtsi | 6 ++++++
->  arch/arm/boot/dts/at91sam9263.dtsi | 6 ++++++
->  arch/arm/boot/dts/at91sam9g45.dtsi | 6 ++++++
->  arch/arm/boot/dts/evk-pro3.dts     | 4 ++++
-split board and soc
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Best Regards,
-J.
+In case of error, the function ioremap() returns NULL
+not ERR_PTR(). The IS_ERR() test in the return value
+check should be replaced with NULL test.
+
+dpatch engine is used to auto generate this patch.
+(https://github.com/weiyj/dpatch)
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-imx/mm-imx3.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 9d2c843..b5deb05 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -108,9 +108,8 @@ void __init imx3_init_l2x0(void)
+ 	}
+ 
+ 	l2x0_base = ioremap(MX3x_L2CC_BASE_ADDR, 4096);
+-	if (IS_ERR(l2x0_base)) {
+-		printk(KERN_ERR "remapping L2 cache area failed with %ld\n",
+-				PTR_ERR(l2x0_base));
++	if (!l2x0_base) {
++		printk(KERN_ERR "remapping L2 cache area failed\n");
+ 		return;
+ 	}
+ 
