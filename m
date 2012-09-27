@@ -1,125 +1,104 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 27 Sep 2012 05:22:37 +0000
-Subject: 8bit i2c register address
-In-Reply-To: <006c01cd9a5c$b67bd550$23737ff0$@m@jasmin-infotech.com>
-References: <006c01cd9a5c$b67bd550$23737ff0$@m@jasmin-infotech.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA928C5@DBDE01.ent.ti.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 27 Sep 2012 01:35:19 -0400
+Subject: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+In-Reply-To: <000901cd9c5d$cc53fbc0$64fbf340$@samsung.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153552.21241.8656.stgit@ubuntu>
+ <000101cd9b0e$78934fe0$69b9efa0$@samsung.com>
+ <CANM98qLuY3G6bBBnK+GJtEVZMRYX+Bk+bKh-bEQq0r7RyX9Nuw@mail.gmail.com>
+ <000901cd9c5d$cc53fbc0$64fbf340$@samsung.com>
+Message-ID: <CANM98qKPjRUFP4566pSaCBRUjCcSbtc1_-=zhe0N9f-LYJJRUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 19:28:45, mahalakshmi.m wrote:
->  
-> 
-> Hi,
-> 
->  
-> 
-> I am trying to send 8 bit register address using i2c_transfer.My code is
-> as follows.
-> 
->  
-> 
-> static int My_Read(void *dev, u8 reg, u32 len,
-> 
->                                  u16 *data, u32 endian)
-> 
-> {
-> 
->         struct i2c_client *client = dev;
-> 
->         struct i2c_msg msg[2];
-> 
->         u16 block_data;
-> 
->         int ret, icnt;
-> 
->         unsigned char u8_RetryCnt = 0;
-> 
->  
-> 
->         msg[0].addr = client->addr;
-> 
->         msg[0].flags = client->flags & I2C_M_TEN;
-> 
->         msg[0].len = 2;
-> 
->         msg[0].buf = (char *)&reg;
-
-Here len is 2 which means i2c framework will send 2 bytes data from wherever buf is pointing
-However in your code, bug points to reg which is char size. So it is sending incorrect data. 
-If reg is actually a char size, then set len = 1 and try.
-
-> 
->  
-> 
->         msg[1].addr = client->addr;
-> 
->         msg[1].flags = client->flags & I2C_M_TEN;
-> 
->         msg[1].flags |= I2C_M_RD;
-> 
->         msg[1].len = len ;
-> 
->         msg[1].buf = (char *)data;
-> 
->  
-> 
->                 ret = i2c_transfer(client->adapter, msg, 2);
-> 
-> }
-> 
->  
-> 
-> Where the register address ? reg?  is for example 0x08. I want to read a
-> 8bit register address 0x08. 
-> 
->  
-> 
-> My confusion is that since  i2c_msg structure has u16 is it possible to
-> send 0x08.Will I need to send as 0x0008.
-> 
->  
-> 
-> struct i2c_msg {
-> 
->   __u16 addr;
-> 
->   __u16 flags;
-> 
-> #define I2C_M_TEN              0x0010
-> 
-> #define I2C_M_RD               0x0001
-> 
-> #define I2C_M_NOSTART          0x4000
-> 
-> #define I2C_M_REV_DIR_ADDR     0x2000
-> 
-> #define I2C_M_IGNORE_NAK       0x1000
-> 
-> #define I2C_M_NO_RD_ACK               0x0800
-> 
-> #define I2C_M_RECV_LEN         0x0400
-> 
->   __u16 len;
-> 
->   __u8 * buf;
-> 
-> };  
-> 
->  
-> 
-> Kindly provide ur views.
-> 
->  
-> 
-> Thanks & Regards,
-> 
-> Maha
-> 
->  
-> 
-> 
-
-
-Regards, 
-Gururaja
+On Wed, Sep 26, 2012 at 11:11 PM, Min-gyu Kim <mingyu84.kim@samsung.com> wrote:
+>
+>
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+>> Behalf Of Christoffer Dall
+>> Sent: Tuesday, September 25, 2012 9:39 PM
+>> To: Min-gyu Kim
+>> Cc: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> kvmarm at lists.cs.columbia.edu; ???
+>> Subject: Re: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+>>
+>> >> +
+>> >> +     /*
+>> >> +      * If this is a write fault (think COW) we need to make sure the
+>> >> +      * existing page, which other CPUs might still read, doesn't go
+>> >> away
+>> >> +      * from under us, by calling gfn_to_pfn_prot(write_fault=true).
+>> >> +      * Therefore, we call gfn_to_pfn_prot(write_fault=false), which
+>> >> will
+>> >> +      * pin the existing page, then we get a new page for the user
+>> space
+>> >> +      * pte and map this in the stage-2 table where we also make sure
+>> to
+>> >> +      * flush the TLB for the VM, if there was an existing entry
+>> >> + (the
+>> >> entry
+>> >> +      * was updated setting the write flag to the potentially new
+> page).
+>> >> +      */
+>> >> +     if (fault_status == FSC_PERM) {
+>> >> +             pfn_existing = gfn_to_pfn_prot(vcpu->kvm, gfn, false,
+> NULL);
+>> >> +             if (is_error_pfn(pfn_existing))
+>> >> +                     return -EFAULT;
+>> >> +     }
+>> >> +
+>> >> +     pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+>> >> +     if (is_error_pfn(pfn)) {
+>> >> +             ret = -EFAULT;
+>> >> +             goto out_put_existing;
+>> >> +     }
+>> >> +
+>> >> +     /* We need minimum second+third level pages */
+>> >> +     ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+>> >> +     if (ret)
+>> >> +             goto out;
+>> >> +     new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
+>> >> +     if (writable)
+>> >> +             pte_val(new_pte) |= L_PTE2_WRITE;
+>> >> +     coherent_icache_guest_page(vcpu->kvm, gfn);
+>> >
+>> > why don't you flush icache only when guest has mapped executable page
+>> > as __sync_icache_dcache function does currently?
+>> >
+>> >
+>>
+>> because we don't know if the guest will map the page executable. The guest
+>> may read the page through a normal load, which causes the fault, and
+>> subsequently execute it (even possible through different guest mappings).
+>> The only way to see this happening would be to mark all pages as non-
+>> executable and catch the fault when it occurs - unfortunately the HPFAR
+>> which gives us the IPA is not populated on execute never faults, so we
+>> would have to translate the PC's va to ipa using cp15 functionality when
+>> this happens, which is then also racy with other CPUs. So the question is
+>> really if this will even be an optimization, but it's definitely something
+>> that requires further investigation.
+>
+> OK. I understand your point.
+>
+> But if guest maps a page for execution, guest will flush Icache
+> from __sync_icache_dcache. Then coherent_icache_guest_page doesn't seem to
+> be
+> necessary again. One thing I'm not sure in this case is when guest maps
+> for kernel executable page(module loading) and it reuses the kernel
+> executable page
+> from host(module unloading). But in that case, I think it is possible to
+> reduce
+> the number of flush by limiting the address range for flush.
+>
+>
+the guest kernel will flush the dcache when it maps the page
+initially. However, when we swap on the host we might use that same
+page at the same virtual address as the original guest in another
+guest or on the host, and the icache will now contain incorrect code
+that can be executed from the guest in case of vipt caches. In the
+case of pipt caches, if the page is used for instructions on any
+virtual address, incorrect entries can be executed from the icache
+once this page is used for guest instructions again. If you have
+suggestions on how to optimize this, it would be great, but I see not
+good way around it.
