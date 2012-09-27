@@ -1,66 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 27 Sep 2012 08:29:38 -0500
-Subject: [PATCH 3/4] pinctrl/nomadik: use simple or linear IRQ domain
-In-Reply-To: <1348751639-17457-1-git-send-email-linus.walleij@stericsson.com>
-References: <1348751639-17457-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <506454C2.2080807@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 27 Sep 2012 15:38:32 +0200
+Subject: ARM: OMAP: fix new sparse warnings
+In-Reply-To: <alpine.DEB.2.00.1209242308100.10406@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209242308100.10406@utopia.booyaka.com>
+Message-ID: <506456D8.7020704@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2012 08:13 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+Hi Paul,
+
+On 09/25/12 01:09, Paul Walmsley wrote:
 > 
-> This alters the Nomadik pinctrl driver to:
+> Commit e54adb1e79762d3591459e5b0e9b9ff578e33fdb ("ARM: OMAP: omap3evm:
+> cleanup revision bits") adds a new sparse[1] warning:
 > 
-> - Call irqdomain_add_linear() for the DT case so we get
->   all independent from IRQ numbers in this case.
-> - Call irqdomain_add_simple() for the legacy case, which
->   allocates the IRQ descriptors for the Nomadik pin controller
->   dynamically.
+> arch/arm/mach-omap2/board-omap3evm.c:90:4: warning: symbol 'get_omap3_evm_rev' was not declared. Should it be static?
 > 
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/pinctrl-nomadik.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+> This symbol no longer appears to be used outside this file, so mark it
+> static and remove the export.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-> index e031c84..6aab107 100644
-> --- a/drivers/pinctrl/pinctrl-nomadik.c
-> +++ b/drivers/pinctrl/pinctrl-nomadik.c
-> @@ -1286,9 +1286,19 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
->  
->  	platform_set_drvdata(dev, nmk_chip);
->  
-> -	nmk_chip->domain = irq_domain_add_legacy(np, NMK_GPIO_PER_CHIP,
-> -						NOMADIK_GPIO_TO_IRQ(pdata->first_gpio),
-> -						0, &nmk_gpio_irq_simple_ops, nmk_chip);
-> +	if (np) {
-> +		/* The DT case will just grab a set of IRQ numbers */
-> +		nmk_chip->domain = irq_domain_add_linear(np, NMK_GPIO_PER_CHIP,
-> +				&nmk_gpio_irq_simple_ops, nmk_chip);
-
-
-irq_start = -1;
-
-if (!np)
-	irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
-
-and then always call irq_domain_add_simple.
-
-Rob
-
-> +	} else {
-> +		/* Non-DT legacy mode, use hardwired IRQ numbers */
-> +		int irq_start;
-> +
-> +		irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
-> +		nmk_chip->domain = irq_domain_add_simple(NULL,
-> +				NMK_GPIO_PER_CHIP, irq_start,
-> +				&nmk_gpio_irq_simple_ops, nmk_chip);
-> +	}
->  	if (!nmk_chip->domain) {
->  		dev_err(&dev->dev, "failed to create irqdomain\n");
->  		ret = -ENOSYS;
+> Commit 801475ccb2b2c1928b22aec4b9e5285d9e347602 ("ARM: OMAP: move
+> debug_card_init() function") results in the following new sparse[1]
+> warning:
 > 
+> arch/arm/plat-omap/debug-devices.c:71:12: warning: symbol 'debug_card_init' was not declared. Should it be static?
+> 
+> Fix by including the proper header file.
+> 
+> ...
+> 
+> 1. https://sparse.wiki.kernel.org/index.php/Main_Page
+
+Yeah, my compiler did not emit those... Thanks for the fix!
+
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Tony Lindgren <tony@atomide.com>
+
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+
+-- 
+Regards,
+Igor.
