@@ -1,14 +1,18 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 27 Sep 2012 16:35:38 +0800
-Subject: [PATCH 1/3] dmaengine: sirf: fix a typo in dma_prep_interleaved
-Message-ID: <1348734938-20014-1-git-send-email-Barry.Song@csr.com>
+Date: Thu, 27 Sep 2012 16:36:10 +0800
+Subject: [PATCH 2/3] dmaengine: sirf: fix a typo in moving running dma_desc to
+ active queue
+Message-ID: <1348734970-20050-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-either DEV_TO_MEM or MEM_TO_DEV is supported, so change
-OR to AND.
+list_move_tail(&schan->queued, &schan->active) makes the list_empty(schan->queued)
+undefined, we either should change it to:
+list_move_tail(schan->queued.next, &schan->active)
+or
+list_move_tail(&sdesc->node, &schan->active)
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
@@ -16,18 +20,18 @@ Signed-off-by: Barry Song <Baohua.Song@csr.com>
  1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 434ad31..35a329d 100644
+index 35a329d..c439489 100644
 --- a/drivers/dma/sirf-dma.c
 +++ b/drivers/dma/sirf-dma.c
-@@ -428,7 +428,7 @@ static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
- 	unsigned long iflags;
- 	int ret;
+@@ -109,7 +109,7 @@ static void sirfsoc_dma_execute(struct sirfsoc_dma_chan *schan)
+ 	sdesc = list_first_entry(&schan->queued, struct sirfsoc_dma_desc,
+ 		node);
+ 	/* Move the first queued descriptor to active list */
+-	list_move_tail(&schan->queued, &schan->active);
++	list_move_tail(&sdesc->node, &schan->active);
  
--	if ((xt->dir != DMA_MEM_TO_DEV) || (xt->dir != DMA_DEV_TO_MEM)) {
-+	if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM)) {
- 		ret = -EINVAL;
- 		goto err_dir;
- 	}
+ 	/* Start the DMA transfer */
+ 	writel_relaxed(sdesc->width, sdma->base + SIRFSOC_DMA_WIDTH_0 +
 -- 
 1.7.0.4
 
