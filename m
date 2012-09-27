@@ -1,45 +1,26 @@
-From: michael@walle.cc (Michael Walle)
-Date: Thu, 27 Sep 2012 23:54:37 +0200
-Subject: [PATCH] ARM: kirkwood: fix buttons on lsxl boards
-Message-ID: <1348782877-857-1-git-send-email-michael@walle.cc>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 27 Sep 2012 23:01:50 +0100
+Subject: [PATCH] ARM: ensure vm_struct has its phys_addr member filled in
+Message-ID: <E1THM9W-0004mm-OY@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change event type to switch for the power and autopower switches.
-Additionally, this patch aligns the keycodes with the other linkstation
-boards already supported by linux.
-
-Signed-off-by: Michael Walle <michael@walle.cc>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/kirkwood-lsxl.dtsi |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mm/ioremap.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index a1dd36d..8fea375 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -48,17 +48,19 @@
- 		#size-cells = <0>;
- 		button at 1 {
- 			label = "Function Button";
--			linux,code = <132>;
-+			linux,code = <357>;
- 			gpios = <&gpio1 9 1>;
- 		};
- 		button at 2 {
- 			label = "Power-on Switch";
--			linux,code = <116>;
-+			linux,code = <0>;
-+			linux,input-type = <5>;
- 			gpios = <&gpio1 10 1>;
- 		};
- 		button at 3 {
- 			label = "Power-auto Switch";
--			linux,code = <142>;
-+			linux,code = <1>;
-+			linux,input-type = <5>;
- 			gpios = <&gpio1 11 1>;
- 		};
- 	};
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index a8372b8..22ed380 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -249,6 +249,7 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+  	if (!area)
+  		return NULL;
+  	addr = (unsigned long)area->addr;
++	area->phys_addr = __pfn_to_phys(pfn);
+ 
+ #if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+ 	if (DOMAIN_IO == 0 &&
 -- 
-1.7.2.5
+1.7.4.4
