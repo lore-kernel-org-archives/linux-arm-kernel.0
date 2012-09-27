@@ -1,41 +1,37 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 27 Sep 2012 17:55:17 +0800
-Subject: [PATCH 3/6] pinctrl: sirf: fix spinlock deadlock in
- sirfsoc_gpio_set_input
-Message-ID: <1348739717-21148-1-git-send-email-Barry.Song@csr.com>
+Date: Thu, 27 Sep 2012 17:55:46 +0800
+Subject: [PATCH 4/6] pinctrl: sirf: initialize the irq_chip pointer of
+ pinctrl_gpio_range
+Message-ID: <1348739746-21184-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-sirfsoc_gpio_set_input() is called in those functions which have
-held the spinlock, so delete the duplicated locking.
+This patch initializes the optional irq_chip pointer gc in sirfsoc
+pinctrl_gpio_range.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Signed-off-by: Baohua Song <Baohua.Song@csr.com>
 ---
- drivers/pinctrl/pinctrl-sirf.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+ drivers/pinctrl/pinctrl-sirf.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 6634944..6eae934 100644
+index 6eae934..9a984e8 100644
 --- a/drivers/pinctrl/pinctrl-sirf.c
 +++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1514,15 +1514,10 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- static inline void sirfsoc_gpio_set_input(struct sirfsoc_gpio_bank *bank, unsigned ctrl_offset)
- {
- 	u32 val;
--	unsigned long flags;
--
--	spin_lock_irqsave(&bank->lock, flags);
+@@ -1266,8 +1266,10 @@ static int __devinit sirfsoc_pinmux_probe(struct platform_device *pdev)
+ 		goto out_no_pmx;
+ 	}
  
- 	val = readl(bank->chip.regs + ctrl_offset);
- 	val &= ~SIRFSOC_GPIO_CTL_OUT_EN_MASK;
- 	writel(val, bank->chip.regs + ctrl_offset);
--
--	spin_unlock_irqrestore(&bank->lock, flags);
- }
+-	for (i = 0; i < ARRAY_SIZE(sirfsoc_gpio_ranges); i++)
++	for (i = 0; i < ARRAY_SIZE(sirfsoc_gpio_ranges); i++) {
++		sirfsoc_gpio_ranges[i].gc = &sgpio_bank[i].chip.gc;
+ 		pinctrl_add_gpio_range(spmx->pmx, &sirfsoc_gpio_ranges[i]);
++	}
  
- static int sirfsoc_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 	dev_info(&pdev->dev, "initialized SIRFSOC pinmux driver\n");
+ 
 -- 
 1.7.0.4
 
