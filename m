@@ -1,52 +1,24 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 27 Sep 2012 11:01:01 +0200
-Subject: [PATCH] USB: ohci-at91: fix null pointer in
- ohci_hcd_at91_overcurrent_irq
-In-Reply-To: <20120925134050.GC15419@kroah.com>
-References: <1348433760-2818-1-git-send-email-joachim.eastwood@jotron.com>
- <50600F5F.7030307@atmel.com> <20120924173407.GE32691@kroah.com>
- <50617DFB.3070405@atmel.com> <20120925134050.GC15419@kroah.com>
-Message-ID: <506415CD.5070004@atmel.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 27 Sep 2012 11:08:39 +0200
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <20120927082955.GR17667@game.jcrosoft.org>
+References: <504DFBBF.5010202@free-electrons.com>
+ <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
+ <20120927082955.GR17667@game.jcrosoft.org>
+Message-ID: <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 03:40 PM, Greg KH :
-> On Tue, Sep 25, 2012 at 11:48:43AM +0200, Nicolas Ferre wrote:
->> On 09/24/2012 07:34 PM, Greg KH :
->>> On Mon, Sep 24, 2012 at 09:44:31AM +0200, Nicolas Ferre wrote:
->>>>> This patches fixed the issue by adding the gpio valid check.
->>>>>
->>>>> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
->>>>
->>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>>
->>>> Thanks a *lot* Joachim for having chased this bug!
->>>>
->>>> Alan, Greg, this one is 3.6 last minute material... I Hope that it can
->>>> make it!
->>>>
->>>>> ---
->>>>>
->>>>> Note: If 6fffb77c goes into stable please either include this patch also or
->>>>> fold it into 6fffb77c to avoid regressions.
->>>>
->>>> Absolutely, I have tagged the faulty patch:
->>>>     Cc: Stable <stable@vger.kernel.org> [3.4+]
->>>>
->>>> So it can be good if this one can follow the same path.
->>>
->>> I'll queue this up for 3.7 and have it backported to 3.6.1 as it's a bit
->>> late for 3.6 for me right now.
->>
->> Ah, too bad! The kernel Oops may affect several AT91 SoC... Can't we
->> push it with the help of Andrew Morton for late material?
-> 
-> 3.6.1 is really too late for you?  What does one week buy you?
+2012/9/27 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> as discuss with Grant no this is a temporary solution so no Makefile Target
+>
+> so nack
 
-Well, even if I appreciate a lot the stable tree ;-) , I find it a
-little bit annoying to know in advance that next Linus' release will
-contain a fatal bug for AT91 SoCs.
+hum, it doesn't seems to be temporary on powerpc.
+cf 25431333813686654907ab987fb5de10c10a16db
+and
+ARCH=powerpc make help
 
-Bye,
--- 
-Nicolas Ferre
+So what's the problem on arm ?
