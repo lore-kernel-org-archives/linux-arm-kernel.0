@@ -1,8 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Sep 2012 14:58:09 +0100
+Date: Thu, 27 Sep 2012 15:03:00 +0100
 Subject: [BUG] Deferred probing in driver model is racy, resulting in
  lost probes
-In-Reply-To: <CACVXFVPnpQ6yHiDaoo_CPG7oSEq+ZzxpmTgQv55-tRRyaavDfA@mail.gmail.com>
+In-Reply-To: <20120927135809.GE14358@n2100.arm.linux.org.uk>
 References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
  <CACVXFVPahbFVEP4p2Z9-TvjQ52tUCMuDeLx0X6GP5t0h5gEV8g@mail.gmail.com>
  <20120916082510.GN12245@n2100.arm.linux.org.uk>
@@ -10,39 +10,43 @@ References: <20120818145856.GP18957@n2100.arm.linux.org.uk>
  <20120926200833.GA14340@kroah.com>
  <20120926202321.GD30938@n2100.arm.linux.org.uk>
  <CACVXFVPnpQ6yHiDaoo_CPG7oSEq+ZzxpmTgQv55-tRRyaavDfA@mail.gmail.com>
-Message-ID: <20120927135809.GE14358@n2100.arm.linux.org.uk>
+ <20120927135809.GE14358@n2100.arm.linux.org.uk>
+Message-ID: <20120927140300.GF14358@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 07:47:46AM +0800, Ming Lei wrote:
-> On Thu, Sep 27, 2012 at 4:23 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > To be honest, I've not bothered to test the above patch, and now when I
-> > look at it, I notice it's broken - in that on error it will corrupt the
-> > driver list.  Take a look at the error path.
-> >
-> > priv is drv->p.  We add priv->knode_bus to the driver list.  If
-> > driver_attach() returns an error, then we go to out_unregister, which
+On Thu, Sep 27, 2012 at 02:58:09PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 27, 2012 at 07:47:46AM +0800, Ming Lei wrote:
+> > On Thu, Sep 27, 2012 at 4:23 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > To be honest, I've not bothered to test the above patch, and now when I
+> > > look at it, I notice it's broken - in that on error it will corrupt the
+> > > driver list.  Take a look at the error path.
+> > >
+> > > priv is drv->p.  We add priv->knode_bus to the driver list.  If
+> > > driver_attach() returns an error, then we go to out_unregister, which
+> > 
+> > In fact, driver_attach() always returns zero, so it does __not__ affect
+> > your test.
 > 
-> In fact, driver_attach() always returns zero, so it does __not__ affect
-> your test.
+> It may not affect my test, but the fact is, that patch lays down the
+> foundations for bugs to be introduced.  Now, while I can test it (and
+> have done) I don't think it's suitable for mainline because of _that_.
+> 
+> If driver_attach() always returns zero, there's no point in it returning
+> a value - it might as well return void and stop leading people to
+> believe that it might return an error.  So I suggest this alternative
+> patch instead, which gets rid of what is effectively dead code, and
+> probably a few warnings about not checking the return value from a
+> __must_check function (see usb-serial.c).
+> 
+> With this patch, no one is lead into a false sense of security that,
+> after your patch, if driver_attach() ever returns an error, proper
+> cleanup will happen - it's blatently obvious to anyone modifying it
+> that if they do want it to return an error, they have to audit all the
+> users of it, which IMHO is a good thing.
 
-It may not affect my test, but the fact is, that patch lays down the
-foundations for bugs to be introduced.  Now, while I can test it (and
-have done) I don't think it's suitable for mainline because of _that_.
-
-If driver_attach() always returns zero, there's no point in it returning
-a value - it might as well return void and stop leading people to
-believe that it might return an error.  So I suggest this alternative
-patch instead, which gets rid of what is effectively dead code, and
-probably a few warnings about not checking the return value from a
-__must_check function (see usb-serial.c).
-
-With this patch, no one is lead into a false sense of security that,
-after your patch, if driver_attach() ever returns an error, proper
-cleanup will happen - it's blatently obvious to anyone modifying it
-that if they do want it to return an error, they have to audit all the
-users of it, which IMHO is a good thing.
+Sorry, old version of that patch.  Here's the right one.
 
 diff --git a/drivers/base/bus.c b/drivers/base/bus.c
 index 2bcef65..39b3ef4 100644
@@ -65,18 +69,21 @@ index 2bcef65..39b3ef4 100644
  
  	error = driver_create_file(drv, &driver_attr_uevent);
 diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 4b01ab3..2999df5 100644
+index 4b01ab3..77e2412 100644
 --- a/drivers/base/dd.c
 +++ b/drivers/base/dd.c
-@@ -456,7 +456,7 @@ static int __driver_attach(struct device *dev, void *data)
+@@ -456,9 +456,9 @@ static int __driver_attach(struct device *dev, void *data)
   * returns 0 and the @dev->driver is set, we've found a
   * compatible pair.
   */
 -int driver_attach(struct device_driver *drv)
 +void driver_attach(struct device_driver *drv)
  {
- 	return bus_for_each_dev(drv->bus, NULL, drv, __driver_attach);
+-	return bus_for_each_dev(drv->bus, NULL, drv, __driver_attach);
++	bus_for_each_dev(drv->bus, NULL, drv, __driver_attach);
  }
+ EXPORT_SYMBOL_GPL(driver_attach);
+ 
 diff --git a/drivers/char/agp/amd64-agp.c b/drivers/char/agp/amd64-agp.c
 index 444f8b6..4c16681 100644
 --- a/drivers/char/agp/amd64-agp.c
