@@ -1,61 +1,170 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 27 Sep 2012 17:56:10 +0800
-Subject: [PATCH 5/6] pinctrl: sirf: add lost chained_irq_enter and exit in
- sirfsoc_gpio_handle_irq
-Message-ID: <1348739770-21218-1-git-send-email-Barry.Song@csr.com>
+Date: Thu, 27 Sep 2012 17:56:30 +0800
+Subject: [PATCH 6/6] pinctrl: sirf: enable the driver support new SiRFmarco SoC
+Message-ID: <1348739790-21253-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-This patch fixes the chained irq hang issue, tested by DM9000 driver using
-GPIO0-3(irqnr=131) as the external IRQ on SiRFmarco:
-   $ cat /proc/interrupts
-               CPU0       CPU1
-     32:       1608          0       GIC  sirfsoc_timer0
-     33:          0       3197       GIC  sirfsoc_timer1
-     50:      10207          0       GIC  sirfsoc-uart
-     56:          2          0       GIC  cc0e0000.i2c
-     70:         44          0       GIC  mmc0
-    131:        333          0  sirf-gpio-irq  eth0
-    ...
+The driver supports old up SiRFprimaII SoCs, this patch makes it support
+the new SiRFmarco as well.
+SiRFmarco, as a SMP SoC, adds new SIRFSOC_GPIO_PAD_EN_CLR registers, to
+disable GPIO pad, we should write 1 to the corresponding bit in the new
+CLEAR register instead of writing 0 to SIRFSOC_GPIO_PAD_EN.
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- drivers/pinctrl/pinctrl-sirf.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ drivers/pinctrl/Kconfig        |    4 +-
+ drivers/pinctrl/pinctrl-sirf.c |   48 ++++++++++++++++++++++++++++++---------
+ 2 files changed, 39 insertions(+), 13 deletions(-)
 
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 54e3588..78ed93f 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -111,8 +111,8 @@ config PINCTRL_SINGLE
+ 	  This selects the device tree based generic pinctrl driver.
+ 
+ config PINCTRL_SIRF
+-	bool "CSR SiRFprimaII pin controller driver"
+-	depends on ARCH_PRIMA2
++	bool "CSR SiRFprimaII/SiRFmarco pin controller driver"
++	depends on ARCH_SIRF
+ 	select PINMUX
+ 
+ config PINCTRL_TEGRA
 diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 9a984e8..675497c 100644
+index 675497c..29f611d 100644
 --- a/drivers/pinctrl/pinctrl-sirf.c
 +++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -25,6 +25,7 @@
- #include <linux/bitops.h>
- #include <linux/gpio.h>
- #include <linux/of_gpio.h>
-+#include <asm/mach/irq.h>
+@@ -32,10 +32,10 @@
+ #define SIRFSOC_NUM_PADS    622
+ #define SIRFSOC_RSC_PIN_MUX 0x4
  
- #define DRIVER_NAME "pinmux-sirf"
+-#define SIRFSOC_GPIO_PAD_EN(g) ((g)*0x100 + 0x84)
++#define SIRFSOC_GPIO_PAD_EN(g)		((g)*0x100 + 0x84)
++#define SIRFSOC_GPIO_PAD_EN_CLR(g)	((g)*0x100 + 0x90)
+ #define SIRFSOC_GPIO_CTRL(g, i)			((g)*0x100 + (i)*4)
+ #define SIRFSOC_GPIO_DSP_EN0			(0x80)
+-#define SIRFSOC_GPIO_PAD_EN(g)			((g)*0x100 + 0x84)
+ #define SIRFSOC_GPIO_INT_STATUS(g)		((g)*0x100 + 0x8C)
  
-@@ -1483,6 +1484,9 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 	u32 status, ctrl;
- 	int idx = 0;
- 	unsigned int first_irq;
-+	struct irq_chip *chip = irq_get_chip(irq);
-+
-+	chained_irq_enter(chip, desc);
+ #define SIRFSOC_GPIO_CTL_INTR_LOW_MASK		0x1
+@@ -60,6 +60,7 @@ struct sirfsoc_gpio_bank {
+ 	int id;
+ 	int parent_irq;
+ 	spinlock_t lock;
++	bool is_marco; /* for marco, some registers are different with prima2 */
+ };
  
- 	status = readl(bank->chip.regs + SIRFSOC_GPIO_INT_STATUS(bank->id));
- 	if (!status) {
-@@ -1511,6 +1515,8 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 		idx++;
- 		status = status >> 1;
+ static struct sirfsoc_gpio_bank sgpio_bank[SIRFSOC_GPIO_NO_OF_BANKS];
+@@ -191,6 +192,7 @@ struct sirfsoc_pmx {
+ 	struct pinctrl_dev *pmx;
+ 	void __iomem *gpio_virtbase;
+ 	void __iomem *rsc_virtbase;
++	bool is_marco;
+ };
+ 
+ /* SIRFSOC_GPIO_PAD_EN set */
+@@ -1088,12 +1090,21 @@ static void sirfsoc_pinmux_endisable(struct sirfsoc_pmx *spmx, unsigned selector
+ 
+ 	for (i = 0; i < mux->muxmask_counts; i++) {
+ 		u32 muxval;
+-		muxval = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(mask[i].group));
+-		if (enable)
+-			muxval = muxval & ~mask[i].mask;
+-		else
+-			muxval = muxval | mask[i].mask;
+-		writel(muxval, spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(mask[i].group));
++		if (!spmx->is_marco) {
++			muxval = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(mask[i].group));
++			if (enable)
++				muxval = muxval & ~mask[i].mask;
++			else
++				muxval = muxval | mask[i].mask;
++			writel(muxval, spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(mask[i].group));
++		} else {
++			if (enable)
++				writel(mask[i].mask, spmx->gpio_virtbase +
++					SIRFSOC_GPIO_PAD_EN_CLR(mask[i].group));
++			else
++				writel(mask[i].mask, spmx->gpio_virtbase +
++					SIRFSOC_GPIO_PAD_EN(mask[i].group));
++		}
  	}
-+
-+	chained_irq_exit(chip, desc);
- }
  
- static inline void sirfsoc_gpio_set_input(struct sirfsoc_gpio_bank *bank, unsigned ctrl_offset)
+ 	if (mux->funcmask && enable) {
+@@ -1158,9 +1169,14 @@ static int sirfsoc_pinmux_request_gpio(struct pinctrl_dev *pmxdev,
+ 
+ 	spmx = pinctrl_dev_get_drvdata(pmxdev);
+ 
+-	muxval = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(group));
+-	muxval = muxval | (1 << (offset - range->pin_base));
+-	writel(muxval, spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(group));
++	if (!spmx->is_marco) {
++		muxval = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(group));
++		muxval = muxval | (1 << (offset - range->pin_base));
++		writel(muxval, spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(group));
++	} else {
++		writel(1 << (offset - range->pin_base), spmx->gpio_virtbase +
++			SIRFSOC_GPIO_PAD_EN(group));
++	}
+ 
+ 	return 0;
+ }
+@@ -1218,6 +1234,7 @@ static void __iomem *sirfsoc_rsc_of_iomap(void)
+ {
+ 	const struct of_device_id rsc_ids[]  = {
+ 		{ .compatible = "sirf,prima2-rsc" },
++		{ .compatible = "sirf,marco-rsc" },
+ 		{}
+ 	};
+ 	struct device_node *np;
+@@ -1259,6 +1276,9 @@ static int __devinit sirfsoc_pinmux_probe(struct platform_device *pdev)
+ 		goto out_no_rsc_remap;
+ 	}
+ 
++	if (of_device_is_compatible(np, "sirf,marco-pinctrl"))
++		spmx->is_marco = 1;
++
+ 	/* Now register the pin controller and all pins it handles */
+ 	spmx->pmx = pinctrl_register(&sirfsoc_pinmux_desc, &pdev->dev, spmx);
+ 	if (!spmx->pmx) {
+@@ -1287,6 +1307,7 @@ out_no_gpio_remap:
+ 
+ static const struct of_device_id pinmux_ids[] __devinitconst = {
+ 	{ .compatible = "sirf,prima2-pinctrl" },
++	{ .compatible = "sirf,marco-pinctrl" },
+ 	{}
+ };
+ 
+@@ -1683,6 +1704,7 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
+ 	struct sirfsoc_gpio_bank *bank;
+ 	void *regs;
+ 	struct platform_device *pdev;
++	bool is_marco = false;
+ 
+ 	pdev = of_find_device_by_node(np);
+ 	if (!pdev)
+@@ -1692,6 +1714,9 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
+ 	if (!regs)
+ 		return -ENOMEM;
+ 
++	if (of_device_is_compatible(np, "sirf,marco-pinctrl"))
++		is_marco = 1;
++
+ 	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
+ 		bank = &sgpio_bank[i];
+ 		spin_lock_init(&bank->lock);
+@@ -1708,6 +1733,7 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
+ 		bank->chip.gc.of_node = np;
+ 		bank->chip.regs = regs;
+ 		bank->id = i;
++		bank->is_marco = is_marco;
+ 		bank->parent_irq = platform_get_irq(pdev, i);
+ 		if (bank->parent_irq < 0) {
+ 			err = bank->parent_irq;
 -- 
 1.7.0.4
 
