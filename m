@@ -1,46 +1,44 @@
-From: fwu@marvell.com (Fan Wu)
-Date: Thu, 27 Sep 2012 14:36:01 +0800
-Subject: [PATCH] ARM:CPUIDLE: Fix wrongly used idle control counter
-Message-ID: <1348727761-16485-1-git-send-email-fwu@marvell.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 27 Sep 2012 06:57:49 +0000
+Subject: [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <20120922153313.GN4495@opensource.wolfsonmicro.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA92A1D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: fwu <fwu@marvell.com>
+On Sat, Sep 22, 2012 at 21:03:14, Mark Brown wrote:
+> On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
+> 
+> > +config SND_DAVINCI_HAVE_SRAM
+> > +	bool
+> > +	default y if ARCH_DAVINCI=y
+> > +	default n if ARCH_OMAP=y
+> > +
+> 
+> I've been sitting on this mostly since it seems like a step back from
+> multi-platform kernels (which is where we're trying to get to) and I've
+> been trying to decide what the best approach is.  I'm thinking that we
+> do want a generic API for allocating this stuff, it's a fairly generic
+> feature (there's TCMs as well).  
+> 
+> Adding ifdefs like this does just doesn't seem good.
+> 
 
-1. On ARM platform, "nohlt" can be used to prevent core from idle
-   process, returning immediately.
-2. There are two interface, exported for other modules, named
-   disable_hlt and enable_hlt and used to enable/disable the
-   cpuidle mechanism by increasing/decreasing "hlt_counter".
-   So, the more "hlt_counter" is, the more user want to disable
-   cpuidle. Disable_hlt and enable_hlt are paired operation,
-   when you first call disable_hlt and then enable_hlt, the
-   semantics are right, but if you call enable_hlt and
-   then disable_hlt, it is wrong.
-3. Change "hlt_counter > 0" can fix the problem.
-   The judgement whethere the cpuidle is disabled need to check
-   whether the "hlt_counter > 0" rather than "hlt_counter != 0".
+I have no knowledge about multi-platform builds yet.
 
-Change-Id: Ibd5ea805b0c01fe326833d333ce5d72e0447430a
-Signed-off-by: fwu <fwu@marvell.com>
-Signed-off-by: YiLu Mao <ylmao@marvell.com>
-Signed-off-by: Ning Jiang <ning.jiang@marvell.com>
----
- arch/arm/kernel/process.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Currently this driver is shared between OMAP & DaVinci and both of them 
+doesn't exist in single image build.
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 693b744..4dc2fee 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -204,7 +204,7 @@ void cpu_idle(void)
- #ifdef CONFIG_PL310_ERRATA_769419
- 			wmb();
- #endif
--			if (hlt_counter) {
-+			if (hlt_counter > 0) {
- 				local_irq_enable();
- 				cpu_relax();
- 			} else if (!need_resched()) {
--- 
-1.7.0.4
+There was a effort done for this SRAM Consolidation [1] but it didn't progress.
+Hence I took this approach as a time-being/workaround. This was we can get 
+affected platforms (like AM335x) get going/working.
+
+
+[1]. http://patchwork.ozlabs.org/patch/104059/
+
+Regards, 
+Gururaja
