@@ -1,98 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 27 Sep 2012 08:41:53 -0500
-Subject: [PATCH 2/4] irqdomain: augment add_simple() to allocate descs
-In-Reply-To: <1348751625-17420-1-git-send-email-linus.walleij@stericsson.com>
-References: <1348751625-17420-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <506457A1.8050404@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 27 Sep 2012 14:44:53 +0100
+Subject: [GIT PULL] ARM: cache flushing LoUIS API
+In-Reply-To: <20120927114805.GC14358@n2100.arm.linux.org.uk>
+References: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
+ <20120927114805.GC14358@n2100.arm.linux.org.uk>
+Message-ID: <20120927134453.GA15585@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2012 08:13 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Sep 27, 2012 at 12:48:05PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 25, 2012 at 01:57:58PM +0100, Lorenzo Pieralisi wrote:
+> > Hi Russell,
+> > 
+> > I know it is coming quite late in the cycle but please consider pulling
+> > the patch series implementing the new cache maintenance LoUIS API, since
+> > it provides a stepping stone to implementing power management on upcoming
+> > A15 and A7 based platforms, leaving functionality for earlier processor
+> > versions unchanged.
+> > 
+> > It has been tested on:
+> > 
+> > - OMAP4/5
+> >   # suspend/hotplug and CPU idle
+> > - iMX6q
+> >   # suspend and hotplug
+> > - TC2 big.LITTLE testchip
+> >   # CPU idle
 > 
-> Currently we rely on all IRQ chip instances to dynamically
-> allocate their IRQ descriptors unless they use the linear
-> IRQ domain. So for irqdomain_add_legacy() and
-> irqdomain_add_simple() the caller need to make sure that
-> descriptors are allocated.
+> Ok, last night's PXA build regressed with this:
 > 
-> Let's slightly augment the yet unused irqdomain_add_simple()
-> to also allocate descriptors as a means to simplify usage
-> and avoid code duplication throughout the kernel.
+> arch/arm/mm/built-in.o: In function `xscale_dma_unmap_area':
+> cache-xsc3l2.c:(.text+0x4194): undefined reference to `xscale_80200_A0_A1_flush_kern_cache_louis'
 > 
-> We warn if descriptors cannot be allocated, e.g. if a
-> platform has the bad habit of hogging descriptors at boot
-> time.
-> 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Rob/Grant/Thomas if you ACK this I will take it through the
-> pinctrl tree since I introduce its only user right there.
+> That's because we missed that proc-xscale.S aliases a bunch of functions to
+> xscale_80200_A0_A1_xxx from xscale_xxx.  And looking at that, it seems that
+> we also .type equivalent symbols - have you tested this on T2 builds to
+> check whether it works correctly there?
 
-You really should have Grant's ack here.
+Point taken for the regression, currently looking into that. I have not
+run tests on T2, I would be surprised if the set triggers any issue on
+T2 but I should have thought about that, my apologies.
 
-> ---
->  kernel/irq/irqdomain.c | 21 ++++++++++++++++-----
->  1 file changed, 16 insertions(+), 5 deletions(-)
-> 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 49a7772..a0655b6 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -148,7 +148,8 @@ static unsigned int irq_domain_legacy_revmap(struct irq_domain *domain,
->   * @host_data: Controller private data pointer
->   *
->   * Allocates a legacy irq_domain if irq_base is positive or a linear
-> - * domain otherwise.
-> + * domain otherwise. For the legacy domain, IRQ descriptors will also
-> + * be allocated.
->   *
->   * This is intended to implement the expected behaviour for most
->   * interrupt controllers which is that a linear mapping should
-> @@ -162,11 +163,21 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
->  					 const struct irq_domain_ops *ops,
->  					 void *host_data)
->  {
-> -	if (first_irq > 0)
-> -		return irq_domain_add_legacy(of_node, size, first_irq, 0,
-> +	if (first_irq > 0) {
-> +		int irq_base;
-> +
-> +		irq_base = irq_alloc_descs(first_irq, 0, size, numa_node_id());
+I will test it ASAP and get back to you, sorry again.
 
-This will always fail for !SPARSE_IRQ, so we probably don't want warn in
-that case. So perhaps something like this:
-
-int irq_base = first_irq;
-
-if (is_enabled(CONFIG_SPARSE_IRQ)) {
-	irq_base = irq_alloc_descs(first_irq, 0, size, numa_node_id());
-	if (irq_base < 0) {
-		WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
-		     first_irq);
-		irq_base = first_irq;
-	}
-}
-
-> +		if (irq_base < 0) {
-> +			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
-> +			     first_irq);
-> +			irq_base = first_irq;
-> +		}
-> +		return irq_domain_add_legacy(of_node, size, irq_base, 0,
->  					     ops, host_data);
-> -	else
-> -		return irq_domain_add_linear(of_node, size, ops, host_data);
-> +	}
-> +
-> +	/* A linear domain is the default */
-> +	return irq_domain_add_linear(of_node, size, ops, host_data);
->  }
->  
->  /**
-> 
+Lorenzo
