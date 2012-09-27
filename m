@@ -1,24 +1,69 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 27 Sep 2012 11:08:39 +0200
-Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <20120927082955.GR17667@game.jcrosoft.org>
-References: <504DFBBF.5010202@free-electrons.com>
- <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
- <20120927082955.GR17667@game.jcrosoft.org>
-Message-ID: <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Sep 2012 10:10:59 +0100
+Subject: [PULL] HYP-mode boot
+In-Reply-To: <c65993c242ac431861fb90dbd94e0057@localhost>
+References: <c65993c242ac431861fb90dbd94e0057@localhost>
+Message-ID: <50641823.2050302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/9/27 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> as discuss with Grant no this is a temporary solution so no Makefile Target
->
-> so nack
+On 19/09/12 08:55, Marc Zyngier wrote:
 
-hum, it doesn't seems to be temporary on powerpc.
-cf 25431333813686654907ab987fb5de10c10a16db
-and
-ARCH=powerpc make help
+Hi Russell,
 
-So what's the problem on arm ?
+> Could you please pull the following branch into your tree? It contains the
+> HYP-mode boot code, which has been posted twice on LAK, and has been
+> heavily used for KVM.
+> 
+> It is based on your opcodes branch.
+
+Any update on this?
+
+Cheers,
+
+	M.
+
+> The following changes since commit
+> 508514ed25315dd28340000831b17535d6f772da:
+> 
+>   ARM: 7511/1: opcodes: Opcode definitions for the Virtualization
+> Extensions (2012-09-15 21:26:00 +0100)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> hyp-boot-mode-rmk
+> 
+> Dave Martin (5):
+>       ARM: virt: allow the kernel to be entered in HYP mode
+>       ARM: zImage/virt: hyp mode entry support for the zImage loader
+>       ARM: virt: Update documentation for hyp mode entry support
+>       ARM: virt: Add boot-time diagnostics
+>       ARM: virt: Add CONFIG_ARM_VIRT_EXT option
+> 
+> Marc Zyngier (2):
+>       ARM: opcodes: add __ERET/__MSR_ELR_HYP instruction encoding
+>       ARM: virt: arch_timers: enable access to physical timers
+> 
+>  Documentation/arm/Booting           |   22 ++++-
+>  arch/arm/boot/compressed/.gitignore |    1 +
+>  arch/arm/boot/compressed/Makefile   |    9 ++-
+>  arch/arm/boot/compressed/head.S     |   71 ++++++++++-
+>  arch/arm/include/asm/assembler.h    |   28 +++++
+>  arch/arm/include/asm/opcodes-virt.h |   10 ++
+>  arch/arm/include/asm/ptrace.h       |    1 +
+>  arch/arm/include/asm/virt.h         |   69 +++++++++++
+>  arch/arm/kernel/Makefile            |    2 +
+>  arch/arm/kernel/head.S              |   14 ++-
+>  arch/arm/kernel/hyp-stub.S          |  223
+> +++++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/setup.c             |   20 +++
+>  arch/arm/kernel/smp.c               |    3 +
+>  arch/arm/mm/Kconfig                 |   17 +++
+>  14 files changed, 478 insertions(+), 12 deletions(-)
+>  create mode 100644 arch/arm/include/asm/virt.h
+>  create mode 100644 arch/arm/kernel/hyp-stub.S
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
