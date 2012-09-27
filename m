@@ -1,86 +1,87 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 27 Sep 2012 13:50:05 +0900
-Subject: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member in
- samsung_gpio_chip
-In-Reply-To: <000001cd9c63$e95c7b60$bc157220$@com>
-References: <000001cd9c63$e95c7b60$bc157220$@com>
-Message-ID: <5063DAFD.1040903@samsung.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Thu, 27 Sep 2012 10:43:06 +0530
+Subject: [PATCH 4/4] usb: phy: omap-usb2: enable 960Mhz clock for omap5
+In-Reply-To: <20120926182719.GA10326@arwen.pp.htv.fi>
+References: <1348054229-27362-1-git-send-email-kishon@ti.com>
+ <1348054229-27362-5-git-send-email-kishon@ti.com>
+ <20120919115647.GI3772@arwen.pp.htv.fi>
+ <CAAe_U6Kr8t1=T7MGMjAe+1n6S-NncypnPkXYqA2_FtVK=uxULA@mail.gmail.com>
+ <20120926182719.GA10326@arwen.pp.htv.fi>
+Message-ID: <CAAe_U6+t1rQh4VWsFRob3gQHMjbfXzhnfCswF-Ah7da_Xsfv8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2012 12:55 PM, Eunki Kim wrote:
-> When a device uses GPIO interrupt, its driver assumes that GPIO
-> should be INPUT mode. However, GPIO of SAMSUNG SoC is sepated to
-> INPUT mode and INTERRUPT mode. They are set by 0x0 and 0xF in GPIO
-> control register. If the register is set to INPUT mode, the
-> interrupt never occur. Therefore, it's necessary to set INTERRUPT
-> mode instead of INPUT mode when the pin is used for GPIO interrupt.
+Hi,
 
-If for this, already the patch was posted.
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074387.html
-
-Thanks.
-
-> This patch inserts the bitmap_gpio_int member in struct samsung_
-> gpio_chip in order to represent use of GPIO interrupt for each pin
-> and sets the related bit when s5p_register_gpio_interrupt function
-> is called.
+On Wed, Sep 26, 2012 at 11:57 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
 >
-> Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
->   arch/arm/plat-samsung/include/plat/gpio-core.h |    2 ++
->   arch/arm/plat-samsung/s5p-irq-gpioint.c        |    8 ++++++--
->   2 files changed, 8 insertions(+), 2 deletions(-)
+> On Wed, Sep 26, 2012 at 11:10:48AM +0530, ABRAHAM, KISHON VIJAY wrote:
+>> Hi,
+>>
+>> On Wed, Sep 19, 2012 at 5:26 PM, Felipe Balbi <balbi@ti.com> wrote:
+>> > On Wed, Sep 19, 2012 at 05:00:29PM +0530, Kishon Vijay Abraham I wrote:
+>> >> "usb_otg_ss_refclk960m" is needed by usb2 phy present in omap5. For
+>> >> omap4, the clk_get of this clock will fail since it does not have this
+>> >> clock.
+>> >>
+>> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> >> ---
+>> >>  Documentation/devicetree/bindings/usb/usb-phy.txt |    3 +++
+>> >>  drivers/usb/phy/omap-usb2.c                       |   28 ++++++++++++++++++++-
+>> >>  2 files changed, 30 insertions(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> >> index 7c5fd89..d5626de 100644
+>> >> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> >> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>> >> @@ -24,6 +24,9 @@ Required properties:
+>> >>  add the address of control module phy power register until a driver for
+>> >>  control module is added
+>> >>
+>> >> +Optional properties:
+>> >> + - has960mhzclk: should be added if the phy needs 960mhz clock
+>> >> +
+>> >>  This is usually a subnode of ocp2scp to which it is connected.
+>> >>
+>> >>  usb3phy at 4a084400 {
+>> >> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
+>> >> index d36c282..d6612ba 100644
+>> >> --- a/drivers/usb/phy/omap-usb2.c
+>> >> +++ b/drivers/usb/phy/omap-usb2.c
+>> >> @@ -146,6 +146,7 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
+>> >>       struct omap_usb                 *phy;
+>> >>       struct usb_otg                  *otg;
+>> >>       struct resource                 *res;
+>> >> +     struct device_node              *np = pdev->dev.of_node;
+>> >>
+>> >>       phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+>> >>       if (!phy) {
+>> >> @@ -190,6 +191,15 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
+>> >>       }
+>> >>       clk_prepare(phy->wkupclk);
+>> >>
+>> >> +     if (of_property_read_bool(np, "has960mhzclk")) {
+>> >> +             phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
+>> >> +             if (IS_ERR(phy->optclk)) {
+>> >> +                     dev_err(&pdev->dev, "unable to get refclk960m\n");
+>> >> +                     return PTR_ERR(phy->optclk);
+>> >> +             }
+>> >> +             clk_prepare(phy->optclk);
+>> >> +     }
+>> >
+>> > instead, can't you just always try to get the clock but ignore the error
+>> > if it fails ?
+>>
+>> This clock is needed for usb2 to work in dwc3 (omap5). So we have to
+>> report the error in case we dont get the clock no?
 >
-> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
-> b/arch/arm/plat-samsung/include/plat/gpio-core.h
-> index 1fe6917..dfd8b7a 100644
-> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
-> @@ -48,6 +48,7 @@ struct samsung_gpio_cfg;
->    * @config: special function and pull-resistor control information.
->    * @lock: Lock for exclusive access to this gpio bank.
->    * @pm_save: Save information for suspend/resume support.
-> + * @bitmap_gpio_int: Bitmap for representing GPIO interrupt or not.
->    *
->    * This wrapper provides the necessary information for the Samsung
->    * specific gpios being registered with gpiolib.
-> @@ -71,6 +72,7 @@ struct samsung_gpio_chip {
->   #ifdef CONFIG_PM
->   	u32			pm_save[4];
->   #endif
-> +	u32			bitmap_gpio_int;
->   };
->   
->   static inline struct samsung_gpio_chip *to_samsung_gpio(struct gpio_chip *gpc)
-> diff --git a/arch/arm/plat-samsung/s5p-irq-gpioint.c b/arch/arm/plat-samsung/s5p-irq-gpioint.c
-> index f9431fe..d981c61 100644
-> --- a/arch/arm/plat-samsung/s5p-irq-gpioint.c
-> +++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
-> @@ -185,7 +185,7 @@ int __init s5p_register_gpio_interrupt(int pin)
->   
->   	/* check if the group has been already registered */
->   	if (my_chip->irq_base)
-> -		return my_chip->irq_base + offset;
-> +		goto success;
->   
->   	/* register gpio group */
->   	ret = s5p_gpioint_add(my_chip);
-> @@ -193,9 +193,13 @@ int __init s5p_register_gpio_interrupt(int pin)
->   		my_chip->chip.to_irq = samsung_gpiolib_to_irq;
->   		printk(KERN_INFO "Registered interrupt support for gpio group %d.\n",
->   		       group);
-> -		return my_chip->irq_base + offset;
-> +		goto success;
->   	}
->   	return ret;
-> +success:
-> +	my_chip->bitmap_gpio_int |= BIT(offset);
-> +
-> +	return my_chip->irq_base + offset;
->   }
->   
->   int __init s5p_register_gpioint_bank(int chain_irq, int start, int nr_groups)
+> sure, but you don't need to bail out. Print a warning message such as:
+>
+> dev_dbg(&pdev->dev, "couldn't get refclk960m, trying without\n");
+
+but then we'll get this debug message for omap4 which actually doesn't
+need 960m clk.
+
+Thanks
+Kishon
