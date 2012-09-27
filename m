@@ -1,54 +1,125 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 26 Sep 2012 23:19:04 -0600
-Subject: [RFC PATCH 1/3] ARM: move ICEDCC uncompress.h to common location
-In-Reply-To: <20120926215651.GA20405@glitch>
-References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
- <1348613212-21897-2-git-send-email-swarren@wwwdotorg.org>
- <20120926215651.GA20405@glitch>
-Message-ID: <5063E1C8.70801@wwwdotorg.org>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 27 Sep 2012 05:22:37 +0000
+Subject: 8bit i2c register address
+In-Reply-To: <006c01cd9a5c$b67bd550$23737ff0$@m@jasmin-infotech.com>
+References: <006c01cd9a5c$b67bd550$23737ff0$@m@jasmin-infotech.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA928C5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2012 03:56 PM, Domenico Andreoli wrote:
-> On Tue, Sep 25, 2012 at 04:46:50PM -0600, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Create a common location for uncompress.h, and select the included debug
->> macro file using config option.
->>
->> This does the same for uncompress.h as a recent patch for debug-macro.S,
->> which was based on a suggestion by Russell King and implemented by Rob
->> Herring.
-
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-
->> +config UNCOMPRESS_INCLUDE
->> +	string
->> +	default "debug/icedcc-uncompress.h" if DEBUG_ICEDCC
->> +	default "debug/none-uncompress.h" if ARCH_MULTIPLATFORM || \
->> +		DEBUG_HIGHBANK_UART || DEBUG_MVEBU_UART || \
->> +		DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
->> +		DEBUG_VEXPRESS_UART0_DETECT || DEBUG_VEXPRESS_UART0_CA9 || \
->> +		DEBUG_VEXPRESS_UART0_RS1
+On Mon, Sep 24, 2012 at 19:28:45, mahalakshmi.m wrote:
+>  
 > 
-> I would ask to add DEBUG_LL_UART_NONE to the or-ed list, which fixes the
-> build of platforms without mach/uncompress.h and mach/debug-macro.S in
-> case NONE is selected, but I'm not sure.
+> Hi,
+> 
+>  
+> 
+> I am trying to send 8 bit register address using i2c_transfer.My code is
+> as follows.
+> 
+>  
+> 
+> static int My_Read(void *dev, u8 reg, u32 len,
+> 
+>                                  u16 *data, u32 endian)
+> 
+> {
+> 
+>         struct i2c_client *client = dev;
+> 
+>         struct i2c_msg msg[2];
+> 
+>         u16 block_data;
+> 
+>         int ret, icnt;
+> 
+>         unsigned char u8_RetryCnt = 0;
+> 
+>  
+> 
+>         msg[0].addr = client->addr;
+> 
+>         msg[0].flags = client->flags & I2C_M_TEN;
+> 
+>         msg[0].len = 2;
+> 
+>         msg[0].buf = (char *)&reg;
 
-Yes, I just noticed that it (UART_NONE) depends on !MULTIPLATFORM, and
-with this patch it probably shouldn't any more; it should be the default
-uncompress type for MULTIPLATFORM.
+Here len is 2 which means i2c framework will send 2 bytes data from wherever buf is pointing
+However in your code, bug points to reg which is char size. So it is sending incorrect data. 
+If reg is actually a char size, then set len = 1 and try.
 
-> If I got the point of Russel right, uncompress.h is not a debug trace and
-> maybe should not depend on any DEBUG_LL* option?
+> 
+>  
+> 
+>         msg[1].addr = client->addr;
+> 
+>         msg[1].flags = client->flags & I2C_M_TEN;
+> 
+>         msg[1].flags |= I2C_M_RD;
+> 
+>         msg[1].len = len ;
+> 
+>         msg[1].buf = (char *)data;
+> 
+>  
+> 
+>                 ret = i2c_transfer(client->adapter, msg, 2);
+> 
+> }
+> 
+>  
+> 
+> Where the register address ? reg?  is for example 0x08. I want to read a
+> 8bit register address 0x08. 
+> 
+>  
+> 
+> My confusion is that since  i2c_msg structure has u16 is it possible to
+> send 0x08.Will I need to send as 0x0008.
+> 
+>  
+> 
+> struct i2c_msg {
+> 
+>   __u16 addr;
+> 
+>   __u16 flags;
+> 
+> #define I2C_M_TEN              0x0010
+> 
+> #define I2C_M_RD               0x0001
+> 
+> #define I2C_M_NOSTART          0x4000
+> 
+> #define I2C_M_REV_DIR_ADDR     0x2000
+> 
+> #define I2C_M_IGNORE_NAK       0x1000
+> 
+> #define I2C_M_NO_RD_ACK               0x0800
+> 
+> #define I2C_M_RECV_LEN         0x0400
+> 
+>   __u16 len;
+> 
+>   __u8 * buf;
+> 
+> };  
+> 
+>  
+> 
+> Kindly provide ur views.
+> 
+>  
+> 
+> Thanks & Regards,
+> 
+> Maha
+> 
+>  
+> 
+> 
 
-The only way a multi-platform zImage can work (at the moment anyway) is
-to have no serial/debug/... output from the uncompressor, nor
-earlyprintk. Once the DT is parsed and the real platform-specific
-console driver is registered, console output can commence. If the kernel
-experiences problems before that point, you might want to turn on
-earlyprintk or even output from the uncompressor. Once you've done that,
-you've tied the kernel image to a single platform. This is likely only
-something you'd do when debugging a problem, otherwise it would defeat
-the point of single zImage. Hence, classifying this as a debug option
-seems reasonable.
+
+Regards, 
+Gururaja
