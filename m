@@ -1,23 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Sep 2012 13:48:56 +0000
-Subject: How to get revision and serial numbers with device tree?
-In-Reply-To: <5063E1C2.8020407@bluegiga.com>
-References: <5063E1C2.8020407@bluegiga.com>
-Message-ID: <201209271348.56700.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Sep 2012 15:18:38 +0100
+Subject: [PATCH v2 1/2] usb: phy: add a new driver for usb3 phy
+In-Reply-To: <1348754648-8315-2-git-send-email-kishon@ti.com>
+References: <1348754648-8315-1-git-send-email-kishon@ti.com>
+ <1348754648-8315-2-git-send-email-kishon@ti.com>
+Message-ID: <20120927141837.GA26268@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 September 2012, Lauri Hintsala wrote:
-> 
-> /proc/cpuinfo contains revision and serial numbers. They are got from 
-> ATAGs when device tree is disabled. How are they managed when device 
-> tree is in use? On my imx28 based board they are zeros.
+On Thu, Sep 27, 2012 at 07:34:07PM +0530, Kishon Vijay Abraham I wrote:
+> +static int omap5_usb_phy_power(struct omap_usb *phy, bool on)
+> +{
+> +	u32 val;
+> +	unsigned long rate;
+> +	struct clk *sys_clk;
+> +
+> +	sys_clk = clk_get(NULL, "sys_clkin");
+> +	if (IS_ERR(sys_clk)) {
+> +		pr_err("%s: unable to get sys_clkin\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	rate = clk_get_rate(sys_clk);
+> +	rate = rate/1000000;
+> +	clk_put(sys_clk);
 
-Right, we don't currently interpret a serial number from the device tree.
-At least IBM uses a "system-id" property in the root node for the serial
-number, and we could theoretically show this in /proc/cpuid, but I don't
-think any of the ARM systems currently fill this correctly, and it is
-a string property, so we can't use it interchangeably with the integer
-in the ATAGs.
+Actually, you're supposed to hold on to the struct clk all the time your
+driver is making use of that - you're not supposed to drop it.
 
-	Arnd
+That has several advantages: if clk_get() fails, then you're failing
+earlier on (when the driver is being probed) and when some event occurs.
