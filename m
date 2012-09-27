@@ -1,59 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Sep 2012 15:19:58 +0200
-Subject: [PATCH 01/13] clk: davinci - add Main PLL clock driver
-In-Reply-To: <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
-References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
- <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CACRpkdZ=8m+X2KnUPFFhT2LsvTe-jPR_m6oVt_CEFfY-LvFHmg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 27 Sep 2012 08:29:38 -0500
+Subject: [PATCH 3/4] pinctrl/nomadik: use simple or linear IRQ domain
+In-Reply-To: <1348751639-17457-1-git-send-email-linus.walleij@stericsson.com>
+References: <1348751639-17457-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <506454C2.2080807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 8:07 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+On 09/27/2012 08:13 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This alters the Nomadik pinctrl driver to:
+> 
+> - Call irqdomain_add_linear() for the DT case so we get
+>   all independent from IRQ numbers in this case.
+> - Call irqdomain_add_simple() for the legacy case, which
+>   allocates the IRQ descriptors for the Nomadik pin controller
+>   dynamically.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/pinctrl/pinctrl-nomadik.c | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+> index e031c84..6aab107 100644
+> --- a/drivers/pinctrl/pinctrl-nomadik.c
+> +++ b/drivers/pinctrl/pinctrl-nomadik.c
+> @@ -1286,9 +1286,19 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+>  
+>  	platform_set_drvdata(dev, nmk_chip);
+>  
+> -	nmk_chip->domain = irq_domain_add_legacy(np, NMK_GPIO_PER_CHIP,
+> -						NOMADIK_GPIO_TO_IRQ(pdata->first_gpio),
+> -						0, &nmk_gpio_irq_simple_ops, nmk_chip);
+> +	if (np) {
+> +		/* The DT case will just grab a set of IRQ numbers */
+> +		nmk_chip->domain = irq_domain_add_linear(np, NMK_GPIO_PER_CHIP,
+> +				&nmk_gpio_irq_simple_ops, nmk_chip);
 
-> +struct clk_davinci_pll_data {
-> +       /* physical addresses set by platform code */
-> +       u32 phy_pllm;
-> +       /* if PLL has a prediv register this should be non zero */
-> +       u32 phy_prediv;
-> +       /* if PLL has a postdiv register this should be non zero */
-> +       u32 phy_postdiv;
-> +       /* mapped addresses. should be initialized by  */
-> +       void __iomem *pllm;
-> +       void __iomem *prediv;
-> +       void __iomem *postdiv;
-> +       u32 pllm_mask;
-> +       u32 prediv_mask;
-> +       u32 postdiv_mask;
-> +       u32 num;
-> +       /* framework flags */
-> +       u32 flags;
-> +       /* pll flags */
-> +       u32 pll_flags;
-> +       /* use this value for prediv */
-> +       u32 fixed_prediv;
-> +       /* multiply PLLM by this factor. By default most SOC set this to zero
-> +        * that translates to a multiplier of 1 and incrementer of 1.
-> +        * To override default, set this factor
-> +        */
-> +       u32 pllm_multiplier;
-> +};
+
+irq_start = -1;
+
+if (!np)
+	irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
+
+and then always call irq_domain_add_simple.
+
+Rob
+
+> +	} else {
+> +		/* Non-DT legacy mode, use hardwired IRQ numbers */
+> +		int irq_start;
 > +
-
-No, that's not what I meant.
-
-I meant like this:
-
-/**
- * struct clk_davinci_pll_data - struct holding the PLL data
- * phy_pllm: physical addresses set by platform code
- * phy_prediv: ...
-(...)
- */
-struct clk_davinci_pll_data {
-      u32 phy_pllm;
-      u32 phy_prediv;
-(...)
-};
-
-Yours,
-Linus Walleij
+> +		irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
+> +		nmk_chip->domain = irq_domain_add_simple(NULL,
+> +				NMK_GPIO_PER_CHIP, irq_start,
+> +				&nmk_gpio_irq_simple_ops, nmk_chip);
+> +	}
+>  	if (!nmk_chip->domain) {
+>  		dev_err(&dev->dev, "failed to create irqdomain\n");
+>  		ret = -ENOSYS;
+> 
