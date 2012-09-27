@@ -1,23 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 27 Sep 2012 17:18:15 +0100
-Subject: [PATCH 2/3] ARM: dts: imx53-qsb: Make DA9053 regulator functional
-In-Reply-To: <201209270229.54462.marex@denx.de>
-References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
- <201209270200.57482.marex@denx.de>
- <CAOMZO5Bi7gMH4RE047-uxc5bhz_UuQpLArpOSMae03U08tebxA@mail.gmail.com>
- <201209270229.54462.marex@denx.de>
-Message-ID: <20120927161815.GB4428@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 27 Sep 2012 10:33:30 -0600
+Subject: [PATCH 1/6] OMAPDSS: remove unnecessary plat/clock.h includes
+In-Reply-To: <20120927162800.21755.62891.stgit@dusk.lan>
+References: <20120927162800.21755.62891.stgit@dusk.lan>
+Message-ID: <20120927163329.21755.34776.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 02:29:54AM +0200, Marek Vasut wrote:
-> Dear Fabio Estevam,
+The OMAP DSS video drivers include <plat/clock.h> but don't use any
+information from that file.  These includes are causing problems with
+ARM single image kernels - remove them.
 
-> > Looking at the mx53qsb/DA9053 board schematics I cannot see any of
-> > these supplies that can be turned-off, and that's why I kept the
-> > 'always-on' flag.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ drivers/video/omap2/dss/dispc.c |    1 -
+ drivers/video/omap2/dss/dsi.c   |    1 -
+ drivers/video/omap2/dss/dss.c   |    1 -
+ 3 files changed, 3 deletions(-)
 
-> I agree, let's see what Mark has to say. I believe your approach is valid.
-
-Sorry, I'm missing some context on the discussion here so I'm not usre
-what the question is.
+diff --git a/drivers/video/omap2/dss/dispc.c b/drivers/video/omap2/dss/dispc.c
+index ee9e296..17fcb94 100644
+--- a/drivers/video/omap2/dss/dispc.c
++++ b/drivers/video/omap2/dss/dispc.c
+@@ -38,7 +38,6 @@
+ #include <linux/pm_runtime.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ 
+ #include <video/omapdss.h>
+ 
+diff --git a/drivers/video/omap2/dss/dsi.c b/drivers/video/omap2/dss/dsi.c
+index b07e886..bf7a080 100644
+--- a/drivers/video/omap2/dss/dsi.c
++++ b/drivers/video/omap2/dss/dsi.c
+@@ -41,7 +41,6 @@
+ 
+ #include <video/omapdss.h>
+ #include <video/mipi_display.h>
+-#include <plat/clock.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
+diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+index 04b4586..1dfef0e 100644
+--- a/drivers/video/omap2/dss/dss.c
++++ b/drivers/video/omap2/dss/dss.c
+@@ -35,7 +35,6 @@
+ #include <video/omapdss.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
