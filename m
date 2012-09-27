@@ -1,41 +1,42 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 27 Sep 2012 07:40:38 +0200
-Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
-In-Reply-To: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
+Date: Thu, 27 Sep 2012 07:44:38 +0200
+Subject: [RFC PATCH 1/3] kbuild: introduce cmd_dtc_cpp
+In-Reply-To: <1348599998-2729-2-git-send-email-swarren@wwwdotorg.org>
 References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120927054038.GL17667@game.jcrosoft.org>
+ <1348599998-2729-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120927054438.GM17667@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 13:06 Tue 25 Sep     , Stephen Warren wrote:
 > From: Stephen Warren <swarren@nvidia.com>
 > 
-> This series adds some build rules to run cpp on *.dts-cpp prior to
-> invoking dtc, and converts Tegra to the new rule as an example. What do
-> people think?
+> cmd_dtc_cpp runs the C pre-processor on the input .dts file before
+> passing it to dtc for final compilation. This allows used of #define
+> within the .dts file.
 > 
-> I assume that you've applied the dtc patches I sent yesterday. They
-> aren't in this series. See:
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  scripts/Makefile.lib |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020182.html
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020183.html
-> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020181.html
-> 
-> Note: those patches are against upstream dtc. If you wish to test this
-> series, apply the dtc patches to upstream dtc, build it, and copy the
-> resultant dtc binary over the top of scripts/dtc/dtc.
-> 
-> Stephen Warren (3):
->   kbuild: introduce cmd_dtc_cpp
->   ARM: use cmd_dtc_cpp for compilation of *.dts-cpp to *.dtb
->   ARM: tegra: compile all DT files with cpp 
-I do not like the extention
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 0be6f11..e3a149e 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -266,6 +266,9 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
+>  quiet_cmd_dtc = DTC     $@
+>  cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile) $<
+>  
+> +quiet_cmd_dtc_cpp = DTC+CPP $@
+> +cmd_dtc_cpp = $(CC) -E -Wp,-MD,$(depfile) -xc $< | $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -
+this should go to Makefile.build
 
-can we run gcc everytime?
+and we should keep the same nomecalture as lds with lds.S
 
-or just do as done for lds
+here dts.S
 
-*.dts.S
+and is it possible to cmd with it
 
 Best Regards,
 J.
