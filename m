@@ -1,32 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 27 Sep 2012 10:29:55 +0200
-Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
-References: <504DFBBF.5010202@free-electrons.com>
- <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20120927082955.GR17667@game.jcrosoft.org>
+From: Barry.Song@csr.com (Barry Song)
+Date: Thu, 27 Sep 2012 16:35:38 +0800
+Subject: [PATCH 1/3] dmaengine: sirf: fix a typo in dma_prep_interleaved
+Message-ID: <1348734938-20014-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:10 Thu 27 Sep     , Richard Genoud wrote:
-> [add Grant Likely and Rob Herring in To: since this is maybe more OF
-> related than ARM related]
-> 
-> This rules are useful for appended device tree conforming to the
-> CONFIG_ARM_APPENDED_DTB kernel option.
-> 
-> The rule dtbImage.<dt> is actually just a:
-> cat zImage <dt>.dtb > dtbImage.<dt>
-> 
-> The dtbuImage.<dt> makes an uImage out of the dtbImage.<dt> file.
-> 
-> KernelVersion: v3.6-rc5
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-as discuss with Grant no this is a temporary solution so no Makefile Target
+From: Barry Song <Baohua.Song@csr.com>
 
-so nack
+either DEV_TO_MEM or MEM_TO_DEV is supported, so change
+OR to AND.
 
-Best Regards,
-J.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/dma/sirf-dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 434ad31..35a329d 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -428,7 +428,7 @@ static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
+ 	unsigned long iflags;
+ 	int ret;
+ 
+-	if ((xt->dir != DMA_MEM_TO_DEV) || (xt->dir != DMA_DEV_TO_MEM)) {
++	if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM)) {
+ 		ret = -EINVAL;
+ 		goto err_dir;
+ 	}
+-- 
+1.7.0.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
