@@ -1,32 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Sep 2012 15:30:16 +0000
-Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform
- conversion
-In-Reply-To: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
-References: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201209271530.17243.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 27 Sep 2012 09:38:12 -0600
+Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
+In-Reply-To: <20120927054038.GL17667@game.jcrosoft.org>
+References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
+ <20120927054038.GL17667@game.jcrosoft.org>
+Message-ID: <506472E4.5060107@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 September 2012, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 09/26/2012 11:40 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 13:06 Tue 25 Sep     , Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> This series adds some build rules to run cpp on *.dts-cpp prior to
+>> invoking dtc, and converts Tegra to the new rule as an example. What do
+>> people think?
+>>
+>> I assume that you've applied the dtc patches I sent yesterday. They
+>> aren't in this series. See:
+>>
+>> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020182.html
+>> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020183.html
+>> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020181.html
+>>
+>> Note: those patches are against upstream dtc. If you wish to test this
+>> series, apply the dtc patches to upstream dtc, build it, and copy the
+>> resultant dtc binary over the top of scripts/dtc/dtc.
+>>
+>> Stephen Warren (3):
+>>   kbuild: introduce cmd_dtc_cpp
+>>   ARM: use cmd_dtc_cpp for compilation of *.dts-cpp to *.dtb
+>>   ARM: tegra: compile all DT files with cpp 
+>
+> I do not like the extention
+
+It is a bit unwieldy. Perhaps *.dtsp, *.dtsip would be better.
+
+> can we run gcc everytime?
+
+Not without editing all the device tree files; any property (or node)
+name the starts with a # must be escaped; changed from "#foo" to "\#foo"
+to avoid cpp attempting to interpret it as a pre-processor directive.
+
+> or just do as done for lds
 > 
-> Moving ARCH_MVEBU for multi-platform support caused several breakages in
-> recently added addr-map and pinctrl support for mvebu. This adds the
-> necessary selects and include paths to fix the build.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
+> *.dts.S
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-I actually had the same patch since monday but haven't managed to
-send out my series.
-
-Olof probably has a better idea of how to apply this than me
-to avoid further merge conflicts.
-
-	Arnd
+.S means assembly. (that's why I went with .dts-cpp rather than .dts.cpp).
