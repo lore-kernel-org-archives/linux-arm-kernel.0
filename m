@@ -1,99 +1,28 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 27 Sep 2012 15:52:29 +0200
-Subject: OMAP baseline test results for v3.6-rc7
-In-Reply-To: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
-Message-ID: <50645A1D.5040108@compulab.co.il>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 27 Sep 2012 22:54:21 +0900
+Subject: [PATCH 2/4] irqdomain: augment add_simple() to allocate descs
+In-Reply-To: <1348751625-17420-1-git-send-email-linus.walleij@stericsson.com>
+References: <1348751625-17420-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120927135420.GM13568@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/12 21:21, Paul Walmsley wrote:
-> 
-> Here are some basic OMAP boot and power management test results for 
-> v3.6-rc6:
-> 
->    http://www.pwsan.com/omap/testlogs/test_v3.6-rc6/20120918101040/
-> 
-> Some observations:
-> 
-> Boot tests:
-> 
-> * CM-T3517: L3 in-band error with IPSS during boot
->   - Cause unknown but see 
-> http://marc.info/?l=linux-omap&m=134833869730129&w=2
->   - Longstanding issue; does not occur on the 3517EVM
+On Thu, Sep 27, 2012 at 03:13:45PM +0200, Linus Walleij wrote:
+> +	if (first_irq > 0) {
+> +		int irq_base;
+> +
+> +		irq_base = irq_alloc_descs(first_irq, 0, size, numa_node_id());
+> +		if (irq_base < 0) {
+> +			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
+> +			     first_irq);
+> +			irq_base = first_irq;
+> +		}
+> +		return irq_domain_add_legacy(of_node, size, irq_base, 0,
+>  					     ops, host_data);
 
-I'll be able to put some human resources on investigating this
-in a couple of weeks hopefully. Currently, it does not affect all
-boards (using the same boot loader) and does not look that it interferes
-with any functionality later in the boot or runtime.
+If first_irq is specified you presumably want irq_alloc_desc_at()
+behaviour, so you should use irq_alloc_descs(first_irq, first_irq, ...),
+similar to what irq_create_strict_mappings() does.
 
-> 
-> * 3517EVM & CM-T3517: boot hangs               
->   - Probably due to the use of NFS root; there are likely some Kconfig,
->     board file, and PM issues with EMAC
-
-Have you tried the nohlt boot parameter?
-It looks like the wfi is killing those SoCs once you use EMAC.
-
-> 
-> PM tests:
-> 
-> * 37xx EVM: CORE not entering dynamic off-idle
->   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
->     off works
-> 
-> * 3730 Beagle XM: does not serial wake from off-idle suspend when console
->   UART doesn't clock gate ("debug ignore_loglevel")
->   - Not shown in the current test logs; cause unknown
-> 
-> * 4430ES2 Panda: UART corruption during long transmit buffers
->   - Presumably due to either a missing hardware workaround or a bug in
->     the OMAP serial driver
-> 
-> Other:
-> 
-> * RCU stall messages appear if boards are booted into a minimal userspace
->   and left to sit for a few minutes
->   - Fixed by http://marc.info/?l=linux-arm-kernel&m=134835120600590&w=2
-> 
-> 
-> Changes from v3.6-rc6 (test 20120918101040):
-> (see http://www.pwsan.com/omap/testlogs/test_v3.6-rc6/20120918101040/ )
-> 
-> - Added comments about RCU stalls, appearing since at least v3.6-rc3
-> 
-> - Updated CM-T3517 "USB OTG" (really IPSS) comment
-> 
-> object size (delta in bytes from test_v3.6-rc6 (5698bd757d55b1bb87edd1a9744ab09c142abfc2)):
->   text 	  data 	   bss 	 total 	kernel
->   -328 	   +72 	     0 	  -256 	2430_testconfig
->    -16 	   +16 	     0 	     0 	5912osk_testconfig
->   -376 	   +72 	     0 	  -304 	am33xx_testconfig
->    +64 	   +32 	     0 	   +96 	n800_b_testconfig
->    +80 	   +64 	     0 	  +144 	n800_multi_omap2xxx
->    +80 	   +32 	     0 	  +112 	n800_testconfig
->    +72 	   +80 	     0 	  +152 	omap1510_defconfig
->    +40 	   +16 	     0 	   +56 	omap1_defconfig
->    +80 	   +64 	     0 	  +144 	omap2_4_testconfig
->   -376 	   +40 	     0 	  -336 	omap2plus_defconfig
->   -376 	   +72 	     0 	  -304 	omap2plus_defconfig_cpupm
->    +20 	   +72 	     0 	   +92 	omap2plus_no_pm
->    +20 	    +8 	     0 	   +28 	omap3_4_testconfig
->   +140 	   +72 	     0 	  +212 	omap3_testconfig
->    +20 	   +40 	     0 	   +60 	omap4_testconfig
->    -40 	   +72 	     0 	   +32 	rmk_omap3430_ldp_oldconfig
->   -200 	    +8 	     0 	  -192 	rmk_omap4430_sdp_oldconfig
-> 
-> 
-> 
-> - Paul
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-Regards,
-Igor.
+Also don't use numa_node_id() for this, of_node_to_nid() handles both the
+OF and non-OF cases.
