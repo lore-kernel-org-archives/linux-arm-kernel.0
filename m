@@ -1,119 +1,119 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 27 Sep 2012 16:41:44 +0900
-Subject: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member in
- samsung_gpio_chip
-In-Reply-To: <000101cd9c74$b64cfa90$22e6efb0$@com>
-References: <000001cd9c63$e95c7b60$bc157220$@com>
- <5063DAFD.1040903@samsung.com> <000101cd9c74$b64cfa90$22e6efb0$@com>
-Message-ID: <50640338.9000808@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Sep 2012 09:43:31 +0200
+Subject: [PATCH 2/3] clk: ux500: Support prcmu ape opp voltage clock
+In-Reply-To: <20120926192532.12878.56719@nucleus>
+References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348497799-32143-3-git-send-email-ulf.hansson@stericsson.com>
+ <20120924153514.12878.47739@nucleus>
+ <CAPDyKFqKUuqEj7yWGMPnFUvE2-kBExevweMdGAdD1EjhHSEwsQ@mail.gmail.com>
+ <20120926192532.12878.56719@nucleus>
+Message-ID: <CAPDyKFq=kF3n7kiFUhv+6KkVdi99G+0aHOFVNMLPRO60jpEoBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2012 02:55 PM, Eunki Kim wrote:
->> -----Original Message-----
->> From: Joonyoung Shim [mailto:jy0922.shim at samsung.com]
->> Sent: Thursday, September 27, 2012 1:50 PM
->> To: Eunki Kim
->> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
->> grant.likely at secretlab.ca; linus.walleij at linaro.org; kgene.kim at samsung.com
->> Subject: Re: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member in samsung_gpio_chip
+Hi Mike,
+
+On 26 September 2012 21:25, Mike Turquette <mturquette@ti.com> wrote:
+> Quoting Ulf Hansson (2012-09-25 00:56:56)
+>> Hi Mike,
 >>
->> On 09/27/2012 12:55 PM, Eunki Kim wrote:
->>> When a device uses GPIO interrupt, its driver assumes that GPIO should
->>> be INPUT mode. However, GPIO of SAMSUNG SoC is sepated to INPUT mode
->>> and INTERRUPT mode. They are set by 0x0 and 0xF in GPIO control
->>> register. If the register is set to INPUT mode, the interrupt never
->>> occur. Therefore, it's necessary to set INTERRUPT mode instead of
->>> INPUT mode when the pin is used for GPIO interrupt.
->> If for this, already the patch was posted.
+>> Thanks for your input!
 >>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074387.html
+>> On 24 September 2012 17:35, Mike Turquette <mturquette@ti.com> wrote:
+>> > Quoting Ulf Hansson (2012-09-24 07:43:18)
+>> >> From: Ulf Hansson <ulf.hansson@linaro.org>
+>> >>
+>> >> Some scalable prcmu clocks needs to be handled in conjuction with the
+>> >> ape opp 100 voltage. A new prcmu clock type clk_prcmu_opp_volt_scalable
+>> >> is implemented to handle this.
+>> >>
+>> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> >> ---
+>> >>  drivers/clk/ux500/clk-prcmu.c |   55 +++++++++++++++++++++++++++++++++++++++++
+>> >>  drivers/clk/ux500/clk.h       |    6 +++++
+>> >>  2 files changed, 61 insertions(+)
+>> >>
+>> >> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+>> >> index 930cdfe..04577ca 100644
+>> >> --- a/drivers/clk/ux500/clk-prcmu.c
+>> >> +++ b/drivers/clk/ux500/clk-prcmu.c
+>> >> @@ -133,6 +133,40 @@ out_error:
+>> >>                 hw->init->name);
+>> >>  }
+>> >>
+>> >> +static int clk_prcmu_opp_volt_prepare(struct clk_hw *hw)
+>> >> +{
+>> >> +       int err;
+>> >> +       struct clk_prcmu *clk = to_clk_prcmu(hw);
+>> >> +
+>> >> +       err = prcmu_request_ape_opp_100_voltage(true);
+>> >> +       if (err) {
+>> >> +               pr_err("clk_prcmu: %s failed to request APE OPP VOLT for %s.\n",
+>> >> +                       __func__, hw->init->name);
+>> >> +               return err;
+>> >> +       }
+>> >> +
+>> >> +       err = prcmu_request_clock(clk->cg_sel, true);
+>> >> +       if (err)
+>> >> +               prcmu_request_ape_opp_100_voltage(false);
+>> >> +
+>> >> +       return err;
+>> >> +}
+>> >> +
+>> >> +static void clk_prcmu_opp_volt_unprepare(struct clk_hw *hw)
+>> >> +{
+>> >> +       struct clk_prcmu *clk = to_clk_prcmu(hw);
+>> >> +
+>> >> +       if (prcmu_request_clock(clk->cg_sel, false))
+>> >> +               goto out_error;
+>> >> +       if (prcmu_request_ape_opp_100_voltage(false))
+>> >> +               goto out_error;
+>> >> +       return;
+>> >> +
+>> >> +out_error:
+>> >> +       pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
+>> >> +               hw->init->name);
+>> >> +}
+>> >
+>> > Hello Ulf,
+>> >
+>> > I was hoping to use the rate-change notifiers for voltage scaling, as in
+>> > my clk reentrancy/dvfs RFCs.  Using prepare/unprepare to set voltage for
+>> > non-scalable clocks is probably OK; do you plan to scale voltage when
+>> > your clocks change rate?  If so then you will need more than just
+>> > prepare/unprepare.
 >>
->> Thanks.
+>> I see, you have a good point here. Although right now this clock will
+>> never change rate except during "init". Prepare/unprepare is thus
+>> enough.
 >>
-> The old posted patch and my new patches solve the same problem.
+>> For the u8500 platform the sdmmc clock is the parent for all the
+>> mmc/sd/sdio controllers. So, to no introduce a very complex
+>> clockhandling mechanism (using rate-change notifiers would help a bit,
+>> but is not enough), the clock is not supposed to be changed after
+>> init. Proper dividing of the clock is handled internally by each
+>> controller instead.
+>>
 >
-> However, the old patch fixes s5p_gpioint_set_type function which is irq_set_type function of GPIO
-> int. The objective of irq_set_type function is setting IRQ type as rising, falling, level and etc.
-> It's not setting GPIO pin configuration.
+> The internal dividers could be modeled as clk nodes, which themselves
+> could have notifier handlers that scale voltage.  So perhaps the MMC
+> controller driver for your platform should define the appropriate leaf
+> clks?
 
-Ok, it's reasonable but s5p_irq_eint_set_type() does it. So, do we need
-to remove it in s5p_irq_eint_set_type() later?
+I am not sure I completely follow you here, but let me try to answer
+your suggestions.
+The internal dividers are supposed to be handled only by the mmc host
+driver since it is IP specific. I don't think it is viable to add
+another clock type/node for this, but maybe that is not what you are
+suggesting either. :-)
 
->
-> The new patches solve the problem root. It monitors use of GPIO int for each pin. If then, it sets
-> INTERRUPT mode instead of INPUT mode when gpio_direction_input function is called. As you know, the
-> objective of gpio_direction_input function is setting the GPIO configuration.
+In my case for ux500 we use the mmci host driver. It is an ARM cross
+SoC device driver, and I believe adding clock notifiers in the driver
+to handle the voltage scale would complicate things quite a bit. It
+seems a lot easier to let the clock driver handle this, especially
+since the frequency will remain fixed after initialization. So in the
+end I see now need and benefit for adding the clock notifiers in the
+mmci host driver.
 
-Ok. It is minor concern, we will have to take care of the function call
-order dependency because s5p_register_gpio_interrupt() should be called
-prior to gpio_direction_input().
-
-Thanks.
-
->
->>> This patch inserts the bitmap_gpio_int member in struct samsung_
->>> gpio_chip in order to represent use of GPIO interrupt for each pin and
->>> sets the related bit when s5p_register_gpio_interrupt function is
->>> called.
->>>
->>> Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>>    arch/arm/plat-samsung/include/plat/gpio-core.h |    2 ++
->>>    arch/arm/plat-samsung/s5p-irq-gpioint.c        |    8 ++++++--
->>>    2 files changed, 8 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
->>> b/arch/arm/plat-samsung/include/plat/gpio-core.h
->>> index 1fe6917..dfd8b7a 100644
->>> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
->>> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
->>> @@ -48,6 +48,7 @@ struct samsung_gpio_cfg;
->>>     * @config: special function and pull-resistor control information.
->>>     * @lock: Lock for exclusive access to this gpio bank.
->>>     * @pm_save: Save information for suspend/resume support.
->>> + * @bitmap_gpio_int: Bitmap for representing GPIO interrupt or not.
->>>     *
->>>     * This wrapper provides the necessary information for the Samsung
->>>     * specific gpios being registered with gpiolib.
->>> @@ -71,6 +72,7 @@ struct samsung_gpio_chip {
->>>    #ifdef CONFIG_PM
->>>    	u32			pm_save[4];
->>>    #endif
->>> +	u32			bitmap_gpio_int;
->>>    };
->>>
->>>    static inline struct samsung_gpio_chip *to_samsung_gpio(struct
->>> gpio_chip *gpc) diff --git a/arch/arm/plat-samsung/s5p-irq-gpioint.c
->>> b/arch/arm/plat-samsung/s5p-irq-gpioint.c
->>> index f9431fe..d981c61 100644
->>> --- a/arch/arm/plat-samsung/s5p-irq-gpioint.c
->>> +++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
->>> @@ -185,7 +185,7 @@ int __init s5p_register_gpio_interrupt(int pin)
->>>
->>>    	/* check if the group has been already registered */
->>>    	if (my_chip->irq_base)
->>> -		return my_chip->irq_base + offset;
->>> +		goto success;
->>>
->>>    	/* register gpio group */
->>>    	ret = s5p_gpioint_add(my_chip);
->>> @@ -193,9 +193,13 @@ int __init s5p_register_gpio_interrupt(int pin)
->>>    		my_chip->chip.to_irq = samsung_gpiolib_to_irq;
->>>    		printk(KERN_INFO "Registered interrupt support for gpio group %d.\n",
->>>    		       group);
->>> -		return my_chip->irq_base + offset;
->>> +		goto success;
->>>    	}
->>>    	return ret;
->>> +success:
->>> +	my_chip->bitmap_gpio_int |= BIT(offset);
->>> +
->>> +	return my_chip->irq_base + offset;
->>>    }
->>>
->>>    int __init s5p_register_gpioint_bank(int chain_irq, int start, int
->>> nr_groups)
->
+Kind regards
+Ulf Hansson
