@@ -1,46 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 27 Sep 2012 09:40:20 -0600
-Subject: [RFC PATCH 2/3] ARM: use cmd_dtc_cpp for compilation of *.dts-cpp
- to *.dtb
-In-Reply-To: <20120927054700.GN17667@game.jcrosoft.org>
-References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
- <1348599998-2729-3-git-send-email-swarren@wwwdotorg.org>
- <20120927054700.GN17667@game.jcrosoft.org>
-Message-ID: <50647364.7090501@wwwdotorg.org>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 27 Sep 2012 17:40:29 +0200
+Subject: [PATCH v5 0/3] watchdog: at91sam9_wdt: add device tree support
+Message-ID: <1348760432-12284-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2012 11:47 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:06 Tue 25 Sep     , Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> This allows DT source files to use the C pre-processor. A new file
->> extension is introduced for this purpose, since use of the pre-processor
->> must be optional; any property or node name that starts with "#" must be
->> escaped to prevent the pre-processor attempting to interpret it as a
->> directive. For this reason, skeleton.dtsi-cpp is introduced for *.dts-cpp
->> to include.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  arch/arm/boot/Makefile              |    3 +++
->>  arch/arm/boot/dts/skeleton.dtsi-cpp |   13 +++++++++++++
->>  2 files changed, 16 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/skeleton.dtsi-cpp
->>
->> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
->> index 3fdab01..c5d7fca 100644
->> --- a/arch/arm/boot/Makefile
->> +++ b/arch/arm/boot/Makefile
->> @@ -65,6 +65,9 @@ targets += $(dtb-y)
->>  $(obj)/%.dtb: $(src)/dts/%.dts FORCE
->>  	$(call if_changed_dep,dtc)
->>  
->> +$(obj)/%.dtb: $(src)/dts/%.dts-cpp FORCE
->> +	$(call if_changed_dep,dtc_cpp)
->> +
->
-> move this to Makefile.build so we wan use it acroos arch
 
-That would be an unrelated cleanup patch; the existing *.dts->*.dtb rule
-is not there.
+Hi all,
+
+This set of patches is for adding device tree support to the
+at91sam9_wdt driver.
+
+I've tested it on an at91sam9260 board (evk-pro3).
+
+Changes:
+v5:
+ - split dts commit in two, one for socs and one for boards.
+v4:
+ - use "atmel,at91sam9260-wdt" as compatible
+v3:
+ - add heartbeat option
+ - default disabled for all the soc, enable only for evk-pro3 board
+ - add at91sam9263 and at91sam9g45 soc
+v2:
+ - add missing to and cc addresses
+
+Fabio Porcedda (3):
+  watchdog: at91sam9_wdt: add device tree support
+  ARM: at91/dts: add at91sam9_wdt driver to at91sam926x, at91sam9g45
+  ARM: at91/dts: evk-pro3: enable watchdog
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi                  |  6 ++++++
+ arch/arm/boot/dts/at91sam9263.dtsi                  |  6 ++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                  |  6 ++++++
+ arch/arm/boot/dts/evk-pro3.dts                      |  4 ++++
+ drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+ 6 files changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+
+-- 
+1.7.11.3
