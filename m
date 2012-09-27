@@ -1,36 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Sep 2012 12:48:05 +0100
-Subject: [GIT PULL] ARM: cache flushing LoUIS API
-In-Reply-To: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
-References: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
-Message-ID: <20120927114805.GC14358@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 27 Sep 2012 13:59:08 +0200
+Subject: [PATCH] pinctrl/nomadik: allocate IRQ descriptors dynamically
+In-Reply-To: <5063E06A.6000205@nvidia.com>
+References: <1348679887-2135-1-git-send-email-linus.walleij@stericsson.com>
+ <5063E06A.6000205@nvidia.com>
+Message-ID: <CACRpkdYdU-4yszhbJ5ZkyfncVpObdy0Ah=kz7pSpZ=HGgFax7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 01:57:58PM +0100, Lorenzo Pieralisi wrote:
-> Hi Russell,
-> 
-> I know it is coming quite late in the cycle but please consider pulling
-> the patch series implementing the new cache maintenance LoUIS API, since
-> it provides a stepping stone to implementing power management on upcoming
-> A15 and A7 based platforms, leaving functionality for earlier processor
-> versions unchanged.
-> 
-> It has been tested on:
-> 
-> - OMAP4/5
->   # suspend/hotplug and CPU idle
-> - iMX6q
->   # suspend and hotplug
-> - TC2 big.LITTLE testchip
->   # CPU idle
+On Thu, Sep 27, 2012 at 7:13 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> On 09/26/2012 11:18 AM, Linus Walleij wrote:
 
-Ok, last night's PXA build regressed with this:
+>> +     irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
+>
+> Presumably that's a 1:1 mapping...
 
-arch/arm/mm/built-in.o: In function `xscale_dma_unmap_area':
-cache-xsc3l2.c:(.text+0x4194): undefined reference to `xscale_80200_A0_A1_flush_kern_cache_louis'
+Yep, albeit on a legacy domain to be able to keep the start irq.
 
-That's because we missed that proc-xscale.S aliases a bunch of functions to
-xscale_80200_A0_A1_xxx from xscale_xxx.  And looking at that, it seems that
-we also .type equivalent symbols - have you tested this on T2 builds to
-check whether it works correctly there?
+>> +     irq_base = irq_alloc_descs(irq_start, 0, NMK_GPIO_PER_CHIP,
+>> +                                numa_node_id());
+>> +     if (IS_ERR_VALUE(irq_base)) {
+>> +             WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
+>> +                  irq_start);
+>> +             irq_base = irq_start;
+>> +     }
+>
+> Hmmm. Is this code targetting the DT case or the non-DT case or both? I
+> think typically you'd call irq_domain_add_linear without forcing a
+> particular IRQ base for the DT case, and only call irq_alloc_descs() for
+> the non-DT case, right?
+
+This is indeed the non-DT case. The irqdomain stuff here doesn't seem
+to be properly addressing the DT usecase. I'll cook a v2 version doing
+a linear domain for DT and have Lee review it.
+
+Thanks!
+Linus Walleij
