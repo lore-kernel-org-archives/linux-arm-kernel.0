@@ -1,55 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 27 Sep 2012 19:27:25 +0200
-Subject: [RFC PATCH 0/3] ARM: use C pre-processor with dtc
-In-Reply-To: <506472E4.5060107@wwwdotorg.org>
-References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
- <20120927054038.GL17667@game.jcrosoft.org>
- <506472E4.5060107@wwwdotorg.org>
-Message-ID: <20120927172725.GT17667@game.jcrosoft.org>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 27 Sep 2012 19:35:43 +0200
+Subject: [PATCH 2/2] ARM: remove unnecessary flush of anon pages in
+ flush(_kernel)_dcache_page()
+In-Reply-To: <20120927122327.GA26188@arm.com>
+References: <1348695659-27603-1-git-send-email-gmbnomis@gmail.com>
+ <1348695659-27603-3-git-send-email-gmbnomis@gmail.com>
+ <20120927122327.GA26188@arm.com>
+Message-ID: <20120927173543.GA20442@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:38 Thu 27 Sep     , Stephen Warren wrote:
-> On 09/26/2012 11:40 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 13:06 Tue 25 Sep     , Stephen Warren wrote:
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> This series adds some build rules to run cpp on *.dts-cpp prior to
-> >> invoking dtc, and converts Tegra to the new rule as an example. What do
-> >> people think?
-> >>
-> >> I assume that you've applied the dtc patches I sent yesterday. They
-> >> aren't in this series. See:
-> >>
-> >> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020182.html
-> >> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020183.html
-> >> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-September/020181.html
-> >>
-> >> Note: those patches are against upstream dtc. If you wish to test this
-> >> series, apply the dtc patches to upstream dtc, build it, and copy the
-> >> resultant dtc binary over the top of scripts/dtc/dtc.
-> >>
-> >> Stephen Warren (3):
-> >>   kbuild: introduce cmd_dtc_cpp
-> >>   ARM: use cmd_dtc_cpp for compilation of *.dts-cpp to *.dtb
-> >>   ARM: tegra: compile all DT files with cpp 
-> >
-> > I do not like the extention
-> 
-> It is a bit unwieldy. Perhaps *.dtsp, *.dtsip would be better.
-> 
-> > can we run gcc everytime?
-> 
-> Not without editing all the device tree files; any property (or node)
-> name the starts with a # must be escaped; changed from "#foo" to "\#foo"
-> to avoid cpp attempting to interpret it as a pre-processor directive.
-> 
-> > or just do as done for lds
-> > 
-> > *.dts.S
-> 
-> .S means assembly. (that's why I went with .dts-cpp rather than .dts.cpp).
-on lds we do this way lds.S => lds
+Hi Catalin,
 
-Best Regards,
-J.
+On Thu, Sep 27, 2012 at 01:23:28PM +0100, Catalin Marinas wrote:
+> On Wed, Sep 26, 2012 at 10:40:59PM +0100, Simon Baatz wrote:
+> > On non-aliasing VIPT D-caches, there is no need to flush the kernel
+> > mapping of anon pages in flush_kernel_dcache_page() and
+> > flush_dcache_page() directly.  If the page is mapped as executable
+> > later, the necessary D/I-cache flush will be done in
+> > __sync_icache_dcache().
+> > 
+> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> I would suggest you make this patch the first one rather than
+> introducing __flush_kernel_dcache_page() and subsequently replacing its
+> code.
+
+The reason for this structure is that I did not want to mix the bug
+fix (which may qualify for stable) with the improvement.  If I do the
+patches the other way around and only the bug fix patch will be
+picked for stable, flush_dcache_page() and flush_kernel_dcache_page()
+will have different logic in which cases to flush.  We know that the
+current logic is solid, we don't have much evidence for the logic of
+the proposed improvement.
+
+>From this point of view, I find the current structure cleaner, but I
+have no strong opinion about this.  If we can't apply that particular
+patch for stable anyway or you still think it is better the other way
+around, I can change that of course.
+
+- Simon
