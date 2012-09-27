@@ -1,45 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 27 Sep 2012 19:40:33 +0200
-Subject: [RFC PATCH 1/3] kbuild: introduce cmd_dtc_cpp
-In-Reply-To: <50647330.9030306@wwwdotorg.org>
-References: <1348599998-2729-1-git-send-email-swarren@wwwdotorg.org>
- <1348599998-2729-2-git-send-email-swarren@wwwdotorg.org>
- <20120927054438.GM17667@game.jcrosoft.org>
- <50647330.9030306@wwwdotorg.org>
-Message-ID: <20120927174033.GU17667@game.jcrosoft.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 27 Sep 2012 11:05:00 -0700
+Subject: [GIT PULL] ARM: SoC: one more bug fix for 3.6
+Message-ID: <CAOesGMhT6xBz-8h76PXuaWNrKa3EK+T2DnX9k8OcFNJONHdvJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:39 Thu 27 Sep     , Stephen Warren wrote:
-> On 09/26/2012 11:44 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 13:06 Tue 25 Sep     , Stephen Warren wrote:
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> cmd_dtc_cpp runs the C pre-processor on the input .dts file before
-> >> passing it to dtc for final compilation. This allows used of #define
-> >> within the .dts file.
-> >>
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> >> ---
-> >>  scripts/Makefile.lib |    3 +++
-> >>  1 files changed, 3 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> >> index 0be6f11..e3a149e 100644
-> >> --- a/scripts/Makefile.lib
-> >> +++ b/scripts/Makefile.lib
-> >> @@ -266,6 +266,9 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
-> >>  quiet_cmd_dtc = DTC     $@
-> >>  cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile) $<
-> >>  
-> >> +quiet_cmd_dtc_cpp = DTC+CPP $@
-> >> +cmd_dtc_cpp = $(CC) -E -Wp,-MD,$(depfile) -xc $< | $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -
-> >
-> > this should go to Makefile.build
-> 
-> Hmm. Consistency with the existing cmd_dtc right above would dictate
-> otherwise.
-no build command go to Makefile.build aside with makefile target
+Hi Linus,
 
-Best Regards,
-J.
+The following changes since commit 23f3f0613f6172ef1f0cbb0e971adf29f1c1fe5e:
+
+  Merge tag 'imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6
+into fixes (2012-09-18 10:16:44 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/fixes-for-linus
+
+for you to fetch changes up to 84d5dfbf09be6be71d6dda63d99a8303e85663c7:
+
+  ARM: Orion5x: Fix too small coherent pool. (2012-09-26 16:48:47 -0700)
+
+----------------------------------------------------------------
+arm-soc: one more bug fix for 3.6
+
+Here's a bugfix for orion5x. Without this, PCI doesn't initialize properly
+because of too small coherent pool to cover the allocations needed.
+
+A similar fix has already been done on kirkwood.
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Orion5x: Fix too small coherent pool.
+
+ arch/arm/mach-orion5x/common.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
