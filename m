@@ -1,28 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Sep 2012 16:46:25 +0100
-Subject: [PATCH v2 RESEND 2/2] ARM: local timers: add timer support using
- IO mapped register
-In-Reply-To: <5062013F.8050507@codeaurora.org>
-References: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
- <1347694914-1457-2-git-send-email-rvaswani@codeaurora.org>
- <5062013F.8050507@codeaurora.org>
-Message-ID: <506474D1.30309@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Sep 2012 16:01:43 +0000
+Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform
+ conversion
+In-Reply-To: <20120927172618.7ba233f0@skate>
+References: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
+ <20120927172618.7ba233f0@skate>
+Message-ID: <201209271601.43717.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/12 20:08, Rohit Vaswani wrote:
-> Any comments ?
+On Thursday 27 September 2012, Thomas Petazzoni wrote:
+> This select was already part added as a part of:
 > 
-> Marc, would it be possible for you to pull this into your timers-next tree ?
+> commit 7e8d941567c99a03390154a7bb116d1b03db82b3
+> Author: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Date:   Thu Sep 13 17:41:43 2012 +0200
+> 
+>     pinctrl: mvebu: pinctrl driver core
+>     
+>     This patch adds a pinctrl driver core for Marvell SoCs plus DT
+>     binding documentation. This core driver will be used by SoC family
+>     specific drivers, i.e. Armada XP, Armada 370, Dove, Kirkwood, aso.
+>     
+>     Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>     Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>     Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>     Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>     Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+>     Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+>     
+>     Conflicts:
+>     
+>         arch/arm/Kconfig
+> 
+> which was requested for pull from the kirkwood/drivers branch of Jason
+> Cooper repository. If it is no longer there, then it is a merge
+> conflict resolution mistake.
 
-Hi Rohit,
+I believe it was lost again in the move to the multiplatform configuration,
+which moves the ARCH_MVEBU definition to arch/arm/mach-mvebu/Kconfig.
+automated merges with git don't notice this. Same for the other one.
 
-Sorry for the delay.
-
-I'll give these patches a whirl first thing tomorrow.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
