@@ -1,84 +1,98 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 27 Sep 2012 10:04:53 +0900
-Subject: [GIT PULL 4/4] Samsung DT for v3.7
-In-Reply-To: <505C22CD.9030401@samsung.com>
-References: <505C089C.4050801@samsung.com> <505C22CD.9030401@samsung.com>
-Message-ID: <146201cd9c4c$1a219b30$4e64d190$%kim@samsung.com>
+From: mingyu84.kim@samsung.com (Min-gyu Kim)
+Date: Thu, 27 Sep 2012 12:11:33 +0900
+Subject: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+In-Reply-To: <CANM98qLuY3G6bBBnK+GJtEVZMRYX+Bk+bKh-bEQq0r7RyX9Nuw@mail.gmail.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153552.21241.8656.stgit@ubuntu>
+ <000101cd9b0e$78934fe0$69b9efa0$@samsung.com>
+ <CANM98qLuY3G6bBBnK+GJtEVZMRYX+Bk+bKh-bEQq0r7RyX9Nuw@mail.gmail.com>
+Message-ID: <000901cd9c5d$cc53fbc0$64fbf340$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> On 09/21/12 15:26, Kukjin Kim wrote:
-> > Hi Arnd, Olof
-> >
-> > This is for updating Samsung DT for v3.7.
-> >
-> > But now this makes many conflicts with pinctrl dt because of moving file
-> > so I'm sorting them out to avoid useless conflicts.
-> >
-> > I'll re-send this soon again.
-> > This is jut for your information.
-> >
-> I created following branch which is merged on top of Samsung pinctrl and
-> board branches already are pulled into arm-soc.
-> 
-> This includes moving common exynos4 dt for supporting other exynos4xxxx
-> SoCs easily and adding exynos43210-trats board support and some updates.
-> 
-> Please pull from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/dt-samsung-new
-> 
-> If any problems, please kindly let me know.
-> 
-Hi Arnd and Olof,
 
-Maybe, you missed this one?
 
-Note, this will make conflicts with Rob's change, move all dtb targets.
+> -----Original Message-----
+> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+> Behalf Of Christoffer Dall
+> Sent: Tuesday, September 25, 2012 9:39 PM
+> To: Min-gyu Kim
+> Cc: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> kvmarm at lists.cs.columbia.edu; ???
+> Subject: Re: [PATCH 13/15] KVM: ARM: Handle guest faults in KVM
+> 
+> >> +
+> >> +     /*
+> >> +      * If this is a write fault (think COW) we need to make sure the
+> >> +      * existing page, which other CPUs might still read, doesn't go
+> >> away
+> >> +      * from under us, by calling gfn_to_pfn_prot(write_fault=true).
+> >> +      * Therefore, we call gfn_to_pfn_prot(write_fault=false), which
+> >> will
+> >> +      * pin the existing page, then we get a new page for the user
+> space
+> >> +      * pte and map this in the stage-2 table where we also make sure
+> to
+> >> +      * flush the TLB for the VM, if there was an existing entry
+> >> + (the
+> >> entry
+> >> +      * was updated setting the write flag to the potentially new
+page).
+> >> +      */
+> >> +     if (fault_status == FSC_PERM) {
+> >> +             pfn_existing = gfn_to_pfn_prot(vcpu->kvm, gfn, false,
+NULL);
+> >> +             if (is_error_pfn(pfn_existing))
+> >> +                     return -EFAULT;
+> >> +     }
+> >> +
+> >> +     pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+> >> +     if (is_error_pfn(pfn)) {
+> >> +             ret = -EFAULT;
+> >> +             goto out_put_existing;
+> >> +     }
+> >> +
+> >> +     /* We need minimum second+third level pages */
+> >> +     ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+> >> +     if (ret)
+> >> +             goto out;
+> >> +     new_pte = pfn_pte(pfn, PAGE_KVM_GUEST);
+> >> +     if (writable)
+> >> +             pte_val(new_pte) |= L_PTE2_WRITE;
+> >> +     coherent_icache_guest_page(vcpu->kvm, gfn);
+> >
+> > why don't you flush icache only when guest has mapped executable page
+> > as __sync_icache_dcache function does currently?
+> >
+> >
+> 
+> because we don't know if the guest will map the page executable. The guest
+> may read the page through a normal load, which causes the fault, and
+> subsequently execute it (even possible through different guest mappings).
+> The only way to see this happening would be to mark all pages as non-
+> executable and catch the fault when it occurs - unfortunately the HPFAR
+> which gives us the IPA is not populated on execute never faults, so we
+> would have to translate the PC's va to ipa using cp15 functionality when
+> this happens, which is then also racy with other CPUs. So the question is
+> really if this will even be an optimization, but it's definitely something
+> that requires further investigation.
 
-Thanks.
+OK. I understand your point.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+But if guest maps a page for execution, guest will flush Icache
+from __sync_icache_dcache. Then coherent_icache_guest_page doesn't seem to
+be
+necessary again. One thing I'm not sure in this case is when guest maps
+for kernel executable page(module loading) and it reuses the kernel
+executable page
+from host(module unloading). But in that case, I think it is possible to
+reduce 
+the number of flush by limiting the address range for flush.
 
-> >
-> > The following changes since commit
-> > 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
-> >
-> > Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
-> >
-> > are available in the git repository at:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > next/dt-samsung
-> >
-> > Kukjin Kim (1):
-> > ARM: dts: use uart2 for console on smdkv310 and smdk5250
-> >
-> > Tomasz Figa (6):
-> > ARM: dts: Move parts common to EXYNOS4 from exynos4210.dtsi to
-> exynos4.dtsi
-> > ARM: EXYNOS: Use exynos4 prefix instead of exynos4210 on exynos4-dt
-> > ARM: dts: Assume status of all optional nodes as disabled for exynos4
-> > ARM: dts: Specify address and size cells for i2c controllers for EXYNOS4
-> > ARM: EXYNOS: Add OF compatibility lookups for EXYNOS4 i2c adapters
-> > ARM: dts: Add basic dts file for Samsung Trats board
-> >
-> > Tushar Behera (1):
-> > ARM: dts: Enable on-board keys as wakeup source for exynos4210-origen
-> >
-> > arch/arm/boot/dts/exynos4.dtsi | 248 +++++++++++++++++++++++++++++
-> > arch/arm/boot/dts/exynos4210-origen.dts | 63 +-------
-> > arch/arm/boot/dts/exynos4210-smdkv310.dts | 54 +------
-> > arch/arm/boot/dts/exynos4210-trats.dts | 237 +++++++++++++++++++++++++++
-> > arch/arm/boot/dts/exynos4210.dtsi | 181 +---------------------
-> > arch/arm/boot/dts/exynos5250-smdk5250.dts | 2 +-
-> > arch/arm/mach-exynos/Makefile.boot | 2 +-
-> > arch/arm/mach-exynos/mach-exynos4-dt.c | 32 +++-
-> > 8 files changed, 523 insertions(+), 296 deletions(-)
-> > create mode 100644 arch/arm/boot/dts/exynos4.dtsi
-> > create mode 100644 arch/arm/boot/dts/exynos4210-trats.dts
+
+> 
+> -Christoffer
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
