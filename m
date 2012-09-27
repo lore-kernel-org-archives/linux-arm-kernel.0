@@ -1,77 +1,75 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Sep 2012 16:12:05 +0100
-Subject: [PATCH 6/7] ARM: ux500: Add support for gpio-keys and Proximity
- Sensor for HREF
+Date: Thu, 27 Sep 2012 16:12:06 +0100
+Subject: [PATCH 7/7] ARM: ux500: Remove platform specific device registration
+ when DT is enabled
 In-Reply-To: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
 References: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348758726-25336-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348758726-25336-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we ensure the SFH7741 Proximity Sensor is registered through
-gpio-keys when booting with Device Tree enabled.
+Most devices have now been successfully DT:ed and each supported
+platform has its own Device Tree source file. Hence the majority
+of the platform specific device registration calls can now be
+successfully removed.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/href.dtsi       |   11 +++++++++++
- arch/arm/boot/dts/hrefprev60.dts  |    6 ++++++
- arch/arm/boot/dts/hrefv60plus.dts |    6 ++++++
- 3 files changed, 23 insertions(+)
+ arch/arm/mach-ux500/board-mop500.c |   29 +----------------------------
+ 1 file changed, 1 insertion(+), 28 deletions(-)
 
-diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
-index 27baa44..592fb9d 100644
---- a/arch/arm/boot/dts/href.dtsi
-+++ b/arch/arm/boot/dts/href.dtsi
-@@ -16,6 +16,17 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 38e53b2..5dd4a59 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -793,8 +793,6 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
+ static void __init u8500_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+-	int i2c0_devs;
+-	int i;
  
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		button at 1 {
-+			linux,code = <11>;
-+			label = "SFH7741 Proximity Sensor";
-+		};
-+	};
-+
- 	soc-u9500 {
- 		uart at 80120000 {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
-index 2dd28b9..128cf1c 100644
---- a/arch/arm/boot/dts/hrefprev60.dts
-+++ b/arch/arm/boot/dts/hrefprev60.dts
-@@ -17,6 +17,12 @@
- 	model = "ST-Ericsson HREF (pre-v60) platform with Device Tree";
- 	compatible = "st-ericsson,mop500";
+ 	/* Pinmaps must be in place before devices register */
+ 	if (of_machine_is_compatible("st-ericsson,mop500"))
+@@ -804,37 +802,12 @@ static void __init u8500_init_machine(void)
+ 	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
+ 		hrefv60_pinmaps_init();
  
-+	gpio_keys {
-+		button at 1 {
-+			gpios  = <&tc3589x_gpio 7 0x4>;
-+		};
-+	};
-+
- 	soc-u9500 {
- 		i2c at 80004000 {
- 			tps61052 at 33 {
-diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-index 2a85893..1252d8a 100644
---- a/arch/arm/boot/dts/hrefv60plus.dts
-+++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -16,4 +16,10 @@
- / {
- 	model = "ST-Ericsson HREF (v60+) platform with Device Tree";
- 	compatible = "st-ericsson,hrefv60+";
-+
-+	gpio_keys {
-+		button at 1 {
-+			gpios  = <&gpio6 25 0x4>;
-+		};
-+	};
- };
++	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
+ 	parent = u8500_of_init_devices();
+ 
+-	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
+-		mop500_platform_devs[i]->dev.parent = parent;
+-
+ 	/* automatically probe child nodes of db8500 device */
+ 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
+ 
+-	if (of_machine_is_compatible("st-ericsson,mop500")) {
+-		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
+-
+-		platform_add_devices(mop500_platform_devs,
+-				ARRAY_SIZE(mop500_platform_devs));
+-
+-		mop500_audio_init(parent);
+-		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+-		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+-		i2c_register_board_info(2, mop500_i2c2_devices,
+-					ARRAY_SIZE(mop500_i2c2_devices));
+-
+-	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+-		/*
+-		 * The HREFv60 board removed a GPIO expander and routed
+-		 * all these GPIO pins to the internal GPIO controller
+-		 * instead.
+-		 */
+-		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
+-		platform_add_devices(mop500_platform_devs,
+-				ARRAY_SIZE(mop500_platform_devs));
+-	}
+-
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
+ }
 -- 
 1.7.9.5
