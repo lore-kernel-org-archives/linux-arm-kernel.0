@@ -1,95 +1,89 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Sep 2012 16:12:00 +0100
-Subject: [PATCH 1/7] ARM: ux500: Elaborate on SDI device node names in Device
- Tree
+Date: Thu, 27 Sep 2012 16:12:01 +0100
+Subject: [PATCH 2/7] ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
 In-Reply-To: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
 References: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348758726-25336-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348758726-25336-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the DB8500 Reference Manual SDI devices are described as being
-part of peripheral blocks. This is more in line with how these devices
-are actually represented in hardware, so here we detail which
-peripheral block each of the SDI devices belong in the node name.
+Here we add the Device Tree nodes which are required to successfully
+probe the MMCI driver which will enable the four cards available on
+ST-Ericsson's HREF hardware development platform.
 
-Requested-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi  |   12 ++++++------
- arch/arm/boot/dts/snowball.dts |    4 ++--
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/hrefv60plus.dts  |   44 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.c |    1 -
+ 2 files changed, 44 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index c8c39dd..07a085b 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -536,37 +536,37 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index e2213204..3fd83c6 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -77,6 +77,50 @@
+ 			};
  		};
  
--		sdi at 80126000 {
++		// External Micro SD slot
 +		sdi0_per1 at 80126000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80126000 0x1000>;
- 			interrupts = <0 60 0x4>;
- 			status = "disabled";
- 		};
--		sdi at 80118000 {
++			arm,primecell-periphid = <0x10480180>;
++			max-frequency = <50000000>;
++			bus-width = <4>;
++			mmc-cap-sd-highspeed;
++			mmc-cap-mmc-highspeed;
++			vmmc-supply = <&ab8500_ldo_aux3_reg>;
++
++			cd-gpios  = <&tc3589x_gpio 3 0x4>;
++
++			status = "okay";
++		};
++
++		// WLAN SDIO channel
 +		sdi1_per2 at 80118000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80118000 0x1000>;
- 			interrupts = <0 50 0x4>;
- 			status = "disabled";
- 		};
--		sdi at 80005000 {
++			arm,primecell-periphid = <0x10480180>;
++			max-frequency = <50000000>;
++			bus-width = <4>;
++
++			status = "okay";
++		};
++
++		// PoP:ed eMMC
 +		sdi2_per3 at 80005000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80005000 0x1000>;
- 			interrupts = <0 41 0x4>;
- 			status = "disabled";
- 		};
--		sdi at 80119000 {
-+		sdi3_per2 at 80119000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80119000 0x1000>;
- 			interrupts = <0 59 0x4>;
- 			status = "disabled";
- 		};
--		sdi at 80114000 {
++			arm,primecell-periphid = <0x10480180>;
++			max-frequency = <50000000>;
++			bus-width = <8>;
++			mmc-cap-mmc-highspeed;
++
++			status = "okay";
++		};
++
++		// On-board eMMC
 +		sdi4_per2 at 80114000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80114000 0x1000>;
- 			interrupts = <0 99 0x4>;
- 			status = "disabled";
- 		};
--		sdi at 80008000 {
-+		sdi5_per3 at 80008000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80114000 0x1000>;
- 			interrupts = <0 100 0x4>;
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 639b8e9..9a37244 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -120,7 +120,7 @@
- 		};
++			arm,primecell-periphid = <0x10480180>;
++		        max-frequency = <50000000>;
++			bus-width = <8>;
++			mmc-cap-mmc-highspeed;
++			vmmc-supply = <&ab8500_ldo_aux2_reg>;
++
++			status = "okay";
++		};
++
+ 		sound {
+ 			compatible = "stericsson,snd-soc-mop500";
  
- 		// External Micro SD slot
--		sdi at 80126000 {
-+		sdi0_per1 at 80126000 {
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <50000000>;
- 			bus-width = <8>;
-@@ -134,7 +134,7 @@
- 		};
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 4eedf1c..38e53b2 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -818,7 +818,6 @@ static void __init u8500_init_machine(void)
+ 		platform_add_devices(mop500_platform_devs,
+ 				ARRAY_SIZE(mop500_platform_devs));
  
- 		// On-board eMMC
--		sdi at 80114000 {
-+		sdi4_per2 at 80114000 {
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <50000000>;
- 			bus-width = <8>;
+-		mop500_sdi_init(parent);
+ 		mop500_audio_init(parent);
+ 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+ 		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
 -- 
 1.7.9.5
