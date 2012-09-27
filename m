@@ -1,64 +1,66 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 27 Sep 2012 23:02:32 +0100
-Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
-Message-ID: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Sep 2012 23:27:11 +0100
+Subject: [GIT PULL] ARM: cache flushing LoUIS API
+In-Reply-To: <20120927161552.GA5001@e102568-lin.cambridge.arm.com>
+References: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
+ <20120927114805.GC14358@n2100.arm.linux.org.uk>
+ <20120927161552.GA5001@e102568-lin.cambridge.arm.com>
+Message-ID: <20120927222711.GA7916@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are building for a LE platform, and we haven't overriden the
-MMIO ops, then we can optimize the mem*io operations using the
-standard string functions.
+On Thu, Sep 27, 2012 at 05:15:52PM +0100, Lorenzo Pieralisi wrote:
+> Russell,
+> 
+> Do you think it is sufficient/proper or you see other issues ?
+> 
+> If it is ok I can fold it into the series and prepare a new pull request.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/io.h |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+Looks fine to me.
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 815c669..ed0577e 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -23,6 +23,7 @@
- 
- #ifdef __KERNEL__
- 
-+#include <linux/string.h>
- #include <linux/types.h>
- #include <asm/byteorder.h>
- #include <asm/memory.h>
-@@ -249,9 +250,33 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define writesw(p,d,l)		__raw_writesw(p,d,l)
- #define writesl(p,d,l)		__raw_writesl(p,d,l)
- 
-+#ifndef __ARMBE__
-+static inline void memset_io(volatile void __iomem *dst, unsigned c,
-+	size_t count)
-+{
-+	memset((void __force *)dst, c, count);
-+}
-+#define memset_io(dst,c,count) memset_io(dst,c,count)
-+
-+static inline void memcpy_fromio(void *to, const volatile void __iomem *from,
-+	size_t count)
-+{
-+	memcpy(to, (const void __force *)from, count);
-+}
-+#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
-+
-+static inline void memcpy_toio(volatile void __iomem *to, const void *from,
-+	size_t count)
-+{
-+	memcpy((void __force *)to, from, count);
-+}
-+#define memcpy_toio(to,from,count) memcpy_toio(to,from,count)
-+
-+#else
- #define memset_io(c,v,l)	_memset_io(c,(v),(l))
- #define memcpy_fromio(a,c,l)	_memcpy_fromio((a),c,(l))
- #define memcpy_toio(c,a,l)	_memcpy_toio(c,(a),(l))
-+#endif
- 
- #endif	/* readl */
- 
--- 
-1.7.4.4
+> 
+> Thanks a lot for your help and sorry again.
+> Lorenzo
+> 
+> -- >8 --
+> Subject: [PATCH] ARM: mm: fix cache LoUIS API for xscale and feroceon
+> 
+> Some architectures like xscale and feroceon have cache API variants that
+> map cache flushing functions as aliases to the base architecture.
+> This patch adds the required aliases to complete the implementation of
+> cache flushing LoUIS API.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/mm/proc-feroceon.S | 1 +
+>  arch/arm/mm/proc-xscale.S   | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+> index 85e5e3b..4106b09 100644
+> --- a/arch/arm/mm/proc-feroceon.S
+> +++ b/arch/arm/mm/proc-feroceon.S
+> @@ -434,6 +434,7 @@ ENDPROC(feroceon_dma_unmap_area)
+>  	range_alias flush_icache_all
+>  	range_alias flush_user_cache_all
+>  	range_alias flush_kern_cache_all
+> +	range_alias flush_kern_cache_louis
+>  	range_alias flush_user_cache_range
+>  	range_alias coherent_kern_range
+>  	range_alias coherent_user_range
+> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+> index b5ea31d..2551036 100644
+> --- a/arch/arm/mm/proc-xscale.S
+> +++ b/arch/arm/mm/proc-xscale.S
+> @@ -442,6 +442,7 @@ ENDPROC(xscale_dma_unmap_area)
+>  	a0_alias flush_icache_all
+>  	a0_alias flush_user_cache_all
+>  	a0_alias flush_kern_cache_all
+> +	a0_alias flush_kern_cache_louis
+>  	a0_alias flush_user_cache_range
+>  	a0_alias coherent_kern_range
+>  	a0_alias coherent_user_range
+> -- 
+> 1.7.12
+> 
+> 
