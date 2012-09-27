@@ -1,22 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 27 Sep 2012 02:03:43 +0200
-Subject: [PATCH V4] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <20120916111223.GD933@pengutronix.de>
-References: <1345779871-7677-1-git-send-email-marex@denx.de>
- <201209161251.41895.marex@denx.de> <20120916111223.GD933@pengutronix.de>
-Message-ID: <201209270203.43818.marex@denx.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Sep 2012 21:12:52 -0300
+Subject: [PATCH 2/3] ARM: dts: imx53-qsb: Make DA9053 regulator functional
+In-Reply-To: <201209270200.57482.marex@denx.de>
+References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+ <1348702057-2351-2-git-send-email-festevam@gmail.com>
+ <201209270200.57482.marex@denx.de>
+Message-ID: <CAOMZO5Bi7gMH4RE047-uxc5bhz_UuQpLArpOSMae03U08tebxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
+Hi Marek,
 
-[...]
+On Wed, Sep 26, 2012 at 9:00 PM, Marek Vasut <marex@denx.de> wrote:
+> Dear Fabio Estevam,
+>
+> [...]
+>
+>> +                                     interrupt-parent = <&gpio7>;
+>> +                                     interrupts = <11 0x8>; /* low-level
+> active IRQ at GPIO7_11 */
+>
+> You mean active-low ? :-)
 
-Didn't you claim you're adding this DMA patch into next some time ago finally? 
-;-)
+Actually I meant 'active low level-sensitive':
 
-Subject: Re: I2C_FUNC_SMBUS_QUICK on i2c-mxs
-Message-ID: <20120830135612.GJ27306@pengutronix.de>
+>From Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt:
 
-Best regards,
-Marek Vasut
+ The second cell bits[3:0] is used to specify trigger type and level flags:
+      1 = low-to-high edge triggered.
+      2 = high-to-low edge triggered.
+      4 = active high level-sensitive.
+      8 = active low level-sensitive
+
+> What was the conclusion on over-using regulator-always-on ?
+
+I will be glad to get some suggestions about this.
+
+With the original code the regulators were getting disabled, which
+caused some key power supplies to be removed and then system died.
+
+Looking at the mx53qsb/DA9053 board schematics I cannot see any of
+these supplies that can be turned-off, and that's why I kept the
+'always-on' flag.
+
+Regards,
+
+Fabio Estevam
