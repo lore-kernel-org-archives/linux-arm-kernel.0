@@ -1,67 +1,62 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 27 Sep 2012 17:06:36 +0200
-Subject: [PATCH V2] spi/pl022: Simplify use of runtime pm
-Message-ID: <1348758396-25276-1-git-send-email-ulf.hansson@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 27 Sep 2012 10:10:12 -0500
+Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform conversion
+Message-ID: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+From: Rob Herring <rob.herring@calxeda.com>
 
-In probe the pm_runtime_resume is not needed since the amba bus
-has already set the device in "resumed" state by using
-pm_runtime_set_active.
+Moving ARCH_MVEBU for multi-platform support caused several breakages in
+recently added addr-map and pinctrl support for mvebu. This adds the
+necessary selects and include paths to fix the build.
 
-Additionally more simplifications is done in probe by removing
-pm_runtime_put_autosuspend. pm_runtime_put_autosuspend does in
-probe functions have same effect as doing pm_runtime_put. This
-due to upper layer in driver core is preventing the device from
-being runtime suspended by a pm_runtime_get*.
-
-Finally, removing pm_runtime_disable from the remove function
-can be done since it is already handled by the amba bus.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 ---
+ arch/arm/mach-mvebu/Kconfig  |    2 ++
+ arch/arm/mach-mvebu/Makefile |    3 ++-
+ arch/arm/plat-orion/Makefile |    1 +
+ 3 files changed, 5 insertions(+), 1 deletion(-)
 
-V2: Clearification added in commit message
-
----
- drivers/spi/spi-pl022.c |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index f8568b4..e51a026 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2188,8 +2188,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
- 	       adev->res.start, pl022->virtbase);
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 26a817d..416d46e 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -6,6 +6,8 @@ config ARCH_MVEBU
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select PINCTRL
++	select PLAT_ORION
+ 	select SPARSE_IRQ
  
--	pm_runtime_resume(dev);
--
- 	pl022->clk = clk_get(&adev->dev, NULL);
- 	if (IS_ERR(pl022->clk)) {
- 		status = PTR_ERR(pl022->clk);
-@@ -2250,10 +2248,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 		pm_runtime_set_autosuspend_delay(dev,
- 			platform_info->autosuspend_delay);
- 		pm_runtime_use_autosuspend(dev);
--		pm_runtime_put_autosuspend(dev);
--	} else {
--		pm_runtime_put(dev);
- 	}
-+	pm_runtime_put(dev);
-+
- 	return 0;
+ if ARCH_MVEBU
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index cbe5664..57f996b 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -1,4 +1,5 @@
+-ccflags-$(ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
++	-I$(srctree)/arch/arm/plat-orion/include
  
-  err_spi_register:
-@@ -2302,7 +2299,6 @@ pl022_remove(struct amba_device *adev)
- 	clk_disable(pl022->clk);
- 	clk_unprepare(pl022->clk);
- 	clk_put(pl022->clk);
--	pm_runtime_disable(&adev->dev);
- 	iounmap(pl022->virtbase);
- 	amba_release_regions(adev);
- 	tasklet_disable(&pl022->pump_transfers);
+ obj-y += system-controller.o
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
+diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
+index 1251e5b..a82cecb 100644
+--- a/arch/arm/plat-orion/Makefile
++++ b/arch/arm/plat-orion/Makefile
+@@ -1,6 +1,7 @@
+ #
+ # Makefile for the linux kernel.
+ #
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+ 
+ obj-y                             += addr-map.o
+ 
 -- 
-1.7.10
+1.7.9.5
