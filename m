@@ -1,46 +1,99 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 27 Sep 2012 14:44:53 +0100
-Subject: [GIT PULL] ARM: cache flushing LoUIS API
-In-Reply-To: <20120927114805.GC14358@n2100.arm.linux.org.uk>
-References: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
- <20120927114805.GC14358@n2100.arm.linux.org.uk>
-Message-ID: <20120927134453.GA15585@e102568-lin.cambridge.arm.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 27 Sep 2012 15:52:29 +0200
+Subject: OMAP baseline test results for v3.6-rc7
+In-Reply-To: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
+Message-ID: <50645A1D.5040108@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 12:48:05PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 25, 2012 at 01:57:58PM +0100, Lorenzo Pieralisi wrote:
-> > Hi Russell,
-> > 
-> > I know it is coming quite late in the cycle but please consider pulling
-> > the patch series implementing the new cache maintenance LoUIS API, since
-> > it provides a stepping stone to implementing power management on upcoming
-> > A15 and A7 based platforms, leaving functionality for earlier processor
-> > versions unchanged.
-> > 
-> > It has been tested on:
-> > 
-> > - OMAP4/5
-> >   # suspend/hotplug and CPU idle
-> > - iMX6q
-> >   # suspend and hotplug
-> > - TC2 big.LITTLE testchip
-> >   # CPU idle
+On 09/24/12 21:21, Paul Walmsley wrote:
 > 
-> Ok, last night's PXA build regressed with this:
+> Here are some basic OMAP boot and power management test results for 
+> v3.6-rc6:
 > 
-> arch/arm/mm/built-in.o: In function `xscale_dma_unmap_area':
-> cache-xsc3l2.c:(.text+0x4194): undefined reference to `xscale_80200_A0_A1_flush_kern_cache_louis'
+>    http://www.pwsan.com/omap/testlogs/test_v3.6-rc6/20120918101040/
 > 
-> That's because we missed that proc-xscale.S aliases a bunch of functions to
-> xscale_80200_A0_A1_xxx from xscale_xxx.  And looking at that, it seems that
-> we also .type equivalent symbols - have you tested this on T2 builds to
-> check whether it works correctly there?
+> Some observations:
+> 
+> Boot tests:
+> 
+> * CM-T3517: L3 in-band error with IPSS during boot
+>   - Cause unknown but see 
+> http://marc.info/?l=linux-omap&m=134833869730129&w=2
+>   - Longstanding issue; does not occur on the 3517EVM
 
-Point taken for the regression, currently looking into that. I have not
-run tests on T2, I would be surprised if the set triggers any issue on
-T2 but I should have thought about that, my apologies.
+I'll be able to put some human resources on investigating this
+in a couple of weeks hopefully. Currently, it does not affect all
+boards (using the same boot loader) and does not look that it interferes
+with any functionality later in the boot or runtime.
 
-I will test it ASAP and get back to you, sorry again.
+> 
+> * 3517EVM & CM-T3517: boot hangs               
+>   - Probably due to the use of NFS root; there are likely some Kconfig,
+>     board file, and PM issues with EMAC
 
-Lorenzo
+Have you tried the nohlt boot parameter?
+It looks like the wfi is killing those SoCs once you use EMAC.
+
+> 
+> PM tests:
+> 
+> * 37xx EVM: CORE not entering dynamic off-idle
+>   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
+>     off works
+> 
+> * 3730 Beagle XM: does not serial wake from off-idle suspend when console
+>   UART doesn't clock gate ("debug ignore_loglevel")
+>   - Not shown in the current test logs; cause unknown
+> 
+> * 4430ES2 Panda: UART corruption during long transmit buffers
+>   - Presumably due to either a missing hardware workaround or a bug in
+>     the OMAP serial driver
+> 
+> Other:
+> 
+> * RCU stall messages appear if boards are booted into a minimal userspace
+>   and left to sit for a few minutes
+>   - Fixed by http://marc.info/?l=linux-arm-kernel&m=134835120600590&w=2
+> 
+> 
+> Changes from v3.6-rc6 (test 20120918101040):
+> (see http://www.pwsan.com/omap/testlogs/test_v3.6-rc6/20120918101040/ )
+> 
+> - Added comments about RCU stalls, appearing since at least v3.6-rc3
+> 
+> - Updated CM-T3517 "USB OTG" (really IPSS) comment
+> 
+> object size (delta in bytes from test_v3.6-rc6 (5698bd757d55b1bb87edd1a9744ab09c142abfc2)):
+>   text 	  data 	   bss 	 total 	kernel
+>   -328 	   +72 	     0 	  -256 	2430_testconfig
+>    -16 	   +16 	     0 	     0 	5912osk_testconfig
+>   -376 	   +72 	     0 	  -304 	am33xx_testconfig
+>    +64 	   +32 	     0 	   +96 	n800_b_testconfig
+>    +80 	   +64 	     0 	  +144 	n800_multi_omap2xxx
+>    +80 	   +32 	     0 	  +112 	n800_testconfig
+>    +72 	   +80 	     0 	  +152 	omap1510_defconfig
+>    +40 	   +16 	     0 	   +56 	omap1_defconfig
+>    +80 	   +64 	     0 	  +144 	omap2_4_testconfig
+>   -376 	   +40 	     0 	  -336 	omap2plus_defconfig
+>   -376 	   +72 	     0 	  -304 	omap2plus_defconfig_cpupm
+>    +20 	   +72 	     0 	   +92 	omap2plus_no_pm
+>    +20 	    +8 	     0 	   +28 	omap3_4_testconfig
+>   +140 	   +72 	     0 	  +212 	omap3_testconfig
+>    +20 	   +40 	     0 	   +60 	omap4_testconfig
+>    -40 	   +72 	     0 	   +32 	rmk_omap3430_ldp_oldconfig
+>   -200 	    +8 	     0 	  -192 	rmk_omap4430_sdp_oldconfig
+> 
+> 
+> 
+> - Paul
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+Regards,
+Igor.
