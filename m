@@ -1,43 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Sep 2012 13:53:14 +0100
-Subject: [PATCH] pinctrl/nomadik: allocate IRQ descriptors dynamically
-In-Reply-To: <1348679887-2135-1-git-send-email-linus.walleij@stericsson.com>
-References: <1348679887-2135-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120927125314.GD14358@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 27 Sep 2012 15:13:45 +0200
+Subject: [PATCH 2/4] irqdomain: augment add_simple() to allocate descs
+Message-ID: <1348751625-17420-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 07:18:07PM +0200, Linus Walleij wrote:
-> +	irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
-> +	irq_base = irq_alloc_descs(irq_start, 0, NMK_GPIO_PER_CHIP,
-> +				   numa_node_id());
-> +	if (IS_ERR_VALUE(irq_base)) {
+From: Linus Walleij <linus.walleij@linaro.org>
 
-commit 07ab67c8d0d7c1021343b7d5c045033d6bf7be69
-Author: Linus Torvalds <torvalds@ppc970.osdl.org>
-Date:   Thu May 19 22:43:37 2005 -0700
+Currently we rely on all IRQ chip instances to dynamically
+allocate their IRQ descriptors unless they use the linear
+IRQ domain. So for irqdomain_add_legacy() and
+irqdomain_add_simple() the caller need to make sure that
+descriptors are allocated.
 
-    Fix get_unmapped_area sanity tests
+Let's slightly augment the yet unused irqdomain_add_simple()
+to also allocate descriptors as a means to simplify usage
+and avoid code duplication throughout the kernel.
 
-    As noted by Chris Wright, we need to do the full range of tests regardless
-    of whether MAP_FIXED is set or not, so re-organize get_unmapped_area()
-    slightly to do the sanity checks unconditionally.
+We warn if descriptors cannot be allocated, e.g. if a
+platform has the bad habit of hogging descriptors at boot
+time.
 
-diff --git a/include/linux/err.h b/include/linux/err.h
-index 17c55df..ff71d2a 100644
---- a/include/linux/err.h
-+++ b/include/linux/err.h
-@@ -13,6 +13,8 @@
-  * This should be a per-architecture thing, to allow different
-  * error and pointer decisions.
-  */
-+#define IS_ERR_VALUE(x) unlikely((x) > (unsigned long)-1000L)
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Rob/Grant/Thomas if you ACK this I will take it through the
+pinctrl tree since I introduce its only user right there.
+---
+ kernel/irq/irqdomain.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-This is because get_unmapped_area() can return negative numbers which are
-not error codes.
-
-My position on this is that IS_ERR_VALUE() should only be used for checking
-the return value of a function where some negative numbers are not error
-codes, and everywhere else should use "ret < 0".
-
-Just because we have a funky macro is no reason to blindly (ab)use it.
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 49a7772..a0655b6 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -148,7 +148,8 @@ static unsigned int irq_domain_legacy_revmap(struct irq_domain *domain,
+  * @host_data: Controller private data pointer
+  *
+  * Allocates a legacy irq_domain if irq_base is positive or a linear
+- * domain otherwise.
++ * domain otherwise. For the legacy domain, IRQ descriptors will also
++ * be allocated.
+  *
+  * This is intended to implement the expected behaviour for most
+  * interrupt controllers which is that a linear mapping should
+@@ -162,11 +163,21 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
+ 					 const struct irq_domain_ops *ops,
+ 					 void *host_data)
+ {
+-	if (first_irq > 0)
+-		return irq_domain_add_legacy(of_node, size, first_irq, 0,
++	if (first_irq > 0) {
++		int irq_base;
++
++		irq_base = irq_alloc_descs(first_irq, 0, size, numa_node_id());
++		if (irq_base < 0) {
++			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
++			     first_irq);
++			irq_base = first_irq;
++		}
++		return irq_domain_add_legacy(of_node, size, irq_base, 0,
+ 					     ops, host_data);
+-	else
+-		return irq_domain_add_linear(of_node, size, ops, host_data);
++	}
++
++	/* A linear domain is the default */
++	return irq_domain_add_linear(of_node, size, ops, host_data);
+ }
+ 
+ /**
+-- 
+1.7.11.3
