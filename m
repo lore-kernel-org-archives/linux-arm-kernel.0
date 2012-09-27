@@ -1,33 +1,28 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 27 Sep 2012 17:40:32 +0200
-Subject: [PATCH v5 3/3] ARM: at91/dts: evk-pro3: enable watchdog
-In-Reply-To: <1348760432-12284-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1348760432-12284-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1348760432-12284-4-git-send-email-fabio.porcedda@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Sep 2012 16:46:25 +0100
+Subject: [PATCH v2 RESEND 2/2] ARM: local timers: add timer support using
+ IO mapped register
+In-Reply-To: <5062013F.8050507@codeaurora.org>
+References: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
+ <1347694914-1457-2-git-send-email-rvaswani@codeaurora.org>
+ <5062013F.8050507@codeaurora.org>
+Message-ID: <506474D1.30309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on evk-pro3.
+On 25/09/12 20:08, Rohit Vaswani wrote:
+> Any comments ?
+> 
+> Marc, would it be possible for you to pull this into your timers-next tree ?
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
----
- arch/arm/boot/dts/evk-pro3.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi Rohit,
 
-diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-index b7354e6..ce959ee 100644
---- a/arch/arm/boot/dts/evk-pro3.dts
-+++ b/arch/arm/boot/dts/evk-pro3.dts
-@@ -26,6 +26,10 @@
- 				atmel,vbus-gpio = <&pioC 5 0>;
- 				status = "okay";
- 			};
-+
-+			watchdog at fffffd40 {
-+				status = "okay";
-+			};
- 		};
- 
- 		usb0: ohci at 00500000 {
+Sorry for the delay.
+
+I'll give these patches a whirl first thing tomorrow.
+
+Thanks,
+
+	M.
 -- 
-1.7.11.3
+Jazz is not dead. It just smells funny...
