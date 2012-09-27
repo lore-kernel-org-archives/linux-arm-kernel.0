@@ -1,35 +1,58 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Sep 2012 16:12:02 +0100
-Subject: [PATCH 3/7] ARM: ux500: Correct Snowball's external SD/MMC slot's bus
- width
+Date: Thu, 27 Sep 2012 16:12:04 +0100
+Subject: [PATCH 5/7] ARM: ux500: Create a Device Tree for early HREFs
 In-Reply-To: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
 References: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348758726-25336-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1348758726-25336-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Snowball's external SD/MMC slot is only capable of 4 bit data
-transfer, not 8 bits as previously thought. This is a simple
-fixup moving to the correct settings.
+In ux500 platform code we currently support a number of devices.
+Two of these devices are fairly similar, but have key differences.
+Early (pre-v60) HREFs and the more up-to-date versions (v60+), and
+they both need to be supported by Device Tree. Here we apply a DT
+source file for the earlier versions.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/snowball.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/hrefprev60.dts |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 arch/arm/boot/dts/hrefprev60.dts
 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 9a37244..6a2b58b 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -123,7 +123,7 @@
- 		sdi0_per1 at 80126000 {
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <50000000>;
--			bus-width = <8>;
-+			bus-width = <4>;
- 			mmc-cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 
+diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
+new file mode 100644
+index 0000000..2dd28b9
+--- /dev/null
++++ b/arch/arm/boot/dts/hrefprev60.dts
+@@ -0,0 +1,28 @@
++/*
++ * Copyright 2012 ST-Ericsson AB
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "dbx5x0.dtsi"
++/include/ "href.dtsi"
++
++/ {
++	model = "ST-Ericsson HREF (pre-v60) platform with Device Tree";
++	compatible = "st-ericsson,mop500";
++
++	soc-u9500 {
++		i2c at 80004000 {
++			tps61052 at 33 {
++				compatible = "tps61052";
++				reg = <0x33>;
++			};
++		};
++	};
++};
 -- 
 1.7.9.5
