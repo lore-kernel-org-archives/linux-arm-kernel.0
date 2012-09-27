@@ -1,38 +1,54 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 27 Sep 2012 15:45:50 +0100
-Subject: [kvmarm] [PATCH 06/15] KVM: ARM: Initial skeleton to compile KVM
- support
-In-Reply-To: <20120927141314.GK25916@mudshark.cambridge.arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153508.21241.47712.stgit@ubuntu>
- <20120925152055.GC28728@mudshark.cambridge.arm.com>
- <50625DB2.4000700@virtualopensystems.com>
- <20120927141314.GK25916@mudshark.cambridge.arm.com>
-Message-ID: <CAFEAcA-3hcteG2pOLh3ZtRF+uw-X2LS+zkAp2tq7BT4SkYqtaw@mail.gmail.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 27 Sep 2012 16:59:02 +0200
+Subject: [PATCH v4 1/2] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <20120927055636.GP17667@game.jcrosoft.org>
+References: <1348568704-28304-1-git-send-email-fabio.porcedda@gmail.com>
+ <1348568704-28304-2-git-send-email-fabio.porcedda@gmail.com>
+ <20120927055636.GP17667@game.jcrosoft.org>
+Message-ID: <CAHkwnC_R4DMaRfjQHO=+K1DO62-iH70B2_QsipLD5D4xRznouw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 September 2012 15:13, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 26, 2012 at 02:43:14AM +0100, Christoffer Dall wrote:
->> this API has been discussed to death on the KVM lists, and we can of
->> course revive that if the regset makes it nicer - I'd prefer getting
->> this upstream the way that it is now though, where GET_REG / SET_REG
->> seems to be the way forward from a KVM perspective.
+On Thu, Sep 27, 2012 at 7:56 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 12:25 Tue 25 Sep     , Fabio Porcedda wrote:
+>> Tested on an at91sam9260 board (evk-pro3)
+>>
+>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> ---
+>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>>  2 files changed, 40 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> new file mode 100644
+>> index 0000000..5947929
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> @@ -0,0 +1,19 @@
+>> +* Atmel Watchdog Timers
+>> +
+>> +** at91sam9-wdt
+>> +
+>> +Required properties:
+>> +- compatible: must be "atmel,at91sam9260-wdt".
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +  region.
+>> +
+>> +Optional properties:
+>> +- heartbeat: contains the watchdog heartbeats in seconds.
+> more I read this binding more it's seems wrong
 >
-> I'm sure the API has been discussed, but I've not seen that conversation and
-> I'm also not aware about whether or not regsets were considered as a
-> possibility for this stuff.
+> Today we do not use yet the watchdog framework which we will so we need to
+> use the same binding as the watchdog framework
 
-Can you point me at some documentation for regsets? It's a bit
-difficult to have a sensible conversation about their suitability
-otherwise...
+What is the binding of the heartbeat value in the watchdog framework?
+I didn't found any binding of the heartbeat in other dt enabled drivers.
 
-(The potentially tricky area to handle is the cp15 registers, where
-it's quite likely that new registers might be added later and so
-userspace has to be able to query the kernel for what is supported
-and possibly deal with the kernel reporting attempts to set read
-only bits within registers, etc. Using the same ABI for simpler
-cases like the GPRs and FP registers is then just a matter of
-being consistent in the interface we expose to userspace.)
+> So when we switch the DT will not change
 
--- PMM
+
+Best regards
+-- 
+Fabio Porcedda
