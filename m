@@ -1,38 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Sep 2012 16:01:19 +0100
-Subject: [GIT PULL] MOP500 Audio patches due for ASoC
-In-Reply-To: <20120920125618.GP17666@opensource.wolfsonmicro.com>
-References: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
- <20120920125618.GP17666@opensource.wolfsonmicro.com>
-Message-ID: <20120927150119.GD1176@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 27 Sep 2012 17:06:36 +0200
+Subject: [PATCH V2] spi/pl022: Simplify use of runtime pm
+Message-ID: <1348758396-25276-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2012, Mark Brown wrote:
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-> On Thu, Sep 20, 2012 at 02:09:09PM +0200, Lee Jones wrote:
-> > The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
-> > 
-> >   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-asoc-next
-> 
-> Pulled, thanks.
+In probe the pm_runtime_resume is not needed since the amba bus
+has already set the device in "resumed" state by using
+pm_runtime_set_active.
 
-Hi Mark,
+Additionally more simplifications is done in probe by removing
+pm_runtime_put_autosuspend. pm_runtime_put_autosuspend does in
+probe functions have same effect as doing pm_runtime_put. This
+due to upper layer in driver core is preventing the device from
+being runtime suspended by a pm_runtime_get*.
 
-Is there any reason why the following patches didn't make it into -next?
+Finally, removing pm_runtime_disable from the remove function
+can be done since it is already handled by the amba bus.
 
-ASoC: codecs: Enable AB8500 CODEC for Device Tree
-ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
 
-Kind regards,
-Lee
+V2: Clearification added in commit message
 
+---
+ drivers/spi/spi-pl022.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index f8568b4..e51a026 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2188,8 +2188,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
+ 	       adev->res.start, pl022->virtbase);
+ 
+-	pm_runtime_resume(dev);
+-
+ 	pl022->clk = clk_get(&adev->dev, NULL);
+ 	if (IS_ERR(pl022->clk)) {
+ 		status = PTR_ERR(pl022->clk);
+@@ -2250,10 +2248,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 		pm_runtime_set_autosuspend_delay(dev,
+ 			platform_info->autosuspend_delay);
+ 		pm_runtime_use_autosuspend(dev);
+-		pm_runtime_put_autosuspend(dev);
+-	} else {
+-		pm_runtime_put(dev);
+ 	}
++	pm_runtime_put(dev);
++
+ 	return 0;
+ 
+  err_spi_register:
+@@ -2302,7 +2299,6 @@ pl022_remove(struct amba_device *adev)
+ 	clk_disable(pl022->clk);
+ 	clk_unprepare(pl022->clk);
+ 	clk_put(pl022->clk);
+-	pm_runtime_disable(&adev->dev);
+ 	iounmap(pl022->virtbase);
+ 	amba_release_regions(adev);
+ 	tasklet_disable(&pl022->pump_transfers);
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10
