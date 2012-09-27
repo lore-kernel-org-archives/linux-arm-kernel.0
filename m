@@ -1,75 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Sep 2012 16:12:06 +0100
-Subject: [PATCH 7/7] ARM: ux500: Remove platform specific device registration
- when DT is enabled
-In-Reply-To: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
-References: <1348758726-25336-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1348758726-25336-8-git-send-email-lee.jones@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Sep 2012 17:13:01 +0200
+Subject: [PATCHv3 0/3] ARM: I2C: Add device tree bindings to i2c-mux-gpio
+Message-ID: <1348758784-15245-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most devices have now been successfully DT:ed and each supported
-platform has its own Device Tree source file. Hence the majority
-of the platform specific device registration calls can now be
-successfully removed.
+Hi everyone,
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |   29 +----------------------------
- 1 file changed, 1 insertion(+), 28 deletions(-)
+This patchset adds the device tree entry to the CFA-10049 board of its i2c
+muxer. This muxer controls sub-buses that contains three Nuvoton NAU7802
+ADCs and a NXP PCA955 GPIO expander. Support for these will be added
+eventually.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 38e53b2..5dd4a59 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -793,8 +793,6 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
- static void __init u8500_init_machine(void)
- {
- 	struct device *parent = NULL;
--	int i2c0_devs;
--	int i;
- 
- 	/* Pinmaps must be in place before devices register */
- 	if (of_machine_is_compatible("st-ericsson,mop500"))
-@@ -804,37 +802,12 @@ static void __init u8500_init_machine(void)
- 	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
- 		hrefv60_pinmaps_init();
- 
-+	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
- 	parent = u8500_of_init_devices();
- 
--	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
--		mop500_platform_devs[i]->dev.parent = parent;
--
- 	/* automatically probe child nodes of db8500 device */
- 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
- 
--	if (of_machine_is_compatible("st-ericsson,mop500")) {
--		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
--
--		platform_add_devices(mop500_platform_devs,
--				ARRAY_SIZE(mop500_platform_devs));
--
--		mop500_audio_init(parent);
--		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
--		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--		i2c_register_board_info(2, mop500_i2c2_devices,
--					ARRAY_SIZE(mop500_i2c2_devices));
--
--	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
--		/*
--		 * The HREFv60 board removed a GPIO expander and routed
--		 * all these GPIO pins to the internal GPIO controller
--		 * instead.
--		 */
--		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
--		platform_add_devices(mop500_platform_devs,
--				ARRAY_SIZE(mop500_platform_devs));
--	}
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
+Thanks,
+Maxime
+
+Changes from v2:
+  - Fixed indentation of device tree nodes in patch 3
+  - Removed the address-cells and size-cells properties that are useless
+    for now.
+
+Changes from v1:
+  - Fixed indentation in patch 1
+  - Fixed arrays allocation for the dt bindings
+  - Various fixes in the documentation
+
+Maxime Ripard (3):
+  i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
+  i2c: mux: Add dt support to i2c-mux-gpio driver
+  ARM: dts: cfa10049: Add the i2c muxer buses to the CFA-10049
+
+ .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   81 +++++++++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |   24 +++
+ drivers/i2c/muxes/i2c-mux-gpio.c                   |  172 +++++++++++++++-----
+ 3 files changed, 234 insertions(+), 43 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+
 -- 
 1.7.9.5
