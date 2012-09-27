@@ -1,57 +1,36 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Thu, 27 Sep 2012 15:59:37 +0530
-Subject: [PATCH v2] ASoC: Samsung: Update Kconfig for Exynos5250 and Exynos4412
-Message-ID: <1348741777-29569-1-git-send-email-padma.v@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Sep 2012 12:48:05 +0100
+Subject: [GIT PULL] ARM: cache flushing LoUIS API
+In-Reply-To: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
+References: <20120925125758.GA16842@e102568-lin.cambridge.arm.com>
+Message-ID: <20120927114805.GC14358@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Kconfig file to support the Exynos5250 and Exynos4412
+On Tue, Sep 25, 2012 at 01:57:58PM +0100, Lorenzo Pieralisi wrote:
+> Hi Russell,
+> 
+> I know it is coming quite late in the cycle but please consider pulling
+> the patch series implementing the new cache maintenance LoUIS API, since
+> it provides a stepping stone to implementing power management on upcoming
+> A15 and A7 based platforms, leaving functionality for earlier processor
+> versions unchanged.
+> 
+> It has been tested on:
+> 
+> - OMAP4/5
+>   # suspend/hotplug and CPU idle
+> - iMX6q
+>   # suspend and hotplug
+> - TC2 big.LITTLE testchip
+>   # CPU idle
 
-Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- sound/soc/samsung/Kconfig |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Ok, last night's PXA build regressed with this:
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index fe3995c..430783b 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -1,6 +1,6 @@
- config SND_SOC_SAMSUNG
- 	tristate "ASoC support for Samsung"
--	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_EXYNOS4
-+	depends on PLAT_SAMSUNG
- 	select S3C64XX_DMA if ARCH_S3C64XX
- 	select S3C2410_DMA if ARCH_S3C24XX
- 	help
-@@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
- 
- config SND_SOC_SAMSUNG_SMDK_WM8994
- 	tristate "SoC I2S Audio support for WM8994 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 || MACH_SMDK4212)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 || MACH_SMDK4212 || MACH_SMDK4412 || MACH_EXYNOS5_DT)
- 	depends on I2C=y && GENERIC_HARDIRQS
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
-@@ -162,7 +162,7 @@ config SND_SOC_GONI_AQUILA_WM8994
- 
- config SND_SOC_SAMSUNG_SMDK_SPDIF
- 	tristate "SoC S/PDIF Audio support for SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKC100 || MACH_SMDKC110 || MACH_SMDKV210 || MACH_SMDKV310 || MACH_SMDK4212)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDKC100 || MACH_SMDKC110 || MACH_SMDKV210 || MACH_SMDKV310 || MACH_SMDK4212 || MACH_SMDK4412 || SOC_EXYNOS5250)
- 	select SND_SAMSUNG_SPDIF
- 	help
- 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
-@@ -177,7 +177,7 @@ config SND_SOC_SMDK_WM8580_PCM
- 
- config SND_SOC_SMDK_WM8994_PCM
- 	tristate "SoC PCM Audio support for WM8994 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKC210 || MACH_SMDKV310 || MACH_SMDK4212)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDKC210 || MACH_SMDKV310 || MACH_SMDK4212 || MACH_SMDK4412 || MACH_EXYNOS5_DT)
- 	depends on I2C=y && GENERIC_HARDIRQS
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
--- 
-1.7.4.4
+arch/arm/mm/built-in.o: In function `xscale_dma_unmap_area':
+cache-xsc3l2.c:(.text+0x4194): undefined reference to `xscale_80200_A0_A1_flush_kern_cache_louis'
+
+That's because we missed that proc-xscale.S aliases a bunch of functions to
+xscale_80200_A0_A1_xxx from xscale_xxx.  And looking at that, it seems that
+we also .type equivalent symbols - have you tested this on T2 builds to
+check whether it works correctly there?
