@@ -1,33 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 27 Sep 2012 09:28:37 -0600
-Subject: [PATCH V2] ASoC: SAMSUNG: Add DT support for i2s
-In-Reply-To: <1348741532-29412-1-git-send-email-padma.v@samsung.com>
-References: <1348741532-29412-1-git-send-email-padma.v@samsung.com>
-Message-ID: <506470A5.3070307@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Sep 2012 15:30:16 +0000
+Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform
+ conversion
+In-Reply-To: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
+References: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201209271530.17243.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2012 04:25 AM, Padmavathi Venna wrote:
-> Add support for device based discovery.
+On Thursday 27 September 2012, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Moving ARCH_MVEBU for multi-platform support caused several breakages in
+> recently added addr-map and pinctrl support for mvebu. This adds the
+> necessary selects and include paths to fix the build.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
 
-> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-> +i2s at 03830000 {
-> +	compatible = "samsung,samsung-i2s";
-> +	reg = <0x03830000 0x100>;
+I actually had the same patch since monday but haven't managed to
+send out my series.
 
-> +	tx-dma-channel-secondary = <&pdma0 8>;
-> +	tx-dma-channel = <&pdma0 10>;
-> +	rx-dma-channel = <&pdma0 9>;
-> +	supports-6ch;
-> +	supports-rstclr;
-> +	supports-secdai;
+Olof probably has a better idea of how to apply this than me
+to avoid further merge conflicts.
 
-Those 6 properties are custom to this binding so should have a vendor
-prefix, e.g. "samsung,supports-6ch".
-
-Also, I wonder if this shouldn't wait for the forthcoming standardized
-DT DMA bindings (or perhaps document custom bindings that are identical
-to the new standardized bindings)? Otherwise, the DMA stuff will all
-have to be redefined again. Apparently it's hoped the bindings will be
-in 3.7, or if not there, in 3.8.
+	Arnd
