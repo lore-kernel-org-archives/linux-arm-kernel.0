@@ -1,67 +1,56 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 28 Sep 2012 18:15:53 +0100
-Subject: [PATCH v2 RESEND 2/2] ARM: local timers: add timer support using
- IO mapped register
-In-Reply-To: <20120928155746.GB2253@linaro.org>
-References: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
- <1347694914-1457-2-git-send-email-rvaswani@codeaurora.org>
- <5062013F.8050507@codeaurora.org>
- <20120928122858.GD9472@e106331-lin.cambridge.arm.com>
- <20120928155746.GB2253@linaro.org>
-Message-ID: <20120928171549.GA29991@e102568-lin.cambridge.arm.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 28 Sep 2012 20:32:47 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <20120928160105.GA17667@game.jcrosoft.org>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <20120928024744.GV17667@game.jcrosoft.org> <50654E57.3080201@antcom.de>
+ <20120928075145.GW17667@game.jcrosoft.org> <50656522.1050900@antcom.de>
+ <20120928090848.GX17667@game.jcrosoft.org>
+ <20120928102822.GY17667@game.jcrosoft.org> <50658AD0.1050501@antcom.de>
+ <20120928160105.GA17667@game.jcrosoft.org>
+Message-ID: <5065ED4F.5070700@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 04:57:46PM +0100, Dave Martin wrote:
-> [ Note: please aim to CC devicetree-discuss at lists.ozlabs.org with any
-> patches or bindings relevant to device tree. ]
-> 
-> [ Lorenzo, there's a question for you further down this mail. ]
+Hi,
 
-[...]
+On 28/09/12 18:01, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> Maybe like this, for some struct block *?
+>>
+>> block = set_block_prepare(gc, pins, values, size);
+>> if (block) {
+>> 	set_block(gc, block);
+>> 	...
+>> 	set_block_unprepare(gc, block);
+>> }
+>>
+>> Would mean that all supported drivers would need to implement those 3
+>> new functions... Need to be careful about not introducing bloat...
+> the prepare is gpiolib specific, it will be a helper to conver a gpio list to
+> a gpio block list
+>
+> I was thinking more
+>
+> block = gpio_block_prepare(pins, size);
+>
+> gpio_block_set_value(pin0, val);
+> gpio_block_set_value(pin1, val);
+> gpio_block_set_value(pin2, val);
+> gpio_block_set(block);
+>
+> andfor get
+>
+> gpio_block_get(block)
+> val = gpio_block_get_value(block, pin0);
+> val = gpio_block_get_value(block, pin1);
+>
+> for the gpio driver ti's transparent
 
-> > > > +  If using the memory mapped interface, list the interrupts for each core,
-> > > > +  starting with core 0.
-> > 
-> > I take it that core 0 means physical cpu 0 (i.e. MPIDR.Aff{2,1,0} == 0)?
-> 
-> Lorenzo, should we have a standard way of referring to CPUs and topology
-> nodes documented as part of the topology bindings?  We certainly need
-> rules of some kind, since when the topology is non-trivial there is no
-> well-defined "first" CPU, nor any single correct order in which to list
-> CPUs.
+Problem here is that it's only an intermediate format since hardware 
+often needs special preparation of the data.
 
-I think, and that's just my opinion, that whatever solution we go for to
-describe the topology must contain the information needed by all kernel
-subsystems to retrieve HW information. I do not think we should document
-how devices connect to CPU(s)/Cluster(s) in the topology bindings per-se,
-since those are properties that belong to device nodes.
+But will evaluate what makes most sense.
 
-There must be a common way for all devices to link to the topology, though.
+Thanks for your notes!
 
-The topology must be descriptive enough to cater for all required cases
-and that's what Mark with PMU and all of us are trying to come up with, a solid
-way to represent with DT the topology of current and future ARM systems.
-
-First idea I implemented and related LAK posting:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html
-
-Are "cluster" nodes really needed or "cpu" nodes are enough ? I do not
-know, let's get this discussion started, that's all I need.
-
-But definitely declaring IRQs in physical CPU id order (and mind, as you say,
-physical CPU ids, ie MPIDR, can be sparsely populated) and initializing them
-*thinking* the order is the logical one is plainly broken.
-
-> The topology may also be sparsely populated (e.g.,
-> Aff[2,1,0] in { (0,0,0), (0,0,1), (0,1,0), (0,1,1), (0,1,2), (0,1,3) })
-> 
-> It would be bad if different driver bindings end up solving this in
-> different ways (even non-broken ways)
-
-Yes, I agree and code that relies on any temporary work-around to tackle
-this problem should not be merged before we set in stone proper topology
-bindings.
-
-Lorenzo
+Roland
