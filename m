@@ -1,100 +1,41 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Sat, 29 Sep 2012 00:21:10 +0530
-Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
-In-Reply-To: <5063330E.3000203@ti.com>
-References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
- <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
- <5063330E.3000203@ti.com>
-Message-ID: <5065F19E.5020708@ti.com>
+From: jdl@jdl.com (Jon Loeliger)
+Date: Fri, 28 Sep 2012 13:53:33 -0500
+Subject: [PATCH 1/1] Fix segfault in DTC
+In-Reply-To: <5065D9C7.40906@wwwdotorg.org>
+References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
+ <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
+ <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
+ <20120925233054.GL9800@truffula.fritz.box> <50624393.30607@broadcom.com>
+ <20120926003508.GB31993@truffula.fritz.box> <50632F78.4030709@broadcom.com>
+ <5065D9C7.40906@wwwdotorg.org>
+Message-ID: <E1THfgr-0006Fg-KT@jdl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 9/26/2012 10:23 PM, Jon Hunter wrote:
+> > 
+> > Yeah, seems like the kernel DTC is quite old.
 > 
-> On 09/20/2012 06:53 PM, Tony Lindgren wrote:
->> * Benoit Cousson <b-cousson@ti.com> [120919 19:24]:
->>> Hi Tony,
->>>
->>> I was about to take the DTS patch, but was wondering if you will pull
->>> the driver changes for 3.7.
->>
->> I suggest that you do a separate branch on top of Paul's hwmod series
->> when he posts those if that works for you?
-> 
-> Benoit, I see that you have pulled in the DTS patch.
-> 
-> Do you guys want me to rebase the remaining patches with Rob's change on
-> Tony's master branch and re-submit?
-> 
+> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
 
-Jon,
+Awesome.  Thank you.
 
-Sorry for delayed response, But I tried using your omap_test application
-to validate this patch series, but it is failing for me.
+> I've run a regression test vs. the old dtc in the kernel ...
 
-How did you test it? Are you running same test application at your end?
+Which is the icky step.  Again, thank you.
 
-I am debugging this issue, i just thought I should tell you this before
-its too late.
+> ... and found that
+> some of the PowerPC .dts files don't compile with the new dtc (but did
+> with the old), all due to non-existent labels/paths being referenced.
+> I'll try and track down whether this is a regression in dtc, or simply
+> buggy .dts files that weren't noticed before.
 
+I think you should just smack the PowerPC guys. :-)
 
-Below is the log -
+> Everything non-PowerPC works fine, and most PowerPC files work fine.
+> Where compilation succeeds, the md5sum of the .dtb is identical in every
+> case.
 
-[root at arago /]# echo 3 > /tmp/omap-test/timer/one
-[   79.612223] omap_dm_timer_request_specific: Please use
-omap_dm_timer_request_by_cap()
-[   79.620636] Timer 3 not available!
+Cool.
 
-[root at arago /]#
-[root at arago /]# echo 3 > /tmp/omap-test/timer/all
-[  135.111949] Testing 48042000.timer with 24000000 Hz clock ...
-[root at arago /]# [  137.457389] Timer read test PASSED! No errors, 100 loops
-[  137.463267] Timer interrupt test PASSED!
-[  137.467650] Testing 48042000.timer with 32768 Hz clock ...
-[  139.816892] Timer read test PASSED! No errors, 100 loops
-[  139.830776] Timer interrupt test PASSED!
-[  139.835245] Testing 48044000.timer with 24000000 Hz clock ...
-[  142.183912] Timer read test PASSED! No errors, 100 loops
-[  142.189734] Timer interrupt test PASSED!
-[  142.194076] Testing 48044000.timer with 32768 Hz clock ...
-[  144.543451] Timer read test PASSED! No errors, 100 loops
-[  144.557334] Timer interrupt test PASSED!
-[  144.561806] Testing 48046000.timer with 24000000 Hz clock ...
-[  146.910469] Timer read test PASSED! No errors, 100 loops
-[  147.910493] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-[  147.917598] Testing 48046000.timer with 32768 Hz clock ...
-[  150.262203] Timer read test PASSED! No errors, 100 loops
-[  151.262049] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-[  151.269298] Testing 48048000.timer with 24000000 Hz clock ...
-[  153.613596] Timer read test PASSED! No errors, 100 loops
-[  154.613618] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-[  154.620725] Testing 48048000.timer with 32768 Hz clock ...
-[  156.965324] Timer read test PASSED! No errors, 100 loops
-[  157.965176] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-[  157.972419] Testing 4804a000.timer with 24000000 Hz clock ...
-
-[root at arago /]# [  160.316753] Timer read test PASSED! No errors, 100 loops
-
-[root at arago /]# [  161.316728] Timer interrupt test FAILED! No interrupt
-occurred in 1 sec
-[  161.323912] Testing 4804a000.timer with 32768 Hz clock ...
-
-[root at arago /]# [  163.668490] Timer read test PASSED! No errors, 100 loops
-[  164.668328] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-[  164.675545] Tested 5 timers, skipped 6 timers and detected 6 errors
-[  164.682202] Test iteration 0 complete in 29 secs
-[  164.687104] Test summary: Iterations 1, Errors 6
-
-
-
-> Cheers
-> Jon
-> 
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+Thanks,
+jdl
