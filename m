@@ -1,44 +1,33 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Fri, 28 Sep 2012 16:38:02 -0500
-Subject: [PATCH 02/12] ata: mark probe function as __devinit rather than
- __init
-In-Reply-To: <1348868177-21205-3-git-send-email-arnd@arndb.de>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Fri, 28 Sep 2012 16:45:37 -0500
+Subject: [PATCH 09/12] tty/console: fix warnings in
+ drivers/tty/serial/kgdboc.c
+In-Reply-To: <1348868177-21205-10-git-send-email-arnd@arndb.de>
 References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-3-git-send-email-arnd@arndb.de>
-Message-ID: <506618BA.4070509@calxeda.com>
+ <1348868177-21205-10-git-send-email-arnd@arndb.de>
+Message-ID: <50661A81.7000501@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/28/2012 04:36 PM, Arnd Bergmann wrote:
-> Functions for hotplugging must be marked as __devinit so
-> they do not get discarded, as pointed out by a build time
-> warning from modpost.
-> 
-> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Jeff Garzik <jgarzik@redhat.com>
-> ---
->  drivers/ata/sata_highbank.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/ata/sata_highbank.c b/drivers/ata/sata_highbank.c
-> index 0d7c4c2..36a141a 100644
-> --- a/drivers/ata/sata_highbank.c
-> +++ b/drivers/ata/sata_highbank.c
-> @@ -260,7 +260,7 @@ static const struct of_device_id ahci_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, ahci_of_match);
->  
-> -static int __init ahci_highbank_probe(struct platform_device *pdev)
-> +static int __devinit ahci_highbank_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
->  	struct ahci_host_priv *hpriv;
+> The con_debug_leave/con_debug_enter functions are stubbed out
+> by defining them to (0), which causes harmless build warnings.
+> Using proper inline functions is the normal way to deal with
+> this.
+>
+> Without this patch, building the ARM bcm2835_defconfig results in:
+>
+> drivers/tty/serial/kgdboc.c: In function 'kgdboc_pre_exp_handler':
+> drivers/tty/serial/kgdboc.c:279:3: warning: statement with no effect [-Wunused-value]
+> drivers/tty/serial/kgdboc.c: In function 'kgdboc_post_exp_handler':
+> drivers/tty/serial/kgdboc.c:293:3: warning: statement with no effect [-Wunused-value]
 
-Thanks. I just ran into this today and couldn't figure out the error
-message.
 
-Acked-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Thanks Arnd!
 
---Mark Langsdorf
-Calxeda, Inc.
+I'll put this in kgdb-next for the upcoming merge window, unless Greg pulls it into his queue first.
+
+Acked-by: Jason Wessel <jason.wessel@windriver.com>
+
+Cheers,
+Jason.
