@@ -1,52 +1,45 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 28 Sep 2012 11:52:22 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <CACRpkdZ+1ffsMDRZXYb5RRndoXstj_QHvHOpeikRY0bas72dKQ@mail.gmail.com>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
- <CACRpkdZ+1ffsMDRZXYb5RRndoXstj_QHvHOpeikRY0bas72dKQ@mail.gmail.com>
-Message-ID: <50657356.4010801@antcom.de>
+From: sangsu4u.park@samsung.com (Sangsu Park)
+Date: Fri, 28 Sep 2012 18:53:20 +0900
+Subject: [PATCH v2] ASoC: Samsung: Update Kconfig for Exynos5250 and
+ Exynos4412
+In-Reply-To: <1348741777-29569-1-git-send-email-padma.v@samsung.com>
+References: <1348741777-29569-1-git-send-email-padma.v@samsung.com>
+Message-ID: <003401cd9d5f$179495c0$46bdc140$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2012 11:14 AM, Linus Walleij wrote:
->> @@ -686,6 +731,13 @@ read-only attributes:
->>
->>         "ngpio" ... how many GPIOs this manges (N to N + ngpio - 1)
->>
->> +       "block" ... get/set Block GPIO:
->> +                   * reads: space separated list of GPIO inputs of this chip that
->> +                     are set to 1, e.g. "83 85 87 99"
->> +                   * write: space separated list of GPIO outputs of this chip
->> +                     that are to be set or cleared, e.g. "80 -83 -85" (prefix
->> +                     "-" clears)
+
+On Thu, Sep 27, 2012 at 07:30 PM, Padmavathi Venna wrote:
+
+> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+> index fe3995c..430783b 100644
+> --- a/sound/soc/samsung/Kconfig
+> +++ b/sound/soc/samsung/Kconfig
+> @@ -1,6 +1,6 @@
+>  config SND_SOC_SAMSUNG
+>  	tristate "ASoC support for Samsung"
+> -	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210
+> || ARCH_S5P64X0 || ARCH_EXYNOS4
+> +	depends on PLAT_SAMSUNG
+>  	select S3C64XX_DMA if ARCH_S3C64XX
+>  	select S3C2410_DMA if ARCH_S3C24XX
+>  	help
+
+This code is already updated.
+
+> @@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
 > 
-> This sort of breaks the sysfs convention of one value per file,
-> does it not?
-> 
-> It's not like I have some better idea, just we need to think about
-> other possible solutions.
-> 
-> The GPIO sysfs interface is not universally liked. What are the
-> typical applications you have for this? Industrial control by
-> bit-banging userspace processes?
+>  config SND_SOC_SAMSUNG_SMDK_WM8994
+>  	tristate "SoC I2S Audio support for WM8994 on SMDK"
+> -	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+> MACH_SMDK4212)
+> +	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+> MACH_SMDK4212 || MACH_SMDK4412 || MACH_EXYNOS5_DT)
+>  	depends on I2C=y && GENERIC_HARDIRQS
+>  	select MFD_WM8994
+>  	select SND_SOC_WM8994
 
-Yes, I had several projects in the past with the need of setting groups
-of GPIOs at once (typically, 8 bit busses via GPIO lines), so needed to
-provide some hacks. Don't want to do this over and over again. :-)
+I'm not sure about this since MACH_EXYNOS5_DT can have others instead of SMDK.
 
-Bit-banging in kernel and userspace.
-
-It's hard to do the one-value-per-file right for a several-gpios-at-once
-goal. :-) I originally had a one-value solution: A bit map, continuously
-hex coded, like in the original kernel API idea (e.g. 0x000F0A0010).
-Wasn't sure because it encodes GPIO numbers in a weird way.
-
-Strictly formally: Isn't a comma-separated list of a GPIO block (e.g.
-"80,81,85") a singe value in a sense? :-) Or other possibilities? Maybe
-some node in /proc? Or some kind of new character device node?
-
-Otherwise, I need to think about leaving out the sysfs for this purpose.
-
-Thanks in advance,
-
-Roland
+Thanks,
+Sangsu.
