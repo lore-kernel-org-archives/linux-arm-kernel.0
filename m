@@ -1,105 +1,85 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2012 23:36:08 +0200
-Subject: [PATCH 03/12] mmc: dw_mmc: fix building exynos driver as a module
+Date: Fri, 28 Sep 2012 23:36:16 +0200
+Subject: [PATCH 11/12] pinctrl: samsung: use __devinit section for init code
 In-Reply-To: <1348868177-21205-1-git-send-email-arnd@arndb.de>
 References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
-Message-ID: <1348868177-21205-4-git-send-email-arnd@arndb.de>
+Message-ID: <1348868177-21205-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MODULE_DEVICE_TABLE() entry in the dw_mmc_exynos driver
-points to the wrong symbol which results in a link error
-when building as a loadable module.
+The samsung pinctrl driver has a probe function that is
+__devinit and that calls a lot of other functions that are
+marked __init, which kbuild complains about.
 
-Further, we get a warning about the driver_data being
-marked constant, which requires annotating a few pointers
-as const.
+Marking everything __devinit means that the code does not
+discarded when CONFIG_HOTPLUG is set, which is a little
+more wasteful, but also more consistent
+
+Without this patch, building exynos_defconfig results in:
+
+WARNING: drivers/pinctrl/built-in.o(.devinit.text+0x124): Section mismatch in reference from the function samsung_pinctrl_probe() to the function .init.text:samsung_gpiolib_register()
+The function __devinit samsung_pinctrl_probe() references
+a function __init samsung_gpiolib_register().
+If samsung_gpiolib_register is only used by samsung_pinctrl_probe then
+annotate samsung_gpiolib_register with a matching annotation.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Chris Ball <cjb@laptop.org>
 Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Will Newton <will.newton@imgtec.com>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Seungwon Jeon <tgih.jun@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: linux-mmc at vger.kernel.org
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/mmc/host/dw_mmc-exynos.c |    4 ++--
- drivers/mmc/host/dw_mmc-pltfm.c  |    2 +-
- drivers/mmc/host/dw_mmc-pltfm.h  |    2 +-
- drivers/mmc/host/dw_mmc.c        |    2 +-
- include/linux/mmc/dw_mmc.h       |    2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/pinctrl/pinctrl-samsung.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 660bbc5..32109a6 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -223,11 +223,11 @@ static const struct of_device_id dw_mci_exynos_match[] = {
- 			.data = (void *)&exynos5250_drv_data, },
- 	{},
- };
--MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
-+MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
- 
- int dw_mci_exynos_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+index dd108a9..861cd5f 100644
+--- a/drivers/pinctrl/pinctrl-samsung.c
++++ b/drivers/pinctrl/pinctrl-samsung.c
+@@ -513,7 +513,7 @@ static int samsung_gpio_direction_output(struct gpio_chip *gc, unsigned offset,
+  * Parse the pin names listed in the 'samsung,pins' property and convert it
+  * into a list of gpio numbers are create a pin group from it.
+  */
+-static int __init samsung_pinctrl_parse_dt_pins(struct platform_device *pdev,
++static int __devinit samsung_pinctrl_parse_dt_pins(struct platform_device *pdev,
+ 			struct device_node *cfg_np, struct pinctrl_desc *pctl,
+ 			unsigned int **pin_list, unsigned int *npins)
  {
--	struct dw_mci_drv_data *drv_data;
-+	const struct dw_mci_drv_data *drv_data;
- 	const struct of_device_id *match;
- 
- 	match = of_match_node(dw_mci_exynos_match, pdev->dev.of_node);
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-index c960ca7..5e33156 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.c
-+++ b/drivers/mmc/host/dw_mmc-pltfm.c
-@@ -24,7 +24,7 @@
- #include "dw_mmc.h"
- 
- int dw_mci_pltfm_register(struct platform_device *pdev,
--				struct dw_mci_drv_data *drv_data)
-+				const struct dw_mci_drv_data *drv_data)
+@@ -560,7 +560,7 @@ static int __init samsung_pinctrl_parse_dt_pins(struct platform_device *pdev,
+  * from device node of the pin-controller. A pin group is formed with all
+  * the pins listed in the "samsung,pins" property.
+  */
+-static int __init samsung_pinctrl_parse_dt(struct platform_device *pdev,
++static int __devinit samsung_pinctrl_parse_dt(struct platform_device *pdev,
+ 				struct samsung_pinctrl_drv_data *drvdata)
  {
- 	struct dw_mci *host;
- 	struct resource	*regs;
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.h b/drivers/mmc/host/dw_mmc-pltfm.h
-index 301f245..2ac37b8 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.h
-+++ b/drivers/mmc/host/dw_mmc-pltfm.h
-@@ -13,7 +13,7 @@
- #define _DW_MMC_PLTFM_H_
+ 	struct device *dev = &pdev->dev;
+@@ -655,7 +655,7 @@ static int __init samsung_pinctrl_parse_dt(struct platform_device *pdev,
+ }
  
- extern int dw_mci_pltfm_register(struct platform_device *pdev,
--				struct dw_mci_drv_data *drv_data);
-+				const struct dw_mci_drv_data *drv_data);
- extern int __devexit dw_mci_pltfm_remove(struct platform_device *pdev);
- extern const struct dev_pm_ops dw_mci_pltfm_pmops;
+ /* register the pinctrl interface with the pinctrl subsystem */
+-static int __init samsung_pinctrl_register(struct platform_device *pdev,
++static int __devinit samsung_pinctrl_register(struct platform_device *pdev,
+ 				struct samsung_pinctrl_drv_data *drvdata)
+ {
+ 	struct pinctrl_desc *ctrldesc = &drvdata->pctl;
+@@ -729,7 +729,7 @@ static int __init samsung_pinctrl_register(struct platform_device *pdev,
+ }
  
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index a23af77..026cf92 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1973,7 +1973,7 @@ static void dw_mci_init_dma(struct dw_mci *host)
- 	/* Determine which DMA interface to use */
- #ifdef CONFIG_MMC_DW_IDMAC
- 	host->dma_ops = &dw_mci_idmac_ops;
--	dev_info(&host->dev, "Using internal DMA controller.\n");
-+	dev_info(host->dev, "Using internal DMA controller.\n");
- #endif
+ /* register the gpiolib interface with the gpiolib subsystem */
+-static int __init samsung_gpiolib_register(struct platform_device *pdev,
++static int __devinit samsung_gpiolib_register(struct platform_device *pdev,
+ 				struct samsung_pinctrl_drv_data *drvdata)
+ {
+ 	struct gpio_chip *gc;
+@@ -762,7 +762,7 @@ static int __init samsung_gpiolib_register(struct platform_device *pdev,
+ }
  
- 	if (!host->dma_ops)
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 7c6a113..0f62c8c 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -162,7 +162,7 @@ struct dw_mci {
- 	u16			data_offset;
- 	struct device		*dev;
- 	struct dw_mci_board	*pdata;
--	struct dw_mci_drv_data	*drv_data;
-+	const struct dw_mci_drv_data	*drv_data;
- 	void			*priv;
- 	struct clk		*biu_clk;
- 	struct clk		*ciu_clk;
+ /* unregister the gpiolib interface with the gpiolib subsystem */
+-static int __init samsung_gpiolib_unregister(struct platform_device *pdev,
++static int __devinit samsung_gpiolib_unregister(struct platform_device *pdev,
+ 				struct samsung_pinctrl_drv_data *drvdata)
+ {
+ 	int ret = gpiochip_remove(drvdata->gc);
 -- 
 1.7.10
