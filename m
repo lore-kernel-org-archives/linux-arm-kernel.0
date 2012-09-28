@@ -1,45 +1,72 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Fri, 28 Sep 2012 14:33:55 +0530
-Subject: [PATCH V2] ASoC: SAMSUNG: Add DT support for i2s
-In-Reply-To: <506470A5.3070307@wwwdotorg.org>
-References: <1348741532-29412-1-git-send-email-padma.v@samsung.com>
- <506470A5.3070307@wwwdotorg.org>
-Message-ID: <CAAgF-Bc_KwJgcDOOkzrqcondGnmHDQ08s9Ooq61DbON7ZZtvmA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 28 Sep 2012 11:08:48 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <50656522.1050900@antcom.de>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <20120928024744.GV17667@game.jcrosoft.org>
+ <50654E57.3080201@antcom.de>
+ <20120928075145.GW17667@game.jcrosoft.org>
+ <50656522.1050900@antcom.de>
+Message-ID: <20120928090848.GX17667@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 8:58 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/27/2012 04:25 AM, Padmavathi Venna wrote:
->> Add support for device based discovery.
->
->> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
->
->> +i2s at 03830000 {
->> +     compatible = "samsung,samsung-i2s";
->> +     reg = <0x03830000 0x100>;
->
->> +     tx-dma-channel-secondary = <&pdma0 8>;
->> +     tx-dma-channel = <&pdma0 10>;
->> +     rx-dma-channel = <&pdma0 9>;
->> +     supports-6ch;
->> +     supports-rstclr;
->> +     supports-secdai;
->
-> Those 6 properties are custom to this binding so should have a vendor
-> prefix, e.g. "samsung,supports-6ch".
-Okay. I will change this.
->
-> Also, I wonder if this shouldn't wait for the forthcoming standardized
-> DT DMA bindings (or perhaps document custom bindings that are identical
-> to the new standardized bindings)? Otherwise, the DMA stuff will all
-> have to be redefined again. Apparently it's hoped the bindings will be
-> in 3.7, or if not there, in 3.8.
-Okay. Once the generic DT DMA bindings are available I will use that.
-But It will be good if atleast other things get reviewed.
+On 10:51 Fri 28 Sep     , Roland Stigge wrote:
+> Hi!
+> 
+> On 09/28/2012 09:51 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >> Right - will add checking for the request state of the respective GPIOs.
+> >>
+> >> The list of GPIOs to handle is defined by the offset (specified GPIO)
+> >> and bitmapped list.
+> >>
+> >> If it looks more natural, I can change this to a list of ints specifying
+> >> GPIOs directly.
+> > you pass the correctly information to the gpiolib
+> > 
+> > as if you do not request the gpio the gpiolib will auto request the gpios
+> > so you api will be 
+> > int gpio_get_block(unsigned int *gpios, u8* values, size_t size);
+> > 
+> > return an error
+> > 
+> > int gpio_set_block(unsigned int *gpios, u8* set, size_t size);
+> > 
+> > so you do not care about the banks you work on the gpiolib framework will call
+> > each gpio_chip seperatly. If the set_block get_block is not availlable the
+> > gpiolib could fallback to get/set
+> > 
+> > inside of the gpiolib that you call each bank with a bitmapped list is correct
+> > but not in the public gpiolib API
+> 
+> Good idea! Talking about the public API (your above gpio_set_block()):
+> *gpios is a list of GPIOs, but set is still bitmapped (mapped onto the
+> list specified in *gpios)? To prevent confusion about what the size
+> argument means (number of gpios in *gpios _or_ number of bytes in the
+> bitmap *set) - wouldn't it be clearer to have a "bool *set" and "bool
+> *values" list?
+public API list of gpio as example
 
-Thanks
-Padma
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+gpios = {1, 33, 34, 55};
+set = {1, 0, 0 ,1};
+
+gpio_set_blocks(gpios, set, 4);
+
+private you do just provide the array related to the gpio_chip
+lets assume 4 bank with 32 gpio each
+
+gpio0 = {1};
+set0 = {1};
+
+gpio1 = {33, 34};
+set1 = {0, 0};
+
+gpio2 = {55};
+set2 = {1};
+
+set_blocks(gpio_chip0, gpio0, set0, 1);
+set_blocks(gpio_chip1, gpio1, set1, 2);
+set_blocks(gpio_chip2, gpio2, set2, 1);
+
+Best Regards,
+J.
