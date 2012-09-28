@@ -1,61 +1,19 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 28 Sep 2012 15:45:43 -0400 (EDT)
-Subject: [PATCH] ARM: Add BUG_ON when hlt counter is wrongly used
-In-Reply-To: <1348827774-17880-1-git-send-email-fwu@marvell.com>
-References: <1348827774-17880-1-git-send-email-fwu@marvell.com>
-Message-ID: <alpine.LFD.2.02.1209281542560.6667@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2012 19:46:16 +0000
+Subject: [PATCH v3 2/2] ARM: Remove mach-bcmring
+In-Reply-To: <1348263626-3087-3-git-send-email-csd@broadcom.com>
+References: <1348263626-3087-1-git-send-email-csd@broadcom.com>
+ <1348263626-3087-3-git-send-email-csd@broadcom.com>
+Message-ID: <201209281946.17118.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Sep 2012, Fan Wu wrote:
-
-> From: fwu <fwu@marvell.com>
+On Friday 21 September 2012, Christian Daudt wrote:
+> Remove mach-bcmring as this is no longer maintained or used.
 > 
-> 1. On ARM platform, "nohlt" can be used to prevent core from idle
->    process, returning immediately.
-> 2. There are two interfaces, exported for other modules, named
->    "disable_hlt" and "enable_hlt" are used to enable/disable the
->    cpuidle mechanism by increasing/decreasing "hlt_counter".
->    Disable_hlt and enable_hlt are paired operation,
->    when you first call disable_hlt and then enable_hlt, the
->    semantics are right.
-> 3. There is no obvious constraint to prevent user(driver/module)
->    code to prevent the case that enable_hlt is ahead of disable_hlt,
->    which is a fatal operation on kernel state change from user,
->    and there is no any WARNING or notification if the case happens
->    in current kernel code.
->    This patch aims to report BUG when the case happens, just like
->    what the kernel do when enable_irq is ahead of disable_irq.
-> 
-> Signed-off-by: fwu <fwu@marvell.com>
-> Signed-off-by: YiLu Mao <ylmao@marvell.com>
-> Signed-off-by: Ning Jiang <ning.jiang@marvell.com>
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Jiandong Zheng <jdzheng@broadcom.com>
 
-This looks sensible to me.
+Applied to next/cleanup2 branch in arm-soc now.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> Change-Id: Iddacf45aec012bb663e130801727b4eb3d11436b
-
-Please don't forget to strip that when submitting your patch to 
-Russell's patch system.
-
-> ---
->  arch/arm/kernel/process.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 693b744..5bbd3be 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -70,6 +70,7 @@ EXPORT_SYMBOL(disable_hlt);
->  void enable_hlt(void)
->  {
->  	hlt_counter--;
-> +	BUG_ON(hlt_counter < 0)
->  }
->  
->  EXPORT_SYMBOL(enable_hlt);
-> -- 
-> 1.7.0.4
-> 
+	Arnd
