@@ -1,79 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 28 Sep 2012 10:21:23 +0100
-Subject: [GIT PULL] ARM: cache flushing LoUIS API v2
-Message-ID: <20120928092123.GA28967@e102568-lin.cambridge.arm.com>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Fri, 28 Sep 2012 11:22:27 +0200
+Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
+ conditions.
+In-Reply-To: <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
+References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
+ <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
+ <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
+Message-ID: <CAHod+GfbcB4d_siaTXn5a163b5sivUTqkWim8r2KJASh=7iGuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+> I believe that was derived from the legacy code, so if you think it's
+> a bug and can get a proper fix, just go with it. Note, however, if the
+> code affects poodle/corgi, you may take another look and make sure
+> it doesn't break the rest ones.
 
-I updated as discussed the patch series and folded the xscale and feroceon
-fix into the first patch of the series, please consider dropping the old
-series and pulling this updated version.
+I think i found the actual problem here.
 
-Changes wrt v1:
-	# fixed LoUIS cache aliases for xscale and feroceon
-	# rebased against v3.6-rc7
+-       pxa_gpio_mode(GPIO18_RDY|GPIO_OUT | GPIO_DFLT_HIGH);
++       pxa2xx_mfp_config(&gpio18_config[0], 1);
 
-It has been tested on:
+These two lines don't do the same thing. The first one sets GPIO18 as
+output, default high.
+The second one sets GPIO18 to alternate function RDY. Similar thing
+happens here:
 
-- OMAP4/5 (ARM and T2 kernels)
-  # suspend/hotplug and CPU idle
-- iMX6q (ARM kernel)
-  # suspend and hotplug
-- TC2 big.LITTLE testchip (ARM and T2 kernels)
-  # CPU idle
+-       pxa_gpio_mode(GPIO18_RDY_MD);
+-       pxa_gpio_mode(10 | GPIO_IN);
++       pxa2xx_mfp_config(&gpio18_config[1], 1);
 
-Thank you very much indeed,
-Lorenzo
+ This is probably due to the fact that
+prior to pxa-regs.h breakup, GPIO18_RDY was defined as 18
+and GPIO18_RDY_MD defined the RDY alternate function.
 
-The following changes since commit 979570e02981d4a8fc20b3cc8fd651856c98ee9d:
+Basically, this bug is caused by a gpio naming mixup.
 
-  Linux 3.6-rc7 (2012-09-23 18:10:57 -0700)
+A simple fix would be:
 
-are available in the git repository at:
+ static unsigned long gpio18_config[] = {
+-       GPIO18_RDY,
+        GPIO18_GPIO,
++       GPIO18_RDY,
+ };
 
-  git://linux-arm.org/linux-2.6-lp.git cache-louis
+I tested this and it works. If you think this is correct
+i'll post a proper patch.
 
-for you to fetch changes up to 94966a21d293668115e2195cb3488e009236b140:
-
-  ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API (2012-09-28 09:46:18 +0100)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (4):
-      ARM: mm: implement LoUIS API for cache maintenance ops
-      ARM: mm: rename jump labels in v7_flush_dcache_all function
-      ARM: kernel: update cpu_suspend code to use cache LoUIS operations
-      ARM: kernel: update __cpu_disable to use cache LoUIS maintenance API
-
-Santosh Shilimkar (1):
-      ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API
-
- arch/arm/include/asm/cacheflush.h | 15 ++++++++++++
- arch/arm/include/asm/glue-cache.h |  1 +
- arch/arm/kernel/smp.c             |  5 +++-
- arch/arm/kernel/suspend.c         | 17 +++++++++++++-
- arch/arm/mm/cache-fa.S            |  3 +++
- arch/arm/mm/cache-v3.S            |  3 +++
- arch/arm/mm/cache-v4.S            |  3 +++
- arch/arm/mm/cache-v4wb.S          |  3 +++
- arch/arm/mm/cache-v4wt.S          |  3 +++
- arch/arm/mm/cache-v6.S            |  3 +++
- arch/arm/mm/cache-v7.S            | 48 ++++++++++++++++++++++++++++++++++-----
- arch/arm/mm/proc-arm1020.S        |  3 +++
- arch/arm/mm/proc-arm1020e.S       |  3 +++
- arch/arm/mm/proc-arm1022.S        |  3 +++
- arch/arm/mm/proc-arm1026.S        |  3 +++
- arch/arm/mm/proc-arm920.S         |  3 +++
- arch/arm/mm/proc-arm922.S         |  3 +++
- arch/arm/mm/proc-arm925.S         |  3 +++
- arch/arm/mm/proc-arm926.S         |  3 +++
- arch/arm/mm/proc-arm940.S         |  3 +++
- arch/arm/mm/proc-arm946.S         |  3 +++
- arch/arm/mm/proc-feroceon.S       |  4 ++++
- arch/arm/mm/proc-macros.S         |  1 +
- arch/arm/mm/proc-mohawk.S         |  3 +++
- arch/arm/mm/proc-v7.S             |  2 +-
- arch/arm/mm/proc-xsc3.S           |  3 +++
- arch/arm/mm/proc-xscale.S         |  4 ++++
- 27 files changed, 142 insertions(+), 9 deletions(-)
+I also looked at the original sharp kernel sources.
+Only tosa used the RDY signal for it's tc6393tx chip, other machines simply
+configured gpio18 as output in their suspend routines.
