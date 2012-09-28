@@ -1,147 +1,117 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 27 Sep 2012 22:08:00 -0600
-Subject: [PATCH] ARM: bcm2835: implement machine restart hook
-Message-ID: <1348805280-7647-1-git-send-email-swarren@wwwdotorg.org>
+Date: Thu, 27 Sep 2012 22:10:12 -0600
+Subject: [PATCH 2/2] ARM: bcm2835: enable GPIO/pinctrl
+In-Reply-To: <1348805412-7804-1-git-send-email-swarren@wwwdotorg.org>
+References: <1348805412-7804-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1348805412-7804-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the machine restart hook using the SoC's watchdog timer module.
-To support this, define a DT binding for the watchdog module, and add it
-to the device tree.
+Enable GPIO and pinctrl in Kconfig.
 
-The downstream rpi-split branch contains a full watchdog timer driver
-implementation, which also implements the restart hook. However, the
-restart function is largely separate from the watchdog driver, so for
-simplicity, the restart hook is implemented here directly in the main
-machine source file.
+Add required <mach/gpio.h> for gpiolib.
 
-Overall structure (separate setup/restart) functions derived from the
-picoxcell ARM support.
+Instantiate the BCM2835 GPIO module in bcm2835.dtsi.
 
-Watchdog register IO sequence taken from code by Simon Arlott. Note that
-the watchdog module is not documented in BCM2835-ARM-Peripherals.pdf.
+Add a pinctrl definition to bcm2835-rpi-b.dts that sets up all of the
+board's required pinmux configuration. GPIO aren't specified; that's
+left to gpio_request().
 
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- .../bindings/watchdog/brcm,bcm2835-pm-wdog.txt     |   13 ++++++
- arch/arm/boot/dts/bcm2835.dtsi                     |    5 +++
- arch/arm/mach-bcm2835/bcm2835.c                    |   46 ++++++++++++++++++++
- 3 files changed, 64 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
+ arch/arm/Kconfig                          |    5 ++++-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts       |   15 +++++++++++++++
+ arch/arm/boot/dts/bcm2835.dtsi            |   23 +++++++++++++++++++++++
+ arch/arm/mach-bcm2835/include/mach/gpio.h |    1 +
+ 4 files changed, 43 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-bcm2835/include/mach/gpio.h
 
-diff --git a/Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt b/Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
-new file mode 100644
-index 0000000..03138e6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
-@@ -0,0 +1,13 @@
-+BCM2835 Watchdog timer
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 84e914a..257ac7c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -351,7 +351,7 @@ config ARCH_AT91
+ 
+ config ARCH_BCM2835
+ 	bool "Broadcom BCM2835 family"
+-	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_ERRATA_411920
+ 	select ARM_TIMER_SP804
+@@ -359,7 +359,10 @@ config ARCH_BCM2835
+ 	select COMMON_CLK
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
++	select GENERIC_GPIO
+ 	select MULTI_IRQ_HANDLER
++	select PINCTRL
++	select PINCTRL_BCM2835
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 	help
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 7dd860f..9b72054 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -10,3 +10,18 @@
+ 		reg = <0 0x10000000>;
+ 	};
+ };
 +
-+Required properties:
++&gpio {
++	pinctrl-names = "default";
++	pinctrl-0 = <&alt0 &alt3>;
 +
-+- compatible : should be "brcm,bcm2835-pm-wdog"
-+- reg : Specifies base physical address and size of the registers.
++	alt0: alt0 {
++		brcm,pins = <0 1 2 3 4 5 6 7 8 9 10 11 14 15 40 45>;
++		brcm,function = <4>; /* alt0 */
++	};
 +
-+Example:
-+
-+intc: interrupt-controller {
-+	compatible = "brcm,bcm2835-pm-wdog";
-+	reg = <0x7e100000 0x28>;
++	alt3: alt3 {
++		brcm,pins = <48 49 50 51 52 53>;
++		brcm,function = <7>; /* alt3 */
++	};
 +};
 diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 0b61939..7e0d515 100644
+index 7e0d515..7e22ed3 100644
 --- a/arch/arm/boot/dts/bcm2835.dtsi
 +++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -29,6 +29,11 @@
- 			#interrupt-cells = <2>;
+@@ -40,5 +40,28 @@
+ 			interrupts = <2 25>;
+ 			clock-frequency = <3000000>;
  		};
- 
-+		watchdog {
-+			compatible = "brcm,bcm2835-pm-wdog";
-+			reg = <0x7e100000 0x28>;
++
++		gpio: gpio {
++			compatible = "brcm,bcm2835-gpio";
++			reg = <0x7e200000 0xb4>;
++			/*
++			 * The GPIO IP block is designed for 3 banks of GPIOs.
++			 * Each bank has a GPIO interrupt for itself.
++			 * There is an overall "any bank" interrupt.
++			 * In order, these are GIC interrupts 17, 18, 19, 20.
++			 * Since the BCM2835 only has 2 banks, the 2nd bank
++			 * interrupt output appears to be mirrored onto the
++			 * 3rd bank's interrupt signal.
++			 * So, a bank0 interrupt shows up on 17, 20, and
++			 * a bank1 interrupt shows up on 18, 19, 20!
++			 */
++			interrupts = <2 17>, <2 18>, <2 19>, <2 20>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
 +		};
-+
- 		uart at 20201000 {
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
-diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
-index f6fea49..35859c6 100644
---- a/arch/arm/mach-bcm2835/bcm2835.c
-+++ b/arch/arm/mach-bcm2835/bcm2835.c
-@@ -12,8 +12,10 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/irqchip/bcm2835.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/bcm2835_timer.h>
- #include <linux/clk/bcm2835.h>
-@@ -23,6 +25,48 @@
- 
- #include <mach/bcm2835_soc.h>
- 
-+#define PM_RSTC				0x1c
-+#define PM_WDOG				0x24
-+
-+#define PM_PASSWORD			0x5a000000
-+#define PM_RSTC_WRCFG_MASK		0x00000030
-+#define PM_RSTC_WRCFG_FULL_RESET	0x00000020
-+
-+static void __iomem *wdt_regs;
-+
-+/*
-+ * The machine restart method can be called from an atomic context so we won't
-+ * be able to ioremap the regs then.
-+ */
-+static void bcm2835_setup_restart(void)
-+{
-+	struct device_node *np = of_find_compatible_node(NULL, NULL,
-+						"brcm,bcm2835-pm-wdog");
-+	if (WARN(!np, "unable to setup watchdog restart"))
-+		return;
-+
-+	wdt_regs = of_iomap(np, 0);
-+	WARN(!wdt_regs, "failed to remap watchdog regs");
-+}
-+
-+static void bcm2835_restart(char mode, const char *cmd)
-+{
-+	u32 val;
-+
-+	if (!wdt_regs)
-+		return;
-+
-+	/* use a timeout of 10 ticks (~150us) */
-+	writel_relaxed(10 | PM_PASSWORD, wdt_regs + PM_WDOG);
-+	val = readl_relaxed(wdt_regs + PM_RSTC);
-+	val &= ~PM_RSTC_WRCFG_MASK;
-+	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
-+	writel_relaxed(val, wdt_regs + PM_RSTC);
-+
-+	/* No sleeping, possibly atomic. */
-+	mdelay(1);
-+}
-+
- static struct map_desc io_map __initdata = {
- 	.virtual = BCM2835_PERIPH_VIRT,
- 	.pfn = __phys_to_pfn(BCM2835_PERIPH_PHYS),
-@@ -39,6 +83,7 @@ void __init bcm2835_init(void)
- {
- 	int ret;
- 
-+	bcm2835_setup_restart();
- 	bcm2835_init_clocks();
- 
- 	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
-@@ -60,5 +105,6 @@ DT_MACHINE_START(BCM2835, "BCM2835")
- 	.handle_irq = bcm2835_handle_irq,
- 	.init_machine = bcm2835_init,
- 	.timer = &bcm2835_timer,
-+	.restart = bcm2835_restart,
- 	.dt_compat = bcm2835_compat
- MACHINE_END
+ 	};
+ };
+diff --git a/arch/arm/mach-bcm2835/include/mach/gpio.h b/arch/arm/mach-bcm2835/include/mach/gpio.h
+new file mode 100644
+index 0000000..40a8c17
+--- /dev/null
++++ b/arch/arm/mach-bcm2835/include/mach/gpio.h
+@@ -0,0 +1 @@
++/* empty */
 -- 
 1.7.9.5
