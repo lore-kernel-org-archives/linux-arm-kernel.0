@@ -1,30 +1,52 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 28 Sep 2012 10:24:42 -0600
-Subject: [PATCH v2] pinctrl: clarify idle vs sleep states
-In-Reply-To: <1348816688-27531-1-git-send-email-linus.walleij@stericsson.com>
-References: <1348816688-27531-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <5065CF4A.9070406@wwwdotorg.org>
+Date: Fri, 28 Sep 2012 11:09:27 -0600
+Subject: [PATCH 1/1] Fix segfault in DTC
+In-Reply-To: <50632F78.4030709@broadcom.com>
+References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
+ <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
+ <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
+ <20120925233054.GL9800@truffula.fritz.box> <50624393.30607@broadcom.com>
+ <20120926003508.GB31993@truffula.fritz.box> <50632F78.4030709@broadcom.com>
+Message-ID: <5065D9C7.40906@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2012 01:18 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On 09/26/2012 10:38 AM, Markus Mayer wrote:
+> On 25/09/2012 17:35, David Gibson wrote:
+>> On Tue, Sep 25, 2012 at 04:51:47PM -0700, Markus Mayer wrote:
+>>> On 25/09/2012 16:30, David Gibson wrote:
+>>>>
+>>>> Which dtc version did you observe this with?  I'm unable to reproduce
+>>>> the SEGV with current git.
+>>>
+>>> That was
+>>>
+>>> $ cat version_gen.h
+>>> #define DTC_VERSION "DTC 1.2.0-g37c0b6a0"
+>>>
+>>> from
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git. In
+>>> other words, the DTC used by the Linux 3.6-rc series.
+>>
+>> Ah, ok.  Patches to dtc should be made against the upstream version at
+>> git://git.jdl.com/software/dtc.git.  In this case the bug was already
+>> fixed there, in commit a6e6c60e3a97a6b3a033cd052bb3740fd53cbf4c.
 > 
-> This pure documentation fix tries to align the "idle" and
-> "sleep" pin states to the idle and suspend states from
-> runtime PM.
+> Ah yes. That makes sense. Thanks for pointing out the commit that fixes
+> the issue. I just checked it out.
 > 
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - I changed my mind slightly after experimentation in practice
->   (empirical stuff is the best). So now I think "idle" is for
->   runtime_suspend(), and "sleep" is for suspend() proper. This
->   works best in practice for us. I'm trying to set some model
->   here that will be easy to understand and usable for typical
->   cases.
+>> I think we're overdue to update the kernel copy of dtc from upstream.
+> 
+> Yeah, seems like the kernel DTC is quite old.
 
-Yes, I think this makes sense.
+FYI, I'm working on a patch to the kernel to bring in the latest dtc.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+I've run a regression test vs. the old dtc in the kernel and found that
+some of the PowerPC .dts files don't compile with the new dtc (but did
+with the old), all due to non-existent labels/paths being referenced.
+I'll try and track down whether this is a regression in dtc, or simply
+buggy .dts files that weren't noticed before.
+
+Everything non-PowerPC works fine, and most PowerPC files work fine.
+Where compilation succeeds, the md5sum of the .dtb is identical in every
+case.
