@@ -1,84 +1,26 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 28 Sep 2012 18:25:50 +0530
-Subject: [PATCH 1/2] dm644x: replace the obsolete preset API by the
- timings API.
-In-Reply-To: <201209281452.22871.hverkuil@xs4all.nl>
-References: <1344429020-27616-1-git-send-email-prabhakar.lad@ti.com>
- <1344429020-27616-2-git-send-email-prabhakar.lad@ti.com>
- <CA+V-a8tPQsc4-gS7jDCNy5PmsbTafoER9aXeL39_45Tk=0MjSw@mail.gmail.com>
- <201209281452.22871.hverkuil@xs4all.nl>
-Message-ID: <CA+V-a8vVLyrDdR4NMMq17orb-dvFwsjT_2GeRygqcW-bYZnsjw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 28 Sep 2012 09:58:21 -0300
+Subject: Using ipuv3 driver with device tree
+In-Reply-To: <20120928123853.GJ24458@pengutronix.de>
+References: <CAOMZO5CUFJ4-J90oVcNDmVLJDd4Q3xtHPKqD+BoADg7gV0gtsw@mail.gmail.com>
+ <20120928123853.GJ24458@pengutronix.de>
+Message-ID: <CAOMZO5C+0uYW+cGRed+W2SSPBpFPtNoq2UPOjr0oEvy5D9NuSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Fri, Sep 28, 2012 at 9:38 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-On Fri, Sep 28, 2012 at 6:22 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> Hi Prabhakar!
->
-> On Fri September 28 2012 14:44:59 Prabhakar Lad wrote:
->> Hi Kevin,
->>
->> On Wed, Aug 8, 2012 at 6:00 PM, Prabhakar Lad <prabhakar.lad@ti.com> wrote:
->> > From: Hans Verkuil <hans.verkuil@cisco.com>
->> >
->> > Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
->> > Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
->> > ---
->> >  arch/arm/mach-davinci/board-dm644x-evm.c   |   15 ++--
->> >  arch/arm/mach-davinci/dm644x.c             |   17 +---
->> >  drivers/media/video/davinci/vpbe.c         |  110 ++++++++++++----------------
->> >  drivers/media/video/davinci/vpbe_display.c |   60 +++++++--------
->> >  drivers/media/video/davinci/vpbe_venc.c    |   25 +++---
->> >  include/media/davinci/vpbe.h               |   14 ++--
->> >  include/media/davinci/vpbe_types.h         |    8 +--
->> >  include/media/davinci/vpbe_venc.h          |    2 +-
->> >  8 files changed, 111 insertions(+), 140 deletions(-)
->> >
->> Can you ACK this patch? Since this patch needs to go from Mauro's tree
->> due to changes in media drivers folder structure.
->>
->> Regards,
->> --Prabhakar Lad
->>
->
-> ...
->
->> > -static int vpbe_s_dv_preset(struct vpbe_device *vpbe_dev,
->> > -                    struct v4l2_dv_preset *dv_preset)
->> > +static int vpbe_s_dv_timings(struct vpbe_device *vpbe_dev,
->> > +                    struct v4l2_dv_timings *dv_timings)
->> >  {
->> >         struct vpbe_config *cfg = vpbe_dev->cfg;
->> >         int out_index = vpbe_dev->current_out_index;
->> > +       struct vpbe_output *output = &cfg->outputs[out_index];
->> >         int sd_index = vpbe_dev->current_sd_index;
->> > -       int ret;
->> > +       int ret, i;
->> >
->> >
->> >         if (!(cfg->outputs[out_index].output.capabilities &
->> > -           V4L2_OUT_CAP_PRESETS))
->> > +           V4L2_OUT_CAP_CUSTOM_TIMINGS))
->
-> Can you make a follow-up patch that renames V4L2_IN/OUT_CAP_CUSTOM_TIMINGS to
-> V4L2_IN/OUT_CAP_DV_TIMINGS? The old name for this define is deprecated, so it
-> would be nice to fix this in this driver as well.
->
-> The code that adds the new define names went in just two days ago, so as far
-> as I am concerned there is no need to modify the patch again. A follow-up
-> patch is sufficient.
->
-Ok, I'll create a follow up patch.
+> I just wanted to create some followup patches to add the devicetree
+> support so that you have something to test with, but I found out
+> that this is not so simple as it seems. The i.MX6 clock lookups will
+> be switched to devicetree probe, but this is not in -next yet. Current
+> -next is broken for me right now (haven't figured out why, but CMA
+> does not work, I get not ethernet link on my babbage board,...)
+> I think we'll just wait until things have settled after the merge
+> window until I base further work on the IPU patches.
 
-Regards,
---Prabhakar
+Understood, makes sense. Let's wait for 3.7-rc1.
 
-> Regards,
->
->         Hans
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+
+Fabio Estevam
