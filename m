@@ -1,49 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Sep 2012 10:58:08 +0100
-Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
-In-Reply-To: <alpine.LFD.2.02.1209280011340.6667@xanadu.home>
-References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
- <alpine.LFD.2.02.1209280011340.6667@xanadu.home>
-Message-ID: <20120928095808.GB18125@mudshark.cambridge.arm.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Fri, 28 Sep 2012 15:37:37 +0530
+Subject: [PATCH 1/5] drivers: usb: phy: add a new driver for omap usb2 phy
+In-Reply-To: <5064D7CA.1070909@ti.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-2-git-send-email-kishon@ti.com>
+ <50605CFB.5090402@gmail.com>
+ <CAAe_U6+2Vxd8F_JMafm41+0SnZSrZCa_9VKRbdB200BUHw5vEQ@mail.gmail.com>
+ <506461A0.4050103@gmail.com> <5064D7CA.1070909@ti.com>
+Message-ID: <CAAe_U6KHk1nuSBVn-4H397wzUk0cnqGe_H0D8RVqrSFYGJVMCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 05:17:53AM +0100, Nicolas Pitre wrote:
-> On Thu, 27 Sep 2012, Russell King wrote:
-> 
-> > If we are building for a LE platform, and we haven't overriden the
-> > MMIO ops, then we can optimize the mem*io operations using the
-> > standard string functions.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> We presume that the IO space is able to cope with a mixture of access 
-> width other than byte access which should be perfectly reasonable by 
-> default.  If so then...
-> 
-> Acked-by: Nicolas Pitre <nico@.linaro.org>
+Hi,
 
-This looks pretty scary to me, but maybe I'm worrying too much. The first
-thing to ensure is that the accesses are always aligned, which I believe is
-true for the string operations. However, a quick glance at memset shows that
-we do things like store multiple with writeback addressing modes. This is
-bad for a few reasons:
+On Fri, Sep 28, 2012 at 4:18 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 9/27/2012 7:24 AM, Rob Herring wrote:
+>>
+>> On 09/25/2012 05:06 AM, ABRAHAM, KISHON VIJAY wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Mon, Sep 24, 2012 at 6:45 PM, Rob Herring <robherring2@gmail.com>
+>>> wrote:
+>>>>
+>>>> On 09/06/2012 09:57 AM, Kishon Vijay Abraham I wrote:
+>>>>>
+>>>>> All phy related programming like enabling/disabling the clocks,
+>>>>> powering
+>>>>> on/off the phy is taken care of by this driver. It is also used for OTG
+>>>>> related functionality like srp.
+>>>>>
+>>>>> This also includes device tree support for usb2 phy driver and
+>>>>> the documentation with device tree binding information is updated.
+>>>>>
+>>>>> Currently writing to control module register is taken care in this
+>>>>> driver which will be removed once the control module driver is in
+>>>>> place.
+>>>>>
+>>>>> Cc: Felipe Balbi <balbi@ti.com>
+>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>> ---
+>>>>>   Documentation/devicetree/bindings/usb/usb-phy.txt |   17 ++
+>>>>>   drivers/usb/phy/Kconfig                           |    9 +
+>>>>>   drivers/usb/phy/Makefile                          |    1 +
+>>>>>   drivers/usb/phy/omap-usb2.c                       |  271
+>>>>> +++++++++++++++++++++
+>>>>>   include/linux/usb/omap_usb.h                      |   46 ++++
+>>>>>   include/linux/usb/phy_companion.h                 |   34 +++
+>>>>>   6 files changed, 378 insertions(+)
+>>>>>   create mode 100644 Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>>>   create mode 100644 drivers/usb/phy/omap-usb2.c
+>>>>>   create mode 100644 include/linux/usb/omap_usb.h
+>>>>>   create mode 100644 include/linux/usb/phy_companion.h
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>>> b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..80d4148
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+>>>>
+>>>>
+>>>> This is a very generic name...
+>>>>
+>>>>> @@ -0,0 +1,17 @@
+>>>>> +USB PHY
+>>>>> +
+>>>>> +OMAP USB2 PHY
+>>>>> +
+>>>>> +Required properties:
+>>>>> + - compatible: Should be "ti,omap-usb2"
+>>>>
+>>>>
+>>>> ...for a specific phy. However, I do think a generic binding to describe
+>>>> host ctrlr to phy connections is needed.
+>>>>
+>>>>> + - reg : Address and length of the register set for the device. Also
+>>>>> +add the address of control module dev conf register until a driver for
+>>>>> +control module is added
+>>>>
+>>>>
+>>>> The dts should describe the h/w, not what you need for the current
+>>>> driver. The 2nd reg field does not belong here.
+>>>
+>>>
+>>> Indeed. This was discussed and agreed upon as a interim solution till
+>>> we have a control module driver in place to write to the control
+>>> module register.
+>>
+>>
+>> Discussed where and agreed by who? I for one do not agree.
+>
+>
+> Yeah, what was tolerated was the addition of that address inside hwmod data,
+> but I do agree that it should not go into DTS.
 
-	1. If an access other the first one generated by the instruction
-	   causes an abort, the CPU will ultimately re-execute the earlier
-	   accesses, which could be problematic to a device.
+So how can we handle reg writes to control module until we have a
+control module driver. usb2 phy does not have a hwmod data for itself.
+Do you think we should add a new hwmod data for usb2 phy and use this
+in the usb2phy data node in the dts file?
 
-	2. Writeback addressing modes when accessing MMIO peripherals causes
-	   serious performance problems with virtualisation, as I have
-	   described before.
-
-	3. We have to guarantee that no single instruction causes accesses
-	   that span a page boundary, as this leads to UNPREDICTABLE
-	   behaviour.
-
-So, unless we can guarantee that our accesses are all aligned, will never
-fault, do not cross a page boundary and we are not running as a guest then
-I'd be inclined to stick with byte-by-byte implementations for these
-functions.
-
-Will
+Thanks
+Kishon
