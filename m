@@ -1,100 +1,62 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 28 Sep 2012 16:28:31 +0200
-Subject: [RFC PATCH 00/16] pinctrl: samsung: Usability and extensibiltiy
- improvements
-Message-ID: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
+Date: Fri, 28 Sep 2012 16:28:32 +0200
+Subject: [RFC PATCH 01/16] pinctrl: exynos: Parse wakeup-eint parameters from
+ DT
+In-Reply-To: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
+References: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1348842527-22460-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC series is a work on improving usability and extensibiltiy of the
-pinctrl-samsung driver. It consists of three main parts:
- - moving SoC-specific data to device tree
- - converting the driver to use one GPIO chip and one IRQ domain per pin bank
- - introducing generic wake-up interrupt capability description
+This patch converts the pinctrl-exynos driver to parse wakeup interrupt
+count and register offsets from device tree. It reduces the amount of
+static platform-specific data and facilitates adding further SoC
+variants to pinctrl-samsung driver.
 
-What the first part does is replacing static platform-specific data in
-pinctrl-samsung driver with data dynamically parsed from device tree.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ drivers/pinctrl/pinctrl-exynos.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-It aims at reducing the SoC-specific part of the driver and thus the
-amount of modifications to driver sources when adding support for next
-SoCs (like Exynos4x12).
-
-In addition, it extends the description of SoC-specific attributes to cover all
-mainlined Samsung SoCs, starting from s3c24xx and ending on latest Exynos5
-series, with the exception of 4-bit banks with more than 8 pins on S3C64xx,
-which will be covered by futher patch(es).
-
-The second part attempts to simplify usage of the driver and fix several
-problems of current implementation, in particular:
-
-  - Simplifies GPIO pin specification in device tree by using pin
-    namespace local to pin bank instead of local to pin controller, e.g.
-
-	gpios = <&gpj0 3 0>;
-
-    instead of
-
-	gpios = <&pinctrl0 115 0>;
-
-  - Simplifies GPIO interrupt specification in device tree by using
-    namespace local to pin bank (and equal to GPIO namespace), e.g.
-
-	interrupt-parent = <&gpj0>;
-	interrupts = <3 0>;
-
-    instead of
-
-	interrupt-parent = <&pinctrl0>;
-	interrupts = <115 0>;
-
-  - Simplifies internal GPIO pin to bank translation thanks to
-    correspondence of particular GPIO chips to pin banks. This allows
-    to remove the (costly in case of GPIO bit-banging drivers) lookup
-    over all banks to find the one that the pin is from.
-
-Third part is focused on removing the static, hard-coded description of wake-up
-interrupt controller and wake-up interrupt layout.
-
-It defines a (mostly) generic (in scope of targetted SoCs) wake-up interrupt
-layout specification format that allows to specify which pin banks support
-wake-up interrupts and how they are handled (direct or multiplexed/chained).
-
-See particular patches for more detailed descriptions and the last patch for
-updated device tree bindings.
-
-Any comments are welcome.
-
-Tomasz Figa (16):
-  pinctrl: exynos: Parse wakeup-eint parameters from DT
-  pinctrl: samsung: Detect and handle unsupported configuration types
-  pinctrl: samsung: Parse pin banks from DT
-  pinctrl: exynos: Remove static platform-specific data
-  pinctrl: samsung: Parse bank-specific eint offset from DT
-  pinctrl: samsung: Hold OF node of pin bank in bank struct
-  pinctrl: samsung: Hold pointer to driver data in bank struct
-  pinctrl: exynos: Use one IRQ domain per pin bank
-  pinctrl: samsung: Do not pass gpio_chip to pin_to_reg_bank
-  pinctrl: samsung: Use one GPIO chip per pin bank
-  pinctrl: samsung: Use per-bank IRQ domain for wake-up interrupts
-  pinctrl: exynos: Set pin function to EINT in irq_set_type of wake-up
-    EINT
-  pinctrl: samsung: Parse offsets of particular registers from DT
-  ARM: dts: exynos4210: Remove legacy gpio nodes
-  ARM: dts: exynos4210: Add platform-specific descriptions for pin
-    controllers
-  Documentation: Update samsung-pinctrl device tree bindings
-    documentation
-
- .../bindings/pinctrl/samsung-pinctrl.txt           | 212 ++++++++--
- arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi    | 459 +++++++++++++++++++++
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi          |   2 +
- arch/arm/boot/dts/exynos4210.dtsi                  | 254 +-----------
- drivers/pinctrl/pinctrl-exynos.c                   | 401 ++++++++----------
- drivers/pinctrl/pinctrl-exynos.h                   | 184 +--------
- drivers/pinctrl/pinctrl-samsung.c                  | 372 +++++++++++++----
- drivers/pinctrl/pinctrl-samsung.h                  |  87 ++--
- 8 files changed, 1186 insertions(+), 785 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
-
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 21362f4..b4b58d4 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -435,6 +435,8 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	struct device_node *np;
+ 	struct exynos_weint_data *weint_data;
+ 	int idx, irq;
++	u32 val;
++	int ret;
+ 
+ 	for_each_child_of_node(dev->of_node, np) {
+ 		if (of_match_node(exynos_wkup_irq_ids, np)) {
+@@ -445,6 +447,26 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	if (!wkup_np)
+ 		return -ENODEV;
+ 
++	ret = of_property_read_u32(wkup_np, "samsung,weint-count", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->nr_wint = val;
++
++	ret = of_property_read_u32(wkup_np, "samsung,weint-con", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->weint_con = val;
++
++	ret = of_property_read_u32(wkup_np, "samsung,weint-mask", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->weint_mask = val;
++
++	ret = of_property_read_u32(wkup_np, "samsung,weint-pend", &val);
++	if (ret)
++		return -EINVAL;
++	d->ctrl->weint_pend = val;
++
+ 	d->wkup_irqd = irq_domain_add_linear(wkup_np, d->ctrl->nr_wint,
+ 				&exynos_wkup_irqd_ops, d);
+ 	if (!d->wkup_irqd) {
 -- 
 1.7.12
