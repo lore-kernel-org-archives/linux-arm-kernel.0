@@ -1,55 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Sep 2012 15:13:42 +0100
-Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
-In-Reply-To: <201209281336.30728.arnd@arndb.de>
-References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
- <201209281336.30728.arnd@arndb.de>
-Message-ID: <CAHkRjk684Qbbac4oxY2NpmExG8WKJT_XSXYfv5Tr9vn0+OkFwQ@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 28 Sep 2012 16:16:50 +0200
+Subject: [PATCH 0/4] cpufreq: db8500: Use platform data to provide cpufreq
+ table
+Message-ID: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 September 2012 14:36, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 27 September 2012, Russell King wrote:
->> +#ifndef __ARMBE__
->> +static inline void memset_io(volatile void __iomem *dst, unsigned c,
->> +       size_t count)
->> +{
->> +       memset((void __force *)dst, c, count);
->> +}
->> +#define memset_io(dst,c,count) memset_io(dst,c,count)
->> +
->> +static inline void memcpy_fromio(void *to, const volatile void __iomem *from,
->> +       size_t count)
->> +{
->> +       memcpy(to, (const void __force *)from, count);
->> +}
->> +#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
->> +
->
-> I wonder whether we need any barriers here. PowerPC has the strongest
-> barriers befor eand after the access, at least since f007cacffc8870
-> "[POWERPC] Fix MMIO ops to provide expected barrier behaviour".
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-In theory, we need barriers but only at the beginning and the end of
-the operation, not for every iteration (and in practice we might even
-be OK without any). The device accesses are ordered with each-other by
-hardware, it's only when you need them to be ordered with other types
-or memory accesses (or even other devices).
+Since the cpufreq table is dependant on the prmcu fw, it make sense to
+keep the table there. Moreover since the cpufreq is already a mfd child
+device added by the prcmu this make even more logic.
 
-> arm64 actually copies the arm variant, and I suspect we can use the
-> simpler version there as well.
+The next step after these patches will be to implement an "arm_clk" to be
+used from cpufreq to update the opp instead of using the prcmu opp API directly.
+This will then remove the last hard dependency to the prcmu API from cpufreq.
 
-For arm64 I have a set of optimised library functions which I left out
-from the upstream branch just to make the review easier. I'll post the
-patches and push them once the core code is upstream. But the memcpy()
-implementation does not perform pointer alignment (it may at some
-point, based on benchmarks), so not usable with I/O.
+Ulf Hansson (4):
+  ARM: ux500: Remove cpufreq platform device
+  mfd: db8500: Provide cpufreq table as platform data
+  cpufreq: db8500: Register as a platform driver
+  cpufreq: db8500: Fetch cpufreq table from platform data
 
-The simplest optimisation for arm64 (already suggested by Olof and on
-my to-do list) is  something like the powerpc implementation but using
-write*_relaxed() to avoid barriers in a loop. The performance of the
-compiled code shouldn't be far from hand-written assembly, especially
-on ARMv8 with more out of order execution.
+ arch/arm/mach-ux500/cpu-db8500.c |    6 ---
+ drivers/cpufreq/db8500-cpufreq.c |   87 +++++++++++++++++++-------------------
+ drivers/mfd/db8500-prcmu.c       |   22 ++++++++++
+ 3 files changed, 66 insertions(+), 49 deletions(-)
 
 -- 
-Catalin
+1.7.10
