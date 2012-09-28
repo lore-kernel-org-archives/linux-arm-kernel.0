@@ -1,82 +1,122 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 28 Sep 2012 00:17:53 -0400 (EDT)
-Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
-In-Reply-To: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
-References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1209280011340.6667@xanadu.home>
+From: hdk@igel.co.jp (Hideki EIRAKU)
+Date: Fri, 28 Sep 2012 13:29:11 +0900 (JST)
+Subject: [PATCH v3 1/2] iommu/shmobile: Add iommu driver for Renesas
+ IPMMU modules
+In-Reply-To: <CABMQnVKiZyKMy_T7iAArc48zKnwzHpEUZY9+iqTRzCf9v9tJ0g@mail.gmail.com>
+References: <1347343814-32299-1-git-send-email-hdk@igel.co.jp>
+ <1347343814-32299-2-git-send-email-hdk@igel.co.jp>
+ <CABMQnVKiZyKMy_T7iAArc48zKnwzHpEUZY9+iqTRzCf9v9tJ0g@mail.gmail.com>
+Message-ID: <20120928.132911.321770401.hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Sep 2012, Russell King wrote:
+Hi,
 
-> If we are building for a LE platform, and we haven't overriden the
-> MMIO ops, then we can optimize the mem*io operations using the
-> standard string functions.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Subject: Re: [PATCH v3 1/2] iommu/shmobile: Add iommu driver for Renesas IPMMU modules
+Date: Wed, 12 Sep 2012 17:07:00 +0900
 
-We presume that the IO space is able to cope with a mixture of access 
-width other than byte access which should be perfectly reasonable by 
-default.  If so then...
+>> +static inline void ipmmu_add_device(struct device *dev)
+>> +{
+>> +}
+> 
+> Please use 'do { } while (0)'.
 
-Acked-by: Nicolas Pitre <nico@.linaro.org>
+Do you mean using #define macro is better than this inline function?
+I chose the inline function because:
 
-> ---
->  arch/arm/include/asm/io.h |   25 +++++++++++++++++++++++++
->  1 files changed, 25 insertions(+), 0 deletions(-)
+- The function's argument type is checked by a compiler.
+- Its output code should be exactly the same as a macro in this case.
+- The Linux kernel coding style says "Generally, inline functions are
+  preferable to macros resembling functions."
+
+>> +       switch (size) {
+>> +       default:
+>> +               priv->tlb_enabled = 0;
+>> +               break;
+>> +       case 0x2000:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 1);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       case 0x1000:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 2);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       case 0x800:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 3);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       case 0x400:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 4);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       case 0x200:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 5);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       case 0x100:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 6);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       case 0x80:
+>> +               ipmmu_reg_write(priv, IMTTBCR, 7);
+>> +               priv->tlb_enabled = 1;
+>> +               break;
+>> +       }
 > 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 815c669..ed0577e 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -23,6 +23,7 @@
->  
->  #ifdef __KERNEL__
->  
-> +#include <linux/string.h>
->  #include <linux/types.h>
->  #include <asm/byteorder.h>
->  #include <asm/memory.h>
-> @@ -249,9 +250,33 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->  #define writesw(p,d,l)		__raw_writesw(p,d,l)
->  #define writesl(p,d,l)		__raw_writesl(p,d,l)
->  
-> +#ifndef __ARMBE__
-> +static inline void memset_io(volatile void __iomem *dst, unsigned c,
-> +	size_t count)
-> +{
-> +	memset((void __force *)dst, c, count);
-> +}
-> +#define memset_io(dst,c,count) memset_io(dst,c,count)
-> +
-> +static inline void memcpy_fromio(void *to, const volatile void __iomem *from,
-> +	size_t count)
-> +{
-> +	memcpy(to, (const void __force *)from, count);
-> +}
-> +#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
-> +
-> +static inline void memcpy_toio(volatile void __iomem *to, const void *from,
-> +	size_t count)
-> +{
-> +	memcpy((void __force *)to, from, count);
-> +}
-> +#define memcpy_toio(to,from,count) memcpy_toio(to,from,count)
-> +
-> +#else
->  #define memset_io(c,v,l)	_memset_io(c,(v),(l))
->  #define memcpy_fromio(a,c,l)	_memcpy_fromio((a),c,(l))
->  #define memcpy_toio(c,a,l)	_memcpy_toio(c,(a),(l))
-> +#endif
->  
->  #endif	/* readl */
->  
-> -- 
-> 1.7.4.4
+> I thought that you could describe more briefly if ffs() is used.
+
+This is simply converted from a hardware manual.  ffs() can be used
+like below:
+
+	bit = ffs(size);
+	if (bit >= 7 && bit <= 13 && (1 << bit) == size) {
+		ipmmu_reg_write(priv, IMTTBCR, 14 - bit);
+		priv->tlb_enabled = 1;
+	} else {
+		priv->tlb_enabled = 0;
+	}
+
+Checking size is still needed because only 7 sizes are allowed here.
+I think using switch() is easier to understand.
+
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_8192
+>> +#define L1_SIZE 8192
+>> +#endif
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_4096
+>> +#define L1_SIZE 4096
+>> +#endif
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_2048
+>> +#define L1_SIZE 2048
+>> +#endif
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_1024
+>> +#define L1_SIZE 1024
+>> +#endif
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_512
+>> +#define L1_SIZE 512
+>> +#endif
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_256
+>> +#define L1_SIZE 256
+>> +#endif
+>> +#ifdef CONFIG_SHMOBILE_IOMMU_L1SIZE_128
+>> +#define L1_SIZE 128
+>> +#endif
 > 
+> I think that it was better to define by kconfig.
+> For example, following codes.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> +config SHMOBILE_IOMMU_L1SIZE
+> +       hex
+> +       default "0x00002000" if SHMOBILE_IOMMU_L1SIZE_8192
+> +       default "0x00001000" if SHMOBILE_IOMMU_L1SIZE_4096
+> +       default "0x00000800" if SHMOBILE_IOMMU_L1SIZE_2048
+> +       default "0x00000400" if SHMOBILE_IOMMU_L1SIZE_1024
+> +       default "0x00000200" if SHMOBILE_IOMMU_L1SIZE_512
+> +       default "0x00000100" if SHMOBILE_IOMMU_L1SIZE_256
+> +       default "0x00000080" if SHMOBILE_IOMMU_L1SIZE_128
+
+I did not know that way.  It looks good for me too.
+Thank you.
+
+-- 
+Hideki EIRAKU <hdk@igel.co.jp>
