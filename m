@@ -1,38 +1,120 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 27 Sep 2012 23:53:33 -0400 (EDT)
-Subject: [RFC PATCH 0/3] ARM: uncompress.h multi-platform enablement
-In-Reply-To: <50632096.7080208@wwwdotorg.org>
-References: <1348613212-21897-1-git-send-email-swarren@wwwdotorg.org>
- <201209261417.18883.arnd@arndb.de> <506315A6.3090300@am.sony.com>
- <201209261449.48468.arnd@arndb.de>
- <20120926151023.GC30938@n2100.arm.linux.org.uk>
- <50632096.7080208@wwwdotorg.org>
-Message-ID: <alpine.LFD.2.02.1209272343330.6667@xanadu.home>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 28 Sep 2012 09:24:26 +0300
+Subject: [PATCH 1/6] OMAPDSS: remove unnecessary plat/clock.h includes
+In-Reply-To: <20120927163329.21755.34776.stgit@dusk.lan>
+References: <20120927162800.21755.62891.stgit@dusk.lan>
+ <20120927163329.21755.34776.stgit@dusk.lan>
+Message-ID: <1348813466.2437.1.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Sep 2012, Stephen Warren wrote:
+On Thu, 2012-09-27 at 10:33 -0600, Paul Walmsley wrote:
+> The OMAP DSS video drivers include <plat/clock.h> but don't use any
+> information from that file.  These includes are causing problems with
+> ARM single image kernels - remove them.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>  drivers/video/omap2/dss/dispc.c |    1 -
+>  drivers/video/omap2/dss/dsi.c   |    1 -
+>  drivers/video/omap2/dss/dss.c   |    1 -
+>  3 files changed, 3 deletions(-)
 
-> In the Tegra case, by omitting uncompress.h, we lose more than just the
-> "Decompressing Linux..." message; uncompress.h contains code to parse
-> extract the platform's debug UART ID from data set up by the boot ROM
-> (since we have 5 UARTs), and pass this on to debug-macro.S.
+Hi Paul. I already have the below patch in omapdss branch, and it's also
+in linux-next.
 
-Let me tell you that this is totally evil.  OMAP and Davinci are doing 
-the same abuse.
-
-> Without uncompress.h running, debug-macro.S would either have to 
-> hard-code a single UART ID (and different boards uses different UARTs, 
-> which would make running a single kernel image across all Tegra 
-> devices with earlyprintk enabled impossible) *or* we'd have to port 
-> the UART ID extraction code to debug-macro.S too,
-
-Please do the later.  That's the only sane solution.
-
-> which I don't fancy very much since that's assembly whereas 
-> uncompress.h is C.
-
-Well, that's too bad.  Time to sharpen your assembly skills.  ;-)
+ Tomi
 
 
-Nicolas
+commit fe6a466283cf1ced93360bd5f5055d6543021a6a
+Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date:   Thu Aug 30 10:52:47 2012 +0300
+
+    OMAPDSS: remove unnecessary includes
+    
+    Remove unnecessary includes from omapdss.
+    
+    Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+diff --git a/drivers/video/omap2/dss/dispc.c b/drivers/video/omap2/dss/dispc.c
+index 0de9a7e..e934abb 100644
+--- a/drivers/video/omap2/dss/dispc.c
++++ b/drivers/video/omap2/dss/dispc.c
+@@ -37,8 +37,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ 
+-#include <plat/clock.h>
+-
+ #include <video/omapdss.h>
+ 
+ #include "dss.h"
+diff --git a/drivers/video/omap2/dss/dpi.c b/drivers/video/omap2/dss/dpi.c
+index 25fb895..99b9851 100644
+--- a/drivers/video/omap2/dss/dpi.c
++++ b/drivers/video/omap2/dss/dpi.c
+@@ -31,7 +31,6 @@
+ #include <linux/regulator/consumer.h>
+ 
+ #include <video/omapdss.h>
+-#include <plat/cpu.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
+diff --git a/drivers/video/omap2/dss/dsi.c b/drivers/video/omap2/dss/dsi.c
+index 254666f..8d815e3 100644
+--- a/drivers/video/omap2/dss/dsi.c
++++ b/drivers/video/omap2/dss/dsi.c
+@@ -41,7 +41,6 @@
+ 
+ #include <video/omapdss.h>
+ #include <video/mipi_display.h>
+-#include <plat/clock.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
+diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+index 31a553a..759dbee 100644
+--- a/drivers/video/omap2/dss/dss.c
++++ b/drivers/video/omap2/dss/dss.c
+@@ -36,7 +36,6 @@
+ #include <video/omapdss.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
+diff --git a/drivers/video/omap2/dss/overlay.c b/drivers/video/omap2/dss/overlay.c
+index 952c6fa..94e74be 100644
+--- a/drivers/video/omap2/dss/overlay.c
++++ b/drivers/video/omap2/dss/overlay.c
+@@ -32,7 +32,6 @@
+ #include <linux/slab.h>
+ 
+ #include <video/omapdss.h>
+-#include <plat/cpu.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
+diff --git a/drivers/video/omap2/dss/venc.c b/drivers/video/omap2/dss/venc.c
+index 4a6caf9..45252cf 100644
+--- a/drivers/video/omap2/dss/venc.c
++++ b/drivers/video/omap2/dss/venc.c
+@@ -36,7 +36,6 @@
+ #include <linux/pm_runtime.h>
+ 
+ #include <video/omapdss.h>
+-#include <plat/cpu.h>
+ 
+ #include "dss.h"
+ #include "dss_features.h"
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120928/5c20fc3f/attachment-0001.sig>
