@@ -1,52 +1,61 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 28 Sep 2012 15:37:52 -0400
-Subject: [PATCH v2 7/7] ARM: dts: AM33xx PRUSS support
-In-Reply-To: <1348861072-14507-1-git-send-email-mporter@ti.com>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
-Message-ID: <1348861072-14507-8-git-send-email-mporter@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 28 Sep 2012 15:45:43 -0400 (EDT)
+Subject: [PATCH] ARM: Add BUG_ON when hlt counter is wrongly used
+In-Reply-To: <1348827774-17880-1-git-send-email-fwu@marvell.com>
+References: <1348827774-17880-1-git-send-email-fwu@marvell.com>
+Message-ID: <alpine.LFD.2.02.1209281542560.6667@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a pruss node and an example of use on Beaglebone.
+On Fri, 28 Sep 2012, Fan Wu wrote:
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/boot/dts/am335x-bone.dts |    4 ++++
- arch/arm/boot/dts/am33xx.dtsi     |   11 +++++++++++
- 2 files changed, 15 insertions(+)
+> From: fwu <fwu@marvell.com>
+> 
+> 1. On ARM platform, "nohlt" can be used to prevent core from idle
+>    process, returning immediately.
+> 2. There are two interfaces, exported for other modules, named
+>    "disable_hlt" and "enable_hlt" are used to enable/disable the
+>    cpuidle mechanism by increasing/decreasing "hlt_counter".
+>    Disable_hlt and enable_hlt are paired operation,
+>    when you first call disable_hlt and then enable_hlt, the
+>    semantics are right.
+> 3. There is no obvious constraint to prevent user(driver/module)
+>    code to prevent the case that enable_hlt is ahead of disable_hlt,
+>    which is a fatal operation on kernel state change from user,
+>    and there is no any WARNING or notification if the case happens
+>    in current kernel code.
+>    This patch aims to report BUG when the case happens, just like
+>    what the kernel do when enable_irq is ahead of disable_irq.
+> 
+> Signed-off-by: fwu <fwu@marvell.com>
+> Signed-off-by: YiLu Mao <ylmao@marvell.com>
+> Signed-off-by: Ning Jiang <ning.jiang@marvell.com>
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index c634f87..9e070c2 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -78,3 +78,7 @@
- 		};
- 	};
- };
-+
-+&pruss {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index bb31bff..399feb3 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -210,5 +210,16 @@
- 			interrupt-parent = <&intc>;
- 			interrupts = <91>;
- 		};
-+
-+		pruss: pruss at 4a300000 {
-+			compatible = "ti,pruss-v2";
-+			ti,hwmods = "pruss";
-+			ti,deassert-hard-reset = "pruss", "pruss";
-+			reg = <0x4a300000 0x080000>;
-+			ti,pintc-offset = <0x20000>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <20 21 22 23 24 25 26 27>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.9.5
+This looks sensible to me.
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> Change-Id: Iddacf45aec012bb663e130801727b4eb3d11436b
+
+Please don't forget to strip that when submitting your patch to 
+Russell's patch system.
+
+> ---
+>  arch/arm/kernel/process.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 693b744..5bbd3be 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -70,6 +70,7 @@ EXPORT_SYMBOL(disable_hlt);
+>  void enable_hlt(void)
+>  {
+>  	hlt_counter--;
+> +	BUG_ON(hlt_counter < 0)
+>  }
+>  
+>  EXPORT_SYMBOL(enable_hlt);
+> -- 
+> 1.7.0.4
+> 
