@@ -1,42 +1,23 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 28 Sep 2012 13:21:05 +0200
-Subject: [PATCH 2/3] Revert "spi/pl022: enable runtime PM"
-In-Reply-To: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1348831266-16721-3-git-send-email-ulf.hansson@stericsson.com>
+Date: Fri, 28 Sep 2012 13:21:03 +0200
+Subject: [PATCH 0/3] Fixup use of runtime pm
+Message-ID: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-This reverts commit 2fb30d1147c599f5657e8c62c862f9a0f58d9d99.
+Some old runtime pm patches got merged whiched messed up things.
+These is now reverted. Additionaly one patch do a simplification
+of the use of runtime pm functions.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/spi/spi-pl022.c |    4 ----
- 1 file changed, 4 deletions(-)
+Ulf Hansson (3):
+  Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+  Revert "spi/pl022: enable runtime PM"
+  spi: spi-pl022: Minor simplification for runtime pm
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 3f2f36c..05cfb61e 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2188,9 +2188,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
- 	       adev->res.start, pl022->virtbase);
- 
--	pm_runtime_enable(dev);
--	pm_runtime_resume(dev);
--
- 	pl022->clk = clk_get(&adev->dev, NULL);
- 	if (IS_ERR(pl022->clk)) {
- 		status = PTR_ERR(pl022->clk);
-@@ -2303,7 +2300,6 @@ pl022_remove(struct amba_device *adev)
- 	clk_disable(pl022->clk);
- 	clk_unprepare(pl022->clk);
- 	clk_put(pl022->clk);
--	pm_runtime_disable(&adev->dev);
- 	iounmap(pl022->virtbase);
- 	amba_release_regions(adev);
- 	tasklet_disable(&pl022->pump_transfers);
+ drivers/spi/spi-pl022.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
 -- 
 1.7.10
