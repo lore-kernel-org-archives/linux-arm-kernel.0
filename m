@@ -1,65 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Sep 2012 16:12:46 +0200
-Subject: [PATCH] ARM: Orion5x: ts78xx: Add IOMEM for virtual addresses.
-Message-ID: <1348841566-18308-1-git-send-email-andrew@lunn.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Sep 2012 15:13:42 +0100
+Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
+In-Reply-To: <201209281336.30728.arnd@arndb.de>
+References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
+ <201209281336.30728.arnd@arndb.de>
+Message-ID: <CAHkRjk684Qbbac4oxY2NpmExG8WKJT_XSXYfv5Tr9vn0+OkFwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also convert logical or to + for register offsets from base
-addresses. This fixes a number of warnings currently seen in
-linux-next:
+On 28 September 2012 14:36, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 27 September 2012, Russell King wrote:
+>> +#ifndef __ARMBE__
+>> +static inline void memset_io(volatile void __iomem *dst, unsigned c,
+>> +       size_t count)
+>> +{
+>> +       memset((void __force *)dst, c, count);
+>> +}
+>> +#define memset_io(dst,c,count) memset_io(dst,c,count)
+>> +
+>> +static inline void memcpy_fromio(void *to, const volatile void __iomem *from,
+>> +       size_t count)
+>> +{
+>> +       memcpy(to, (const void __force *)from, count);
+>> +}
+>> +#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
+>> +
+>
+> I wonder whether we need any barriers here. PowerPC has the strongest
+> barriers befor eand after the access, at least since f007cacffc8870
+> "[POWERPC] Fix MMIO ops to provide expected barrier behaviour".
 
-warning: passing argument 2 of '__raw_writeb' makes pointer from
-interger without cast.
+In theory, we need barriers but only at the beginning and the end of
+the operation, not for every iteration (and in practice we might even
+be OK without any). The device accesses are ordered with each-other by
+hardware, it's only when you need them to be ordered with other types
+or memory accesses (or even other devices).
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-orion5x/ts78xx-setup.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> arm64 actually copies the arm variant, and I suspect we can use the
+> simpler version there as well.
 
-diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-index b420327..b0727dc 100644
---- a/arch/arm/mach-orion5x/ts78xx-setup.c
-+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-@@ -36,7 +36,7 @@
-  * FPGA - lives where the PCI bus would be at ORION5X_PCI_MEM_PHYS_BASE
-  */
- #define TS78XX_FPGA_REGS_PHYS_BASE	0xe8000000
--#define TS78XX_FPGA_REGS_VIRT_BASE	0xff900000
-+#define TS78XX_FPGA_REGS_VIRT_BASE	IOMEM(0xff900000)
- #define TS78XX_FPGA_REGS_SIZE		SZ_1M
- 
- static struct ts78xx_fpga_data ts78xx_fpga = {
-@@ -50,7 +50,7 @@ static struct ts78xx_fpga_data ts78xx_fpga = {
-  ****************************************************************************/
- static struct map_desc ts78xx_io_desc[] __initdata = {
- 	{
--		.virtual	= TS78XX_FPGA_REGS_VIRT_BASE,
-+		.virtual	= (unsigned long)TS78XX_FPGA_REGS_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(TS78XX_FPGA_REGS_PHYS_BASE),
- 		.length		= TS78XX_FPGA_REGS_SIZE,
- 		.type		= MT_DEVICE,
-@@ -80,8 +80,8 @@ static struct mv_sata_platform_data ts78xx_sata_data = {
- /*****************************************************************************
-  * RTC M48T86 - nicked^Wborrowed from arch/arm/mach-ep93xx/ts72xx.c
-  ****************************************************************************/
--#define TS_RTC_CTRL	(TS78XX_FPGA_REGS_VIRT_BASE | 0x808)
--#define TS_RTC_DATA	(TS78XX_FPGA_REGS_VIRT_BASE | 0x80c)
-+#define TS_RTC_CTRL	(TS78XX_FPGA_REGS_VIRT_BASE + 0x808)
-+#define TS_RTC_DATA	(TS78XX_FPGA_REGS_VIRT_BASE + 0x80c)
- 
- static unsigned char ts78xx_ts_rtc_readbyte(unsigned long addr)
- {
-@@ -162,8 +162,8 @@ static void ts78xx_ts_rtc_unload(void)
- /*****************************************************************************
-  * NAND Flash
-  ****************************************************************************/
--#define TS_NAND_CTRL	(TS78XX_FPGA_REGS_VIRT_BASE | 0x800)	/* VIRT */
--#define TS_NAND_DATA	(TS78XX_FPGA_REGS_PHYS_BASE | 0x804)	/* PHYS */
-+#define TS_NAND_CTRL	(TS78XX_FPGA_REGS_VIRT_BASE + 0x800)	/* VIRT */
-+#define TS_NAND_DATA	(TS78XX_FPGA_REGS_PHYS_BASE + 0x804)	/* PHYS */
- 
- /*
-  * hardware specific access to control-lines
+For arm64 I have a set of optimised library functions which I left out
+from the upstream branch just to make the review easier. I'll post the
+patches and push them once the core code is upstream. But the memcpy()
+implementation does not perform pointer alignment (it may at some
+point, based on benchmarks), so not usable with I/O.
+
+The simplest optimisation for arm64 (already suggested by Olof and on
+my to-do list) is  something like the powerpc implementation but using
+write*_relaxed() to avoid barriers in a loop. The performance of the
+compiled code shouldn't be far from hand-written assembly, especially
+on ARMv8 with more out of order execution.
+
 -- 
-1.7.10.4
+Catalin
