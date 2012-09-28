@@ -1,50 +1,81 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 28 Sep 2012 11:23:37 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <20120928090848.GX17667@game.jcrosoft.org>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
- <20120928024744.GV17667@game.jcrosoft.org> <50654E57.3080201@antcom.de>
- <20120928075145.GW17667@game.jcrosoft.org> <50656522.1050900@antcom.de>
- <20120928090848.GX17667@game.jcrosoft.org>
-Message-ID: <50656C99.50204@antcom.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Sep 2012 11:36:18 +0200
+Subject: [PATCH] ARM: dts: cfa10049: Add FEC to the CFA-10049 expansion board
+Message-ID: <1348824978-25340-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2012 11:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> Good idea! Talking about the public API (your above gpio_set_block()):
->> *gpios is a list of GPIOs, but set is still bitmapped (mapped onto the
->> list specified in *gpios)? To prevent confusion about what the size
->> argument means (number of gpios in *gpios _or_ number of bytes in the
->> bitmap *set) - wouldn't it be clearer to have a "bool *set" and "bool
->> *values" list?
-> public API list of gpio as example
-> 
-> gpios = {1, 33, 34, 55};
-> set = {1, 0, 0 ,1};
-> 
-> gpio_set_blocks(gpios, set, 4);
-> 
-> private you do just provide the array related to the gpio_chip
-> lets assume 4 bank with 32 gpio each
-> 
-> gpio0 = {1};
-> set0 = {1};
-> 
-> gpio1 = {33, 34};
-> set1 = {0, 0};
-> 
-> gpio2 = {55};
-> set2 = {1};
-> 
-> set_blocks(gpio_chip0, gpio0, set0, 1);
-> set_blocks(gpio_chip1, gpio1, set1, 2);
-> set_blocks(gpio_chip2, gpio2, set2, 1);
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10049.dts |   11 +++++++++++
+ arch/arm/mach-mxs/mach-mxs.c         |   14 ++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-Good.
-
-For the internal driver API (gpio_chip), we even don't really need the
-first argument (gpio_chip) since we can infer it from the gpios.
-
-Will provide an update.
-
-Roland
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index d91d16c..97ee098 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -102,4 +102,15 @@
+ 			gpio = <&gpio0 7 1>;
+ 		};
+ 	};
++
++	ahb at 80080000 {
++		mac0: ethernet at 800f0000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac0_pins_a>;
++			phy-reset-gpios = <&gpio2 21 0>;
++			phy-reset-duration = <100>;
++			status = "okay";
++		};
++	};
+ };
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 8dabfe8..65b8fbb 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -157,6 +157,7 @@ static struct sys_timer imx28_timer = {
+ enum mac_oui {
+ 	OUI_FSL,
+ 	OUI_DENX,
++	OUI_CRYSTALFONTZ,
+ };
+ 
+ static void __init update_fec_mac_prop(enum mac_oui oui)
+@@ -202,6 +203,11 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 			macaddr[1] = 0xe5;
+ 			macaddr[2] = 0x4e;
+ 			break;
++		case OUI_CRYSTALFONTZ:
++			macaddr[0] = 0x58;
++			macaddr[1] = 0xb9;
++			macaddr[2] = 0xe1;
++			break;
+ 		}
+ 		val = ocotp[i];
+ 		macaddr[3] = (val >> 16) & 0xff;
+@@ -270,6 +276,12 @@ static void __init apx4devkit_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
+ 
++static void __init cfa10049_init(void)
++{
++	enable_clk_enet_out();
++	update_fec_mac_prop(OUI_CRYSTALFONTZ);
++}
++
+ static void __init mxs_machine_init(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+@@ -280,6 +292,8 @@ static void __init mxs_machine_init(void)
+ 		m28evk_init();
+ 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
+ 		apx4devkit_init();
++	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
++		cfa10049_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     mxs_auxdata_lookup, NULL);
+-- 
+1.7.9.5
