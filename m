@@ -1,44 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2012 23:36:11 +0200
-Subject: [PATCH 06/12] sched: warnings in kernel/sched/fair.c
-In-Reply-To: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Fri, 28 Sep 2012 16:38:02 -0500
+Subject: [PATCH 02/12] ata: mark probe function as __devinit rather than
+ __init
+In-Reply-To: <1348868177-21205-3-git-send-email-arnd@arndb.de>
 References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
-Message-ID: <1348868177-21205-7-git-send-email-arnd@arndb.de>
+ <1348868177-21205-3-git-send-email-arnd@arndb.de>
+Message-ID: <506618BA.4070509@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a4c96ae319 "sched: Unthrottle rt runqueues in __disable_runtime()"
-turned the unthrottle_offline_cfs_rqs function into a static symbol,
-which now triggers a warning about it being potentially unused:
+On 09/28/2012 04:36 PM, Arnd Bergmann wrote:
+> Functions for hotplugging must be marked as __devinit so
+> they do not get discarded, as pointed out by a build time
+> warning from modpost.
+> 
+> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Jeff Garzik <jgarzik@redhat.com>
+> ---
+>  drivers/ata/sata_highbank.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/ata/sata_highbank.c b/drivers/ata/sata_highbank.c
+> index 0d7c4c2..36a141a 100644
+> --- a/drivers/ata/sata_highbank.c
+> +++ b/drivers/ata/sata_highbank.c
+> @@ -260,7 +260,7 @@ static const struct of_device_id ahci_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, ahci_of_match);
+>  
+> -static int __init ahci_highbank_probe(struct platform_device *pdev)
+> +static int __devinit ahci_highbank_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct ahci_host_priv *hpriv;
 
-kernel/sched/fair.c:2055:13: warning: 'unthrottle_offline_cfs_rqs' defined but not used [-Wunused-function]
+Thanks. I just ran into this today and couldn't figure out the error
+message.
 
-Marking it __maybe_unused shuts up the gcc warning and lets the
-compiler safely drop the function body when it's not being used.
+Acked-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
 
-To reproduce, build the ARM bcm2835_defconfig.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Peter Boonstoppel <pboonstoppel@nvidia.com>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Paul Turner <pjt@google.com>
-Cc: Ingo Molnar <mingo@kernel.org>
----
- kernel/sched/fair.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 6b800a1..9f52728 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -2052,7 +2052,7 @@ static void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
- 	hrtimer_cancel(&cfs_b->slack_timer);
- }
- 
--static void unthrottle_offline_cfs_rqs(struct rq *rq)
-+static void __maybe_unused unthrottle_offline_cfs_rqs(struct rq *rq)
- {
- 	struct cfs_rq *cfs_rq;
- 
--- 
-1.7.10
+--Mark Langsdorf
+Calxeda, Inc.
