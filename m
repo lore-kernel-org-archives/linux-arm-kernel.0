@@ -1,56 +1,100 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 28 Sep 2012 20:32:47 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <20120928160105.GA17667@game.jcrosoft.org>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
- <20120928024744.GV17667@game.jcrosoft.org> <50654E57.3080201@antcom.de>
- <20120928075145.GW17667@game.jcrosoft.org> <50656522.1050900@antcom.de>
- <20120928090848.GX17667@game.jcrosoft.org>
- <20120928102822.GY17667@game.jcrosoft.org> <50658AD0.1050501@antcom.de>
- <20120928160105.GA17667@game.jcrosoft.org>
-Message-ID: <5065ED4F.5070700@antcom.de>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Sat, 29 Sep 2012 00:21:10 +0530
+Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
+In-Reply-To: <5063330E.3000203@ti.com>
+References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
+ <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
+ <5063330E.3000203@ti.com>
+Message-ID: <5065F19E.5020708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 28/09/12 18:01, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> Maybe like this, for some struct block *?
+
+On 9/26/2012 10:23 PM, Jon Hunter wrote:
+> 
+> On 09/20/2012 06:53 PM, Tony Lindgren wrote:
+>> * Benoit Cousson <b-cousson@ti.com> [120919 19:24]:
+>>> Hi Tony,
+>>>
+>>> I was about to take the DTS patch, but was wondering if you will pull
+>>> the driver changes for 3.7.
 >>
->> block = set_block_prepare(gc, pins, values, size);
->> if (block) {
->> 	set_block(gc, block);
->> 	...
->> 	set_block_unprepare(gc, block);
->> }
->>
->> Would mean that all supported drivers would need to implement those 3
->> new functions... Need to be careful about not introducing bloat...
-> the prepare is gpiolib specific, it will be a helper to conver a gpio list to
-> a gpio block list
->
-> I was thinking more
->
-> block = gpio_block_prepare(pins, size);
->
-> gpio_block_set_value(pin0, val);
-> gpio_block_set_value(pin1, val);
-> gpio_block_set_value(pin2, val);
-> gpio_block_set(block);
->
-> andfor get
->
-> gpio_block_get(block)
-> val = gpio_block_get_value(block, pin0);
-> val = gpio_block_get_value(block, pin1);
->
-> for the gpio driver ti's transparent
+>> I suggest that you do a separate branch on top of Paul's hwmod series
+>> when he posts those if that works for you?
+> 
+> Benoit, I see that you have pulled in the DTS patch.
+> 
+> Do you guys want me to rebase the remaining patches with Rob's change on
+> Tony's master branch and re-submit?
+> 
 
-Problem here is that it's only an intermediate format since hardware 
-often needs special preparation of the data.
+Jon,
 
-But will evaluate what makes most sense.
+Sorry for delayed response, But I tried using your omap_test application
+to validate this patch series, but it is failing for me.
 
-Thanks for your notes!
+How did you test it? Are you running same test application at your end?
 
-Roland
+I am debugging this issue, i just thought I should tell you this before
+its too late.
+
+
+Below is the log -
+
+[root at arago /]# echo 3 > /tmp/omap-test/timer/one
+[   79.612223] omap_dm_timer_request_specific: Please use
+omap_dm_timer_request_by_cap()
+[   79.620636] Timer 3 not available!
+
+[root at arago /]#
+[root at arago /]# echo 3 > /tmp/omap-test/timer/all
+[  135.111949] Testing 48042000.timer with 24000000 Hz clock ...
+[root at arago /]# [  137.457389] Timer read test PASSED! No errors, 100 loops
+[  137.463267] Timer interrupt test PASSED!
+[  137.467650] Testing 48042000.timer with 32768 Hz clock ...
+[  139.816892] Timer read test PASSED! No errors, 100 loops
+[  139.830776] Timer interrupt test PASSED!
+[  139.835245] Testing 48044000.timer with 24000000 Hz clock ...
+[  142.183912] Timer read test PASSED! No errors, 100 loops
+[  142.189734] Timer interrupt test PASSED!
+[  142.194076] Testing 48044000.timer with 32768 Hz clock ...
+[  144.543451] Timer read test PASSED! No errors, 100 loops
+[  144.557334] Timer interrupt test PASSED!
+[  144.561806] Testing 48046000.timer with 24000000 Hz clock ...
+[  146.910469] Timer read test PASSED! No errors, 100 loops
+[  147.910493] Timer interrupt test FAILED! No interrupt occurred in 1 sec
+[  147.917598] Testing 48046000.timer with 32768 Hz clock ...
+[  150.262203] Timer read test PASSED! No errors, 100 loops
+[  151.262049] Timer interrupt test FAILED! No interrupt occurred in 1 sec
+[  151.269298] Testing 48048000.timer with 24000000 Hz clock ...
+[  153.613596] Timer read test PASSED! No errors, 100 loops
+[  154.613618] Timer interrupt test FAILED! No interrupt occurred in 1 sec
+[  154.620725] Testing 48048000.timer with 32768 Hz clock ...
+[  156.965324] Timer read test PASSED! No errors, 100 loops
+[  157.965176] Timer interrupt test FAILED! No interrupt occurred in 1 sec
+[  157.972419] Testing 4804a000.timer with 24000000 Hz clock ...
+
+[root at arago /]# [  160.316753] Timer read test PASSED! No errors, 100 loops
+
+[root at arago /]# [  161.316728] Timer interrupt test FAILED! No interrupt
+occurred in 1 sec
+[  161.323912] Testing 4804a000.timer with 32768 Hz clock ...
+
+[root at arago /]# [  163.668490] Timer read test PASSED! No errors, 100 loops
+[  164.668328] Timer interrupt test FAILED! No interrupt occurred in 1 sec
+[  164.675545] Tested 5 timers, skipped 6 timers and detected 6 errors
+[  164.682202] Test iteration 0 complete in 29 secs
+[  164.687104] Test summary: Iterations 1, Errors 6
+
+
+
+> Cheers
+> Jon
+> 
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
