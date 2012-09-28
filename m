@@ -1,50 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Sep 2012 13:34:18 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <50657356.4010801@antcom.de>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
- <CACRpkdZ+1ffsMDRZXYb5RRndoXstj_QHvHOpeikRY0bas72dKQ@mail.gmail.com>
- <50657356.4010801@antcom.de>
-Message-ID: <CACRpkdbEgBqSdZmebw+PBMo9G_Y24mgz17=dp11VrbKf5fKyDQ@mail.gmail.com>
+From: vipulkumar.samar@st.com (vipul kumar samar)
+Date: Fri, 28 Sep 2012 17:15:53 +0530
+Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+In-Reply-To: <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <50658DF1.2000409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 11:52 AM, Roland Stigge <stigge@antcom.de> wrote:
+Hello Ulf,
 
-> It's hard to do the one-value-per-file right for a several-gpios-at-once
-> goal. :-)
+On 9/28/2012 4:51 PM, Ulf HANSSON wrote:
+> From: Ulf Hansson<ulf.hansson@linaro.org>
+>
+> This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
+>
+> Signed-off-by: Ulf Hansson<ulf.hansson@linaro.org>
+> ---
+>   drivers/spi/spi-pl022.c |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+> index f8568b4..3f2f36c 100644
+> --- a/drivers/spi/spi-pl022.c
+> +++ b/drivers/spi/spi-pl022.c
+> @@ -2188,6 +2188,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+>   	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
+>   	       adev->res.start, pl022->virtbase);
+>
+> +	pm_runtime_enable(dev);
 
-That's true. This is one of the reasons I think GPIO chips should
-be /dev/gpioN device nodes and this business be handled by
-ioctl():s instead, it is harder from an ABI point of view but can
-do several things at once.
+Before calling spi-pl022 probe, amba_probe enables runtime pm. Is it 
+requires to re-enable it in spi-pl022 probe??
 
-> I originally had a one-value solution: A bit map, continuously
-> hex coded, like in the original kernel API idea (e.g. 0x000F0A0010).
-> Wasn't sure because it encodes GPIO numbers in a weird way.
-
-Yeah, well that is not so nice either.
-
-> Strictly formally: Isn't a comma-separated list of a GPIO block (e.g.
-> "80,81,85") a singe value in a sense? :-)
-
-I think it's called an array ...
-
-> Or other possibilities? Maybe
-> some node in /proc?
-
-Heaven's no.
-
-> Or some kind of new character device node?
-
-Yes, I don't know if we should create /dev/gpioN or /dev/pinctrlN for
-this, and add GPIO functions to pinctrl (while wrapping it in the
-gpiolib to aid migration) the latter would encourage users of the
-new ABI to switch to writing pinctrl drivers.
-
-> Otherwise, I need to think about leaving out the sysfs for this purpose.
-
-Do you really need it?
-
-Yours,
-Linus Walleij
+Regards
+Vipul Samar
