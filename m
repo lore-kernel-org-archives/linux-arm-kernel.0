@@ -1,65 +1,55 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 28 Sep 2012 18:23:12 +0530
-Subject: [PATCH 3/6] usb: dwc3-omap: Remove explicit writes to SYSCONFIG
- register
+Date: Fri, 28 Sep 2012 18:23:11 +0530
+Subject: [PATCH 2/6] usb: dwc3-omap: use runtime API's to enable clocks
 In-Reply-To: <1348836795-4783-1-git-send-email-kishon@ti.com>
 References: <1348836795-4783-1-git-send-email-kishon@ti.com>
-Message-ID: <1348836795-4783-4-git-send-email-kishon@ti.com>
+Message-ID: <1348836795-4783-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The runtime API's takes care of setting the SYSCONFIG register with
-appropriate values. Hence explicit writes to SYSCONFIG register is
-removed.
+Before accessing any register, runtime API's should be invoked to enable
+the clocks. runtime API's are added here to prevent abort during register
+access.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/usb/dwc3/dwc3-omap.c |   26 --------------------------
- 1 file changed, 26 deletions(-)
+ drivers/usb/dwc3/dwc3-omap.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
-index 6a0e17f..a1704c6 100644
+index 34578de..6a0e17f 100644
 --- a/drivers/usb/dwc3/dwc3-omap.c
 +++ b/drivers/usb/dwc3/dwc3-omap.c
-@@ -77,23 +77,6 @@
+@@ -43,6 +43,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/dwc3-omap.h>
++#include <linux/pm_runtime.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/ioport.h>
+ #include <linux/io.h>
+@@ -281,6 +282,13 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
+ 	omap->irq	= irq;
+ 	omap->base	= base;
  
- /* SYSCONFIG REGISTER */
- #define USBOTGSS_SYSCONFIG_DMADISABLE		(1 << 16)
--#define USBOTGSS_SYSCONFIG_STANDBYMODE(x)	((x) << 4)
--
--#define USBOTGSS_STANDBYMODE_FORCE_STANDBY	0
--#define USBOTGSS_STANDBYMODE_NO_STANDBY		1
--#define USBOTGSS_STANDBYMODE_SMART_STANDBY	2
--#define USBOTGSS_STANDBYMODE_SMART_WAKEUP	3
--
--#define USBOTGSS_STANDBYMODE_MASK		(0x03 << 4)
--
--#define USBOTGSS_SYSCONFIG_IDLEMODE(x)		((x) << 2)
--
--#define USBOTGSS_IDLEMODE_FORCE_IDLE		0
--#define USBOTGSS_IDLEMODE_NO_IDLE		1
--#define USBOTGSS_IDLEMODE_SMART_IDLE		2
--#define USBOTGSS_IDLEMODE_SMART_WAKEUP		3
--
--#define USBOTGSS_IDLEMODE_MASK			(0x03 << 2)
++	pm_runtime_enable(dev);
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0) {
++		dev_err(dev, "get_sync failed with err %d\n", ret);
++			goto err1;
++	}
++
+ 	reg = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
  
- /* IRQ_EOI REGISTER */
- #define USBOTGSS_IRQ_EOI_LINE_NUMBER		(1 << 0)
-@@ -318,15 +301,6 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
- 	reg = dwc3_omap_readl(omap->base, USBOTGSS_SYSCONFIG);
- 	omap->dma_status = !!(reg & USBOTGSS_SYSCONFIG_DMADISABLE);
+ 	utmi_mode = of_get_property(node, "utmi-mode", &size);
+@@ -354,6 +362,8 @@ err1:
+ static int __devexit dwc3_omap_remove(struct platform_device *pdev)
+ {
+ 	device_for_each_child(&pdev->dev, NULL, dwc3_remove_core);
++	pm_runtime_put(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
  
--	/* Set No-Idle and No-Standby */
--	reg &= ~(USBOTGSS_STANDBYMODE_MASK
--			| USBOTGSS_IDLEMODE_MASK);
--
--	reg |= (USBOTGSS_SYSCONFIG_STANDBYMODE(USBOTGSS_STANDBYMODE_NO_STANDBY)
--		| USBOTGSS_SYSCONFIG_IDLEMODE(USBOTGSS_IDLEMODE_NO_IDLE));
--
--	dwc3_omap_writel(omap->base, USBOTGSS_SYSCONFIG, reg);
--
- 	ret = devm_request_irq(dev, omap->irq, dwc3_omap_interrupt, 0,
- 			"dwc3-omap", omap);
- 	if (ret) {
+ 	return 0;
+ }
 -- 
 1.7.10.4
