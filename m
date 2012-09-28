@@ -1,74 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Sep 2012 16:54:43 +0100
-Subject: [PATCH 2/4] ARM: OMAP: DMA: Move plat/dma hearder to
- platform_data/dma-omap
-In-Reply-To: <20120928150538.GB4840@atomide.com>
-References: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
- <1348839609-10456-3-git-send-email-lokeshvutla@ti.com>
- <20120928145459.GZ4840@atomide.com>
- <CAMQu2gw9DJSZ4QVvo83atTpnsXyegneuQ2rJKBc+5ioiwEaqaQ@mail.gmail.com>
- <20120928150538.GB4840@atomide.com>
-Message-ID: <20120928155443.GA15246@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 28 Sep 2012 16:57:46 +0100
+Subject: [PATCH v2 RESEND 2/2] ARM: local timers: add timer support using
+ IO mapped register
+In-Reply-To: <20120928122858.GD9472@e106331-lin.cambridge.arm.com>
+References: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
+ <1347694914-1457-2-git-send-email-rvaswani@codeaurora.org>
+ <5062013F.8050507@codeaurora.org>
+ <20120928122858.GD9472@e106331-lin.cambridge.arm.com>
+Message-ID: <20120928155746.GB2253@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 08:05:38AM -0700, Tony Lindgren wrote:
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120928 08:02]:
-> > On Fri, Sep 28, 2012 at 8:25 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > >
-> > > * Lokesh Vutla <lokeshvutla@ti.com> [120928 06:41]:
-> > > > Move plat/dma.h header to platform_data/dma-omap.h as
-> > > > part of the single zImage work.
-> > >
-> > > Hmm there's no platform data in this header, just
-> > > exported things for drivers to use. So it should not
-> > > be placed into platform_data.
-> > >
-> > > Maybe it should be #include <asm/mach/dma-omap.h> for now?
-> > >
-> > I wasn't sure either when the file was placed under platform-data.
-> > I agree for now we can keep it mach layer but than means OMAP1 and
-> > OMAP2+ DMA header and source code needs to be split. That
-> > is not so straight forward.
+[ Note: please aim to CC devicetree-discuss at lists.ozlabs.org with any
+patches or bindings relevant to device tree. ]
+
+[ Lorenzo, there's a question for you further down this mail. ]
+
+On Fri, Sep 28, 2012 at 01:28:58PM +0100, Mark Rutland wrote:
+> On Tue, Sep 25, 2012 at 08:08:47PM +0100, Rohit Vaswani wrote:
+> > Any comments ?
 > 
-> No need for that, the path I'm suggesting is located under
-> arch/arm/include/asm/mach, it's not same as include <mach/dma-omap.h>.
->  
-> > With DMA engine conversion hopefully, we might get rid of the
-> > header eventually, but for now not sure whether we should
-> > go ahead and follow the splitting part.
-> > 
-> > Thoughts ?
+> I have a few questions about the irq side of things.
 > 
-> No need for splitting anything :)
+> > > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > > index 52478c8..8e01328 100644
+> > > --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > > +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> > > @@ -7,10 +7,13 @@ The timer is attached to a GIC to deliver its per-processor interrupts.
+> > >
+> > >   ** Timer node properties:
+> > >
+> > > -- compatible : Should at least contain "arm,armv7-timer".
+> > > +- compatible : Should at least contain "arm,armv7-timer" or
+> > > +  "arm,armv7-timer-mem" if using the memory mapped arch timer interface.
+> > >
+> > > -- interrupts : Interrupt list for secure, non-secure, virtual and
+> > > -  hypervisor timers, in that order.
+> > > +- interrupts : If using the cp15 interface, the interrupt list for secure,
+> > > +  non-secure, virtual and hypervisor timers, in that order.
+
+We should use the correct architectural terms for documenting these.
+For example, "non-secure" requires qualification.
+
+If I understand the ARM ARM correctly, the architectural names are
+
+ * Secure PL1 physical
+ * Non-secure PL2 physical
+ * Non-secure PL1 physical
+ * Virtual
+
+[...]
+
+> What privilege level are the interrupts for the memory-mapped interface?
 > 
-> The other possible location would be just include <linux/dma-omap.h>,
-> but as we all know that will be going away, <asm/mach/dma-omap.h>
-> is probably better.
+> Could each core have multiple interrupts at different privilege levels?
+> 
+> I also notice we don't seem to handle the case of systems without security
+> extensions, which only have physical and virtual interrupts. If we're adding
+> support for different interrupt setups, how do we handle them?
 
-No, not asm/mach/anything, please.  Let's try to get headers into the
-right place second time around.
+Agreed, some of the timers will be absent depending on the architectural
+options implemented by the processor.
 
-This header appears to contain:
+Also, timers not visible to / usable by the kernel being booted should
+probably left out of the DT, even though the hardware may physically have
+them:
 
-1. definitions for DMA signals, used by drivers.
+For example, a guest should not see the Secure PL1 physical timer or the
+Non-secure PL2 physical timer.  A hypervisor or host OS which does not
+provide the guest with access to the Non-secure PL1 physical timer (such
+as KVM) should leave that out too: there is no exception-free way for
+the OS to probe that directly: i.e., from the guest's point of view the
+device doesn't exist at all, so it seems wrong for the DT to include them
+in this case.
 
-   This can be eliminated by using DT, platform data, or IORESOURCE_DMA
-   (that's in preference order) which then means that these definitions
-   can live in a header file in arch/arm/mach-omap*/ if at all.
 
-2. data definitions and structures used by drivers using the legacy OMAP
-   DMA API.
+[...]
 
-So, it doesn't contain platform data (as said above).  It's not an
-API definition between core ARM code and ARM platform code, so that
-rules out arch/arm/include/asm/mach.  Obviously arch/arm/include/asm
-is out of the question too.
+> > > +  If using the memory mapped interface, list the interrupts for each core,
+> > > +  starting with core 0.
+> 
+> I take it that core 0 means physical cpu 0 (i.e. MPIDR.Aff{2,1,0} == 0)?
 
-I don't think we have a clear cut place for this to live - and lets
-be clear that this file will eventually be going away _anyway_ when
-OMAP is converted 100% to DMA engine.
+Lorenzo, should we have a standard way of referring to CPUs and topology
+nodes documented as part of the topology bindings?  We certainly need
+rules of some kind, since when the topology is non-trivial there is no
+well-defined "first" CPU, nor any single correct order in which to list
+CPUs.
 
-So, where to put the file?  At the moment, I don't know, it doesn't
-seem to have an obvious home other than where it currently is, which
-then gets in the way of the single kernel work.
+The topology may also be sparsely populated (e.g.,
+Aff[2,1,0] in { (0,0,0), (0,0,1), (0,1,0), (0,1,1), (0,1,2), (0,1,3) })
+
+It would be bad if different driver bindings end up solving this in
+different ways (even non-broken ways)
+
+Cheers
+---Dave
+
+[...]
