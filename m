@@ -1,59 +1,61 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 28 Sep 2012 16:30:16 -0500
-Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
-In-Reply-To: <5065F19E.5020708@ti.com>
-References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
- <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
- <5063330E.3000203@ti.com> <5065F19E.5020708@ti.com>
-Message-ID: <506616E8.9000006@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2012 23:36:05 +0200
+Subject: [PATCH 00/12] New warnings and build errors in linux-next
+Message-ID: <1348868177-21205-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi everyone,
 
-On 09/28/2012 01:51 PM, Vaibhav Hiremath wrote:
-> 
-> 
-> On 9/26/2012 10:23 PM, Jon Hunter wrote:
->>
->> On 09/20/2012 06:53 PM, Tony Lindgren wrote:
->>> * Benoit Cousson <b-cousson@ti.com> [120919 19:24]:
->>>> Hi Tony,
->>>>
->>>> I was about to take the DTS patch, but was wondering if you will pull
->>>> the driver changes for 3.7.
->>>
->>> I suggest that you do a separate branch on top of Paul's hwmod series
->>> when he posts those if that works for you?
->>
->> Benoit, I see that you have pulled in the DTS patch.
->>
->> Do you guys want me to rebase the remaining patches with Rob's change on
->> Tony's master branch and re-submit?
->>
-> 
-> Jon,
-> 
-> Sorry for delayed response, But I tried using your omap_test application
-> to validate this patch series, but it is failing for me.
-> 
-> How did you test it? Are you running same test application at your end?
+I've run my own build tests on the arm-soc tree, and now on linux-next
+in order to find regressions on build warnings. These are a bunch of
+patches that I came up with to address problems that were newly
+introduced since 3.6 and that are not in the domain of the
+arm-soc tree.
 
-Check your email on Sept 14th. I sent you the latest version of the test
-code. I will resend in case it got lost in deep space.
+I'd hope to find someone for each patch to apply or rewrite it
+in a better way. Sorry for any duplicates. I've made the patches
+last week but had not gotten around to get them ready for submission,
+it it may be possible that they are already fixed in one tree or
+another.
 
-> I am debugging this issue, i just thought I should tell you this before
-> its too late.
-> 
-> 
-> Below is the log -
-> 
-> [root at arago /]# echo 3 > /tmp/omap-test/timer/one
-> [   79.612223] omap_dm_timer_request_specific: Please use
-> omap_dm_timer_request_by_cap()
-> [   79.620636] Timer 3 not available!
+	Arnd
 
-Yes that's expected as omap_dm_timer_request_specific is not supported
-with DT. Don't spend anytime debugging you just need the latest test.
+Arnd Bergmann (12):
+  mtd: atmel nand: build regression
+  ata: mark probe function as __devinit rather than __init
+  mmc: dw_mmc: fix building exynos driver as a module
+  video: exynos: warnings in exynos_dp_core.c
+  ARM: ixp4xx: use __iomem for MMIO
+  sched: warnings in kernel/sched/fair.c
+  staging/iio/lis3l02dq: fix building without irq_to_gpio
+  dtc: be more quiet with "make -s"
+  tty/console: fix warnings in drivers/tty/serial/kgdboc.c
+  gpio: pcf857x: select IRQ_DOMAIN
+  pinctrl: samsung: use __devinit section for init code
+  time/jiffies: bring back unconditional LATCH definition
 
-Cheers
-Jon
+ arch/arm/mach-ixp4xx/include/mach/qmgr.h   |   12 ++++++------
+ arch/arm/mach-ixp4xx/ixp4xx_qmgr.c         |    4 ++--
+ drivers/ata/sata_highbank.c                |    2 +-
+ drivers/gpio/Kconfig                       |    1 +
+ drivers/mmc/host/dw_mmc-exynos.c           |    4 ++--
+ drivers/mmc/host/dw_mmc-pltfm.c            |    2 +-
+ drivers/mmc/host/dw_mmc-pltfm.h            |    2 +-
+ drivers/mmc/host/dw_mmc.c                  |    2 +-
+ drivers/mtd/nand/atmel_nand.c              |    8 ++++----
+ drivers/pinctrl/pinctrl-samsung.c          |   10 +++++-----
+ drivers/staging/iio/accel/lis3l02dq.h      |    1 +
+ drivers/staging/iio/accel/lis3l02dq_core.c |   10 ++++++----
+ drivers/staging/iio/accel/lis3l02dq_ring.c |    2 +-
+ drivers/video/exynos/exynos_dp_core.c      |    2 +-
+ include/linux/console.h                    |   10 ++++++++--
+ include/linux/jiffies.h                    |    5 +++--
+ include/linux/mmc/dw_mmc.h                 |    2 +-
+ kernel/sched/fair.c                        |    2 +-
+ scripts/Makefile.lib                       |    2 +-
+ scripts/dtc/dtc.c                          |    5 +++--
+ 20 files changed, 50 insertions(+), 38 deletions(-)
+
+-- 
+1.7.10
