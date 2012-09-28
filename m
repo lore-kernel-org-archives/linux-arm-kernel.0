@@ -1,39 +1,89 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 28 Sep 2012 19:10:06 +0530
-Subject: [PATCH 1/4] ARM: OMAP: DMA: Removing plat/dma-44xx.h
-In-Reply-To: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
-References: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1348839609-10456-2-git-send-email-lokeshvutla@ti.com>
+Date: Fri, 28 Sep 2012 19:10:05 +0530
+Subject: [PATCH 0/4] ARM: OMAP: Move plat/dma*.h,
+ omap-secure.h headers as part of single zImage work
+Message-ID: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-None of the DMA channel definitions defined in
-plat/dma-44xx.h are used. So removing it.
+Patch 1: 
+	Dropping the file plat/dma44xx.h as none of the 
+	dma channel definitions are used.
+Patch 2:
+	Moving plat/dma.h to platform_data/dma-omap.h
+Patch 3:
+	Move omap_reserve() locally to mach-omap1/2
+	This helps in moving plat/omap-secure.h locally to mach-omap2
+Patch 4:
+	Move plat/omap-secure.h locally to mach-omap2
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/plat-omap/include/plat/dma-44xx.h |  147 ----------------------------
- arch/arm/plat-omap/include/plat/dma.h      |    3 -
- 2 files changed, 150 deletions(-)
+Lokesh Vutla (4):
+  ARM: OMAP: DMA: Removing plat/dma-44xx.h
+  ARM: OMAP: DMA: Move plat/dma hearder to platform_data/dma-omap
+  ARM: OMAP: Move omap_reserve() locally to mach-omap1/2
+  ARM: OMAP: Move plat/omap-secure.h locally to mach-omap2
+
+ arch/arm/mach-omap1/board-h2.c                     |    2 +-
+ arch/arm/mach-omap1/board-h3.c                     |    2 +-
+ arch/arm/mach-omap1/board-palmte.c                 |    2 +-
+ arch/arm/mach-omap1/board-palmtt.c                 |    2 +-
+ arch/arm/mach-omap1/board-palmz71.c                |    2 +-
+ arch/arm/mach-omap1/board-sx1.c                    |    2 +-
+ arch/arm/mach-omap1/common.h                       |    3 +
+ arch/arm/mach-omap1/devices.c                      |    2 +-
+ arch/arm/mach-omap1/dma.c                          |    2 +-
+ arch/arm/mach-omap1/io.c                           |    2 +-
+ arch/arm/mach-omap1/lcd_dma.c                      |    3 +-
+ arch/arm/mach-omap1/mcbsp.c                        |    2 +-
+ arch/arm/mach-omap1/pm.c                           |    2 +-
+ arch/arm/mach-omap2/board-3430sdp.c                |    2 +-
+ arch/arm/mach-omap2/board-h4.c                     |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |    2 +-
+ arch/arm/mach-omap2/board-rx51.c                   |    2 +-
+ arch/arm/mach-omap2/common.c                       |   20 +++
+ arch/arm/mach-omap2/common.h                       |    1 +
+ arch/arm/mach-omap2/devices.c                      |    2 +-
+ arch/arm/mach-omap2/dma.c                          |    2 +-
+ arch/arm/mach-omap2/io.c                           |    2 +-
+ arch/arm/mach-omap2/mcbsp.c                        |    2 +-
+ arch/arm/mach-omap2/omap-secure.c                  |    1 -
+ arch/arm/mach-omap2/omap-secure.h                  |    7 +
+ arch/arm/mach-omap2/omap4-common.c                 |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    2 +-
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    3 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 +-
+ arch/arm/mach-omap2/pm24xx.c                       |    2 +-
+ arch/arm/mach-omap2/pm34xx.c                       |    2 +-
+ arch/arm/mach-omap2/serial.c                       |    2 +-
+ arch/arm/plat-omap/common.c                        |   21 +--
+ arch/arm/plat-omap/dma.c                           |    2 +-
+ arch/arm/plat-omap/include/plat/common.h           |    1 -
+ arch/arm/plat-omap/include/plat/dma-44xx.h         |  147 --------------------
+ arch/arm/plat-omap/include/plat/omap-secure.h      |   14 --
+ drivers/crypto/omap-aes.c                          |    2 +-
+ drivers/crypto/omap-sham.c                         |    3 +-
+ drivers/dma/omap-dma.c                             |    2 +-
+ drivers/media/platform/omap/omap_vout.c            |    2 +-
+ drivers/media/platform/omap/omap_vout_vrfb.c       |    2 +-
+ drivers/media/platform/omap3isp/ispstat.h          |    3 +-
+ drivers/media/platform/soc_camera/omap1_camera.c   |    4 +-
+ drivers/mmc/host/omap.c                            |    2 +-
+ drivers/mtd/nand/omap2.c                           |    2 +-
+ drivers/mtd/onenand/omap2.c                        |    2 +-
+ drivers/usb/gadget/omap_udc.c                      |    3 +-
+ drivers/usb/musb/tusb6010_omap.c                   |    2 +-
+ drivers/video/omap/lcdc.c                          |    2 +-
+ drivers/video/omap/omapfb_main.c                   |    3 +-
+ drivers/video/omap/sossi.c                         |    3 +-
+ .../linux/platform_data/dma-omap.h                 |    5 +-
+ 57 files changed, 83 insertions(+), 240 deletions(-)
  delete mode 100644 arch/arm/plat-omap/include/plat/dma-44xx.h
+ delete mode 100644 arch/arm/plat-omap/include/plat/omap-secure.h
+ rename arch/arm/plat-omap/include/plat/dma.h => include/linux/platform_data/dma-omap.h (99%)
 
-diff --git a/arch/arm/plat-omap/include/plat/dma-44xx.h b/arch/arm/plat-omap/include/plat/dma-44xx.h
-deleted file mode 100644
-index 1f767cb..0000000
-diff --git a/arch/arm/plat-omap/include/plat/dma.h b/arch/arm/plat-omap/include/plat/dma.h
-index 0a87b05..e413bd8 100644
---- a/arch/arm/plat-omap/include/plat/dma.h
-+++ b/arch/arm/plat-omap/include/plat/dma.h
-@@ -28,9 +28,6 @@
-  * the omap drivers hwmod adapted.
-  */
- 
--/* Move omap4 specific defines to dma-44xx.h */
--#include "dma-44xx.h"
--
- #define INT_DMA_LCD			25
- 
- /* DMA channels for omap1 */
 -- 
 1.7.10.4
