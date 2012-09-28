@@ -1,84 +1,68 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 28 Sep 2012 16:16:52 +0200
-Subject: [PATCH 2/4] mfd: db8500: Provide cpufreq table as platform data
+Date: Fri, 28 Sep 2012 16:16:53 +0200
+Subject: [PATCH 3/4] cpufreq: db8500: Register as a platform driver
 In-Reply-To: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1348841814-13645-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1348841814-13645-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-The cpufreq table needs dynamically update due to what the PRCMU
-firmware is supporting. The table is then provided through to the
-mfd child device as platform data.
+To fetch the mfd child device we register the cpufreq driver
+as a platform driver.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/cpufreq/db8500-cpufreq.c |   20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index bac4876..163d1b3 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -31,6 +31,7 @@
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/db8500-prcmu.h>
- #include <linux/regulator/machine.h>
-+#include <linux/cpufreq.h>
- #include <asm/hardware/gic.h>
- #include <mach/hardware.h>
- #include <mach/irqs.h>
-@@ -3001,6 +3002,15 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
- 	},
+diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
+index 74b830b..7d61a6c 100644
+--- a/drivers/cpufreq/db8500-cpufreq.c
++++ b/drivers/cpufreq/db8500-cpufreq.c
+@@ -8,10 +8,12 @@
+  * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
+  *
+  */
++#include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/cpufreq.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/platform_device.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <mach/id.h>
+ 
+@@ -159,12 +161,28 @@ static struct cpufreq_driver db8500_cpufreq_driver = {
+ 	.attr   = db8500_cpufreq_attr,
  };
  
-+/* CPU FREQ table, may be changed due to if MAX_OPP is supported. */
-+static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
-+	{ .frequency = 200000, .index = ARM_EXTCLK,},
-+	{ .frequency = 400000, .index = ARM_50_OPP,},
-+	{ .frequency = 800000, .index = ARM_100_OPP,},
-+	{ .frequency = CPUFREQ_TABLE_END,}, /* To be used for MAX_OPP. */
-+	{ .frequency = CPUFREQ_TABLE_END,},
-+};
-+
- static struct resource ab8500_resources[] = {
- 	[0] = {
- 		.start	= IRQ_DB8500_AB8500,
-@@ -3019,6 +3029,8 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 	{
- 		.name = "cpufreq-u8500",
- 		.of_compatible = "stericsson,cpufreq-u8500",
-+		.platform_data = &db8500_cpufreq_table,
-+		.pdata_size = sizeof(db8500_cpufreq_table),
- 	},
- 	{
- 		.name = "ab8500-core",
-@@ -3029,6 +3041,14 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 	},
- };
- 
-+static void db8500_prcmu_update_cpufreq(void)
++static int db8500_cpufreq_probe(struct platform_device *pdev)
 +{
-+	if (prcmu_has_arm_maxopp()) {
-+		db8500_cpufreq_table[3].frequency = 1000000;
-+		db8500_cpufreq_table[3].index = ARM_MAX_OPP;
-+	}
++	return cpufreq_register_driver(&db8500_cpufreq_driver);
 +}
 +
- /**
-  * prcmu_fw_init - arch init call for the Linux PRCMU fw init logic
-  *
-@@ -3073,6 +3093,8 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
- 	if (cpu_is_u8500v20_or_later())
- 		prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
- 
-+	db8500_prcmu_update_cpufreq();
++static struct platform_driver db8500_cpufreq_plat_driver = {
++	.driver = {
++		.name = "cpufreq-u8500",
++		.owner = THIS_MODULE,
++	},
++	.probe = db8500_cpufreq_probe,
++};
 +
- 	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
- 			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
- 	if (err) {
+ static int __init db8500_cpufreq_register(void)
+ {
+ 	if (!cpu_is_u8500_family())
+ 		return -ENODEV;
+ 
+ 	pr_info("cpufreq for DB8500 started\n");
+-	return cpufreq_register_driver(&db8500_cpufreq_driver);
++	return platform_driver_register(&db8500_cpufreq_plat_driver);
+ }
+ device_initcall(db8500_cpufreq_register);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("cpufreq driver for DB8500");
 -- 
 1.7.10
