@@ -1,27 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Sep 2012 14:50:14 +0200
-Subject: [PATCH 0/2] Add spidev to the CFA-10049
-Message-ID: <1348836616-29783-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 28 Sep 2012 14:50:15 +0200
+Subject: [PATCH 1/2] spi: spidev: Add device tree bindings
+In-Reply-To: <1348836616-29783-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1348836616-29783-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1348836616-29783-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This will allow to probe spidev from device tree
 
-This patchset probes spidev on the SSP3 bus where on the CFA-10049 there is
-a DAC.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/spi/spidev.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-It first adds the dt bindings for the spidev driver, and the proper node in
-the CFA-10049 device tree file.
-
-Maxime
-
-Maxime Ripard (2):
-  spi: spidev: Add device tree bindings
-  ARM: dts: cfa10049: Add spidev to drive the DAC on SSP3
-
- arch/arm/boot/dts/imx28-cfa10049.dts |    6 ++++++
- drivers/spi/spidev.c                 |   10 ++++++++++
- 2 files changed, 16 insertions(+)
-
+diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
+index 830adbe..8ae0660 100644
+--- a/drivers/spi/spidev.c
++++ b/drivers/spi/spidev.c
+@@ -31,6 +31,8 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ #include <linux/compat.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/spi/spidev.h>
+@@ -642,10 +644,18 @@ static int __devexit spidev_remove(struct spi_device *spi)
+ 	return 0;
+ }
+ 
++static const struct of_device_id spidev_dt_ids[] = {
++	{ .compatible = "linux,spidev" },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, spidev_dt_ids);
++
+ static struct spi_driver spidev_spi_driver = {
+ 	.driver = {
+ 		.name =		"spidev",
+ 		.owner =	THIS_MODULE,
++		.of_match_table = of_match_ptr(spidev_dt_ids),
+ 	},
+ 	.probe =	spidev_probe,
+ 	.remove =	__devexit_p(spidev_remove),
 -- 
 1.7.9.5
