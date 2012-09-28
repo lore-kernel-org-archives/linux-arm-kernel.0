@@ -1,291 +1,549 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 28 Sep 2012 16:28:44 +0200
-Subject: [RFC PATCH 13/16] pinctrl: samsung: Parse offsets of particular
- registers from DT
+Date: Fri, 28 Sep 2012 16:28:46 +0200
+Subject: [RFC PATCH 15/16] ARM: dts: exynos4210: Add platform-specific
+ descriptions for pin controllers
 In-Reply-To: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
 References: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1348842527-22460-14-git-send-email-t.figa@samsung.com>
+Message-ID: <1348842527-22460-16-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The order and availability of pin control registers vary with SoC.
+The patch "pinctrl: samsung: Parse pin banks from DT" introduced
+platform-specific data parsing from DT.
 
-This patch modifies the driver to parse register offsets from device
-tree as a part of bank type definition.
+This patch adds all necessary nodes and properties to exynos4210 device
+tree sources.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/pinctrl/pinctrl-exynos.c  | 12 ++---
- drivers/pinctrl/pinctrl-samsung.c | 93 +++++++++++++++++++++------------------
- drivers/pinctrl/pinctrl-samsung.h | 38 +++++++++-------
- 3 files changed, 78 insertions(+), 65 deletions(-)
+ arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi | 459 ++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi       |   2 +
+ arch/arm/boot/dts/exynos4210.dtsi               |  25 +-
+ 3 files changed, 474 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
 
-diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 001d2ec..7ad2884 100644
---- a/drivers/pinctrl/pinctrl-exynos.c
-+++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -113,9 +113,9 @@ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	con |= trig_type << shift;
- 	writel(con, d->virt_base + reg_con);
- 
--	reg_con = bank->pctl_offset;
--	shift = pin * bank->func_width;
--	mask = (1 << bank->func_width) - 1;
-+	reg_con = bank->pctl_offset + bank->regs[REG_FUNC].offset;
-+	shift = pin * bank->regs[REG_FUNC].width;
-+	mask = (1 << bank->regs[REG_FUNC].width) - 1;
- 
- 	con = readl(d->virt_base + reg_con);
- 	con &= ~(mask << shift);
-@@ -290,9 +290,9 @@ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	con |= trig_type << shift;
- 	writel(con, d->virt_base + reg_con);
- 
--	reg_con = bank->pctl_offset;
--	shift = pin * bank->func_width;
--	mask = (1 << bank->func_width) - 1;
-+	reg_con = bank->pctl_offset + bank->regs[REG_FUNC].offset;
-+	shift = pin * bank->regs[REG_FUNC].width;
-+	mask = (1 << bank->regs[REG_FUNC].width) - 1;
- 
- 	con = readl(d->virt_base + reg_con);
- 	con &= ~(mask << shift);
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 9b38609..b02cd46 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -273,10 +273,6 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
- 	*offset = pin - b->pin_base;
- 	if (bank)
- 		*bank = b;
--
--	/* some banks have two config registers in a single bank */
--	if (*offset * b->func_width > BITS_PER_LONG)
--		*reg += 4;
- }
- 
- /* enable or disable a pinmux function */
-@@ -299,8 +295,9 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 	for (cnt = 0; cnt < drvdata->pin_groups[group].num_pins; cnt++) {
- 		pin_to_reg_bank(drvdata, pins[cnt] - drvdata->ctrl->base,
- 				&reg, &pin_offset, &bank);
--		mask = (1 << bank->func_width) - 1;
--		shift = pin_offset * bank->func_width;
-+		mask = (1 << bank->regs[REG_FUNC].width) - 1;
-+		shift = pin_offset * bank->regs[REG_FUNC].width;
-+		reg += bank->regs[REG_FUNC].offset;
- 
- 		data = readl(reg);
- 		data &= ~(mask << shift);
-@@ -342,10 +339,11 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
- 	drvdata = pinctrl_dev_get_drvdata(pctldev);
- 
- 	pin_offset = offset - bank->pin_base;
--	reg = drvdata->virt_base + bank->pctl_offset;
-+	reg = drvdata->virt_base + bank->pctl_offset
-+						+ bank->regs[REG_FUNC].offset;
- 
--	mask = (1 << bank->func_width) - 1;
--	shift = pin_offset * bank->func_width;
-+	mask = (1 << bank->regs[REG_FUNC].width) - 1;
-+	shift = pin_offset * bank->regs[REG_FUNC].width;
- 
- 	data = readl(reg);
- 	data &= ~(mask << shift);
-@@ -382,20 +380,20 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
- 
- 	switch (cfg_type) {
- 	case PINCFG_TYPE_PUD:
--		width = bank->pud_width;
--		cfg_reg = PUD_REG;
-+		width = bank->regs[REG_PUD].width;
-+		cfg_reg = bank->regs[REG_PUD].offset;
- 		break;
- 	case PINCFG_TYPE_DRV:
--		width = bank->drv_width;
--		cfg_reg = DRV_REG;
-+		width = bank->regs[REG_DRV].width;
-+		cfg_reg = bank->regs[REG_DRV].offset;
- 		break;
- 	case PINCFG_TYPE_CON_PDN:
--		width = bank->conpdn_width;
--		cfg_reg = CONPDN_REG;
-+		width = bank->regs[REG_CONPDN].width;
-+		cfg_reg = bank->regs[REG_CONPDN].offset;
- 		break;
- 	case PINCFG_TYPE_PUD_PDN:
--		width = bank->pudpdn_width;
--		cfg_reg = PUDPDN_REG;
-+		width = bank->regs[REG_PUDPDN].width;
-+		cfg_reg = bank->regs[REG_PUDPDN].offset;
- 		break;
- 	default:
- 		WARN_ON(1);
-@@ -481,13 +479,14 @@ static void samsung_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
- 	void __iomem *reg;
- 	u32 data;
- 
--	reg = bank->drvdata->virt_base + bank->pctl_offset;
-+	reg = bank->drvdata->virt_base + bank->pctl_offset
-+						+ bank->regs[REG_DAT].offset;
- 
--	data = readl(reg + DAT_REG);
-+	data = readl(reg);
- 	data &= ~(1 << offset);
- 	if (value)
- 		data |= 1 << offset;
--	writel(data, reg + DAT_REG);
-+	writel(data, reg);
- }
- 
- /* gpiolib gpio_get callback function */
-@@ -497,9 +496,10 @@ static int samsung_gpio_get(struct gpio_chip *gc, unsigned offset)
- 	u32 data;
- 	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
- 
--	reg = bank->drvdata->virt_base + bank->pctl_offset;
-+	reg = bank->drvdata->virt_base + bank->pctl_offset
-+						+ bank->regs[REG_DAT].offset;
- 
--	data = readl(reg + DAT_REG);
-+	data = readl(reg);
- 	data >>= offset;
- 	data &= 1;
- 	return data;
-@@ -817,12 +817,24 @@ static int __init samsung_gpiolib_unregister(struct platform_device *pdev,
- 
- static const struct of_device_id samsung_pinctrl_dt_match[];
- 
-+
-+
- static int samsung_pinctrl_parse_dt_bank_type(struct samsung_pin_bank *bank,
- 							struct device_node *np)
- {
-+	static const char *reg_names[REG_NUM] = {
-+		[REG_FUNC] = "func",
-+		[REG_DAT] = "dat",
-+		[REG_PUD] = "pud",
-+		[REG_DRV] = "drv",
-+		[REG_CONPDN] = "conpdn",
-+		[REG_PUDPDN] = "pudpdn",
-+	};
- 	struct samsung_pin_bank *type = np->data;
--	int ret;
--	u32 val;
-+	const __be32 *data;
-+	int len = 0;
-+	int index;
-+	int i;
- 
- 	if (type) {
- 		*bank = *type;
-@@ -833,26 +845,21 @@ static int samsung_pinctrl_parse_dt_bank_type(struct samsung_pin_bank *bank,
- 	if (!type)
- 		return -ENOMEM;
- 
--	ret = of_property_read_u32(np, "samsung,func-width", &val);
--	if (ret)
--		return ret;
--	type->func_width = val;
--
--	ret = of_property_read_u32(np, "samsung,pud-width", &val);
--	if (!ret)
--		type->pud_width = val;
--
--	ret = of_property_read_u32(np, "samsung,drv-width", &val);
--	if (!ret)
--		type->drv_width = val;
--
--	ret = of_property_read_u32(np, "samsung,conpdn-width", &val);
--	if (!ret)
--		type->conpdn_width = val;
-+	data = of_get_property(np, "samsung,reg-params", &len);
-+	if (!data)
-+		return -EINVAL;
-+	len /= sizeof(*data);
- 
--	ret = of_property_read_u32(np, "samsung,pudpdn-width", &val);
--	if (!ret)
--		type->pudpdn_width = val;
-+	for (i = 0; i < ARRAY_SIZE(reg_names); ++i) {
-+		index = of_property_match_string(np, "samsung,reg-names",
-+								reg_names[i]);
-+		if (index < 0)
-+			continue;
-+		if (index >= len / 2)
-+			return -EINVAL;
-+		type->regs[i].offset = be32_to_cpu(data[2 * index]);
-+		type->regs[i].width = be32_to_cpu(data[2 * index + 1]);
-+	}
- 
- 	*bank = *type;
- 	np->data = type;
-diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index 355f4e2..684f042 100644
---- a/drivers/pinctrl/pinctrl-samsung.h
-+++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -25,12 +25,16 @@
- 
- #include <linux/gpio.h>
- 
--/* register offsets within a pin bank */
--#define DAT_REG		0x4
--#define PUD_REG		0x8
--#define DRV_REG		0xC
--#define CONPDN_REG	0x10
--#define PUDPDN_REG	0x14
-+enum pincfg_reg {
-+	REG_FUNC = 0,
-+	REG_DAT,
-+	REG_PUD,
-+	REG_DRV,
-+	REG_CONPDN,
-+	REG_PUDPDN,
-+
-+	REG_NUM
-+};
- 
- /* pinmux function number for pin as gpio output line */
- #define FUNC_OUTPUT	0x1
-@@ -103,15 +107,21 @@ enum eint_type {
- struct samsung_pinctrl_drv_data;
- 
- /**
-+ * struct samsung_pin_reg: defines a configuration register.
-+ * @offset: offset from bank base.
-+ * @width: with of a bit field used for single pin.
+diff --git a/arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
+new file mode 100644
+index 0000000..457d28a
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
+@@ -0,0 +1,459 @@
++/*
++ * Samsung's Exynos4210 SoC pinctrl banks device tree source
++ *
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung's Exynos4210 SoC pin banks are listed as device tree nodes
++ * in this file.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+struct samsung_pin_reg {
-+	u8 offset;
-+	u8 width;
-+};
 +
-+/**
-  * struct samsung_pin_bank: represent a controller pin-bank.
-  * @reg_offset: starting offset of the pin-bank registers.
-  * @pin_base: starting pin number of the bank.
-  * @nr_pins: number of pins included in this bank.
-- * @func_width: width of the function selector bit field.
-- * @pud_width: width of the pin pull up/down selector bit field.
-- * @drv_width: width of the pin driver strength selector bit field.
-- * @conpdn_width: width of the sleep mode function selector bin field.
-- * @pudpdn_width: width of the sleep mode pull up/down selector bit field.
-+ * @regs: low level parameters of available configuration registers.
-  * @eint_type: type of the external interrupt supported by the bank.
-  * @name: name to be prefixed for each pin in this pin bank.
-  * @of_node: node of pin bank in device tree
-@@ -124,11 +134,7 @@ struct samsung_pin_bank {
- 	u32		pctl_offset;
- 	u32		pin_base;
- 	u8		nr_pins;
--	u8		func_width;
--	u8		pud_width;
--	u8		drv_width;
--	u8		conpdn_width;
--	u8		pudpdn_width;
-+	struct samsung_pin_reg regs[REG_NUM];
- 	enum eint_type	eint_type;
- 	u32		eint_offset;
- 	const char	*name;
++/ {
++	pinctrl-bank-types {
++		bank_off: bank-off {
++			samsung,reg-names = "func", "dat", "pud",
++						"drv", "conpdn", "pudpdn";
++			samsung,reg-params = <0x00 4>, <0x04 1>, <0x08 2>,
++						<0x0C 2>, <0x10 2>, <0x14 2>;
++		};
++
++		bank_alive: bank-alive {
++			samsung,reg-names = "func", "dat", "pud",
++						"drv";
++			samsung,reg-params = <0x00 4>, <0x04 1>, <0x08 2>,
++						<0x0C 2>;
++		};
++	};
++
++	pinctrl at 11400000 {
++		gpa0: gpa0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x000>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x00>;
++			#interrupt-cells = <2>;
++		};
++
++		gpa1: gpa1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x020>;
++			samsung,pin-count = <6>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x04>;
++			#interrupt-cells = <2>;
++		};
++
++		gpb: gpb {
++			gpio-controller;
++			samsung,pctl-offset = <0x040>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x08>;
++			#interrupt-cells = <2>;
++		};
++
++		gpc0: gpc0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x060>;
++			samsung,pin-count = <5>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x0C>;
++			#interrupt-cells = <2>;
++		};
++
++		gpc1: gpc1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x080>;
++			samsung,pin-count = <5>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x10>;
++			#interrupt-cells = <2>;
++		};
++
++		gpd0: gpd0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x0A0>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x14>;
++			#interrupt-cells = <2>;
++		};
++
++		gpd1: gpd1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x0C0>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x18>;
++			#interrupt-cells = <2>;
++		};
++
++		gpe0: gpe0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x0E0>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x1C>;
++			#interrupt-cells = <2>;
++		};
++
++		gpe1: gpe1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x100>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x20>;
++			#interrupt-cells = <2>;
++		};
++
++		gpe2: gpe2 {
++			gpio-controller;
++			samsung,pctl-offset = <0x120>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x24>;
++			#interrupt-cells = <2>;
++		};
++
++		gpe3: gpe3 {
++			gpio-controller;
++			samsung,pctl-offset = <0x140>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x28>;
++			#interrupt-cells = <2>;
++		};
++
++		gpe4: gpe4 {
++			gpio-controller;
++			samsung,pctl-offset = <0x160>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x2C>;
++			#interrupt-cells = <2>;
++		};
++
++		gpf0: gpf0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x180>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x30>;
++			#interrupt-cells = <2>;
++		};
++
++		gpf1: gpf1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x1A0>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x34>;
++			#interrupt-cells = <2>;
++		};
++
++		gpf2: gpf2 {
++			gpio-controller;
++			samsung,pctl-offset = <0x1C0>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x38>;
++			#interrupt-cells = <2>;
++		};
++
++		gpf3: gpf3 {
++			gpio-controller;
++			samsung,pctl-offset = <0x1E0>;
++			samsung,pin-count = <6>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x3C>;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	pinctrl at 11000000 {
++		gpj0: gpj0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x000>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x00>;
++			#interrupt-cells = <2>;
++		};
++
++		gpj1: gpj1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x020>;
++			samsung,pin-count = <5>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x04>;
++			#interrupt-cells = <2>;
++		};
++
++		gpk0: gpk0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x040>;
++			samsung,pin-count = <7>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x08>;
++			#interrupt-cells = <2>;
++		};
++
++		gpk1: gpk1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x060>;
++			samsung,pin-count = <7>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x0C>;
++			#interrupt-cells = <2>;
++		};
++
++		gpk2: gpk2 {
++			gpio-controller;
++			samsung,pctl-offset = <0x080>;
++			samsung,pin-count = <7>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x10>;
++			#interrupt-cells = <2>;
++		};
++
++		gpk3: gpk3 {
++			gpio-controller;
++			samsung,pctl-offset = <0x0A0>;
++			samsung,pin-count = <7>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x14>;
++			#interrupt-cells = <2>;
++		};
++
++		gpl0: gpl0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x0C0>;
++			samsung,pin-count = <7>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x18>;
++			#interrupt-cells = <2>;
++		};
++
++		gpl1: gpl1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x0E0>;
++			samsung,pin-count = <2>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x1C>;
++			#interrupt-cells = <2>;
++		};
++
++		gpl2: gpl2 {
++			gpio-controller;
++			samsung,pctl-offset = <0x100>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,eint-offset = <0x20>;
++			#interrupt-cells = <2>;
++		};
++
++		gpy0: gpy0 {
++			gpio-controller;
++			samsung,pctl-offset = <0x120>;
++			samsung,pin-count = <6>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpy1: gpy1 {
++			gpio-controller;
++			samsung,pctl-offset = <0x140>;
++			samsung,pin-count = <4>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpy2: gpy2 {
++			gpio-controller;
++			samsung,pctl-offset = <0x160>;
++			samsung,pin-count = <6>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpy3: gpy3 {
++			gpio-controller;
++			samsung,pctl-offset = <0x180>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpy4: gpy4 {
++			gpio-controller;
++			samsung,pctl-offset = <0x1A0>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpy5: gpy5 {
++			gpio-controller;
++			samsung,pctl-offset = <0x1C0>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpy6: gpy6 {
++			gpio-controller;
++			samsung,pctl-offset = <0x1E0>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++
++		gpx0: gpx0 {
++			gpio-controller;
++			samsung,pctl-offset = <0xC00>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_alive>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,wkup-eint;
++			interrupt-parent = <&gic>;
++			interrupts = <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
++				     <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>;
++			samsung,eint-offset = <0x00>;
++			#interrupt-cells = <2>;
++		};
++
++		gpx1: gpx1 {
++			gpio-controller;
++			samsung,pctl-offset = <0xC20>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_alive>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,wkup-eint;
++			interrupt-parent = <&gic>;
++			interrupts = <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
++				     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
++			samsung,eint-offset = <0x04>;
++			#interrupt-cells = <2>;
++		};
++
++		gpx2: gpx2 {
++			gpio-controller;
++			samsung,pctl-offset = <0xC40>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_alive>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,wkup-eint;
++			samsung,eint-offset = <0x08>;
++			#interrupt-cells = <2>;
++		};
++
++		gpx3: gpx3 {
++			gpio-controller;
++			samsung,pctl-offset = <0xC60>;
++			samsung,pin-count = <8>;
++			samsung,bank-type = <&bank_alive>;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			samsung,wkup-eint;
++			samsung,eint-offset = <0x0C>;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	pinctrl at 03860000 {
++		gpz: gpz {
++			gpio-controller;
++			samsung,pctl-offset = <0x000>;
++			samsung,pin-count = <7>;
++			samsung,bank-type = <&bank_off>;
++			#gpio-cells = <2>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+index b12cf27..94846d5 100644
+--- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+@@ -14,6 +14,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
++/include/ "exynos4210-pinctrl-banks.dtsi"
++
+ / {
+ 	pinctrl at 11400000 {
+ 		uart0_data: uart0-data {
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index ecbc707..f2f6ef5 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -58,27 +58,28 @@
+ 		compatible = "samsung,pinctrl-exynos4210";
+ 		reg = <0x11400000 0x1000>;
+ 		interrupts = <0 47 0>;
+-		interrupt-controller;
+-		#interrupt-cells = <2>;
++		samsung,geint-con = <0x700>;
++		samsung,geint-mask = <0x900>;
++		samsung,geint-pend = <0xA00>;
++		samsung,svc = <0xB08>;
+ 	};
+ 
+ 	pinctrl_1: pinctrl at 11000000 {
+ 		compatible = "samsung,pinctrl-exynos4210";
+ 		reg = <0x11000000 0x1000>;
+ 		interrupts = <0 46 0>;
+-		interrupt-controller;
+-		#interrupt-cells = <2>;
++		samsung,geint-con = <0x700>;
++		samsung,geint-mask = <0x900>;
++		samsung,geint-pend = <0xA00>;
++		samsung,svc = <0xB08>;
+ 
+-		wakup_eint: wakeup-interrupt-controller {
++		wakeup-interrupt-controller {
+ 			compatible = "samsung,exynos4210-wakeup-eint";
+ 			interrupt-parent = <&gic>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			interrupts = <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
+-					<0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
+-					<0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
+-					<0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>,
+-					<0 32 0>;
++			interrupts = <0 32 0>;
++			samsung,weint-con = <0xE00>;
++			samsung,weint-mask = <0xF00>;
++			samsung,weint-pend = <0xF40>;
+ 		};
+ 	};
+ 
 -- 
 1.7.12
