@@ -1,123 +1,105 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2012 23:36:10 +0200
-Subject: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
+Date: Fri, 28 Sep 2012 23:36:08 +0200
+Subject: [PATCH 03/12] mmc: dw_mmc: fix building exynos driver as a module
 In-Reply-To: <1348868177-21205-1-git-send-email-arnd@arndb.de>
 References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
-Message-ID: <1348868177-21205-6-git-send-email-arnd@arndb.de>
+Message-ID: <1348868177-21205-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ixp4xx queue manager uses "const struct qmgr_regs __iomem *" as the
-type for a pointer that is passed to __raw_writel, which is not
-allowed because of the const-ness.
+The MODULE_DEVICE_TABLE() entry in the dw_mmc_exynos driver
+points to the wrong symbol which results in a link error
+when building as a loadable module.
 
-Dropping the 'const' keyword fixes the problem. While we're here,
-let's also drop the useless type cast.
-
-Without this patch, building ixp4xx_defconfig results in:
-
-In file included from arch/arm/mach-ixp4xx/ixp4xx_qmgr.c:15:0:
-arch/arm/mach-ixp4xx/include/mach/qmgr.h: In function 'qmgr_put_entry':
-arch/arm/mach-ixp4xx/include/mach/qmgr.h:96:2: warning: passing argument 2 of '__raw_writel' discards 'const' qualifier from pointer target type [enabled by default]
-arch/arm/include/asm/io.h:88:91: note: expected 'volatile void *' but argument is of type 'const u32 *'
-In file included from drivers/net/ethernet/xscale/ixp4xx_eth.c:41:0:
-arch/arm/mach-ixp4xx/include/mach/qmgr.h: In function 'qmgr_put_entry':
-arch/arm/mach-ixp4xx/include/mach/qmgr.h:96:2: warning: passing argument 2 of '__raw_writel' discards 'const' qualifier from pointer target type [enabled by default]
-arch/arm/include/asm/io.h:88:91: note: expected 'volatile void *' but argument is of type 'const u32 *'
-arch/arm/mach-ixp4xx/ixp4xx_qmgr.c: In function 'qmgr_set_irq':
-arch/arm/mach-ixp4xx/ixp4xx_qmgr.c:41:9: warning: passing argument 2 of '__raw_writel' discards 'const' qualifier from pointer target type [enabled by default]
-arch/arm/include/asm/io.h:88:91: note: expected 'volatile void *' but argument is of type 'const u32 *'
+Further, we get a warning about the driver_data being
+marked constant, which requires annotating a few pointers
+as const.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Will Newton <will.newton@imgtec.com>
+Cc: Jaehoon Chung <jh80.chung@samsung.com>
+Cc: Seungwon Jeon <tgih.jun@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: linux-mmc at vger.kernel.org
 ---
+ drivers/mmc/host/dw_mmc-exynos.c |    4 ++--
+ drivers/mmc/host/dw_mmc-pltfm.c  |    2 +-
+ drivers/mmc/host/dw_mmc-pltfm.h  |    2 +-
+ drivers/mmc/host/dw_mmc.c        |    2 +-
+ include/linux/mmc/dw_mmc.h       |    2 +-
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
-Krzysztof, please apply in your next branch so this problem goes away in
-3.8. I realize it won't make 3.7 any more since the base patches are not
-in arm-soc, but it's bad if linux-next is broken.
-
- arch/arm/mach-ixp4xx/include/mach/qmgr.h |   12 ++++++------
- arch/arm/mach-ixp4xx/ixp4xx_qmgr.c       |    4 ++--
- 2 files changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-ixp4xx/include/mach/qmgr.h b/arch/arm/mach-ixp4xx/include/mach/qmgr.h
-index 0a88d3b..4de8da5 100644
---- a/arch/arm/mach-ixp4xx/include/mach/qmgr.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/qmgr.h
-@@ -86,7 +86,7 @@ void qmgr_release_queue(unsigned int queue);
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index 660bbc5..32109a6 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -223,11 +223,11 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+ 			.data = (void *)&exynos5250_drv_data, },
+ 	{},
+ };
+-MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
++MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
  
- static inline void qmgr_put_entry(unsigned int queue, u32 val)
+ int dw_mci_exynos_probe(struct platform_device *pdev)
  {
--	const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+	struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- #if DEBUG_QMGR
- 	BUG_ON(!qmgr_queue_descs[queue]); /* not yet requested */
+-	struct dw_mci_drv_data *drv_data;
++	const struct dw_mci_drv_data *drv_data;
+ 	const struct of_device_id *match;
  
-@@ -99,7 +99,7 @@ static inline void qmgr_put_entry(unsigned int queue, u32 val)
- static inline u32 qmgr_get_entry(unsigned int queue)
- {
- 	u32 val;
--	const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+	const struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- 	val = __raw_readl(&qmgr_regs->acc[queue][0]);
- #if DEBUG_QMGR
- 	BUG_ON(!qmgr_queue_descs[queue]); /* not yet requested */
-@@ -112,14 +112,14 @@ static inline u32 qmgr_get_entry(unsigned int queue)
+ 	match = of_match_node(dw_mci_exynos_match, pdev->dev.of_node);
+diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+index c960ca7..5e33156 100644
+--- a/drivers/mmc/host/dw_mmc-pltfm.c
++++ b/drivers/mmc/host/dw_mmc-pltfm.c
+@@ -24,7 +24,7 @@
+ #include "dw_mmc.h"
  
- static inline int __qmgr_get_stat1(unsigned int queue)
+ int dw_mci_pltfm_register(struct platform_device *pdev,
+-				struct dw_mci_drv_data *drv_data)
++				const struct dw_mci_drv_data *drv_data)
  {
--	const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+	const struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- 	return (__raw_readl(&qmgr_regs->stat1[queue >> 3])
- 		>> ((queue & 7) << 2)) & 0xF;
- }
+ 	struct dw_mci *host;
+ 	struct resource	*regs;
+diff --git a/drivers/mmc/host/dw_mmc-pltfm.h b/drivers/mmc/host/dw_mmc-pltfm.h
+index 301f245..2ac37b8 100644
+--- a/drivers/mmc/host/dw_mmc-pltfm.h
++++ b/drivers/mmc/host/dw_mmc-pltfm.h
+@@ -13,7 +13,7 @@
+ #define _DW_MMC_PLTFM_H_
  
- static inline int __qmgr_get_stat2(unsigned int queue)
- {
--	const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+	const struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- 	BUG_ON(queue >= HALF_QUEUES);
- 	return (__raw_readl(&qmgr_regs->stat2[queue >> 4])
- 		>> ((queue & 0xF) << 1)) & 0x3;
-@@ -145,7 +145,7 @@ static inline int qmgr_stat_empty(unsigned int queue)
-  */
- static inline int qmgr_stat_below_low_watermark(unsigned int queue)
- {
--	const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+	const struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- 	if (queue >= HALF_QUEUES)
- 		return (__raw_readl(&qmgr_regs->statne_h) >>
- 			(queue - HALF_QUEUES)) & 0x01;
-@@ -172,7 +172,7 @@ static inline int qmgr_stat_above_high_watermark(unsigned int queue)
-  */
- static inline int qmgr_stat_full(unsigned int queue)
- {
--	const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+	const struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- 	if (queue >= HALF_QUEUES)
- 		return (__raw_readl(&qmgr_regs->statf_h) >>
- 			(queue - HALF_QUEUES)) & 0x01;
-diff --git a/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c b/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c
-index 7c0584e..9d1b6b7 100644
---- a/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c
-+++ b/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c
-@@ -14,7 +14,7 @@
- #include <linux/module.h>
- #include <mach/qmgr.h>
+ extern int dw_mci_pltfm_register(struct platform_device *pdev,
+-				struct dw_mci_drv_data *drv_data);
++				const struct dw_mci_drv_data *drv_data);
+ extern int __devexit dw_mci_pltfm_remove(struct platform_device *pdev);
+ extern const struct dev_pm_ops dw_mci_pltfm_pmops;
  
--static const struct qmgr_regs __iomem *qmgr_regs = (void __iomem *)IXP4XX_QMGR_BASE_VIRT;
-+static struct qmgr_regs __iomem *qmgr_regs = IXP4XX_QMGR_BASE_VIRT;
- static struct resource *mem_res;
- static spinlock_t qmgr_lock;
- static u32 used_sram_bitmap[4]; /* 128 16-dword pages */
-@@ -32,7 +32,7 @@ void qmgr_set_irq(unsigned int queue, int src,
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index a23af77..026cf92 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1973,7 +1973,7 @@ static void dw_mci_init_dma(struct dw_mci *host)
+ 	/* Determine which DMA interface to use */
+ #ifdef CONFIG_MMC_DW_IDMAC
+ 	host->dma_ops = &dw_mci_idmac_ops;
+-	dev_info(&host->dev, "Using internal DMA controller.\n");
++	dev_info(host->dev, "Using internal DMA controller.\n");
+ #endif
  
- 	spin_lock_irqsave(&qmgr_lock, flags);
- 	if (queue < HALF_QUEUES) {
--		const u32 __iomem *reg;
-+		u32 __iomem *reg;
- 		int bit;
- 		BUG_ON(src > QUEUE_IRQ_SRC_NOT_FULL);
- 		reg = &qmgr_regs->irqsrc[queue >> 3]; /* 8 queues per u32 */
+ 	if (!host->dma_ops)
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 7c6a113..0f62c8c 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -162,7 +162,7 @@ struct dw_mci {
+ 	u16			data_offset;
+ 	struct device		*dev;
+ 	struct dw_mci_board	*pdata;
+-	struct dw_mci_drv_data	*drv_data;
++	const struct dw_mci_drv_data	*drv_data;
+ 	void			*priv;
+ 	struct clk		*biu_clk;
+ 	struct clk		*ciu_clk;
 -- 
 1.7.10
