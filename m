@@ -1,31 +1,147 @@
-From: jangra.pankaj9@gmail.com (Pankaj Jangra)
-Date: Fri, 28 Sep 2012 07:54:17 +0530
-Subject: [PATCH] arm/omap: Replace board_ref_clock with enum values
-In-Reply-To: <5063306E.8080200@gmail.com>
-References: <5063306E.8080200@gmail.com>
-Message-ID: <CADTbHxozV2UyJjWoDaK3acpDxbtDJDOoapiV19w3FSMZUdMtpA@mail.gmail.com>
+From: eunki_kim@samsung.com (Eunki Kim)
+Date: Fri, 28 Sep 2012 11:41:02 +0900
+Subject: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member in
+ samsung_gpio_chip
+In-Reply-To: <50640338.9000808@samsung.com>
+References: <000001cd9c63$e95c7b60$bc157220$@com>
+ <5063DAFD.1040903@samsung.com> <000101cd9c74$b64cfa90$22e6efb0$@com>
+ <50640338.9000808@samsung.com>
+Message-ID: <002d01cd9d22$b335d170$19a17450$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> -----Original Message-----
+> From: Joonyoung Shim [mailto:jy0922.shim at samsung.com]
+> Sent: Thursday, September 27, 2012 4:42 PM
+> To: Eunki Kim
+> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
+> grant.likely at secretlab.ca; linus.walleij at linaro.org; kgene.kim at samsung.com
+> Subject: Re: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member in samsung_gpio_chip
+> 
+> On 09/27/2012 02:55 PM, Eunki Kim wrote:
+> >> -----Original Message-----
+> >> From: Joonyoung Shim [mailto:jy0922.shim at samsung.com]
+> >> Sent: Thursday, September 27, 2012 1:50 PM
+> >> To: Eunki Kim
+> >> Cc: linux-arm-kernel at lists.infradead.org;
+> >> linux-samsung-soc at vger.kernel.org;
+> >> grant.likely at secretlab.ca; linus.walleij at linaro.org;
+> >> kgene.kim at samsung.com
+> >> Subject: Re: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member
+> >> in samsung_gpio_chip
+> >>
+> >> On 09/27/2012 12:55 PM, Eunki Kim wrote:
+> >>> When a device uses GPIO interrupt, its driver assumes that GPIO
+> >>> should be INPUT mode. However, GPIO of SAMSUNG SoC is sepated to
+> >>> INPUT mode and INTERRUPT mode. They are set by 0x0 and 0xF in GPIO
+> >>> control register. If the register is set to INPUT mode, the
+> >>> interrupt never occur. Therefore, it's necessary to set INTERRUPT
+> >>> mode instead of INPUT mode when the pin is used for GPIO interrupt.
+> >> If for this, already the patch was posted.
+> >>
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/0
+> >> 74387.html
+> >>
+> >> Thanks.
+> >>
+> > The old posted patch and my new patches solve the same problem.
+> >
+> > However, the old patch fixes s5p_gpioint_set_type function which is
+> > irq_set_type function of GPIO int. The objective of irq_set_type function is setting IRQ type as
+> rising, falling, level and etc.
+> > It's not setting GPIO pin configuration.
+> 
+> Ok, it's reasonable but s5p_irq_eint_set_type() does it. So, do we need to remove it in
+> s5p_irq_eint_set_type() later?
+> 
 
-On Wed, Sep 26, 2012 at 10:12 PM, Vikram Narayanan <vikram186@gmail.com> wrote:
-> Use the enum for board_ref_clock from linux/wl12xx.h
->
-> Signed-off-by: Vikram Narayanan <vikram186@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> ---
-> I'm not subscribed to the list. So please keep me in Cc for the replies.
->
->  arch/arm/mach-omap2/board-omap4panda.c       |    3 +--
->  arch/arm/mach-omap2/board-zoom-peripherals.c |    3 +--
->  2 files changed, 2 insertions(+), 4 deletions(-)
->
+What do you mean? The old patch was not merged to mainline. I have checked 3.6-rc7 kernel source,
+but there isn't.
 
-Looks good.
+> >
+> > The new patches solve the problem root. It monitors use of GPIO int
+> > for each pin. If then, it sets INTERRUPT mode instead of INPUT mode
+> > when gpio_direction_input function is called. As you know, the objective of gpio_direction_input
+> function is setting the GPIO configuration.
+> 
+> Ok. It is minor concern, we will have to take care of the function call order dependency because
+> s5p_register_gpio_interrupt() should be called prior to gpio_direction_input().
+> 
+> Thanks.
+> 
 
-Reviewed-by: Pankaj Jangra<jangra.pankaj9@gmail.com>
+The s5p_register_gpio_interrupt function is called from the board file like mach-nuri.c
+mach-universal_c210.c. mach-goni.c generally. And also, setting GPIO pin to INTERRUPT mode codes
+(ex: s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));) follow the s5p_register_gpio_interrupt function.
+It's better to remain setting INTERRUPT mode. This patch just prevents from changing to INPUT mode
+by gpio_direction_input in any driver's probe function.
 
---
-Pankaj Jangra
+Thanks.
+
+> >
+> >>> This patch inserts the bitmap_gpio_int member in struct samsung_
+> >>> gpio_chip in order to represent use of GPIO interrupt for each pin
+> >>> and sets the related bit when s5p_register_gpio_interrupt function
+> >>> is called.
+> >>>
+> >>> Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
+> >>> Cc: Grant Likely <grant.likely@secretlab.ca>
+> >>> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >>> ---
+> >>>    arch/arm/plat-samsung/include/plat/gpio-core.h |    2 ++
+> >>>    arch/arm/plat-samsung/s5p-irq-gpioint.c        |    8 ++++++--
+> >>>    2 files changed, 8 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
+> >>> b/arch/arm/plat-samsung/include/plat/gpio-core.h
+> >>> index 1fe6917..dfd8b7a 100644
+> >>> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
+> >>> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+> >>> @@ -48,6 +48,7 @@ struct samsung_gpio_cfg;
+> >>>     * @config: special function and pull-resistor control information.
+> >>>     * @lock: Lock for exclusive access to this gpio bank.
+> >>>     * @pm_save: Save information for suspend/resume support.
+> >>> + * @bitmap_gpio_int: Bitmap for representing GPIO interrupt or not.
+> >>>     *
+> >>>     * This wrapper provides the necessary information for the Samsung
+> >>>     * specific gpios being registered with gpiolib.
+> >>> @@ -71,6 +72,7 @@ struct samsung_gpio_chip {
+> >>>    #ifdef CONFIG_PM
+> >>>    	u32			pm_save[4];
+> >>>    #endif
+> >>> +	u32			bitmap_gpio_int;
+> >>>    };
+> >>>
+> >>>    static inline struct samsung_gpio_chip *to_samsung_gpio(struct
+> >>> gpio_chip *gpc) diff --git a/arch/arm/plat-samsung/s5p-irq-gpioint.c
+> >>> b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+> >>> index f9431fe..d981c61 100644
+> >>> --- a/arch/arm/plat-samsung/s5p-irq-gpioint.c
+> >>> +++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+> >>> @@ -185,7 +185,7 @@ int __init s5p_register_gpio_interrupt(int pin)
+> >>>
+> >>>    	/* check if the group has been already registered */
+> >>>    	if (my_chip->irq_base)
+> >>> -		return my_chip->irq_base + offset;
+> >>> +		goto success;
+> >>>
+> >>>    	/* register gpio group */
+> >>>    	ret = s5p_gpioint_add(my_chip);
+> >>> @@ -193,9 +193,13 @@ int __init s5p_register_gpio_interrupt(int pin)
+> >>>    		my_chip->chip.to_irq = samsung_gpiolib_to_irq;
+> >>>    		printk(KERN_INFO "Registered interrupt support for gpio group %d.\n",
+> >>>    		       group);
+> >>> -		return my_chip->irq_base + offset;
+> >>> +		goto success;
+> >>>    	}
+> >>>    	return ret;
+> >>> +success:
+> >>> +	my_chip->bitmap_gpio_int |= BIT(offset);
+> >>> +
+> >>> +	return my_chip->irq_base + offset;
+> >>>    }
+> >>>
+> >>>    int __init s5p_register_gpioint_bank(int chain_irq, int start,
+> >>> int
+> >>> nr_groups)
+> >
