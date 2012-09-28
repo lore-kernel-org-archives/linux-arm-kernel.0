@@ -1,51 +1,50 @@
-From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
-Date: Fri, 28 Sep 2012 11:22:27 +0200
-Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
- conditions.
-In-Reply-To: <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
-References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
- <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
- <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
-Message-ID: <CAHod+GfbcB4d_siaTXn5a163b5sivUTqkWim8r2KJASh=7iGuA@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 28 Sep 2012 11:23:37 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <20120928090848.GX17667@game.jcrosoft.org>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <20120928024744.GV17667@game.jcrosoft.org> <50654E57.3080201@antcom.de>
+ <20120928075145.GW17667@game.jcrosoft.org> <50656522.1050900@antcom.de>
+ <20120928090848.GX17667@game.jcrosoft.org>
+Message-ID: <50656C99.50204@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I believe that was derived from the legacy code, so if you think it's
-> a bug and can get a proper fix, just go with it. Note, however, if the
-> code affects poodle/corgi, you may take another look and make sure
-> it doesn't break the rest ones.
+On 09/28/2012 11:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> Good idea! Talking about the public API (your above gpio_set_block()):
+>> *gpios is a list of GPIOs, but set is still bitmapped (mapped onto the
+>> list specified in *gpios)? To prevent confusion about what the size
+>> argument means (number of gpios in *gpios _or_ number of bytes in the
+>> bitmap *set) - wouldn't it be clearer to have a "bool *set" and "bool
+>> *values" list?
+> public API list of gpio as example
+> 
+> gpios = {1, 33, 34, 55};
+> set = {1, 0, 0 ,1};
+> 
+> gpio_set_blocks(gpios, set, 4);
+> 
+> private you do just provide the array related to the gpio_chip
+> lets assume 4 bank with 32 gpio each
+> 
+> gpio0 = {1};
+> set0 = {1};
+> 
+> gpio1 = {33, 34};
+> set1 = {0, 0};
+> 
+> gpio2 = {55};
+> set2 = {1};
+> 
+> set_blocks(gpio_chip0, gpio0, set0, 1);
+> set_blocks(gpio_chip1, gpio1, set1, 2);
+> set_blocks(gpio_chip2, gpio2, set2, 1);
 
-I think i found the actual problem here.
+Good.
 
--       pxa_gpio_mode(GPIO18_RDY|GPIO_OUT | GPIO_DFLT_HIGH);
-+       pxa2xx_mfp_config(&gpio18_config[0], 1);
+For the internal driver API (gpio_chip), we even don't really need the
+first argument (gpio_chip) since we can infer it from the gpios.
 
-These two lines don't do the same thing. The first one sets GPIO18 as
-output, default high.
-The second one sets GPIO18 to alternate function RDY. Similar thing
-happens here:
+Will provide an update.
 
--       pxa_gpio_mode(GPIO18_RDY_MD);
--       pxa_gpio_mode(10 | GPIO_IN);
-+       pxa2xx_mfp_config(&gpio18_config[1], 1);
-
- This is probably due to the fact that
-prior to pxa-regs.h breakup, GPIO18_RDY was defined as 18
-and GPIO18_RDY_MD defined the RDY alternate function.
-
-Basically, this bug is caused by a gpio naming mixup.
-
-A simple fix would be:
-
- static unsigned long gpio18_config[] = {
--       GPIO18_RDY,
-        GPIO18_GPIO,
-+       GPIO18_RDY,
- };
-
-I tested this and it works. If you think this is correct
-i'll post a proper patch.
-
-I also looked at the original sharp kernel sources.
-Only tosa used the RDY signal for it's tc6393tx chip, other machines simply
-configured gpio18 as output in their suspend routines.
+Roland
