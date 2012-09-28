@@ -1,205 +1,86 @@
 From: mporter@ti.com (Matt Porter)
-Date: Fri, 28 Sep 2012 15:37:50 -0400
-Subject: [PATCH v2 5/7] ARM: davinci: Add support for PRUSS on DA850
+Date: Fri, 28 Sep 2012 15:37:51 -0400
+Subject: [PATCH v2 6/7] ARM: omap: add DT support for deasserting hardware
+ reset lines
 In-Reply-To: <1348861072-14507-1-git-send-email-mporter@ti.com>
 References: <1348861072-14507-1-git-send-email-mporter@ti.com>
-Message-ID: <1348861072-14507-6-git-send-email-mporter@ti.com>
+Message-ID: <1348861072-14507-7-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds PRUSS clock, registers the L3RAM pool, and registers the
-platform device for uio_pruss on DA850.
+This optional binding extension allows specification of a hwmod
+and associate hardware reset line which should be deasserted for
+the device to be functional.
+
+The implementation works for reference as to the problem that
+exists for utilizing uio_pruss on AM33xx but is suboptimal. The
+problem is that this deassertion occurs before clocks are enabled
+and we are warned that the hard reset failed. Ideally the list of
+rst lines requested to be deasserted would be cached and used within
+the hwmod enable sequencing (instead of it just returning if any
+hardware reset line is asserted).
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c    |   12 +++++
- arch/arm/mach-davinci/da850.c              |    9 ++++
- arch/arm/mach-davinci/devices-da8xx.c      |   66 ++++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |    3 ++
- 4 files changed, 90 insertions(+)
+ .../devicetree/bindings/arm/omap/omap.txt          |    2 ++
+ arch/arm/plat-omap/omap_device.c                   |   25 ++++++++++++++++++--
+ 2 files changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 1295e61..d4f1720 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -29,6 +29,7 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/tps6507x.h>
- #include <linux/input/tps6507x-ts.h>
-+#include <linux/platform_data/uio_pruss.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
- #include <linux/delay.h>
-@@ -42,6 +43,7 @@
- #include <mach/da8xx.h>
- #include <linux/platform_data/mtd-davinci.h>
- #include <mach/mux.h>
-+#include <mach/sram.h>
- #include <linux/platform_data/mtd-davinci-aemif.h>
- #include <linux/platform_data/spi-davinci.h>
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index d0051a7..3133a4b 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -21,6 +21,8 @@ Required properties:
+ Optional properties:
+ - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+   during suspend.
++- ti,deassert-hard-reset: list of hwmod and hardware reset line name pairs
++  (ascii strings) to be deasserted upon device instantiation.
  
-@@ -1253,6 +1255,10 @@ static __init int da850_wl12xx_init(void)
  
- #endif /* CONFIG_DA850_WL12XX */
+ Example:
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index d5f617c..d1ae68c 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -330,8 +330,8 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ 	struct omap_device *od;
+ 	struct omap_hwmod *oh;
+ 	struct device_node *node = pdev->dev.of_node;
+-	const char *oh_name;
+-	int oh_cnt, i, ret = 0;
++	const char *oh_name, *rst_name;
++	int oh_cnt, dstr_cnt, i, ret = 0;
  
-+struct uio_pruss_pdata da8xx_pruss_uio_pdata = {
-+	.pintc_base	= 0x4000,
-+};
-+
- #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+ 	oh_cnt = of_property_count_strings(node, "ti,hwmods");
+ 	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
+@@ -376,6 +376,27 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ 	if (of_get_property(node, "ti,no_idle_on_suspend", NULL))
+ 		omap_device_disable_idle_on_suspend(pdev);
  
- static __init void da850_evm_init(void)
-@@ -1339,6 +1345,12 @@ static __init void da850_evm_init(void)
- 		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
- 				ret);
- 
-+	da8xx_pruss_uio_pdata.l3ram_pool = sram_get_l3ram_pool();
-+	ret = da8xx_register_pruss_uio(&da8xx_pruss_uio_pdata);
-+	if (ret)
-+		pr_warning("pruss_uio initialization failed: %d\n",
-+				ret);
-+
- 	/* Handle board specific muxing for LCD here */
- 	ret = davinci_cfg_reg_list(da850_evm_lcdc_pins);
- 	if (ret)
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 6676dee..131c175 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -212,6 +212,12 @@ static struct clk tptc2_clk = {
- 	.flags		= ALWAYS_ENABLED,
- };
- 
-+static struct clk pruss_clk = {
-+	.name		= "pruss",
-+	.parent		= &pll0_sysclk2,
-+	.lpsc		= DA8XX_LPSC0_PRUSS,
-+};
-+
- static struct clk uart0_clk = {
- 	.name		= "uart0",
- 	.parent		= &pll0_sysclk2,
-@@ -378,6 +384,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK(NULL,		"tptc1",	&tptc1_clk),
- 	CLK(NULL,		"tpcc1",	&tpcc1_clk),
- 	CLK(NULL,		"tptc2",	&tptc2_clk),
-+	CLK(NULL,		"pruss",	&pruss_clk),
- 	CLK(NULL,		"uart0",	&uart0_clk),
- 	CLK(NULL,		"uart1",	&uart1_clk),
- 	CLK(NULL,		"uart2",	&uart2_clk),
-@@ -1089,6 +1096,8 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.emac_pdata		= &da8xx_emac_pdata,
- 	.sram_dma		= DA8XX_ARM_RAM_BASE,
- 	.sram_len		= SZ_8K,
-+	.l3ram_dma		= DA8XX_SHARED_RAM_BASE,
-+	.l3ram_len		= SZ_128K,
- };
- 
- void __init da850_init(void)
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index bd2f72b..7c2e0d2 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -518,6 +518,72 @@ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
- 	}
- }
- 
-+#define DA8XX_PRUSS_MEM_BASE		0x01C30000
-+
-+static struct resource da8xx_pruss_resources[] = {
-+	{
-+		.start	= DA8XX_PRUSS_MEM_BASE,
-+		.end	= DA8XX_PRUSS_MEM_BASE + 0xFFFF,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT0,
-+		.end	= IRQ_DA8XX_EVTOUT0,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT1,
-+		.end	= IRQ_DA8XX_EVTOUT1,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT2,
-+		.end	= IRQ_DA8XX_EVTOUT2,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT3,
-+		.end	= IRQ_DA8XX_EVTOUT3,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT4,
-+		.end	= IRQ_DA8XX_EVTOUT4,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT5,
-+		.end	= IRQ_DA8XX_EVTOUT5,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT6,
-+		.end	= IRQ_DA8XX_EVTOUT6,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_EVTOUT7,
-+		.end	= IRQ_DA8XX_EVTOUT7,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device da8xx_pruss_uio_dev = {
-+	.name		= "pruss_uio",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(da8xx_pruss_resources),
-+	.resource	= da8xx_pruss_resources,
-+	.dev	 =	{
-+		.coherent_dma_mask = 0xffffffff,
++	dstr_cnt =
++		of_property_count_strings(node, "ti,deassert-hard-reset");
++	if (dstr_cnt > 0) {
++		for (i = 0; i < dstr_cnt; i += 2) {
++			of_property_read_string_index(
++				node, "ti,deassert-hard-reset", i,
++				&oh_name);
++			of_property_read_string_index(
++				node, "ti,deassert-hard-reset", i+1,
++				&rst_name);
++			oh = omap_hwmod_lookup(oh_name);
++			if (!oh) {
++				dev_warn(&pdev->dev,
++				"Cannot parse deassert property for '%s'\n",
++				oh_name);
++				break;
++			}
++			omap_hwmod_deassert_hardreset(oh, rst_name);
++		}
 +	}
-+};
 +
-+int __init da8xx_register_pruss_uio(struct uio_pruss_pdata *config)
-+{
-+	da8xx_pruss_uio_dev.dev.platform_data = config;
-+	return platform_device_register(&da8xx_pruss_uio_dev);
-+}
-+
- static const struct display_panel disp_panel = {
- 	QVGA,
- 	16,
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index c9ee723..5320e12 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -25,6 +25,7 @@
- #include <linux/platform_data/mmc-davinci.h>
- #include <linux/platform_data/usb-davinci.h>
- #include <linux/platform_data/spi-davinci.h>
-+#include <linux/platform_data/uio_pruss.h>
+ 	pdev->dev.pm_domain = &omap_device_pm_domain;
  
- extern void __iomem *da8xx_syscfg0_base;
- extern void __iomem *da8xx_syscfg1_base;
-@@ -69,6 +70,7 @@ extern unsigned int da850_max_speed;
- #define DA8XX_AEMIF_CS3_BASE	0x62000000
- #define DA8XX_AEMIF_CTL_BASE	0x68000000
- #define DA8XX_ARM_RAM_BASE	0xffff0000
-+#define DA8XX_SHARED_RAM_BASE	0x80000000
- 
- void __init da830_init(void);
- void __init da850_init(void);
-@@ -82,6 +84,7 @@ int da8xx_register_watchdog(void);
- int da8xx_register_usb20(unsigned mA, unsigned potpgt);
- int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
- int da8xx_register_emac(void);
-+int da8xx_register_pruss_uio(struct uio_pruss_pdata *config);
- int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
- int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
- int da850_register_mmcsd1(struct davinci_mmc_config *config);
+ odbfd_exit1:
 -- 
 1.7.9.5
