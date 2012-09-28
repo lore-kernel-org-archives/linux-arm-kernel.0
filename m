@@ -1,40 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Sep 2012 14:50:16 +0200
-Subject: [PATCH 2/2] ARM: dts: cfa10049: Add spidev to drive the DAC on SSP3
-In-Reply-To: <1348836616-29783-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1348836616-29783-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1348836616-29783-3-git-send-email-maxime.ripard@free-electrons.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 28 Sep 2012 18:23:14 +0530
+Subject: [PATCH 5/6] usb: dwc3-omap: Minor fixes to get dt working
+In-Reply-To: <1348836795-4783-1-git-send-email-kishon@ti.com>
+References: <1348836795-4783-1-git-send-email-kishon@ti.com>
+Message-ID: <1348836795-4783-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+Includes few minor fixes in dwc3-omap like populating the compatible
+string in a correct way, extracting the utmi-mode property properly and
+changing the index of get_irq since irq of core is removed from hwmod
+entry.
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 05c892e..d91d16c 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -29,6 +29,7 @@
- 						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
- 						0x0111 /* MX28_PAD_GPMI_CE1N__SSP3_D3 */
- 						0x01a2 /* MX28_PAD_GPMI_ALE__SSP3_D4 */
-+						0x01b2 /* MX28_PAD_GPMI_CLE__SSP3_D5 */
- 					>;
- 					fsl,drive-strength = <1>;
- 					fsl,voltage = <1>;
-@@ -60,6 +61,11 @@
- 					spi-max-frequency = <100000>;
- 				};
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/usb/dwc3/dwc3-omap.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
+index 7ae4d73..e3d9a5f 100644
+--- a/drivers/usb/dwc3/dwc3-omap.c
++++ b/drivers/usb/dwc3/dwc3-omap.c
+@@ -277,7 +277,7 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
  
-+				spidev: spidev at 2 {
-+					compatible = "linux,spidev";
-+					reg = <2>;
-+					spi-max-frequency = <100000>;
-+				};
- 			};
- 		};
+ 	platform_set_drvdata(pdev, omap);
  
+-	irq = platform_get_irq(pdev, 1);
++	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(dev, "missing IRQ resource\n");
+ 		return -EINVAL;
+@@ -335,7 +335,7 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
+ 
+ 	utmi_mode = of_get_property(node, "utmi-mode", &size);
+ 	if (utmi_mode && size == sizeof(*utmi_mode)) {
+-		reg |= *utmi_mode;
++		reg |= be32_to_cpup(utmi_mode);
+ 	} else {
+ 		if (!pdata) {
+ 			dev_dbg(dev, "missing platform data\n");
+@@ -403,7 +403,7 @@ static int __devexit dwc3_omap_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id of_dwc3_matach[] = {
+ 	{
+-		"ti,dwc3",
++		.compatible =	"ti,dwc3"
+ 	},
+ 	{ },
+ };
 -- 
-1.7.9.5
+1.7.10.4
