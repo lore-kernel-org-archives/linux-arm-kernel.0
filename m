@@ -1,26 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 28 Sep 2012 09:58:21 -0300
-Subject: Using ipuv3 driver with device tree
-In-Reply-To: <20120928123853.GJ24458@pengutronix.de>
-References: <CAOMZO5CUFJ4-J90oVcNDmVLJDd4Q3xtHPKqD+BoADg7gV0gtsw@mail.gmail.com>
- <20120928123853.GJ24458@pengutronix.de>
-Message-ID: <CAOMZO5C+0uYW+cGRed+W2SSPBpFPtNoq2UPOjr0oEvy5D9NuSw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 28 Sep 2012 15:57:59 +0300
+Subject: [PATCH 1/6] usb: dwc3-omap: use of_platform API to create dwc3
+ core pdev
+In-Reply-To: <1348836795-4783-2-git-send-email-kishon@ti.com>
+References: <1348836795-4783-1-git-send-email-kishon@ti.com>
+ <1348836795-4783-2-git-send-email-kishon@ti.com>
+Message-ID: <20120928125758.GK31006@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 9:38 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Hi,
 
-> I just wanted to create some followup patches to add the devicetree
-> support so that you have something to test with, but I found out
-> that this is not so simple as it seems. The i.MX6 clock lookups will
-> be switched to devicetree probe, but this is not in -next yet. Current
-> -next is broken for me right now (haven't figured out why, but CMA
-> does not work, I get not ethernet link on my babbage board,...)
-> I think we'll just wait until things have settled after the merge
-> window until I base further work on the IPU patches.
+On Fri, Sep 28, 2012 at 06:23:10PM +0530, Kishon Vijay Abraham I wrote:
+> Used of_platform_populate() to populate dwc3 core platform_device
+> from device tree data. Since now the allocation of unique device id is
+> handled be of_*, removed the call to dwc3_get_device_id.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Understood, makes sense. Let's wait for 3.7-rc1.
+I think it's best if you split the use of device_for_each_child() from
+this patch. So first do the device_for_each_child() part, then later use
+of_platform_populate().
 
-Thanks,
-
-Fabio Estevam
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120928/1d7513b6/attachment.sig>
