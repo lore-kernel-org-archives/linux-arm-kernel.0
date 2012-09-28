@@ -1,22 +1,38 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Fri, 28 Sep 2012 15:29:33 +0900
-Subject: [PATCH V2] ASoC: SAMSUNG: Add DT support for i2s
-In-Reply-To: <1348741532-29412-1-git-send-email-padma.v@samsung.com>
-References: <1348741532-29412-1-git-send-email-padma.v@samsung.com>
-Message-ID: <000d01cd9d42$9fbd7b50$df3871f0$@com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 28 Sep 2012 12:03:34 +0530
+Subject: [PATCH V2] ARM: OMAP2+: Round of the carve out memory requested
+ to section_size
+In-Reply-To: <1347434053-11431-1-git-send-email-r.sricharan@ti.com>
+References: <1347434053-11431-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <CAMQu2gwuQ6uht0iHtPuhFU4B9P+zgNHYazK+BqE-rnBfnhL2cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-On Thu, Sep 27, 2012 at 07:26 PM, Padmavathi Venna wrote:
+On Wed, Sep 12, 2012 at 12:44 PM, R Sricharan <r.sricharan@ti.com> wrote:
+> memblock_steal tries to reserve physical memory during boot.
+> When the requested size is not aligned on the section size
+> then, the remaining memory available for lowmem becomes
+> unaligned on the section boundary. There is a issue with this,
+> which is discussed in the thread below.
+>
+> https://lkml.org/lkml/2012/6/28/112
+>
+> The final conclusion from the thread seems to
+> be align the memblock_steal calls on the SECTION boundary.
+> The issue comes out when LPAE is enabled, where the
+> section size is 2MB.
+>
+> Boot tested this on OMAP5 evm with and without LPAE.
+>
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> ---
+>  [V2] Corrected the subject and added one more description line.
+>
+Looks good.
+Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-> Subject: [PATCH V2] ASoC: SAMSUNG: Add DT support for i2s
-> 
-> Add support for device based discovery.
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Tony,
+Can you take this into your next "fixes-noncritical" queue please ?
 
-Please describe the difference between v1 and v2.
-
-Thanks,
-Sangbeom.
+Regards,
+Santosh
