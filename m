@@ -1,59 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2012 20:13:34 +0000
-Subject: [PATCH 13/24] ARM: nomadik: use __iomem pointers for MMIO
-In-Reply-To: <20120915113356.GA31284@mail.gnudd.com>
-References: <1347658492-11608-14-git-send-email-arnd@arndb.de>
- <1347658492-11608-1-git-send-email-arnd@arndb.de>
- <20120915113356.GA31284@mail.gnudd.com>
-Message-ID: <201209282013.34638.arnd@arndb.de>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Fri, 28 Sep 2012 20:12:43 +0000
+Subject: [linux-keystone] Re: [PATCH 01/13] clk: davinci - add Main PLL
+ clock driver
+In-Reply-To: <CACRpkdZ=8m+X2KnUPFFhT2LsvTe-jPR_m6oVt_CEFfY-LvFHmg@mail.gmail.com>
+References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
+ <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
+ <CACRpkdZ=8m+X2KnUPFFhT2LsvTe-jPR_m6oVt_CEFfY-LvFHmg@mail.gmail.com>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B7041EF93B@DFLE12.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 September 2012, Alessandro Rubini wrote:
-> > -     .options        = NAND_COPYBACK | NAND_CACHEPRG | NAND_NO_PADDING \
-> > -                     | NAND_NO_READRDY,
-> > +     .options        = NAND_COPYBACK | NAND_CACHEPRG | NAND_NO_PADDING,
-> 
-> This is not clear to me, and it looks unrelated. But I admit I haven't
-> studied what happened to NAND_NO_READRDY lately.
-> 
-> If this hunk is desired and not just something else
-> that slipped in, then
-> 
->   Acked-by: Alessandro Rubini <rubini@unipv.it>
+>> -----Original Message-----
+>> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+>> Sent: Thursday, September 27, 2012 9:20 AM
+>> To: Karicheri, Muralidharan
+>> Cc: mturquette at linaro.org; arnd at arndb.de; akpm at linux-foundation.org;
+>> shawn.guo at linaro.org; rob.herring at calxeda.com; viresh.linux at gmail.com; linux-
+>> kernel at vger.kernel.org; Nori, Sekhar; Hilman, Kevin; linux at arm.linux.org.uk; davinci-
+>> linux-open-source at linux.davincidsp.com; linux-arm-kernel at lists.infradead.org; linux-
+>> keystone at list.ti.com - Linux developers for Keystone family of devices (May contain non-
+>> TIers); linux-c6x-dev at linux-c6x.org; Chemparathy, Cyril
+>> Subject: [linux-keystone] Re: [PATCH 01/13] clk: davinci - add Main PLL clock driver
+>> 
+>> On Wed, Sep 26, 2012 at 8:07 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+>> 
+>> > +struct clk_davinci_pll_data {
+>> > +       /* physical addresses set by platform code */
+>> > +       u32 phy_pllm;
+>> > +       /* if PLL has a prediv register this should be non zero */
+>> > +       u32 phy_prediv;
+>> > +       /* if PLL has a postdiv register this should be non zero */
+>> > +       u32 phy_postdiv;
+>> > +       /* mapped addresses. should be initialized by  */
+>> > +       void __iomem *pllm;
+>> > +       void __iomem *prediv;
+>> > +       void __iomem *postdiv;
+>> > +       u32 pllm_mask;
+>> > +       u32 prediv_mask;
+>> > +       u32 postdiv_mask;
+>> > +       u32 num;
+>> > +       /* framework flags */
+>> > +       u32 flags;
+>> > +       /* pll flags */
+>> > +       u32 pll_flags;
+>> > +       /* use this value for prediv */
+>> > +       u32 fixed_prediv;
+>> > +       /* multiply PLLM by this factor. By default most SOC set this to zero
+>> > +        * that translates to a multiplier of 1 and incrementer of 1.
+>> > +        * To override default, set this factor
+>> > +        */
+>> > +       u32 pllm_multiplier;
+>> > +};
+>> > +
+>> 
+>> No, that's not what I meant.
+>> 
+>> I meant like this:
+>> 
+>> /**
+>>  * struct clk_davinci_pll_data - struct holding the PLL data
+>>  * phy_pllm: physical addresses set by platform code
+>>  * phy_prediv: ...
+>> (...)
+>>  */
+>> struct clk_davinci_pll_data {
+>>       u32 phy_pllm;
+>>       u32 phy_prediv;
+>> (...)
+>> };
+>> 
+Ok. Will do in the next revision.
 
-I've added the patch below to the next/fixes-non-critical branch now,
-to avoid the build error in linux-next.
+Murali Karicheri
+Software Design Engineer
 
-	Arnd
-
->From 06f8ab806e9e180966e812f6e47a0735bba638d8 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Sun, 23 Sep 2012 22:57:22 +0000
-Subject: [PATCH] ARM: nomadik: remove NAND_NO_READRDY use
-
-The nhk8815 board files uses NAND_NO_READRDY in its platform data, but
-this macro is getting removed because it was not being used anywhere.
-
-Without this patch, building nhk8815_defconfig results in:
-
-arch/arm/mach-nomadik/board-nhk8815.c:118:6: error: 'NAND_NO_READRDY' undeclared here (not in a function)
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index 381c080..92a0026 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -112,8 +112,7 @@ static struct mtd_partition nhk8815_partitions[] = {
- static struct nomadik_nand_platform_data nhk8815_nand_data = {
- 	.parts		= nhk8815_partitions,
- 	.nparts		= ARRAY_SIZE(nhk8815_partitions),
--	.options	= NAND_COPYBACK | NAND_CACHEPRG | NAND_NO_PADDING \
--			| NAND_NO_READRDY,
-+	.options	= NAND_COPYBACK | NAND_CACHEPRG | NAND_NO_PADDING,
- 	.init		= nhk8815_nand_init,
- };
- 
+>> Yours,
+>> Linus Walleij
