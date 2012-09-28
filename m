@@ -1,31 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Sep 2012 11:44:28 +0100
-Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
-In-Reply-To: <20120928104216.GC18125@mudshark.cambridge.arm.com>
-References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
- <alpine.LFD.2.02.1209280011340.6667@xanadu.home>
- <20120928095808.GB18125@mudshark.cambridge.arm.com>
- <20120928103109.GD7916@n2100.arm.linux.org.uk>
- <20120928104216.GC18125@mudshark.cambridge.arm.com>
-Message-ID: <20120928104428.GE7916@n2100.arm.linux.org.uk>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 28 Sep 2012 16:29:49 +0530
+Subject: [PATCH v2] ASoC: Samsung: Update Kconfig for Exynos5250 and
+ Exynos4412
+In-Reply-To: <003401cd9d5f$179495c0$46bdc140$@samsung.com>
+References: <1348741777-29569-1-git-send-email-padma.v@samsung.com>
+ <003401cd9d5f$179495c0$46bdc140$@samsung.com>
+Message-ID: <50658325.8050704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 11:42:16AM +0100, Will Deacon wrote:
-> How are these regions mapped? If it's something like ioremap_wc, then this
-> gives us normal non-cacheable memory on ARMv7, which wouldn't be subject to
-> the restrictions that you have with device memory. 
-
-Yes, ioremap_wc() but we can't guarantee that for all causes of memset_io.
-
-> > Either that or we allow DRM to be a security hole by omitting any kind
-> > of buffer clearing, because using the existing memset_io() is just far
-> > too expensive to clear 8MB a byte at a time.
+On 09/28/2012 03:23 PM, Sangsu Park wrote:
 > 
-> If DRM is using normal memory, it sounds like the *_io string functions need
-> to be made to work with different memory types.
+> On Thu, Sep 27, 2012 at 07:30 PM, Padmavathi Venna wrote:
+> 
+>> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+>> index fe3995c..430783b 100644
+>> --- a/sound/soc/samsung/Kconfig
+>> +++ b/sound/soc/samsung/Kconfig
+>> @@ -1,6 +1,6 @@
+>>  config SND_SOC_SAMSUNG
+>>  	tristate "ASoC support for Samsung"
+>> -	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210
+>> || ARCH_S5P64X0 || ARCH_EXYNOS4
+>> +	depends on PLAT_SAMSUNG
+>>  	select S3C64XX_DMA if ARCH_S3C64XX
+>>  	select S3C2410_DMA if ARCH_S3C24XX
+>>  	help
+> 
+> This code is already updated.
+> 
+>> @@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
+>>
+>>  config SND_SOC_SAMSUNG_SMDK_WM8994
+>>  	tristate "SoC I2S Audio support for WM8994 on SMDK"
+>> -	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+>> MACH_SMDK4212)
+>> +	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+>> MACH_SMDK4212 || MACH_SMDK4412 || MACH_EXYNOS5_DT)
+>>  	depends on I2C=y && GENERIC_HARDIRQS
+>>  	select MFD_WM8994
+>>  	select SND_SOC_WM8994
+> 
+> I'm not sure about this since MACH_EXYNOS5_DT can have others instead of SMDK.
+> 
 
-Take a look at the *_io string function declarations, and observe the use
-of __iomem.  That means they're only used with memory returned from the
-ioremap*() suite of functions (or they're being used non-compliantly and
-sparse should be spitting warnings.)
+But there is no other way we can differentiate between two EXYNOS5_DT
+based boards in the kernel. So, support for all possible codecs and
+sound-cards should be enabled in the kernel. The instantiation of the
+drivers should depend on the device-tree entries.
+
+> Thanks,
+> Sangsu.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Tushar Behera
