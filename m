@@ -1,32 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Sep 2012 09:29:48 +0200
-Subject: [PATCH 6/6] pinctrl: sirf: enable the driver support new
- SiRFmarco SoC
-In-Reply-To: <1348739790-21253-1-git-send-email-Barry.Song@csr.com>
-References: <1348739790-21253-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CACRpkdYT2TZX8cchPk+H4LkdVXw861BBTn1dbnSJO-ZQVT5sdw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 28 Sep 2012 09:30:21 +0200
+Subject: Using ipuv3 driver with device tree
+In-Reply-To: <CAOMZO5CUFJ4-J90oVcNDmVLJDd4Q3xtHPKqD+BoADg7gV0gtsw@mail.gmail.com>
+References: <CAOMZO5CUFJ4-J90oVcNDmVLJDd4Q3xtHPKqD+BoADg7gV0gtsw@mail.gmail.com>
+Message-ID: <20120928073021.GY1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 11:56 AM, Barry Song <Barry.Song@csr.com> wrote:
+Hi Fabio,
 
-> From: Barry Song <Baohua.Song@csr.com>
->
-> The driver supports old up SiRFprimaII SoCs, this patch makes it support
-> the new SiRFmarco as well.
-> SiRFmarco, as a SMP SoC, adds new SIRFSOC_GPIO_PAD_EN_CLR registers, to
-> disable GPIO pad, we should write 1 to the corresponding bit in the new
-> CLEAR register instead of writing 0 to SIRFSOC_GPIO_PAD_EN.
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On Thu, Sep 27, 2012 at 11:56:00PM -0300, Fabio Estevam wrote:
+> Hi Sascha,
+> 
+> I would like to try the ipuv3 driver on mx53qsb (it can be WVGA, LVDS
+> or VGA) and would like to know if there are any patches for the dts
+> files I can use for this purpose.
 
-This doesn't apply to my tree, you must have some other changes that
-are not included in the patch set...
+I'll send patches for the dts very soon.
 
-Can you pls try to generate and test the patch against the pinctrl tree?
+> 
+> I am not sure what is the recommended way for passing the video
+> timings in dt and looking for an example.
 
-I might apply it as per the "new driver" rule if I can convince myself that it
-doesn't destabilize the current driver.
+Right now the only way for passing video timings is using an EDID blob
+in the devicetree. We are currently trying to change this, but it seems
+it will take some time. See this thread:
 
-Yours,
-Linus Walleij
+[PATCH v5] of: add display helper (was: of: add videomode helper) 
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
