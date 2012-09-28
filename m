@@ -1,68 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Sep 2012 17:04:10 +0200
-Subject: [PATCH] ATA: sata_mv: Fix warnings when no PCI
-Message-ID: <1348844650-2957-1-git-send-email-andrew@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Sep 2012 08:05:38 -0700
+Subject: [PATCH 2/4] ARM: OMAP: DMA: Move plat/dma hearder to
+ platform_data/dma-omap
+In-Reply-To: <CAMQu2gw9DJSZ4QVvo83atTpnsXyegneuQ2rJKBc+5ioiwEaqaQ@mail.gmail.com>
+References: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
+ <1348839609-10456-3-git-send-email-lokeshvutla@ti.com>
+ <20120928145459.GZ4840@atomide.com>
+ <CAMQu2gw9DJSZ4QVvo83atTpnsXyegneuQ2rJKBc+5ioiwEaqaQ@mail.gmail.com>
+Message-ID: <20120928150538.GB4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove can be configured with PCI. We then get a number of warnings:
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120928 08:02]:
+> On Fri, Sep 28, 2012 at 8:25 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > * Lokesh Vutla <lokeshvutla@ti.com> [120928 06:41]:
+> > > Move plat/dma.h header to platform_data/dma-omap.h as
+> > > part of the single zImage work.
+> >
+> > Hmm there's no platform data in this header, just
+> > exported things for drivers to use. So it should not
+> > be placed into platform_data.
+> >
+> > Maybe it should be #include <asm/mach/dma-omap.h> for now?
+> >
+> I wasn't sure either when the file was placed under platform-data.
+> I agree for now we can keep it mach layer but than means OMAP1 and
+> OMAP2+ DMA header and source code needs to be split. That
+> is not so straight forward.
 
-warning: 'msi' defined but not used
-warning: 'mv5_sht' defined but not used
-warning: 'mv_dump_pci_cfg' defined but not used.
-
-Move around variables and add #ifdef as necassary to fix the warnings.
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- drivers/ata/sata_mv.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-index 311be18..68f4fb5 100644
---- a/drivers/ata/sata_mv.c
-+++ b/drivers/ata/sata_mv.c
-@@ -79,8 +79,8 @@
-  * module options
-  */
+No need for that, the path I'm suggesting is located under
+arch/arm/include/asm/mach, it's not same as include <mach/dma-omap.h>.
  
--static int msi;
- #ifdef CONFIG_PCI
-+static int msi;
- module_param(msi, int, S_IRUGO);
- MODULE_PARM_DESC(msi, "Enable use of PCI MSI (0=off, 1=on)");
- #endif
-@@ -652,12 +652,13 @@ static u8 mv_sff_check_status(struct ata_port *ap);
-  * because we have to allow room for worst case splitting of
-  * PRDs for 64K boundaries in mv_fill_sg().
-  */
-+#ifdef CONFIG_PCI
- static struct scsi_host_template mv5_sht = {
- 	ATA_BASE_SHT(DRV_NAME),
- 	.sg_tablesize		= MV_MAX_SG_CT / 2,
- 	.dma_boundary		= MV_DMA_BOUNDARY,
- };
--
-+#endif
- static struct scsi_host_template mv6_sht = {
- 	ATA_NCQ_SHT(DRV_NAME),
- 	.can_queue		= MV_MAX_Q_DEPTH - 1,
-@@ -1252,7 +1253,7 @@ static void mv_dump_mem(void __iomem *start, unsigned bytes)
- 	}
- }
- #endif
--
-+#if defined(ATA_DEBUG) || defined(CONFIG_PCI)
- static void mv_dump_pci_cfg(struct pci_dev *pdev, unsigned bytes)
- {
- #ifdef ATA_DEBUG
-@@ -1269,6 +1270,7 @@ static void mv_dump_pci_cfg(struct pci_dev *pdev, unsigned bytes)
- 	}
- #endif
- }
-+#endif
- static void mv_dump_all_regs(void __iomem *mmio_base, int port,
- 			     struct pci_dev *pdev)
- {
--- 
-1.7.10.4
+> With DMA engine conversion hopefully, we might get rid of the
+> header eventually, but for now not sure whether we should
+> go ahead and follow the splitting part.
+> 
+> Thoughts ?
+
+No need for splitting anything :)
+
+The other possible location would be just include <linux/dma-omap.h>,
+but as we all know that will be going away, <asm/mach/dma-omap.h>
+is probably better.
+
+Tony
