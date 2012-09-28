@@ -1,35 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Sep 2012 10:50:02 +0200
-Subject: [PATCH 2/2] ARM: bcm2835: enable GPIO/pinctrl
-In-Reply-To: <1348805412-7804-2-git-send-email-swarren@wwwdotorg.org>
-References: <1348805412-7804-1-git-send-email-swarren@wwwdotorg.org>
- <1348805412-7804-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkdaUkz5kVZqMeDB6X0B6=0YX4_KxM0eG9RmJMJ4ujkvShw@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 28 Sep 2012 10:51:46 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <20120928075145.GW17667@game.jcrosoft.org>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <20120928024744.GV17667@game.jcrosoft.org> <50654E57.3080201@antcom.de>
+ <20120928075145.GW17667@game.jcrosoft.org>
+Message-ID: <50656522.1050900@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 6:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+Hi!
 
-> Enable GPIO and pinctrl in Kconfig.
->
-> Add required <mach/gpio.h> for gpiolib.
->
-> Instantiate the BCM2835 GPIO module in bcm2835.dtsi.
->
-> Add a pinctrl definition to bcm2835-rpi-b.dts that sets up all of the
-> board's required pinmux configuration. GPIO aren't specified; that's
-> left to gpio_request().
->
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+On 09/28/2012 09:51 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> Right - will add checking for the request state of the respective GPIOs.
+>>
+>> The list of GPIOs to handle is defined by the offset (specified GPIO)
+>> and bitmapped list.
+>>
+>> If it looks more natural, I can change this to a list of ints specifying
+>> GPIOs directly.
+> you pass the correctly information to the gpiolib
+> 
+> as if you do not request the gpio the gpiolib will auto request the gpios
+> so you api will be 
+> int gpio_get_block(unsigned int *gpios, u8* values, size_t size);
+> 
+> return an error
+> 
+> int gpio_set_block(unsigned int *gpios, u8* set, size_t size);
+> 
+> so you do not care about the banks you work on the gpiolib framework will call
+> each gpio_chip seperatly. If the set_block get_block is not availlable the
+> gpiolib could fallback to get/set
+> 
+> inside of the gpiolib that you call each bank with a bitmapped list is correct
+> but not in the public gpiolib API
 
-This thing does not apply to my tree because of deps in
-other trees (I guess ARM SoC).
+Good idea! Talking about the public API (your above gpio_set_block()):
+*gpios is a list of GPIOs, but set is still bitmapped (mapped onto the
+list specified in *gpios)? To prevent confusion about what the size
+argument means (number of gpios in *gpios _or_ number of bytes in the
+bitmap *set) - wouldn't it be clearer to have a "bool *set" and "bool
+*values" list?
 
-You have my ACK:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>> And how you can hope to describe this via DT
+>>
+>> Haven't had planned that yet. Finally, this interface should just be
+>> another view on the GPIOs already requested / assigned. Or which
+>> additional info do you mean?
+> how do you plan to give the gpio base vai DT to the driver as via DT we just
+> pass the list of GPIO to work on
 
-If you figure out a way to get it into a later part of the
-merge window, else it'll need to wait for v3.7-rc1.
+Right. If I understand correctly, with the above discussed changes, this
+"GPIO base" issue is gone...
 
-Yours,
-Linus Walleij
+Thanks for your feedback!
+
+Roland
