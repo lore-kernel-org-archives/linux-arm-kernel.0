@@ -1,50 +1,59 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 28 Sep 2012 16:48:16 -0400
-Subject: [PATCH RESEND 0/5] ARM: dts: AM33XX: Add device tree data
-In-Reply-To: <505A3D4C.4090502@ti.com>
-References: <1348089570-16161-1-git-send-email-anilkumar@ti.com>
- <B7CE1C39EBFBA0428A012975D4B2FC830B5DF78F@DNCE05.ent.ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA34232@DBDE01.ent.ti.com>
- <505A3D4C.4090502@ti.com>
-Message-ID: <20120928204816.GI5641@beef>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 28 Sep 2012 16:30:16 -0500
+Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
+In-Reply-To: <5065F19E.5020708@ti.com>
+References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
+ <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
+ <5063330E.3000203@ti.com> <5065F19E.5020708@ti.com>
+Message-ID: <506616E8.9000006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2012 at 04:46:52PM -0500, Benoit Cousson wrote:
-> + Matt
+
+On 09/28/2012 01:51 PM, Vaibhav Hiremath wrote:
 > 
-> On 9/19/2012 4:28 PM, AnilKumar, Chimata wrote:
-> >On Thu, Sep 20, 2012 at 02:53:38, Cousson, Benoit wrote:
-> >>+ Paul
-> >>
-> >>Hi Anil,
-> >>
-> >>Thanks for the rebase / repost. I'll pulled the full series if Paul is OK with
-> >>   ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
-> >>
 > 
-> What about Matt's series to fix the I2C number? Should it be applied
-> on top of that one?
-
-I had the series to fix the GPIO numbering [1]. It's dependent on this
-series which carries the led dts patch. Pantelis has a patch for i2c
-dts numbering in his i2c series [2]. A hunk in that patch has support
-for his i2c pinctrl series mixed in (not sure where that one is due to
-the change to early init) so it doesn't apply cleanly alone on top of
-for_3.7/dts_part2. If you're willing to pick up that i2c renumbering by
-itself I can drop you a patch just for that part.
-
--Matt
-
-[1] https://patchwork.kernel.org/patch/1433481/
-    https://patchwork.kernel.org/patch/1433471/
-
-[2] https://patchwork.kernel.org/patch/1474001/
-
+> On 9/26/2012 10:23 PM, Jon Hunter wrote:
+>>
+>> On 09/20/2012 06:53 PM, Tony Lindgren wrote:
+>>> * Benoit Cousson <b-cousson@ti.com> [120919 19:24]:
+>>>> Hi Tony,
+>>>>
+>>>> I was about to take the DTS patch, but was wondering if you will pull
+>>>> the driver changes for 3.7.
+>>>
+>>> I suggest that you do a separate branch on top of Paul's hwmod series
+>>> when he posts those if that works for you?
+>>
+>> Benoit, I see that you have pulled in the DTS patch.
+>>
+>> Do you guys want me to rebase the remaining patches with Rob's change on
+>> Tony's master branch and re-submit?
+>>
 > 
-> Regards,
-> Benoit
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Jon,
+> 
+> Sorry for delayed response, But I tried using your omap_test application
+> to validate this patch series, but it is failing for me.
+> 
+> How did you test it? Are you running same test application at your end?
+
+Check your email on Sept 14th. I sent you the latest version of the test
+code. I will resend in case it got lost in deep space.
+
+> I am debugging this issue, i just thought I should tell you this before
+> its too late.
+> 
+> 
+> Below is the log -
+> 
+> [root at arago /]# echo 3 > /tmp/omap-test/timer/one
+> [   79.612223] omap_dm_timer_request_specific: Please use
+> omap_dm_timer_request_by_cap()
+> [   79.620636] Timer 3 not available!
+
+Yes that's expected as omap_dm_timer_request_specific is not supported
+with DT. Don't spend anytime debugging you just need the latest test.
+
+Cheers
+Jon
