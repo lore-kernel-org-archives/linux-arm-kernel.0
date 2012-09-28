@@ -1,27 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Sep 2012 12:15:18 +0200
-Subject: [PATCH] ARM: bcm2835: implement machine restart hook
-In-Reply-To: <1348805280-7647-1-git-send-email-swarren@wwwdotorg.org>
-References: <1348805280-7647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120928121518.7f88196b@skate>
+From: fwu@marvell.com (Fan Wu)
+Date: Fri, 28 Sep 2012 18:22:54 +0800
+Subject: [PATCH] ARM: Add BUG_ON when hlt counter is wrongly used
+Message-ID: <1348827774-17880-1-git-send-email-fwu@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+From: fwu <fwu@marvell.com>
 
-On Thu, 27 Sep 2012 22:08:00 -0600, Stephen Warren wrote:
+1. On ARM platform, "nohlt" can be used to prevent core from idle
+   process, returning immediately.
+2. There are two interfaces, exported for other modules, named
+   "disable_hlt" and "enable_hlt" are used to enable/disable the
+   cpuidle mechanism by increasing/decreasing "hlt_counter".
+   Disable_hlt and enable_hlt are paired operation,
+   when you first call disable_hlt and then enable_hlt, the
+   semantics are right.
+3. There is no obvious constraint to prevent user(driver/module)
+   code to prevent the case that enable_hlt is ahead of disable_hlt,
+   which is a fatal operation on kernel state change from user,
+   and there is no any WARNING or notification if the case happens
+   in current kernel code.
+   This patch aims to report BUG when the case happens, just like
+   what the kernel do when enable_irq is ahead of disable_irq.
 
-> +intc: interrupt-controller {
+Signed-off-by: fwu <fwu@marvell.com>
+Signed-off-by: YiLu Mao <ylmao@marvell.com>
+Signed-off-by: Ning Jiang <ning.jiang@marvell.com>
 
-Isn't this a bizarre name for a watchdog device?
+Change-Id: Iddacf45aec012bb663e130801727b4eb3d11436b
+---
+ arch/arm/kernel/process.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> +	compatible = "brcm,bcm2835-pm-wdog";
-> +	reg = <0x7e100000 0x28>;
-> +};
-
-Thomas
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 693b744..5bbd3be 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -70,6 +70,7 @@ EXPORT_SYMBOL(disable_hlt);
+ void enable_hlt(void)
+ {
+ 	hlt_counter--;
++	BUG_ON(hlt_counter < 0)
+ }
+ 
+ EXPORT_SYMBOL(enable_hlt);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.0.4
