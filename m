@@ -1,17 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 28 Sep 2012 14:13:15 +0100
-Subject: [PATCH v2] ASoC: eukrea-tlv320: Convert it to platform driver
-In-Reply-To: <1348327652-21567-1-git-send-email-festevam@gmail.com>
-References: <1348327652-21567-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120928131315.GJ30869@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Sep 2012 14:15:30 +0100
+Subject: [GIT PULL] ARM: cache flushing LoUIS API v2
+In-Reply-To: <20120928131254.GB30058@e102568-lin.cambridge.arm.com>
+References: <20120928092123.GA28967@e102568-lin.cambridge.arm.com>
+ <20120928125446.GF7916@n2100.arm.linux.org.uk>
+ <20120928131254.GB30058@e102568-lin.cambridge.arm.com>
+Message-ID: <20120928131530.GG7916@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 12:27:31PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Sep 28, 2012 at 02:12:54PM +0100, Lorenzo Pieralisi wrote:
+> Ok, understood, sorry. What's the best way forward then ?
 > 
-> Convert eukrea-tlv320 to platform driver.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Should I add the fix for xscale and feroceon to your patch system ?
 
-Applied, thanks - we should get this into 3.7 if we can.
+That's one solution, and probably the best as it means less commits in
+the end.
+
+Another solution is that I assume all changes I receive are bad, and
+delay publishing my tree until the overnight tests have run, which adds
+something like another 24 hours (or more) to the linux-next latency for
+changes committed to my tree.
