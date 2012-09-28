@@ -1,34 +1,52 @@
-From: sangsu4u.park@samsung.com (Sangsu Park)
-Date: Fri, 28 Sep 2012 19:39:49 +0900
-Subject: [PATCH] ARM: EXYNOS: Remove wrong I2S0 clock from peril clock
-Message-ID: <003501cd9d65$9611d060$c2357120$@samsung.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Fri, 28 Sep 2012 12:41:35 +0200
+Subject: [PATCH] ARM: OMAP2+: SmartReflex: fix return value check in
+ sr_dev_init()
+In-Reply-To: <CAPgLHd_jXBNGNh452sGh5OweX+CdwpcVuWHmnfZKaCt4FnsTuA@mail.gmail.com>
+References: <CAPgLHd_jXBNGNh452sGh5OweX+CdwpcVuWHmnfZKaCt4FnsTuA@mail.gmail.com>
+Message-ID: <CAORVsuUcOFKFoOuxZqPJR=WSsTouqBH3EP4Xu82o515ofGbn+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove I2S0 clock from peril since peril doesn't have I2S0 clock for EXYNOS4.
-Audio Subsystem block has I2S0 clk.
+Hello,
 
-Signed-off-by: sangsu <sangsu@sangsu-P560.(none)>
----
- arch/arm/mach-exynos/clock-exynos4.c |    5 -----
- 1 file changed, 5 deletions(-)
+On Thu, Sep 27, 2012 at 7:54 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> In case of error, the function voltdm_lookup() returns NULL
+> not ERR_PTR(). The IS_ERR() test in the return value check
+> should be replaced with NULL test.
+>
+> dpatch engine is used to auto generate this patch.
+> (https://github.com/weiyj/dpatch)
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  arch/arm/mach-omap2/sr_device.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+> index d033a65..c248b30 100644
+> --- a/arch/arm/mach-omap2/sr_device.c
+> +++ b/arch/arm/mach-omap2/sr_device.c
+> @@ -123,7 +123,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+>         sr_data->senp_mod = 0x1;
+>
+>         sr_data->voltdm = voltdm_lookup(sr_dev_attr->sensor_voltdm_name);
+> -       if (IS_ERR(sr_data->voltdm)) {
+> +       if (!sr_data->voltdm) {
+>                 pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
+>                         __func__, sr_dev_attr->sensor_voltdm_name);
+>                 goto exit;
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c
-b/arch/arm/mach-exynos/clock-exynos4.c
-index 6a45c9a..fa8a134 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -613,11 +613,6 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.ctrlbit	= (1 << 18),
- 	}, {
- 		.name		= "iis",
--		.devname	= "samsung-i2s.0",
--		.enable		= exynos4_clk_ip_peril_ctrl,
--		.ctrlbit	= (1 << 19),
--	}, {
--		.name		= "iis",
- 		.devname	= "samsung-i2s.1",
- 		.enable		= exynos4_clk_ip_peril_ctrl,
- 		.ctrlbit	= (1 << 20),
--- 
-1.7.9.5
+This looks good, so here is the ack:
+Acked-by: Jean Pihet <j-pihet@ti.com>
+
+Thanks,
+Jean
+
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
