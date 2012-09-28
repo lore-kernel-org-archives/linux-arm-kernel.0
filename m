@@ -1,103 +1,68 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 28 Sep 2012 16:28:40 +0200
-Subject: [RFC PATCH 09/16] pinctrl: samsung: Do not pass gpio_chip to
- pin_to_reg_bank
-In-Reply-To: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
-References: <1348842527-22460-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1348842527-22460-10-git-send-email-t.figa@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 28 Sep 2012 22:29:23 +0800
+Subject: [PATCH 6/6] pinctrl: sirf: enable the driver support new
+ SiRFmarco SoC
+In-Reply-To: <CACRpkdYT2TZX8cchPk+H4LkdVXw861BBTn1dbnSJO-ZQVT5sdw@mail.gmail.com>
+References: <1348739790-21253-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdYT2TZX8cchPk+H4LkdVXw861BBTn1dbnSJO-ZQVT5sdw@mail.gmail.com>
+Message-ID: <CAGsJ_4wqaii9=8C8rXftzjYcPa95_Djf=uOfZZEKV-zz-ky0QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pointer to gpio_chip passed to pin_to_reg_bank utility function is
-used only to retrieve a pointer to samsung_pinctrl_drv_data structure.
+Hi linus,
+thanks very much!
 
-This patch modifies the function and its users to pass a pointer to
-samsung_pinctrl_drv_data directly.
+2012/9/28 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Sep 27, 2012 at 11:56 AM, Barry Song <Barry.Song@csr.com> wrote:
+>
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> The driver supports old up SiRFprimaII SoCs, this patch makes it support
+>> the new SiRFmarco as well.
+>> SiRFmarco, as a SMP SoC, adds new SIRFSOC_GPIO_PAD_EN_CLR registers, to
+>> disable GPIO pad, we should write 1 to the corresponding bit in the new
+>> CLEAR register instead of writing 0 to SIRFSOC_GPIO_PAD_EN.
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> This doesn't apply to my tree, you must have some other changes that
+> are not included in the patch set...
+>
+> Can you pls try to generate and test the patch against the pinctrl tree?
+>
+> I might apply it as per the "new driver" rule if I can convince myself that it
+> doesn't destabilize the current driver.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- drivers/pinctrl/pinctrl-samsung.c | 25 ++++++++++++++++---------
- 1 file changed, 16 insertions(+), 9 deletions(-)
+this one actually depends on:
 
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 6ae82d5..e63a365 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -252,14 +252,12 @@ static int samsung_pinmux_get_groups(struct pinctrl_dev *pctldev,
-  * given a pin number that is local to a pin controller, find out the pin bank
-  * and the register base of the pin bank.
-  */
--static void pin_to_reg_bank(struct gpio_chip *gc, unsigned pin,
--			void __iomem **reg, u32 *offset,
-+static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
-+			unsigned pin, void __iomem **reg, u32 *offset,
- 			struct samsung_pin_bank **bank)
- {
--	struct samsung_pinctrl_drv_data *drvdata;
- 	struct samsung_pin_bank *b;
- 
--	drvdata = dev_get_drvdata(gc->dev);
- 	b = drvdata->ctrl->pin_banks;
- 
- 	while ((pin >= b->pin_base) &&
-@@ -294,7 +292,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 	 * pin function number in the config register.
- 	 */
- 	for (cnt = 0; cnt < drvdata->pin_groups[group].num_pins; cnt++) {
--		pin_to_reg_bank(drvdata->gc, pins[cnt] - drvdata->ctrl->base,
-+		pin_to_reg_bank(drvdata, pins[cnt] - drvdata->ctrl->base,
- 				&reg, &pin_offset, &bank);
- 		mask = (1 << bank->func_width) - 1;
- 		shift = pin_offset * bank->func_width;
-@@ -331,10 +329,13 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
- 		struct pinctrl_gpio_range *range, unsigned offset, bool input)
- {
- 	struct samsung_pin_bank *bank;
-+	struct samsung_pinctrl_drv_data *drvdata;
- 	void __iomem *reg;
- 	u32 data, pin_offset, mask, shift;
- 
--	pin_to_reg_bank(range->gc, offset, &reg, &pin_offset, &bank);
-+	drvdata = pinctrl_dev_get_drvdata(pctldev);
-+
-+	pin_to_reg_bank(drvdata, offset, &reg, &pin_offset, &bank);
- 	mask = (1 << bank->func_width) - 1;
- 	shift = pin_offset * bank->func_width;
- 
-@@ -368,7 +369,7 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
- 	u32 cfg_value, cfg_reg;
- 
- 	drvdata = pinctrl_dev_get_drvdata(pctldev);
--	pin_to_reg_bank(drvdata->gc, pin - drvdata->ctrl->base, &reg_base,
-+	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base, &reg_base,
- 					&pin_offset, &bank);
- 
- 	switch (cfg_type) {
-@@ -470,8 +471,11 @@ static void samsung_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
- {
- 	void __iomem *reg;
- 	u32 pin_offset, data;
-+	struct samsung_pinctrl_drv_data *drvdata;
- 
--	pin_to_reg_bank(gc, offset, &reg, &pin_offset, NULL);
-+	drvdata = dev_get_drvdata(gc->dev);
-+
-+	pin_to_reg_bank(drvdata, offset, &reg, &pin_offset, NULL);
- 	data = readl(reg + DAT_REG);
- 	data &= ~(1 << pin_offset);
- 	if (value)
-@@ -484,8 +488,11 @@ static int samsung_gpio_get(struct gpio_chip *gc, unsigned offset)
- {
- 	void __iomem *reg;
- 	u32 pin_offset, data;
-+	struct samsung_pinctrl_drv_data *drvdata;
-+
-+	drvdata = dev_get_drvdata(gc->dev);
- 
--	pin_to_reg_bank(gc, offset, &reg, &pin_offset, NULL);
-+	pin_to_reg_bank(drvdata, offset, &reg, &pin_offset, NULL);
- 	data = readl(reg + DAT_REG);
- 	data >>= pin_offset;
- 	data &= 1;
--- 
-1.7.12
+http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commitdiff;h=056876f6c73406c06d530d16d020177f5ec4a0bd
+which was applied to arm soc tree.
+
+the only conflict comes from:
+ static const struct of_device_id pinmux_ids[] __devinitconst = {
+        { .compatible = "sirf,prima2-pinctrl" },
++       { .compatible = "sirf,marco-pinctrl" },
+        {}
+ };
+
+as commit 056876f6c73406c0 renamed the old
+static const struct of_device_id pinmux_ids[] __devinitconst = {
+        { .compatible = "sirf,prima2-gpio-pinmux" },
+        {}
+};
+to
+static const struct of_device_id pinmux_ids[] __devinitconst = {
+        { .compatible = "sirf,sirf,prima2-pinctrl" },
+        {}
+};
+
+so i think the best way is we hold on this patch for the moment, and
+wait for 3.7-rc1.
+all other 5 are critical fixes and have no merge conflict with arm-soc
+tree as i have tried.
+
+> Yours,
+> Linus Walleij
+
+Thanks
+barry
