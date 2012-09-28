@@ -1,48 +1,32 @@
-From: fwu@marvell.com (Fan Wu)
-Date: Fri, 28 Sep 2012 18:59:16 +0800
-Subject: [PATCH] ARM: Add BUG_ON when hlt counter is wrongly used
-Message-ID: <1348829956-18189-1-git-send-email-fwu@marvell.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 28 Sep 2012 13:21:04 +0200
+Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+In-Reply-To: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: fwu <fwu@marvell.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-1. On ARM platform, "nohlt" can be used to prevent core from idle
-   process, returning immediately.
-2. There are two interfaces, exported for other modules, named
-   "disable_hlt" and "enable_hlt" are used to enable/disable the
-   cpuidle mechanism by increasing/decreasing "hlt_counter".
-   Disable_hlt and enable_hlt are paired operation,
-   when you first call disable_hlt and then enable_hlt, the
-   semantics are right.
-3. There is no obvious constraint to prevent user(driver/module)
-   code to prevent the case that enable_hlt is ahead of disable_hlt,
-   which is a fatal operation on kernel state change from user,
-   and there is no any WARNING or notification if the case happens
-   in current kernel code.
-   This patch aims to report BUG when the case happens, just like
-   what the kernel do when enable_irq is ahead of disable_irq.
+This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
 
-Signed-off-by: fwu <fwu@marvell.com>
-Signed-off-by: YiLu Mao <ylmao@marvell.com>
-Signed-off-by: Ning Jiang <ning.jiang@marvell.com>
-
-Change-Id: Iddacf45aec012bb663e130801727b4eb3d11436b
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/kernel/process.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/spi/spi-pl022.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 693b744..d3f2972 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -70,6 +70,7 @@ EXPORT_SYMBOL(disable_hlt);
- void enable_hlt(void)
- {
- 	hlt_counter--;
-+	BUG_ON(hlt_counter < 0);
- }
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index f8568b4..3f2f36c 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2188,6 +2188,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
+ 	       adev->res.start, pl022->virtbase);
  
- EXPORT_SYMBOL(enable_hlt);
++	pm_runtime_enable(dev);
+ 	pm_runtime_resume(dev);
+ 
+ 	pl022->clk = clk_get(&adev->dev, NULL);
 -- 
-1.7.0.4
+1.7.10
