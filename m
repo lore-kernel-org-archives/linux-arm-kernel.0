@@ -1,63 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Sep 2012 11:14:39 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <1348780923-27428-1-git-send-email-stigge@antcom.de>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
-Message-ID: <CACRpkdZ+1ffsMDRZXYb5RRndoXstj_QHvHOpeikRY0bas72dKQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 28 Sep 2012 10:21:23 +0100
+Subject: [GIT PULL] ARM: cache flushing LoUIS API v2
+Message-ID: <20120928092123.GA28967@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 11:22 PM, Roland Stigge <stigge@antcom.de> wrote:
+Hi Russell,
 
-Grant really need to look at this patch too...
+I updated as discussed the patch series and folded the xscale and feroceon
+fix into the first patch of the series, please consider dropping the old
+series and pulling this updated version.
 
-> The recurring task of providing simultaneous access to GPIO lines (especially
-> for bit banging protocols) needs an appropriate API.
->
-> This patch adds a kernel internal "Block GPIO" API that enables simultaneous
-> access to several GPIOs in the same gpio_chip (bit mapped). Further, it adds a
-> sysfs interface (/sys/class/gpio/gpiochipXX/block).
+Changes wrt v1:
+	# fixed LoUIS cache aliases for xscale and feroceon
+	# rebased against v3.6-rc7
 
-I've had others talk about the need for this in the past, I think it may have
-been Bill Gatliff who brought it up.
+It has been tested on:
 
-I'm pretty sure it's a need for the industry so we really need something
-like this, thanks for working on it Roland.
+- OMAP4/5 (ARM and T2 kernels)
+  # suspend/hotplug and CPU idle
+- iMX6q (ARM kernel)
+  # suspend and hotplug
+- TC2 big.LITTLE testchip (ARM and T2 kernels)
+  # CPU idle
 
->  Documentation/gpio.txt     |   52 +++++++++++++++++++
->  drivers/gpio/gpiolib.c     |  121 +++++++++++++++++++++++++++++++++++++++++++++
->  include/asm-generic/gpio.h |    7 ++
->  include/linux/gpio.h       |   24 ++++++++
->  4 files changed, 204 insertions(+)
+Thank you very much indeed,
+Lorenzo
 
-You probably want to patch Documentation/ABI/testing/sysfs-gpio as well.
+The following changes since commit 979570e02981d4a8fc20b3cc8fd651856c98ee9d:
 
-> @@ -686,6 +731,13 @@ read-only attributes:
->
->         "ngpio" ... how many GPIOs this manges (N to N + ngpio - 1)
->
-> +       "block" ... get/set Block GPIO:
-> +                   * reads: space separated list of GPIO inputs of this chip that
-> +                     are set to 1, e.g. "83 85 87 99"
-> +                   * write: space separated list of GPIO outputs of this chip
-> +                     that are to be set or cleared, e.g. "80 -83 -85" (prefix
-> +                     "-" clears)
+  Linux 3.6-rc7 (2012-09-23 18:10:57 -0700)
 
-This sort of breaks the sysfs convention of one value per file,
-does it not?
+are available in the git repository at:
 
-It's not like I have some better idea, just we need to think about
-other possible solutions.
+  git://linux-arm.org/linux-2.6-lp.git cache-louis
 
-The GPIO sysfs interface is not universally liked. What are the
-typical applications you have for this? Industrial control by
-bit-banging userspace processes?
+for you to fetch changes up to 94966a21d293668115e2195cb3488e009236b140:
 
-I've heard about people doing that kind of things and running
-these processes as real-time scheduled and then running e.g.
-factory lines and other scary stuff through the GPIO sysfs ...
+  ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API (2012-09-28 09:46:18 +0100)
 
-J-C:s comments are valid as well, will not repeat them.
+----------------------------------------------------------------
+Lorenzo Pieralisi (4):
+      ARM: mm: implement LoUIS API for cache maintenance ops
+      ARM: mm: rename jump labels in v7_flush_dcache_all function
+      ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+      ARM: kernel: update __cpu_disable to use cache LoUIS maintenance API
 
-Yours,
-Linus Walleij
+Santosh Shilimkar (1):
+      ARM: mm: update __v7_setup() to the new LoUIS cache maintenance API
+
+ arch/arm/include/asm/cacheflush.h | 15 ++++++++++++
+ arch/arm/include/asm/glue-cache.h |  1 +
+ arch/arm/kernel/smp.c             |  5 +++-
+ arch/arm/kernel/suspend.c         | 17 +++++++++++++-
+ arch/arm/mm/cache-fa.S            |  3 +++
+ arch/arm/mm/cache-v3.S            |  3 +++
+ arch/arm/mm/cache-v4.S            |  3 +++
+ arch/arm/mm/cache-v4wb.S          |  3 +++
+ arch/arm/mm/cache-v4wt.S          |  3 +++
+ arch/arm/mm/cache-v6.S            |  3 +++
+ arch/arm/mm/cache-v7.S            | 48 ++++++++++++++++++++++++++++++++++-----
+ arch/arm/mm/proc-arm1020.S        |  3 +++
+ arch/arm/mm/proc-arm1020e.S       |  3 +++
+ arch/arm/mm/proc-arm1022.S        |  3 +++
+ arch/arm/mm/proc-arm1026.S        |  3 +++
+ arch/arm/mm/proc-arm920.S         |  3 +++
+ arch/arm/mm/proc-arm922.S         |  3 +++
+ arch/arm/mm/proc-arm925.S         |  3 +++
+ arch/arm/mm/proc-arm926.S         |  3 +++
+ arch/arm/mm/proc-arm940.S         |  3 +++
+ arch/arm/mm/proc-arm946.S         |  3 +++
+ arch/arm/mm/proc-feroceon.S       |  4 ++++
+ arch/arm/mm/proc-macros.S         |  1 +
+ arch/arm/mm/proc-mohawk.S         |  3 +++
+ arch/arm/mm/proc-v7.S             |  2 +-
+ arch/arm/mm/proc-xsc3.S           |  3 +++
+ arch/arm/mm/proc-xscale.S         |  4 ++++
+ 27 files changed, 142 insertions(+), 9 deletions(-)
