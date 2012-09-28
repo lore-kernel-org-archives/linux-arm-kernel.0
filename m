@@ -1,72 +1,74 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Fri, 28 Sep 2012 16:11:32 +0000
-Subject: [REMINDER: PATCH 1/1] spi:clk: preparation for switch to common
- clock framework
-In-Reply-To: <1347900122-25101-2-git-send-email-m-karicheri2@ti.com>
-References: <1347900122-25101-1-git-send-email-m-karicheri2@ti.com>
- <1347900122-25101-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7041EF690@DFLE12.ent.ti.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Fri, 28 Sep 2012 18:20:14 +0200
+Subject: [PATCH v4 1/2] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <20120927171934.GS17667@game.jcrosoft.org>
+References: <1348568704-28304-1-git-send-email-fabio.porcedda@gmail.com>
+ <1348568704-28304-2-git-send-email-fabio.porcedda@gmail.com>
+ <20120927055636.GP17667@game.jcrosoft.org>
+ <CAHkwnC_R4DMaRfjQHO=+K1DO62-iH70B2_QsipLD5D4xRznouw@mail.gmail.com>
+ <20120927171934.GS17667@game.jcrosoft.org>
+Message-ID: <CAHkwnC8tsM2iLsbcnMGbzR4G=SqPfTxyMBYYQbe79gZK1=jYEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> -----Original Message-----
->> From: Karicheri, Muralidharan
->> Sent: Monday, September 17, 2012 12:42 PM
->> To: spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org; davinci-linux-
->> open-source at linux.davincidsp.com; grant.likely at secretlab.ca; linux-arm-
->> kernel at lists.infradead.org
->> Cc: Chemparathy, Cyril; Karicheri, Muralidharan
->> Subject: [PATCH 1/1] spi:clk: preparation for switch to common clock framework
->> 
->> As a first step towards migrating davinci platforms to use common clock
->> framework, replace all instances of clk_enable() with clk_prepare_enable()
->> and clk_disable() with clk_disable_unprepare(). Until the platform is
->> switched to use the CONFIG_HAVE_CLK_PREPARE Kconfig variable, this just
->> adds a might_sleep() call and would work without any issues.
->> 
->> This will make it easy later to switch to common clk based implementation
->> of clk driver from DaVinci specific driver.
->> 
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Reviewed-by: Mike Turquette <mturquette@linaro.org>
->> 
->> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
->> index c1ec52d..3f54f9e 100644
->> --- a/drivers/spi/spi-davinci.c
->> +++ b/drivers/spi/spi-davinci.c
->> @@ -843,7 +843,7 @@ static int __devinit davinci_spi_probe(struct platform_device
->> *pdev)
->>  		ret = -ENODEV;
->>  		goto put_master;
->>  	}
->> -	clk_enable(dspi->clk);
->> +	clk_prepare_enable(dspi->clk);
->> 
->>  	master->bus_num = pdev->id;
->>  	master->num_chipselect = pdata->num_chipselect;
->> @@ -927,7 +927,7 @@ free_dma:
->>  	dma_release_channel(dspi->dma_rx);
->>  	dma_release_channel(dspi->dma_tx);
->>  free_clk:
->> -	clk_disable(dspi->clk);
->> +	clk_disable_unprepare(dspi->clk);
->>  	clk_put(dspi->clk);
->>  put_master:
->>  	spi_master_put(master);
->> @@ -963,7 +963,7 @@ static int __devexit davinci_spi_remove(struct platform_device
->> *pdev)
->> 
->>  	spi_bitbang_stop(&dspi->bitbang);
->> 
->> -	clk_disable(dspi->clk);
->> +	clk_disable_unprepare(dspi->clk);
->>  	clk_put(dspi->clk);
->>  	spi_master_put(master);
->>  	free_irq(dspi->irq, dspi);
->> --
->> 1.7.9.5
+On Thu, Sep 27, 2012 at 7:19 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 16:59 Thu 27 Sep     , Fabio Porcedda wrote:
+>> On Thu, Sep 27, 2012 at 7:56 AM, Jean-Christophe PLAGNIOL-VILLARD
+>> <plagnioj@jcrosoft.com> wrote:
+>> > On 12:25 Tue 25 Sep     , Fabio Porcedda wrote:
+>> >> Tested on an at91sam9260 board (evk-pro3)
+>> >>
+>> >> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> >> ---
+>> >>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>> >>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>> >>  2 files changed, 40 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> >> new file mode 100644
+>> >> index 0000000..5947929
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>> >> @@ -0,0 +1,19 @@
+>> >> +* Atmel Watchdog Timers
+>> >> +
+>> >> +** at91sam9-wdt
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible: must be "atmel,at91sam9260-wdt".
+>> >> +- reg: physical base address of the controller and length of memory mapped
+>> >> +  region.
+>> >> +
+>> >> +Optional properties:
+>> >> +- heartbeat: contains the watchdog heartbeats in seconds.
+>> > more I read this binding more it's seems wrong
+>> >
+>> > Today we do not use yet the watchdog framework which we will so we need to
+>> > use the same binding as the watchdog framework
+>>
+>> What is the binding of the heartbeat value in the watchdog framework?
+>> I didn't found any binding of the heartbeat in other dt enabled drivers.
+> when you read the new watchdog framework cf watchdog_dev.c and watchdog_core.c
+>
+> you will see that we can set a timeout which have the same meaning as
+> heartbeat
+>
+> the key point here is you try to solve the DT the wrong way -> drivers
+> specific
+>
+> the binding need to be framwork specific os here we need to do the binding of
+> the watchdog framework first and then use it in the at91sam9 driver evenif we
+> do not switch yet. Because in the DT we describe the hw not a drvier
+> implementation
 
-Could you please review and apply this patch to linux-next?
+Ok i will try to send an updated patch following your advice.
 
-Murali Karicheri
-Software Design Engineer
+> Best Regards,
+> J.
+
+
+Best regards
+-- 
+Fabio Porcedda
