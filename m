@@ -1,36 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 28 Sep 2012 15:59:49 +0100
-Subject: [GIT PULL] MOP500 Audio patches due for ASoC
-In-Reply-To: <20120928123743.GE30869@opensource.wolfsonmicro.com>
-References: <1348142956-1872-1-git-send-email-lee.jones@linaro.org>
- <20120920125618.GP17666@opensource.wolfsonmicro.com>
- <20120927150119.GD1176@gmail.com>
- <20120928123743.GE30869@opensource.wolfsonmicro.com>
-Message-ID: <20120928145949.GA20786@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 28 Sep 2012 20:31:18 +0530
+Subject: [PATCH 2/4] ARM: OMAP: DMA: Move plat/dma hearder to
+ platform_data/dma-omap
+In-Reply-To: <20120928145459.GZ4840@atomide.com>
+References: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
+ <1348839609-10456-3-git-send-email-lokeshvutla@ti.com>
+ <20120928145459.GZ4840@atomide.com>
+Message-ID: <CAMQu2gw9DJSZ4QVvo83atTpnsXyegneuQ2rJKBc+5ioiwEaqaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Sep 2012, Mark Brown wrote:
+On Fri, Sep 28, 2012 at 8:25 PM, Tony Lindgren <tony@atomide.com> wrote:
+>
+> * Lokesh Vutla <lokeshvutla@ti.com> [120928 06:41]:
+> > Move plat/dma.h header to platform_data/dma-omap.h as
+> > part of the single zImage work.
+>
+> Hmm there's no platform data in this header, just
+> exported things for drivers to use. So it should not
+> be placed into platform_data.
+>
+> Maybe it should be #include <asm/mach/dma-omap.h> for now?
+>
+I wasn't sure either when the file was placed under platform-data.
+I agree for now we can keep it mach layer but than means OMAP1 and
+OMAP2+ DMA header and source code needs to be split. That
+is not so straight forward.
 
-> On Thu, Sep 27, 2012 at 04:01:19PM +0100, Lee Jones wrote:
-> 
-> > Is there any reason why the following patches didn't make it into -next?
-> 
-> > ASoC: codecs: Enable AB8500 CODEC for Device Tree
-> > ASoC: Ux500: Enable ux500 MSP driver for Device Tree
-> 
-> They appear to be there, there's certainly no reason why they'd be any
-> different to the rest of the series.
+With DMA engine conversion hopefully, we might get rid of the
+header eventually, but for now not sure whether we should
+go ahead and follow the splitting part.
 
-Okay, I see what's happened. When I rebased the patches I had in my local
-delta git just reapplied the commits instead of throwing them out. I can
-confirm that the patches above have been applied to -next after all.
+Thoughts ?
 
-Thanks again,
-Lee 
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards
+Santosh
