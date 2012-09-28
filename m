@@ -1,40 +1,34 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 28 Sep 2012 14:55:22 -0700
-Subject: [PATCH 12/12] time/jiffies: bring back unconditional LATCH
- definition
-In-Reply-To: <1348868177-21205-13-git-send-email-arnd@arndb.de>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-13-git-send-email-arnd@arndb.de>
-Message-ID: <50661CCA.8000900@linaro.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 28 Sep 2012 17:17:03 -0500
+Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
+In-Reply-To: <5065F19E.5020708@ti.com>
+References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
+ <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
+ <5063330E.3000203@ti.com> <5065F19E.5020708@ti.com>
+Message-ID: <506621DF.20508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2012 02:36 PM, Arnd Bergmann wrote:
-> Patch a7ea3bbf5d "time/jiffies: Allow CLOCK_TICK_RATE to be undefined"
-> breaks the compilation of targets that rely on the LATCH definition,
-> because of recursive header file inclusion not defining CLOCK_TICK_RATE
-> before it is checked here.
->
-> This fixes the problem by moving LATCH back to where it was, but it
-> seems that there are still cases where SHIFTED_HZ is defined incorrectly
-> because of the same problem. Need to investigate further.
->
-> Without this patch, building h7201_defconfig results in:
->
-> arch/arm/mach-h720x/common.c: In function 'h720x_gettimeoffset':
-> arch/arm/mach-h720x/common.c:50:73: error: 'LATCH' undeclared (first use in this function)
-> arch/arm/mach-h720x/common.c:50:73: note: each undeclared identifier is reported only once for each function it appears in
-> arch/arm/mach-h720x/common.c:51:1: warning: control reaches end of non-void function [-Wreturn-type]
 
-Hrrm. Ok. I had a patch for 3.7 that tried to get rid of the generic 
-CLOCK_TICK_RATE derived users, but that may not fly if there's still 
-LATCH users around.  I guess I'll tweak it so we keep LATCH around, 
-probably by mering your change into my tree.
+On 09/28/2012 01:51 PM, Vaibhav Hiremath wrote:
 
-I suspect the long term fix is to push the LATCH definition up into arch 
-specific code that is using it, so it can be made dynamic instead of a 
-compile time constant. Otherwise it might be hard to get a unified 
-zImage working.  But for now I guess your current fix is good short-term.
+[snip]
 
-thanks
--john
+> Jon,
+> 
+> Sorry for delayed response, But I tried using your omap_test application
+> to validate this patch series, but it is failing for me.
+> 
+> How did you test it? Are you running same test application at your end?
+> 
+> I am debugging this issue, i just thought I should tell you this before
+> its too late.
+
+By the way, I have not seen any such issues on OMAP2/3/4 and so this
+appears to be specific to AM335x. So I would not be too concerned, we
+just need to understand why interrupts on some timers are not working on
+the AM335x. Probably a configuration issue some where and that can
+always be fixed separately.
+
+Cheers
+Jon
