@@ -1,85 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2012 23:36:16 +0200
-Subject: [PATCH 11/12] pinctrl: samsung: use __devinit section for init code
+Date: Fri, 28 Sep 2012 23:36:13 +0200
+Subject: [PATCH 08/12] dtc: be more quiet with "make -s"
 In-Reply-To: <1348868177-21205-1-git-send-email-arnd@arndb.de>
 References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
-Message-ID: <1348868177-21205-12-git-send-email-arnd@arndb.de>
+Message-ID: <1348868177-21205-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung pinctrl driver has a probe function that is
-__devinit and that calls a lot of other functions that are
-marked __init, which kbuild complains about.
+On a normal build, we get output from both make and from dtc
+about each file that is being processed.
 
-Marking everything __devinit means that the code does not
-discarded when CONFIG_HOTPLUG is set, which is a little
-more wasteful, but also more consistent
+  DTC     arch/arm/boot/vexpress-v2p-ca5s.dtb
+DTC: dts->dtb  on file "/git/arnd/linux-arm/arch/arm/boot/dts/vexpress-v2p-ca5s.dts"
+  DTC     arch/arm/boot/vexpress-v2p-ca9.dtb
+DTC: dts->dtb  on file "/git/arnd/linux-arm/arch/arm/boot/dts/vexpress-v2p-ca9.dts"
+  DTC     arch/arm/boot/vexpress-v2p-ca15-tc1.dtb
+DTC: dts->dtb  on file "/git/arnd/linux-arm/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts"
+  DTC     arch/arm/boot/vexpress-v2p-ca15_a7.dtb
+DTC: dts->dtb  on file "/git/arnd/linux-arm/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts"
 
-Without this patch, building exynos_defconfig results in:
+When both lines refer to the same action. When building with "make -s",
+the "DTC: dts->dtb ..." line is the only output we currently get.
 
-WARNING: drivers/pinctrl/built-in.o(.devinit.text+0x124): Section mismatch in reference from the function samsung_pinctrl_probe() to the function .init.text:samsung_gpiolib_register()
-The function __devinit samsung_pinctrl_probe() references
-a function __init samsung_gpiolib_register().
-If samsung_gpiolib_register is only used by samsung_pinctrl_probe then
-annotate samsung_gpiolib_register with a matching annotation.
+This patch makes dtc not output the message when the "-q" flag is passed,
+and ensures that we pass it in both cases.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Michal Marek <mmarek@suse.cz>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: David Gibson <dwg@au1.ibm.com>
 ---
- drivers/pinctrl/pinctrl-samsung.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ scripts/Makefile.lib |    2 +-
+ scripts/dtc/dtc.c    |    5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index dd108a9..861cd5f 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -513,7 +513,7 @@ static int samsung_gpio_direction_output(struct gpio_chip *gc, unsigned offset,
-  * Parse the pin names listed in the 'samsung,pins' property and convert it
-  * into a list of gpio numbers are create a pin group from it.
-  */
--static int __init samsung_pinctrl_parse_dt_pins(struct platform_device *pdev,
-+static int __devinit samsung_pinctrl_parse_dt_pins(struct platform_device *pdev,
- 			struct device_node *cfg_np, struct pinctrl_desc *pctl,
- 			unsigned int **pin_list, unsigned int *npins)
- {
-@@ -560,7 +560,7 @@ static int __init samsung_pinctrl_parse_dt_pins(struct platform_device *pdev,
-  * from device node of the pin-controller. A pin group is formed with all
-  * the pins listed in the "samsung,pins" property.
-  */
--static int __init samsung_pinctrl_parse_dt(struct platform_device *pdev,
-+static int __devinit samsung_pinctrl_parse_dt(struct platform_device *pdev,
- 				struct samsung_pinctrl_drv_data *drvdata)
- {
- 	struct device *dev = &pdev->dev;
-@@ -655,7 +655,7 @@ static int __init samsung_pinctrl_parse_dt(struct platform_device *pdev,
- }
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 0be6f11..662528a 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -264,7 +264,7 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
+ 	$(call cmd,dt_S_dtb)
  
- /* register the pinctrl interface with the pinctrl subsystem */
--static int __init samsung_pinctrl_register(struct platform_device *pdev,
-+static int __devinit samsung_pinctrl_register(struct platform_device *pdev,
- 				struct samsung_pinctrl_drv_data *drvdata)
- {
- 	struct pinctrl_desc *ctrldesc = &drvdata->pctl;
-@@ -729,7 +729,7 @@ static int __init samsung_pinctrl_register(struct platform_device *pdev,
- }
+ quiet_cmd_dtc = DTC     $@
+-cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile) $<
++cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -q -d $(depfile) $<
  
- /* register the gpiolib interface with the gpiolib subsystem */
--static int __init samsung_gpiolib_register(struct platform_device *pdev,
-+static int __devinit samsung_gpiolib_register(struct platform_device *pdev,
- 				struct samsung_pinctrl_drv_data *drvdata)
- {
- 	struct gpio_chip *gc;
-@@ -762,7 +762,7 @@ static int __init samsung_gpiolib_register(struct platform_device *pdev,
- }
+ # Bzip2
+ # ---------------------------------------------------------------------------
+diff --git a/scripts/dtc/dtc.c b/scripts/dtc/dtc.c
+index 2ef5e2e..a1586ff 100644
+--- a/scripts/dtc/dtc.c
++++ b/scripts/dtc/dtc.c
+@@ -188,8 +188,9 @@ int main(int argc, char *argv[])
+ 	if (minsize)
+ 		fprintf(stderr, "DTC: Use of \"-S\" is deprecated; it will be removed soon, use \"-p\" instead\n");
  
- /* unregister the gpiolib interface with the gpiolib subsystem */
--static int __init samsung_gpiolib_unregister(struct platform_device *pdev,
-+static int __devinit samsung_gpiolib_unregister(struct platform_device *pdev,
- 				struct samsung_pinctrl_drv_data *drvdata)
- {
- 	int ret = gpiochip_remove(drvdata->gc);
+-	fprintf(stderr, "DTC: %s->%s  on file \"%s\"\n",
+-		inform, outform, arg);
++	if (!quiet)
++		fprintf(stderr, "DTC: %s->%s  on file \"%s\"\n",
++			inform, outform, arg);
+ 
+ 	if (depname) {
+ 		depfile = fopen(depname, "w");
 -- 
 1.7.10
