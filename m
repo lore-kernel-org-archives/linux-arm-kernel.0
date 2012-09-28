@@ -1,72 +1,106 @@
 From: mporter@ti.com (Matt Porter)
-Date: Fri, 28 Sep 2012 15:37:45 -0400
-Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
-Message-ID: <1348861072-14507-1-git-send-email-mporter@ti.com>
+Date: Fri, 28 Sep 2012 15:37:46 -0400
+Subject: [PATCH v2 1/7] uio: uio_pruss: replace private SRAM API with genalloc
+In-Reply-To: <1348861072-14507-1-git-send-email-mporter@ti.com>
+References: <1348861072-14507-1-git-send-email-mporter@ti.com>
+Message-ID: <1348861072-14507-2-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-	- Replaced uio_pruss private SRAM API use with genalloc
-	- Added DA850 platform device and clock support
-	- Added DA850 L3 RAM gen_pool support
-	- Split out DT binding
+Remove the use of the private DaVinci SRAM API in favor
+of genalloc. The pool to be used is provided by platform
+data.
 
-This series enables uio_pruss on both DA850 and AM33xx. The driver
-previously was not enabled by any platform and the private SRAM API
-was accessing an invalid SRAM bank for use on DA850. For AM33xx,
-DT, pinctrl, and runtime PM support are added since AM33xx only
-boots via DT.
+Signed-off-by: Matt Porter <mporter@ti.com>
+---
+ drivers/uio/Kconfig                     |    1 +
+ drivers/uio/uio_pruss.c                 |   24 +++++++++++++++++-------
+ include/linux/platform_data/uio_pruss.h |    3 ++-
+ 3 files changed, 20 insertions(+), 8 deletions(-)
 
-The AM33xx support requires some help in hwmod due to the following
-comment in arch/arm/mach-omap2/omap_hwmod.c:
-	/*
-	 * If an IP block contains HW reset lines and any of them are
-	 * asserted, we let integration code associated with that
-	 * block handle the enable.  We've received very little
-	 * information on what those driver authors need, and until
-	 * detailed information is provided and the driver code is
-	 * posted to the public lists, this is probably the best we
-	 * can do.
-	 */
-
-The approach to deal with the hardware reset (for at least the pruss
-hwmod) was to add a generic omap property to properly define this
-hardware. The implementation simply deasserts any rst lines that
-are called out in the property when the omap_device is
-instantiated. This is not the ideal implementation as the sequence is
-a bit wrong for pruss since the busy check during the hard reset
-will fail, even though it fails in a benign manner. Ideally, we would
-want the implementation to observe the ti,deassert-hard-reset property
-and use that in omap_hwmod.c:_enable() *after* the module is unidled
-and the clocks active. However, this is actually functional for purposes
-of getting the uio_pruss driver up and running.
-
-Matt Porter (7):
-  uio: uio_pruss: replace private SRAM API with genalloc
-  uio: uio_pruss: add support for am33xx
-  uio: dt: add TI PRUSS binding
-  ARM: davinci: Add support for an L3RAM gen_pool
-  ARM: davinci: Add support for PRUSS on DA850
-  ARM: omap: add DT support for deasserting hardware reset lines
-  ARM: dts: AM33xx PRUSS support
-
- .../devicetree/bindings/arm/omap/omap.txt          |    2 +
- Documentation/devicetree/bindings/uio/pruss.txt    |   17 +++
- arch/arm/boot/dts/am335x-bone.dts                  |    4 +
- arch/arm/boot/dts/am33xx.dtsi                      |   11 ++
- arch/arm/mach-davinci/board-da850-evm.c            |   12 +++
- arch/arm/mach-davinci/da850.c                      |    9 ++
- arch/arm/mach-davinci/devices-da8xx.c              |   66 ++++++++++++
- arch/arm/mach-davinci/include/mach/common.h        |    2 +
- arch/arm/mach-davinci/include/mach/da8xx.h         |    3 +
- arch/arm/mach-davinci/include/mach/sram.h          |    3 +
- arch/arm/mach-davinci/sram.c                       |   28 ++++-
- arch/arm/plat-omap/omap_device.c                   |   25 ++++-
- drivers/uio/Kconfig                                |    5 +-
- drivers/uio/uio_pruss.c                            |  108 +++++++++++++++-----
- include/linux/platform_data/uio_pruss.h            |    3 +-
- 15 files changed, 269 insertions(+), 29 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/uio/pruss.txt
-
+diff --git a/drivers/uio/Kconfig b/drivers/uio/Kconfig
+index 6f3ea9b..c48b938 100644
+--- a/drivers/uio/Kconfig
++++ b/drivers/uio/Kconfig
+@@ -97,6 +97,7 @@ config UIO_NETX
+ config UIO_PRUSS
+ 	tristate "Texas Instruments PRUSS driver"
+ 	depends on ARCH_DAVINCI_DA850
++	select GENERIC_ALLOCATOR
+ 	help
+ 	  PRUSS driver for OMAPL138/DA850/AM18XX devices
+ 	  PRUSS driver requires user space components, examples and user space
+diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
+index 33a7a27..1b55db3 100644
+--- a/drivers/uio/uio_pruss.c
++++ b/drivers/uio/uio_pruss.c
+@@ -25,7 +25,7 @@
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/slab.h>
+-#include <mach/sram.h>
++#include <linux/genalloc.h>
+ 
+ #define DRV_NAME "pruss_uio"
+ #define DRV_VERSION "1.0"
+@@ -65,10 +65,11 @@ struct uio_pruss_dev {
+ 	dma_addr_t sram_paddr;
+ 	dma_addr_t ddr_paddr;
+ 	void __iomem *prussio_vaddr;
+-	void *sram_vaddr;
++	unsigned long sram_vaddr;
+ 	void *ddr_vaddr;
+ 	unsigned int hostirq_start;
+ 	unsigned int pintc_base;
++	struct gen_pool *sram_pool;
+ };
+ 
+ static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+@@ -106,7 +107,9 @@ static void pruss_cleanup(struct platform_device *dev,
+ 			gdev->ddr_paddr);
+ 	}
+ 	if (gdev->sram_vaddr)
+-		sram_free(gdev->sram_vaddr, sram_pool_sz);
++		gen_pool_free(gdev->sram_pool,
++			      gdev->sram_vaddr,
++			      sram_pool_sz);
+ 	kfree(gdev->info);
+ 	clk_put(gdev->pruss_clk);
+ 	kfree(gdev);
+@@ -152,10 +155,17 @@ static int __devinit pruss_probe(struct platform_device *dev)
+ 		goto out_free;
+ 	}
+ 
+-	gdev->sram_vaddr = sram_alloc(sram_pool_sz, &(gdev->sram_paddr));
+-	if (!gdev->sram_vaddr) {
+-		dev_err(&dev->dev, "Could not allocate SRAM pool\n");
+-		goto out_free;
++	if (pdata->l3ram_pool) {
++		gdev->sram_pool = pdata->l3ram_pool;
++		gdev->sram_vaddr =
++			gen_pool_alloc(gdev->sram_pool, sram_pool_sz);
++		if (!gdev->sram_vaddr) {
++			dev_err(&dev->dev, "Could not allocate SRAM pool\n");
++			goto out_free;
++		}
++		gdev->sram_paddr =
++			gen_pool_virt_to_phys(gdev->sram_pool,
++					      gdev->sram_vaddr);
+ 	}
+ 
+ 	gdev->ddr_vaddr = dma_alloc_coherent(&dev->dev, extram_pool_sz,
+diff --git a/include/linux/platform_data/uio_pruss.h b/include/linux/platform_data/uio_pruss.h
+index f39140a..e500fe6 100644
+--- a/include/linux/platform_data/uio_pruss.h
++++ b/include/linux/platform_data/uio_pruss.h
+@@ -20,6 +20,7 @@
+ 
+ /* To configure the PRUSS INTC base offset for UIO driver */
+ struct uio_pruss_pdata {
+-	u32	pintc_base;
++	u32		pintc_base;
++	struct gen_pool *l3ram_pool;
+ };
+ #endif /* _UIO_PRUSS_H_ */
 -- 
 1.7.9.5
