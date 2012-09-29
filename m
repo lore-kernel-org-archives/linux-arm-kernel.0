@@ -1,57 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Sep 2012 11:44:32 -0700
-Subject: [GIT PULL][for 3.7] pull request on dt2 branch from arch-pxa
-In-Reply-To: <CAN1soZwArV88LU=p1mu5UQKjd0zVPTkM5azDrPvBFXRtL+8FfA@mail.gmail.com>
-References: <CAN1soZxC_KovdgENmsSQcUFkK2VgirkaKKSx1=RjLhULATw=+Q@mail.gmail.com>
- <20120922060817.GJ32245@quad.lixom.net>
- <CAN1soZwArV88LU=p1mu5UQKjd0zVPTkM5azDrPvBFXRtL+8FfA@mail.gmail.com>
-Message-ID: <20120929184432.GA32167@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Sep 2012 20:39:44 +0100
+Subject: [PATCH 3/4] ARM: OMAP: Move omap_reserve() locally to mach-omap1/2
+In-Reply-To: <1348839609-10456-4-git-send-email-lokeshvutla@ti.com>
+References: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
+ <1348839609-10456-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20120929193944.GB15246@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 02:04:36PM +0800, Haojian Zhuang wrote:
-> On Sat, Sep 22, 2012 at 2:08 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Fri, Sep 21, 2012 at 04:24:58PM +0800, Haojian Zhuang wrote:
-> >> Hi Olof & Arnd,
-> >>
-> >> Please help to merge dt2 branch from arch-pxa git tree.
-> >>
-> >> Regards
-> >> Haojian
-> >>
-> >> The following changes since commit 5698bd757d55b1bb87edd1a9744ab09c142abfc2:
-> >>
-> >>   Linux 3.6-rc6 (2012-09-16 14:58:51 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://github.com/hzhuang1/linux.git dt2
-> >>
-> >> for you to fetch changes up to 37586e0b9cadd1072196c3cca8ea8559b91b1605:
-> >>
-> >>   ARM: dt: mmp-dma: add binding file (2012-09-21 15:51:26 +0800)
-> >>
-> >> ----------------------------------------------------------------
-> >> Zhangfei Gao (1):
-> >>       ARM: dt: mmp-dma: add binding file
-> >
-> > What happened to the rest of this series? It makes more sense to merge the
-> > driver using the binding at the same time as the binding itself, so let's hold
-> > off until the driver is reviewed and ready to go in too (or, if you merge that
-> > through a different path, the binding could/should go with it there).
-> >
-> >
-> > -Olof
+On Fri, Sep 28, 2012 at 07:10:08PM +0530, Lokesh Vutla wrote:
+> omap_reserve() is a stub for omap1. So creating a
+> stub locally in mach-omap1. And moving the definition
+> to mach-omap2.
+> This helps in moving plat/omap_secure.h local to
+> mach-omap2
 > 
-> Vinod merges the rest of the patch series into his dma tree except for this one.
-> I have to merge this one.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap1/common.h             |    3 +++
+>  arch/arm/mach-omap2/common.c             |   20 ++++++++++++++++++++
+>  arch/arm/mach-omap2/common.h             |    1 +
+>  arch/arm/plat-omap/common.c              |   17 -----------------
+>  arch/arm/plat-omap/include/plat/common.h |    1 -
+>  5 files changed, 24 insertions(+), 18 deletions(-)
 > 
-> http://www.spinics.net/lists/arm-kernel/msg195141.html
-> 
-> Would you like to merge it into arm-soc tree?
-> 
+> diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+> index c2552b2..f7b01f1 100644
+> --- a/arch/arm/mach-omap1/common.h
+> +++ b/arch/arm/mach-omap1/common.h
+> @@ -90,4 +90,7 @@ extern int ocpi_enable(void);
+>  static inline int ocpi_enable(void) { return 0; }
+>  #endif
+>  
+> +static inline void omap_reserve(void)
+> +{ }
 
-Applied to next/dt. Thanks!
+This is the wrong approach.  If OMAP1 doesn't need to do any reservation,
+then OMAP1 platforms should not be calling omap_reserve() and OMAP1 should
+not have this defined.
 
-
--Olof
+Just because OMAP2 does something one way does not mean OMAP1 needs to
+copy it in every detail.
