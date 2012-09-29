@@ -1,34 +1,64 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 28 Sep 2012 17:17:03 -0500
-Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
-In-Reply-To: <5065F19E.5020708@ti.com>
-References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
- <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
- <5063330E.3000203@ti.com> <5065F19E.5020708@ti.com>
-Message-ID: <506621DF.20508@ti.com>
+From: fwu@marvell.com (FanWu)
+Date: Sat, 29 Sep 2012 08:45:36 +0800
+Subject: [PATCH] ARM: Add BUG_ON when hlt counter is wrongly used
+In-Reply-To: <alpine.LFD.2.02.1209281542560.6667@xanadu.home>
+References: <1348827774-17880-1-git-send-email-fwu@marvell.com>
+ <alpine.LFD.2.02.1209281542560.6667@xanadu.home>
+Message-ID: <506644B0.4030500@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/28/2012 01:51 PM, Vaibhav Hiremath wrote:
-
-[snip]
-
-> Jon,
-> 
-> Sorry for delayed response, But I tried using your omap_test application
-> to validate this patch series, but it is failing for me.
-> 
-> How did you test it? Are you running same test application at your end?
-> 
-> I am debugging this issue, i just thought I should tell you this before
-> its too late.
-
-By the way, I have not seen any such issues on OMAP2/3/4 and so this
-appears to be specific to AM335x. So I would not be too concerned, we
-just need to understand why interrupts on some timers are not working on
-the AM335x. Probably a configuration issue some where and that can
-always be fixed separately.
-
-Cheers
-Jon
+On 09/29/2012 03:45 AM, Nicolas Pitre wrote:
+> On Fri, 28 Sep 2012, Fan Wu wrote:
+>
+>> From: fwu <fwu@marvell.com>
+>>
+>> 1. On ARM platform, "nohlt" can be used to prevent core from idle
+>>     process, returning immediately.
+>> 2. There are two interfaces, exported for other modules, named
+>>     "disable_hlt" and "enable_hlt" are used to enable/disable the
+>>     cpuidle mechanism by increasing/decreasing "hlt_counter".
+>>     Disable_hlt and enable_hlt are paired operation,
+>>     when you first call disable_hlt and then enable_hlt, the
+>>     semantics are right.
+>> 3. There is no obvious constraint to prevent user(driver/module)
+>>     code to prevent the case that enable_hlt is ahead of disable_hlt,
+>>     which is a fatal operation on kernel state change from user,
+>>     and there is no any WARNING or notification if the case happens
+>>     in current kernel code.
+>>     This patch aims to report BUG when the case happens, just like
+>>     what the kernel do when enable_irq is ahead of disable_irq.
+>>
+>> Signed-off-by: fwu <fwu@marvell.com>
+>> Signed-off-by: YiLu Mao <ylmao@marvell.com>
+>> Signed-off-by: Ning Jiang <ning.jiang@marvell.com>
+> This looks sensible to me.
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+>
+>> Change-Id: Iddacf45aec012bb663e130801727b4eb3d11436b
+> Please don't forget to strip that when submitting your patch to
+> Russell's patch system.
+>
+>> ---
+>>   arch/arm/kernel/process.c |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>> index 693b744..5bbd3be 100644
+>> --- a/arch/arm/kernel/process.c
+>> +++ b/arch/arm/kernel/process.c
+>> @@ -70,6 +70,7 @@ EXPORT_SYMBOL(disable_hlt);
+>>   void enable_hlt(void)
+>>   {
+>>   	hlt_counter--;
+>> +	BUG_ON(hlt_counter < 0)
+>>   }
+>>   
+>>   EXPORT_SYMBOL(enable_hlt);
+>> -- 
+>> 1.7.0.4
+>>
+Thanks a lot for reviewing the patch.
+I'll remove that in the new patch version.
+Thanks again.
