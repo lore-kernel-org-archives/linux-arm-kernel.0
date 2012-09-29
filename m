@@ -1,58 +1,118 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 29 Sep 2012 15:03:40 +0000
-Subject: [PATCH 07/12] staging/iio/lis3l02dq: fix building without
- irq_to_gpio
-In-Reply-To: <5066C71E.9030302@kernel.org>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-8-git-send-email-arnd@arndb.de>
- <5066C71E.9030302@kernel.org>
-Message-ID: <201209291503.40519.arnd@arndb.de>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Sat, 29 Sep 2012 11:50:25 -0400
+Subject: [PATCH 09/15] KVM: ARM: Inject IRQs and FIQs from userspace
+In-Reply-To: <20120925155505.GD28728@mudshark.cambridge.arm.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153527.21241.61813.stgit@ubuntu>
+ <20120925155505.GD28728@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qJ5PJZ3KAgxvizqHC2Q0OmkGvVjrRkhO511OvwpMvGgzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 29 September 2012, Jonathan Cameron wrote:
-> On 09/28/2012 10:36 PM, Arnd Bergmann wrote:
-> > The driver has not been building for some time after the
-> > irq_to_gpio function has been removed from the kernel.
-> > 
-> > The only board in the upstream kernel that provides
-> > this device is the "Stargate 2", which is also maintained
-> > by Jonathan Cameron. Rather than working around the problem
-> > by adding new platform data for this driver, this patch
-> > uses the of_gpio framework to get to the gpio number.
-> > 
-> > However, the stargate2 code does not (yet) use DT based
-> > probing, so it is still broken, but at least building
-> > allyesconfig works again.
-> Will be optimistic to think anyone will convert a platform
-> that no one still makes (stargate 2 was pretty much intel
-> research only + some they gave to accademics - imote2 has
-> been dropped by memsic for a while now.)  If nothing else
-> there is little chance anyone will bother porting a remotely
-> up to date bootloader to these boards given how few people
-> are still using them for anything.
+On Tue, Sep 25, 2012 at 11:55 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Sep 15, 2012 at 04:35:27PM +0100, Christoffer Dall wrote:
+>> diff --git a/arch/arm/include/asm/kvm.h b/arch/arm/include/asm/kvm.h
+>> index a13b582..131e632 100644
+>> --- a/arch/arm/include/asm/kvm.h
+>> +++ b/arch/arm/include/asm/kvm.h
+>> @@ -22,6 +22,7 @@
+>>  #include <asm/types.h>
+>>
+>>  #define __KVM_HAVE_GUEST_DEBUG
+>> +#define __KVM_HAVE_IRQ_LINE
+>>
+>>  #define KVM_REG_SIZE(id)                                             \
+>>       (1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+>> @@ -85,4 +86,24 @@ struct kvm_reg_list {
+>>  #define KVM_REG_ARM_CORE             (0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+>>  #define KVM_REG_ARM_CORE_REG(name)   (offsetof(struct kvm_regs, name) / 4)
+>>
+>> +/* KVM_IRQ_LINE irq field index values */
+>> +#define KVM_ARM_IRQ_TYPE_SHIFT               24
+>> +#define KVM_ARM_IRQ_TYPE_MASK                0xff
+>> +#define KVM_ARM_IRQ_VCPU_SHIFT               16
+>> +#define KVM_ARM_IRQ_VCPU_MASK                0xff
+>> +#define KVM_ARM_IRQ_NUM_SHIFT                0
+>> +#define KVM_ARM_IRQ_NUM_MASK         0xffff
+>> +
+>> +/* irq_type field */
+>> +#define KVM_ARM_IRQ_TYPE_CPU         0
+>> +#define KVM_ARM_IRQ_TYPE_SPI         1
+>> +#define KVM_ARM_IRQ_TYPE_PPI         2
+>> +
+>> +/* out-of-kernel GIC cpu interrupt injection irq_number field */
+>> +#define KVM_ARM_IRQ_CPU_IRQ          0
+>> +#define KVM_ARM_IRQ_CPU_FIQ          1
+>> +
+>> +/* Highest supported SPI, from VGIC_NR_IRQS */
+>> +#define KVM_ARM_IRQ_GIC_MAX          127
+>
+> This define, and those referring to PPIs and SPIs sound highly GIC-specific.
+> Is that really appropriate for kvm.h? Do you mandate a single GIC as the
+> only interrupt controller?
+>
 
-The way are converting most ARM platforms to DT, we should be
-able to replace the board files with .dts files once all
-device drivers have been converted over. This is taking a
-bit longer for mmp/pxa than for some of the other platforms,
-Updating the boot loader makes it easier to deploy a DT
-version, but you can also append a DT blob to the kernel
-if that's not possible, and we will in the future allow
-appending multiple DT blobs and let the early boot stages
-pick the right one based on the board ID.
+you can add a another gic with another in-kernel gic emulation if
+someone makes such one that's different from the vgic specifications
+by defining another irq type.
 
-> I'm happy enough with this patch.  Would prefer to
-> take it post merge window as a fix than now given timing.
+devices must interact with a gic available in the kernel, so I think
+referring to PPIs and SPIs is very appropriate in kvm.h for a user
+space device emulation that must inject either a PPI or an SPI.
 
-Ok, fair enough. It has been broken for a while, so there
-is no hurry now. I just stumbled over it when doing an
-"allyesconfig" build.
+We can call them TYPE_GIC_V2_XXX or something like that if you feel
+this is cleaner.
 
-> Long run this driver will hopefully get replaced by the
-> unified driver for all the st accelerometers (assuming that
-> ever gets back to this long obsolete part).
+>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>> index 6e46541..0f641c1 100644
+>> --- a/arch/arm/include/asm/kvm_arm.h
+>> +++ b/arch/arm/include/asm/kvm_arm.h
+>> @@ -74,6 +74,7 @@
+>>  #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
+>>                       HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
+>>                       HCR_SWIO | HCR_TIDCP)
+>> +#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+>>
+>>  /* Hyp System Control Register (HSCTLR) bits */
+>>  #define HSCTLR_TE    (1 << 30)
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index b97ebd0..8a87fc7 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -24,6 +24,7 @@
+>>  #include <linux/fs.h>
+>>  #include <linux/mman.h>
+>>  #include <linux/sched.h>
+>> +#include <linux/kvm.h>
+>>  #include <trace/events/kvm.h>
+>>
+>>  #define CREATE_TRACE_POINTS
+>> @@ -271,6 +272,7 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
+>>
+>>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>>  {
+>> +     vcpu->cpu = cpu;
+>>  }
+>>
+>>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>> @@ -311,6 +313,74 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>       return -EINVAL;
+>>  }
+>>
+>> +static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
+>> +{
+>> +     int bit_index;
+>> +     bool set;
+>> +     unsigned long *ptr;
+>> +
+>> +     if (number == KVM_ARM_IRQ_CPU_IRQ)
+>> +             bit_index = ffs(HCR_VI) - 1;
+>> +     else /* KVM_ARM_IRQ_CPU_FIQ */
+>> +             bit_index = ffs(HCR_VF) - 1;
+>
+> __ffs
+>
+fixed
 
-Ok.
 
-	Arnd
+-Christoffer
