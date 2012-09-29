@@ -1,27 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Sep 2012 14:32:45 -0700
-Subject: [GIT PULL] ep93xx-fixes for 3.7
-In-Reply-To: <50638DE6.8010801@gmail.com>
-References: <50638DE6.8010801@gmail.com>
-Message-ID: <20120929213245.GJ12999@quad.lixom.net>
+Date: Sat, 29 Sep 2012 14:34:06 -0700
+Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform
+ conversion
+In-Reply-To: <201209282032.03004.arnd@arndb.de>
+References: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
+ <201209282032.03004.arnd@arndb.de>
+Message-ID: <20120929213406.GK12999@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 09:21:10AM +1000, Ryan Mallon wrote:
-> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+On Fri, Sep 28, 2012 at 08:32:02PM +0000, Arnd Bergmann wrote:
+> On Thursday 27 September 2012, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Moving ARCH_MVEBU for multi-platform support caused several breakages in
+> > recently added addr-map and pinctrl support for mvebu. This adds the
+> > necessary selects and include paths to fix the build.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
 > 
->   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.7
-> 
-> for you to fetch changes up to e4d4a9027877593d80d71e8a93e39670b1881627:
-> 
->   ARM: ep93xx: Move ts72xx.h out of include/mach (2012-09-17 09:09:08 +1000)
-> 
+> Applied on top of the late/kirkwood branch that introduced the incorrect
+> merge.
 
-Thanks, pulled into ep93xx/fixes-non-critical.
+Thanks Arnd!
 
-
--Olof
+-Olfo
