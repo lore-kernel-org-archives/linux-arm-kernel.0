@@ -1,97 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 29 Sep 2012 09:57:45 -0700
-Subject: [PATCH 2/4] ARM: OMAP: DMA: Move plat/dma hearder to
- platform_data/dma-omap
-In-Reply-To: <5065FBF7.2030704@ti.com>
-References: <1348839609-10456-1-git-send-email-lokeshvutla@ti.com>
- <1348839609-10456-3-git-send-email-lokeshvutla@ti.com>
- <20120928145459.GZ4840@atomide.com>
- <CAMQu2gw9DJSZ4QVvo83atTpnsXyegneuQ2rJKBc+5ioiwEaqaQ@mail.gmail.com>
- <20120928150538.GB4840@atomide.com>
- <20120928155443.GA15246@n2100.arm.linux.org.uk>
- <5065FBF7.2030704@ti.com>
-Message-ID: <20120929165744.GD4840@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 29 Sep 2012 10:31:27 -0700
+Subject: ARM SoC tree,
+ Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
+In-Reply-To: <m3y5jskbir.fsf@intrepid.localdomain>
+References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+ <1348868177-21205-6-git-send-email-arnd@arndb.de>
+ <m3lift6rru.fsf_-_@intrepid.localdomain>
+ <201209291458.16112.arnd@arndb.de>
+ <m3y5jskbir.fsf@intrepid.localdomain>
+Message-ID: <CAOesGMh9PCjoiUZZZtPFBrsOfO+QhjW_bSdCOf0b_uXd_Jx2qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [120928 12:36]:
-> 
-> On 09/28/2012 10:54 AM, Russell King - ARM Linux wrote:
-> > On Fri, Sep 28, 2012 at 08:05:38AM -0700, Tony Lindgren wrote:
-> >> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120928 08:02]:
-> >>> On Fri, Sep 28, 2012 at 8:25 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >>>>
-> >>>> * Lokesh Vutla <lokeshvutla@ti.com> [120928 06:41]:
-> >>>>> Move plat/dma.h header to platform_data/dma-omap.h as
-> >>>>> part of the single zImage work.
-> >>>>
-> >>>> Hmm there's no platform data in this header, just
-> >>>> exported things for drivers to use. So it should not
-> >>>> be placed into platform_data.
-> >>>>
-> >>>> Maybe it should be #include <asm/mach/dma-omap.h> for now?
-> >>>>
-> >>> I wasn't sure either when the file was placed under platform-data.
-> >>> I agree for now we can keep it mach layer but than means OMAP1 and
-> >>> OMAP2+ DMA header and source code needs to be split. That
-> >>> is not so straight forward.
-> >>
-> >> No need for that, the path I'm suggesting is located under
-> >> arch/arm/include/asm/mach, it's not same as include <mach/dma-omap.h>.
-> >>  
-> >>> With DMA engine conversion hopefully, we might get rid of the
-> >>> header eventually, but for now not sure whether we should
-> >>> go ahead and follow the splitting part.
-> >>>
-> >>> Thoughts ?
-> >>
-> >> No need for splitting anything :)
-> >>
-> >> The other possible location would be just include <linux/dma-omap.h>,
-> >> but as we all know that will be going away, <asm/mach/dma-omap.h>
-> >> is probably better.
-> > 
-> > No, not asm/mach/anything, please.  Let's try to get headers into the
-> > right place second time around.
-> > 
-> > This header appears to contain:
-> > 
-> > 1. definitions for DMA signals, used by drivers.
-> > 
-> >    This can be eliminated by using DT, platform data, or IORESOURCE_DMA
-> >    (that's in preference order) which then means that these definitions
-> >    can live in a header file in arch/arm/mach-omap*/ if at all.
-> > 
-> > 2. data definitions and structures used by drivers using the legacy OMAP
-> >    DMA API.
-> > 
-> > So, it doesn't contain platform data (as said above).  It's not an
-> > API definition between core ARM code and ARM platform code, so that
-> > rules out arch/arm/include/asm/mach.  Obviously arch/arm/include/asm
-> > is out of the question too.
-> > 
-> > I don't think we have a clear cut place for this to live - and lets
-> > be clear that this file will eventually be going away _anyway_ when
-> > OMAP is converted 100% to DMA engine.
-> > 
-> > So, where to put the file?  At the moment, I don't know, it doesn't
-> > seem to have an obvious home other than where it currently is, which
-> > then gets in the way of the single kernel work.
-> 
-> I am having the same problem with the OMAP dmtimer platform driver that
-> the legacy DMA driver has. It is slightly worse as currently it is pure
-> custom platform driver. Obviously long-term it would be best to create a
-> generic timer driver in drivers/timer/ that other devices and
-> architectures could use but we are a long way from that.
-> 
-> I know that this is ugly and has probably already been shot-down, but as
-> a short-term fix, has creating arch/arm/plat-omap/include/plat-omap been
-> NAK'ed for such problematic drivers?
+On Sat, Sep 29, 2012 at 10:02 AM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
 
-Sounds like that's the way to go then. What we did not want to do is
-just move all the files blindly there, but for these files that
-seems like the way to go until they are just regular device drivers.
+> It would be different if my tree included e.g. core ARM changes - but it
+> doesn't. What's the _real_ reason for asking me to push my changes
+> indirectly?
 
-Regards,
+The reason is that when all ARM platform maintainers pushed code
+straight to Linus, no one was making sure that the code meets a
+quality bar and each vendor only focused on just their own stuff.
 
-Tony
+As an end result, over the years lots of crap got pushed straight to
+Linus, code that we have now spent about a year and a half doing
+massive cleanups and restructurings of. No vendors really talked to
+each other, all of them solved their own problems their own way
+without figuring out how to work better together and build
+infrastructure for their common requirements. Linus finally lost his
+patience with the massive churn of duplicated reinvented code and
+there was a huge blow up about it. See http://lwn.net/Articles/439326/
+for background.
+
+> Also, not that it's the most important, but how is it better for anyone
+> to delay changes - which are completely orthogonal to arm-soc - for
+> additional months? Doesn't "release early, release often" make sense
+> anymore?
+
+Nothing is delayed by going through arm-soc. We're closing down our
+tree for new (large) pull requests around the same time where you
+should no longer add them to your -next branch either (-rc6/-rc7 time
+frame).
+
+Small fixups, and of course bugfixes, are welcome closer to the merge
+window but the major chances should all have landed by then.
+
+
+-Olof
