@@ -1,43 +1,34 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Sat, 29 Sep 2012 23:58:57 +0200
-Subject: imx6q: high interrupt latencies
-Message-ID: <50676F21.4000705@xenomai.org>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Sat, 29 Sep 2012 19:00:12 -0400
+Subject: [PATCH 15/15] KVM: ARM: Guest wait-for-interrupts (WFI) support
+In-Reply-To: <20120925170423.GG28728@mudshark.cambridge.arm.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153605.21241.75455.stgit@ubuntu>
+ <20120925170423.GG28728@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qLuirMEipeV=Y_dLg66r1pm2FL-XnDyLof+4UYHYPs7JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 25, 2012 at 1:04 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Sep 15, 2012 at 04:36:05PM +0100, Christoffer Dall wrote:
+>> From: Christoffer Dall <cdall@cs.columbia.edu>
+>>
+>> When the guest executes a WFI instruction the operation is trapped to
+>> KVM, which emulates the instruction in software. There is no correlation
+>> between a guest executing a WFI instruction and actually putting the
+>> hardware into a low-power mode, since a KVM guest is essentially a
+>> process and the WFI instruction can be seen as 'sleep' call from this
+>> process. Therefore, we block the vcpu when the guest excecutes a wfi
+>> instruction and the IRQ or FIQ lines are not raised.
+>>
+>> When an interrupt comes in through KVM_IRQ_LINE (see previous patch) we
+>> signal the VCPU thread and unflag the VCPU to no longer wait for
+>> interrupts.
+>
+> Seems a bit strange tagging this small addition on the end of this series.
+> Can you merge it in with the rest?
+>
 
-Hi,
+sure, I'll tag it in with the world-switch or emulation.
 
-I have been observing high interrupt latencies on imx6q, the problem
-seems to be in the FEC driver, function fec_enet_tx. The following line:
-
-        while (((status = bdp->cbd_sc) & BD_ENET_TX_READY) == 0) {
-
-can take 100us or more to execute, during which the local timer
-interrupt are postponed.
-
-As far as I understand, bdp is a pointer to a "struct bufdesc" shared
-with the hardware and its status member is updated by the hardware when
-the corresponding ethernet packet transmission is complete.
-
-Adding a call to "mb()" or "outer_sync()" before reading the status
-seems to avoid the issue, though I do not know if this is the proper fix.
-
-Some more data. The boot logs say:
-CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d
-CPU identified as i.MX6Q, silicon rev 1.0
-l2x0: 16 ways, CACHE_ID 0x410000c7
-
-the kernel is compiled with the following errata enabled:
-CONFIG_PL310_ERRATA_588369
-CONFIG_PL310_ERRATA_727915
-CONFIG_ARM_ERRATA_743622
-CONFIG_ARM_ERRATA_751472
-CONFIG_ARM_ERRATA_754322
-CONFIG_ARM_ERRATA_764369
-CONFIG_PL310_ERRATA_769419
-
-Regards.
-
--- 
-                                                                Gilles.
+-Christoffer
