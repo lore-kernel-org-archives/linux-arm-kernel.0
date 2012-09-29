@@ -1,49 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Sep 2012 10:31:27 -0700
-Subject: ARM SoC tree,
- Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Sep 2012 18:44:01 +0100
+Subject: ARM SoC tree, Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem
+ for MMIO
 In-Reply-To: <m3y5jskbir.fsf@intrepid.localdomain>
 References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
  <1348868177-21205-6-git-send-email-arnd@arndb.de>
- <m3lift6rru.fsf_-_@intrepid.localdomain>
- <201209291458.16112.arnd@arndb.de>
+ <m3lift6rru.fsf_-_@intrepid.localdomain> <201209291458.16112.arnd@arndb.de>
  <m3y5jskbir.fsf@intrepid.localdomain>
-Message-ID: <CAOesGMh9PCjoiUZZZtPFBrsOfO+QhjW_bSdCOf0b_uXd_Jx2qA@mail.gmail.com>
+Message-ID: <20120929174400.GA6933@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2012 at 10:02 AM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
+On Sat, Sep 29, 2012 at 07:02:36PM +0200, Krzysztof Halasa wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > explaining that we're closing the window for 3.7 except for a
+> > few things that were already submitted earlier.
+> 
+> No offense, but... You say how does it work for YOU but that's not
+> exactly what I'm asking for. I'm asking for a statement that it's
+> not OK for me to push my IXP4xx changes straight to Linus.
 
-> It would be different if my tree included e.g. core ARM changes - but it
-> doesn't. What's the _real_ reason for asking me to push my changes
-> indirectly?
+If you bypass arm-soc, then you may find you have more problems - if
+the arm-soc goes in before you, and your tree conflicts with arm-soc.
+There are major changes going through at the present time which could
+very well mean that you miss something and IXP4xx gets broken because
+you're not participating.
 
-The reason is that when all ARM platform maintainers pushed code
-straight to Linus, no one was making sure that the code meets a
-quality bar and each vendor only focused on just their own stuff.
+If you wish to find out about those breakages after the event, and
+play constant catch up, then pushing straight to Linus is what you
+should do.
 
-As an end result, over the years lots of crap got pushed straight to
-Linus, code that we have now spent about a year and a half doing
-massive cleanups and restructurings of. No vendors really talked to
-each other, all of them solved their own problems their own way
-without figuring out how to work better together and build
-infrastructure for their common requirements. Linus finally lost his
-patience with the massive churn of duplicated reinvented code and
-there was a huge blow up about it. See http://lwn.net/Articles/439326/
-for background.
+If you wish to know about the breakages, and fix them up ahead of time,
+then participate in the established process.
+
+> > The arm-soc process is definitely meant to make your life easier
+> > as well as help Linus understand what's going on with all of ARM
+> > to the degree that he needs to know, but it only works if everyone
+> > participates.
+> 
+> I'd like to know how is it easier for me. Actually, I think it would
+> only make things worse for everyone (mostly for me). Also, I can't see
+> how "it only works if everyone participates" is true.
+> 
+> I'm currently supporting (for our internal needs) hw platforms based
+> on x86, MIPS and now ARM. I'm using 3.1 (non-trivial upgrades required
+> so -ETIME) and 3.5 "stable" trees, and need to also use Linus' current
+> tree since it's the next stable.
+
+That makes no sense what so ever.  The tree which is used for the next
+stable tree will be Linus' tree, which will be the result of merging all
+those other trees into Linus' tree.  If you base your changes off only
+Linus' tree on the run up to the next merge window, then you are preparing
+your changes against an _older_ kernel than if you base them off a tree
+containing the changes which will be _included_ in the next merge window.
+
+So, in the long run, you'll end up doing the same amount of work, but
+you'll end up having to do the "fix it for the merge window" hoops _after_
+your tree has been merged into mainline, rather than before.
 
 > Also, not that it's the most important, but how is it better for anyone
 > to delay changes - which are completely orthogonal to arm-soc - for
 > additional months? Doesn't "release early, release often" make sense
 > anymore?
 
-Nothing is delayed by going through arm-soc. We're closing down our
-tree for new (large) pull requests around the same time where you
-should no longer add them to your -next branch either (-rc6/-rc7 time
-frame).
+Err, no idea what you're getting at here, but take a moment to think about
+it.
 
-Small fixups, and of course bugfixes, are welcome closer to the merge
-window but the major chances should all have landed by then.
+If you want to work in total isolation, that's your choice, but in the
+long run you will be playing catch-up rather than being prepared early
+for the changes which will happen at the next merge window.  If you want
+-rc1, rc2, rc3, rc4 etc to be broken on IXP4xx until you get around to
+fixing up the merge window breakage, then go ahead.
 
-
--Olof
+Otherwise, participate and be part of the community, and get your changes
+into arm-soc, so that others can see what's going on.
