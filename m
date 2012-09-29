@@ -1,54 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 29 Sep 2012 18:34:54 +0000 (UTC)
-Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <1348861072-14507-1-git-send-email-mporter@ti.com>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
-Message-ID: <alpine.DEB.2.00.1209291830270.20956@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 29 Sep 2012 11:36:39 -0700
+Subject: [GIT PULL 4/4] Samsung DT for v3.7
+In-Reply-To: <146201cd9c4c$1a219b30$4e64d190$%kim@samsung.com>
+References: <505C089C.4050801@samsung.com> <505C22CD.9030401@samsung.com>
+ <146201cd9c4c$1a219b30$4e64d190$%kim@samsung.com>
+Message-ID: <20120929183639.GA29547@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-cc Omar
-
-Hi Matt
-
-On Fri, 28 Sep 2012, Matt Porter wrote:
-
-> The AM33xx support requires some help in hwmod due to the following
-> comment in arch/arm/mach-omap2/omap_hwmod.c:
-> 	/*
-> 	 * If an IP block contains HW reset lines and any of them are
-> 	 * asserted, we let integration code associated with that
-> 	 * block handle the enable.  We've received very little
-> 	 * information on what those driver authors need, and until
-> 	 * detailed information is provided and the driver code is
-> 	 * posted to the public lists, this is probably the best we
-> 	 * can do.
-> 	 */
+On Thu, Sep 27, 2012 at 10:04:53AM +0900, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > On 09/21/12 15:26, Kukjin Kim wrote:
+> > > Hi Arnd, Olof
+> > >
+> > > This is for updating Samsung DT for v3.7.
+> > >
+> > > But now this makes many conflicts with pinctrl dt because of moving file
+> > > so I'm sorting them out to avoid useless conflicts.
+> > >
+> > > I'll re-send this soon again.
+> > > This is jut for your information.
+> > >
+> > I created following branch which is merged on top of Samsung pinctrl and
+> > board branches already are pulled into arm-soc.
+> > 
+> > This includes moving common exynos4 dt for supporting other exynos4xxxx
+> > SoCs easily and adding exynos43210-trats board support and some updates.
+> > 
+> > Please pull from:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next/dt-samsung-new
+> > 
+> > If any problems, please kindly let me know.
+> > 
+> Hi Arnd and Olof,
 > 
-> The approach to deal with the hardware reset (for at least the pruss
-> hwmod) was to add a generic omap property to properly define this
-> hardware. The implementation simply deasserts any rst lines that
-> are called out in the property when the omap_device is
-> instantiated. This is not the ideal implementation as the sequence is
-> a bit wrong for pruss since the busy check during the hard reset
-> will fail, even though it fails in a benign manner. Ideally, we would
-> want the implementation to observe the ti,deassert-hard-reset property
-> and use that in omap_hwmod.c:_enable() *after* the module is unidled
-> and the clocks active. However, this is actually functional for purposes
-> of getting the uio_pruss driver up and running.
+> Maybe, you missed this one?
+> 
+> Note, this will make conflicts with Rob's change, move all dtb targets.
 
-Could you please sync with Omar on the hard reset handling?  He posted 
-some patches that change the hard reset code.  Perhaps you can align on an 
-approach with him?
+Kukjin,
 
-A few general comments: if some new per-IP block flag is needed to control 
-this, the best place for it right now would be the hwmod data in 
-arch/arm/mach-omap2/omap_hwmod_*_data.c, rather than DT.  At some point 
-soon, the hard reset handling will be split between a PRM driver and some 
-hwmod bus driver, and it seems best to deal with the DT binding question 
-at that time.  That way we don't wind up with a legacy binding that has to 
-be supported over the long term.
+The branch contents is not the same as your repeated pull request, it had
+patches added on the 26th and the original request was sent on the 21st. I've
+pulled it anyway after reviewing those patches, but please be more transparent
+with what you do to your branch if you update it after pull requests have been
+sent.
+
+Also, next time please do a full re-send of the pull request, I probably missed
+it because it was a reply with just a new link and not the full diffstat, etc.
 
 
-- Paul
+-Olof
