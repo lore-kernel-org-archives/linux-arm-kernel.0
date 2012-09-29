@@ -1,32 +1,22 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 29 Sep 2012 21:53:21 +0200
-Subject: [PATCH 01/12] mtd: atmel nand: build regression
-In-Reply-To: <1348868177-21205-2-git-send-email-arnd@arndb.de>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-2-git-send-email-arnd@arndb.de>
-Message-ID: <20120929195321.GB17667@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Sep 2012 21:47:21 +0100
+Subject: s3c2410 bast (== lists.arm.linux.org.uk) - appears to be broken
+ with 3.1.8...
+Message-ID: <20120929204721.GB6933@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:36 Fri 28 Sep     , Arnd Bergmann wrote:
-> The atmel_nand driver was broken by b654a9a46fc2 "mtd: atmel nand: fix
-> gpio missing request". This is a rather helpless attempt to fix this,
-> probably messing up the error handling even further but getting the
-> build to work again, so please treat it as a bug report rather than
-> a fix to be applied.
-> 
-> Without this patch, building any at91 configuration results in:
-> 
-> drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
-> drivers/mtd/nand/atmel_nand.c:1451:4: error: label 'err_ecc_ioremap' used but not defined
+I've not been able to get very far with debugging this, because there
+appears to be *multiple* issues here.
 
-for the record the error come from the merge of the pmecc and the commit you
-mention
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-I already have seach path in my quere from Josh
+1. It appears that LZMA fails on this platform.  Gzip'd zImage's also
+   occasionally fail with CRC errors.  ABLE reports loading the right
+   size of image though.
 
-Best Regards,
-J.
+2. When the decompressor does work, no output from the kernel is
+   forthcoming.  Attempts to use DEBUG_LL have proved fruitless so far
+   because of (1).
+
+I won't be around much for the next week or so, so I won't be able to
+do any debugging.  I suggest those with a S3C2410 platform test out the
+3.x.x kernels and report back successes/failures.
