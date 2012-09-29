@@ -1,31 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Sep 2012 14:34:06 -0700
-Subject: [PATCH] ARM: mvebu: fix build breaks from multi-platform
- conversion
-In-Reply-To: <201209282032.03004.arnd@arndb.de>
-References: <1348758612-27012-1-git-send-email-robherring2@gmail.com>
- <201209282032.03004.arnd@arndb.de>
-Message-ID: <20120929213406.GK12999@quad.lixom.net>
+Date: Sat, 29 Sep 2012 14:36:54 -0700
+Subject: [PATCH] ARM: add v7 multi-platform defconfig
+In-Reply-To: <1348774765-9420-1-git-send-email-robherring2@gmail.com>
+References: <1348774765-9420-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120929213654.GL12999@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 08:32:02PM +0000, Arnd Bergmann wrote:
-> On Thursday 27 September 2012, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > Moving ARCH_MVEBU for multi-platform support caused several breakages in
-> > recently added addr-map and pinctrl support for mvebu. This adds the
-> > necessary selects and include paths to fix the build.
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
+On Thu, Sep 27, 2012 at 02:39:25PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Applied on top of the late/kirkwood branch that introduced the incorrect
-> merge.
+> Add a v7 defconfig enabling highbank, socfpga, mvebu, and vexpress
+> platforms and their drivers. Most other options are left to the default.
+> 
+> The existing individual platform defconfigs are kept for now as they are
+> a bit different. In some cases, the choices look pretty arbitrary and
+> just copied from other defconfigs.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
 
-Thanks Arnd!
+Thanks, applied on to of the multplatform branch now.
 
--Olfo
+
+> I'm not sure I have all needed drivers enabled for all platforms, so please
+> test and give feedback on other drivers that should be enabled.
+> 
+> There's a couple of fixes needed to build. The branch is available here:
+> 
+> git://sources.calxeda.com/kernel/linux.git defconfig
+
+Looks like we've received one of them already (the mvebu one), and the sata fix
+should go through libata.
+
+
+-Olof
