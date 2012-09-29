@@ -1,118 +1,64 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Sat, 29 Sep 2012 11:50:25 -0400
-Subject: [PATCH 09/15] KVM: ARM: Inject IRQs and FIQs from userspace
-In-Reply-To: <20120925155505.GD28728@mudshark.cambridge.arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153527.21241.61813.stgit@ubuntu>
- <20120925155505.GD28728@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qJ5PJZ3KAgxvizqHC2Q0OmkGvVjrRkhO511OvwpMvGgzQ@mail.gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sat, 29 Sep 2012 19:02:36 +0200
+Subject: ARM SoC tree,
+ Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
+In-Reply-To: <201209291458.16112.arnd@arndb.de> (Arnd Bergmann's message of
+ "Sat, 29 Sep 2012 14:58:15 +0000")
+References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+ <1348868177-21205-6-git-send-email-arnd@arndb.de>
+ <m3lift6rru.fsf_-_@intrepid.localdomain>
+ <201209291458.16112.arnd@arndb.de>
+Message-ID: <m3y5jskbir.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 11:55 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Sep 15, 2012 at 04:35:27PM +0100, Christoffer Dall wrote:
->> diff --git a/arch/arm/include/asm/kvm.h b/arch/arm/include/asm/kvm.h
->> index a13b582..131e632 100644
->> --- a/arch/arm/include/asm/kvm.h
->> +++ b/arch/arm/include/asm/kvm.h
->> @@ -22,6 +22,7 @@
->>  #include <asm/types.h>
->>
->>  #define __KVM_HAVE_GUEST_DEBUG
->> +#define __KVM_HAVE_IRQ_LINE
->>
->>  #define KVM_REG_SIZE(id)                                             \
->>       (1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
->> @@ -85,4 +86,24 @@ struct kvm_reg_list {
->>  #define KVM_REG_ARM_CORE             (0x0010 << KVM_REG_ARM_COPROC_SHIFT)
->>  #define KVM_REG_ARM_CORE_REG(name)   (offsetof(struct kvm_regs, name) / 4)
->>
->> +/* KVM_IRQ_LINE irq field index values */
->> +#define KVM_ARM_IRQ_TYPE_SHIFT               24
->> +#define KVM_ARM_IRQ_TYPE_MASK                0xff
->> +#define KVM_ARM_IRQ_VCPU_SHIFT               16
->> +#define KVM_ARM_IRQ_VCPU_MASK                0xff
->> +#define KVM_ARM_IRQ_NUM_SHIFT                0
->> +#define KVM_ARM_IRQ_NUM_MASK         0xffff
->> +
->> +/* irq_type field */
->> +#define KVM_ARM_IRQ_TYPE_CPU         0
->> +#define KVM_ARM_IRQ_TYPE_SPI         1
->> +#define KVM_ARM_IRQ_TYPE_PPI         2
->> +
->> +/* out-of-kernel GIC cpu interrupt injection irq_number field */
->> +#define KVM_ARM_IRQ_CPU_IRQ          0
->> +#define KVM_ARM_IRQ_CPU_FIQ          1
->> +
->> +/* Highest supported SPI, from VGIC_NR_IRQS */
->> +#define KVM_ARM_IRQ_GIC_MAX          127
+Arnd Bergmann <arnd@arndb.de> writes:
+
+>> Could you please point me to a statement requiring eg. my changes to go
+>> through arm-soc?
 >
-> This define, and those referring to PPIs and SPIs sound highly GIC-specific.
-> Is that really appropriate for kvm.h? Do you mandate a single GIC as the
-> only interrupt controller?
+> We've been doing it like this for some time. Stephen Warren replied
+> to your request to add your tree to linux-next in
 >
-
-you can add a another gic with another in-kernel gic emulation if
-someone makes such one that's different from the vgic specifications
-by defining another irq type.
-
-devices must interact with a gic available in the kernel, so I think
-referring to PPIs and SPIs is very appropriate in kvm.h for a user
-space device emulation that must inject either a PPI or an SPI.
-
-We can call them TYPE_GIC_V2_XXX or something like that if you feel
-this is cleaner.
-
->> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
->> index 6e46541..0f641c1 100644
->> --- a/arch/arm/include/asm/kvm_arm.h
->> +++ b/arch/arm/include/asm/kvm_arm.h
->> @@ -74,6 +74,7 @@
->>  #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
->>                       HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
->>                       HCR_SWIO | HCR_TIDCP)
->> +#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
->>
->>  /* Hyp System Control Register (HSCTLR) bits */
->>  #define HSCTLR_TE    (1 << 30)
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index b97ebd0..8a87fc7 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/fs.h>
->>  #include <linux/mman.h>
->>  #include <linux/sched.h>
->> +#include <linux/kvm.h>
->>  #include <trace/events/kvm.h>
->>
->>  #define CREATE_TRACE_POINTS
->> @@ -271,6 +272,7 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
->>
->>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->>  {
->> +     vcpu->cpu = cpu;
->>  }
->>
->>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->> @@ -311,6 +313,74 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>       return -EINVAL;
->>  }
->>
->> +static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
->> +{
->> +     int bit_index;
->> +     bool set;
->> +     unsigned long *ptr;
->> +
->> +     if (number == KVM_ARM_IRQ_CPU_IRQ)
->> +             bit_index = ffs(HCR_VI) - 1;
->> +     else /* KVM_ARM_IRQ_CPU_FIQ */
->> +             bit_index = ffs(HCR_VF) - 1;
+> http://comments.gmane.org/gmane.linux.kernel/1356118
 >
-> __ffs
+> explaining how it works. Olof sent a mail last week in 
 >
-fixed
+> http://lkml.org/lkml/2012/9/21/31
+>
+> explaining that we're closing the window for 3.7 except for a
+> few things that were already submitted earlier.
 
+No offense, but... You say how does it work for YOU but that's not
+exactly what I'm asking for. I'm asking for a statement that it's not OK
+for me to push my IXP4xx changes straight to Linus.
 
--Christoffer
+> The arm-soc process is definitely meant to make your life easier
+> as well as help Linus understand what's going on with all of ARM
+> to the degree that he needs to know, but it only works if everyone
+> participates.
+
+I'd like to know how is it easier for me. Actually, I think it would
+only make things worse for everyone (mostly for me). Also, I can't see
+how "it only works if everyone participates" is true.
+
+I'm currently supporting (for our internal needs) hw platforms based
+on x86, MIPS and now ARM. I'm using 3.1 (non-trivial upgrades required
+so -ETIME) and 3.5 "stable" trees, and need to also use Linus' current
+tree since it's the next stable. The hw is e.g. Gateworks' platforms
+with code taken from e.g. OpenWRT. I hope to have most of this in Linus'
+tree when it's eventually ready. Unfortunately, I'm just one man, and
+the above is only a slim part of my work. Egoistically, I don't think
+I'm currently willing to spend time with arm-soc tree, if I can't see
+any real technical benefit to anyone.
+
+It would be different if my tree included e.g. core ARM changes - but it
+doesn't. What's the _real_ reason for asking me to push my changes
+indirectly?
+
+Also, not that it's the most important, but how is it better for anyone
+to delay changes - which are completely orthogonal to arm-soc - for
+additional months? Doesn't "release early, release often" make sense
+anymore?
+-- 
+Krzysztof Halasa
