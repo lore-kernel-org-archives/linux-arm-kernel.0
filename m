@@ -1,66 +1,63 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Sat, 29 Sep 2012 16:05:20 +0530
-Subject: [PATCH 2/2] ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
-In-Reply-To: <1348914920-30737-1-git-send-email-avinashphilip@ti.com>
-References: <1348914920-30737-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1348914920-30737-3-git-send-email-avinashphilip@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 29 Sep 2012 14:58:15 +0000
+Subject: ARM SoC tree,
+ Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
+In-Reply-To: <m3lift6rru.fsf_-_@intrepid.localdomain>
+References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+ <1348868177-21205-6-git-send-email-arnd@arndb.de>
+ <m3lift6rru.fsf_-_@intrepid.localdomain>
+Message-ID: <201209291458.16112.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM output from ecap0 uses as backlight source. Also adds low threshold
-value to have a uniform divisions in brightness-levels scales.
+On Saturday 29 September 2012, Krzysztof Halasa wrote:
+> > I realize it won't make 3.7 any more since the base patches are not
+> > in arm-soc, but it's bad if linux-next is broken.
+> 
+> Well, I'm not aware of any requirement to push my IXP4xx changes
+> exclusively through arm-soc. I believe I can still send my tree straight
+> to Linus.
 
-Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
----
-:100644 100644 a5c4c62... 5516098... M	arch/arm/boot/dts/am335x-evm.dts
- arch/arm/boot/dts/am335x-evm.dts |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+No, we don't do that any more, all ARM related changes go either
+through arm-soc (for mach-* and plat-* as well as a few related bits)
+or through Russell's arm tree (for everything else).
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index a5c4c62..5516098 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -24,6 +24,14 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
- 
-+	am33xx_pinmux: pinmux at 44e10800 {
-+		ecap0_pins: backlight_pins {
-+			pinctrl-single,pins = <
-+				0x164 0x0	/* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
-+			>;
-+		};
-+	};
-+
- 	ocp {
- 		uart1: serial at 44e09000 {
- 			status = "okay";
-@@ -75,6 +83,12 @@
- 				reg = <0x48>;
- 			};
- 		};
-+
-+		ecap0: ecap at 48300100 {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ecap0_pins>;
-+		};
- 	};
- 
- 	vbat: fixedregulator at 0 {
-@@ -90,6 +104,13 @@
- 		regulator-name = "lis3_reg";
- 		regulator-boot-on;
- 	};
-+
-+	backlight {
-+		compatible	= "pwm-backlight";
-+		pwms = <&ecap0 0 50000 0>;
-+		brightness-levels = <0 51 53 56 62 75 101 152 255>;
-+		default-brightness-level = <8>;
-+	};
- };
- 
- /include/ "tps65910.dtsi"
--- 
-1.7.0.4
+We can make exceptions for stuff that has interdependencies with other
+subsystems and can Ack patches if you want to have them included in
+another subsystem tree.
+
+> My tree is fairly isolated (with one trivial patch in need of ack from
+> Russell, but I can remove that) and, to be honest, I can't see any
+> benefit to anyone, caused by sending through intermediate trees. In
+> fact, now that I have at last a bit of spare time to work on IXP4xx
+> again (acquired some IXP435 devices), such requirement would only mean
+> extra workload to me.
+> 
+> Could you please point me to a statement requiring eg. my changes to go
+> through arm-soc?
+
+
+We've been doing it like this for some time. Stephen Warren replied
+to your request to add your tree to linux-next in
+
+http://comments.gmane.org/gmane.linux.kernel/1356118
+
+explaining how it works. Olof sent a mail last week in 
+
+http://lkml.org/lkml/2012/9/21/31
+
+explaining that we're closing the window for 3.7 except for a
+few things that were already submitted earlier.
+
+You are definitely welcome to send your pull request for arm-soc
+after the merge window so we can integrate it into the 3.8 series,
+and please send any bug fixes you have for immediate integration
+at any time to arm at kernel.org. There may be a few other things 
+in the process that are new to you, but we can work that out.
+
+The arm-soc process is definitely meant to make your life easier
+as well as help Linus understand what's going on with all of ARM
+to the degree that he needs to know, but it only works if everyone
+participates.
+
+	Arnd
