@@ -1,22 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 29 Sep 2012 21:47:21 +0100
-Subject: s3c2410 bast (== lists.arm.linux.org.uk) - appears to be broken
- with 3.1.8...
-Message-ID: <20120929204721.GB6933@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 29 Sep 2012 13:57:56 -0700
+Subject: [GIT PULL 1/3] omap clock late patches for v3.7 merge window
+In-Reply-To: <5060d05b.c787e50a.133c.67b1SMTPIN_ADDED@mx.google.com>
+References: <5060d05b.c787e50a.133c.67b1SMTPIN_ADDED@mx.google.com>
+Message-ID: <20120929205756.GA12999@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've not been able to get very far with debugging this, because there
-appears to be *multiple* issues here.
+On Mon, Sep 24, 2012 at 02:25:51PM -0700, Tony Lindgren wrote:
+> The following changes since commit 1e2ee2a60df5c3ab74dd1c9155fb01b5bc6f807d:
+> 
+>   Merge tag 'omap-devel-am33xx-for-v3.7' into test_v3.6-rc6_ocb3.7_cff3.7_odaf3.7 (2012-09-23 17:16:04 -0600)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-late-for-v3.7
 
-1. It appears that LZMA fails on this platform.  Gzip'd zImage's also
-   occasionally fail with CRC errors.  ABLE reports loading the right
-   size of image though.
+Merged as late/soc (omap/devel-late) due to the heavy dependencies on other
+branches. I hope we can get it in after the rest goes in.
 
-2. When the decompressor does work, no output from the kernel is
-   forthcoming.  Attempts to use DEBUG_LL have proved fruitless so far
-   because of (1).
 
-I won't be around much for the next week or so, so I won't be able to
-do any debugging.  I suggest those with a S3C2410 platform test out the
-3.x.x kernels and report back successes/failures.
+-Olof
