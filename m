@@ -1,38 +1,79 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 29 Sep 2012 12:35:17 +0200
-Subject: ARM SoC tree, Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
-In-Reply-To: <1348868177-21205-6-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Fri, 28 Sep 2012 23:36:10 +0200")
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-6-git-send-email-arnd@arndb.de>
-Message-ID: <m3lift6rru.fsf_-_@intrepid.localdomain>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Sat, 29 Sep 2012 16:05:19 +0530
+Subject: [PATCH 1/2] ARM: dts: AM33XX: Add ECAP & EHRPWM device tree nodes
+In-Reply-To: <1348914920-30737-1-git-send-email-avinashphilip@ti.com>
+References: <1348914920-30737-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1348914920-30737-2-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Add ECAP and EHRPWM device tree nodes to AM33XX SoC family
+by adding necessary properties like pwm-cells, base reg & set disabled
+as status.
 
-> Krzysztof, please apply in your next branch so this problem goes away in
-> 3.8.
+Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+---
+:100644 100644 a9c885a... 736ba0a... M	arch/arm/boot/dts/am33xx.dtsi
+ arch/arm/boot/dts/am33xx.dtsi |   48 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
 
-Right, I'll look at it.
-
-> I realize it won't make 3.7 any more since the base patches are not
-> in arm-soc, but it's bad if linux-next is broken.
-
-Well, I'm not aware of any requirement to push my IXP4xx changes
-exclusively through arm-soc. I believe I can still send my tree straight
-to Linus.
-
-My tree is fairly isolated (with one trivial patch in need of ack from
-Russell, but I can remove that) and, to be honest, I can't see any
-benefit to anyone, caused by sending through intermediate trees. In
-fact, now that I have at last a bit of spare time to work on IXP4xx
-again (acquired some IXP435 devices), such requirement would only mean
-extra workload to me.
-
-Could you please point me to a statement requiring eg. my changes to go
-through arm-soc?
-
-Thanks.
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index a9c885a..736ba0a 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -313,5 +313,53 @@
+ 			ti,hwmods = "timer7";
+ 			ti,timer-pwm;
+ 		};
++
++		ecap0: ecap at 48300100 {
++			compatible = "ti,am33xx-ecap";
++			#pwm-cells = <3>;
++			reg = <0x48300100 0x80 0x48300000 0x10>;
++			ti,hwmods = "ecap0";
++			status = "disabled";
++		};
++
++		ecap1: ecap at 48302100 {
++			compatible = "ti,am33xx-ecap";
++			#pwm-cells = <3>;
++			reg = <0x48302100 0x80 0x48302000 0x10>;
++			ti,hwmods = "ecap1";
++			status = "disabled";
++		};
++
++		ecap2: ecap at 48304100 {
++			compatible = "ti,am33xx-ecap";
++			#pwm-cells = <3>;
++			reg = <0x48304100 0x80 0x48304000 0x10>;
++			ti,hwmods = "ecap2";
++			status = "disabled";
++		};
++
++		ehrpwm0: ehrpwm at 48300200 {
++			compatible = "ti,am33xx-ehrpwm";
++			#pwm-cells = <3>;
++			reg = <0x48300200 0x100 0x48300000 0x10>;
++			ti,hwmods = "ehrpwm0";
++			status = "disabled";
++		};
++
++		ehrpwm1: ehrpwm at 48302200 {
++			compatible = "ti,am33xx-ehrpwm";
++			#pwm-cells = <3>;
++			reg = <0x48302200 0x100 0x48302000 0x10>;
++			ti,hwmods = "ehrpwm1";
++			status = "disabled";
++		};
++
++		ehrpwm2: ehrpwm at 48304200 {
++			compatible = "ti,am33xx-ehrpwm";
++			#pwm-cells = <3>;
++			reg = <0x48304200 0x100 0x48304000 0x10>;
++			ti,hwmods = "ehrpwm2";
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
-Krzysztof Halasa
+1.7.0.4
