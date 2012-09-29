@@ -1,151 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 28 Sep 2012 23:17:15 -0600
-Subject: [PATCH V2] ARM: bcm2835: implement machine restart hook
-Message-ID: <1348895835-18245-1-git-send-email-swarren@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 29 Sep 2012 07:27:41 +0000
+Subject: [PATCH 08/12] dtc: be more quiet with "make -s"
+In-Reply-To: <50661CC6.2010007@wwwdotorg.org>
+References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+ <1348868177-21205-9-git-send-email-arnd@arndb.de>
+ <50661CC6.2010007@wwwdotorg.org>
+Message-ID: <201209290727.41798.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the machine restart hook using the SoC's watchdog timer module.
-To support this, define a DT binding for the watchdog module, and add it
-to the device tree.
+On Friday 28 September 2012, Stephen Warren wrote:
+> On 09/28/2012 03:36 PM, Arnd Bergmann wrote:
+> > This patch makes dtc not output the message when the "-q" flag is passed,
+> > and ensures that we pass it in both cases.
+> 
+> Just as an FYI, the upstream dtc no longer prints this message, and I
+> just posted a patch to pull that whole upstream dtc into the kernel.
 
-The downstream rpi-split branch contains a full watchdog timer driver
-implementation, which also implements the restart hook. However, the
-restart function is largely separate from the watchdog driver, so for
-simplicity, the restart hook is implemented here directly in the main
-machine source file.
+Ok, excellent!
 
-Overall structure (separate setup/restart) functions derived from the
-picoxcell ARM support.
+Michal, please ignore my patch then.
 
-Watchdog register IO sequence taken from code by Simon Arlott. Note that
-the watchdog module is not documented in BCM2835-ARM-Peripherals.pdf.
-
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
-v2:
-* s/-wdog/-wdt/ in compatible value given precedent in other bindings.
-* Fix node name in DT binding example.
----
- .../bindings/watchdog/brcm,bcm2835-pm-wdog.txt     |   13 ++++++
- arch/arm/boot/dts/bcm2835.dtsi                     |    5 +++
- arch/arm/mach-bcm2835/bcm2835.c                    |   46 ++++++++++++++++++++
- 3 files changed, 64 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
-
-diff --git a/Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt b/Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
-new file mode 100644
-index 0000000..d209366
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
-@@ -0,0 +1,13 @@
-+BCM2835 Watchdog timer
-+
-+Required properties:
-+
-+- compatible : should be "brcm,bcm2835-pm-wdt"
-+- reg : Specifies base physical address and size of the registers.
-+
-+Example:
-+
-+watchdog {
-+	compatible = "brcm,bcm2835-pm-wdt";
-+	reg = <0x7e100000 0x28>;
-+};
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 0b61939..5c5cbaf 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -29,6 +29,11 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		watchdog {
-+			compatible = "brcm,bcm2835-pm-wdt";
-+			reg = <0x7e100000 0x28>;
-+		};
-+
- 		uart at 20201000 {
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
-diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
-index f6fea49..c4dd210 100644
---- a/arch/arm/mach-bcm2835/bcm2835.c
-+++ b/arch/arm/mach-bcm2835/bcm2835.c
-@@ -12,8 +12,10 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/irqchip/bcm2835.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/bcm2835_timer.h>
- #include <linux/clk/bcm2835.h>
-@@ -23,6 +25,48 @@
- 
- #include <mach/bcm2835_soc.h>
- 
-+#define PM_RSTC				0x1c
-+#define PM_WDOG				0x24
-+
-+#define PM_PASSWORD			0x5a000000
-+#define PM_RSTC_WRCFG_MASK		0x00000030
-+#define PM_RSTC_WRCFG_FULL_RESET	0x00000020
-+
-+static void __iomem *wdt_regs;
-+
-+/*
-+ * The machine restart method can be called from an atomic context so we won't
-+ * be able to ioremap the regs then.
-+ */
-+static void bcm2835_setup_restart(void)
-+{
-+	struct device_node *np = of_find_compatible_node(NULL, NULL,
-+						"brcm,bcm2835-pm-wdt");
-+	if (WARN(!np, "unable to setup watchdog restart"))
-+		return;
-+
-+	wdt_regs = of_iomap(np, 0);
-+	WARN(!wdt_regs, "failed to remap watchdog regs");
-+}
-+
-+static void bcm2835_restart(char mode, const char *cmd)
-+{
-+	u32 val;
-+
-+	if (!wdt_regs)
-+		return;
-+
-+	/* use a timeout of 10 ticks (~150us) */
-+	writel_relaxed(10 | PM_PASSWORD, wdt_regs + PM_WDOG);
-+	val = readl_relaxed(wdt_regs + PM_RSTC);
-+	val &= ~PM_RSTC_WRCFG_MASK;
-+	val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
-+	writel_relaxed(val, wdt_regs + PM_RSTC);
-+
-+	/* No sleeping, possibly atomic. */
-+	mdelay(1);
-+}
-+
- static struct map_desc io_map __initdata = {
- 	.virtual = BCM2835_PERIPH_VIRT,
- 	.pfn = __phys_to_pfn(BCM2835_PERIPH_PHYS),
-@@ -39,6 +83,7 @@ void __init bcm2835_init(void)
- {
- 	int ret;
- 
-+	bcm2835_setup_restart();
- 	bcm2835_init_clocks();
- 
- 	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
-@@ -60,5 +105,6 @@ DT_MACHINE_START(BCM2835, "BCM2835")
- 	.handle_irq = bcm2835_handle_irq,
- 	.init_machine = bcm2835_init,
- 	.timer = &bcm2835_timer,
-+	.restart = bcm2835_restart,
- 	.dt_compat = bcm2835_compat
- MACHINE_END
--- 
-1.7.9.5
+	Arnd
