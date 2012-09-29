@@ -1,36 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Sep 2012 14:30:39 -0700
-Subject: [GIT PULL] ARM: LPC32xx: Core updates #2
-In-Reply-To: <50616AD5.3010104@antcom.de>
-References: <50616AD5.3010104@antcom.de>
-Message-ID: <20120929213039.GI12999@quad.lixom.net>
+Date: Sat, 29 Sep 2012 14:32:45 -0700
+Subject: [GIT PULL] ep93xx-fixes for 3.7
+In-Reply-To: <50638DE6.8010801@gmail.com>
+References: <50638DE6.8010801@gmail.com>
+Message-ID: <20120929213245.GJ12999@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 10:27:01AM +0200, Roland Stigge wrote:
-> Hi Arnd and Olof,
+On Thu, Sep 27, 2012 at 09:21:10AM +1000, Ryan Mallon wrote:
+> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 > 
-> this is a second round of mach-lpc32xx specific updates for 3.7. Below,
-> the core branch.
-> 
-> Thanks,
-> 
-> Roland
-> 
-> 
-> The following changes since commit 7a5deff68f9e0a1db170ac9dd3b2b4aaddc1b80c:
-> 
->   ARM: LPC32xx: Remove board specific GPIO init (2012-09-06 11:39:29 +0200)
+>   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.antcom.de/linux-2.6.git lpc32xx/core
+>   git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.7
 > 
-> for you to fetch changes up to 8e4b97e3b8fd6a7f86bf8b38e7975549f2c48a78:
+> for you to fetch changes up to e4d4a9027877593d80d71e8a93e39670b1881627:
 > 
->   ARM: LPC32xx: Support GPI 28 (2012-09-25 10:19:23 +0200)
+>   ARM: ep93xx: Move ts72xx.h out of include/mach (2012-09-17 09:09:08 +1000)
+> 
 
-Thanks, pulled on top of previous lpc32xx/core branch.
+Thanks, pulled into ep93xx/fixes-non-critical.
 
 
 -Olof
