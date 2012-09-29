@@ -1,125 +1,130 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Sat, 29 Sep 2012 09:33:11 +0000
-Subject: [PATCH V2 0/7] ARM: OMAP2+: Add device-tree support for timers
-In-Reply-To: <50661B07.1040200@ti.com>
-References: <1347579091-3794-1-git-send-email-jon-hunter@ti.com>
- <505A7E0B.30709@ti.com> <20120920235309.GO28835@atomide.com>
- <5063330E.3000203@ti.com> <5065F19E.5020708@ti.com> <50661B07.1040200@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAEB9C6@DBDE01.ent.ti.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 29 Sep 2012 11:02:06 +0100
+Subject: [PATCH 07/12] staging/iio/lis3l02dq: fix building without
+ irq_to_gpio
+In-Reply-To: <1348868177-21205-8-git-send-email-arnd@arndb.de>
+References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+ <1348868177-21205-8-git-send-email-arnd@arndb.de>
+Message-ID: <5066C71E.9030302@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2012 at 03:17:51, Hunter, Jon wrote:
+On 09/28/2012 10:36 PM, Arnd Bergmann wrote:
+> The driver has not been building for some time after the
+> irq_to_gpio function has been removed from the kernel.
 > 
-> On 09/28/2012 01:51 PM, Vaibhav Hiremath wrote:
-> > 
-> > 
-> > On 9/26/2012 10:23 PM, Jon Hunter wrote:
-> >>
-> >> On 09/20/2012 06:53 PM, Tony Lindgren wrote:
-> >>> * Benoit Cousson <b-cousson@ti.com> [120919 19:24]:
-> >>>> Hi Tony,
-> >>>>
-> >>>> I was about to take the DTS patch, but was wondering if you will pull
-> >>>> the driver changes for 3.7.
-> >>>
-> >>> I suggest that you do a separate branch on top of Paul's hwmod series
-> >>> when he posts those if that works for you?
-> >>
-> >> Benoit, I see that you have pulled in the DTS patch.
-> >>
-> >> Do you guys want me to rebase the remaining patches with Rob's change on
-> >> Tony's master branch and re-submit?
-> >>
-> > 
-> > Jon,
-> > 
-> > Sorry for delayed response, But I tried using your omap_test application
-> > to validate this patch series, but it is failing for me.
-> > 
-> > How did you test it? Are you running same test application at your end?
+> The only board in the upstream kernel that provides
+> this device is the "Stargate 2", which is also maintained
+> by Jonathan Cameron. Rather than working around the problem
+> by adding new platform data for this driver, this patch
+> uses the of_gpio framework to get to the gpio number.
 > 
-> Sorry, I now see you are using the latest test code! I was too hasty
-> when I saw the first error ;-)
-> 
+> However, the stargate2 code does not (yet) use DT based
+> probing, so it is still broken, but at least building
+> allyesconfig works again.
+Will be optimistic to think anyone will convert a platform
+that no one still makes (stargate 2 was pretty much intel
+research only + some they gave to accademics - imote2 has
+been dropped by memsic for a while now.)  If nothing else
+there is little chance anyone will bother porting a remotely
+up to date bootloader to these boards given how few people
+are still using them for anything.
 
-Jon, have patience ;-)
-I understand, sometimes it happens un-intentionally.
+I'm happy enough with this patch.  Would prefer to
+take it post merge window as a fix than now given timing.
 
-> > I am debugging this issue, i just thought I should tell you this before
-> > its too late.
-> 
-> Thanks.
-> 
-> > Below is the log -
-> > 
-> > [root at arago /]# echo 3 > /tmp/omap-test/timer/one
-> > [   79.612223] omap_dm_timer_request_specific: Please use
-> > omap_dm_timer_request_by_cap()
-> > [   79.620636] Timer 3 not available!
-> 
-> This is expected because omap_dm_timer_request_specific() is no longer
-> supported. I should remove in the omap-test/timer/one going forward.
-> 
-> > [root at arago /]#
-> > [root at arago /]# echo 3 > /tmp/omap-test/timer/all
-> > [  135.111949] Testing 48042000.timer with 24000000 Hz clock ...
-> > [root at arago /]# [  137.457389] Timer read test PASSED! No errors, 100 loops
-> > [  137.463267] Timer interrupt test PASSED!
-> > [  137.467650] Testing 48042000.timer with 32768 Hz clock ...
-> > [  139.816892] Timer read test PASSED! No errors, 100 loops
-> > [  139.830776] Timer interrupt test PASSED!
-> > [  139.835245] Testing 48044000.timer with 24000000 Hz clock ...
-> > [  142.183912] Timer read test PASSED! No errors, 100 loops
-> > [  142.189734] Timer interrupt test PASSED!
-> > [  142.194076] Testing 48044000.timer with 32768 Hz clock ...
-> > [  144.543451] Timer read test PASSED! No errors, 100 loops
-> > [  144.557334] Timer interrupt test PASSED!
-> > [  144.561806] Testing 48046000.timer with 24000000 Hz clock ...
-> > [  146.910469] Timer read test PASSED! No errors, 100 loops
-> > [  147.910493] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-> > [  147.917598] Testing 48046000.timer with 32768 Hz clock ...
-> > [  150.262203] Timer read test PASSED! No errors, 100 loops
-> > [  151.262049] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-> > [  151.269298] Testing 48048000.timer with 24000000 Hz clock ...
-> > [  153.613596] Timer read test PASSED! No errors, 100 loops
-> > [  154.613618] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-> > [  154.620725] Testing 48048000.timer with 32768 Hz clock ...
-> > [  156.965324] Timer read test PASSED! No errors, 100 loops
-> > [  157.965176] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-> > [  157.972419] Testing 4804a000.timer with 24000000 Hz clock ...
-> > 
-> > [root at arago /]# [  160.316753] Timer read test PASSED! No errors, 100 loops
-> > 
-> > [root at arago /]# [  161.316728] Timer interrupt test FAILED! No interrupt
-> > occurred in 1 sec
-> > [  161.323912] Testing 4804a000.timer with 32768 Hz clock ...
-> > 
-> > [root at arago /]# [  163.668490] Timer read test PASSED! No errors, 100 loops
-> > [  164.668328] Timer interrupt test FAILED! No interrupt occurred in 1 sec
-> > [  164.675545] Tested 5 timers, skipped 6 timers and detected 6 errors
-> > [  164.682202] Test iteration 0 complete in 29 secs
-> > [  164.687104] Test summary: Iterations 1, Errors 6
-> 
-> What is interesting is that it is the interrupt test that is failing for
-> timers 5-7. Any chance there is a problem with the interrupt mapping? I
-> checked the documentation for AM335x and I don't see anything obvious
-> that is wrong with the binding unless the documentation itself is wrong.
-> 
-> Given that the interrupts work on timers 3 and 4 it appears to be a
-> interrupt configuration problem somewhere. We could adapt the test to
-> see if an interrupt is pending in the timer peripheral when it fails.
-> This would tell us that the timer is working but the interrupt is not
-> being enabled correctly in the interrupt controller.
-> 
+Long run this driver will hopefully get replaced by the
+unified driver for all the st accelerometers (assuming that
+ever gets back to this long obsolete part).
 
-I am also surprised to see this, and as you mentioned, nothing I looks 
-obviously wrong to me in  timer5-7. 
-I have to debug this further and will keep you updated.
+Thanks for the patch Arnd, I've been ignoring this one on
+the basis it would go away for far too long. Sorry about that!
 
-Thanks,
-Vaibhav
-
-> Cheers
-> Jon
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Lars-Peter Clausen <lars@metafoo.de>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>  drivers/staging/iio/accel/lis3l02dq.h      |    1 +
+>  drivers/staging/iio/accel/lis3l02dq_core.c |   10 ++++++----
+>  drivers/staging/iio/accel/lis3l02dq_ring.c |    2 +-
+>  3 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/staging/iio/accel/lis3l02dq.h b/drivers/staging/iio/accel/lis3l02dq.h
+> index f9bcd41..2bac722 100644
+> --- a/drivers/staging/iio/accel/lis3l02dq.h
+> +++ b/drivers/staging/iio/accel/lis3l02dq.h
+> @@ -158,6 +158,7 @@ struct lis3l02dq_state {
+>  	struct spi_device		*us;
+>  	struct iio_trigger		*trig;
+>  	struct mutex			buf_lock;
+> +	int				gpio;
+>  	bool				trigger_on;
+>  
+>  	u8	tx[LIS3L02DQ_MAX_RX] ____cacheline_aligned;
+> diff --git a/drivers/staging/iio/accel/lis3l02dq_core.c b/drivers/staging/iio/accel/lis3l02dq_core.c
+> index 21b0469..d13c7e9 100644
+> --- a/drivers/staging/iio/accel/lis3l02dq_core.c
+> +++ b/drivers/staging/iio/accel/lis3l02dq_core.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  #include <linux/gpio.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/mutex.h>
+>  #include <linux/device.h>
+>  #include <linux/kernel.h>
+> @@ -690,6 +691,7 @@ static int __devinit lis3l02dq_probe(struct spi_device *spi)
+>  	spi_set_drvdata(spi, indio_dev);
+>  
+>  	st->us = spi;
+> +	st->gpio = of_get_gpio(spi->dev.of_node, 0);
+>  	mutex_init(&st->buf_lock);
+>  	indio_dev->name = spi->dev.driver->name;
+>  	indio_dev->dev.parent = &spi->dev;
+> @@ -711,7 +713,7 @@ static int __devinit lis3l02dq_probe(struct spi_device *spi)
+>  		goto error_unreg_buffer_funcs;
+>  	}
+>  
+> -	if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0) {
+> +	if (spi->irq) {
+>  		ret = request_threaded_irq(st->us->irq,
+>  					   &lis3l02dq_th,
+>  					   &lis3l02dq_event_handler,
+> @@ -738,10 +740,10 @@ static int __devinit lis3l02dq_probe(struct spi_device *spi)
+>  	return 0;
+>  
+>  error_remove_trigger:
+> -	if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)))
+> +	if (spi->irq)
+>  		lis3l02dq_remove_trigger(indio_dev);
+>  error_free_interrupt:
+> -	if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0)
+> +	if (spi->irq)
+>  		free_irq(st->us->irq, indio_dev);
+>  error_uninitialize_buffer:
+>  	iio_buffer_unregister(indio_dev);
+> @@ -790,7 +792,7 @@ static int __devexit lis3l02dq_remove(struct spi_device *spi)
+>  	lis3l02dq_disable_all_events(indio_dev);
+>  	lis3l02dq_stop_device(indio_dev);
+>  
+> -	if (spi->irq && gpio_is_valid(irq_to_gpio(spi->irq)) > 0)
+> +	if (spi->irq)
+>  		free_irq(st->us->irq, indio_dev);
+>  
+>  	lis3l02dq_remove_trigger(indio_dev);
+> diff --git a/drivers/staging/iio/accel/lis3l02dq_ring.c b/drivers/staging/iio/accel/lis3l02dq_ring.c
+> index fa4190d..13c0b4b 100644
+> --- a/drivers/staging/iio/accel/lis3l02dq_ring.c
+> +++ b/drivers/staging/iio/accel/lis3l02dq_ring.c
+> @@ -263,7 +263,7 @@ static int lis3l02dq_trig_try_reen(struct iio_trigger *trig)
+>  	/* If gpio still high (or high again)
+>  	 * In theory possible we will need to do this several times */
+>  	for (i = 0; i < 5; i++)
+> -		if (gpio_get_value(irq_to_gpio(st->us->irq)))
+> +		if (gpio_get_value(st->gpio))
+>  			lis3l02dq_read_all(indio_dev, NULL);
+>  		else
+>  			break;
 > 
