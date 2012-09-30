@@ -1,27 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 30 Sep 2012 23:43:33 +0200
-Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-In-Reply-To: <20120930101418.GF6933@n2100.arm.linux.org.uk>
+Date: Sun, 30 Sep 2012 23:46:55 +0200
+Subject: [PATCH 2/3] Revert "spi/pl022: enable runtime PM"
+In-Reply-To: <1348831266-16721-3-git-send-email-ulf.hansson@stericsson.com>
 References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
- <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdb+bnCzYV2Dzqou5kGyc1hrh0VT-pYXZm1auu4uik2GNg@mail.gmail.com>
- <20120930101418.GF6933@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdaJx7sccJmCRhndGHz+NY9iUv39B2jmNb6DLC5WQuj5_g@mail.gmail.com>
+ <1348831266-16721-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdbuTnx4vDutbtNBmehPwVzRAKWAVOisM==jHVGnDZoACQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2012 at 12:14 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Fri, Sep 28, 2012 at 1:21 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-> The real answer is to revert both commits to get the driver back to a
-> sane state, before then progressing with the driver in a sane manner.
-> This is what Ulf is doing.
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> This reverts commit 2fb30d1147c599f5657e8c62c862f9a0f58d9d99.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Aha, mea culpa.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-For all of them, I'll read up on this exploding backlog and then Ulf
-will hammer me at the office until I understand this stuff properly...
-
-Yours,
+Thanks for fixing my stupid mistakes ...
 Linus Walleij
