@@ -1,47 +1,47 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Sun, 30 Sep 2012 09:53:42 +1000
-Subject: [PATCH 1/1] Fix segfault in DTC
-In-Reply-To: <5065F4FD.4010807@wwwdotorg.org>
-References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
- <20120925233054.GL9800@truffula.fritz.box>
- <50624393.30607@broadcom.com>
- <20120926003508.GB31993@truffula.fritz.box>
- <50632F78.4030709@broadcom.com> <5065D9C7.40906@wwwdotorg.org>
- <E1THfgr-0006Fg-KT@jdl.com> <5065F4FD.4010807@wwwdotorg.org>
-Message-ID: <20120929235342.GA23078@truffula.fritz.box>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 30 Sep 2012 09:01:36 +0100
+Subject: [GIT PULL] ARM: mvebu: cache-l2x0 DT for v3.7
+In-Reply-To: <20120930035503.GB477@quad.lixom.net>
+References: <20120930015012.GB17765@titan.lakedaemon.net>
+ <20120930035503.GB477@quad.lixom.net>
+Message-ID: <20120930080136.GE6933@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
-> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
-> >>>
-> >>> Yeah, seems like the kernel DTC is quite old.
-> >>
-> >> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
+On Sat, Sep 29, 2012 at 08:55:03PM -0700, Olof Johansson wrote:
+> On Sat, Sep 29, 2012 at 09:50:12PM -0400, Jason Cooper wrote:
+> > Depends:
+> >  - Based on arm-soc/late/kirkwood
+> >  - Patches going through rmk's patch tracker:
+> >     - arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
+> >     - arm: cache-l2x0: add an optional register to save/restore
+> >     - arm: cache-l2x0: add support for Aurora L2 cache ctrl
 > > 
-> > Awesome.  Thank you.
+> >     - feature-use dependency only.  No build breakage or failed boot
+> >       should occur.  Until patches from rmk's tracker land, driver
+> >       won't know about compatible property, so it's like the driver
+> >       isn't there.
 > > 
-> >> I've run a regression test vs. the old dtc in the kernel ...
-> > 
-> > Which is the icky step.  Again, thank you.
-> > 
-> >> ... and found that
-> >> some of the PowerPC .dts files don't compile with the new dtc (but did
-> >> with the old), all due to non-existent labels/paths being referenced.
-> >> I'll try and track down whether this is a regression in dtc, or simply
-> >> buggy .dts files that weren't noticed before.
-> > 
-> > I think you should just smack the PowerPC guys. :-)
+> > Adds:
+> >  - cache-l2x0 DT entry for Marvell Armada (mvebu) SoCs
 > 
-> For the record in this thread, it was a regression I introduced into dtc
-> - the patch I just sent was for this.
+> Hi Jason,
+> 
+> I'd prefer to hold off on this until we know that Russell is happy with
+> the l2x0 changes, just in case this part of the series might need revising
+> (i.e.  bindings changes). Please resend when he has picked them up!
 
-I would be nice to add a testcase for this regression into dtc.
+Well, there's no patches ever existing in the patch tracker with a
+summary line as you list above - here are the last three containing
+"l2x0":
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+   7398/1? l2x0: only write to debug         3.4-rc3?      20 Apr Applied?
+           registers on PL310                              2012?
+   7429/1? cache-l2x0: add a const qualifier 3.4?          22 Jun Discarded?
+                                                           2012?
+   7507/1? cache-l2x0.c: save the final aux  3.6-rc4?      03 Sep Applied?
+           ctrl value for resuming                         2012?
+
+and it's probably now too late as I'm not going to be able to apply
+any patches for the rest of the week, and as the -rc's have been
+released over the weekend, we could see -final today.
