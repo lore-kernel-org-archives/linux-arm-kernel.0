@@ -1,33 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 30 Sep 2012 10:37:39 +0200
-Subject: [PATCH 2/3] clk: ux500: Support prcmu ape opp voltage clock
-In-Reply-To: <CAPDyKFq=kF3n7kiFUhv+6KkVdi99G+0aHOFVNMLPRO60jpEoBg@mail.gmail.com>
-References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
- <1348497799-32143-3-git-send-email-ulf.hansson@stericsson.com>
- <20120924153514.12878.47739@nucleus>
- <CAPDyKFqKUuqEj7yWGMPnFUvE2-kBExevweMdGAdD1EjhHSEwsQ@mail.gmail.com>
- <20120926192532.12878.56719@nucleus>
- <CAPDyKFq=kF3n7kiFUhv+6KkVdi99G+0aHOFVNMLPRO60jpEoBg@mail.gmail.com>
-Message-ID: <CACRpkdZHveqq-o48wd7+aLhG02sQTOu6myBX69FNRn8xEus+PQ@mail.gmail.com>
+Date: Sun, 30 Sep 2012 10:44:17 +0200
+Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+In-Reply-To: <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdb+bnCzYV2Dzqou5kGyc1hrh0VT-pYXZm1auu4uik2GNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 9:43 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Fri, Sep 28, 2012 at 1:21 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-> In my case for ux500 we use the mmci host driver. It is an ARM cross
-> SoC device driver, and I believe adding clock notifiers in the driver
-> to handle the voltage scale would complicate things quite a bit. It
-> seems a lot easier to let the clock driver handle this, especially
-> since the frequency will remain fixed after initialization. So in the
-> end I see now need and benefit for adding the clock notifiers in the
-> mmci host driver.
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Right now it certainly cannot be done anyway, because some of the
-clients to this driver does not implement the generic clock framework,
-and thus it just won't compile anymore for them if we introduce that.
+Why?
 
-The patch does raise the issue of how to handle OPP requests
-though.
+It was removed in this commit, is it wrong?
+
+Author: Michel JAOUEN <michel.jaouen@stericsson.com>
+Date:   Fri Aug 17 17:28:41 2012 +0200
+
+    spi/pl022: fix spi-pl022 pm enable at probe
+
+    amba drivers does not need to enable pm runtime at probe.
+    amba_probe already enables pm runtime.
+
+    This rids this warning in the ux500 boot log:
+    ssp-pl022 ssp0: Unbalanced pm_runtime_enable!
+
+    Signed-off-by: Michel JAOUEN <michel.jaouen@stericsson.com>
+    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+    Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
 Yours,
 Linus Walleij
