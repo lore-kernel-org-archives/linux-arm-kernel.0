@@ -1,21 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 30 Sep 2012 23:39:42 +0200
-Subject: [PATCH 10/12] gpio: pcf857x: select IRQ_DOMAIN
-In-Reply-To: <1348868177-21205-11-git-send-email-arnd@arndb.de>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-11-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdYjCQd91O=G9bnZNGtqBjKzwXN1JedLfvPU_Uq4LXboPw@mail.gmail.com>
+Date: Sun, 30 Sep 2012 23:43:33 +0200
+Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+In-Reply-To: <20120930101418.GF6933@n2100.arm.linux.org.uk>
+References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdb+bnCzYV2Dzqou5kGyc1hrh0VT-pYXZm1auu4uik2GNg@mail.gmail.com>
+ <20120930101418.GF6933@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdaJx7sccJmCRhndGHz+NY9iUv39B2jmNb6DLC5WQuj5_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 11:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Sun, Sep 30, 2012 at 12:14 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-> Patch 6e20a0a4 "gpio: pcf857x: enable gpio_to_irq() support"
-> added IRQ domain support to the pcf857x driver, but some configurations
-> (e.g. davinci_all_defconfig) don't already enable CONFIG_IRQ_DOMAIN.
+> The real answer is to revert both commits to get the driver back to a
+> sane state, before then progressing with the driver in a sane manner.
+> This is what Ulf is doing.
 
-Excellent patch Arnd thanks for this!
-Applied to my GPIO tree (where the offending patch is queued).
+Aha, mea culpa.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+For all of them, I'll read up on this exploding backlog and then Ulf
+will hammer me at the office until I understand this stuff properly...
 
 Yours,
 Linus Walleij
