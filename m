@@ -1,23 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 30 Sep 2012 11:17:29 -0700
-Subject: [GIT PULL 2/3] omap platform and board related late patches
- for v3.7 merge window
-In-Reply-To: <20120929210324.GC12999@quad.lixom.net>
-References: <pull-1348521952-285145> <E1TGGAI-0000D1-T0@merlin.infradead.org>
- <20120925003953.GQ28835@atomide.com>
- <20120925033136.GS28835@atomide.com>
- <20120929210324.GC12999@quad.lixom.net>
-Message-ID: <20120930181728.GH4840@atomide.com>
+From: tim01@iss.tu-darmstadt.de (Tim Sander)
+Date: Sun, 30 Sep 2012 21:14:49 +0200
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <20120930082802.GA15392@netboy.at.omicron.at>
+References: <20120930082802.GA15392@netboy.at.omicron.at>
+Message-ID: <201209302114.52140.tim01@iss.tu-darmstadt.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [120929 14:04]:
-> 
-> Thanks, pulled this on top of the previous cleanup-headers.
-> 
-> In the future, feel free to remove the tag that you don't want me to pull from
-> the repo so I don't accidentally pull it anyway.
+Hi Richard
+> Does any vanilla kernel even boot on this board?
+> If so, which ones, and how?
+http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status#AM335x_Linux_Status
 
-OK thanks will do.
+It seems we are not there yet :-(.
 
-Tony
+Best regards
+Tim
