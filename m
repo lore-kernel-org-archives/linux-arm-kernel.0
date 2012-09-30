@@ -1,70 +1,78 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 30 Sep 2012 12:50:42 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <CAOY=C6GG6jqqEAAGJjmDG-BFT2eq=9+ck+F_EOcthRgDCDv8=Q@mail.gmail.com>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
- <CAOY=C6GG6jqqEAAGJjmDG-BFT2eq=9+ck+F_EOcthRgDCDv8=Q@mail.gmail.com>
-Message-ID: <50682402.8020402@antcom.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 30 Sep 2012 13:48:58 +0100
+Subject: [PATCH 09/15] KVM: ARM: Inject IRQs and FIQs from userspace
+In-Reply-To: <CANM98qJ5PJZ3KAgxvizqHC2Q0OmkGvVjrRkhO511OvwpMvGgzQ@mail.gmail.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153527.21241.61813.stgit@ubuntu>
+ <20120925155505.GD28728@mudshark.cambridge.arm.com>
+ <CANM98qJ5PJZ3KAgxvizqHC2Q0OmkGvVjrRkhO511OvwpMvGgzQ@mail.gmail.com>
+Message-ID: <20120930124858.GA18755@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/12 11:35, Stijn Devriendt wrote:
-> In our kernel tree we have similar code. If you like I can request
-> permission
-> to share. I can, however, already give you an update on the basic
-> structure, perhaps
-> it's useful now.
+Hi Christoffer,
+
+On Sat, Sep 29, 2012 at 04:50:25PM +0100, Christoffer Dall wrote:
+> On Tue, Sep 25, 2012 at 11:55 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Sep 15, 2012 at 04:35:27PM +0100, Christoffer Dall wrote:
+> >> diff --git a/arch/arm/include/asm/kvm.h b/arch/arm/include/asm/kvm.h
+> >> index a13b582..131e632 100644
+> >> --- a/arch/arm/include/asm/kvm.h
+> >> +++ b/arch/arm/include/asm/kvm.h
+> >> @@ -22,6 +22,7 @@
+> >>  #include <asm/types.h>
+> >>
+> >>  #define __KVM_HAVE_GUEST_DEBUG
+> >> +#define __KVM_HAVE_IRQ_LINE
+> >>
+> >>  #define KVM_REG_SIZE(id)                                             \
+> >>       (1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+> >> @@ -85,4 +86,24 @@ struct kvm_reg_list {
+> >>  #define KVM_REG_ARM_CORE             (0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+> >>  #define KVM_REG_ARM_CORE_REG(name)   (offsetof(struct kvm_regs, name) / 4)
+> >>
+> >> +/* KVM_IRQ_LINE irq field index values */
+> >> +#define KVM_ARM_IRQ_TYPE_SHIFT               24
+> >> +#define KVM_ARM_IRQ_TYPE_MASK                0xff
+> >> +#define KVM_ARM_IRQ_VCPU_SHIFT               16
+> >> +#define KVM_ARM_IRQ_VCPU_MASK                0xff
+> >> +#define KVM_ARM_IRQ_NUM_SHIFT                0
+> >> +#define KVM_ARM_IRQ_NUM_MASK         0xffff
+> >> +
+> >> +/* irq_type field */
+> >> +#define KVM_ARM_IRQ_TYPE_CPU         0
+> >> +#define KVM_ARM_IRQ_TYPE_SPI         1
+> >> +#define KVM_ARM_IRQ_TYPE_PPI         2
+> >> +
+> >> +/* out-of-kernel GIC cpu interrupt injection irq_number field */
+> >> +#define KVM_ARM_IRQ_CPU_IRQ          0
+> >> +#define KVM_ARM_IRQ_CPU_FIQ          1
+> >> +
+> >> +/* Highest supported SPI, from VGIC_NR_IRQS */
+> >> +#define KVM_ARM_IRQ_GIC_MAX          127
+> >
+> > This define, and those referring to PPIs and SPIs sound highly GIC-specific.
+> > Is that really appropriate for kvm.h? Do you mandate a single GIC as the
+> > only interrupt controller?
+> >
 > 
-> For the first part, the drivers need to implement a the gpio interface
-> for groups.
-> gpio_set_multi, gpio_get_multi, gpio_direction_input_multi,
-> gpio_direction_output_multi. Each of them gets a 'u32 mask'.
+> you can add a another gic with another in-kernel gic emulation if
+> someone makes such one that's different from the vgic specifications
+> by defining another irq type.
 > 
-> Secondly, gpiolib gets some new code to handle groups:
-> groups are requested via a list of gpio ids. Mind that order is respected:
-> request( [1, 5, 2, 4] ) followed by a set(0x5) will translate to
-> gpio_set_multi( 0x18 ). An opaque gpio_group struct is used to keep track.
-> This means the gpiolib interface also has a u32 mask, but translation is
-> done for the gpio-drivers.
+> devices must interact with a gic available in the kernel, so I think
+> referring to PPIs and SPIs is very appropriate in kvm.h for a user
+> space device emulation that must inject either a PPI or an SPI.
 > 
-> There is some code to request groups via device-tree (again respecting
-> order)
-> and there are also platform driver structures.
-> 
-> gpiolib was also extended to export groups into sysfs, respecting policy
-> (input, output, user-selectable) and to make softlinks to groups in other
-> driver's subdir. (One driver we use this in is a power-sequencer with 2
-> gpios selecting a margining profile, this driver then has the gpio_group
-> exported in it's sysfs dir as .../profile, allowing H/W engineers to select
-> the profile without voltage glitches)
-> 
-> There's also a separate driver, that does nothing more than exporting
-> both individual pins and groups to userspace based on platform description
-> or devicetree. This is probably less interesting for mainline, since we're
-> abusing device-tree to do away with some init script that can do the same.
-> 
-> The rationale behind a 32bit mask is that typical processors can at most
-> set one processor-word worth of GPIOs at once and there are probably
-> few chips with over 32GPIOs on a single gpio_chip anyway.
-> Nevertheless, in the era of 64bit, it's definitely possible to go for
-> u64 instead.
+> We can call them TYPE_GIC_V2_XXX or something like that if you feel
+> this is cleaner.
 
-Hi Stijn,
+It's more that the GIC isn't really part of the architecture, so it would be
+cleaner to have the GIC-specifics separated out from the architectural part
+of KVM. That will also make it easier when adding support for future
+versions of the GIC.
 
-thank you for your notes!
+If core KVM needs the concept of a per-cpu interrupt, just call it
+IRQ_TYPE_PERCPU or something rather than PPI.
 
-Besides what I discussed with JC and Linus, I find the unsigned int
-(i.e. u32 or u64, depending on the arch) quite appealing. It is a nice
-compromise between my general bit mapped data model (variable size *u8
-array) and the bool *values list. Even maps easily onto a single sysfs
-entry for values, by abstracting a gpio list to an actual data word.
-
-What do others think? JC? Linus? I'm considering this (unsigned int
-data) a valid option.
-
-One question: How did you solve the one-value-per-file in the sysfs
-interface?
-
-Thanks in advance!
-
-Roland
+Will
