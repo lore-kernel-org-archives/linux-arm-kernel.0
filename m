@@ -1,59 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 30 Sep 2012 11:14:18 +0100
-Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-In-Reply-To: <CACRpkdb+bnCzYV2Dzqou5kGyc1hrh0VT-pYXZm1auu4uik2GNg@mail.gmail.com>
-References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
- <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdb+bnCzYV2Dzqou5kGyc1hrh0VT-pYXZm1auu4uik2GNg@mail.gmail.com>
-Message-ID: <20120930101418.GF6933@n2100.arm.linux.org.uk>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 30 Sep 2012 12:34:55 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <20120929195754.GC17667@game.jcrosoft.org>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <20120928024744.GV17667@game.jcrosoft.org> <50654E57.3080201@antcom.de>
+ <20120928075145.GW17667@game.jcrosoft.org> <50656522.1050900@antcom.de>
+ <20120928090848.GX17667@game.jcrosoft.org>
+ <20120928102822.GY17667@game.jcrosoft.org> <50658AD0.1050501@antcom.de>
+ <20120928160105.GA17667@game.jcrosoft.org> <5065ED4F.5070700@antcom.de>
+ <20120929195754.GC17667@game.jcrosoft.org>
+Message-ID: <5068204F.6090606@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2012 at 10:44:17AM +0200, Linus Walleij wrote:
-> On Fri, Sep 28, 2012 at 1:21 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On 29/09/12 21:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> Problem here is that it's only an intermediate format since hardware
+>> often needs special preparation of the data.
+>>
+>> But will evaluate what makes most sense.
+> the key point here is to avoid to manipualte data each time we call
+> gpio_block_set
 > 
-> > From: Ulf Hansson <ulf.hansson@linaro.org>
-> >
-> > This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
-> >
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> Why?
-> 
-> It was removed in this commit, is it wrong?
+> hardware specific will have to be handle at driver level
 
-Linus, please read the previous thread on pl022.
+Understand, thanks! I'm just trying to prevent overly complex API because:
 
-The long and short of it is that your commit 2fb30d1147c599f5657e8c62c862f9a0f58d9d99
-(spi/pl022: enable runtime PM) is totally broken, and Michel came along
-trying to fix the resulting breakage by partially removing your commit
-in 6887237cd7da904184dab2750504040c68f3a080 (spi/pl022: fix spi-pl022
-pm enable at probe).
+* In our discussed scheme, the driver still needs to convert the data bits
+* In practice, the block gpio API is especially useful for use on single
+gpio_chips (only there, a real simultaneous i/o is possible anyway)
+* Wouldn't introduce this kind of optimization in lack of measurable
+improvement
+* The actual i/o data bits still need handling, generating a bit CPU
+load anyway.
 
-The reason why your commit is wrong is:
+Trying to provide as simple API as possible.
 
-                pm_runtime_get_noresume(dev);
-                pm_runtime_set_active(dev);
-                pm_runtime_enable(dev);
-
-                ret = pcdrv->probe(pcdev, id);
-
-So, adding this in spi-pl022 probe:
-
-+       pm_runtime_enable(dev);
-+       pm_runtime_resume(dev);
-
-makes the sequence:
-
-	pm_runtime_get_noresume(dev);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
-	pm_runtime_enable(dev);
-	pm_runtime_resume(dev);
-
-which is absolute rubbish.  Your commit should never have gone into any
-tree.
-
-The real answer is to revert both commits to get the driver back to a
-sane state, before then progressing with the driver in a sane manner.
-This is what Ulf is doing.
+Roland
