@@ -1,54 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 30 Sep 2012 18:47:22 +0200
-Subject: [PATCH 6/6] usb: dwc3: core: add dt support for dwc3 core
-In-Reply-To: <1348836795-4783-7-git-send-email-kishon@ti.com>
-References: <1348836795-4783-1-git-send-email-kishon@ti.com>
- <1348836795-4783-7-git-send-email-kishon@ti.com>
-Message-ID: <5068779A.20402@mvista.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 30 Sep 2012 19:01:59 +0200
+Subject: ARM SoC tree,
+ Was: Re: [PATCH 05/12] ARM: ixp4xx: use __iomem for MMIO
+In-Reply-To: <20120929215355.GD6933@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 29 Sep 2012 22:53:55 +0100")
+References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
+ <1348868177-21205-6-git-send-email-arnd@arndb.de>
+ <m3lift6rru.fsf_-_@intrepid.localdomain>
+ <201209291458.16112.arnd@arndb.de>
+ <m3y5jskbir.fsf@intrepid.localdomain>
+ <20120929174400.GA6933@n2100.arm.linux.org.uk>
+ <m3pq54jyqw.fsf@intrepid.localdomain>
+ <20120929215355.GD6933@n2100.arm.linux.org.uk>
+Message-ID: <m3vcevtpfc.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-On 28-09-2012 14:53, Kishon Vijay Abraham I wrote:
-
-> Added dwc3 support for dwc3 core and update the documentation with
-> device tree binding information.
+>> Note I'm not only doing ARM, but also X86 and MIPS, with additional code
+>> shared between them, and the "stable" part of it is what I'm paid for.
+>> I can't simply work with arm-soc, none of my platforms will even boot
+>> with pure arm-soc.
 >
-> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
-[...]
+> I'm assuming that Linus' -rc kernels work for you, yes?
 
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index 08a5738..0c17a7a 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-[...]
-> @@ -602,11 +601,22 @@ static int __devexit dwc3_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id of_dwc3_matach[] = {
+No, but it's OK :-)
 
-     I guess you meant 'of_dwc3_match' here and below?
+I meant I need additional code for a) ARM and MIPS-based boards (off the
+shelf by Ubiquity, Gateworks etc., support ported mostly from OpenWRT),
+b) custom hardware used only by us.
 
+I hope to eventually submit a) upstream, then arm-soc and Linus' trees
+would work for me. I know it's a mess, but for now I have no options.
 
-> +	{
-> +		.compatible = "synopsis,dwc3"
-> +	},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, of_dwc3_matach);
-> +#endif
-> +
->   static struct platform_driver dwc3_driver = {
->   	.probe		= dwc3_probe,
->   	.remove		= __devexit_p(dwc3_remove),
->   	.driver		= {
->   		.name	= "dwc3",
-> +		.of_match_table	= of_match_ptr(of_dwc3_matach),
->   	},
->   };
->   
-
-WBR, Sergei
+BTW the situation with hardware supported only by OpenWRT is a part of
+the equation.
+-- 
+Krzysztof Halasa
