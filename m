@@ -1,39 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 30 Sep 2012 10:44:17 +0200
-Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-In-Reply-To: <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
- <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdb+bnCzYV2Dzqou5kGyc1hrh0VT-pYXZm1auu4uik2GNg@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Sun, 30 Sep 2012 10:48:48 +0100
+Subject: [kvmarm] [PATCH 10/15] KVM: ARM: World-switch implementation
+In-Reply-To: <CANM98q+gBZ-msYxp=aOhHLJboweuJ35CQQ602gcqE7-PjsYe-A@mail.gmail.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153533.21241.82489.stgit@ubuntu>
+ <20120925170031.GF28728@mudshark.cambridge.arm.com>
+ <CAFEAcA-69tmRdZkZ9dsSk9ck-AC7tKmYvxyxGGVA6ocKDRB25A@mail.gmail.com>
+ <2f4c4963f36aabf6e5f48ad42bf145f2@localhost>
+ <CANM98q+gBZ-msYxp=aOhHLJboweuJ35CQQ602gcqE7-PjsYe-A@mail.gmail.com>
+Message-ID: <CAFEAcA_=Lk7yUep6h+S=p9URT4jNqq2wVBjN8cALPPGV=A5+1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 1:21 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On 30 September 2012 01:33, Christoffer Dall
+<c.dall@virtualopensystems.com> wrote:
+> On Tue, Sep 25, 2012 at 1:42 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Well, we're still in HYP mode when performing the pop, so the VMID is
+>> pretty much irrelevant. Same for the initial push, actually. As long as
+>> we're sure VTTBR has been updated when we do the exception return, I think
+>> we're safe.
+>>
+> yeah we're safe, but I can't find anywhere that says the ISB is
+> implied from exception handling/hvc, even though I seem to recall
+> having read this, so I put this here not to worry other readers.
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+"TLB maintenance operations and the memory order model" in section
+B3.10.1 of the ARM ARM says that exception entry forces completion of
+TLB maintenance ops. Section B5.6.3 ("Synchronization of changes to
+system control registers") says that taking an exception synchronizes
+context, so the VTTBR update is guaranteed to have happened.
 
-Why?
-
-It was removed in this commit, is it wrong?
-
-Author: Michel JAOUEN <michel.jaouen@stericsson.com>
-Date:   Fri Aug 17 17:28:41 2012 +0200
-
-    spi/pl022: fix spi-pl022 pm enable at probe
-
-    amba drivers does not need to enable pm runtime at probe.
-    amba_probe already enables pm runtime.
-
-    This rids this warning in the ux500 boot log:
-    ssp-pl022 ssp0: Unbalanced pm_runtime_enable!
-
-    Signed-off-by: Michel JAOUEN <michel.jaouen@stericsson.com>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-    Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-Yours,
-Linus Walleij
+-- PMM
