@@ -1,86 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 29 Sep 2012 22:23:59 -0400
-Subject: [PATCH] ATA: sata_mv: Fix warnings when no PCI
-In-Reply-To: <1348844650-2957-1-git-send-email-andrew@lunn.ch>
-References: <1348844650-2957-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20120930022359.GC17765@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 29 Sep 2012 20:55:03 -0700
+Subject: [GIT PULL] ARM: mvebu: cache-l2x0 DT for v3.7
+In-Reply-To: <20120930015012.GB17765@titan.lakedaemon.net>
+References: <20120930015012.GB17765@titan.lakedaemon.net>
+Message-ID: <20120930035503.GB477@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeff,
+On Sat, Sep 29, 2012 at 09:50:12PM -0400, Jason Cooper wrote:
+> Depends:
+>  - Based on arm-soc/late/kirkwood
+>  - Patches going through rmk's patch tracker:
+>     - arm: cache-l2x0: make outer_cache_fns a field of l2x0_of_data
+>     - arm: cache-l2x0: add an optional register to save/restore
+>     - arm: cache-l2x0: add support for Aurora L2 cache ctrl
+> 
+>     - feature-use dependency only.  No build breakage or failed boot
+>       should occur.  Until patches from rmk's tracker land, driver
+>       won't know about compatible property, so it's like the driver
+>       isn't there.
+> 
+> Adds:
+>  - cache-l2x0 DT entry for Marvell Armada (mvebu) SoCs
 
-Would you like to take this through your tree?  If not, I'll take it
-through my kirkwood tree with your Ack.  Either is fine with me.
+Hi Jason,
 
-thx,
+I'd prefer to hold off on this until we know that Russell is happy with
+the l2x0 changes, just in case this part of the series might need revising
+(i.e.  bindings changes). Please resend when he has picked them up!
 
-Jason.
 
-On Fri, Sep 28, 2012 at 05:04:10PM +0200, Andrew Lunn wrote:
-> Dove can be configured with PCI. We then get a number of warnings:
-> 
-> warning: 'msi' defined but not used
-> warning: 'mv5_sht' defined but not used
-> warning: 'mv_dump_pci_cfg' defined but not used.
-> 
-> Move around variables and add #ifdef as necassary to fix the warnings.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  drivers/ata/sata_mv.c |    8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-> index 311be18..68f4fb5 100644
-> --- a/drivers/ata/sata_mv.c
-> +++ b/drivers/ata/sata_mv.c
-> @@ -79,8 +79,8 @@
->   * module options
->   */
->  
-> -static int msi;
->  #ifdef CONFIG_PCI
-> +static int msi;
->  module_param(msi, int, S_IRUGO);
->  MODULE_PARM_DESC(msi, "Enable use of PCI MSI (0=off, 1=on)");
->  #endif
-> @@ -652,12 +652,13 @@ static u8 mv_sff_check_status(struct ata_port *ap);
->   * because we have to allow room for worst case splitting of
->   * PRDs for 64K boundaries in mv_fill_sg().
->   */
-> +#ifdef CONFIG_PCI
->  static struct scsi_host_template mv5_sht = {
->  	ATA_BASE_SHT(DRV_NAME),
->  	.sg_tablesize		= MV_MAX_SG_CT / 2,
->  	.dma_boundary		= MV_DMA_BOUNDARY,
->  };
-> -
-> +#endif
->  static struct scsi_host_template mv6_sht = {
->  	ATA_NCQ_SHT(DRV_NAME),
->  	.can_queue		= MV_MAX_Q_DEPTH - 1,
-> @@ -1252,7 +1253,7 @@ static void mv_dump_mem(void __iomem *start, unsigned bytes)
->  	}
->  }
->  #endif
-> -
-> +#if defined(ATA_DEBUG) || defined(CONFIG_PCI)
->  static void mv_dump_pci_cfg(struct pci_dev *pdev, unsigned bytes)
->  {
->  #ifdef ATA_DEBUG
-> @@ -1269,6 +1270,7 @@ static void mv_dump_pci_cfg(struct pci_dev *pdev, unsigned bytes)
->  	}
->  #endif
->  }
-> +#endif
->  static void mv_dump_all_regs(void __iomem *mmio_base, int port,
->  			     struct pci_dev *pdev)
->  {
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+
+-Olof
