@@ -1,53 +1,56 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Sat, 29 Sep 2012 20:33:51 -0400
-Subject: [kvmarm] [PATCH 10/15] KVM: ARM: World-switch implementation
-In-Reply-To: <2f4c4963f36aabf6e5f48ad42bf145f2@localhost>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153533.21241.82489.stgit@ubuntu>
- <20120925170031.GF28728@mudshark.cambridge.arm.com>
- <CAFEAcA-69tmRdZkZ9dsSk9ck-AC7tKmYvxyxGGVA6ocKDRB25A@mail.gmail.com>
- <2f4c4963f36aabf6e5f48ad42bf145f2@localhost>
-Message-ID: <CANM98q+gBZ-msYxp=aOhHLJboweuJ35CQQ602gcqE7-PjsYe-A@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 29 Sep 2012 20:55:48 -0400
+Subject: [GIT PULL V2] dove late fixes for v3.7
+In-Reply-To: <20120929210915.GE12999@quad.lixom.net>
+References: <20120925020716.GY5469@titan.lakedaemon.net>
+ <20120929210915.GE12999@quad.lixom.net>
+Message-ID: <20120930005548.GN13343@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 1:42 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Tue, 25 Sep 2012 18:15:50 +0100, Peter Maydell
-> <peter.maydell@linaro.org> wrote:
->> On 25 September 2012 18:00, Will Deacon <will.deacon@arm.com> wrote:
->>> On Sat, Sep 15, 2012 at 04:35:33PM +0100, Christoffer Dall wrote:
->>>>  ENTRY(__kvm_tlb_flush_vmid)
->>>> +       hvc     #0                      @ Switch to Hyp mode
->>>> +       push    {r2, r3}
->>>> +
->>>> +       add     r0, r0, #KVM_VTTBR
->>>> +       ldrd    r2, r3, [r0]
->>>> +       mcrr    p15, 6, r2, r3, c2      @ Write VTTBR
->>>> +       isb
->>>> +       mcr     p15, 0, r0, c8, c3, 0   @ TLBIALLIS (rt ignored)
->>>> +       dsb
->>>> +       isb
->>>> +       mov     r2, #0
->>>> +       mov     r3, #0
->>>> +       mcrr    p15, 6, r2, r3, c2      @ Back to VMID #0
->>>> +       isb
->>>
->>> Do you need this isb, given that you're about to do an hvc?
->>>
->>>> +       pop     {r2, r3}
->>>> +       hvc     #0                      @ Back to SVC
->>>>         bx      lr
->>
->> ...you probably don't want to do the memory accesses involved
->> in the 'pop' under the wrong VMID ?
->
-> Well, we're still in HYP mode when performing the pop, so the VMID is
-> pretty much irrelevant. Same for the initial push, actually. As long as
-> we're sure VTTBR has been updated when we do the exception return, I think
-> we're safe.
->
-yeah we're safe, but I can't find anywhere that says the ISB is
-implied from exception handling/hvc, even though I seem to recall
-having read this, so I put this here not to worry other readers.
+On Sat, Sep 29, 2012 at 02:09:15PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Sep 24, 2012 at 10:07:16PM -0400, Jason Cooper wrote:
+> > Depends:
+> >  - Based against arm-soc/for-next
+> 
+> Unfortunately this won't work. The arm-soc for-next branch is not a stable
+> branch, it's the aggregate where we merge in the contents of different next/*
+> branches for staging, but the branch itself doesn't get sent upstream.
+> 
+> Can you rebase this branch against something that makes more sense? Ideally the
+> branch that introduced the breakage, since that will minimize the upstream
+> exposure to the bugs.
 
--Christoffer
+Ok, since you merged all of the kirkwood/mvebu stuff into one branch, I
+based against that (arm-soc/late/kirkwood).
+
+---
+Depends:
+ - Based against arm-soc/late/kirkwood
+ - Latest changes to arch/arm/mm/cache-tauros2.c
+    c2b7e05 ARM: cache: add dt support for tauros2 cache
+
+Misc. fixes for latest changes to mach-dove/
+Fixes build breakage for mach-dove
+
+The following changes since commit 46f2007c1efadfa4071c17e75f140c47f09293de:
+
+  ARM: mvebu: fix build breaks from multi-platform conversion (2012-09-28 22:27:07 +0200)
+
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux.git dove/late-fixes
+
+Sebastian Hesselbarth (6):
+      ARM: dove: Add pcie clock support
+      ARM: dove: Fix tauros2 device tree init
+      ARM: dove: Fix clock names of sata and gbe
+      ARM: dove: Restructure SoC device tree descriptor
+      ARM: dove: Remove watchdog from DT
+      ARM: dove: Add crypto engine to DT
+
+ arch/arm/boot/dts/dove.dtsi |   49 ++++++++++++++++++++++++++++---------------
+ arch/arm/mach-dove/common.c |    8 +++---
+ arch/arm/mach-dove/pcie.c   |    5 ++++
+ 3 files changed, 41 insertions(+), 21 deletions(-)
