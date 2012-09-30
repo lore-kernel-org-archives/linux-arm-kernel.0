@@ -1,18 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 30 Sep 2012 10:27:21 +0200
-Subject: [PATCH 2/2] gpio: Document device_node's det_debounce
-In-Reply-To: <1348559774-15484-2-git-send-email-stigge@antcom.de>
-References: <1348559774-15484-1-git-send-email-stigge@antcom.de>
- <1348559774-15484-2-git-send-email-stigge@antcom.de>
-Message-ID: <CACRpkdYbRu5=9vDPQWOfOeO_o4gu+KyH5GNU-naDU2P0dzK5sg@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sun, 30 Sep 2012 10:28:02 +0200
+Subject: Booting vanilla kernel on the beaglebone
+Message-ID: <20120930082802.GA15392@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 9:56 AM, Roland Stigge <stigge@antcom.de> wrote:
 
-> This patch adds documentation for set_debounce in struct device_node.
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+I just received by very own beaglebone, and I would like to add PTP
+hardware clock support for the CPTS unit, but I naturally want to do
+this with the latest mainstream kernel and not the hacked up arago 3.2
+kernel that ships with the board.
 
-Applied, thanks!
-Linus Walleij
+Does any vanilla kernel even boot on this board?
+If so, which ones, and how?
+
+I have tried a few variations of kernel/u-boot without any luck.
+The u-boot that came with the board is
+
+  U-Boot 2011.09-00000-gf63b270-dirty (Apr 24 2012 - 09:51:01)
+  arm-angstrom-linux-gnueabi-gcc (GCC) 4.5.4 20120305 (prerelease)
+  GNU ld (GNU Binutils) 2.20.1.20100303
+
+and I also tried the latest version:
+
+  U-Boot 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
+  arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2009q1-203) 4.3.3
+  GNU ld (Sourcery G++ Lite 2009q1-203) 2.19.51.20090205
+
+Thanks,
+Richard
