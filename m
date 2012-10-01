@@ -1,284 +1,185 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 01 Oct 2012 05:09:59 -0400
-Subject: [PATCH v2 00/14] KVM/ARM Implementation
-Message-ID: <20121001090945.49198.68950.stgit@ubuntu>
+Date: Mon, 01 Oct 2012 05:10:06 -0400
+Subject: [PATCH v2 01/14] ARM: Add page table and page defines needed by KVM
+In-Reply-To: <20121001090945.49198.68950.stgit@ubuntu>
+References: <20121001090945.49198.68950.stgit@ubuntu>
+Message-ID: <20121001091006.49198.57708.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series implements KVM support for ARM processors,
-specifically on the Cortex A-15 platform.  We feel this is ready to be
-merged.
+KVM uses the stage-2 page tables and the Hyp page table format,
+so we define the fields and page protection flags needed by KVM.
 
-Work is done in collaboration between Columbia University, Virtual Open
-Systems and ARM/Linaro.
+The nomenclature is this:
+ - page_hyp:        PL2 code/data mappings
+ - page_hyp_device: PL2 device mappings (vgic access)
+ - page_s2:         Stage-2 code/data page mappings
+ - page_s2_device:  Stage-2 device mappings (vgic access)
 
-The patch series applies to Linux 3.6 with a number of merges:
- 1. git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-        branch: hyp-mode-boot-next (e5a04cb0b4a)
- 2. git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-        branch: timers-next (437814c44c)
- 3. git://git.kernel.org/pub/scm/virt/kvm/kvm.git
-        branch: next (1e08ec4a)
-
-This is Version 12 of the patch series, the first 10 versions were
-reviewed on the KVM/ARM and KVM mailing lists. Changes can also be
-pulled from:
-    git://github.com/virtualopensystems/linux-kvm-arm.git
-        branch: kvm-arm-v12
-        branch: kvm-arm-v12-vgic
-        branch: kvm-arm-v12-vgic-timers
-
-A non-flattened edition of the patch series, which can always be merged,
-can be found at:
- git://github.com/virtualopensystems/linux-kvm-arm.git kvm-arm-master
-
-This patch series requires QEMU compatibility.  Use the branch
- git://github.com/virtualopensystems/qemu.git kvm-arm
-
-Following this patch series, which implements core KVM support are two
-other patch series implementing Virtual Generic Interrupt Controller
-(VGIC) support and Architected Generic Timers.  All three patch series
-should be applied for full QEMU compatibility.
-
-The implementation is broken up into a logical set of patches, the first
-are preparatory patches:
-  1. ARM: Add page table defines for KVM
-  3. ARM: Section based HYP idmaps
-  3. ARM: Factor out cpuid implementor and part_number fields
-
-The main implementation is broken up into separate patches, the first
-containing a skeleton of files, makefile changes, the basic user space
-interface and KVM architecture specific stubs.  Subsequent patches
-implement parts of the system as listed:
-  4. Skeleton and reset hooks
-  5. Hypervisor initialization
-  6. Memory virtualization setup (hyp mode mappings and 2nd stage)
-  7. Inject IRQs and FIQs from userspace
-  8. World-switch implementation and Hyp exception vectors
-  9. Emulation framework and coproc emulation
- 10. Coproc user space API
- 11. Demux multiplexed coproc registers
- 12. User spac API to get/set VFP registers
- 13. Handle guest user memory aborts
- 14. Handle guest MMIO aborts
-
-Testing:
- Tested on FAST Models and Versatile Express test-chip2.  Tested by
- running three simultaenous VMs, all running SMP, on an SMP host, each
- VM running hackbench and cyclictest and with extreme memory pressure
- applied to the host with swapping enabled to provoke page eviction.
- Also tested KSM merging and GCC inside VMs.  Fully boots both Ubuntu
- (user space Thumb-2) and Debian (user space ARM) guests.
-
-For a guide on how to set up a testing environment and try out these
-patches, see:
- http://www.virtualopensystems.com/media/pdf/kvm-arm-guide.pdf
-
-Changes since v11:
- - Memory setup and page table defines reworked
- - We do not export unused perf bitfields anymore
- - No module support anymore and following cleanup
- - Hide vcpu register accessors
- - Fix unmap range mmu notifier race condition
- - Factored out A15 coprocs in separate file
- - Factored out world-switch assembly macros to separate file
- - Add dmux of multiplexed coprocs to user space
- - Add VFP get/set interface to user space
- - Addressed various cleanup comments from reviewers
-
-Changes since v10:
- - Boot in Hyp mode and user HVC to initialize HVBAR
- - Support VGIC
- - Support Arch timers
- - Support Thumb-2 mmio instruction decoding
- - Transition to GET_ONE/SET_ONE register API
- - Added KVM_VCPU_GET_REG_LIST
- - New interrupt injection API
- - Don't pin guest pages anymore
- - Fix race condition in page fault handler
- - Cleanup guest instruction copying.
- - Fix race when copying SMP guest instructions
- - Inject data/prefetch aborts when guest does something strange
-
-Changes since v9:
- - Addressed reviewer comments (see mailing list archive)
- - Limit the user of .arch_extensiion sec/virt for compilers that need them
- - VFP/Neon Support (Antonios Motakis)
- - Run exit handling under preemption and still handle guest cache ops
- - Add support for IO mapping at Hyp level (VGIC prep)
- - Add support for IO mapping at Guest level (VGIC prep)
- - Remove backdoor call to irq_svc
- - Complete rework of CP15 handling and register reset (Rusty Russell)
- - Don't use HSTR for anything else than CR 15
- - New ioctl to set emulation target core (only A15 supported for now)
- - Support KVM_GET_MSRS / KVM_SET_MSRS
- - Add page accounting and page table eviction
- - Change pgd lock to spinlock and fix sleeping in atomic bugs
- - Check kvm_condition_valid for HVC traps of undefs
- - Added a naive implementation of kvm_unmap_hva_range
-
-Changes since v8:
- - Support cache maintenance on SMP through set/way
- - Hyp mode idmaps are now section based and happen at kernel init
- - Handle aborts in Hyp mode
- - Inject undefined exceptions into the guest on error
- - Kernel-side reset of all crucial registers
- - Specifically state which target CPU is being virtualized
- - Exit statistics in debugfs
- - Some L2CTLR cp15 emulation cleanups
- - Support spte_hva for MMU notifiers and take write faults
- - FIX: Race condition in VMID generation
- - BUG: Run exit handling code with disabled preemption
- - Save/Restore abort fault register during world switch
-
-Changes since v7:
- - Traps accesses to ACTLR
- - Do not trap WFE execution
- - Upgrade barriers and TLB operations to inner-shareable domain
- - Restrucure hyp_pgd related code to be more opaque
- - Random SMP fixes
- - Random BUG fixes
- - Improve commenting
- - Support module loading/unloading of KVM/ARM
- - Thumb-2 support for host kernel and KVM
- - Unaligned cross-page wide guest Thumb instruction fetching
- - Support ITSTATE fields in CPSR for Thumb guests
- - Document HCR settings
-
-Changes since v6:
- - Support for MMU notifiers to not pin user pages in memory
- - Suport build with log debugging
- - Bugfix: v6 clobbered r7 in init code
- - Simplify hyp code mapping
- - Cleanup of register access code
- - Table-based CP15 emulation from Rusty Russell
- - Various other bug fixes and cleanups
-
-Changes since v5:
- - General bugfixes and nit fixes from reviews
- - Implemented re-use of VMIDs
- - Cleaned up the Hyp-mapping code to be readable by non-mm hackers
-   (including myself)
- - Integrated preliminary SMP support in base patches
- - Lock-less interrupt injection and WFI support
- - Fixed signal-handling in while in guest (increases overall stability)
-
-Changes since v4:
- - Addressed reviewer comments from v4
-    * cleanup debug and trace code
-    * remove printks
-    * fixup kvm_arch_vcpu_ioctl_run
-    * add trace details to mmio emulation
- - Fix from Marc Zyngier: Move kvm_guest_enter/exit into non-preemptible
-   section (squashed into world-switch patch)
- - Cleanup create_hyp_mappings/remove_hyp_mappings from Marc Zyngier
-   (squashed into hypervisor initialization patch)
- - Removed the remove_hyp_mappings feature. Removing hypervisor mappings
-   could potentially unmap other important data shared in the same page.
- - Removed the arm_ prefix from the arch-specific files.
- - Initial SMP host/guest support
-
-Changes since v3:
- - v4 actually works, fully boots a guest
- - Support compiling as a module
- - Use static inlines instead of macros for vcpu_reg and friends
- - Optimize kvm_vcpu_reg function
- - Use Ftrace for trace capabilities
- - Updated documentation and commenting
- - Use KVM_IRQ_LINE instead of KVM_INTERRUPT
- - Emulates load/store instructions not supported through HSR
-  syndrome information.
- - Frees 2nd stage translation tables on VM teardown
- - Handles IRQ/FIQ instructions
- - Handles more CP15 accesses
- - Support guest WFI calls
- - Uses debugfs instead of /proc
- - Support compiling in Thumb mode
-
-Changes since v2:
- - Performs world-switch code
- - Maps guest memory using 2nd stage translation
- - Emulates co-processor 15 instructions
- - Forwards I/O faults to QEMU.
-
+Christoffer Dall <c.dall@virtualopensystems.com>
 ---
+ arch/arm/include/asm/pgtable-3level.h |   18 ++++++++++++++++++
+ arch/arm/include/asm/pgtable.h        |    7 +++++++
+ arch/arm/mm/mmu.c                     |   25 +++++++++++++++++++++++++
+ 3 files changed, 50 insertions(+)
 
-Christoffer Dall (13):
-      ARM: Add page table and page defines needed by KVM
-      ARM: Section based HYP idmap
-      ARM: Factor out cpuid implementor and part number
-      KVM: ARM: Initial skeleton to compile KVM support
-      KVM: ARM: Hypervisor inititalization
-      KVM: ARM: Memory virtualization setup
-      KVM: ARM: Inject IRQs and FIQs from userspace
-      KVM: ARM: World-switch implementation
-      KVM: ARM: Emulation framework and CP15 emulation
-      KVM: ARM: User space API for getting/setting co-proc registers
-      KVM: ARM: Demux CCSIDR in the userspace API
-      KVM: ARM: Handle guest faults in KVM
-      KVM: ARM: Handle I/O aborts
-
-Rusty Russell (1):
-      KVM: ARM: VFP userspace interface
-
-
- Documentation/virtual/kvm/api.txt           |  133 +++
- arch/arm/Kconfig                            |    2 
- arch/arm/Makefile                           |    1 
- arch/arm/include/asm/cputype.h              |   26 +
- arch/arm/include/asm/idmap.h                |    5 
- arch/arm/include/asm/kvm.h                  |  131 +++
- arch/arm/include/asm/kvm_arm.h              |  191 +++++
- arch/arm/include/asm/kvm_asm.h              |   84 ++
- arch/arm/include/asm/kvm_coproc.h           |   47 +
- arch/arm/include/asm/kvm_emulate.h          |   90 ++
- arch/arm/include/asm/kvm_host.h             |  154 ++++
- arch/arm/include/asm/kvm_mmu.h              |   49 +
- arch/arm/include/asm/pgtable-3level-hwdef.h |    5 
- arch/arm/include/asm/pgtable-3level.h       |   18 
- arch/arm/include/asm/pgtable.h              |    7 
- arch/arm/kernel/asm-offsets.c               |   24 +
- arch/arm/kernel/perf_event.c                |   30 -
- arch/arm/kernel/vmlinux.lds.S               |    6 
- arch/arm/kvm/Kconfig                        |   45 +
- arch/arm/kvm/Makefile                       |   22 +
- arch/arm/kvm/arm.c                          |  964 +++++++++++++++++++++++++
- arch/arm/kvm/coproc.c                       | 1045 +++++++++++++++++++++++++++
- arch/arm/kvm/coproc.h                       |  153 ++++
- arch/arm/kvm/coproc_a15.c                   |  164 ++++
- arch/arm/kvm/emulate.c                      |  847 ++++++++++++++++++++++
- arch/arm/kvm/guest.c                        |  222 ++++++
- arch/arm/kvm/init.S                         |  126 +++
- arch/arm/kvm/interrupts.S                   |  537 ++++++++++++++
- arch/arm/kvm/interrupts_head.S              |  293 ++++++++
- arch/arm/kvm/mmu.c                          | 1013 ++++++++++++++++++++++++++
- arch/arm/kvm/reset.c                        |   74 ++
- arch/arm/kvm/trace.h                        |  217 ++++++
- arch/arm/mm/idmap.c                         |   74 ++
- arch/arm/mm/mmu.c                           |   25 +
- include/linux/kvm.h                         |    3 
- mm/memory.c                                 |    2 
- 36 files changed, 6793 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm/include/asm/kvm.h
- create mode 100644 arch/arm/include/asm/kvm_arm.h
- create mode 100644 arch/arm/include/asm/kvm_asm.h
- create mode 100644 arch/arm/include/asm/kvm_coproc.h
- create mode 100644 arch/arm/include/asm/kvm_emulate.h
- create mode 100644 arch/arm/include/asm/kvm_host.h
- create mode 100644 arch/arm/include/asm/kvm_mmu.h
- create mode 100644 arch/arm/kvm/Kconfig
- create mode 100644 arch/arm/kvm/Makefile
- create mode 100644 arch/arm/kvm/arm.c
- create mode 100644 arch/arm/kvm/coproc.c
- create mode 100644 arch/arm/kvm/coproc.h
- create mode 100644 arch/arm/kvm/coproc_a15.c
- create mode 100644 arch/arm/kvm/emulate.c
- create mode 100644 arch/arm/kvm/guest.c
- create mode 100644 arch/arm/kvm/init.S
- create mode 100644 arch/arm/kvm/interrupts.S
- create mode 100644 arch/arm/kvm/interrupts_head.S
- create mode 100644 arch/arm/kvm/mmu.c
- create mode 100644 arch/arm/kvm/reset.c
- create mode 100644 arch/arm/kvm/trace.h
-
--- 
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index b249035..eaba5a4 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -102,11 +102,29 @@
+  */
+ #define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
+ 
++/*
++ * 2nd stage PTE definitions for LPAE.
++ */
++#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
++#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
++#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
++#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
++#define L_PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
++
++/*
++ * Hyp-mode PL2 PTE definitions for LPAE.
++ */
++#define L_PTE_HYP		L_PTE_USER
++
+ #ifndef __ASSEMBLY__
+ 
+ #define pud_none(pud)		(!pud_val(pud))
+ #define pud_bad(pud)		(!(pud_val(pud) & 2))
+ #define pud_present(pud)	(pud_val(pud))
++#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++						 PMD_TYPE_TABLE)
++#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++						 PMD_TYPE_SECT)
+ 
+ #define pud_clear(pudp)			\
+ 	do {				\
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 41dc31f..cb8a72c 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -70,6 +70,9 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+ 
+ extern pgprot_t		pgprot_user;
+ extern pgprot_t		pgprot_kernel;
++extern pgprot_t		pgprot_hyp_device;
++extern pgprot_t		pgprot_s2;
++extern pgprot_t		pgprot_s2_device;
+ 
+ #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
+ 
+@@ -82,6 +85,10 @@ extern pgprot_t		pgprot_kernel;
+ #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+ #define PAGE_KERNEL_EXEC	pgprot_kernel
++#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
++#define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
++#define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
+ 
+ #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN)
+ #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index c2fa21d..40d4dc1 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -56,43 +56,61 @@ static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
+ static unsigned int ecc_mask __initdata = 0;
+ pgprot_t pgprot_user;
+ pgprot_t pgprot_kernel;
++pgprot_t pgprot_hyp_device;
++pgprot_t pgprot_s2;
++pgprot_t pgprot_s2_device;
+ 
+ EXPORT_SYMBOL(pgprot_user);
+ EXPORT_SYMBOL(pgprot_kernel);
++EXPORT_SYMBOL(pgprot_hyp_device);
++EXPORT_SYMBOL(pgprot_s2);
++EXPORT_SYMBOL(pgprot_s2_device);
+ 
+ struct cachepolicy {
+ 	const char	policy[16];
+ 	unsigned int	cr_mask;
+ 	pmdval_t	pmd;
+ 	pteval_t	pte;
++	pteval_t	pte_s2;
+ };
+ 
++#ifdef CONFIG_ARM_LPAE
++#define s2_policy(policy)	policy
++#else
++#define s2_policy(policy)	0
++#endif
++
+ static struct cachepolicy cache_policies[] __initdata = {
+ 	{
+ 		.policy		= "uncached",
+ 		.cr_mask	= CR_W|CR_C,
+ 		.pmd		= PMD_SECT_UNCACHED,
+ 		.pte		= L_PTE_MT_UNCACHED,
++		.pte_s2		= s2_policy(L_PTE_S2_MT_UNCACHED),
+ 	}, {
+ 		.policy		= "buffered",
+ 		.cr_mask	= CR_C,
+ 		.pmd		= PMD_SECT_BUFFERED,
+ 		.pte		= L_PTE_MT_BUFFERABLE,
++		.pte_s2		= s2_policy(L_PTE_S2_MT_UNCACHED),
+ 	}, {
+ 		.policy		= "writethrough",
+ 		.cr_mask	= 0,
+ 		.pmd		= PMD_SECT_WT,
+ 		.pte		= L_PTE_MT_WRITETHROUGH,
++		.pte_s2		= s2_policy(L_PTE_S2_MT_WRITETHROUGH),
+ 	}, {
+ 		.policy		= "writeback",
+ 		.cr_mask	= 0,
+ 		.pmd		= PMD_SECT_WB,
+ 		.pte		= L_PTE_MT_WRITEBACK,
++		.pte_s2		= s2_policy(L_PTE_S2_MT_WRITEBACK),
+ 	}, {
+ 		.policy		= "writealloc",
+ 		.cr_mask	= 0,
+ 		.pmd		= PMD_SECT_WBWA,
+ 		.pte		= L_PTE_MT_WRITEALLOC,
++		.pte_s2		= s2_policy(L_PTE_S2_MT_WRITEBACK),
+ 	}
+ };
+ 
+@@ -309,6 +327,7 @@ static void __init build_mem_type_table(void)
+ 	struct cachepolicy *cp;
+ 	unsigned int cr = get_cr();
+ 	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
++	pteval_t hyp_device_pgprot, s2_pgprot, s2_device_pgprot;
+ 	int cpu_arch = cpu_architecture();
+ 	int i;
+ 
+@@ -420,6 +439,8 @@ static void __init build_mem_type_table(void)
+ 	 */
+ 	cp = &cache_policies[cachepolicy];
+ 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
++	s2_pgprot = cp->pte_s2;
++	hyp_device_pgprot = s2_device_pgprot = mem_types[MT_DEVICE].prot_pte;
+ 
+ 	/*
+ 	 * Enable CPU-specific coherency if supported.
+@@ -454,6 +475,7 @@ static void __init build_mem_type_table(void)
+ 			user_pgprot |= L_PTE_SHARED;
+ 			kern_pgprot |= L_PTE_SHARED;
+ 			vecs_pgprot |= L_PTE_SHARED;
++			s2_pgprot |= L_PTE_SHARED;
+ 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
+ 			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
+ 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
+@@ -508,6 +530,9 @@ static void __init build_mem_type_table(void)
+ 	pgprot_user   = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | user_pgprot);
+ 	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
+ 				 L_PTE_DIRTY | kern_pgprot);
++	pgprot_s2  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | s2_pgprot);
++	pgprot_s2_device  = __pgprot(s2_device_pgprot);
++	pgprot_hyp_device  = __pgprot(hyp_device_pgprot);
+ 
+ 	mem_types[MT_LOW_VECTORS].prot_l1 |= ecc_mask;
+ 	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
