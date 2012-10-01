@@ -1,29 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 1 Oct 2012 13:09:07 +0100
-Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
-References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
- <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
- <20121001114454.GA9170@sirena.org.uk>
- <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
-Message-ID: <20121001120907.GK4360@opensource.wolfsonmicro.com>
+From: chander.kashyap@linaro.org (chander.kashyap at linaro.org)
+Date: Mon,  1 Oct 2012 17:39:19 +0530
+Subject: [PATCH 0/2] ARM: Exynos4: Migrate to common clock framework.
+Message-ID: <1349093361-18820-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 05:23:15PM +0530, ABRAHAM, KISHON VIJAY wrote:
-> On Mon, Oct 1, 2012 at 5:14 PM, Mark Brown
+From: Thomas Abraham <thomas.abraham@linaro.org>
 
-> > No, this is not at all sensible - if there's an mfd_remove_devices()
-> > function we really ought to be able to use it to remove the children.
-> > If we can't do that we should fix the API usability, not open code the
-> > same stuff in every user.
+This patch series migrates Exynos4 clock support to common clock framework.
+The first patch in this series removes the existing Exynos4 clock support
+that uses the Samsung specific clock framework. The second patch in this
+series add Exynos4 clock support using common clock framework.
 
-> What makes more sense to me is extend mfd_add_devices to create child
-> devices from dt data. Then for removing devices, one can use
-> mfd_remove_devices().
+Thomas Abraham (2):
+  ARM: Exynos4: Remove Samsung clock type support
+  ARM: Exynos4: Register clocks via common clock framework
 
-Why would that be helpful?  Most platforms don't support DT at all, and
-having the API behave differently depending on the platform doesn't seem
-like a step forwards.  I would really expect any usage of DT to be
-totally orthogonal here.
+ arch/arm/mach-exynos/Kconfig               |    1 +
+ arch/arm/mach-exynos/Makefile              |    3 -
+ arch/arm/mach-exynos/clock-exynos4.c       | 1572 ----------------------------
+ arch/arm/mach-exynos/clock-exynos4.h       |   35 -
+ arch/arm/mach-exynos/clock-exynos4210.c    |  188 ----
+ arch/arm/mach-exynos/clock-exynos4212.c    |  192 ----
+ arch/arm/mach-exynos/common.c              |   18 +-
+ arch/arm/mach-exynos/common.h              |    3 +
+ arch/arm/mach-exynos/mach-armlex4210.c     |    1 -
+ arch/arm/mach-exynos/mach-exynos4-dt.c     |    1 -
+ arch/arm/mach-exynos/mach-nuri.c           |    1 -
+ arch/arm/mach-exynos/mach-origen.c         |    1 -
+ arch/arm/mach-exynos/mach-smdk4x12.c       |    1 -
+ arch/arm/mach-exynos/mach-smdkv310.c       |    1 -
+ arch/arm/mach-exynos/mach-universal_c210.c |    1 -
+ arch/arm/mach-exynos/mct.c                 |   11 +-
+ arch/arm/plat-samsung/Kconfig              |    4 +-
+ drivers/clk/Makefile                       |    1 +
+ drivers/clk/clk.c                          |   12 +-
+ drivers/clk/samsung/Makefile               |    6 +
+ drivers/clk/samsung/clk-exynos4.c          |  585 +++++++++++
+ drivers/clk/samsung/clk.c                  |  231 ++++
+ drivers/clk/samsung/clk.h                  |  190 ++++
+ 23 files changed, 1043 insertions(+), 2016 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4.c
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4.h
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
+ create mode 100644 drivers/clk/samsung/Makefile
+ create mode 100644 drivers/clk/samsung/clk-exynos4.c
+ create mode 100644 drivers/clk/samsung/clk.c
+ create mode 100644 drivers/clk/samsung/clk.h
