@@ -1,42 +1,46 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sun, 30 Sep 2012 22:43:37 -0600
-Subject: [PATCH] [ARM] Build failure CONFIG_ARCH_KIRKWOOD_DT relies on
- CACHE_FEROCEON_L2
-In-Reply-To: <CAOesGMgpDs60jGsV4Wu-A7M+ThXh7YVkgb_mPgMJfPwNa_QbSw@mail.gmail.com>
-References: <20120930232253.GD30637@obsidianresearch.com>
- <CAOesGMgpDs60jGsV4Wu-A7M+ThXh7YVkgb_mPgMJfPwNa_QbSw@mail.gmail.com>
-Message-ID: <20121001044337.GA8446@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sun, 30 Sep 2012 23:34:50 -0600
+Subject: [PATCH 1/1] Fix segfault in DTC
+In-Reply-To: <20120929235342.GA23078@truffula.fritz.box>
+References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
+ <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
+ <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
+ <20120925233054.GL9800@truffula.fritz.box> <50624393.30607@broadcom.com>
+ <20120926003508.GB31993@truffula.fritz.box> <50632F78.4030709@broadcom.com>
+ <5065D9C7.40906@wwwdotorg.org> <E1THfgr-0006Fg-KT@jdl.com>
+ <5065F4FD.4010807@wwwdotorg.org> <20120929235342.GA23078@truffula.fritz.box>
+Message-ID: <50692B7A.8000405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2012 at 07:44:10PM -0700, Olof Johansson wrote:
-
-> >  void __init kirkwood_l2_init(void)
-> >  {
-> > +#ifdef CONFIG_CACHE_FEROCEON_L2
-> >  #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+On 09/29/2012 05:53 PM, David Gibson wrote:
+> On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
+>> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
+>>>>>
+>>>>> Yeah, seems like the kernel DTC is quite old.
+>>>>
+>>>> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
+>>>
+>>> Awesome.  Thank you.
+>>>
+>>>> I've run a regression test vs. the old dtc in the kernel ...
+>>>
+>>> Which is the icky step.  Again, thank you.
+>>>
+>>>> ... and found that
+>>>> some of the PowerPC .dts files don't compile with the new dtc (but did
+>>>> with the old), all due to non-existent labels/paths being referenced.
+>>>> I'll try and track down whether this is a regression in dtc, or simply
+>>>> buggy .dts files that weren't noticed before.
+>>>
+>>> I think you should just smack the PowerPC guys. :-)
+>>
+>> For the record in this thread, it was a regression I introduced into dtc
+>> - the patch I just sent was for this.
 > 
-> Aren't these added ifdefs completely redundant? L2_WRITETHROUGH is
-> dependent on the outer options anyway.
+> I would be nice to add a testcase for this regression into dtc.
 
-No, the complete new function is:
-
-void __init kirkwood_l2_init(void)
-{
-#ifdef CONFIG_CACHE_FEROCEON_L2
-#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
-        writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
-        feroceon_l2_init(1);
-#else
-        writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
-        feroceon_l2_init(0);
-#endif
-#endif
-}
-
-So you hit the #else clause and link fails on feroceon_l2_init because
-of:
-
-obj-$(CONFIG_CACHE_FEROCEON_L2) += cache-feroceon-l2.o
-
-Jason
+The issue here was caused by uninitialized memory, so it would, I think,
+be basically impossible to create a test-case that would be guaranteed
+to fail because of this; it'd depend on the internal details of the
+malloc library and how/when it re-used previously free()d memory blocks.
