@@ -1,33 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Oct 2012 10:55:11 +0200
-Subject: rcu self-detected stall messages on OMAP3, 4 boards
-In-Reply-To: <20120922215923.GA13161@linux.vnet.ibm.com>
-References: <F95344A7-3351-4E6B-BF61-37E591AF16A2@ti.com>
- <20120920220130.GN2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
- <20120920232114.GO2449@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209211803290.8839@utopia.booyaka.com>
- <20120921185827.GC2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209211900520.8839@utopia.booyaka.com>
- <20120921195717.GD2454@linux.vnet.ibm.com>
- <alpine.DEB.2.00.1209221836070.10663@utopia.booyaka.com>
- <20120922201043.GE2934@linux.vnet.ibm.com>
- <20120922215923.GA13161@linux.vnet.ibm.com>
-Message-ID: <CACRpkdb2f18vwv9qXZkypPxM4UwyeTrDs4+JnpFtYRCzADzFPQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 1 Oct 2012 11:50:52 +0300
+Subject: [PATCH 1/6] usb: dwc3-omap: use of_platform API to create dwc3
+ core pdev
+In-Reply-To: <CAAe_U6JX8nqhZU-m+0Cfh1-xEkZhXNf2ecYcg_JX9mx5fv1b3A@mail.gmail.com>
+References: <1348836795-4783-1-git-send-email-kishon@ti.com>
+ <1348836795-4783-2-git-send-email-kishon@ti.com>
+ <20120928125758.GK31006@arwen.pp.htv.fi>
+ <CAAe_U6JX8nqhZU-m+0Cfh1-xEkZhXNf2ecYcg_JX9mx5fv1b3A@mail.gmail.com>
+Message-ID: <20121001085051.GA19346@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2012 at 11:59 PM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
+Hi,
 
-> rcu: Fix day-one dyntick-idle stall-warning bug
+On Fri, Sep 28, 2012 at 07:01:04PM +0530, ABRAHAM, KISHON VIJAY wrote:
+> Hi,
+> 
+> On Fri, Sep 28, 2012 at 6:27 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Fri, Sep 28, 2012 at 06:23:10PM +0530, Kishon Vijay Abraham I wrote:
+> >> Used of_platform_populate() to populate dwc3 core platform_device
+> >> from device tree data. Since now the allocation of unique device id is
+> >> handled be of_*, removed the call to dwc3_get_device_id.
+> >>
+> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >
+> > I think it's best if you split the use of device_for_each_child() from
+> > this patch. So first do the device_for_each_child() part, then later use
+> > of_platform_populate().
+> 
+> I think it's better to have it both together as of_platform_populate
+> will create the device and the device_for_each_child() part will
+> delete it on error conditions and during driver removal.
+> In this patch the first device_for_each_child() comes in error
+> condition and it is not needed if we have not created the device using
+> of_platform_populate.
 
-As mentioned in another thread this solves the same problem for ux500.
-Reported/Tested-by: Linus Walleij <linus.walleij@linaro.org>
+We are already parent of a device and we already handle child removal
+manually. You can change the current implementation to use
+device_for_each_child() and on a later patch introduce
+of_platform_populate().
 
-But now it appears that this commit didn't make it into v3.6 so
-it definately needs to be tagged with Cc: stable at kernel.org
-before it gets merged since the stall warnings are kinda scary.
-
-Yours,
-Linus Walleij
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121001/947d0b43/attachment.sig>
