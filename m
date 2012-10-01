@@ -1,58 +1,60 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon,  1 Oct 2012 14:24:37 +0200
-Subject: [PATCH v6 1/5] watchdog: core: dt: add support for the timeout device
- tree property
+Date: Mon,  1 Oct 2012 14:24:38 +0200
+Subject: [PATCH v6 2/5] watchdog: orion_wdt: dt: add the timeout property
+ binding
 In-Reply-To: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1349094281-28889-2-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1349094281-28889-3-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The binding is provided by the watchdog core.
+
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 ---
- Documentation/watchdog/watchdog-kernel-api.txt |  3 +++
- include/linux/watchdog.h                       | 11 +++++++++++
- 2 files changed, 14 insertions(+)
+ Documentation/devicetree/bindings/watchdog/marvel.txt | 5 +++++
+ drivers/watchdog/orion_wdt.c                          | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
-index 086638f..decd981 100644
---- a/Documentation/watchdog/watchdog-kernel-api.txt
-+++ b/Documentation/watchdog/watchdog-kernel-api.txt
-@@ -212,3 +212,6 @@ driver specific data to and a pointer to the data itself.
- The watchdog_get_drvdata function allows you to retrieve driver specific data.
- The argument of this function is the watchdog device where you want to retrieve
- data from. The function returns the pointer to the driver specific data.
+diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
+index 0b2503a..66c2b8c 100644
+--- a/Documentation/devicetree/bindings/watchdog/marvel.txt
++++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
+@@ -5,10 +5,15 @@ Required Properties:
+ - Compatibility : "marvell,orion-wdt"
+ - reg		: Address of the timer registers
+ 
++Optional properties:
 +
-+The watchdog_probe_dt function allows you to retrieve the timeout property
-+from the device tree.
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index da70f0f..06f9384 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -11,6 +11,7 @@
- 
- #include <linux/ioctl.h>
- #include <linux/types.h>
-+#include <linux/of.h>
- 
- #define	WATCHDOG_IOCTL_BASE	'W'
- 
-@@ -174,6 +175,16 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
- 	return wdd->driver_data;
- }
- 
-+/* Use the following function to retrieve the timeout property from dt */
-+static inline void watchdog_probe_dt(struct watchdog_device *wdd,
-+				     struct device_node *node)
-+{
-+	if (!node)
-+		return;
++- timeout	: Contains the watchdog timeout in seconds
 +
-+	of_property_read_u32(node, "timeout", &wdd->timeout);
-+}
-+
- /* drivers/watchdog/core/watchdog_core.c */
- extern int watchdog_register_device(struct watchdog_device *);
- extern void watchdog_unregister_device(struct watchdog_device *);
+ Example:
+ 
+ 	wdt at 20300 {
+ 		compatible = "marvell,orion-wdt";
+ 		reg = <0x20300 0x28>;
++		timeout = <10>;
+ 		status = "okay";
+ 	};
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index c20f96b..3dc7481 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -24,7 +24,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+-#include <linux/of.h>
+ #include <mach/bridge-regs.h>
+ 
+ /*
+@@ -168,6 +167,7 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+ 	orion_wdt.timeout = heartbeat;
+ 	orion_wdt.min_timeout = 1;
+ 	orion_wdt.max_timeout = wdt_max_duration;
++	watchdog_probe_dt(&orion_wdt, pdev->dev.of_node);
+ 
+ 	watchdog_set_nowayout(&orion_wdt, nowayout);
+ 	ret = watchdog_register_device(&orion_wdt);
 -- 
 1.7.11.3
