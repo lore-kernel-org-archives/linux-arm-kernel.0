@@ -1,76 +1,139 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 01 Oct 2012 10:41:09 -0600
-Subject: [PATCH 1/1] Fix segfault in DTC
-In-Reply-To: <20121001064610.GA5323@truffula.fritz.box>
-References: <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
- <20120925233054.GL9800@truffula.fritz.box> <50624393.30607@broadcom.com>
- <20120926003508.GB31993@truffula.fritz.box> <50632F78.4030709@broadcom.com>
- <5065D9C7.40906@wwwdotorg.org> <E1THfgr-0006Fg-KT@jdl.com>
- <5065F4FD.4010807@wwwdotorg.org> <20120929235342.GA23078@truffula.fritz.box>
- <50692B7A.8000405@wwwdotorg.org> <20121001064610.GA5323@truffula.fritz.box>
-Message-ID: <5069C7A5.8090409@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 01 Oct 2012 10:31:58 -0700
+Subject: [GIT PULL] clk: changes for 3.7
+Message-ID: <20121001173158.12878.37886@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2012 12:46 AM, David Gibson wrote:
-> On Sun, Sep 30, 2012 at 11:34:50PM -0600, Stephen Warren wrote:
->> On 09/29/2012 05:53 PM, David Gibson wrote:
->>> On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
->>>> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
->>>>>>>
->>>>>>> Yeah, seems like the kernel DTC is quite old.
->>>>>>
->>>>>> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
->>>>>
->>>>> Awesome.  Thank you.
->>>>>
->>>>>> I've run a regression test vs. the old dtc in the kernel ...
->>>>>
->>>>> Which is the icky step.  Again, thank you.
->>>>>
->>>>>> ... and found that
->>>>>> some of the PowerPC .dts files don't compile with the new dtc (but did
->>>>>> with the old), all due to non-existent labels/paths being referenced.
->>>>>> I'll try and track down whether this is a regression in dtc, or simply
->>>>>> buggy .dts files that weren't noticed before.
->>>>>
->>>>> I think you should just smack the PowerPC guys. :-)
->>>>
->>>> For the record in this thread, it was a regression I introduced into dtc
->>>> - the patch I just sent was for this.
->>>
->>> I would be nice to add a testcase for this regression into dtc.
->>
->> The issue here was caused by uninitialized memory, so it would, I think,
->> be basically impossible to create a test-case that would be guaranteed
->> to fail because of this; it'd depend on the internal details of the
->> malloc library and how/when it re-used previously free()d memory blocks.
-> 
-> It doesn't have to be guaranteed to fail to be useful.  Plus, we
-> already have the infrastructure to run the tests under valgrind, which
-> would catch it.
+Hi Linus,
 
-I certainly disagree here; the absolute worst kind of test is one which
-gives different results each time it's run, or statically gives
-different results to different people. People will either ignore the
-test because it's flaky, or it'll end up blaming the wrong person due to
-some entirely unrelated and correct change just happening to tickle the
-test.
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
 
-If we were to force any such new test to always run under valgrind, then
-hopefully the test would always fail (assuming the test harness triggers
-failure if valgrind finds problems). That might be reasonable. However,
-if we do this, then I think instead we should just always force the
-entire existing test suite to run under valgrind; no new test should be
-needed for valgrind to detect this failure (since there was a
-read-before-write problem any time a label was used in the existing
-code, it just didn't always cause a user-visible issue).
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
 
-Another alternative might be to LD_PRELOAD a test malloc library with a
-known allocation pattern. That would allow a new test for this case to
-always fail. However, the allocation pattern of this test malloc library
-would have to be carefully tied to the allocation pattern of dtc itself
-when processing the new test's .dts file, and that could easily and
-legitimately change due to unrelated implementation details of dtc
-changing, thus making the maintenance of the test malloc library
-painful. So, I don't think this is the way to go.
+are available in the git repository at:
+
+  git://git.linaro.org/people/mturquette/linux.git tags/clk-for-linus
+
+for you to fetch changes up to 494bfec99922d54054d2d0873f1017680cfc3f13:
+
+  clk: add of_clk_src_onecell_get() support (2012-09-07 18:30:19 -0700)
+
+----------------------------------------------------------------
+The common clk framework changes for 3.7 are dominated by ARM platform
+ports to the framework along with one MIPS port, one MFD port, one minor
+framework enhancement and one helper function for platforms expressing
+their clock data through device tree.
+
+----------------------------------------------------------------
+Barry Song (1):
+      clk: prima2: move from arch/arm/mach to drivers/clk
+
+Binghua Duan (1):
+      ARM: PRIMA2: convert to common clk and finish full clk tree
+
+Chao Xie (5):
+      clk: mmp: add mmp specific clocks
+      clk: mmp: add clock definition for pxa168
+      clk: mmp: add clock definition for pxa910
+      clk: mmp: add clock definition for mmp2
+      arm: mmp: make all SOCs use common clock by default
+
+Jonghwa Lee (1):
+      clock: max77686: Add driver for Maxim 77686 32Khz crystal oscillator.
+
+Kelvin Cheung (1):
+      clk: add Loongson1B clock support
+
+Linus Walleij (2):
+      clk: convert ARM RealView to common clk
+      clk: versatile: make config option boolean
+
+Michel Jaouen (1):
+      mfd: dbx500: Provide a more accurate smp_twd clock
+
+Shawn Guo (1):
+      clk: add of_clk_src_onecell_get() support
+
+Ulf Hansson (7):
+      clk: ux500: Adapt PRCMU and PRCC clocks for common clk
+      clk: ux500: First version of clock definitions for ux500
+      clk: ux500: Clock definitions for u8500
+      ARM: ux500: Switch to use common clock framework
+      clk: Provide option for clk_get_rate to issue hw for new rate
+      clk: ux500: Support for prmcu_rate clock
+      clk: ux500: Define smp_twd clock for u8500
+
+ arch/arm/Kconfig                             |    9 +-
+ arch/arm/mach-mmp/Kconfig                    |    3 +
+ arch/arm/mach-prima2/Makefile                |    1 -
+ arch/arm/mach-prima2/clock.c                 |  510 -----------
+ arch/arm/mach-prima2/prima2.c                |    1 -
+ arch/arm/mach-prima2/timer.c                 |    8 +-
+ arch/arm/mach-realview/core.c                |  106 ---
+ arch/arm/mach-realview/include/mach/clkdev.h |   16 -
+ arch/arm/mach-realview/realview_eb.c         |    2 +
+ arch/arm/mach-realview/realview_pb1176.c     |    2 +
+ arch/arm/mach-realview/realview_pb11mp.c     |    2 +
+ arch/arm/mach-realview/realview_pba8.c       |    2 +
+ arch/arm/mach-realview/realview_pbx.c        |    2 +
+ arch/arm/mach-ux500/Kconfig                  |    1 +
+ arch/arm/mach-ux500/Makefile                 |    2 +-
+ arch/arm/mach-ux500/clock.c                  |  715 ----------------
+ arch/arm/mach-ux500/clock.h                  |  164 ----
+ arch/arm/mach-ux500/cpu.c                    |   14 +-
+ drivers/clk/Kconfig                          |   13 +
+ drivers/clk/Makefile                         |    9 +-
+ drivers/clk/clk-ls1x.c                       |  111 +++
+ drivers/clk/clk-max77686.c                   |  244 ++++++
+ drivers/clk/clk-prima2.c                     | 1171 ++++++++++++++++++++++++++
+ drivers/clk/clk.c                            |   57 +-
+ drivers/clk/mmp/Makefile                     |    9 +
+ drivers/clk/mmp/clk-apbc.c                   |  152 ++++
+ drivers/clk/mmp/clk-apmu.c                   |   97 +++
+ drivers/clk/mmp/clk-frac.c                   |  153 ++++
+ drivers/clk/mmp/clk-mmp2.c                   |  449 ++++++++++
+ drivers/clk/mmp/clk-pxa168.c                 |  346 ++++++++
+ drivers/clk/mmp/clk-pxa910.c                 |  320 +++++++
+ drivers/clk/mmp/clk.h                        |   35 +
+ drivers/clk/ux500/Makefile                   |   12 +
+ drivers/clk/ux500/clk-prcc.c                 |  164 ++++
+ drivers/clk/ux500/clk-prcmu.c                |  252 ++++++
+ drivers/clk/ux500/clk.h                      |   48 ++
+ drivers/clk/ux500/u8500_clk.c                |  477 +++++++++++
+ drivers/clk/ux500/u8540_clk.c                |   21 +
+ drivers/clk/ux500/u9540_clk.c                |   21 +
+ drivers/clk/versatile/Makefile               |    1 +
+ drivers/clk/versatile/clk-realview.c         |  114 +++
+ drivers/mfd/db8500-prcmu.c                   |   42 +
+ drivers/mfd/dbx500-prcmu-regs.h              |    4 +-
+ include/linux/clk-provider.h                 |    6 +
+ include/linux/mfd/dbx500-prcmu.h             |    1 +
+ include/linux/platform_data/clk-realview.h   |    1 +
+ include/linux/platform_data/clk-ux500.h      |   17 +
+ 47 files changed, 4360 insertions(+), 1547 deletions(-)
+ delete mode 100644 arch/arm/mach-prima2/clock.c
+ delete mode 100644 arch/arm/mach-realview/include/mach/clkdev.h
+ delete mode 100644 arch/arm/mach-ux500/clock.c
+ delete mode 100644 arch/arm/mach-ux500/clock.h
+ create mode 100644 drivers/clk/clk-ls1x.c
+ create mode 100644 drivers/clk/clk-max77686.c
+ create mode 100644 drivers/clk/clk-prima2.c
+ create mode 100644 drivers/clk/mmp/Makefile
+ create mode 100644 drivers/clk/mmp/clk-apbc.c
+ create mode 100644 drivers/clk/mmp/clk-apmu.c
+ create mode 100644 drivers/clk/mmp/clk-frac.c
+ create mode 100644 drivers/clk/mmp/clk-mmp2.c
+ create mode 100644 drivers/clk/mmp/clk-pxa168.c
+ create mode 100644 drivers/clk/mmp/clk-pxa910.c
+ create mode 100644 drivers/clk/mmp/clk.h
+ create mode 100644 drivers/clk/ux500/Makefile
+ create mode 100644 drivers/clk/ux500/clk-prcc.c
+ create mode 100644 drivers/clk/ux500/clk-prcmu.c
+ create mode 100644 drivers/clk/ux500/clk.h
+ create mode 100644 drivers/clk/ux500/u8500_clk.c
+ create mode 100644 drivers/clk/ux500/u8540_clk.c
+ create mode 100644 drivers/clk/ux500/u9540_clk.c
+ create mode 100644 drivers/clk/versatile/clk-realview.c
+ create mode 100644 include/linux/platform_data/clk-realview.h
+ create mode 100644 include/linux/platform_data/clk-ux500.h
