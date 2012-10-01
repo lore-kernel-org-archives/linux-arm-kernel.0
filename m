@@ -1,108 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 1 Oct 2012 15:06:58 +0200
-Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
-References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
- <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
- <20121001124546.GE11837@lunn.ch>
- <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
- <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
-Message-ID: <20121001130658.GG11837@lunn.ch>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 1 Oct 2012 06:28:44 -0700
+Subject: rcu self-detected stall messages on OMAP3, 4 boards
+In-Reply-To: <CACRpkdb2f18vwv9qXZkypPxM4UwyeTrDs4+JnpFtYRCzADzFPQ@mail.gmail.com>
+References: <alpine.DEB.2.00.1209202244470.32589@utopia.booyaka.com>
+ <20120920232114.GO2449@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209211803290.8839@utopia.booyaka.com>
+ <20120921185827.GC2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209211900520.8839@utopia.booyaka.com>
+ <20120921195717.GD2454@linux.vnet.ibm.com>
+ <alpine.DEB.2.00.1209221836070.10663@utopia.booyaka.com>
+ <20120922201043.GE2934@linux.vnet.ibm.com>
+ <20120922215923.GA13161@linux.vnet.ibm.com>
+ <CACRpkdb2f18vwv9qXZkypPxM4UwyeTrDs4+JnpFtYRCzADzFPQ@mail.gmail.com>
+Message-ID: <20121001132844.GA2558@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 02:54:55PM +0200, Fabio Porcedda wrote:
-> On Mon, Oct 1, 2012 at 2:48 PM, Fabio Porcedda <fabio.porcedda@gmail.com> wrote:
-> > On Mon, Oct 1, 2012 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> On Mon, Oct 01, 2012 at 02:24:39PM +0200, Fabio Porcedda wrote:
-> >>> Tested on an at91sam9260 board (evk-pro3)
-> >>>
-> >>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> >>> ---
-> >>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
-> >>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
-> >>>  2 files changed, 40 insertions(+)
-> >>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >>> new file mode 100644
-> >>> index 0000000..65c1755
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >>> @@ -0,0 +1,19 @@
-> >>> +* Atmel Watchdog Timers
-> >>> +
-> >>> +** at91sam9-wdt
-> >>> +
-> >>> +Required properties:
-> >>> +- compatible: must be "atmel,at91sam9260-wdt".
-> >>> +- reg: physical base address of the controller and length of memory mapped
-> >>> +  region.
-> >>> +
-> >>> +Optional properties:
-> >>> +- timeout: contains the watchdog timeout in seconds.
-> >>> +
-> >>> +Example:
-> >>> +
-> >>> +     watchdog at fffffd40 {
-> >>> +             compatible = "atmel,at91sam9260-wdt";
-> >>> +             reg = <0xfffffd40 0x10>;
-> >>> +             timeout = <10>;
-> >>> +     };
-> >>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> >>> index 05e1be8..c9e6bfa 100644
-> >>> --- a/drivers/watchdog/at91sam9_wdt.c
-> >>> +++ b/drivers/watchdog/at91sam9_wdt.c
-> >>> @@ -32,6 +32,7 @@
-> >>>  #include <linux/timer.h>
-> >>>  #include <linux/bitops.h>
-> >>>  #include <linux/uaccess.h>
-> >>> +#include <linux/of.h>
-> >>>
-> >>>  #include "at91sam9_wdt.h"
-> >>>
-> >>> @@ -254,6 +255,14 @@ static struct miscdevice at91wdt_miscdev = {
-> >>>       .fops           = &at91wdt_fops,
-> >>>  };
-> >>>
-> >>> +static inline void __init at91wdt_probe_dt(struct device_node *node)
-> >>> +{
-> >>> +     if (!node)
-> >>> +             return;
-> >>> +
-> >>> +     of_property_read_u32(node, "timeout", &heartbeat);
-> >>> +}
-> >>> +
-> >>
-> >> In patch #1 you add a function to do this, and then you don't make use
-> >> of it here ?
-> >>
-> >> Or am i missing something?
-> >
-> > I'm using it on the patch #2 for the orion_wdt driver.
-> > Do you think it's better to join the #1 and the #2 patch?
-> >
-> > Best regards
-> > --
-> > Fabio Porcedda
+On Mon, Oct 01, 2012 at 10:55:11AM +0200, Linus Walleij wrote:
+> On Sat, Sep 22, 2012 at 11:59 PM, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
 > 
-> I'm sorry, only now i understand your question.
-> The at91sam9_wdt driver don't use the watchdog core framework si i
-> can't use that function cleanly.
+> > rcu: Fix day-one dyntick-idle stall-warning bug
+> 
+> As mentioned in another thread this solves the same problem for ux500.
+> Reported/Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> But now it appears that this commit didn't make it into v3.6 so
+> it definately needs to be tagged with Cc: stable at kernel.org
+> before it gets merged since the stall warnings are kinda scary.
 
-> The patch #1 and #2 are for introducing the same property as the
-> at91sam9_wdt driver.
+Ingo submitting this to Linus Torvalds earlier today, so we should be
+able to send to stable shortly.
 
-So maybe split this up into two different patchsets. One patchset to
-add the helper function, and the use of this helper to all watchdog
-divers that can use it. I think the following drivers should be
-modified:
-
-orion_wdt.c
-pnx4008_wdt.c
-s3c2410_wdt.c
-
-In a second patchset, convert the AT91SAM9 driver over to the watchdog
-core framework, and then use the helper function.
-
-     Andrew
+							Thanx, Paul
