@@ -1,871 +1,698 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 01 Oct 2012 05:10:35 -0400
-Subject: [PATCH v2 05/14] KVM: ARM: Hypervisor inititalization
+Date: Mon, 01 Oct 2012 05:10:42 -0400
+Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
 In-Reply-To: <20121001090945.49198.68950.stgit@ubuntu>
 References: <20121001090945.49198.68950.stgit@ubuntu>
-Message-ID: <20121001091035.49198.31170.stgit@ubuntu>
+Message-ID: <20121001091042.49198.93241.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sets up KVM code to handle all exceptions taken to Hyp mode.
+This commit introduces the framework for guest memory management
+through the use of 2nd stage translation. Each VM has a pointer
+to a level-1 table (the pgd field in struct kvm_arch) which is
+used for the 2nd stage translations. Entries are added when handling
+guest faults (later patch) and the table itself can be allocated and
+freed through the following functions implemented in
+arch/arm/kvm/arm_mmu.c:
+ - kvm_alloc_stage2_pgd(struct kvm *kvm);
+ - kvm_free_stage2_pgd(struct kvm *kvm);
 
-When the kernel is booted in Hyp mode, calling "hvc #0xff" with r0 pointing to
-the new vectors, the HVBAR is changed to the the vector pointers.  This allows
-subsystems (like KVM here) to execute code in Hyp-mode with the MMU disabled.
+Each entry in TLBs and caches are tagged with a VMID identifier in
+addition to ASIDs. The VMIDs are assigned consecutively to VMs in the
+order that VMs are executed, and caches and tlbs are invalidated when
+the VMID space has been used to allow for more than 255 simultaenously
+running guests.
 
-We initialize other Hyp-mode registers and enables the MMU for Hyp-mode from
-the id-mapped hyp initialization code. Afterwards, the HVBAR is changed to
-point to KVM Hyp vectors used to catch guest faults and to switch to Hyp mode
-to perform a world-switch into a KVM guest.
+The 2nd stage pgd is allocated in kvm_arch_init_vm(). The table is
+freed in kvm_arch_destroy_vm(). Both functions are called from the main
+KVM code.
 
-If the KVM module is unloaded we call "hvc #0xff" once more to disable the MMU
-in Hyp mode again and install a vector handler to change the HVBAR for a
-subsequent reload of KVM or another hypervisor.
+We pre-allocate page table memory to be able to synchronize using a
+spinlock and be called under rcu_read_lock from the MMU notifiers.  We
+steal the mmu_memory_cache implementation from x86 and adapt for our
+specific usage.
 
-Also provides memory mapping code to map required code pages, data structures,
-and I/O regions  accessed in Hyp mode at the same virtual address as the host
-kernel virtual addresses, but which conforms to the architectural requirements
-for translations in Hyp mode. This interface is added in arch/arm/kvm/arm_mmu.c
-and comprises:
- - create_hyp_mappings(from, to);
- - create_hyp_io_mappings(from, to, phys_addr);
- - free_hyp_pmds();
+We support MMU notifiers (thanks to Marc Zyngier) through
+kvm_unmap_hva and kvm_set_spte_hva.
+
+Finally, define kvm_phys_addr_ioremap() to map a device at a guest IPA,
+which is used by VGIC support to map the virtual CPU interface registers
+to the guest. This support is added by Marc Zyngier.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- arch/arm/include/asm/kvm_arm.h              |  107 ++++++++++++++
- arch/arm/include/asm/kvm_asm.h              |   20 +++
- arch/arm/include/asm/kvm_mmu.h              |   39 +++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |    4 +
- arch/arm/kvm/arm.c                          |  172 ++++++++++++++++++++++
- arch/arm/kvm/init.S                         |  107 ++++++++++++++
- arch/arm/kvm/interrupts.S                   |   48 ++++++
- arch/arm/kvm/mmu.c                          |  210 +++++++++++++++++++++++++++
- mm/memory.c                                 |    2 
- 9 files changed, 709 insertions(+)
- create mode 100644 arch/arm/include/asm/kvm_mmu.h
+ arch/arm/include/asm/kvm_asm.h  |    2 
+ arch/arm/include/asm/kvm_host.h |   18 ++
+ arch/arm/include/asm/kvm_mmu.h  |    9 +
+ arch/arm/kvm/Kconfig            |    1 
+ arch/arm/kvm/arm.c              |   37 ++++
+ arch/arm/kvm/interrupts.S       |    8 +
+ arch/arm/kvm/mmu.c              |  381 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/trace.h            |   46 +++++
+ 8 files changed, 501 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index c196a22..f6e8f6f 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -21,4 +21,111 @@
- 
- #include <asm/types.h>
- 
-+/* Hyp Configuration Register (HCR) bits */
-+#define HCR_TGE		(1 << 27)
-+#define HCR_TVM		(1 << 26)
-+#define HCR_TTLB	(1 << 25)
-+#define HCR_TPU		(1 << 24)
-+#define HCR_TPC		(1 << 23)
-+#define HCR_TSW		(1 << 22)
-+#define HCR_TAC		(1 << 21)
-+#define HCR_TIDCP	(1 << 20)
-+#define HCR_TSC		(1 << 19)
-+#define HCR_TID3	(1 << 18)
-+#define HCR_TID2	(1 << 17)
-+#define HCR_TID1	(1 << 16)
-+#define HCR_TID0	(1 << 15)
-+#define HCR_TWE		(1 << 14)
-+#define HCR_TWI		(1 << 13)
-+#define HCR_DC		(1 << 12)
-+#define HCR_BSU		(3 << 10)
-+#define HCR_BSU_IS	(1 << 10)
-+#define HCR_FB		(1 << 9)
-+#define HCR_VA		(1 << 8)
-+#define HCR_VI		(1 << 7)
-+#define HCR_VF		(1 << 6)
-+#define HCR_AMO		(1 << 5)
-+#define HCR_IMO		(1 << 4)
-+#define HCR_FMO		(1 << 3)
-+#define HCR_PTW		(1 << 2)
-+#define HCR_SWIO	(1 << 1)
-+#define HCR_VM		1
-+
-+/*
-+ * The bits we set in HCR:
-+ * TAC:		Trap ACTLR
-+ * TSC:		Trap SMC
-+ * TSW:		Trap cache operations by set/way
-+ * TWI:		Trap WFI
-+ * TIDCP:	Trap L2CTLR/L2ECTLR
-+ * BSU_IS:	Upgrade barriers to the inner shareable domain
-+ * FB:		Force broadcast of all maintainance operations
-+ * AMO:		Override CPSR.A and enable signaling with VA
-+ * IMO:		Override CPSR.I and enable signaling with VI
-+ * FMO:		Override CPSR.F and enable signaling with VF
-+ * SWIO:	Turn set/way invalidates into set/way clean+invalidate
-+ */
-+#define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
-+			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-+			HCR_SWIO | HCR_TIDCP)
-+
-+/* Hyp System Control Register (HSCTLR) bits */
-+#define HSCTLR_TE	(1 << 30)
-+#define HSCTLR_EE	(1 << 25)
-+#define HSCTLR_FI	(1 << 21)
-+#define HSCTLR_WXN	(1 << 19)
-+#define HSCTLR_I	(1 << 12)
-+#define HSCTLR_C	(1 << 2)
-+#define HSCTLR_A	(1 << 1)
-+#define HSCTLR_M	1
-+#define HSCTLR_MASK	(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I | \
-+			 HSCTLR_WXN | HSCTLR_FI | HSCTLR_EE | HSCTLR_TE)
-+
-+/* TTBCR and HTCR Registers bits */
-+#define TTBCR_EAE	(1 << 31)
-+#define TTBCR_IMP	(1 << 30)
-+#define TTBCR_SH1	(3 << 28)
-+#define TTBCR_ORGN1	(3 << 26)
-+#define TTBCR_IRGN1	(3 << 24)
-+#define TTBCR_EPD1	(1 << 23)
-+#define TTBCR_A1	(1 << 22)
-+#define TTBCR_T1SZ	(3 << 16)
-+#define TTBCR_SH0	(3 << 12)
-+#define TTBCR_ORGN0	(3 << 10)
-+#define TTBCR_IRGN0	(3 << 8)
-+#define TTBCR_EPD0	(1 << 7)
-+#define TTBCR_T0SZ	3
-+#define HTCR_MASK	(TTBCR_T0SZ | TTBCR_IRGN0 | TTBCR_ORGN0 | TTBCR_SH0)
-+
-+/* Hyp Debug Configuration Register bits */
-+#define HDCR_TDRA	(1 << 11)
-+#define HDCR_TDOSA	(1 << 10)
-+#define HDCR_TDA	(1 << 9)
-+#define HDCR_TDE	(1 << 8)
-+#define HDCR_HPME	(1 << 7)
-+#define HDCR_TPM	(1 << 6)
-+#define HDCR_TPMCR	(1 << 5)
-+#define HDCR_HPMN_MASK	(0x1F)
-+
-+/* Virtualization Translation Control Register (VTCR) bits */
-+#define VTCR_SH0	(3 << 12)
-+#define VTCR_ORGN0	(3 << 10)
-+#define VTCR_IRGN0	(3 << 8)
-+#define VTCR_SL0	(3 << 6)
-+#define VTCR_S		(1 << 4)
-+#define VTCR_T0SZ	3
-+#define VTCR_MASK	(VTCR_SH0 | VTCR_ORGN0 | VTCR_IRGN0 | VTCR_SL0 | \
-+			 VTCR_S | VTCR_T0SZ | VTCR_MASK)
-+#define VTCR_HTCR_SH	(VTCR_SH0 | VTCR_ORGN0 | VTCR_IRGN0)
-+#define VTCR_SL_L2	0		/* Starting-level: 2 */
-+#define VTCR_SL_L1	(1 << 6)	/* Starting-level: 1 */
-+#define VTCR_GUEST_SL	VTCR_SL_L1
-+#define VTCR_GUEST_T0SZ	0
-+#if VTCR_GUEST_SL == 0
-+#define VTTBR_X		(14 - VTCR_GUEST_T0SZ)
-+#else
-+#define VTTBR_X		(5 - VTCR_GUEST_T0SZ)
-+#endif
-+
-+
- #endif /* __ARM_KVM_ARM_H__ */
 diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 48ddf99..954bf7c 100644
+index 954bf7c..47a0e57 100644
 --- a/arch/arm/include/asm/kvm_asm.h
 +++ b/arch/arm/include/asm/kvm_asm.h
-@@ -54,5 +54,25 @@
- #define ARM_EXCEPTION_DATA_ABORT  4
- #define ARM_EXCEPTION_IRQ	  5
- #define ARM_EXCEPTION_FIQ	  6
-+#define ARM_EXCEPTION_HVC	  7
-+
-+#ifndef __ASSEMBLY__
-+struct kvm_vcpu;
-+
-+extern char __kvm_hyp_init[];
-+extern char __kvm_hyp_init_end[];
-+
-+extern char __kvm_hyp_exit[];
-+extern char __kvm_hyp_exit_end[];
-+
-+extern char __kvm_hyp_vector[];
-+
-+extern char __kvm_hyp_code_start[];
-+extern char __kvm_hyp_code_end[];
-+
-+extern void __kvm_flush_vm_context(void);
-+
-+extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-+#endif
+@@ -57,6 +57,7 @@
+ #define ARM_EXCEPTION_HVC	  7
  
- #endif /* __ARM_KVM_ASM_H__ */
+ #ifndef __ASSEMBLY__
++struct kvm;
+ struct kvm_vcpu;
+ 
+ extern char __kvm_hyp_init[];
+@@ -71,6 +72,7 @@ extern char __kvm_hyp_code_start[];
+ extern char __kvm_hyp_code_end[];
+ 
+ extern void __kvm_flush_vm_context(void);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 1849803..f1c7725 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -113,4 +113,22 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ struct kvm_one_reg;
+ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++
++#define KVM_ARCH_WANT_MMU_NOTIFIER
++struct kvm;
++int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
++int kvm_unmap_hva_range(struct kvm *kvm,
++			unsigned long start, unsigned long end);
++void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
++
++/* We do not have shadow page tables, hence the empty hooks */
++static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
++
++static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
+ #endif /* __ARM_KVM_HOST_H__ */
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-new file mode 100644
-index 0000000..741ab8f
---- /dev/null
+index 741ab8f..9bd0508 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-+ */
-+
-+#ifndef __ARM_KVM_MMU_H__
-+#define __ARM_KVM_MMU_H__
-+
-+/*
-+ * The architecture supports 40-bit IPA as input to the 2nd stage translations
-+ * and PTRS_PER_PGD2 could therefore be 1024.
-+ *
-+ * To save a bit of memory and to avoid alignment issues we assume 39-bit IPA
-+ * for now, but remember that the level-1 table must be aligned to its size.
-+ */
-+#define PTRS_PER_PGD2	512
-+#define PGD2_ORDER	get_order(PTRS_PER_PGD2 * sizeof(pgd_t))
-+
-+int create_hyp_mappings(void *from, void *to);
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+void free_hyp_pmds(void);
-+
-+unsigned long kvm_mmu_get_httbr(void);
-+int kvm_mmu_init(void);
-+void kvm_mmu_exit(void);
-+#endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index a2d404e..18f5cef 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -32,6 +32,9 @@
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 1) << 0)
- #define PMD_BIT4		(_AT(pmdval_t, 0))
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, 0))
-+#define PMD_APTABLE_SHIFT	(61)
-+#define PMD_APTABLE		(_AT(pgdval_t, 3) << PGD_APTABLE_SHIFT)
-+#define PMD_PXNTABLE		(_AT(pgdval_t, 1) << 59)
+@@ -33,6 +33,15 @@ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_hyp_pmds(void);
  
- /*
-  *   - section
-@@ -41,6 +44,7 @@
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_nG		(_AT(pmdval_t, 1) << 11)
-+#define PMD_SECT_PXN		(_AT(pmdval_t, 1) << 53)
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 54)
- #define PMD_SECT_AP_WRITE	(_AT(pmdval_t, 0))
- #define PMD_SECT_AP_READ	(_AT(pmdval_t, 0))
++int kvm_alloc_stage2_pgd(struct kvm *kvm);
++void kvm_free_stage2_pgd(struct kvm *kvm);
++int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
++			  phys_addr_t pa, unsigned long size);
++
++int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
++
++void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
++
+ unsigned long kvm_mmu_get_httbr(void);
+ int kvm_mmu_init(void);
+ void kvm_mmu_exit(void);
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index a07ddcc..47c5500 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -36,6 +36,7 @@ config KVM_ARM_HOST
+ 	depends on KVM
+ 	depends on MMU
+ 	depends on CPU_V7 && ARM_VIRT_EXT
++	select	MMU_NOTIFIER
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index ead5a4e..8e1ea2b 100644
+index 8e1ea2b..5ac3132 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -34,11 +34,21 @@
- #include <asm/ptrace.h>
- #include <asm/mman.h>
- #include <asm/cputype.h>
-+#include <asm/tlbflush.h>
-+#include <asm/virt.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_mmu.h>
- 
- #ifdef REQUIRES_VIRT
- __asm__(".arch_extension	virt");
- #endif
- 
-+static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
-+static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
-+static unsigned long hyp_default_vectors;
-+
-+
- int kvm_arch_hardware_enable(void *garbage)
+@@ -81,12 +81,33 @@ void kvm_arch_sync_events(struct kvm *kvm)
  {
- 	return 0;
-@@ -324,9 +334,171 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	return -EINVAL;
  }
  
-+static void cpu_init_hyp_mode(void *vector)
-+{
-+	unsigned long pgd_ptr;
-+	unsigned long hyp_stack_ptr;
-+	unsigned long stack_page;
-+	unsigned long vector_ptr;
-+
-+	/* Switch from the HYP stub to our own HYP init vector */
-+	__hyp_set_vectors((unsigned long)vector);
-+
-+	pgd_ptr = kvm_mmu_get_httbr();
-+	stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
-+	hyp_stack_ptr = stack_page + PAGE_SIZE;
-+	vector_ptr = (unsigned long)__kvm_hyp_vector;
-+
-+	/*
-+	 * Call initialization code, and switch to the full blown
-+	 * HYP code. The init code corrupts r12, so set the clobber
-+	 * list accordingly.
-+	 */
-+	asm volatile (
-+		"mov	r0, %[pgd_ptr]\n\t"
-+		"mov	r1, %[hyp_stack_ptr]\n\t"
-+		"mov	r2, %[vector_ptr]\n\t"
-+		"hvc	#0\n\t" : :
-+		[pgd_ptr] "r" (pgd_ptr),
-+		[hyp_stack_ptr] "r" (hyp_stack_ptr),
-+		[vector_ptr] "r" (vector_ptr) :
-+		"r0", "r1", "r2", "r12");
-+}
-+
 +/**
-+ * Inits Hyp-mode on all online CPUs
++ * kvm_arch_init_vm - initializes a VM data structure
++ * @kvm:	pointer to the KVM struct
 + */
-+static int init_hyp_mode(void)
-+{
-+	phys_addr_t init_phys_addr;
-+	int cpu;
-+	int err = 0;
-+
-+	/*
-+	 * Allocate Hyp PGD and setup Hyp identity mapping
-+	 */
-+	err = kvm_mmu_init();
-+	if (err)
-+		return err;
-+
-+	/*
-+	 * It is probably enough to obtain the default on one
-+	 * CPU. It's unlikely to be different on the others.
-+	 */
-+	hyp_default_vectors = __hyp_get_vectors();
-+
-+	/*
-+	 * Allocate stack pages for Hypervisor-mode
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		unsigned long stack_page;
-+
-+		stack_page = __get_free_page(GFP_KERNEL);
-+		if (!stack_page) {
-+			err = -ENOMEM;
-+			goto out_free_stack_pages;
-+		}
-+
-+		per_cpu(kvm_arm_hyp_stack_page, cpu) = stack_page;
-+	}
-+
-+	/*
-+	 * Execute the init code on each CPU.
-+	 *
-+	 * Note: The stack is not mapped yet, so don't do anything else than
-+	 * initializing the hypervisor mode on each CPU using a local stack
-+	 * space for temporary storage.
-+	 */
-+	init_phys_addr = virt_to_phys(__kvm_hyp_init);
-+	for_each_online_cpu(cpu) {
-+		smp_call_function_single(cpu, cpu_init_hyp_mode,
-+					 (void *)(long)init_phys_addr, 1);
-+	}
-+
-+	/*
-+	 * Unmap the identity mapping
-+	 */
-+	kvm_mmu_exit();
-+
-+	/*
-+	 * Map the Hyp-code called directly from the host
-+	 */
-+	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
-+	if (err) {
-+		kvm_err("Cannot map world-switch code\n");
-+		goto out_free_mappings;
-+	}
-+
-+	/*
-+	 * Map the Hyp stack pages
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		char *stack_page = (char *)per_cpu(kvm_arm_hyp_stack_page, cpu);
-+		err = create_hyp_mappings(stack_page, stack_page + PAGE_SIZE);
-+
-+		if (err) {
-+			kvm_err("Cannot map hyp stack\n");
-+			goto out_free_mappings;
-+		}
-+	}
-+
-+	/*
-+	 * Map the host VFP structures
-+	 */
-+	kvm_host_vfp_state = alloc_percpu(struct vfp_hard_struct);
-+	if (!kvm_host_vfp_state) {
-+		err = -ENOMEM;
-+		kvm_err("Cannot allocate host VFP state\n");
-+		goto out_free_mappings;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		struct vfp_hard_struct *vfp;
-+
-+		vfp = per_cpu_ptr(kvm_host_vfp_state, cpu);
-+		err = create_hyp_mappings(vfp, vfp + 1);
-+
-+		if (err) {
-+			kvm_err("Cannot map host VFP state: %d\n", err);
-+			goto out_free_vfp;
-+		}
-+	}
-+
-+	return 0;
-+out_free_vfp:
-+	free_percpu(kvm_host_vfp_state);
-+out_free_mappings:
-+	free_hyp_pmds();
-+out_free_stack_pages:
-+	for_each_possible_cpu(cpu)
-+		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-+	return err;
-+}
-+
-+/**
-+ * Initialize Hyp-mode and memory mappings on all CPUs.
-+ */
- int kvm_arch_init(void *opaque)
+ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
  {
-+	int err;
++	int ret = 0;
 +
-+	if (!is_hyp_mode_available()) {
-+		kvm_err("HYP mode not available\n");
-+		return -ENODEV;
-+	}
+ 	if (type)
+ 		return -EINVAL;
+ 
+-	return 0;
++	ret = kvm_alloc_stage2_pgd(kvm);
++	if (ret)
++		goto out_fail_alloc;
 +
-+	if (kvm_target_cpu() < 0) {
-+		kvm_err("Target CPU not supported!\n");
-+		return -ENODEV;
-+	}
++	ret = create_hyp_mappings(kvm, kvm + 1);
++	if (ret)
++		goto out_free_stage2_pgd;
 +
-+	err = init_hyp_mode();
-+	if (err)
-+		goto out_err;
++	/* Mark the initial VMID generation invalid */
++	kvm->arch.vmid_gen = 0;
 +
- 	return 0;
-+out_err:
-+	return err;
++	return ret;
++out_free_stage2_pgd:
++	kvm_free_stage2_pgd(kvm);
++out_fail_alloc:
++	return ret;
  }
  
- /* NOP: Compiling as a module not supported */
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 1dc8926..3e0690b 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -15,5 +15,112 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
-+
-+#include <linux/linkage.h>
-+#include <asm/unified.h>
- #include <asm/asm-offsets.h>
- #include <asm/kvm_asm.h>
-+#include <asm/kvm_arm.h>
-+
-+/********************************************************************
-+ * Hypervisor initialization
-+ *   - should be called with:
-+ *       r0 = Hypervisor pgd pointer
-+ *       r1 = top of Hyp stack (kernel VA)
-+ *       r2 = pointer to hyp vectors
+ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+@@ -104,10 +125,16 @@ int kvm_arch_create_memslot(struct kvm_memory_slot *slot, unsigned long npages)
+ 	return 0;
+ }
+ 
++/**
++ * kvm_arch_destroy_vm - destroy the VM data structure
++ * @kvm:	pointer to the KVM struct
 + */
+ void kvm_arch_destroy_vm(struct kvm *kvm)
+ {
+ 	int i;
+ 
++	kvm_free_stage2_pgd(kvm);
 +
-+	.text
-+	.pushsection    .hyp.idmap.text,"ax"
-+	.align 12
-+__kvm_hyp_init:
-+	.globl __kvm_hyp_init
+ 	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
+ 		if (kvm->vcpus[i]) {
+ 			kvm_arch_vcpu_free(kvm->vcpus[i]);
+@@ -189,7 +216,13 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ 	if (err)
+ 		goto free_vcpu;
+ 
++	err = create_hyp_mappings(vcpu, vcpu + 1);
++	if (err)
++		goto vcpu_uninit;
 +
-+	@ Hyp-mode exception vector
-+	W(b)	.
-+	W(b)	.
-+	W(b)	.
-+	W(b)	.
-+	W(b)	.
-+	W(b)	__do_hyp_init
-+	W(b)	.
-+	W(b)	.
-+
-+__do_hyp_init:
-+	@ Set the sp to end of this page and push data for later use
-+ARM(	add	r12, pc, #(__kvm_init_sp - .)	)
-+ARM(	sub	r12, r12, #8			)
-+THUMB(	adr	r12, __kvm_init_sp		)
-+	mov	sp, r12
-+	push	{r1, r2}
-+
-+	@ Set the HTTBR to point to the hypervisor PGD pointer passed to
-+	@ function and set the upper bits equal to the kernel PGD.
-+	mrrc	p15, 1, r1, r2, c2
-+	mcrr	p15, 4, r0, r2, c2
-+
-+	@ Set the HTCR and VTCR to the same shareability and cacheability
-+	@ settings as the non-secure TTBCR and with T0SZ == 0.
-+	mrc	p15, 4, r0, c2, c0, 2	@ HTCR
-+	ldr	r12, =HTCR_MASK
-+	bic	r0, r0, r12
-+	mrc	p15, 0, r1, c2, c0, 2	@ TTBCR
-+	and	r1, r1, #(HTCR_MASK & ~TTBCR_T0SZ)
-+	orr	r0, r0, r1
-+	mcr	p15, 4, r0, c2, c0, 2	@ HTCR
-+
-+	mrc	p15, 4, r1, c2, c1, 2	@ VTCR
-+	bic	r1, r1, #(VTCR_HTCR_SH | VTCR_SL0)
-+	bic	r0, r0, #(~VTCR_HTCR_SH)
-+	orr	r1, r0, r1
-+	orr	r1, r1, #(VTCR_SL_L1 | VTCR_GUEST_T0SZ)
-+	mcr	p15, 4, r1, c2, c1, 2	@ VTCR
-+
-+	@ Use the same memory attributes for hyp. accesses as the kernel
-+	@ (copy MAIRx ro HMAIRx).
-+	mrc	p15, 0, r0, c10, c2, 0
-+	mcr	p15, 4, r0, c10, c2, 0
-+	mrc	p15, 0, r0, c10, c2, 1
-+	mcr	p15, 4, r0, c10, c2, 1
-+
-+	@ Set the HSCTLR to:
-+	@  - ARM/THUMB exceptions: Kernel config (Thumb-2 kernel)
-+	@  - Endianness: Kernel config
-+	@  - Fast Interrupt Features: Kernel config
-+	@  - Write permission implies XN: disabled
-+	@  - Instruction cache: enabled
-+	@  - Data/Unified cache: enabled
-+	@  - Memory alignment checks: enabled
-+	@  - MMU: enabled (this code must be run from an identity mapping)
-+	mrc	p15, 4, r0, c1, c0, 0	@ HSCR
-+	ldr	r12, =HSCTLR_MASK
-+	bic	r0, r0, r12
-+	mrc	p15, 0, r1, c1, c0, 0	@ SCTLR
-+	ldr	r12, =(HSCTLR_EE | HSCTLR_FI)
-+	and	r1, r1, r12
-+ ARM(	ldr	r12, =(HSCTLR_M | HSCTLR_A | HSCTLR_I)			)
-+ THUMB(	ldr	r12, =(HSCTLR_M | HSCTLR_A | HSCTLR_I | HSCTLR_TE)	)
-+	orr	r1, r1, r12
-+	orr	r0, r0, r1
-+	isb
-+	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
-+	isb
-+
-+	@ Set stack pointer and return to the kernel
-+	pop	{r1, r2}
-+	mov	sp, r1
-+
-+	@ Set HVBAR to point to the HYP vectors
-+	mcr	p15, 4, r2, c12, c0, 0	@ HVBAR
-+
-+	eret
-+
-+	.ltorg
-+
-+	.align 12
-+
-+	__kvm_init_sp:
-+	.globl __kvm_hyp_init_end
-+__kvm_hyp_init_end:
-+
-+	.popsection
+ 	return vcpu;
++vcpu_uninit:
++	kvm_vcpu_uninit(vcpu);
+ free_vcpu:
+ 	kmem_cache_free(kvm_vcpu_cache, vcpu);
+ out:
+@@ -198,6 +231,8 @@ out:
+ 
+ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ {
++	kvm_mmu_free_memory_caches(vcpu);
++	kmem_cache_free(kvm_vcpu_cache, vcpu);
+ }
+ 
+ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 1dc8926..98a67ca 100644
+index 98a67ca..2b92a9f 100644
 --- a/arch/arm/kvm/interrupts.S
 +++ b/arch/arm/kvm/interrupts.S
-@@ -15,5 +15,53 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+@@ -34,6 +34,14 @@ __kvm_hyp_code_start:
+  * Flush per-VMID TLBs
   */
-+
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/unified.h>
-+#include <asm/page.h>
- #include <asm/asm-offsets.h>
- #include <asm/kvm_asm.h>
-+#include <asm/kvm_arm.h>
-+
-+	.text
-+	.align	PAGE_SHIFT
-+
-+__kvm_hyp_code_start:
-+	.globl __kvm_hyp_code_start
-+
-+/********************************************************************
-+ * Flush per-VMID TLBs
-+ */
-+
-+ENTRY(__kvm_flush_vm_context)
+ 
++ENTRY(__kvm_tlb_flush_vmid)
 +	bx	lr
-+ENDPROC(__kvm_flush_vm_context)
++ENDPROC(__kvm_tlb_flush_vmid)
 +
 +/********************************************************************
-+ *  Hypervisor world-switch code
++ * Flush TLBs and instruction caches of current CPU for all VMIDs
 + */
 +
-+ENTRY(__kvm_vcpu_run)
-+	bx	lr
-+
-+
-+/********************************************************************
-+ * Hypervisor exception vector and handlers
-+ */
-+
-+	.align 5
-+__kvm_hyp_vector:
-+	.globl __kvm_hyp_vector
-+	nop
-+
-+/*
-+ * The below lines makes sure the HYP mode code fits in a single page (the
-+ * assembler will bark at you if it doesn't). Please keep them together. If
-+ * you plan to restructure the code or increase its size over a page, you'll
-+ * have to fix the code in init_hyp_mode().
-+ */
-+__kvm_hyp_code_end:
-+	.globl	__kvm_hyp_code_end
-+
-+	.org	__kvm_hyp_code_start + PAGE_SIZE
+ ENTRY(__kvm_flush_vm_context)
+ 	bx	lr
+ ENDPROC(__kvm_flush_vm_context)
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 10ed464..17c2bf5 100644
+index 17c2bf5..3f835a2 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -15,3 +15,213 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
+@@ -23,11 +23,47 @@
+ #include <asm/pgalloc.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/kvm_asm.h>
+ #include <asm/mach/map.h>
++#include <trace/events/kvm.h>
 +
-+#include <linux/mman.h>
-+#include <linux/kvm_host.h>
-+#include <linux/io.h>
-+#include <asm/idmap.h>
-+#include <asm/pgalloc.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_mmu.h>
-+#include <asm/mach/map.h>
-+
-+static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
-+static pgd_t *hyp_pgd;
-+
-+static void free_ptes(pmd_t *pmd, unsigned long addr)
++#include "trace.h"
+ 
+ static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
+ static pgd_t *hyp_pgd;
+ 
++static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
++				  int min, int max)
 +{
-+	pte_t *pte;
++	void *page;
++
++	BUG_ON(max > KVM_NR_MEM_OBJS);
++	if (cache->nobjs >= min)
++		return 0;
++	while (cache->nobjs < max) {
++		page = (void *)__get_free_page(PGALLOC_GFP);
++		if (!page)
++			return -ENOMEM;
++		cache->objects[cache->nobjs++] = page;
++	}
++	return 0;
++}
++
++static void mmu_free_memory_cache(struct kvm_mmu_memory_cache *mc)
++{
++	while (mc->nobjs)
++		free_page((unsigned long)mc->objects[--mc->nobjs]);
++}
++
++static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
++{
++	void *p;
++
++	BUG_ON(!mc || !mc->nobjs);
++	p = mc->objects[--mc->nobjs];
++	return p;
++}
++
+ static void free_ptes(pmd_t *pmd, unsigned long addr)
+ {
+ 	pte_t *pte;
+@@ -201,11 +237,356 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t addr)
+ 	return __create_hyp_mappings(from, to, &pfn);
+ }
+ 
++/**
++ * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
++ * @kvm:	The KVM struct pointer for the VM.
++ *
++ * Allocates the 1st level table only of size defined by PGD2_ORDER (can
++ * support either full 40-bit input addresses or limited to 32-bit input
++ * addresses). Clears the allocated pages.
++ *
++ * Note we don't need locking here as this is only called when the VM is
++ * created, which can only be done once.
++ */
++int kvm_alloc_stage2_pgd(struct kvm *kvm)
++{
++	pgd_t *pgd;
++
++	if (kvm->arch.pgd != NULL) {
++		kvm_err("kvm_arch already initialized?\n");
++		return -EINVAL;
++	}
++
++	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, PGD2_ORDER);
++	if (!pgd)
++		return -ENOMEM;
++
++	memset(pgd, 0, PTRS_PER_PGD2 * sizeof(pgd_t));
++	clean_dcache_area(pgd, PTRS_PER_PGD2 * sizeof(pgd_t));
++	kvm->arch.pgd = pgd;
++
++	return 0;
++}
++
++static void free_guest_pages(pte_t *pte, unsigned long addr)
++{
 +	unsigned int i;
++	struct page *pte_page;
++
++	pte_page = virt_to_page(pte);
++
++	for (i = 0; i < PTRS_PER_PTE; i++) {
++		if (pte_present(*pte))
++			put_page(pte_page);
++		pte++;
++	}
++
++	WARN_ON(page_count(pte_page) != 1);
++}
++
++static void free_stage2_ptes(pmd_t *pmd, unsigned long addr)
++{
++	unsigned int i;
++	pte_t *pte;
++	struct page *pmd_page;
++
++	pmd_page = virt_to_page(pmd);
 +
 +	for (i = 0; i < PTRS_PER_PMD; i++, addr += PMD_SIZE) {
++		BUG_ON(pmd_sect(*pmd));
 +		if (!pmd_none(*pmd) && pmd_table(*pmd)) {
 +			pte = pte_offset_kernel(pmd, addr);
++			free_guest_pages(pte, addr);
 +			pte_free_kernel(NULL, pte);
++
++			put_page(pmd_page);
 +		}
 +		pmd++;
 +	}
++
++	WARN_ON(page_count(pmd_page) != 1);
 +}
 +
 +/**
-+ * free_hyp_pmds - free a Hyp-mode level-2 tables and child level-3 tables
++ * kvm_free_stage2_pgd - free all stage-2 tables
++ * @kvm:	The KVM struct pointer for the VM.
 + *
-+ * Assumes this is a page table used strictly in Hyp-mode and therefore contains
-+ * only mappings in the kernel memory area, which is above PAGE_OFFSET.
++ * Walks the level-1 page table pointed to by kvm->arch.pgd and frees all
++ * underlying level-2 and level-3 tables before freeing the actual level-1 table
++ * and setting the struct pointer to NULL.
++ *
++ * Note we don't need locking here as this is only called when the VM is
++ * destroyed, which can only be done once.
 + */
-+void free_hyp_pmds(void)
++void kvm_free_stage2_pgd(struct kvm *kvm)
 +{
 +	pgd_t *pgd;
 +	pud_t *pud;
 +	pmd_t *pmd;
-+	unsigned long addr;
++	unsigned long long i, addr;
++	struct page *pud_page;
 +
-+	mutex_lock(&kvm_hyp_pgd_mutex);
-+	for (addr = PAGE_OFFSET; addr != 0; addr += PGDIR_SIZE) {
-+		pgd = hyp_pgd + pgd_index(addr);
++	if (kvm->arch.pgd == NULL)
++		return;
++
++	/*
++	 * We do this slightly different than other places, since we need more
++	 * than 32 bits and for instance pgd_addr_end converts to unsigned long.
++	 */
++	addr = 0;
++	for (i = 0; i < PTRS_PER_PGD2; i++) {
++		addr = i * (unsigned long long)PGDIR_SIZE;
++		pgd = kvm->arch.pgd + i;
 +		pud = pud_offset(pgd, addr);
++		pud_page = virt_to_page(pud);
 +
 +		if (pud_none(*pud))
 +			continue;
++
 +		BUG_ON(pud_bad(*pud));
 +
 +		pmd = pmd_offset(pud, addr);
-+		free_ptes(pmd, addr);
++		free_stage2_ptes(pmd, addr);
 +		pmd_free(NULL, pmd);
-+		pud_clear(pud);
++		put_page(pud_page);
 +	}
-+	mutex_unlock(&kvm_hyp_pgd_mutex);
++
++	WARN_ON(page_count(pud_page) != 1);
++	free_pages((unsigned long)kvm->arch.pgd, PGD2_ORDER);
++	kvm->arch.pgd = NULL;
 +}
 +
-+/*
-+ * Create a HYP pte mapping.
++/**
++ * stage2_clear_pte -- Clear a stage-2 PTE.
++ * @kvm:  The VM pointer
++ * @addr: The physical address of the PTE
 + *
-+ * If pfn_base is NULL, we map kernel pages into HYP with the virtual
-+ * address. Otherwise, this is considered an I/O mapping and we map
-+ * the physical region starting@*pfn_base to [start, end[.
++ * Clear a stage-2 PTE, lowering the various ref-counts. Also takes
++ * care of invalidating the TLBs.  Must be called while holding
++ * mmu_lock, otherwise another faulting VCPU may come in and mess
++ * things behind our back.
 + */
-+static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
-+				    unsigned long end, unsigned long *pfn_base)
++static void stage2_clear_pte(struct kvm *kvm, phys_addr_t addr)
 +{
-+	pte_t *pte;
-+	unsigned long addr;
-+	pgprot_t prot;
-+
-+	if (pfn_base)
-+		prot = PAGE_HYP_DEVICE;
-+	else
-+		prot = PAGE_HYP;
-+
-+	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
-+		pte = pte_offset_kernel(pmd, addr);
-+		if (pfn_base) {
-+			BUG_ON(pfn_valid(*pfn_base));
-+			set_pte_ext(pte, pfn_pte(*pfn_base, prot), 0);
-+			(*pfn_base)++;
-+		} else {
-+			struct page *page;
-+			BUG_ON(!virt_addr_valid(addr));
-+			page = virt_to_page(addr);
-+			set_pte_ext(pte, mk_pte(page, prot), 0);
-+		}
-+
-+	}
-+}
-+
-+static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
-+				   unsigned long end, unsigned long *pfn_base)
-+{
-+	pmd_t *pmd;
-+	pte_t *pte;
-+	unsigned long addr, next;
-+
-+	for (addr = start; addr < end; addr = next) {
-+		pmd = pmd_offset(pud, addr);
-+
-+		BUG_ON(pmd_sect(*pmd));
-+
-+		if (pmd_none(*pmd)) {
-+			pte = pte_alloc_one_kernel(NULL, addr);
-+			if (!pte) {
-+				kvm_err("Cannot allocate Hyp pte\n");
-+				return -ENOMEM;
-+			}
-+			pmd_populate_kernel(NULL, pmd, pte);
-+		}
-+
-+		next = pmd_addr_end(addr, end);
-+		create_hyp_pte_mappings(pmd, addr, next, pfn_base);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
-+{
-+	unsigned long start = (unsigned long)from;
-+	unsigned long end = (unsigned long)to;
 +	pgd_t *pgd;
 +	pud_t *pud;
 +	pmd_t *pmd;
-+	unsigned long addr, next;
-+	int err = 0;
++	pte_t *pte;
++	struct page *page;
 +
-+	BUG_ON(start > end);
-+	if (start < PAGE_OFFSET)
-+		return -EINVAL;
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	pud = pud_offset(pgd, addr);
++	if (pud_none(*pud))
++		return;
 +
-+	mutex_lock(&kvm_hyp_pgd_mutex);
-+	for (addr = start; addr < end; addr = next) {
-+		pgd = hyp_pgd + pgd_index(addr);
-+		pud = pud_offset(pgd, addr);
++	pmd = pmd_offset(pud, addr);
++	if (pmd_none(*pmd))
++		return;
 +
-+		if (pud_none_or_clear_bad(pud)) {
-+			pmd = pmd_alloc_one(NULL, addr);
-+			if (!pmd) {
-+				kvm_err("Cannot allocate Hyp pmd\n");
-+				err = -ENOMEM;
-+				goto out;
-+			}
-+			pud_populate(NULL, pud, pmd);
-+		}
++	pte = pte_offset_kernel(pmd, addr);
++	set_pte_ext(pte, __pte(0), 0);
 +
-+		next = pgd_addr_end(addr, end);
-+		err = create_hyp_pmd_mappings(pud, addr, next, pfn_base);
-+		if (err)
-+			goto out;
++	page = virt_to_page(pte);
++	put_page(page);
++	if (page_count(page) != 1) {
++		__kvm_tlb_flush_vmid(kvm);
++		return;
 +	}
++
++	/* Need to remove pte page */
++	pmd_clear(pmd);
++	pte_free_kernel(NULL, (pte_t *)((unsigned long)pte & PAGE_MASK));
++
++	page = virt_to_page(pmd);
++	put_page(page);
++	if (page_count(page) != 1) {
++		__kvm_tlb_flush_vmid(kvm);
++		return;
++	}
++
++	pud_clear(pud);
++	pmd_free(NULL, (pmd_t *)((unsigned long)pmd & PAGE_MASK));
++
++	page = virt_to_page(pud);
++	put_page(page);
++	__kvm_tlb_flush_vmid(kvm);
++}
++
++static void stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
++			   phys_addr_t addr, const pte_t *new_pte)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++	pte_t *pte, old_pte;
++
++	/* Create 2nd stage page table mapping - Level 1 */
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	pud = pud_offset(pgd, addr);
++	if (pud_none(*pud)) {
++		if (!cache)
++			return; /* ignore calls from kvm_set_spte_hva */
++		pmd = mmu_memory_cache_alloc(cache);
++		pud_populate(NULL, pud, pmd);
++		pmd += pmd_index(addr);
++		get_page(virt_to_page(pud));
++	} else
++		pmd = pmd_offset(pud, addr);
++
++	/* Create 2nd stage page table mapping - Level 2 */
++	if (pmd_none(*pmd)) {
++		if (!cache)
++			return; /* ignore calls from kvm_set_spte_hva */
++		pte = mmu_memory_cache_alloc(cache);
++		clean_pte_table(pte);
++		pmd_populate_kernel(NULL, pmd, pte);
++		pte += pte_index(addr);
++		get_page(virt_to_page(pmd));
++	} else
++		pte = pte_offset_kernel(pmd, addr);
++
++	/* Create 2nd stage page table mapping - Level 3 */
++	old_pte = *pte;
++	set_pte_ext(pte, *new_pte, 0);
++	if (pte_present(old_pte))
++		__kvm_tlb_flush_vmid(kvm);
++	else
++		get_page(virt_to_page(pte));
++}
++
++/**
++ * kvm_phys_addr_ioremap - map a device range to guest IPA
++ *
++ * @kvm:	The KVM pointer
++ * @guest_ipa:	The IPA at which to insert the mapping
++ * @pa:		The physical address of the device
++ * @size:	The size of the mapping
++ */
++int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
++			  phys_addr_t pa, unsigned long size)
++{
++	phys_addr_t addr, end;
++	int ret = 0;
++	unsigned long pfn;
++	struct kvm_mmu_memory_cache cache = { 0, };
++
++	end = (guest_ipa + size + PAGE_SIZE - 1) & PAGE_MASK;
++	pfn = __phys_to_pfn(pa);
++
++	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
++		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE | L_PTE_S2_RDWR);
++
++		ret = mmu_topup_memory_cache(&cache, 2, 2);
++		if (ret)
++			goto out;
++		spin_lock(&kvm->mmu_lock);
++		stage2_set_pte(kvm, &cache, addr, &pte);
++		spin_unlock(&kvm->mmu_lock);
++
++		pfn++;
++	}
++
 +out:
-+	mutex_unlock(&kvm_hyp_pgd_mutex);
-+	return err;
++	mmu_free_memory_cache(&cache);
++	return ret;
 +}
 +
-+/**
-+ * create_hyp_mappings - map a kernel virtual address range in Hyp mode
-+ * @from:	The virtual kernel start address of the range
-+ * @to:		The virtual kernel end address of the range (exclusive)
-+ *
-+ * The same virtual address as the kernel virtual address is also used in
-+ * Hyp-mode mapping to the same underlying physical pages.
-+ *
-+ * Note: Wrapping around zero in the "to" address is not supported.
-+ */
-+int create_hyp_mappings(void *from, void *to)
+ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	return -EINVAL;
+ }
+ 
++static void handle_hva_to_gpa(struct kvm *kvm,
++			      unsigned long start,
++			      unsigned long end,
++			      void (*handler)(struct kvm *kvm,
++					      gpa_t gpa, void *data),
++			      void *data)
 +{
-+	return __create_hyp_mappings(from, to, NULL);
++	struct kvm_memslots *slots;
++	struct kvm_memory_slot *memslot;
++
++	slots = kvm_memslots(kvm);
++
++	/* we only care about the pages that the guest sees */
++	kvm_for_each_memslot(memslot, slots) {
++		unsigned long hva_start, hva_end;
++		gfn_t gfn, gfn_end;
++
++		hva_start = max(start, memslot->userspace_addr);
++		hva_end = min(end, memslot->userspace_addr +
++					(memslot->npages << PAGE_SHIFT));
++		if (hva_start >= hva_end)
++			continue;
++
++		/*
++		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
++		 * {gfn_start, gfn_start+1, ..., gfn_end-1}.
++		 */
++		gfn = hva_to_gfn_memslot(hva_start, memslot);
++		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
++
++		for (; gfn < gfn_end; ++gfn) {
++			gpa_t gpa = gfn << PAGE_SHIFT;
++			handler(kvm, gpa, data);
++		}
++	}
 +}
 +
-+/**
-+ * create_hyp_io_mappings - map a physical IO range in Hyp mode
-+ * @from:	The virtual HYP start address of the range
-+ * @to:		The virtual HYP end address of the range (exclusive)
-+ * @addr:	The physical start address which gets mapped
-+ */
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t addr)
++static void kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 +{
-+	unsigned long pfn = __phys_to_pfn(addr);
-+	return __create_hyp_mappings(from, to, &pfn);
++	stage2_clear_pte(kvm, gpa);
 +}
 +
-+int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
++int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
 +{
-+	return -EINVAL;
-+}
++	unsigned long end = hva + PAGE_SIZE;
 +
-+unsigned long kvm_mmu_get_httbr(void)
-+{
-+	return virt_to_phys(hyp_pgd);
-+}
++	if (!kvm->arch.pgd)
++		return 0;
 +
-+int kvm_mmu_init(void)
-+{
-+	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
-+	if (!hyp_pgd)
-+		return -ENOMEM;
-+
-+	hyp_idmap_setup(hyp_pgd);
++	trace_kvm_unmap_hva(hva);
++	handle_hva_to_gpa(kvm, hva, end, &kvm_unmap_hva_handler, NULL);
 +	return 0;
 +}
 +
-+void kvm_mmu_exit(void)
++int kvm_unmap_hva_range(struct kvm *kvm,
++			unsigned long start, unsigned long end)
 +{
-+	hyp_idmap_teardown(hyp_pgd);
++	if (!kvm->arch.pgd)
++		return 0;
++
++	trace_kvm_unmap_hva_range(start, end);
++	handle_hva_to_gpa(kvm, start, end, &kvm_unmap_hva_handler, NULL);
++	return 0;
 +}
-diff --git a/mm/memory.c b/mm/memory.c
-index 5736170..0e58fdd 100644
---- a/mm/memory.c
-+++ b/mm/memory.c
-@@ -383,12 +383,14 @@ void pgd_clear_bad(pgd_t *pgd)
- 	pgd_ERROR(*pgd);
- 	pgd_clear(pgd);
- }
-+EXPORT_SYMBOL_GPL(pgd_clear_bad);
- 
- void pud_clear_bad(pud_t *pud)
++
++static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
++{
++	pte_t *pte = (pte_t *)data;
++
++	stage2_set_pte(kvm, NULL, gpa, pte);
++}
++
++
++void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
++{
++	unsigned long end = hva + PAGE_SIZE;
++	pte_t stage2_pte;
++
++	if (!kvm->arch.pgd)
++		return;
++
++	trace_kvm_set_spte_hva(hva);
++	stage2_pte = pfn_pte(pte_pfn(pte), PAGE_S2);
++	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
++}
++
++void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu)
++{
++	mmu_free_memory_cache(&vcpu->arch.mmu_page_cache);
++}
++
+ unsigned long kvm_mmu_get_httbr(void)
  {
- 	pud_ERROR(*pud);
- 	pud_clear(pud);
- }
-+EXPORT_SYMBOL_GPL(pud_clear_bad);
+ 	return virt_to_phys(hyp_pgd);
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+index f8869c1..862b2cc 100644
+--- a/arch/arm/kvm/trace.h
++++ b/arch/arm/kvm/trace.h
+@@ -39,7 +39,53 @@ TRACE_EVENT(kvm_exit,
+ 	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
+ );
  
- void pmd_clear_bad(pmd_t *pmd)
- {
++TRACE_EVENT(kvm_unmap_hva,
++	TP_PROTO(unsigned long hva),
++	TP_ARGS(hva),
+ 
++	TP_STRUCT__entry(
++		__field(	unsigned long,	hva		)
++	),
++
++	TP_fast_assign(
++		__entry->hva		= hva;
++	),
++
++	TP_printk("mmu notifier unmap hva: %#08lx", __entry->hva)
++);
++
++TRACE_EVENT(kvm_unmap_hva_range,
++	TP_PROTO(unsigned long start, unsigned long end),
++	TP_ARGS(start, end),
++
++	TP_STRUCT__entry(
++		__field(	unsigned long,	start		)
++		__field(	unsigned long,	end		)
++	),
++
++	TP_fast_assign(
++		__entry->start		= start;
++		__entry->end		= end;
++	),
++
++	TP_printk("mmu notifier unmap range: %#08lx -- %#08lx",
++		  __entry->start, __entry->end)
++);
++
++TRACE_EVENT(kvm_set_spte_hva,
++	TP_PROTO(unsigned long hva),
++	TP_ARGS(hva),
++
++	TP_STRUCT__entry(
++		__field(	unsigned long,	hva		)
++	),
++
++	TP_fast_assign(
++		__entry->hva		= hva;
++	),
++
++	TP_printk("mmu notifier set pte hva: %#08lx", __entry->hva)
++);
+ 
+ #endif /* _TRACE_KVM_H */
+ 
