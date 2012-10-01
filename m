@@ -1,192 +1,63 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 1 Oct 2012 13:53:26 +0100
-Subject: [PATCH 14/15] KVM: ARM: Handle I/O aborts
-In-Reply-To: <CANM98qKFKU98EWNaOepjxab3h5vQypxdt_YoJbKV9kd31XUfaw@mail.gmail.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153559.21241.29970.stgit@ubuntu>
- <20120927151108.GM25916@mudshark.cambridge.arm.com>
- <CANM98qKFKU98EWNaOepjxab3h5vQypxdt_YoJbKV9kd31XUfaw@mail.gmail.com>
-Message-ID: <20121001125326.GA2100@linaro.org>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 1 Oct 2012 08:54:18 -0400
+Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
+In-Reply-To: <alpine.DEB.2.00.1209291830270.20956@utopia.booyaka.com>
+References: <1348861072-14507-1-git-send-email-mporter@ti.com>
+ <alpine.DEB.2.00.1209291830270.20956@utopia.booyaka.com>
+Message-ID: <20121001125418.GK5641@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2012 at 05:49:21PM -0400, Christoffer Dall wrote:
-> On Thu, Sep 27, 2012 at 11:11 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Sat, Sep 15, 2012 at 04:35:59PM +0100, Christoffer Dall wrote:
-> >> When the guest accesses I/O memory this will create data abort
-> >> exceptions and they are handled by decoding the HSR information
-> >> (physical address, read/write, length, register) and forwarding reads
-> >> and writes to QEMU which performs the device emulation.
-> >>
-> >> Certain classes of load/store operations do not support the syndrome
-> >> information provided in the HSR and we therefore must be able to fetch
-> >> the offending instruction from guest memory and decode it manually.
-> >>
-> >> We only support instruction decoding for valid reasonable MMIO operations
-> >> where trapping them do not provide sufficient information in the HSR (no
-> >> 16-bit Thumb instructions provide register writeback that we care about).
-> >>
-> >> The following instruciton types are NOT supported for MMIO operations
-> >> despite the HSR not containing decode info:
-> >>  - any Load/Store multiple
-> >>  - any load/store exclusive
-> >>  - any load/store dual
-> >>  - anything with the PC as the dest register
-> >
-> > [...]
-> >
-> >> +
-> >> +/******************************************************************************
-> >> + * Load-Store instruction emulation
-> >> + *****************************************************************************/
-> >> +
-> >> +/*
-> >> + * Must be ordered with LOADS first and WRITES afterwards
-> >> + * for easy distinction when doing MMIO.
-> >> + */
-> >> +#define NUM_LD_INSTR  9
-> >> +enum INSTR_LS_INDEXES {
-> >> +       INSTR_LS_LDRBT, INSTR_LS_LDRT, INSTR_LS_LDR, INSTR_LS_LDRB,
-> >> +       INSTR_LS_LDRD, INSTR_LS_LDREX, INSTR_LS_LDRH, INSTR_LS_LDRSB,
-> >> +       INSTR_LS_LDRSH,
-> >> +       INSTR_LS_STRBT, INSTR_LS_STRT, INSTR_LS_STR, INSTR_LS_STRB,
-> >> +       INSTR_LS_STRD, INSTR_LS_STREX, INSTR_LS_STRH,
-> >> +       NUM_LS_INSTR
-> >> +};
-> >> +
-> >> +static u32 ls_instr[NUM_LS_INSTR][2] = {
-> >> +       {0x04700000, 0x0d700000}, /* LDRBT */
-> >> +       {0x04300000, 0x0d700000}, /* LDRT  */
-> >> +       {0x04100000, 0x0c500000}, /* LDR   */
-> >> +       {0x04500000, 0x0c500000}, /* LDRB  */
-> >> +       {0x000000d0, 0x0e1000f0}, /* LDRD  */
-> >> +       {0x01900090, 0x0ff000f0}, /* LDREX */
-> >> +       {0x001000b0, 0x0e1000f0}, /* LDRH  */
-> >> +       {0x001000d0, 0x0e1000f0}, /* LDRSB */
-> >> +       {0x001000f0, 0x0e1000f0}, /* LDRSH */
-> >> +       {0x04600000, 0x0d700000}, /* STRBT */
-> >> +       {0x04200000, 0x0d700000}, /* STRT  */
-> >> +       {0x04000000, 0x0c500000}, /* STR   */
-> >> +       {0x04400000, 0x0c500000}, /* STRB  */
-> >> +       {0x000000f0, 0x0e1000f0}, /* STRD  */
-> >> +       {0x01800090, 0x0ff000f0}, /* STREX */
-> >> +       {0x000000b0, 0x0e1000f0}  /* STRH  */
-> >> +};
-> >> +
-> >> +static inline int get_arm_ls_instr_index(u32 instr)
-> >> +{
-> >> +       return kvm_instr_index(instr, ls_instr, NUM_LS_INSTR);
-> >> +}
-> >> +
-> >> +/*
-> >> + * Load-Store instruction decoding
-> >> + */
-> >> +#define INSTR_LS_TYPE_BIT              26
-> >> +#define INSTR_LS_RD_MASK               0x0000f000
-> >> +#define INSTR_LS_RD_SHIFT              12
-> >> +#define INSTR_LS_RN_MASK               0x000f0000
-> >> +#define INSTR_LS_RN_SHIFT              16
-> >> +#define INSTR_LS_RM_MASK               0x0000000f
-> >> +#define INSTR_LS_OFFSET12_MASK         0x00000fff
-> >
-> > I'm afraid you're not going to thank me much for this, but it's high time we
-> > unified the various instruction decoding functions we have under arch/arm/
-> > and this seems like a good opportunity for that. For example, look at the
-> > following snippets (there is much more in the files I list) in addition to
-> > what you have:
-> >
+On Sat, Sep 29, 2012 at 06:34:54PM +0000, Paul Walmsley wrote:
 > 
-> I think it would be great if we had a set of unified decoding functions!
+> cc Omar
 > 
-> However, I think it's a shame if we can't merge KVM because we want to
-> clean up this code. There would be nothing in the way of breaking API
-> or anything like that preventing us from cleaning this up after the
-> code has been merged.
+> Hi Matt
 > 
-> Please consider reviewing the code for correctness and consider if the
-> code could be merged as is.
+> On Fri, 28 Sep 2012, Matt Porter wrote:
 > 
-> On the other hand, if you or Dave or anyone else wants to create a set
-> of patches that cleans this up in a timely manner, I will be happy to
-> merge them for my code as well ;)
+> > The AM33xx support requires some help in hwmod due to the following
+> > comment in arch/arm/mach-omap2/omap_hwmod.c:
+> > 	/*
+> > 	 * If an IP block contains HW reset lines and any of them are
+> > 	 * asserted, we let integration code associated with that
+> > 	 * block handle the enable.  We've received very little
+> > 	 * information on what those driver authors need, and until
+> > 	 * detailed information is provided and the driver code is
+> > 	 * posted to the public lists, this is probably the best we
+> > 	 * can do.
+> > 	 */
+> > 
+> > The approach to deal with the hardware reset (for at least the pruss
+> > hwmod) was to add a generic omap property to properly define this
+> > hardware. The implementation simply deasserts any rst lines that
+> > are called out in the property when the omap_device is
+> > instantiated. This is not the ideal implementation as the sequence is
+> > a bit wrong for pruss since the busy check during the hard reset
+> > will fail, even though it fails in a benign manner. Ideally, we would
+> > want the implementation to observe the ti,deassert-hard-reset property
+> > and use that in omap_hwmod.c:_enable() *after* the module is unidled
+> > and the clocks active. However, this is actually functional for purposes
+> > of getting the uio_pruss driver up and running.
+> 
+> Could you please sync with Omar on the hard reset handling?  He posted 
+> some patches that change the hard reset code.  Perhaps you can align on an 
+> approach with him?
 
-The time I would have available to put into this is rather limited, but
-I have some initial ideas, as outlined below.
+Ok, yes, I looked over his series now and it goes some way to solving
+the problem on PRUSS. My only concern is that the approach of loading up
+function pointers in pdata for the assert/deassert calls gets a bit ugly on a
+DT-only platform like AM33xx. I'll work with Omar on that.
+ 
+> A few general comments: if some new per-IP block flag is needed to control 
+> this, the best place for it right now would be the hwmod data in 
+> arch/arm/mach-omap2/omap_hwmod_*_data.c, rather than DT.  At some point 
+> soon, the hard reset handling will be split between a PRM driver and some 
+> hwmod bus driver, and it seems best to deal with the DT binding question 
+> at that time.  That way we don't wind up with a legacy binding that has to 
+> be supported over the long term.
 
-Tixy (who did the kprobes implementation, which is probably the most
-sophisticated opcode handling we have in the kernel right now) may have
-ideas too.  I would hope that any common framework could reuse a fair
-chunk of his implementation and test coverage.
+Ok, make sense.
 
-
-
-I think that a common framework would have to start out a lot more
-generic that the special-purpose code in current subsystems, at least
-initially.  We should try to move all the knowledge about how
-instructions are encoded out of subsystems and into the common
-framework, so far as possible.
-
-
-We might end up with an interface like this:
-
-Instruction data in memory <-> __arm_mem_to_opcode*() and friends <-> canonical form
-
-canonical form -> __arm_opcode_decode() -> decoded form
-
-decoded form -> __arm_opcode_encode() -> canonical form
-
-
-The decoded form might look something like this:
-
-struct arm_insn {
-	u32			opcode;
-	u32			flags;		/* common flags */
-	enum arm_insn_type	type;
-	u32			insn_flags;	/* insn specific flags */
-	enum arm_reg		Rd;
-	enum arm_reg		Rn;
-	enum arm_reg		Rm;
-	enum arm_reg		Rs;
-	enum arm_reg		Rt;
-	enum arm_reg		Ra;
-
-	/* ... */
-};
-
-... and so on.  This just a sketch, and deliberately very incomplete.
-
-The basic principle here is that the client gets the architectural,
-encoding-independent view of the instruction: as far as possible, client
-code should never need to know anything about how the encoding works.
-The client code should not even need to know for most purposes whether
-the instruction is ARM or Thumb, once decoded.
-
-Identifying instruction classes (i.e., is this a VFP/NEON instruction,
-does this access memory, does this change the PC) etc. should all be
-abstracted as helper functions / macros.
-
-All cleverness involving tables and hashes to accelerate decode and
-identify instruction classes should move into the framework, but
-we can start out with something stupid and simple: if we only need
-to distinguish a few instruction types to begin with, a simple switch
-statement for decode may be enough to get started.  However, as
-things mature, a more sophisticated table-driven approach could be
-
-
-A good starting point would be load/store emulation as this seems to be a
-common theme, and we would need a credible deployment for any new
-framework so that we know it's fit for purpose.
-
-So just refactoring the code that appears in the KVM patches could be a
-good way of getting such a framework off the ground.
-
-Subsystems could be migrated to the new framework incrementally after
-its initial creation, while extending the framework as needed.  This
-means that the initial that the initial framework could be pretty simple
--- we don't need all the functionality all at once.
-
-
-[...]
-
-Cheers
----Dave
+Thanks,
+Matt
