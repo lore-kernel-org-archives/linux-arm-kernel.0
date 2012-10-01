@@ -1,10 +1,11 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 01 Oct 2012 16:00:40 -0700
-Subject: [PATCH] ARM: OMAP: fix return value check in beagle_opp_init()
-In-Reply-To: <CAPgLHd9aJUYX_a7_iXLi5r6VEVuB0W15G9Ryw2bVzNzko2NpBA@mail.gmail.com>
- (Wei Yongjun's message of "Fri, 21 Sep 2012 14:26:37 +0800")
-References: <CAPgLHd9aJUYX_a7_iXLi5r6VEVuB0W15G9Ryw2bVzNzko2NpBA@mail.gmail.com>
-Message-ID: <87d311er1j.fsf@deeprootsystems.com>
+Date: Mon, 01 Oct 2012 16:01:11 -0700
+Subject: [PATCH] ARM: OMAP: omap_device: fix return value check in
+ omap_device_build_ss()
+In-Reply-To: <CAPgLHd8ys7uU8wBhMF7JWZEDAddOnGo4vHPu1V_+Q3__WWK-3g@mail.gmail.com>
+ (Wei Yongjun's message of "Fri, 21 Sep 2012 14:32:04 +0800")
+References: <CAPgLHd8ys7uU8wBhMF7JWZEDAddOnGo4vHPu1V_+Q3__WWK-3g@mail.gmail.com>
+Message-ID: <878vbper0o.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,9 +13,9 @@ Wei Yongjun <weiyj.lk@gmail.com> writes:
 
 > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 >
-> In case of error, the function omap_device_get_by_hwmod_name()
-> returns ERR_PTR() not NULL pointer. The NULL test in the return
-> value check should be replaced with IS_ERR().
+> In case of error, the function omap_device_alloc() returns ERR_PTR()
+> and never returns NULL pointer. The NULL test in the return value
+> check should be replaced with IS_ERR().
 >
 > dpatch engine is used to auto generated this patch.
 > (https://github.com/weiyj/dpatch)
@@ -23,23 +24,24 @@ Wei Yongjun <weiyj.lk@gmail.com> writes:
 
 Acked-by: Kevin Hilman <khilman@ti.com>
 
+
 > ---
->  arch/arm/mach-omap2/board-omap3beagle.c | 2 +-
+>  arch/arm/plat-omap/omap_device.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 6202fc7..a548d70 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -466,7 +466,7 @@ static void __init beagle_opp_init(void)
->  		mpu_dev = omap_device_get_by_hwmod_name("mpu");
->  		iva_dev = omap_device_get_by_hwmod_name("iva");
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index c490240..3f62de6 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -671,7 +671,7 @@ struct platform_device __init *omap_device_build_ss(const char *pdev_name, int p
+>  		dev_set_name(&pdev->dev, "%s", pdev->name);
 >  
-> -		if (!mpu_dev || !iva_dev) {
-> +		if (IS_ERR(mpu_dev) || IS_ERR(iva_dev)) {
->  			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
->  				__func__, mpu_dev, iva_dev);
->  			return;
+>  	od = omap_device_alloc(pdev, ohs, oh_cnt, pm_lats, pm_lats_cnt);
+> -	if (!od)
+> +	if (IS_ERR(od))
+>  		goto odbs_exit1;
+>  
+>  	ret = platform_device_add_data(pdev, pdata, pdata_len);
 >
 >
 > --
