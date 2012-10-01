@@ -1,75 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  1 Oct 2012 11:43:48 +0100
-Subject: [PATCH 7/7] ARM: ux500: Remove platform specific device registration
- when DT is enabled
-In-Reply-To: <1349088228-8582-1-git-send-email-lee.jones@linaro.org>
-References: <1349088228-8582-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349088228-8582-8-git-send-email-lee.jones@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 1 Oct 2012 06:46:52 -0400
+Subject: [PATCH] [ARM] Build failure CONFIG_ARCH_KIRKWOOD_DT relies on
+ CACHE_FEROCEON_L2
+In-Reply-To: <CAOesGMgpDs60jGsV4Wu-A7M+ThXh7YVkgb_mPgMJfPwNa_QbSw@mail.gmail.com>
+References: <20120930232253.GD30637@obsidianresearch.com>
+ <CAOesGMgpDs60jGsV4Wu-A7M+ThXh7YVkgb_mPgMJfPwNa_QbSw@mail.gmail.com>
+Message-ID: <20121001104652.GK17765@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most devices have now been successfully DT:ed and each supported
-platform has its own Device Tree source file. Hence the majority
-of the platform specific device registration calls can now be
-successfully removed.
+On Sun, Sep 30, 2012 at 07:44:10PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Sun, Sep 30, 2012 at 4:22 PM, Jason Gunthorpe
+> <jgunthorpe@obsidianresearch.com> wrote:
+> > Move the CACHE_FEROCEON_L2 test to kirkwood_l2_init, since linking
+> > fails on the reference to feroceon_l2_init.
+> >
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > ---
+> >  arch/arm/mach-kirkwood/board-dt.c |    2 --
+> >  arch/arm/mach-kirkwood/common.c   |    4 ++--
+> >  2 files changed, 2 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> > index e4eb450..d00223e 100644
+> > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > @@ -50,9 +50,7 @@ static void __init kirkwood_dt_init(void)
+> >
+> >         kirkwood_setup_cpu_mbus();
+> >
+> > -#ifdef CONFIG_CACHE_FEROCEON_L2
+> >         kirkwood_l2_init();
+> > -#endif
+> >
+> >         /* Setup root of clk tree */
+> >         kirkwood_clk_init();
+> > diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> > index 1201191..4177304 100644
+> > --- a/arch/arm/mach-kirkwood/common.c
+> > +++ b/arch/arm/mach-kirkwood/common.c
+> > @@ -645,6 +645,7 @@ char * __init kirkwood_id(void)
+> >
+> >  void __init kirkwood_l2_init(void)
+> >  {
+> > +#ifdef CONFIG_CACHE_FEROCEON_L2
+> >  #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+> 
+> Aren't these added ifdefs completely redundant? L2_WRITETHROUGH is
+> dependent on the outer options anyway.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |   29 +----------------------------
- 1 file changed, 1 insertion(+), 28 deletions(-)
+I thought so as well, so I went and looked at the code.  There is a
+#else between the original #ifdef/#endif pair.  So, feroceon_l2_init()
+gets called in both cases.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 38e53b2..5dd4a59 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -793,8 +793,6 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
- static void __init u8500_init_machine(void)
- {
- 	struct device *parent = NULL;
--	int i2c0_devs;
--	int i;
- 
- 	/* Pinmaps must be in place before devices register */
- 	if (of_machine_is_compatible("st-ericsson,mop500"))
-@@ -804,37 +802,12 @@ static void __init u8500_init_machine(void)
- 	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
- 		hrefv60_pinmaps_init();
- 
-+	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
- 	parent = u8500_of_init_devices();
- 
--	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
--		mop500_platform_devs[i]->dev.parent = parent;
--
- 	/* automatically probe child nodes of db8500 device */
- 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
- 
--	if (of_machine_is_compatible("st-ericsson,mop500")) {
--		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
--
--		platform_add_devices(mop500_platform_devs,
--				ARRAY_SIZE(mop500_platform_devs));
--
--		mop500_audio_init(parent);
--		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
--		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--		i2c_register_board_info(2, mop500_i2c2_devices,
--					ARRAY_SIZE(mop500_i2c2_devices));
--
--	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
--		/*
--		 * The HREFv60 board removed a GPIO expander and routed
--		 * all these GPIO pins to the internal GPIO controller
--		 * instead.
--		 */
--		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
--		platform_add_devices(mop500_platform_devs,
--				ARRAY_SIZE(mop500_platform_devs));
--	}
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
--- 
-1.7.9.5
+hth,
+
+Jason.
