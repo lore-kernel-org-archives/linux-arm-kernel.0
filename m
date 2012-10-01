@@ -1,77 +1,58 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Mon, 1 Oct 2012 07:03:47 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Mon, 1 Oct 2012 16:46:10 +1000
+Subject: [PATCH 1/1] Fix segfault in DTC
+In-Reply-To: <50692B7A.8000405@wwwdotorg.org>
+References: <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
+ <20120925233054.GL9800@truffula.fritz.box>
+ <50624393.30607@broadcom.com>
+ <20120926003508.GB31993@truffula.fritz.box>
+ <50632F78.4030709@broadcom.com> <5065D9C7.40906@wwwdotorg.org>
+ <E1THfgr-0006Fg-KT@jdl.com> <5065F4FD.4010807@wwwdotorg.org>
+ <20120929235342.GA23078@truffula.fritz.box>
+ <50692B7A.8000405@wwwdotorg.org>
+Message-ID: <20121001064610.GA5323@truffula.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Don Aisheng
-
-On Tue, Sep 11, 2012 at 01:10:12, Linus Walleij wrote:
-> On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+On Sun, Sep 30, 2012 at 11:34:50PM -0600, Stephen Warren wrote:
+> On 09/29/2012 05:53 PM, David Gibson wrote:
+> > On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
+> >> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
+> >>>>>
+> >>>>> Yeah, seems like the kernel DTC is quite old.
+> >>>>
+> >>>> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
+> >>>
+> >>> Awesome.  Thank you.
+> >>>
+> >>>> I've run a regression test vs. the old dtc in the kernel ...
+> >>>
+> >>> Which is the icky step.  Again, thank you.
+> >>>
+> >>>> ... and found that
+> >>>> some of the PowerPC .dts files don't compile with the new dtc (but did
+> >>>> with the old), all due to non-existent labels/paths being referenced.
+> >>>> I'll try and track down whether this is a regression in dtc, or simply
+> >>>> buggy .dts files that weren't noticed before.
+> >>>
+> >>> I think you should just smack the PowerPC guys. :-)
+> >>
+> >> For the record in this thread, it was a regression I introduced into dtc
+> >> - the patch I just sent was for this.
+> > 
+> > I would be nice to add a testcase for this regression into dtc.
 > 
-> > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > device pointer, pinctrl driver configure SoC pins to GPIO
-> > mode according to definitions provided in .dts file.
-> >
-> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> 
-> So looking back at this after Stephen posed a real good
-> question, when you say "configure SoC pins to GPIO
-> mode", does that mean anything else than to mux them into
-> GPIO mode?
->
+> The issue here was caused by uninitialized memory, so it would, I think,
+> be basically impossible to create a test-case that would be guaranteed
+> to fail because of this; it'd depend on the internal details of the
+> malloc library and how/when it re-used previously free()d memory blocks.
 
-pinctrl-single.c driver sets mux mode as well as pin configuration
-like pull-up/pull-down, input/output and slew rate.
+It doesn't have to be guaranteed to fail to be useful.  Plus, we
+already have the infrastructure to run the tests under valgrind, which
+would catch it.
 
-> In that case, have you considered augmenting
-> pinctrl-single.c to implement .gpio_request_enable()
-> .gpio_disable_free() and maybe also .gpio_set_direction()
-> in its struct pinmux_ops pinmux backend?
-> 
-> If not, why?
-
-Recently, I have gone through the details on implementing
-gpio_request_enable in pinctrl-single driver. To add this
-functionality we have to add gpio_range's to pinctrl driver.
-
-AM335x EVM supports total 128 GPIO pins (4 banks) and these
-are randomly distributed across AM33XX SoC pins.
-
-These are the concerns/questions I have:-
-1. I haven't added yet but it will come to more than 30-40
-pinctrl_gpio_range entries
-2. If the silicon package is changed then these will change.
-3. If the GPIO driver is common for multiple SoCs then these
-entries will be more & more over SoC specific and driver has
-to change every time the gpio_range changes. 
-
-   I have gone through the "Don Aisheng" patch series, which
-adds "pinctrl_dt_add_gpio_ranges" support but not accepted
-yet. With this patch series we can overcome the driver changes.
-
-4. The current pinctrl driver has support for these APIs
-pinctrl_request_gpio(), pinctrl_free_gpio(),
-pinctrl_gpio_direction_input/output()
-no API for slew rate control, pulled down/up control
-how can we handle this?
-5. pinctrl-single driver has to modify to provide separate handles
-for pinmux and pinconfig. And we need separate pin configuration
-bit masks and values/flags to take care of pull-up/down, slew rate,
-receiver in/out and mux mode control.
-6. This is for my understanding, on which node do we have to add
-pinctrl data i.e., pin mux-mode data. In leds-gpio node (mostly not)
-and if it is in gpio node then how can we pass pinmux data with
-the existing API pinctrl_request_gpio(gpio);? Here we are passing
-only gpio number.
-
-Few more driver patches are pending along with this (leds-gpio DT
-data additions according to this patch, similarly other drivers
-like matrix keypad and volume keys)
-
-Thanks
-AnilKumar
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
