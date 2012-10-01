@@ -1,35 +1,38 @@
-From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Mon,  1 Oct 2012 22:46:09 +0200
-Subject: [PATCH] arm/dts: at91sam9g20ek_common: Fix typos in buttons labels.
-Message-ID: <1349124369-28742-1-git-send-email-marek.belisko@open-nandra.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon,  1 Oct 2012 22:52:43 +0200
+Subject: [PATCH] mmc: mxs-mmc: Fix merge issue causing build error
+Message-ID: <1349124763-10840-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
----
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The following error appeared due to trivial merge problem:
 
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index b06c0db..e6391a4 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -126,14 +126,14 @@
- 		#size-cells = <0>;
- 
- 		btn3 {
--			label = "Buttin 3";
-+			label = "Button 3";
- 			gpios = <&pioA 30 1>;
- 			linux,code = <0x103>;
- 			gpio-key,wakeup;
- 		};
- 
- 		btn4 {
--			label = "Buttin 4";
-+			label = "Button 4";
- 			gpios = <&pioA 31 1>;
- 			linux,code = <0x104>;
- 			gpio-key,wakeup;
+drivers/mmc/host/mxs-mmc.c: In function 'mxs_mmc_enable_sdio_irq':
+drivers/mmc/host/mxs-mmc.c:527:3: error: 'struct mxs_mmc_host' has no member named 'base'
+drivers/mmc/host/mxs-mmc.c:527:3: error: 'struct mxs_mmc_host' has no member named 'devid'
+make[3]: *** [drivers/mmc/host/mxs-mmc.o] Error 1
+
+This patches corrects the issue.
+
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/host/mxs-mmc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index bb4c2bf..80d1e6d 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -525,7 +525,7 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+ 		       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ 		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
+-		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
++		       ssp->base + HW_SSP_CTRL1(ssp) + STMP_OFFSET_REG_SET);
+ 	} else {
+ 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+ 		       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
 -- 
-1.7.9.5
+1.7.10.4
