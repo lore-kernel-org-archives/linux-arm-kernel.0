@@ -1,48 +1,36 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 1 Oct 2012 14:03:43 +0200
-Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
-References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20121001120343.GG12231@sortiz-mobl>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 1 Oct 2012 17:34:02 +0530
+Subject: [PATCH v2 4/7] ARM: davinci: Add support for an L3RAM gen_pool
+In-Reply-To: <1348861072-14507-5-git-send-email-mporter@ti.com>
+References: <1348861072-14507-1-git-send-email-mporter@ti.com>
+ <1348861072-14507-5-git-send-email-mporter@ti.com>
+Message-ID: <506986B2.1030000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sourav,
+Hi Matt,
 
-On Mon, Oct 01, 2012 at 04:31:22PM +0530, Sourav Poddar wrote:
-> smsc ece1099 is a keyboard scan or gpio expansion device.
-> The patch create keypad and gpio expander child for this
-> multi function smsc driver.
+On 9/29/2012 1:07 AM, Matt Porter wrote:
+> L3RAM (shared SRAM) is needed for use by several drivers.
+> This creates a genalloc pool and a hook for the platform code
+> to provide the struct gen_pool * in platform data.
 > 
-> Tested on omap5430 evm with 3.6-rc6 custom kernel.
-> 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
-> Changes since v2:
->  - Change the cache type, max register assignment
->  - remove of_device_table, since i2c based device gets 
-> probed according to i2c_device_id through dt.
->  - Modify the remove function
->  - Minor return patch cleanups.
->  Documentation/smsc_ece1099.txt |   56 ++++++++++++++++++++
->  drivers/mfd/Kconfig            |   12 ++++
->  drivers/mfd/Makefile           |    1 +
->  drivers/mfd/smsc-ece1099.c     |  113 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/smsc.h       |  109 ++++++++++++++++++++++++++++++++++++++
->  5 files changed, 291 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/smsc_ece1099.txt
->  create mode 100644 drivers/mfd/smsc-ece1099.c
->  create mode 100644 include/linux/mfd/smsc.h
-Applied with a warning fix for the !CONFIG_OF case.
+> Signed-off-by: Matt Porter <mporter@ti.com>
 
-Cheers,
-Samuel.
+I am not sure if any of the DaVinci devices have a need to allocate from
+*both* ARM RAM and shared RAM. Shared RAM is not present on all DaVinci
+devices AFAIR, and on DA850, there is just 8KB ARM RAM so I am not sure
+if there is much point in trying to allocate from there.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Can you instead see if Ben's earlier patch[1] to use shared RAM for SRAM
+allocation on DA850 makes sense for your case? If yes, can you repost
+with Ben's patch included in your series instead of this patch? I would
+prefer that over creating a new pool for shared RAM.
+
+Thanks,
+Sekhar
+
+[1] https://patchwork.kernel.org/patch/840552/
+
+Thanks,
+Sekhar
