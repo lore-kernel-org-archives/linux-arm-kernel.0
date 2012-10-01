@@ -1,285 +1,282 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 01 Oct 2012 05:11:25 -0400
-Subject: [PATCH v2 12/14] KVM: ARM: VFP userspace interface
+Date: Mon, 01 Oct 2012 05:11:32 -0400
+Subject: [PATCH v2 13/14] KVM: ARM: Handle guest faults in KVM
 In-Reply-To: <20121001090945.49198.68950.stgit@ubuntu>
 References: <20121001090945.49198.68950.stgit@ubuntu>
-Message-ID: <20121001091125.49198.90819.stgit@ubuntu>
+Message-ID: <20121001091132.49198.41177.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rusty Russell <rusty.russell@linaro.org>
+Handles the guest faults in KVM by mapping in corresponding user pages
+in the 2nd stage page tables.
 
-We use space #18 for floating point regs.
+We invalidate the instruction cache by MVA whenever we map a page to the
+guest (no, we cannot only do it when we have an iabt because the guest
+may happily read/write a page before hitting the icache) if the hardware
+uses VIPT or PIPT.  In the latter case, we can invalidate only that
+physical page.  In the first case, all bets are off and we simply must
+invalidate the whole affair.  Not that VIVT icaches are tagged with
+vmids, and we are out of the woods on that one.  Alexander Graf was nice
+enough to remind us of this massive pain.
 
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+There is also  a subtle bug hidden somewhere, which we currently hide by
+marking all pages dirty even when the pages are only mapped read-only.  The
+current hypothesis is that marking pages dirty may exercise the IO system and
+data cache more and therefore we don't see stale data in the guest, but it's
+purely guesswork.  The bug is manifested by seemingly random kernel crashes in
+guests when the host is under extreme memory pressure and swapping is enabled.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- Documentation/virtual/kvm/api.txt |    6 +
- arch/arm/include/asm/kvm.h        |   12 ++
- arch/arm/kvm/coproc.c             |  178 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 196 insertions(+)
+ arch/arm/include/asm/kvm_arm.h |    9 ++
+ arch/arm/include/asm/kvm_asm.h |    2 +
+ arch/arm/kvm/mmu.c             |  145 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/trace.h           |   28 ++++++++
+ 4 files changed, 183 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 74223f3..7695425 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -1765,6 +1765,12 @@ ARM 64-bit CP15 registers have the following id bit patterns:
- ARM CCSIDR registers are demultiplexed by CSSELR value:
-   0x4002 0000 0011 00 <csselr:8>
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index 6b8bb51..61d8a26 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -152,11 +152,20 @@
+ #define HSR_ISS		(HSR_IL - 1)
+ #define HSR_ISV_SHIFT	(24)
+ #define HSR_ISV		(1U << HSR_ISV_SHIFT)
++#define HSR_FSC		(0x3f)
++#define HSR_FSC_TYPE	(0x3c)
++#define HSR_WNR		(1 << 6)
+ #define HSR_CV_SHIFT	(24)
+ #define HSR_CV		(1U << HSR_CV_SHIFT)
+ #define HSR_COND_SHIFT	(20)
+ #define HSR_COND	(0xfU << HSR_COND_SHIFT)
  
-+ARM 32-bit VFP control registers have the following id bit patterns:
-+  0x4002 0000 0012 1 <selector:3>
++#define FSC_FAULT	(0x04)
++#define FSC_PERM	(0x0c)
 +
-+ARM 64-bit FP registers have the following id bit patterns:
-+  0x4002 0000 0012 0 <selector:3>
++/* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
++#define HPFAR_MASK	(~0xf)
 +
- 4.69 KVM_GET_ONE_REG
+ #define HSR_EC_UNKNOWN	(0x00)
+ #define HSR_EC_WFI	(0x01)
+ #define HSR_EC_CP15_32	(0x03)
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 47a0e57..6fccdb3 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -71,6 +71,8 @@ extern char __kvm_hyp_vector[];
+ extern char __kvm_hyp_code_start[];
+ extern char __kvm_hyp_code_end[];
  
- Capability: KVM_CAP_ONE_REG
-diff --git a/arch/arm/include/asm/kvm.h b/arch/arm/include/asm/kvm.h
-index 0ab12fd..b6eaf0c 100644
---- a/arch/arm/include/asm/kvm.h
-+++ b/arch/arm/include/asm/kvm.h
-@@ -95,6 +95,18 @@ struct kvm_reg_list {
- #define KVM_REG_ARM_DEMUX_VAL_MASK	0x00000000000000FF
- #define KVM_REG_ARM_DEMUX_VAL_SHIFT	0
- 
-+/* VFP registers: we could overload CP10 like ARM does, but that's ugly. */
-+#define KVM_REG_ARM_VFP			(0x0012 << KVM_REG_ARM_COPROC_SHIFT)
-+#define KVM_REG_ARM_VFP_MASK		0x000000000000FFFF
-+#define KVM_REG_ARM_VFP_BASE_REG	0x0
-+#define KVM_REG_ARM_VFP_FPSID		0x1000
-+#define KVM_REG_ARM_VFP_FPSCR		0x1001
-+#define KVM_REG_ARM_VFP_MVFR1		0x1006
-+#define KVM_REG_ARM_VFP_MVFR0		0x1007
-+#define KVM_REG_ARM_VFP_FPEXC		0x1008
-+#define KVM_REG_ARM_VFP_FPINST		0x1009
-+#define KVM_REG_ARM_VFP_FPINST2		0x100A
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
 +
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
  
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 7addf62..b8bddd7 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -26,6 +26,8 @@
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3f835a2..15ca732 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -21,9 +21,11 @@
+ #include <linux/io.h>
+ #include <asm/idmap.h>
+ #include <asm/pgalloc.h>
++#include <asm/cacheflush.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
+ #include <asm/mach/map.h>
  #include <trace/events/kvm.h>
-+#include <asm/vfp.h>
-+#include "../vfp/vfpinstr.h"
  
- #include "trace.h"
- #include "coproc.h"
-@@ -652,6 +654,170 @@ static int demux_c15_set(u64 id, void __user *uaddr)
- 	}
+@@ -491,9 +493,150 @@ out:
+ 	return ret;
  }
  
-+#ifdef CONFIG_VFPv3
-+static const int vfp_sysregs[] = { KVM_REG_ARM_VFP_FPEXC,
-+				   KVM_REG_ARM_VFP_FPSCR,
-+				   KVM_REG_ARM_VFP_FPINST,
-+				   KVM_REG_ARM_VFP_FPINST2,
-+				   KVM_REG_ARM_VFP_MVFR0,
-+				   KVM_REG_ARM_VFP_MVFR1,
-+				   KVM_REG_ARM_VFP_FPSID };
-+
-+static unsigned int num_fp_regs(void)
++static void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
 +{
-+	if (((fmrx(MVFR0) & MVFR0_A_SIMD_MASK) >> MVFR0_A_SIMD_BIT) == 2)
-+		return 32;
++	/*
++	 * If we are going to insert an instruction page and the icache is
++	 * either VIPT or PIPT, there is a potential problem where the host
++	 * (or another VM) may have used this page at the same virtual address
++	 * as this guest, and we read incorrect data from the icache.  If
++	 * we're using a PIPT cache, we can invalidate just that page, but if
++	 * we are using a VIPT cache we need to invalidate the entire icache -
++	 * damn shame - as written in the ARM ARM (DDI 0406C - Page B3-1384)
++	 */
++	if (icache_is_pipt()) {
++		unsigned long hva = gfn_to_hva(kvm, gfn);
++		__cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
++	} else if (!icache_is_vivt_asid_tagged()) {
++		/* any kind of VIPT cache */
++		__flush_icache_all();
++	}
++}
++
++static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
++			  gfn_t gfn, struct kvm_memory_slot *memslot,
++			  bool is_iabt, unsigned long fault_status)
++{
++	pte_t new_pte;
++	pfn_t pfn;
++	int ret;
++	bool write_fault, writable;
++	unsigned long mmu_seq;
++	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
++
++	if (is_iabt)
++		write_fault = false;
++	else if ((vcpu->arch.hsr & HSR_ISV) && !(vcpu->arch.hsr & HSR_WNR))
++		write_fault = false;
 +	else
-+		return 16;
-+}
++		write_fault = true;
 +
-+static unsigned int num_vfp_regs(void)
-+{
-+	/* Normal FP regs + control regs. */
-+	return num_fp_regs() + ARRAY_SIZE(vfp_sysregs);
-+}
-+
-+static int copy_vfp_regids(u64 __user *uindices)
-+{
-+	unsigned int i;
-+	const u64 u32reg = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_VFP;
-+	const u64 u64reg = KVM_REG_ARM | KVM_REG_SIZE_U64 | KVM_REG_ARM_VFP;
-+
-+	for (i = 0; i < num_fp_regs(); i++) {
-+		if (put_user((u64reg | KVM_REG_ARM_VFP_BASE_REG) + i,
-+			     uindices))
-+			return -EFAULT;
-+		uindices++;
++	if (fault_status == FSC_PERM && !write_fault) {
++		kvm_err("Unexpected L2 read permission error\n");
++		return -EFAULT;
 +	}
 +
-+	for (i = 0; i < ARRAY_SIZE(vfp_sysregs); i++) {
-+		if (put_user(u32reg | vfp_sysregs[i], uindices))
-+			return -EFAULT;
-+		uindices++;
++	/* We need minimum second+third level pages */
++	ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
++	if (ret)
++		return ret;
++
++	mmu_seq = vcpu->kvm->mmu_notifier_seq;
++	smp_rmb();
++
++	pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
++	if (is_error_pfn(pfn))
++		return -EFAULT;
++
++	new_pte = pfn_pte(pfn, PAGE_S2);
++	coherent_icache_guest_page(vcpu->kvm, gfn);
++
++	spin_lock(&vcpu->kvm->mmu_lock);
++	if (mmu_notifier_retry(vcpu, mmu_seq))
++		goto out_unlock;
++	if (writable) {
++		pte_val(new_pte) |= L_PTE_S2_RDWR;
++		kvm_set_pfn_dirty(pfn);
 +	}
++	stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte);
 +
-+	return num_vfp_regs();
-+}
-+
-+static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
-+{
-+	u32 vfpid = (id & KVM_REG_ARM_VFP_MASK);
-+	u32 val;
-+
-+	/* Fail if we have unknown bits set. */
-+	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
-+		   | ((1 << KVM_REG_ARM_COPROC_SHIFT)-1)))
-+		return -ENOENT;
-+
-+	if (vfpid < num_fp_regs()) {
-+		if (KVM_REG_SIZE(id) != 8)
-+			return -ENOENT;
-+		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpregs[vfpid],
-+				   id);
-+	}
-+
-+	/* FP control registers are all 32 bit. */
-+	if (KVM_REG_SIZE(id) != 4)
-+		return -ENOENT;
-+
-+	switch (vfpid) {
-+	case KVM_REG_ARM_VFP_FPEXC:
-+		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpexc, id);
-+	case KVM_REG_ARM_VFP_FPSCR:
-+		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpscr, id);
-+	case KVM_REG_ARM_VFP_FPINST:
-+		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst, id);
-+	case KVM_REG_ARM_VFP_FPINST2:
-+		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst2, id);
-+	case KVM_REG_ARM_VFP_MVFR0:
-+		val = fmrx(MVFR0);
-+		return reg_to_user(uaddr, &val, id);
-+	case KVM_REG_ARM_VFP_MVFR1:
-+		val = fmrx(MVFR1);
-+		return reg_to_user(uaddr, &val, id);
-+	case KVM_REG_ARM_VFP_FPSID:
-+		val = fmrx(FPSID);
-+		return reg_to_user(uaddr, &val, id);
-+	default:
-+		return -ENOENT;
-+	}
-+}
-+
-+static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
-+{
-+	u32 vfpid = (id & KVM_REG_ARM_VFP_MASK);
-+	u32 val;
-+
-+	/* Fail if we have unknown bits set. */
-+	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
-+		   | ((1 << KVM_REG_ARM_COPROC_SHIFT)-1)))
-+		return -ENOENT;
-+
-+	if (vfpid < num_fp_regs()) {
-+		if (KVM_REG_SIZE(id) != 8)
-+			return -ENOENT;
-+		return reg_from_user(&vcpu->arch.vfp_guest.fpregs[vfpid],
-+				     uaddr, id);
-+	}
-+
-+	/* FP control registers are all 32 bit. */
-+	if (KVM_REG_SIZE(id) != 4)
-+		return -ENOENT;
-+
-+	switch (vfpid) {
-+	case KVM_REG_ARM_VFP_FPEXC:
-+		return reg_from_user(&vcpu->arch.vfp_guest.fpexc, uaddr, id);
-+	case KVM_REG_ARM_VFP_FPSCR:
-+		return reg_from_user(&vcpu->arch.vfp_guest.fpscr, uaddr, id);
-+	case KVM_REG_ARM_VFP_FPINST:
-+		return reg_from_user(&vcpu->arch.vfp_guest.fpinst, uaddr, id);
-+	case KVM_REG_ARM_VFP_FPINST2:
-+		return reg_from_user(&vcpu->arch.vfp_guest.fpinst2, uaddr, id);
-+	/* These are invariant. */
-+	case KVM_REG_ARM_VFP_MVFR0:
-+		if (reg_from_user(&val, uaddr, id))
-+			return -EFAULT;
-+		if (val != fmrx(MVFR0))
-+			return -EINVAL;
-+		return 0;
-+	case KVM_REG_ARM_VFP_MVFR1:
-+		if (reg_from_user(&val, uaddr, id))
-+			return -EFAULT;
-+		if (val != fmrx(MVFR1))
-+			return -EINVAL;
-+		return 0;
-+	case KVM_REG_ARM_VFP_FPSID:
-+		if (reg_from_user(&val, uaddr, id))
-+			return -EFAULT;
-+		if (val != fmrx(FPSID))
-+			return -EINVAL;
-+		return 0;
-+	default:
-+		return -ENOENT;
-+	}
-+}
-+#else /* !CONFIG_VFPv3 */
-+static unsigned int num_vfp_regs(void)
-+{
++out_unlock:
++	spin_unlock(&vcpu->kvm->mmu_lock);
++	/*
++	 * XXX TODO FIXME:
++-        * This is _really_ *weird* !!!
++-        * We should be calling the _clean version, because we set the pfn dirty
++	 * if we map the page writable, but this causes memory failures in
++	 * guests under heavy memory pressure on the host and heavy swapping.
++	 */
++	kvm_release_pfn_dirty(pfn);
 +	return 0;
 +}
 +
-+static int copy_vfp_regids(u64 __user *uindices)
-+{
-+	return 0;
-+}
-+
-+static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
-+{
-+	return -ENOENT;
-+}
-+
-+static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
-+{
-+	return -ENOENT;
-+}
-+#endif /* !CONFIG_VFPv3 */
-+
- int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++/**
++ * kvm_handle_guest_abort - handles all 2nd stage aborts
++ * @vcpu:	the VCPU pointer
++ * @run:	the kvm_run structure
++ *
++ * Any abort that gets to the host is almost guaranteed to be caused by a
++ * missing second stage translation table entry, which can mean that either the
++ * guest simply needs more memory and we must allocate an appropriate page or it
++ * can mean that the guest tried to access I/O memory, which is emulated by user
++ * space. The distinction is based on the IPA causing the fault and whether this
++ * memory region has been registered as standard RAM by user space.
++ */
+ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
  {
- 	const struct coproc_reg *r;
-@@ -660,6 +826,9 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
- 		return demux_c15_get(reg->id, uaddr);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
-+		return vfp_get_reg(vcpu, reg->id, uaddr);
+-	return -EINVAL;
++	unsigned long hsr_ec;
++	unsigned long fault_status;
++	phys_addr_t fault_ipa;
++	struct kvm_memory_slot *memslot = NULL;
++	bool is_iabt;
++	gfn_t gfn;
++	int ret;
 +
- 	r = index_to_coproc_reg(vcpu, reg->id);
- 	if (!r)
- 		return get_invariant_cp15(reg->id, uaddr);
-@@ -676,6 +845,9 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
- 		return demux_c15_set(reg->id, uaddr);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
-+		return vfp_set_reg(vcpu, reg->id, uaddr);
++	hsr_ec = vcpu->arch.hsr >> HSR_EC_SHIFT;
++	is_iabt = (hsr_ec == HSR_EC_IABT);
++	fault_ipa = ((phys_addr_t)vcpu->arch.hpfar & HPFAR_MASK) << 8;
 +
- 	r = index_to_coproc_reg(vcpu, reg->id);
- 	if (!r)
- 		return set_invariant_cp15(reg->id, uaddr);
-@@ -787,6 +959,7 @@ unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu)
- {
- 	return ARRAY_SIZE(invariant_cp15)
- 		+ num_demux_regs()
-+		+ num_vfp_regs()
- 		+ walk_cp15(vcpu, (u64 __user *)NULL);
++	trace_kvm_guest_fault(*vcpu_pc(vcpu), vcpu->arch.hsr,
++			      vcpu->arch.hdfar, vcpu->arch.hifar, fault_ipa);
++
++	/* Check the stage-2 fault is trans. fault or write fault */
++	fault_status = (vcpu->arch.hsr & HSR_FSC_TYPE);
++	if (fault_status != FSC_FAULT && fault_status != FSC_PERM) {
++		kvm_err("Unsupported fault status: EC=%#lx DFCS=%#lx\n",
++			hsr_ec, fault_status);
++		return -EFAULT;
++	}
++
++	gfn = fault_ipa >> PAGE_SHIFT;
++	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
++		if (is_iabt) {
++			/* Prefetch Abort on I/O address */
++			kvm_inject_pabt(vcpu, vcpu->arch.hifar);
++			return 1;
++		}
++
++		if (fault_status != FSC_FAULT) {
++			kvm_err("Unsupported fault status on io memory: %#lx\n",
++				fault_status);
++			return -EFAULT;
++		}
++
++		kvm_pr_unimpl("I/O address abort...");
++		return 0;
++	}
++
++	memslot = gfn_to_memslot(vcpu->kvm, gfn);
++	if (!memslot->user_alloc) {
++		kvm_err("non user-alloc memslots not supported\n");
++		return -EINVAL;
++	}
++
++	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot,
++			     is_iabt, fault_status);
++	return ret ? ret : 1;
  }
  
-@@ -807,6 +980,11 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		return err;
- 	uindices += err;
+ static void handle_hva_to_gpa(struct kvm *kvm,
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+index c86a513..e088c78 100644
+--- a/arch/arm/kvm/trace.h
++++ b/arch/arm/kvm/trace.h
+@@ -39,6 +39,34 @@ TRACE_EVENT(kvm_exit,
+ 	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
+ );
  
-+	err = copy_vfp_regids(uindices);
-+	if (err < 0)
-+		return err;
-+	uindices += err;
++TRACE_EVENT(kvm_guest_fault,
++	TP_PROTO(unsigned long vcpu_pc, unsigned long hsr,
++		 unsigned long hdfar, unsigned long hifar,
++		 unsigned long ipa),
++	TP_ARGS(vcpu_pc, hsr, hdfar, hifar, ipa),
 +
- 	return write_demux_regids(uindices);
- }
- 
++	TP_STRUCT__entry(
++		__field(	unsigned long,	vcpu_pc		)
++		__field(	unsigned long,	hsr		)
++		__field(	unsigned long,	hdfar		)
++		__field(	unsigned long,	hifar		)
++		__field(	unsigned long,	ipa		)
++	),
++
++	TP_fast_assign(
++		__entry->vcpu_pc		= vcpu_pc;
++		__entry->hsr			= hsr;
++		__entry->hdfar			= hdfar;
++		__entry->hifar			= hifar;
++		__entry->ipa			= ipa;
++	),
++
++	TP_printk("guest fault at PC %#08lx (hdfar %#08lx, hifar %#08lx, "
++		  "ipa %#08lx, hsr %#08lx",
++		  __entry->vcpu_pc, __entry->hdfar, __entry->hifar,
++		  __entry->hsr, __entry->ipa)
++);
++
+ TRACE_EVENT(kvm_irq_line,
+ 	TP_PROTO(unsigned int type, int vcpu_idx, int irq_num, int level),
+ 	TP_ARGS(type, vcpu_idx, irq_num, level),
