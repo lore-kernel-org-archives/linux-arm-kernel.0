@@ -1,44 +1,48 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Mon, 1 Oct 2012 17:23:15 +0530
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 1 Oct 2012 14:03:43 +0200
 Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
  driver
-In-Reply-To: <20121001114454.GA9170@sirena.org.uk>
+In-Reply-To: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
 References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
- <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
- <20121001114454.GA9170@sirena.org.uk>
-Message-ID: <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+Message-ID: <20121001120343.GG12231@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sourav,
 
-On Mon, Oct 1, 2012 at 5:14 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Oct 01, 2012 at 05:00:06PM +0530, ABRAHAM, KISHON VIJAY wrote:
->> On Mon, Oct 1, 2012 at 4:31 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
->
-> Delete irrelevant context from your replies, it makes it much easier to
-> find new text.
->
->> > +static int smsc_i2c_remove(struct i2c_client *i2c)
->> > +{
->> > +       struct smsc *smsc = i2c_get_clientdata(i2c);
->> > +
->> > +       mfd_remove_devices(smsc->dev);
->
->> IMO, this should have resulted in an abort (hint: see
->> mfd_remove_devices_fn()). Trying to do mfd_remove_devices without
->> mfd_add_devices(). Use device_for_each_child here to remove the
->> device.
->
-> No, this is not at all sensible - if there's an mfd_remove_devices()
-> function we really ought to be able to use it to remove the children.
-> If we can't do that we should fix the API usability, not open code the
-> same stuff in every user.
+On Mon, Oct 01, 2012 at 04:31:22PM +0530, Sourav Poddar wrote:
+> smsc ece1099 is a keyboard scan or gpio expansion device.
+> The patch create keypad and gpio expander child for this
+> multi function smsc driver.
+> 
+> Tested on omap5430 evm with 3.6-rc6 custom kernel.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+> Changes since v2:
+>  - Change the cache type, max register assignment
+>  - remove of_device_table, since i2c based device gets 
+> probed according to i2c_device_id through dt.
+>  - Modify the remove function
+>  - Minor return patch cleanups.
+>  Documentation/smsc_ece1099.txt |   56 ++++++++++++++++++++
+>  drivers/mfd/Kconfig            |   12 ++++
+>  drivers/mfd/Makefile           |    1 +
+>  drivers/mfd/smsc-ece1099.c     |  113 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/smsc.h       |  109 ++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 291 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/smsc_ece1099.txt
+>  create mode 100644 drivers/mfd/smsc-ece1099.c
+>  create mode 100644 include/linux/mfd/smsc.h
+Applied with a warning fix for the !CONFIG_OF case.
 
-What makes more sense to me is extend mfd_add_devices to create child
-devices from dt data. Then for removing devices, one can use
-mfd_remove_devices().
+Cheers,
+Samuel.
 
-Thanks
-Kishon
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
