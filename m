@@ -1,61 +1,46 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 01 Oct 2012 16:12:09 +0100
-Subject: [PATCH 14/15] KVM: ARM: Handle I/O aborts
-In-Reply-To: <20121001125326.GA2100@linaro.org>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153559.21241.29970.stgit@ubuntu>
- <20120927151108.GM25916@mudshark.cambridge.arm.com>
- <CANM98qKFKU98EWNaOepjxab3h5vQypxdt_YoJbKV9kd31XUfaw@mail.gmail.com>
- <20121001125326.GA2100@linaro.org>
-Message-ID: <1349104329.2160.71.camel@linaro1.home>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Mon, 1 Oct 2012 20:54:23 +0530
+Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <20121001120907.GK4360@opensource.wolfsonmicro.com>
+References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
+ <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
+ <20121001114454.GA9170@sirena.org.uk>
+ <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+ <20121001120907.GK4360@opensource.wolfsonmicro.com>
+Message-ID: <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-01 at 13:53 +0100, Dave Martin wrote:
-> On Sun, Sep 30, 2012 at 05:49:21PM -0400, Christoffer Dall wrote:
-> > On Thu, Sep 27, 2012 at 11:11 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Sat, Sep 15, 2012 at 04:35:59PM +0100, Christoffer Dall wrote:
-> > > I'm afraid you're not going to thank me much for this, but it's high time we
-> > > unified the various instruction decoding functions we have under arch/arm/
-> > > and this seems like a good opportunity for that. For example, look at the
-> > > following snippets (there is much more in the files I list) in addition to
-> > > what you have:
-> > >
-> > 
-> > I think it would be great if we had a set of unified decoding functions!
-> > 
-> > However, I think it's a shame if we can't merge KVM because we want to
-> > clean up this code. There would be nothing in the way of breaking API
-> > or anything like that preventing us from cleaning this up after the
-> > code has been merged.
-> > 
-> > Please consider reviewing the code for correctness and consider if the
-> > code could be merged as is.
-> > 
-> > On the other hand, if you or Dave or anyone else wants to create a set
-> > of patches that cleans this up in a timely manner, I will be happy to
-> > merge them for my code as well ;)
-> 
-> The time I would have available to put into this is rather limited, but
-> I have some initial ideas, as outlined below.
-> 
-> Tixy (who did the kprobes implementation, which is probably the most
-> sophisticated opcode handling we have in the kernel right now) may have
-> ideas too.  I would hope that any common framework could reuse a fair
-> chunk of his implementation and test coverage.
+Hi,
 
-To my thinking, the kprobes code is very tailored to the job it needs to
-do and that turning it into something generic is just going to make
-everything bigger and more complex - because a generic framework would
-be bigger (as it's trying to be generic) and then things like kprobes
-will probably end up having an additional framework layered over the top
-to bend it to it's purposes. Perhaps I'm being too pessimistic.
+On Mon, Oct 1, 2012 at 5:39 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Oct 01, 2012 at 05:23:15PM +0530, ABRAHAM, KISHON VIJAY wrote:
+>> On Mon, Oct 1, 2012 at 5:14 PM, Mark Brown
+>
+>> > No, this is not at all sensible - if there's an mfd_remove_devices()
+>> > function we really ought to be able to use it to remove the children.
+>> > If we can't do that we should fix the API usability, not open code the
+>> > same stuff in every user.
+>
+>> What makes more sense to me is extend mfd_add_devices to create child
+>> devices from dt data. Then for removing devices, one can use
+>> mfd_remove_devices().
+>
+> Why would that be helpful?  Most platforms don't support DT at all, and
+I'm not sure how to put it correctly. All I'm trying to tell is mfd is
+a framework that exposes a set of API's to create and remove a device
+among others. If a mfd child device is not created using mfd API,
+it'll be unfair to expect that child be removed properly using mfd
+API. Like in this patch, the device is created using
+of_platform_populate (not a mfd API) but is removed using
+mfd_remove_devices (mfd API) [which should result in an abort].
+This means mfd framework does not have an API to create a device from
+dt data or so do I think since of_platform_populate() is used. Thats
+why I suggested the idea of extending mfd_add_devices() (or adding a
+new API in mfd framework) to create child devices from dt data so that
+we'll have API's in mfd framework to both create and delete a device.
 
-It would also requiring an inordinate amount of time to thrash out
-requirements, design, prototype, and to implement. (I don't think I'm
-being overly pessimistic about that ;-)
-
-So, unless some-one has serious quantities of spare time lying around...
-
--- 
-Tixy
+Thanks
+Kishon
