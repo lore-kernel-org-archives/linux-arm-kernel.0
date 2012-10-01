@@ -1,132 +1,53 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 2 Oct 2012 00:17:01 +0530
-Subject: [PATCH V2 2/7] ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
- to mach-omap1
+Date: Tue, 2 Oct 2012 00:17:02 +0530
+Subject: [PATCH V2 3/7] ARM: OMAP2+: DMA: Moving OMAP2+ DMA channel
+ definitions to mach-omap2
 In-Reply-To: <1349117226-4980-1-git-send-email-lokeshvutla@ti.com>
 References: <1349117226-4980-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1349117226-4980-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1349117226-4980-4-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the omap1 dma channel definitions are used by some drivers.
-For moving omap1 dma channel definitions to mach-omap1/, the used
-ones should be defined locally to driver. Driver can eliminate it
-by using DT, platform data, or IORESOURCE_DMA.
-And moving OMAP1 DMA channel definitions to mach-omap1
+Similar to omap1, some of the omap2+ dma channel definitions are
+used by some drivers. For moving omap2+ dma channel definitions
+to mach-omap2/, the used ones should be defined locally to driver.
+Drivers can eliminate it using DT, platform data, or IORESOURCE_DMA
+And moving omap2+ DMA channel definitions to mach-omap2
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/mach-omap1/board-h2.c                   |    1 +
- arch/arm/mach-omap1/board-palmte.c               |    1 +
- arch/arm/mach-omap1/board-palmtt.c               |    1 +
- arch/arm/mach-omap1/board-palmz71.c              |    1 +
- arch/arm/mach-omap1/board-sx1.c                  |    1 +
- arch/arm/mach-omap1/devices.c                    |    1 +
- arch/arm/mach-omap1/dma.c                        |    2 +
- arch/arm/mach-omap1/dma.h                        |   83 ++++++++++++++++++++++
- arch/arm/mach-omap1/lcd_dma.c                    |    2 +
- arch/arm/mach-omap1/mcbsp.c                      |    1 +
- arch/arm/plat-omap/include/plat/dma.h            |   66 -----------------
- drivers/media/platform/omap/omap_vout_vrfb.c     |    2 +
- drivers/media/platform/soc_camera/omap1_camera.c |    1 +
- drivers/mmc/host/omap.c                          |    4 ++
- drivers/usb/gadget/omap_udc.c                    |    2 +
- 15 files changed, 103 insertions(+), 66 deletions(-)
- create mode 100644 arch/arm/mach-omap1/dma.h
+ arch/arm/mach-omap2/devices.c                      |    1 +
+ arch/arm/mach-omap2/dma.h                          |  131 ++++++++++++++++++++
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    1 +
+ arch/arm/plat-omap/include/plat/dma.h              |  110 ----------------
+ drivers/media/platform/omap3isp/isphist.c          |    2 +
+ drivers/mmc/host/omap.c                            |    6 +
+ drivers/mtd/nand/omap2.c                           |    2 +
+ drivers/usb/musb/tusb6010_omap.c                   |    7 ++
+ 9 files changed, 151 insertions(+), 110 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/dma.h
 
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index a2e53e1..72855ce 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -50,6 +50,7 @@
- 
- #include "common.h"
- #include "board-h2.h"
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index d092d2a8..998152c 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -34,6 +34,7 @@
+ #include "mux.h"
+ #include "control.h"
+ #include "devices.h"
 +#include "dma.h"
  
- /* At OMAP1610 Innovator the Ethernet is directly connected to CS1 */
- #define OMAP1610_ETHR_START		0x04000300
-diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
-index 1c578d5..75ac3cd 100644
---- a/arch/arm/mach-omap1/board-palmte.c
-+++ b/arch/arm/mach-omap1/board-palmte.c
-@@ -45,6 +45,7 @@
- #include <mach/usb.h>
- 
- #include "common.h"
-+#include "dma.h"
- 
- #define PALMTE_USBDETECT_GPIO	0
- #define PALMTE_USB_OR_DC_GPIO	1
-diff --git a/arch/arm/mach-omap1/board-palmtt.c b/arch/arm/mach-omap1/board-palmtt.c
-index 9715809..14e1847 100644
---- a/arch/arm/mach-omap1/board-palmtt.c
-+++ b/arch/arm/mach-omap1/board-palmtt.c
-@@ -45,6 +45,7 @@
- #include <mach/usb.h>
- 
- #include "common.h"
-+#include "dma.h"
- 
- #define PALMTT_USBDETECT_GPIO	0
- #define PALMTT_CABLE_GPIO	1
-diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
-index e311032..e403bc9 100644
---- a/arch/arm/mach-omap1/board-palmz71.c
-+++ b/arch/arm/mach-omap1/board-palmz71.c
-@@ -47,6 +47,7 @@
- #include <mach/usb.h>
- 
- #include "common.h"
-+#include "dma.h"
- 
- #define PALMZ71_USBDETECT_GPIO	0
- #define PALMZ71_PENIRQ_GPIO	6
-diff --git a/arch/arm/mach-omap1/board-sx1.c b/arch/arm/mach-omap1/board-sx1.c
-index 13bf2cc..1248fcc 100644
---- a/arch/arm/mach-omap1/board-sx1.c
-+++ b/arch/arm/mach-omap1/board-sx1.c
-@@ -45,6 +45,7 @@
- #include <mach/usb.h>
- 
- #include "common.h"
-+#include "dma.h"
- 
- /* Write to I2C device */
- int sx1_i2c_write_byte(u8 devaddr, u8 regoffset, u8 value)
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index 0cc54dd..890db8f 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -30,6 +30,7 @@
- 
- #include "common.h"
- #include "clock.h"
-+#include "dma.h"
- 
- #if defined(CONFIG_SND_SOC) || defined(CONFIG_SND_SOC_MODULE)
- 
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index 29007fe..40f1dc4 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -30,6 +30,8 @@
- 
- #include <mach/irqs.h>
- 
-+#include "dma.h"
-+
- #define OMAP1_DMA_BASE			(0xfffed800)
- #define OMAP1_LOGICAL_DMA_CH_COUNT	17
- #define OMAP1_DMA_STRIDE		0x40
-diff --git a/arch/arm/mach-omap1/dma.h b/arch/arm/mach-omap1/dma.h
+ #define L3_MODULES_MAX_LEN 12
+ #define L3_MODULES 3
+diff --git a/arch/arm/mach-omap2/dma.h b/arch/arm/mach-omap2/dma.h
 new file mode 100644
-index 0000000..da6345d
+index 0000000..eba80db
 --- /dev/null
-+++ b/arch/arm/mach-omap1/dma.h
-@@ -0,0 +1,83 @@
++++ b/arch/arm/mach-omap2/dma.h
+@@ -0,0 +1,131 @@
 +/*
-+ *  OMAP1 DMA channel definitions
++ *  OMAP2PLUS DMA channel definitions
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -143,227 +64,324 @@ index 0000000..da6345d
 + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 + */
 +
-+#ifndef __OMAP1_DMA_CHANNEL_H
-+#define __OMAP1_DMA_CHANNEL_H
++#ifndef __OMAP2PLUS_DMA_CHANNEL_H
++#define __OMAP2PLUS_DMA_CHANNEL_H
 +
-+/* DMA channels for omap1 */
-+#define OMAP_DMA_NO_DEVICE		0
-+#define OMAP_DMA_MCSI1_TX		1
-+#define OMAP_DMA_MCSI1_RX		2
-+#define OMAP_DMA_I2C_RX			3
-+#define OMAP_DMA_I2C_TX			4
-+#define OMAP_DMA_EXT_NDMA_REQ		5
-+#define OMAP_DMA_EXT_NDMA_REQ2		6
-+#define OMAP_DMA_UWIRE_TX		7
-+#define OMAP_DMA_MCBSP1_TX		8
-+#define OMAP_DMA_MCBSP1_RX		9
-+#define OMAP_DMA_MCBSP3_TX		10
-+#define OMAP_DMA_MCBSP3_RX		11
-+#define OMAP_DMA_UART1_TX		12
-+#define OMAP_DMA_UART1_RX		13
-+#define OMAP_DMA_UART2_TX		14
-+#define OMAP_DMA_UART2_RX		15
-+#define OMAP_DMA_MCBSP2_TX		16
-+#define OMAP_DMA_MCBSP2_RX		17
-+#define OMAP_DMA_UART3_TX		18
-+#define OMAP_DMA_UART3_RX		19
-+#define OMAP_DMA_CAMERA_IF_RX		20
-+#define OMAP_DMA_MMC_TX			21
-+#define OMAP_DMA_MMC_RX			22
-+#define OMAP_DMA_NAND			23
-+#define OMAP_DMA_IRQ_LCD_LINE		24
-+#define OMAP_DMA_MEMORY_STICK		25
-+#define OMAP_DMA_USB_W2FC_RX0		26
-+#define OMAP_DMA_USB_W2FC_RX1		27
-+#define OMAP_DMA_USB_W2FC_RX2		28
-+#define OMAP_DMA_USB_W2FC_TX0		29
-+#define OMAP_DMA_USB_W2FC_TX1		30
-+#define OMAP_DMA_USB_W2FC_TX2		31
 +
-+/* These are only for 1610 */
-+#define OMAP_DMA_CRYPTO_DES_IN		32
-+#define OMAP_DMA_SPI_TX			33
-+#define OMAP_DMA_SPI_RX			34
-+#define OMAP_DMA_CRYPTO_HASH		35
-+#define OMAP_DMA_CCP_ATTN		36
-+#define OMAP_DMA_CCP_FIFO_NOT_EMPTY	37
-+#define OMAP_DMA_CMT_APE_TX_CHAN_0	38
-+#define OMAP_DMA_CMT_APE_RV_CHAN_0	39
-+#define OMAP_DMA_CMT_APE_TX_CHAN_1	40
-+#define OMAP_DMA_CMT_APE_RV_CHAN_1	41
-+#define OMAP_DMA_CMT_APE_TX_CHAN_2	42
-+#define OMAP_DMA_CMT_APE_RV_CHAN_2	43
-+#define OMAP_DMA_CMT_APE_TX_CHAN_3	44
-+#define OMAP_DMA_CMT_APE_RV_CHAN_3	45
-+#define OMAP_DMA_CMT_APE_TX_CHAN_4	46
-+#define OMAP_DMA_CMT_APE_RV_CHAN_4	47
-+#define OMAP_DMA_CMT_APE_TX_CHAN_5	48
-+#define OMAP_DMA_CMT_APE_RV_CHAN_5	49
-+#define OMAP_DMA_CMT_APE_TX_CHAN_6	50
-+#define OMAP_DMA_CMT_APE_RV_CHAN_6	51
-+#define OMAP_DMA_CMT_APE_TX_CHAN_7	52
-+#define OMAP_DMA_CMT_APE_RV_CHAN_7	53
-+#define OMAP_DMA_MMC2_TX		54
-+#define OMAP_DMA_MMC2_RX		55
-+#define OMAP_DMA_CRYPTO_DES_OUT		56
++/* DMA channels for 24xx */
++#define OMAP24XX_DMA_NO_DEVICE		0
++#define OMAP24XX_DMA_XTI_DMA		1	/* S_DMA_0 */
++#define OMAP24XX_DMA_EXT_DMAREQ0	2	/* S_DMA_1 */
++#define OMAP24XX_DMA_EXT_DMAREQ1	3	/* S_DMA_2 */
++#define OMAP24XX_DMA_GPMC		4	/* S_DMA_3 */
++#define OMAP24XX_DMA_GFX		5	/* S_DMA_4 */
++#define OMAP24XX_DMA_DSS		6	/* S_DMA_5 */
++#define OMAP242X_DMA_VLYNQ_TX		7	/* S_DMA_6 */
++#define OMAP24XX_DMA_EXT_DMAREQ2	7	/* S_DMA_6 */
++#define OMAP24XX_DMA_CWT		8	/* S_DMA_7 */
++#define OMAP24XX_DMA_AES_TX		9	/* S_DMA_8 */
++#define OMAP24XX_DMA_AES_RX		10	/* S_DMA_9 */
++#define OMAP24XX_DMA_DES_TX		11	/* S_DMA_10 */
++#define OMAP24XX_DMA_DES_RX		12	/* S_DMA_11 */
++#define OMAP24XX_DMA_SHA1MD5_RX		13	/* S_DMA_12 */
++#define OMAP34XX_DMA_SHA2MD5_RX		13	/* S_DMA_12 */
++#define OMAP242X_DMA_EXT_DMAREQ2	14	/* S_DMA_13 */
++#define OMAP242X_DMA_EXT_DMAREQ3	15	/* S_DMA_14 */
++#define OMAP242X_DMA_EXT_DMAREQ4	16	/* S_DMA_15 */
++#define OMAP242X_DMA_EAC_AC_RD		17	/* S_DMA_16 */
++#define OMAP242X_DMA_EAC_AC_WR		18	/* S_DMA_17 */
++#define OMAP242X_DMA_EAC_MD_UL_RD	19	/* S_DMA_18 */
++#define OMAP242X_DMA_EAC_MD_UL_WR	20	/* S_DMA_19 */
++#define OMAP242X_DMA_EAC_MD_DL_RD	21	/* S_DMA_20 */
++#define OMAP242X_DMA_EAC_MD_DL_WR	22	/* S_DMA_21 */
++#define OMAP242X_DMA_EAC_BT_UL_RD	23	/* S_DMA_22 */
++#define OMAP242X_DMA_EAC_BT_UL_WR	24	/* S_DMA_23 */
++#define OMAP242X_DMA_EAC_BT_DL_RD	25	/* S_DMA_24 */
++#define OMAP242X_DMA_EAC_BT_DL_WR	26	/* S_DMA_25 */
++#define OMAP243X_DMA_EXT_DMAREQ3	14	/* S_DMA_13 */
++#define OMAP24XX_DMA_SPI3_TX0		15	/* S_DMA_14 */
++#define OMAP24XX_DMA_SPI3_RX0		16	/* S_DMA_15 */
++#define OMAP24XX_DMA_MCBSP3_TX		17	/* S_DMA_16 */
++#define OMAP24XX_DMA_MCBSP3_RX		18	/* S_DMA_17 */
++#define OMAP24XX_DMA_MCBSP4_TX		19	/* S_DMA_18 */
++#define OMAP24XX_DMA_MCBSP4_RX		20	/* S_DMA_19 */
++#define OMAP24XX_DMA_MCBSP5_TX		21	/* S_DMA_20 */
++#define OMAP24XX_DMA_MCBSP5_RX		22	/* S_DMA_21 */
++#define OMAP24XX_DMA_SPI3_TX1		23	/* S_DMA_22 */
++#define OMAP24XX_DMA_SPI3_RX1		24	/* S_DMA_23 */
++#define OMAP243X_DMA_EXT_DMAREQ4	25	/* S_DMA_24 */
++#define OMAP243X_DMA_EXT_DMAREQ5	26	/* S_DMA_25 */
++#define OMAP34XX_DMA_I2C3_TX		25	/* S_DMA_24 */
++#define OMAP34XX_DMA_I2C3_RX		26	/* S_DMA_25 */
++#define OMAP24XX_DMA_I2C1_TX		27	/* S_DMA_26 */
++#define OMAP24XX_DMA_I2C1_RX		28	/* S_DMA_27 */
++#define OMAP24XX_DMA_I2C2_TX		29	/* S_DMA_28 */
++#define OMAP24XX_DMA_I2C2_RX		30	/* S_DMA_29 */
++#define OMAP24XX_DMA_MCBSP1_TX		31	/* S_DMA_30 */
++#define OMAP24XX_DMA_MCBSP1_RX		32	/* S_DMA_31 */
++#define OMAP24XX_DMA_MCBSP2_TX		33	/* S_DMA_32 */
++#define OMAP24XX_DMA_MCBSP2_RX		34	/* S_DMA_33 */
++#define OMAP24XX_DMA_SPI1_TX0		35	/* S_DMA_34 */
++#define OMAP24XX_DMA_SPI1_RX0		36	/* S_DMA_35 */
++#define OMAP24XX_DMA_SPI1_TX1		37	/* S_DMA_36 */
++#define OMAP24XX_DMA_SPI1_RX1		38	/* S_DMA_37 */
++#define OMAP24XX_DMA_SPI1_TX2		39	/* S_DMA_38 */
++#define OMAP24XX_DMA_SPI1_RX2		40	/* S_DMA_39 */
++#define OMAP24XX_DMA_SPI1_TX3		41	/* S_DMA_40 */
++#define OMAP24XX_DMA_SPI1_RX3		42	/* S_DMA_41 */
++#define OMAP24XX_DMA_SPI2_TX0		43	/* S_DMA_42 */
++#define OMAP24XX_DMA_SPI2_RX0		44	/* S_DMA_43 */
++#define OMAP24XX_DMA_SPI2_TX1		45	/* S_DMA_44 */
++#define OMAP24XX_DMA_SPI2_RX1		46	/* S_DMA_45 */
++#define OMAP24XX_DMA_MMC2_TX		47	/* S_DMA_46 */
++#define OMAP24XX_DMA_MMC2_RX		48	/* S_DMA_47 */
++#define OMAP24XX_DMA_UART1_TX		49	/* S_DMA_48 */
++#define OMAP24XX_DMA_UART1_RX		50	/* S_DMA_49 */
++#define OMAP24XX_DMA_UART2_TX		51	/* S_DMA_50 */
++#define OMAP24XX_DMA_UART2_RX		52	/* S_DMA_51 */
++#define OMAP24XX_DMA_UART3_TX		53	/* S_DMA_52 */
++#define OMAP24XX_DMA_UART3_RX		54	/* S_DMA_53 */
++#define OMAP24XX_DMA_USB_W2FC_TX0	55	/* S_DMA_54 */
++#define OMAP24XX_DMA_USB_W2FC_RX0	56	/* S_DMA_55 */
++#define OMAP24XX_DMA_USB_W2FC_TX1	57	/* S_DMA_56 */
++#define OMAP24XX_DMA_USB_W2FC_RX1	58	/* S_DMA_57 */
++#define OMAP24XX_DMA_USB_W2FC_TX2	59	/* S_DMA_58 */
++#define OMAP24XX_DMA_USB_W2FC_RX2	60	/* S_DMA_59 */
++#define OMAP24XX_DMA_MMC1_TX		61	/* S_DMA_60 */
++#define OMAP24XX_DMA_MMC1_RX		62	/* S_DMA_61 */
++#define OMAP24XX_DMA_MS			63	/* S_DMA_62 */
++#define OMAP242X_DMA_EXT_DMAREQ5	64	/* S_DMA_63 */
++#define OMAP243X_DMA_EXT_DMAREQ6	64	/* S_DMA_63 */
++#define OMAP34XX_DMA_EXT_DMAREQ3	64	/* S_DMA_63 */
++#define OMAP34XX_DMA_AES2_TX		65	/* S_DMA_64 */
++#define OMAP34XX_DMA_AES2_RX		66	/* S_DMA_65 */
++#define OMAP34XX_DMA_DES2_TX		67	/* S_DMA_66 */
++#define OMAP34XX_DMA_DES2_RX		68	/* S_DMA_67 */
++#define OMAP34XX_DMA_SHA1MD5_RX		69	/* S_DMA_68 */
++#define OMAP34XX_DMA_SPI4_TX0		70	/* S_DMA_69 */
++#define OMAP34XX_DMA_SPI4_RX0		71	/* S_DMA_70 */
++#define OMAP34XX_DSS_DMA0		72	/* S_DMA_71 */
++#define OMAP34XX_DSS_DMA1		73	/* S_DMA_72 */
++#define OMAP34XX_DSS_DMA2		74	/* S_DMA_73 */
++#define OMAP34XX_DSS_DMA3		75	/* S_DMA_74 */
++#define OMAP34XX_DMA_MMC3_TX		77	/* S_DMA_76 */
++#define OMAP34XX_DMA_MMC3_RX		78	/* S_DMA_77 */
++#define OMAP34XX_DMA_USIM_TX		79	/* S_DMA_78 */
++#define OMAP34XX_DMA_USIM_RX		80	/* S_DMA_79 */
 +
-+#endif /* __OMAP1_DMA_CHANNEL_H */
-diff --git a/arch/arm/mach-omap1/lcd_dma.c b/arch/arm/mach-omap1/lcd_dma.c
-index ed42628..9a54d3b 100644
---- a/arch/arm/mach-omap1/lcd_dma.c
-+++ b/arch/arm/mach-omap1/lcd_dma.c
-@@ -32,6 +32,8 @@
- #include <mach/hardware.h>
- #include <mach/lcdc.h>
++#define OMAP36XX_DMA_UART4_TX		81	/* S_DMA_80 */
++#define OMAP36XX_DMA_UART4_RX		82	/* S_DMA_81 */
++
++/* Only for AM35xx */
++#define AM35XX_DMA_UART4_TX		54
++#define AM35XX_DMA_UART4_RX		55
++
++#endif /* __OMAP2PLUS_DMA_CHANNEL_H */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+index 8851bbb..04b99de 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+@@ -16,6 +16,7 @@
+ #include "hdq1w.h"
  
+ #include "omap_hwmod_common_data.h"
 +#include "dma.h"
-+
- int omap_lcd_dma_running(void)
- {
- 	/*
-diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
-index bdc2e75..b92f15a 100644
---- a/arch/arm/mach-omap1/mcbsp.c
-+++ b/arch/arm/mach-omap1/mcbsp.c
-@@ -27,6 +27,7 @@
- #include <mach/irqs.h>
  
- #include "iomap.h"
+ /* UART */
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 94b38af..deff845 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -35,6 +35,7 @@
+ #include "prm-regbits-34xx.h"
+ #include "cm-regbits-34xx.h"
+ #include "wd_timer.h"
 +#include "dma.h"
  
- #define DPS_RSTCT2_PER_EN	(1 << 0)
- #define DSP_RSTCT2_WD_PER_EN	(1 << 1)
+ /*
+  * OMAP3xxx hardware module integration data
 diff --git a/arch/arm/plat-omap/include/plat/dma.h b/arch/arm/plat-omap/include/plat/dma.h
-index e413bd8..972897f 100644
+index 972897f..3f81458 100644
 --- a/arch/arm/plat-omap/include/plat/dma.h
 +++ b/arch/arm/plat-omap/include/plat/dma.h
-@@ -23,74 +23,8 @@
+@@ -25,116 +25,6 @@
  
- #include <linux/platform_device.h>
- 
--/*
-- * TODO: These dma channel defines should go away once all
-- * the omap drivers hwmod adapted.
-- */
--
  #define INT_DMA_LCD			25
  
--/* DMA channels for omap1 */
--#define OMAP_DMA_NO_DEVICE		0
--#define OMAP_DMA_MCSI1_TX		1
--#define OMAP_DMA_MCSI1_RX		2
--#define OMAP_DMA_I2C_RX			3
--#define OMAP_DMA_I2C_TX			4
--#define OMAP_DMA_EXT_NDMA_REQ		5
--#define OMAP_DMA_EXT_NDMA_REQ2		6
--#define OMAP_DMA_UWIRE_TX		7
--#define OMAP_DMA_MCBSP1_TX		8
--#define OMAP_DMA_MCBSP1_RX		9
--#define OMAP_DMA_MCBSP3_TX		10
--#define OMAP_DMA_MCBSP3_RX		11
--#define OMAP_DMA_UART1_TX		12
--#define OMAP_DMA_UART1_RX		13
--#define OMAP_DMA_UART2_TX		14
--#define OMAP_DMA_UART2_RX		15
--#define OMAP_DMA_MCBSP2_TX		16
--#define OMAP_DMA_MCBSP2_RX		17
--#define OMAP_DMA_UART3_TX		18
--#define OMAP_DMA_UART3_RX		19
--#define OMAP_DMA_CAMERA_IF_RX		20
--#define OMAP_DMA_MMC_TX			21
--#define OMAP_DMA_MMC_RX			22
--#define OMAP_DMA_NAND			23
--#define OMAP_DMA_IRQ_LCD_LINE		24
--#define OMAP_DMA_MEMORY_STICK		25
--#define OMAP_DMA_USB_W2FC_RX0		26
--#define OMAP_DMA_USB_W2FC_RX1		27
--#define OMAP_DMA_USB_W2FC_RX2		28
--#define OMAP_DMA_USB_W2FC_TX0		29
--#define OMAP_DMA_USB_W2FC_TX1		30
--#define OMAP_DMA_USB_W2FC_TX2		31
+-/* DMA channels for 24xx */
+-#define OMAP24XX_DMA_NO_DEVICE		0
+-#define OMAP24XX_DMA_XTI_DMA		1	/* S_DMA_0 */
+-#define OMAP24XX_DMA_EXT_DMAREQ0	2	/* S_DMA_1 */
+-#define OMAP24XX_DMA_EXT_DMAREQ1	3	/* S_DMA_2 */
+-#define OMAP24XX_DMA_GPMC		4	/* S_DMA_3 */
+-#define OMAP24XX_DMA_GFX		5	/* S_DMA_4 */
+-#define OMAP24XX_DMA_DSS		6	/* S_DMA_5 */
+-#define OMAP242X_DMA_VLYNQ_TX		7	/* S_DMA_6 */
+-#define OMAP24XX_DMA_EXT_DMAREQ2	7	/* S_DMA_6 */
+-#define OMAP24XX_DMA_CWT		8	/* S_DMA_7 */
+-#define OMAP24XX_DMA_AES_TX		9	/* S_DMA_8 */
+-#define OMAP24XX_DMA_AES_RX		10	/* S_DMA_9 */
+-#define OMAP24XX_DMA_DES_TX		11	/* S_DMA_10 */
+-#define OMAP24XX_DMA_DES_RX		12	/* S_DMA_11 */
+-#define OMAP24XX_DMA_SHA1MD5_RX		13	/* S_DMA_12 */
+-#define OMAP34XX_DMA_SHA2MD5_RX		13	/* S_DMA_12 */
+-#define OMAP242X_DMA_EXT_DMAREQ2	14	/* S_DMA_13 */
+-#define OMAP242X_DMA_EXT_DMAREQ3	15	/* S_DMA_14 */
+-#define OMAP242X_DMA_EXT_DMAREQ4	16	/* S_DMA_15 */
+-#define OMAP242X_DMA_EAC_AC_RD		17	/* S_DMA_16 */
+-#define OMAP242X_DMA_EAC_AC_WR		18	/* S_DMA_17 */
+-#define OMAP242X_DMA_EAC_MD_UL_RD	19	/* S_DMA_18 */
+-#define OMAP242X_DMA_EAC_MD_UL_WR	20	/* S_DMA_19 */
+-#define OMAP242X_DMA_EAC_MD_DL_RD	21	/* S_DMA_20 */
+-#define OMAP242X_DMA_EAC_MD_DL_WR	22	/* S_DMA_21 */
+-#define OMAP242X_DMA_EAC_BT_UL_RD	23	/* S_DMA_22 */
+-#define OMAP242X_DMA_EAC_BT_UL_WR	24	/* S_DMA_23 */
+-#define OMAP242X_DMA_EAC_BT_DL_RD	25	/* S_DMA_24 */
+-#define OMAP242X_DMA_EAC_BT_DL_WR	26	/* S_DMA_25 */
+-#define OMAP243X_DMA_EXT_DMAREQ3	14	/* S_DMA_13 */
+-#define OMAP24XX_DMA_SPI3_TX0		15	/* S_DMA_14 */
+-#define OMAP24XX_DMA_SPI3_RX0		16	/* S_DMA_15 */
+-#define OMAP24XX_DMA_MCBSP3_TX		17	/* S_DMA_16 */
+-#define OMAP24XX_DMA_MCBSP3_RX		18	/* S_DMA_17 */
+-#define OMAP24XX_DMA_MCBSP4_TX		19	/* S_DMA_18 */
+-#define OMAP24XX_DMA_MCBSP4_RX		20	/* S_DMA_19 */
+-#define OMAP24XX_DMA_MCBSP5_TX		21	/* S_DMA_20 */
+-#define OMAP24XX_DMA_MCBSP5_RX		22	/* S_DMA_21 */
+-#define OMAP24XX_DMA_SPI3_TX1		23	/* S_DMA_22 */
+-#define OMAP24XX_DMA_SPI3_RX1		24	/* S_DMA_23 */
+-#define OMAP243X_DMA_EXT_DMAREQ4	25	/* S_DMA_24 */
+-#define OMAP243X_DMA_EXT_DMAREQ5	26	/* S_DMA_25 */
+-#define OMAP34XX_DMA_I2C3_TX		25	/* S_DMA_24 */
+-#define OMAP34XX_DMA_I2C3_RX		26	/* S_DMA_25 */
+-#define OMAP24XX_DMA_I2C1_TX		27	/* S_DMA_26 */
+-#define OMAP24XX_DMA_I2C1_RX		28	/* S_DMA_27 */
+-#define OMAP24XX_DMA_I2C2_TX		29	/* S_DMA_28 */
+-#define OMAP24XX_DMA_I2C2_RX		30	/* S_DMA_29 */
+-#define OMAP24XX_DMA_MCBSP1_TX		31	/* S_DMA_30 */
+-#define OMAP24XX_DMA_MCBSP1_RX		32	/* S_DMA_31 */
+-#define OMAP24XX_DMA_MCBSP2_TX		33	/* S_DMA_32 */
+-#define OMAP24XX_DMA_MCBSP2_RX		34	/* S_DMA_33 */
+-#define OMAP24XX_DMA_SPI1_TX0		35	/* S_DMA_34 */
+-#define OMAP24XX_DMA_SPI1_RX0		36	/* S_DMA_35 */
+-#define OMAP24XX_DMA_SPI1_TX1		37	/* S_DMA_36 */
+-#define OMAP24XX_DMA_SPI1_RX1		38	/* S_DMA_37 */
+-#define OMAP24XX_DMA_SPI1_TX2		39	/* S_DMA_38 */
+-#define OMAP24XX_DMA_SPI1_RX2		40	/* S_DMA_39 */
+-#define OMAP24XX_DMA_SPI1_TX3		41	/* S_DMA_40 */
+-#define OMAP24XX_DMA_SPI1_RX3		42	/* S_DMA_41 */
+-#define OMAP24XX_DMA_SPI2_TX0		43	/* S_DMA_42 */
+-#define OMAP24XX_DMA_SPI2_RX0		44	/* S_DMA_43 */
+-#define OMAP24XX_DMA_SPI2_TX1		45	/* S_DMA_44 */
+-#define OMAP24XX_DMA_SPI2_RX1		46	/* S_DMA_45 */
+-#define OMAP24XX_DMA_MMC2_TX		47	/* S_DMA_46 */
+-#define OMAP24XX_DMA_MMC2_RX		48	/* S_DMA_47 */
+-#define OMAP24XX_DMA_UART1_TX		49	/* S_DMA_48 */
+-#define OMAP24XX_DMA_UART1_RX		50	/* S_DMA_49 */
+-#define OMAP24XX_DMA_UART2_TX		51	/* S_DMA_50 */
+-#define OMAP24XX_DMA_UART2_RX		52	/* S_DMA_51 */
+-#define OMAP24XX_DMA_UART3_TX		53	/* S_DMA_52 */
+-#define OMAP24XX_DMA_UART3_RX		54	/* S_DMA_53 */
+-#define OMAP24XX_DMA_USB_W2FC_TX0	55	/* S_DMA_54 */
+-#define OMAP24XX_DMA_USB_W2FC_RX0	56	/* S_DMA_55 */
+-#define OMAP24XX_DMA_USB_W2FC_TX1	57	/* S_DMA_56 */
+-#define OMAP24XX_DMA_USB_W2FC_RX1	58	/* S_DMA_57 */
+-#define OMAP24XX_DMA_USB_W2FC_TX2	59	/* S_DMA_58 */
+-#define OMAP24XX_DMA_USB_W2FC_RX2	60	/* S_DMA_59 */
+-#define OMAP24XX_DMA_MMC1_TX		61	/* S_DMA_60 */
+-#define OMAP24XX_DMA_MMC1_RX		62	/* S_DMA_61 */
+-#define OMAP24XX_DMA_MS			63	/* S_DMA_62 */
+-#define OMAP242X_DMA_EXT_DMAREQ5	64	/* S_DMA_63 */
+-#define OMAP243X_DMA_EXT_DMAREQ6	64	/* S_DMA_63 */
+-#define OMAP34XX_DMA_EXT_DMAREQ3	64	/* S_DMA_63 */
+-#define OMAP34XX_DMA_AES2_TX		65	/* S_DMA_64 */
+-#define OMAP34XX_DMA_AES2_RX		66	/* S_DMA_65 */
+-#define OMAP34XX_DMA_DES2_TX		67	/* S_DMA_66 */
+-#define OMAP34XX_DMA_DES2_RX		68	/* S_DMA_67 */
+-#define OMAP34XX_DMA_SHA1MD5_RX		69	/* S_DMA_68 */
+-#define OMAP34XX_DMA_SPI4_TX0		70	/* S_DMA_69 */
+-#define OMAP34XX_DMA_SPI4_RX0		71	/* S_DMA_70 */
+-#define OMAP34XX_DSS_DMA0		72	/* S_DMA_71 */
+-#define OMAP34XX_DSS_DMA1		73	/* S_DMA_72 */
+-#define OMAP34XX_DSS_DMA2		74	/* S_DMA_73 */
+-#define OMAP34XX_DSS_DMA3		75	/* S_DMA_74 */
+-#define OMAP34XX_DMA_MMC3_TX		77	/* S_DMA_76 */
+-#define OMAP34XX_DMA_MMC3_RX		78	/* S_DMA_77 */
+-#define OMAP34XX_DMA_USIM_TX		79	/* S_DMA_78 */
+-#define OMAP34XX_DMA_USIM_RX		80	/* S_DMA_79 */
 -
--/* These are only for 1610 */
--#define OMAP_DMA_CRYPTO_DES_IN		32
--#define OMAP_DMA_SPI_TX			33
--#define OMAP_DMA_SPI_RX			34
--#define OMAP_DMA_CRYPTO_HASH		35
--#define OMAP_DMA_CCP_ATTN		36
--#define OMAP_DMA_CCP_FIFO_NOT_EMPTY	37
--#define OMAP_DMA_CMT_APE_TX_CHAN_0	38
--#define OMAP_DMA_CMT_APE_RV_CHAN_0	39
--#define OMAP_DMA_CMT_APE_TX_CHAN_1	40
--#define OMAP_DMA_CMT_APE_RV_CHAN_1	41
--#define OMAP_DMA_CMT_APE_TX_CHAN_2	42
--#define OMAP_DMA_CMT_APE_RV_CHAN_2	43
--#define OMAP_DMA_CMT_APE_TX_CHAN_3	44
--#define OMAP_DMA_CMT_APE_RV_CHAN_3	45
--#define OMAP_DMA_CMT_APE_TX_CHAN_4	46
--#define OMAP_DMA_CMT_APE_RV_CHAN_4	47
--#define OMAP_DMA_CMT_APE_TX_CHAN_5	48
--#define OMAP_DMA_CMT_APE_RV_CHAN_5	49
--#define OMAP_DMA_CMT_APE_TX_CHAN_6	50
--#define OMAP_DMA_CMT_APE_RV_CHAN_6	51
--#define OMAP_DMA_CMT_APE_TX_CHAN_7	52
--#define OMAP_DMA_CMT_APE_RV_CHAN_7	53
--#define OMAP_DMA_MMC2_TX		54
--#define OMAP_DMA_MMC2_RX		55
--#define OMAP_DMA_CRYPTO_DES_OUT		56
+-#define OMAP36XX_DMA_UART4_TX		81	/* S_DMA_80 */
+-#define OMAP36XX_DMA_UART4_RX		82	/* S_DMA_81 */
 -
- /* DMA channels for 24xx */
- #define OMAP24XX_DMA_NO_DEVICE		0
- #define OMAP24XX_DMA_XTI_DMA		1	/* S_DMA_0 */
-diff --git a/drivers/media/platform/omap/omap_vout_vrfb.c b/drivers/media/platform/omap/omap_vout_vrfb.c
-index 4be26abf6c..11d7a29 100644
---- a/drivers/media/platform/omap/omap_vout_vrfb.c
-+++ b/drivers/media/platform/omap/omap_vout_vrfb.c
-@@ -22,6 +22,8 @@
- #include "omap_voutdef.h"
- #include "omap_voutlib.h"
+-/* Only for AM35xx */
+-#define AM35XX_DMA_UART4_TX		54
+-#define AM35XX_DMA_UART4_RX		55
+-
+-/*----------------------------------------------------------------------------*/
+-
+ #define OMAP1_DMA_TOUT_IRQ		(1 << 0)
+ #define OMAP_DMA_DROP_IRQ		(1 << 1)
+ #define OMAP_DMA_HALF_IRQ		(1 << 2)
+diff --git a/drivers/media/platform/omap3isp/isphist.c b/drivers/media/platform/omap3isp/isphist.c
+index d1a8dee..e7f9c42 100644
+--- a/drivers/media/platform/omap3isp/isphist.c
++++ b/drivers/media/platform/omap3isp/isphist.c
+@@ -34,6 +34,8 @@
+ #include "ispreg.h"
+ #include "isphist.h"
  
-+#define OMAP_DMA_NO_DEVICE	0
++#define OMAP24XX_DMA_NO_DEVICE		0
 +
- /*
-  * Function for allocating video buffers
-  */
-diff --git a/drivers/media/platform/soc_camera/omap1_camera.c b/drivers/media/platform/soc_camera/omap1_camera.c
-index fa08c76..3046dba 100644
---- a/drivers/media/platform/soc_camera/omap1_camera.c
-+++ b/drivers/media/platform/soc_camera/omap1_camera.c
-@@ -40,6 +40,7 @@
- #define DRIVER_NAME		"omap1-camera"
- #define DRIVER_VERSION		"0.0.2"
+ #define HIST_CONFIG_DMA	1
  
-+#define OMAP_DMA_CAMERA_IF_RX		20
- 
- /*
-  * ---------------------------------------------------------------------------
+ #define HIST_USING_DMA(hist) ((hist)->dma_ch >= 0)
 diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
-index 48ad361..b2cf37b 100644
+index b2cf37b..9664fa9 100644
 --- a/drivers/mmc/host/omap.c
 +++ b/drivers/mmc/host/omap.c
-@@ -84,6 +84,10 @@
- #define OMAP_MMC_CMDTYPE_AC	2
- #define OMAP_MMC_CMDTYPE_ADTC	3
+@@ -89,6 +89,12 @@
+ #define OMAP_DMA_MMC2_TX	54
+ #define OMAP_DMA_MMC2_RX	55
  
-+#define OMAP_DMA_MMC_TX		21
-+#define OMAP_DMA_MMC_RX		22
-+#define OMAP_DMA_MMC2_TX	54
-+#define OMAP_DMA_MMC2_RX	55
- 
++#define OMAP24XX_DMA_MMC2_TX	47
++#define OMAP24XX_DMA_MMC2_RX	48
++#define OMAP24XX_DMA_MMC1_TX	61
++#define OMAP24XX_DMA_MMC1_RX	62
++
++
  #define DRIVER_NAME "mmci-omap"
  
-diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
-index 2a4749c..024c0b9 100644
---- a/drivers/usb/gadget/omap_udc.c
-+++ b/drivers/usb/gadget/omap_udc.c
-@@ -61,6 +61,8 @@
- #define	DRIVER_DESC	"OMAP UDC driver"
- #define	DRIVER_VERSION	"4 October 2004"
+ /* Specifies how often in millisecs to poll for card status changes
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 5b31386..3105f22 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -111,6 +111,8 @@
+ #define	ECCCLEAR			0x100
+ #define	ECC1				0x1
  
-+#define OMAP_DMA_USB_W2FC_TX0		29
++#define OMAP24XX_DMA_GPMC		4
 +
- /*
-  * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
-  * D+ pullup to allow enumeration.  That's too early for the gadget
+ /* oob info generated runtime depending on ecc algorithm and layout selected */
+ static struct nand_ecclayout omap_oobinfo;
+ /* Define some generic bad / good block scan pattern which are used
+diff --git a/drivers/usb/musb/tusb6010_omap.c b/drivers/usb/musb/tusb6010_omap.c
+index 7a62b95..c032fc2 100644
+--- a/drivers/usb/musb/tusb6010_omap.c
++++ b/drivers/usb/musb/tusb6010_omap.c
+@@ -25,6 +25,13 @@
+ 
+ #define MAX_DMAREQ		5	/* REVISIT: Really 6, but req5 not OK */
+ 
++#define OMAP24XX_DMA_EXT_DMAREQ0	2
++#define OMAP24XX_DMA_EXT_DMAREQ1	3
++#define OMAP242X_DMA_EXT_DMAREQ2	14
++#define OMAP242X_DMA_EXT_DMAREQ3	15
++#define OMAP242X_DMA_EXT_DMAREQ4	16
++#define OMAP242X_DMA_EXT_DMAREQ5	64
++
+ struct tusb_omap_dma_ch {
+ 	struct musb		*musb;
+ 	void __iomem		*tbase;
 -- 
 1.7.10.4
