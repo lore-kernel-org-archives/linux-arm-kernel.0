@@ -1,98 +1,110 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 2 Oct 2012 00:17:06 +0530
-Subject: [PATCH V2 7/7] ARM: OMAP: Move plat/omap-secure.h locally to
- mach-omap2
-In-Reply-To: <1349117226-4980-1-git-send-email-lokeshvutla@ti.com>
-References: <1349117226-4980-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1349117226-4980-8-git-send-email-lokeshvutla@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 1 Oct 2012 19:55:21 +0000 (UTC)
+Subject: OMAP baseline test results for v3.6
+Message-ID: <alpine.DEB.2.00.1210011923120.2160@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving plat/omap-secure.h locally to mach-omap2/
-as part of single zImage work
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/mach-omap2/common.c                  |    2 +-
- arch/arm/mach-omap2/omap-secure.c             |    1 -
- arch/arm/mach-omap2/omap-secure.h             |    7 +++++++
- arch/arm/mach-omap2/omap4-common.c            |    2 +-
- arch/arm/plat-omap/include/plat/omap-secure.h |   14 --------------
- 5 files changed, 9 insertions(+), 17 deletions(-)
- delete mode 100644 arch/arm/plat-omap/include/plat/omap-secure.h
+Here are some basic OMAP test results for Linux v3.6.
+Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.6/
 
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 4ce0d63..b0f21b7 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -19,7 +19,6 @@
- #include <linux/platform_data/dsp-omap.h>
- 
- #include <plat/clock.h>
--#include <plat/omap-secure.h>
- #include <plat/vram.h>
- 
- #include "soc.h"
-@@ -27,6 +26,7 @@
- #include "common.h"
- #include "sdrc.h"
- #include "control.h"
-+#include "omap-secure.h"
- 
- /* Global address base setup code */
- 
-diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
-index a004cb9..98624fe 100644
---- a/arch/arm/mach-omap2/omap-secure.c
-+++ b/arch/arm/mach-omap2/omap-secure.c
-@@ -18,7 +18,6 @@
- #include <asm/cacheflush.h>
- #include <asm/memblock.h>
- 
--#include <plat/omap-secure.h>
- #include "omap-secure.h"
- 
- static phys_addr_t omap_secure_memblock_base;
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index c90a435..0e72917 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -52,6 +52,13 @@ extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
- 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
- extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
- extern phys_addr_t omap_secure_ram_mempool_base(void);
-+extern int omap_secure_ram_reserve_memblock(void);
- 
-+#ifdef CONFIG_OMAP4_ERRATA_I688
-+extern int omap_barrier_reserve_memblock(void);
-+#else
-+static inline void omap_barrier_reserve_memblock(void)
-+{ }
-+#endif
- #endif /* __ASSEMBLER__ */
- #endif /* OMAP_ARCH_OMAP_SECURE_H */
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index e1f2897..ae57b63 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -26,7 +26,6 @@
- #include <asm/memblock.h>
- 
- #include <plat/sram.h>
--#include <plat/omap-secure.h>
- #include <plat/mmc.h>
- 
- #include "omap-wakeupgen.h"
-@@ -35,6 +34,7 @@
- #include "common.h"
- #include "hsmmc.h"
- #include "omap4-sar-layout.h"
-+#include "omap-secure.h"
- 
- #ifdef CONFIG_CACHE_L2X0
- static void __iomem *l2cache_base;
-diff --git a/arch/arm/plat-omap/include/plat/omap-secure.h b/arch/arm/plat-omap/include/plat/omap-secure.h
-deleted file mode 100644
-index 0e4acd2..0000000
--- 
-1.7.10.4
+
+Passing tests
+-------------
+
+Boot to userspace: 2420n800, 2430sdp, 3530es3beagle, 3730beaglexm, 
+                   37xxevm, 4430es2panda, 5912osk
+
+PM ret/off, suspend + dynamic idle: 3530es3beagle, 3730beaglexm
+
+
+Failing tests: fixed by posted patches
+--------------------------------------
+
+PM tests:
+
+* 4430ES2 Panda: UART corruption during long transmit buffers
+  - Presumably due to either a missing hardware workaround or a bug in
+    the OMAP serial driver
+  - Corruption disappears after this series is applied:
+    http://www.spinics.net/lists/arm-kernel/msg192995.html
+    * Unknown whether these are an actual fix, or just mask the problem
+
+Other:
+
+* RCU stall messages appear if boards are booted into a minimal userspace
+  and left to sit for a few minutes
+  - Not shown in the current test logs
+  - Fixed by http://marc.info/?l=linux-arm-kernel&m=134835120600590&w=2
+
+* 2420N800: powers down 30 seconds after boot
+  - Presumably due to missing CBUS patches for watchdog control
+
+
+
+Failing tests: needing investigation
+------------------------------------
+
+Boot tests:
+
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
+
+* 3517EVM & CM-T3517: boot hangs               
+  - Probably due to the use of NFS root; there are likely some Kconfig,
+    board file, and PM issues with EMAC
+
+PM tests:
+
+* 37xx EVM: CORE not entering dynamic off-idle
+  - Cause unknown; dynamic retention-idle seems to work; system suspend to 
+    off works
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock gate ("debug ignore_loglevel")
+  - Not shown in the current test logs; cause unknown
+
+
+
+Kernel size/memory differences
+------------------------------
+
+vmlinux object size
+(delta in bytes from test_v3.5 (28a33cbc24e4256c143dce96c7d93bf423229f92)):
+  text    data     bss   total  kernel
++106549 +17784   +2380  +126713 2430_testconfig
++38971   +5296    +920  +45187  5912osk_testconfig
++98563  +30344    -316  +128591 am33xx_testconfig
++63542  +14584   +1992  +80118  n800_b_testconfig
++58180  +14808   +1988  +74976  n800_multi_omap2xxx
++39388  +15672   +1960  +57020  n800_testconfig
++49048   +5328    +920  +55296  omap1510_defconfig
++45816   +5264    +952  +52032  omap1_defconfig
++42090  +15360    -156  +57294  omap2_4_testconfig
++121890 +23480   +2884  +148254 omap2plus_defconfig
++125042 +23624   +2884  +151550 omap2plus_defconfig_cpupm
++54593  +21360    -380  +75573  omap2plus_no_pm
++83137  +23760    -316  +106581 omap3_4_testconfig
++55217  +21576   +1036  +77829  omap3_testconfig
++62061  +18840      +4  +80905  omap4_testconfig
++86789  +21608   +1380  +109777 rmk_omap3430_ldp_oldconfig
++96177  -14216    +208  +82169  rmk_omap4430_sdp_oldconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.5 (28a33cbc24e4256c143dce96c7d93bf423229f92))
+  avail  rsrvd   high  freed  board          kconfig
+   -72k    72k      .      .  2420n800       omap2plus_defconfig
+  -156k   156k      .     8k  2430sdp        omap2plus_defconfig
+  -156k   156k      .      .  3517evm        omap2plus_defconfig
+  -156k   156k      .     8k  3530es3beagle  omap2plus_defconfig
+  -156k   156k      .     8k  3730beaglexm   omap2plus_defconfig
+  -156k   156k      .     8k  37xxevm        omap2plus_defconfig
+  -160k   160k      .     8k  4430es2panda   omap2plus_defconfig
+   -56k    56k      .     4k  5912osk        omap2plus_defconfig
+  -156k   156k      .      .  cmt3517        omap2plus_defconfig
+
+
+- Paul
