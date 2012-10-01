@@ -1,23 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Oct 2012 23:28:09 +0000 (UTC)
-Subject: OMAP baseline test results for v3.6-rc7
-In-Reply-To: <50645A1D.5040108@compulab.co.il>
-References: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
- <50645A1D.5040108@compulab.co.il>
-Message-ID: <alpine.DEB.2.00.1210012318460.26402@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  1 Oct 2012 16:56:55 -0700
+Subject: [GIT PULL 0/12] ARM: soc: updates for 3.7, first batch
+Message-ID: <1349135827-24790-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Sep 2012, Igor Grinberg wrote:
+Hi Linus,
 
-> Have you tried the nohlt boot parameter?
-> It looks like the wfi is killing those SoCs once you use EMAC.
+Here is the first batch of pull requests for arm-soc for this merge
+window. Some of them are tiny, and we will probably start to combine
+them into slightly larger misc branches in the future. I didn't do it
+this time around since the dependencies between branches ended up quite
+complex this time around.
 
-Just tried with nohlt.  Didn't help on CM-T3517 with either NFS or MMC 
-root, nor with the 3517EVM with NFS root.  But I was able to get the 
-3517EVM booting to userspace with MMC root.  Looks like the CM-T3517 board 
-file is missing the MMC setup code, so would guess that adding that back 
-in would help.
+We unfortunately have a somewhat conflict-heavy merge window in front
+of us. The reason is a couple of substantial moves of header files and
+Makefile contents on platforms. The shuffling is done to allow multiple
+platforms to be built into the same kernel image, a goal that has
+been worked towards for quite some time now and finally are bearing
+fruit. We're starting out with just a few platforms but it's expected
+that several more will be enabled for 3.8.
+
+As usual I have described the conflicts in each pull request and how I
+resolved them. I have also pushed up a temporary branch at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git merge-part1-resolved
+
+that contains the merges as I have done them.
+
+With that, here comes the first batch of updates. There will be a second
+batch later on once these have been merged.
 
 
- - Paul
+Thanks!
+
+-Olof
