@@ -1,48 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Oct 2012 07:31:58 -0700
-Subject: [PATCH] [ARM] Build failure CONFIG_ARCH_KIRKWOOD_DT relies on
- CACHE_FEROCEON_L2
-In-Reply-To: <20121001044337.GA8446@obsidianresearch.com>
-References: <20120930232253.GD30637@obsidianresearch.com>
- <CAOesGMgpDs60jGsV4Wu-A7M+ThXh7YVkgb_mPgMJfPwNa_QbSw@mail.gmail.com>
- <20121001044337.GA8446@obsidianresearch.com>
-Message-ID: <CAOesGMhQpqdCRoV85vW+7THstbx+HWmCkR3Q6bpK6uLEmhKqfw@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Mon, 01 Oct 2012 20:28:20 +0530
+Subject: [PATCHv3 2/4] Input: keypad: Add smsc ece1099 keypad driver
+In-Reply-To: <1349089310-22134-1-git-send-email-sourav.poddar@ti.com>
+References: <1349089310-22134-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <5069AF8C.2070807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2012 at 9:43 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Sun, Sep 30, 2012 at 07:44:10PM -0700, Olof Johansson wrote:
+On Monday 01 October 2012 04:31 PM, Sourav Poddar wrote:
+> +smsc_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct smsc *smsc = dev_get_drvdata(pdev->dev.parent);
+> +	struct input_dev *input;
+> +	struct smsc_keypad *kp;
+> +	int ret = 0, error;
+> +	int col, i, max_keys, row_shift;
+> +	int irq;
+> +	int addr;
+> +
+> +	kp = devm_kzalloc(dev, sizeof(*kp), GFP_KERNEL);
+> +
+> +	input = input_allocate_device();
+> +	if (!kp || !input) {
+> +		error = -ENOMEM;
+> +		goto err1;
+> +	}
+> +
+> +	error = smsc_keypad_parse_dt(&pdev->dev, kp);
+> +	if (error)
+> +		return error;
 >
->> >  void __init kirkwood_l2_init(void)
->> >  {
->> > +#ifdef CONFIG_CACHE_FEROCEON_L2
->> >  #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
->>
->> Aren't these added ifdefs completely redundant? L2_WRITETHROUGH is
->> dependent on the outer options anyway.
->
-> No, the complete new function is:
->
-> void __init kirkwood_l2_init(void)
-> {
-> #ifdef CONFIG_CACHE_FEROCEON_L2
-> #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
->         writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
->         feroceon_l2_init(1);
-> #else
->         writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
->         feroceon_l2_init(0);
-> #endif
-> #endif
-> }
-
-Ah. diff took out the #else in the middle and I didn't look at the
-file. Obviously correct as-is.
-
-In some other places we choose to put the ifdef outside the function
-and provide a static inline stub in the header file instead. Either
-way works fine though.
-
-
--Olof
+Are we leaking input here?
