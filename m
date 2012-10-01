@@ -1,139 +1,134 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 01 Oct 2012 10:31:58 -0700
-Subject: [GIT PULL] clk: changes for 3.7
-Message-ID: <20121001173158.12878.37886@nucleus>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 1 Oct 2012 18:56:47 +0100
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121001160639.GA31620@obsidianresearch.com>
+References: <20120930232116.GC30637@obsidianresearch.com>
+ <20121001153952.GB2100@linaro.org>
+ <20121001160639.GA31620@obsidianresearch.com>
+Message-ID: <20121001175647.GD2100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Oct 01, 2012 at 10:06:39AM -0600, Jason Gunthorpe wrote:
+> On Mon, Oct 01, 2012 at 04:39:53PM +0100, Dave Martin wrote:
+> 
+> > >   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+> > >   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
+> > 
+> > Not related directly to your patch, but I wonder why we don't we see
+> > separate r-x and rw- segments?
+> 
+> I think this is because the sections are not aligned when the
+> protections change, and the sections are not sorted by protection
+> type.
+> 
+>   [ 1] .head.text        PROGBITS        c0008000 008000 0001c0 00  AX  0   0 32
+>   [ 2] .text             PROGBITS        c00081c0 0081c0 1dc880 00  AX  0   0 32
+>   [ 3] .rodata           PROGBITS        c01e5000 1e5000 060a80 00   A  0   0 32
+>   [ 4] __bug_table       PROGBITS        c0245a80 245a80 002a78 00   A  0   0  1
+>   [ 5] .pci_fixup        PROGBITS        c02484f8 2484f8 000090 00   A  0   0  4
+>   [ 6] __param           PROGBITS        c0248588 248588 000280 00   A  0   0  4
+>   [ 7] __modver          PROGBITS        c0248808 248808 0007f8 00   A  0   0  4
+>   [ 8] .init.text        PROGBITS        c0249000 249000 01af20 00  AX  0   0 32
+>   [ 9] .exit.text        PROGBITS        c0263f20 263f20 000c0c 00  AX  0   0  4
+>   [10] .init.proc.info   PROGBITS        c0264b2c 264b2c 00009c 00  AX  0   0  1
+>   [11] .init.arch.info   PROGBITS        c0264bc8 264bc8 000044 00   A  0   0  4
+>   [12] .init.tagtable    PROGBITS        c0264c0c 264c0c 000040 00   A  0   0  4
+>   [13] .init.data        PROGBITS        c0264c60 264c60 0f481c 00  WA  0   0 32
+>   [14] .data             PROGBITS        c035a000 35a000 020220 00  WA  0   0 32
+>   [15] .notes            NOTE            c037a220 37a220 000024 00  AX  0   0  4
+>   [16] .bss              NOBITS          c037a260 37a244 0320b0 00  WA  0   0 32
+>   [17] .comment          PROGBITS        00000000 37a244 000021 01  MS  0   0  1
+> 
+>  
+> > > +/* If we have a known, fixed physical load address then set LOAD_OFFSET
+> > > +   and generate an ELF that has the physical load address in the program
+> > > +   headers. */
+> > > +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
+> > > +#define LOAD_OFFSET (PAGE_OFFSET - PHYS_OFFSET)
+> > > +#endif
+> > > +
+> > 
+> > What happens if CONFIG_ARM_PATCH_PHYS_VIRT=y?  This will be used
+> > increasingly, especially for multiplatform kernels.
+> 
+> Then LOAD_OFFSET is unset and include/asm-generic/vmlinux.lds.h does:
+> 
+> #ifndef LOAD_OFFSET
+> #define LOAD_OFFSET 0
+> #endif
 
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+OK, good.
+ 
+> Which is exactly the same case we have today. LOAD_OFFSET is not a
+> name I invented, it is the standard kernel name for the functionality.
+>  
+> > If the kernel is intended to be loadable at a physical address which is
+> > not statically known, no ELF loader that does not ignore the ELF
+> > phdr
+> 
+> In this case you can't really use a standard ELF loader to load the
+> kernel so, LOAD_OFFSET = 0 is fine. My case is using an ELF loader,
+> and I have set options for a static physical load address.
 
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+Generally, people should try to be compatible with the single kernel
+image effort unless there's a really compelling reason not to.
 
-are available in the git repository at:
+Wouldn't your firmware be incapable of loading a multiplatform kernel?
 
-  git://git.linaro.org/people/mturquette/linux.git tags/clk-for-linus
+> > >  OUTPUT_ARCH(arm)
+> > > -ENTRY(stext)
+> > > +ENTRY(phys_start)
+> > 
+> > This is debatable.  In fact, stext has the property that its virtual
+> > (runtime) and load addresses are the same.
+> 
+> This is what other arches using LOAD_OFFSET do (eg see ia64), and is
+> sensible. ENTRY is *only* used by the ELF loader and specifies where
+> the loader should jump. It must be a physical address since the loader
+> only works with physical addresse. I don't understand your comment
+> that .stext has the same load and virtual address, that is clearly not
+> true for the ELF images my build is producing:
+> 
+> c0008000 T _text
+> c0008000 T stext
+> 
+> The physical address of that symbol is 0x8000.
 
-for you to fetch changes up to 494bfec99922d54054d2d0873f1017680cfc3f13:
+Well, that was a bit of a pedantic point I admit, but there are
+conflicting definitions of what "virtual address" really means in these
+situations.  The original SYSV ABI spec explicitly specifies that
+e_entry is a virtual address, but is also rather vague about how the
+paddr fields should be interpreted.
 
-  clk: add of_clk_src_onecell_get() support (2012-09-07 18:30:19 -0700)
 
-----------------------------------------------------------------
-The common clk framework changes for 3.7 are dominated by ARM platform
-ports to the framework along with one MIPS port, one MFD port, one minor
-framework enhancement and one helper function for platforms expressing
-their clock data through device tree.
+All that AT(ADDR(blah) - LOAD_OFFSET) stuff is cumbersome, but if it's
+at least consistent with other architectures then it may not such a
+disaster.  It's not universal though: less than 50% of the arches in
+the kernel currently seem to use this.
 
-----------------------------------------------------------------
-Barry Song (1):
-      clk: prima2: move from arch/arm/mach to drivers/clk
+An alternative, cleaner approach might be to specify segment load
+addresses directly using PHDRS { }.  This should at leat allow the
+load address to be specified once per phdr, rather than once per section.
 
-Binghua Duan (1):
-      ARM: PRIMA2: convert to common clk and finish full clk tree
+> > To represent this correctly in the linker scripts, the
+> > position-independent head.S code should be split out into a separate
+> > section to which LOAD_OFFSET is not applied.
+> 
+> I'm not sure, the linker script should use addresses that are correct
+> during runtime, and if the PIC code does not care about its PC then it
+> is fine to keep it at the virtual address to minimize confusion once
+> the MMU is on.
+> > Setting vaddr and paddr to PAGE_OFFSET (as we do now) and having the
+> > loader choose the appropriate board-specific place to load the kernel
+> > image makes this irrelevant, if I've understood the situation correctly.
+> 
+> Yes, if you use more loader stages then the load headers are ignored.
+> Our boot loaders on our boards boot straight ELF vmlinux.gz so they
+> need correct load headers.
 
-Chao Xie (5):
-      clk: mmp: add mmp specific clocks
-      clk: mmp: add clock definition for pxa168
-      clk: mmp: add clock definition for pxa910
-      clk: mmp: add clock definition for mmp2
-      arm: mmp: make all SOCs use common clock by default
+If your image is compressed anyway though, why are you not using zImage?
 
-Jonghwa Lee (1):
-      clock: max77686: Add driver for Maxim 77686 32Khz crystal oscillator.
-
-Kelvin Cheung (1):
-      clk: add Loongson1B clock support
-
-Linus Walleij (2):
-      clk: convert ARM RealView to common clk
-      clk: versatile: make config option boolean
-
-Michel Jaouen (1):
-      mfd: dbx500: Provide a more accurate smp_twd clock
-
-Shawn Guo (1):
-      clk: add of_clk_src_onecell_get() support
-
-Ulf Hansson (7):
-      clk: ux500: Adapt PRCMU and PRCC clocks for common clk
-      clk: ux500: First version of clock definitions for ux500
-      clk: ux500: Clock definitions for u8500
-      ARM: ux500: Switch to use common clock framework
-      clk: Provide option for clk_get_rate to issue hw for new rate
-      clk: ux500: Support for prmcu_rate clock
-      clk: ux500: Define smp_twd clock for u8500
-
- arch/arm/Kconfig                             |    9 +-
- arch/arm/mach-mmp/Kconfig                    |    3 +
- arch/arm/mach-prima2/Makefile                |    1 -
- arch/arm/mach-prima2/clock.c                 |  510 -----------
- arch/arm/mach-prima2/prima2.c                |    1 -
- arch/arm/mach-prima2/timer.c                 |    8 +-
- arch/arm/mach-realview/core.c                |  106 ---
- arch/arm/mach-realview/include/mach/clkdev.h |   16 -
- arch/arm/mach-realview/realview_eb.c         |    2 +
- arch/arm/mach-realview/realview_pb1176.c     |    2 +
- arch/arm/mach-realview/realview_pb11mp.c     |    2 +
- arch/arm/mach-realview/realview_pba8.c       |    2 +
- arch/arm/mach-realview/realview_pbx.c        |    2 +
- arch/arm/mach-ux500/Kconfig                  |    1 +
- arch/arm/mach-ux500/Makefile                 |    2 +-
- arch/arm/mach-ux500/clock.c                  |  715 ----------------
- arch/arm/mach-ux500/clock.h                  |  164 ----
- arch/arm/mach-ux500/cpu.c                    |   14 +-
- drivers/clk/Kconfig                          |   13 +
- drivers/clk/Makefile                         |    9 +-
- drivers/clk/clk-ls1x.c                       |  111 +++
- drivers/clk/clk-max77686.c                   |  244 ++++++
- drivers/clk/clk-prima2.c                     | 1171 ++++++++++++++++++++++++++
- drivers/clk/clk.c                            |   57 +-
- drivers/clk/mmp/Makefile                     |    9 +
- drivers/clk/mmp/clk-apbc.c                   |  152 ++++
- drivers/clk/mmp/clk-apmu.c                   |   97 +++
- drivers/clk/mmp/clk-frac.c                   |  153 ++++
- drivers/clk/mmp/clk-mmp2.c                   |  449 ++++++++++
- drivers/clk/mmp/clk-pxa168.c                 |  346 ++++++++
- drivers/clk/mmp/clk-pxa910.c                 |  320 +++++++
- drivers/clk/mmp/clk.h                        |   35 +
- drivers/clk/ux500/Makefile                   |   12 +
- drivers/clk/ux500/clk-prcc.c                 |  164 ++++
- drivers/clk/ux500/clk-prcmu.c                |  252 ++++++
- drivers/clk/ux500/clk.h                      |   48 ++
- drivers/clk/ux500/u8500_clk.c                |  477 +++++++++++
- drivers/clk/ux500/u8540_clk.c                |   21 +
- drivers/clk/ux500/u9540_clk.c                |   21 +
- drivers/clk/versatile/Makefile               |    1 +
- drivers/clk/versatile/clk-realview.c         |  114 +++
- drivers/mfd/db8500-prcmu.c                   |   42 +
- drivers/mfd/dbx500-prcmu-regs.h              |    4 +-
- include/linux/clk-provider.h                 |    6 +
- include/linux/mfd/dbx500-prcmu.h             |    1 +
- include/linux/platform_data/clk-realview.h   |    1 +
- include/linux/platform_data/clk-ux500.h      |   17 +
- 47 files changed, 4360 insertions(+), 1547 deletions(-)
- delete mode 100644 arch/arm/mach-prima2/clock.c
- delete mode 100644 arch/arm/mach-realview/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-ux500/clock.c
- delete mode 100644 arch/arm/mach-ux500/clock.h
- create mode 100644 drivers/clk/clk-ls1x.c
- create mode 100644 drivers/clk/clk-max77686.c
- create mode 100644 drivers/clk/clk-prima2.c
- create mode 100644 drivers/clk/mmp/Makefile
- create mode 100644 drivers/clk/mmp/clk-apbc.c
- create mode 100644 drivers/clk/mmp/clk-apmu.c
- create mode 100644 drivers/clk/mmp/clk-frac.c
- create mode 100644 drivers/clk/mmp/clk-mmp2.c
- create mode 100644 drivers/clk/mmp/clk-pxa168.c
- create mode 100644 drivers/clk/mmp/clk-pxa910.c
- create mode 100644 drivers/clk/mmp/clk.h
- create mode 100644 drivers/clk/ux500/Makefile
- create mode 100644 drivers/clk/ux500/clk-prcc.c
- create mode 100644 drivers/clk/ux500/clk-prcmu.c
- create mode 100644 drivers/clk/ux500/clk.h
- create mode 100644 drivers/clk/ux500/u8500_clk.c
- create mode 100644 drivers/clk/ux500/u8540_clk.c
- create mode 100644 drivers/clk/ux500/u9540_clk.c
- create mode 100644 drivers/clk/versatile/clk-realview.c
- create mode 100644 include/linux/platform_data/clk-realview.h
- create mode 100644 include/linux/platform_data/clk-ux500.h
+Cheers
+---Dave
