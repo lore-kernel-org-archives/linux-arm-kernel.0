@@ -1,324 +1,243 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 01 Oct 2012 05:08:08 -0400
-Subject: [PATCH v2 05/10] ARM: KVM: VGIC virtual CPU interface management
+Date: Mon, 1 Oct 2012 05:09:05 -0400
+Subject: [PATCH v2 00/10] KVM/ARM Implementation
 In-Reply-To: <20121001090716.49038.90056.stgit@ubuntu>
 References: <20121001090716.49038.90056.stgit@ubuntu>
-Message-ID: <20121001090808.49038.32377.stgit@ubuntu>
+Message-ID: <CANM98qKa62xY29ZLmn9RjZ-5Sk45HOca=HheaqoSMpGmQafxAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Oct 1, 2012 at 5:07 AM, Christoffer Dall
+<c.dall@virtualopensystems.com> wrote:
+> The following series implements KVM support for ARM processors,
+> specifically on the Cortex A-15 platform.  We feel this is ready to be
+> merged.
+>
+> Work is done in collaboration between Columbia University, Virtual Open
+> Systems and ARM/Linaro.
+>
+> The patch series applies to Linux 3.6 with a number of merges:
+>  1. git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>         branch: hyp-mode-boot-next (e5a04cb0b4a)
+>  2. git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>         branch: timers-next (437814c44c)
+>  3. git://git.kernel.org/pub/scm/virt/kvm/kvm.git
+>         branch: next (1e08ec4a)
+>
+> This is Version 12 of the patch series, the first 10 versions were
+> reviewed on the KVM/ARM and KVM mailing lists. Changes can also be
+> pulled from:
+>     git://github.com/virtualopensystems/linux-kvm-arm.git
+>         branch: kvm-arm-v12
+>         branch: kvm-arm-v12-vgic
+>         branch: kvm-arm-v12-vgic-timers
+>
+> A non-flattened edition of the patch series, which can always be merged,
+> can be found at:
+>  git://github.com/virtualopensystems/linux-kvm-arm.git kvm-arm-master
+>
+> This patch series requires QEMU compatibility.  Use the branch
+>  git://github.com/virtualopensystems/qemu.git kvm-arm
+>
+> Following this patch series, which implements core KVM support are two
+> other patch series implementing Virtual Generic Interrupt Controller
+> (VGIC) support and Architected Generic Timers.  All three patch series
+> should be applied for full QEMU compatibility.
+>
+> The implementation is broken up into a logical set of patches, the first
+> are preparatory patches:
+>   1. ARM: Add page table defines for KVM
+>   3. ARM: Section based HYP idmaps
+>   3. ARM: Factor out cpuid implementor and part_number fields
+>
+> The main implementation is broken up into separate patches, the first
+> containing a skeleton of files, makefile changes, the basic user space
+> interface and KVM architecture specific stubs.  Subsequent patches
+> implement parts of the system as listed:
+>   4. Skeleton and reset hooks
+>   5. Hypervisor initialization
+>   6. Memory virtualization setup (hyp mode mappings and 2nd stage)
+>   7. Inject IRQs and FIQs from userspace
+>   8. World-switch implementation and Hyp exception vectors
+>   9. Emulation framework and coproc emulation
+>  10. Coproc user space API
+>  11. Demux multiplexed coproc registers
+>  12. User spac API to get/set VFP registers
+>  13. Handle guest user memory aborts
+>  14. Handle guest MMIO aborts
+>
+> Testing:
+>  Tested on FAST Models and Versatile Express test-chip2.  Tested by
+>  running three simultaenous VMs, all running SMP, on an SMP host, each
+>  VM running hackbench and cyclictest and with extreme memory pressure
+>  applied to the host with swapping enabled to provoke page eviction.
+>  Also tested KSM merging and GCC inside VMs.  Fully boots both Ubuntu
+>  (user space Thumb-2) and Debian (user space ARM) guests.
+>
+> For a guide on how to set up a testing environment and try out these
+> patches, see:
+>  http://www.virtualopensystems.com/media/pdf/kvm-arm-guide.pdf
+>
+> Changes since v11:
+>  - Memory setup and page table defines reworked
+>  - We do not export unused perf bitfields anymore
+>  - No module support anymore and following cleanup
+>  - Hide vcpu register accessors
+>  - Fix unmap range mmu notifier race condition
+>  - Factored out A15 coprocs in separate file
+>  - Factored out world-switch assembly macros to separate file
+>  - Add dmux of multiplexed coprocs to user space
+>  - Add VFP get/set interface to user space
+>  - Addressed various cleanup comments from reviewers
+>
+> Changes since v10:
+>  - Boot in Hyp mode and user HVC to initialize HVBAR
+>  - Support VGIC
+>  - Support Arch timers
+>  - Support Thumb-2 mmio instruction decoding
+>  - Transition to GET_ONE/SET_ONE register API
+>  - Added KVM_VCPU_GET_REG_LIST
+>  - New interrupt injection API
+>  - Don't pin guest pages anymore
+>  - Fix race condition in page fault handler
+>  - Cleanup guest instruction copying.
+>  - Fix race when copying SMP guest instructions
+>  - Inject data/prefetch aborts when guest does something strange
+>
+> Changes since v9:
+>  - Addressed reviewer comments (see mailing list archive)
+>  - Limit the user of .arch_extensiion sec/virt for compilers that need them
+>  - VFP/Neon Support (Antonios Motakis)
+>  - Run exit handling under preemption and still handle guest cache ops
+>  - Add support for IO mapping at Hyp level (VGIC prep)
+>  - Add support for IO mapping at Guest level (VGIC prep)
+>  - Remove backdoor call to irq_svc
+>  - Complete rework of CP15 handling and register reset (Rusty Russell)
+>  - Don't use HSTR for anything else than CR 15
+>  - New ioctl to set emulation target core (only A15 supported for now)
+>  - Support KVM_GET_MSRS / KVM_SET_MSRS
+>  - Add page accounting and page table eviction
+>  - Change pgd lock to spinlock and fix sleeping in atomic bugs
+>  - Check kvm_condition_valid for HVC traps of undefs
+>  - Added a naive implementation of kvm_unmap_hva_range
+>
+> Changes since v8:
+>  - Support cache maintenance on SMP through set/way
+>  - Hyp mode idmaps are now section based and happen at kernel init
+>  - Handle aborts in Hyp mode
+>  - Inject undefined exceptions into the guest on error
+>  - Kernel-side reset of all crucial registers
+>  - Specifically state which target CPU is being virtualized
+>  - Exit statistics in debugfs
+>  - Some L2CTLR cp15 emulation cleanups
+>  - Support spte_hva for MMU notifiers and take write faults
+>  - FIX: Race condition in VMID generation
+>  - BUG: Run exit handling code with disabled preemption
+>  - Save/Restore abort fault register during world switch
+>
+> Changes since v7:
+>  - Traps accesses to ACTLR
+>  - Do not trap WFE execution
+>  - Upgrade barriers and TLB operations to inner-shareable domain
+>  - Restrucure hyp_pgd related code to be more opaque
+>  - Random SMP fixes
+>  - Random BUG fixes
+>  - Improve commenting
+>  - Support module loading/unloading of KVM/ARM
+>  - Thumb-2 support for host kernel and KVM
+>  - Unaligned cross-page wide guest Thumb instruction fetching
+>  - Support ITSTATE fields in CPSR for Thumb guests
+>  - Document HCR settings
+>
+> Changes since v6:
+>  - Support for MMU notifiers to not pin user pages in memory
+>  - Suport build with log debugging
+>  - Bugfix: v6 clobbered r7 in init code
+>  - Simplify hyp code mapping
+>  - Cleanup of register access code
+>  - Table-based CP15 emulation from Rusty Russell
+>  - Various other bug fixes and cleanups
+>
+> Changes since v5:
+>  - General bugfixes and nit fixes from reviews
+>  - Implemented re-use of VMIDs
+>  - Cleaned up the Hyp-mapping code to be readable by non-mm hackers
+>    (including myself)
+>  - Integrated preliminary SMP support in base patches
+>  - Lock-less interrupt injection and WFI support
+>  - Fixed signal-handling in while in guest (increases overall stability)
+>
+> Changes since v4:
+>  - Addressed reviewer comments from v4
+>     * cleanup debug and trace code
+>     * remove printks
+>     * fixup kvm_arch_vcpu_ioctl_run
+>     * add trace details to mmio emulation
+>  - Fix from Marc Zyngier: Move kvm_guest_enter/exit into non-preemptible
+>    section (squashed into world-switch patch)
+>  - Cleanup create_hyp_mappings/remove_hyp_mappings from Marc Zyngier
+>    (squashed into hypervisor initialization patch)
+>  - Removed the remove_hyp_mappings feature. Removing hypervisor mappings
+>    could potentially unmap other important data shared in the same page.
+>  - Removed the arm_ prefix from the arch-specific files.
+>  - Initial SMP host/guest support
+>
+> Changes since v3:
+>  - v4 actually works, fully boots a guest
+>  - Support compiling as a module
+>  - Use static inlines instead of macros for vcpu_reg and friends
+>  - Optimize kvm_vcpu_reg function
+>  - Use Ftrace for trace capabilities
+>  - Updated documentation and commenting
+>  - Use KVM_IRQ_LINE instead of KVM_INTERRUPT
+>  - Emulates load/store instructions not supported through HSR
+>   syndrome information.
+>  - Frees 2nd stage translation tables on VM teardown
+>  - Handles IRQ/FIQ instructions
+>  - Handles more CP15 accesses
+>  - Support guest WFI calls
+>  - Uses debugfs instead of /proc
+>  - Support compiling in Thumb mode
+>
+> Changes since v2:
+>  - Performs world-switch code
+>  - Maps guest memory using 2nd stage translation
+>  - Emulates co-processor 15 instructions
+>  - Forwards I/O faults to QEMU.
+>
+> ---
+>
+> Marc Zyngier (10):
+>       ARM: KVM: Keep track of currently running vcpus
+>       ARM: KVM: Initial VGIC infrastructure support
+>       ARM: KVM: Initial VGIC MMIO support code
+>       ARM: KVM: VGIC distributor handling
+>       ARM: KVM: VGIC virtual CPU interface management
+>       ARM: KVM: VGIC interrupt injection
+>       ARM: KVM: VGIC control interface world switch
+>       ARM: KVM: VGIC initialisation code
+>       ARM: KVM: vgic: reduce the number of vcpu kick
+>       ARM: KVM: Add VGIC configuration option
+>
+>
+>  arch/arm/include/asm/kvm_arm.h  |   12
+>  arch/arm/include/asm/kvm_host.h |   16 +
+>  arch/arm/include/asm/kvm_vgic.h |  301 +++++++++++
+>  arch/arm/kernel/asm-offsets.c   |   12
+>  arch/arm/kvm/Kconfig            |    7
+>  arch/arm/kvm/Makefile           |    1
+>  arch/arm/kvm/arm.c              |  101 +++-
+>  arch/arm/kvm/interrupts.S       |    4
+>  arch/arm/kvm/interrupts_head.S  |   68 ++
+>  arch/arm/kvm/mmu.c              |    3
+>  arch/arm/kvm/vgic.c             | 1115 +++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/kvm_main.c             |    5
+>  12 files changed, 1640 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm/include/asm/kvm_vgic.h
+>  create mode 100644 arch/arm/kvm/vgic.c
+>
+> --
 
-Add VGIC virtual CPU interface code, picking pending interrupts
-from the distributor and stashing them in the VGIC control interface
-list registers.
+Please disregard this first mail-out, I messed up my stgit config.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/include/asm/kvm_vgic.h |   41 +++++++
- arch/arm/kvm/vgic.c             |  224 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 264 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-index a82699f..bb67076 100644
---- a/arch/arm/include/asm/kvm_vgic.h
-+++ b/arch/arm/include/asm/kvm_vgic.h
-@@ -193,17 +193,58 @@ struct vgic_dist {
- };
- 
- struct vgic_cpu {
-+#ifdef CONFIG_KVM_ARM_VGIC
-+	/* per IRQ to LR mapping */
-+	u8		vgic_irq_lr_map[VGIC_NR_IRQS];
-+
-+	/* Pending interrupts on this VCPU */
-+	DECLARE_BITMAP(	pending, VGIC_NR_IRQS);
-+
-+	/* Bitmap of used/free list registers */
-+	DECLARE_BITMAP(	lr_used, 64);
-+
-+	/* Number of list registers on this CPU */
-+	int		nr_lr;
-+
-+	/* CPU vif control registers for world switch */
-+	u32		vgic_hcr;
-+	u32		vgic_vmcr;
-+	u32		vgic_misr;	/* Saved only */
-+	u32		vgic_eisr[2];	/* Saved only */
-+	u32		vgic_elrsr[2];	/* Saved only */
-+	u32		vgic_apr;
-+	u32		vgic_lr[64];	/* A15 has only 4... */
-+#endif
- };
- 
-+#define VGIC_HCR_EN		(1 << 0)
-+#define VGIC_HCR_UIE		(1 << 1)
-+
-+#define VGIC_LR_VIRTUALID	(0x3ff << 0)
-+#define VGIC_LR_PHYSID_CPUID	(7 << 10)
-+#define VGIC_LR_STATE		(3 << 28)
-+#define VGIC_LR_PENDING_BIT	(1 << 28)
-+#define VGIC_LR_ACTIVE_BIT	(1 << 29)
-+#define VGIC_LR_EOI		(1 << 19)
-+
-+#define VGIC_MISR_EOI		(1 << 0)
-+#define VGIC_MISR_U		(1 << 1)
-+
-+#define LR_EMPTY	0xff
-+
- struct kvm;
- struct kvm_vcpu;
- struct kvm_run;
- struct kvm_exit_mmio;
- 
- #ifdef CONFIG_KVM_ARM_VGIC
-+void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu);
-+void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu);
-+int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		      struct kvm_exit_mmio *mmio);
- 
-+#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
- #else
- static inline int kvm_vgic_hyp_init(void)
- {
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index a870596..2b90785 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -584,7 +584,25 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
- 
- static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
- {
--	return 0;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	unsigned long *pending, *enabled, *pend;
-+	int vcpu_id;
-+
-+	vcpu_id = vcpu->vcpu_id;
-+	pend = vcpu->arch.vgic_cpu.pending;
-+
-+	pending = vgic_bitmap_get_cpu_map(&dist->irq_state, vcpu_id);
-+	enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
-+	bitmap_and(pend, pending, enabled, 32);
-+
-+	pending = vgic_bitmap_get_shared_map(&dist->irq_state);
-+	enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
-+	bitmap_and(pend + 1, pending, enabled, VGIC_NR_SHARED_IRQS);
-+	bitmap_and(pend + 1, pend + 1,
-+		   vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
-+		   VGIC_NR_SHARED_IRQS);
-+
-+	return (find_first_bit(pend, VGIC_NR_IRQS) < VGIC_NR_IRQS);
- }
- 
- /*
-@@ -609,3 +627,207 @@ static void vgic_update_state(struct kvm *kvm)
- 		}
- 	}
- }
-+
-+#define LR_PHYSID(lr) 		(((lr) & VGIC_LR_PHYSID_CPUID) >> 10)
-+#define MK_LR_PEND(src, irq)	(VGIC_LR_PENDING_BIT | ((src) << 10) | (irq))
-+/*
-+ * Queue an interrupt to a CPU virtual interface. Return true on success,
-+ * or false if it wasn't possible to queue it.
-+ */
-+static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int lr, is_level;
-+
-+	/* Sanitize the input... */
-+	BUG_ON(sgi_source_id & ~7);
-+	BUG_ON(sgi_source_id && irq > 15);
-+	BUG_ON(irq >= VGIC_NR_IRQS);
-+
-+	kvm_debug("Queue IRQ%d\n", irq);
-+
-+	lr = vgic_cpu->vgic_irq_lr_map[irq];
-+	is_level = !vgic_irq_is_edge(dist, irq);
-+
-+	/* Do we have an active interrupt for the same CPUID? */
-+	if (lr != LR_EMPTY &&
-+	    (LR_PHYSID(vgic_cpu->vgic_lr[lr]) == sgi_source_id)) {
-+		kvm_debug("LR%d piggyback for IRQ%d %x\n", lr, irq, vgic_cpu->vgic_lr[lr]);
-+		BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
-+		vgic_cpu->vgic_lr[lr] |= VGIC_LR_PENDING_BIT;
-+		if (is_level)
-+			vgic_cpu->vgic_lr[lr] |= VGIC_LR_EOI;
-+		return true;
-+	}
-+
-+	/* Try to use another LR for this interrupt */
-+	lr = find_first_bit((unsigned long *)vgic_cpu->vgic_elrsr,
-+			       vgic_cpu->nr_lr);
-+	if (lr >= vgic_cpu->nr_lr)
-+		return false;
-+
-+	kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
-+	vgic_cpu->vgic_lr[lr] = MK_LR_PEND(sgi_source_id, irq);
-+	if (is_level)
-+		vgic_cpu->vgic_lr[lr] |= VGIC_LR_EOI;
-+
-+	vgic_cpu->vgic_irq_lr_map[irq] = lr;
-+	clear_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr);
-+	set_bit(lr, vgic_cpu->lr_used);
-+
-+	return true;
-+}
-+
-+/*
-+ * Fill the list registers with pending interrupts before running the
-+ * guest.
-+ */
-+static void __kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	unsigned long *pending;
-+	int i, c, vcpu_id;
-+	int overflow = 0;
-+
-+	vcpu_id = vcpu->vcpu_id;
-+
-+	/*
-+	 * We may not have any pending interrupt, or the interrupts
-+	 * may have been serviced from another vcpu. In all cases,
-+	 * move along.
-+	 */
-+	if (!kvm_vgic_vcpu_pending_irq(vcpu)) {
-+		pr_debug("CPU%d has no pending interrupt\n", vcpu_id);
-+		goto epilog;
-+	}
-+
-+	/* SGIs */
-+	pending = vgic_bitmap_get_cpu_map(&dist->irq_state, vcpu_id);
-+	for_each_set_bit(i, vgic_cpu->pending, 16) {
-+		unsigned long sources;
-+
-+		sources = dist->irq_sgi_sources[vcpu_id][i];
-+		for_each_set_bit(c, &sources, 8) {
-+			if (!vgic_queue_irq(vcpu, c, i)) {
-+				overflow = 1;
-+				continue;
-+			}
-+
-+			clear_bit(c, &sources);
-+		}
-+
-+		if (!sources)
-+			clear_bit(i, pending);
-+
-+		dist->irq_sgi_sources[vcpu_id][i] = sources;
-+	}
-+
-+	/* PPIs */
-+	for_each_set_bit_from(i, vgic_cpu->pending, 32) {
-+		if (!vgic_queue_irq(vcpu, 0, i)) {
-+			overflow = 1;
-+			continue;
-+		}
-+
-+		clear_bit(i, pending);
-+	}
-+
-+
-+	/* SPIs */
-+	pending = vgic_bitmap_get_shared_map(&dist->irq_state);
-+	for_each_set_bit_from(i, vgic_cpu->pending, VGIC_NR_IRQS) {
-+		if (vgic_bitmap_get_irq_val(&dist->irq_active, 0, i))
-+			continue; /* level interrupt, already queued */
-+
-+		if (!vgic_queue_irq(vcpu, 0, i)) {
-+			overflow = 1;
-+			continue;
-+		}
-+
-+		/* Immediate clear on edge, set active on level */
-+		if (vgic_irq_is_edge(dist, i))
-+			clear_bit(i - 32, pending);
-+		else
-+			vgic_bitmap_set_irq_val(&dist->irq_active, 0, i, 1);
-+	}
-+
-+epilog:
-+	if (overflow)
-+		vgic_cpu->vgic_hcr |= VGIC_HCR_UIE;
-+	else {
-+		vgic_cpu->vgic_hcr &= ~VGIC_HCR_UIE;
-+		/*
-+		 * We're about to run this VCPU, and we've consumed
-+		 * everything the distributor had in store for
-+		 * us. Claim we don't have anything pending. We'll
-+		 * adjust that if needed while exiting.
-+		 */
-+		clear_bit(vcpu_id, &dist->irq_pending_on_cpu);
-+	}
-+}
-+
-+/*
-+ * Sync back the VGIC state after a guest run. We do not really touch
-+ * the distributor here (the irq_pending_on_cpu bit is safe to set),
-+ * so there is no need for taking its lock.
-+ */
-+static void __kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int lr, pending;
-+
-+	/* Clear mappings for empty LRs */
-+	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr,
-+			 vgic_cpu->nr_lr) {
-+		int irq;
-+
-+		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-+			continue;
-+
-+		irq = vgic_cpu->vgic_lr[lr] & VGIC_LR_VIRTUALID;
-+
-+		BUG_ON(irq >= VGIC_NR_IRQS);
-+		vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-+	}
-+
-+	/* Check if we still have something up our sleeve... */
-+	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_elrsr,
-+				      vgic_cpu->nr_lr);
-+	if (pending < vgic_cpu->nr_lr) {
-+		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
-+		smp_mb();
-+	}
-+}
-+
-+void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return;
-+
-+	spin_lock(&dist->lock);
-+	__kvm_vgic_sync_to_cpu(vcpu);
-+	spin_unlock(&dist->lock);
-+}
-+
-+void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu)
-+{
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return;
-+
-+	__kvm_vgic_sync_from_cpu(vcpu);
-+}
-+
-+int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return 0;
-+
-+	return test_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
-+}
+-Christoffer
