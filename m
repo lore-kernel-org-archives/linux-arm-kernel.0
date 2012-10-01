@@ -1,46 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Oct 2012 20:12:09 +0000 (UTC)
-Subject: OMAP baseline test results for v3.6
-In-Reply-To: <alpine.DEB.2.00.1210011923120.2160@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210011923120.2160@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1210011957180.2160@utopia.booyaka.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Mon, 1 Oct 2012 22:30:21 +0200
+Subject: [PATCH V5 3/5] ARM: bcm2835: add system timer
+In-Reply-To: <1347690093-16910-3-git-send-email-swarren@wwwdotorg.org>
+References: <1347690093-16910-1-git-send-email-swarren@wwwdotorg.org>
+ <1347690093-16910-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121001203020.GA9346@raptus.dandreoli.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Oct 2012, Paul Walmsley wrote:
-
-> Kernel size/memory differences
-> ------------------------------
+On Sat, Sep 15, 2012 at 12:21:31AM -0600, Stephen Warren wrote:
 > 
-> vmlinux object size
-> (delta in bytes from test_v3.5 (28a33cbc24e4256c143dce96c7d93bf423229f92)):
->   text    data     bss   total  kernel
-> +106549 +17784   +2380  +126713 2430_testconfig
-> +38971   +5296    +920  +45187  5912osk_testconfig
-> +98563  +30344    -316  +128591 am33xx_testconfig
-> +63542  +14584   +1992  +80118  n800_b_testconfig
-> +58180  +14808   +1988  +74976  n800_multi_omap2xxx
-> +39388  +15672   +1960  +57020  n800_testconfig
-> +49048   +5328    +920  +55296  omap1510_defconfig
-> +45816   +5264    +952  +52032  omap1_defconfig
-> +42090  +15360    -156  +57294  omap2_4_testconfig
-> +121890 +23480   +2884  +148254 omap2plus_defconfig
-> +125042 +23624   +2884  +151550 omap2plus_defconfig_cpupm
-> +54593  +21360    -380  +75573  omap2plus_no_pm
-> +83137  +23760    -316  +106581 omap3_4_testconfig
-> +55217  +21576   +1036  +77829  omap3_testconfig
-> +62061  +18840      +4  +80905  omap4_testconfig
-> +86789  +21608   +1380  +109777 rmk_omap3430_ldp_oldconfig
-> +96177  -14216    +208  +82169  rmk_omap4430_sdp_oldconfig
+> diff --git a/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt b/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
+> new file mode 100644
+> index 0000000..a0b727f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
+> @@ -0,0 +1,22 @@
+> +BCM2835 System Timer
+> +
+> +The System Timer peripheral provides four 32-bit timer channels and a
+> +single 64-bit free running counter. Each channel has an output compare
+> +register, which is compared against the 32 least significant bits of the
+> +free running counter values, and generates an interrupt.
+> +
+> +Required properties:
+> +
+> +- compatible : should be "brcm,bcm2835-system-timer.txt"
+                                                      ^^^^
+typo here
 
-One comment about some of these vmlinux sizes.  Due to the way the configs 
-are generated, the AM33xx data is being included into some of the kernels 
-that shouldn't have it.  So for configs like omap3_4_testconfig or 
-omap2_4_testconfig, that AM33xx data accounts for about 12K of the 'data' 
-column that wasn't intended.
+> +- reg : Specifies base physical address and size of the registers.
+> +- interrupts : A list of 4 interrupt sinks; one per timer channel.
+> +- clock-frequency : The frequency of the clock that drives the counter, in Hz.
+> +
+> +Example:
+> +
+> +timer {
+> +	compatible = "brcm,bcm2835-system-timer";
+> +	reg = <0x20003000 0x1000>;
+> +	interrupts = <1 0>, <1 1>, <1 2>, <1 3>;
+> +	clock-frequency = <1000000>;
+> +};
 
-Kconfig handling in the scripts here needs some work; with luck, will 
-address that during this development cycle.
-
-
-- Paul
+cheers,
+Domenico
