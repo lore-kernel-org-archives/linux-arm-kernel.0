@@ -1,107 +1,89 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 1 Oct 2012 10:06:39 -0600
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121001153952.GB2100@linaro.org>
-References: <20120930232116.GC30637@obsidianresearch.com>
- <20121001153952.GB2100@linaro.org>
-Message-ID: <20121001160639.GA31620@obsidianresearch.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 1 Oct 2012 17:07:25 +0100
+Subject: [PATCH 14/15] KVM: ARM: Handle I/O aborts
+In-Reply-To: <1349104329.2160.71.camel@linaro1.home>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153559.21241.29970.stgit@ubuntu>
+ <20120927151108.GM25916@mudshark.cambridge.arm.com>
+ <CANM98qKFKU98EWNaOepjxab3h5vQypxdt_YoJbKV9kd31XUfaw@mail.gmail.com>
+ <20121001125326.GA2100@linaro.org>
+ <1349104329.2160.71.camel@linaro1.home>
+Message-ID: <20121001160725.GC2100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 04:39:53PM +0100, Dave Martin wrote:
-
-> >   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
-> >   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
+On Mon, Oct 01, 2012 at 04:12:09PM +0100, Jon Medhurst (Tixy) wrote:
+> On Mon, 2012-10-01 at 13:53 +0100, Dave Martin wrote:
+> > On Sun, Sep 30, 2012 at 05:49:21PM -0400, Christoffer Dall wrote:
+> > > On Thu, Sep 27, 2012 at 11:11 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > On Sat, Sep 15, 2012 at 04:35:59PM +0100, Christoffer Dall wrote:
+> > > > I'm afraid you're not going to thank me much for this, but it's high time we
+> > > > unified the various instruction decoding functions we have under arch/arm/
+> > > > and this seems like a good opportunity for that. For example, look at the
+> > > > following snippets (there is much more in the files I list) in addition to
+> > > > what you have:
+> > > >
+> > > 
+> > > I think it would be great if we had a set of unified decoding functions!
+> > > 
+> > > However, I think it's a shame if we can't merge KVM because we want to
+> > > clean up this code. There would be nothing in the way of breaking API
+> > > or anything like that preventing us from cleaning this up after the
+> > > code has been merged.
+> > > 
+> > > Please consider reviewing the code for correctness and consider if the
+> > > code could be merged as is.
+> > > 
+> > > On the other hand, if you or Dave or anyone else wants to create a set
+> > > of patches that cleans this up in a timely manner, I will be happy to
+> > > merge them for my code as well ;)
+> > 
+> > The time I would have available to put into this is rather limited, but
+> > I have some initial ideas, as outlined below.
+> > 
+> > Tixy (who did the kprobes implementation, which is probably the most
+> > sophisticated opcode handling we have in the kernel right now) may have
+> > ideas too.  I would hope that any common framework could reuse a fair
+> > chunk of his implementation and test coverage.
 > 
-> Not related directly to your patch, but I wonder why we don't we see
-> separate r-x and rw- segments?
+> To my thinking, the kprobes code is very tailored to the job it needs to
+> do and that turning it into something generic is just going to make
+> everything bigger and more complex - because a generic framework would
+> be bigger (as it's trying to be generic) and then things like kprobes
+> will probably end up having an additional framework layered over the top
+> to bend it to it's purposes. Perhaps I'm being too pessimistic.
 
-I think this is because the sections are not aligned when the
-protections change, and the sections are not sorted by protection
-type.
+Perhaps kprobes is a bit of a double-edged example.  It's an example of
+an implementation with some good features, but because it is larger
+the amount of adaptation required to convert to a common framework
+would necessarily be larger also.
 
-  [ 1] .head.text        PROGBITS        c0008000 008000 0001c0 00  AX  0   0 32
-  [ 2] .text             PROGBITS        c00081c0 0081c0 1dc880 00  AX  0   0 32
-  [ 3] .rodata           PROGBITS        c01e5000 1e5000 060a80 00   A  0   0 32
-  [ 4] __bug_table       PROGBITS        c0245a80 245a80 002a78 00   A  0   0  1
-  [ 5] .pci_fixup        PROGBITS        c02484f8 2484f8 000090 00   A  0   0  4
-  [ 6] __param           PROGBITS        c0248588 248588 000280 00   A  0   0  4
-  [ 7] __modver          PROGBITS        c0248808 248808 0007f8 00   A  0   0  4
-  [ 8] .init.text        PROGBITS        c0249000 249000 01af20 00  AX  0   0 32
-  [ 9] .exit.text        PROGBITS        c0263f20 263f20 000c0c 00  AX  0   0  4
-  [10] .init.proc.info   PROGBITS        c0264b2c 264b2c 00009c 00  AX  0   0  1
-  [11] .init.arch.info   PROGBITS        c0264bc8 264bc8 000044 00   A  0   0  4
-  [12] .init.tagtable    PROGBITS        c0264c0c 264c0c 000040 00   A  0   0  4
-  [13] .init.data        PROGBITS        c0264c60 264c60 0f481c 00  WA  0   0 32
-  [14] .data             PROGBITS        c035a000 35a000 020220 00  WA  0   0 32
-  [15] .notes            NOTE            c037a220 37a220 000024 00  AX  0   0  4
-  [16] .bss              NOBITS          c037a260 37a244 0320b0 00  WA  0   0 32
-  [17] .comment          PROGBITS        00000000 37a244 000021 01  MS  0   0  1
+Yet, kprobes isn't trying to solve radically different problems from
+other subsystems in the kernel.  It doesn't just want to descode and
+manipulate the properties of instructions, it is actually interested in
+many of the same properties (for example, whether an instruction is
+a load or store, whether it modifies the PC etc.) as some other
+subsystems.
 
- 
-> > +/* If we have a known, fixed physical load address then set LOAD_OFFSET
-> > +   and generate an ELF that has the physical load address in the program
-> > +   headers. */
-> > +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
-> > +#define LOAD_OFFSET (PAGE_OFFSET - PHYS_OFFSET)
-> > +#endif
-> > +
+I worry that by default every implementation of this ends up rather
+deeply tailored to its correcponding subsystem -- so we gradually
+accumulate more incompatible partially-overlapping duplicates of this
+functionality over time.  This doesn't feel like a good thing.
+
+> It would also requiring an inordinate amount of time to thrash out
+> requirements, design, prototype, and to implement. (I don't think I'm
+> being overly pessimistic about that ;-)
 > 
-> What happens if CONFIG_ARM_PATCH_PHYS_VIRT=y?  This will be used
-> increasingly, especially for multiplatform kernels.
+> So, unless some-one has serious quantities of spare time lying around...
 
-Then LOAD_OFFSET is unset and include/asm-generic/vmlinux.lds.h does:
+Well, I don't suggest that we should expect to get there in one go:
+such an effort won't ever the off the ground for sure.
 
-#ifndef LOAD_OFFSET
-#define LOAD_OFFSET 0
-#endif
+If we can consolidate a few simpler subsystems' opcode handling then
+that would still be a step in the right direction, even if integrating
+kprobes could not happen until much later.
 
-Which is exactly the same case we have today. LOAD_OFFSET is not a
-name I invented, it is the standard kernel name for the functionality.
- 
-> If the kernel is intended to be loadable at a physical address which is
-> not statically known, no ELF loader that does not ignore the ELF
-> phdr
+If we do nothing, the situation will just gradually get worse.
 
-In this case you can't really use a standard ELF loader to load the
-kernel so, LOAD_OFFSET = 0 is fine. My case is using an ELF loader,
-and I have set options for a static physical load address.
-
-> >  OUTPUT_ARCH(arm)
-> > -ENTRY(stext)
-> > +ENTRY(phys_start)
-> 
-> This is debatable.  In fact, stext has the property that its virtual
-> (runtime) and load addresses are the same.
-
-This is what other arches using LOAD_OFFSET do (eg see ia64), and is
-sensible. ENTRY is *only* used by the ELF loader and specifies where
-the loader should jump. It must be a physical address since the loader
-only works with physical addresse. I don't understand your comment
-that .stext has the same load and virtual address, that is clearly not
-true for the ELF images my build is producing:
-
-c0008000 T _text
-c0008000 T stext
-
-The physical address of that symbol is 0x8000.
-
-> To represent this correctly in the linker scripts, the
-> position-independent head.S code should be split out into a separate
-> section to which LOAD_OFFSET is not applied.
-
-I'm not sure, the linker script should use addresses that are correct
-during runtime, and if the PIC code does not care about its PC then it
-is fine to keep it at the virtual address to minimize confusion once
-the MMU is on.
-
-> Setting vaddr and paddr to PAGE_OFFSET (as we do now) and having the
-> loader choose the appropriate board-specific place to load the kernel
-> image makes this irrelevant, if I've understood the situation correctly.
-
-Yes, if you use more loader stages then the load headers are ignored.
-Our boot loaders on our boards boot straight ELF vmlinux.gz so they
-need correct load headers.
-
-Jason
+Cheers
+---Dave
