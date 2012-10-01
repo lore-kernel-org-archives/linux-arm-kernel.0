@@ -1,63 +1,97 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon, 1 Oct 2012 08:54:18 -0400
-Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <alpine.DEB.2.00.1209291830270.20956@utopia.booyaka.com>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
- <alpine.DEB.2.00.1209291830270.20956@utopia.booyaka.com>
-Message-ID: <20121001125418.GK5641@beef>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Mon, 1 Oct 2012 14:54:55 +0200
+Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
+References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
+ <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
+ <20121001124546.GE11837@lunn.ch>
+ <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
+Message-ID: <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2012 at 06:34:54PM +0000, Paul Walmsley wrote:
-> 
-> cc Omar
-> 
-> Hi Matt
-> 
-> On Fri, 28 Sep 2012, Matt Porter wrote:
-> 
-> > The AM33xx support requires some help in hwmod due to the following
-> > comment in arch/arm/mach-omap2/omap_hwmod.c:
-> > 	/*
-> > 	 * If an IP block contains HW reset lines and any of them are
-> > 	 * asserted, we let integration code associated with that
-> > 	 * block handle the enable.  We've received very little
-> > 	 * information on what those driver authors need, and until
-> > 	 * detailed information is provided and the driver code is
-> > 	 * posted to the public lists, this is probably the best we
-> > 	 * can do.
-> > 	 */
-> > 
-> > The approach to deal with the hardware reset (for at least the pruss
-> > hwmod) was to add a generic omap property to properly define this
-> > hardware. The implementation simply deasserts any rst lines that
-> > are called out in the property when the omap_device is
-> > instantiated. This is not the ideal implementation as the sequence is
-> > a bit wrong for pruss since the busy check during the hard reset
-> > will fail, even though it fails in a benign manner. Ideally, we would
-> > want the implementation to observe the ti,deassert-hard-reset property
-> > and use that in omap_hwmod.c:_enable() *after* the module is unidled
-> > and the clocks active. However, this is actually functional for purposes
-> > of getting the uio_pruss driver up and running.
-> 
-> Could you please sync with Omar on the hard reset handling?  He posted 
-> some patches that change the hard reset code.  Perhaps you can align on an 
-> approach with him?
+On Mon, Oct 1, 2012 at 2:48 PM, Fabio Porcedda <fabio.porcedda@gmail.com> wrote:
+> On Mon, Oct 1, 2012 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> On Mon, Oct 01, 2012 at 02:24:39PM +0200, Fabio Porcedda wrote:
+>>> Tested on an at91sam9260 board (evk-pro3)
+>>>
+>>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>>> ---
+>>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>>>  2 files changed, 40 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> new file mode 100644
+>>> index 0000000..65c1755
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> @@ -0,0 +1,19 @@
+>>> +* Atmel Watchdog Timers
+>>> +
+>>> +** at91sam9-wdt
+>>> +
+>>> +Required properties:
+>>> +- compatible: must be "atmel,at91sam9260-wdt".
+>>> +- reg: physical base address of the controller and length of memory mapped
+>>> +  region.
+>>> +
+>>> +Optional properties:
+>>> +- timeout: contains the watchdog timeout in seconds.
+>>> +
+>>> +Example:
+>>> +
+>>> +     watchdog at fffffd40 {
+>>> +             compatible = "atmel,at91sam9260-wdt";
+>>> +             reg = <0xfffffd40 0x10>;
+>>> +             timeout = <10>;
+>>> +     };
+>>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+>>> index 05e1be8..c9e6bfa 100644
+>>> --- a/drivers/watchdog/at91sam9_wdt.c
+>>> +++ b/drivers/watchdog/at91sam9_wdt.c
+>>> @@ -32,6 +32,7 @@
+>>>  #include <linux/timer.h>
+>>>  #include <linux/bitops.h>
+>>>  #include <linux/uaccess.h>
+>>> +#include <linux/of.h>
+>>>
+>>>  #include "at91sam9_wdt.h"
+>>>
+>>> @@ -254,6 +255,14 @@ static struct miscdevice at91wdt_miscdev = {
+>>>       .fops           = &at91wdt_fops,
+>>>  };
+>>>
+>>> +static inline void __init at91wdt_probe_dt(struct device_node *node)
+>>> +{
+>>> +     if (!node)
+>>> +             return;
+>>> +
+>>> +     of_property_read_u32(node, "timeout", &heartbeat);
+>>> +}
+>>> +
+>>
+>> In patch #1 you add a function to do this, and then you don't make use
+>> of it here ?
+>>
+>> Or am i missing something?
+>
+> I'm using it on the patch #2 for the orion_wdt driver.
+> Do you think it's better to join the #1 and the #2 patch?
+>
+> Best regards
+> --
+> Fabio Porcedda
 
-Ok, yes, I looked over his series now and it goes some way to solving
-the problem on PRUSS. My only concern is that the approach of loading up
-function pointers in pdata for the assert/deassert calls gets a bit ugly on a
-DT-only platform like AM33xx. I'll work with Omar on that.
- 
-> A few general comments: if some new per-IP block flag is needed to control 
-> this, the best place for it right now would be the hwmod data in 
-> arch/arm/mach-omap2/omap_hwmod_*_data.c, rather than DT.  At some point 
-> soon, the hard reset handling will be split between a PRM driver and some 
-> hwmod bus driver, and it seems best to deal with the DT binding question 
-> at that time.  That way we don't wind up with a legacy binding that has to 
-> be supported over the long term.
+I'm sorry, only now i understand your question.
+The at91sam9_wdt driver don't use the watchdog core framework si i
+can't use that function cleanly.
+The patch #1 and #2 are for introducing the same property as the
+at91sam9_wdt driver.
+When the at91sam9_wdt is converted to the watchdog core framework, the
+driver can use finally the new function.
 
-Ok, make sense.
-
-Thanks,
-Matt
+Best regards
+-- 
+Fabio Porcedda
