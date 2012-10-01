@@ -1,255 +1,102 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon,  1 Oct 2012 19:42:33 +0400
-Subject: [PATCH v3] GPIO: Add support for GPIO on CLPS711X-target platform
-Message-ID: <1349106153-27371-1-git-send-email-shc_work@mail.ru>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Oct 2012 08:44:52 -0700
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
+ <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
+Message-ID: <20121001154451.GI4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLPS711X CPUs provide some GPIOs for use in the system. This
-driver provides support for these via gpiolib. Due to platform
-limitations, driver does not support interrupts, only inputs and
-outputs.
+* Linus Walleij <linus.walleij@linaro.org> [121001 01:25]:
+> On Mon, Oct 1, 2012 at 9:03 AM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
+> 
+> >    I have gone through the "Don Aisheng" patch series, which
+> > adds "pinctrl_dt_add_gpio_ranges" support but not accepted
+> > yet. With this patch series we can overcome the driver changes.
+> 
+> OK then this is the direction we need to go.
+> 
+> > 4. The current pinctrl driver has support for these APIs
+> > pinctrl_request_gpio(), pinctrl_free_gpio(),
+> > pinctrl_gpio_direction_input/output()
+> > no API for slew rate control, pulled down/up control
+> > how can we handle this?
+> 
+> You are not supposed to handle that from the GPIO level
+> of the API. That is supposed to be handled by pinctrl.
+> 
+> These two subsystems are orthogonal, with the exception
+> of the above calls. If you need to pass more information
+> between the GPIO and pinctrl interfaces it usually means
+> you're doing something wrong.
+> 
+> The reason why pinctrl was created in the first place
+> was that Grant didn't like that we started to shoehorn all
+> kind of pin control into the GPIO subsystem.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/Kconfig                           |    1 +
- arch/arm/mach-clps711x/include/mach/gpio.h |   27 +++++
- drivers/gpio/Kconfig                       |    4 +
- drivers/gpio/Makefile                      |    1 +
- drivers/gpio/gpio-clps711x.c               |  152 ++++++++++++++++++++++++++++
- 5 files changed, 185 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
- create mode 100644 drivers/gpio/gpio-clps711x.c
+Agreed.
+ 
+> > 5. pinctrl-single driver has to modify to provide separate handles
+> > for pinmux and pinconfig. And we need separate pin configuration
+> > bit masks and values/flags to take care of pull-up/down, slew rate,
+> > receiver in/out and mux mode control.
+> 
+> OK that is typical pinctrl driver implementation work.
+> I hope Tony can advice on this?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2f88d8d..e73bf9d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -384,6 +384,7 @@ config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
- 	select CPU_ARM720T
- 	select ARCH_USES_GETTIMEOFFSET
-+	select ARCH_REQUIRE_GPIOLIB
- 	select NEED_MACH_MEMORY_H
- 	help
- 	  Support for Cirrus Logic 711x/721x/731x based boards.
-diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
-new file mode 100644
-index 0000000..cbcc985
---- /dev/null
-+++ b/arch/arm/mach-clps711x/include/mach/gpio.h
-@@ -0,0 +1,27 @@
-+/*
-+ *  This file contains the CLPS711X GPIO definitions.
-+ *
-+ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+/* Simple helper for convert port & pin to GPIO number */
-+#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
-+
-+/* Temporaty definitions for GPIO-ports */
-+/* Will be removed after remove clps_read(write) macros */
-+#include <mach/hardware.h>
-+#define _PADR	(CLPS711X_VIRT_BASE + PADR)
-+#define _PBDR	(CLPS711X_VIRT_BASE + PBDR)
-+#define _PCDR	(CLPS711X_VIRT_BASE + PCDR)
-+#define _PDDR	(CLPS711X_VIRT_BASE + PDDR)
-+#define _PADDR	(CLPS711X_VIRT_BASE + PADDR)
-+#define _PBDDR	(CLPS711X_VIRT_BASE + PBDDR)
-+#define _PCDDR	(CLPS711X_VIRT_BASE + PCDDR)
-+#define _PDDDR	(CLPS711X_VIRT_BASE + PDDDR)
-+#define _PEDR	(CLPS711X_VIRT_BASE + PEDR)
-+#define _PEDDR	(CLPS711X_VIRT_BASE + PEDDR)
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index ba7926f5..636eda6 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -91,6 +91,10 @@ config GPIO_MAX730X
+I think we're best off to just stick to alternative named modes
+passed from device tree. For example, for GPIO wake-ups you can
+have named modes such as "default", "enabled" and "idle" where
+"idle" muxes things for GPIO wake-ups for the duration of idle.
+
+It seems that should also work for leds-gpio. And you can
+define more named modes as needed.
+
+You really don't want the client driver or the GPIO driver doing
+things like pull-up/down automatically as that is board specific and
+can also depend on things like externall pull resistors.
+
+> > 6. This is for my understanding, on which node do we have to add
+> > pinctrl data i.e., pin mux-mode data. In leds-gpio node (mostly not)
+> > and if it is in gpio node then how can we pass pinmux data with
+> > the existing API pinctrl_request_gpio(gpio);? Here we are passing
+> > only gpio number.
+> 
+> So with the pinctrl_request_gpio() call you are requesting a single
+> pin to be used as GPIO, nothing else.
+> 
+> No additional data should be passed with that call.
+
+Yeah I agree.
  
- comment "Memory mapped GPIO drivers:"
- 
-+config GPIO_CLPS711X
-+	def_bool y
-+	depends on ARCH_CLPS711X
-+
- config GPIO_GENERIC_PLATFORM
- 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
- 	select GPIO_GENERIC
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 153cace..6a41f79 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
- obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
- obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
- obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
-+obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
- obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
- obj-$(CONFIG_GPIO_DA9052)	+= gpio-da9052.o
- obj-$(CONFIG_ARCH_DAVINCI)	+= gpio-davinci.o
-diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
-new file mode 100644
-index 0000000..c2576f9
---- /dev/null
-+++ b/drivers/gpio/gpio-clps711x.c
-@@ -0,0 +1,152 @@
-+/*
-+ *  CLPS711X GPIO driver
-+ *
-+ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/gpio.h>
-+#include <linux/module.h>
-+#include <linux/spinlock.h>
-+#include <linux/platform_device.h>
-+
-+#define CLPS711X_GPIO_PORTS	5
-+#define CLPS711X_GPIO_NAME	"gpio-clps711x"
-+
-+struct clps711x_gpio {
-+	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
-+	spinlock_t		lock;
-+};
-+
-+static const void __iomem *clps711x_ports[] = {
-+	_PADR, _PBDR, _PCDR, _PDDR, _PEDR,
-+};
-+
-+static const void __iomem *clps711x_pdirs[] = {
-+	_PADDR, _PBDDR, _PCDDR, _PDDDR, _PEDDR,
-+};
-+
-+#define clps711x_port(x)	clps711x_ports[x->base / 8]
-+#define clps711x_pdir(x)	clps711x_pdirs[x->base / 8]
-+
-+static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	return !!readb(clps711x_port(chip)) & (1 << offset);
-+}
-+
-+static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
-+			      int value)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
-+	if (value)
-+		tmp |= 1 << offset;
-+	writeb(tmp, clps711x_port(chip));
-+	spin_unlock_irqrestore(&gpio->lock, flags);
-+}
-+
-+static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
-+	writeb(tmp, clps711x_pdir(chip));
-+	spin_unlock_irqrestore(&gpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
-+				       int value)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
-+	writeb(tmp, clps711x_pdir(chip));
-+	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
-+	if (value)
-+		tmp |= 1 << offset;
-+	writeb(tmp, clps711x_port(chip));
-+	spin_unlock_irqrestore(&gpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+struct clps711x_gpio_port {
-+	char	*name;
-+	int	nr;
-+};
-+
-+static const struct clps711x_gpio_port clps711x_gpio_ports[] __initconst = {
-+	{ "PORTA", 8, },
-+	{ "PORTB", 8, },
-+	{ "PORTC", 8, },
-+	{ "PORTD", 8, },
-+	{ "PORTE", 3, },
-+};
-+
-+static int __init gpio_clps711x_init(void)
-+{
-+	int i;
-+	struct platform_device *pdev;
-+	struct clps711x_gpio *gpio;
-+
-+	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
-+	if (!pdev) {
-+		pr_err("Cannot create platform device: %s\n",
-+		       CLPS711X_GPIO_NAME);
-+		return -ENOMEM;
-+	}
-+
-+	platform_device_add(pdev);
-+
-+	gpio = kzalloc(sizeof(struct clps711x_gpio), GFP_KERNEL);
-+	if (!gpio) {
-+		dev_err(&pdev->dev, "GPIO allocating memory error\n");
-+		platform_device_del(pdev);
-+		platform_device_put(pdev);
-+		return -ENOMEM;
-+	}
-+
-+	platform_set_drvdata(pdev, gpio);
-+
-+	spin_lock_init(&gpio->lock);
-+
-+	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
-+		gpio->chip[i].owner		= THIS_MODULE;
-+		gpio->chip[i].dev		= &pdev->dev;
-+		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
-+		gpio->chip[i].base		= i * 8;
-+		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
-+		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
-+		gpio->chip[i].get		= gpio_clps711x_get;
-+		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
-+		gpio->chip[i].set		= gpio_clps711x_set;
-+		gpiochip_add(&gpio->chip[i]);
-+	}
-+
-+	dev_info(&pdev->dev, "GPIO driver initialized\n");
-+
-+	return 0;
-+}
-+arch_initcall(gpio_clps711x_init);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-+MODULE_DESCRIPTION("CLPS711X GPIO driver");
--- 
-1.7.8.6
+> Implementing it is up to the pinctrl driver, the pinctrl subsystem
+> API does not say anything about how this should be done, but
+> there are a few examples.
+>
+> The pinctrl maps of muxes and config from the pin control
+> subsystem are for entire devices, and the single-pin GPIO
+> reservation API is orthogonal to this, please consult
+> Documentation/pinctrl.txt if you are uncertain about what
+> I mean with this, I've really tried to explain it there.
+> 
+> The docs were recently amended to reflect some corner-case
+> GPIO uses, see e.g.:
+> http://marc.info/?l=linux-arm-kernel&m=134763067415678&w=2
+> 
+> > Few more driver patches are pending along with this (leds-gpio DT
+> > data additions according to this patch, similarly other drivers
+> > like matrix keypad and volume keys)
+> 
+> OK so the threshold is that we need to get it right for the first
+> one and then the others will look good too.
+
+It seems we want to keep leds-gpio, gpio framework and pinctrl
+framework generic. It also seems you should be able to do
+what you're describing using the pinctrl named modes.
+
+Regards,
+
+Tony
