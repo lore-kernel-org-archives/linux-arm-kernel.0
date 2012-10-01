@@ -1,102 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Oct 2012 08:44:52 -0700
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
- <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
-Message-ID: <20121001154451.GI4840@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 1 Oct 2012 16:54:11 +0100
+Subject: [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA92A1D@DBDE01.ent.ti.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA92A1D@DBDE01.ent.ti.com>
+Message-ID: <20121001155410.GR4360@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [121001 01:25]:
-> On Mon, Oct 1, 2012 at 9:03 AM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> 
-> >    I have gone through the "Don Aisheng" patch series, which
-> > adds "pinctrl_dt_add_gpio_ranges" support but not accepted
-> > yet. With this patch series we can overcome the driver changes.
-> 
-> OK then this is the direction we need to go.
-> 
-> > 4. The current pinctrl driver has support for these APIs
-> > pinctrl_request_gpio(), pinctrl_free_gpio(),
-> > pinctrl_gpio_direction_input/output()
-> > no API for slew rate control, pulled down/up control
-> > how can we handle this?
-> 
-> You are not supposed to handle that from the GPIO level
-> of the API. That is supposed to be handled by pinctrl.
-> 
-> These two subsystems are orthogonal, with the exception
-> of the above calls. If you need to pass more information
-> between the GPIO and pinctrl interfaces it usually means
-> you're doing something wrong.
-> 
-> The reason why pinctrl was created in the first place
-> was that Grant didn't like that we started to shoehorn all
-> kind of pin control into the GPIO subsystem.
+On Thu, Sep 27, 2012 at 06:57:49AM +0000, Hebbar, Gururaja wrote:
 
-Agreed.
- 
-> > 5. pinctrl-single driver has to modify to provide separate handles
-> > for pinmux and pinconfig. And we need separate pin configuration
-> > bit masks and values/flags to take care of pull-up/down, slew rate,
-> > receiver in/out and mux mode control.
-> 
-> OK that is typical pinctrl driver implementation work.
-> I hope Tony can advice on this?
+> I have no knowledge about multi-platform builds yet.
 
-I think we're best off to just stick to alternative named modes
-passed from device tree. For example, for GPIO wake-ups you can
-have named modes such as "default", "enabled" and "idle" where
-"idle" muxes things for GPIO wake-ups for the duration of idle.
+> Currently this driver is shared between OMAP & DaVinci and both of them 
+> doesn't exist in single image build.
 
-It seems that should also work for leds-gpio. And you can
-define more named modes as needed.
+...due to issues like having compile time things selecting between the
+platforms.  In other words what these ifdefs would do is move us further
+away from that goal rather than towards it as we should be doing.
 
-You really don't want the client driver or the GPIO driver doing
-things like pull-up/down automatically as that is board specific and
-can also depend on things like externall pull resistors.
+> There was a effort done for this SRAM Consolidation [1] but it didn't progress.
+> Hence I took this approach as a time-being/workaround. This was we can get 
+> affected platforms (like AM335x) get going/working.
 
-> > 6. This is for my understanding, on which node do we have to add
-> > pinctrl data i.e., pin mux-mode data. In leds-gpio node (mostly not)
-> > and if it is in gpio node then how can we pass pinmux data with
-> > the existing API pinctrl_request_gpio(gpio);? Here we are passing
-> > only gpio number.
-> 
-> So with the pinctrl_request_gpio() call you are requesting a single
-> pin to be used as GPIO, nothing else.
-> 
-> No additional data should be passed with that call.
-
-Yeah I agree.
- 
-> Implementing it is up to the pinctrl driver, the pinctrl subsystem
-> API does not say anything about how this should be done, but
-> there are a few examples.
->
-> The pinctrl maps of muxes and config from the pin control
-> subsystem are for entire devices, and the single-pin GPIO
-> reservation API is orthogonal to this, please consult
-> Documentation/pinctrl.txt if you are uncertain about what
-> I mean with this, I've really tried to explain it there.
-> 
-> The docs were recently amended to reflect some corner-case
-> GPIO uses, see e.g.:
-> http://marc.info/?l=linux-arm-kernel&m=134763067415678&w=2
-> 
-> > Few more driver patches are pending along with this (leds-gpio DT
-> > data additions according to this patch, similarly other drivers
-> > like matrix keypad and volume keys)
-> 
-> OK so the threshold is that we need to get it right for the first
-> one and then the others will look good too.
-
-It seems we want to keep leds-gpio, gpio framework and pinctrl
-framework generic. It also seems you should be able to do
-what you're describing using the pinctrl named modes.
-
-Regards,
-
-Tony
+Looks like it just needs more people pushing it...
