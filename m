@@ -1,258 +1,255 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 1 Oct 2012 16:39:53 +0100
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20120930232116.GC30637@obsidianresearch.com>
-References: <20120930232116.GC30637@obsidianresearch.com>
-Message-ID: <20121001153952.GB2100@linaro.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Mon,  1 Oct 2012 19:42:33 +0400
+Subject: [PATCH v3] GPIO: Add support for GPIO on CLPS711X-target platform
+Message-ID: <1349106153-27371-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2012 at 05:21:16PM -0600, Jason Gunthorpe wrote:
-> The standard linux asm-generic/vmlinux.lds.h already supports this,
-> and it seems other architectures do as well.
-> 
-> The goal is to create an ELF file that has correct program headers. We
-> want to see the VirtAddr be the runtime address of the kernel with the
-> MMU turned on, and PhysAddr be the physical load address for the section
-> with no MMU.
-> 
-> This allows ELF based boot loaders to properly load vmlinux:
-> 
-> $ readelf -l vmlinux
-> Entry point 0x8000
->   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
->   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
+The CLPS711X CPUs provide some GPIOs for use in the system. This
+driver provides support for these via gpiolib. Due to platform
+limitations, driver does not support interrupts, only inputs and
+outputs.
 
-Not related directly to your patch, but I wonder why we don't we see
-separate r-x and rw- segments?
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/Kconfig                           |    1 +
+ arch/arm/mach-clps711x/include/mach/gpio.h |   27 +++++
+ drivers/gpio/Kconfig                       |    4 +
+ drivers/gpio/Makefile                      |    1 +
+ drivers/gpio/gpio-clps711x.c               |  152 ++++++++++++++++++++++++++++
+ 5 files changed, 185 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
+ create mode 100644 drivers/gpio/gpio-clps711x.c
 
-Perhaps the linker script needs tidyup, or there are wrong attributes on
-some sections somewhere.
-
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  arch/arm/include/asm/memory.h |    2 +-
->  arch/arm/kernel/vmlinux.lds.S |   47 ++++++++++++++++++++++++----------------
->  2 files changed, 29 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 5f6ddcc..4ce5b6d 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -283,7 +283,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
->  #define arch_is_coherent()		0
->  #endif
->  
-> -#endif
-> +#endif /* __ASSEMBLY__ */
->  
->  #include <asm-generic/memory_model.h>
->  
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 36ff15b..07942b6 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -3,6 +3,13 @@
->   * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
->   */
->  
-> +/* If we have a known, fixed physical load address then set LOAD_OFFSET
-> +   and generate an ELF that has the physical load address in the program
-> +   headers. */
-> +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
-> +#define LOAD_OFFSET (PAGE_OFFSET - PHYS_OFFSET)
-> +#endif
-> +
-
-What happens if CONFIG_ARM_PATCH_PHYS_VIRT=y?  This will be used
-increasingly, especially for multiplatform kernels.
-
-Currently, it looks like we will just fail to link the kernel with
-ARM_PATCH_PHYS_VIRT... or have I overlooked something?
-
-If the kernel is intended to be loadable at a physical address which is
-not statically known, no ELF loader that does not ignore the ELF phdr
-address fields can work.  There is no correct way to represent this
-situation using an ET_EXEC image, unless we specify explicitly that
-the addresses must be ignored as part of our boot protocol.  (We ran into
-the same situation with uImages, which bake the load address into the
-image.  The eventual answer was to fix U-Boot.)
-
-
-Really, LOAD_OFFSET (in your terminology) is something that has to be
-inferred by the loader in the general case, and in that case the ELF
-paddr might as well be the same as the vaddr.
-
-
->  #include <asm-generic/vmlinux.lds.h>
->  #include <asm/cache.h>
->  #include <asm/thread_info.h>
-> @@ -39,7 +46,7 @@
->  #endif
->  
->  OUTPUT_ARCH(arm)
-> -ENTRY(stext)
-> +ENTRY(phys_start)
-
-This is debatable.  In fact, stext has the property that its virtual
-(runtime) and load addresses are the same.  To represent this correctly
-in the linker scripts, the position-independent head.S code should be
-split out into a separate section to which LOAD_OFFSET is not applied.
-
-This may cause confusion elsewhere though, since _text probably needs
-to coincide with the virtual image of stext.
-
-
-Setting vaddr and paddr to PAGE_OFFSET (as we do now) and having the
-loader choose the appropriate board-specific place to load the kernel
-image makes this irrelevant, if I've understood the situation correctly.
-
-Cheers
----Dave
-
->  
->  #ifndef __ARMEB__
->  jiffies = jiffies_64;
-> @@ -86,11 +93,13 @@ SECTIONS
->  #else
->  	. = PAGE_OFFSET + TEXT_OFFSET;
->  #endif
-> -	.head.text : {
-> +	.head.text : AT(ADDR(.head.text) - LOAD_OFFSET) {
->  		_text = .;
-> +		phys_start = . - LOAD_OFFSET;
->  		HEAD_TEXT
->  	}
-> -	.text : {			/* Real text segment		*/
-> +	/* Real text segment */
-> +	.text :  AT(ADDR(.text) - LOAD_OFFSET) {
->  		_stext = .;		/* Text and read-only data	*/
->  			__exception_text_start = .;
->  			*(.exception.text)
-> @@ -119,12 +128,12 @@ SECTIONS
->  	 * Stack unwinding tables
->  	 */
->  	. = ALIGN(8);
-> -	.ARM.unwind_idx : {
-> +	.ARM.unwind_idx : AT(ADDR(.ARM.unwind_idx) - LOAD_OFFSET) {
->  		__start_unwind_idx = .;
->  		*(.ARM.exidx*)
->  		__stop_unwind_idx = .;
->  	}
-> -	.ARM.unwind_tab : {
-> +	.ARM.unwind_tab : AT(ADDR(.ARM.unwind_tab) - LOAD_OFFSET) {
->  		__start_unwind_tab = .;
->  		*(.ARM.extab*)
->  		__stop_unwind_tab = .;
-> @@ -139,35 +148,35 @@ SECTIONS
->  #endif
->  
->  	INIT_TEXT_SECTION(8)
-> -	.exit.text : {
-> +	.exit.text : AT(ADDR(.exit.text) - LOAD_OFFSET) {
->  		ARM_EXIT_KEEP(EXIT_TEXT)
->  	}
-> -	.init.proc.info : {
-> +	.init.proc.info : AT(ADDR(.init.proc.info) - LOAD_OFFSET) {
->  		ARM_CPU_DISCARD(PROC_INFO)
->  	}
-> -	.init.arch.info : {
-> +	.init.arch.info : AT(ADDR(.init.arch.info) - LOAD_OFFSET) {
->  		__arch_info_begin = .;
->  		*(.arch.info.init)
->  		__arch_info_end = .;
->  	}
-> -	.init.tagtable : {
-> +	.init.tagtable : AT(ADDR(.init.tagtable) - LOAD_OFFSET) {
->  		__tagtable_begin = .;
->  		*(.taglist.init)
->  		__tagtable_end = .;
->  	}
->  #ifdef CONFIG_SMP_ON_UP
-> -	.init.smpalt : {
-> +	.init.smpalt : AT(ADDR(.init.smpalt) - LOAD_OFFSET) {
->  		__smpalt_begin = .;
->  		*(.alt.smp.init)
->  		__smpalt_end = .;
->  	}
->  #endif
-> -	.init.pv_table : {
-> +	.init.pv_table : AT(ADDR(.init.pv_table) - LOAD_OFFSET) {
->  		__pv_table_begin = .;
->  		*(.pv_table)
->  		__pv_table_end = .;
->  	}
-> -	.init.data : {
-> +	.init.data : AT(ADDR(.init.data) - LOAD_OFFSET) {
->  #ifndef CONFIG_XIP_KERNEL
->  		INIT_DATA
->  #endif
-> @@ -178,7 +187,7 @@ SECTIONS
->  		INIT_RAM_FS
->  	}
->  #ifndef CONFIG_XIP_KERNEL
-> -	.exit.data : {
-> +	.exit.data : AT(ADDR(.exit.data) - LOAD_OFFSET) {
->  		ARM_EXIT_KEEP(EXIT_DATA)
->  	}
->  #endif
-> @@ -196,7 +205,7 @@ SECTIONS
->  	__data_loc = .;
->  #endif
->  
-> -	.data : AT(__data_loc) {
-> +	.data : AT(__data_loc - LOAD_OFFSET) {
->  		_data = .;		/* address in memory */
->  		_sdata = .;
->  
-> @@ -245,7 +254,7 @@ SECTIONS
->  	 * free it after init has commenced and TCM contents have
->  	 * been copied to its destination.
->  	 */
-> -	.tcm_start : {
-> +	.tcm_start : AT(ADDR(.tcm_start) - LOAD_OFFSET) {
->  		. = ALIGN(PAGE_SIZE);
->  		__tcm_start = .;
->  		__itcm_start = .;
-> @@ -257,7 +266,7 @@ SECTIONS
->  	 * and we'll upload the contents from RAM to TCM and free
->  	 * the used RAM after that.
->  	 */
-> -	.text_itcm ITCM_OFFSET : AT(__itcm_start)
-> +	.text_itcm ITCM_OFFSET : AT(__itcm_start - LOAD_OFFSET)
->  	{
->  		__sitcm_text = .;
->  		*(.tcm.text)
-> @@ -272,12 +281,12 @@ SECTIONS
->  	 */
->  	. = ADDR(.tcm_start) + SIZEOF(.tcm_start) + SIZEOF(.text_itcm);
->  
-> -	.dtcm_start : {
-> +	.dtcm_start : AT(ADDR(.dtcm_start) - LOAD_OFFSET) {
->  		__dtcm_start = .;
->  	}
->  
->  	/* TODO: add remainder of ITCM as well, that can be used for data! */
-> -	.data_dtcm DTCM_OFFSET : AT(__dtcm_start)
-> +	.data_dtcm DTCM_OFFSET : AT(__dtcm_start - LOAD_OFFSET)
->  	{
->  		. = ALIGN(4);
->  		__sdtcm_data = .;
-> @@ -290,7 +299,7 @@ SECTIONS
->  	. = ADDR(.dtcm_start) + SIZEOF(.data_dtcm);
->  
->  	/* End marker for freeing TCM copy in linked object */
-> -	.tcm_end : AT(ADDR(.dtcm_start) + SIZEOF(.data_dtcm)){
-> +	.tcm_end : AT(ADDR(.dtcm_start) + SIZEOF(.data_dtcm) - LOAD_OFFSET){
->  		. = ALIGN(PAGE_SIZE);
->  		__tcm_end = .;
->  	}
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2f88d8d..e73bf9d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -384,6 +384,7 @@ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select CPU_ARM720T
+ 	select ARCH_USES_GETTIMEOFFSET
++	select ARCH_REQUIRE_GPIOLIB
+ 	select NEED_MACH_MEMORY_H
+ 	help
+ 	  Support for Cirrus Logic 711x/721x/731x based boards.
+diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
+new file mode 100644
+index 0000000..cbcc985
+--- /dev/null
++++ b/arch/arm/mach-clps711x/include/mach/gpio.h
+@@ -0,0 +1,27 @@
++/*
++ *  This file contains the CLPS711X GPIO definitions.
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++/* Simple helper for convert port & pin to GPIO number */
++#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
++
++/* Temporaty definitions for GPIO-ports */
++/* Will be removed after remove clps_read(write) macros */
++#include <mach/hardware.h>
++#define _PADR	(CLPS711X_VIRT_BASE + PADR)
++#define _PBDR	(CLPS711X_VIRT_BASE + PBDR)
++#define _PCDR	(CLPS711X_VIRT_BASE + PCDR)
++#define _PDDR	(CLPS711X_VIRT_BASE + PDDR)
++#define _PADDR	(CLPS711X_VIRT_BASE + PADDR)
++#define _PBDDR	(CLPS711X_VIRT_BASE + PBDDR)
++#define _PCDDR	(CLPS711X_VIRT_BASE + PCDDR)
++#define _PDDDR	(CLPS711X_VIRT_BASE + PDDDR)
++#define _PEDR	(CLPS711X_VIRT_BASE + PEDR)
++#define _PEDDR	(CLPS711X_VIRT_BASE + PEDDR)
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index ba7926f5..636eda6 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -91,6 +91,10 @@ config GPIO_MAX730X
+ 
+ comment "Memory mapped GPIO drivers:"
+ 
++config GPIO_CLPS711X
++	def_bool y
++	depends on ARCH_CLPS711X
++
+ config GPIO_GENERIC_PLATFORM
+ 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
+ 	select GPIO_GENERIC
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 153cace..6a41f79 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
+ obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
++obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
+ obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
+ obj-$(CONFIG_GPIO_DA9052)	+= gpio-da9052.o
+ obj-$(CONFIG_ARCH_DAVINCI)	+= gpio-davinci.o
+diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
+new file mode 100644
+index 0000000..c2576f9
+--- /dev/null
++++ b/drivers/gpio/gpio-clps711x.c
+@@ -0,0 +1,152 @@
++/*
++ *  CLPS711X GPIO driver
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/gpio.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/platform_device.h>
++
++#define CLPS711X_GPIO_PORTS	5
++#define CLPS711X_GPIO_NAME	"gpio-clps711x"
++
++struct clps711x_gpio {
++	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
++	spinlock_t		lock;
++};
++
++static const void __iomem *clps711x_ports[] = {
++	_PADR, _PBDR, _PCDR, _PDDR, _PEDR,
++};
++
++static const void __iomem *clps711x_pdirs[] = {
++	_PADDR, _PBDDR, _PCDDR, _PDDDR, _PEDDR,
++};
++
++#define clps711x_port(x)	clps711x_ports[x->base / 8]
++#define clps711x_pdir(x)	clps711x_pdirs[x->base / 8]
++
++static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
++{
++	return !!readb(clps711x_port(chip)) & (1 << offset);
++}
++
++static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
++			      int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_port(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++}
++
++static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
++	writeb(tmp, clps711x_pdir(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
++				       int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
++	writeb(tmp, clps711x_pdir(chip));
++	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_port(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++struct clps711x_gpio_port {
++	char	*name;
++	int	nr;
++};
++
++static const struct clps711x_gpio_port clps711x_gpio_ports[] __initconst = {
++	{ "PORTA", 8, },
++	{ "PORTB", 8, },
++	{ "PORTC", 8, },
++	{ "PORTD", 8, },
++	{ "PORTE", 3, },
++};
++
++static int __init gpio_clps711x_init(void)
++{
++	int i;
++	struct platform_device *pdev;
++	struct clps711x_gpio *gpio;
++
++	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
++	if (!pdev) {
++		pr_err("Cannot create platform device: %s\n",
++		       CLPS711X_GPIO_NAME);
++		return -ENOMEM;
++	}
++
++	platform_device_add(pdev);
++
++	gpio = kzalloc(sizeof(struct clps711x_gpio), GFP_KERNEL);
++	if (!gpio) {
++		dev_err(&pdev->dev, "GPIO allocating memory error\n");
++		platform_device_del(pdev);
++		platform_device_put(pdev);
++		return -ENOMEM;
++	}
++
++	platform_set_drvdata(pdev, gpio);
++
++	spin_lock_init(&gpio->lock);
++
++	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
++		gpio->chip[i].owner		= THIS_MODULE;
++		gpio->chip[i].dev		= &pdev->dev;
++		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
++		gpio->chip[i].base		= i * 8;
++		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
++		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
++		gpio->chip[i].get		= gpio_clps711x_get;
++		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
++		gpio->chip[i].set		= gpio_clps711x_set;
++		gpiochip_add(&gpio->chip[i]);
++	}
++
++	dev_info(&pdev->dev, "GPIO driver initialized\n");
++
++	return 0;
++}
++arch_initcall(gpio_clps711x_init);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
++MODULE_DESCRIPTION("CLPS711X GPIO driver");
+-- 
+1.7.8.6
