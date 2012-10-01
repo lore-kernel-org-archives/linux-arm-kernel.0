@@ -1,37 +1,43 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 01 Oct 2012 05:14:50 -0400
-Subject: [PATCH v2 10/10] ARM: KVM: Add VGIC configuration option
-In-Reply-To: <20121001091244.49503.96318.stgit@ubuntu>
-References: <20121001091244.49503.96318.stgit@ubuntu>
-Message-ID: <20121001091450.49503.69627.stgit@ubuntu>
+Date: Mon, 01 Oct 2012 05:15:33 -0400
+Subject: [PATCH v2 0/5] KVM/ARM Architected Timers support
+Message-ID: <20121001091528.49694.69990.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+The following series implements support for the architected generic
+timers for KVM/ARM.
 
-It is now possible to select the VGIC configuration option.
+This is an unmodified repost of the previously submitted series.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+This patch series can also be pulled from:
+    git://github.com/virtualopensystems/linux-kvm-arm.git
+        branch: kvm-arm-v12-vgic-timers
+
 ---
- arch/arm/kvm/Kconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 47c5500..867551e 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -40,6 +40,13 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
- 
-+config KVM_ARM_VGIC
-+        bool "KVM support for Virtual GIC"
-+	depends on KVM_ARM_HOST && OF
-+	select HAVE_KVM_IRQCHIP
-+	---help---
-+	  Adds support for a hardware assisted, in-kernel GIC emulation.
-+
- source drivers/virtio/Kconfig
- 
- endif # VIRTUALIZATION
+Marc Zyngier (5):
+      ARM: arch_timers: switch to physical timers if HYP mode is available
+      ARM: KVM: arch_timers: Add minimal infrastructure
+      ARM: KVM: arch_timers: Add guest timer core support
+      ARM: KVM: arch_timers: Add timer world switch
+      ARM: KVM: arch_timers: Wire the init code and config option
+
+
+ arch/arm/include/asm/kvm_arch_timer.h |   95 +++++++++++++++
+ arch/arm/include/asm/kvm_host.h       |    5 +
+ arch/arm/kernel/arch_timer.c          |    7 +
+ arch/arm/kernel/asm-offsets.c         |    8 +
+ arch/arm/kvm/Kconfig                  |    7 +
+ arch/arm/kvm/Makefile                 |    1 
+ arch/arm/kvm/arm.c                    |   14 ++
+ arch/arm/kvm/interrupts.S             |    2 
+ arch/arm/kvm/interrupts_head.S        |   60 ++++++++++
+ arch/arm/kvm/reset.c                  |    9 +
+ arch/arm/kvm/timer.c                  |  204 +++++++++++++++++++++++++++++++++
+ arch/arm/kvm/vgic.c                   |    4 +
+ 12 files changed, 415 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/asm/kvm_arch_timer.h
+ create mode 100644 arch/arm/kvm/timer.c
+
+-- 
