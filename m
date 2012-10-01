@@ -1,38 +1,80 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon,  1 Oct 2012 22:52:43 +0200
-Subject: [PATCH] mmc: mxs-mmc: Fix merge issue causing build error
-Message-ID: <1349124763-10840-1-git-send-email-marex@denx.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon,  1 Oct 2012 23:12:03 +0200
+Subject: [PATCH V2 0/3] Add clock framework for armada 370/XP
+Message-ID: <1349125926-16144-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following error appeared due to trivial merge problem:
+Hello Mike,
 
-drivers/mmc/host/mxs-mmc.c: In function 'mxs_mmc_enable_sdio_irq':
-drivers/mmc/host/mxs-mmc.c:527:3: error: 'struct mxs_mmc_host' has no member named 'base'
-drivers/mmc/host/mxs-mmc.c:527:3: error: 'struct mxs_mmc_host' has no member named 'devid'
-make[3]: *** [drivers/mmc/host/mxs-mmc.o] Error 1
+My first version didn't get many attention, so I guess it's too late
+for 3.7! ;) I should have ping you earlier about this series. This
+time was not lost, by using the cpu clock with SMP I found a bug and
+fixed it. And I also improved the spelling and removed unnecessary
+small piece of code thanks to the feed back of Andrew Lunn.
 
-This patches corrects the issue.
+The purpose of this patch set is to add support for clock framework
+for Armada 370 and Armada XP SoCs. All the support is done under the
+directory drivers/clk/mvebu/ as the support for other mvebu SoCs was
+in mind during the writing of the code.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/mxs-mmc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Two kinds of clocks are added:
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index bb4c2bf..80d1e6d 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -525,7 +525,7 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
- 		       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
- 		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
--		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
-+		       ssp->base + HW_SSP_CTRL1(ssp) + STMP_OFFSET_REG_SET);
- 	} else {
- 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
- 		       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+- The CPU clocks are only for Armada XP (which si multi-core)
+
+- The core clocks are clocks which have their rate fixed during
+  reset.
+
+This patch set is based on the clk-3.7 branch of Mike Turquette as it
+use the patch "clk: add of_clk_src_onecell_get() support" from Shawn
+Guo.
+
+Many thanks to Thomas Petazzoni and Sebastian Hesselbarth for their
+review and feedback. The device tree bindings were really improved
+with the advices of Sebastian.
+
+Changelog:
+V1 -> V2:
+
+- Improved the spelling and the wording of the documentation and the
+  1st commit log
+- Removed the "end_of_list" name which are unused here.
+- Fix the cpu clock by using of_clk_src_onecell_get in the same way it
+  was used for the core clocks
+
+Regards,
+
+Gregory CLEMENT (3):
+  clk: mvebu: add armada-370-xp specific clocks
+  clk: armada-370-xp: add support for clock framework
+  clocksource: time-armada-370-xp converted to clk framework
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   40 +++
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 ++
+ arch/arm/boot/dts/armada-370-db.dts                |    4 -
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+ arch/arm/boot/dts/armada-370.dtsi                  |   12 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   48 +++
+ arch/arm/mach-mvebu/Kconfig                        |    5 +
+ arch/arm/mach-mvebu/armada-370-xp.c                |    8 +-
+ arch/arm/mach-mvebu/common.h                       |    1 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/mvebu/Makefile                         |    2 +
+ drivers/clk/mvebu/clk-core.c                       |  312 ++++++++++++++++++++
+ drivers/clk/mvebu/clk-core.h                       |   19 ++
+ drivers/clk/mvebu/clk-cpu.c                        |  155 ++++++++++
+ drivers/clk/mvebu/clk-cpu.h                        |   19 ++
+ drivers/clk/mvebu/clk.c                            |   36 +++
+ drivers/clocksource/time-armada-370-xp.c           |   11 +-
+ 17 files changed, 685 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+ create mode 100644 drivers/clk/mvebu/Makefile
+ create mode 100644 drivers/clk/mvebu/clk-core.c
+ create mode 100644 drivers/clk/mvebu/clk-core.h
+ create mode 100644 drivers/clk/mvebu/clk-cpu.c
+ create mode 100644 drivers/clk/mvebu/clk-cpu.h
+ create mode 100644 drivers/clk/mvebu/clk.c
+
 -- 
-1.7.10.4
+1.7.9.5
