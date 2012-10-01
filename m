@@ -1,47 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 01 Oct 2012 10:20:44 -0600
-Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
-In-Reply-To: <CAL1wa8eOA6eV-9EoeUFrSFaFwq5sEVnYXn9yKnPRv=0mSU5WvQ@mail.gmail.com>
-References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
- <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
- <505BF79A.8060802@wwwdotorg.org>
- <CAL1wa8eOA6eV-9EoeUFrSFaFwq5sEVnYXn9yKnPRv=0mSU5WvQ@mail.gmail.com>
-Message-ID: <5069C2DC.8080905@wwwdotorg.org>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 1 Oct 2012 12:37:24 -0400
+Subject: [RFC PATCH 10/13] spi: omap2-mcspi: dma_request_slave_channel()
+ support for DT platforms
+In-Reply-To: <1348738594.1648.9.camel@vkoul-udesk3>
+References: <1348152226-13588-1-git-send-email-mporter@ti.com>
+ <1348152226-13588-11-git-send-email-mporter@ti.com>
+ <20120920220931.GJ28835@atomide.com>
+ <201209210816.01473.arnd@arndb.de>
+ <20120921154247.GZ28835@atomide.com> <20120921183729.GI16522@beef>
+ <1348738594.1648.9.camel@vkoul-udesk3>
+Message-ID: <20121001163723.GN5641@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2012 11:29 PM, Leela Krishna Amudala wrote:
-> Hello Stephen Warren,
-> 
-> The binding names that I use in my dts file should match with the
-> names given in http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
-> right?
+On Thu, Sep 27, 2012 at 03:06:34PM +0530, Vinod Koul wrote:
+> On Fri, 2012-09-21 at 14:37 -0400, Matt Porter wrote:
+> > On Fri, Sep 21, 2012 at 08:42:47AM -0700, Tony Lindgren wrote:
+> > > 
+> > > Can't we come up with a version of dma_request_slave_channel that works
+> > > both ways for now:
+> > > 
+> > > 	mcspi_dma->dma_rx =
+> > > 		dma_request_slave_channel_compat(mask, omap_dma_filter_fn, &sig,
+> > > 					&master->dev, mcspi_dma->dma_rx_ch_name);
+> > > 	...			
+> > > 
+> > > Then it's just question of patching away two lines later on rather than
+> > > having to add all this if else to all the drivers first, then patching
+> > > it away again.
+> > 
+> > I think that something like that is workable with the implementation
+> > simply checking for of_node to do the right thing.
+> Yes, I think it would be better to have common API but underneath two
+> implementations in transitional phase.
 
-I don't think so; the binding in that link is for example:
+Ok, I'll implement something for discussion in the v2 series.
 
-> + - xres, yres: Display resolution
-> + - left-margin, right-margin, hsync-len: Horizontal Display timing parameters
-> +   in pixels
-> +   upper-margin, lower-margin, vsync-len: Vertical display timing parameters in
-> +   lines
-> + - clock: displayclock in Hz
-
-i.e. a bunch of separate properties, one for each value needed to
-describe the display timing. However, your patch contains:
-
->>> + - samsung,fimd-display: This property should specify the phandle of the
->>> +   display device node which holds the video interface timing with the
->>> +   below mentioned properties.
->>> +
->>> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
->>> +     horizontal timing includes four parameters in the following order.
->>> +
->>> +     - horizontal back porch (in number of lcd clocks)
->>> +     - horizontal front porch (in number of lcd clocks)
->>> +     - hsync pulse width (in number of lcd clocks)
->>> +     - Display panels X resolution.
-
-A single lcd-htiming property, which contains 4 values. (and a similar
-construct for the vertical timing).
-
-That seems entirely different to me...
+-Matt
