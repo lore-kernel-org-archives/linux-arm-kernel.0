@@ -1,46 +1,258 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Mon, 1 Oct 2012 20:54:23 +0530
-Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <20121001120907.GK4360@opensource.wolfsonmicro.com>
-References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
- <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
- <20121001114454.GA9170@sirena.org.uk>
- <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
- <20121001120907.GK4360@opensource.wolfsonmicro.com>
-Message-ID: <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 1 Oct 2012 16:39:53 +0100
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20120930232116.GC30637@obsidianresearch.com>
+References: <20120930232116.GC30637@obsidianresearch.com>
+Message-ID: <20121001153952.GB2100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Sep 30, 2012 at 05:21:16PM -0600, Jason Gunthorpe wrote:
+> The standard linux asm-generic/vmlinux.lds.h already supports this,
+> and it seems other architectures do as well.
+> 
+> The goal is to create an ELF file that has correct program headers. We
+> want to see the VirtAddr be the runtime address of the kernel with the
+> MMU turned on, and PhysAddr be the physical load address for the section
+> with no MMU.
+> 
+> This allows ELF based boot loaders to properly load vmlinux:
+> 
+> $ readelf -l vmlinux
+> Entry point 0x8000
+>   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+>   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
 
-On Mon, Oct 1, 2012 at 5:39 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Oct 01, 2012 at 05:23:15PM +0530, ABRAHAM, KISHON VIJAY wrote:
->> On Mon, Oct 1, 2012 at 5:14 PM, Mark Brown
->
->> > No, this is not at all sensible - if there's an mfd_remove_devices()
->> > function we really ought to be able to use it to remove the children.
->> > If we can't do that we should fix the API usability, not open code the
->> > same stuff in every user.
->
->> What makes more sense to me is extend mfd_add_devices to create child
->> devices from dt data. Then for removing devices, one can use
->> mfd_remove_devices().
->
-> Why would that be helpful?  Most platforms don't support DT at all, and
-I'm not sure how to put it correctly. All I'm trying to tell is mfd is
-a framework that exposes a set of API's to create and remove a device
-among others. If a mfd child device is not created using mfd API,
-it'll be unfair to expect that child be removed properly using mfd
-API. Like in this patch, the device is created using
-of_platform_populate (not a mfd API) but is removed using
-mfd_remove_devices (mfd API) [which should result in an abort].
-This means mfd framework does not have an API to create a device from
-dt data or so do I think since of_platform_populate() is used. Thats
-why I suggested the idea of extending mfd_add_devices() (or adding a
-new API in mfd framework) to create child devices from dt data so that
-we'll have API's in mfd framework to both create and delete a device.
+Not related directly to your patch, but I wonder why we don't we see
+separate r-x and rw- segments?
 
-Thanks
-Kishon
+Perhaps the linker script needs tidyup, or there are wrong attributes on
+some sections somewhere.
+
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  arch/arm/include/asm/memory.h |    2 +-
+>  arch/arm/kernel/vmlinux.lds.S |   47 ++++++++++++++++++++++++----------------
+>  2 files changed, 29 insertions(+), 20 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 5f6ddcc..4ce5b6d 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -283,7 +283,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+>  #define arch_is_coherent()		0
+>  #endif
+>  
+> -#endif
+> +#endif /* __ASSEMBLY__ */
+>  
+>  #include <asm-generic/memory_model.h>
+>  
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 36ff15b..07942b6 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -3,6 +3,13 @@
+>   * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
+>   */
+>  
+> +/* If we have a known, fixed physical load address then set LOAD_OFFSET
+> +   and generate an ELF that has the physical load address in the program
+> +   headers. */
+> +#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
+> +#define LOAD_OFFSET (PAGE_OFFSET - PHYS_OFFSET)
+> +#endif
+> +
+
+What happens if CONFIG_ARM_PATCH_PHYS_VIRT=y?  This will be used
+increasingly, especially for multiplatform kernels.
+
+Currently, it looks like we will just fail to link the kernel with
+ARM_PATCH_PHYS_VIRT... or have I overlooked something?
+
+If the kernel is intended to be loadable at a physical address which is
+not statically known, no ELF loader that does not ignore the ELF phdr
+address fields can work.  There is no correct way to represent this
+situation using an ET_EXEC image, unless we specify explicitly that
+the addresses must be ignored as part of our boot protocol.  (We ran into
+the same situation with uImages, which bake the load address into the
+image.  The eventual answer was to fix U-Boot.)
+
+
+Really, LOAD_OFFSET (in your terminology) is something that has to be
+inferred by the loader in the general case, and in that case the ELF
+paddr might as well be the same as the vaddr.
+
+
+>  #include <asm-generic/vmlinux.lds.h>
+>  #include <asm/cache.h>
+>  #include <asm/thread_info.h>
+> @@ -39,7 +46,7 @@
+>  #endif
+>  
+>  OUTPUT_ARCH(arm)
+> -ENTRY(stext)
+> +ENTRY(phys_start)
+
+This is debatable.  In fact, stext has the property that its virtual
+(runtime) and load addresses are the same.  To represent this correctly
+in the linker scripts, the position-independent head.S code should be
+split out into a separate section to which LOAD_OFFSET is not applied.
+
+This may cause confusion elsewhere though, since _text probably needs
+to coincide with the virtual image of stext.
+
+
+Setting vaddr and paddr to PAGE_OFFSET (as we do now) and having the
+loader choose the appropriate board-specific place to load the kernel
+image makes this irrelevant, if I've understood the situation correctly.
+
+Cheers
+---Dave
+
+>  
+>  #ifndef __ARMEB__
+>  jiffies = jiffies_64;
+> @@ -86,11 +93,13 @@ SECTIONS
+>  #else
+>  	. = PAGE_OFFSET + TEXT_OFFSET;
+>  #endif
+> -	.head.text : {
+> +	.head.text : AT(ADDR(.head.text) - LOAD_OFFSET) {
+>  		_text = .;
+> +		phys_start = . - LOAD_OFFSET;
+>  		HEAD_TEXT
+>  	}
+> -	.text : {			/* Real text segment		*/
+> +	/* Real text segment */
+> +	.text :  AT(ADDR(.text) - LOAD_OFFSET) {
+>  		_stext = .;		/* Text and read-only data	*/
+>  			__exception_text_start = .;
+>  			*(.exception.text)
+> @@ -119,12 +128,12 @@ SECTIONS
+>  	 * Stack unwinding tables
+>  	 */
+>  	. = ALIGN(8);
+> -	.ARM.unwind_idx : {
+> +	.ARM.unwind_idx : AT(ADDR(.ARM.unwind_idx) - LOAD_OFFSET) {
+>  		__start_unwind_idx = .;
+>  		*(.ARM.exidx*)
+>  		__stop_unwind_idx = .;
+>  	}
+> -	.ARM.unwind_tab : {
+> +	.ARM.unwind_tab : AT(ADDR(.ARM.unwind_tab) - LOAD_OFFSET) {
+>  		__start_unwind_tab = .;
+>  		*(.ARM.extab*)
+>  		__stop_unwind_tab = .;
+> @@ -139,35 +148,35 @@ SECTIONS
+>  #endif
+>  
+>  	INIT_TEXT_SECTION(8)
+> -	.exit.text : {
+> +	.exit.text : AT(ADDR(.exit.text) - LOAD_OFFSET) {
+>  		ARM_EXIT_KEEP(EXIT_TEXT)
+>  	}
+> -	.init.proc.info : {
+> +	.init.proc.info : AT(ADDR(.init.proc.info) - LOAD_OFFSET) {
+>  		ARM_CPU_DISCARD(PROC_INFO)
+>  	}
+> -	.init.arch.info : {
+> +	.init.arch.info : AT(ADDR(.init.arch.info) - LOAD_OFFSET) {
+>  		__arch_info_begin = .;
+>  		*(.arch.info.init)
+>  		__arch_info_end = .;
+>  	}
+> -	.init.tagtable : {
+> +	.init.tagtable : AT(ADDR(.init.tagtable) - LOAD_OFFSET) {
+>  		__tagtable_begin = .;
+>  		*(.taglist.init)
+>  		__tagtable_end = .;
+>  	}
+>  #ifdef CONFIG_SMP_ON_UP
+> -	.init.smpalt : {
+> +	.init.smpalt : AT(ADDR(.init.smpalt) - LOAD_OFFSET) {
+>  		__smpalt_begin = .;
+>  		*(.alt.smp.init)
+>  		__smpalt_end = .;
+>  	}
+>  #endif
+> -	.init.pv_table : {
+> +	.init.pv_table : AT(ADDR(.init.pv_table) - LOAD_OFFSET) {
+>  		__pv_table_begin = .;
+>  		*(.pv_table)
+>  		__pv_table_end = .;
+>  	}
+> -	.init.data : {
+> +	.init.data : AT(ADDR(.init.data) - LOAD_OFFSET) {
+>  #ifndef CONFIG_XIP_KERNEL
+>  		INIT_DATA
+>  #endif
+> @@ -178,7 +187,7 @@ SECTIONS
+>  		INIT_RAM_FS
+>  	}
+>  #ifndef CONFIG_XIP_KERNEL
+> -	.exit.data : {
+> +	.exit.data : AT(ADDR(.exit.data) - LOAD_OFFSET) {
+>  		ARM_EXIT_KEEP(EXIT_DATA)
+>  	}
+>  #endif
+> @@ -196,7 +205,7 @@ SECTIONS
+>  	__data_loc = .;
+>  #endif
+>  
+> -	.data : AT(__data_loc) {
+> +	.data : AT(__data_loc - LOAD_OFFSET) {
+>  		_data = .;		/* address in memory */
+>  		_sdata = .;
+>  
+> @@ -245,7 +254,7 @@ SECTIONS
+>  	 * free it after init has commenced and TCM contents have
+>  	 * been copied to its destination.
+>  	 */
+> -	.tcm_start : {
+> +	.tcm_start : AT(ADDR(.tcm_start) - LOAD_OFFSET) {
+>  		. = ALIGN(PAGE_SIZE);
+>  		__tcm_start = .;
+>  		__itcm_start = .;
+> @@ -257,7 +266,7 @@ SECTIONS
+>  	 * and we'll upload the contents from RAM to TCM and free
+>  	 * the used RAM after that.
+>  	 */
+> -	.text_itcm ITCM_OFFSET : AT(__itcm_start)
+> +	.text_itcm ITCM_OFFSET : AT(__itcm_start - LOAD_OFFSET)
+>  	{
+>  		__sitcm_text = .;
+>  		*(.tcm.text)
+> @@ -272,12 +281,12 @@ SECTIONS
+>  	 */
+>  	. = ADDR(.tcm_start) + SIZEOF(.tcm_start) + SIZEOF(.text_itcm);
+>  
+> -	.dtcm_start : {
+> +	.dtcm_start : AT(ADDR(.dtcm_start) - LOAD_OFFSET) {
+>  		__dtcm_start = .;
+>  	}
+>  
+>  	/* TODO: add remainder of ITCM as well, that can be used for data! */
+> -	.data_dtcm DTCM_OFFSET : AT(__dtcm_start)
+> +	.data_dtcm DTCM_OFFSET : AT(__dtcm_start - LOAD_OFFSET)
+>  	{
+>  		. = ALIGN(4);
+>  		__sdtcm_data = .;
+> @@ -290,7 +299,7 @@ SECTIONS
+>  	. = ADDR(.dtcm_start) + SIZEOF(.data_dtcm);
+>  
+>  	/* End marker for freeing TCM copy in linked object */
+> -	.tcm_end : AT(ADDR(.dtcm_start) + SIZEOF(.data_dtcm)){
+> +	.tcm_end : AT(ADDR(.dtcm_start) + SIZEOF(.data_dtcm) - LOAD_OFFSET){
+>  		. = ALIGN(PAGE_SIZE);
+>  		__tcm_end = .;
+>  	}
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
