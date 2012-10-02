@@ -1,32 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Oct 2012 13:45:01 +0200
-Subject: [PATCH 0/4] cpufreq: db8500: Use platform data to provide cpufreq
- table
-In-Reply-To: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdb-SWkysKGQrJBL1hJLucQ=aN59Sfxe6rxrvtR0HsOJ_g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2012 11:44:53 +0000
+Subject: [PATCH 00/10] Platform data clean-up and UIB device enablement
+In-Reply-To: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
+References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201210021144.53559.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 4:16 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On Tuesday 02 October 2012, Lee Jones wrote:
+> In this patch-set we move all Device Tree start-up code from the u8500
+> board file and into the more persistent db8500 cpu file. This will aid
+> future endeavours to remove platform code completely from Mainline. We
+> also enable some of the devices found on the STUIB (User Interface
+> board), which attaches to some of ST-Ericsson's reference platforms.
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Since the cpufreq table is dependant on the prmcu fw, it make sense to
-> keep the table there. Moreover since the cpufreq is already a mfd child
-> device added by the prcmu this make even more logic.
+Looks all good to me.
 
-Better there than elsewhere.
-
-> The next step after these patches will be to implement an "arm_clk" to be
-> used from cpufreq to update the opp instead of using the prcmu opp API directly.
-> This will then remove the last hard dependency to the prcmu API from cpufreq.
-
-Sounds like a plan.
-
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Is this going to be merged through the cpufreq tree or the MFD tree?
-
-Yours,
-Linus Walleij
+Acked-by: Arnd Bergmann <arnd@arndb.de>
