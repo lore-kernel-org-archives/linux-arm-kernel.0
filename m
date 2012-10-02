@@ -1,77 +1,46 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue, 2 Oct 2012 12:20:31 -0400
-Subject: [PATCH v2 4/7] ARM: davinci: Add support for an L3RAM gen_pool
-In-Reply-To: <506ACC77.9090604@ti.com>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
- <1348861072-14507-5-git-send-email-mporter@ti.com>
- <506986B2.1030000@ti.com> <20121001123242.GJ5641@beef>
- <CAPcSpELdAK6=O8HG9FJXG_t88eymZO1f3wxzFqmR-faUn4jx4g@mail.gmail.com>
- <506ACC77.9090604@ti.com>
-Message-ID: <20121002162031.GQ5641@beef>
+Date: Tue, 2 Oct 2012 12:28:33 -0400
+Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <506A9C65.5040309@ti.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com>
+ <506A9C65.5040309@ti.com>
+Message-ID: <20121002162833.GR5641@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 04:43:59PM +0530, Sekhar Nori wrote:
-> On 10/1/2012 7:20 PM, Ben Gardiner wrote:
-> > On Mon, Oct 1, 2012 at 8:32 AM, Matt Porter <mporter@ti.com> wrote:
-> >> On Mon, Oct 01, 2012 at 05:34:02PM +0530, Sekhar Nori wrote:
-> >>> Hi Matt,
-> >>>
-> >>> On 9/29/2012 1:07 AM, Matt Porter wrote:
-> >>>> L3RAM (shared SRAM) is needed for use by several drivers.
-> >>>> This creates a genalloc pool and a hook for the platform code
-> >>>> to provide the struct gen_pool * in platform data.
-> >>>>
-> >>>> Signed-off-by: Matt Porter <mporter@ti.com>
-> >>>
-> >>> I am not sure if any of the DaVinci devices have a need to allocate from
-> >>> *both* ARM RAM and shared RAM. Shared RAM is not present on all DaVinci
-> >>> devices AFAIR, and on DA850, there is just 8KB ARM RAM so I am not sure
-> >>> if there is much point in trying to allocate from there.
-> >>>
-> >>> Can you instead see if Ben's earlier patch[1] to use shared RAM for SRAM
-> >>> allocation on DA850 makes sense for your case? If yes, can you repost
-> >>> with Ben's patch included in your series instead of this patch? I would
-> >>> prefer that over creating a new pool for shared RAM.
-> >>
-> >> Hrm, I did look at Ben's earlier patch. The reason I added a separate
-> >> pool mostly was so I didn't have to touch the PM code at all. That can
-> >> continue using the private SRAM API with the ARM RAM as it is now. The
-> >> idea here was to allow that to be separate since no other bus masters
-> >> can access the ARM RAM anyway and do something that didn't require
-> >> regression testing PM. Also, I figured there's really no reason to use
-> >> even a tiny bit of the shared SRAM on PM if we have that ARM RAM there
-> >> and working fine for that use case.
-> >> [...]
+On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
+> On 09/22/2012 06:33 PM, Mark Brown wrote:
+> > On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
 > > 
-> > I agree with Matt. Preserving the use of the ARM RAM (8K on L138 -- as
-> > you said, Sekhar) in any fashion is preferable to moving suspend
-> > support into shared RAM. There is more of it (128K on L138) but also
-> > more pressure on allocations there since there are more clients.
+> >> +config SND_DAVINCI_HAVE_SRAM
+> >> +	bool
+> >> +	default y if ARCH_DAVINCI=y
+> >> +	default n if ARCH_OMAP=y
+> >> +
+> > 
+> > I've been sitting on this mostly since it seems like a step back from
+> > multi-platform kernels (which is where we're trying to get to) and I've
+> > been trying to decide what the best approach is.  I'm thinking that we
+> > do want a generic API for allocating this stuff, it's a fairly generic
+> > feature (there's TCMs as well).  
+> > 
+> > Adding ifdefs like this does just doesn't seem good.
 > 
-> There is where I would like to see more information on who the potential
-> clients are. Even if DSP takes away 64K of the shared RAM on OMAP-L138,
-> there should be more than enough for PM, Audio and PRU. I haven't
-> checked the PM code size lately but it should be fairly small and I can
-> check the actual number if that helps. So, adding a new pool just to
-> save on those bytes doesn't sound like helping a lot.
+> I also agree that ifdef is not a good solution.
+> It is better to have this information passed as device_data and via DT it can
+> be decided based on the compatible property for the device.
 
-The only wildcard is PRU usage due to the small per-PRU memory on PRUss
-v1...though no sense in speculating further until somebody demonstrates a
-need.
-
-> > I appreciate that you are trying to preserve prior efforts in
-> > attempted merging of SRAM support -- thank you for that; however, that
-> > patch [1] was just an import of Subashish Ghosh's patch [2]  -- I
-> > chose _that_ implementation option then mainly because I imagined it
-> > would be the least risky to get accepted upstream and not because of
-> > any particular technical merits.
-> 
-> Its not a question of prior effort since Matt has already put in the
-> effort too. I am yet unconvinced that we need to add support to manage
-> two blocks of SoC internal RAM on DA850 in the kernel today. That's all.
-
-Yeah, I've come to agree with that. If somebody ends up needing that
-extra 8K of local ram on L138 then they can add support.
+The driver is going to be used by both !DT and DT only platforms for a
+while so DT-centric solutions just don't make sense. There's a clean way
+to do this that was used for uio_pruss.c. When davinci is further along
+on DT conversion we can make use of the devicetree-based generic sram
+driver that's progressing along right now [1]. It needs some minor help
+to allow specifying the gen_pool allocation order, but it will work
+nicely for getting access to the right sram pool.
 
 -Matt
+
+[1] https://patchwork.kernel.org/patch/1421961/
