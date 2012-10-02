@@ -1,38 +1,34 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 2 Oct 2012 21:33:16 +0200
-Subject: [PATCH] ARM: tegra: update *.dts for regulator-compatible
- deprecation
-In-Reply-To: <1349204824-21758-1-git-send-email-swarren@wwwdotorg.org>
-References: <1349204824-21758-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20121002193315.GA30966@avionic-0098.mockup.avionic-design.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 2 Oct 2012 20:45:54 +0100
+Subject: [kvmarm] [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
+In-Reply-To: <20121002192806.GC20411@mudshark.cambridge.arm.com>
+References: <20121001091244.49503.96318.stgit@ubuntu>
+ <20121001091426.49503.94722.stgit@ubuntu>
+ <20121002092412.GB8847@mudshark.cambridge.arm.com>
+ <b4b11d71544812cff978b3457a99b90e@localhost>
+ <C24866D7-ED20-402F-B769-1FE4D5561C77@virtualopensystems.com>
+ <CAFEAcA8Mvh3QzVYTAhLjjbgCqd_AjJ7ji9z7NoLWnM4YUW0OQw@mail.gmail.com>
+ <20121002192806.GC20411@mudshark.cambridge.arm.com>
+Message-ID: <CAFEAcA-KL36kwaFFrOA0NG0y1qGhkXZ+bm5FA0LhJsmKDk66Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 01:07:04PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Commit 13511de "regulator: deprecate regulator-compatible DT property"
-> now allows for simpler content within the regulators node within a PMIC.
-> Modify all the Tegra device tree files to take advantage of this.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra20-harmony.dts   |   63 ++++------------
->  arch/arm/boot/dts/tegra20-paz00.dts     |   59 ++++------------
->  arch/arm/boot/dts/tegra20-seaboard.dts  |   59 ++++------------
->  arch/arm/boot/dts/tegra20-tamonten.dtsi |   63 ++++------------
->  arch/arm/boot/dts/tegra20-ventana.dts   |   59 ++++------------
->  arch/arm/boot/dts/tegra20-whistler.dts  |  119 ++++++++-----------------------
->  arch/arm/boot/dts/tegra30-cardhu.dtsi   |   47 +++---------
->  7 files changed, 112 insertions(+), 357 deletions(-)
+On 2 October 2012 20:28, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Oct 02, 2012 at 07:31:43PM +0100, Peter Maydell wrote:
+>> We probably want to be passing in the "base of the cpu-internal
+>> peripherals", rather than "base of the GIC" specifically. For the
+>> A15 these are the same thing, but that's not inherent [compare the
+>> A9 which has more devices at fixed offsets from a configurable
+>> base address].
+>
+> If you do that, userspace will need a way to probe the emulated CPU so
+> that is knows exactly which set of peripherals there are and which ones it
+> needs to emulate. This feels pretty nasty, given that the vgic is handled
+> more or less completely by the kernel-side of things.
 
-Funny how this has come full circle.
+Userspace knows what the emulated CPU is because it tells the
+kernel which CPU to provide -- the kernel can say "yes" or "no" but
+it can't provide a different CPU to the one we ask for, or
+one with bits mising...
 
-Acked-by: Thierry Reding <thierry.reding@avionic-design.de>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/698128c5/attachment-0001.sig>
+-- PMM
