@@ -1,50 +1,92 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Tue, 2 Oct 2012 15:24:48 -0700
-Subject: Problem with mmc DMA on panda board in 3.6
-Message-ID: <506B69B0.2010109@am.sony.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 02 Oct 2012 15:21:12 -0700
+Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data
+ via platform data
+In-Reply-To: <1348496201-6378-3-git-send-email-j-pihet@ti.com> (Jean Pihet's
+ message of "Mon, 24 Sep 2012 16:16:41 +0200")
+References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
+ <1348496201-6378-1-git-send-email-j-pihet@ti.com>
+ <1348496201-6378-3-git-send-email-j-pihet@ti.com>
+Message-ID: <877gr87bxj.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an early report - I'm just checking if anyone else has seen this.
+Hi Jean,
 
-With Linux version v3.6, my PandaBoard (OMAP-based) no longer boots.  The
-system appears to fail to initialize the mmc controller.
+Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-The kernel log message of interest appears to be this:
-[    1.690002] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 6
+> Remove the device dependent settings (cpu_is_xxx(), IP fck etc.)
+> from the driver code and pass them instead via the platform
+> data.
+> This allows a clean separation of the driver code and the platform
+> code, as required by the move of the platform header files to
+> include/linux/platform_data.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-I can supply full kernel log messages and my .config if needed.
+Could you make pdata change and the clock change should be two different
+patches?  Also, your previous patch to align SR clock names should be
+combined with the changes made here.
 
-I bisected the code and arrived at the following commit:
--------
-commit 26b88520b80695a6fa5fd95b5d97c03f4daf87e0
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Fri Apr 13 12:27:37 2012 +0100
+Some comments on the clock change below...
 
-    mmc: omap_hsmmc: remove private DMA API implementation
+> ---
+>  arch/arm/mach-omap2/sr_device.c   |   13 ++++++++++++
+>  drivers/power/avs/smartreflex.c   |   40 ++++++++++--------------------------
+>  include/linux/power/smartreflex.h |   14 +++++++++++-
+>  3 files changed, 36 insertions(+), 31 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+> index d033a65..2885a77 100644
+> --- a/arch/arm/mach-omap2/sr_device.c
+> +++ b/arch/arm/mach-omap2/sr_device.c
+> @@ -122,6 +122,19 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+>  	sr_data->senn_mod = 0x1;
+>  	sr_data->senp_mod = 0x1;
+>  
+> +	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+> +		sr_data->err_weight = OMAP3430_SR_ERRWEIGHT;
+> +		sr_data->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+> +		sr_data->accum_data = OMAP3430_SR_ACCUMDATA;
+> +		if (!(strcmp(sr_data->name, "smartreflex_mpu"))) {
+> +			sr_data->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
+> +			sr_data->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
+> +		} else {
+> +			sr_data->senn_avgweight = OMAP3430_SR2_SENNAVGWEIGHT;
+> +			sr_data->senp_avgweight = OMAP3430_SR2_SENPAVGWEIGHT;
+> +		}
+> +	}
+> +
+>  	sr_data->voltdm = voltdm_lookup(sr_dev_attr->sensor_voltdm_name);
+>  	if (IS_ERR(sr_data->voltdm)) {
+>  		pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
+> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
+> index 92f6728..7c03c90 100644
+> --- a/drivers/power/avs/smartreflex.c
+> +++ b/drivers/power/avs/smartreflex.c
+> @@ -128,17 +128,16 @@ static irqreturn_t sr_interrupt(int irq, void *data)
+>  
+>  static void sr_set_clk_length(struct omap_sr *sr)
+>  {
+> +	char fck_name[16]; /* "smartreflex.0" fits in 16 chars */
+>  	struct clk *sys_ck;
+>  	u32 sys_clk_speed;
+>  
+> -	if (cpu_is_omap34xx())
+> -		sys_ck = clk_get(NULL, "sys_ck");
+> -	else
+> -		sys_ck = clk_get(NULL, "sys_clkin_ck");
+> +	sprintf(fck_name, "smartreflex.%d", sr->srid);
 
-    Remove the private DMA API implementation from omap_hsmmc, making it
-    use entirely the DMA engine API.
+hmm, isn't this the same as dev_name(&sr->pdev.dev) ?
 
-    Tested-by: Tony Lindgren <tony@atomide.com>
-    Tested-by: Venkatraman S <svenkatr@ti.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
--------
-The board works up until this commit.
-After this commit, the board hangs during boot after the message:
-[    1.852508] Waiting for root device /dev/mmcblk0p3...
-(and some other USB and network messages, which I presume
-are unrelated.)
+Combined with your earlier patch to align clock names, this should just
+be:
 
-My questions are these:
-Has anyone else had problems with the PandaBoard (or other OMAP) on 3.6?
-Are there any related CONFIG_ variables I could change to try alternatives?
-What should I try next to debug this?
+        sys_ck = clk_get(&sr->pdev.dev, "fck");
 
- -- Tim
+Also note that you've changed this from sys_clk to the SR functional
+clock, which seems to be the same clock on 34xx and 44xx, but that change
+should be clearly documented in the changelog.
 
-=============================
-Tim Bird
-Architecture Group Chair, CE Workgroup of the Linux Foundation
-Senior Staff Engineer, Sony Network Entertainment
-=============================
+Kevin
