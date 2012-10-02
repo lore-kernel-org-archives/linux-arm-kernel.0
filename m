@@ -1,23 +1,26 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 02 Oct 2012 14:59:05 -0700
-Subject: [PATCH 1/2] ARM: OMAP: SmartReflex: fix error path in init
- function
-In-Reply-To: <1348496201-6378-2-git-send-email-j-pihet@ti.com> (Jean Pihet's
- message of "Mon, 24 Sep 2012 16:16:40 +0200")
-References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
- <1348496201-6378-1-git-send-email-j-pihet@ti.com>
- <1348496201-6378-2-git-send-email-j-pihet@ti.com>
-Message-ID: <87vces7cye.fsf@deeprootsystems.com>
+Date: Tue, 02 Oct 2012 15:08:00 -0700
+Subject: [PATCH] ARM: OMAP: hwmod: align the SmartReflex fck names
+In-Reply-To: <87626s8rys.fsf@deeprootsystems.com>
+References: <1348134503-28220-1-git-send-email-j-pihet@ti.com>
+ <1348497352-6464-1-git-send-email-j-pihet@ti.com>
+ <87626s8rys.fsf@deeprootsystems.com>
+Message-ID: <506B65C0.7070902@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
-
-> Fix the error handling path in omap_sr_probe to correctly
-> de-allocate resources in case of problems.
+On 10/02/2012 02:49 PM, Kevin Hilman wrote:
+> Jean Pihet <jean.pihet@newoldbits.com> writes:
 >
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> Rename the smartreflex fck names for consistency and better readability;
+>> rename the clock aliases for use by the SmartReflex driver, with the
+>> "smartreflex.%d" format.
+>
+> hmm, do we even need the clkdev nodes anymore?  The driver isn't
+> directly accessing the fclk at all, so it seems like these could be
+> removed now.
 
-Thanks, queuing this one as a fix for v3.7-rc
+Please ignore this comment, I see what you're doing in the other series 
+now.  See my comments there.
 
 Kevin
