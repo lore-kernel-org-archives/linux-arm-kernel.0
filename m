@@ -1,56 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Oct 2012 10:24:13 +0100
-Subject: [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
-In-Reply-To: <20121001091426.49503.94722.stgit@ubuntu>
-References: <20121001091244.49503.96318.stgit@ubuntu>
- <20121001091426.49503.94722.stgit@ubuntu>
-Message-ID: <20121002092412.GB8847@mudshark.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 02 Oct 2012 11:24:06 +0200
+Subject: [PATCH v2 4/4] ARM: dts: exynos4: Set up power domains
+In-Reply-To: <1349169846-30385-1-git-send-email-t.figa@samsung.com>
+References: <1349169846-30385-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1349169846-30385-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 10:14:26AM +0100, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Add the init code for the hypervisor, the virtual machine, and
-> the virtual CPUs.
-> 
-> An interrupt handler is also wired to allow the VGIC maintenance
-> interrupts, used to deal with level triggered interrupts and LR
-> underflows.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
+This patch adds device tree nodes for power domains of Exynos4 SoCs.
 
-[...]
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi    | 30 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210.dtsi |  5 +++++
+ 2 files changed, 35 insertions(+)
 
-> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-> index b52d4c2..fc2a138 100644
-> --- a/arch/arm/kvm/vgic.c
-> +++ b/arch/arm/kvm/vgic.c
-> @@ -20,7 +20,14 @@
->  #include <linux/kvm_host.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
->  #include <asm/kvm_emulate.h>
-> +#include <asm/hardware/gic.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
->  
->  /*
->   * How the whole thing works (courtesy of Christoffer Dall):
-> @@ -61,6 +68,13 @@
->  /* Temporary hacks, need to be provided by userspace emulation */
->  #define VGIC_DIST_BASE		0x2c001000
->  #define VGIC_DIST_SIZE		0x1000
-> +#define VGIC_CPU_BASE		0x2c002000
-> +#define VGIC_CPU_SIZE		0x2000
-
-We really don't want the physical memory map for the guest hardwired in the
-kernel. Please find a way to parameterise this from userspace.
-
-Will
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index a26c3dd..0c14f50 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -30,6 +30,36 @@
+ 		spi2 = &spi_2;
+ 	};
+ 
++	pd_mfc: mfc-power-domain at 10023C40 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C40 0x20>;
++	};
++
++	pd_g3d: g3d-power-domain at 10023C60 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C60 0x20>;
++	};
++
++	pd_lcd0: lcd0-power-domain at 10023C80 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C80 0x20>;
++	};
++
++	pd_tv: tv-power-domain at 10023C20 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C20 0x20>;
++	};
++
++	pd_cam: cam-power-domain at 10023C00 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C00 0x20>;
++	};
++
++	pd_gps: gps-power-domain at 10023CE0 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023CE0 0x20>;
++	};
++
+ 	gic:interrupt-controller at 10490000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 214c557..f9f840e 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -31,6 +31,11 @@
+ 		pinctrl2 = &pinctrl_2;
+ 	};
+ 
++	pd_lcd1: lcd1-power-domain at 10023CA0 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023CA0 0x20>;
++	};
++
+ 	gic:interrupt-controller at 10490000 {
+ 		cpu-offset = <0x8000>;
+ 	};
+-- 
+1.7.12
