@@ -1,54 +1,29 @@
-From: linux4michelle@tamay-dogan.net (Michelle Konzack)
-Date: Tue, 2 Oct 2012 06:31:06 +0200
-Subject: How many cores does the ARM branch support?
-Message-ID: <20121002043106.GD21233@work1>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 2 Oct 2012 15:13:27 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the spi-mb tree
+Message-ID: <20121002151327.bff0573c41ce8d983c392820@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello OverGeeks and *,
+Hi all,
 
-I have gotten a new gadget which run only with 700MHz but has  32 cores.
-Support 16 GE Interfaces a 50 Gbit universal interface and 4 PCIe ports,
-SATA HDD and much more...
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/spi/Kconfig between commit 536a53a300d0 ("spi: remove completely
+broken Tegra driver") from the spi-mb tree and commit 5bd276118189 ("spi:
+tegra: remove support of legacy DMA driver based access") from the
+arm-soc tree.
 
-...and yes, this ARM microcontroller is a telecommunications controller.
-
-However, I have the Evaluation  Kit  and  a  PCIe  graphiccard  and  now
-installed Debian ARMEL.  Unfortunately I get only 2 cores working...
-
-What must I do to get the other 30 cores?
-
-(without them, my Marvel Discovery MV78200 us 5 times faster)
-
-And is it possibel, to get 100 cores running?
-(this is the bigger version of the microcontroller I have)
-
-I like to transform the 32 and 100 core versions into PanelPCs with  the
-ultimate super power...  :-D  ...even it will be only a gadget for me!
-
-Thanks, Greetings and nice Day/Evening
-    Michelle Konzack
+I fixed it up (by removing the SPI_TEGRA section) and can carry the fix
+as necessary (no action is required).
 
 -- 
-##################### Debian GNU/Linux Consultant ######################
-   Development of Intranet and Embedded Systems with Debian GNU/Linux
-               Internet Service Provider, Cloud Computing
-                <http://www.itsystems.tamay-dogan.net/>
-
-itsystems at tdnet                     Jabber  linux4michelle at jabber.ccc.de
-Owner Michelle Konzack
-
-Gewerbe Strasse 3                   Tel office: +49-176-86004575
-77694 Kehl                          Tel mobil:  +49-177-9351947
-Germany                             Tel mobil:  +33-6-61925193  (France)
-
-USt-ID:  DE 278 049 239
-
-Linux-User #280138 with the Linux Counter, http://counter.li.org/
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+http://www.canb.auug.org.au/~sfr/
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.pgp
+Name: not available
 Type: application/pgp-signature
-Size: 190 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/32fc8ba9/attachment.sig>
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/46803068/attachment-0001.sig>
