@@ -1,47 +1,25 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 1 Oct 2012 17:59:32 -0600
-Subject: [PATCH] [ARM] Enable the second I2C bus on Marvell Kirkwood
-Message-ID: <20121001235932.GA678@obsidianresearch.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 01 Oct 2012 17:34:28 -0700
+Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
+ monitor mode
+In-Reply-To: <20120924171934.GE5522@mudshark.cambridge.arm.com>
+References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+ <20120920173556.GQ4654@mudshark.cambridge.arm.com>
+ <20120924171934.GE5522@mudshark.cambridge.arm.com>
+Message-ID: <506A3694.4070004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mv64xxx_of_config requires that the tclk frequency be found
-through the clk stuff rather than through device tree, so add
-another override for the 2nd controller.
+On 09/24/12 10:19, Will Deacon wrote:
+> Ok, I've pushed a bunch of patches to my hw-breakpoint branch (head commit
+> 55cb726797c7). I'll post them to the list after the merge window, but please
+> do take them for a spin if you get a chance.
+>
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- arch/arm/mach-kirkwood/board-dt.c |    2 ++
- arch/arm/mach-kirkwood/common.c   |    1 +
- 2 files changed, 3 insertions(+), 0 deletions(-)
+Forgot to reply here. Took them for a spin last week with that commit.
+No more boot hangs but I can't say much else beyond that. When you post
+to the list I'll add my tested-by.
 
-of_serial specifies the tclk frequency (via clock-frequency) in the
-DT, should the i2c have the same option?
-
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index d00223e..4428f2f 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -30,6 +30,8 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
- 	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
- 		       NULL),
-+	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011100, "mv64xxx_i2c.1",
-+		       NULL),
- 	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
- 	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
- 	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 4177304..0cc2bd2 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -278,6 +278,7 @@ void __init kirkwood_clk_init(void)
- 	orion_clkdev_add("1", "pcie", pex1);
- 	orion_clkdev_add(NULL, "kirkwood-i2s", audio);
- 	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", runit);
-+	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".1", runit);
- 
- 	/* Marvell says runit is used by SPI, UART, NAND, TWSI, ...,
- 	 * so should never be gated.
 -- 
-1.7.5.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
