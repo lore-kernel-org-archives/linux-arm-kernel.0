@@ -1,65 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 1 Oct 2012 20:52:48 -0400
-Subject: [PATCH] [ARM] Enable the second I2C bus on Marvell Kirkwood
-In-Reply-To: <20121001235932.GA678@obsidianresearch.com>
-References: <20121001235932.GA678@obsidianresearch.com>
-Message-ID: <20121002005248.GN17765@titan.lakedaemon.net>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 1 Oct 2012 19:22:34 -0700
+Subject: [GIT PULL 0/12] ARM: soc: updates for 3.7, first batch
+In-Reply-To: <1349135827-24790-1-git-send-email-olof@lixom.net>
+References: <1349135827-24790-1-git-send-email-olof@lixom.net>
+Message-ID: <CA+55aFwoDOdKv9wcqEPkE76+w2TCz+419qp94T3_70jK9dR3-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 05:59:32PM -0600, Jason Gunthorpe wrote:
-> mv64xxx_of_config requires that the tclk frequency be found
-> through the clk stuff rather than through device tree, so add
-> another override for the 2nd controller.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+On Mon, Oct 1, 2012 at 4:56 PM, Olof Johansson <olof@lixom.net> wrote:
+>
+> Here is the first batch of pull requests for arm-soc for this merge
+> window. Some of them are tiny, and we will probably start to combine
+> them into slightly larger misc branches in the future. I didn't do it
+> this time around since the dependencies between branches ended up quite
+> complex this time around.
 
-Thanks for the patch, Jason.  Looks good.  One small note, please don't
-forget to CC: the maintainers in future submissions.  In this case,
-myself and Andrew Lunn.
+Ok, I've merged them all. As usual, my end result is slightly
+different from yours, although the differences are pretty small.
 
-thx,
+ - I added exynos4210-trats.dtb to the "dtb-$(CONFIG_ARCH_EXYNOS)"
+case in arch/arm/boot/dts/Makefile
 
-Jason.
+   That seemed to be the right thing, otherwise that dtb file isn't
+actually accessed from anything. Hmm?
 
-> ---
->  arch/arm/mach-kirkwood/board-dt.c |    2 ++
->  arch/arm/mach-kirkwood/common.c   |    1 +
->  2 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> of_serial specifies the tclk frequency (via clock-frequency) in the
-> DT, should the i2c have the same option?
-> 
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index d00223e..4428f2f 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -30,6 +30,8 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
->  	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
->  		       NULL),
-> +	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011100, "mv64xxx_i2c.1",
-> +		       NULL),
->  	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
->  	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
->  	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 4177304..0cc2bd2 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -278,6 +278,7 @@ void __init kirkwood_clk_init(void)
->  	orion_clkdev_add("1", "pcie", pex1);
->  	orion_clkdev_add(NULL, "kirkwood-i2s", audio);
->  	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", runit);
-> +	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".1", runit);
->  
->  	/* Marvell says runit is used by SPI, UART, NAND, TWSI, ...,
->  	 * so should never be gated.
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ - Commit dbc04161048d ("ARM: OMAP: Split plat/hardware.h, use local
+soc.h for omap2+") added the line
+
+    #include "soc.h"
+
+   to arch/arm/mach-omap2/omap_l3_noc.c, and I left it in as it moved
+into drivers/bus/.
+
+   My resolution is quite possibly wrong, but I didn't know what the
+right thing to do was. Please double-check.
+
+ - non-semantic order/whitespace difference for
+CONFIG_CLKSRC_ARM_GENERIC in drivers/clocksource/Makefile.
+
+   I didn't want to mix the generic case up with the random cases.
+
+Anyway, you should double-check the merges, the "soc.h" one in
+particular is suspect.
+
+          Linus
