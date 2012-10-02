@@ -1,40 +1,46 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 2 Oct 2012 22:28:35 +0200
-Subject: [PATCH 11/12] pinctrl: samsung: use __devinit section for init
- code
-In-Reply-To: <1348868177-21205-12-git-send-email-arnd@arndb.de>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-12-git-send-email-arnd@arndb.de>
-Message-ID: <20121002202835.GA31446@avionic-0098.mockup.avionic-design.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2012 20:27:45 +0000
+Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
+In-Reply-To: <87fw5wofwm.fsf_-_@octavius.laptop.org>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-7-git-send-email-arnd@arndb.de>
+ <87fw5wofwm.fsf_-_@octavius.laptop.org>
+Message-ID: <201210022027.45461.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 11:36:16PM +0200, Arnd Bergmann wrote:
-> The samsung pinctrl driver has a probe function that is
-> __devinit and that calls a lot of other functions that are
-> marked __init, which kbuild complains about.
+On Tuesday 02 October 2012, Chris Ball wrote:
+> Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
+> renamed arch/arm/mach-mmp/include/mach/sram.h to
+> include/linux/platform_data/dma-mmp_tdma.h, but didn't update
+> mmp-pcm.c which uses the header.  Fix the build error.
 > 
-> Marking everything __devinit means that the code does not
-> discarded when CONFIG_HOTPLUG is set, which is a little
-> more wasteful, but also more consistent
+> Signed-off-by: Chris Ball <cjb@laptop.org>
+> ---
+>  sound/soc/pxa/mmp-pcm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Without this patch, building exynos_defconfig results in:
-> 
-> WARNING: drivers/pinctrl/built-in.o(.devinit.text+0x124): Section mismatch in reference from the function samsung_pinctrl_probe() to the function .init.text:samsung_gpiolib_register()
-> The function __devinit samsung_pinctrl_probe() references
-> a function __init samsung_gpiolib_register().
-> If samsung_gpiolib_register is only used by samsung_pinctrl_probe then
-> annotate samsung_gpiolib_register with a matching annotation.
+> diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
+> index 73ac546..e834faf 100644
+> --- a/sound/soc/pxa/mmp-pcm.c
+> +++ b/sound/soc/pxa/mmp-pcm.c
+> @@ -15,13 +15,13 @@
+>  #include <linux/slab.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/dmaengine.h>
+> +#include <linux/platform_data/dma-mmp_tdma.h>
+>  #include <linux/platform_data/mmp_audio.h>
+>  #include <sound/pxa2xx-lib.h>
+>  #include <sound/core.h>
+>  #include <sound/pcm.h>
+>  #include <sound/pcm_params.h>
+>  #include <sound/soc.h>
+> -#include <mach/sram.h>
+>  #include <sound/dmaengine_pcm.h>
+>  
+>  struct mmp_dma_data {
 
-Note that work is underway to remove HOTPLUG altogether (see commit
-45f035a, "CONFIG_HOTPLUG should be always on" in linux-next), so it
-may make more sense to just drop the __init markings.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/619651cc/attachment-0001.sig>
+Sorry I didn't catch this earlier. The file was only recently added
+and somehow didn't appear in my build tests.
