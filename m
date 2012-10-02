@@ -1,113 +1,39 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 02 Oct 2012 09:10:13 +0200
-Subject: [PATCH V2 0/3] Add clock framework for armada 370/XP
-In-Reply-To: <20121002041736.21556.20051@nucleus>
-References: <1349125926-16144-1-git-send-email-gregory.clement@free-electrons.com>
- <20121002041736.21556.20051@nucleus>
-Message-ID: <506A9355.1020101@free-electrons.com>
+Date: Tue, 02 Oct 2012 09:42:19 +0200
+Subject: How many cores does the ARM branch support?
+In-Reply-To: <20121002043106.GD21233@work1>
+References: <20121002043106.GD21233@work1>
+Message-ID: <506A9ADB.4060306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2012 06:17 AM, Mike Turquette wrote:
-> Quoting Gregory CLEMENT (2012-10-01 14:12:03)
->> Hello Mike,
->>
->> My first version didn't get many attention, so I guess it's too late
->> for 3.7! ;) I should have ping you earlier about this series. This
->> time was not lost, by using the cpu clock with SMP I found a bug and
->> fixed it. And I also improved the spelling and removed unnecessary
->> small piece of code thanks to the feed back of Andrew Lunn.
->>
+On 10/02/2012 06:31 AM, Michelle Konzack wrote:
+> Hello OverGeeks and *,
 > 
-> My apologies for letting this one slip through the cracks.  I'm glad you
-> fixed the bug though!
+
+Hello Michelle,
+
+> I have gotten a new gadget which run only with 700MHz but has  32 cores. Support 16 GE Interfaces a 50 Gbit universal interface and 4 PCIe ports, SATA HDD and much more...
 > 
-> I'll give this a review once the -rc1 merge window is closed.
+> ...and yes, this ARM microcontroller is a telecommunications controller.
+> 
+> However, I have the Evaluation  Kit  and  a  PCIe  graphiccard  and  now installed Debian ARMEL.  Unfortunately I get only 2 cores working...
+> 
+> What must I do to get the other 30 cores?
 
-This time I will remind you as soon as -rc1 will be released ;)
+You have to check that your kernel was compiled with CONFIG_NR_CPUS = 32.
+Checks also that you don't have "nr_cpus=2" in your kernel parameter.
 
-I have an other patch set which will depend on this one. So I hope
-this one will be merged early enough in your clk-3.8 branch.
+> 
+> (without them, my Marvel Discovery MV78200 us 5 times faster)
+> 
+> And is it possibel, to get 100 cores running? (this is the bigger version of the microcontroller I have)
+
+Currently the maximum number of core supported is limited to 32.
+the NR_CPUS range is from 2 to 32 for ARM.
 
 Regards,
 Gregory
-
-> 
-> Regards,
-> Mike
-> 
->> The purpose of this patch set is to add support for clock framework
->> for Armada 370 and Armada XP SoCs. All the support is done under the
->> directory drivers/clk/mvebu/ as the support for other mvebu SoCs was
->> in mind during the writing of the code.
->>
->> Two kinds of clocks are added:
->>
->> - The CPU clocks are only for Armada XP (which si multi-core)
->>
->> - The core clocks are clocks which have their rate fixed during
->>   reset.
->>
->> This patch set is based on the clk-3.7 branch of Mike Turquette as it
->> use the patch "clk: add of_clk_src_onecell_get() support" from Shawn
->> Guo.
->>
->> Many thanks to Thomas Petazzoni and Sebastian Hesselbarth for their
->> review and feedback. The device tree bindings were really improved
->> with the advices of Sebastian.
->>
->> Changelog:
->> V1 -> V2:
->>
->> - Improved the spelling and the wording of the documentation and the
->>   1st commit log
->> - Removed the "end_of_list" name which are unused here.
->> - Fix the cpu clock by using of_clk_src_onecell_get in the same way it
->>   was used for the core clocks
->>
->> Regards,
->>
->> Gregory CLEMENT (3):
->>   clk: mvebu: add armada-370-xp specific clocks
->>   clk: armada-370-xp: add support for clock framework
->>   clocksource: time-armada-370-xp converted to clk framework
->>
->>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   40 +++
->>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 ++
->>  arch/arm/boot/dts/armada-370-db.dts                |    4 -
->>  arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
->>  arch/arm/boot/dts/armada-370.dtsi                  |   12 +
->>  arch/arm/boot/dts/armada-xp.dtsi                   |   48 +++
->>  arch/arm/mach-mvebu/Kconfig                        |    5 +
->>  arch/arm/mach-mvebu/armada-370-xp.c                |    8 +-
->>  arch/arm/mach-mvebu/common.h                       |    1 +
->>  drivers/clk/Makefile                               |    1 +
->>  drivers/clk/mvebu/Makefile                         |    2 +
->>  drivers/clk/mvebu/clk-core.c                       |  312 ++++++++++++++++++++
->>  drivers/clk/mvebu/clk-core.h                       |   19 ++
->>  drivers/clk/mvebu/clk-cpu.c                        |  155 ++++++++++
->>  drivers/clk/mvebu/clk-cpu.h                        |   19 ++
->>  drivers/clk/mvebu/clk.c                            |   36 +++
->>  drivers/clocksource/time-armada-370-xp.c           |   11 +-
->>  17 files changed, 685 insertions(+), 10 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
->>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
->>  create mode 100644 drivers/clk/mvebu/Makefile
->>  create mode 100644 drivers/clk/mvebu/clk-core.c
->>  create mode 100644 drivers/clk/mvebu/clk-core.h
->>  create mode 100644 drivers/clk/mvebu/clk-cpu.c
->>  create mode 100644 drivers/clk/mvebu/clk-cpu.h
->>  create mode 100644 drivers/clk/mvebu/clk.c
->>
->> -- 
->> 1.7.9.5
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
 
 -- 
 Gregory Clement, Free Electrons
