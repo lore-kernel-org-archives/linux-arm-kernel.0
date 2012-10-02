@@ -1,41 +1,34 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Oct 2012 14:07:20 +0530
-Subject: [PATCH 2/3] ASoC: Davinci: pcm: add support for sram-support-less
- platforms
-In-Reply-To: <20120922153313.GN4495@opensource.wolfsonmicro.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com>
-Message-ID: <506AA7C0.5080300@ti.com>
+Date: Tue, 2 Oct 2012 14:18:59 +0530
+Subject: [PATCH v3] media: davinci: vpif: display: separate out subdev
+ from output
+In-Reply-To: <1348571509-4131-1-git-send-email-prabhakar.lad@ti.com>
+References: <1348571509-4131-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <506AAA7B.1020308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 9/22/2012 9:03 PM, Mark Brown wrote:
-> On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
+On 9/25/2012 4:41 PM, Prabhakar wrote:
+> From: Lad, Prabhakar <prabhakar.lad@ti.com>
 > 
->> +config SND_DAVINCI_HAVE_SRAM
->> +	bool
->> +	default y if ARCH_DAVINCI=y
->> +	default n if ARCH_OMAP=y
->> +
+> vpif_display relied on a 1-1 mapping of output and subdev. This is not
+> necessarily the case. Separate the two. So there is a list of subdevs
+> and a list of outputs. Each output refers to a subdev and has routing
+> information. An output does not have to have a subdev.
 > 
-> I've been sitting on this mostly since it seems like a step back from
-> multi-platform kernels (which is where we're trying to get to) and I've
-> been trying to decide what the best approach is.  I'm thinking that we
-> do want a generic API for allocating this stuff, it's a fairly generic
-> feature (there's TCMs as well).  
+> The initial output for each channel is set to the fist output.
 > 
-> Adding ifdefs like this does just doesn't seem good.
+> Currently missing is support for associating multiple subdevs with
+> an output.
+> 
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Cc: Hans Verkuil <hans.verkuil@cisco.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
 
-How about converting to use genalloc instead of the DaVinci private SRAM
-API and passing the pool to be used via platform data?
+For the DaVinci platform changes:
 
-Matt Porter just used this approach to make the uio PRUSS driver usable
-on both DaVinci and AM335x. It suffered from the exact same problem.
-
-https://patchwork.kernel.org/patch/1522481/
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
 Thanks,
 Sekhar
