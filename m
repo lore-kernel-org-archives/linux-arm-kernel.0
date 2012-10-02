@@ -1,177 +1,56 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 02 Oct 2012 11:24:05 +0200
-Subject: [PATCH v2 3/4] ARM: EXYNOS: pm_domain: Bind devices to power domains
- using DT
-In-Reply-To: <1349169846-30385-1-git-send-email-t.figa@samsung.com>
-References: <1349169846-30385-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1349169846-30385-4-git-send-email-t.figa@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Oct 2012 10:24:13 +0100
+Subject: [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
+In-Reply-To: <20121001091426.49503.94722.stgit@ubuntu>
+References: <20121001091244.49503.96318.stgit@ubuntu>
+ <20121001091426.49503.94722.stgit@ubuntu>
+Message-ID: <20121002092412.GB8847@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a way to specify bindings between devices and power
-domains using device tree.
+On Mon, Oct 01, 2012 at 10:14:26AM +0100, Christoffer Dall wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Add the init code for the hypervisor, the virtual machine, and
+> the virtual CPUs.
+> 
+> An interrupt handler is also wired to allow the VGIC maintenance
+> interrupts, used to deal with level triggered interrupts and LR
+> underflows.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
 
-A device can be bound to particular power domain by adding a
-power-domain property containing a phandle to the domain. The device
-will be bound to the domain before binding a driver to it and unbound
-after unbinding a driver from it.
+[...]
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- .../bindings/arm/exynos/power_domain.txt           | 13 +++-
- arch/arm/mach-exynos/pm_domains.c                  | 82 ++++++++++++++++++++++
- 2 files changed, 94 insertions(+), 1 deletion(-)
+> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+> index b52d4c2..fc2a138 100644
+> --- a/arch/arm/kvm/vgic.c
+> +++ b/arch/arm/kvm/vgic.c
+> @@ -20,7 +20,14 @@
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +
+>  #include <asm/kvm_emulate.h>
+> +#include <asm/hardware/gic.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_mmu.h>
+>  
+>  /*
+>   * How the whole thing works (courtesy of Christoffer Dall):
+> @@ -61,6 +68,13 @@
+>  /* Temporary hacks, need to be provided by userspace emulation */
+>  #define VGIC_DIST_BASE		0x2c001000
+>  #define VGIC_DIST_SIZE		0x1000
+> +#define VGIC_CPU_BASE		0x2c002000
+> +#define VGIC_CPU_SIZE		0x2000
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 843b546..5216b41 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -4,14 +4,25 @@ Exynos processors include support for multiple power domains which are used
- to gate power to one or more peripherals on the processor.
- 
- Required Properties:
--- compatiable: should be one of the following.
-+- compatible: should be one of the following.
-     * samsung,exynos4210-pd - for exynos4210 type power domain.
- - reg: physical base address of the controller and length of memory mapped
-     region.
- 
-+Node of a device using power domains must have a samsung,power-domain property
-+defined with a phandle to respective power domain.
-+
- Example:
- 
- 	lcd0: power-domain-lcd0 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C00 0x10>;
- 	};
-+
-+Example of the node using power domain:
-+
-+	node {
-+		/* ... */
-+		samsung,power-domain = <&lcd0>;
-+		/* ... */
-+	};
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 5b7ce7e..4063016 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -19,6 +19,8 @@
- #include <linux/pm_domain.h>
- #include <linux/delay.h>
- #include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/sched.h>
- 
- #include <mach/regs-pmu.h>
- #include <plat/devs.h>
-@@ -83,14 +85,89 @@ static struct exynos_pm_domain PD = {			\
- }
- 
- #ifdef CONFIG_OF
-+static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
-+							struct device *dev)
-+{
-+	int ret;
-+
-+	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
-+
-+	while(1) {
-+		ret = pm_genpd_add_device(&pd->pd, dev);
-+		if (ret != -EAGAIN)
-+			break;
-+		cond_resched();
-+	}
-+
-+	pm_genpd_dev_need_restore(dev, true);
-+}
-+
-+static void exynos_remove_device_from_domain(struct device *dev)
-+{
-+	struct generic_pm_domain *genpd = dev_to_genpd(dev);
-+	int ret;
-+
-+	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
-+
-+	while(1) {
-+		ret = pm_genpd_remove_device(genpd, dev);
-+		if (ret != -EAGAIN)
-+			break;
-+		cond_resched();
-+	}
-+}
-+
-+static void exynos_read_domain_from_dt(struct device *dev)
-+{
-+	struct platform_device *pd_pdev;
-+	struct exynos_pm_domain *pd;
-+	struct device_node *node;
-+
-+	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
-+	if (!node)
-+		return;
-+	pd_pdev = of_find_device_by_node(node);
-+	if (!pd_pdev)
-+		return;
-+	pd = platform_get_drvdata(pd_pdev);
-+	exynos_add_device_to_domain(pd, dev);
-+}
-+
-+static int exynos_pm_notifier_call(struct notifier_block *nb,
-+				    unsigned long event, void *data)
-+{
-+	struct device *dev = data;
-+
-+	switch (event) {
-+	case BUS_NOTIFY_BIND_DRIVER:
-+		if (dev->of_node)
-+			exynos_read_domain_from_dt(dev);
-+
-+		break;
-+
-+	case BUS_NOTIFY_UNBOUND_DRIVER:
-+		exynos_remove_device_from_domain(dev);
-+
-+		break;
-+	}
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block platform_nb = {
-+	.notifier_call = exynos_pm_notifier_call,
-+};
-+
- static __init int exynos_pm_dt_parse_domains(void)
- {
-+	struct platform_device *pdev;
- 	struct device_node *np;
- 
- 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
- 		struct exynos_pm_domain *pd;
- 		int on;
- 
-+		pdev = of_find_device_by_node(np);
-+
- 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
- 		if (!pd) {
- 			pr_err("%s: failed to allocate memory for domain\n",
-@@ -105,10 +182,15 @@ static __init int exynos_pm_dt_parse_domains(void)
- 		pd->pd.power_on = exynos_pd_power_on;
- 		pd->pd.of_node = np;
- 
-+		platform_set_drvdata(pdev, pd);
-+
- 		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
- 	}
-+
-+	bus_register_notifier(&platform_bus_type, &platform_nb);
-+
- 	return 0;
- }
- #else
--- 
-1.7.12
+We really don't want the physical memory map for the guest hardwired in the
+kernel. Please find a way to parameterise this from userspace.
+
+Will
