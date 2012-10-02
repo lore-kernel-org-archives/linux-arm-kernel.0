@@ -1,56 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Oct 2012 19:43:06 -0700
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Oct 2012 20:03:32 -0700
 Subject: [GIT PULL 0/12] ARM: soc: updates for 3.7, first batch
-In-Reply-To: <CA+55aFzmm=y85k81kAfgiuBb=oaFxi0f83hFb32Y2tTHu1wozw@mail.gmail.com>
+In-Reply-To: <20121002023420.GA838@quad.lixom.net>
 References: <1349135827-24790-1-git-send-email-olof@lixom.net>
  <CA+55aFwoDOdKv9wcqEPkE76+w2TCz+419qp94T3_70jK9dR3-A@mail.gmail.com>
- <CA+55aFzmm=y85k81kAfgiuBb=oaFxi0f83hFb32Y2tTHu1wozw@mail.gmail.com>
-Message-ID: <20121002024306.GA1327@quad.lixom.net>
+ <20121002023420.GA838@quad.lixom.net>
+Message-ID: <20121002030332.GO4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 07:26:26PM -0700, Linus Torvalds wrote:
-> On Mon, Oct 1, 2012 at 7:22 PM, Linus Torvalds
-> <torvalds@linux-foundation.org> wrote:
-> >
-> > Ok, I've merged them all. As usual, my end result is slightly
-> > different from yours, although the differences are pretty small.
+* Olof Johansson <olof@lixom.net> [121001 19:36]:
+> On Mon, Oct 01, 2012 at 07:22:34PM -0700, Linus Torvalds wrote:
 > 
-> Oh, one more thing: I suspect the OMAP_OCP2SCP config option should
-> depend on CONFIG_ARM or something. Just based on the name, I assume it
-> doesn't actually work on x86-64, but I see the question..
+> > Anyway, you should double-check the merges, the "soc.h" one in
+> > particular is suspect.
+> 
+> Yes, my bad for not remembering to move the tag forward. The patch is below.
 
-Ah, yes. It should build fine and not cause breakage, but it's largely
-pointless to offer the option. Patch below.
+Thanks, the current head is building just fine for omaps
+with that fix.
 
+Regards,
 
--Olof
-
-
->From 5ae0b658cc10af29d7a0a66f2a412a754011ca0e Mon Sep 17 00:00:00 2001
-From: Olof Johansson <olof@lixom.net>
-Date: Mon, 1 Oct 2012 19:39:33 -0700
-Subject: [PATCH] drivers/bus: make ocp2scp depend on OMAP2+
-
-No use in enabling the driver on platforms where it won't be useful.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Cc: Tony Lindgren <tony@atomide.com>
----
- drivers/bus/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index bbec35d..0f51ed6 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -6,6 +6,7 @@ menu "Bus devices"
- 
- config OMAP_OCP2SCP
- 	tristate "OMAP OCP2SCP DRIVER"
-+	depends on ARCH_OMAP2PLUS
- 	help
- 	  Driver to enable ocp2scp module which transforms ocp interface
- 	  protocol to scp protocol. In OMAP4, USB PHY is connected via
--- 
-1.7.10.1.488.g05fbf7a
+Tony
