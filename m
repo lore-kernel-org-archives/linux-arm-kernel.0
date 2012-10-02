@@ -1,58 +1,338 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  2 Oct 2012 09:13:19 +0100
-Subject: [PATCH 06/10] Documentation: Detail permitted DT properties for the
- BU21013 Touch Screen
+Date: Tue,  2 Oct 2012 09:13:14 +0100
+Subject: [PATCH 01/10] ARM: ux500: Move all Device Tree booting into cpu-db8500
 In-Reply-To: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
 References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349165603-24401-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349165603-24401-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we apply required documentation for the Rohm BU21013 Touch
-Screen driver which describe available properties and how to use
-them.
+To aid the kernel in its effort to move to DT only booting, we're
+transplanting all Device Tree related code to cpu-db8500 which will
+remain persistent throughout the transition. This change paths the
+way for complete removal of board-mop500, which will be done once
+the all DMA settings are moved into the respective DT source files.
 
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../bindings/input/touchscreen/bu21013.txt         |   28 ++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
+ arch/arm/mach-ux500/board-mop500.c |  105 ++---------------------------------
+ arch/arm/mach-ux500/board-mop500.h |    8 +--
+ arch/arm/mach-ux500/cpu-db8500.c   |  107 ++++++++++++++++++++++++++++++++++--
+ 3 files changed, 111 insertions(+), 109 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/bu21013.txt b/Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
-new file mode 100644
-index 0000000..51edc75
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
-@@ -0,0 +1,28 @@
-+* Rohm BU21013 Touch Screen
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 5dd4a59..2d7906a 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -33,8 +33,6 @@
+ #include <linux/smsc911x.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/delay.h>
+-#include <linux/of.h>
+-#include <linux/of_platform.h>
+ #include <linux/leds.h>
+ #include <linux/pinctrl/consumer.h>
+ 
+@@ -464,7 +462,7 @@ static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
+ };
+ #endif
+ 
+-static struct pl022_ssp_controller ssp0_plat = {
++struct pl022_ssp_controller ssp0_plat = {
+ 	.bus_id = 0,
+ #ifdef CONFIG_STE_DMA40
+ 	.enable_dma = 1,
+@@ -561,7 +559,7 @@ static void ux500_uart0_reset(void)
+ 	udelay(1);
+ }
+ 
+-static struct amba_pl011_data uart0_plat = {
++struct amba_pl011_data uart0_plat = {
+ #ifdef CONFIG_STE_DMA40
+ 	.dma_filter = stedma40_filter,
+ 	.dma_rx_param = &uart0_dma_cfg_rx,
+@@ -570,7 +568,7 @@ static struct amba_pl011_data uart0_plat = {
+ 	.reset = ux500_uart0_reset,
+ };
+ 
+-static struct amba_pl011_data uart1_plat = {
++struct amba_pl011_data uart1_plat = {
+ #ifdef CONFIG_STE_DMA40
+ 	.dma_filter = stedma40_filter,
+ 	.dma_rx_param = &uart1_dma_cfg_rx,
+@@ -578,7 +576,7 @@ static struct amba_pl011_data uart1_plat = {
+ #endif
+ };
+ 
+-static struct amba_pl011_data uart2_plat = {
++struct amba_pl011_data uart2_plat = {
+ #ifdef CONFIG_STE_DMA40
+ 	.dma_filter = stedma40_filter,
+ 	.dma_rx_param = &uart2_dma_cfg_rx,
+@@ -737,98 +735,3 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+ 	.init_machine	= snowball_init_machine,
+ 	.init_late	= NULL,
+ MACHINE_END
+-
+-#ifdef CONFIG_MACH_UX500_DT
+-
+-struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+-	/* Requires call-back bindings. */
+-	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+-	/* Requires DMA and call-back bindings. */
+-	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
+-	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
+-	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
+-	/* Requires DMA bindings. */
+-	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
+-	/* Requires clock name bindings. */
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e000, "gpio.2", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e080, "gpio.3", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e100, "gpio.4", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e180, "gpio.5", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e000, "gpio.6", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e080, "gpio.7", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0xa03fe000, "gpio.8", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
+-	/* Requires device name bindings. */
+-	OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
+-	/* Requires clock name and DMA bindings. */
+-	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
+-		"ux500-msp-i2s.0", &msp0_platform_data),
+-	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80124000,
+-		"ux500-msp-i2s.1", &msp1_platform_data),
+-	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80117000,
+-		"ux500-msp-i2s.2", &msp2_platform_data),
+-	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
+-		"ux500-msp-i2s.3", &msp3_platform_data),
+-	{},
+-};
+-
+-static const struct of_device_id u8500_local_bus_nodes[] = {
+-	/* only create devices below soc node */
+-	{ .compatible = "stericsson,db8500", },
+-	{ .compatible = "stericsson,db8500-prcmu", },
+-	{ .compatible = "simple-bus"},
+-	{ },
+-};
+-
+-static void __init u8500_init_machine(void)
+-{
+-	struct device *parent = NULL;
+-
+-	/* Pinmaps must be in place before devices register */
+-	if (of_machine_is_compatible("st-ericsson,mop500"))
+-		mop500_pinmaps_init();
+-	else if (of_machine_is_compatible("calaosystems,snowball-a9500"))
+-		snowball_pinmaps_init();
+-	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
+-		hrefv60_pinmaps_init();
+-
+-	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
+-	parent = u8500_of_init_devices();
+-
+-	/* automatically probe child nodes of db8500 device */
+-	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
+-
+-	/* This board has full regulator constraints */
+-	regulator_has_full_constraints();
+-}
+-
+-static const char * u8500_dt_board_compat[] = {
+-	"calaosystems,snowball-a9500",
+-	"st-ericsson,hrefv60+",
+-	"st-ericsson,u8500",
+-	"st-ericsson,mop500",
+-	NULL,
+-};
+-
+-
+-DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
+-	.map_io		= u8500_map_io,
+-	.init_irq	= ux500_init_irq,
+-	/* we re-use nomadik timer here */
+-	.timer		= &ux500_timer,
+-	.handle_irq	= gic_handle_irq,
+-	.init_machine	= u8500_init_machine,
+-	.init_late	= ux500_init_late,
+-	.dt_compat      = u8500_dt_board_compat,
+-MACHINE_END
+-#endif
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index 1f86387..eaa605f 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -89,6 +89,10 @@ extern struct msp_i2s_platform_data msp1_platform_data;
+ extern struct msp_i2s_platform_data msp2_platform_data;
+ extern struct msp_i2s_platform_data msp3_platform_data;
+ extern struct arm_pmu_platdata db8500_pmu_platdata;
++extern struct amba_pl011_data uart0_plat;
++extern struct amba_pl011_data uart1_plat;
++extern struct amba_pl011_data uart2_plat;
++extern struct pl022_ssp_controller ssp0_plat;
+ 
+ extern void mop500_sdi_init(struct device *parent);
+ extern void snowball_sdi_init(struct device *parent);
+@@ -104,8 +108,4 @@ void mop500_audio_init(struct device *parent);
+ int __init mop500_uib_init(void);
+ void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
+ 		unsigned n);
+-
+-/* TODO: Once all pieces are DT:ed, remove completely. */
+-struct device * __init u8500_of_init_devices(void);
+-
+ #endif
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 38b7f9c..610ad7f 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -17,9 +17,14 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/mfd/abx500/ab8500.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/regulator/machine.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/pmu.h>
++#include <asm/mach/arch.h>
++#include <asm/hardware/gic.h>
+ #include <plat/gpio-nomadik.h>
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+@@ -29,6 +34,7 @@
+ 
+ #include "devices-db8500.h"
+ #include "ste-dma40-db8500.h"
++#include "board-mop500.h"
+ 
+ /* minimum static i/o mapping required to boot U8500 platforms */
+ static struct map_desc u8500_uart_io_desc[] __initdata = {
+@@ -227,12 +233,12 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
+ 	return parent;
+ }
+ 
++#ifdef CONFIG_MACH_UX500_DT
 +
-+Required properties:
-+ - compatible           : "stericsson,bu21013_tp"
-+ - reg                  :  I2C device address
+ /* TODO: Once all pieces are DT:ed, remove completely. */
+-struct device * __init u8500_of_init_devices(void)
++static struct device * __init u8500_of_init_devices(void)
+ {
+-	struct device *parent;
+-
+-	parent = db8500_soc_device_init();
++	struct device *parent = db8500_soc_device_init();
+ 
+ 	db8500_add_usb(parent, usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);
+ 
+@@ -251,3 +257,96 @@ struct device * __init u8500_of_init_devices(void)
+ 
+ 	return parent;
+ }
 +
-+Optional properties:
-+touch-gpio              : GPIO pin registering a touch event
-+<supply_name>-supply	: Phandle to a regulator supply
-+stericsson,touch-max-x 	: Maximum outward permitted limit in the X axis
-+stericsson,touch-max-y	: Maximum outward permitted limit in the Y axis
-+stericsson,flip-x	: Flip touch coordinates on the X axis
-+stericsson,flip-y	: Flip touch coordinates on the Y axis
++static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
++	/* Requires call-back bindings. */
++	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
++	/* Requires DMA and call-back bindings. */
++	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
++	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
++	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
++	/* Requires DMA bindings. */
++	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
++	/* Requires clock name bindings. */
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e000, "gpio.2", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e080, "gpio.3", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e100, "gpio.4", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e180, "gpio.5", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e000, "gpio.6", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e080, "gpio.7", NULL),
++	OF_DEV_AUXDATA("st,nomadik-gpio", 0xa03fe000, "gpio.8", NULL),
++	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
++	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
++	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
++	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
++	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
++	/* Requires device name bindings. */
++	OF_DEV_AUXDATA("stericsson,nmk_pinctrl", 0, "pinctrl-db8500", NULL),
++	/* Requires clock name and DMA bindings. */
++	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
++		"ux500-msp-i2s.0", &msp0_platform_data),
++	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80124000,
++		"ux500-msp-i2s.1", &msp1_platform_data),
++	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80117000,
++		"ux500-msp-i2s.2", &msp2_platform_data),
++	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
++		"ux500-msp-i2s.3", &msp3_platform_data),
++	{},
++};
 +
-+Example:
++static const struct of_device_id u8500_local_bus_nodes[] = {
++	/* only create devices below soc node */
++	{ .compatible = "stericsson,db8500", },
++	{ .compatible = "stericsson,db8500-prcmu", },
++	{ .compatible = "simple-bus"},
++	{ },
++};
 +
-+	i2c at 80110000 {
-+		bu21013_tp at 0x5c {
-+			compatible = "bu21013_tp";
-+			reg = <0x5c>;
-+			touch-gpio = <&gpio2 20 0x4>;
-+			avdd-supply = <&ab8500_ldo_aux1_reg>;
++static void __init u8500_init_machine(void)
++{
++	struct device *parent = NULL;
 +
-+			stericsson,touch-max-x = <384>;
-+			stericsson,touch-max-y = <704>;
-+			stricsson,flip-y;
-+		};
-+	};
++	/* Pinmaps must be in place before devices register */
++	if (of_machine_is_compatible("st-ericsson,mop500"))
++		mop500_pinmaps_init();
++	else if (of_machine_is_compatible("calaosystems,snowball-a9500"))
++		snowball_pinmaps_init();
++	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
++		hrefv60_pinmaps_init();
++
++	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
++	parent = u8500_of_init_devices();
++
++	/* automatically probe child nodes of db8500 device */
++	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
++
++	/* This board has full regulator constraints */
++	regulator_has_full_constraints();
++}
++
++static const char * u8500_dt_board_compat[] = {
++	"calaosystems,snowball-a9500",
++	"st-ericsson,hrefv60+",
++	"st-ericsson,u8500",
++	"st-ericsson,mop500",
++	NULL,
++};
++
++DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
++	.map_io		= u8500_map_io,
++	.init_irq	= ux500_init_irq,
++	/* we re-use nomadik timer here */
++	.timer		= &ux500_timer,
++	.handle_irq	= gic_handle_irq,
++	.init_machine	= u8500_init_machine,
++	.init_late	= ux500_init_late,
++	.dt_compat      = u8500_dt_board_compat,
++MACHINE_END
++
++#endif
 -- 
 1.7.9.5
