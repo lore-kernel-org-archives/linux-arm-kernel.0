@@ -1,54 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Oct 2012 16:44:02 +0300
-Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <20121002125819.GY4360@opensource.wolfsonmicro.com>
-References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
- <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
- <20121001114454.GA9170@sirena.org.uk>
- <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
- <20121001120907.GK4360@opensource.wolfsonmicro.com>
- <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
- <20121002123856.GX4360@opensource.wolfsonmicro.com>
- <20121002124321.GD30762@arwen.pp.htv.fi>
- <20121002125819.GY4360@opensource.wolfsonmicro.com>
-Message-ID: <20121002134400.GA12125@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2012 13:54:00 +0000
+Subject: [PATCH 2/2] mtd: sh_flctl: Add device tree support
+In-Reply-To: <1349183522-15321-3-git-send-email-hechtb@gmail.com>
+References: <1349183522-15321-1-git-send-email-hechtb@gmail.com>
+ <1349183522-15321-3-git-send-email-hechtb@gmail.com>
+Message-ID: <201210021354.01247.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 02 October 2012, Bastian Hecht wrote:
+> +Required properties:
+> +- compatible : "renesas,shmobile-flctl-sh7372"
+> +- reg : Address range of the FLCTL
+> +- interrupts : flste IRQ number
+> +- nand-bus-width : bus width to NAND chip
+> +
+> +The device tree may optionally contain sub-nodes describing partitions of the
+> +address space. See partition.txt for more detail.
+> +
+> +Example:
+> +
+> +       flctl at e6a30000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "renesas,shmobile-flctl-sh7372";
+> +               reg = <0xe6a30000 0x100>;
+> +               interrupts = <0x0d80>;
+> +
+> +               nand-bus-width = <16>;
+> +
+> +               system at 0 {
+> +                       label = "system";
+> +                       reg = <0x0 0x8000000>;
+> +               };
+> +
+> +               userdata at 8000000 {
+> +                       label = "userdata";
+> +                       reg = <0x8000000 0x10000000>;
+> +               };
+> +
+> +               cache at 18000000 {
+> +                       label = "cache";
+> +                       reg = <0x18000000 0x8000000>;
+> +               };
+> +       };
 
-On Tue, Oct 02, 2012 at 01:58:20PM +0100, Mark Brown wrote:
-> On Tue, Oct 02, 2012 at 03:43:22PM +0300, Felipe Balbi wrote:
-> 
-> > BTW, OTOH writing all children into the DT actually describes the HW,
-> > no ? And depending on the device I feel it'd be better to write that
-> 
-> Well, it depends on the hardware.  Some hardware has a bunch of nice,
-> neat IPs which can usefully be reproduced and which map sensibly onto OS
-> abstractions but a lot of it doesn't and frequently the abstractions
-> which Linux wants to use don't bear a huge resemblance to the hardware
-> (and Linux's ideas can change over time, as with the clock API being
-> factored out for example).
-> 
-> > data to DT. Think of twlxxxx (TI's PMICs), we might have completely
-> > unrelated drivers using one of TWL's GPIO lines as an interrupt source.
-> 
-> > If that particular children isn't listed in DT, it can't be used as an
-> > interrupt-parent, right ?
-> 
-> You can have the interrupt controller there without having to list every
-> IP in the device, just make the parent device the interrupt controller
-> to DT.
+Since you are also adding dma-engine support, I would suggest you specify
+a "dmas" and "dma-names" property as well, so the device can find the
+right dma channel. The code might not do that yet while you're still
+sorting out the dependencies (and the sh dmaengine code is not yet
+converted to DT), but I think it would be good to nail down the binding
+for this device.
 
-fair enough, thanks ;-)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/af2ffe1c/attachment.sig>
+	Arnd
