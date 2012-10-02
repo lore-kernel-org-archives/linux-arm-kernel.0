@@ -1,20 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Oct 2012 11:18:32 +0200
-Subject: [PATCH 04/10] Input: bu21013_ts - Move GPIO init and exit
- functions into the driver
-In-Reply-To: <1349165603-24401-5-git-send-email-lee.jones@linaro.org>
+Date: Tue, 2 Oct 2012 11:20:29 +0200
+Subject: [PATCH 05/10] Input: bu21013_ts - Add support for Device Tree
+ booting
+In-Reply-To: <1349165603-24401-6-git-send-email-lee.jones@linaro.org>
 References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
- <1349165603-24401-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYE1GgLPMjQ-Oz_ap022OykhfK8D7BoN6oTXGYwttxN9A@mail.gmail.com>
+ <1349165603-24401-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdahgNCbTbfYSwhHOaqrjcuTByoxTjwmA=u=+htHpYdQjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Oct 2, 2012 at 10:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> These GPIO init and exit functions have no place in platform data.
-> Instead they should be part of the driver. This patch moves them to
-> their rightful place, which subsequently elevates platform data of
-> yet more cruft.
+> Now we can register the BU21013_ts touch screen when booting with
+> Device Tree enabled. Here we parse all the necessary components
+> previously expected to be passed from platform data.
 >
 > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > Cc: linux-input at vger.kernel.org
