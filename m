@@ -1,42 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 02 Oct 2012 09:42:19 +0200
-Subject: How many cores does the ARM branch support?
-In-Reply-To: <20121002043106.GD21233@work1>
-References: <20121002043106.GD21233@work1>
-Message-ID: <506A9ADB.4060306@free-electrons.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 02 Oct 2012 10:48:53 +0300
+Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <20120922153313.GN4495@opensource.wolfsonmicro.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com>
+Message-ID: <506A9C65.5040309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2012 06:31 AM, Michelle Konzack wrote:
-> Hello OverGeeks and *,
+On 09/22/2012 06:33 PM, Mark Brown wrote:
+> On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
 > 
-
-Hello Michelle,
-
-> I have gotten a new gadget which run only with 700MHz but has  32 cores. Support 16 GE Interfaces a 50 Gbit universal interface and 4 PCIe ports, SATA HDD and much more...
+>> +config SND_DAVINCI_HAVE_SRAM
+>> +	bool
+>> +	default y if ARCH_DAVINCI=y
+>> +	default n if ARCH_OMAP=y
+>> +
 > 
-> ...and yes, this ARM microcontroller is a telecommunications controller.
+> I've been sitting on this mostly since it seems like a step back from
+> multi-platform kernels (which is where we're trying to get to) and I've
+> been trying to decide what the best approach is.  I'm thinking that we
+> do want a generic API for allocating this stuff, it's a fairly generic
+> feature (there's TCMs as well).  
 > 
-> However, I have the Evaluation  Kit  and  a  PCIe  graphiccard  and  now installed Debian ARMEL.  Unfortunately I get only 2 cores working...
-> 
-> What must I do to get the other 30 cores?
+> Adding ifdefs like this does just doesn't seem good.
 
-You have to check that your kernel was compiled with CONFIG_NR_CPUS = 32.
-Checks also that you don't have "nr_cpus=2" in your kernel parameter.
-
-> 
-> (without them, my Marvel Discovery MV78200 us 5 times faster)
-> 
-> And is it possibel, to get 100 cores running? (this is the bigger version of the microcontroller I have)
-
-Currently the maximum number of core supported is limited to 32.
-the NR_CPUS range is from 2 to 32 for ARM.
-
-Regards,
-Gregory
+I also agree that ifdef is not a good solution.
+It is better to have this information passed as device_data and via DT it can
+be decided based on the compatible property for the device.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+P?ter
