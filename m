@@ -1,27 +1,52 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 02 Oct 2012 14:36:52 -0700
-Subject: [PATCH] ARM: OMAP: omap_device: fix return value check in
- omap_device_build_ss()
-In-Reply-To: <CAPgLHd8ys7uU8wBhMF7JWZEDAddOnGo4vHPu1V_+Q3__WWK-3g@mail.gmail.com>
- (Wei Yongjun's message of "Fri, 21 Sep 2012 14:32:04 +0800")
-References: <CAPgLHd8ys7uU8wBhMF7JWZEDAddOnGo4vHPu1V_+Q3__WWK-3g@mail.gmail.com>
-Message-ID: <87lifo8sjv.fsf@deeprootsystems.com>
+Date: Tue, 02 Oct 2012 14:37:22 -0700
+Subject: [PATCH] ARM: OMAP2+: SmartReflex: fix return value check in
+ sr_dev_init()
+In-Reply-To: <CAORVsuUcOFKFoOuxZqPJR=WSsTouqBH3EP4Xu82o515ofGbn+w@mail.gmail.com>
+ (Jean Pihet's message of "Fri, 28 Sep 2012 12:41:35 +0200")
+References: <CAPgLHd_jXBNGNh452sGh5OweX+CdwpcVuWHmnfZKaCt4FnsTuA@mail.gmail.com>
+ <CAORVsuUcOFKFoOuxZqPJR=WSsTouqBH3EP4Xu82o515ofGbn+w@mail.gmail.com>
+Message-ID: <87haqc8sj1.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wei Yongjun <weiyj.lk@gmail.com> writes:
+Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> Hello,
 >
-> In case of error, the function omap_device_alloc() returns ERR_PTR()
-> and never returns NULL pointer. The NULL test in the return value
-> check should be replaced with IS_ERR().
+> On Thu, Sep 27, 2012 at 7:54 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+>> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>>
+>> In case of error, the function voltdm_lookup() returns NULL
+>> not ERR_PTR(). The IS_ERR() test in the return value check
+>> should be replaced with NULL test.
+>>
+>> dpatch engine is used to auto generate this patch.
+>> (https://github.com/weiyj/dpatch)
+>>
+>> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>> ---
+>>  arch/arm/mach-omap2/sr_device.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+>> index d033a65..c248b30 100644
+>> --- a/arch/arm/mach-omap2/sr_device.c
+>> +++ b/arch/arm/mach-omap2/sr_device.c
+>> @@ -123,7 +123,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+>>         sr_data->senp_mod = 0x1;
+>>
+>>         sr_data->voltdm = voltdm_lookup(sr_dev_attr->sensor_voltdm_name);
+>> -       if (IS_ERR(sr_data->voltdm)) {
+>> +       if (!sr_data->voltdm) {
+>>                 pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
+>>                         __func__, sr_dev_attr->sensor_voltdm_name);
+>>                 goto exit;
 >
-> dpatch engine is used to auto generated this patch.
-> (https://github.com/weiyj/dpatch)
+> This looks good, so here is the ack:
+> Acked-by: Jean Pihet <j-pihet@ti.com>
 >
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Thanks, queueing this for v3.7-rc.
+Thanks, queuing this one for v3.7-rc.
 
 Kevin
