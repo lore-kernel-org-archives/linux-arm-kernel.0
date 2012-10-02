@@ -1,53 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Oct 2012 15:43:22 +0300
-Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <20121002123856.GX4360@opensource.wolfsonmicro.com>
-References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
- <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
- <20121001114454.GA9170@sirena.org.uk>
- <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
- <20121001120907.GK4360@opensource.wolfsonmicro.com>
- <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
- <20121002123856.GX4360@opensource.wolfsonmicro.com>
-Message-ID: <20121002124321.GD30762@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2012 12:48:57 +0000
+Subject: How many cores does the ARM branch support?
+In-Reply-To: <20121002043106.GD21233@work1>
+References: <20121002043106.GD21233@work1>
+Message-ID: <201210021248.58172.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-coming late to the discussion, so bear with me
-
-On Tue, Oct 02, 2012 at 01:38:56PM +0100, Mark Brown wrote:
-> > This means mfd framework does not have an API to create a device from
-> > dt data or so do I think since of_platform_populate() is used. Thats
-> > why I suggested the idea of extending mfd_add_devices() (or adding a
-> > new API in mfd framework) to create child devices from dt data so that
-> > we'll have API's in mfd framework to both create and delete a device.
+On Tuesday 02 October 2012, Michelle Konzack wrote:
+> I have gotten a new gadget which run only with 700MHz but has  32 cores.
+> Support 16 GE Interfaces a 50 Gbit universal interface and 4 PCIe ports,
+> SATA HDD and much more...
 > 
-> The trouble that always exists with representing MFD children in DT is
-> that unless you've got a usefully reusable IP block which is clearly
-> separate from the chip integration you end up essentially just dumping
-> the Linux data structures into DT which often doesn't leave you with
-> something which describes the hardware.
+> ...and yes, this ARM microcontroller is a telecommunications controller.
+> 
+> However, I have the Evaluation  Kit  and  a  PCIe  graphiccard  and  now
+> installed Debian ARMEL.  Unfortunately I get only 2 cores working...
+> 
+> What must I do to get the other 30 cores?
 
-do you mean to say that children creation should be left into the driver
-(outside dt) ? That should be doable, indeed.
+You have to be a little more specific with the configuration. The mainline
+kernel supports no hardware that have more than 4 cores at the moment, so
+whatever kernel you are running already has to have some out of tree patches
+on it. The system you describe sounds interesting enough to make everyone
+want to have another look, but there is no point without looking at those
+patches first. Could you upload them to a public git tree?
 
-BTW, OTOH writing all children into the DT actually describes the HW,
-no ? And depending on the device I feel it'd be better to write that
-data to DT. Think of twlxxxx (TI's PMICs), we might have completely
-unrelated drivers using one of TWL's GPIO lines as an interrupt source.
+I suspect that the system you have actually has 16 dual-core systems on
+a chip (or on a board), so you could run up to 16 separate instances of
+Linux on it, but not a single instance that sees all the cores.
 
-If that particular children isn't listed in DT, it can't be used as an
-interrupt-parent, right ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/a5cf6283/attachment.sig>
+	Arnd
