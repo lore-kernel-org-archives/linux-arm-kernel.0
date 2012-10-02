@@ -1,25 +1,21 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 2 Oct 2012 17:36:34 +0100
-Subject: make dtbs in linus/master
-Message-ID: <alpine.DEB.2.02.1210021725320.29232@kaball.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Oct 2012 09:40:21 -0700
+Subject: [PATCH v2 2/5] iommu/omap: Merge iommu2.h into iommu.h
+In-Reply-To: <1349131591-10804-2-git-send-email-ido@wizery.com>
+References: <20120927195526.GP4840@atomide.com>
+ <1349131591-10804-1-git-send-email-ido@wizery.com>
+ <1349131591-10804-2-git-send-email-ido@wizery.com>
+Message-ID: <20121002164021.GS4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-I am testing linus/master after the recent merge with the arm-soc tree
-and I find that if I choose:
+* Ido Yariv <ido@wizery.com> [121001 15:48]:
+> Since iommu is not supported on OMAP1 and will not likely to ever be
+> supported, merge plat/iommu2.h into iommu.h so only one file would have
+> to move to platform_data/ as part of the single zImage effort.
 
-ARM system type
-  1. Allow multiple platforms to be selected (ARCH_MULTIPLATFORM) (NEW)
-  2. ARM Ltd. Integrator family (ARCH_INTEGRATOR)
-  3. ARM Ltd. RealView family (ARCH_REALVIEW)
->  4. ARM Ltd. Versatile family (ARCH_VERSATILE)
+Thanks I'll be applying patches 2 - 5 once we have -rc1 available.
 
-in my kernel config, then "make dtbs" doesn't work.
-However if I choose ARCH_MULTIPLATFORM then it works properly.
+Regards,
 
-Is it expected?
-
-Cheers,
-
-Stefano
+Tony
