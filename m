@@ -1,26 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Oct 2012 10:55:30 +0200
-Subject: [PATCH 01/10] ARM: ux500: Move all Device Tree booting into
- cpu-db8500
-In-Reply-To: <1349165603-24401-2-git-send-email-lee.jones@linaro.org>
+Date: Tue, 2 Oct 2012 11:07:48 +0200
+Subject: [PATCH 02/10] ARM: ux500: Strip out duplicate touch screen
+ platform information
+In-Reply-To: <1349165603-24401-3-git-send-email-lee.jones@linaro.org>
 References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
- <1349165603-24401-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbU-LyzHj9egNeGEaKShdT13QE3b4635tjEuPFfUOMCgg@mail.gmail.com>
+ <1349165603-24401-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZDO7NRGr7ON6_EpsQzqcBbfO8Dx4M3yWphBgn6y3bnrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Oct 2, 2012 at 10:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> To aid the kernel in its effort to move to DT only booting, we're
-> transplanting all Device Tree related code to cpu-db8500 which will
-> remain persistent throughout the transition. This change paths the
-> way for complete removal of board-mop500, which will be done once
-> the all DMA settings are moved into the respective DT source files.
+> We're currently carrying two 'struct bu21013_platform_device's which
+> are identical for no apparent reason. Here we remove the extra burden
+> and apply the same information to the two different instances of the
+> bu21012_tp driver registration.
 >
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Looks good:
+Makes perfect sense.
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
