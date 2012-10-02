@@ -1,27 +1,139 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Oct 2012 20:28:06 +0100
-Subject: [kvmarm] [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
-In-Reply-To: <CAFEAcA8Mvh3QzVYTAhLjjbgCqd_AjJ7ji9z7NoLWnM4YUW0OQw@mail.gmail.com>
-References: <20121001091244.49503.96318.stgit@ubuntu>
- <20121001091426.49503.94722.stgit@ubuntu>
- <20121002092412.GB8847@mudshark.cambridge.arm.com>
- <b4b11d71544812cff978b3457a99b90e@localhost>
- <C24866D7-ED20-402F-B769-1FE4D5561C77@virtualopensystems.com>
- <CAFEAcA8Mvh3QzVYTAhLjjbgCqd_AjJ7ji9z7NoLWnM4YUW0OQw@mail.gmail.com>
-Message-ID: <20121002192806.GC20411@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  2 Oct 2012 13:30:45 -0600
+Subject: [PATCH] ARM: tegra: remove <mach/dma.h>
+Message-ID: <1349206245-22560-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 07:31:43PM +0100, Peter Maydell wrote:
-> We probably want to be passing in the "base of the cpu-internal
-> peripherals", rather than "base of the GIC" specifically. For the
-> A15 these are the same thing, but that's not inherent [compare the
-> A9 which has more devices at fixed offsets from a configurable
-> base address].
+From: Stephen Warren <swarren@nvidia.com>
 
-If you do that, userspace will need a way to probe the emulated CPU so
-that is knows exactly which set of peripherals there are and which ones it
-needs to emulate. This feels pretty nasty, given that the vgic is handled
-more or less completely by the kernel-side of things.
+Remove includes of <mach/dma.h> from sound/soc; nothing from it is used.
 
-Will
+Remove include of <mach/dma.h> from mach-tegra/apbio.c; since the DMA
+transfers made by this file don't need flow-control with any peripheral,
+there's no need to set any slave ID.
+
+Once those changes are made, there are no remaining users of <mach/dma.h>
+so remove it. Drivers should get this information from device tree. This
+removal is necessary for single zImage.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Mark, I'd like to take this through the Tegra tree please, unless you want
+me to split out the ASoC parts of the patch, and have you apply them to 3.7.
+
+ arch/arm/mach-tegra/apbio.c            |    3 --
+ arch/arm/mach-tegra/include/mach/dma.h |   54 --------------------------------
+ sound/soc/tegra/tegra30_ahub.c         |    1 -
+ sound/soc/tegra/tegra_pcm.h            |    2 -
+ 4 files changed, 0 insertions(+), 60 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/include/mach/dma.h
+
+diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
+index b5015d0..bc949fb 100644
+--- a/arch/arm/mach-tegra/apbio.c
++++ b/arch/arm/mach-tegra/apbio.c
+@@ -24,8 +24,6 @@
+ #include <linux/sched.h>
+ #include <linux/mutex.h>
+ 
+-#include <mach/dma.h>
+-
+ #include "apbio.h"
+ 
+ #if defined(CONFIG_TEGRA20_APB_DMA)
+@@ -71,7 +69,6 @@ bool tegra_apb_dma_init(void)
+ 
+ 	dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-	dma_sconfig.slave_id = TEGRA_DMA_REQ_SEL_CNTR;
+ 	dma_sconfig.src_maxburst = 1;
+ 	dma_sconfig.dst_maxburst = 1;
+ 
+diff --git a/arch/arm/mach-tegra/include/mach/dma.h b/arch/arm/mach-tegra/include/mach/dma.h
+deleted file mode 100644
+index 3081cc6..0000000
+--- a/arch/arm/mach-tegra/include/mach/dma.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/*
+- * arch/arm/mach-tegra/include/mach/dma.h
+- *
+- * Copyright (c) 2008-2009, NVIDIA Corporation.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along
+- * with this program; if not, write to the Free Software Foundation, Inc.,
+- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+- */
+-
+-#ifndef __MACH_TEGRA_DMA_H
+-#define __MACH_TEGRA_DMA_H
+-
+-#include <linux/list.h>
+-
+-#define TEGRA_DMA_REQ_SEL_CNTR			0
+-#define TEGRA_DMA_REQ_SEL_I2S_2			1
+-#define TEGRA_DMA_REQ_SEL_I2S_1			2
+-#define TEGRA_DMA_REQ_SEL_SPD_I			3
+-#define TEGRA_DMA_REQ_SEL_UI_I			4
+-#define TEGRA_DMA_REQ_SEL_MIPI			5
+-#define TEGRA_DMA_REQ_SEL_I2S2_2		6
+-#define TEGRA_DMA_REQ_SEL_I2S2_1		7
+-#define TEGRA_DMA_REQ_SEL_UARTA			8
+-#define TEGRA_DMA_REQ_SEL_UARTB			9
+-#define TEGRA_DMA_REQ_SEL_UARTC			10
+-#define TEGRA_DMA_REQ_SEL_SPI			11
+-#define TEGRA_DMA_REQ_SEL_AC97			12
+-#define TEGRA_DMA_REQ_SEL_ACMODEM		13
+-#define TEGRA_DMA_REQ_SEL_SL4B			14
+-#define TEGRA_DMA_REQ_SEL_SL2B1			15
+-#define TEGRA_DMA_REQ_SEL_SL2B2			16
+-#define TEGRA_DMA_REQ_SEL_SL2B3			17
+-#define TEGRA_DMA_REQ_SEL_SL2B4			18
+-#define TEGRA_DMA_REQ_SEL_UARTD			19
+-#define TEGRA_DMA_REQ_SEL_UARTE			20
+-#define TEGRA_DMA_REQ_SEL_I2C			21
+-#define TEGRA_DMA_REQ_SEL_I2C2			22
+-#define TEGRA_DMA_REQ_SEL_I2C3			23
+-#define TEGRA_DMA_REQ_SEL_DVC_I2C		24
+-#define TEGRA_DMA_REQ_SEL_OWR			25
+-#define TEGRA_DMA_REQ_SEL_INVALID		31
+-
+-#endif
+diff --git a/sound/soc/tegra/tegra30_ahub.c b/sound/soc/tegra/tegra30_ahub.c
+index bf56101..64b67a3 100644
+--- a/sound/soc/tegra/tegra30_ahub.c
++++ b/sound/soc/tegra/tegra30_ahub.c
+@@ -26,7 +26,6 @@
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+ #include <mach/clk.h>
+-#include <mach/dma.h>
+ #include <sound/soc.h>
+ #include "tegra30_ahub.h"
+ 
+diff --git a/sound/soc/tegra/tegra_pcm.h b/sound/soc/tegra/tegra_pcm.h
+index b40279b..bc8b46a 100644
+--- a/sound/soc/tegra/tegra_pcm.h
++++ b/sound/soc/tegra/tegra_pcm.h
+@@ -31,8 +31,6 @@
+ #ifndef __TEGRA_PCM_H__
+ #define __TEGRA_PCM_H__
+ 
+-#include <mach/dma.h>
+-
+ struct tegra_pcm_dma_params {
+ 	unsigned long addr;
+ 	unsigned long wrap;
+-- 
+1.7.0.4
