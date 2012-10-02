@@ -1,135 +1,28 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 2 Oct 2012 18:29:32 +0100
-Subject: [PATCH] xen: resolve merge conflict with
- 617276307cd4cdb9a95c77efaa3063695af63aa7
-Message-ID: <alpine.DEB.2.02.1210021724300.29232@kaball.uk.xensource.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 02 Oct 2012 10:47:23 -0700
+Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
+ monitor mode
+In-Reply-To: <20121002091301.GA8847@mudshark.cambridge.arm.com>
+References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+ <20120920173556.GQ4654@mudshark.cambridge.arm.com>
+ <20120924171934.GE5522@mudshark.cambridge.arm.com>
+ <506A3694.4070004@codeaurora.org>
+ <20121002091301.GA8847@mudshark.cambridge.arm.com>
+Message-ID: <506B28AB.4060706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen tree tries to add a line to
-arch/arm/mach-vexpress/Makefile.boot that has been removed by the
-following commit in Linus' master:
+On 10/02/12 02:13, Will Deacon wrote:
+>
+> Thanks Stephen. I've also got some patches for OS save/restore of the debug
+> registers using the various hardware locking and readout mechanisms, so that
+> debug state can be persisted across low-power states.
+>
+> Do any of the Qualcomm chips (v7 as opposed to v7.1) implement the save/restore
+> registers?
 
-commit 617276307cd4cdb9a95c77efaa3063695af63aa7
-Author: Rob Herring <rob.herring@calxeda.com>
-Date:   Thu Sep 6 13:43:04 2012 -0500
+Yes, we have save and restore registers.
 
-    ARM: vexpress: convert to multi-platform
-
-In fact the dts Makefile is now arch/arm/boot/dts/Makefile, as per
-commit 9cd11c0c47b8690b47e7573311ce5c483cb344ed.
-
-
-This is the merge resolution patch.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-diff --cc arch/arm/boot/dts/Makefile
-index 43c084c,0000000..4745c1f
-mode 100644,000000..100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@@ -1,101 -1,0 +1,102 @@@
- +ifeq ($(CONFIG_OF),y)
- +
- +dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb \
- +	at91sam9263ek.dtb \
- +	at91sam9g20ek_2mmc.dtb \
- +	at91sam9g20ek.dtb \
- +	at91sam9g25ek.dtb \
- +	at91sam9m10g45ek.dtb \
- +	at91sam9n12ek.dtb \
- +	ethernut5.dtb \
- +	evk-pro3.dtb \
- +	kizbox.dtb \
- +	tny_a9260.dtb \
- +	tny_a9263.dtb \
- +	tny_a9g20.dtb \
- +	usb_a9260.dtb \
- +	usb_a9263.dtb \
- +	usb_a9g20.dtb
- +dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- +dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- +	exynos4210-smdkv310.dtb \
- +	exynos4210-trats.dtb \
- +	exynos5250-smdk5250.dtb
- +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
- +dtb-$(CONFIG_ARCH_IMX5) += imx51-babbage.dtb \
- +	imx53-ard.dtb \
- +	imx53-evk.dtb \
- +	imx53-qsb.dtb \
- +	imx53-smd.dtb
- +dtb-$(CONFIG_SOC_IMX6Q) += imx6q-arm2.dtb \
- +	imx6q-sabrelite.dtb \
- +	imx6q-sabresd.dtb
- +dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
- +dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
- +	kirkwood-dns325.dtb \
- +	kirkwood-dreamplug.dtb \
- +	kirkwood-goflexnet.dtb \
- +	kirkwood-ib62x0.dtb \
- +	kirkwood-iconnect.dtb \
- +	kirkwood-lschlv2.dtb \
- +	kirkwood-lsxhl.dtb \
- +	kirkwood-ts219-6281.dtb \
- +	kirkwood-ts219-6282.dtb
- +dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
- +	msm8960-cdp.dtb
- +dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- +	armada-xp-db.dtb
- +dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
- +	imx53-ard.dtb \
- +	imx53-evk.dtb \
- +	imx53-qsb.dtb \
- +	imx53-smd.dtb \
- +	imx6q-arm2.dtb \
- +	imx6q-sabrelite.dtb \
- +	imx6q-sabresd.dtb
- +dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- +	imx23-olinuxino.dtb \
- +	imx23-stmp378x_devb.dtb \
- +	imx28-apx4devkit.dtb \
- +	imx28-cfa10036.dtb \
- +	imx28-cfa10049.dtb \
- +	imx28-evk.dtb \
- +	imx28-m28evk.dtb \
- +	imx28-tx28.dtb
- +dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- +	omap3-beagle-xm.dtb \
- +	omap3-evm.dtb \
- +	omap3-tobi.dtb \
- +	omap4-panda.dtb \
- +	omap4-pandaES.dtb \
- +	omap4-var_som.dtb \
- +	omap4-sdp.dtb \
- +	omap5-evm.dtb
- +dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- +dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
- +dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- +	r8a7740-armadillo800eva.dtb \
- +	sh73a0-kzm9g.dtb
- +dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
- +	spear1340-evb.dtb
- +dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- +	spear310-evb.dtb \
- +	spear320-evb.dtb
- +dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
- +dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- +	tegra20-medcom-wide.dtb \
- +	tegra20-paz00.dtb \
- +	tegra20-plutux.dtb \
- +	tegra20-seaboard.dtb \
- +	tegra20-tec.dtb \
- +	tegra20-trimslice.dtb \
- +	tegra20-ventana.dtb \
- +	tegra20-whistler.dtb \
- +	tegra30-cardhu-a02.dtb \
- +	tegra30-cardhu-a04.dtb
- +dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
- +	vexpress-v2p-ca9.dtb \
- +	vexpress-v2p-ca15-tc1.dtb \
-- 	vexpress-v2p-ca15_a7.dtb
-++	vexpress-v2p-ca15_a7.dtb \
-++	xenvm-4.2.dtb
- +
- +endif
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
