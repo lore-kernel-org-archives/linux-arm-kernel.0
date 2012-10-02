@@ -1,34 +1,32 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 2 Oct 2012 20:45:54 +0100
-Subject: [kvmarm] [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
-In-Reply-To: <20121002192806.GC20411@mudshark.cambridge.arm.com>
-References: <20121001091244.49503.96318.stgit@ubuntu>
- <20121001091426.49503.94722.stgit@ubuntu>
- <20121002092412.GB8847@mudshark.cambridge.arm.com>
- <b4b11d71544812cff978b3457a99b90e@localhost>
- <C24866D7-ED20-402F-B769-1FE4D5561C77@virtualopensystems.com>
- <CAFEAcA8Mvh3QzVYTAhLjjbgCqd_AjJ7ji9z7NoLWnM4YUW0OQw@mail.gmail.com>
- <20121002192806.GC20411@mudshark.cambridge.arm.com>
-Message-ID: <CAFEAcA-KL36kwaFFrOA0NG0y1qGhkXZ+bm5FA0LhJsmKDk66Hg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 2 Oct 2012 21:59:14 +0200
+Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
+References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
+ <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
+ <20121001124546.GE11837@lunn.ch>
+ <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
+ <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
+ <20121001130658.GG11837@lunn.ch>
+ <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
+Message-ID: <20121002195914.GG21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2012 20:28, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Oct 02, 2012 at 07:31:43PM +0100, Peter Maydell wrote:
->> We probably want to be passing in the "base of the cpu-internal
->> peripherals", rather than "base of the GIC" specifically. For the
->> A15 these are the same thing, but that's not inherent [compare the
->> A9 which has more devices at fixed offsets from a configurable
->> base address].
->
-> If you do that, userspace will need a way to probe the emulated CPU so
-> that is knows exactly which set of peripherals there are and which ones it
-> needs to emulate. This feels pretty nasty, given that the vgic is handled
-> more or less completely by the kernel-side of things.
+> I was thinking to add a more generic helper function like this:
+> 
+> static inline void watchdog_get_dttimeout(struct device_node *node,
+> u32 *timeout)
+> {
+> 	if (node)
+> 		of_property_read_u32(node, "timeout", &wdd->timeout);
+> }
 
-Userspace knows what the emulated CPU is because it tells the
-kernel which CPU to provide -- the kernel can say "yes" or "no" but
-it can't provide a different CPU to the one we ask for, or
-one with bits mising...
+You forgot to change the function signature. 
 
--- PMM
+Also, if you are adding a generic function, it should be a generic
+function for the framework. All drivers should be slowly moving
+towards the framework, so adding functions which help you not move
+towards the framework are wrong.
+
+	Andrew
