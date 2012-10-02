@@ -1,22 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 2 Oct 2012 10:37:53 +0100
-Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <506A9C65.5040309@ti.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com>
- <506A9C65.5040309@ti.com>
-Message-ID: <20121002093753.GU4360@opensource.wolfsonmicro.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 02 Oct 2012 11:38:18 +0200
+Subject: OMAP baseline test results for v3.6-rc7
+In-Reply-To: <alpine.DEB.2.00.1210012318460.26402@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209241919130.25811@utopia.booyaka.com>
+ <50645A1D.5040108@compulab.co.il>
+ <alpine.DEB.2.00.1210012318460.26402@utopia.booyaka.com>
+Message-ID: <506AB60A.5040901@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
+On 10/02/12 01:28, Paul Walmsley wrote:
+> On Thu, 27 Sep 2012, Igor Grinberg wrote:
+> 
+>> Have you tried the nohlt boot parameter?
+>> It looks like the wfi is killing those SoCs once you use EMAC.
+> 
+> Just tried with nohlt.  Didn't help on CM-T3517 with either NFS or MMC 
+> root, nor with the 3517EVM with NFS root.  But I was able to get the 
+> 3517EVM booting to userspace with MMC root.  Looks like the CM-T3517 board 
+> file is missing the MMC setup code, so would guess that adding that back 
+> in would help.
 
-> I also agree that ifdef is not a good solution.
-> It is better to have this information passed as device_data and via DT it can
-> be decided based on the compatible property for the device.
+It never had the MMC in mainline...
+I have some patches for that, based on v3.5,
+but it should not be a problem to rebase those on a more recent git.
+I will send them in a week or so, and if Tony will agree to merge them,
+we will have the MMC on CM-T3517 mainline.
 
-That's not really the problem here - the problem is that the APIs used
-to get the SRAM are DaVinci only so it's not possible to build on OMAP
-or other platforms.  The SRAM code needs to move to a standard API.
+
+-- 
+Regards,
+Igor.
