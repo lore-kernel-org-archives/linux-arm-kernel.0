@@ -1,92 +1,38 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 02 Oct 2012 15:21:12 -0700
-Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data
- via platform data
-In-Reply-To: <1348496201-6378-3-git-send-email-j-pihet@ti.com> (Jean Pihet's
- message of "Mon, 24 Sep 2012 16:16:41 +0200")
-References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
- <1348496201-6378-1-git-send-email-j-pihet@ti.com>
- <1348496201-6378-3-git-send-email-j-pihet@ti.com>
-Message-ID: <877gr87bxj.fsf@deeprootsystems.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 03 Oct 2012 00:28:45 +0200
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
+ McASP IP Variant
+In-Reply-To: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <506B6A9D.3090100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+On 31.08.2012 14:50, Hebbar, Gururaja wrote:
+> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
+> register offset and missing generic SRAM APIs support
+> 
+> Changes
+> - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
+>   "ti,omap2-mcasp-audio" to identify version 3 controller.
+> - The register offsets are handled depending on the version.
+> - Provide a config option to indicate missing SRAM API support.
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+Could you give some insight which hardware this was tested on? I'm
+trying to get this up and running on a AM33xx board, and the patches
+look all reasonable to me. My problem is that I can't make the DMA
+engine move forward, I fail to receive a single interrupt on this
+peripheral after the stream starts. I will continue searching for the
+reason of this tomorrow, but maybe you can give me some hint by
+explaining your setup?
 
-> Remove the device dependent settings (cpu_is_xxx(), IP fck etc.)
-> from the driver code and pass them instead via the platform
-> data.
-> This allows a clean separation of the driver code and the platform
-> code, as required by the move of the platform header files to
-> include/linux/platform_data.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+Note that I'm using your patches together with Matt's from this series:
 
-Could you make pdata change and the clock change should be two different
-patches?  Also, your previous patch to align SR clock names should be
-combined with the changes made here.
+  https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
 
-Some comments on the clock change below...
+... but it doesn't work without those either.
 
-> ---
->  arch/arm/mach-omap2/sr_device.c   |   13 ++++++++++++
->  drivers/power/avs/smartreflex.c   |   40 ++++++++++--------------------------
->  include/linux/power/smartreflex.h |   14 +++++++++++-
->  3 files changed, 36 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-> index d033a65..2885a77 100644
-> --- a/arch/arm/mach-omap2/sr_device.c
-> +++ b/arch/arm/mach-omap2/sr_device.c
-> @@ -122,6 +122,19 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
->  	sr_data->senn_mod = 0x1;
->  	sr_data->senp_mod = 0x1;
->  
-> +	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
-> +		sr_data->err_weight = OMAP3430_SR_ERRWEIGHT;
-> +		sr_data->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
-> +		sr_data->accum_data = OMAP3430_SR_ACCUMDATA;
-> +		if (!(strcmp(sr_data->name, "smartreflex_mpu"))) {
-> +			sr_data->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
-> +			sr_data->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
-> +		} else {
-> +			sr_data->senn_avgweight = OMAP3430_SR2_SENNAVGWEIGHT;
-> +			sr_data->senp_avgweight = OMAP3430_SR2_SENPAVGWEIGHT;
-> +		}
-> +	}
-> +
->  	sr_data->voltdm = voltdm_lookup(sr_dev_attr->sensor_voltdm_name);
->  	if (IS_ERR(sr_data->voltdm)) {
->  		pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
-> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
-> index 92f6728..7c03c90 100644
-> --- a/drivers/power/avs/smartreflex.c
-> +++ b/drivers/power/avs/smartreflex.c
-> @@ -128,17 +128,16 @@ static irqreturn_t sr_interrupt(int irq, void *data)
->  
->  static void sr_set_clk_length(struct omap_sr *sr)
->  {
-> +	char fck_name[16]; /* "smartreflex.0" fits in 16 chars */
->  	struct clk *sys_ck;
->  	u32 sys_clk_speed;
->  
-> -	if (cpu_is_omap34xx())
-> -		sys_ck = clk_get(NULL, "sys_ck");
-> -	else
-> -		sys_ck = clk_get(NULL, "sys_clkin_ck");
-> +	sprintf(fck_name, "smartreflex.%d", sr->srid);
 
-hmm, isn't this the same as dev_name(&sr->pdev.dev) ?
 
-Combined with your earlier patch to align clock names, this should just
-be:
-
-        sys_ck = clk_get(&sr->pdev.dev, "fck");
-
-Also note that you've changed this from sys_clk to the SR functional
-clock, which seems to be the same clock on 34xx and 44xx, but that change
-should be clearly documented in the changelog.
-
-Kevin
+Thanks,
+Daniel
