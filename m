@@ -1,64 +1,32 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 02 Oct 2012 11:13:22 +0200
-Subject: [PATCH v2 0/6] ARM: EXYNOS: Add secure firmware support
-In-Reply-To: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
-References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1647638.5fBfDOzz0u@amdc1227>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Oct 2012 10:13:01 +0100
+Subject: [PATCH] ARM: hw_breakpoint: Clear breakpoints before enabling
+ monitor mode
+In-Reply-To: <506A3694.4070004@codeaurora.org>
+References: <1348160260-19486-1-git-send-email-sboyd@codeaurora.org>
+ <20120920173556.GQ4654@mudshark.cambridge.arm.com>
+ <20120924171934.GE5522@mudshark.cambridge.arm.com>
+ <506A3694.4070004@codeaurora.org>
+Message-ID: <20121002091301.GA8847@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 02, 2012 at 01:34:28AM +0100, Stephen Boyd wrote:
+> On 09/24/12 10:19, Will Deacon wrote:
+> > Ok, I've pushed a bunch of patches to my hw-breakpoint branch (head commit
+> > 55cb726797c7). I'll post them to the list after the merge window, but please
+> > do take them for a spin if you get a chance.
+> >
+> 
+> Forgot to reply here. Took them for a spin last week with that commit.
+> No more boot hangs but I can't say much else beyond that. When you post
+> to the list I'll add my tested-by.
 
-On Monday 24 of September 2012 16:28:27 Tomasz Figa wrote:
-> Some Exynos-based boards are running with secure firmware running in
-> TrustZone secure world, which changes the way some things have to be
-> initialized.
-> 
-> This series adds support for specifying firmware operations, implements
-> some firmware operations for Exynos secure firmware and adds a method of
-> enabling secure firmware operations on Exynos-based boards through board
-> file and device tree.
-> 
-> Changes since v1
-> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12583/focus=12820
->   - Changed return types of all operations to int
->   - Defined all operations to return 0 on success, -ENOSYS when not
->     implemented or appropriate error code on error
-> 
-> Tomasz Figa (6):
->   ARM: Add interface for registering and calling firmware-specific
->     operations
->   ARM: EXYNOS: Add support for secure monitor calls
->   ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
->   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
->   ARM: EXYNOS: Add support for Exynos secure firmware
->   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
-> 
->  .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
->  arch/arm/common/Makefile                           |  2 +
->  arch/arm/common/firmware.c                         | 18 ++++++++
->  arch/arm/include/asm/firmware.h                    | 31 +++++++++++++
->  arch/arm/mach-exynos/Makefile                      |  6 +++
->  arch/arm/mach-exynos/common.c                      | 34 ++++++++++++++
->  arch/arm/mach-exynos/common.h                      |  2 +
->  arch/arm/mach-exynos/exynos-smc.S                  | 22 +++++++++
->  arch/arm/mach-exynos/firmware.c                    | 54
-> ++++++++++++++++++++++ arch/arm/mach-exynos/include/mach/map.h          
->  |  3 ++
->  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
->  arch/arm/mach-exynos/platsmp.c                     | 36 ++++++++++++---
->  arch/arm/mach-exynos/smc.h                         | 31 +++++++++++++
->  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
->  14 files changed, 243 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/common/firmware.c
->  create mode 100644 arch/arm/include/asm/firmware.h
->  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
->  create mode 100644 arch/arm/mach-exynos/firmware.c
->  create mode 100644 arch/arm/mach-exynos/smc.h
+Thanks Stephen. I've also got some patches for OS save/restore of the debug
+registers using the various hardware locking and readout mechanisms, so that
+debug state can be persisted across low-power states.
 
-Any comments, nitpicks or acks on this patchset?
+Do any of the Qualcomm chips (v7 as opposed to v7.1) implement the save/restore
+registers?
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+Will
