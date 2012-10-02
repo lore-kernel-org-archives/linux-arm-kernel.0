@@ -1,109 +1,135 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 2 Oct 2012 13:28:28 -0400
-Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <506B1B46.2070006@gmail.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com>
- <506A9C65.5040309@ti.com>
- <20121002093753.GU4360@opensource.wolfsonmicro.com>
- <506AC303.9080906@gmail.com> <506ACACE.4030308@ti.com>
- <506AEF57.2000306@gmail.com> <20121002164116.GT5641@beef>
- <506B1B46.2070006@gmail.com>
-Message-ID: <20121002172828.GU5641@beef>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 2 Oct 2012 18:29:32 +0100
+Subject: [PATCH] xen: resolve merge conflict with
+ 617276307cd4cdb9a95c77efaa3063695af63aa7
+Message-ID: <alpine.DEB.2.02.1210021724300.29232@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 06:50:14PM +0200, Daniel Mack wrote:
-> On 02.10.2012 18:41, Matt Porter wrote:
-> > On Tue, Oct 02, 2012 at 03:42:47PM +0200, Daniel Mack wrote:
-> >> On 02.10.2012 13:06, Sekhar Nori wrote:
-> >>> On 10/2/2012 4:03 PM, Daniel Mack wrote:
-> >>>> On 02.10.2012 11:37, Mark Brown wrote:
-> >>>>> On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
-> >>>>>
-> >>>>>> I also agree that ifdef is not a good solution.
-> >>>>>> It is better to have this information passed as device_data and via DT it can
-> >>>>>> be decided based on the compatible property for the device.
-> >>>>>
-> >>>>> That's not really the problem here - the problem is that the APIs used
-> >>>>> to get the SRAM are DaVinci only so it's not possible to build on OMAP
-> >>>>> or other platforms.  The SRAM code needs to move to a standard API.
-> >>>>
-> >>>> What about following Matt Porter's idea and ignore the SRAM code
-> >>>> entirely and port the entire PCM code to generic dmaengine code first?
-> >>>> The EDMA driver needs to learn support for cyclic DMA for that, and I
-> >>>> might give that a try in near future.
-> >>>>
-> >>>> Later on, the SRAM ping-pong code can get added back using genalloc
-> >>>> functions, as Sekhar proposed. That needs to be done by someone who has
-> >>>> access to a Davinci board though, I only have a AM33xx/OMAP here.
-> >>>
-> >>> We cannot "get rid" of SRAM code and add it back "later". It is required
-> >>> for most DaVinci parts. The SRAM code can be converted to use genalloc
-> >>> (conversion should be straightforward and I can help test it) and the
-> >>> code that uses SRAM can probably keep using the private EDMA API till
-> >>> the dmaengine EDMA driver has cyclic DMA support. Matt has already
-> >>> posted patches to move private EDMA APIs to a common location. That
-> >>> should keep AM335x build from breaking. Is this something that is feasible?
-> >>
-> >> Yes - by "later" I just meant in a subsequent patch. But you're probably
-> >> right, we can also do that first.
-> >>
-> >> I'm looking at that right now and the problem seems that we don't have a
-> >> sane way to dynamically look up gen_pools independently of the actual
-> >> run-time platform. All users of gen_pools seem to know which platform
-> >> they run on and access a platform-specific pool. So I don't currently
-> >> see how we could implement multi-platform code, gen_pools are fine but
-> >> don't solve the problem here.
-> >>
-> >> Would it be an idea to add a char* member to gen_pools and a function
-> >> that can be used to dynamically look it up again? If a buffer with a
-> >> certain name exists, we can use it and install that ping-pong buffer,
-> >> otherwise we just don't. While that would be easy to do, it's a
-> >> tree-wide change.
-> >>
-> >> Is there a better way that I miss?
-> > 
-> > At the high level there's two platform models we have to handle, the
-> > boot from board file !DT case, and then the boot from DT case. Since
-> > Davinci is just starting DT conversion, we mostly care about the !DT
-> > base in which the struct gen_pool * is passed in pdata to the ASoC
-> > driver. It is then selectable on a per-platform basis where the decision
-> > should be made.
-> > 
-> > Given a separate discussion with Sekhar, we're only going to have one
-> > SRAM pool on any DaVinci part right now...this was only a question on
-> > L138 anyway. But regardless, the created gen_pool will be passed via
-> > pdata.
-> 
-> I thought about this too, as mmp does it that way.
-> 
-> > Since DT conversion is starting and we need to consider that now,
-> > the idea there is to use the DT-based generic sram driver [1] such that
-> > when we do boot from DT on Davinci, the genpool is provided via phandle
-> > and the pointer extracted with the OF helpers that are part of the
-> > series.
-> 
-> A phandle is the cleanest way I think, yes.
+The Xen tree tries to add a line to
+arch/arm/mach-vexpress/Makefile.boot that has been removed by the
+following commit in Linus' master:
 
-See the of_get_named_gen_pool() helper example in the series
-http://comments.gmane.org/gmane.linux.kernel/1352210
+commit 617276307cd4cdb9a95c77efaa3063695af63aa7
+Author: Rob Herring <rob.herring@calxeda.com>
+Date:   Thu Sep 6 13:43:04 2012 -0500
 
-> > That's pretty much it. I'm reworking the backend support as discussed
-> > with Sekhar wrt to my uio_pruss series. I can post a standalone series
-> > that just replaces sram_* with genalloc for davinci ASoC.
-> 
-> As you can also test it, it would be easiest if you came up with a patch
-> for that, yes. I can have a look at the dma bits laters, once my OMAP
-> board finally works with the code as it currently stands. I'm still
-> fighting with the mcasp driver right now ...
+    ARM: vexpress: convert to multi-platform
 
-Ok. Also, as Sekhar pointed out, dmaengine itself isn't a blocker since
-we can have AM33xx use the private EDMA API for ASoC until I finish
-cyclic DMA support. Handling the ping-pong and normal case transparently
-within the dmaengine driver will require a further look but at least
-genalloc is our first step there.
+In fact the dts Makefile is now arch/arm/boot/dts/Makefile, as per
+commit 9cd11c0c47b8690b47e7573311ce5c483cb344ed.
 
--Matt
+
+This is the merge resolution patch.
+
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+diff --cc arch/arm/boot/dts/Makefile
+index 43c084c,0000000..4745c1f
+mode 100644,000000..100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@@ -1,101 -1,0 +1,102 @@@
+ +ifeq ($(CONFIG_OF),y)
+ +
+ +dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb \
+ +	at91sam9263ek.dtb \
+ +	at91sam9g20ek_2mmc.dtb \
+ +	at91sam9g20ek.dtb \
+ +	at91sam9g25ek.dtb \
+ +	at91sam9m10g45ek.dtb \
+ +	at91sam9n12ek.dtb \
+ +	ethernut5.dtb \
+ +	evk-pro3.dtb \
+ +	kizbox.dtb \
+ +	tny_a9260.dtb \
+ +	tny_a9263.dtb \
+ +	tny_a9g20.dtb \
+ +	usb_a9260.dtb \
+ +	usb_a9263.dtb \
+ +	usb_a9g20.dtb
+ +dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ +dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ +	exynos4210-smdkv310.dtb \
+ +	exynos4210-trats.dtb \
+ +	exynos5250-smdk5250.dtb
+ +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+ +dtb-$(CONFIG_ARCH_IMX5) += imx51-babbage.dtb \
+ +	imx53-ard.dtb \
+ +	imx53-evk.dtb \
+ +	imx53-qsb.dtb \
+ +	imx53-smd.dtb
+ +dtb-$(CONFIG_SOC_IMX6Q) += imx6q-arm2.dtb \
+ +	imx6q-sabrelite.dtb \
+ +	imx6q-sabresd.dtb
+ +dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
+ +dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
+ +	kirkwood-dns325.dtb \
+ +	kirkwood-dreamplug.dtb \
+ +	kirkwood-goflexnet.dtb \
+ +	kirkwood-ib62x0.dtb \
+ +	kirkwood-iconnect.dtb \
+ +	kirkwood-lschlv2.dtb \
+ +	kirkwood-lsxhl.dtb \
+ +	kirkwood-ts219-6281.dtb \
+ +	kirkwood-ts219-6282.dtb
+ +dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+ +	msm8960-cdp.dtb
+ +dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ +	armada-xp-db.dtb
+ +dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+ +	imx53-ard.dtb \
+ +	imx53-evk.dtb \
+ +	imx53-qsb.dtb \
+ +	imx53-smd.dtb \
+ +	imx6q-arm2.dtb \
+ +	imx6q-sabrelite.dtb \
+ +	imx6q-sabresd.dtb
+ +dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ +	imx23-olinuxino.dtb \
+ +	imx23-stmp378x_devb.dtb \
+ +	imx28-apx4devkit.dtb \
+ +	imx28-cfa10036.dtb \
+ +	imx28-cfa10049.dtb \
+ +	imx28-evk.dtb \
+ +	imx28-m28evk.dtb \
+ +	imx28-tx28.dtb
+ +dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ +	omap3-beagle-xm.dtb \
+ +	omap3-evm.dtb \
+ +	omap3-tobi.dtb \
+ +	omap4-panda.dtb \
+ +	omap4-pandaES.dtb \
+ +	omap4-var_som.dtb \
+ +	omap4-sdp.dtb \
+ +	omap5-evm.dtb
+ +dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ +dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+ +dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ +	r8a7740-armadillo800eva.dtb \
+ +	sh73a0-kzm9g.dtb
+ +dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ +	spear1340-evb.dtb
+ +dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ +	spear310-evb.dtb \
+ +	spear320-evb.dtb
+ +dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+ +dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ +	tegra20-medcom-wide.dtb \
+ +	tegra20-paz00.dtb \
+ +	tegra20-plutux.dtb \
+ +	tegra20-seaboard.dtb \
+ +	tegra20-tec.dtb \
+ +	tegra20-trimslice.dtb \
+ +	tegra20-ventana.dtb \
+ +	tegra20-whistler.dtb \
+ +	tegra30-cardhu-a02.dtb \
+ +	tegra30-cardhu-a04.dtb
+ +dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
+ +	vexpress-v2p-ca9.dtb \
+ +	vexpress-v2p-ca15-tc1.dtb \
+- 	vexpress-v2p-ca15_a7.dtb
+++	vexpress-v2p-ca15_a7.dtb \
+++	xenvm-4.2.dtb
+ +
+ +endif
