@@ -1,55 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 2 Oct 2012 14:44:44 +0100
-Subject: [PATCH v2 RESEND 2/2] ARM: local timers: add timer support using
- IO mapped register
-In-Reply-To: <20121002112704.GA2410@linaro.org>
-References: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
- <1347694914-1457-2-git-send-email-rvaswani@codeaurora.org>
- <5062013F.8050507@codeaurora.org>
- <20120928122858.GD9472@e106331-lin.cambridge.arm.com>
- <20120928155746.GB2253@linaro.org>
- <20120928171549.GA29991@e102568-lin.cambridge.arm.com>
- <20121002112704.GA2410@linaro.org>
-Message-ID: <20121002134444.GB28600@e102568-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Oct 2012 16:44:02 +0300
+Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <20121002125819.GY4360@opensource.wolfsonmicro.com>
+References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
+ <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
+ <20121001114454.GA9170@sirena.org.uk>
+ <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+ <20121001120907.GK4360@opensource.wolfsonmicro.com>
+ <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+ <20121002123856.GX4360@opensource.wolfsonmicro.com>
+ <20121002124321.GD30762@arwen.pp.htv.fi>
+ <20121002125819.GY4360@opensource.wolfsonmicro.com>
+Message-ID: <20121002134400.GA12125@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 12:27:04PM +0100, Dave Martin wrote:
-> On Fri, Sep 28, 2012 at 06:15:53PM +0100, Lorenzo Pieralisi wrote:
-> > On Fri, Sep 28, 2012 at 04:57:46PM +0100, Dave Martin wrote:
+Hi,
 
-[...]
-
-> > There must be a common way for all devices to link to the topology, though.
-> > 
-> > The topology must be descriptive enough to cater for all required cases
-> > and that's what Mark with PMU and all of us are trying to come up with, a solid
-> > way to represent with DT the topology of current and future ARM systems.
-> > 
-> > First idea I implemented and related LAK posting:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html
-> > 
-> > Are "cluster" nodes really needed or "cpu" nodes are enough ? I do not
-> > know, let's get this discussion started, that's all I need.
+On Tue, Oct 02, 2012 at 01:58:20PM +0100, Mark Brown wrote:
+> On Tue, Oct 02, 2012 at 03:43:22PM +0300, Felipe Balbi wrote:
 > 
-> One thing which now occurs to me on this point it that if we want to describe
-> the CCI properly in the DT (yes) then we need a way to describe the mapping
-> between clusters and CCI slave ports.  Currently that knowledge just has to
-> be a hard-coded hack somewhere: it's not probeable at all.
-
-That's definitely a good point. We can still define CCI ports as belonging
-to a range of CPUs, but that's a bit of a stretch IMHO.
-
-> I'm not sure how we do that, or how we describe the cache topology, without
-> the clusters being explicit in the DT
+> > BTW, OTOH writing all children into the DT actually describes the HW,
+> > no ? And depending on the device I feel it'd be better to write that
 > 
-> ...unless you already have ideas ?
+> Well, it depends on the hardware.  Some hardware has a bunch of nice,
+> neat IPs which can usefully be reproduced and which map sensibly onto OS
+> abstractions but a lot of it doesn't and frequently the abstractions
+> which Linux wants to use don't bear a huge resemblance to the hardware
+> (and Linux's ideas can change over time, as with the clock API being
+> factored out for example).
+> 
+> > data to DT. Think of twlxxxx (TI's PMICs), we might have completely
+> > unrelated drivers using one of TWL's GPIO lines as an interrupt source.
+> 
+> > If that particular children isn't listed in DT, it can't be used as an
+> > interrupt-parent, right ?
+> 
+> You can have the interrupt controller there without having to list every
+> IP in the device, just make the parent device the interrupt controller
+> to DT.
 
-Either we define the cluster node explicitly or we can always see it as a
-collection of CPUs, ie phandles to "cpu" nodes. That's what the decision
-we have to make is all about. I think that describing it explicitly make
-sense, but we need to check all possible use cases to see if that's
-worthwhile.
+fair enough, thanks ;-)
 
-Lorenzo
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/af2ffe1c/attachment.sig>
