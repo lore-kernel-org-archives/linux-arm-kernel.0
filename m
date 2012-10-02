@@ -1,68 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 02 Oct 2012 12:25:25 +0200
-Subject: [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
-In-Reply-To: <20121002092412.GB8847@mudshark.cambridge.arm.com>
-References: <20121001091244.49503.96318.stgit@ubuntu>
- <20121001091426.49503.94722.stgit@ubuntu>
- <20121002092412.GB8847@mudshark.cambridge.arm.com>
-Message-ID: <b4b11d71544812cff978b3457a99b90e@localhost>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 02 Oct 2012 12:33:39 +0200
+Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <20121002093753.GU4360@opensource.wolfsonmicro.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com> <506A9C65.5040309@ti.com>
+ <20121002093753.GU4360@opensource.wolfsonmicro.com>
+Message-ID: <506AC303.9080906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Oct 2012 10:24:13 +0100, Will Deacon <will.deacon@arm.com>
-wrote:
-> On Mon, Oct 01, 2012 at 10:14:26AM +0100, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->> 
->> Add the init code for the hypervisor, the virtual machine, and
->> the virtual CPUs.
->> 
->> An interrupt handler is also wired to allow the VGIC maintenance
->> interrupts, used to deal with level triggered interrupts and LR
->> underflows.
->> 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
+On 02.10.2012 11:37, Mark Brown wrote:
+> On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
 > 
-> [...]
+>> I also agree that ifdef is not a good solution.
+>> It is better to have this information passed as device_data and via DT it can
+>> be decided based on the compatible property for the device.
 > 
->> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->> index b52d4c2..fc2a138 100644
->> --- a/arch/arm/kvm/vgic.c
->> +++ b/arch/arm/kvm/vgic.c
->> @@ -20,7 +20,14 @@
->>  #include <linux/kvm_host.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +
->>  #include <asm/kvm_emulate.h>
->> +#include <asm/hardware/gic.h>
->> +#include <asm/kvm_arm.h>
->> +#include <asm/kvm_mmu.h>
->>  
->>  /*
->>   * How the whole thing works (courtesy of Christoffer Dall):
->> @@ -61,6 +68,13 @@
->>  /* Temporary hacks, need to be provided by userspace emulation */
->>  #define VGIC_DIST_BASE		0x2c001000
->>  #define VGIC_DIST_SIZE		0x1000
->> +#define VGIC_CPU_BASE		0x2c002000
->> +#define VGIC_CPU_SIZE		0x2000
-> 
-> We really don't want the physical memory map for the guest hardwired in
-the
-> kernel. Please find a way to parameterise this from userspace.
+> That's not really the problem here - the problem is that the APIs used
+> to get the SRAM are DaVinci only so it's not possible to build on OMAP
+> or other platforms.  The SRAM code needs to move to a standard API.
 
-Yes, this is a known problem. KVM doesn't offer a standard way of passing
-the address of an interrupt controller (none of the other architectures
-have it memory mapped).
+What about following Matt Porter's idea and ignore the SRAM code
+entirely and port the entire PCM code to generic dmaengine code first?
+The EDMA driver needs to learn support for cyclic DMA for that, and I
+might give that a try in near future.
 
-We probably need a separate ioctl for that...
+Later on, the SRAM ping-pong code can get added back using genalloc
+functions, as Sekhar proposed. That needs to be done by someone who has
+access to a Davinci board though, I only have a AM33xx/OMAP here.
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+
+Daniel
