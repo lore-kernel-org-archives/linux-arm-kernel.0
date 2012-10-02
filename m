@@ -1,34 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  2 Oct 2012 13:10:48 -0600
-Subject: [PATCH 2/2] ARM: tegra: remove "Tegra board type" comment from Kconfig
-In-Reply-To: <1349205048-22228-1-git-send-email-swarren@wwwdotorg.org>
-References: <1349205048-22228-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1349205048-22228-2-git-send-email-swarren@wwwdotorg.org>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Wed, 3 Oct 2012 00:42:12 +0530
+Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <20121002123856.GX4360@opensource.wolfsonmicro.com>
+References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
+ <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
+ <20121001114454.GA9170@sirena.org.uk>
+ <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+ <20121001120907.GK4360@opensource.wolfsonmicro.com>
+ <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+ <20121002123856.GX4360@opensource.wolfsonmicro.com>
+Message-ID: <CAAe_U6LFOzSe9PDnFhjk4G5vXjoz3QSBM99NL4okjq2s5V0t3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi,
 
-Since the complete conversion to device tree, there are no board-
-specific Kconfig options left, so remove the useless Kconfig entry.
+On Tue, Oct 2, 2012 at 6:08 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Oct 01, 2012 at 08:54:23PM +0530, ABRAHAM, KISHON VIJAY wrote:
+>> On Mon, Oct 1, 2012 at 5:39 PM, Mark Brown
+>
+>> > Why would that be helpful?  Most platforms don't support DT at all, and
+>
+>> I'm not sure how to put it correctly. All I'm trying to tell is mfd is
+>> a framework that exposes a set of API's to create and remove a device
+>> among others. If a mfd child device is not created using mfd API,
+>> it'll be unfair to expect that child be removed properly using mfd
+>> API. Like in this patch, the device is created using
+>> of_platform_populate (not a mfd API) but is removed using
+>> mfd_remove_devices (mfd API) [which should result in an abort].
+>
+> That doesn't sound terribly clever, no, though it's not immediately
+> clear to me if the non-clever bit is using mfd_remove_devices() or
+> of_platform_populate().
+>
+>> This means mfd framework does not have an API to create a device from
+>> dt data or so do I think since of_platform_populate() is used. Thats
+>> why I suggested the idea of extending mfd_add_devices() (or adding a
+>> new API in mfd framework) to create child devices from dt data so that
+>> we'll have API's in mfd framework to both create and delete a device.
+>
+> The trouble that always exists with representing MFD children in DT is
+> that unless you've got a usefully reusable IP block which is clearly
+> separate from the chip integration you end up essentially just dumping
+> the Linux data structures into DT which often doesn't leave you with
+> something which describes the hardware.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+indeed!
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5f3c03b..1219d87 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -57,8 +57,6 @@ config TEGRA_AHB
- 	  which controls AHB bus master arbitration and some
- 	  perfomance parameters(priority, prefech size).
- 
--comment "Tegra board type"
--
- choice
-         prompt "Default low-level debug console UART"
-         default TEGRA_DEBUG_UART_NONE
--- 
-1.7.0.4
+Thanks
+Kishon
