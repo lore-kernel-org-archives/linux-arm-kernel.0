@@ -1,41 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Oct 2012 14:57:08 +0200
-Subject: [PATCH 11/12] pinctrl: samsung: use __devinit section for init
- code
-In-Reply-To: <201210021152.30099.arnd@arndb.de>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-12-git-send-email-arnd@arndb.de>
- <CACRpkdZv2b8M2Y4BJpqOX72prLHf4aACbmYk=imevX7h-X65QQ@mail.gmail.com>
- <201210021152.30099.arnd@arndb.de>
-Message-ID: <CACRpkdbC_59OZhA2h4w5=5+iWd5j=xVr2yiDfYmYV5h=0cYLWw@mail.gmail.com>
+Date: Tue, 2 Oct 2012 14:58:15 +0200
+Subject: [PATCH 08/10] ARM: ux500: Stop calling the UIB init function when
+ using Device Tree
+In-Reply-To: <20121002121533.GA26783@gmail.com>
+References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
+ <1349165603-24401-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaM1SxcrAn086W+b-oC+k6w=SEhxq0CGqrA_4iXmgfWYA@mail.gmail.com>
+ <20121002121533.GA26783@gmail.com>
+Message-ID: <CACRpkdZ8ZLNi+VTqoP18zsA01QLjD7uSGWJGvP=2rkkqVTs3jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2012 at 1:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 01 October 2012, Linus Walleij wrote:
->> On Fri, Sep 28, 2012 at 11:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> > The samsung pinctrl driver has a probe function that is
->> > __devinit and that calls a lot of other functions that are
->> > marked __init, which kbuild complains about.
->> >
->> > Marking everything __devinit means that the code does not
->> > discarded when CONFIG_HOTPLUG is set, which is a little
->> > more wasteful, but also more consistent
->> >
->> > Without this patch, building exynos_defconfig results in:
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> I think the Samsing pinctrl driver has landed into next from some
->> branch in ARM SoC so you probably know better than me
->> where this thing should be merged...
->>
+On Tue, Oct 2, 2012 at 2:15 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 02 Oct 2012, Linus Walleij wrote:
 >
-> Sorry, I was too late for this one. Can you pick it up now that the
-> driver is merged?
+>> On Tue, Oct 2, 2012 at 10:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > As there will be a Device Tree created for the UIBs, there is no
+>> > need to call the UIB initiation functions. Each device will be
+>> > detailed and registered from the Device Tree instead.
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Acked-by, but...
+>>
+>> > -       .init_late      = ux500_init_late,
+>> > +       .init_late      = NULL,
+>>
+>> Why even define it?
+>
+> More to show that we're _intentionally_ not using it.
+>
+> I'm happy to remove if it offends you? :)
 
-Sure I've queued it for my -rc fixes.
+No, I was just asking. I did ACK it...
 
 Thanks,
 Linus Walleij
