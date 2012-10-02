@@ -1,69 +1,70 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 2 Oct 2012 16:04:54 +0200 (CEST)
-Subject: [PATCH 2/2] mtd: sh_flctl: Add device tree support
-In-Reply-To: <201210021354.01247.arnd@arndb.de>
-References: <1349183522-15321-1-git-send-email-hechtb@gmail.com>
- <1349183522-15321-3-git-send-email-hechtb@gmail.com>
- <201210021354.01247.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.64.1210021602250.15778@axis700.grange>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 2 Oct 2012 16:03:33 +0100
+Subject: [PATCH v2 RESEND 2/2] ARM: local timers: add timer support using
+ IO mapped register
+In-Reply-To: <20121002134444.GB28600@e102568-lin.cambridge.arm.com>
+References: <1347694914-1457-1-git-send-email-rvaswani@codeaurora.org>
+ <1347694914-1457-2-git-send-email-rvaswani@codeaurora.org>
+ <5062013F.8050507@codeaurora.org>
+ <20120928122858.GD9472@e106331-lin.cambridge.arm.com>
+ <20120928155746.GB2253@linaro.org>
+ <20120928171549.GA29991@e102568-lin.cambridge.arm.com>
+ <20121002112704.GA2410@linaro.org>
+ <20121002134444.GB28600@e102568-lin.cambridge.arm.com>
+Message-ID: <20121002150333.GC2108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
-
-On Tue, 2 Oct 2012, Arnd Bergmann wrote:
-
-> On Tuesday 02 October 2012, Bastian Hecht wrote:
-> > +Required properties:
-> > +- compatible : "renesas,shmobile-flctl-sh7372"
-> > +- reg : Address range of the FLCTL
-> > +- interrupts : flste IRQ number
-> > +- nand-bus-width : bus width to NAND chip
-> > +
-> > +The device tree may optionally contain sub-nodes describing partitions of the
-> > +address space. See partition.txt for more detail.
-> > +
-> > +Example:
-> > +
-> > +       flctl at e6a30000 {
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               compatible = "renesas,shmobile-flctl-sh7372";
-> > +               reg = <0xe6a30000 0x100>;
-> > +               interrupts = <0x0d80>;
-> > +
-> > +               nand-bus-width = <16>;
-> > +
-> > +               system at 0 {
-> > +                       label = "system";
-> > +                       reg = <0x0 0x8000000>;
-> > +               };
-> > +
-> > +               userdata at 8000000 {
-> > +                       label = "userdata";
-> > +                       reg = <0x8000000 0x10000000>;
-> > +               };
-> > +
-> > +               cache at 18000000 {
-> > +                       label = "cache";
-> > +                       reg = <0x18000000 0x8000000>;
-> > +               };
-> > +       };
+On Tue, Oct 02, 2012 at 02:44:44PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Oct 02, 2012 at 12:27:04PM +0100, Dave Martin wrote:
+> > On Fri, Sep 28, 2012 at 06:15:53PM +0100, Lorenzo Pieralisi wrote:
+> > > On Fri, Sep 28, 2012 at 04:57:46PM +0100, Dave Martin wrote:
 > 
-> Since you are also adding dma-engine support, I would suggest you specify
-> a "dmas" and "dma-names" property as well, so the device can find the
-> right dma channel. The code might not do that yet while you're still
-> sorting out the dependencies (and the sh dmaengine code is not yet
-> converted to DT), but I think it would be good to nail down the binding
-> for this device.
+> [...]
+> 
+> > > There must be a common way for all devices to link to the topology, though.
+> > > 
+> > > The topology must be descriptive enough to cater for all required cases
+> > > and that's what Mark with PMU and all of us are trying to come up with, a solid
+> > > way to represent with DT the topology of current and future ARM systems.
+> > > 
+> > > First idea I implemented and related LAK posting:
+> > > 
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/080873.html
+> > > 
+> > > Are "cluster" nodes really needed or "cpu" nodes are enough ? I do not
+> > > know, let's get this discussion started, that's all I need.
+> > 
+> > One thing which now occurs to me on this point it that if we want to describe
+> > the CCI properly in the DT (yes) then we need a way to describe the mapping
+> > between clusters and CCI slave ports.  Currently that knowledge just has to
+> > be a hard-coded hack somewhere: it's not probeable at all.
+> 
+> That's definitely a good point. We can still define CCI ports as belonging
+> to a range of CPUs, but that's a bit of a stretch IMHO.
+> 
+> > I'm not sure how we do that, or how we describe the cache topology, without
+> > the clusters being explicit in the DT
+> > 
+> > ...unless you already have ideas ?
+> 
+> Either we define the cluster node explicitly or we can always see it as a
+> collection of CPUs, ie phandles to "cpu" nodes. That's what the decision
+> we have to make is all about. I think that describing it explicitly make
+> sense, but we need to check all possible use cases to see if that's
+> worthwhile.
 
-Have DMA DT bindings been accepted yet, are they fixed? Wouldn't it be 
-better to wait until patches appear in a tree, at least with high 
-probability heading towards the mainline, or have they already?
+How is the cache topology described today (forgive my laziness in not
+answering this question for myself)?  The issues are somewhat similar.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I still have some misgivings about describing clusters in terms of sets of
+CPUs.  For example, when we boot up a cluster, we have to set up ... the
+cluster.  This is a distinct thing which we must set up in addition to
+any of the actual CPUs.
+
+There is a strict child/parent relationship between clusters and CPUs, so
+a tree of nodes does seem the most natural description ... but I'm not
+aware of all the background to this discussion.
+
+Cheers
+---Dave
