@@ -1,40 +1,57 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 2 Oct 2012 12:30:00 -0400
-Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <506AC303.9080906@gmail.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com>
- <506A9C65.5040309@ti.com>
- <20121002093753.GU4360@opensource.wolfsonmicro.com>
- <506AC303.9080906@gmail.com>
-Message-ID: <20121002163000.GS5641@beef>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Oct 2012 09:31:58 -0700
+Subject: [PATCH v2 1/5] [media] omap3isp: Fix compilation error in ispreg.h
+In-Reply-To: <1349131591-10804-1-git-send-email-ido@wizery.com>
+References: <20120927195526.GP4840@atomide.com>
+ <1349131591-10804-1-git-send-email-ido@wizery.com>
+Message-ID: <20121002163158.GR4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 12:33:39PM +0200, Daniel Mack wrote:
-> On 02.10.2012 11:37, Mark Brown wrote:
-> > On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
-> > 
-> >> I also agree that ifdef is not a good solution.
-> >> It is better to have this information passed as device_data and via DT it can
-> >> be decided based on the compatible property for the device.
-> > 
-> > That's not really the problem here - the problem is that the APIs used
-> > to get the SRAM are DaVinci only so it's not possible to build on OMAP
-> > or other platforms.  The SRAM code needs to move to a standard API.
+* Ido Yariv <ido@wizery.com> [121001 15:48]:
+> Commit c49f34bc ("ARM: OMAP2+ Move SoC specific headers to be local to
+> mach-omap2") moved omap34xx.h to mach-omap2. This broke omap3isp, as it
+> includes omap34xx.h.
 > 
-> What about following Matt Porter's idea and ignore the SRAM code
-> entirely and port the entire PCM code to generic dmaengine code first?
-> The EDMA driver needs to learn support for cyclic DMA for that, and I
-> might give that a try in near future.
+> Instead of moving omap34xx to platform_data, simply add the two
+> definitions the driver needs and remove the include altogether.
 > 
-> Later on, the SRAM ping-pong code can get added back using genalloc
-> functions, as Sekhar proposed. That needs to be done by someone who has
-> access to a Davinci board though, I only have a AM33xx/OMAP here.
+> Signed-off-by: Ido Yariv <ido@wizery.com>
 
-I already backed away from that idea since the older SoCs without a
-FIFO absolutely need ping-pong buffering in SRAM.
+I'm assuming that Mauro picks this one up, sorry
+for breaking it.
 
--Matt
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  drivers/media/platform/omap3isp/ispreg.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/platform/omap3isp/ispreg.h b/drivers/media/platform/omap3isp/ispreg.h
+> index 084ea77..e2c57f3 100644
+> --- a/drivers/media/platform/omap3isp/ispreg.h
+> +++ b/drivers/media/platform/omap3isp/ispreg.h
+> @@ -27,13 +27,13 @@
+>  #ifndef OMAP3_ISP_REG_H
+>  #define OMAP3_ISP_REG_H
+>  
+> -#include <plat/omap34xx.h>
+> -
+> -
+>  #define CM_CAM_MCLK_HZ			172800000	/* Hz */
+>  
+>  /* ISP Submodules offset */
+>  
+> +#define L4_34XX_BASE			0x48000000
+> +#define OMAP3430_ISP_BASE		(L4_34XX_BASE + 0xBC000)
+> +
+>  #define OMAP3ISP_REG_BASE		OMAP3430_ISP_BASE
+>  #define OMAP3ISP_REG(offset)		(OMAP3ISP_REG_BASE + (offset))
+>  
+> -- 
+> 1.7.11.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
