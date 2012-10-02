@@ -1,27 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Oct 2012 11:21:33 +0200
-Subject: [PATCH 06/10] Documentation: Detail permitted DT properties for
- the BU21013 Touch Screen
-In-Reply-To: <1349165603-24401-7-git-send-email-lee.jones@linaro.org>
-References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
- <1349165603-24401-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdb8gA+wtkzd=wQbp8kHf=j-DJC9QsN16ruWmvwhgD5HZA@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 02 Oct 2012 11:24:02 +0200
+Subject: [PATCH v2 0/4] ARM: EXYNOS: Power domain DT support extension
+Message-ID: <1349169846-30385-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2012 at 10:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
+This patch series fixes two issues with existing DT support for Exynos
+power domains and extends it with the ability of binding devices to domains,
+basically making it possible to use power domains with DT.
 
-> Here we apply required documentation for the Rohm BU21013 Touch
-> Screen driver which describe available properties and how to use
-> them.
->
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Based on next/dt-samsung-new branch of Samsung tree.
 
-Should be CC to the devicetree-discuss list right?
-FWIW:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Changes since v1:
+ - Added "samsung," prefix to "power-domain" property.
+ - Added power domain nodes to Exynos4 device tree sources.
 
-Yours,
-Linus Walleij
+Tomasz Figa (4):
+  ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
+  ARM: EXYNOS: pm_domain: Fix power domain name initialization
+  ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
+  ARM: dts: exynos4: Set up power domains
+
+ .../bindings/arm/exynos/power_domain.txt           | 15 +++-
+ arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
+ arch/arm/mach-exynos/pm_domains.c                  | 93 +++++++++++++++++++++-
+ 4 files changed, 135 insertions(+), 8 deletions(-)
+
+-- 
+1.7.12
