@@ -1,1155 +1,218 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  2 Oct 2012 13:07:04 -0600
-Subject: [PATCH] ARM: tegra: update *.dts for regulator-compatible deprecation
-Message-ID: <1349204824-21758-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue,  2 Oct 2012 13:07:44 -0600
+Subject: [PATCH 1/3] ARM: tegra: simplify DEBUG_LL UART selection options
+Message-ID: <1349204866-21810-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Commit 13511de "regulator: deprecate regulator-compatible DT property"
-now allows for simpler content within the regulators node within a PMIC.
-Modify all the Tegra device tree files to take advantage of this.
+Delete CONFIG_TEGRA_DEBUG_UART_AUTO_SCRATCH; it's not useful any more:
+* No upstream bootloader currently or will ever support this option.
+* CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA is a much more direct alternative.
+
+Merge the fixed and automatic UART selection menus into a single choice
+for simplicity; now you either pick AUTO_ODMDATA or a single fixed UART,
+rather than potentially having an AUTO option override whatever fixed
+option was chosen.
+
+Remove TEGRA_DEBUG_UART_NONE; if you don't want a Tegra DEBUG_LL UART,
+simply don't turn on DEBUG_LL. NONE used to be the default option, so
+pick AUTO_ODMDATA as the new default.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-harmony.dts   |   63 ++++------------
- arch/arm/boot/dts/tegra20-paz00.dts     |   59 ++++------------
- arch/arm/boot/dts/tegra20-seaboard.dts  |   59 ++++------------
- arch/arm/boot/dts/tegra20-tamonten.dtsi |   63 ++++------------
- arch/arm/boot/dts/tegra20-ventana.dts   |   59 ++++------------
- arch/arm/boot/dts/tegra20-whistler.dts  |  119 ++++++++-----------------------
- arch/arm/boot/dts/tegra30-cardhu.dtsi   |   47 +++---------
- 7 files changed, 112 insertions(+), 357 deletions(-)
+ arch/arm/mach-tegra/Kconfig                   |   41 +++++---------------
+ arch/arm/mach-tegra/common.c                  |    5 +-
+ arch/arm/mach-tegra/include/mach/iomap.h      |   14 -------
+ arch/arm/mach-tegra/include/mach/uncompress.h |   52 ++-----------------------
+ 4 files changed, 16 insertions(+), 96 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
-index c3ef1ad..74b8a47 100644
---- a/arch/arm/boot/dts/tegra20-harmony.dts
-+++ b/arch/arm/boot/dts/tegra20-harmony.dts
-@@ -297,131 +297,98 @@
- 			vinldo9-supply = <&sm2_reg>;
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 1219d87..87f0e2d 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -58,11 +58,17 @@ config TEGRA_AHB
+ 	  perfomance parameters(priority, prefech size).
  
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+ choice
+-        prompt "Default low-level debug console UART"
+-        default TEGRA_DEBUG_UART_NONE
++        prompt "Low-level debug console UART"
++        default TEGRA_DEBUG_UART_AUTO_ODMDATA
+ 
+-config TEGRA_DEBUG_UART_NONE
+-        bool "None"
++config TEGRA_DEBUG_UART_AUTO_ODMDATA
++	bool "Via ODMDATA"
++	help
++	  Automatically determines which UART to use for low-level debug based
++	  on the ODMDATA value. This value is part of the BCT, and is written
++	  to the boot memory device using nvflash, or other flashing tool.
++	  When bits 19:18 are 3, then bits 17:15 indicate which UART to use;
++	  0/1/2/3/4 are UART A/B/C/D/E.
+ 
+ config TEGRA_DEBUG_UARTA
+         bool "UART-A"
+@@ -81,33 +87,6 @@ config TEGRA_DEBUG_UARTE
+ 
+ endchoice
+ 
+-choice
+-	prompt "Automatic low-level debug console UART"
+-	default TEGRA_DEBUG_UART_AUTO_NONE
 -
--				sys_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "sys";
-+				sys_reg: sys {
- 					regulator-name = "vdd_sys";
- 					regulator-always-on;
- 				};
- 
--				regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "sm0";
-+				sm0 {
- 					regulator-name = "vdd_sm0,vdd_core";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "sm1";
-+				sm1 {
- 					regulator-name = "vdd_sm1,vdd_cpu";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
- 				};
- 
--				sm2_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "sm2";
-+				sm2_reg: sm2 {
- 					regulator-name = "vdd_sm2,vin_ldo*";
- 					regulator-min-microvolt = <3700000>;
- 					regulator-max-microvolt = <3700000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 4 {
--					reg = <4>;
--					regulator-compatible = "ldo0";
-+				ldo0 {
- 					regulator-name = "vdd_ldo0,vddio_pex_clk";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo1";
-+				ldo1 {
- 					regulator-name = "vdd_ldo1,avdd_pll*";
- 					regulator-min-microvolt = <1100000>;
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 6 {
--					reg = <6>;
--					regulator-compatible = "ldo2";
-+				ldo2 {
- 					regulator-name = "vdd_ldo2,vdd_rtc";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo3";
-+				ldo3 {
- 					regulator-name = "vdd_ldo3,avdd_usb*";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo4";
-+				ldo4 {
- 					regulator-name = "vdd_ldo4,avdd_osc,vddio_sys";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo5";
-+				ldo5 {
- 					regulator-name = "vdd_ldo5,vcore_mmc";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo6";
-+				ldo6 {
- 					regulator-name = "vdd_ldo6,avdd_vdac";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo7";
-+				ldo7 {
- 					regulator-name = "vdd_ldo7,avdd_hdmi";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 12 {
--					reg = <12>;
--					regulator-compatible = "ldo8";
-+				ldo8 {
- 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 13 {
--					reg = <13>;
--					regulator-compatible = "ldo9";
-+				ldo9 {
- 					regulator-name = "vdd_ldo9,avdd_2v85,vdd_ddr_rx";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 14 {
--					reg = <14>;
--					regulator-compatible = "ldo_rtc";
-+				ldo_rtc {
- 					regulator-name = "vdd_rtc_out,vdd_cell";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-index ddf287f..6a93d14 100644
---- a/arch/arm/boot/dts/tegra20-paz00.dts
-+++ b/arch/arm/boot/dts/tegra20-paz00.dts
-@@ -291,37 +291,26 @@
- 			vinldo9-supply = <&sm2_reg>;
- 
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+-config TEGRA_DEBUG_UART_AUTO_NONE
+-	bool "None"
 -
--				sys_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "sys";
-+				sys_reg: sys {
- 					regulator-name = "vdd_sys";
- 					regulator-always-on;
- 				};
- 
--				regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "sm0";
-+				sm0 {
- 					regulator-name = "+1.2vs_sm0,vdd_core";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "sm1";
-+				sm1 {
- 					regulator-name = "+1.0vs_sm1,vdd_cpu";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
- 				};
- 
--				sm2_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "sm2";
-+				sm2_reg: sm2 {
- 					regulator-name = "+3.7vs_sm2,vin_ldo*";
- 					regulator-min-microvolt = <3700000>;
- 					regulator-max-microvolt = <3700000>;
-@@ -330,53 +319,41 @@
- 
- 				/* LDO0 is not connected to anything */
- 
--				regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo1";
-+				ldo1 {
- 					regulator-name = "+1.1vs_ldo1,avdd_pll*";
- 					regulator-min-microvolt = <1100000>;
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 6 {
--					reg = <6>;
--					regulator-compatible = "ldo2";
-+				ldo2 {
- 					regulator-name = "+1.2vs_ldo2,vdd_rtc";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo3";
-+				ldo3 {
- 					regulator-name = "+3.3vs_ldo3,avdd_usb*";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo4";
-+				ldo4 {
- 					regulator-name = "+1.8vs_ldo4,avdd_osc,vddio_sys";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo5";
-+				ldo5 {
- 					regulator-name = "+2.85vs_ldo5,vcore_mmc";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo6";
-+				ldo6 {
- 					/*
- 					 * Research indicates this should be
- 					 * 1.8v; other boards that use this
-@@ -390,34 +367,26 @@
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo7";
-+				ldo7 {
- 					regulator-name = "+3.3vs_ldo7,avdd_hdmi";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 12 {
--					reg = <12>;
--					regulator-compatible = "ldo8";
-+				ldo8 {
- 					regulator-name = "+1.8vs_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 13 {
--					reg = <13>;
--					regulator-compatible = "ldo9";
-+				ldo9 {
- 					regulator-name = "+2.85vs_ldo9,vdd_ddr_rx";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 14 {
--					reg = <14>;
--					regulator-compatible = "ldo_rtc";
-+				ldo_rtc {
- 					regulator-name = "+3.3vs_rtc";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index f0ba901..33ae813 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -395,37 +395,26 @@
- 			vinldo9-supply = <&sm2_reg>;
- 
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+-config TEGRA_DEBUG_UART_AUTO_ODMDATA
+-	bool "Via ODMDATA"
+-	help
+-	  Automatically determines which UART to use for low-level debug based
+-	  on the ODMDATA value. This value is part of the BCT, and is written
+-	  to the boot memory device using nvflash, or other flashing tool.
+-	  When bits 19:18 are 3, then bits 17:15 indicate which UART to use;
+-	  0/1/2/3/4 are UART A/B/C/D/E.
 -
--				sys_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "sys";
-+				sys_reg: sys {
- 					regulator-name = "vdd_sys";
- 					regulator-always-on;
- 				};
- 
--				regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "sm0";
-+				sm0 {
- 					regulator-name = "vdd_sm0,vdd_core";
- 					regulator-min-microvolt = <1300000>;
- 					regulator-max-microvolt = <1300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "sm1";
-+				sm1 {
- 					regulator-name = "vdd_sm1,vdd_cpu";
- 					regulator-min-microvolt = <1125000>;
- 					regulator-max-microvolt = <1125000>;
- 					regulator-always-on;
- 				};
- 
--				sm2_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "sm2";
-+				sm2_reg: sm2 {
- 					regulator-name = "vdd_sm2,vin_ldo*";
- 					regulator-min-microvolt = <3700000>;
- 					regulator-max-microvolt = <3700000>;
-@@ -434,86 +423,66 @@
- 
- 				/* LDO0 is not connected to anything */
- 
--				regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo1";
-+				ldo1 {
- 					regulator-name = "vdd_ldo1,avdd_pll*";
- 					regulator-min-microvolt = <1100000>;
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 6 {
--					reg = <6>;
--					regulator-compatible = "ldo2";
-+				ldo2 {
- 					regulator-name = "vdd_ldo2,vdd_rtc";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo3";
-+				ldo3 {
- 					regulator-name = "vdd_ldo3,avdd_usb*";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo4";
-+				ldo4 {
- 					regulator-name = "vdd_ldo4,avdd_osc,vddio_sys";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo5";
-+				ldo5 {
- 					regulator-name = "vdd_ldo5,vcore_mmc";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo6";
-+				ldo6 {
- 					regulator-name = "vdd_ldo6,avdd_vdac,vddio_vi,vddio_cam";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo7";
-+				ldo7 {
- 					regulator-name = "vdd_ldo7,avdd_hdmi,vdd_fuse";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 12 {
--					reg = <12>;
--					regulator-compatible = "ldo8";
-+				ldo8 {
- 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 13 {
--					reg = <13>;
--					regulator-compatible = "ldo9";
-+				ldo9 {
- 					regulator-name = "vdd_ldo9,avdd_2v85,vdd_ddr_rx";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 14 {
--					reg = <14>;
--					regulator-compatible = "ldo_rtc";
-+				ldo_rtc {
- 					regulator-name = "vdd_rtc_out,vdd_cell";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-index f18cec9..5b3d8b1 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-@@ -271,97 +271,72 @@
- 			vinldo9-supply = <&sm2_reg>;
- 
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+-config TEGRA_DEBUG_UART_AUTO_SCRATCH
+-	bool "Via UART scratch register"
+-	help
+-	  Automatically determines which UART to use for low-level debug based
+-	  on the UART scratch register value. Some bootloaders put ASCII 'D'
+-	  in this register when they initialize their own console UART output.
+-	  Using this option allows the kernel to automatically pick the same
+-	  UART.
 -
--				sys_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "sys";
-+				sys_reg: sys {
- 					regulator-name = "vdd_sys";
- 					regulator-always-on;
- 				};
- 
--				regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "sm0";
-+				sm0 {
- 					regulator-name = "vdd_sys_sm0,vdd_core";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "sm1";
-+				sm1 {
- 					regulator-name = "vdd_sys_sm1,vdd_cpu";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
- 				};
- 
--				sm2_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "sm2";
-+				sm2_reg: sm2 {
- 					regulator-name = "vdd_sys_sm2,vin_ldo*";
- 					regulator-min-microvolt = <3700000>;
- 					regulator-max-microvolt = <3700000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 4 {
--					reg = <4>;
--					regulator-compatible = "ldo0";
-+				ldo0 {
- 					regulator-name = "vdd_ldo0,vddio_pex_clk";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo1";
-+				ldo1 {
- 					regulator-name = "vdd_ldo1,avdd_pll*";
- 					regulator-min-microvolt = <1100000>;
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 6 {
--					reg = <6>;
--					regulator-compatible = "ldo2";
-+				ldo2 {
- 					regulator-name = "vdd_ldo2,vdd_rtc";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo3";
-+				ldo3 {
- 					regulator-name = "vdd_ldo3,avdd_usb*";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo4";
-+				ldo4 {
- 					regulator-name = "vdd_ldo4,avdd_osc,vddio_sys";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo5";
-+				ldo5 {
- 					regulator-name = "vdd_ldo5,vcore_mmc";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 				};
- 
--				regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo6";
-+				ldo6 {
- 					regulator-name = "vdd_ldo6,avdd_vdac";
- 					/*
- 					 * According to the Tegra 2 Automotive
-@@ -373,25 +348,19 @@
- 					regulator-max-microvolt = <2850000>;
- 				};
- 
--				regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo7";
-+				ldo7 {
- 					regulator-name = "vdd_ldo7,avdd_hdmi";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 12 {
--					reg = <12>;
--					regulator-compatible = "ldo8";
-+				ldo8 {
- 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 13 {
--					reg = <13>;
--					regulator-compatible = "ldo9";
-+				ldo9 {
- 					regulator-name = "vdd_ldo9,vdd_ddr_rx,avdd_cam";
- 					/*
- 					 * According to the Tegra 2 Automotive
-@@ -404,9 +373,7 @@
- 					regulator-always-on;
- 				};
- 
--				regulator at 14 {
--					reg = <14>;
--					regulator-compatible = "ldo_rtc";
-+				ldo_rtc {
- 					regulator-name = "vdd_rtc_out";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 3e5952f..86854f1 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -311,37 +311,26 @@
- 			vinldo9-supply = <&sm2_reg>;
- 
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+-endchoice
 -
--				sys_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "sys";
-+				sys_reg: sys {
- 					regulator-name = "vdd_sys";
- 					regulator-always-on;
- 				};
+ config TEGRA_EMC_SCALING_ENABLE
+ 	bool "Enable scaling the memory frequency"
  
--				regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "sm0";
-+				sm0 {
- 					regulator-name = "vdd_sm0,vdd_core";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 0b0a5f5..0913d1f 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -44,14 +44,13 @@
+  * kernel is loaded. The data is declared here rather than debug-macro.S so
+  * that multiple inclusions of debug-macro.S point at the same data.
+  */
+-#define TEGRA_DEBUG_UART_OFFSET (TEGRA_DEBUG_UART_BASE & 0xFFFF)
+ u32 tegra_uart_config[3] = {
+ 	/* Debug UART initialization required */
+ 	1,
+ 	/* Debug UART physical address */
+-	(u32)(IO_APB_PHYS + TEGRA_DEBUG_UART_OFFSET),
++	0,
+ 	/* Debug UART virtual address */
+-	(u32)(IO_APB_VIRT + TEGRA_DEBUG_UART_OFFSET),
++	0,
+ };
  
--				regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "sm1";
-+				sm1 {
- 					regulator-name = "vdd_sm1,vdd_cpu";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
- 				};
+ #ifdef CONFIG_OF
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index fee3a94..4f1d9a3 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -263,20 +263,6 @@
+ #define TEGRA_SDMMC4_BASE		0xC8000600
+ #define TEGRA_SDMMC4_SIZE		SZ_512
  
--				sm2_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "sm2";
-+				sm2_reg: sm2 {
- 					regulator-name = "vdd_sm2,vin_ldo*";
- 					regulator-min-microvolt = <3700000>;
- 					regulator-max-microvolt = <3700000>;
-@@ -350,86 +339,66 @@
- 
- 				/* LDO0 is not connected to anything */
- 
--				regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo1";
-+				ldo1 {
- 					regulator-name = "vdd_ldo1,avdd_pll*";
- 					regulator-min-microvolt = <1100000>;
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 6 {
--					reg = <6>;
--					regulator-compatible = "ldo2";
-+				ldo2 {
- 					regulator-name = "vdd_ldo2,vdd_rtc";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo3";
-+				ldo3 {
- 					regulator-name = "vdd_ldo3,avdd_usb*";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo4";
-+				ldo4 {
- 					regulator-name = "vdd_ldo4,avdd_osc,vddio_sys";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo5";
-+				ldo5 {
- 					regulator-name = "vdd_ldo5,vcore_mmc";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo6";
-+				ldo6 {
- 					regulator-name = "vdd_ldo6,avdd_vdac";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo7";
-+				ldo7 {
- 					regulator-name = "vdd_ldo7,avdd_hdmi,vdd_fuse";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 12 {
--					reg = <12>;
--					regulator-compatible = "ldo8";
-+				ldo8 {
- 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 13 {
--					reg = <13>;
--					regulator-compatible = "ldo9";
-+				ldo9 {
- 					regulator-name = "vdd_ldo9,avdd_2v85,vdd_ddr_rx";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 14 {
--					reg = <14>;
--					regulator-compatible = "ldo_rtc";
-+				ldo_rtc {
- 					regulator-name = "vdd_rtc_out,vdd_cell";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index c636d00..94a71c9 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -295,243 +295,182 @@
- 			in20-supply = <&mbatt_reg>;
- 
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+-#if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
+-# define TEGRA_DEBUG_UART_BASE 0
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
+-# define TEGRA_DEBUG_UART_BASE TEGRA_UARTA_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+-# define TEGRA_DEBUG_UART_BASE TEGRA_UARTB_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+-# define TEGRA_DEBUG_UART_BASE TEGRA_UARTC_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+-# define TEGRA_DEBUG_UART_BASE TEGRA_UARTD_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+-# define TEGRA_DEBUG_UART_BASE TEGRA_UARTE_BASE
+-#endif
 -
--				mbatt_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "mbatt";
-+				mbatt_reg: mbatt {
- 					regulator-name = "vbat_pmu";
- 					regulator-always-on;
- 				};
+ /* On TEGRA, many peripherals are very closely packed in
+  * two 256MB io windows (that actually only use about 64KB
+  * at the start of each).
+diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
+index 937c4c5..d5b86ce 100644
+--- a/arch/arm/mach-tegra/include/mach/uncompress.h
++++ b/arch/arm/mach-tegra/include/mach/uncompress.h
+@@ -139,51 +139,19 @@ int auto_odmdata(void)
+ }
+ #endif
  
--				regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "sd1";
-+				sd1 {
- 					regulator-name = "nvvdd_sv1,vdd_cpu_pmu";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "sd2";
-+				sd2 {
- 					regulator-name = "nvvdd_sv2,vdd_core";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				nvvdd_sv3_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "sd3";
-+				nvvdd_sv3_reg: sd3 {
- 					regulator-name = "nvvdd_sv3";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 4 {
--					reg = <4>;
--					regulator-compatible = "ldo1";
-+				ldo1 {
- 					regulator-name = "nvvdd_ldo1,vddio_rx_ddr,vcore_acc";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo2";
-+				ldo2 {
- 					regulator-name = "nvvdd_ldo2,avdd_pll*";
- 					regulator-min-microvolt = <1100000>;
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 6 {
--					reg = <6>;
--					regulator-compatible = "ldo3";
-+				ldo3 {
- 					regulator-name = "nvvdd_ldo3,vcom_1v8b";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo4";
-+				ldo4 {
- 					regulator-name = "nvvdd_ldo4,avdd_usb*";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo5";
-+				ldo5 {
- 					regulator-name = "nvvdd_ldo5,vcore_mmc,avdd_lcd1,vddio_1wire";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo6";
-+				ldo6 {
- 					regulator-name = "nvvdd_ldo6,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo7";
-+				ldo7 {
- 					regulator-name = "nvvdd_ldo7,avddio_audio";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo8";
-+				ldo8 {
- 					regulator-name = "nvvdd_ldo8,vcom_3v0,vcore_cmps";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
- 				};
- 
--				regulator at 12 {
--					reg = <12>;
--					regulator-compatible = "ldo9";
-+				ldo9 {
- 					regulator-name = "nvvdd_ldo9,avdd_cam*";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 				};
- 
--				regulator at 13 {
--					reg = <13>;
--					regulator-compatible = "ldo10";
-+				ldo10 {
- 					regulator-name = "nvvdd_ldo10,avdd_usb_ic_3v0";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 14 {
--					reg = <14>;
--					regulator-compatible = "ldo11";
-+				ldo11 {
- 					regulator-name = "nvvdd_ldo11,vddio_pex_clk,vcom_33,avdd_hdmi";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 15 {
--					reg = <15>;
--					regulator-compatible = "ldo12";
-+				ldo12 {
- 					regulator-name = "nvvdd_ldo12,vddio_sdio";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 16 {
--					reg = <16>;
--					regulator-compatible = "ldo13";
-+				ldo13 {
- 					regulator-name = "nvvdd_ldo13,vcore_phtn,vdd_af";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 				};
- 
--				regulator at 17 {
--					reg = <17>;
--					regulator-compatible = "ldo14";
-+				ldo14 {
- 					regulator-name = "nvvdd_ldo14,avdd_vdac";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 				};
- 
--				regulator at 18 {
--					reg = <18>;
--					regulator-compatible = "ldo15";
-+				ldo15 {
- 					regulator-name = "nvvdd_ldo15,vcore_temp,vddio_hdcp";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				regulator at 19 {
--					reg = <19>;
--					regulator-compatible = "ldo16";
-+				ldo16 {
- 					regulator-name = "nvvdd_ldo16,vdd_dbrtr";
- 					regulator-min-microvolt = <1300000>;
- 					regulator-max-microvolt = <1300000>;
- 				};
- 
--				regulator at 20 {
--					reg = <20>;
--					regulator-compatible = "ldo17";
-+				ldo17 {
- 					regulator-name = "nvvdd_ldo17,vddio_mipi";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				regulator at 21 {
--					reg = <21>;
--					regulator-compatible = "ldo18";
-+				ldo18 {
- 					regulator-name = "nvvdd_ldo18,vddio_vi,vcore_cam*";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				regulator at 22 {
--					reg = <22>;
--					regulator-compatible = "ldo19";
-+				ldo19 {
- 					regulator-name = "nvvdd_ldo19,avdd_lcd2,vddio_lx";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 				};
- 
--				regulator at 23 {
--					reg = <23>;
--					regulator-compatible = "ldo20";
-+				ldo20 {
- 					regulator-name = "nvvdd_ldo20,vddio_ddr_1v2,vddio_hsic,vcom_1v2";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 24 {
--					reg = <24>;
--					regulator-compatible = "out5v";
-+				out5v {
- 					regulator-name = "usb0_vbus_reg";
- 				};
- 
--				regulator at 25 {
--					reg = <25>;
--					regulator-compatible = "out33v";
-+				out33v {
- 					regulator-name = "pmu_out3v3";
- 				};
- 
--				regulator at 26 {
--					reg = <26>;
--					regulator-compatible = "bbat";
-+				bbat {
- 					regulator-name = "pmu_bbat";
- 					regulator-min-microvolt = <2400000>;
- 					regulator-max-microvolt = <2400000>;
- 					regulator-always-on;
- 				};
- 
--				regulator at 27 {
--					reg = <27>;
--					regulator-compatible = "sdby";
-+				sdby {
- 					regulator-name = "vdd_aon";
- 					regulator-always-on;
- 				};
- 
--				regulator at 28 {
--					reg = <28>;
--					regulator-compatible = "vrtc";
-+				vrtc {
- 					regulator-name = "vrtc,pmu_vccadc";
- 					regulator-always-on;
- 				};
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index d10c9c5..b1271a8 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -171,56 +171,41 @@
- 			vccio-supply = <&vdd_ac_bat_reg>;
- 
- 			regulators {
--				#address-cells = <1>;
--				#size-cells = <0>;
+-#ifdef CONFIG_TEGRA_DEBUG_UART_AUTO_SCRATCH
+-int auto_scratch(void)
+-{
+-	int i;
 -
--				vdd1_reg: regulator at 0 {
--					reg = <0>;
--					regulator-compatible = "vdd1";
-+				vdd1_reg: vdd1 {
- 					regulator-name = "vddio_ddr_1v2";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
+-	/*
+-	 * Look for the first UART that:
+-	 * a) Is not in reset.
+-	 * b) Is clocked.
+-	 * c) Has a 'D' in the scratchpad register.
+-	 *
+-	 * Note that on Tegra30, the first two conditions are required, since
+-	 * if not true, accesses to the UART scratch register will hang.
+-	 * Tegra20 doesn't have this issue.
+-	 *
+-	 * The intent is that the bootloader will tell the kernel which UART
+-	 * to use by setting up those conditions. If nothing found, we'll fall
+-	 * back to what's specified in TEGRA_DEBUG_UART_BASE.
+-	 */
+-	for (i = 0; i < ARRAY_SIZE(uarts); i++) {
+-		if (!uart_clocked(i))
+-			continue;
+-
+-		uart = (volatile u8 *)uarts[i].base;
+-		if (uart[UART_SCR << DEBUG_UART_SHIFT] != 'D')
+-			continue;
+-
+-		return i;
+-	}
+-
+-	return -1;
+-}
+-#endif
+-
+ /*
+  * Setup before decompression.  This is where we do UART selection for
+  * earlyprintk and init the uart_base register.
+  */
+ static inline void arch_decomp_setup(void)
+ {
+-	int uart_id, auto_uart_id;
++	int uart_id;
+ 	volatile u32 *apb_misc = (volatile u32 *)TEGRA_APB_MISC_BASE;
+ 	u32 chip, div;
  
--				vdd2_reg: regulator at 1 {
--					reg = <1>;
--					regulator-compatible = "vdd2";
-+				vdd2_reg: vdd2 {
- 					regulator-name = "vdd_1v5_gen";
- 					regulator-min-microvolt = <1500000>;
- 					regulator-max-microvolt = <1500000>;
- 					regulator-always-on;
- 				};
+-#if defined(CONFIG_TEGRA_DEBUG_UARTA)
++#if defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
++	uart_id = auto_odmdata();
++#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
+ 	uart_id = 0;
+ #elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+ 	uart_id = 1;
+@@ -193,19 +161,7 @@ static inline void arch_decomp_setup(void)
+ 	uart_id = 3;
+ #elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+ 	uart_id = 4;
+-#else
+-	uart_id = -1;
+-#endif
+-
+-#if defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
+-	auto_uart_id = auto_odmdata();
+-#elif defined(CONFIG_TEGRA_DEBUG_UART_AUTO_SCRATCH)
+-	auto_uart_id = auto_scratch();
+-#else
+-	auto_uart_id = -1;
+ #endif
+-	if (auto_uart_id != -1)
+-		uart_id = auto_uart_id;
  
--				vddctrl_reg: regulator at 2 {
--					reg = <2>;
--					regulator-compatible = "vddctrl";
-+				vddctrl_reg: vddctrl {
- 					regulator-name = "vdd_cpu,vdd_sys";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
- 				};
- 
--				vio_reg: regulator at 3 {
--					reg = <3>;
--					regulator-compatible = "vio";
-+				vio_reg: vio {
- 					regulator-name = "vdd_1v8_gen";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
- 				};
- 
--				ldo1_reg: regulator at 4 {
--					reg = <4>;
--					regulator-compatible = "ldo1";
-+				ldo1_reg: ldo1 {
- 					regulator-name = "vdd_pexa,vdd_pexb";
- 					regulator-min-microvolt = <1050000>;
- 					regulator-max-microvolt = <1050000>;
- 				};
- 
--				ldo2_reg: regulator at 5 {
--					reg = <5>;
--					regulator-compatible = "ldo2";
-+				ldo2_reg: ldo2 {
- 					regulator-name = "vdd_sata,avdd_plle";
- 					regulator-min-microvolt = <1050000>;
- 					regulator-max-microvolt = <1050000>;
-@@ -228,44 +213,34 @@
- 
- 				/* LDO3 is not connected to anything */
- 
--				ldo4_reg: regulator at 7 {
--					reg = <7>;
--					regulator-compatible = "ldo4";
-+				ldo4_reg: ldo4 {
- 					regulator-name = "vdd_rtc";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				ldo5_reg: regulator at 8 {
--					reg = <8>;
--					regulator-compatible = "ldo5";
-+				ldo5_reg: ldo5 {
- 					regulator-name = "vddio_sdmmc,avdd_vdac";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
- 
--				ldo6_reg: regulator at 9 {
--					reg = <9>;
--					regulator-compatible = "ldo6";
-+				ldo6_reg: ldo6 {
- 					regulator-name = "avdd_dsi_csi,pwrdet_mipi";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 				};
- 
--				ldo7_reg: regulator at 10 {
--					reg = <10>;
--					regulator-compatible = "ldo7";
-+				ldo7_reg: ldo7 {
- 					regulator-name = "vdd_pllm,x,u,a_p_c_s";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 				};
- 
--				ldo8_reg: regulator at 11 {
--					reg = <11>;
--					regulator-compatible = "ldo8";
-+				ldo8_reg: ldo8 {
- 					regulator-name = "vdd_ddr_hs";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
+ 	if (uart_id < 0 || uart_id >= ARRAY_SIZE(uarts) ||
+ 	    !uart_clocked(uart_id))
 -- 
 1.7.0.4
