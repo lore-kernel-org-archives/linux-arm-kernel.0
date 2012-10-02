@@ -1,53 +1,44 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Wed, 3 Oct 2012 00:42:12 +0530
-Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
- driver
-In-Reply-To: <20121002123856.GX4360@opensource.wolfsonmicro.com>
-References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
- <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
- <20121001114454.GA9170@sirena.org.uk>
- <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
- <20121001120907.GK4360@opensource.wolfsonmicro.com>
- <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
- <20121002123856.GX4360@opensource.wolfsonmicro.com>
-Message-ID: <CAAe_U6LFOzSe9PDnFhjk4G5vXjoz3QSBM99NL4okjq2s5V0t3Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Oct 2012 20:18:51 +0100
+Subject: [RFC PATCH 1/2] ARM: use generic strnlen_user and
+ strncpy_from_user functions
+In-Reply-To: <20121002175316.GA598@pengutronix.de>
+References: <1339169935-31775-1-git-send-email-will.deacon@arm.com>
+ <1339169935-31775-2-git-send-email-will.deacon@arm.com>
+ <20121002175316.GA598@pengutronix.de>
+Message-ID: <20121002191851.GB20411@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 02, 2012 at 06:53:16PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 
-On Tue, Oct 2, 2012 at 6:08 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Oct 01, 2012 at 08:54:23PM +0530, ABRAHAM, KISHON VIJAY wrote:
->> On Mon, Oct 1, 2012 at 5:39 PM, Mark Brown
->
->> > Why would that be helpful?  Most platforms don't support DT at all, and
->
->> I'm not sure how to put it correctly. All I'm trying to tell is mfd is
->> a framework that exposes a set of API's to create and remove a device
->> among others. If a mfd child device is not created using mfd API,
->> it'll be unfair to expect that child be removed properly using mfd
->> API. Like in this patch, the device is created using
->> of_platform_populate (not a mfd API) but is removed using
->> mfd_remove_devices (mfd API) [which should result in an abort].
->
-> That doesn't sound terribly clever, no, though it's not immediately
-> clear to me if the non-clever bit is using mfd_remove_devices() or
-> of_platform_populate().
->
->> This means mfd framework does not have an API to create a device from
->> dt data or so do I think since of_platform_populate() is used. Thats
->> why I suggested the idea of extending mfd_add_devices() (or adding a
->> new API in mfd framework) to create child devices from dt data so that
->> we'll have API's in mfd framework to both create and delete a device.
->
-> The trouble that always exists with representing MFD children in DT is
-> that unless you've got a usefully reusable IP block which is clearly
-> separate from the chip integration you end up essentially just dumping
-> the Linux data structures into DT which often doesn't leave you with
-> something which describes the hardware.
+Hi Uwe,
 
-indeed!
+> On Fri, Jun 08, 2012 at 04:38:54PM +0100, Will Deacon wrote:
+> > This patch implements the word-at-a-time interface for ARM using the
+> > same algorithm as x86. Although we have a clz instruction from ARMv5,
+> > this only saves us one mov instruction when building with Thumb-2 and
+> > makes no difference when targetting ARM, so we use the magic 0x0ff0001
+> > constant for all CPUs. For big-endian configurations, we use the
+> > implementation from asm-generic.
+> > 
+> > With this implemented, we can replace our byte-at-a-time strnlen_user
+> > and strncpy_from_user functions with the optimised generic versions.
+> This patch is in Linus tree as 8c56cc8be5b38e3684eba96dc9b3f7ca7e495755
+> now and it broke my booting my Cortex-M3 machine. I didn't debug that
+> yet, but wanted to let you know already now before I call it a day.
 
-Thanks
-Kishon
+Ok, thanks for the heads-up. I didn't test it with an M-class CPU, but
+hopefully that's understandable :)
+
+> > +#define user_addr_max() \
+> > +	(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
+> > +
+> I think this is the problem as for no-mmu USER_DS == KERNEL_DS. I will
+> take a look tomorrow.
+
+I can't immediately see why that would cause a problem, so please let me
+know if you get more information.
+
+Will
