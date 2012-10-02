@@ -1,74 +1,46 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 06 Oct 2012 13:45:47 +0100
-Subject: [RFC 20/24] SERIAL: core: add xmit buffer allocation callbacks
-In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-Message-ID: <E1TKTlL-0002ni-MB@rmk-PC.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 2 Oct 2012 22:07:53 +0200
+Subject: [PATCH v7 1/3] watchdog: at91sam9_wdt: add device tree
+Message-ID: <20121002200753.GA12565@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows drivers (such as OMAP serial) to allocate and free their
-transmit buffers in a sane manner, rather than working around the
-buffer allocation provided by serial_core.
+> Date: Tue,  2 Oct 2012 18:01:00 +0200
+> From: Fabio Porcedda <fabio.porcedda@gmail.com>
+> To: Wim Van Sebroeck <wim@iguana.be>, linux-watchdog at vger.kernel.org,
+>         linux-arm-kernel at lists.infradead.org, Nicolas Ferre
+>         <nicolas.ferre@atmel.com>, Jean-Christophe PLAGNIOL-VILLARD
+>         <plagnioj@jcrosoft.com>, Andrew Victor <linux@maxim.org.za>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Subject: [PATCH v7 1/3] watchdog: at91sam9_wdt: add device tree
+>         support
+> Message-ID:
+>         <1349193662-23482-2-git-send-email-fabio.porcedda@gmail.com>
+> 
+> Tested on an at91sam9260 board (evk-pro3)
+> 
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/timer.h>
+>  #include <linux/bitops.h>
+>  #include <linux/uaccess.h>
+> +#include <linux/of.h>
+> 
+>  #include "at91sam9_wdt.h"
+> 
+> > @@ -302,11 +303,21 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+>         return res;
+>  }
+> 
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id at91_wdt_dt_ids[] = {
+> +       { .compatible = "atmel,at91sam9260-wdt" },
+> +       { /* sentinel */ }
+> +};
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/tty/serial/serial_core.c |   23 ++++++++++++++++-------
- include/linux/serial_core.h      |    2 ++
- 2 files changed, 18 insertions(+), 7 deletions(-)
+Hi Fabio
 
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index 4dd609e..53274ae 100644
---- a/drivers/tty/serial/serial_core.c
-+++ b/drivers/tty/serial/serial_core.c
-@@ -147,12 +147,18 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
- 	 * buffer.
- 	 */
- 	if (!state->xmit.buf) {
--		/* This is protected by the per port mutex */
--		page = get_zeroed_page(GFP_KERNEL);
--		if (!page)
--			return -ENOMEM;
-+		if (uport->ops->alloc_xmit) {
-+			retval = uport->ops->alloc_xmit(uport, &state->xmit);
-+			if (retval)
-+				return retval;
-+		} else {
-+			/* This is protected by the per port mutex */
-+			page = get_zeroed_page(GFP_KERNEL);
-+			if (!page)
-+				return -ENOMEM;
- 
--		state->xmit.buf = (unsigned char *) page;
-+			state->xmit.buf = (unsigned char *) page;
-+		}
- 		uart_circ_clear(&state->xmit);
- 	}
- 
-@@ -257,7 +263,10 @@ static void uart_shutdown(struct tty_struct *tty, struct uart_state *state)
- 	 * Free the transmit buffer page.
- 	 */
- 	if (state->xmit.buf) {
--		free_page((unsigned long)state->xmit.buf);
-+		if (uport->ops->free_xmit)
-+			uport->ops->free_xmit(uport, &state->xmit);
-+		else
-+			free_page((unsigned long)state->xmit.buf);
- 		state->xmit.buf = NULL;
- 	}
- }
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index b17d4c9..ebe9af1 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -248,6 +248,8 @@ struct uart_ops {
- 	void		(*break_ctl)(struct uart_port *, int ctl);
- 	int		(*startup)(struct uart_port *);
- 	void		(*shutdown)(struct uart_port *);
-+	int		(*alloc_xmit)(struct uart_port *, struct circ_buf *);
-+	void		(*free_xmit)(struct uart_port *, struct circ_buf *);
- 	void		(*flush_buffer)(struct uart_port *);
- 	void		(*set_termios)(struct uart_port *, struct ktermios *new,
- 				       struct ktermios *old);
--- 
-1.7.4.4
+You are missing __devinitdata.
+
+    Andrew
