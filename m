@@ -1,69 +1,62 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Oct 2012 15:32:55 +0530
-Subject: [PATCH v2 4/7] ARM: davinci: Add support for an L3RAM gen_pool
-In-Reply-To: <20121001123242.GJ5641@beef>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
- <1348861072-14507-5-git-send-email-mporter@ti.com> <506986B2.1030000@ti.com>
- <20121001123242.GJ5641@beef>
-Message-ID: <506ABBCF.8010009@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 2 Oct 2012 12:04:29 +0200
+Subject: How many cores does the ARM branch support?
+In-Reply-To: <20121002043106.GD21233@work1>
+References: <20121002043106.GD21233@work1>
+Message-ID: <20121002100429.GA5117@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/1/2012 6:02 PM, Matt Porter wrote:
-> On Mon, Oct 01, 2012 at 05:34:02PM +0530, Sekhar Nori wrote:
->> Hi Matt,
->>
->> On 9/29/2012 1:07 AM, Matt Porter wrote:
->>> L3RAM (shared SRAM) is needed for use by several drivers.
->>> This creates a genalloc pool and a hook for the platform code
->>> to provide the struct gen_pool * in platform data.
->>>
->>> Signed-off-by: Matt Porter <mporter@ti.com>
->>
->> I am not sure if any of the DaVinci devices have a need to allocate from
->> *both* ARM RAM and shared RAM. Shared RAM is not present on all DaVinci
->> devices AFAIR, and on DA850, there is just 8KB ARM RAM so I am not sure
->> if there is much point in trying to allocate from there.
->>
->> Can you instead see if Ben's earlier patch[1] to use shared RAM for SRAM
->> allocation on DA850 makes sense for your case? If yes, can you repost
->> with Ben's patch included in your series instead of this patch? I would
->> prefer that over creating a new pool for shared RAM.
+On 06:31 Tue 02 Oct     , Michelle Konzack wrote:
+> Hello OverGeeks and *,
 > 
-> Hrm, I did look at Ben's earlier patch. The reason I added a separate
-> pool mostly was so I didn't have to touch the PM code at all. That can
-> continue using the private SRAM API with the ARM RAM as it is now. The
+> I have gotten a new gadget which run only with 700MHz but has  32 cores.
+> Support 16 GE Interfaces a 50 Gbit universal interface and 4 PCIe ports,
+> SATA HDD and much more...
+> 
+> ...and yes, this ARM microcontroller is a telecommunications controller.
+> 
+> However, I have the Evaluation  Kit  and  a  PCIe  graphiccard  and  now
+> installed Debian ARMEL.  Unfortunately I get only 2 cores working...
+> 
+> What must I do to get the other 30 cores?
+32 cores on arm? which soc is it
 
-But you dont have to touch the PM code. PM code can continue using SRAM
-API. I have verified in the past that PM can work using shared RAM.
+usualy the nr_cpus is set to 2 check it
+> 
+> (without them, my Marvel Discovery MV78200 us 5 times faster)
+> 
+> And is it possibel, to get 100 cores running?
+> (this is the bigger version of the microcontroller I have)
+> 
+> I like to transform the 32 and 100 core versions into PanelPCs with  the
+> ultimate super power...  :-D  ...even it will be only a gadget for me!
+Best Regards,
+J.
+> 
+> Thanks, Greetings and nice Day/Evening
+>     Michelle Konzack
+> 
+> -- 
+> ##################### Debian GNU/Linux Consultant ######################
+>    Development of Intranet and Embedded Systems with Debian GNU/Linux
+>                Internet Service Provider, Cloud Computing
+>                 <http://www.itsystems.tamay-dogan.net/>
+> 
+> itsystems at tdnet                     Jabber  linux4michelle at jabber.ccc.de
+> Owner Michelle Konzack
+> 
+> Gewerbe Strasse 3                   Tel office: +49-176-86004575
+> 77694 Kehl                          Tel mobil:  +49-177-9351947
+> Germany                             Tel mobil:  +33-6-61925193  (France)
+> 
+> USt-ID:  DE 278 049 239
+> 
+> Linux-User #280138 with the Linux Counter, http://counter.li.org/
 
-> idea here was to allow that to be separate since no other bus masters
-> can access the ARM RAM anyway and do something that didn't require
-> regression testing PM. Also, I figured there's really no reason to use
-> even a tiny bit of the shared SRAM on PM if we have that ARM RAM there
-> and working fine for that use case.
 
-I see no reason why PM would break with shared RAM. I have not even seen
-reports of shared RAM being short of size so we need to save space by
-having PM code in ARM RAM. I can test the changes before the code is
-committed and it will get tested in linux-next as well.
 
-> The other thing is that Ben's patch needs to be rewritten to at least
-> have the hook I added so we can provide the gen_pool in platform data.
-> If you prefer this path still, I can add the needed hook on top of his
-> original patch. Ultimately, I only *need* genalloc support for the
-> shared sram so I can remove the private SRAM API from uio_pruss...so I'm
-> happy with any way to get at it.
-
-Right, I prefer just adding the hook so that genalloc can be used along
-with SRAM API.
-
-> Oh, and to be honest...it's not just for uio_pruss, but also to cleanly
-> remove the private SRAM API usage from the davinci ASoC driver too.
-
-Audio can use the shared RAM too. And once all users of the SRAM API are
-gone, only the hook to help pass the gen_pool as platform data needs to
-remain.
-
-Thanks,
-Sekhar
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
