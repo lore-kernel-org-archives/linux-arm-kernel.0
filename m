@@ -1,35 +1,37 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 02 Oct 2012 10:48:53 +0300
-Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <20120922153313.GN4495@opensource.wolfsonmicro.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com>
-Message-ID: <506A9C65.5040309@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  2 Oct 2012 09:13:16 +0100
+Subject: [PATCH 03/10] Input: bu21013_ts - Request a regulator that actually
+ exists
+In-Reply-To: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
+References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349165603-24401-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2012 06:33 PM, Mark Brown wrote:
-> On Fri, Aug 31, 2012 at 06:20:58PM +0530, Hebbar, Gururaja wrote:
-> 
->> +config SND_DAVINCI_HAVE_SRAM
->> +	bool
->> +	default y if ARCH_DAVINCI=y
->> +	default n if ARCH_OMAP=y
->> +
-> 
-> I've been sitting on this mostly since it seems like a step back from
-> multi-platform kernels (which is where we're trying to get to) and I've
-> been trying to decide what the best approach is.  I'm thinking that we
-> do want a generic API for allocating this stuff, it's a fairly generic
-> feature (there's TCMs as well).  
-> 
-> Adding ifdefs like this does just doesn't seem good.
+Currently the BU21013 Touch Screen driver requests a regulator by the
+name of 'V-TOUCH', which doesn't exist anywhere in the kernel. The
+correct name, as referenced in platform regulator code is 'avdd'. Here,
+when we request a regulator, we use the correct name instead.
 
-I also agree that ifdef is not a good solution.
-It is better to have this information passed as device_data and via DT it can
-be decided based on the compatible property for the device.
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/input/touchscreen/bu21013_ts.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/input/touchscreen/bu21013_ts.c b/drivers/input/touchscreen/bu21013_ts.c
+index 5c487d2..2fae682 100644
+--- a/drivers/input/touchscreen/bu21013_ts.c
++++ b/drivers/input/touchscreen/bu21013_ts.c
+@@ -461,7 +461,7 @@ static int __devinit bu21013_probe(struct i2c_client *client,
+ 	bu21013_data->chip = pdata;
+ 	bu21013_data->client = client;
+ 
+-	bu21013_data->regulator = regulator_get(&client->dev, "V-TOUCH");
++	bu21013_data->regulator = regulator_get(&client->dev, "avdd");
+ 	if (IS_ERR(bu21013_data->regulator)) {
+ 		dev_err(&client->dev, "regulator_get failed\n");
+ 		error = PTR_ERR(bu21013_data->regulator);
 -- 
-P?ter
+1.7.9.5
