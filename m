@@ -1,55 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2012 13:54:00 +0000
-Subject: [PATCH 2/2] mtd: sh_flctl: Add device tree support
-In-Reply-To: <1349183522-15321-3-git-send-email-hechtb@gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 2 Oct 2012 15:55:05 +0200 (CEST)
+Subject: [PATCH 1/2] mtd: sh_flctl: Add DMA capabilty
+In-Reply-To: <1349183522-15321-2-git-send-email-hechtb@gmail.com>
 References: <1349183522-15321-1-git-send-email-hechtb@gmail.com>
- <1349183522-15321-3-git-send-email-hechtb@gmail.com>
-Message-ID: <201210021354.01247.arnd@arndb.de>
+ <1349183522-15321-2-git-send-email-hechtb@gmail.com>
+Message-ID: <Pine.LNX.4.64.1210021534570.15778@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 October 2012, Bastian Hecht wrote:
-> +Required properties:
-> +- compatible : "renesas,shmobile-flctl-sh7372"
-> +- reg : Address range of the FLCTL
-> +- interrupts : flste IRQ number
-> +- nand-bus-width : bus width to NAND chip
-> +
-> +The device tree may optionally contain sub-nodes describing partitions of the
-> +address space. See partition.txt for more detail.
-> +
-> +Example:
-> +
-> +       flctl at e6a30000 {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "renesas,shmobile-flctl-sh7372";
-> +               reg = <0xe6a30000 0x100>;
-> +               interrupts = <0x0d80>;
-> +
-> +               nand-bus-width = <16>;
-> +
-> +               system at 0 {
-> +                       label = "system";
-> +                       reg = <0x0 0x8000000>;
-> +               };
-> +
-> +               userdata at 8000000 {
-> +                       label = "userdata";
-> +                       reg = <0x8000000 0x10000000>;
-> +               };
-> +
-> +               cache at 18000000 {
-> +                       label = "cache";
-> +                       reg = <0x18000000 0x8000000>;
-> +               };
-> +       };
+On Tue, 2 Oct 2012, Bastian Hecht wrote:
 
-Since you are also adding dma-engine support, I would suggest you specify
-a "dmas" and "dma-names" property as well, so the device can find the
-right dma channel. The code might not do that yet while you're still
-sorting out the dependencies (and the sh dmaengine code is not yet
-converted to DT), but I think it would be good to nail down the binding
-for this device.
+> The code probes if DMA channels can get allocated and tears them down at
+> removal/failure if needed.
+> If available it uses them to transfer the data part (not ECC). On
+> failure we fall back to PIO mode.
+> 
+> Based on Guennadi Liakhovetski's code from the sh_mmcif driver.
+> 
+> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
 
-	Arnd
+Looks mostly good to me, just a couple of cosmetic remarks below. They are 
+not critical, so, I won't be upset, if you fix them later:-) In any case
+
+Reviewed-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+> ---
+>  drivers/mtd/nand/sh_flctl.c  |  174 +++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mtd/sh_flctl.h |   12 +++
+>  2 files changed, 183 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/sh_flctl.c b/drivers/mtd/nand/sh_flctl.c
+> index 4fbfe96..0fead2a 100644
+> --- a/drivers/mtd/nand/sh_flctl.c
+> +++ b/drivers/mtd/nand/sh_flctl.c
+> @@ -24,10 +24,13 @@
+>  #include <linux/module.h>
+>  #include <linux/kernel.h>
+>  #include <linux/delay.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/sh_dma.h>
+>  #include <linux/slab.h>
+>  #include <linux/string.h>
+>  
+> @@ -106,6 +109,84 @@ static void wait_completion(struct sh_flctl *flctl)
+>  	writeb(0x0, FLTRCR(flctl));
+>  }
+>  
+> +static void flctl_dma_complete(void *param)
+> +{
+> +	struct sh_flctl *flctl = param;
+> +
+> +	complete(&flctl->dma_complete);
+
+I think I mentioned in the first review, that it is good to include 
+headers everywhere, where they are needed and not rely on pulling them in 
+via other headers. So, it would be good to also include complete.h here 
+directly.
+
+[snip]
+
+> @@ -308,13 +462,23 @@ static enum flctl_ecc_res_t read_ecfiforeg
+>  static void write_fiforeg(struct sh_flctl *flctl, int rlen, int offset)
+>  {
+>  	int i, len_4align;
+> -	unsigned long *data = (unsigned long *)&flctl->done_buff[offset];
+> +	unsigned long *buf = (unsigned long *)&flctl->done_buff[offset];
+>  	void *fifo_addr = (void *)FLDTFIFO(flctl);
+>  
+>  	len_4align = (rlen + 3) / 4;
+> +
+> +	for (i = 0; i < len_4align; i++)
+> +			buf[i] = cpu_to_be32(buf[i]);
+
+indentation ran away here.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
