@@ -1,45 +1,69 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Oct 2012 16:36:54 +0530
-Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
- sram-support-less platforms
-In-Reply-To: <506AC303.9080906@gmail.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
- <20120922153313.GN4495@opensource.wolfsonmicro.com> <506A9C65.5040309@ti.com>
- <20121002093753.GU4360@opensource.wolfsonmicro.com>
- <506AC303.9080906@gmail.com>
-Message-ID: <506ACACE.4030308@ti.com>
+Date: Tue, 2 Oct 2012 16:43:59 +0530
+Subject: [PATCH v2 4/7] ARM: davinci: Add support for an L3RAM gen_pool
+In-Reply-To: <CAPcSpELdAK6=O8HG9FJXG_t88eymZO1f3wxzFqmR-faUn4jx4g@mail.gmail.com>
+References: <1348861072-14507-1-git-send-email-mporter@ti.com>
+ <1348861072-14507-5-git-send-email-mporter@ti.com> <506986B2.1030000@ti.com>
+ <20121001123242.GJ5641@beef>
+ <CAPcSpELdAK6=O8HG9FJXG_t88eymZO1f3wxzFqmR-faUn4jx4g@mail.gmail.com>
+Message-ID: <506ACC77.9090604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/2/2012 4:03 PM, Daniel Mack wrote:
-> On 02.10.2012 11:37, Mark Brown wrote:
->> On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
+On 10/1/2012 7:20 PM, Ben Gardiner wrote:
+> On Mon, Oct 1, 2012 at 8:32 AM, Matt Porter <mporter@ti.com> wrote:
+>> On Mon, Oct 01, 2012 at 05:34:02PM +0530, Sekhar Nori wrote:
+>>> Hi Matt,
+>>>
+>>> On 9/29/2012 1:07 AM, Matt Porter wrote:
+>>>> L3RAM (shared SRAM) is needed for use by several drivers.
+>>>> This creates a genalloc pool and a hook for the platform code
+>>>> to provide the struct gen_pool * in platform data.
+>>>>
+>>>> Signed-off-by: Matt Porter <mporter@ti.com>
+>>>
+>>> I am not sure if any of the DaVinci devices have a need to allocate from
+>>> *both* ARM RAM and shared RAM. Shared RAM is not present on all DaVinci
+>>> devices AFAIR, and on DA850, there is just 8KB ARM RAM so I am not sure
+>>> if there is much point in trying to allocate from there.
+>>>
+>>> Can you instead see if Ben's earlier patch[1] to use shared RAM for SRAM
+>>> allocation on DA850 makes sense for your case? If yes, can you repost
+>>> with Ben's patch included in your series instead of this patch? I would
+>>> prefer that over creating a new pool for shared RAM.
 >>
->>> I also agree that ifdef is not a good solution.
->>> It is better to have this information passed as device_data and via DT it can
->>> be decided based on the compatible property for the device.
->>
->> That's not really the problem here - the problem is that the APIs used
->> to get the SRAM are DaVinci only so it's not possible to build on OMAP
->> or other platforms.  The SRAM code needs to move to a standard API.
+>> Hrm, I did look at Ben's earlier patch. The reason I added a separate
+>> pool mostly was so I didn't have to touch the PM code at all. That can
+>> continue using the private SRAM API with the ARM RAM as it is now. The
+>> idea here was to allow that to be separate since no other bus masters
+>> can access the ARM RAM anyway and do something that didn't require
+>> regression testing PM. Also, I figured there's really no reason to use
+>> even a tiny bit of the shared SRAM on PM if we have that ARM RAM there
+>> and working fine for that use case.
+>> [...]
 > 
-> What about following Matt Porter's idea and ignore the SRAM code
-> entirely and port the entire PCM code to generic dmaengine code first?
-> The EDMA driver needs to learn support for cyclic DMA for that, and I
-> might give that a try in near future.
-> 
-> Later on, the SRAM ping-pong code can get added back using genalloc
-> functions, as Sekhar proposed. That needs to be done by someone who has
-> access to a Davinci board though, I only have a AM33xx/OMAP here.
+> I agree with Matt. Preserving the use of the ARM RAM (8K on L138 -- as
+> you said, Sekhar) in any fashion is preferable to moving suspend
+> support into shared RAM. There is more of it (128K on L138) but also
+> more pressure on allocations there since there are more clients.
 
-We cannot "get rid" of SRAM code and add it back "later". It is required
-for most DaVinci parts. The SRAM code can be converted to use genalloc
-(conversion should be straightforward and I can help test it) and the
-code that uses SRAM can probably keep using the private EDMA API till
-the dmaengine EDMA driver has cyclic DMA support. Matt has already
-posted patches to move private EDMA APIs to a common location. That
-should keep AM335x build from breaking. Is this something that is feasible?
+There is where I would like to see more information on who the potential
+clients are. Even if DSP takes away 64K of the shared RAM on OMAP-L138,
+there should be more than enough for PM, Audio and PRU. I haven't
+checked the PM code size lately but it should be fairly small and I can
+check the actual number if that helps. So, adding a new pool just to
+save on those bytes doesn't sound like helping a lot.
+
+> I appreciate that you are trying to preserve prior efforts in
+> attempted merging of SRAM support -- thank you for that; however, that
+> patch [1] was just an import of Subashish Ghosh's patch [2]  -- I
+> chose _that_ implementation option then mainly because I imagined it
+> would be the least risky to get accepted upstream and not because of
+> any particular technical merits.
+
+Its not a question of prior effort since Matt has already put in the
+effort too. I am yet unconvinced that we need to add support to manage
+two blocks of SoC internal RAM on DA850 in the kernel today. That's all.
 
 Thanks,
 Sekhar
