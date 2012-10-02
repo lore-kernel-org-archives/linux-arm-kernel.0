@@ -1,46 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2012 20:27:45 +0000
-Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
-In-Reply-To: <87fw5wofwm.fsf_-_@octavius.laptop.org>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-7-git-send-email-arnd@arndb.de>
- <87fw5wofwm.fsf_-_@octavius.laptop.org>
-Message-ID: <201210022027.45461.arnd@arndb.de>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Tue, 2 Oct 2012 20:47:49 +0000
+Subject: [PATCH 2/2] mtd: sh_flctl: Add device tree support
+In-Reply-To: <Pine.LNX.4.64.1210021602250.15778@axis700.grange>
+References: <1349183522-15321-1-git-send-email-hechtb@gmail.com>
+ <201210021354.01247.arnd@arndb.de>
+ <Pine.LNX.4.64.1210021602250.15778@axis700.grange>
+Message-ID: <201210022047.50064.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 October 2012, Chris Ball wrote:
-> Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
-> renamed arch/arm/mach-mmp/include/mach/sram.h to
-> include/linux/platform_data/dma-mmp_tdma.h, but didn't update
-> mmp-pcm.c which uses the header.  Fix the build error.
+On Tuesday 02 October 2012, Guennadi Liakhovetski wrote:
+> > 
+> > Since you are also adding dma-engine support, I would suggest you specify
+> > a "dmas" and "dma-names" property as well, so the device can find the
+> > right dma channel. The code might not do that yet while you're still
+> > sorting out the dependencies (and the sh dmaengine code is not yet
+> > converted to DT), but I think it would be good to nail down the binding
+> > for this device.
 > 
-> Signed-off-by: Chris Ball <cjb@laptop.org>
-> ---
->  sound/soc/pxa/mmp-pcm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Have DMA DT bindings been accepted yet, are they fixed? Wouldn't it be 
+> better to wait until patches appear in a tree, at least with high 
+> probability heading towards the mainline, or have they already?
 > 
-> diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
-> index 73ac546..e834faf 100644
-> --- a/sound/soc/pxa/mmp-pcm.c
-> +++ b/sound/soc/pxa/mmp-pcm.c
-> @@ -15,13 +15,13 @@
->  #include <linux/slab.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/dmaengine.h>
-> +#include <linux/platform_data/dma-mmp_tdma.h>
->  #include <linux/platform_data/mmp_audio.h>
->  #include <sound/pxa2xx-lib.h>
->  #include <sound/core.h>
->  #include <sound/pcm.h>
->  #include <sound/pcm_params.h>
->  #include <sound/soc.h>
-> -#include <mach/sram.h>
->  #include <sound/dmaengine_pcm.h>
->  
->  struct mmp_dma_data {
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+I think they ended up not getting scheduled for 3.7, which is a bit disappointing
+after we got an agreement on the binding.  However, I am rather confident that
+we won't change the binding again, at least I don't see how they would change
+in a way that would impact the binding document for a device using a DMA channel.
 
-Sorry I didn't catch this earlier. The file was only recently added
-and somehow didn't appear in my build tests.
+	Arnd
