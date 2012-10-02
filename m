@@ -1,39 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Oct 2012 14:58:15 +0200
-Subject: [PATCH 08/10] ARM: ux500: Stop calling the UIB init function when
- using Device Tree
-In-Reply-To: <20121002121533.GA26783@gmail.com>
-References: <1349165603-24401-1-git-send-email-lee.jones@linaro.org>
- <1349165603-24401-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdaM1SxcrAn086W+b-oC+k6w=SEhxq0CGqrA_4iXmgfWYA@mail.gmail.com>
- <20121002121533.GA26783@gmail.com>
-Message-ID: <CACRpkdZ8ZLNi+VTqoP18zsA01QLjD7uSGWJGvP=2rkkqVTs3jw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 2 Oct 2012 13:58:20 +0100
+Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <20121002124321.GD30762@arwen.pp.htv.fi>
+References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
+ <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
+ <20121001114454.GA9170@sirena.org.uk>
+ <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+ <20121001120907.GK4360@opensource.wolfsonmicro.com>
+ <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+ <20121002123856.GX4360@opensource.wolfsonmicro.com>
+ <20121002124321.GD30762@arwen.pp.htv.fi>
+Message-ID: <20121002125819.GY4360@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2012 at 2:15 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 02 Oct 2012, Linus Walleij wrote:
->
->> On Tue, Oct 2, 2012 at 10:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > As there will be a Device Tree created for the UIBs, there is no
->> > need to call the UIB initiation functions. Each device will be
->> > detailed and registered from the Device Tree instead.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> Acked-by, but...
->>
->> > -       .init_late      = ux500_init_late,
->> > +       .init_late      = NULL,
->>
->> Why even define it?
->
-> More to show that we're _intentionally_ not using it.
->
-> I'm happy to remove if it offends you? :)
+On Tue, Oct 02, 2012 at 03:43:22PM +0300, Felipe Balbi wrote:
 
-No, I was just asking. I did ACK it...
+> BTW, OTOH writing all children into the DT actually describes the HW,
+> no ? And depending on the device I feel it'd be better to write that
 
-Thanks,
-Linus Walleij
+Well, it depends on the hardware.  Some hardware has a bunch of nice,
+neat IPs which can usefully be reproduced and which map sensibly onto OS
+abstractions but a lot of it doesn't and frequently the abstractions
+which Linux wants to use don't bear a huge resemblance to the hardware
+(and Linux's ideas can change over time, as with the clock API being
+factored out for example).
+
+> data to DT. Think of twlxxxx (TI's PMICs), we might have completely
+> unrelated drivers using one of TWL's GPIO lines as an interrupt source.
+
+> If that particular children isn't listed in DT, it can't be used as an
+> interrupt-parent, right ?
+
+You can have the interrupt controller there without having to list every
+IP in the device, just make the parent device the interrupt controller
+to DT.
