@@ -1,211 +1,53 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 2 Oct 2012 14:43:54 +0200
-Subject: [PATCH] ARM: SAMSUNG: Add naming of s3c64xx-spi devices
-Message-ID: <201210021443.54897.heiko@sntech.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Oct 2012 15:43:22 +0300
+Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <20121002123856.GX4360@opensource.wolfsonmicro.com>
+References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
+ <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
+ <20121001114454.GA9170@sirena.org.uk>
+ <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+ <20121001120907.GK4360@opensource.wolfsonmicro.com>
+ <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+ <20121002123856.GX4360@opensource.wolfsonmicro.com>
+Message-ID: <20121002124321.GD30762@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a5238e360b71 (spi: s3c64xx: move controller information into driver
-data) introduced separate device names for the different subtypes of the
-spi controller but forgot to set these in the relevant machines.
+Hi,
 
-To fix this introduce a s3c64xx_spi_setname function and populate all
-Samsung arches with the correct names. The function resides in a new
-header, as the s3c64xx-spi.h contains driver platform data and should
-therefore at some later point move out of the Samsung include dir.
+coming late to the discussion, so bear with me
 
-Tested on a s3c2416-based machine.
+On Tue, Oct 02, 2012 at 01:38:56PM +0100, Mark Brown wrote:
+> > This means mfd framework does not have an API to create a device from
+> > dt data or so do I think since of_platform_populate() is used. Thats
+> > why I suggested the idea of extending mfd_add_devices() (or adding a
+> > new API in mfd framework) to create child devices from dt data so that
+> > we'll have API's in mfd framework to both create and delete a device.
+> 
+> The trouble that always exists with representing MFD children in DT is
+> that unless you've got a usefully reusable IP block which is clearly
+> separate from the chip integration you end up essentially just dumping
+> the Linux data structures into DT which often doesn't leave you with
+> something which describes the hardware.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: stable at vger.kernel.org
----
- arch/arm/mach-exynos/common.c                 |    5 ++++
- arch/arm/mach-s3c24xx/s3c2416.c               |    2 +
- arch/arm/mach-s3c24xx/s3c2443.c               |    4 +++
- arch/arm/mach-s5p64x0/common.c                |    3 ++
- arch/arm/mach-s5pc100/common.c                |    3 ++
- arch/arm/mach-s5pv210/common.c                |    3 ++
- arch/arm/plat-samsung/include/plat/spi-core.h |   30 +++++++++++++++++++++++++
- 7 files changed, 50 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/spi-core.h
+do you mean to say that children creation should be left into the driver
+(outside dt) ? That should be doable, indeed.
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4eb39cd..3e02ae6 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -47,6 +47,7 @@
- #include <plat/fimc-core.h>
- #include <plat/iic-core.h>
- #include <plat/tv-core.h>
-+#include <plat/spi-core.h>
- #include <plat/regs-serial.h>
- 
- #include "common.h"
-@@ -346,6 +347,8 @@ static void __init exynos4_map_io(void)
- 
- 	s5p_fb_setname(0, "exynos4-fb");
- 	s5p_hdmi_setname("exynos4-hdmi");
-+
-+	s3c64xx_spi_setname("exynos4210-spi");
- }
- 
- static void __init exynos5_map_io(void)
-@@ -366,6 +369,8 @@ static void __init exynos5_map_io(void)
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
- 	s3c_i2c2_setname("s3c2440-i2c");
-+
-+	s3c64xx_spi_setname("exynos4210-spi");
- }
- 
- static void __init exynos4_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s3c24xx/s3c2416.c b/arch/arm/mach-s3c24xx/s3c2416.c
-index 20507c7..a24960c 100644
---- a/arch/arm/mach-s3c24xx/s3c2416.c
-+++ b/arch/arm/mach-s3c24xx/s3c2416.c
-@@ -61,6 +61,7 @@
- #include <plat/nand-core.h>
- #include <plat/adc-core.h>
- #include <plat/rtc-core.h>
-+#include <plat/spi-core.h>
- 
- static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -147,6 +148,7 @@ void __init s3c2416_map_io(void)
- 	/* initialize device information early */
- 	s3c2416_default_sdhci0();
- 	s3c2416_default_sdhci1();
-+	s3c64xx_spi_setname("s3c2443-spi");
- 
- 	iotable_init(s3c2416_iodesc, ARRAY_SIZE(s3c2416_iodesc));
- }
-diff --git a/arch/arm/mach-s3c24xx/s3c2443.c b/arch/arm/mach-s3c24xx/s3c2443.c
-index ab648ad..165b6a6 100644
---- a/arch/arm/mach-s3c24xx/s3c2443.c
-+++ b/arch/arm/mach-s3c24xx/s3c2443.c
-@@ -43,6 +43,7 @@
- #include <plat/nand-core.h>
- #include <plat/adc-core.h>
- #include <plat/rtc-core.h>
-+#include <plat/spi-core.h>
- 
- static struct map_desc s3c2443_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -100,6 +101,9 @@ void __init s3c2443_map_io(void)
- 	s3c24xx_gpiocfg_default.set_pull = s3c2443_gpio_setpull;
- 	s3c24xx_gpiocfg_default.get_pull = s3c2443_gpio_getpull;
- 
-+	/* initialize device information early */
-+	s3c64xx_spi_setname("s3c2443-spi");
-+
- 	iotable_init(s3c2443_iodesc, ARRAY_SIZE(s3c2443_iodesc));
- }
- 
-diff --git a/arch/arm/mach-s5p64x0/common.c b/arch/arm/mach-s5p64x0/common.c
-index 6e6a0a9..111e404 100644
---- a/arch/arm/mach-s5p64x0/common.c
-+++ b/arch/arm/mach-s5p64x0/common.c
-@@ -44,6 +44,7 @@
- #include <plat/sdhci.h>
- #include <plat/adc-core.h>
- #include <plat/fb-core.h>
-+#include <plat/spi-core.h>
- #include <plat/gpio-cfg.h>
- #include <plat/regs-irqtype.h>
- #include <plat/regs-serial.h>
-@@ -179,6 +180,7 @@ void __init s5p6440_map_io(void)
- 	/* initialize any device information early */
- 	s3c_adc_setname("s3c64xx-adc");
- 	s3c_fb_setname("s5p64x0-fb");
-+	s3c64xx_spi_setname("s5p64x0-spi");
- 
- 	s5p64x0_default_sdhci0();
- 	s5p64x0_default_sdhci1();
-@@ -193,6 +195,7 @@ void __init s5p6450_map_io(void)
- 	/* initialize any device information early */
- 	s3c_adc_setname("s3c64xx-adc");
- 	s3c_fb_setname("s5p64x0-fb");
-+	s3c64xx_spi_setname("s5p64x0-spi");
- 
- 	s5p64x0_default_sdhci0();
- 	s5p64x0_default_sdhci1();
-diff --git a/arch/arm/mach-s5pc100/common.c b/arch/arm/mach-s5pc100/common.c
-index 6219086..cc6e561 100644
---- a/arch/arm/mach-s5pc100/common.c
-+++ b/arch/arm/mach-s5pc100/common.c
-@@ -45,6 +45,7 @@
- #include <plat/fb-core.h>
- #include <plat/iic-core.h>
- #include <plat/onenand-core.h>
-+#include <plat/spi-core.h>
- #include <plat/regs-serial.h>
- #include <plat/watchdog-reset.h>
- 
-@@ -165,6 +166,8 @@ void __init s5pc100_map_io(void)
- 	s3c_onenand_setname("s5pc100-onenand");
- 	s3c_fb_setname("s5pc100-fb");
- 	s3c_cfcon_setname("s5pc100-pata");
-+
-+	s3c64xx_spi_setname("s5pc100-spi");
- }
- 
- void __init s5pc100_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-index 4c9e902..a0c50ef 100644
---- a/arch/arm/mach-s5pv210/common.c
-+++ b/arch/arm/mach-s5pv210/common.c
-@@ -43,6 +43,7 @@
- #include <plat/iic-core.h>
- #include <plat/keypad-core.h>
- #include <plat/tv-core.h>
-+#include <plat/spi-core.h>
- #include <plat/regs-serial.h>
- 
- #include "common.h"
-@@ -196,6 +197,8 @@ void __init s5pv210_map_io(void)
- 
- 	/* setup TV devices */
- 	s5p_hdmi_setname("s5pv210-hdmi");
-+
-+	s3c64xx_spi_setname("s5pv210-spi");
- }
- 
- void __init s5pv210_init_clocks(int xtal)
-diff --git a/arch/arm/plat-samsung/include/plat/spi-core.h b/arch/arm/plat-samsung/include/plat/spi-core.h
-new file mode 100644
-index 0000000..0b9428a
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/spi-core.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2012 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __PLAT_S3C_SPI_CORE_H
-+#define __PLAT_S3C_SPI_CORE_H
-+
-+/* These functions are only for use with the core support code, such as
-+ * the cpu specific initialisation code
-+ */
-+
-+/* re-define device name depending on support. */
-+static inline void s3c64xx_spi_setname(char *name)
-+{
-+#ifdef CONFIG_S3C64XX_DEV_SPI0
-+	s3c64xx_device_spi0.name = name;
-+#endif
-+#ifdef CONFIG_S3C64XX_DEV_SPI1
-+	s3c64xx_device_spi1.name = name;
-+#endif
-+#ifdef CONFIG_S3C64XX_DEV_SPI2
-+	s3c64xx_device_spi2.name = name;
-+#endif
-+}
-+
-+#endif /* __PLAT_S3C_SPI_CORE_H */
+BTW, OTOH writing all children into the DT actually describes the HW,
+no ? And depending on the device I feel it'd be better to write that
+data to DT. Think of twlxxxx (TI's PMICs), we might have completely
+unrelated drivers using one of TWL's GPIO lines as an interrupt source.
+
+If that particular children isn't listed in DT, it can't be used as an
+interrupt-parent, right ?
+
 -- 
-1.7.2.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121002/a5cf6283/attachment.sig>
