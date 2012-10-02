@@ -1,48 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Oct 2012 13:21:24 +0100
-Subject: [PATCH] arm: include linux/sched.h in syscall.h
-In-Reply-To: <5069F8A0.5020801@mentor.com>
-References: <5069F8A0.5020801@mentor.com>
-Message-ID: <20121002122124.GB11278@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 2 Oct 2012 13:38:56 +0100
+Subject: [PATCHv3 1/4] mfd: smsc: Add support for smsc gpio io/keypad
+ driver
+In-Reply-To: <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+References: <1349089282-22105-1-git-send-email-sourav.poddar@ti.com>
+ <CAAe_U6+zEGuwMC1yn7O=LXE6PhPvPc2i7DCF0EAprkE8s+-iEw@mail.gmail.com>
+ <20121001114454.GA9170@sirena.org.uk>
+ <CAAe_U6JX9QDWvWA3KH7E9sOv0EHGkozVONuXDgn+a2MZ4GTE7Q@mail.gmail.com>
+ <20121001120907.GK4360@opensource.wolfsonmicro.com>
+ <CAAe_U6K6nAjsZUOk2rBFweWHtJmcLF7EJDpu9O6FXrq3tzv3yg@mail.gmail.com>
+Message-ID: <20121002123856.GX4360@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wade,
+On Mon, Oct 01, 2012 at 08:54:23PM +0530, ABRAHAM, KISHON VIJAY wrote:
+> On Mon, Oct 1, 2012 at 5:39 PM, Mark Brown
 
-On Mon, Oct 01, 2012 at 09:10:08PM +0100, Wade Farnsworth wrote:
-> task_thread_info() is defined in linux/sched.h.  Explicitly include this
-> file in arch/arm/include/asm/syscall.h.  This fixes an lttng-modules compile error.
+> > Why would that be helpful?  Most platforms don't support DT at all, and
 
-Can you be more specific about the error? From your description, it sounds
-like it should be fixed in lttng rather than here.
+> I'm not sure how to put it correctly. All I'm trying to tell is mfd is
+> a framework that exposes a set of API's to create and remove a device
+> among others. If a mfd child device is not created using mfd API,
+> it'll be unfair to expect that child be removed properly using mfd
+> API. Like in this patch, the device is created using
+> of_platform_populate (not a mfd API) but is removed using
+> mfd_remove_devices (mfd API) [which should result in an abort].
 
-Cheers,
+That doesn't sound terribly clever, no, though it's not immediately
+clear to me if the non-clever bit is using mfd_remove_devices() or
+of_platform_populate().
 
-Will
+> This means mfd framework does not have an API to create a device from
+> dt data or so do I think since of_platform_populate() is used. Thats
+> why I suggested the idea of extending mfd_add_devices() (or adding a
+> new API in mfd framework) to create child devices from dt data so that
+> we'll have API's in mfd framework to both create and delete a device.
 
-> Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
-> ---
->  arch/arm/include/asm/syscall.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-> index c334a23..fce38a6 100644
-> --- a/arch/arm/include/asm/syscall.h
-> +++ b/arch/arm/include/asm/syscall.h
-> @@ -8,6 +8,7 @@
->  #define _ASM_ARM_SYSCALL_H
->  
->  #include <linux/err.h>
-> +#include <linux/sched.h>
->  
->  extern const unsigned long sys_call_table[];
->  
-> -- 
-> 1.7.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+The trouble that always exists with representing MFD children in DT is
+that unless you've got a usefully reusable IP block which is clearly
+separate from the chip integration you end up essentially just dumping
+the Linux data structures into DT which often doesn't leave you with
+something which describes the hardware.
