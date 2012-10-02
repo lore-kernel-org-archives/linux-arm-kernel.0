@@ -1,128 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 2 Oct 2012 21:00:20 +0200
-Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
-References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
- <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
- <20121001124546.GE11837@lunn.ch>
- <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
- <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
- <20121001130658.GG11837@lunn.ch>
- <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
-Message-ID: <20121002190020.GD5117@game.jcrosoft.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 02 Oct 2012 15:03:21 -0400
+Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
+In-Reply-To: <1347368390-31252-7-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Tue, 11 Sep 2012 14:59:41 +0200")
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-7-git-send-email-arnd@arndb.de>
+Message-ID: <87fw5wofwm.fsf_-_@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:04 Tue 02 Oct     , Fabio Porcedda wrote:
-> On Mon, Oct 1, 2012 at 3:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > On Mon, Oct 01, 2012 at 02:54:55PM +0200, Fabio Porcedda wrote:
-> >> On Mon, Oct 1, 2012 at 2:48 PM, Fabio Porcedda <fabio.porcedda@gmail.com> wrote:
-> >> > On Mon, Oct 1, 2012 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> >> On Mon, Oct 01, 2012 at 02:24:39PM +0200, Fabio Porcedda wrote:
-> >> >>> Tested on an at91sam9260 board (evk-pro3)
-> >> >>>
-> >> >>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> >> >>> ---
-> >> >>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
-> >> >>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
-> >> >>>  2 files changed, 40 insertions(+)
-> >> >>>  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >> >>>
-> >> >>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >> >>> new file mode 100644
-> >> >>> index 0000000..65c1755
-> >> >>> --- /dev/null
-> >> >>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> >> >>> @@ -0,0 +1,19 @@
-> >> >>> +* Atmel Watchdog Timers
-> >> >>> +
-> >> >>> +** at91sam9-wdt
-> >> >>> +
-> >> >>> +Required properties:
-> >> >>> +- compatible: must be "atmel,at91sam9260-wdt".
-> >> >>> +- reg: physical base address of the controller and length of memory mapped
-> >> >>> +  region.
-> >> >>> +
-> >> >>> +Optional properties:
-> >> >>> +- timeout: contains the watchdog timeout in seconds.
-> >> >>> +
-> >> >>> +Example:
-> >> >>> +
-> >> >>> +     watchdog at fffffd40 {
-> >> >>> +             compatible = "atmel,at91sam9260-wdt";
-> >> >>> +             reg = <0xfffffd40 0x10>;
-> >> >>> +             timeout = <10>;
-> >> >>> +     };
-> >> >>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> >> >>> index 05e1be8..c9e6bfa 100644
-> >> >>> --- a/drivers/watchdog/at91sam9_wdt.c
-> >> >>> +++ b/drivers/watchdog/at91sam9_wdt.c
-> >> >>> @@ -32,6 +32,7 @@
-> >> >>>  #include <linux/timer.h>
-> >> >>>  #include <linux/bitops.h>
-> >> >>>  #include <linux/uaccess.h>
-> >> >>> +#include <linux/of.h>
-> >> >>>
-> >> >>>  #include "at91sam9_wdt.h"
-> >> >>>
-> >> >>> @@ -254,6 +255,14 @@ static struct miscdevice at91wdt_miscdev = {
-> >> >>>       .fops           = &at91wdt_fops,
-> >> >>>  };
-> >> >>>
-> >> >>> +static inline void __init at91wdt_probe_dt(struct device_node *node)
-> >> >>> +{
-> >> >>> +     if (!node)
-> >> >>> +             return;
-> >> >>> +
-> >> >>> +     of_property_read_u32(node, "timeout", &heartbeat);
-> >> >>> +}
-> >> >>> +
-> >> >>
-> >> >> In patch #1 you add a function to do this, and then you don't make use
-> >> >> of it here ?
-> >> >>
-> >> >> Or am i missing something?
-> >> >
-> >> > I'm using it on the patch #2 for the orion_wdt driver.
-> >> > Do you think it's better to join the #1 and the #2 patch?
-> >> >
-> >> > Best regards
-> >> > --
-> >> > Fabio Porcedda
-> >>
-> >> I'm sorry, only now i understand your question.
-> >> The at91sam9_wdt driver don't use the watchdog core framework si i
-> >> can't use that function cleanly.
-> >
-> >> The patch #1 and #2 are for introducing the same property as the
-> >> at91sam9_wdt driver.
-> >
-> > So maybe split this up into two different patchsets. One patchset to
-> > add the helper function, and the use of this helper to all watchdog
-> > divers that can use it. I think the following drivers should be
-> > modified:
-> >
-> > orion_wdt.c
-> > pnx4008_wdt.c
-> > s3c2410_wdt.c
-> >
-> > In a second patchset, convert the AT91SAM9 driver over to the watchdog
-> > core framework, and then use the helper function.
-> 
-> I was thinking to add a more generic helper function like this:
-> 
-> static inline void watchdog_get_dttimeout(struct device_node *node,
-> u32 *timeout)
-> {
-> 	if (node)
-> 		of_property_read_u32(node, "timeout", &wdd->timeout);
-> }
-> 
-> This way i can use this helper function in the at91sam9_wdt driver too.
-> What do you think?
-timeout_sec and this can be move at of.h level
+Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
+renamed arch/arm/mach-mmp/include/mach/sram.h to
+include/linux/platform_data/dma-mmp_tdma.h, but didn't update
+mmp-pcm.c which uses the header.  Fix the build error.
 
-as this is not watchdog framework secific
+Signed-off-by: Chris Ball <cjb@laptop.org>
+---
+ sound/soc/pxa/mmp-pcm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best Regards,
-J.
+diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
+index 73ac546..e834faf 100644
+--- a/sound/soc/pxa/mmp-pcm.c
++++ b/sound/soc/pxa/mmp-pcm.c
+@@ -15,13 +15,13 @@
+ #include <linux/slab.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
++#include <linux/platform_data/dma-mmp_tdma.h>
+ #include <linux/platform_data/mmp_audio.h>
+ #include <sound/pxa2xx-lib.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
+-#include <mach/sram.h>
+ #include <sound/dmaengine_pcm.h>
+ 
+ struct mmp_dma_data {
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
