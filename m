@@ -1,160 +1,40 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Wed, 3 Oct 2012 21:20:45 +0200
-Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
-In-Reply-To: <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
-References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
-Message-ID: <20121003192044.GB27502@parrot.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 3 Oct 2012 21:23:23 +0200
+Subject: [PATCH] ARM: mv78xx0: correct addr_map_cfg __initdata annotation
+In-Reply-To: <201210031906.35123.arnd@arndb.de>
+References: <201210031906.35123.arnd@arndb.de>
+Message-ID: <20121003192323.GB25766@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 03:29:49PM +0100, Philip, Avinash wrote:
-> ELM module can be used for error correction of BCH 4 & 8 bit. Also
-> support read & write page in one shot by adding custom read_page &
-> write_page methods. This helps in optimizing code.
+On Wed, Oct 03, 2012 at 07:06:34PM +0000, Arnd Bergmann wrote:
+> The annotation on the addr_map_cfg variable is in the wrong place.
 > 
-> New structure member "is_elm_used" is added to know the status of
-> whether the ELM module is used for error correction or not.
+> Without this patch, building mv78xx0_defconfig results in:
 > 
-> Note:
-> ECC layout of BCH8 uses 14 bytes for 512 byte of data to make compatible
-> with RBL ECC layout, even though the requirement was only 13 byte. This
-> results a common ecc layout across RBL, U-boot & Linux.
+> /home/arnd/linux-arm/arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: initialization from incompatible pointer type [enabled by default]
+> /home/arnd/linux-arm/arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: (near initialization for 'addr_map_cfg.win_cfg_base') [enabled by default]
 > 
-
-See a few comments below,
-
-(...)
-> +static int omap_elm_correct_data(struct mtd_info *mtd, u_char *dat,
-> +                               u_char *read_ecc, u_char *calc_ecc)
-> +{
-> +       struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
-> +                       mtd);
-> +       int eccsteps = info->nand.ecc.steps;
-> +       int i , j, stat = 0;
-> +       int eccsize, eccflag, size;
-> +       struct elm_errorvec err_vec[ERROR_VECTOR_MAX];
-> +       u_char *ecc_vec = calc_ecc;
-> +       enum bch_ecc type;
-> +       bool is_error_reported = false;
-> +
-> +       /* initialize elm error vector to zero */
-> +       memset(err_vec, 0, sizeof(err_vec));
-> +       if (info->nand.ecc.strength == BCH8_MAX_ERROR) {
-> +               size = BCH8_SIZE;
-> +               eccsize = BCH8_ECC_OOB_BYTES;
-> +               type = BCH8_ECC;
-> +       } else {
-> +               size = BCH4_SIZE;
-> +               eccsize = BCH4_SIZE;
-> +               type = BCH4_ECC;
-> +       }
-> +
-> +       for (i = 0; i < eccsteps ; i++) {
-> +               eccflag = 0;    /* initialize eccflag */
-> +
-> +               for (j = 0; (j < eccsize); j++) {
-> +                       if (read_ecc[j] != 0xFF) {
-> +                               eccflag = 1;    /* data area is flashed */
-
-Just a reminder: this way of checking if a page has been programmed is not robust to bitflips,
-so you may get into trouble with UBIFS on a fairly recent device.
-
-(...)
-> @@ -1039,14 +1180,45 @@ static void omap3_enable_hwecc_bch(struct mtd_info *mtd, int mode)
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> ---
+> Queued in the late/fixes branch
 > 
->         nerrors = info->nand.ecc.strength;
->         dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
-> +#ifdef CONFIG_MTD_NAND_OMAP_BCH
-> +       if (info->is_elm_used) {
-> +               /*
-> +                * Program GPMC to perform correction on (steps * 512) byte
-> +                * sector at a time.
-> +                */
-> +               gpmc_enable_hwecc_bch(info->gpmc_cs, mode, dev_width,
-> +                               info->nand.ecc.steps, nerrors);
-> +               return;
-> +       }
-> +#endif
->         /*
-> -        * Program GPMC to perform correction on one 512-byte sector at a time.
-> -        * Using 4 sectors at a time (i.e. ecc.size = 2048) is also possible and
-> -        * gives a slight (5%) performance gain (but requires additional code).
-> +        * Program GPMC to perform correction on one 512-byte sector at
-> +        * a time.
+> diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+> index a9bc841..03f7486 100644
+> --- a/arch/arm/mach-mv78xx0/addr-map.c
+> +++ b/arch/arm/mach-mv78xx0/addr-map.c
+> @@ -53,7 +53,7 @@ static void __init __iomem *win_cfg_base(const struct orion_addr_map_cfg *cfg, i
+>  /*
+>   * Description of the windows needed by the platform code
+>   */
+> -static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+> +static struct orion_addr_map_cfg addr_map_cfg __initdata = {
+>  	.num_wins = 14,
+>  	.remappable_wins = 8,
+>  	.win_cfg_base = win_cfg_base,
 
-Why removing the comment about 4-sector perf gain ? :-)
+Humm, been there, done that once. Must of forgotten to post it. :-(
 
-(...)
-> @@ -1146,35 +1402,62 @@ static int omap3_init_bch(struct mtd_info *mtd, int ecc_opt)
->                 goto fail;
->         }
-> 
-> -       /* initialize GPMC BCH engine */
-> -       ret = gpmc_init_hwecc_bch(info->gpmc_cs, 1, max_errors);
-> -       if (ret)
-> -               goto fail;
-> -
-> -       /* software bch library is only used to detect and locate errors */
-> -       info->bch = init_bch(13, max_errors, 0x201b /* hw polynomial */);
-> -       if (!info->bch)
-> -               goto fail;
-> +       info->nand.ecc.size = 512;
-> +       info->nand.ecc.hwctl = omap3_enable_hwecc_bch;
-> +       info->nand.ecc.mode = NAND_ECC_HW;
-> +       info->nand.ecc.strength = hw_errors;
-> 
-> -       info->nand.ecc.size    = 512;
-> -       info->nand.ecc.hwctl   = omap3_enable_hwecc_bch;
-> -       info->nand.ecc.correct = omap3_correct_data_bch;
-> -       info->nand.ecc.mode    = NAND_ECC_HW;
-> +       if (info->is_elm_used && (mtd->writesize <= 4096)) {
-> +               enum bch_ecc bch_type;
-> 
-> -       /*
-> -        * The number of corrected errors in an ecc block that will trigger
-> -        * block scrubbing defaults to the ecc strength (4 or 8).
-> -        * Set mtd->bitflip_threshold here to define a custom threshold.
-> -        */
-> +               if (hw_errors == BCH8_MAX_ERROR) {
-> +                       bch_type = BCH8_ECC;
-> +                       info->nand.ecc.bytes = BCH8_SIZE;
-> +               } else {
-> +                       bch_type = BCH4_ECC;
-> +                       info->nand.ecc.bytes = BCH4_SIZE;
-> +               }
-> 
-> -       if (max_errors == 8) {
-> -               info->nand.ecc.strength  = 8;
-> -               info->nand.ecc.bytes     = 13;
-> -               info->nand.ecc.calculate = omap3_calculate_ecc_bch8;
-> +               info->nand.ecc.correct = omap_elm_correct_data;
-> +               info->nand.ecc.calculate = omap3_calculate_ecc_bch;
-> +               info->nand.ecc.read_page = omap_read_page_bch;
-> +               info->nand.ecc.write_page = omap_write_page_bch;
-> +               info->elm_dev = elm_request(bch_type);
-> +               if (!info->elm_dev) {
-> +                       pr_err("Request to elm module failed\n");
-> +                       goto fail;
-> +               }
->         } else {
-> -               info->nand.ecc.strength  = 4;
-> -               info->nand.ecc.bytes     = 7;
-> -               info->nand.ecc.calculate = omap3_calculate_ecc_bch4;
-> +
-> +               /* initialize GPMC BCH engine */
-> +               ret = gpmc_init_hwecc_bch(info->gpmc_cs, 1, max_errors);
-> +               if (ret)
-> +                       goto fail;
-> +
-> +               /*
-> +                * software bch library is only used to detect and
-> +                * locateerrors
-
-s/locateerrors/locate errors/
-
-BTW, did you check that your patch does not break the software BCH case (i.e. no ELM) ?
-
-BR,
---
-Ivan
+Acked-by: Andrew Lunn <andrew@lunn.ch>
