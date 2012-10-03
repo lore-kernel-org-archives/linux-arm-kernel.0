@@ -1,29 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 3 Oct 2012 14:36:03 +0530
-Subject: [PATCH] davinci: vpbe: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
- V4L2_OUT_CAP_DV_TIMINGS
-In-Reply-To: <1349245973-7377-1-git-send-email-prabhakar.lad@ti.com>
-References: <1349245973-7377-1-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <506BFFFB.5050103@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Oct 2012 10:13:10 +0100
+Subject: [PATCH] ARM: arch timer: Export 'read_current_timer' symbol
+In-Reply-To: <20121003005218.GA23874@animalcreek.com>
+References: <20121003005218.GA23874@animalcreek.com>
+Message-ID: <20121003091310.GB22445@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/3/2012 12:02 PM, Prabhakar wrote:
-> From: Lad, Prabhakar <prabhakar.lad@ti.com>
+Hi Mark,
+
+On Wed, Oct 03, 2012 at 01:52:18AM +0100, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 > 
-> This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
-> V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
-> out.
+> Commit 923df96b9f31b7d08d8438ff9677326d9537accf
+> (ARM: 7451/1: arch timer: implement read_current_timer and get_cycles)
+> modifies get_cycles() such that it calls read_current_timer().
+> Unfortunately, the 'read_current_timer' symbol is not exported so when
+> a driver that calls get_cycles() is built as a module, an undefined
+> reference error occurs.
 > 
-> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Hans Verkuil <hansverk@cisco.com>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> A good example is the crypto/tcrypt.c (CONFIG_CRYPTO_TEST) driver
+> because it calls get_cycles() and can only be built as a module.
+> 
+> Fix this error by exporting the 'read_current_timer' symbol.
 
-For the DaVinci platform change:
+This was already reported over on the kernel-janitors list, I assumed they'd
+CC'd LAK, but it looks like it didn't happen.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+  http://marc.info/?l=kernel-janitors&m=134910841909057&w=2
 
-Thanks,
-Sekhar
+Anyway, I've got a fix in the works (I don't think you need the ifdef).
+
+Will
