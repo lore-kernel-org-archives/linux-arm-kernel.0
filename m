@@ -1,54 +1,33 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 3 Oct 2012 16:10:12 +0200
-Subject: [PATCH v7 1/3] watchdog: at91sam9_wdt: add device tree
-In-Reply-To: <20121002200753.GA12565@lunn.ch>
-References: <20121002200753.GA12565@lunn.ch>
-Message-ID: <CAHkwnC9a4wEko=dTpbkGXSqC0-zbjSy2AsfQPb6CnXZcEEPKzg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 3 Oct 2012 16:28:34 +0200
+Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+In-Reply-To: <20121003135556.GE4360@opensource.wolfsonmicro.com>
+References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
+ <CAPDyKFo5-UeUe7PkxCBMnRziWh+eSC_ZjJ0pKhcBkHUkFdSH+w@mail.gmail.com>
+ <20121003135556.GE4360@opensource.wolfsonmicro.com>
+Message-ID: <CAPDyKFrQ9UhEc_jEKdR=J8T-NUxsYQHB-yMh2vTyxJ+y+R38Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2012 at 10:07 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> Date: Tue,  2 Oct 2012 18:01:00 +0200
->> From: Fabio Porcedda <fabio.porcedda@gmail.com>
->> To: Wim Van Sebroeck <wim@iguana.be>, linux-watchdog at vger.kernel.org,
->>         linux-arm-kernel at lists.infradead.org, Nicolas Ferre
->>         <nicolas.ferre@atmel.com>, Jean-Christophe PLAGNIOL-VILLARD
->>         <plagnioj@jcrosoft.com>, Andrew Victor <linux@maxim.org.za>
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Subject: [PATCH v7 1/3] watchdog: at91sam9_wdt: add device tree
->>         support
->> Message-ID:
->>         <1349193662-23482-2-git-send-email-fabio.porcedda@gmail.com>
->>
->> Tested on an at91sam9260 board (evk-pro3)
->>
->> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
->> +++ b/drivers/watchdog/at91sam9_wdt.c
->> @@ -32,6 +32,7 @@
->>  #include <linux/timer.h>
->>  #include <linux/bitops.h>
->>  #include <linux/uaccess.h>
->> +#include <linux/of.h>
->>
->>  #include "at91sam9_wdt.h"
->>
->> > @@ -302,11 +303,21 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
->>         return res;
->>  }
->>
->> +#if defined(CONFIG_OF)
->> +static const struct of_device_id at91_wdt_dt_ids[] = {
->> +       { .compatible = "atmel,at91sam9260-wdt" },
->> +       { /* sentinel */ }
->> +};
->
-> Hi Fabio
->
-> You are missing __devinitdata.
+Hi Mark,
 
-Thank you, Andrew.
-I'll add __initconst, because it's const and use platform_driver_probe.
+I will do a resend and include some explanation for the reverts in the
+"cover-letter".
 
-Best regards
--- 
-Fabio Porcedda
+Kind regards
+Ulf Hansson
+
+On 3 October 2012 15:55, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Oct 03, 2012 at 03:43:16PM +0200, Ulf Hansson wrote:
+>
+>> Heard from Linus Walleij that you Mark has been helping out merging
+>> spi patches, did not know that when sending out this series. Anyway,
+>> do you guys see any issues merging this?
+>
+>> [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+>> [PATCH 2/3] Revert "spi/pl022: enable runtime PM"
+>> [PATCH 3/3] spi: spi-pl022: Minor simplification for runtime pm
+>
+> If someone could send the patches I'll take a look...  some explanation
+> as to why we're reverting things would be helpful.
