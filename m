@@ -1,92 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 3 Oct 2012 19:47:12 +0200
-Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <CAHkwnC_uS1Q_oxr61w8k-7MJWyNfHx=maF_jMZ97tyGxPOn1kg@mail.gmail.com>
-References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
- <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
- <20121001124546.GE11837@lunn.ch>
- <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
- <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
- <20121001130658.GG11837@lunn.ch>
- <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
- <20121002190020.GD5117@game.jcrosoft.org>
- <CAHkwnC_uS1Q_oxr61w8k-7MJWyNfHx=maF_jMZ97tyGxPOn1kg@mail.gmail.com>
-Message-ID: <20121003174712.GE5117@game.jcrosoft.org>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 3 Oct 2012 20:19:28 +0200
+Subject: [PATCH 1/2] ARM: OMAP: hwmod: align the SmartReflex fck names
+In-Reply-To: <20121003170059.GD4840@atomide.com>
+References: <1349279277-7634-1-git-send-email-j-pihet@ti.com>
+ <1349279277-7634-2-git-send-email-j-pihet@ti.com>
+ <20121003170059.GD4840@atomide.com>
+Message-ID: <CAORVsuUCwGYjUjAuxZQb+en9SLE066OFJ3AOgSQou7JEyu5cjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:32 Wed 03 Oct     , Fabio Porcedda wrote:
-> On Tue, Oct 2, 2012 at 9:00 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 17:04 Tue 02 Oct     , Fabio Porcedda wrote:
-> >> On Mon, Oct 1, 2012 at 3:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> > On Mon, Oct 01, 2012 at 02:54:55PM +0200, Fabio Porcedda wrote:
-> >> >> On Mon, Oct 1, 2012 at 2:48 PM, Fabio Porcedda <fabio.porcedda@gmail.com> wrote:
-> >> >> > On Mon, Oct 1, 2012 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> >> >> On Mon, Oct 01, 2012 at 02:24:39PM +0200, Fabio Porcedda wrote:
-> >> >> >>> Tested on an at91sam9260 board (evk-pro3)
-> >> >> >>>
-> >> >> >>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> >> >> >>> ---
-> >> >> >>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
-> >> >> >>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
-> >> >> >>>  2 files changed, 40 insertions(+)
-> >> >> >>> ...
-> >> >> >>
-> >> >> >> In patch #1 you add a function to do this, and then you don't make use
-> >> >> >> of it here ?
-> >> >> >>
-> >> >> >> Or am i missing something?
-> >> >> >
-> >> >> > I'm using it on the patch #2 for the orion_wdt driver.
-> >> >> > Do you think it's better to join the #1 and the #2 patch?
-> >> >> >
-> >> >> > Best regards
-> >> >> > --
-> >> >> > Fabio Porcedda
-> >> >>
-> >> >> I'm sorry, only now i understand your question.
-> >> >> The at91sam9_wdt driver don't use the watchdog core framework si i
-> >> >> can't use that function cleanly.
-> >> >
-> >> >> The patch #1 and #2 are for introducing the same property as the
-> >> >> at91sam9_wdt driver.
-> >> >
-> >> > So maybe split this up into two different patchsets. One patchset to
-> >> > add the helper function, and the use of this helper to all watchdog
-> >> > divers that can use it. I think the following drivers should be
-> >> > modified:
-> >> >
-> >> > orion_wdt.c
-> >> > pnx4008_wdt.c
-> >> > s3c2410_wdt.c
-> >> >
-> >> > In a second patchset, convert the AT91SAM9 driver over to the watchdog
-> >> > core framework, and then use the helper function.
-> >>
-> >> I was thinking to add a more generic helper function like this:
-> >>
-> >> static inline void watchdog_get_dttimeout(struct device_node *node,
-> >> u32 *timeout)
-> >> {
-> >>       if (node)
-> >>               of_property_read_u32(node, "timeout", &wdd->timeout);
-> >> }
-> >>
-> >> This way i can use this helper function in the at91sam9_wdt driver too.
-> >> What do you think?
-> > timeout_sec and this can be move at of.h level
-> >
-> > as this is not watchdog framework secific
-> 
-> I can not find any property with the "_sec" suffix, you think it's
-> still fine to use that suffix?
-> 
-> You are speaking about a of_watchdog.h header with a
-> of_watchdog_get_timeout function?
-no a global helper not watchdog specific for timeout binding
+Hi Tony,
 
-that why I said of.h not of_watchdog.h
+On Wed, Oct 3, 2012 at 7:00 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [121003 08:48]:
+>> @@ -1036,8 +1036,8 @@ static struct omap_clk am33xx_clks[] = {
+>>       CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
+>>       CLK("NULL",     "mmc2_fck",             &mmc2_fck,      CK_AM33XX),
+>>       CLK(NULL,       "mmu_fck",              &mmu_fck,       CK_AM33XX),
+>> -     CLK(NULL,       "smartreflex0_fck",     &smartreflex0_fck,      CK_AM33XX),
+>> -     CLK(NULL,       "smartreflex1_fck",     &smartreflex1_fck,      CK_AM33XX),
+>> +     CLK(NULL,       "smartreflex.0",        &smartreflex_mpu_fck,   CK_AM33XX),
+>> +     CLK(NULL,       "smartreflex.1",        &smartreflex_core_fck,  CK_AM33XX),
+>>       CLK(NULL,       "timer1_fck",           &timer1_fck,    CK_AM33XX),
+>>       CLK(NULL,       "timer2_fck",           &timer2_fck,    CK_AM33XX),
+>>       CLK(NULL,       "timer3_fck",           &timer3_fck,    CK_AM33XX),
+>
+> I think this should be something like this instead:
+>
+>         CLK("smartreflex.0",    "fck",  &smartreflex_mpu_fck,   CK_AM33XX),
+>         CLK("smartreflex.1",    "fck",  &smartreflex_core_fck,  CK_AM33XX),
+>
+> Where the first one is the dev name, the second one is the
+> alias you want to use in the client driver?
+Ok, thanks for the suggestion.
 
-Best Regards,
-J.
+It works however I get a ' smartreflex.0: alias fck already exists'
+warning at boot, coming from _add_hwmod_clocks_clkdev (called from
+omap_device_alloc).
+Since an "fck" is implicitly added for every device (in
+_add_hwmod_clocks_clkdev) I replaced "fck" in the alias definition by
+NULL but the warning is still present.
+
+What do you think? /me dives into the omap_device code for details...
+
+> Regards,
+>
+> Tony
+
+Thanks,
+Jean
