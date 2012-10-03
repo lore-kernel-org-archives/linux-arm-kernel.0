@@ -1,45 +1,80 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  2 Oct 2012 19:26:37 -0600
-Subject: [PATCH] ARM: bcm2835: fix typos in DT binding documentation
-Message-ID: <1349227597-5187-1-git-send-email-swarren@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Oct 2012 11:19:22 +0900
+Subject: [PATCH 2/2] arm: Add ARM ERRATA 782773 workaround
+In-Reply-To: <20120928083819.GA21542@arm.com>
+References: <1347434097-7924-1-git-send-email-horms@verge.net.au>
+ <1347434097-7924-3-git-send-email-horms@verge.net.au>
+ <5050CD87.4020800@codeaurora.org>
+ <20120913010041.GD7622@verge.net.au>
+ <CAHkRjk500KGTeBD67YMWy2qSdaoO_=Y9WBT_Q78n9Zxgqtmo4w@mail.gmail.com>
+ <20120921010037.GI21660@verge.net.au>
+ <20120928010246.GA13133@verge.net.au>
+ <20120928083819.GA21542@arm.com>
+Message-ID: <20121003021922.GK31207@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible value shouldn't include ".txt", which was probably cut
-and paste from the filename.
+On Fri, Sep 28, 2012 at 09:38:19AM +0100, Catalin Marinas wrote:
+> On Fri, Sep 28, 2012 at 02:02:46AM +0100, Simon Horman wrote:
+> > On Fri, Sep 21, 2012 at 10:00:37AM +0900, Simon Horman wrote:
+> > > On Thu, Sep 20, 2012 at 10:35:50AM +0100, Catalin Marinas wrote:
+> > > > On 13 September 2012 02:00, Simon Horman <horms@verge.net.au> wrote:
+> > > > > On Wed, Sep 12, 2012 at 10:59:35AM -0700, Stephen Boyd wrote:
+> > > > >> On 09/12/12 00:14, Simon Horman wrote:
+> > > > >> > @@ -1423,6 +1423,15 @@ config ARM_ERRATA_775420
+> > > > >> >           deadlock. This workaround puts DSB before executing ISB at the
+> > > > >> >           beginning of the abort exception handler.
+> > > > >> >
+> > > > >> > +config ARM_ERRATA_782773
+> > > > >> > +   bool "ARM errata: Updating a translation entry might cause an unexpected translation fault"
+> > > > >> > +   depends on CPU_V7
+> > > > >> > +   help
+> > > > >> > +     This option enables the workaround for the 782773 Cortex-A9 (all r0,
+> > > > >> > +     ,r2 and r3 revisions) erratum. It might cause MMU exception in case
+> > > > >>
+> > > > >> Seems to be an extra comma here.
+> > > > >
+> > > > > Thanks, here is an updated version.
+> > > > >
+> > > > > From: Kouei Abe <kouei.abe.cp@rms.renesas.com>
+> > > > >
+> > > > > arm: Add ARM ERRATA 782773 workaround
+> > > > >
+> > > > > Signed-off-by: Kouei Abe <kouei.abe.cp@rms.renesas.com>
+> > > > > Signed-off-by: Simon Horman <horms@verge.net.au>
+> > > > 
+> > > > I would add some text to the commit log as well, even though it
+> > > > matches the Kconfig entry.
+> > > 
+> > > Sure, an updated patch is below.
+> > > I also reworded the text to make it easier on my eyes,
+> > > I don't think the meaning has been altered.
+> > > 
+> > > > Have you hit this in practice? In general the kernel shouldn't access
+> > > > kernel virtual address corresponding to a page table that is being
+> > > > changed. For user address space it is possible but the kernel can
+> > > > handle use translation faults, even though they may be spurious.
+> > > 
+> > > I believe that Abe-san's team have come up against this,
+> > > I can confirm that if it is important.
+> > 
+> > I was wondering if I could get an Ack on this as you indicated
+> > in another email that you feel that the implementation is an
+> > appropriate workaround.
+> 
+> I'd like to know whether this is actually hit in practice and the
+> conditions. The only time when we write live (i.e. translation that's
+> currently in use) kernel mappings is during boot, alloc_init_section()
+> replacing (though with the same value) the initial memory map. But if
+> that's the scenario you are getting, I would rather add another
+> flush_pmd_entry() call before setting the pmd in alloc_init_section().
+> 
+> I'm not convinced a costly run-time workaround in set_pte is needed.
 
-Reported-by: Domenico Andreoli <cavokz@gmail.com>
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
- .../brcm,bcm2835-armctrl-ic.txt                    |    2 +-
- .../bindings/timer/brcm,bcm2835-system-timer.txt   |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Hi Catalin,
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-index 548892c..7da578d 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-@@ -7,7 +7,7 @@ as "armctrl" in the SoC documentation, hence naming of this binding.
- 
- Required properties:
- 
--- compatible : should be "brcm,bcm2835-armctrl-ic.txt"
-+- compatible : should be "brcm,bcm2835-armctrl-ic"
- - reg : Specifies base physical address and size of the registers.
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
-diff --git a/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt b/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
-index 2de21c2..844bd5f 100644
---- a/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
-@@ -7,7 +7,7 @@ free running counter values, and generates an interrupt.
- 
- Required properties:
- 
--- compatible : should be "brcm,bcm2835-system-timer.txt"
-+- compatible : should be "brcm,bcm2835-system-timer"
- - reg : Specifies base physical address and size of the registers.
- - interrupts : A list of 4 interrupt sinks; one per timer channel.
- - clock-frequency : The frequency of the clock that drives the counter, in Hz.
--- 
-1.7.9.5
+I have discussed this the issue that you raised above with the platform
+team that provided me with the workaround. Although they have not encountered a
+situation in which the errata is hit they would like the workaround
+considered for merging as it is needed for compliance with customer
+requirements, in this case an automotive customer (I do not know which one).
