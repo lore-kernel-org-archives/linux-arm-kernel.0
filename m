@@ -1,75 +1,72 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed,  3 Oct 2012 17:48:04 +0200
-Subject: [PATCH v8 1/3] watchdog: at91sam9_wdt: add device tree support
+Date: Wed,  3 Oct 2012 17:48:05 +0200
+Subject: [PATCH v8 2/3] ARM: at91/dts: add at91sam9_wdt driver to at91sam926x,
+ at91sam9g45
 In-Reply-To: <1349279286-11261-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1349279286-11261-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1349279286-11261-2-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1349279286-11261-3-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on an at91sam9260 board (evk-pro3)
+Tested on an at91sam9260 board (evk-pro3).
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 ---
- Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 15 +++++++++++++++
- drivers/watchdog/at91sam9_wdt.c                          | 11 +++++++++++
- 2 files changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+ arch/arm/boot/dts/at91sam9260.dtsi | 6 ++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 6 ++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi | 6 ++++++
+ 3 files changed, 18 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-new file mode 100644
-index 0000000..2957ebb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-@@ -0,0 +1,15 @@
-+* Atmel Watchdog Timers
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 7c95f76..7612193 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -236,6 +236,12 @@
+ 					trigger-external;
+ 				};
+ 			};
 +
-+** at91sam9-wdt
-+
-+Required properties:
-+- compatible: must be "atmel,at91sam9260-wdt".
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+Example:
-+
-+	watchdog at fffffd40 {
-+		compatible = "atmel,at91sam9260-wdt";
-+		reg = <0xfffffd40 0x10>;
-+	};
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 05e1be8..dc42e44 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -32,6 +32,7 @@
- #include <linux/timer.h>
- #include <linux/bitops.h>
- #include <linux/uaccess.h>
-+#include <linux/of.h>
++			watchdog at fffffd40 {
++				compatible = "atmel,at91sam9260-wdt";
++				reg = <0xfffffd40 0x10>;
++				status = "disabled";
++			};
+ 		};
  
- #include "at91sam9_wdt.h"
- 
-@@ -302,11 +303,21 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
- 	return res;
- }
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id at91_wdt_dt_ids[] __initconst = {
-+	{ .compatible = "atmel,at91sam9260-wdt" },
-+	{ /* sentinel */ }
-+};
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 195019b..d822240 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -185,6 +185,12 @@
+ 				interrupts = <24 4 2>;
+ 				status = "disabled";
+ 			};
 +
-+MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-+#endif
-+
- static struct platform_driver at91wdt_driver = {
- 	.remove		= __exit_p(at91wdt_remove),
- 	.driver		= {
- 		.name	= "at91_wdt",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(at91_wdt_dt_ids),
- 	},
- };
++			watchdog at fffffd40 {
++				compatible = "atmel,at91sam9260-wdt";
++				reg = <0xfffffd40 0x10>;
++				status = "disabled";
++			};
+ 		};
  
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 63751b1..df998ab 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -242,6 +242,12 @@
+ 					trigger-value = <0x6>;
+ 				};
+ 			};
++
++			watchdog at fffffd40 {
++				compatible = "atmel,at91sam9260-wdt";
++				reg = <0xfffffd40 0x10>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
 -- 
 1.7.11.3
