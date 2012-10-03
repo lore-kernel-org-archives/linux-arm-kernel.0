@@ -1,44 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Oct 2012 11:02:13 +0100
-Subject: [PATCH] ARM: MMUless Core: Fix insmod error - module
- relocation out of range
-In-Reply-To: <20121003094801.GG6933@n2100.arm.linux.org.uk>
-References: <4995c6bc655337598b88bef025cd48b320c2ada0.1349235619.git.pratyush.anand@st.com>
- <CAHkRjk5gLSWG0uiSAK9wnLDi19bEPMpFAFfbqXjz6xNH1W4HXw@mail.gmail.com>
- <20121003094801.GG6933@n2100.arm.linux.org.uk>
-Message-ID: <20121003100213.GB31930@arm.com>
+From: prabhakar.lad@ti.com (Prabhakar Lad)
+Date: Wed, 3 Oct 2012 15:33:27 +0530
+Subject: [GIT PULL FOR v3.7] Davinci VPBE feature enhancement and fixes
+Message-ID: <506C0D6F.1070700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 10:48:02AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Oct 03, 2012 at 10:25:09AM +0100, Catalin Marinas wrote:
-> > On 3 October 2012 04:43, Pratyush Anand <pratyush.anand@st.com> wrote:
-> > > From: Neha MAKHIJA <neha.makhija-ext@st.com>
-> > >
-> > > ARM supports 32Mb jump. Hence branch instruction has a limited range.
-> > >
-> > > For MMU systems, the module area is located just before the kernel memory
-> > > because this allows function calls to be linked directly without any indirect
-> > > branches.
-> > >
-> > > In case of MMU-less system, Module area is given whole of the DDR address
-> > > space.  Since, module_alloc() calls vmalloc(), the module area goes outside the
-> > > allowed jump range. Due to this insmod will not be able to load the modules
-> > > giving out of range relocation errors.
-> > >
-> > > Solution - Add the mlong-calls flags while compiling the modules. This tells
-> > > the compiler to perform function calls by first loading the address of the
-> > > function and then performing a subroutine function call on this register.
-> > 
-> > Do we need the module loader to handle additional relocations or they
-> > are all already handled?
-> 
-> I have explained this extensively when the 2.6 module loader came into
-> being.  It's not about additional relocations, it's about the addressible
-> range of the 'b' instruction.
+Hi Mauro,
 
-But doesn't -mlong-calls generate the function calls by first loading
-the address in a register?
+Can you please pull the following patches for davinci VPBE driver.
+Some of the patches include platform changes for which Sekhar has Acked it.
 
--- 
-Catalin
+Thanks and Regards,
+--Prabhakar Lad
+
+The following changes since commit 2425bb3d4016ed95ce83a90b53bd92c7f31091e4:
+
+  em28xx: regression fix: use DRX-K sync firmware requests on em28xx
+(2012-10-02 17:15:22 -0300)
+
+are available in the git repository at:
+  git://linuxtv.org/mhadli/v4l-dvb-davinci_devices.git vpbe_3.7_pull
+
+Hans Verkuil (1):
+      dm644x: replace the obsolete preset API by the timings API.
+
+Lad, Prabhakar (2):
+      media: davinci: vpbe: fix build warning
+      davinci: vpbe: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
+V4L2_OUT_CAP_DV_TIMINGS
+
+Manjunath Hadli (1):
+      ths7303: enable THS7303 for HD modes
+
+ arch/arm/mach-davinci/board-dm644x-evm.c      |   15 ++--
+ arch/arm/mach-davinci/dm644x.c                |   17 +---
+ drivers/media/i2c/ths7303.c                   |  106
+++++++++++++++++++++----
+ drivers/media/platform/davinci/vpbe.c         |  110
++++++++++++--------------
+ drivers/media/platform/davinci/vpbe_display.c |   80 +++++++++---------
+ drivers/media/platform/davinci/vpbe_venc.c    |   25 +++---
+ include/media/davinci/vpbe.h                  |   14 ++--
+ include/media/davinci/vpbe_types.h            |    8 +--
+ include/media/davinci/vpbe_venc.h             |    2 +-
+ 9 files changed, 211 insertions(+), 166 deletions(-)
