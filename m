@@ -1,46 +1,44 @@
-From: prabhakar.lad@ti.com (Prabhakar Lad)
-Date: Wed, 3 Oct 2012 15:33:27 +0530
-Subject: [GIT PULL FOR v3.7] Davinci VPBE feature enhancement and fixes
-Message-ID: <506C0D6F.1070700@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 3 Oct 2012 12:12:05 +0200
+Subject: [PATCH 0/4] cpufreq: db8500: Use platform data to provide cpufreq
+ table
+In-Reply-To: <CACRpkdb-SWkysKGQrJBL1hJLucQ=aN59Sfxe6rxrvtR0HsOJ_g@mail.gmail.com>
+References: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdb-SWkysKGQrJBL1hJLucQ=aN59Sfxe6rxrvtR0HsOJ_g@mail.gmail.com>
+Message-ID: <CAPDyKFqqS4D4ZNDp3tFqE5t5iYOKCcaQYvyFsfGQa5U8bzWWag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+On 2 October 2012 13:45, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Sep 28, 2012 at 4:16 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Since the cpufreq table is dependant on the prmcu fw, it make sense to
+>> keep the table there. Moreover since the cpufreq is already a mfd child
+>> device added by the prcmu this make even more logic.
+>
+> Better there than elsewhere.
+>
+>> The next step after these patches will be to implement an "arm_clk" to be
+>> used from cpufreq to update the opp instead of using the prcmu opp API directly.
+>> This will then remove the last hard dependency to the prcmu API from cpufreq.
+>
+> Sounds like a plan.
+>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Is this going to be merged through the cpufreq tree or the MFD tree?
 
-Can you please pull the following patches for davinci VPBE driver.
-Some of the patches include platform changes for which Sekhar has Acked it.
+Good question! Actually I would prefer to go through Mike Turquette
+clock tree, if he feel it is OK of course.
+My idea is then get the Ack from Rafael for cpufreq patches and from
+Samuel for the mfd patches.
 
-Thanks and Regards,
---Prabhakar Lad
+The reason for doing this in a quite complicated manner is that my
+soon upcoming clock and mfd patches will functionality wise depend on
+these patches, and don't want to be sitting around and waiting for a
+new rc before being able to push the next series.
 
-The following changes since commit 2425bb3d4016ed95ce83a90b53bd92c7f31091e4:
-
-  em28xx: regression fix: use DRX-K sync firmware requests on em28xx
-(2012-10-02 17:15:22 -0300)
-
-are available in the git repository at:
-  git://linuxtv.org/mhadli/v4l-dvb-davinci_devices.git vpbe_3.7_pull
-
-Hans Verkuil (1):
-      dm644x: replace the obsolete preset API by the timings API.
-
-Lad, Prabhakar (2):
-      media: davinci: vpbe: fix build warning
-      davinci: vpbe: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
-V4L2_OUT_CAP_DV_TIMINGS
-
-Manjunath Hadli (1):
-      ths7303: enable THS7303 for HD modes
-
- arch/arm/mach-davinci/board-dm644x-evm.c      |   15 ++--
- arch/arm/mach-davinci/dm644x.c                |   17 +---
- drivers/media/i2c/ths7303.c                   |  106
-++++++++++++++++++++----
- drivers/media/platform/davinci/vpbe.c         |  110
-+++++++++++--------------
- drivers/media/platform/davinci/vpbe_display.c |   80 +++++++++---------
- drivers/media/platform/davinci/vpbe_venc.c    |   25 +++---
- include/media/davinci/vpbe.h                  |   14 ++--
- include/media/davinci/vpbe_types.h            |    8 +--
- include/media/davinci/vpbe_venc.h             |    2 +-
- 9 files changed, 211 insertions(+), 166 deletions(-)
+Kind regards
+Ulf Hansson
