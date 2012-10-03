@@ -1,51 +1,136 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 3 Oct 2012 20:19:28 +0200
-Subject: [PATCH 1/2] ARM: OMAP: hwmod: align the SmartReflex fck names
-In-Reply-To: <20121003170059.GD4840@atomide.com>
-References: <1349279277-7634-1-git-send-email-j-pihet@ti.com>
- <1349279277-7634-2-git-send-email-j-pihet@ti.com>
- <20121003170059.GD4840@atomide.com>
-Message-ID: <CAORVsuUCwGYjUjAuxZQb+en9SLE066OFJ3AOgSQou7JEyu5cjg@mail.gmail.com>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Wed, 3 Oct 2012 20:54:58 +0200
+Subject: [PATCH 3/4] ARM: OMAP2: gpmc: Add support for BCH ECC scheme
+In-Reply-To: <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121003185458.GA27502@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wed, Oct 03, 2012 at 03:29:48PM +0100, Philip, Avinash wrote:
+> Add support for BCH ECC scheme to gpmc driver and also enabling multi
+> sector read/write. This helps in doing single shot NAND page read and
+> write.
+> 
+> ECC engine configurations
+> BCH 4 bit support
+> 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
+> 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
+> 13 and ecc_size1 as 1.
+> 
+> BCH 8 bit support
+> 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
+> 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
+> 26 and ecc_size1 as 2.
+> 
+> Note: For BCH8 ECC bytes set to 14 to make compatible with RBL.
+> 
 
-On Wed, Oct 3, 2012 at 7:00 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [121003 08:48]:
->> @@ -1036,8 +1036,8 @@ static struct omap_clk am33xx_clks[] = {
->>       CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
->>       CLK("NULL",     "mmc2_fck",             &mmc2_fck,      CK_AM33XX),
->>       CLK(NULL,       "mmu_fck",              &mmu_fck,       CK_AM33XX),
->> -     CLK(NULL,       "smartreflex0_fck",     &smartreflex0_fck,      CK_AM33XX),
->> -     CLK(NULL,       "smartreflex1_fck",     &smartreflex1_fck,      CK_AM33XX),
->> +     CLK(NULL,       "smartreflex.0",        &smartreflex_mpu_fck,   CK_AM33XX),
->> +     CLK(NULL,       "smartreflex.1",        &smartreflex_core_fck,  CK_AM33XX),
->>       CLK(NULL,       "timer1_fck",           &timer1_fck,    CK_AM33XX),
->>       CLK(NULL,       "timer2_fck",           &timer2_fck,    CK_AM33XX),
->>       CLK(NULL,       "timer3_fck",           &timer3_fck,    CK_AM33XX),
->
-> I think this should be something like this instead:
->
->         CLK("smartreflex.0",    "fck",  &smartreflex_mpu_fck,   CK_AM33XX),
->         CLK("smartreflex.1",    "fck",  &smartreflex_core_fck,  CK_AM33XX),
->
-> Where the first one is the dev name, the second one is the
-> alias you want to use in the client driver?
-Ok, thanks for the suggestion.
+Hi Philip,
 
-It works however I get a ' smartreflex.0: alias fck already exists'
-warning at boot, coming from _add_hwmod_clocks_clkdev (called from
-omap_device_alloc).
-Since an "fck" is implicitly added for every device (in
-_add_hwmod_clocks_clkdev) I replaced "fck" in the alias definition by
-NULL but the warning is still present.
+I have a few comments/questions below,
 
-What do you think? /me dives into the omap_device code for details...
+(...)
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 72428bd..c9bc3cf 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/io.h>
+>  #include <linux/module.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/mtd/nand.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <plat/gpmc.h>
+> @@ -83,6 +84,18 @@
+>  #define ENABLE_PREFETCH		(0x1 << 7)
+>  #define DMA_MPU_MODE		2
+>  
+> +/* GPMC ecc engine settings for read */
+> +#define BCH_WRAPMODE_1		1	/* BCH wrap mode 6 */
 
-> Regards,
->
-> Tony
+Comment should say "mode 1".
 
-Thanks,
-Jean
+(...)
+>  /**
+> + * gpmc_calculate_ecc_bch	- Generate ecc bytes per block of 512 data bytes for entire page
+> + * @cs:  chip select number
+> + * @dat: The pointer to data on which ECC is computed
+> + * @ecc: The ECC output buffer
+> + */
+> +int gpmc_calculate_ecc_bch(int cs, const u_char *dat, u_char *ecc)
+> +{
+> +	int i, eccbchtsel;
+> +	u32 nsectors, reg, bch_val1, bch_val2, bch_val3, bch_val4;
+> +
+> +	if (gpmc_ecc_used != cs)
+> +		return -EINVAL;
+> +
+> +	/* read number of sectors for ecc to be calculated */
+> +	nsectors = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 4) & 0x7) + 1;
+> +	/*
+> +	 * find BCH scheme used
+> +	 * 0 -> BCH4
+> +	 * 1 -> BCH8
+> +	 */
+> +	eccbchtsel = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 12) & 0x3);
+> +
+> +	/* update ecc bytes for entire page */
+> +	for (i = 0; i < nsectors; i++) {
+> +
+> +		reg = GPMC_ECC_BCH_RESULT_0 + 16 * i;
+> +
+> +		/* Read hw-computed remainder */
+> +		bch_val1 = gpmc_read_reg(reg + 0);
+> +		bch_val2 = gpmc_read_reg(reg + 4);
+> +		if (eccbchtsel) {
+> +			bch_val3 = gpmc_read_reg(reg + 8);
+> +			bch_val4 = gpmc_read_reg(reg + 12);
+> +		}
+> +
+> +		if (eccbchtsel) {
+> +			/* BCH8 ecc scheme */
+> +			*ecc++ = (bch_val4 & 0xFF);
+> +			*ecc++ = ((bch_val3 >> 24) & 0xFF);
+> +			*ecc++ = ((bch_val3 >> 16) & 0xFF);
+> +			*ecc++ = ((bch_val3 >> 8) & 0xFF);
+> +			*ecc++ = (bch_val3 & 0xFF);
+> +			*ecc++ = ((bch_val2 >> 24) & 0xFF);
+> +			*ecc++ = ((bch_val2 >> 16) & 0xFF);
+> +			*ecc++ = ((bch_val2 >> 8) & 0xFF);
+> +			*ecc++ = (bch_val2 & 0xFF);
+> +			*ecc++ = ((bch_val1 >> 24) & 0xFF);
+> +			*ecc++ = ((bch_val1 >> 16) & 0xFF);
+> +			*ecc++ = ((bch_val1 >> 8) & 0xFF);
+> +			*ecc++ = (bch_val1 & 0xFF);
+> +			/* 14th byte of ecc not used */
+> +			*ecc++ = 0;
+> +		} else {
+> +			/* BCH4 ecc scheme */
+> +			*ecc++ = ((bch_val2 >> 12) & 0xFF);
+> +			*ecc++ = ((bch_val2 >> 4) & 0xFF);
+> +			*ecc++ = (((bch_val2 & 0xF) << 4) |
+> +					((bch_val1 >> 28) & 0xF));
+> +			*ecc++ = ((bch_val1 >> 20) & 0xFF);
+> +			*ecc++ = ((bch_val1 >> 12) & 0xFF);
+> +			*ecc++ = ((bch_val1 >> 4) & 0xFF);
+> +			*ecc++ = ((bch_val1 & 0xF) << 4);
+> +		}
+> +	}
+> +
+> +	gpmc_ecc_used = -EINVAL;
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(gpmc_calculate_ecc_bch);
+
+Here you introduce a function very similar to gpmc_calculate_ecc_bch4 and
+gpmc_calculate_ecc_bch8, but without the added benefit (IMHO) of the constant
+polynomial that allows to get an ecc sequence of 0xFFs for a buffer filled with
+0xFFs. Why ?
+If using the ELM prevents you from reusing gpmc_calculate_ecc_bch[48], could you explain in which way ?
+
+Best regards,
+--
+Ivan
