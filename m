@@ -1,68 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 3 Oct 2012 17:43:10 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
- parents
-In-Reply-To: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
-References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20121003154310.GI11837@lunn.ch>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Wed,  3 Oct 2012 17:47:55 +0200
+Subject: [PATCH 0/2] ARM: OMAP: SmartReflex: pass device dependent data via
+ platform data
+Message-ID: <1349279277-7634-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 05:14:30PM +0200, Simon Guinot wrote:
-> This patch adds DT board setup for LaCie Network Space v2 and parents,
-> based the Marvell Kirkwood 6281 SoC. This includes Network Space (Max)
-> v2 and Internet Space v2.
+From: Jean Pihet <j-pihet@ti.com>
 
-Hi Simon
+Remove the device dependent code (ex. cpu_is_xxx()) and settings
+from the driver code and instead pass them via the platform
+data. This allows a clean separation of the driver code and the platform
+code, as required by the move of the platform header files to
+include/linux/platform_data.
 
-At a first look, this looks good. Also nice to see you use the new
-gpio-fan binding.
+Note about the smartreflex functional clocks: the smartreflex fclks
+are derived from sys_clk and are renamed "smartreflex.%d". Since the
+smartreflex device names and the functional clock names are identical
+the device driver code uses them to control the functional clocks.
 
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
->  	if (of_machine_is_compatible("keymile,km_kirkwood"))
->  		km_kirkwood_init();
->  
-> +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
-> +	    of_machine_is_compatible("lacie,netspace_v2") ||
-> +	    of_machine_is_compatible("lacie,netspace_max_v2"))
-> +		ns2_init();
-> +
->  	of_platform_populate(NULL, kirkwood_dt_match_table,
->  			     kirkwood_auxdata_lookup, NULL);
+Based on mainline 3.6.0. Boot tested on OMAP3&4 platforms.
+										
+Jean Pihet (2):
+  ARM: OMAP: hwmod: align the SmartReflex fck names
+  ARM: OMAP: SmartReflex: pass device dependent data via platform data
 
-I'm not a DT policy expert. Could this be one compatibility string for
-all the boards? Maybe ask on the DT mainline list?
+ arch/arm/mach-omap2/clock33xx_data.c       |   12 +++----
+ arch/arm/mach-omap2/clock3xxx_data.c       |   12 +++----
+ arch/arm/mach-omap2/clock44xx_data.c       |    6 ++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++---
+ arch/arm/mach-omap2/sr_device.c            |   13 +++++++
+ drivers/power/avs/smartreflex.c            |   54 +++++++++-------------------
+ include/linux/power/smartreflex.h          |   14 ++++++--
+ 7 files changed, 61 insertions(+), 58 deletions(-)
 
-> +#define NETSPACE_V2_GPIO_BLUE_LED_SLOW	29
-> +#define NETSPACE_V2_GPIO_BLUE_LED_CMD	30
-> +
-> +static struct ns2_led ns2_led_pins[] = {
-> +	{
-> +		.name	= "ns_v2:blue:sata",
-> +		.cmd	= NETSPACE_V2_GPIO_BLUE_LED_CMD,
-> +		.slow	= NETSPACE_V2_GPIO_BLUE_LED_SLOW,
-> +	},
-> +};
-> +
-> +static struct ns2_led_platform_data ns2_leds_data = {
-> +	.num_leds	= ARRAY_SIZE(ns2_led_pins),
-> +	.leds		= ns2_led_pins,
-> +};
-> +
-> +static struct platform_device ns2_leds = {
-> +	.name		= "leds-ns2",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.platform_data	= &ns2_leds_data,
-> +	},
-> +};
-
-Have you thought about adding a DT binding for this driver?
-
-It would be nice if you could respin the patches for -rc1, when it
-comes out. There are changes to Makefile.boot at least required.
-
-Thanks
-	Andrew
+-- 
+1.7.10.4
