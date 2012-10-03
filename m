@@ -1,607 +1,416 @@
-From: pmeerw@pmeerw.net (Peter Meerwald)
-Date: Wed, 3 Oct 2012 17:10:46 +0200 (CEST)
-Subject: [PATCH 2/4] mtd: devices: elm: Add support for ELM error
- correction
-In-Reply-To: <1349274589-11389-3-git-send-email-avinashphilip@ti.com>
-References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <alpine.DEB.2.01.1210031701440.32543@pmeerw.net>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed,  3 Oct 2012 17:14:30 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and parents
+Message-ID: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds DT board setup for LaCie Network Space v2 and parents,
+based the Marvell Kirkwood 6281 SoC. This includes Network Space (Max)
+v2 and Internet Space v2.
 
-some minor nitpicks below
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ arch/arm/boot/dts/kirkwood-is2.dts         |   20 +++++
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi |   63 +++++++++++++++
+ arch/arm/boot/dts/kirkwood-ns2.dts         |   20 +++++
+ arch/arm/boot/dts/kirkwood-ns2max.dts      |   39 ++++++++++
+ arch/arm/mach-kirkwood/Kconfig             |    8 ++
+ arch/arm/mach-kirkwood/Makefile            |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot       |    1 +
+ arch/arm/mach-kirkwood/board-dt.c          |    8 ++
+ arch/arm/mach-kirkwood/board-ns2.c         |  117 ++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.h            |    6 ++
+ drivers/leds/Kconfig                       |    3 +-
+ 11 files changed, 285 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-is2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2max.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-ns2.c
 
-> Platforms containing the ELM module can be used to correct errors
-> reported by BCH 4, 8 & 16 bit ECC scheme. For now only 4 & 8 bit
-> support is added.
-> 
-> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> ---
-> :000000 100644 0000000... b88ee83... A	Documentation/devicetree/bindings/mtd/elm.txt
-> :100644 100644 395733a... 0f6a94b... M	drivers/mtd/devices/Makefile
-> :000000 100644 0000000... 802b572... A	drivers/mtd/devices/elm.c
-> :000000 100644 0000000... eb53163... A	include/linux/platform_data/elm.h
->  Documentation/devicetree/bindings/mtd/elm.txt |   18 +
->  drivers/mtd/devices/Makefile                  |    4 +-
->  drivers/mtd/devices/elm.c                     |  440 +++++++++++++++++++++++++
->  include/linux/platform_data/elm.h             |   60 ++++
->  4 files changed, 521 insertions(+), 1 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/elm.txt b/Documentation/devicetree/bindings/mtd/elm.txt
-> new file mode 100644
-> index 0000000..b88ee83
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/elm.txt
-> @@ -0,0 +1,18 @@
-> +Error location module
-> +
-> +Required properties:
-> +- compatible: Must be "ti,elm"
-> +- reg: physical base address and size of the registers map.
-> +- interrupts: Interrupt number for the elm.
-> +- interrupt-parent: The parent interrupt controller
-> +
-> +Optional properties:
-> +- ti,hwmods: Name of the hwmod associated to the elm
-> +
-> +Example:
-> +elm: elm at 0 {
-> +	compatible	= "ti,elm";
-> +	reg = <0x48080000 0x2000>;
-> +	interrupt-parent = <&intc>;
-> +	interrupts = <4>;
-> +};
-> diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
-> index 395733a..0f6a94b 100644
-> --- a/drivers/mtd/devices/Makefile
-> +++ b/drivers/mtd/devices/Makefile
-> @@ -17,8 +17,10 @@ obj-$(CONFIG_MTD_LART)		+= lart.o
->  obj-$(CONFIG_MTD_BLOCK2MTD)	+= block2mtd.o
->  obj-$(CONFIG_MTD_DATAFLASH)	+= mtd_dataflash.o
->  obj-$(CONFIG_MTD_M25P80)	+= m25p80.o
-> +obj-$(CONFIG_MTD_NAND_OMAP2)	+= elm.o
->  obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
->  obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
->  obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
->  
-> -CFLAGS_docg3.o			+= -I$(src)
-> \ No newline at end of file
-> +
-> +CFLAGS_docg3.o			+= -I$(src)
-> diff --git a/drivers/mtd/devices/elm.c b/drivers/mtd/devices/elm.c
-> new file mode 100644
-> index 0000000..802b572
-> --- /dev/null
-> +++ b/drivers/mtd/devices/elm.c
-> @@ -0,0 +1,440 @@
-> +/*
-> + * Error Location Module
-> + *
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/module.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/platform_data/elm.h>
-> +
-> +#define ELM_IRQSTATUS			0x018
-> +#define ELM_IRQENABLE			0x01c
-> +#define ELM_LOCATION_CONFIG		0x020
-> +#define ELM_PAGE_CTRL			0x080
-> +#define ELM_SYNDROME_FRAGMENT_0		0x400
-> +#define ELM_SYNDROME_FRAGMENT_6		0x418
-> +#define ELM_LOCATION_STATUS		0x800
-> +#define ELM_ERROR_LOCATION_0		0x880
-> +
-> +/* ELM Interrupt Status Register */
-> +#define INTR_STATUS_PAGE_VALID		BIT(8)
-> +
-> +/* ELM Interrupt Enable Register */
-> +#define INTR_EN_PAGE_MASK		BIT(8)
-> +
-> +/* ELM Location Configuration Register */
-> +#define ECC_BCH_LEVEL_MASK		0x3
-> +
-> +/* ELM syndrome */
-> +#define ELM_SYNDROME_VALID		BIT(16)
-> +
-> +/* ELM_LOCATION_STATUS Register */
-> +#define ECC_CORRECTABLE_MASK		BIT(8)
-> +#define ECC_NB_ERRORS_MASK		0x1f
-> +
-> +/* ELM_ERROR_LOCATION_0-15 Registers */
-> +#define ECC_ERROR_LOCATION_MASK		0x1fff
-> +
-> +#define ELM_ECC_SIZE			0x7ff
-> +
-> +#define SYNDROME_FRAGMENT_REG_SIZE	0x40
-> +#define ERROR_LOCATION_SIZE		0x100
-> +#define MAX_BCH_ELM_ERROR		16
-> +#define ELM_FRAGMENT_REG		7
-> +
-> +typedef u32 syn_t[ELM_FRAGMENT_REG];
-> +typedef u32 elm_error_t[MAX_BCH_ELM_ERROR];
-> +
-> +struct elm_info {
-> +	struct device *dev;
-> +	void __iomem *elm_base;
-> +	struct completion elm_completion;
-> +	struct list_head list;
-> +	enum bch_ecc bch_type;
-> +};
-> +
-> +static LIST_HEAD(elm_devices);
-> +
-> +static void elm_write_reg(void *offset, u32 val)
-> +{
-> +	writel(val, offset);
-> +}
-> +
-> +static u32 elm_read_reg(void *offset)
-> +{
-> +	return readl(offset);
-> +}
-> +
-> +/**
-> + * elm_config - Configure ELM module
-> + * @info:	elm info
-> + */
-> +static void elm_config(struct elm_info *info)
-> +{
-> +	u32 reg_val;
-> +
-> +	reg_val = (info->bch_type & ECC_BCH_LEVEL_MASK) | (ELM_ECC_SIZE << 16);
-> +	elm_write_reg(info->elm_base + ELM_LOCATION_CONFIG, reg_val);
-> +}
-> +
-> +/**
-> + * elm_configure_page_mode - Enable/Disable page mode
-> + * @info:	elm info
-> + * @index:	index number of syndrome fragment vector
-> + * @enable:	enable/disable flag for page mode
-> + *
-> + * Enable page mode for syndrome fragment index
-> + */
-> +static void elm_configure_page_mode(struct elm_info *info, int index,
-> +		bool enable)
-> +{
-> +	u32 reg_val;
-> +
-> +	reg_val = elm_read_reg(info->elm_base + ELM_PAGE_CTRL);
-> +	if (enable)
-> +		reg_val |= BIT(index);	/* enable page mode */
-> +	else
-> +		reg_val &= ~BIT(index);	/* disable page mode */
-> +
-> +	elm_write_reg(info->elm_base + ELM_PAGE_CTRL, reg_val);
-> +}
-> +
-> +static void rearrange_bch4(u8 *syndrome)
-> +{
-> +	/*
-> +	 * BCH4 has 52 bit used for ecc, but OOB stored with
-> +	 * nibble 0 appended, removes appended 0 nibble
-> +	 */
-> +	u64 *dst = (u64 *)syndrome;
-> +	*dst >>= 4;
-> +}
-> +
-> +/**
-> + * elm_reverse_eccdata - Reverse ecc data
-> + * @info:	elm info
-> + * @ecc_data:	buffer for calculated ecc
-> + * @syndrome:	buffer for syndrome polynomial
-> + *
-> + * ecc_data has to be reversed for syndrome vector
-> + */
-> +static void elm_reverse_eccdata(struct elm_info *info, u8 *ecc_data,
-> +		u8 *syndrome)
-> +{
-> +	int i;
-> +	int bch_size = info->bch_type ? BCH8_ECC_OOB_BYTES : BCH4_SIZE;
-> +
-> +	for (i = 0; i < bch_size; i++)
-> +		syndrome[bch_size - 1 - i] = ecc_data[i];
-> +
-> +	/*
-> +	 * syndrome polynomial to be rearranged for BCH 4 ecc scheme as 52
-> +	 * bits being used and 4 bits being appended in syndrome vector
-> +	 */
-> +	if (info->bch_type == BCH4_ECC)
-> +		rearrange_bch4(syndrome);
-> +}
-> +
-> +/**
-> + * elm_load_syndrome - Load ELM syndrome reg
-> + * @info:	elm info
-> + * @index:	syndrome fragment index
-> + * @syndrome:	Syndrome polynomial
-> + *
-> + * Load syndrome fragment registers with syndrome polynomial
-> + */
-> +static void elm_load_syndrome(struct elm_info *info, int index, u8 *syndrome)
-> +{
-> +	int i;
-> +	int max = info->bch_type ? BCH8_SYNDROME_SIZE : BCH4_SYNDROME_SIZE;
-> +	void *syn_frag_base = info->elm_base + ELM_SYNDROME_FRAGMENT_0;
-> +	syn_t *syn_fragment;
-> +	u32 reg_val;
-> +
-> +	elm_configure_page_mode(info, index, true);
-> +	syn_fragment = syn_frag_base + SYNDROME_FRAGMENT_REG_SIZE * index;
-> +
-> +	for (i = 0; i < max; i++) {
-> +		reg_val = syndrome[0] | syndrome[1] << 8 | syndrome[2] << 16 |
-> +			syndrome[3] << 24;
-> +		elm_write_reg(*syn_fragment + i, reg_val);
-> +		/* Update syndrome polynomial pointer */
-> +		syndrome += 4;
-> +	}
-> +}
-> +
-> +/**
-> + * elm_start_processing - start elm syndrome processing
-> + * @info:	elm info
-> + * @err_vec:	elm error vectors
-> + *
-> + * Set syndrome valid bit for syndrome fragment registers for which
-> + * elm syndrome fragment registers are loaded. This enables elm module
-> + * to start processing syndrome vectors.
-> + */
-> +static void elm_start_processing(struct elm_info *info,
-> +		struct elm_errorvec *err_vec)
-> +{
-> +	int i;
-> +	void *offset;
-> +	u32 reg_val;
-> +
-> +	/*
-> +	 * Set syndrome vector valid so that ELM module will process it for
-> +	 * vectors error is reported
-> +	 */
-> +	for (i = 0; i < ERROR_VECTOR_MAX; i++) {
-> +		if (err_vec[i].error_reported) {
-> +			offset = info->elm_base + ELM_SYNDROME_FRAGMENT_6 + i *
-> +				SYNDROME_FRAGMENT_REG_SIZE;
-> +			reg_val = elm_read_reg(offset);
-> +			reg_val |= ELM_SYNDROME_VALID;
-> +			elm_write_reg(offset, reg_val);
-> +		}
-> +	}
-> +}
-> +
-> +/**
-> + * elm_error_correction - locate correctable error position
-> + * @info:	elm info
-> + * @err_vec:	elm error vectors
-> + *
-> + * On completion of processing by elm module, error location status
-> + * register updated with correctable/uncorrectable error information.
-> + * In case of correctable errors, number of errors located from
-> + * elm location status register & read the these many positions from
-
-should probably be: "... & read the positions from ..."?
-
-> + * elm error location register.
-> + */
-> +static void elm_error_correction(struct elm_info *info,
-> +		struct elm_errorvec *err_vec)
-> +{
-> +	int i, j, errors = 0;
-> +	void *err_loc_base = info->elm_base + ELM_ERROR_LOCATION_0;
-> +	elm_error_t *err_loc;
-> +	void *offset;
-> +	u32 reg_val;
-> +
-> +	for (i = 0; i < ERROR_VECTOR_MAX; i++) {
-> +		/* check error reported */
-> +		if (err_vec[i].error_reported) {
-> +			offset = info->elm_base + ELM_LOCATION_STATUS +
-> +				i * ERROR_LOCATION_SIZE;
-> +			reg_val = elm_read_reg(offset);
-> +			/* check correctable error or not */
-> +			if (reg_val & ECC_CORRECTABLE_MASK) {
-> +				err_loc = err_loc_base +
-> +					i * ERROR_LOCATION_SIZE;
-> +				/* read count of correctable errors */
-> +				err_vec[i].error_count = reg_val &
-> +					ECC_NB_ERRORS_MASK;
-> +
-> +				/* update the error locations in error vector */
-> +				for (j = 0; j < err_vec[i].error_count; j++) {
-> +
-> +					reg_val = elm_read_reg(*err_loc + j);
-> +					err_vec[i].error_loc[j] = reg_val &
-> +						ECC_ERROR_LOCATION_MASK;
-> +				}
-> +
-> +				errors += err_vec[i].error_count;
-> +			} else {
-> +				err_vec[i].error_uncorrectable++;
-> +			}
-
-extra braces above
-
-> +
-> +			/* clearing interrupts for processed error vectors */
-> +			elm_write_reg(info->elm_base + ELM_IRQSTATUS, BIT(i));
-> +
-> +			/* disable page mode */
-> +			elm_configure_page_mode(info, i, false);
-> +		}
-> +	}
-> +
-> +	return;
-> +}
-> +
-> +/**
-> + * elm_decode_bch_error_page - Locate error position
-> + * @info:	elm info
-
-should be dev, not info
-
-> + * @ecc_calc:	calculated ECC bytes from GPMC
-> + * @err_vec:	elm error vectors
-> + *
-> + * Called with one or greater reported and is vectors with error reported
-> + * is updated in err_vec[].error_reported
-> + */
-
-I do not understand the statement "Called with one ..."
-
-> +void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
-> +		struct elm_errorvec *err_vec)
-> +{
-> +	int i;
-> +	u8 syndrome[BCH_MAX_ECC_BYTES_PER_SECTOR] = {0}, *syn_p;
-> +	struct elm_info *info = dev_get_drvdata(dev);
-> +	u32 reg_val;
-> +
-> +	/* enable page mode interrupt */
-> +	reg_val = elm_read_reg(info->elm_base + ELM_IRQSTATUS);
-> +	elm_write_reg(info->elm_base + ELM_IRQSTATUS,
-> +			reg_val & INTR_STATUS_PAGE_VALID);
-> +	elm_write_reg(info->elm_base + ELM_IRQENABLE, INTR_EN_PAGE_MASK);
-> +
-> +	syn_p = syndrome;
-> +	for (i = 0; i < ERROR_VECTOR_MAX; i++) {
-> +		if (err_vec[i].error_reported) {
-> +			elm_reverse_eccdata(info, ecc_calc, syn_p);
-> +			elm_load_syndrome(info, i, syn_p);
-> +		}
-> +
-> +		ecc_calc += info->bch_type ? BCH8_SIZE : BCH4_SIZE;
-> +		syn_p += OOB_SECTOR_SIZE;
-> +	}
-> +
-> +	elm_start_processing(info, err_vec);
-> +
-> +	/*
-> +	 * In case of error reported, wait for ELM module to finish
-> +	 * locating error correction
-> +	 */
-> +	wait_for_completion(&info->elm_completion);
-> +
-> +	/* disable page mode interrupt */
-> +	reg_val = elm_read_reg(info->elm_base + ELM_IRQENABLE);
-> +	elm_write_reg(info->elm_base + ELM_IRQENABLE,
-> +			reg_val & ~INTR_EN_PAGE_MASK);
-> +	elm_error_correction(info, err_vec);
-> +}
-> +EXPORT_SYMBOL(elm_decode_bch_error_page);
-> +
-> +static irqreturn_t elm_isr(int this_irq, void *dev_id)
-> +{
-> +	u32 reg_val;
-> +	struct elm_info *info = dev_id;
-> +
-> +	reg_val = elm_read_reg(info->elm_base + ELM_IRQSTATUS);
-> +
-> +	/* all error vectors processed */
-> +	if (reg_val & INTR_STATUS_PAGE_VALID) {
-> +		elm_write_reg(info->elm_base + ELM_IRQSTATUS,
-> +				reg_val & INTR_STATUS_PAGE_VALID);
-> +		complete(&info->elm_completion);
-> +		return IRQ_HANDLED;
-> +	}
-> +
-> +	return IRQ_NONE;
-> +}
-> +
-> +struct device *elm_request(enum bch_ecc bch_type)
-> +{
-> +	struct elm_info *info;
-> +
-> +	list_for_each_entry(info, &elm_devices, list) {
-> +		if (info && info->dev) {
-> +				info->bch_type = bch_type;
-> +				elm_config(info);
-> +				return info->dev;
-> +		}
-> +	}
-> +
-> +	return NULL;
-> +}
-> +EXPORT_SYMBOL(elm_request);
-> +
-> +static int __devinit elm_probe(struct platform_device *pdev)
-> +{
-> +	int ret = 0;
-> +	struct resource *res, *irq;
-> +	struct elm_info *info;
-> +
-> +	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
-> +	if (!info) {
-> +		dev_err(&pdev->dev, "failed to allocate memory\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	info->dev = &pdev->dev;
-> +
-> +	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +	if (!irq) {
-> +		dev_err(&pdev->dev, "no irq resource defined\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "no memory resource defined\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +
-> +	info->elm_base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!info->elm_base)
-> +		return -EADDRNOTAVAIL;
-> +
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
-> +			pdev->name, info);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
-> +		return ret;
-> +	}
-> +
-> +	pm_runtime_enable(&pdev->dev);
-> +	if (pm_runtime_get_sync(&pdev->dev)) {
-> +		ret = -EINVAL;
-> +		pm_runtime_disable(&pdev->dev);
-> +		dev_err(&pdev->dev, "can't enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	init_completion(&info->elm_completion);
-> +	INIT_LIST_HEAD(&info->list);
-> +	list_add(&info->list, &elm_devices);
-> +	platform_set_drvdata(pdev, info);
-> +	return ret;
-> +}
-> +
-> +static int __devexit elm_remove(struct platform_device *pdev)
-> +{
-> +	pm_runtime_put_sync(&pdev->dev);
-> +	pm_runtime_disable(&pdev->dev);
-> +	platform_set_drvdata(pdev, NULL);
-> +	return 0;
-> +}
-> +
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id elm_of_match[] = {
-> +	{ .compatible = "ti,elm" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, elm_of_match);
-> +#endif
-> +
-> +static struct platform_driver elm_driver = {
-> +	.driver		= {
-> +		.name	= "elm",
-> +		.of_match_table = of_match_ptr(elm_of_match),
-> +		.owner	= THIS_MODULE,
-> +	},
-> +	.probe		= elm_probe,
-> +	.remove		= __devexit_p(elm_remove),
-> +};
-> +
-> +module_platform_driver(elm_driver);
-> +
-> +MODULE_DESCRIPTION("ELM driver for BCH error correction");
-> +MODULE_AUTHOR("Texas Instruments");
-> +MODULE_ALIAS("platform: elm");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/platform_data/elm.h b/include/linux/platform_data/elm.h
-> new file mode 100644
-> index 0000000..eb53163
-> --- /dev/null
-> +++ b/include/linux/platform_data/elm.h
-> @@ -0,0 +1,60 @@
-> +/*
-> + * BCH Error Location Module
-> + *
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#ifndef __ELM_H
-> +#define __ELM_H
-> +
-> +enum bch_ecc {
-> +	BCH4_ECC = 0,
-> +	BCH8_ECC,
-> +	BCH16_ECC,
-> +};
-> +
-> +/* ELM support 8 error syndrome process */
-> +#define ERROR_VECTOR_MAX		8
-> +#define OOB_SECTOR_SIZE			16
-> +
-> +#define BCH_MAX_ECC_BYTES_PER_SECTOR	(OOB_SECTOR_SIZE * ERROR_VECTOR_MAX)
-> +
-> +#define BCH8_ECC_OOB_BYTES		13
-> +/* RBL requires 14 byte even though BCH8 uses only 13 byte */
-
-not sure what RBL is?
-
-> +#define BCH8_SIZE			(BCH8_ECC_OOB_BYTES + 1)
-> +#define BCH4_SIZE			7
-> +
-> +#define	BCH8_SYNDROME_SIZE		4	/* 13 bytes of ecc */
-> +#define	BCH4_SYNDROME_SIZE		2	/* 7 bytes of ecc */
-> +
-> +/**
-> + * struct elm_errorvec - error vector for elm
-> + * @error_reported:		set true for vectors error is reported
-> + *
-> + * @error_count:		number of correctable errors in the sector
-> + * @error_uncorrectable:	number of uncorrectable errors
-> + * @error_loc:			buffer for error location
-> + *
-> + */
-> +struct elm_errorvec {
-> +	bool error_reported;
-> +	int error_count;
-> +	int error_uncorrectable;
-> +	int error_loc[ERROR_VECTOR_MAX];
-> +};
-> +
-> +void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
-> +		struct elm_errorvec *err_vec);
-> +struct device *elm_request(enum bch_ecc bch_type);
-> +#endif /* __ELM_H */
-> 
-
+diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
+new file mode 100644
+index 0000000..6390db5
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-is2.dts
+@@ -0,0 +1,20 @@
++/dts-v1/;
++
++/include/ "kirkwood-ns2-common.dtsi"
++
++/ {
++	model = "LaCie Internet Space v2";
++	compatible = "lacie,inetspace_v2", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	ocp at f1000000 {
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+new file mode 100644
+index 0000000..030904d
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -0,0 +1,63 @@
++/include/ "kirkwood.dtsi"
++
++/ {
++	chosen {
++		bootargs = "console=ttyS0,115200n8";
++	};
++
++	ocp at f1000000 {
++		serial at 12000 {
++			clock-frequency = <166666667>;
++			status = "okay";
++		};
++
++		spi at 10600 {
++			status = "okay";
++
++			flash at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "mx25l4005a";
++				reg = <0>;
++				spi-max-frequency = <20000000>;
++				mode = <0>;
++
++				partition at 0 {
++					reg = <0x0 0x80000>;
++					label = "u-boot";
++				};
++			};
++		};
++
++		i2c at 11000 {
++			status = "okay";
++
++			eeprom at 50 {
++				compatible = "at,24c04";
++				pagesize = <16>;
++				reg = <0x50>;
++			};
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		button at 1 {
++			label = "Power push button";
++			linux,code = <116>;
++			gpios = <&gpio1 0 0>;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++
++		red-fail {
++			label = "ns_v2:red:fail";
++			gpios = <&gpio0 12 0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
+new file mode 100644
+index 0000000..6ef66b9
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-ns2.dts
+@@ -0,0 +1,20 @@
++/dts-v1/;
++
++/include/ "kirkwood-ns2-common.dtsi"
++
++/ {
++	model = "LaCie Network Space v2";
++	compatible = "lacie,netspace_v2", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>;
++	};
++
++	ocp at f1000000 {
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
+new file mode 100644
+index 0000000..30ed909
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
+@@ -0,0 +1,39 @@
++/dts-v1/;
++
++/include/ "kirkwood-ns2-common.dtsi"
++
++/ {
++	model = "LaCie Network Space Max v2";
++	compatible = "lacie,netspace_max_v2", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>;
++	};
++
++	ocp at f1000000 {
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <2>;
++		};
++	};
++
++	gpio_fan {
++		compatible = "gpio-fan";
++		gpios = <&gpio0 22 1
++			 &gpio0  7 1
++			 &gpio1  1 1
++			 &gpio0 23 1>;
++		gpio-fan,speed-map =
++			<   0  0
++			 1500 15
++			 1700 14
++			 1800 13
++			 2100 12
++			 3100 11
++			 3300 10
++			 4300  9
++			 5500  8>;
++		alarm-gpios = <&gpio0 25 1>;
++	};
++};
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 50bca50..5b239a6 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -130,6 +130,14 @@ config MACH_KM_KIRKWOOD_DT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Keymile Kirkwood Reference Desgin, using Flattened Device Tree.
+ 
++config MACH_NETSPACE_V2_DT
++	bool "LaCie Network Space v2 NAS and parents (Flattened Device Tree)"
++	select ARCH_KIRKWOOD_DT
++	help
++	  Say 'Y' here if you want your kernel to support the LaCie
++	  Network Space v2 NAS and parents, using Flattened Device Tree.
++	  This includes Network Space (Max) v2 and Internet Space v2.
++
+ config MACH_TS219
+ 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 294779f..0562753 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -31,3 +31,4 @@ obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
+ obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
+ obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
+ obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
++obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
+diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+index 5edef8e..1e15c37 100644
+--- a/arch/arm/mach-kirkwood/Makefile.boot
++++ b/arch/arm/mach-kirkwood/Makefile.boot
+@@ -15,3 +15,4 @@ dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
+ dtb-$(CONFIG_MACH_IOMEGA_IX2_200_DT) += kirkwood-iomega_ix2_200.dtb
+ dtb-$(CONFIG_MACH_DOCKSTAR_DT) += kirkwood-dockstar.dtb
+ dtb-$(CONFIG_MACH_KM_KIRKWOOD_DT) += kirkwood-km_kirkwood.dtb
++dtb-$(CONFIG_MACH_NETSPACE_V2_DT) += kirkwood-ns2.dtb
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 4965546..f1746b3 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("keymile,km_kirkwood"))
+ 		km_kirkwood_init();
+ 
++	if (of_machine_is_compatible("lacie,inetspace_v2") ||
++	    of_machine_is_compatible("lacie,netspace_v2") ||
++	    of_machine_is_compatible("lacie,netspace_max_v2"))
++		ns2_init();
++
+ 	of_platform_populate(NULL, kirkwood_dt_match_table,
+ 			     kirkwood_auxdata_lookup, NULL);
+ }
+@@ -112,6 +117,9 @@ static const char *kirkwood_dt_board_compat[] = {
+ 	"buffalo,lsxl",
+ 	"iom,ix2-200",
+ 	"keymile,km_kirkwood",
++	"lacie,inetspace_v2",
++	"lacie,netspace_max_v2",
++	"lacie,netspace_v2",
+ 	NULL
+ };
+ 
+diff --git a/arch/arm/mach-kirkwood/board-ns2.c b/arch/arm/mach-kirkwood/board-ns2.c
+new file mode 100644
+index 0000000..f87abad
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/board-ns2.c
+@@ -0,0 +1,117 @@
++/*
++ * Copyright 2012 (C), Simon Guinot <simon.guinot@sequanux.org>
++ *
++ * arch/arm/mach-kirkwood/board-ns2.c
++ *
++ * LaCie Network Space v2 board (and parents) initialization for drivers
++ * not converted to flattened device tree yet.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/gpio.h>
++#include <mach/leds-ns2.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mv643xx_eth_platform_data ns2_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
++};
++
++/*****************************************************************************
++ * Dual-GPIO CPLD LEDs
++ ****************************************************************************/
++
++#define NETSPACE_V2_GPIO_BLUE_LED_SLOW	29
++#define NETSPACE_V2_GPIO_BLUE_LED_CMD	30
++
++static struct ns2_led ns2_led_pins[] = {
++	{
++		.name	= "ns_v2:blue:sata",
++		.cmd	= NETSPACE_V2_GPIO_BLUE_LED_CMD,
++		.slow	= NETSPACE_V2_GPIO_BLUE_LED_SLOW,
++	},
++};
++
++static struct ns2_led_platform_data ns2_leds_data = {
++	.num_leds	= ARRAY_SIZE(ns2_led_pins),
++	.leds		= ns2_led_pins,
++};
++
++static struct platform_device ns2_leds = {
++	.name		= "leds-ns2",
++	.id		= -1,
++	.dev		= {
++		.platform_data	= &ns2_leds_data,
++	},
++};
++
++/*****************************************************************************
++ * General Setup
++ ****************************************************************************/
++
++static unsigned int ns2_mpp_config[] __initdata = {
++	MPP0_SPI_SCn,
++	MPP1_SPI_MOSI,
++	MPP2_SPI_SCK,
++	MPP3_SPI_MISO,
++	MPP4_NF_IO6,
++	MPP5_NF_IO7,
++	MPP6_SYSRST_OUTn,
++	MPP7_GPO,		/* Fan speed (bit 1) */
++	MPP8_TW0_SDA,
++	MPP9_TW0_SCK,
++	MPP10_UART0_TXD,
++	MPP11_UART0_RXD,
++	MPP12_GPO,		/* Red led */
++	MPP14_GPIO,		/* USB fuse */
++	MPP16_GPIO,		/* SATA 0 power */
++	MPP17_GPIO,		/* SATA 1 power */
++	MPP18_NF_IO0,
++	MPP19_NF_IO1,
++	MPP20_SATA1_ACTn,
++	MPP21_SATA0_ACTn,
++	MPP22_GPIO,		/* Fan speed (bit 0) */
++	MPP23_GPIO,		/* Fan power */
++	MPP24_GPIO,		/* USB mode select */
++	MPP25_GPIO,		/* Fan rotation fail */
++	MPP26_GPIO,		/* USB device vbus */
++	MPP28_GPIO,		/* USB enable host vbus */
++	MPP29_GPIO,		/* Blue led (slow register) */
++	MPP30_GPIO,		/* Blue led (command register) */
++	MPP31_GPIO,		/* Board power off */
++	MPP32_GPIO,		/* Power button (0 = Released, 1 = Pushed) */
++	MPP33_GPO,		/* Fan speed (bit 2) */
++	0
++};
++
++#define NETSPACE_V2_GPIO_POWER_OFF	31
++
++static void ns2_power_off(void)
++{
++	gpio_set_value(NETSPACE_V2_GPIO_POWER_OFF, 1);
++}
++
++void __init ns2_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_mpp_conf(ns2_mpp_config);
++
++	kirkwood_ehci_init();
++	kirkwood_ge00_init(&ns2_ge00_data);
++	platform_device_register(&ns2_leds);
++
++	if (gpio_request(NETSPACE_V2_GPIO_POWER_OFF, "power-off") == 0 &&
++	    gpio_direction_output(NETSPACE_V2_GPIO_POWER_OFF, 0) == 0)
++		pm_power_off = ns2_power_off;
++	else
++		pr_err("ns2: failed to configure power-off GPIO\n");
++}
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index bcffd7c..f6c0fc9 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -112,6 +112,12 @@ void km_kirkwood_init(void);
+ static inline void km_kirkwood_init(void) {};
+ #endif
+ 
++#ifdef CONFIG_MACH_NETSPACE_V2_DT
++void ns2_init(void);
++#else
++static inline void ns2_init(void) {};
++#endif
++
+ /* early init functions not converted to fdt yet */
+ char *kirkwood_id(void);
+ void kirkwood_l2_init(void);
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index c96bbaa..483ef81 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -367,7 +367,8 @@ config LEDS_NS2
+ 	tristate "LED support for Network Space v2 GPIO LEDs"
+ 	depends on LEDS_CLASS
+ 	depends on MACH_NETSPACE_V2 || MACH_INETSPACE_V2 || \
+-		   MACH_NETSPACE_MAX_V2 || MACH_D2NET_V2
++		   MACH_NETSPACE_MAX_V2 || MACH_D2NET_V2 || \
++		   MACH_NETSPACE_V2_DT
+ 	default y
+ 	help
+ 	  This option enable support for the dual-GPIO LED found on the
 -- 
-
-Peter Meerwald
-+43-664-2444418 (mobile)
+1.7.10
