@@ -1,81 +1,89 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Wed,  3 Oct 2012 17:03:12 +0200
-Subject: [PATCH 16/25] ARM: cns3xxx: use OHCI platform driver
+Date: Wed,  3 Oct 2012 17:03:06 +0200
+Subject: [PATCH 11/25] ARM: cns3xxx: use ehci platform driver
 In-Reply-To: <1349276601-8371-1-git-send-email-florian@openwrt.org>
 References: <1349276601-8371-1-git-send-email-florian@openwrt.org>
-Message-ID: <1349276601-8371-18-git-send-email-florian@openwrt.org>
+Message-ID: <1349276601-8371-12-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since both the EHCI and OHCI platform drivers use the same power_{on,off}
-callbacks, rename them to cns3xx_usb_power_{on,off} to show that they are
-shared.
-
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- arch/arm/mach-cns3xxx/cns3420vb.c |   18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/mach-cns3xxx/cns3420vb.c |   44 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 906094c..8a00cee8 100644
+index 2c5fb4c..906094c 100644
 --- a/arch/arm/mach-cns3xxx/cns3420vb.c
 +++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -25,6 +25,7 @@
+@@ -24,6 +24,7 @@
+ #include <linux/mtd/mtd.h>
  #include <linux/mtd/physmap.h>
  #include <linux/mtd/partitions.h>
- #include <linux/usb/ehci_pdriver.h>
-+#include <linux/usb/ohci_pdriver.h>
++#include <linux/usb/ehci_pdriver.h>
  #include <asm/setup.h>
  #include <asm/mach-types.h>
  #include <asm/hardware/gic.h>
-@@ -127,7 +128,7 @@ static struct resource cns3xxx_usb_ehci_resources[] = {
+@@ -32,6 +33,7 @@
+ #include <asm/mach/time.h>
+ #include <mach/cns3xxx.h>
+ #include <mach/irqs.h>
++#include <mach/pm.h>
+ #include "core.h"
+ #include "devices.h"
+ 
+@@ -125,13 +127,53 @@ static struct resource cns3xxx_usb_ehci_resources[] = {
  
  static u64 cns3xxx_usb_ehci_dma_mask = DMA_BIT_MASK(32);
  
--static int csn3xxx_usb_ehci_power_on(struct platform_device *pdev)
-+static int csn3xxx_usb_power_on(struct platform_device *pdev)
- {
- 	/*
- 	 * EHCI and OHCI share the same clock and power,
-@@ -148,7 +149,7 @@ static int csn3xxx_usb_ehci_power_on(struct platform_device *pdev)
- 	return 0;
- }
- 
--static void csn3xxx_usb_ehci_power_off(struct platform_device *pdev)
-+static void csn3xxx_usb_power_off(struct platform_device *pdev)
- {
- 	/*
- 	 * EHCI and OHCI share the same clock and power,
-@@ -162,8 +163,8 @@ static void csn3xxx_usb_ehci_power_off(struct platform_device *pdev)
- 
- static struct usb_ehci_pdata cns3xxx_usb_ehci_pdata = {
- 	.port_power_off	= 1,
--	.power_on	= csn3xxx_usb_ehci_power_on,
--	.power_off	= csn3xxx_usb_ehci_power_off,
-+	.power_on	= csn3xxx_usb_power_on,
-+	.power_off	= csn3xxx_usb_power_off,
- };
- 
- static struct platform_device cns3xxx_usb_ehci_device = {
-@@ -191,13 +192,20 @@ static struct resource cns3xxx_usb_ohci_resources[] = {
- 
- static u64 cns3xxx_usb_ohci_dma_mask = DMA_BIT_MASK(32);
- 
-+static struct usb_ohci_pdata cns3xxx_usb_ohci_pdata = {
-+	.num_ports	= 1,
-+	.power_on	= csn3xxx_usb_power_on,
-+	.power_off	= csn3xxx_usb_power_off,
++static int csn3xxx_usb_ehci_power_on(struct platform_device *pdev)
++{
++	/*
++	 * EHCI and OHCI share the same clock and power,
++	 * resetting twice would cause the 1st controller been reset.
++	 * Therefore only do power up  at the first up device, and
++	 * power down at the last down device.
++	 *
++	 * Set USB AHB INCR length to 16
++	 */
++	if (atomic_inc_return(&usb_pwr_ref) == 1) {
++		cns3xxx_pwr_power_up(1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_PLL_USB);
++		cns3xxx_pwr_clk_en(1 << PM_CLK_GATE_REG_OFFSET_USB_HOST);
++		cns3xxx_pwr_soft_rst(1 << PM_SOFT_RST_REG_OFFST_USB_HOST);
++		__raw_writel((__raw_readl(MISC_CHIP_CONFIG_REG) | (0X2 << 24)),
++			MISC_CHIP_CONFIG_REG);
++	}
++
++	return 0;
++}
++
++static void csn3xxx_usb_ehci_power_off(struct platform_device *pdev)
++{
++	/*
++	 * EHCI and OHCI share the same clock and power,
++	 * resetting twice would cause the 1st controller been reset.
++	 * Therefore only do power up  at the first up device, and
++	 * power down@the last down device.
++	 */
++	if (atomic_dec_return(&usb_pwr_ref) == 0)
++		cns3xxx_pwr_clk_dis(1 << PM_CLK_GATE_REG_OFFSET_USB_HOST);
++}
++
++static struct usb_ehci_pdata cns3xxx_usb_ehci_pdata = {
++	.port_power_off	= 1,
++	.power_on	= csn3xxx_usb_ehci_power_on,
++	.power_off	= csn3xxx_usb_ehci_power_off,
 +};
 +
- static struct platform_device cns3xxx_usb_ohci_device = {
--	.name          = "cns3xxx-ohci",
-+	.name          = "ohci-platform",
- 	.num_resources = ARRAY_SIZE(cns3xxx_usb_ohci_resources),
- 	.resource      = cns3xxx_usb_ohci_resources,
+ static struct platform_device cns3xxx_usb_ehci_device = {
+-	.name          = "cns3xxx-ehci",
++	.name          = "ehci-platform",
+ 	.num_resources = ARRAY_SIZE(cns3xxx_usb_ehci_resources),
+ 	.resource      = cns3xxx_usb_ehci_resources,
  	.dev           = {
- 		.dma_mask          = &cns3xxx_usb_ohci_dma_mask,
+ 		.dma_mask          = &cns3xxx_usb_ehci_dma_mask,
  		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data	   = &cns3xxx_usb_ohci_pdata,
++		.platform_data     = &cns3xxx_usb_ehci_pdata,
  	},
  };
  
