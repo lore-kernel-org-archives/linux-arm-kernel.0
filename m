@@ -1,136 +1,44 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Wed, 3 Oct 2012 20:54:58 +0200
-Subject: [PATCH 3/4] ARM: OMAP2: gpmc: Add support for BCH ECC scheme
-In-Reply-To: <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
-References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
-Message-ID: <20121003185458.GA27502@parrot.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 3 Oct 2012 19:02:15 +0000
+Subject: [PATCH] ARM: footbridge: remove RTC_IRQ definition
+Message-ID: <201210031902.16200.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 03:29:48PM +0100, Philip, Avinash wrote:
-> Add support for BCH ECC scheme to gpmc driver and also enabling multi
-> sector read/write. This helps in doing single shot NAND page read and
-> write.
-> 
-> ECC engine configurations
-> BCH 4 bit support
-> 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
-> 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
-> 13 and ecc_size1 as 1.
-> 
-> BCH 8 bit support
-> 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
-> 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
-> 26 and ecc_size1 as 2.
-> 
-> Note: For BCH8 ECC bytes set to 14 to make compatible with RBL.
-> 
+Since commit bd8abc9a32c "ARM: mc146818rtc: remove unnecessary include of
+mach/irqs.h", building footbridge_defconfig results in this warning:
 
-Hi Philip,
+In file included from include/linux/mc146818rtc.h:16:0,
+                 from arch/arm/mach-footbridge/isa-rtc.c:21:
+arch/arm/include/asm/mc146818rtc.h:10:0: warning: "RTC_IRQ" redefined [enabled by default]
+arch/arm/mach-footbridge/include/mach/irqs.h:93:0: note: this is the location of the previous definition
 
-I have a few comments/questions below,
+The above commit was intentionally made to catch errors like this,
+where code relies on the RTC_IRQ definition. The only driver using
+it is the legacy PC-style drivers/char/rtc.c driver.
+However, the ARM architecture has been using the RTC_LIB framework
+since at least 2006, and that doesn't use it.
 
-(...)
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 72428bd..c9bc3cf 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -24,6 +24,7 @@
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/interrupt.h>
-> +#include <linux/mtd/nand.h>
->  
->  #include <asm/mach-types.h>
->  #include <plat/gpmc.h>
-> @@ -83,6 +84,18 @@
->  #define ENABLE_PREFETCH		(0x1 << 7)
->  #define DMA_MPU_MODE		2
->  
-> +/* GPMC ecc engine settings for read */
-> +#define BCH_WRAPMODE_1		1	/* BCH wrap mode 6 */
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: rtc-linux at googlegroups.com
+Cc: Russell King <linux@arm.linux.org.uk>
 
-Comment should say "mode 1".
+---
+I've queued this in late/fixes for the current merge window. Will
+send later unless someone objects.
 
-(...)
->  /**
-> + * gpmc_calculate_ecc_bch	- Generate ecc bytes per block of 512 data bytes for entire page
-> + * @cs:  chip select number
-> + * @dat: The pointer to data on which ECC is computed
-> + * @ecc: The ECC output buffer
-> + */
-> +int gpmc_calculate_ecc_bch(int cs, const u_char *dat, u_char *ecc)
-> +{
-> +	int i, eccbchtsel;
-> +	u32 nsectors, reg, bch_val1, bch_val2, bch_val3, bch_val4;
-> +
-> +	if (gpmc_ecc_used != cs)
-> +		return -EINVAL;
-> +
-> +	/* read number of sectors for ecc to be calculated */
-> +	nsectors = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 4) & 0x7) + 1;
-> +	/*
-> +	 * find BCH scheme used
-> +	 * 0 -> BCH4
-> +	 * 1 -> BCH8
-> +	 */
-> +	eccbchtsel = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 12) & 0x3);
-> +
-> +	/* update ecc bytes for entire page */
-> +	for (i = 0; i < nsectors; i++) {
-> +
-> +		reg = GPMC_ECC_BCH_RESULT_0 + 16 * i;
-> +
-> +		/* Read hw-computed remainder */
-> +		bch_val1 = gpmc_read_reg(reg + 0);
-> +		bch_val2 = gpmc_read_reg(reg + 4);
-> +		if (eccbchtsel) {
-> +			bch_val3 = gpmc_read_reg(reg + 8);
-> +			bch_val4 = gpmc_read_reg(reg + 12);
-> +		}
-> +
-> +		if (eccbchtsel) {
-> +			/* BCH8 ecc scheme */
-> +			*ecc++ = (bch_val4 & 0xFF);
-> +			*ecc++ = ((bch_val3 >> 24) & 0xFF);
-> +			*ecc++ = ((bch_val3 >> 16) & 0xFF);
-> +			*ecc++ = ((bch_val3 >> 8) & 0xFF);
-> +			*ecc++ = (bch_val3 & 0xFF);
-> +			*ecc++ = ((bch_val2 >> 24) & 0xFF);
-> +			*ecc++ = ((bch_val2 >> 16) & 0xFF);
-> +			*ecc++ = ((bch_val2 >> 8) & 0xFF);
-> +			*ecc++ = (bch_val2 & 0xFF);
-> +			*ecc++ = ((bch_val1 >> 24) & 0xFF);
-> +			*ecc++ = ((bch_val1 >> 16) & 0xFF);
-> +			*ecc++ = ((bch_val1 >> 8) & 0xFF);
-> +			*ecc++ = (bch_val1 & 0xFF);
-> +			/* 14th byte of ecc not used */
-> +			*ecc++ = 0;
-> +		} else {
-> +			/* BCH4 ecc scheme */
-> +			*ecc++ = ((bch_val2 >> 12) & 0xFF);
-> +			*ecc++ = ((bch_val2 >> 4) & 0xFF);
-> +			*ecc++ = (((bch_val2 & 0xF) << 4) |
-> +					((bch_val1 >> 28) & 0xF));
-> +			*ecc++ = ((bch_val1 >> 20) & 0xFF);
-> +			*ecc++ = ((bch_val1 >> 12) & 0xFF);
-> +			*ecc++ = ((bch_val1 >> 4) & 0xFF);
-> +			*ecc++ = ((bch_val1 & 0xF) << 4);
-> +		}
-> +	}
-> +
-> +	gpmc_ecc_used = -EINVAL;
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(gpmc_calculate_ecc_bch);
-
-Here you introduce a function very similar to gpmc_calculate_ecc_bch4 and
-gpmc_calculate_ecc_bch8, but without the added benefit (IMHO) of the constant
-polynomial that allows to get an ecc sequence of 0xFFs for a buffer filled with
-0xFFs. Why ?
-If using the ELM prevents you from reusing gpmc_calculate_ecc_bch[48], could you explain in which way ?
-
-Best regards,
---
-Ivan
+diff --git a/arch/arm/mach-footbridge/include/mach/irqs.h b/arch/arm/mach-footbridge/include/mach/irqs.h
+index 400551e..61c714c 100644
+--- a/arch/arm/mach-footbridge/include/mach/irqs.h
++++ b/arch/arm/mach-footbridge/include/mach/irqs.h
+@@ -89,8 +89,6 @@
+ #define IRQ_NETWINDER_VGA	_ISA_IRQ(11)
+ #define IRQ_NETWINDER_SOUND	_ISA_IRQ(12)
+ 
+-#undef RTC_IRQ
+-#define RTC_IRQ		IRQ_ISA_RTC_ALARM
+ #define I8042_KBD_IRQ	IRQ_ISA_KEYBOARD
+ #define I8042_AUX_IRQ	(machine_is_netwinder() ? IRQ_NETWINDER_PS2MOUSE : IRQ_ISA_PS2MOUSE)
+ #define IRQ_FLOPPYDISK	IRQ_ISA_FLOPPY
