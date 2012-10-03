@@ -1,38 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Oct 2012 10:48:02 +0100
-Subject: [PATCH] ARM: MMUless Core: Fix insmod error - module
- relocation out of range
-In-Reply-To: <CAHkRjk5gLSWG0uiSAK9wnLDi19bEPMpFAFfbqXjz6xNH1W4HXw@mail.gmail.com>
-References: <4995c6bc655337598b88bef025cd48b320c2ada0.1349235619.git.pratyush.anand@st.com>
- <CAHkRjk5gLSWG0uiSAK9wnLDi19bEPMpFAFfbqXjz6xNH1W4HXw@mail.gmail.com>
-Message-ID: <20121003094801.GG6933@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Oct 2012 11:02:05 +0100
+Subject: [kvmarm] [PATCH v2 08/10] ARM: KVM: VGIC initialisation code
+In-Reply-To: <CAFEAcA-KL36kwaFFrOA0NG0y1qGhkXZ+bm5FA0LhJsmKDk66Hg@mail.gmail.com>
+References: <20121001091244.49503.96318.stgit@ubuntu>
+ <20121001091426.49503.94722.stgit@ubuntu>
+ <20121002092412.GB8847@mudshark.cambridge.arm.com>
+ <b4b11d71544812cff978b3457a99b90e@localhost>
+ <C24866D7-ED20-402F-B769-1FE4D5561C77@virtualopensystems.com>
+ <CAFEAcA8Mvh3QzVYTAhLjjbgCqd_AjJ7ji9z7NoLWnM4YUW0OQw@mail.gmail.com>
+ <20121002192806.GC20411@mudshark.cambridge.arm.com>
+ <CAFEAcA-KL36kwaFFrOA0NG0y1qGhkXZ+bm5FA0LhJsmKDk66Hg@mail.gmail.com>
+Message-ID: <20121003100205.GL22445@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 10:25:09AM +0100, Catalin Marinas wrote:
-> On 3 October 2012 04:43, Pratyush Anand <pratyush.anand@st.com> wrote:
-> > From: Neha MAKHIJA <neha.makhija-ext@st.com>
+On Tue, Oct 02, 2012 at 08:45:54PM +0100, Peter Maydell wrote:
+> On 2 October 2012 20:28, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Oct 02, 2012 at 07:31:43PM +0100, Peter Maydell wrote:
+> >> We probably want to be passing in the "base of the cpu-internal
+> >> peripherals", rather than "base of the GIC" specifically. For the
+> >> A15 these are the same thing, but that's not inherent [compare the
+> >> A9 which has more devices at fixed offsets from a configurable
+> >> base address].
 > >
-> > ARM supports 32Mb jump. Hence branch instruction has a limited range.
-> >
-> > For MMU systems, the module area is located just before the kernel memory
-> > because this allows function calls to be linked directly without any indirect
-> > branches.
-> >
-> > In case of MMU-less system, Module area is given whole of the DDR address
-> > space.  Since, module_alloc() calls vmalloc(), the module area goes outside the
-> > allowed jump range. Due to this insmod will not be able to load the modules
-> > giving out of range relocation errors.
-> >
-> > Solution - Add the mlong-calls flags while compiling the modules. This tells
-> > the compiler to perform function calls by first loading the address of the
-> > function and then performing a subroutine function call on this register.
+> > If you do that, userspace will need a way to probe the emulated CPU so
+> > that is knows exactly which set of peripherals there are and which ones it
+> > needs to emulate. This feels pretty nasty, given that the vgic is handled
+> > more or less completely by the kernel-side of things.
 > 
-> Do we need the module loader to handle additional relocations or they
-> are all already handled?
+> Userspace knows what the emulated CPU is because it tells the
+> kernel which CPU to provide -- the kernel can say "yes" or "no" but
+> it can't provide a different CPU to the one we ask for, or
+> one with bits mising...
 
-I have explained this extensively when the 2.6 module loader came into
-being.  It's not about additional relocations, it's about the addressible
-range of the 'b' instruction.
+Aha, ok, I didn't realise that's how it works. Does userspace just pass the
+CPUID or is there an identifier provided by kvm?
 
-Please search the archives for the explanation.
+/me jumps back into the code.
+
+Thanks,
+
+Will
