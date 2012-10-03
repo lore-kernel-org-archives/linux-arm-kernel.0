@@ -1,23 +1,80 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 3 Oct 2012 14:55:57 +0100
-Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-In-Reply-To: <CAPDyKFo5-UeUe7PkxCBMnRziWh+eSC_ZjJ0pKhcBkHUkFdSH+w@mail.gmail.com>
-References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
- <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFo5-UeUe7PkxCBMnRziWh+eSC_ZjJ0pKhcBkHUkFdSH+w@mail.gmail.com>
-Message-ID: <20121003135556.GE4360@opensource.wolfsonmicro.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 03 Oct 2012 16:07:41 +0200
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
+ McASP IP Variant
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA99DA8@DBDE01.ent.ti.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <506B6A9D.3090100@gmail.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
+ <506C1E97.1070700@gmail.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA99DA8@DBDE01.ent.ti.com>
+Message-ID: <506C46AD.1090807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 03:43:16PM +0200, Ulf Hansson wrote:
+On 03.10.2012 14:57, Hebbar, Gururaja wrote:
+> On Wed, Oct 03, 2012 at 16:46:39, Daniel Mack wrote:
+>> On 03.10.2012 09:16, Hebbar, Gururaja wrote:
+>>> On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
+>>>> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
+>>>>> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
+>>>>> register offset and missing generic SRAM APIs support
+>>>>>
+>>>>> Changes
+>>>>> - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
+>>>>>   "ti,omap2-mcasp-audio" to identify version 3 controller.
+>>>>> - The register offsets are handled depending on the version.
+>>>>> - Provide a config option to indicate missing SRAM API support.
+>>>>
+>>>> Could you give some insight which hardware this was tested on? I'm
+>>>> trying to get this up and running on a AM33xx board, and the patches
+>>>> look all reasonable to me. My problem is that I can't make the DMA
+>>>> engine move forward, I fail to receive a single interrupt on this
+>>>> peripheral after the stream starts. I will continue searching for the
+>>>> reason of this tomorrow, but maybe you can give me some hint by
+>>>> explaining your setup?
+>>>>
+>>>> Note that I'm using your patches together with Matt's from this series:
+>>>>
+>>>>   https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
+>>>>
+>>>> ... but it doesn't work without those either.
+>>>
+>>>
+>>> When I started working on adding DT support to McASP driver, Matt Porter 
+>>> EDMA port was not yet ready. 
+>>>
+>>> So 
+>>> 1. I took existing edma driver from AM335x Arago release [1] (driver + edma 
+>>>    device init). 
+>>> 2. Added this to Vaibhav's Local (linux-next + AM335x patches) tree [2] 
+>>>
+>>> 3. Added DT support to McASP driver.
+>>>
+>>> I tested this on AM335x EVM board. 
+>>
+>> Hmm, so I think there's a tiny bit missing for the EDMA conversion on DT
+>> kernels.
+>>
+>>> If you need the code, I can share it as a patch (I will send the patch as a 
+>>> private mail since the patch is huge).
+>>
+>> Please do :) Or just push your entire tree somewhere.
+> 
+> I have pushed the code at below git repo
+> Repo :https://github.com/hvaibhav/am335x-linux
+> Branch : am335x-upstream-staging-audio
+> 
+> This includes 
+> 1. (linux-next + AM335x patches)
+> 2. McASP DT conversion
+> 3. EDMA hack
+> 4. AM335x audio specific DT blobs
+> 5. Am335x dma DT blobs [hack]
 
-> Heard from Linus Walleij that you Mark has been helping out merging
-> spi patches, did not know that when sending out this series. Anyway,
-> do you guys see any issues merging this?
+Ha, that 5th point was what I was missing, in particular these DMA
+offset matching bits. Thanks a lot! I'll get back to you soon with some
+patches for the mcasp driver.
 
-> [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-> [PATCH 2/3] Revert "spi/pl022: enable runtime PM"
-> [PATCH 3/3] spi: spi-pl022: Minor simplification for runtime pm
 
-If someone could send the patches I'll take a look...  some explanation
-as to why we're reverting things would be helpful.
+Daniel
