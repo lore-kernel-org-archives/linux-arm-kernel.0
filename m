@@ -1,96 +1,126 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 4 Oct 2012 00:09:16 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
- parents
-In-Reply-To: <20121003154310.GI11837@lunn.ch>
-References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
- <20121003154310.GI11837@lunn.ch>
-Message-ID: <20121003220916.GW31897@kw.sim.vm.gnt>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed,  3 Oct 2012 15:24:15 -0700
+Subject: [PATCH] ARM: OMAP2+: PM: MPU DVFS: use generic CPU device for MPU-SS
+Message-ID: <1349303055-27741-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 05:43:10PM +0200, Andrew Lunn wrote:
-> On Wed, Oct 03, 2012 at 05:14:30PM +0200, Simon Guinot wrote:
-> > This patch adds DT board setup for LaCie Network Space v2 and parents,
-> > based the Marvell Kirkwood 6281 SoC. This includes Network Space (Max)
-> > v2 and Internet Space v2.
-> 
-> Hi Simon
-> 
-> At a first look, this looks good. Also nice to see you use the new
-> gpio-fan binding.
+From: Kevin Hilman <khilman@ti.com>
 
-Hi Andrew,
+Currently, a dummy omap_device is created for the MPU sub-system so
+that a device node exists for MPU DVFS.  Specifically, for the
+association of MPU OPPs to a device node, and so that a voltage
+regulator can be mapped to a device node.
 
-It is nice to have this binding. It works fine.
+For drivers to get a handle to this device node, an OMAP-specific API
+has been used.  However, the kernel already has device nodes for the
+CPU(s) in the system, so we can use those instead of an OMAP-specific
+dummy device and then drivers (like OMAP CPUfreq) can use generic
+APIs.
 
-> 
-> > --- a/arch/arm/mach-kirkwood/board-dt.c
-> > +++ b/arch/arm/mach-kirkwood/board-dt.c
-> > @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
-> >  	if (of_machine_is_compatible("keymile,km_kirkwood"))
-> >  		km_kirkwood_init();
-> >  
-> > +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
-> > +	    of_machine_is_compatible("lacie,netspace_v2") ||
-> > +	    of_machine_is_compatible("lacie,netspace_max_v2"))
-> > +		ns2_init();
-> > +
-> >  	of_platform_populate(NULL, kirkwood_dt_match_table,
-> >  			     kirkwood_auxdata_lookup, NULL);
-> 
-> I'm not a DT policy expert. Could this be one compatibility string for
-> all the boards? Maybe ask on the DT mainline list?
+To use the existing CPU device nodes, modify the OPP creation and
+regulator registration to use the CPU0 device node for registraion.
 
-Maybe I could use "lacie,ns2_common" as a compatibility string. But this
-does not match any existing device. I don't know if it is correct.
+NOTE: this patch always uses CPU0 as the device node.  On all
+      OMAPs today, MPU DVFS scales all CPUs together, so this will
+      not be a problem, but this assumption will need to be changed
+      if independently scalable CPUs are introduced.
 
-> 
-> > +#define NETSPACE_V2_GPIO_BLUE_LED_SLOW	29
-> > +#define NETSPACE_V2_GPIO_BLUE_LED_CMD	30
-> > +
-> > +static struct ns2_led ns2_led_pins[] = {
-> > +	{
-> > +		.name	= "ns_v2:blue:sata",
-> > +		.cmd	= NETSPACE_V2_GPIO_BLUE_LED_CMD,
-> > +		.slow	= NETSPACE_V2_GPIO_BLUE_LED_SLOW,
-> > +	},
-> > +};
-> > +
-> > +static struct ns2_led_platform_data ns2_leds_data = {
-> > +	.num_leds	= ARRAY_SIZE(ns2_led_pins),
-> > +	.leds		= ns2_led_pins,
-> > +};
-> > +
-> > +static struct platform_device ns2_leds = {
-> > +	.name		= "leds-ns2",
-> > +	.id		= -1,
-> > +	.dev		= {
-> > +		.platform_data	= &ns2_leds_data,
-> > +	},
-> > +};
-> 
-> Have you thought about adding a DT binding for this driver?
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Applies on current Linus master.
+Targetted for v3.7-rc1 so CPUfreq driver can be cleaned of plat includes
+(follow on series)
 
-Yes. I am on it.
+ arch/arm/mach-omap2/opp.c        |   23 +++++++++++++++++------
+ arch/arm/mach-omap2/pm.c         |   11 ++++++++++-
+ arch/arm/mach-omap2/twl-common.c |    2 +-
+ 3 files changed, 28 insertions(+), 8 deletions(-)
 
-> 
-> It would be nice if you could respin the patches for -rc1, when it
-> comes out. There are changes to Makefile.boot at least required.
-
-OK. I will.
-
-Note that this patch is based against the branch kirkwood/boards from
-the git repository git://git.infradead.org/users/jcooper/linux.git. Is
-that correct ?
-
-Thanks.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/b1121644/attachment.sig>
+diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+index 45ad7f7..58e16ae 100644
+--- a/arch/arm/mach-omap2/opp.c
++++ b/arch/arm/mach-omap2/opp.c
+@@ -18,6 +18,7 @@
+  */
+ #include <linux/module.h>
+ #include <linux/opp.h>
++#include <linux/cpu.h>
+ 
+ #include <plat/omap_device.h>
+ 
+@@ -62,13 +63,23 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ 				__func__, i);
+ 			return -EINVAL;
+ 		}
+-		oh = omap_hwmod_lookup(opp_def->hwmod_name);
+-		if (!oh || !oh->od) {
+-			pr_debug("%s: no hwmod or odev for %s, [%d] cannot add OPPs.\n",
+-				 __func__, opp_def->hwmod_name, i);
+-			continue;
++
++		if (!strncmp(opp_def->hwmod_name, "mpu", 3)) {
++			/* 
++			 * All current OMAPs share voltage rail and
++			 * clock source, so CPU0 is used to represent
++			 * the MPU-SS.
++			 */
++			dev = get_cpu_device(0);
++		} else {
++			oh = omap_hwmod_lookup(opp_def->hwmod_name);
++			if (!oh || !oh->od) {
++				pr_debug("%s: no hwmod or odev for %s, [%d] cannot add OPPs.\n",
++					 __func__, opp_def->hwmod_name, i);
++				continue;
++			}
++			dev = &oh->od->pdev->dev;
+ 		}
+-		dev = &oh->od->pdev->dev;
+ 
+ 		r = opp_add(dev, opp_def->freq, opp_def->u_volt);
+ 		if (r) {
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 939bd6f..173c2be 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -16,6 +16,7 @@
+ #include <linux/opp.h>
+ #include <linux/export.h>
+ #include <linux/suspend.h>
++#include <linux/cpu.h>
+ 
+ #include <asm/system_misc.h>
+ 
+@@ -168,7 +169,15 @@ static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
+ 		goto exit;
+ 	}
+ 
+-	dev = omap_device_get_by_hwmod_name(oh_name);
++	if (!strncmp(oh_name, "mpu", 3))
++		/* 
++		 * All current OMAPs share voltage rail and clock
++		 * source, so CPU0 is used to represent the MPU-SS.
++		 */
++		dev = get_cpu_device(0);
++	else
++		dev = omap_device_get_by_hwmod_name(oh_name);
++
+ 	if (IS_ERR(dev)) {
+ 		pr_err("%s: Unable to get dev pointer for hwmod %s\n",
+ 			__func__, oh_name);
+diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+index 45f7741..3f5eacc 100644
+--- a/arch/arm/mach-omap2/twl-common.c
++++ b/arch/arm/mach-omap2/twl-common.c
+@@ -158,7 +158,7 @@ static struct regulator_init_data omap3_vpll2_idata = {
+ };
+ 
+ static struct regulator_consumer_supply omap3_vdd1_supply[] = {
+-	REGULATOR_SUPPLY("vcc", "mpu.0"),
++	REGULATOR_SUPPLY("vcc", "cpu0"),
+ };
+ 
+ static struct regulator_consumer_supply omap3_vdd2_supply[] = {
+-- 
+1.7.9.2
