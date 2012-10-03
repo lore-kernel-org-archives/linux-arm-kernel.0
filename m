@@ -1,30 +1,47 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 3 Oct 2012 11:00:58 -0400
-Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <1348861072-14507-1-git-send-email-mporter@ti.com>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
-Message-ID: <20121003150058.GB11180@beef>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 3 Oct 2012 11:04:54 -0400 (EDT)
+Subject: [PATCH] ARM: proc-v7: Ensure correct instruction set after
+ cpu_reset
+In-Reply-To: <1349256170-4367-1-git-send-email-dave.martin@linaro.org>
+References: <1349256170-4367-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.02.1210031104180.24483@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2012 at 03:37:45PM -0400, Matt Porter wrote:
-> Changes since v1:
-> 	- Replaced uio_pruss private SRAM API use with genalloc
-> 	- Added DA850 platform device and clock support
-> 	- Added DA850 L3 RAM gen_pool support
-> 	- Split out DT binding
+On Wed, 3 Oct 2012, Dave Martin wrote:
+
+> Because mov pc,<Rn> never switches instruction set when executed in
+> Thumb code, Thumb-2 kernels will silently execute the target code
+> after cpu_reset as Thumb code, even if the passed code pointer
+> denotes ARM (bit 0 clear).
 > 
-> This series enables uio_pruss on both DA850 and AM33xx. The driver
-> previously was not enabled by any platform and the private SRAM API
-> was accessing an invalid SRAM bank for use on DA850. For AM33xx,
-> DT, pinctrl, and runtime PM support are added since AM33xx only
-> boots via DT.
+> This patch uses bx instead, ensuring the correct instruction set
+> for the target code.
+> 
+> Thumb code in the kernel is not supported prior to ARMv7, so other
+> CPUs are not affected.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-I'm dropping AM33xx/OMAP support from v3 for this series since the
-focus has turned to fixing Davinci SRAM to provide genalloc support
-and the associated use of that in the driver.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-I'll have a separate series with AM33xx support since dealing cleanly
-with external resets on OMAP is a bigger issue.
-
--Matt
+> ---
+>  arch/arm/mm/proc-v7.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index c2e2b66..ca5b575 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -57,7 +57,7 @@ ENTRY(cpu_v7_reset)
+>   THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
+>  	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+>  	isb
+> -	mov	pc, r0
+> +	bx	r0
+>  ENDPROC(cpu_v7_reset)
+>  	.popsection
+>  
+> -- 
+> 1.7.4.1
+> 
