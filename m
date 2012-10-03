@@ -1,88 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Oct 2012 08:53:27 -0700
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
- <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
- <20121001154451.GI4840@atomide.com>
- <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
-Message-ID: <20121003155327.GZ4840@atomide.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Wed, 3 Oct 2012 18:32:31 +0200
+Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
+In-Reply-To: <20121002190020.GD5117@game.jcrosoft.org>
+References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
+ <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
+ <20121001124546.GE11837@lunn.ch>
+ <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
+ <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
+ <20121001130658.GG11837@lunn.ch>
+ <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
+ <20121002190020.GD5117@game.jcrosoft.org>
+Message-ID: <CAHkwnC_uS1Q_oxr61w8k-7MJWyNfHx=maF_jMZ97tyGxPOn1kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* AnilKumar, Chimata <anilkumar@ti.com> [121003 03:53]:
-> On Tue, Oct 02, 2012 at 01:29:37, Linus Walleij wrote:
-> > On Mon, Oct 1, 2012 at 5:44 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > 
-> > >> OK that is typical pinctrl driver implementation work.
-> > >> I hope Tony can advice on this?
-> > >
-> > > I think we're best off to just stick to alternative named modes
-> > > passed from device tree. For example, for GPIO wake-ups you can
-> > > have named modes such as "default", "enabled" and "idle" where
-> > > "idle" muxes things for GPIO wake-ups for the duration of idle.
-> > >
-> 
-> In this case we need to add three different values according
-> to three modes (default, enabled, idle) and for each node.
+On Tue, Oct 2, 2012 at 9:00 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 17:04 Tue 02 Oct     , Fabio Porcedda wrote:
+>> On Mon, Oct 1, 2012 at 3:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > On Mon, Oct 01, 2012 at 02:54:55PM +0200, Fabio Porcedda wrote:
+>> >> On Mon, Oct 1, 2012 at 2:48 PM, Fabio Porcedda <fabio.porcedda@gmail.com> wrote:
+>> >> > On Mon, Oct 1, 2012 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> >> >> On Mon, Oct 01, 2012 at 02:24:39PM +0200, Fabio Porcedda wrote:
+>> >> >>> Tested on an at91sam9260 board (evk-pro3)
+>> >> >>>
+>> >> >>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> >> >>> ---
+>> >> >>>  .../devicetree/bindings/watchdog/atmel-wdt.txt      | 19 +++++++++++++++++++
+>> >> >>>  drivers/watchdog/at91sam9_wdt.c                     | 21 +++++++++++++++++++++
+>> >> >>>  2 files changed, 40 insertions(+)
+>> >> >>> ...
+>> >> >>
+>> >> >> In patch #1 you add a function to do this, and then you don't make use
+>> >> >> of it here ?
+>> >> >>
+>> >> >> Or am i missing something?
+>> >> >
+>> >> > I'm using it on the patch #2 for the orion_wdt driver.
+>> >> > Do you think it's better to join the #1 and the #2 patch?
+>> >> >
+>> >> > Best regards
+>> >> > --
+>> >> > Fabio Porcedda
+>> >>
+>> >> I'm sorry, only now i understand your question.
+>> >> The at91sam9_wdt driver don't use the watchdog core framework si i
+>> >> can't use that function cleanly.
+>> >
+>> >> The patch #1 and #2 are for introducing the same property as the
+>> >> at91sam9_wdt driver.
+>> >
+>> > So maybe split this up into two different patchsets. One patchset to
+>> > add the helper function, and the use of this helper to all watchdog
+>> > divers that can use it. I think the following drivers should be
+>> > modified:
+>> >
+>> > orion_wdt.c
+>> > pnx4008_wdt.c
+>> > s3c2410_wdt.c
+>> >
+>> > In a second patchset, convert the AT91SAM9 driver over to the watchdog
+>> > core framework, and then use the helper function.
+>>
+>> I was thinking to add a more generic helper function like this:
+>>
+>> static inline void watchdog_get_dttimeout(struct device_node *node,
+>> u32 *timeout)
+>> {
+>>       if (node)
+>>               of_property_read_u32(node, "timeout", &wdd->timeout);
+>> }
+>>
+>> This way i can use this helper function in the at91sam9_wdt driver too.
+>> What do you think?
+> timeout_sec and this can be move at of.h level
+>
+> as this is not watchdog framework secific
 
-Yes those make sense from the generic leds-gpio point of view
-for the platforms that implement pinctrl.
- 
-> > > It seems that should also work for leds-gpio. And you can
-> > > define more named modes as needed.
-> 
-> If we want to implement pinctrl_gpio functionality we have to
-> separate "function-mask" bits to
-> 
-> 1. pinmux-mask
-> 2. pinconf-mask, to make it generic we need following bit masks
-> 	a. receiver enable/disable bit
-> 	b. slew rate fast/slow bit
-> 	c. pull-up/down bit
-> 	....
+I can not find any property with the "_sec" suffix, you think it's
+still fine to use that suffix?
 
-Yes those can be implemented, but the problem will always be
-that the driver will not know if the board is using external
-pulls. If you implement the board specific settings in the .dts
-file for default, enabled and idle, the leds-gpio does not need
-to care if the pull is internal or external. So that seems like
-a more generic way to do it.
- 
-> I have gone through nvidia pinctrl dt data (tegra20-seaboard.dts,
-> node drive_sdio1) which has different pinconfig values, those
-> are mapping to pinconf values.
-> 
-> With the above bit masks and function-mask we can identify
-> pull-up/down, slow/high speed slew rate and direction in/out.
-> 
-> (or)
-> 
-> Named modes:-
-> 
-> Are you saying named modes like this?
-> default-input-up
-> default-input-down
-> default-output-up
-> default-output-down
+You are speaking about a of_watchdog.h header with a
+of_watchdog_get_timeout function?
 
-Hmm no, you want to implement named modes that make sense
-from the client driver point of view. It seems that default,
-enabled and idle should do here? Then for the enabled mode
-you can set the LED specific pins to whatever pull mode
-you want for the board, and then leds-gpio does the rest
-using the gpio framework.
- 
-> This 1, 2 and 2.a or named modes are required to implement
-> pinctrl_gpio_direction_input/output and
-> pinctrl_request/free_gpio.
-
-I would just add the named modes to leds-gpio because 2a
-does not work for the case where you use external pulls.
-
-Regards,
-
-Tony 
+Best regards and thanks for the review.
+-- 
+Fabio Porcedda
