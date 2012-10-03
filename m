@@ -1,70 +1,46 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 3 Oct 2012 07:16:30 +0000
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
- McASP IP Variant
-In-Reply-To: <506B6A9D.3090100@gmail.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <506B6A9D.3090100@gmail.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 03 Oct 2012 09:26:50 +0200
+Subject: [PATCH 0/2] ARM: Exynos4: Migrate to common clock framework.
+In-Reply-To: <1349093361-18820-1-git-send-email-thomas.abraham@linaro.org>
+References: <1349093361-18820-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <2779610.RIGYtRk86h@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
-> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
-> > The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
-> > register offset and missing generic SRAM APIs support
-> > 
-> > Changes
-> > - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
-> >   "ti,omap2-mcasp-audio" to identify version 3 controller.
-> > - The register offsets are handled depending on the version.
-> > - Provide a config option to indicate missing SRAM API support.
+Hi Chander, Thomas,
+
+On Monday 01 of October 2012 17:39:19 chander.kashyap at linaro.org wrote:
+> From: Thomas Abraham <thomas.abraham@linaro.org>
 > 
-> Could you give some insight which hardware this was tested on? I'm
-> trying to get this up and running on a AM33xx board, and the patches
-> look all reasonable to me. My problem is that I can't make the DMA
-> engine move forward, I fail to receive a single interrupt on this
-> peripheral after the stream starts. I will continue searching for the
-> reason of this tomorrow, but maybe you can give me some hint by
-> explaining your setup?
+> This patch series migrates Exynos4 clock support to common clock
+> framework. The first patch in this series removes the existing Exynos4
+> clock support that uses the Samsung specific clock framework. The second
+> patch in this series add Exynos4 clock support using common clock
+> framework.
 > 
-> Note that I'm using your patches together with Matt's from this series:
-> 
->   https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
-> 
-> ... but it doesn't work without those either.
+> Thomas Abraham (2):
+>   ARM: Exynos4: Remove Samsung clock type support
+>   ARM: Exynos4: Register clocks via common clock framework
 
+I think the order of changes is a little bit off here:
+ - patch 1 will break all exynos4-based boards (what about bisects?)
+ - patch 2 will be still broken until all related drivers get converted to 
+use clk_prepare(_enable) and clk_(disable_)unprepare.
 
-When I started working on adding DT support to McASP driver, Matt Porter 
-EDMA port was not yet ready. 
+Shouldn't the order be exactly opposite, i.e.:
+ - all the patches for prepare/unprepare first
+ - then the patch adding common clock frameworks support for exynos4 
+(disabling the old clock code)
+ - and finally the patch removing remaining (disabled by previous patch) 
+code.
 
-So 
-1. I took existing edma driver from AM335x Arago release [1] (driver + edma 
-   device init). 
-2. Added this to Vaibhav's Local (linux-next + AM335x patches) tree [2] 
+Also, I assume that these patches doesn't consider native device tree 
+support (without auxdata, using OF-based clock lookup), correct me if I'm 
+wrong. If I'm right, since Exynos SoCs are going to be DT-only, is there 
+really a point for adding common clock framework support for non-DT 
+platforms (which are going to be eventually dropped anyway)?
 
-3. Added DT support to McASP driver.
-
-I tested this on AM335x EVM board. 
-
-If you need the code, I can share it as a patch (I will send the patch as a 
-private mail since the patch is huge).
-
-
-[1]
-http://arago-project.org/git/projects/?p=linux-am33x.git;a=commit;h=d7e124e8074cccf9958290e773c88a4b2b36412b
-
-[2]
-https://github.com/hvaibhav/am335x-linux/tree/am335x-upstream-staging
-
-> 
-> 
-> 
-> Thanks,
-> Daniel
-> 
-> 
-
-
-Regards, 
-Gururaja
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
