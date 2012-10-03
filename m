@@ -1,46 +1,69 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 03 Oct 2012 09:26:50 +0200
-Subject: [PATCH 0/2] ARM: Exynos4: Migrate to common clock framework.
-In-Reply-To: <1349093361-18820-1-git-send-email-thomas.abraham@linaro.org>
-References: <1349093361-18820-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <2779610.RIGYtRk86h@amdc1227>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 3 Oct 2012 13:47:58 +0530
+Subject: [PATCH v3 0/2] ARM: davinci: da850/omap-l138: add support for
+ VPIF driver
+In-Reply-To: <1347344709-6180-1-git-send-email-prabhakar.lad@ti.com>
+References: <1347344709-6180-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <506BF4B6.8090701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander, Thomas,
+Hi Prabhakar,
 
-On Monday 01 of October 2012 17:39:19 chander.kashyap at linaro.org wrote:
-> From: Thomas Abraham <thomas.abraham@linaro.org>
+On 9/11/2012 11:55 AM, Prabhakar Lad wrote:
+> This patch series adds support for VPIF
+> capture and display driver on da850/omap-l138.
+> Enables SD capture and display.
 > 
-> This patch series migrates Exynos4 clock support to common clock
-> framework. The first patch in this series removes the existing Exynos4
-> clock support that uses the Samsung specific clock framework. The second
-> patch in this series add Exynos4 clock support using common clock
-> framework.
+> This patch series is dependent on the following patch:
+> https://patchwork.kernel.org/patch/1332311/
 > 
-> Thomas Abraham (2):
->   ARM: Exynos4: Remove Samsung clock type support
->   ARM: Exynos4: Register clocks via common clock framework
+> Changes for v3:
+> 1: Clubbed the code for DA850_UI_SD_VIDEO_PORT config
+>    as pointed by Sekhar.
+> 2: Define  the resource structure outside the function as pointed
+>    by Sekhar.
+> 
+> Changes for v2:
+> 1: Avoid breaking of print messages.
+> 2: Removed the handlers which just returned zero (which did nothing).
+> 3: Clubbed the code where ever possible for DA850_UI_SD_VIDEO_PORT
+>    config option.
+> 4: Removed the dma_declare_coherent_memory() calls and used
+>    global CMA.
+> 5: Added the base address in increasing order.
+> 
+> Manjunath Hadli (2):
+>   ARM: da850/omap-l138: Add SoC related definitions for VPIF
+>   ARM: da850/omap-l138: Add EVM specific code for VPIF to work
+> 
+> Manjunath Hadli (2):
+>   ARM: da850/omap-l138: Add SoC related definitions for VPIF
+>   ARM: da850/omap-l138: Add EVM specific code for VPIF to work
+> 
+>  arch/arm/mach-davinci/Kconfig              |    7 ++
+>  arch/arm/mach-davinci/board-da850-evm.c    |  156 ++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/da850.c              |  152 +++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/da8xx.h |   11 ++
+>  arch/arm/mach-davinci/include/mach/mux.h   |   42 ++++++++
+>  arch/arm/mach-davinci/include/mach/psc.h   |    1 +
+>  6 files changed, 369 insertions(+), 0 deletions(-)
 
-I think the order of changes is a little bit off here:
- - patch 1 will break all exynos4-based boards (what about bisects?)
- - patch 2 will be still broken until all related drivers get converted to 
-use clk_prepare(_enable) and clk_(disable_)unprepare.
+The patches look good to me. In case you want to queue them through the
+media tree to manage the dependencies, feel free to add my:
 
-Shouldn't the order be exactly opposite, i.e.:
- - all the patches for prepare/unprepare first
- - then the patch adding common clock frameworks support for exynos4 
-(disabling the old clock code)
- - and finally the patch removing remaining (disabled by previous patch) 
-code.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Also, I assume that these patches doesn't consider native device tree 
-support (without auxdata, using OF-based clock lookup), correct me if I'm 
-wrong. If I'm right, since Exynos SoCs are going to be DT-only, is there 
-really a point for adding common clock framework support for non-DT 
-platforms (which are going to be eventually dropped anyway)?
+Note that the subject like prefix for DA850 soc patches should be
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+"ARM: davinci: da850: .."
+
+and that for DA850 EVM patches should be:
+
+"ARM: davinci: da850 evm: .."
+
+instead of what you have used here. Please fix these if you are queuing
+them and take care of this in future.
+
+Thanks,
+Sekhar
