@@ -1,45 +1,45 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 2 Oct 2012 17:52:18 -0700
-Subject: [PATCH] ARM: arch timer: Export 'read_current_timer' symbol
-Message-ID: <20121003005218.GA23874@animalcreek.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  2 Oct 2012 19:26:37 -0600
+Subject: [PATCH] ARM: bcm2835: fix typos in DT binding documentation
+Message-ID: <1349227597-5187-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+The compatible value shouldn't include ".txt", which was probably cut
+and paste from the filename.
 
-Commit 923df96b9f31b7d08d8438ff9677326d9537accf
-(ARM: 7451/1: arch timer: implement read_current_timer and get_cycles)
-modifies get_cycles() such that it calls read_current_timer().
-Unfortunately, the 'read_current_timer' symbol is not exported so when
-a driver that calls get_cycles() is built as a module, an undefined
-reference error occurs.
-
-A good example is the crypto/tcrypt.c (CONFIG_CRYPTO_TEST) driver
-because it calls get_cycles() and can only be built as a module.
-
-Fix this error by exporting the 'read_current_timer' symbol.
-
-CC: Will Deacon <will.deacon@arm.com>
-CC: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+Reported-by: Domenico Andreoli <cavokz@gmail.com>
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
+ .../brcm,bcm2835-armctrl-ic.txt                    |    2 +-
+ .../bindings/timer/brcm,bcm2835-system-timer.txt   |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-This patch applies against current arm-soc/for-next branch.
-
- arch/arm/kernel/armksyms.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index 60d3b73..e7a29fe 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -156,3 +156,7 @@ EXPORT_SYMBOL(__gnu_mcount_nc);
- #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
- EXPORT_SYMBOL(__pv_phys_offset);
- #endif
-+
-+#ifdef CONFIG_ARM_ARCH_TIMER
-+EXPORT_SYMBOL(read_current_timer);
-+#endif
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+index 548892c..7da578d 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+@@ -7,7 +7,7 @@ as "armctrl" in the SoC documentation, hence naming of this binding.
+ 
+ Required properties:
+ 
+-- compatible : should be "brcm,bcm2835-armctrl-ic.txt"
++- compatible : should be "brcm,bcm2835-armctrl-ic"
+ - reg : Specifies base physical address and size of the registers.
+ - interrupt-controller : Identifies the node as an interrupt controller
+ - #interrupt-cells : Specifies the number of cells needed to encode an
+diff --git a/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt b/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
+index 2de21c2..844bd5f 100644
+--- a/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
++++ b/Documentation/devicetree/bindings/timer/brcm,bcm2835-system-timer.txt
+@@ -7,7 +7,7 @@ free running counter values, and generates an interrupt.
+ 
+ Required properties:
+ 
+-- compatible : should be "brcm,bcm2835-system-timer.txt"
++- compatible : should be "brcm,bcm2835-system-timer"
+ - reg : Specifies base physical address and size of the registers.
+ - interrupts : A list of 4 interrupt sinks; one per timer channel.
+ - clock-frequency : The frequency of the clock that drives the counter, in Hz.
 -- 
-1.7.12
+1.7.9.5
