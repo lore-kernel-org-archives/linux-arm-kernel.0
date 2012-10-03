@@ -1,40 +1,77 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 3 Oct 2012 21:23:23 +0200
-Subject: [PATCH] ARM: mv78xx0: correct addr_map_cfg __initdata annotation
-In-Reply-To: <201210031906.35123.arnd@arndb.de>
-References: <201210031906.35123.arnd@arndb.de>
-Message-ID: <20121003192323.GB25766@lunn.ch>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Wed, 3 Oct 2012 16:13:33 -0500
+Subject: [PATCH v2 8/9] ARM: OMAP: iommu: add device tree support
+In-Reply-To: <20121002212523.GA11180@beef>
+References: <1347479152-588-1-git-send-email-omar.luna@linaro.org>
+ <1347479152-588-9-git-send-email-omar.luna@linaro.org>
+ <20121002212523.GA11180@beef>
+Message-ID: <CALLhW=4oawfGqSDHAVgh_SPqB4Ugeyw6MjoaNDVkxSJcJd4Tpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 07:06:34PM +0000, Arnd Bergmann wrote:
-> The annotation on the addr_map_cfg variable is in the wrong place.
-> 
-> Without this patch, building mv78xx0_defconfig results in:
-> 
-> /home/arnd/linux-arm/arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: initialization from incompatible pointer type [enabled by default]
-> /home/arnd/linux-arm/arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: (near initialization for 'addr_map_cfg.win_cfg_base') [enabled by default]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> ---
-> Queued in the late/fixes branch
-> 
-> diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
-> index a9bc841..03f7486 100644
-> --- a/arch/arm/mach-mv78xx0/addr-map.c
-> +++ b/arch/arm/mach-mv78xx0/addr-map.c
-> @@ -53,7 +53,7 @@ static void __init __iomem *win_cfg_base(const struct orion_addr_map_cfg *cfg, i
->  /*
->   * Description of the windows needed by the platform code
->   */
-> -static struct __initdata orion_addr_map_cfg addr_map_cfg = {
-> +static struct orion_addr_map_cfg addr_map_cfg __initdata = {
->  	.num_wins = 14,
->  	.remappable_wins = 8,
->  	.win_cfg_base = win_cfg_base,
+Hi Matt,
 
-Humm, been there, done that once. Must of forgotten to post it. :-(
+On 2 October 2012 16:25, Matt Porter <mporter@ti.com> wrote:
+...
+> I can see why you went this path with the iommu driver as it already had
+> some integration code present here. I have some concerns going forward
+> about how this should be long-term. Take any platform booting only with
+> DT populated, we'd like to avoid having to use this approach where
+> platform private APIs are called via pdata. In fact, it's going to makes
+> thing ugly to carry any sort of pdata for a driver that's otherwise
+> driven exclusively from DT.
+>
+> For AM335x, I can implement this approach, but it means adding some
+> pruss specific integration code just to have it create the pdata for
+> reset_name and assert/deassert.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Yes I agree, it looks a bit ugly for devices that have more than one
+reset line name too, but right now there is no other way to keep the
+reset names and also provide flexibility to the driver to control them
+in a given order.
+
+> From reading all the threads on hardresets and OMAP, it seems we may not
+> be able to come up with a generic OMAP handler for these resets and
+> that's really reflected in the fact that this API exists. So given that,
+> it reasons that OMAP isn't the only one needing a reset API for drivers.
+> I'm thinking that (as trivial as it may seem), this support may need to
+> move to a reset subsystem such that drivers have a clean way to access
+> reset resources in an SoC.
+
+Well, there was a point where the OMAP hwmod code contained the reset
+code and at least for me it was working fine, with iommu and ipu
+processor, just with a minor misleading warning print... however then
+this code got stripped out and since there appeared to be people
+needing to handle their reset lines in unknown ways it was advised
+that everybody should implement their own reset functions, but in my
+case I could reuse most of the disabled code at the expense of almost
+duplicating _enable (omap_hwmod) function while waiting all the reset
+line users started asking for changes.
+
+> I'm curious if you or others have thought about where this needs to go
+> next.
+
+I haven't planned for a reset subsystem or a more generic
+implementation, although I have been looking for a way to avoid using
+the pdata function pointers.
+
+> When I first thought about a reset subsystem it seemed to trivial
+> to bother with but looking at the reasoning behind the power_seq
+> subsystem, it seems to have similar justification to get this machine
+> specific logic out of the platform code and under standardized control
+> of the driver.
+
+IMHO, the reset code even if made a subsystem or a library, would
+still need to interface with machine specific code and definitions
+(say omap_hwmod), so I don't see much difference in making the
+omap_device reset handlers as exported symbols for the time being,
+with acceptance of the owners of omap_device code.
+
+And then if power_seq makes it to mainline perhaps extending it to
+handle deassert, assert and softreset events, but then again this
+would have the same hooks to omap_hwmod which is the one with the prcm
+information.
+
+Regards,
+
+Omar
