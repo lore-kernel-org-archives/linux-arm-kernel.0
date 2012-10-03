@@ -1,44 +1,25 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 3 Oct 2012 12:12:05 +0200
-Subject: [PATCH 0/4] cpufreq: db8500: Use platform data to provide cpufreq
- table
-In-Reply-To: <CACRpkdb-SWkysKGQrJBL1hJLucQ=aN59Sfxe6rxrvtR0HsOJ_g@mail.gmail.com>
-References: <1348841814-13645-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdb-SWkysKGQrJBL1hJLucQ=aN59Sfxe6rxrvtR0HsOJ_g@mail.gmail.com>
-Message-ID: <CAPDyKFqqS4D4ZNDp3tFqE5t5iYOKCcaQYvyFsfGQa5U8bzWWag@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 3 Oct 2012 16:08:05 +0530
+Subject: [PATCH] ARM: davinci: dm644x: fix out range signal for ED
+In-Reply-To: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
+References: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <506C158D.4000906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2012 13:45, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Sep 28, 2012 at 4:16 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
->
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> Since the cpufreq table is dependant on the prmcu fw, it make sense to
->> keep the table there. Moreover since the cpufreq is already a mfd child
->> device added by the prcmu this make even more logic.
->
-> Better there than elsewhere.
->
->> The next step after these patches will be to implement an "arm_clk" to be
->> used from cpufreq to update the opp instead of using the prcmu opp API directly.
->> This will then remove the last hard dependency to the prcmu API from cpufreq.
->
-> Sounds like a plan.
->
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Is this going to be merged through the cpufreq tree or the MFD tree?
+On 10/3/2012 12:05 PM, Prabhakar wrote:
+> From: Lad, Prabhakar <prabhakar.lad@ti.com>
+> 
+> while testing display on dm644x, for ED out-range signals
+> was observed. This patch fixes appropriate clock setting
+> for ED.
 
-Good question! Actually I would prefer to go through Mike Turquette
-clock tree, if he feel it is OK of course.
-My idea is then get the Ack from Rafael for cpufreq patches and from
-Samuel for the mfd patches.
+Can you please clarify what you mean by "out range signal"? Are there
+any user visible artifacts on the display? What was the clock being
+provided earlier and what is the value after this patch?
 
-The reason for doing this in a quite complicated manner is that my
-soon upcoming clock and mfd patches will functionality wise depend on
-these patches, and don't want to be sitting around and waiting for a
-new rc before being able to push the next series.
+Also, is the issue severe enough that this patch should be applied to
+stable tree as well?
 
-Kind regards
-Ulf Hansson
+Thanks,
+Sekhar
