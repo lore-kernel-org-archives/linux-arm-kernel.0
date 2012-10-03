@@ -1,122 +1,96 @@
-From: const@MakeLinux.com (const at MakeLinux.com)
-Date: Thu,  4 Oct 2012 00:04:19 +0200
-Subject: [PATCH v3] Enable USB peripheral on dm365 EVM
-Message-ID: <1349301859-31306-1-git-send-email-const@MakeLinux.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 4 Oct 2012 00:09:16 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
+ parents
+In-Reply-To: <20121003154310.GI11837@lunn.ch>
+References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
+ <20121003154310.GI11837@lunn.ch>
+Message-ID: <20121003220916.GW31897@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Constantine Shulyupin <const@MakeLinux.com>
+On Wed, Oct 03, 2012 at 05:43:10PM +0200, Andrew Lunn wrote:
+> On Wed, Oct 03, 2012 at 05:14:30PM +0200, Simon Guinot wrote:
+> > This patch adds DT board setup for LaCie Network Space v2 and parents,
+> > based the Marvell Kirkwood 6281 SoC. This includes Network Space (Max)
+> > v2 and Internet Space v2.
+> 
+> Hi Simon
+> 
+> At a first look, this looks good. Also nice to see you use the new
+> gpio-fan binding.
 
-From: Miguel Aguilar <miguel.aguilar@ridgerun.com>
-Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
----
-Tested with usb gadget g_zero.
-This patch is based on code from Arago, Angstom, and RidgeRun projects.
-Original patch is three years ago:
-http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
+Hi Andrew,
 
----
- arch/arm/mach-davinci/board-dm365-evm.c |    8 ++++++++
- arch/arm/mach-davinci/usb.c             |    2 ++
- drivers/usb/musb/davinci.h              |    1 +
- drivers/usb/musb/musb_core.c            |   20 ++++++++++++--------
- 4 files changed, 23 insertions(+), 8 deletions(-)
+It is nice to have this binding. It works fine.
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 3a4743b..dfcb67f 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -38,6 +38,8 @@
- #include <mach/mmc.h>
- #include <mach/nand.h>
- #include <mach/keyscan.h>
-+#include <mach/usb.h>
-+#include <mach/hardware.h>
- 
- #include <media/tvp514x.h>
- 
-@@ -92,6 +94,9 @@ static inline int have_tvp7002(void)
- #define CPLD_CCD_DIR3	CPLD_OFFSET(0x3f,0)
- #define CPLD_CCD_IO3	CPLD_OFFSET(0x3f,1)
- 
-+#define USBPHY_CTL_PADDR	0x01c40034
-+#define USBPHY_CLKFREQ_24MHZ	BIT(13)
-+
- static void __iomem *cpld;
- 
- 
-@@ -613,6 +618,9 @@ static __init void dm365_evm_init(void)
- 
- 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
- 			ARRAY_SIZE(dm365_evm_spi_info));
-+	writel(readl(IO_ADDRESS(USBPHY_CTL_PADDR)) | USBPHY_CLKFREQ_24MHZ,
-+			IO_ADDRESS(USBPHY_CTL_PADDR));
-+	davinci_setup_usb(500, 8);
- }
- 
- MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
-diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
-index 23d2b6d..664c689 100644
---- a/arch/arm/mach-davinci/usb.c
-+++ b/arch/arm/mach-davinci/usb.c
-@@ -49,6 +49,8 @@ static struct musb_hdrc_platform_data usb_data = {
- 	.mode           = MUSB_PERIPHERAL,
- #elif defined(CONFIG_USB_MUSB_HOST)
- 	.mode           = MUSB_HOST,
-+#else
-+	.mode           = MUSB_OTG,
- #endif
- 	.clock		= "usb",
- 	.config		= &musb_config,
-diff --git a/drivers/usb/musb/davinci.h b/drivers/usb/musb/davinci.h
-index 371baa0..e737d97 100644
---- a/drivers/usb/musb/davinci.h
-+++ b/drivers/usb/musb/davinci.h
-@@ -16,6 +16,7 @@
- 
- /* Integrated highspeed/otg PHY */
- #define USBPHY_CTL_PADDR	0x01c40034
-+#define USBPHY_CLKFREQ_24MHZ	BIT(13)
- #define USBPHY_DATAPOL		BIT(11)	/* (dm355) switch D+/D- */
- #define USBPHY_PHYCLKGD		BIT(8)
- #define USBPHY_SESNDEN		BIT(7)	/* v(sess_end) comparator */
-diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-index 26f1bef..277fe65 100644
---- a/drivers/usb/musb/musb_core.c
-+++ b/drivers/usb/musb/musb_core.c
-@@ -2051,9 +2051,17 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
- 	dev_info(dev, "USB %s mode controller at %p using %s, IRQ %d\n",
- 			({char *s;
- 			 switch (musb->board_mode) {
--			 case MUSB_HOST:		s = "Host"; break;
--			 case MUSB_PERIPHERAL:	s = "Peripheral"; break;
--			 default:		s = "OTG"; break;
-+			 case MUSB_HOST:
-+				s = "Host";
-+			 break;
-+			 case MUSB_PERIPHERAL:
-+				s = "Peripheral";
-+			 break;
-+			 case MUSB_OTG:
-+				s = "OTG";
-+			 break;
-+			 default:
-+				s = "Undefined";
- 			 }; s; }),
- 			ctrl,
- 			(is_dma_capable() && musb->dma_controller)
-@@ -2402,11 +2410,7 @@ static int __init musb_init(void)
- 	if (usb_disabled())
- 		return 0;
- 
--	pr_info("%s: version " MUSB_VERSION ", "
--		"?dma?"
--		", "
--		"otg (peripheral+host)",
--		musb_driver_name);
-+	pr_info("%s: version %s\n", MUSB_VERSION, musb_driver_name);
- 	return platform_driver_register(&musb_driver);
- }
- module_init(musb_init);
--- 
-1.7.9.5
+> 
+> > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
+> >  	if (of_machine_is_compatible("keymile,km_kirkwood"))
+> >  		km_kirkwood_init();
+> >  
+> > +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
+> > +	    of_machine_is_compatible("lacie,netspace_v2") ||
+> > +	    of_machine_is_compatible("lacie,netspace_max_v2"))
+> > +		ns2_init();
+> > +
+> >  	of_platform_populate(NULL, kirkwood_dt_match_table,
+> >  			     kirkwood_auxdata_lookup, NULL);
+> 
+> I'm not a DT policy expert. Could this be one compatibility string for
+> all the boards? Maybe ask on the DT mainline list?
+
+Maybe I could use "lacie,ns2_common" as a compatibility string. But this
+does not match any existing device. I don't know if it is correct.
+
+> 
+> > +#define NETSPACE_V2_GPIO_BLUE_LED_SLOW	29
+> > +#define NETSPACE_V2_GPIO_BLUE_LED_CMD	30
+> > +
+> > +static struct ns2_led ns2_led_pins[] = {
+> > +	{
+> > +		.name	= "ns_v2:blue:sata",
+> > +		.cmd	= NETSPACE_V2_GPIO_BLUE_LED_CMD,
+> > +		.slow	= NETSPACE_V2_GPIO_BLUE_LED_SLOW,
+> > +	},
+> > +};
+> > +
+> > +static struct ns2_led_platform_data ns2_leds_data = {
+> > +	.num_leds	= ARRAY_SIZE(ns2_led_pins),
+> > +	.leds		= ns2_led_pins,
+> > +};
+> > +
+> > +static struct platform_device ns2_leds = {
+> > +	.name		= "leds-ns2",
+> > +	.id		= -1,
+> > +	.dev		= {
+> > +		.platform_data	= &ns2_leds_data,
+> > +	},
+> > +};
+> 
+> Have you thought about adding a DT binding for this driver?
+
+Yes. I am on it.
+
+> 
+> It would be nice if you could respin the patches for -rc1, when it
+> comes out. There are changes to Makefile.boot at least required.
+
+OK. I will.
+
+Note that this patch is based against the branch kirkwood/boards from
+the git repository git://git.infradead.org/users/jcooper/linux.git. Is
+that correct ?
+
+Thanks.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/b1121644/attachment.sig>
