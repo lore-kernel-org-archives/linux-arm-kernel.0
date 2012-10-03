@@ -1,83 +1,53 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  3 Oct 2012 16:00:28 -0700
-Subject: [PATCH 3/4] cpufreq: OMAP: fix clock usage to be SoC independent,
- remove plat/ includes
+Date: Wed,  3 Oct 2012 16:00:29 -0700
+Subject: [PATCH 4/4] cpufreq: OMAP: use get_cpu_device() instead of
+ omap_device API
 In-Reply-To: <1349305229-28480-1-git-send-email-khilman@deeprootsystems.com>
 References: <1349305229-28480-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1349305229-28480-4-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1349305229-28480-5-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Walmsley <paul@pwsan.com>
+From: Kevin Hilman <khilman@ti.com>
 
-OMAP core code now has SoC-independent clock alias for the scalable
-CPU clock.  Using it means driver is SoC independent and will work for
-AM3xxx SoCs as well as OMAP1/3/4.
+OMAP PM core code has moved to using the existing, generic CPU devices
+for attaching OPPs, so the CPUfreq driver can now use the generic
+get_cpu_device() API instead of the OMAP-specific omap_device API.
 
-While here, remove some unnecessary plat/ includes that are
-interfering with multi-subarch ARM kernels.
+This allows us to remove the last <plat/*> include from this driver.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-[tony at atomide.com: updated already changed clock aliases]
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-[khilman at ti.com: minor shortlog/changelog updates]
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/cpufreq/omap-cpufreq.c |   19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+ drivers/cpufreq/omap-cpufreq.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 7d4d455..5d1f5e4 100644
+index 5d1f5e4..1f3417a 100644
 --- a/drivers/cpufreq/omap-cpufreq.c
 +++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -30,19 +30,14 @@
+@@ -30,8 +30,6 @@
  #include <asm/smp_plat.h>
  #include <asm/cpu.h>
  
--#include <plat/clock.h>
--#include <plat/common.h>
- #include <plat/omap_device.h>
- 
--#include <mach/hardware.h>
+-#include <plat/omap_device.h>
 -
  /* OPP tolerance in percentage */
  #define	OPP_TOLERANCE	4
  
- static struct cpufreq_frequency_table *freq_table;
- static atomic_t freq_table_users = ATOMIC_INIT(0);
- static struct clk *mpu_clk;
--static char *mpu_clk_name;
- static struct device *mpu_dev;
- static struct regulator *mpu_reg;
- 
-@@ -179,7 +174,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
- {
- 	int result = 0;
- 
--	mpu_clk = clk_get(NULL, mpu_clk_name);
-+	mpu_clk = clk_get(NULL, "cpufreq_ck");
- 	if (IS_ERR(mpu_clk))
- 		return PTR_ERR(mpu_clk);
- 
-@@ -260,18 +255,6 @@ static struct cpufreq_driver omap_driver = {
+@@ -255,10 +253,10 @@ static struct cpufreq_driver omap_driver = {
  
  static int __init omap_cpufreq_init(void)
  {
--	if (cpu_is_omap24xx())
--		mpu_clk_name = "virt_prcm_set";
--	else if (cpu_is_omap34xx())
--		mpu_clk_name = "dpll1_ck";
--	else if (cpu_is_omap44xx())
--		mpu_clk_name = "dpll_mpu_ck";
--
--	if (!mpu_clk_name) {
--		pr_err("%s: unsupported Silicon?\n", __func__);
--		return -EINVAL;
--	}
--
- 	mpu_dev = omap_device_get_by_hwmod_name("mpu");
- 	if (IS_ERR(mpu_dev)) {
+-	mpu_dev = omap_device_get_by_hwmod_name("mpu");
+-	if (IS_ERR(mpu_dev)) {
++	mpu_dev = get_cpu_device(0);
++	if (!mpu_dev) {
  		pr_warning("%s: unable to get the mpu device\n", __func__);
+-		return PTR_ERR(mpu_dev);
++		return -EINVAL;
+ 	}
+ 
+ 	mpu_reg = regulator_get(mpu_dev, "vcc");
 -- 
 1.7.9.2
