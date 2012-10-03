@@ -1,84 +1,108 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 3 Oct 2012 12:57:12 +0000
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
- McASP IP Variant
-In-Reply-To: <506C1E97.1070700@gmail.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <506B6A9D.3090100@gmail.com>
- <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
- <506C1E97.1070700@gmail.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA99DA8@DBDE01.ent.ti.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 3 Oct 2012 15:05:26 +0200
+Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data
+ via platform data
+In-Reply-To: <877gr87bxj.fsf@deeprootsystems.com>
+References: <1348152453-30532-1-git-send-email-j-pihet@ti.com>
+ <1348496201-6378-1-git-send-email-j-pihet@ti.com>
+ <1348496201-6378-3-git-send-email-j-pihet@ti.com>
+ <877gr87bxj.fsf@deeprootsystems.com>
+Message-ID: <CAORVsuWKMHbqKvJ6x3dY0Kz_f2va4O8-fTmazF5tpNp1qLUgPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 16:46:39, Daniel Mack wrote:
-> On 03.10.2012 09:16, Hebbar, Gururaja wrote:
-> > On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
-> >> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
-> >>> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
-> >>> register offset and missing generic SRAM APIs support
-> >>>
-> >>> Changes
-> >>> - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
-> >>>   "ti,omap2-mcasp-audio" to identify version 3 controller.
-> >>> - The register offsets are handled depending on the version.
-> >>> - Provide a config option to indicate missing SRAM API support.
-> >>
-> >> Could you give some insight which hardware this was tested on? I'm
-> >> trying to get this up and running on a AM33xx board, and the patches
-> >> look all reasonable to me. My problem is that I can't make the DMA
-> >> engine move forward, I fail to receive a single interrupt on this
-> >> peripheral after the stream starts. I will continue searching for the
-> >> reason of this tomorrow, but maybe you can give me some hint by
-> >> explaining your setup?
-> >>
-> >> Note that I'm using your patches together with Matt's from this series:
-> >>
-> >>   https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
-> >>
-> >> ... but it doesn't work without those either.
-> > 
-> > 
-> > When I started working on adding DT support to McASP driver, Matt Porter 
-> > EDMA port was not yet ready. 
-> > 
-> > So 
-> > 1. I took existing edma driver from AM335x Arago release [1] (driver + edma 
-> >    device init). 
-> > 2. Added this to Vaibhav's Local (linux-next + AM335x patches) tree [2] 
-> > 
-> > 3. Added DT support to McASP driver.
-> > 
-> > I tested this on AM335x EVM board. 
-> 
-> Hmm, so I think there's a tiny bit missing for the EDMA conversion on DT
-> kernels.
-> 
-> > If you need the code, I can share it as a patch (I will send the patch as a 
-> > private mail since the patch is huge).
-> 
-> Please do :) Or just push your entire tree somewhere.
+Hi Kevin,
 
-I have pushed the code at below git repo
-Repo :https://github.com/hvaibhav/am335x-linux
-Branch : am335x-upstream-staging-audio
+On Wed, Oct 3, 2012 at 12:21 AM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Hi Jean,
+>
+> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>
+>> Remove the device dependent settings (cpu_is_xxx(), IP fck etc.)
+>> from the driver code and pass them instead via the platform
+>> data.
+>> This allows a clean separation of the driver code and the platform
+>> code, as required by the move of the platform header files to
+>> include/linux/platform_data.
+>>
+>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>
+> Could you make pdata change and the clock change should be two different
+> patches?  Also, your previous patch to align SR clock names should be
+> combined with the changes made here.
+>
+> Some comments on the clock change below...
+>
+>> ---
+>>  arch/arm/mach-omap2/sr_device.c   |   13 ++++++++++++
+>>  drivers/power/avs/smartreflex.c   |   40 ++++++++++--------------------------
+>>  include/linux/power/smartreflex.h |   14 +++++++++++-
+>>  3 files changed, 36 insertions(+), 31 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+>> index d033a65..2885a77 100644
+>> --- a/arch/arm/mach-omap2/sr_device.c
+>> +++ b/arch/arm/mach-omap2/sr_device.c
+>> @@ -122,6 +122,19 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+>>       sr_data->senn_mod = 0x1;
+>>       sr_data->senp_mod = 0x1;
+>>
+>> +     if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+>> +             sr_data->err_weight = OMAP3430_SR_ERRWEIGHT;
+>> +             sr_data->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+>> +             sr_data->accum_data = OMAP3430_SR_ACCUMDATA;
+>> +             if (!(strcmp(sr_data->name, "smartreflex_mpu"))) {
+>> +                     sr_data->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
+>> +                     sr_data->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
+>> +             } else {
+>> +                     sr_data->senn_avgweight = OMAP3430_SR2_SENNAVGWEIGHT;
+>> +                     sr_data->senp_avgweight = OMAP3430_SR2_SENPAVGWEIGHT;
+>> +             }
+>> +     }
+>> +
+>>       sr_data->voltdm = voltdm_lookup(sr_dev_attr->sensor_voltdm_name);
+>>       if (IS_ERR(sr_data->voltdm)) {
+>>               pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
+>> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
+>> index 92f6728..7c03c90 100644
+>> --- a/drivers/power/avs/smartreflex.c
+>> +++ b/drivers/power/avs/smartreflex.c
+>> @@ -128,17 +128,16 @@ static irqreturn_t sr_interrupt(int irq, void *data)
+>>
+>>  static void sr_set_clk_length(struct omap_sr *sr)
+>>  {
+>> +     char fck_name[16]; /* "smartreflex.0" fits in 16 chars */
+>>       struct clk *sys_ck;
+>>       u32 sys_clk_speed;
+>>
+>> -     if (cpu_is_omap34xx())
+>> -             sys_ck = clk_get(NULL, "sys_ck");
+>> -     else
+>> -             sys_ck = clk_get(NULL, "sys_clkin_ck");
+>> +     sprintf(fck_name, "smartreflex.%d", sr->srid);
+>
+> hmm, isn't this the same as dev_name(&sr->pdev.dev) ?
+Yes. Atfer the previous patch "ARM: OMAP: hwmod: align the SmartReflex
+fck names" there is a direct mapping between the device name and the
+IP functional clock. Note: the mapping is based on the order of the
+hwmod entries and so it is important not to move them around.
 
-This includes 
-1. (linux-next + AM335x patches)
-2. McASP DT conversion
-3. EDMA hack
-4. AM335x audio specific DT blobs
-5. Am335x dma DT blobs [hack]
+> Combined with your earlier patch to align clock names, this should just
+> be:
+>
+>         sys_ck = clk_get(&sr->pdev.dev, "fck");
+Great! That works great and the code is much more elegant.
 
-Kindly let me know if you need any more details.
+> Also note that you've changed this from sys_clk to the SR functional
+> clock, which seems to be the same clock on 34xx and 44xx, but that change
+> should be clearly documented in the changelog.
+Ok.
 
-> 
-> 
-> Thanks,
-> Daniel
-> 
-> 
+Updated patch in a bit.
 
+>
+> Kevin
 
-Regards, 
-Gururaja
+Thanks for reviewing,
+Jean
