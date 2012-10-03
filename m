@@ -1,48 +1,58 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 3 Oct 2012 09:13:39 +0530
-Subject: [PATCH] ARM: MMUless Core: Fix insmod error - module relocation out
- of range
-Message-ID: <4995c6bc655337598b88bef025cd48b320c2ada0.1349235619.git.pratyush.anand@st.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 3 Oct 2012 09:36:00 +0530
+Subject: [PATCH V6 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <5069C2DC.8080905@wwwdotorg.org>
+References: <1348226536-22899-1-git-send-email-l.krishna@samsung.com>
+ <1348226536-22899-3-git-send-email-l.krishna@samsung.com>
+ <505BF79A.8060802@wwwdotorg.org>
+ <CAL1wa8eOA6eV-9EoeUFrSFaFwq5sEVnYXn9yKnPRv=0mSU5WvQ@mail.gmail.com>
+ <5069C2DC.8080905@wwwdotorg.org>
+Message-ID: <CAL1wa8egdA=1iu8Jr-TQLnSweOQoCL=TD4cvo1BHHNn9UyOSEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Neha MAKHIJA <neha.makhija-ext@st.com>
+On Mon, Oct 1, 2012 at 9:50 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 09/30/2012 11:29 PM, Leela Krishna Amudala wrote:
+>> Hello Stephen Warren,
+>>
+>> The binding names that I use in my dts file should match with the
+>> names given in http://lists.freedesktop.org/archives/dri-devel/2012-July/024875.html
+>> right?
+>
+> I don't think so; the binding in that link is for example:
+>
+>> + - xres, yres: Display resolution
+>> + - left-margin, right-margin, hsync-len: Horizontal Display timing parameters
+>> +   in pixels
+>> +   upper-margin, lower-margin, vsync-len: Vertical display timing parameters in
+>> +   lines
+>> + - clock: displayclock in Hz
+>
+> i.e. a bunch of separate properties, one for each value needed to
+> describe the display timing. However, your patch contains:
+>
 
-ARM supports 32Mb jump. Hence branch instruction has a limited range.
+I mean to say that even I have to use separate properties for each one
+instead of grouping them.
+Also the names should match with the ones given in the example..?
 
-For MMU systems, the module area is located just before the kernel memory
-because this allows function calls to be linked directly without any indirect
-branches.
-
-In case of MMU-less system, Module area is given whole of the DDR address
-space.  Since, module_alloc() calls vmalloc(), the module area goes outside the
-allowed jump range. Due to this insmod will not be able to load the modules
-giving out of range relocation errors.
-
-Solution - Add the mlong-calls flags while compiling the modules. This tells
-the compiler to perform function calls by first loading the address of the
-function and then performing a subroutine function call on this register.
-
-Signed-off-by: Neha Makhija <neha.makhija-ext@st.com>
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
----
- arch/arm/Makefile |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 88eec8f..78b5c12 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -112,6 +112,10 @@ CFLAGS_MODULE	+=-fno-optimize-sibling-calls
- endif
- endif
- 
-+ifeq ($(CONFIG_MMU),)
-+CFLAGS_MODULE  +=-mlong-calls
-+endif
-+
- # Need -Uarm for gcc < 3.x
- KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
- KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
--- 
-1.7.5.4
+>>>> + - samsung,fimd-display: This property should specify the phandle of the
+>>>> +   display device node which holds the video interface timing with the
+>>>> +   below mentioned properties.
+>>>> +
+>>>> +   - lcd-htiming: Specifies the horizontal timing for the overlay. The
+>>>> +     horizontal timing includes four parameters in the following order.
+>>>> +
+>>>> +     - horizontal back porch (in number of lcd clocks)
+>>>> +     - horizontal front porch (in number of lcd clocks)
+>>>> +     - hsync pulse width (in number of lcd clocks)
+>>>> +     - Display panels X resolution.
+>
+> A single lcd-htiming property, which contains 4 values. (and a similar
+> construct for the vertical timing).
+>
+> That seems entirely different to me...
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
