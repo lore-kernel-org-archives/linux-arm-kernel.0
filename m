@@ -1,20 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 3 Oct 2012 15:29:14 +0100
-Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-In-Reply-To: <CAPDyKFrQ9UhEc_jEKdR=J8T-NUxsYQHB-yMh2vTyxJ+y+R38Og@mail.gmail.com>
-References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
- <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFo5-UeUe7PkxCBMnRziWh+eSC_ZjJ0pKhcBkHUkFdSH+w@mail.gmail.com>
- <20121003135556.GE4360@opensource.wolfsonmicro.com>
- <CAPDyKFrQ9UhEc_jEKdR=J8T-NUxsYQHB-yMh2vTyxJ+y+R38Og@mail.gmail.com>
-Message-ID: <20121003142913.GF4360@opensource.wolfsonmicro.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 3 Oct 2012 19:59:45 +0530
+Subject: [PATCH 0/4] mtd: nand: OMAP: Add support to use ELM as error
+ correction module
+Message-ID: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 04:28:34PM +0200, Ulf Hansson wrote:
+Adds support to use ELM as BCH 4 & 8 bit error correction module and
+adds support for single shot read_page and write_page functions
 
-> I will do a resend and include some explanation for the reverts in the
-> "cover-letter".
+Platforms containing the ELM module can be used to correct errors
+reported by BCH 4, 8 & 16 bit ECC scheme. For now only 4 & 8 bit
+support is added.
 
-It'd be good if the explanation could be in the commit logs so that
-people reading history can understand things.
+BCH 4 & 8 bit error detection support is already available in mainline
+kernel and works with software error correction.
+
+This series is based on top of [1] &[2]
+
+1. linux-next/master
+2. linux-omap-dt/for_3.7/dts_part2
+
+Nand driver tested for BCH 4 & 8 bit error correction per sector.
+This being tested by introducing bit errors at multiple sectors inside page.
+
+Philip, Avinash (4):
+  mtd: nand: omap2: Update nerrors using ecc.strength
+  mtd: devices: elm: Add support for ELM error correction
+  ARM: OMAP2: gpmc: Add support for BCH ECC scheme
+  mtd: nand: omap2: Add data correction support
+
+ arch/arm/mach-omap2/gpmc.c                   |  120 +++++++-
+ arch/arm/plat-omap/include/plat/gpmc.h       |    1 +
+ drivers/mtd/devices/Makefile                 |    4 +-
+ drivers/mtd/devices/elm.c                    |  446 ++++++++++++++++++++++++++
+ drivers/mtd/nand/omap2.c                     |  368 +++++++++++++++++++--
+ include/linux/platform_data/elm.h            |   64 ++++
+ include/linux/platform_data/mtd-nand-omap2.h |    1 +
+ 7 files changed, 958 insertions(+), 46 deletions(-)
+ create mode 100644 drivers/mtd/devices/elm.c
+ create mode 100644 include/linux/platform_data/elm.h
