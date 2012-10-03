@@ -1,62 +1,54 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 03 Oct 2012 13:16:39 +0200
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
- McASP IP Variant
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <506B6A9D.3090100@gmail.com>
- <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
-Message-ID: <506C1E97.1070700@gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Wed, 3 Oct 2012 17:24:36 +0530
+Subject: [PATCH 1/3] serial: omap: Make context_loss_cnt signed
+Message-ID: <1349265278-27763-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.10.2012 09:16, Hebbar, Gururaja wrote:
-> On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
->> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
->>> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
->>> register offset and missing generic SRAM APIs support
->>>
->>> Changes
->>> - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
->>>   "ti,omap2-mcasp-audio" to identify version 3 controller.
->>> - The register offsets are handled depending on the version.
->>> - Provide a config option to indicate missing SRAM API support.
->>
->> Could you give some insight which hardware this was tested on? I'm
->> trying to get this up and running on a AM33xx board, and the patches
->> look all reasonable to me. My problem is that I can't make the DMA
->> engine move forward, I fail to receive a single interrupt on this
->> peripheral after the stream starts. I will continue searching for the
->> reason of this tomorrow, but maybe you can give me some hint by
->> explaining your setup?
->>
->> Note that I'm using your patches together with Matt's from this series:
->>
->>   https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
->>
->> ... but it doesn't work without those either.
-> 
-> 
-> When I started working on adding DT support to McASP driver, Matt Porter 
-> EDMA port was not yet ready. 
-> 
-> So 
-> 1. I took existing edma driver from AM335x Arago release [1] (driver + edma 
->    device init). 
-> 2. Added this to Vaibhav's Local (linux-next + AM335x patches) tree [2] 
-> 
-> 3. Added DT support to McASP driver.
-> 
-> I tested this on AM335x EVM board. 
+get_context_loss_count returns an int however it is stored in
+unsigned integer context_loss_cnt . This patch tries to make
+context_loss_cnt int. So that in case of errors the value
+(which may be negative) is not interpreted wrongly.
 
-Hmm, so I think there's a tiny bit missing for the EDMA conversion on DT
-kernels.
+In serial_omap_runtime_resume in case of errors returned by
+get_context_loss_count print a warning and do a restore.
 
-> If you need the code, I can share it as a patch (I will send the patch as a 
-> private mail since the patch is huge).
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
 
-Please do :) Or just push your entire tree somewhere.
-
-
-Thanks,
-Daniel
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 6ede6fd..fd0fb8c 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -96,7 +96,7 @@ struct uart_omap_port {
+ 	unsigned char		msr_saved_flags;
+ 	char			name[20];
+ 	unsigned long		port_activity;
+-	u32			context_loss_cnt;
++	int			context_loss_cnt;
+ 	u32			errata;
+ 	u8			wakeups_enabled;
+ 	unsigned int		irq_pending:1;
+@@ -1556,11 +1556,15 @@ static int serial_omap_runtime_resume(struct device *dev)
+ {
+ 	struct uart_omap_port *up = dev_get_drvdata(dev);
+ 
+-	u32 loss_cnt = serial_omap_get_context_loss_count(up);
++	int loss_cnt = serial_omap_get_context_loss_count(up);
+ 
+-	if (up->context_loss_cnt != loss_cnt)
++	if (loss_cnt < 0) {
++		dev_err(dev, "serial_omap_get_context_loss_count failed : %d\n",
++			loss_cnt);
+ 		serial_omap_restore_context(up);
+-
++	} else if (up->context_loss_cnt != loss_cnt) {
++		serial_omap_restore_context(up);
++	}
+ 	up->latency = up->calc_latency;
+ 	schedule_work(&up->qos_work);
+ 
+-- 
+1.7.5.4
