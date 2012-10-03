@@ -1,186 +1,51 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Wed,  3 Oct 2012 17:47:57 +0200
-Subject: [PATCH 2/2] ARM: OMAP: SmartReflex: pass device dependent data via
- platform data
-In-Reply-To: <1349279277-7634-1-git-send-email-j-pihet@ti.com>
-References: <1349279277-7634-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1349279277-7634-3-git-send-email-j-pihet@ti.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Wed,  3 Oct 2012 17:48:03 +0200
+Subject: [PATCH v8 0/3] watchdog: at91sam9_wdt: add device tree support
+Message-ID: <1349279286-11261-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+Hi all,
 
-Remove the device dependent code (ex. cpu_is_xxx()) and settings
-from the driver code and instead pass them via the platform
-data. This allows a clean separation of the driver code and the platform
-code, as required by the move of the platform header files to
-include/linux/platform_data.
+This patchset is for adding device tree support to the
+at91sam9_wdt driver.
 
-Note about the smartreflex functional clocks: the smartreflex fclks
-are derived from sys_clk and are named "smartreflex.%d". Since the
-smartreflex device names and the functional clock names are identical
-the device driver code uses them to control the functional clocks.
+Another patchset will follow to add the new "timeout" binding to the
+watchdog framework and to all the relevant drivers.
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/sr_device.c   |   13 +++++++++
- drivers/power/avs/smartreflex.c   |   54 ++++++++++++-------------------------
- include/linux/power/smartreflex.h |   14 ++++++++--
- 3 files changed, 42 insertions(+), 39 deletions(-)
+Changes:
+v8:
+ - add __initconst to at91_wdt_dt_ids
+v7:
+ - split the patchset
+ - remove timeout binding
+v6:
+ - add watchdog core proprty timeout binding
+ - add as example to the orion_wdt driver the new timeout binding
+v5:
+ - split dts commit in two, one for socs and one for boards.
+v4:
+ - use "atmel,at91sam9260-wdt" as compatible
+v3:
+ - add heartbeat option
+ - default disabled for all the soc, enable only for evk-pro3 board
+ - add at91sam9263 and at91sam9g45 soc
+v2:
+ - add missing to and cc addresses
 
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-index cbeae56..06de443 100644
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -121,6 +121,19 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
- 	sr_data->senn_mod = 0x1;
- 	sr_data->senp_mod = 0x1;
- 
-+	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
-+		sr_data->err_weight = OMAP3430_SR_ERRWEIGHT;
-+		sr_data->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
-+		sr_data->accum_data = OMAP3430_SR_ACCUMDATA;
-+		if (!(strcmp(sr_data->name, "smartreflex_mpu"))) {
-+			sr_data->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
-+			sr_data->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
-+		} else {
-+			sr_data->senn_avgweight = OMAP3430_SR2_SENNAVGWEIGHT;
-+			sr_data->senp_avgweight = OMAP3430_SR2_SENPAVGWEIGHT;
-+		}
-+	}
-+
- 	sr_data->voltdm = voltdm_lookup(sr_dev_attr->sensor_voltdm_name);
- 	if (IS_ERR(sr_data->voltdm)) {
- 		pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
-diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
-index 24768a2..c983e85 100644
---- a/drivers/power/avs/smartreflex.c
-+++ b/drivers/power/avs/smartreflex.c
-@@ -130,24 +130,21 @@ static irqreturn_t sr_interrupt(int irq, void *data)
- 
- static void sr_set_clk_length(struct omap_sr *sr)
- {
--	struct clk *sys_ck;
--	u32 sys_clk_speed;
-+	struct clk *fck;
-+	u32 fclk_speed;
- 
--	if (cpu_is_omap34xx())
--		sys_ck = clk_get(NULL, "sys_ck");
--	else
--		sys_ck = clk_get(NULL, "sys_clkin_ck");
-+	fck = clk_get(&sr->pdev->dev, "fck");
- 
--	if (IS_ERR(sys_ck)) {
--		dev_err(&sr->pdev->dev, "%s: unable to get sys clk\n",
--			__func__);
-+	if (IS_ERR(fck)) {
-+		dev_err(&sr->pdev->dev, "%s: unable to get smartreflex fck %s\n",
-+				__func__, dev_name(&sr->pdev->dev));
- 		return;
- 	}
- 
--	sys_clk_speed = clk_get_rate(sys_ck);
--	clk_put(sys_ck);
-+	fclk_speed = clk_get_rate(fck);
-+	clk_put(fck);
- 
--	switch (sys_clk_speed) {
-+	switch (fclk_speed) {
- 	case 12000000:
- 		sr->clk_length = SRCLKLENGTH_12MHZ_SYSCLK;
- 		break;
-@@ -164,34 +161,12 @@ static void sr_set_clk_length(struct omap_sr *sr)
- 		sr->clk_length = SRCLKLENGTH_38MHZ_SYSCLK;
- 		break;
- 	default:
--		dev_err(&sr->pdev->dev, "%s: Invalid sysclk value: %d\n",
--			__func__, sys_clk_speed);
-+		dev_err(&sr->pdev->dev, "%s: Invalid fclk rate: %d\n",
-+			__func__, fclk_speed);
- 		break;
- 	}
- }
- 
--static void sr_set_regfields(struct omap_sr *sr)
--{
--	/*
--	 * For time being these values are defined in smartreflex.h
--	 * and populated during init. May be they can be moved to board
--	 * file or pmic specific data structure. In that case these structure
--	 * fields will have to be populated using the pdata or pmic structure.
--	 */
--	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
--		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
--		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
--		sr->accum_data = OMAP3430_SR_ACCUMDATA;
--		if (!(strcmp(sr->name, "smartreflex_mpu_iva"))) {
--			sr->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
--			sr->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
--		} else {
--			sr->senn_avgweight = OMAP3430_SR2_SENNAVGWEIGHT;
--			sr->senp_avgweight = OMAP3430_SR2_SENPAVGWEIGHT;
--		}
--	}
--}
--
- static void sr_start_vddautocomp(struct omap_sr *sr)
- {
- 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
-@@ -924,8 +899,14 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	sr_info->nvalue_count = pdata->nvalue_count;
- 	sr_info->senn_mod = pdata->senn_mod;
- 	sr_info->senp_mod = pdata->senp_mod;
-+	sr_info->err_weight = pdata->err_weight;
-+	sr_info->err_maxlimit = pdata->err_maxlimit;
-+	sr_info->accum_data = pdata->accum_data;
-+	sr_info->senn_avgweight = pdata->senn_avgweight;
-+	sr_info->senp_avgweight = pdata->senp_avgweight;
- 	sr_info->autocomp_active = false;
- 	sr_info->ip_type = pdata->ip_type;
-+
- 	sr_info->base = ioremap(mem->start, resource_size(mem));
- 	if (!sr_info->base) {
- 		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
-@@ -937,7 +918,6 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		sr_info->irq = irq->start;
- 
- 	sr_set_clk_length(sr_info);
--	sr_set_regfields(sr_info);
- 
- 	list_add(&sr_info->node, &sr_list);
- 
-diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
-index 4a496eb..c0f44c2 100644
---- a/include/linux/power/smartreflex.h
-+++ b/include/linux/power/smartreflex.h
-@@ -260,8 +260,13 @@ struct omap_sr_nvalue_table {
-  *
-  * @name:		instance name
-  * @ip_type:		Smartreflex IP type.
-- * @senp_mod:		SENPENABLE value for the sr
-- * @senn_mod:		SENNENABLE value for sr
-+ * @senp_mod:		SENPENABLE value of the sr CONFIG register
-+ * @senn_mod:		SENNENABLE value for sr CONFIG register
-+ * @err_weight		ERRWEIGHT value of the sr ERRCONFIG register
-+ * @err_maxlimit	ERRMAXLIMIT value of the sr ERRCONFIG register
-+ * @accum_data		ACCUMDATA value of the sr CONFIG register
-+ * @senn_avgweight	SENNAVGWEIGHT value of the sr AVGWEIGHT register
-+ * @senp_avgweight	SENPAVGWEIGHT value of the sr AVGWEIGHT register
-  * @nvalue_count:	Number of distinct nvalues in the nvalue table
-  * @enable_on_init:	whether this sr module needs to enabled at
-  *			boot up or not.
-@@ -274,6 +279,11 @@ struct omap_sr_data {
- 	int				ip_type;
- 	u32				senp_mod;
- 	u32				senn_mod;
-+	u32				err_weight;
-+	u32				err_maxlimit;
-+	u32				accum_data;
-+	u32				senn_avgweight;
-+	u32				senp_avgweight;
- 	int				nvalue_count;
- 	bool				enable_on_init;
- 	struct omap_sr_nvalue_table	*nvalue_table;
+Fabio Porcedda (3):
+  watchdog: at91sam9_wdt: add device tree support
+  ARM: at91/dts: add at91sam9_wdt driver to at91sam926x, at91sam9g45
+  ARM: at91/dts: evk-pro3: enable watchdog
+
+ Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 15 +++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi                       |  6 ++++++
+ arch/arm/boot/dts/at91sam9263.dtsi                       |  6 ++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                       |  6 ++++++
+ arch/arm/boot/dts/evk-pro3.dts                           |  4 ++++
+ drivers/watchdog/at91sam9_wdt.c                          | 11 +++++++++++
+ 6 files changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+
 -- 
-1.7.10.4
+1.7.11.3
