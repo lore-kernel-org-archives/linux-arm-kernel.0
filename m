@@ -1,61 +1,36 @@
 From: prabhakar.csengg@gmail.com (Prabhakar)
-Date: Wed,  3 Oct 2012 12:02:53 +0530
-Subject: [PATCH] davinci: vpbe: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
- V4L2_OUT_CAP_DV_TIMINGS
-Message-ID: <1349245973-7377-1-git-send-email-prabhakar.lad@ti.com>
+Date: Wed,  3 Oct 2012 12:05:00 +0530
+Subject: [PATCH] ARM: davinci: dm644x: fix out range signal for ED
+Message-ID: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
-V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
-out.
+while testing display on dm644x, for ED out-range signals
+was observed. This patch fixes appropriate clock setting
+for ED.
 
 Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
 Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Hans Verkuil <hansverk@cisco.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c |    2 +-
- drivers/media/platform/davinci/vpbe.c    |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/dm644x.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 3baf56d..a79dc1e 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -699,7 +699,7 @@ static struct vpbe_output dm644xevm_vpbe_outputs[] = {
- 			.index		= 1,
- 			.name		= "Component",
- 			.type		= V4L2_OUTPUT_TYPE_ANALOG,
--			.capabilities	= V4L2_OUT_CAP_CUSTOM_TIMINGS,
-+			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
- 		},
- 		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
- 		.default_mode	= "480p59_94",
-diff --git a/drivers/media/platform/davinci/vpbe.c b/drivers/media/platform/davinci/vpbe.c
-index d03f452..9b623bc 100644
---- a/drivers/media/platform/davinci/vpbe.c
-+++ b/drivers/media/platform/davinci/vpbe.c
-@@ -340,7 +340,7 @@ static int vpbe_s_dv_timings(struct vpbe_device *vpbe_dev,
- 
- 
- 	if (!(cfg->outputs[out_index].output.capabilities &
--	    V4L2_OUT_CAP_CUSTOM_TIMINGS))
-+	    V4L2_OUT_CAP_DV_TIMINGS))
- 		return -EINVAL;
- 
- 	for (i = 0; i < output->num_modes; i++) {
-@@ -408,7 +408,7 @@ static int vpbe_enum_dv_timings(struct vpbe_device *vpbe_dev,
- 	int j = 0;
- 	int i;
- 
--	if (!(output->output.capabilities & V4L2_OUT_CAP_CUSTOM_TIMINGS))
-+	if (!(output->output.capabilities & V4L2_OUT_CAP_DV_TIMINGS))
- 		return -EINVAL;
- 
- 	for (i = 0; i < output->num_modes; i++) {
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 79d2880..688484b 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -713,8 +713,7 @@ static int dm644x_venc_setup_clock(enum vpbe_enc_timings_type type,
+ 		break;
+ 	case VPBE_ENC_CUSTOM_TIMINGS:
+ 		if (pclock <= 27000000) {
+-			v |= DM644X_VPSS_MUXSEL_PLL2_MODE |
+-			     DM644X_VPSS_DACCLKEN;
++			v |= DM644X_VPSS_DACCLKEN;
+ 			writel(v, DAVINCI_SYSMOD_VIRT(SYSMOD_VPSS_CLKCTL));
+ 		} else {
+ 			/*
 -- 
 1.7.4.1
