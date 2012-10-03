@@ -1,38 +1,33 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  3 Oct 2012 10:22:50 +0100
-Subject: [PATCH] ARM: proc-v7: Ensure correct instruction set after cpu_reset
-Message-ID: <1349256170-4367-1-git-send-email-dave.martin@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 3 Oct 2012 10:25:09 +0100
+Subject: [PATCH] ARM: MMUless Core: Fix insmod error - module relocation
+ out of range
+In-Reply-To: <4995c6bc655337598b88bef025cd48b320c2ada0.1349235619.git.pratyush.anand@st.com>
+References: <4995c6bc655337598b88bef025cd48b320c2ada0.1349235619.git.pratyush.anand@st.com>
+Message-ID: <CAHkRjk5gLSWG0uiSAK9wnLDi19bEPMpFAFfbqXjz6xNH1W4HXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because mov pc,<Rn> never switches instruction set when executed in
-Thumb code, Thumb-2 kernels will silently execute the target code
-after cpu_reset as Thumb code, even if the passed code pointer
-denotes ARM (bit 0 clear).
+On 3 October 2012 04:43, Pratyush Anand <pratyush.anand@st.com> wrote:
+> From: Neha MAKHIJA <neha.makhija-ext@st.com>
+>
+> ARM supports 32Mb jump. Hence branch instruction has a limited range.
+>
+> For MMU systems, the module area is located just before the kernel memory
+> because this allows function calls to be linked directly without any indirect
+> branches.
+>
+> In case of MMU-less system, Module area is given whole of the DDR address
+> space.  Since, module_alloc() calls vmalloc(), the module area goes outside the
+> allowed jump range. Due to this insmod will not be able to load the modules
+> giving out of range relocation errors.
+>
+> Solution - Add the mlong-calls flags while compiling the modules. This tells
+> the compiler to perform function calls by first loading the address of the
+> function and then performing a subroutine function call on this register.
 
-This patch uses bx instead, ensuring the correct instruction set
-for the target code.
+Do we need the module loader to handle additional relocations or they
+are all already handled?
 
-Thumb code in the kernel is not supported prior to ARMv7, so other
-CPUs are not affected.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mm/proc-v7.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index c2e2b66..ca5b575 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -57,7 +57,7 @@ ENTRY(cpu_v7_reset)
-  THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
- 	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
- 	isb
--	mov	pc, r0
-+	bx	r0
- ENDPROC(cpu_v7_reset)
- 	.popsection
- 
 -- 
-1.7.4.1
+Catalin
