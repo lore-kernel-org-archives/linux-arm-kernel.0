@@ -1,42 +1,34 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 3 Oct 2012 18:32:53 +0200
-Subject: [PATCH v6 3/5] watchdog: at91sam9_wdt: add device tree support
-In-Reply-To: <20121002195914.GG21046@lunn.ch>
-References: <1349094281-28889-1-git-send-email-fabio.porcedda@gmail.com>
- <1349094281-28889-4-git-send-email-fabio.porcedda@gmail.com>
- <20121001124546.GE11837@lunn.ch>
- <CAHkwnC_u+bMX7REU5G3u=cm3VGmOUn+AShruw+ERkPJWtZpxUg@mail.gmail.com>
- <CAHkwnC_5wRgf-DGnUfzkrreT_E1v8i=G8U0qo_5t1DY6+L7c+w@mail.gmail.com>
- <20121001130658.GG11837@lunn.ch>
- <CAHkwnC83DcKXZOtLse_xnYe7zOZ5qwGJVimLkBzDwSJ7Y5vL_Q@mail.gmail.com>
- <20121002195914.GG21046@lunn.ch>
-Message-ID: <CAHkwnC_RUQ+hhzHAVEK5u4UUJDArKQNjEdXTzswn6cfYPWU_ew@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Oct 2012 10:00:59 -0700
+Subject: [PATCH 1/2] ARM: OMAP: hwmod: align the SmartReflex fck names
+In-Reply-To: <1349279277-7634-2-git-send-email-j-pihet@ti.com>
+References: <1349279277-7634-1-git-send-email-j-pihet@ti.com>
+ <1349279277-7634-2-git-send-email-j-pihet@ti.com>
+Message-ID: <20121003170059.GD4840@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2012 at 9:59 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> I was thinking to add a more generic helper function like this:
->>
->> static inline void watchdog_get_dttimeout(struct device_node *node,
->> u32 *timeout)
->> {
->>       if (node)
->>               of_property_read_u32(node, "timeout", &wdd->timeout);
->> }
->
-> You forgot to change the function signature.
->
-> Also, if you are adding a generic function, it should be a generic
-> function for the framework. All drivers should be slowly moving
-> towards the framework, so adding functions which help you not move
-> towards the framework are wrong.
+* jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [121003 08:48]:
+> @@ -1036,8 +1036,8 @@ static struct omap_clk am33xx_clks[] = {
+>  	CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
+>  	CLK("NULL",	"mmc2_fck",		&mmc2_fck,	CK_AM33XX),
+>  	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
+> -	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
+> -	CLK(NULL,	"smartreflex1_fck",	&smartreflex1_fck,	CK_AM33XX),
+> +	CLK(NULL,	"smartreflex.0",	&smartreflex_mpu_fck,	CK_AM33XX),
+> +	CLK(NULL,	"smartreflex.1",	&smartreflex_core_fck,	CK_AM33XX),
+>  	CLK(NULL,	"timer1_fck",		&timer1_fck,	CK_AM33XX),
+>  	CLK(NULL,	"timer2_fck",		&timer2_fck,	CK_AM33XX),
+>  	CLK(NULL,	"timer3_fck",		&timer3_fck,	CK_AM33XX),
 
-Maybe i can use a framework specific function and use a dummy
-watchdog_device for
-the non framerwork drivers.
+I think this should be something like this instead:
 
-If it's ok i will send an updated patch.
+	CLK("smartreflex.0",	"fck",	&smartreflex_mpu_fck,	CK_AM33XX),
+	CLK("smartreflex.1",	"fck",	&smartreflex_core_fck,	CK_AM33XX),
 
-Best regards and thanks for the review.
--- 
-Fabio Porcedda
+Where the first one is the dev name, the second one is the
+alias you want to use in the client driver?
+
+Regards,
+
+Tony
