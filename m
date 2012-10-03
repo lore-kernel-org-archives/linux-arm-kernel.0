@@ -1,71 +1,62 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 3 Oct 2012 10:52:32 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
- <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
- <20121001154451.GI4840@atomide.com>
- <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 03 Oct 2012 13:16:39 +0200
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
+ McASP IP Variant
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <506B6A9D.3090100@gmail.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
+Message-ID: <506C1E97.1070700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 01:29:37, Linus Walleij wrote:
-> On Mon, Oct 1, 2012 at 5:44 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> >> OK that is typical pinctrl driver implementation work.
-> >> I hope Tony can advice on this?
-> >
-> > I think we're best off to just stick to alternative named modes
-> > passed from device tree. For example, for GPIO wake-ups you can
-> > have named modes such as "default", "enabled" and "idle" where
-> > "idle" muxes things for GPIO wake-ups for the duration of idle.
-> >
-
-In this case we need to add three different values according
-to three modes (default, enabled, idle) and for each node.
-
-> > It seems that should also work for leds-gpio. And you can
-> > define more named modes as needed.
-
-If we want to implement pinctrl_gpio functionality we have to
-separate "function-mask" bits to
-
-1. pinmux-mask
-2. pinconf-mask, to make it generic we need following bit masks
-	a. receiver enable/disable bit
-	b. slew rate fast/slow bit
-	c. pull-up/down bit
-	....
-
-I have gone through nvidia pinctrl dt data (tegra20-seaboard.dts,
-node drive_sdio1) which has different pinconfig values, those
-are mapping to pinconf values.
-
-With the above bit masks and function-mask we can identify
-pull-up/down, slow/high speed slew rate and direction in/out.
-
-(or)
-
-Named modes:-
-
-Are you saying named modes like this?
-default-input-up
-default-input-down
-default-output-up
-default-output-down
-
-This 1, 2 and 2.a or named modes are required to implement
-pinctrl_gpio_direction_input/output and
-pinctrl_request/free_gpio.
-
+On 03.10.2012 09:16, Hebbar, Gururaja wrote:
+> On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
+>> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
+>>> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
+>>> register offset and missing generic SRAM APIs support
+>>>
+>>> Changes
+>>> - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
+>>>   "ti,omap2-mcasp-audio" to identify version 3 controller.
+>>> - The register offsets are handled depending on the version.
+>>> - Provide a config option to indicate missing SRAM API support.
+>>
+>> Could you give some insight which hardware this was tested on? I'm
+>> trying to get this up and running on a AM33xx board, and the patches
+>> look all reasonable to me. My problem is that I can't make the DMA
+>> engine move forward, I fail to receive a single interrupt on this
+>> peripheral after the stream starts. I will continue searching for the
+>> reason of this tomorrow, but maybe you can give me some hint by
+>> explaining your setup?
+>>
+>> Note that I'm using your patches together with Matt's from this series:
+>>
+>>   https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
+>>
+>> ... but it doesn't work without those either.
 > 
 > 
-> This is what we're doing for ux500 and should be a good model.
+> When I started working on adding DT support to McASP driver, Matt Porter 
+> EDMA port was not yet ready. 
+> 
+> So 
+> 1. I took existing edma driver from AM335x Arago release [1] (driver + edma 
+>    device init). 
+> 2. Added this to Vaibhav's Local (linux-next + AM335x patches) tree [2] 
+> 
+> 3. Added DT support to McASP driver.
+> 
+> I tested this on AM335x EVM board. 
 
-I have looked into this, but not seen any named modes.
+Hmm, so I think there's a tiny bit missing for the EDMA conversion on DT
+kernels.
 
-Thanks
-AnilKumar
+> If you need the code, I can share it as a patch (I will send the patch as a 
+> private mail since the patch is huge).
+
+Please do :) Or just push your entire tree somewhere.
+
+
+Thanks,
+Daniel
