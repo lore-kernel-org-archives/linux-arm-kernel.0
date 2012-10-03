@@ -1,48 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 3 Oct 2012 15:43:16 +0200
-Subject: [PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-In-Reply-To: <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1348831266-16721-1-git-send-email-ulf.hansson@stericsson.com>
- <1348831266-16721-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CAPDyKFo5-UeUe7PkxCBMnRziWh+eSC_ZjJ0pKhcBkHUkFdSH+w@mail.gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Wed, 03 Oct 2012 15:51:23 +0200
+Subject: [RESEND][PATCH] ASoC: ams-delta: Convert to use
+ snd_soc_register_card()
+In-Reply-To: <1582731.dIkBtAuyKn@vclass>
+References: <20120906073633.GC22330@opensource.wolfsonmicro.com>
+ <1582731.dIkBtAuyKn@vclass>
+Message-ID: <6691562.6MvWD9K1dk@vclass>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark and Grant,
+Mark,
+Please note we have an Ack from Tony.
+http://mailman.alsa-project.org/pipermail/alsa-devel/2012-September/055493.html
 
-Heard from Linus Walleij that you Mark has been helping out merging
-spi patches, did not know that when sending out this series. Anyway,
-do you guys see any issues merging this?
+Thanks,
+Janusz
 
-[PATCH 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-[PATCH 2/3] Revert "spi/pl022: enable runtime PM"
-[PATCH 3/3] spi: spi-pl022: Minor simplification for runtime pm
+---
+Subject: Re: [PATCH] ASoC: ams-delta: Convert to use snd_soc_register_card()
+Date: niedziela, 16 wrze?nia 2012, 13:44:23
+From: Tony Lindgren <tony@atomide.com>
+To: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>, Liam Girdwood <lrg@ti.com>, linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org, alsa-devel at alsa-project.org
 
-Kind regards
-Ulf Hansson
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [120916 12:18]:
+> 
+> Tony,
+> Please give your ack on the arch/arm/mach-omap1 bits if acceptable. I
+> believe there should be no merge conflicts if this change goes through
+> sound/soc.
 
-On 28 September 2012 13:21, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/spi/spi-pl022.c |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index f8568b4..3f2f36c 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2188,6 +2188,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->         printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
->                adev->res.start, pl022->virtbase);
->
-> +       pm_runtime_enable(dev);
->         pm_runtime_resume(dev);
->
->         pl022->clk = clk_get(&adev->dev, NULL);
-> --
-> 1.7.10
->
+Yes looks good to me:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
