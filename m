@@ -1,53 +1,30 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed,  3 Oct 2012 16:00:29 -0700
-Subject: [PATCH 4/4] cpufreq: OMAP: use get_cpu_device() instead of
- omap_device API
-In-Reply-To: <1349305229-28480-1-git-send-email-khilman@deeprootsystems.com>
-References: <1349305229-28480-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1349305229-28480-5-git-send-email-khilman@deeprootsystems.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 4 Oct 2012 01:07:59 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <50682402.8020402@antcom.de>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <CAOY=C6GG6jqqEAAGJjmDG-BFT2eq=9+ck+F_EOcthRgDCDv8=Q@mail.gmail.com>
+ <50682402.8020402@antcom.de>
+Message-ID: <CACRpkdYGePft_XvhhoNyRfBm484FD46WGagivQzjh5-OE3VJUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@ti.com>
+On Sun, Sep 30, 2012 at 12:50 PM, Roland Stigge <stigge@antcom.de> wrote:
 
-OMAP PM core code has moved to using the existing, generic CPU devices
-for attaching OPPs, so the CPUfreq driver can now use the generic
-get_cpu_device() API instead of the OMAP-specific omap_device API.
+> Besides what I discussed with JC and Linus, I find the unsigned int
+> (i.e. u32 or u64, depending on the arch) quite appealing. It is a nice
+> compromise between my general bit mapped data model (variable size *u8
+> array) and the bool *values list. Even maps easily onto a single sysfs
+> entry for values, by abstracting a gpio list to an actual data word.
+>
+> What do others think? JC? Linus? I'm considering this (unsigned int
+> data) a valid option.
 
-This allows us to remove the last <plat/*> include from this driver.
+I think we mostly use an unsigned long for such stuff as IRQ flags
+and ioctl() parameters in the kernel.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- drivers/cpufreq/omap-cpufreq.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+In this case it has the upside that it will be 32bit on 32bit systems
+and 64bit on 64bit systems if I'm not mistaken.
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 5d1f5e4..1f3417a 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -30,8 +30,6 @@
- #include <asm/smp_plat.h>
- #include <asm/cpu.h>
- 
--#include <plat/omap_device.h>
--
- /* OPP tolerance in percentage */
- #define	OPP_TOLERANCE	4
- 
-@@ -255,10 +253,10 @@ static struct cpufreq_driver omap_driver = {
- 
- static int __init omap_cpufreq_init(void)
- {
--	mpu_dev = omap_device_get_by_hwmod_name("mpu");
--	if (IS_ERR(mpu_dev)) {
-+	mpu_dev = get_cpu_device(0);
-+	if (!mpu_dev) {
- 		pr_warning("%s: unable to get the mpu device\n", __func__);
--		return PTR_ERR(mpu_dev);
-+		return -EINVAL;
- 	}
- 
- 	mpu_reg = regulator_get(mpu_dev, "vcc");
--- 
-1.7.9.2
+Yours,
+Linus Walleij
