@@ -1,33 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 Oct 2012 19:06:34 +0000
-Subject: [PATCH] ARM: mv78xx0: correct addr_map_cfg __initdata annotation
-Message-ID: <201210031906.35123.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Oct 2012 20:08:55 +0100
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+Message-ID: <20121003190855.GA1275@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The annotation on the addr_map_cfg variable is in the wrong place.
+On Thu, Sep 27, 2012 at 11:22:02PM +0200, Roland Stigge wrote:
 
-Without this patch, building mv78xx0_defconfig results in:
+> The recurring task of providing simultaneous access to GPIO lines (especially
+> for bit banging protocols) needs an appropriate API.
 
-/home/arnd/linux-arm/arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: initialization from incompatible pointer type [enabled by default]
-/home/arnd/linux-arm/arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: (near initialization for 'addr_map_cfg.win_cfg_base') [enabled by default]
+> This patch adds a kernel internal "Block GPIO" API that enables simultaneous
+> access to several GPIOs in the same gpio_chip (bit mapped). Further, it adds a
+> sysfs interface (/sys/class/gpio/gpiochipXX/block).
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
----
-Queued in the late/fixes branch
-
-diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
-index a9bc841..03f7486 100644
---- a/arch/arm/mach-mv78xx0/addr-map.c
-+++ b/arch/arm/mach-mv78xx0/addr-map.c
-@@ -53,7 +53,7 @@ static void __init __iomem *win_cfg_base(const struct orion_addr_map_cfg *cfg, i
- /*
-  * Description of the windows needed by the platform code
-  */
--static struct __initdata orion_addr_map_cfg addr_map_cfg = {
-+static struct orion_addr_map_cfg addr_map_cfg __initdata = {
- 	.num_wins = 14,
- 	.remappable_wins = 8,
- 	.win_cfg_base = win_cfg_base,
+It would be very useful if this had the option of falling back to
+addressing the GPIOs one by one.  There's some usages that aren't
+performance dependent and it'd make drivers able to run even if they're
+suboptimal.
