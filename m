@@ -1,46 +1,52 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 3 Oct 2012 17:24:37 +0530
-Subject: [PATCH 2/3] serial: omap: Remove the default setting of special
- character
-In-Reply-To: <1349265278-27763-1-git-send-email-shubhrajyoti@ti.com>
-References: <1349265278-27763-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1349265278-27763-2-git-send-email-shubhrajyoti@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 3 Oct 2012 14:29:16 +0200
+Subject: [PATCH] ARM: ux500: add DB serial number to entropy pool
+Message-ID: <1349267356-32171-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Special character detect enable if enabled by default.Received data
-comparison with XOFF2 data happens by default.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-tty provides only XOFF1 no X0FF2 is provided so no need
-to enable check for XOFF2.
+This throws the DB (digital baseband, ASIC) serial number, process
+type etc into the entropy pool by way of the device_add_randomness()
+call. This should make every device have a unique pool state upon
+boot.
 
-Keeping this enabled might give some slow transfers due to dummy xoff2
-comparison with xoff2 reset value.
-
-Since not all want the XOFF2 support lets not enable it by
-default.
-
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Cc: Theodore Tso <tytso@mit.edu>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/tty/serial/omap-serial.c |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index fd0fb8c..caf49a6 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -702,11 +702,7 @@ serial_omap_configure_xonxoff
- 	serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
- 	serial_out(up, UART_TI752_TCR, OMAP_UART_TCR_TRIG);
--	/* Enable special char function UARTi.EFR_REG[5] and
--	 * load the new software flow control mode IXON or IXOFF
--	 * and restore the UARTi.EFR_REG[4] ENHANCED_EN value.
--	 */
--	serial_out(up, UART_EFR, up->efr | UART_EFR_SCD);
-+
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index bcdfe6b..50202a1 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -17,6 +17,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/mfd/abx500/ab8500.h>
++#include <linux/platform_data/usb-musb-ux500.h>
++#include <linux/random.h>
  
- 	serial_out(up, UART_MCR, up->mcr & ~UART_MCR_TCRTLR);
+ #include <asm/pmu.h>
+ #include <asm/mach/map.h>
+@@ -24,7 +26,6 @@
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+ #include <mach/devices.h>
+-#include <linux/platform_data/usb-musb-ux500.h>
+ #include <mach/db8500-regs.h>
+ 
+ #include "devices-db8500.h"
+@@ -187,6 +188,8 @@ static const char *db8500_read_soc_id(void)
+ {
+ 	void __iomem *uid = __io_address(U8500_BB_UID_BASE);
+ 
++	/* Throw these device-specific numbers into the entropy pool */
++	add_device_randomness(uid, 0x14);
+ 	return kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
+ 			 readl((u32 *)uid+1),
+ 			 readl((u32 *)uid+1), readl((u32 *)uid+2),
 -- 
-1.7.5.4
+1.7.11.3
