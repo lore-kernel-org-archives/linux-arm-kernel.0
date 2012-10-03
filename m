@@ -1,91 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 Oct 2012 19:12:07 +0000
-Subject: [PATCH] ARM: footbridge: nw_gpio_lock is raw_spin_lock
-Message-ID: <201210031912.07343.arnd@arndb.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 3 Oct 2012 12:44:38 -0600
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121003104335.GA2254@linaro.org>
+References: <20120930232116.GC30637@obsidianresearch.com>
+ <20121001153952.GB2100@linaro.org>
+ <20121001160639.GA31620@obsidianresearch.com>
+ <20121001175647.GD2100@linaro.org>
+ <20121001183543.GC22342@obsidianresearch.com>
+ <20121002102346.GB2108@linaro.org>
+ <20121002174759.GC23733@obsidianresearch.com>
+ <20121003104335.GA2254@linaro.org>
+Message-ID: <20121003184437.GB12231@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bd31b85960a "locking, ARM: Annotate low level hw locks as raw"
-made nw_gpio_lock a raw spinlock, but did not change all the
-users in device drivers. This fixes the remaining ones.
+On Wed, Oct 03, 2012 at 11:43:35AM +0100, Dave Martin wrote:
 
-sound/oss/waveartist.c: In function 'vnc_mute_spkr':
-sound/oss/waveartist.c:1485:2: warning: passing argument 1 of 'spinlock_check' from incompatible pointer type [enabled by default]
-include/linux/spinlock.h:272:102: note: expected 'struct spinlock_t *' but argument is of type 'struct raw_spinlock_t *'
-drivers/char/ds1620.c: In function 'netwinder_lock':
-drivers/char/ds1620.c:77:2: warning: passing argument 1 of 'spinlock_check' from incompatible pointer type [enabled by default]
-include/linux/spinlock.h:272:102: note: expected 'struct spinlock_t *' but argument is of type 'struct raw_spinlock_t *'
-drivers/char/nwflash.c: In function 'kick_open':
-drivers/char/nwflash.c:620:2: warning: passing argument 1 of 'spinlock_check' from incompatible pointer type [enabled by default]
-include/linux/spinlock.h:272:102: note: expected 'struct spinlock_t *' but argument is of type 'struct raw_spinlock_t *'
+> I'm not sure exactly what you mean by linking the DTB into vmlinux.
+> I don't think this is supported upstream, at least for ARM.  It could
+> be done externally by post-processing vmlinux to add extra sections
+> and some boot shim code which initialises the registers appropriately
+> for kernel entry ... but you're really inventing a bootloader if you
+> start to do that.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
+We use the existing build infrastructure (see cmd_dt_S_dtb) and add a
+4 line patch to head.S to put the dtb address into the right
+register. I think it would be great to have a CONFIG_ARM_BUILT_IN_DTB
+for applications like mine, but it is really no problem to carry the
+head.S patch. The normal build process produces a vmlinux that is self
+contained, no post processing required.
 
-queued in the late/fixes branch, will submit later in the merge window
-unless I hear objections.
+> Making a simple bootloader DT-aware is not actually that hard: libfdt
+> is intentionally pretty straightforward to integrate.
 
-diff --git a/drivers/char/ds1620.c b/drivers/char/ds1620.c
-index aab9605..24ffd8c 100644
---- a/drivers/char/ds1620.c
-+++ b/drivers/char/ds1620.c
-@@ -74,21 +74,21 @@ static inline void netwinder_ds1620_reset(void)
- 
- static inline void netwinder_lock(unsigned long *flags)
- {
--	spin_lock_irqsave(&nw_gpio_lock, *flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, *flags);
- }
- 
- static inline void netwinder_unlock(unsigned long *flags)
- {
--	spin_unlock_irqrestore(&nw_gpio_lock, *flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, *flags);
- }
- 
- static inline void netwinder_set_fan(int i)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	nw_gpio_modify_op(GPIO_FAN, i ? GPIO_FAN : 0);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- }
- 
- static inline int netwinder_get_fan(void)
-diff --git a/drivers/char/nwflash.c b/drivers/char/nwflash.c
-index d45c334..04e2a94 100644
---- a/drivers/char/nwflash.c
-+++ b/drivers/char/nwflash.c
-@@ -617,9 +617,9 @@ static void kick_open(void)
- 	 * we want to write a bit pattern XXX1 to Xilinx to enable
- 	 * the write gate, which will be open for about the next 2ms.
- 	 */
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	nw_cpld_modify(CPLD_FLASH_WR_ENABLE, CPLD_FLASH_WR_ENABLE);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- 
- 	/*
- 	 * let the ISA bus to catch on...
-diff --git a/sound/oss/waveartist.c b/sound/oss/waveartist.c
-index 24c430f..672af8b 100644
---- a/sound/oss/waveartist.c
-+++ b/sound/oss/waveartist.c
-@@ -1482,9 +1482,9 @@ vnc_mute_spkr(wavnc_info *devc)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	nw_cpld_modify(CPLD_UNMUTE, devc->spkr_mute_state ? 0 : CPLD_UNMUTE);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- }
- 
- static void
+Sure, but we have several major issues with that entire idea:
+ 1) Our bootloader (on PPC and ARM) is in redundant NOR flash and
+    is limited to 16K. That is just enough to do gzip, elf, cramfs
+    and tftpv6 - there is no space left for dtb or fdt code.
+ 2) Experience using DT with PPC has shown that the vmlinux is very
+    sensitive to the DTB. Every DTB/vmlinux combination must be tested
+    to ensure it works. By far the best way to manage this *for us* is
+    to guarentee that the vmlinux sees only the DTB it was designed
+    for by including it in vmlinux.
+ 3) The DTB *changes*. We change it because we've changed things in the
+    programmable part of our environment and we change it because the
+    kernel has shifted. Planning for this inevitable change is
+    necessary.
+ 4) On our ARM platforms updating the boot loader in the field is more
+    challenging than updating the vmlinux, not impossible, but not
+    something we want to do every day. Our PPC boot loader has
+    survived without change since 2007, and has booted kernels from
+    2.6.12 to 3.6 with and without DT. This is a time tested,
+    field proven approach.
+
+Fundamentally we treat the DTB like the .config - an integral,
+internal, part of vmlinux.
+
+As far as I can see, the *only* argument to put the DT in the boot
+loader is to support standard, distribution kernels.
+
+> It's more than 100 lines, but not _that_ much more, and contains
+> some implementation features you probably don't need.
+
+But that is not enough, variations of our platforms use bit bang I2C,
+SPI and NOR FLASH to store things like the MAC address and other
+DT-relevant information. So, swaths of that code would need to go into
+the boot loader/zImage as well.
+
+At that point we may as well take our chances with uBoot. :)
+
+> From my side, I think that the fact this takes arch/arm/vmlinux.lds.S
+> closer to some other common arches means that this is low risk and should
+> be mostly harmless, but I will take another look at the patch first.
+
+This matches my opinion..
+
+> > > You store vmlinux.gz in a cramfs?  Is that a typo, or have you already
+> > > compressed the kernel twice?
+> > 
+> > The compression can either be intrisic to cramfs or a raw elf that has
+> > been gzip'd.
+> 
+> If you can have files with intrinsic compression such that they don't
+> get double-compressed, why can you not do this for zImage?
+> 
+> Am I still misunderstanding something?
+
+We have two boot modes, one boots ELF.gz (for development), the other
+boots ELF in CRAMFS (for deployment). Both are compressed, one is
+compressed using gzip and one is compressed using zlib in CRAMFS. It
+is hard to see how to store a zImage in CRAMFS and avoid double
+de-compression. We never store an ELF.gz in CRAMFS.
+
+Since the entire point of zImage is to introduce compression it is
+hard to see *why* we'd want to store a zImage in a CRAMFS.
+
+Jason
