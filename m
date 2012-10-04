@@ -1,45 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Oct 2012 22:24:29 +0200
-Subject: [PATCH v2 0/9] add EDO feature for gpmi-nand driver
-In-Reply-To: <1347519480-31106-1-git-send-email-b32955@freescale.com>
-References: <1347519480-31106-1-git-send-email-b32955@freescale.com>
-Message-ID: <201210042224.30095.marex@denx.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 04 Oct 2012 22:25:48 +0200
+Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CACRpkdYGePft_XvhhoNyRfBm484FD46WGagivQzjh5-OE3VJUA@mail.gmail.com>
+References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
+ <CAOY=C6GG6jqqEAAGJjmDG-BFT2eq=9+ck+F_EOcthRgDCDv8=Q@mail.gmail.com>
+ <50682402.8020402@antcom.de>
+ <CACRpkdYGePft_XvhhoNyRfBm484FD46WGagivQzjh5-OE3VJUA@mail.gmail.com>
+Message-ID: <506DF0CC.9000202@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
+Hi,
 
-> The ONFI nand supports the EDO (extended data out) feature in
-> asynchronous mode when the host controller(such as gpmi-nand)
-> uses a tRC of less then 30ns.
+On 04/10/12 01:07, Linus Walleij wrote:
+>> What do others think? JC? Linus? I'm considering this (unsigned int
+>> data) a valid option.
 > 
-> The gpmi can supports this EDO feature.
-> This patch set adds the EDO support the gpmi-nand driver.
+> I think we mostly use an unsigned long for such stuff as IRQ flags
+> and ioctl() parameters in the kernel.
 > 
-> patch 1 ~ patch 2:
-> 	 These two patches provide the infrastructure for the EDO feature.
->          They add necessary MTD helpers for the ONFI nand set/get features,
-> 	 and the help to get the supportted timing mode.
-> 	 These two patches are new version. The init version has been
-> 	 reviewed by Vikram & Florian.
-> 
-> patch 3 ~ patch 7:
->          These patches are clean-ups for the gpmi-nand's timing code.
-> 	 Also they make the some preparations for the EDO patch.
-> 
-> patch 8: add the EDO feature to the gpmi-nand.
-> 
-> 
-> patch 9: a small optimization for the timing.
->          only set the timing registers one time.
-> 
-> I tested this patch set on the IMX6Q-arm2 board with several Micron's
-> ONFI nand chips. Some chips only can supports to mode 4, some chips
-> can supports to mode 5.
-> 
-> The performance is much improved. Take Micron MT29F32G08MAA for example
-> (in mode 5, 100MHz):
-[...]
+> In this case it has the upside that it will be 32bit on 32bit systems
+> and 64bit on 64bit systems if I'm not mistaken.
 
-Was this ever tested on something else than mx6q? I suspect these broke gpmi 
-nand on mx28. Can you please verify?
+Fine. Will try to prepare a patch tomorrow, including fallback to single
+GPIO handling (if the driver doesn't implement block operations) and
+omitting the sysfs interface in the first patch.
+
+Roland
