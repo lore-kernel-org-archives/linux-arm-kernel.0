@@ -1,289 +1,307 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  4 Oct 2012 15:14:16 +0200
-Subject: [PATCH 1/1] mtd: st fsmc_nand: pass the ale and cmd resource via
- resource
-Message-ID: <1349356456-13371-1-git-send-email-plagnioj@jcrosoft.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 4 Oct 2012 09:35:03 -0400
+Subject: [PATCH 06/15] KVM: ARM: Initial skeleton to compile KVM support
+In-Reply-To: <000301cda230$91eb4fa0$b5c1eee0$@samsung.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153508.21241.47712.stgit@ubuntu>
+ <20120925152055.GC28728@mudshark.cambridge.arm.com>
+ <50625DB2.4000700@virtualopensystems.com>
+ <20120927141314.GK25916@mudshark.cambridge.arm.com>
+ <CANM98qKidvG_sOHM197F+1EDtEFTGnLksCJo=12T36JE3u6R4w@mail.gmail.com>
+ <000301cda230$91eb4fa0$b5c1eee0$@samsung.com>
+Message-ID: <CANM98q+16g6-aQh6geuK+erB6aGCbzVXqax_MNJ9u+cbjX+RGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not use the platform_data to pass resource and be smart in the drivers.
-Just pass it via resource
+On Thu, Oct 4, 2012 at 9:02 AM, Min-gyu Kim <mingyu84.kim@samsung.com> wrote:
+>
+>
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+>> Behalf Of Christoffer Dall
+>> Sent: Monday, October 01, 2012 4:22 AM
+>> To: Will Deacon
+>> Cc: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> kvmarm at lists.cs.columbia.edu; rusty.russell at linaro.org; avi at redhat.com;
+>> marc.zyngier at arm.com
+>> Subject: Re: [PATCH 06/15] KVM: ARM: Initial skeleton to compile KVM
+>> support
+>>
+>> On Thu, Sep 27, 2012 at 10:13 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Sep 26, 2012 at 02:43:14AM +0100, Christoffer Dall wrote:
+>> >> On 09/25/2012 11:20 AM, Will Deacon wrote:
+>> >> >> +/* Multiprocessor Affinity Register */
+>> >> >> +#define MPIDR_CPUID    (0x3 << 0)
+>> >> >
+>> >> > I'm fairly sure we already have code under arch/arm/ for dealing
+>> >> > with the mpidr. Let's re-use that rather than reinventing it here.
+>> >> >
+>> >>
+>> >> I see some defines in topology.c - do you want some of these factored
+>> >> out into a header file that we can then also use from kvm? If so,
+> where?
+>> >
+>> > I guess either in topology.h or a new header (topology-bits.h).
+>> >
+>> >> >> +#define EXCEPTION_NONE      0
+>> >> >> +#define EXCEPTION_RESET     0x80
+>> >> >> +#define EXCEPTION_UNDEFINED 0x40
+>> >> >> +#define EXCEPTION_SOFTWARE  0x20
+>> >> >> +#define EXCEPTION_PREFETCH  0x10
+>> >> >> +#define EXCEPTION_DATA      0x08
+>> >> >> +#define EXCEPTION_IMPRECISE 0x04
+>> >> >> +#define EXCEPTION_IRQ       0x02
+>> >> >> +#define EXCEPTION_FIQ       0x01
+>> >> >
+>> >> > Why the noise?
+>> >> >
+>> >>
+>> >> these are simply cruft from a previous life of KVM/ARM.
+>> >
+>> > Ok, then please get rid of them.
+>> >
+>> >> >> +static inline enum vcpu_mode vcpu_mode(struct kvm_vcpu *vcpu) {
+>> >> >> +       u8 mode = __vcpu_mode(vcpu->arch.regs.cpsr);
+>> >> >> +       BUG_ON(mode == 0xf);
+>> >> >> +       return mode;
+>> >> >> +}
+>> >> >
+>> >> > I noticed that you have a fair few BUG_ONs throughout the series.
+>> >> > Fair enough, but for hyp code is that really the right thing to do?
+>> >> > Killing the guest could make more sense, perhaps?
+>> >>
+>> >> the idea is to have BUG_ONs that are indeed BUG_ONs that we want to
+>> >> catch explicitly on the host. We have had a pass over the code to
+>> >> change all the BUG_ONs that can be provoked by the guest and inject
+>> >> the proper exceptions into the guest in this case. If you find places
+>> >> where this is not the case, it should be changed, and do let me know.
+>> >
+>> > Ok, so are you saying that a BUG_ON due to some detected inconsistency
+>> > with one guest may not necessarily terminate the other guests? BUG_ONs
+>> > in the host seem like a bad idea if the host is able to continue with
+>> > a subset of guests.
+>> >
+>>
+>> No, I'm saying a BUG_ON is an actual BUG, it should not happen and there
+>> should be nowhere where a guest can cause a BUG_ON to occur in the host,
+>> because that would be a bug.
+>>
+>> We basically never kill a guest unless really extreme things happen (like
+>> we cannot allocate a pte, in which case we return -ENOMEM). If a guest
+>> does something really weird, that guest will receive the appropriate
+>> exception (undefined, prefetch abort, ...)
+>>
+>
+> I agree with Will. It seems to be overreacting to kill the entire system.
+>
+> From the code above, BUG_ON case clearly points out that there happened a
+> serious bug case. However, killing the corresponding VM may not cause any
+> further problem.
+> Then leave some logs for debugging and killing the VM seems to be enough.
+>
+> Let's assume KVM for ARM is distributed with a critical bug.
+> If the case is defended by BUG_ON, it will cause host to shutdown.
+> If the case is defended by killing VM, it will cause VM to shutdown.
+> In my opinion, latter case seems to be better.
+>
+> I looked for a guide on BUG_ON and found this:
+>      http://yarchive.net/comp/linux/BUG.html
+>
+>
 
-Switch to devm_request_and_ioremap at the sametime
+I completely agree with all this, no further argument is needed. The
+point of a BUG_ON is to explicitly state the reason for a bug that
+will anyhow cause the host kernel to overall malfunction. The above
+bug_on statement is long gone (see new patches), and if you see other
+cases like this, the code should have been tested and we can remove
+the BUG_ON.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Vipin Kumar <vipin.kumar@st.com>
-Cc: linux-mtd at lists.infradead.org
----
- .../devicetree/bindings/mtd/fsmc-nand.txt          |   12 +++---
- arch/arm/boot/dts/spear13xx.dtsi                   |   10 ++---
- arch/arm/boot/dts/spear300.dtsi                    |    8 ++--
- arch/arm/boot/dts/spear310.dtsi                    |    8 ++--
- arch/arm/boot/dts/spear320.dtsi                    |    8 ++--
- arch/arm/boot/dts/spear600.dtsi                    |    8 ++--
- arch/arm/mach-u300/core.c                          |   14 ++++++-
- drivers/mtd/nand/fsmc_nand.c                       |   44 +++++---------------
- include/linux/mtd/fsmc.h                           |    3 --
- 9 files changed, 49 insertions(+), 66 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
-index e2c663b..e3ea32e 100644
---- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
-@@ -3,9 +3,7 @@
- Required properties:
- - compatible : "st,spear600-fsmc-nand"
- - reg : Address range of the mtd chip
--- reg-names: Should contain the reg names "fsmc_regs" and "nand_data"
--- st,ale-off : Chip specific offset to ALE
--- st,cle-off : Chip specific offset to CLE
-+- reg-names: Should contain the reg names "fsmc_regs", "nand_data", "nand_addr" and "nand_cmd"
- 
- Optional properties:
- - bank-width : Width (in bytes) of the device.  If not present, the width
-@@ -19,10 +17,10 @@ Example:
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		reg = <0xd1800000 0x1000	/* FSMC Register */
--		       0xd2000000 0x4000>;	/* NAND Base */
--		reg-names = "fsmc_regs", "nand_data";
--		st,ale-off = <0x20000>;
--		st,cle-off = <0x10000>;
-+		       0xd2000000 0x0010	/* NAND Base DATA */
-+		       0xd2020000 0x0010	/* NAND Base ADDR */
-+		       0xd2010000 0x0010>;	/* NAND Base CMD */
-+		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 
- 		bank-width = <1>;
- 		nand-skip-bbtscan;
-diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
-index f7b84ac..14a6d15 100644
---- a/arch/arm/boot/dts/spear13xx.dtsi
-+++ b/arch/arm/boot/dts/spear13xx.dtsi
-@@ -104,15 +104,15 @@
- 			compatible = "st,spear600-fsmc-nand";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			reg = <0xb0000000 0x1000	/* FSMC Register */
--			       0xb0800000 0x0010>;	/* NAND Base */
--			reg-names = "fsmc_regs", "nand_data";
-+			reg = <0xb0000000 0x1000	/* FSMC Register*/
-+			       0xb0800000 0x0010	/* NAND Base DATA */
-+			       0xb0820000 0x0010	/* NAND Base ADDR */
-+			       0xb0810000 0x0010>;	/* NAND Base CMD */
-+			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 			interrupts = <0 20 0x4
- 				      0 21 0x4
- 				      0 22 0x4
- 				      0 23 0x4>;
--			st,ale-off = <0x20000>;
--			st,cle-off = <0x10000>;
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
-index ed3627c..bc43638 100644
---- a/arch/arm/boot/dts/spear300.dtsi
-+++ b/arch/arm/boot/dts/spear300.dtsi
-@@ -38,10 +38,10 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x94000000 0x1000	/* FSMC Register */
--			       0x80000000 0x0010>;	/* NAND Base */
--			reg-names = "fsmc_regs", "nand_data";
--			st,ale-off = <0x20000>;
--			st,cle-off = <0x10000>;
-+			       0x80000000 0x0010	/* NAND Base DATA */
-+			       0x80020000 0x0010	/* NAND Base ADDR */
-+			       0x80010000 0x0010>;	/* NAND Base CMD */
-+			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
-index 62fc4fb..7840e52 100644
---- a/arch/arm/boot/dts/spear310.dtsi
-+++ b/arch/arm/boot/dts/spear310.dtsi
-@@ -32,10 +32,10 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x44000000 0x1000	/* FSMC Register */
--			       0x40000000 0x0010>;	/* NAND Base */
--			reg-names = "fsmc_regs", "nand_data";
--			st,ale-off = <0x10000>;
--			st,cle-off = <0x20000>;
-+			       0x40000000 0x0010	/* NAND Base DATA */
-+			       0x40020000 0x0010	/* NAND Base ADDR */
-+			       0x40010000 0x0010>;	/* NAND Base CMD */
-+			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
-index 1f49d69..5ad8206 100644
---- a/arch/arm/boot/dts/spear320.dtsi
-+++ b/arch/arm/boot/dts/spear320.dtsi
-@@ -38,10 +38,10 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x4c000000 0x1000	/* FSMC Register */
--			       0x50000000 0x0010>;	/* NAND Base */
--			reg-names = "fsmc_regs", "nand_data";
--			st,ale-off = <0x20000>;
--			st,cle-off = <0x10000>;
-+			       0x50000000 0x0010	/* NAND Base DATA */
-+			       0x50020000 0x0010	/* NAND Base ADDR */
-+			       0x50010000 0x0010>;	/* NAND Base CMD */
-+			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
-index a3c36e4..4ecc66f 100644
---- a/arch/arm/boot/dts/spear600.dtsi
-+++ b/arch/arm/boot/dts/spear600.dtsi
-@@ -67,10 +67,10 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0xd1800000 0x1000	/* FSMC Register */
--			       0xd2000000 0x4000>;	/* NAND Base */
--			reg-names = "fsmc_regs", "nand_data";
--			st,ale-off = <0x20000>;
--			st,cle-off = <0x10000>;
-+			       0xd2000000 0x0010	/* NAND Base DATA */
-+			       0xd2020000 0x0010	/* NAND Base ADDR */
-+			       0xd2010000 0x0010>;	/* NAND Base CMD */
-+			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index ef6f602..527bcc2 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -252,6 +252,18 @@ static struct resource rtc_resources[] = {
-  */
- static struct resource fsmc_resources[] = {
- 	{
-+		.name  = "nand_addr",
-+		.start = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_ALE,
-+		.end   = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_ALE + SZ_16K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	{
-+		.name  = "nand_cmd",
-+		.start = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_CLE,
-+		.end   = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_CLE + SZ_16K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	{
- 		.name  = "nand_data",
- 		.start = U300_NAND_CS0_PHYS_BASE,
- 		.end   = U300_NAND_CS0_PHYS_BASE + SZ_16K - 1,
-@@ -1496,8 +1508,6 @@ static struct fsmc_nand_platform_data nand_platform_data = {
- 	.nr_partitions = ARRAY_SIZE(u300_partitions),
- 	.options = NAND_SKIP_BBTSCAN,
- 	.width = FSMC_NAND_BW8,
--	.ale_off = PLAT_NAND_ALE,
--	.cle_off = PLAT_NAND_CLE,
- };
- 
- static struct platform_device nand_device = {
-diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
-index 38d2624..cb86450 100644
---- a/drivers/mtd/nand/fsmc_nand.c
-+++ b/drivers/mtd/nand/fsmc_nand.c
-@@ -876,8 +876,6 @@ static int __devinit fsmc_nand_probe_config_dt(struct platform_device *pdev,
- 			return -EINVAL;
- 		}
- 	}
--	of_property_read_u32(np, "st,ale-off", &pdata->ale_off);
--	of_property_read_u32(np, "st,cle-off", &pdata->cle_off);
- 	if (of_get_property(np, "nand-skip-bbtscan", NULL))
- 		pdata->options = NAND_SKIP_BBTSCAN;
- 
-@@ -935,41 +933,28 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
- 	if (!res)
- 		return -EINVAL;
- 
--	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
--				pdev->name)) {
--		dev_err(&pdev->dev, "Failed to get memory data resourse\n");
--		return -ENOENT;
--	}
--
--	host->data_pa = (dma_addr_t)res->start;
--	host->data_va = devm_ioremap(&pdev->dev, res->start,
--			resource_size(res));
-+	host->data_va = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!host->data_va) {
- 		dev_err(&pdev->dev, "data ioremap failed\n");
- 		return -ENOMEM;
- 	}
-+	host->data_pa = (dma_addr_t)res->start;
- 
--	if (!devm_request_mem_region(&pdev->dev, res->start + pdata->ale_off,
--			resource_size(res), pdev->name)) {
--		dev_err(&pdev->dev, "Failed to get memory ale resourse\n");
--		return -ENOENT;
--	}
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nand_addr");
-+	if (!res)
-+		return -EINVAL;
- 
--	host->addr_va = devm_ioremap(&pdev->dev, res->start + pdata->ale_off,
--			resource_size(res));
-+	host->addr_va = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!host->addr_va) {
- 		dev_err(&pdev->dev, "ale ioremap failed\n");
- 		return -ENOMEM;
- 	}
- 
--	if (!devm_request_mem_region(&pdev->dev, res->start + pdata->cle_off,
--			resource_size(res), pdev->name)) {
--		dev_err(&pdev->dev, "Failed to get memory cle resourse\n");
--		return -ENOENT;
--	}
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nand_cmd");
-+	if (!res)
-+		return -EINVAL;
- 
--	host->cmd_va = devm_ioremap(&pdev->dev, res->start + pdata->cle_off,
--			resource_size(res));
-+	host->cmd_va = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!host->cmd_va) {
- 		dev_err(&pdev->dev, "ale ioremap failed\n");
- 		return -ENOMEM;
-@@ -979,14 +964,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
- 	if (!res)
- 		return -EINVAL;
- 
--	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
--			pdev->name)) {
--		dev_err(&pdev->dev, "Failed to get memory regs resourse\n");
--		return -ENOENT;
--	}
--
--	host->regs_va = devm_ioremap(&pdev->dev, res->start,
--			resource_size(res));
-+	host->regs_va = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!host->regs_va) {
- 		dev_err(&pdev->dev, "regs ioremap failed\n");
- 		return -ENOMEM;
-diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
-index b200292..d6ed61e 100644
---- a/include/linux/mtd/fsmc.h
-+++ b/include/linux/mtd/fsmc.h
-@@ -155,9 +155,6 @@ struct fsmc_nand_platform_data {
- 	unsigned int		width;
- 	unsigned int		bank;
- 
--	/* CLE, ALE offsets */
--	unsigned int		cle_off;
--	unsigned int		ale_off;
- 	enum access_mode	mode;
- 
- 	void			(*select_bank)(uint32_t bank, uint32_t busw);
--- 
-1.7.10.4
+>> >> >
+>> >> >> +static inline u32 *vcpu_pc(struct kvm_vcpu *vcpu) {
+>> >> >> +       return vcpu_reg(vcpu, 15); }
+>> >> >
+>> >> > If you stick a struct pt_regs into struct kvm_regs, you could reuse
+>> >> > ARM_pc here etc.
+>> >> >
+>> >>
+>> >> I prefer not to, because we'd have those registers presumably for usr
+>> >> mode and then we only define the others explicit. I think it's much
+>> >> clearer to look at kvm_regs today.
+>> >
+>> > I disagree and think that you should reuse as much of the arch/arm/
+>> > code as possible. Not only does it make it easier to read by people
+>> > who are familiar with that code (and in turn get you more reviewers)
+>> > but it also means that we limit the amount of duplication that we have.
+>>
+>> Reusing a struct just for the sake of reusing is not necessarily an
+>> improvement. Some times it complicates things, and some times it's
+>> misleading. To me, pt_regs carry the meaning that these are the registers
+>> for a user space process that traps into the kernel - in KVM we emulate a
+>> virtual CPU and that current definition is quite clear.
+>>
+>> The argument that more people will review the code if the struct contains
+>> a pt_regs field rather than a usr_regs field is completely invalid,
+>> because I'm sure everyone that reviews virtualization code will know that
+>> user mode is a mode on the cpu and it has some registers and this is the
+>> state we store when we context switch a VM - pt_regs could be read as the
+>> regs that we stored in the mode that the VM happened to be in when we took
+>> an exception, which I would think is crazy, and probably not what you
+>> suggest.
+>>
+>> Writing the literal 15 for the PC register is not really a problem in
+>> terms of duplication - it's nothing that requires separate maintenance.
+>>
+>> At this point the priority should really be correctness, readability, and
+>> performance, imho.
+>>
+>> >
+>> > I think Marc (CC'd) had a go at this with some success.
+>> >
+>>
+>> great, if this improves the code, then I suggest someone rebases an
+>> appropriate patch and sends it to the kvmarm mailing list so we can have a
+>> look at it, but there are users out there looking to try kvm/arm and we
+>> should try to give it to them.
+>>
+>> >> >> +#ifndef __ARM_KVM_HOST_H__
+>> >> >> +#define __ARM_KVM_HOST_H__
+>> >> >> +
+>> >> >> +#include <asm/kvm.h>
+>> >> >> +
+>> >> >> +#define KVM_MAX_VCPUS 4
+>> >> >
+>> >> > NR_CPUS?
+>> >> >
+>> >>
+>> >> well this is defined by KVM generic code, and is common for other
+>> >> architecture.
+>> >
+>> > I mean #define KVM_MAX_CPUS NR_CPUS. The 4 seems arbitrary.
+>> >
+>> >> >> +int __attribute_const__ kvm_target_cpu(void) {
+>> >> >> +       unsigned int midr;
+>> >> >> +
+>> >> >> +       midr = read_cpuid_id();
+>> >> >> +       switch ((midr >> 4) & 0xfff) {
+>> >> >> +       case KVM_ARM_TARGET_CORTEX_A15:
+>> >> >> +               return KVM_ARM_TARGET_CORTEX_A15;
+>> >> >
+>> >> > I have this code already in perf_event.c. Can we move it somewhere
+>> >> > common and share it? You should also check that the implementor field
+>> is 0x41.
+>> >> >
+>> >>
+>> >> by all means, you can probably suggest a good place better than I
+> can...
+>> >
+>> > cputype.h?
+>> >
+>> >> >> +#include <linux/module.h>
+>> >> >> +
+>> >> >> +EXPORT_SYMBOL_GPL(smp_send_reschedule);
+>> >> >
+>> >> > Erm...
+>> >> >
+>> >> > We already have arch/arm/kernel/armksyms.c for exports -- please use
+>> that.
+>> >> > However, exporting such low-level operations sounds like a bad
+>> >> > idea. How realistic is kvm-as-a-module on ARM anyway?
+>> >> >
+>> >>
+>> >> at this point it's broken, so I'll just remove this and leave this
+>> >> for a fun project for some poor soul at some point if anyone ever
+>> >> needs half the code outside the kernel as a module (the other half
+>> >> needs to be compiled in anyway)
+>> >
+>> > Ok, that suits me. If it's broken, let's not include it in the initial
+>> > submission.
+>> >
+>> >> >> +int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct
+>> >> >> +kvm_regs *regs) {
+>> >> >> +       return -EINVAL;
+>> >> >> +}
+>> >> >> +
+>> >> >> +int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct
+>> >> >> +kvm_regs *regs) {
+>> >> >> +       return -EINVAL;
+>> >> >> +}
+>> >> >
+>> >> > Again, all looks like this should be implemented using regsets from
+>> >> > what I can tell.
+>> >> >
+>> >>
+>> >> this API has been discussed to death on the KVM lists, and we can of
+>> >> course revive that if the regset makes it nicer - I'd prefer getting
+>> >> this upstream the way that it is now though, where GET_REG / SET_REG
+>> >> seems to be the way forward from a KVM perspective.
+>> >
+>> > I'm sure the API has been discussed, but I've not seen that
+>> > conversation and I'm also not aware about whether or not regsets were
+>> > considered as a possibility for this stuff. The advantages of using them
+>> are:
+>> >
+>> >         1. It's less code for the arch to implement (and most of what
+> you
+>> >         need, you already have).
+>> >
+>> >         2. You can move the actual copying code into core KVM, like we
+>> have
+>> >         for ptrace.
+>> >
+>> >         3. New KVM ports (e.g. arm64) can reuse the core copying code
+>> >         easily.
+>> >
+>> > Furthermore, some registers (typically) floating point and GPRs will
+>> > already have regsets for the ptrace code, so that can be reused if you
+>> > share the datatypes.
+>> >
+>> > The big problem with getting things upstream and then changing it
+>> > later is that you will break the ABI. I highly doubt that's feasible,
+>> > so can we not just use regsets from the start for ARM?
+>> >
+>> >> >> +int kvm_reset_vcpu(struct kvm_vcpu *vcpu) {
+>> >> >> +       struct kvm_regs *cpu_reset;
+>> >> >> +
+>> >> >> +       switch (vcpu->arch.target) {
+>> >> >> +       case KVM_ARM_TARGET_CORTEX_A15:
+>> >> >> +               if (vcpu->vcpu_id > a15_max_cpu_idx)
+>> >> >> +                       return -EINVAL;
+>> >> >> +               cpu_reset = &a15_regs_reset;
+>> >> >> +               vcpu->arch.midr = read_cpuid_id();
+>> >> >> +               break;
+>> >> >> +       default:
+>> >> >> +               return -ENODEV;
+>> >> >> +       }
+>> >> >> +
+>> >> >> +       /* Reset core registers */
+>> >> >> +       memcpy(&vcpu->arch.regs, cpu_reset,
+>> >> >> + sizeof(vcpu->arch.regs));
+>> >> >> +
+>> >> >> +       /* Reset CP15 registers */
+>> >> >> +       kvm_reset_coprocs(vcpu);
+>> >> >> +
+>> >> >> +       return 0;
+>> >> >> +}
+>> >> >
+>> >> > This is a nice way to plug in new CPUs but the way the rest of the
+>> >> > code is currently written, all the ARMv7 and Cortex-A15 code is
+>> >> > merged together. I
+>> >> > *strongly* suggest you isolate this from the start, as it will help
+>> >> > you see what is architected and what is implementation-specific.
+>> >> >
+>> >>
+>> >> not entirely sure what you mean. You want a separate coproc.c file
+>> >> for
+>> >> Cortex-A15 specific stuff like coproc_a15.c?
+>> >
+>> > Indeed. I think it will make adding new CPUs a lot clearer and
+>> > separate the architecture from the implementation.
+>> >
+>> > Cheers,
+>> >
+>> > Will
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kvm" in the body
+>> of a message to majordomo at vger.kernel.org More majordomo info at
+>> http://vger.kernel.org/majordomo-info.html
+>
