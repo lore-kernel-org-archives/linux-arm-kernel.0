@@ -1,120 +1,56 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Thu, 4 Oct 2012 14:49:29 +1000
-Subject: [PATCH 1/1] Fix segfault in DTC
-In-Reply-To: <506CAF2A.204@wwwdotorg.org>
-References: <50632F78.4030709@broadcom.com> <5065D9C7.40906@wwwdotorg.org>
- <E1THfgr-0006Fg-KT@jdl.com> <5065F4FD.4010807@wwwdotorg.org>
- <20120929235342.GA23078@truffula.fritz.box>
- <50692B7A.8000405@wwwdotorg.org>
- <20121001064610.GA5323@truffula.fritz.box>
- <5069C7A5.8090409@wwwdotorg.org>
- <20121002000851.GA29302@truffula.fritz.box>
- <506CAF2A.204@wwwdotorg.org>
-Message-ID: <20121004044929.GP29302@truffula.fritz.box>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 4 Oct 2012 07:17:35 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
+ parents
+In-Reply-To: <20121003220916.GW31897@kw.sim.vm.gnt>
+References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
+ <20121003154310.GI11837@lunn.ch>
+ <20121003220916.GW31897@kw.sim.vm.gnt>
+Message-ID: <20121004051735.GI21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 03:33:30PM -0600, Stephen Warren wrote:
-> On 10/01/2012 06:08 PM, David Gibson wrote:
-> > On Mon, Oct 01, 2012 at 10:41:09AM -0600, Stephen Warren wrote:
-> >> On 10/01/2012 12:46 AM, David Gibson wrote:
-> >>> On Sun, Sep 30, 2012 at 11:34:50PM -0600, Stephen Warren wrote:
-> >>>> On 09/29/2012 05:53 PM, David Gibson wrote:
-> >>>>> On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
-> >>>>>> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
-> >>>>>>>>>
-> >>>>>>>>> Yeah, seems like the kernel DTC is quite old.
-> >>>>>>>>
-> >>>>>>>> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
-> >>>>>>>
-> >>>>>>> Awesome.  Thank you.
-> >>>>>>>
-> >>>>>>>> I've run a regression test vs. the old dtc in the kernel ...
-> >>>>>>>
-> >>>>>>> Which is the icky step.  Again, thank you.
-> >>>>>>>
-> >>>>>>>> ... and found that
-> >>>>>>>> some of the PowerPC .dts files don't compile with the new dtc (but did
-> >>>>>>>> with the old), all due to non-existent labels/paths being referenced.
-> >>>>>>>> I'll try and track down whether this is a regression in dtc, or simply
-> >>>>>>>> buggy .dts files that weren't noticed before.
-> >>>>>>>
-> >>>>>>> I think you should just smack the PowerPC guys. :-)
-> >>>>>>
-> >>>>>> For the record in this thread, it was a regression I introduced into dtc
-> >>>>>> - the patch I just sent was for this.
-> >>>>>
-> >>>>> I would be nice to add a testcase for this regression into dtc.
-> >>>>
-> >>>> The issue here was caused by uninitialized memory, so it would, I think,
-> >>>> be basically impossible to create a test-case that would be guaranteed
-> >>>> to fail because of this; it'd depend on the internal details of the
-> >>>> malloc library and how/when it re-used previously free()d memory blocks.
-> >>>
-> >>> It doesn't have to be guaranteed to fail to be useful.  Plus, we
-> >>> already have the infrastructure to run the tests under valgrind, which
-> >>> would catch it.
-> >>
-> >> I certainly disagree here; the absolute worst kind of test is one which
-> >> gives different results each time it's run, or statically gives
-> >> different results to different people. People will either ignore the
-> >> test because it's flaky, or it'll end up blaming the wrong person due to
-> >> some entirely unrelated and correct change just happening to tickle the
-> >> test.
+On Thu, Oct 04, 2012 at 12:09:16AM +0200, Simon Guinot wrote:
+> On Wed, Oct 03, 2012 at 05:43:10PM +0200, Andrew Lunn wrote:
+> > On Wed, Oct 03, 2012 at 05:14:30PM +0200, Simon Guinot wrote:
+> > > This patch adds DT board setup for LaCie Network Space v2 and parents,
+> > > based the Marvell Kirkwood 6281 SoC. This includes Network Space (Max)
+> > > v2 and Internet Space v2.
 > > 
-> > I'd agree 100% if the test could give false failures.  But in this
-> > case it can only give false passes.
-> 
-> That is true. I still dislike flaky tests irrespective of
-> false-{negative,positive} though.
-
-I don't love it, but I think a test which can generate false-negatives
-is better than no test.
-
-> > If the test fails there is a bug
-> > *somewhere*, even if it's not actually in whatever changed last.  The
-> > test framework actually has a "PASS (inconclusive)" result for exactly
-> > this sort of case.
+> > Hi Simon
 > > 
-> >> If we were to force any such new test to always run under valgrind, then
-> >> hopefully the test would always fail (assuming the test harness triggers
-> >> failure if valgrind finds problems).
-> > 
-> > Aside: it's supposed to;  if it doesn't, that's a bug.  You can try it
-> > easily enough with "make checkm".
+> > At a first look, this looks good. Also nice to see you use the new
+> > gpio-fan binding.
 > 
-> Ah, I didn't know about that make target (or even "make check"; I'd
-> always run run_tests.sh manually).
+> Hi Andrew,
 > 
-> Incidentally, before commit 317a5d9 "dtc: zero out new label objects"
-> the following two tests fail under make checkm:
-> 
-> dtc -I dts -O dtb -o multilabel.test.dtb multilabel.dts:        FAIL
-> Returned error code 126
-> 
-> dtc -I dts -O dtb -o multilabel_merge.test.dtb multilabel_merge.dts:
-> FAIL Returned error code 126
-> 
-> However, they pass at/after that commit.
+> It is nice to have this binding. It works fine.
 
-Ah, interesting.  Goes to show that neither Jon nor I runs the
-valgrind check as often as we probably should.
+It good to hear that it works. There is one other board which could
+use it. I plan to convert it over for 3.8.
 
-> Equally, those failures were introduced with commit 45013d8 "dtc: Add
-> ability to delete nodes and properties", which is exactly what I'd
-> expect given the fix was a fix for that commit.
+I will take a look at other DT boards and see if there is any patterns
+which might help here, for naming of a shared compatibility string.
+
+> > Have you thought about adding a DT binding for this driver?
 > 
-> So, it seems like we already have tests that catch this problem. Do we
-> need to do anything given that?
+> Yes. I am on it.
 
-Hm, I guess not.
+Great. Please include my CC: when you post it.
 
-> I am slightly surprised that the problem didn't cause all tests to fail
-> make checkm though (I'd expect any usage of a label to trigger the
-> problem); I'll have to think about why some more...
+> > It would be nice if you could respin the patches for -rc1, when it
+> > comes out. There are changes to Makefile.boot at least required.
+> 
+> OK. I will.
+> 
+> Note that this patch is based against the branch kirkwood/boards from
+> the git repository git://git.infradead.org/users/jcooper/linux.git. Is
+> that correct ?
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+Its a good start. However, the Makefile.boot changes were merged in in
+arm-soc, and not by the Marvell maintainers in our trees. So changes
+across multiple arm platforms are not in Jason's tree. -rc1 will have
+all these changes, and forms the best base for a new board.
+
+    Thanks
+	Andrew
