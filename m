@@ -1,45 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Oct 2012 00:09:57 +0100
-Subject: [PATCH] arm: include linux/sched.h in syscall.h
-In-Reply-To: <20121002155255.GJ11278@mudshark.cambridge.arm.com>
-References: <5069F8A0.5020801@mentor.com>
- <20121002122124.GB11278@mudshark.cambridge.arm.com>
- <506B0BB0.5060707@mentor.com>
- <20121002155255.GJ11278@mudshark.cambridge.arm.com>
-Message-ID: <20121004230957.GC4625@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 04 Oct 2012 18:10:26 -0500
+Subject: alignment faults in 3.6
+Message-ID: <506E1762.3010601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2012 at 04:52:55PM +0100, Will Deacon wrote:
-> On Tue, Oct 02, 2012 at 04:43:44PM +0100, Wade Farnsworth wrote:
-> > > On Mon, Oct 01, 2012 at 09:10:08PM +0100, Wade Farnsworth wrote:
-> > >> task_thread_info() is defined in linux/sched.h.  Explicitly include this
-> > >> file in arch/arm/include/asm/syscall.h.  This fixes an lttng-modules compile error.
-> > >
-> > > Can you be more specific about the error? From your description, it sounds
-> > > like it should be fixed in lttng rather than here.
-> > >
-> > My apologies for the lack of clarity.
-> > 
-> > My syscall tracing patch introduces a compile bug in lttng-modules when 
-> > the latter calls syscall_get_nr(), similar to the following:
-> > 
-> > <path-to-linux>/arch/arm/include/asm/syscall.h:21:2: error: implicit 
-> > declaration of function 'task_thread_info' 
-> > [-Werror=implicit-function-declaration]
-> > 
-> > The issue is that we are using task_thread_info() in the 
-> > syscall_get_nr() function in asm/syscall.h, but not explicitly including 
-> > sched.h from this file, so we can expect this bug might surface any time 
-> > that syscall_get_nr() is called.
-> > 
-> > Hopefully that clarifies things somewhat.
-> 
-> Yep, thanks. Your patch sounds like the right thing to do, but please
-> include the compiler error in your commit log.
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+I've been scratching my head with a "scheduling while atomic" bug I
+started seeing on 3.6. I can easily reproduce this problem when doing a
+wget on my system. It ultimately seems to be a combination of factors.
+The "scheduling while atomic" bug is triggered in do_alignment which
+gets triggered by this code in net/ipv4/af_inet.c, line 1356:
 
->From what I can tell, the original commit went in during the 3.4..3.5
-timeframe, so doesn't this patch need to be applied to v3.5-stable
-as well as 3.6-stable and for 3.7 ?
+id = ntohl(*(__be32 *)&iph->id);
+flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id ^ IP_DF));
+id >>= 16;
+
+This code compiles into this using "gcc version 4.6.3 (Ubuntu/Linaro
+4.6.3-1ubuntu5)":
+
+c02ac020:       e8920840        ldm     r2, {r6, fp}
+c02ac024:       e6bfbf3b        rev     fp, fp
+c02ac028:       e6bf6f36        rev     r6, r6
+c02ac02c:       e22bc901        eor     ip, fp, #16384  ; 0x4000
+c02ac030:       e0266008        eor     r6, r6, r8
+c02ac034:       e18c6006        orr     r6, ip, r6
+
+which generates alignment faults on the ldm. These are silent until this
+commit is applied:
+
+commit ad72907acd2943304c292ae36960bb66e6dc23c9
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Fri Sep 7 18:24:10 2012 +0100
+
+    ARM: 7528/1: uaccess: annotate [__]{get,put}_user functions with
+might_fault()
+
+    The user access functions may generate a fault, resulting in invocation
+    of a handler that may sleep.
+
+    This patch annotates the accessors with might_fault() so that we print a
+    warning if they are invoked from atomic context and help lockdep keep
+    track of mmap_sem.
+
+
+I would think the scheduling while atomic messages are harmless in this
+case. However, in addition to spewing out BUG messages this commit also
+seems to eventually cause a kernel panic in __napi_complete. That panic
+seems to go away if I put barrier() between the 2 accesses above which
+eliminates the alignment faults. I haven't figured that part out yet.
+
+There's at least a couple of problems here:
+
+This seems like an overly aggressive compiler optimization considering
+unaligned accesses are not supported by ldm/stm.
+
+The alignment fault handler should handle kernel address faults atomically.
+
+I need to fix alignment of the network rx buffers if possible.
+
+Rob
