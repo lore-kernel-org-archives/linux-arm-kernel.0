@@ -1,38 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 4 Oct 2012 16:11:57 +0200
-Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
-In-Reply-To: <20121004135130.GC5554@sortiz-mobl>
-References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <11987916.rOoNGcb1ly@dev1>
- <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
- <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
- <20121004135130.GC5554@sortiz-mobl>
-Message-ID: <20121004141157.GK598@pengutronix.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 4 Oct 2012 07:26:17 -0700
+Subject: usb: uhci-platform driver fails after patch changes during merge
+In-Reply-To: <1349333716.7905.1.camel@gitbox>
+References: <1349332691.7583.3.camel@gitbox> <1349333716.7905.1.camel@gitbox>
+Message-ID: <20121004142617.GA26625@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 04, 2012 at 07:55:16PM +1300, Tony Prisk wrote:
+> On Thu, 2012-10-04 at 19:38 +1300, Tony Prisk wrote:
+> > Mike,
+> > 
+> > I see someone made changes to the uhci-platform.c driver I submitted
+> > during v3.7 which results in it not working on mach-vt8500.
+> > 
+> > Could you clarify why the changes were made, and what the suggested
+> > resolution would be to solve the problem that it introduced?
+> > 
+> > Lines indicated by ---> below were removed from the patch, which means
+> > that on arch-vt8500 there is no dma_mask set, and its fails to
+> > communicate with attached devices.
+> > 
+> > Regards
+> > 
+> > Tony P
+> > 
+> > 
+> > static int __devinit uhci_hcd_platform_probe(struct platform_device
+> > *pdev)
+> > ...
+> > 	if (usb_disabled())
+> > 		return -ENODEV;
+> > --->
+> > 	/* Right now device-tree probed devices don't get dma_mask set.
+> > 	 * Since shared usb code relies on it, set it here for now.
+> > 	 * Once we have dma capability bindings this can go away.
+> > 	 */
+> > 	if (!pdev->dev.dma_mask)
+> > 		pdev->dev.dma_mask = &platform_uhci_dma_mask;
+> > --->
+> > 	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
+> > 				pdev->name);
+> > ...
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> Greg,
+> 
+> This message was intended for you rather than Mike. Could you clarify
+> what happened and the expected resolution?
 
-On Thu, Oct 04, 2012 at 03:51:30PM +0200, Samuel Ortiz wrote:
-> Did you send it to my samuel.ortiz at intel.com email ? I never look at it when
-> going through my MFD backlog, which is why it was not applied. Which is why it
-> won't be part of the 3.7 merge window, sorry about that.
-I don't know why I picked that one up, but probably it's because this
-address shows up in several commits:
+I don't know, this should be directed at the person who made the change
+that is causing the problem, and the linux-usb at vger.kernel.org mailing
+list.
 
-	$ git log --grep=samuel.ortiz at intel.com | grep Samuel | sort | uniq -c
-	     18     Acked-by: Samuel Ortiz <samuel.ortiz@intel.com>
-	     12 Author: Samuel Ortiz <sameo@linux.intel.com>
-	     27 Author: Samuel Ortiz <samuel.ortiz@intel.com>
-	      4     Cc: Samuel Ortiz <samuel.ortiz@intel.com>
-	      1     Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
-	     50     Signed-off-by: Samuel Ortiz <samuel.ortiz@intel.com>
+Who changed the patch?  What patch exactly are you referring to?  Who
+signed off on it?  Where was it discussed?
 
-and one of these just happend to be the first I looked at.
+thanks,
 
-hmm, *shrug*
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+greg k-h
