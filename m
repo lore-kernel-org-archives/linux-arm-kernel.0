@@ -1,9 +1,9 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 04 Oct 2012 19:48:31 +1300
+Date: Thu, 04 Oct 2012 19:55:16 +1300
 Subject: usb: uhci-platform driver fails after patch changes during merge
 In-Reply-To: <1349332691.7583.3.camel@gitbox>
 References: <1349332691.7583.3.camel@gitbox>
-Message-ID: <1349333311.7905.0.camel@gitbox>
+Message-ID: <1349333716.7905.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -42,7 +42,17 @@ On Thu, 2012-10-04 at 19:38 +1300, Tony Prisk wrote:
 > 				pdev->name);
 > ...
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Apologies Mike,
+Greg,
 
-This isn't intended for you.
+This message was intended for you rather than Mike. Could you clarify
+what happened and the expected resolution?
+
+Regards
+
+Tony P
