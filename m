@@ -1,78 +1,117 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 4 Oct 2012 11:36:44 +0200
-Subject: [GIT PULL] remoteproc for 3.7
-Message-ID: <CAK=Wgbb4uxRQPioho_sGZ2ycrfqzadLgnYQZfQMasRzfo6ohyA@mail.gmail.com>
+From: mporter@ti.com (Porter, Matt)
+Date: Thu, 4 Oct 2012 09:38:40 +0000
+Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <506D552A.2000506@gmail.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com>
+ <506A9C65.5040309@ti.com>
+ <20121002093753.GU4360@opensource.wolfsonmicro.com>
+ <506AC303.9080906@gmail.com> <506ACACE.4030308@ti.com>
+ <506AEF57.2000306@gmail.com> <20121002164116.GT5641@beef>
+ <506B1B46.2070006@gmail.com> <506D552A.2000506@gmail.com>
+Message-ID: <E4D2ACDC-4749-4988-ADC5-277C187B0DC6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-Please pull remoteproc 3.7 material, thanks.
+On Oct 4, 2012, at 5:21 AM, Daniel Mack wrote:
 
-PS - I recently found an annoying typo in the subject of one of the
-patches, but I decided to accept it over doing a rebase.
+> 
+> 
+> On 02.10.2012 18:50, Daniel Mack wrote:
+>> On 02.10.2012 18:41, Matt Porter wrote:
+>>> On Tue, Oct 02, 2012 at 03:42:47PM +0200, Daniel Mack wrote:
+>>>> On 02.10.2012 13:06, Sekhar Nori wrote:
+>>>>> On 10/2/2012 4:03 PM, Daniel Mack wrote:
+>>>>>> On 02.10.2012 11:37, Mark Brown wrote:
+>>>>>>> On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
+>>>>>>> 
+>>>>>>>> I also agree that ifdef is not a good solution.
+>>>>>>>> It is better to have this information passed as device_data and via DT it can
+>>>>>>>> be decided based on the compatible property for the device.
+>>>>>>> 
+>>>>>>> That's not really the problem here - the problem is that the APIs used
+>>>>>>> to get the SRAM are DaVinci only so it's not possible to build on OMAP
+>>>>>>> or other platforms.  The SRAM code needs to move to a standard API.
+>>>>>> 
+>>>>>> What about following Matt Porter's idea and ignore the SRAM code
+>>>>>> entirely and port the entire PCM code to generic dmaengine code first?
+>>>>>> The EDMA driver needs to learn support for cyclic DMA for that, and I
+>>>>>> might give that a try in near future.
+>>>>>> 
+>>>>>> Later on, the SRAM ping-pong code can get added back using genalloc
+>>>>>> functions, as Sekhar proposed. That needs to be done by someone who has
+>>>>>> access to a Davinci board though, I only have a AM33xx/OMAP here.
+>>>>> 
+>>>>> We cannot "get rid" of SRAM code and add it back "later". It is required
+>>>>> for most DaVinci parts. The SRAM code can be converted to use genalloc
+>>>>> (conversion should be straightforward and I can help test it) and the
+>>>>> code that uses SRAM can probably keep using the private EDMA API till
+>>>>> the dmaengine EDMA driver has cyclic DMA support. Matt has already
+>>>>> posted patches to move private EDMA APIs to a common location. That
+>>>>> should keep AM335x build from breaking. Is this something that is feasible?
+>>>> 
+>>>> Yes - by "later" I just meant in a subsequent patch. But you're probably
+>>>> right, we can also do that first.
+>>>> 
+>>>> I'm looking at that right now and the problem seems that we don't have a
+>>>> sane way to dynamically look up gen_pools independently of the actual
+>>>> run-time platform. All users of gen_pools seem to know which platform
+>>>> they run on and access a platform-specific pool. So I don't currently
+>>>> see how we could implement multi-platform code, gen_pools are fine but
+>>>> don't solve the problem here.
+>>>> 
+>>>> Would it be an idea to add a char* member to gen_pools and a function
+>>>> that can be used to dynamically look it up again? If a buffer with a
+>>>> certain name exists, we can use it and install that ping-pong buffer,
+>>>> otherwise we just don't. While that would be easy to do, it's a
+>>>> tree-wide change.
+>>>> 
+>>>> Is there a better way that I miss?
+>>> 
+>>> At the high level there's two platform models we have to handle, the
+>>> boot from board file !DT case, and then the boot from DT case. Since
+>>> Davinci is just starting DT conversion, we mostly care about the !DT
+>>> base in which the struct gen_pool * is passed in pdata to the ASoC
+>>> driver. It is then selectable on a per-platform basis where the decision
+>>> should be made.
+>>> 
+>>> Given a separate discussion with Sekhar, we're only going to have one
+>>> SRAM pool on any DaVinci part right now...this was only a question on
+>>> L138 anyway. But regardless, the created gen_pool will be passed via
+>>> pdata.
+>> 
+>> I thought about this too, as mmp does it that way.
+>> 
+>>> Since DT conversion is starting and we need to consider that now,
+>>> the idea there is to use the DT-based generic sram driver [1] such that
+>>> when we do boot from DT on Davinci, the genpool is provided via phandle
+>>> and the pointer extracted with the OF helpers that are part of the
+>>> series.
+>> 
+>> A phandle is the cleanest way I think, yes.
+>> 
+>>> That's pretty much it. I'm reworking the backend support as discussed
+>>> with Sekhar wrt to my uio_pruss series. I can post a standalone series
+>>> that just replaces sram_* with genalloc for davinci ASoC.
+>> 
+>> As you can also test it, it would be easiest if you came up with a patch
+>> for that, yes. I can have a look at the dma bits laters, once my OMAP
+>> board finally works with the code as it currently stands. I'm still
+>> fighting with the mcasp driver right now ...
+> 
+> I quickly prepared two patches to change that, so that topic is out of
+> the way. But I did only compile-test them on OMAP - could you check on
+> your Davinci platform? Note that these apply on top of the patch in
+> discussion here (which isn't applied to the asoc tree yet).
 
-The following changes since commit 55d512e245bc7699a8800e23df1a24195dd08217:
+I put a series together yesterday, just ran out of time to post
+last night after testing. I'm posting that now...it's on top of my
+uio_pruss/genalloc series and only addresss switching davinci-pcm to
+genalloc (and actually enabling ping-pon from sram).
 
-  Linux 3.6-rc5 (2012-09-08 16:43:45 -0700)
+I'll take a look a your OMAP patches.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-tags/remoteproc-for-3.7
-
-for you to fetch changes up to d09f53a735bae43806a77754312a45d3f1198342:
-
-  remoteproc: Fix use of format specifyer (2012-10-02 10:14:43 +0200)
-
-----------------------------------------------------------------
-- Remoteproc Recovery - by Fernando Guzman Lugo - when a remote processor
-  crash is detected, this mechanism will remove all virtio children
-  devices, wait until their drivers let go, hard reset the remote
-  processor and reload the firmware (resulting in the relevant virtio
-  children devices re-added). Essentially the entire software stack
-  is reset, together with the relevant hardware, so users don't have
-  to reset the entire phone.
-- STE Modem driver is added - by Sjur Br?ndeland
-- OMAP DSP boot address support is added - by Juan Gutierrez
-- A handful of fixes/cleanups - Sjur Br?ndeland, Dan Carpenter, Emil Goode
-
-----------------------------------------------------------------
-Dan Carpenter (3):
-      remoteproc: snprintf() can return more than was printed
-      remoteproc: return -EFAULT on copy_from_user failure
-      remoteproc: fix a potential NULL-dereference on cleanup
-
-Emil Goode (1):
-      remoteproc: Fix use of format specifyer
-
-Fernando Guzman Lugo (3):
-      remoteproc: add rproc_report_crash function to notify rproc crashes
-      remoteproc: add actual recovery implementation
-      remoteproc: create a 'recovery' debugfs entry
-
-Juan Gutierrez (1):
-      remoteproc/omap: set bootaddr support
-
-Ohad Ben-Cohen (1):
-      remoteproc: select VIRTIO to avoid build breakage
-
-Sjur Br?ndeland (3):
-      remoteproc: Add dependency to HAS_DMA
-      remtoteproc: maintain max notifyid
-      remoteproc: Add STE modem driver
-
- Documentation/remoteproc.txt                 |   7 +
- arch/arm/plat-omap/include/plat/remoteproc.h |   2 +
- drivers/remoteproc/Kconfig                   |  14 ++
- drivers/remoteproc/Makefile                  |   1 +
- drivers/remoteproc/omap_remoteproc.c         |   3 +
- drivers/remoteproc/remoteproc_core.c         | 209 +++++++++++++----
- drivers/remoteproc/remoteproc_debugfs.c      |  85 ++++++-
- drivers/remoteproc/remoteproc_internal.h     |   1 +
- drivers/remoteproc/ste_modem_rproc.c         | 322 +++++++++++++++++++++++++++
- include/linux/remoteproc.h                   |  24 ++
- include/linux/ste_modem_shm.h                |  56 +++++
- 11 files changed, 682 insertions(+), 42 deletions(-)
- create mode 100644 drivers/remoteproc/ste_modem_rproc.c
- create mode 100644 include/linux/ste_modem_shm.h
+-Matt
