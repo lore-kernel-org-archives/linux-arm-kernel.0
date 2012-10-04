@@ -1,73 +1,75 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 3 Oct 2012 18:16:04 -0700
-Subject: [PATCH 4/5] ARM: omap: vp: .get_voltage callback
+Date: Wed, 3 Oct 2012 18:16:05 -0700
+Subject: [PATCH 5/5] ARM: omap: initialize voltdm->nominal_volt
 In-Reply-To: <1349313365-5262-1-git-send-email-mturquette@ti.com>
 References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
-Message-ID: <1349313365-5262-5-git-send-email-mturquette@ti.com>
+Message-ID: <1349313365-5262-6-git-send-email-mturquette@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mike Turquette <mturquette@linaro.org>
 
-Implement the voltdm->get_voltage callback for the voltage processor
-driver.  This reads the INITVOLTAGE field corresponding to each VP and
-returns the voltage, after converting it from vsel format.
+Populate the .get_voltage callbacks for VC & VP.  Use these callbacks to
+populate voltdm->nominal_volt during boot sequence.
 
-If INITVOLTAGE is zero (the reset value) then the caller must interpret
-this as the PMIC running at the default power-on voltage.  In such a
-case DT data for the PMIC is necessary to know the voltage.
+This is useful for the Adaptive Body-Bias sequence coming in a
+subsequent series.  Without this patch voltdm->nominal will not be
+populated until after the first call to voltdm_scale.  This is too late
+to be useful to the pre-scale sequence in the ABB series since that
+sequence needs to know the voltage prior to the first transition.
+
+Note that the .get_voltage callback will return zero for the corner case
+wherein the bootloader has not scaling the voltage.  In this case it is
+safe to assume that we are running at the PMIC's default power-on
+voltage.  DT data providing the default voltage for each PMIC is needed
+in this case.
 
 Signed-off-by: Mike Turquette <mturquette@ti.com>
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/mach-omap2/vp.c |   22 ++++++++++++++++++++++
- arch/arm/mach-omap2/vp.h |    1 +
- 2 files changed, 23 insertions(+)
+ arch/arm/mach-omap2/voltage.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index f95c1ba..63dc03e 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -9,6 +9,28 @@
- #include "prm-regbits-44xx.h"
- #include "prm44xx.h"
+diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+index 4dc60e8..f45716c 100644
+--- a/arch/arm/mach-omap2/voltage.c
++++ b/arch/arm/mach-omap2/voltage.c
+@@ -244,9 +244,11 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
+ 	switch (voltscale_method) {
+ 	case VOLTSCALE_VPFORCEUPDATE:
+ 		voltdm->scale = omap_vp_forceupdate_scale;
++		voltdm->get_voltage = omap_vp_get_init_voltage;
+ 		return;
+ 	case VOLTSCALE_VCBYPASS:
+ 		voltdm->scale = omap_vc_bypass_scale;
++		voltdm->get_voltage = omap_vc_get_bypass_data;
+ 		return;
+ 	default:
+ 		pr_warning("%s: Trying to change the method of voltage scaling"
+@@ -288,13 +290,24 @@ int __init omap_voltage_late_init(void)
  
-+unsigned long omap_vp_get_init_voltage(struct voltagedomain *voltdm)
-+{
-+	struct omap_vp_instance *vp = voltdm->vp;
-+	u32 vpconfig;
-+	u8 vsel;
-+	unsigned long volt;
+ 		if (voltdm->vc) {
+ 			voltdm->scale = omap_vc_bypass_scale;
++			voltdm->get_voltage = omap_vc_get_bypass_data;
+ 			omap_vc_init_channel(voltdm);
+ 		}
+ 
+ 		if (voltdm->vp) {
+ 			voltdm->scale = omap_vp_forceupdate_scale;
++			voltdm->get_voltage = omap_vp_get_init_voltage;
+ 			omap_vp_init(voltdm);
+ 		}
 +
-+	/* sanity */
-+	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv
-+			|| !voltdm->read || !voltdm->write)
-+		return 0;
-+
-+	vpconfig = voltdm->read(vp->vpconfig);
-+	vpconfig &= vp->common->vpconfig_initvoltage_mask;
-+
-+	vsel = vpconfig >> __ffs(vp->common->vpconfig_initvoltage_mask);
-+
-+	volt = voltdm->pmic->vsel_to_uv(vsel);
-+
-+	return volt;
-+}
-+
- static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
- {
- 	struct omap_vp_instance *vp = voltdm->vp;
-diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index 7c155d2..0747a78 100644
---- a/arch/arm/mach-omap2/vp.h
-+++ b/arch/arm/mach-omap2/vp.h
-@@ -120,6 +120,7 @@ extern struct omap_vp_instance omap4_vp_core;
- void omap_vp_init(struct voltagedomain *voltdm);
- void omap_vp_enable(struct voltagedomain *voltdm);
- void omap_vp_disable(struct voltagedomain *voltdm);
-+unsigned long omap_vp_get_init_voltage(struct voltagedomain *voltdm);
- int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- 			      unsigned long target_volt);
- int omap_vp_update_errorgain(struct voltagedomain *voltdm,
++		/*
++		 * XXX If voltdm->nominal_volt is zero after calling
++		 * voltdm->get_voltage then we are likely running this
++		 * voltage domain at the default boot voltage of the
++		 * PMIC.  In such a case it would be best to load this
++		 * value from DT.
++		 */
++		voltdm->nominal_volt = voltdm->get_voltage(voltdm);
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.9.5
