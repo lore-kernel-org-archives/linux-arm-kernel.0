@@ -1,407 +1,58 @@
-From: dinuxbg@gmail.com (Dimitar Dimitrov)
-Date: Wed, 3 Oct 2012 19:26:31 -0700
-Subject: [PATCH 6/7] ARM: omap: abb: init & transition functions
-In-Reply-To: <1349313974-5473-7-git-send-email-mturquette@ti.com>
-References: <1349313974-5473-1-git-send-email-mturquette@ti.com>
- <1349313974-5473-7-git-send-email-mturquette@ti.com>
-Message-ID: <CAPOMJ_Pb_Yq-sZMdt7PsVy14Er_=qf8duuS7=aFFscyZgZxArg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 4 Oct 2012 14:29:44 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the modules tree
+Message-ID: <20121004142944.70f5ebb6dbc197322b04bfea@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 3, 2012 at 6:26 PM, Mike Turquette <mturquette@ti.com> wrote:
-> The Adaptive Body-Bias ldo can be set to bypass, Forward Body-Bias or
-> Reverse Body-Bias during a voltage transition.  The ABB programming
-> sequence depends on whether voltage is scaling up or down.
->
-> This patch implements the Adaptive Body-Bias ldo initialization routine
-> and the transition sequence which is needed after any voltage scaling
-> operation.
->
-> Note that this sequence will need to be revisited someday when the
-> various SmartReflex AVS features, fixes and improvements are upstreamed
-> and enabled for OMAP2+ kernels.
->
-> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
->  arch/arm/mach-omap2/Makefile |    2 +-
->  arch/arm/mach-omap2/abb.c    |  322 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/abb.h    |    9 ++
->  3 files changed, 332 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-omap2/abb.c
->
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 57e053e..a262aaa 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -107,7 +107,7 @@ obj-$(CONFIG_ARCH_OMAP4)            += $(omap-prcm-4-5-common) prm44xx.o
->  obj-$(CONFIG_SOC_OMAP5)                        += $(omap-prcm-4-5-common)
->
->  # OMAP voltage domains
-> -voltagedomain-common                   := voltage.o vc.o vp.o
-> +voltagedomain-common                   := voltage.o vc.o vp.o abb.o
->  obj-$(CONFIG_ARCH_OMAP2)               += $(voltagedomain-common)
->  obj-$(CONFIG_ARCH_OMAP2)               += voltagedomains2xxx_data.o
->  obj-$(CONFIG_ARCH_OMAP3)               += $(voltagedomain-common)
-> diff --git a/arch/arm/mach-omap2/abb.c b/arch/arm/mach-omap2/abb.c
-> new file mode 100644
-> index 0000000..e8a3ae0
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/abb.c
-> @@ -0,0 +1,322 @@
-> +/*
-> + * OMAP Adaptive Body-Bias core
-> + *
-> + * Copyright (C) 2011 Texas Instruments, Inc.
-> + * Mike Turquette <mturquette@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/delay.h>
-> +
-> +#include "abb.h"
-> +#include "voltage.h"
-> +
-> +/**
-> + * omap_abb_set_opp - program ABB ldo based on new voltage
-> + *
-> + * @voltdm - voltage domain that just finished scaling voltage
-> + * @opp_sel - target ABB ldo operating mode
-> + *
-> + * Program the ABB ldo to the new state (if necessary), clearing the
-> + * PRM_IRQSTATUS bit before and after the transition.  Returns 0 on
-> + * success, -ETIMEDOUT otherwise.
-> + */
-> +int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
-> +{
-> +       struct omap_abb_instance *abb = voltdm->abb;
-> +       int ret, timeout;
-> +
-> +       /* bail early if no transition is necessary */
-> +       if (opp_sel == abb->_opp_sel)
-> +               return 0;
-> +
-> +       /* clear interrupt status */
-> +       timeout = 0;
-> +       while (timeout++ < ABB_TRANXDONE_TIMEOUT) {
-> +               abb->common->ops->clear_tranxdone(abb->prm_irq_id);
-> +
-> +               ret = abb->common->ops->check_tranxdone(abb->prm_irq_id);
-> +               if (!ret)
-> +                       break;
-> +
-> +               udelay(1);
-> +       }
-> +
-> +       if (timeout >= ABB_TRANXDONE_TIMEOUT) {
-> +               pr_warn("%s: vdd_%s ABB TRANXDONE timeout\n",
-> +                               __func__, voltdm->name);
-> +               return -ETIMEDOUT;
-> +       }
-> +
-> +       /* program the setup register */
-> +       switch (opp_sel) {
-> +       case OMAP_ABB_NOMINAL_OPP:
-> +               voltdm->rmw(abb->common->active_fbb_sel_mask,
-> +                               0x0,
-> +                               abb->setup_offs);
-> +               break;
-> +       case OMAP_ABB_FAST_OPP:
-> +               voltdm->rmw(abb->common->active_fbb_sel_mask,
-> +                               abb->common->active_fbb_sel_mask,
-> +                               abb->setup_offs);
-> +               break;
-> +       }
-> +
-> +       /* program next state of ABB ldo */
-> +       voltdm->rmw(abb->common->opp_sel_mask,
-> +                       opp_sel << __ffs(abb->common->opp_sel_mask),
-> +                       abb->ctrl_offs);
-> +
-> +       /* initiate ABB ldo change */
-> +       voltdm->rmw(abb->common->opp_change_mask,
-> +                       abb->common->opp_change_mask,
-> +                       abb->ctrl_offs);
-> +
-> +       /* clear interrupt status */
-> +       timeout = 0;
-> +       while (timeout++ < ABB_TRANXDONE_TIMEOUT) {
-> +               abb->common->ops->clear_tranxdone(abb->prm_irq_id);
-> +
-> +               ret = abb->common->ops->check_tranxdone(abb->prm_irq_id);
-> +               if (!ret)
-> +                       break;
-> +
-> +               udelay(1);
-> +       }
-> +
-> +       if (timeout >= ABB_TRANXDONE_TIMEOUT) {
-> +               pr_warn("%s: vdd_%s ABB TRANXDONE timeout\n",
-> +                               __func__, voltdm->name);
-> +               return -ETIMEDOUT;
-> +       }
-> +
-> +       /* track internal state */
-> +       abb->_opp_sel = opp_sel;
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * omap_abb_pre_scale - ABB transition pre-voltage scale, if needed
-> + *
-> + * @voltdm - voltage domain that is about to scale
-> + * @target_volt - voltage that voltdm is scaling towards
-> + *
-> + * Changes the ABB ldo mode prior to scaling the voltage domain.
-> + * Returns 0 on success, otherwise an error code.
-> + */
-> +int omap_abb_pre_scale(struct voltagedomain *voltdm,
-> +               unsigned long target_volt)
-> +{
-> +       struct omap_abb_instance *abb = voltdm->abb;
-> +       struct omap_volt_data *cur_volt_data;
-> +       struct omap_volt_data *target_volt_data;
-> +       u8 opp_sel;
-> +
-> +       /* sanity */
-> +       if (!voltdm)
-> +               return -EINVAL;
-> +
-> +       if (!abb)
-> +               return 0;
-> +
-> +       /*
-> +        * XXX boot-time corner case: voltdm->nominal volt might be zero
-> +        *
-> +        * This implies that we're running at the default PMIC voltage,
-> +        * since voltdm->nominal_volt should have been populated in
-> +        * omap_voltage_late_init if the voltage had been scaled
-> +        * previously.  The best way to fix this is for DT data to pass
-> +        * in PMIC boot voltage.
-> +        *
-> +        * For now, handle this by returning success (0) to not block
-> +        * the rest of the transition.
-> +        */
-> +       if (!voltdm->nominal_volt)
-> +               return 0;
-> +
-> +       cur_volt_data = omap_voltage_get_voltdata(voltdm, voltdm->nominal_volt);
-> +       target_volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
-> +
-> +       if (IS_ERR(cur_volt_data))
-> +               return PTR_ERR(cur_volt_data);
-> +
-> +       if (IS_ERR(target_volt_data))
-> +               return PTR_ERR(target_volt_data);
-> +
-> +       /* bail if the sequence is wrong */
-> +       if (target_volt_data->volt_nominal > cur_volt_data->volt_nominal)
-> +               return 0;
-> +
-> +       opp_sel = target_volt_data->opp_sel;
-> +
-> +       /* bail early if no transition is necessary */
-> +       if (opp_sel == abb->_opp_sel)
-> +               return 0;
-> +
-> +       return omap_abb_set_opp(voltdm, opp_sel);
-> +}
-> +
-> +/**
-> + * omap_abb_post_scale - ABB transition post-voltage scale, if needed
-> + * @voltdm - voltage domain that just finished scaling
-> + * @target_volt - voltage that voltdm is scaling towards
-> + *
-> + * Changes the ABB ldo mode prior to scaling the voltage domain.
-> + * Returns 0 on success, otherwise an error code.
-> + */
-> +int omap_abb_post_scale(struct voltagedomain *voltdm,
-> +               unsigned long target_volt)
-> +{
-> +       struct omap_abb_instance *abb = voltdm->abb;
-> +       struct omap_volt_data *cur_volt_data;
-> +       struct omap_volt_data *target_volt_data;
-> +       u8 opp_sel;
-> +
-> +       /* sanity */
-> +       if (!voltdm)
-> +               return -EINVAL;
-> +
-> +       if (!abb)
-> +               return 0;
-> +
-> +       cur_volt_data = omap_voltage_get_voltdata(voltdm, voltdm->nominal_volt);
-> +       if (IS_ERR(cur_volt_data))
-> +               return PTR_ERR(cur_volt_data);
-> +
-> +       target_volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
-> +       if (IS_ERR(target_volt_data))
-> +               return PTR_ERR(target_volt_data);
-> +
-> +       /* bail if the sequence is wrong */
-> +       if (target_volt_data->volt_nominal < cur_volt_data->volt_nominal)
-> +               return 0;
-> +
-> +       opp_sel = target_volt_data->opp_sel;
-> +
-> +       /* bail early if no transition is necessary */
-> +       if (opp_sel == abb->_opp_sel)
-> +               return 0;
-> +
-> +       return omap_abb_set_opp(voltdm, opp_sel);
-> +}
-> +
-> +/*
-> + * omap_abb_enable - enable ABB ldo on a particular voltage domain
-> + *
-> + * @voltdm - pointer to particular voltage domain
-> + */
-> +void omap_abb_enable(struct voltagedomain *voltdm)
-> +{
-> +       struct omap_abb_instance *abb = voltdm->abb;
-> +
-> +       if (abb->enabled)
-> +               return;
-> +
-> +       abb->enabled = true;
-> +
-> +       voltdm->rmw(abb->common->sr2en_mask, abb->common->sr2en_mask,
-> +                       abb->setup_offs);
-> +}
-> +
-> +/*
-> + * omap_abb_disable - disable ABB ldo on a particular voltage domain
-> + *
-> + * @voltdm - pointer to particular voltage domain
-> + *
-> + * Included for completeness.  Not currently used but will be needed in the
-> + * future if ABB is converted to a loadable module.
-> + */
-> +void omap_abb_disable(struct voltagedomain *voltdm)
-> +{
-> +       struct omap_abb_instance *abb = voltdm->abb;
-> +
-> +       if (!abb->enabled)
-> +               return;
-> +
-> +       abb->enabled = false;
-> +
-> +       voltdm->rmw(abb->common->sr2en_mask,
-> +                       (0 << __ffs(abb->common->sr2en_mask)),
-> +                       abb->setup_offs);
-> +}
-> +
-> +/*
-> + * omap_abb_init - Initialize an ABB ldo instance
-> + *
-> + * @voltdm: voltage domain upon which ABB ldo resides
-> + *
-> + * Initializes an individual ABB ldo for Forward Body-Bias.  FBB is used to
-> + * insure stability at higher voltages.  Note that some older OMAP chips have a
-> + * Reverse Body-Bias mode meant to save power at low voltage, but that mode is
-> + * unsupported and phased out on newer chips.
-> + */
-> +void __init omap_abb_init(struct voltagedomain *voltdm)
-> +{
-> +       struct omap_abb_instance *abb = voltdm->abb;
-> +       u32 sys_clk_rate;
-> +       u32 sr2_wt_cnt_val;
-> +       u32 clock_cycles;
-> +       u32 settling_time;
-> +       u32 val;
-> +
-> +       if (IS_ERR_OR_NULL(abb))
-> +               return;
-> +
-> +       /*
-> +        * SR2_WTCNT_VALUE is the settling time for the ABB ldo after a
-> +        * transition and must be programmed with the correct time at boot.
-> +        * The value programmed into the register is the number of SYS_CLK
-> +        * clock cycles that match a given wall time profiled for the ldo.
-> +        * This value depends on:
-> +        * settling time of ldo in micro-seconds (varies per OMAP family)
-> +        * # of clock cycles per SYS_CLK period (varies per OMAP family)
-> +        * the SYS_CLK frequency in MHz (varies per board)
-> +        * The formula is:
-> +        *
-> +        *                      ldo settling time (in micro-seconds)
-> +        * SR2_WTCNT_VALUE = ------------------------------------------
-> +        *                   (# system clock cycles) * (sys_clk period)
-> +        *
-> +        * Put another way:
-> +        *
-> +        * SR2_WTCNT_VALUE = settling time / (# SYS_CLK cycles / SYS_CLK rate))
-> +        *
-> +        * To avoid dividing by zero multiply both "# clock cycles" and
-> +        * "settling time" by 10 such that the final result is the one we want.
-> +        */
-> +
-> +       /* convert SYS_CLK rate to MHz & prevent divide by zero */
-> +       sys_clk_rate = DIV_ROUND_CLOSEST(voltdm->sys_clk.rate, 1000000);
-There is a possible small rounding error here. Depending on
-SYS_CLK_rate value, you might loose significant digits when converting
-from Hz to MHz.
+Hi all,
 
-Also, wouldn't it be safer to do all multiplications first and then
-divisions, like:
-SR2_WTCNT_VALUE = ((settling time * SYS_CLK_rate_kHz) / # SYS_CLK
-cycles  ) / 1000
+Today's linux-next merge of the arm-soc tree got conflicts in
+arch/cris/include/asm/Kbuild, arch/h8300/include/asm/Kbuild and
+arch/m32r/include/asm/Kbuild between commit 786d35d45cc4 ("Make most arch
+asm/module.h files use asm-generic/module.h") from the modules tree and
+commit e7a570ff7dff ("asm-generic: Add default clkdev.h") from the
+arm-soc tree.
 
-> +       clock_cycles = abb->common->clock_cycles * 10;
-> +       settling_time = abb->common->settling_time * 10;
-> +
-> +       /* calculate cycle rate */
-> +       clock_cycles = DIV_ROUND_CLOSEST(clock_cycles, sys_clk_rate);
-> +
-> +       /* calulate SR2_WTCNT_VALUE */
-> +       sr2_wt_cnt_val = DIV_ROUND_CLOSEST(settling_time, clock_cycles);
-> +
-> +       voltdm->rmw(abb->common->sr2_wtcnt_value_mask,
-> +                       (sr2_wt_cnt_val << __ffs(abb->common->sr2_wtcnt_value_mask)),
-> +                       abb->setup_offs);
-> +
-> +       /* did bootloader set OPP_SEL? */
-> +       val = voltdm->read(abb->ctrl_offs);
-> +       val &= abb->common->opp_sel_mask;
-> +       abb->_opp_sel = val >> __ffs(abb->common->opp_sel_mask);
-> +
-> +       /* enable the ldo if not done by bootloader */
-> +       val = voltdm->read(abb->setup_offs);
-> +       val &= abb->common->sr2en_mask;
-> +       if (val)
-> +               abb->enabled = true;
-> +       else
-> +               omap_abb_enable(voltdm);
-> +
-> +       return;
-> +}
-> diff --git a/arch/arm/mach-omap2/abb.h b/arch/arm/mach-omap2/abb.h
-> index 2acc187..b18305f 100644
-> --- a/arch/arm/mach-omap2/abb.h
-> +++ b/arch/arm/mach-omap2/abb.h
-> @@ -82,4 +82,13 @@ extern struct omap_abb_instance omap36xx_abb_mpu;
->  extern struct omap_abb_instance omap4_abb_mpu;
->  extern struct omap_abb_instance omap4_abb_iva;
->
-> +void omap_abb_init(struct voltagedomain *voltdm);
-> +void omap_abb_enable(struct voltagedomain *voltdm);
-> +void omap_abb_disble(struct voltagedomain *voltdm);
-> +int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel);
-> +int omap_abb_pre_scale(struct voltagedomain *voltdm,
-> +               unsigned long target_volt);
-> +int omap_abb_post_scale(struct voltagedomain *voltdm,
-> +               unsigned long target_volt);
-> +
->  #endif
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/cris/include/asm/Kbuild
+index 28b690d,a8eab26..0000000
+--- a/arch/cris/include/asm/Kbuild
++++ b/arch/cris/include/asm/Kbuild
+@@@ -8,4 -8,4 +8,5 @@@ header-y += etraxgpio.
+  header-y += rs485.h
+  header-y += sync_serial.h
+  
+ +generic-y += module.h
++ generic-y += clkdev.h
+diff --cc arch/h8300/include/asm/Kbuild
+index 871382d,0e152a9..0000000
+--- a/arch/h8300/include/asm/Kbuild
++++ b/arch/h8300/include/asm/Kbuild
+@@@ -1,3 -1,3 +1,4 @@@
+  include include/asm-generic/Kbuild.asm
+  
+ +generic-y	+= module.h
++ generic-y	+= clkdev.h
+diff --cc arch/m32r/include/asm/Kbuild
+index 871382d,0e152a9..0000000
+--- a/arch/m32r/include/asm/Kbuild
++++ b/arch/m32r/include/asm/Kbuild
+@@@ -1,3 -1,3 +1,4 @@@
+  include include/asm-generic/Kbuild.asm
+  
+ +generic-y	+= module.h
++ generic-y	+= clkdev.h
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/dcfb7b18/attachment.sig>
