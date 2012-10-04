@@ -1,54 +1,92 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 4 Oct 2012 08:42:53 -0400
-Subject: [PATCH v3 0/6] uio_pruss cleanup and platform support
-In-Reply-To: <20121004091145.GA3317@pengutronix.de>
-References: <1349276133-26408-1-git-send-email-mporter@ti.com>
- <20121004091145.GA3317@pengutronix.de>
-Message-ID: <20121004124253.GC11149@beef>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 04 Oct 2012 07:44:45 -0500
+Subject: [PATCH] serial: i.MX: evaluate linux,stdout-path property
+In-Reply-To: <1349347191-7406-1-git-send-email-s.hauer@pengutronix.de>
+References: <1349347191-7406-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <506D84BD.5010000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 11:11:45AM +0200, Philipp Zabel wrote:
-> Hi Matt,
+On 10/04/2012 05:39 AM, Sascha Hauer wrote:
+> devicetrees may have the linux,stdout-path property to specify the
+> console. This patch adds support to the i.MX serial driver for this.
 > 
-> On 10/3/12, Matt Porter <mporter@ti.com> wrote:
-> > This series enables uio_pruss on DA850 and removes use of the
-> > private SRAM API by the driver. The driver previously was not
-> > enabled by any platform and the private SRAM API was accessing
-> > an invalid SRAM bank.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
 > 
-> have you seen my SRAM patch series at https://lkml.org/lkml/2012/9/7/281
-> "Add device tree support for on-chip SRAM" ?
+> I was originally looking for a more generic way to handle this, but
+> since a struct console has no device associated to it, it's not
+> possible to match a console with a device in a generic way. So we
 
-Yes.
+Could we add a device ptr to struct console?
 
-> I think the generic SRAM/genalloc driver (https://lkml.org/lkml/2012/9/7/282)
-> could be useful to map the L3RAM on Davinci.
-> With the gen_pool lookup patch (https://lkml.org/lkml/2012/9/7/284) the
-> uio_pruss driver could then use the gen_pool_find_by_phys() (or
-> of_get_named_gen_pool() for initialization from device tree) to
-> retrieve the struct gen_pool*.
+> just call add_preferred_console from the driver and let it go down
+> to a string matching in the console code.
+> If anyone has a better idea how to handle this, please let me know.
+> Otherwise I'm happy to see this patch applied aswell.
 > 
-> This way you could avoid handing it over via platform data and you could
-> get rid of arch/arm/mach-davinci/{sram.c,include/mach/sram.h} completely.
+> Thanks
+>  Sascha
+> 
+>  drivers/tty/serial/imx.c |   29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index e309e8b..b52c4a7 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1397,6 +1397,32 @@ static int serial_imx_resume(struct platform_device *dev)
+>  
+>  #ifdef CONFIG_OF
+>  /*
+> + * Check if this device matches the linux,stdout-path property
+> + * in the chosen node. return true if yes, false otherwise
+> + */
+> +static int serial_imx_is_stdoutpath(struct platform_device *pdev)
 
-I did miss the gen_pool_find_by_phys() call in that series. That does
-look useful. I actually mentioned your series in an earlier posting
-since I like it, but since the initialization of the driver was inherently
-tied to DT it's not usable for DaVinci that's just starting to convert
-to DT and needs !DT support as well.
+Couldn't this function be generic? Just move
+IS_ENABLED(CONFIG_SERIAL_IMX_CONSOLE) outside this function. Arguably,
+the presence of the property or not could replace the config option all
+together.
 
-I do see it moving to your driver exclusively, but I wanted to make this
-series focused on only getting rid of the private SRAM API using the
-existing pdata framework that's already there. I think once
-gen_pool_find_by_phys() goes upstream we can switch to that and get the
-address from a resource in the !DT case. I guess we should see if Sekhar
-would like to see this happen in two steps or just have us depend on
-the gen_pool_find_by_phys() patch now.
+And use a struct device so this can work with devices other than
+platform devices (i.e. amba).
 
-BTW, I was going to post a patch for your driver to allow
-configurability of the allocation order, but have been busy with other
-things.  We'll eventually need that when switching to it as the
-hardcoded page size order isn't going to work for all cases.
+Rob
 
--Matt
+> +{
+> +	struct device_node *dn;
+> +	const char *name;
+> +
+> +	if (!IS_ENABLED(CONFIG_SERIAL_IMX_CONSOLE))
+> +		return 0;
+> +
+> +	name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+> +	if (name == NULL)
+> +		return 0;
+> +
+> +	dn = of_find_node_by_path(name);
+> +	if (!dn)
+> +		return 0;
+> +
+> +	if (dn == pdev->dev.of_node)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+>   * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
+>   * could successfully get all information from dt or a negative errno.
+>   */
+> @@ -1427,6 +1453,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+>  
+>  	sport->devdata = of_id->data;
+>  
+> +	if (serial_imx_is_stdoutpath(pdev))
+> +		add_preferred_console(imx_reg.cons->name, sport->port.line, 0);
+> +
+>  	return 0;
+>  }
+>  #else
+> 
