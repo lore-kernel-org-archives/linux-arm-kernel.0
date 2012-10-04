@@ -1,49 +1,78 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 4 Oct 2012 10:04:40 +0200
-Subject: [PATCH V2 2/3] Revert "spi/pl022: enable runtime PM"
-In-Reply-To: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1349337881-15917-3-git-send-email-ulf.hansson@stericsson.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 4 Oct 2012 09:53:36 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
+ parents
+In-Reply-To: <20121004055443.GK21046@lunn.ch>
+References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
+ <20121003154310.GI11837@lunn.ch>
+ <20121003220916.GW31897@kw.sim.vm.gnt>
+ <20121004055443.GK21046@lunn.ch>
+Message-ID: <20121004075335.GY31897@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Thu, Oct 04, 2012 at 07:54:43AM +0200, Andrew Lunn wrote:
+> > > > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > > > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > > > @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
+> > > >  	if (of_machine_is_compatible("keymile,km_kirkwood"))
+> > > >  		km_kirkwood_init();
+> > > >  
+> > > > +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
+> > > > +	    of_machine_is_compatible("lacie,netspace_v2") ||
+> > > > +	    of_machine_is_compatible("lacie,netspace_max_v2"))
+> > > > +		ns2_init();
+> > > > +
+> > > >  	of_platform_populate(NULL, kirkwood_dt_match_table,
+> > > >  			     kirkwood_auxdata_lookup, NULL);
+> > > 
+> > > I'm not a DT policy expert. Could this be one compatibility string for
+> > > all the boards? Maybe ask on the DT mainline list?
+> > 
+> > Maybe I could use "lacie,ns2_common" as a compatibility string. But this
+> > does not match any existing device. I don't know if it is correct.
+> 
+> Hi Simon
+> 
+> I did a bit of looking around. For kirkwood, we already have two
+> boards sharing the same compatibility string. kirkwood-dns320.dts and
+> kirkwood-dns325.dts both have dlink,dns-kirkwood and this is what the
+> board-dt.c matches on.
+> 
+> For the tegra20 soc, all boards match on nvidia,tegra20, and that is the only
+> compatibility string in board-dt-tegra20.c.
+> 
+> So i don't see any problem having just one compatibility string here.
+> 
+> The question is, what is the appropriate name. How common is this
+> common C code? Are there ns2 where this C code is not appropriate. One
+> thing to remember is that most of this C code will soon disappear and
+> become DT. All the mpp will be replaced with pinctrl in 3.8. I hope we
+> can get the Ethernet setup in DT as well. You are working on ns2_led,
+> so all the C code will be replaced by DT. So all we are really left
+> with is power off GPIO handling.
+> 
+> So i think the danger of using lacie,ns2_common, and then finding it
+> does not work with some other ns2 device is quite low.
+> 
+> What do you think?
 
-This reverts commit 2fb30d1147c599f5657e8c62c862f9a0f58d9d99.
+The status for this ns2 boards is more or less end-of-life. I mean, this
+boards are no longer in production. So I think it is safe to consider
+the code inside board-ns2.c as common and shareable between ns2, is2 and
+ns2max.
 
-This patch is reverted due to wrong runtime PM code.
+Once this file will be removed, the compatibility checks will be removed
+as well. But one could easily forget to remove the useless compatibility
+string "lacie,ns2_common" from the dts...
 
-Conflicts:
+Let me know your preference.
 
-	drivers/spi/spi-pl022.c
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/spi-pl022.c |    4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 5cf0643..a1db91a 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2186,9 +2186,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
- 	       adev->res.start, pl022->virtbase);
- 
--	pm_runtime_enable(dev);
--	pm_runtime_resume(dev);
--
- 	pl022->clk = devm_clk_get(&adev->dev, NULL);
- 	if (IS_ERR(pl022->clk)) {
- 		status = PTR_ERR(pl022->clk);
-@@ -2293,7 +2290,6 @@ pl022_remove(struct amba_device *adev)
- 
- 	clk_disable(pl022->clk);
- 	clk_unprepare(pl022->clk);
--	pm_runtime_disable(&adev->dev);
- 	amba_release_regions(adev);
- 	tasklet_disable(&pl022->pump_transfers);
- 	spi_unregister_master(pl022->master);
--- 
-1.7.10
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/0802e67b/attachment.sig>
