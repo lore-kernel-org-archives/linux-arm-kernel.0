@@ -1,98 +1,178 @@
-From: hechtb@googlemail.com (Bastian Hecht)
-Date: Thu, 4 Oct 2012 12:12:52 +0200
-Subject: [PATCH 1/2] mtd: sh_flctl: Add DMA capabilty
-In-Reply-To: <Pine.LNX.4.64.1210021534570.15778@axis700.grange>
-References: <1349183522-15321-1-git-send-email-hechtb@gmail.com>
- <1349183522-15321-2-git-send-email-hechtb@gmail.com>
- <Pine.LNX.4.64.1210021534570.15778@axis700.grange>
-Message-ID: <CABYn4swdBX+verPTDKywC_U3xQboSSGFoezCkYth4PXVE1QcbQ@mail.gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 4 Oct 2012 10:22:43 +0000
+Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
+In-Reply-To: <20121003192044.GB27502@parrot.com>
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
+ <20121003192044.GB27502@parrot.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9B7FDF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Guennadi,
+On Thu, Oct 04, 2012 at 00:50:45, Ivan Djelic wrote:
+> On Wed, Oct 03, 2012 at 03:29:49PM +0100, Philip, Avinash wrote:
+> > ELM module can be used for error correction of BCH 4 & 8 bit. Also
+> > support read & write page in one shot by adding custom read_page &
+> > write_page methods. This helps in optimizing code.
+> > 
+> > New structure member "is_elm_used" is added to know the status of
+> > whether the ELM module is used for error correction or not.
+> > 
+> > Note:
+> > ECC layout of BCH8 uses 14 bytes for 512 byte of data to make compatible
+> > with RBL ECC layout, even though the requirement was only 13 byte. This
+> > results a common ecc layout across RBL, U-boot & Linux.
+> > 
+> 
+> See a few comments below,
+> 
+> (...)
+> > +static int omap_elm_correct_data(struct mtd_info *mtd, u_char *dat,
+> > +                               u_char *read_ecc, u_char *calc_ecc)
+> > +{
+> > +       struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+> > +                       mtd);
+> > +       int eccsteps = info->nand.ecc.steps;
+> > +       int i , j, stat = 0;
+> > +       int eccsize, eccflag, size;
+> > +       struct elm_errorvec err_vec[ERROR_VECTOR_MAX];
+> > +       u_char *ecc_vec = calc_ecc;
+> > +       enum bch_ecc type;
+> > +       bool is_error_reported = false;
+> > +
+> > +       /* initialize elm error vector to zero */
+> > +       memset(err_vec, 0, sizeof(err_vec));
+> > +       if (info->nand.ecc.strength == BCH8_MAX_ERROR) {
+> > +               size = BCH8_SIZE;
+> > +               eccsize = BCH8_ECC_OOB_BYTES;
+> > +               type = BCH8_ECC;
+> > +       } else {
+> > +               size = BCH4_SIZE;
+> > +               eccsize = BCH4_SIZE;
+> > +               type = BCH4_ECC;
+> > +       }
+> > +
+> > +       for (i = 0; i < eccsteps ; i++) {
+> > +               eccflag = 0;    /* initialize eccflag */
+> > +
+> > +               for (j = 0; (j < eccsize); j++) {
+> > +                       if (read_ecc[j] != 0xFF) {
+> > +                               eccflag = 1;    /* data area is flashed */
+> 
+> Just a reminder: this way of checking if a page has been programmed is not robust to bitflips,
+> so you may get into trouble with UBIFS on a fairly recent device.
+> 
+> (...)
+> > @@ -1039,14 +1180,45 @@ static void omap3_enable_hwecc_bch(struct mtd_info *mtd, int mode)
+> > 
+> >         nerrors = info->nand.ecc.strength;
+> >         dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
+> > +#ifdef CONFIG_MTD_NAND_OMAP_BCH
+> > +       if (info->is_elm_used) {
+> > +               /*
+> > +                * Program GPMC to perform correction on (steps * 512) byte
+> > +                * sector at a time.
+> > +                */
+> > +               gpmc_enable_hwecc_bch(info->gpmc_cs, mode, dev_width,
+> > +                               info->nand.ecc.steps, nerrors);
+> > +               return;
+> > +       }
+> > +#endif
+> >         /*
+> > -        * Program GPMC to perform correction on one 512-byte sector at a time.
+> > -        * Using 4 sectors at a time (i.e. ecc.size = 2048) is also possible and
+> > -        * gives a slight (5%) performance gain (but requires additional code).
+> > +        * Program GPMC to perform correction on one 512-byte sector at
+> > +        * a time.
+> 
+> Why removing the comment about 4-sector perf gain ? :-)
 
-2012/10/2 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> On Tue, 2 Oct 2012, Bastian Hecht wrote:
->
->> The code probes if DMA channels can get allocated and tears them down at
->> removal/failure if needed.
->> If available it uses them to transfer the data part (not ECC). On
->> failure we fall back to PIO mode.
->>
->> Based on Guennadi Liakhovetski's code from the sh_mmcif driver.
->>
->> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
->
-> Looks mostly good to me, just a couple of cosmetic remarks below. They are
-> not critical, so, I won't be upset, if you fix them later:-) In any case
->
-> Reviewed-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+With this patch, support for reading 4 sectors (max 8) is available.
+Hence I am removing it.
 
-Great, will add that to the next version!
+> 
+> (...)
+> > @@ -1146,35 +1402,62 @@ static int omap3_init_bch(struct mtd_info *mtd, int ecc_opt)
+> >                 goto fail;
+> >         }
+> > 
+> > -       /* initialize GPMC BCH engine */
+> > -       ret = gpmc_init_hwecc_bch(info->gpmc_cs, 1, max_errors);
+> > -       if (ret)
+> > -               goto fail;
+> > -
+> > -       /* software bch library is only used to detect and locate errors */
+> > -       info->bch = init_bch(13, max_errors, 0x201b /* hw polynomial */);
+> > -       if (!info->bch)
+> > -               goto fail;
+> > +       info->nand.ecc.size = 512;
+> > +       info->nand.ecc.hwctl = omap3_enable_hwecc_bch;
+> > +       info->nand.ecc.mode = NAND_ECC_HW;
+> > +       info->nand.ecc.strength = hw_errors;
+> > 
+> > -       info->nand.ecc.size    = 512;
+> > -       info->nand.ecc.hwctl   = omap3_enable_hwecc_bch;
+> > -       info->nand.ecc.correct = omap3_correct_data_bch;
+> > -       info->nand.ecc.mode    = NAND_ECC_HW;
+> > +       if (info->is_elm_used && (mtd->writesize <= 4096)) {
+> > +               enum bch_ecc bch_type;
+> > 
+> > -       /*
+> > -        * The number of corrected errors in an ecc block that will trigger
+> > -        * block scrubbing defaults to the ecc strength (4 or 8).
+> > -        * Set mtd->bitflip_threshold here to define a custom threshold.
+> > -        */
+> > +               if (hw_errors == BCH8_MAX_ERROR) {
+> > +                       bch_type = BCH8_ECC;
+> > +                       info->nand.ecc.bytes = BCH8_SIZE;
+> > +               } else {
+> > +                       bch_type = BCH4_ECC;
+> > +                       info->nand.ecc.bytes = BCH4_SIZE;
+> > +               }
+> > 
+> > -       if (max_errors == 8) {
+> > -               info->nand.ecc.strength  = 8;
+> > -               info->nand.ecc.bytes     = 13;
+> > -               info->nand.ecc.calculate = omap3_calculate_ecc_bch8;
+> > +               info->nand.ecc.correct = omap_elm_correct_data;
+> > +               info->nand.ecc.calculate = omap3_calculate_ecc_bch;
+> > +               info->nand.ecc.read_page = omap_read_page_bch;
+> > +               info->nand.ecc.write_page = omap_write_page_bch;
+> > +               info->elm_dev = elm_request(bch_type);
+> > +               if (!info->elm_dev) {
+> > +                       pr_err("Request to elm module failed\n");
+> > +                       goto fail;
+> > +               }
+> >         } else {
+> > -               info->nand.ecc.strength  = 4;
+> > -               info->nand.ecc.bytes     = 7;
+> > -               info->nand.ecc.calculate = omap3_calculate_ecc_bch4;
+> > +
+> > +               /* initialize GPMC BCH engine */
+> > +               ret = gpmc_init_hwecc_bch(info->gpmc_cs, 1, max_errors);
+> > +               if (ret)
+> > +                       goto fail;
+> > +
+> > +               /*
+> > +                * software bch library is only used to detect and
+> > +                * locateerrors
+> 
+> s/locateerrors/locate errors/
 
->> ---
->>  drivers/mtd/nand/sh_flctl.c  |  174 +++++++++++++++++++++++++++++++++++++++++-
->>  include/linux/mtd/sh_flctl.h |   12 +++
->>  2 files changed, 183 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/sh_flctl.c b/drivers/mtd/nand/sh_flctl.c
->> index 4fbfe96..0fead2a 100644
->> --- a/drivers/mtd/nand/sh_flctl.c
->> +++ b/drivers/mtd/nand/sh_flctl.c
->> @@ -24,10 +24,13 @@
->>  #include <linux/module.h>
->>  #include <linux/kernel.h>
->>  #include <linux/delay.h>
->> +#include <linux/dmaengine.h>
->> +#include <linux/dma-mapping.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/io.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/pm_runtime.h>
->> +#include <linux/sh_dma.h>
->>  #include <linux/slab.h>
->>  #include <linux/string.h>
->>
->> @@ -106,6 +109,84 @@ static void wait_completion(struct sh_flctl *flctl)
->>       writeb(0x0, FLTRCR(flctl));
->>  }
->>
->> +static void flctl_dma_complete(void *param)
->> +{
->> +     struct sh_flctl *flctl = param;
->> +
->> +     complete(&flctl->dma_complete);
->
-> I think I mentioned in the first review, that it is good to include
-> headers everywhere, where they are needed and not rely on pulling them in
-> via other headers. So, it would be good to also include complete.h here
-> directly.
+Ok I will correct it.
 
-Ok sure, I will include that as well.
+> 
+> BTW, did you check that your patch does not break the software BCH case (i.e. no ELM) ?
 
-> [snip]
+I had checked in AM335x-evm software BCH without ELM. So this patch set is not breaking
+software BCH functionality.
+
+Thanks
+Avinash
 
 
-
->> @@ -308,13 +462,23 @@ static enum flctl_ecc_res_t read_ecfiforeg
->>  static void write_fiforeg(struct sh_flctl *flctl, int rlen, int offset)
->>  {
->>       int i, len_4align;
->> -     unsigned long *data = (unsigned long *)&flctl->done_buff[offset];
->> +     unsigned long *buf = (unsigned long *)&flctl->done_buff[offset];
->>       void *fifo_addr = (void *)FLDTFIFO(flctl);
->>
->>       len_4align = (rlen + 3) / 4;
->> +
->> +     for (i = 0; i < len_4align; i++)
->> +                     buf[i] = cpu_to_be32(buf[i]);
->
-> indentation ran away here.
-
-Ah nice, thanks for the hawk's eye ;)
-
-> Thanks
-> Guennadi
-
-Thanks!
- Bastian
+> 
+> BR,
+> --
+> Ivan
+> 
