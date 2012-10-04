@@ -1,275 +1,214 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 04 Oct 2012 08:05:32 -0500
-Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <506D899C.6010705@gmail.com>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 4 Oct 2012 09:08:06 -0400
+Subject: [PATCH v3 5/6] ARM: davinci: Add support for PRUSS on DA850
+In-Reply-To: <506D7F95.2030401@ti.com>
+References: <1349276133-26408-1-git-send-email-mporter@ti.com>
+ <1349276133-26408-6-git-send-email-mporter@ti.com>
+ <506D7F95.2030401@ti.com>
+Message-ID: <20121004130806.GG11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2012 03:50 AM, Stephen Boyd wrote:
-> The TWD and SCU configs are selected by default as long as
-> SCORPIONMP is false and/or MCT is false. Implementing the logic
-> this way certainly saves lines in the Kconfig but it precludes
-> those machines which select SCORPIONMP or MCT from participating
-> in the single zImage effort because when those machines are
-> combined with other SMP capable machines the TWD and SCU are no
-> longer selected.
+On Thu, Oct 04, 2012 at 05:52:45PM +0530, Sekhar Nori wrote:
+> On 10/3/2012 8:25 PM, Matt Porter wrote:
+> > Adds PRUSS clock, registers the L3RAM pool, and registers the
+> > platform device for uio_pruss on DA850.
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
 > 
-> Push the select out to the machine entries so that we can compile
-> these machines together and still select the appropriate configs.
+> I am interested in knowing how this patch was tested.
 
-I think this is the wrong direction as I'd like to see the platform
-selects shrink. I believe the local timers are run-time enabled now, so
-can't we just drop the condition and always select TWD and SCU for
-multi-platform?
+I'll add similar test information in the commit that I mention in
+my other reply. Basically, I use the examples in the PRU package
+downloadable from ti.com. There's a PRU_memAccessL3andDDR example
+which will fail miserably if the uio_pruss driver SRAM resource
+is not configured properly. With the complete series in place, it's
+able to complete execution successfully, communicating via the
+shared sram pool.
 
-Or perhaps we need a CortexA9 config symbol that selects V7, GIC, TWD,
-SCU, SMP, PL310, errata, etc. rather than duplicating those for every
-platform.
+> > ---
+> >  arch/arm/mach-davinci/board-da850-evm.c    |   12 +++++
+> >  arch/arm/mach-davinci/da850.c              |    7 +++
+> >  arch/arm/mach-davinci/devices-da8xx.c      |   66 ++++++++++++++++++++++++++++
+> >  arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
+> >  4 files changed, 87 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> > index 1295e61..acc6e84 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> > @@ -29,6 +29,7 @@
+> >  #include <linux/regulator/machine.h>
+> >  #include <linux/regulator/tps6507x.h>
+> >  #include <linux/input/tps6507x-ts.h>
+> > +#include <linux/platform_data/uio_pruss.h>
+> >  #include <linux/spi/spi.h>
+> >  #include <linux/spi/flash.h>
+> >  #include <linux/delay.h>
+> > @@ -42,6 +43,7 @@
+> >  #include <mach/da8xx.h>
+> >  #include <linux/platform_data/mtd-davinci.h>
+> >  #include <mach/mux.h>
+> > +#include <mach/sram.h>
+> >  #include <linux/platform_data/mtd-davinci-aemif.h>
+> >  #include <linux/platform_data/spi-davinci.h>
+> 
+> I know you did not introduce the mess, but can you include a patch to
+> fix the mixture of mach/ and linux/ includes here? mach/ includes should
+> follow the linux/ includes.
 
-Rob
+Ok. Yeah, I agree it's a mess there.
 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> ---
+> > @@ -1253,6 +1255,10 @@ static __init int da850_wl12xx_init(void)
+> >  
+> >  #endif /* CONFIG_DA850_WL12XX */
+> >  
+> > +struct uio_pruss_pdata da8xx_pruss_uio_pdata = {
+> > +	.pintc_base	= 0x4000,
+> > +};
+> > +
+> >  #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+> >  
+> >  static __init void da850_evm_init(void)
+> > @@ -1339,6 +1345,12 @@ static __init void da850_evm_init(void)
+> >  		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
+> >  				ret);
+> >  
+> > +	da8xx_pruss_uio_pdata.l3ram_pool = sram_get_gen_pool();
 > 
-> Does OMAP5 need to select TWD? I suspect not if it uses the
-> architected timers.
+> I wonder if this platform data should still be called l3ram pool. L3RAM
+> is OMAP terminology. May be just call it sram_pool? Also this patch
+> should follow 6/6 to prevent build breakage.
+
+I agree, I'll change to sram_pool. I went back and forth on this because
+I found even the userspace PRU tools had it called L3...I think it's
+wise just say sram and avoid confusion. I'll move the patch too.
+
+> > +	ret = da8xx_register_pruss_uio(&da8xx_pruss_uio_pdata);
+> > +	if (ret)
+> > +		pr_warning("pruss_uio initialization failed: %d\n",
+> > +				ret);
+> > +
+> >  	/* Handle board specific muxing for LCD here */
+> >  	ret = davinci_cfg_reg_list(da850_evm_lcdc_pins);
+> >  	if (ret)
+> > diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> > index d8d69de..7c01d31 100644
+> > --- a/arch/arm/mach-davinci/da850.c
+> > +++ b/arch/arm/mach-davinci/da850.c
 > 
->  arch/arm/Kconfig               | 8 ++++++--
->  arch/arm/mach-exynos/Kconfig   | 2 ++
->  arch/arm/mach-highbank/Kconfig | 1 +
->  arch/arm/mach-imx/Kconfig      | 2 ++
->  arch/arm/mach-msm/Kconfig      | 7 ++-----
->  arch/arm/mach-omap2/Kconfig    | 4 ++++
->  arch/arm/mach-realview/Kconfig | 8 ++++++++
->  arch/arm/mach-vexpress/Kconfig | 2 ++
->  arch/arm/plat-spear/Kconfig    | 2 ++
->  9 files changed, 29 insertions(+), 7 deletions(-)
+> Can you separate out board and SoC changes into different patches?
+
+Ok, yes.
+
+> > @@ -212,6 +212,12 @@ static struct clk tptc2_clk = {
+> >  	.flags		= ALWAYS_ENABLED,
+> >  };
+> >  
+> > +static struct clk pruss_clk = {
+> > +	.name		= "pruss",
+> > +	.parent		= &pll0_sysclk2,
+> > +	.lpsc		= DA8XX_LPSC0_PRUSS,
+> > +};
+> > +
+> >  static struct clk uart0_clk = {
+> >  	.name		= "uart0",
+> >  	.parent		= &pll0_sysclk2,
+> > @@ -378,6 +384,7 @@ static struct clk_lookup da850_clks[] = {
+> >  	CLK(NULL,		"tptc1",	&tptc1_clk),
+> >  	CLK(NULL,		"tpcc1",	&tpcc1_clk),
+> >  	CLK(NULL,		"tptc2",	&tptc2_clk),
+> > +	CLK(NULL,		"pruss",	&pruss_clk),
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e85f2b6..303ce90 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -639,6 +639,8 @@ config ARCH_TEGRA
->  	select GENERIC_GPIO
->  	select HAVE_CLK
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select ARCH_HAS_CPUFREQ
->  	select USE_OF
-> @@ -686,6 +688,8 @@ config ARCH_SHMOBILE
->  	select CLKDEV_LOOKUP
->  	select HAVE_MACH_CLKDEV
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select GENERIC_CLOCKEVENTS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select NO_IOPORT
-> @@ -882,6 +886,8 @@ config ARCH_U8500
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARCH_HAS_CPUFREQ
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	help
->  	  Support for ST-Ericsson's Ux500 architecture
-> @@ -1507,7 +1513,6 @@ config SMP
->  	depends on HAVE_SMP
->  	depends on MMU
->  	select USE_GENERIC_SMP_HELPERS
-> -	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
->  	help
->  	  This enables support for systems with more than one CPU. If you have
->  	  a system with only one CPU, like most personal computers, say N. If
-> @@ -1620,7 +1625,6 @@ config LOCAL_TIMERS
->  	bool "Use local timer interrupts"
->  	depends on SMP
->  	default y
-> -	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
->  	help
->  	  Enable support for local timers on SMP platforms, rather then the
->  	  legacy IPI broadcast method.  Local timers allows the system
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 4372075..8f97e92 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -15,6 +15,7 @@ config ARCH_EXYNOS4
->  	bool "SAMSUNG EXYNOS4"
->  	default y
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
->  	select MIGHT_HAVE_CACHE_L2X0
->  	help
->  	  Samsung EXYNOS4 SoCs based systems
-> @@ -22,6 +23,7 @@ config ARCH_EXYNOS4
->  config ARCH_EXYNOS5
->  	bool "SAMSUNG EXYNOS5"
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
->  	help
->  	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
->  
-> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-> index 0e1d0a4..f1ad1f0 100644
-> --- a/arch/arm/mach-highbank/Kconfig
-> +++ b/arch/arm/mach-highbank/Kconfig
-> @@ -11,5 +11,6 @@ config ARCH_HIGHBANK
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_ARM_SCU
->  	select HAVE_SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select SPARSE_IRQ
->  	select USE_OF
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 519ed57..13f765c 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -759,6 +759,8 @@ config SOC_IMX6Q
->  	select HAVE_IMX_MMDC
->  	select HAVE_IMX_SRC
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MFD_SYSCON
->  	select PINCTRL
->  	select PINCTRL_IMX6Q
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 7902de15..5bff882 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -44,7 +44,7 @@ endchoice
->  
->  config ARCH_MSM8X60
->  	bool "MSM8X60"
-> -	select ARCH_MSM_SCORPIONMP
-> +	select HAVE_SMP
->  	select ARM_GIC
->  	select CPU_V7
->  	select MSM_V2_TLMM
-> @@ -55,7 +55,7 @@ config ARCH_MSM8X60
->  
->  config ARCH_MSM8960
->  	bool "MSM8960"
-> -	select ARCH_MSM_SCORPIONMP
-> +	select HAVE_SMP
->  	select ARM_GIC
->  	select CPU_V7
->  	select MSM_V2_TLMM
-> @@ -68,9 +68,6 @@ config MSM_HAS_DEBUG_UART_HS
->  
->  config MSM_SOC_REV_A
->  	bool
-> -config  ARCH_MSM_SCORPIONMP
-> -	bool
-> -	select HAVE_SMP
->  
->  config  ARCH_MSM_ARM11
->  	bool
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index a6219ea..b618748 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -58,7 +58,9 @@ config ARCH_OMAP4
->  	select CPU_V7
->  	select ARM_GIC
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
->  	select LOCAL_TIMERS if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select PL310_ERRATA_588369
->  	select PL310_ERRATA_727915
->  	select ARM_ERRATA_720789
-> @@ -75,6 +77,8 @@ config SOC_OMAP5
->  	select CPU_V7
->  	select ARM_GIC
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select ARM_CPU_SUSPEND if PM
->  	select SOC_HAS_REALTIME_COUNTER
->  	select ARM_ARCH_TIMER
-> diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-> index c593be4..0c019b7 100644
-> --- a/arch/arm/mach-realview/Kconfig
-> +++ b/arch/arm/mach-realview/Kconfig
-> @@ -13,6 +13,8 @@ config REALVIEW_EB_A9MP
->  	depends on MACH_REALVIEW_EB
->  	select CPU_V7
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	help
->  	  Enable support for the Cortex-A9MPCore tile fitted to the
-> @@ -24,6 +26,8 @@ config REALVIEW_EB_ARM11MP
->  	select CPU_V6K
->  	select ARCH_HAS_BARRIERS if SMP
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	help
->  	  Enable support for the ARM11MPCore tile fitted to the Realview(R)
-> @@ -44,6 +48,8 @@ config MACH_REALVIEW_PB11MP
->  	select ARM_GIC
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select ARCH_HAS_BARRIERS if SMP
->  	help
-> @@ -86,6 +92,8 @@ config MACH_REALVIEW_PBX
->  	select ARM_GIC
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
->  	select ZONE_DMA if SPARSEMEM
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index c952960..4f8e0db 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -11,6 +11,8 @@ config ARCH_VEXPRESS
->  	select HAVE_CLK
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select ICST
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select NO_IOPORT
-> diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
-> index 4404f82..a090ea3 100644
-> --- a/arch/arm/plat-spear/Kconfig
-> +++ b/arch/arm/plat-spear/Kconfig
-> @@ -14,6 +14,8 @@ config ARCH_SPEAR13XX
->  	select CPU_V7
->  	select USE_OF
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select PINCTRL
->  	help
+> This is actually incorrect since we should use device name rather than
+> con_id for matching the clock. If there is just one clock that the
+> driver needs, connection id should be NULL. Looking at the driver now,
+> the clk_get() call seems to pass a valid device pointer. So, I wonder
+> how you are able to look up the clock even with a NULL device name.
+
+Hrm, I'll look into this. This part was a not looked at closely, just a
+quick copy/paste/modify and worked as tested with the PRU examples so
+I didn't look further. I'll look again let you know why it actually works.
+I'm guessing I got lucky here, and should be a simple fix.
+
+> >  	CLK(NULL,		"uart0",	&uart0_clk),
+> >  	CLK(NULL,		"uart1",	&uart1_clk),
+> >  	CLK(NULL,		"uart2",	&uart2_clk),
+> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> > index bd2f72b..7c2e0d2 100644
+> > --- a/arch/arm/mach-davinci/devices-da8xx.c
+> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> > @@ -518,6 +518,72 @@ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
+> >  	}
+> >  }
+> >  
+> > +#define DA8XX_PRUSS_MEM_BASE		0x01C30000
 > 
+> In this file all base addresses are added at the top of the file. The
+> defines are sorted in ascending order of address. If that's broken, its
+> all my fault, but please don't add to the breakage when adding this entry :)
+
+Ok :) Will fix.
+
+> > +
+> > +static struct resource da8xx_pruss_resources[] = {
+> > +	{
+> > +		.start	= DA8XX_PRUSS_MEM_BASE,
+> > +		.end	= DA8XX_PRUSS_MEM_BASE + 0xFFFF,
+> > +		.flags	= IORESOURCE_MEM,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT0,
+> > +		.end	= IRQ_DA8XX_EVTOUT0,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT1,
+> > +		.end	= IRQ_DA8XX_EVTOUT1,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT2,
+> > +		.end	= IRQ_DA8XX_EVTOUT2,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT3,
+> > +		.end	= IRQ_DA8XX_EVTOUT3,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT4,
+> > +		.end	= IRQ_DA8XX_EVTOUT4,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT5,
+> > +		.end	= IRQ_DA8XX_EVTOUT5,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT6,
+> > +		.end	= IRQ_DA8XX_EVTOUT6,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +	{
+> > +		.start	= IRQ_DA8XX_EVTOUT7,
+> > +		.end	= IRQ_DA8XX_EVTOUT7,
+> > +		.flags	= IORESOURCE_IRQ,
+> > +	},
+> > +};
+> > +
+> > +static struct platform_device da8xx_pruss_uio_dev = {
+> > +	.name		= "pruss_uio",
+> > +	.id		= -1,
+> > +	.num_resources	= ARRAY_SIZE(da8xx_pruss_resources),
+> > +	.resource	= da8xx_pruss_resources,
+> > +	.dev	 =	{
+> > +		.coherent_dma_mask = 0xffffffff,
+> 
+> DMA_BIT_MASK(32)?
+
+Yeah, more copy/paste/modify stuff. I'll fix that.
+
+-Matt
