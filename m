@@ -1,313 +1,138 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 04 Oct 2012 21:12:48 +0530
-Subject: [PATCH v1 10/14] drm: exynos: hdmi: add support to disable video
- processor in mixer
+Date: Thu, 04 Oct 2012 21:12:49 +0530
+Subject: [PATCH v1 11/14] drm: exynos: hdmi: add support for exynos5 mixer
 In-Reply-To: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
 References: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1349365372-21417-11-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1349365372-21417-12-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for disabling the video processor code based
-on the platform type. This is done based on a field in the mixer driver
-data which changes with the platform variant.
+This patch adds support for exynos5 mixer with device tree enabled.
 
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+Signed-off-by: Fahad Kunnathadi <fahad.k@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_mixer.c |  151 +++++++++++++++++++++------------
- 1 files changed, 98 insertions(+), 53 deletions(-)
+ drivers/gpu/drm/exynos/exynos_mixer.c |   49 +++++++++++++++++++++++++++++++--
+ drivers/gpu/drm/exynos/regs-mixer.h   |    3 ++
+ 2 files changed, 49 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index e312fb1..1677345 100644
+index 1677345..39d2b95 100644
 --- a/drivers/gpu/drm/exynos/exynos_mixer.c
 +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -83,6 +83,7 @@ struct mixer_context {
- 	int			pipe;
- 	bool			interlace;
- 	bool			powered;
-+	bool			vp_enabled;
- 	u32			int_en;
- 
- 	struct mutex		mixer_mutex;
-@@ -93,6 +94,7 @@ struct mixer_context {
- 
- struct mixer_drv_data {
- 	enum mixer_version_id	version;
-+	bool					is_vp_enabled;
- };
- 
- static const u8 filter_y_horiz_tap8[] = {
-@@ -261,7 +263,8 @@ static void mixer_vsync_set_update(struct mixer_context *ctx, bool enable)
- 	mixer_reg_writemask(res, MXR_STATUS, enable ?
- 			MXR_STATUS_SYNC_ENABLE : 0, MXR_STATUS_SYNC_ENABLE);
- 
--	vp_reg_write(res, VP_SHADOW_UPDATE, enable ?
-+	if (ctx->vp_enabled)
-+		vp_reg_write(res, VP_SHADOW_UPDATE, enable ?
- 			VP_SHADOW_UPDATE_ENABLE : 0);
+@@ -481,6 +481,18 @@ static void vp_video_buffer(struct mixer_context *ctx, int win)
+ 	vp_regs_dump(ctx);
  }
  
-@@ -343,8 +346,11 @@ static void mixer_cfg_layer(struct mixer_context *ctx, int win, bool enable)
- 		mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_GRP1_ENABLE);
- 		break;
- 	case 2:
--		vp_reg_writemask(res, VP_ENABLE, val, VP_ENABLE_ON);
--		mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_VP_ENABLE);
-+		if (ctx->vp_enabled) {
-+			vp_reg_writemask(res, VP_ENABLE, val, VP_ENABLE_ON);
-+			mixer_reg_writemask(res, MXR_CFG, val,
-+				MXR_CFG_VP_ENABLE);
-+		}
- 		break;
- 	}
- }
-@@ -602,7 +608,8 @@ static void mixer_win_reset(struct mixer_context *ctx)
- 	 */
- 	val = MXR_LAYER_CFG_GRP1_VAL(3);
- 	val |= MXR_LAYER_CFG_GRP0_VAL(2);
--	val |= MXR_LAYER_CFG_VP_VAL(1);
-+	if (ctx->vp_enabled)
-+		val |= MXR_LAYER_CFG_VP_VAL(1);
- 	mixer_reg_write(res, MXR_LAYER_CFG, val);
- 
- 	/* setting background color */
-@@ -625,14 +632,17 @@ static void mixer_win_reset(struct mixer_context *ctx)
- 	val = MXR_GRP_CFG_ALPHA_VAL(0);
- 	mixer_reg_write(res, MXR_VIDEO_CFG, val);
- 
--	/* configuration of Video Processor Registers */
--	vp_win_reset(ctx);
--	vp_default_filter(res);
-+	if (ctx->vp_enabled) {
-+		/* configuration of Video Processor Registers */
-+		vp_win_reset(ctx);
-+		vp_default_filter(res);
-+	}
- 
- 	/* disable all layers */
- 	mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_GRP0_ENABLE);
- 	mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_GRP1_ENABLE);
--	mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_VP_ENABLE);
-+	if (ctx->vp_enabled)
-+		mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_VP_ENABLE);
- 
- 	mixer_vsync_set_update(ctx, true);
- 	spin_unlock_irqrestore(&res->reg_slock, flags);
-@@ -655,8 +665,10 @@ static void mixer_poweron(struct mixer_context *ctx)
- 	pm_runtime_get_sync(ctx->dev);
- 
- 	clk_enable(res->mixer);
--	clk_enable(res->vp);
--	clk_enable(res->sclk_mixer);
-+	if (ctx->vp_enabled) {
-+		clk_enable(res->vp);
-+		clk_enable(res->sclk_mixer);
-+	}
- 
- 	mixer_reg_write(res, MXR_INT_EN, ctx->int_en);
- 	mixer_win_reset(ctx);
-@@ -676,8 +688,10 @@ static void mixer_poweroff(struct mixer_context *ctx)
- 	ctx->int_en = mixer_reg_read(res, MXR_INT_EN);
- 
- 	clk_disable(res->mixer);
--	clk_disable(res->vp);
--	clk_disable(res->sclk_mixer);
-+	if (ctx->vp_enabled) {
-+		clk_disable(res->vp);
-+		clk_disable(res->sclk_mixer);
-+	}
- 
- 	pm_runtime_put_sync(ctx->dev);
- 
-@@ -810,7 +824,7 @@ static void mixer_win_commit(void *ctx, int win)
- 
- 	DRM_DEBUG_KMS("[%d] %s, win: %d\n", __LINE__, __func__, win);
- 
--	if (win > 1)
-+	if (win > 1 && mixer_ctx->vp_enabled)
- 		vp_video_buffer(mixer_ctx, win);
- 	else
- 		mixer_graph_buffer(mixer_ctx, win);
-@@ -946,39 +960,20 @@ static int __devinit mixer_resources_init(struct exynos_drm_hdmi_context *ctx,
- 		ret = -ENODEV;
- 		goto fail;
- 	}
--	mixer_res->vp = clk_get(dev, "vp");
--	if (IS_ERR_OR_NULL(mixer_res->vp)) {
--		dev_err(dev, "failed to get clock 'vp'\n");
--		ret = -ENODEV;
--		goto fail;
--	}
--	mixer_res->sclk_mixer = clk_get(dev, "sclk_mixer");
--	if (IS_ERR_OR_NULL(mixer_res->sclk_mixer)) {
--		dev_err(dev, "failed to get clock 'sclk_mixer'\n");
--		ret = -ENODEV;
--		goto fail;
--	}
++static void mixer_layer_update(struct mixer_context *ctx)
++{
++	struct mixer_resources *res = &ctx->mixer_res;
++	u32 val;
 +
- 	mixer_res->sclk_hdmi = clk_get(dev, "sclk_hdmi");
- 	if (IS_ERR_OR_NULL(mixer_res->sclk_hdmi)) {
- 		dev_err(dev, "failed to get clock 'sclk_hdmi'\n");
- 		ret = -ENODEV;
- 		goto fail;
- 	}
--	mixer_res->sclk_dac = clk_get(dev, "sclk_dac");
--	if (IS_ERR_OR_NULL(mixer_res->sclk_dac)) {
--		dev_err(dev, "failed to get clock 'sclk_dac'\n");
--		ret = -ENODEV;
--		goto fail;
--	}
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mxr");
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (res == NULL) {
- 		dev_err(dev, "get memory resource failed.\n");
- 		ret = -ENXIO;
- 		goto fail;
- 	}
- 
--	clk_set_parent(mixer_res->sclk_mixer, mixer_res->sclk_hdmi);
--
- 	mixer_res->mixer_regs = devm_ioremap(&pdev->dev, res->start,
- 							resource_size(res));
- 	if (mixer_res->mixer_regs == NULL) {
-@@ -987,54 +982,92 @@ static int __devinit mixer_resources_init(struct exynos_drm_hdmi_context *ctx,
- 		goto fail;
- 	}
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vp");
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (res == NULL) {
--		dev_err(dev, "get memory resource failed.\n");
-+		dev_err(dev, "get interrupt resource failed.\n");
- 		ret = -ENXIO;
- 		goto fail;
- 	}
- 
--	mixer_res->vp_regs = devm_ioremap(&pdev->dev, res->start,
--							resource_size(res));
--	if (mixer_res->vp_regs == NULL) {
--		dev_err(dev, "register mapping failed.\n");
--		ret = -ENXIO;
-+	ret = devm_request_irq(&pdev->dev, res->start, mixer_irq_handler,
-+							0, "drm_mixer", ctx);
-+	if (ret) {
-+		dev_err(dev, "request interrupt failed.\n");
- 		goto fail;
- 	}
-+	mixer_res->irq = res->start;
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "irq");
-+	return 0;
++	val = mixer_reg_read(res, MXR_CFG);
 +
-+fail:
-+	if (!IS_ERR_OR_NULL(mixer_res->sclk_hdmi))
-+		clk_put(mixer_res->sclk_hdmi);
-+	if (!IS_ERR_OR_NULL(mixer_res->mixer))
-+		clk_put(mixer_res->mixer);
-+	return ret;
++	/* allow one update per vsync only */
++	if (!(val & MXR_CFG_LAYER_UPDATE_COUNT_MASK))
++		mixer_reg_writemask(res, MXR_CFG, ~0, MXR_CFG_LAYER_UPDATE);
 +}
 +
-+static int __devinit vp_resources_init(struct exynos_drm_hdmi_context *ctx,
-+				 struct platform_device *pdev)
-+{
-+	struct mixer_context *mixer_ctx = ctx->ctx;
-+	struct device *dev = &pdev->dev;
-+	struct mixer_resources *mixer_res = &mixer_ctx->mixer_res;
-+	struct resource *res;
-+	int ret;
+ static void mixer_graph_buffer(struct mixer_context *ctx, int win)
+ {
+ 	struct mixer_resources *res = &ctx->mixer_res;
+@@ -561,6 +573,11 @@ static void mixer_graph_buffer(struct mixer_context *ctx, int win)
+ 	mixer_cfg_scan(ctx, win_data->mode_height);
+ 	mixer_cfg_rgb_fmt(ctx, win_data->mode_height);
+ 	mixer_cfg_layer(ctx, win, true);
 +
-+	mixer_res->vp = clk_get(dev, "vp");
-+	if (IS_ERR_OR_NULL(mixer_res->vp)) {
-+		dev_err(dev, "failed to get clock 'vp'\n");
-+		ret = -ENODEV;
-+		goto fail;
-+	}
-+	mixer_res->sclk_mixer = clk_get(dev, "sclk_mixer");
-+	if (IS_ERR_OR_NULL(mixer_res->sclk_mixer)) {
-+		dev_err(dev, "failed to get clock 'sclk_mixer'\n");
-+		ret = -ENODEV;
-+		goto fail;
-+	}
-+	mixer_res->sclk_dac = clk_get(dev, "sclk_dac");
-+	if (IS_ERR_OR_NULL(mixer_res->sclk_dac)) {
-+		dev_err(dev, "failed to get clock 'sclk_dac'\n");
-+		ret = -ENODEV;
-+		goto fail;
-+	}
++	/* layer update mandatory for mixer 16.0.33.0 */
++	if (ctx->mxr_ver == MXR_VER_16_0_33_0)
++		mixer_layer_update(ctx);
 +
-+	if (mixer_res->sclk_hdmi)
-+		clk_set_parent(mixer_res->sclk_mixer, mixer_res->sclk_hdmi);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	if (res == NULL) {
--		dev_err(dev, "get interrupt resource failed.\n");
-+		dev_err(dev, "get memory resource failed.\n");
- 		ret = -ENXIO;
- 		goto fail;
- 	}
+ 	mixer_run(ctx);
  
--	ret = devm_request_irq(&pdev->dev, res->start, mixer_irq_handler,
--							0, "drm_mixer", ctx);
--	if (ret) {
--		dev_err(dev, "request interrupt failed.\n");
-+	mixer_res->vp_regs = devm_ioremap(&pdev->dev, res->start,
-+							resource_size(res));
-+	if (mixer_res->vp_regs == NULL) {
-+		dev_err(dev, "register mapping failed.\n");
-+		ret = -ENXIO;
- 		goto fail;
- 	}
--	mixer_res->irq = res->start;
- 
- 	return 0;
- 
- fail:
- 	if (!IS_ERR_OR_NULL(mixer_res->sclk_dac))
- 		clk_put(mixer_res->sclk_dac);
--	if (!IS_ERR_OR_NULL(mixer_res->sclk_hdmi))
--		clk_put(mixer_res->sclk_hdmi);
- 	if (!IS_ERR_OR_NULL(mixer_res->sclk_mixer))
- 		clk_put(mixer_res->sclk_mixer);
- 	if (!IS_ERR_OR_NULL(mixer_res->vp))
- 		clk_put(mixer_res->vp);
--	if (!IS_ERR_OR_NULL(mixer_res->mixer))
--		clk_put(mixer_res->mixer);
+ 	mixer_vsync_set_update(ctx, true);
+@@ -1065,6 +1082,11 @@ fail:
  	return ret;
  }
  
++static struct mixer_drv_data exynos5_mxr_drv_data = {
++	.version = MXR_VER_16_0_33_0,
++	.is_vp_enabled = 0,
++};
++
  static struct mixer_drv_data exynos4_mxr_drv_data = {
  	.version = MXR_VER_0_0_0_16,
-+	.is_vp_enabled = 1,
+ 	.is_vp_enabled = 1,
+@@ -1075,6 +1097,18 @@ static struct platform_device_id mixer_driver_types[] = {
+ 		.name		= "s5p-mixer",
+ 		.driver_data	= (unsigned long)&exynos4_mxr_drv_data,
+ 	}, {
++		.name		= "exynos5-mixer",
++		.driver_data	= (unsigned long)&exynos5_mxr_drv_data,
++	}, {
++		/* end node */
++	}
++};
++
++static struct of_device_id mixer_match_types[] = {
++	{
++		.compatible = "samsung,exynos5-mixer",
++		.data	= &exynos5_mxr_drv_data,
++	}, {
+ 		/* end node */
+ 	}
  };
+@@ -1104,8 +1138,16 @@ static int __devinit mixer_probe(struct platform_device *pdev)
  
- static struct platform_device_id mixer_driver_types[] = {
-@@ -1075,14 +1108,26 @@ static int __devinit mixer_probe(struct platform_device *pdev)
- 			pdev)->driver_data;
- 	ctx->dev = &pdev->dev;
- 	drm_hdmi_ctx->ctx = (void *)ctx;
-+	ctx->vp_enabled = drv->is_vp_enabled;
- 	ctx->mxr_ver = drv->version;
+ 	mutex_init(&ctx->mixer_mutex);
  
- 	platform_set_drvdata(pdev, drm_hdmi_ctx);
- 
- 	/* acquire resources: regs, irqs, clocks */
- 	ret = mixer_resources_init(drm_hdmi_ctx, pdev);
--	if (ret)
-+	if (ret) {
-+		DRM_ERROR("mixer_resources_init failed\n");
- 		goto fail;
+-	drv = (struct mixer_drv_data *)platform_get_device_id(
+-			pdev)->driver_data;
++	if (dev->of_node) {
++		const struct of_device_id *match;
++		match = of_match_node(of_match_ptr(mixer_match_types),
++							  pdev->dev.of_node);
++		drv = match->data;
++	} else {
++		drv = (struct mixer_drv_data *)
++			platform_get_device_id(pdev)->driver_data;
 +	}
 +
-+	if (ctx->vp_enabled) {
-+		/* acquire vp resources: regs, irqs, clocks */
-+		ret = vp_resources_init(drm_hdmi_ctx, pdev);
-+		if (ret) {
-+			DRM_ERROR("vp_resources_init failed\n");
-+			goto fail;
-+		}
-+	}
+ 	ctx->dev = &pdev->dev;
+ 	drm_hdmi_ctx->ctx = (void *)ctx;
+ 	ctx->vp_enabled = drv->is_vp_enabled;
+@@ -1167,9 +1209,10 @@ static SIMPLE_DEV_PM_OPS(mixer_pm_ops, mixer_suspend, NULL);
  
- 	/* register specific callback point to common hdmi. */
- 	exynos_mixer_ops_register(&mixer_ops);
+ struct platform_driver mixer_driver = {
+ 	.driver = {
+-		.name = "s5p-mixer",
++		.name = "exynos-mixer",
+ 		.owner = THIS_MODULE,
+ 		.pm = &mixer_pm_ops,
++		.of_match_table = mixer_match_types,
+ 	},
+ 	.probe = mixer_probe,
+ 	.remove = __devexit_p(mixer_remove),
+diff --git a/drivers/gpu/drm/exynos/regs-mixer.h b/drivers/gpu/drm/exynos/regs-mixer.h
+index fd2f4d1..5d8dbc0 100644
+--- a/drivers/gpu/drm/exynos/regs-mixer.h
++++ b/drivers/gpu/drm/exynos/regs-mixer.h
+@@ -69,6 +69,7 @@
+ 	(((val) << (low_bit)) & MXR_MASK(high_bit, low_bit))
+ 
+ /* bits for MXR_STATUS */
++#define MXR_STATUS_SOFT_RESET		(1 << 8)
+ #define MXR_STATUS_16_BURST		(1 << 7)
+ #define MXR_STATUS_BURST_MASK		(1 << 7)
+ #define MXR_STATUS_BIG_ENDIAN		(1 << 3)
+@@ -77,6 +78,8 @@
+ #define MXR_STATUS_REG_RUN		(1 << 0)
+ 
+ /* bits for MXR_CFG */
++#define MXR_CFG_LAYER_UPDATE		(1 << 31)
++#define MXR_CFG_LAYER_UPDATE_COUNT_MASK (3 << 29)
+ #define MXR_CFG_RGB601_0_255		(0 << 9)
+ #define MXR_CFG_RGB601_16_235		(1 << 9)
+ #define MXR_CFG_RGB709_0_255		(2 << 9)
 -- 
 1.7.0.4
