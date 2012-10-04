@@ -1,63 +1,43 @@
-From: pza@pengutronix.de (Philipp Zabel)
-Date: Thu, 4 Oct 2012 15:35:53 +0200
-Subject: [PATCH v3 0/6] uio_pruss cleanup and platform support
-In-Reply-To: <20121004124253.GC11149@beef>
-References: <1349276133-26408-1-git-send-email-mporter@ti.com>
- <20121004091145.GA3317@pengutronix.de>
- <20121004124253.GC11149@beef>
-Message-ID: <20121004133553.GA5151@pengutronix.de>
+From: avi@redhat.com (Avi Kivity)
+Date: Thu, 04 Oct 2012 15:44:50 +0200
+Subject: [kvmarm] [PATCH 06/15] KVM: ARM: Initial skeleton to compile
+ KVM support
+In-Reply-To: <20120925152055.GC28728@mudshark.cambridge.arm.com>
+References: <20120915153359.21241.86002.stgit@ubuntu>
+ <20120915153508.21241.47712.stgit@ubuntu>
+ <20120925152055.GC28728@mudshark.cambridge.arm.com>
+Message-ID: <506D92D2.5020805@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 08:42:53AM -0400, Matt Porter wrote:
-> > I think the generic SRAM/genalloc driver (https://lkml.org/lkml/2012/9/7/282)
-> > could be useful to map the L3RAM on Davinci.
-> > With the gen_pool lookup patch (https://lkml.org/lkml/2012/9/7/284) the
-> > uio_pruss driver could then use the gen_pool_find_by_phys() (or
-> > of_get_named_gen_pool() for initialization from device tree) to
-> > retrieve the struct gen_pool*.
-> > 
-> > This way you could avoid handing it over via platform data and you could
-> > get rid of arch/arm/mach-davinci/{sram.c,include/mach/sram.h} completely.
+On 09/25/2012 05:20 PM, Will Deacon wrote:
+>> +       case KVM_GET_REG_LIST: {
+>> +               struct kvm_reg_list __user *user_list = argp;
+>> +               struct kvm_reg_list reg_list;
+>> +               unsigned n;
+>> +
+>> +               if (copy_from_user(&reg_list, user_list, sizeof reg_list))
+>> +                       return -EFAULT;
+>> +               n = reg_list.n;
+>> +               reg_list.n = kvm_arm_num_regs(vcpu);
+>> +               if (copy_to_user(user_list, &reg_list, sizeof reg_list))
+>> +                       return -EFAULT;
+>> +               if (n < reg_list.n)
+>> +                       return -E2BIG;
+>> +               return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
 > 
-> I did miss the gen_pool_find_by_phys() call in that series. That does
-> look useful. I actually mentioned your series in an earlier posting
-> since I like it,
+> kvm_reg_list sounds like it could be done using a regset instead.
 
-That I did miss.
+Wouldn't those regsets be userspace oriented?
 
-> but since the initialization of the driver was inherently
-> tied to DT it's not usable for DaVinci that's just starting to convert
-> to DT and needs !DT support as well.
+For example, the GPRs returned here include all the shadowed interrupt
+registers (or however they're called) while most user oriented APIs
+would only include the user visible registers.
 
-There should be no dependency on DT in the sram driver. It just requests
-and remaps the first given iomem resource and creates a gen_pool from that.
-This should work just as well for the !DT case.
-Maybe it's just my choice of patch series subject gave you that
-impression? If there's a real issue for !DT, I should fix it.
-
-> I do see it moving to your driver exclusively, but I wanted to make this
-> series focused on only getting rid of the private SRAM API using the
-> existing pdata framework that's already there. I think once
-> gen_pool_find_by_phys() goes upstream we can switch to that and get the
-> address from a resource in the !DT case. I guess we should see if Sekhar
-> would like to see this happen in two steps or just have us depend on
-> the gen_pool_find_by_phys() patch now.
-
-Thanks, I'm glad you are aware of the sram driver and consider it useful.
-
-> BTW, I was going to post a patch for your driver to allow
-> configurability of the allocation order, but have been busy with other
-> things.  We'll eventually need that when switching to it as the
-> hardcoded page size order isn't going to work for all cases.
-
-Good point.
-
-regards
-Philipp
+FWIW, we're trying to move to an architecture independent ABI for KVM
+registers, but that's a lot of work since we need to make sure all the
+weird x86 registers (and non-register state) fit into that.  Maybe that
+ABI will be regset based, but I don't want to block the ARM port on this.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+error compiling committee.c: too many arguments to function
