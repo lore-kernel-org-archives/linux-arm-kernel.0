@@ -1,65 +1,57 @@
-From: samuel.ortiz@intel.com (Samuel Ortiz)
-Date: Thu, 4 Oct 2012 15:51:30 +0200
-Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
-In-Reply-To: <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
-References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <11987916.rOoNGcb1ly@dev1>
- <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
- <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
-Message-ID: <20121004135130.GC5554@sortiz-mobl>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 4 Oct 2012 19:23:26 +0530
+Subject: [PATCH] ARM: davinci: dm644x: fix out range signal for ED
+In-Reply-To: <506D3704.4060102@ti.com>
+References: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
+ <506C158D.4000906@ti.com>
+ <CA+V-a8uFNXvb7bPv0dLKeSeNzZ9C3rvrXCNSWy+8HgiumR9sEw@mail.gmail.com>
+ <506D3704.4060102@ti.com>
+Message-ID: <CA+V-a8uqQhpe+9Q_A_ojR1MahHLnbKpOEBdg9Vz3Gq8YQbHyjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Sekhar
 
-On Thu, Oct 04, 2012 at 10:01:21AM -0300, Fabio Estevam wrote:
-> Hi Samuel,
-> 
-> On Wed, Sep 5, 2012 at 11:22 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Hi Samuel,
-> >
-> > On Thu, Jul 12, 2012 at 8:02 PM, Marc Reilly <marc@cpdesign.com.au> wrote:
-> >> Hi Uwe,
-> >>
-> >>> This series was tested on a Phytec pcm038 (mc13783 on spi) using
-> >>> traditional boot (i.e. not dt) and on a i.MX53 based machine (mc34708 on
-> >>> i2c) using dt boot.
-> >>>
-> >>> Philippe's patches are already in next, they are just included here for
-> >>> those who want to test the patches. The 'mfd/mc13xxx: drop modifying
-> >>> driver's id_table in probe' was already sent out yesterday and is
-> >>> included here because the last patch depends on it.
-> >>>
-> >>
-> >> For all patches (that don't already have it):
-> >> Acked-by: Marc Reilly <marc@cpdesign.com.au>
-> >
-> > Can this series be applied?
-> 
-> Any comments on this series, please?
-Did you send it to my samuel.ortiz at intel.com email ? I never look at it when
-going through my MFD backlog, which is why it was not applied. Which is why it
-won't be part of the 3.7 merge window, sorry about that.
+On Thu, Oct 4, 2012 at 12:43 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 10/4/2012 10:22 AM, Prabhakar Lad wrote:
+>> Hi Sekhar,
+>>
+>> On Wed, Oct 3, 2012 at 4:08 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>> On 10/3/2012 12:05 PM, Prabhakar wrote:
+>>>> From: Lad, Prabhakar <prabhakar.lad@ti.com>
+>>>>
+>>>> while testing display on dm644x, for ED out-range signals
+>>>> was observed. This patch fixes appropriate clock setting
+>>>> for ED.
+>>>
+>>> Can you please clarify what you mean by "out range signal"? Are there
+>>> any user visible artifacts on the display? What was the clock being
+>>> provided earlier and what is the value after this patch?
+>>>
+>>> Also, is the issue severe enough that this patch should be applied to
+>>> stable tree as well?
+>>>
+>> Ideally a clock of 54Mhz is required for  enhanced definition to
+>> work, which it was actually set to but while testing I noticed
+>> out-of-range signal. The out-of-range signal is often caused
+>> when the field rate is above the rate that the television will handle.
+>> When this is the case the TV or monitor displays "Out-Of-Range Signal".
+>>
+>> Reducing the clock fixed it. now the clock is set to 27Mhz.
+>
+> So, is the requirement for ED 54MHz or lower? Still trying to explain
+> myself how 27MHz is working where a 54MHz is required. I guess there is
+> also a lower limit on what the frequency should be?
+>
+Ideally its 54Mhz, but I see in the datasheet for AD7342/3 [1] it can also
+work at 27Mhz too.
 
- 
-> I want to add mc34708 support to mx53qsb and need this series to be applied.
-I understand. I'll queue it to my for-next branch as soon as the merge window
-is closed.
+Regards,
+--Prabhakar
 
-Cheers,
-Samuel.
+[1] http://www.analog.com/static/imported-files/data_sheets/ADV7342_7343.pdf
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+> Sorry I am not familiar will all the video concepts, hence the questions.
+>
+> Thanks,
+> Sekhar
