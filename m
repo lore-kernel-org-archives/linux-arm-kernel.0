@@ -1,36 +1,30 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 04 Oct 2012 11:49:21 -0700
-Subject: arm-soc maintainer entry
-In-Reply-To: <CAOesGMjotnx_6HiwngRO9OaZYGGAexiwZ_shkOK7qROZcjDmqA@mail.gmail.com>
-References: <506D4BCD.3020402@codeaurora.org>
- <CAOesGMjotnx_6HiwngRO9OaZYGGAexiwZ_shkOK7qROZcjDmqA@mail.gmail.com>
-Message-ID: <506DDA31.9010503@codeaurora.org>
+Date: Thu, 04 Oct 2012 12:01:32 -0700
+Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <506D52D2.9060105@ti.com>
+References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
+ <506D52D2.9060105@ti.com>
+Message-ID: <506DDD0C.4080704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/12 09:55, Olof Johansson wrote:
-> Hi,
+On 10/04/12 02:11, Santosh Shilimkar wrote:
+>> @@ -75,6 +77,8 @@ config SOC_OMAP5
+>>       select CPU_V7
+>>       select ARM_GIC
+>>       select HAVE_SMP
+>> +    select HAVE_ARM_SCU if SMP
+>> +    select HAVE_ARM_TWD if LOCAL_TIMERS
+>>       select ARM_CPU_SUSPEND if PM
+>>       select SOC_HAS_REALTIME_COUNTER
+>>       select ARM_ARCH_TIMER
+> Drop this change.
 >
-> On Thu, Oct 4, 2012 at 1:41 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> Is the arm at kernel.org alias going to be added into the MAINTAINERS file?
->> Should anybody be sending mails to this address?
->>
->> It seems I asked this over a year ago and the response was positive but
->> nothing ever happened[1]. Maybe something like below? I only ask because
->> get_maintainer.pl isn't picking up this email.
-> I've been holding off re-proposing this, mostly because life is easier
-> for us if we don't get arm at kernel.org cc:d on every single patch by
-> people who run get_maintainers.pl -- it's the equivalent of getting
-> linux-arm-kernel cc:d to your inbox. It's better signal-to-noise ratio
-> if it's mostly platform maintainers that email us on that address with
-> pull requests or patches they want applied.
+> With that fixed, for OMAP changes
 >
-> But yeah, it also means that the maintainer structure is undocumented.
-> I'm open for suggestions.
->
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Thanks for clarifying. Maybe we can put in the git tree and no email
-address? That at least documents some structure.
+Thanks. Will drop both lines in this hunk.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
