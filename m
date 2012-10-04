@@ -1,49 +1,33 @@
-From: sourav.poddar@ti.com (Sourav)
-Date: Thu, 4 Oct 2012 13:45:23 +0530
-Subject: [PATCHv3 2/4] Input: keypad: Add smsc ece1099 keypad driver
-In-Reply-To: <20121004072426.GB14217@core.coreip.homeip.net>
-References: <1349089310-22134-1-git-send-email-sourav.poddar@ti.com>
- <20121002061829.GA3853@core.coreip.homeip.net>
- <CAKdam55BEQi9tJb1yzKJWNhO7sHrW5NFHfsZjicw2NGYDEFovQ@mail.gmail.com>
- <20121004072426.GB14217@core.coreip.homeip.net>
-Message-ID: <506D459B.3070504@ti.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu,  4 Oct 2012 10:26:57 +0200
+Subject: [RFC PATCH v2 0/2] watchdog: core: dt: add support for the
+ timeout-sec dt property
+Message-ID: <1349339219-1467-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
-On Thursday 04 October 2012 12:54 PM, Dmitry Torokhov wrote:
-> On Wed, Oct 03, 2012 at 11:26:46AM +0530, Poddar, Sourav wrote:
->> Hi Dmitry,
->>
->> On Tue, Oct 2, 2012 at 11:48 AM, Dmitry Torokhov
->> <dmitry.torokhov@gmail.com> wrote:
->>> Hi Sourav,
->>>
->>> On Mon, Oct 01, 2012 at 04:31:50PM +0530, Sourav Poddar wrote:
->>>> From: G, Manjunath Kondaiah <manjugk@ti.com>
->>>>
->>>> +
->>>> +     /* Enable smsc keypad interrupts */
->>>> +     ret = smsc_write(dev, SMSC_KP_INT_MASK, 0xff);
->>>> +     if (ret < 0)
->>>> +             goto err2;
->>>> +
->>>> +     return 0;
->>>> +
->>>> +err2:
->>>> +     input_unregister_device(input);
->>>> +err1:
->>>> +     input_free_device(input);
->>> Double free.
->>>
->> I believe what you are trying to say here is that we dont really
->> need a " input_unregister_device" (as also I checked in other keypad
->> implementations) and do a "unregister_device" in the remove api ??
-> What I was trying to say is that if input device has been registered
-> then you need to call input_unregister_device() to unregister and free
-> it, otherwise you need to call input_free_device(), but not both.
->
-> Thanks.
-Ok. Thanks for the clarification. Will update and post a new version.
+Hi all,
+this patchset add the timeout-sec property to the watchdog core,
+in the next revision i will add the pnx4008 and s3c2410 driver.
 
-~Sourav
+changes:
+v2:
+  - change "timeout" to "timeout-sec" as asked by Jean-Christophe
+  - at91sam9_wdt: use the new helper function
+  - at91sam9_wdt: add bounds checking
+  - watchdog.h: add bounds checking 
+
+Fabio Porcedda (2):
+  watchdog: core: dt: add support for the timeout-sec dt property
+  watchdog: add timeout-sec property binding to some drivers
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 ++++
+ .../devicetree/bindings/watchdog/marvel.txt        |  5 +++++
+ Documentation/watchdog/watchdog-kernel-api.txt     |  3 +++
+ drivers/watchdog/at91sam9_wdt.c                    | 23 ++++++++++++++++------
+ drivers/watchdog/orion_wdt.c                       | 13 ++++++------
+ include/linux/watchdog.h                           | 15 ++++++++++++++
+ 6 files changed, 51 insertions(+), 12 deletions(-)
+
+-- 
+1.7.11.3
