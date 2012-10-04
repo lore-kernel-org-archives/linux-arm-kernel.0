@@ -1,41 +1,37 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 04 Oct 2012 20:48:54 +0200
-Subject: [PATCH] pwm: Get rid of HAVE_PWM
-In-Reply-To: <20121004182931.GA7228@avionic-0098.mockup.avionic-design.de>
-References: <1349330819-11924-1-git-send-email-thierry.reding@avionic-design.de>
- <506DA487.9070400@metafoo.de>
- <20121004182931.GA7228@avionic-0098.mockup.avionic-design.de>
-Message-ID: <506DDA16.8070604@metafoo.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 04 Oct 2012 11:49:21 -0700
+Subject: arm-soc maintainer entry
+In-Reply-To: <CAOesGMjotnx_6HiwngRO9OaZYGGAexiwZ_shkOK7qROZcjDmqA@mail.gmail.com>
+References: <506D4BCD.3020402@codeaurora.org>
+ <CAOesGMjotnx_6HiwngRO9OaZYGGAexiwZ_shkOK7qROZcjDmqA@mail.gmail.com>
+Message-ID: <506DDA31.9010503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2012 08:29 PM, Thierry Reding wrote:
-> On Thu, Oct 04, 2012 at 05:00:23PM +0200, Lars-Peter Clausen wrote:
->> On 10/04/2012 08:06 AM, Thierry Reding wrote:
->>> [...]
->>> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
->>> index 331d574..b38f23d 100644
->>> --- a/arch/mips/Kconfig
->>> +++ b/arch/mips/Kconfig
->>> @@ -219,7 +219,8 @@ config MACH_JZ4740
->>>  	select GENERIC_GPIO
->>>  	select ARCH_REQUIRE_GPIOLIB
->>>  	select SYS_HAS_EARLY_PRINTK
->>> -	select HAVE_PWM
->>> +	select PWM
->>> +	select PWM_JZ4740
->>>  	select HAVE_CLK
->>>  	select GENERIC_IRQ_CHIP
+On 10/04/12 09:55, Olof Johansson wrote:
+> Hi,
+>
+> On Thu, Oct 4, 2012 at 1:41 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> Is the arm at kernel.org alias going to be added into the MAINTAINERS file?
+>> Should anybody be sending mails to this address?
 >>
->> I'm not sure if this is such a good idea, not all jz4740 based board
->> necessarily require PWM.
-> 
-> This really only restores previous behaviour. But I agree that this is
-> potentially not what we want. Maybe we should just not select this for
-> any boards but rather leave it up to some default configuration. If so
-> the patch can be made simpler by just removing the HAVE_PWM entries.
+>> It seems I asked this over a year ago and the response was positive but
+>> nothing ever happened[1]. Maybe something like below? I only ask because
+>> get_maintainer.pl isn't picking up this email.
+> I've been holding off re-proposing this, mostly because life is easier
+> for us if we don't get arm at kernel.org cc:d on every single patch by
+> people who run get_maintainers.pl -- it's the equivalent of getting
+> linux-arm-kernel cc:d to your inbox. It's better signal-to-noise ratio
+> if it's mostly platform maintainers that email us on that address with
+> pull requests or patches they want applied.
+>
+> But yeah, it also means that the maintainer structure is undocumented.
+> I'm open for suggestions.
+>
 
-At least for JZ4740 I think that is the better solution.
+Thanks for clarifying. Maybe we can put in the git tree and no email
+address? That at least documents some structure.
 
-Thanks,
-- Lars
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
