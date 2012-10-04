@@ -1,80 +1,120 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 4 Oct 2012 14:41:46 +0530
-Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <506D52D2.9060105@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 04 Oct 2012 11:21:46 +0200
+Subject: [alsa-devel] [PATCH 2/3] ASoC: Davinci: pcm: add support for
+ sram-support-less platforms
+In-Reply-To: <506B1B46.2070006@gmail.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-3-git-send-email-gururaja.hebbar@ti.com>
+ <20120922153313.GN4495@opensource.wolfsonmicro.com> <506A9C65.5040309@ti.com>
+ <20121002093753.GU4360@opensource.wolfsonmicro.com>
+ <506AC303.9080906@gmail.com> <506ACACE.4030308@ti.com>
+ <506AEF57.2000306@gmail.com> <20121002164116.GT5641@beef>
+ <506B1B46.2070006@gmail.com>
+Message-ID: <506D552A.2000506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 October 2012 02:20 PM, Stephen Boyd wrote:
-> The TWD and SCU configs are selected by default as long as
-> SCORPIONMP is false and/or MCT is false. Implementing the logic
-> this way certainly saves lines in the Kconfig but it precludes
-> those machines which select SCORPIONMP or MCT from participating
-> in the single zImage effort because when those machines are
-> combined with other SMP capable machines the TWD and SCU are no
-> longer selected.
->
-> Push the select out to the machine entries so that we can compile
-> these machines together and still select the appropriate configs.
->
-> Signed-off-by: Stephen Boyd<sboyd@codeaurora.org>
-> Cc: David Brown<davidb@codeaurora.org>
-> Cc: Kukjin Kim<kgene.kim@samsung.com>
-> Cc: Linus Walleij<linus.walleij@linaro.org>
-> Cc: Pawel Moll<pawel.moll@arm.com>
-> Cc: Rob Herring<rob.herring@calxeda.com>
-> Cc: Russell King<linux@arm.linux.org.uk>
-> Cc: Sascha Hauer<kernel@pengutronix.de>
-> Cc: Shiraz Hashim<shiraz.hashim@st.com>
-> Cc: Simon Horman<horms@verge.net.au>
-> Cc: Srinidhi Kasagar<srinidhi.kasagar@stericsson.com>
-> Cc: Stephen Warren<swarren@wwwdotorg.org>
-> Cc: Tony Lindgren<tony@atomide.com>
-> Cc: Viresh Kumar<viresh.linux@gmail.com>
-> ---
->
-> Does OMAP5 need to select TWD? I suspect not if it uses the
-> architected timers.
->
-Nope. OMAP5 don't use TWD. Infact the external SCU is also used
-for A9 SOCs. You might want to check other A15 SOCS for SCU as
-well.
+On 02.10.2012 18:50, Daniel Mack wrote:
+> On 02.10.2012 18:41, Matt Porter wrote:
+>> On Tue, Oct 02, 2012 at 03:42:47PM +0200, Daniel Mack wrote:
+>>> On 02.10.2012 13:06, Sekhar Nori wrote:
+>>>> On 10/2/2012 4:03 PM, Daniel Mack wrote:
+>>>>> On 02.10.2012 11:37, Mark Brown wrote:
+>>>>>> On Tue, Oct 02, 2012 at 10:48:53AM +0300, Peter Ujfalusi wrote:
+>>>>>>
+>>>>>>> I also agree that ifdef is not a good solution.
+>>>>>>> It is better to have this information passed as device_data and via DT it can
+>>>>>>> be decided based on the compatible property for the device.
+>>>>>>
+>>>>>> That's not really the problem here - the problem is that the APIs used
+>>>>>> to get the SRAM are DaVinci only so it's not possible to build on OMAP
+>>>>>> or other platforms.  The SRAM code needs to move to a standard API.
+>>>>>
+>>>>> What about following Matt Porter's idea and ignore the SRAM code
+>>>>> entirely and port the entire PCM code to generic dmaengine code first?
+>>>>> The EDMA driver needs to learn support for cyclic DMA for that, and I
+>>>>> might give that a try in near future.
+>>>>>
+>>>>> Later on, the SRAM ping-pong code can get added back using genalloc
+>>>>> functions, as Sekhar proposed. That needs to be done by someone who has
+>>>>> access to a Davinci board though, I only have a AM33xx/OMAP here.
+>>>>
+>>>> We cannot "get rid" of SRAM code and add it back "later". It is required
+>>>> for most DaVinci parts. The SRAM code can be converted to use genalloc
+>>>> (conversion should be straightforward and I can help test it) and the
+>>>> code that uses SRAM can probably keep using the private EDMA API till
+>>>> the dmaengine EDMA driver has cyclic DMA support. Matt has already
+>>>> posted patches to move private EDMA APIs to a common location. That
+>>>> should keep AM335x build from breaking. Is this something that is feasible?
+>>>
+>>> Yes - by "later" I just meant in a subsequent patch. But you're probably
+>>> right, we can also do that first.
+>>>
+>>> I'm looking at that right now and the problem seems that we don't have a
+>>> sane way to dynamically look up gen_pools independently of the actual
+>>> run-time platform. All users of gen_pools seem to know which platform
+>>> they run on and access a platform-specific pool. So I don't currently
+>>> see how we could implement multi-platform code, gen_pools are fine but
+>>> don't solve the problem here.
+>>>
+>>> Would it be an idea to add a char* member to gen_pools and a function
+>>> that can be used to dynamically look it up again? If a buffer with a
+>>> certain name exists, we can use it and install that ping-pong buffer,
+>>> otherwise we just don't. While that would be easy to do, it's a
+>>> tree-wide change.
+>>>
+>>> Is there a better way that I miss?
+>>
+>> At the high level there's two platform models we have to handle, the
+>> boot from board file !DT case, and then the boot from DT case. Since
+>> Davinci is just starting DT conversion, we mostly care about the !DT
+>> base in which the struct gen_pool * is passed in pdata to the ASoC
+>> driver. It is then selectable on a per-platform basis where the decision
+>> should be made.
+>>
+>> Given a separate discussion with Sekhar, we're only going to have one
+>> SRAM pool on any DaVinci part right now...this was only a question on
+>> L138 anyway. But regardless, the created gen_pool will be passed via
+>> pdata.
+> 
+> I thought about this too, as mmp does it that way.
+> 
+>> Since DT conversion is starting and we need to consider that now,
+>> the idea there is to use the DT-based generic sram driver [1] such that
+>> when we do boot from DT on Davinci, the genpool is provided via phandle
+>> and the pointer extracted with the OF helpers that are part of the
+>> series.
+> 
+> A phandle is the cleanest way I think, yes.
+> 
+>> That's pretty much it. I'm reworking the backend support as discussed
+>> with Sekhar wrt to my uio_pruss series. I can post a standalone series
+>> that just replaces sram_* with genalloc for davinci ASoC.
+> 
+> As you can also test it, it would be easiest if you came up with a patch
+> for that, yes. I can have a look at the dma bits laters, once my OMAP
+> board finally works with the code as it currently stands. I'm still
+> fighting with the mcasp driver right now ...
 
-[..]
+I quickly prepared two patches to change that, so that topic is out of
+the way. But I did only compile-test them on OMAP - could you check on
+your Davinci platform? Note that these apply on top of the patch in
+discussion here (which isn't applied to the asoc tree yet).
 
->   arch/arm/mach-omap2/Kconfig    | 4 ++++
 
-[..]
+Daniel
 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index a6219ea..b618748 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -58,7 +58,9 @@ config ARCH_OMAP4
->   	select CPU_V7
->   	select ARM_GIC
->   	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
->   	select LOCAL_TIMERS if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->   	select PL310_ERRATA_588369
->   	select PL310_ERRATA_727915
->   	select ARM_ERRATA_720789
-Ok.
-
-> @@ -75,6 +77,8 @@ config SOC_OMAP5
->   	select CPU_V7
->   	select ARM_GIC
->   	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->   	select ARM_CPU_SUSPEND if PM
->   	select SOC_HAS_REALTIME_COUNTER
->   	select ARM_ARCH_TIMER
-Drop this change.
-
-With that fixed, for OMAP changes
-
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-davinci-pass-SRAM-gen_pool-to-mcasp-platform-dat.patch
+Type: text/x-patch
+Size: 8048 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/c5c4e92c/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-ALSA-ASoC-McASP-use-gen_pool-from-platform-data.patch
+Type: text/x-patch
+Size: 4201 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/c5c4e92c/attachment-0003.bin>
