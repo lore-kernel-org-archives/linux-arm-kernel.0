@@ -1,36 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2012 07:01:10 +0000
-Subject: linux-next: manual merge of the signal tree with the modules and
- arm-soc trees
-In-Reply-To: <20121004145241.fac039e78a15bb614cbd6da0@canb.auug.org.au>
-References: <20121004145241.fac039e78a15bb614cbd6da0@canb.auug.org.au>
-Message-ID: <201210040701.10636.arnd@arndb.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 4 Oct 2012 12:43:08 +0530
+Subject: [PATCH] ARM: davinci: dm644x: fix out range signal for ED
+In-Reply-To: <CA+V-a8uFNXvb7bPv0dLKeSeNzZ9C3rvrXCNSWy+8HgiumR9sEw@mail.gmail.com>
+References: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
+ <506C158D.4000906@ti.com>
+ <CA+V-a8uFNXvb7bPv0dLKeSeNzZ9C3rvrXCNSWy+8HgiumR9sEw@mail.gmail.com>
+Message-ID: <506D3704.4060102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 October 2012, Stephen Rothwell wrote:
-> Hi Al,
+On 10/4/2012 10:22 AM, Prabhakar Lad wrote:
+> Hi Sekhar,
 > 
-> Today's linux-next merge of the signal tree got conflicts in
-> arch/avr32/include/asm/Kbuild, arch/cris/include/asm/Kbuild,
-> arch/frv/include/asm/Kbuild, arch/h8300/include/asm/Kbuild,
-> arch/ia64/include/asm/Kbuild, arch/m32r/include/asm/Kbuild,
-> arch/microblaze/include/asm/Kbuild, arch/mn10300/include/asm/Kbuild and
-> arch/xtensa/include/asm/Kbuild between commit e7a570ff7dff ("asm-generic:
-> Add default clkdev.h") from the arm-soc tree, commit 786d35d45cc4 ("Make
-> most arch asm/module.h files use asm-generic/module.h") from the modules
-> tree and commit ddd03a1f7591 ("get rid of generic instances of
-> asm/exec.h") from the signal tree.
+> On Wed, Oct 3, 2012 at 4:08 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On 10/3/2012 12:05 PM, Prabhakar wrote:
+>>> From: Lad, Prabhakar <prabhakar.lad@ti.com>
+>>>
+>>> while testing display on dm644x, for ED out-range signals
+>>> was observed. This patch fixes appropriate clock setting
+>>> for ED.
+>>
+>> Can you please clarify what you mean by "out range signal"? Are there
+>> any user visible artifacts on the display? What was the clock being
+>> provided earlier and what is the value after this patch?
+>>
+>> Also, is the issue severe enough that this patch should be applied to
+>> stable tree as well?
+>>
+> Ideally a clock of 54Mhz is required for  enhanced definition to
+> work, which it was actually set to but while testing I noticed
+> out-of-range signal. The out-of-range signal is often caused
+> when the field rate is above the rate that the television will handle.
+> When this is the case the TV or monitor displays "Out-Of-Range Signal".
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> Reducing the clock fixed it. now the clock is set to 27Mhz.
 
-Thanks for the three fixups. I was aware the conflicts would happen, but
-your solutions are all correct. I had promised ot Mark a long time ago
-to merge his patch and never actually done it.
+So, is the requirement for ED 54MHz or lower? Still trying to explain
+myself how 27MHz is working where a 54MHz is required. I guess there is
+also a lower limit on what the frequency should be?
 
-My plan right now is to send the pull request after the other changes
-have gone in and it's been in linux-next without new complaints for
-a few days. The patch itself is very simple and should be harmless.
+Sorry I am not familiar will all the video concepts, hence the questions.
 
-	Arnd
+Thanks,
+Sekhar
