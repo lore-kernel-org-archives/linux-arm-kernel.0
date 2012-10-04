@@ -1,49 +1,61 @@
-From: pza@pengutronix.de (Philipp Zabel)
-Date: Thu, 4 Oct 2012 16:06:09 +0200
-Subject: [PATCH v3 0/6] uio_pruss cleanup and platform support
-In-Reply-To: <20121004135433.GI11149@beef>
-References: <1349276133-26408-1-git-send-email-mporter@ti.com>
- <20121004091145.GA3317@pengutronix.de>
- <20121004124253.GC11149@beef>
- <20121004133553.GA5151@pengutronix.de>
- <20121004135433.GI11149@beef>
-Message-ID: <20121004140609.GA5464@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 4 Oct 2012 11:07:28 -0300
+Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
+ camera and eMMA
+In-Reply-To: <CAOMZO5CAvwwGEwbZE2VS49tpWOYxAR_qQkfKhswPaofSrni92A@mail.gmail.com>
+References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
+ <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
+ <5047013E.30508@gmail.com>
+ <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
+ <50471187.3040809@gmail.com>
+ <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
+ <50471CEE.60606@gmail.com>
+ <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
+ <504769CF.2070904@gmail.com>
+ <CAOMZO5DyjdrZYNDMuT1=yuxQcHuP3=6dy_j_ja1vub56_m3pvA@mail.gmail.com>
+ <504774B7.8090007@gmail.com>
+ <CAOMZO5CAvwwGEwbZE2VS49tpWOYxAR_qQkfKhswPaofSrni92A@mail.gmail.com>
+Message-ID: <CAOMZO5C+NNQr0mo6P2cKx4RxFoQPyYuPZq4eFUZnvi_7gTRkBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 09:54:33AM -0400, Matt Porter wrote:
-> *sigh*, I see now. I looked at v2 and got wrapped up in the DT use case
-> and missed your platform device support. I think it will work just fine
-> for us to use in a "phase 2" of this work, replacing the backend of
-> davinci sram allocation with this as Sekhar seems to be open to. 
-> 
-> > > I do see it moving to your driver exclusively, but I wanted to make this
-> > > series focused on only getting rid of the private SRAM API using the
-> > > existing pdata framework that's already there. I think once
-> > > gen_pool_find_by_phys() goes upstream we can switch to that and get the
-> > > address from a resource in the !DT case. I guess we should see if Sekhar
-> > > would like to see this happen in two steps or just have us depend on
-> > > the gen_pool_find_by_phys() patch now.
-> > 
-> > Thanks, I'm glad you are aware of the sram driver and consider it useful.
-> > 
-> > > BTW, I was going to post a patch for your driver to allow
-> > > configurability of the allocation order, but have been busy with other
-> > > things.  We'll eventually need that when switching to it as the
-> > > hardcoded page size order isn't going to work for all cases.
-> > 
-> > Good point.
-> 
-> I think this is the only blocker to DaVinci adopting it once it goes
-> upstream. I can add a patch in your driver thread if that helps.
+Hi Javier,
 
-Yes, that would be welcome.
+On Wed, Sep 5, 2012 at 3:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-regards
-Philipp
+> Sylwester suggested me this patch and it fixed the issue:
+> http://git.linuxtv.org/snawrocki/media.git/commitdiff/458b9b5ab8cb970887c9d1f1fddf88399b2d9ef2
+>
+> Now ov2640 probes correctly on mx31pdk, but on mx27pdk I have:
+>
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx2-camera mx2-camera.0: Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb
+> mx2-camera mx2-camera.0: Camera driver detached from camera 0
+> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
+> frequency: 66500000
+>
+> This works fine in 3.4.10 and I suspect this problem is due to the imx
+> clock conversion as the csi clock frequency looks incorrect.
+>
+> Javier,
+>
+> Can you get your camera working on visstrim board using linux-next or
+> 3.6-rc4? Any patches I am missing?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Could you please confirm if your camera works with the latest kernel?
+
+If so, could you please your log below?
+
+Not sure if the clock frequency below is correct.
+
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx2-camera mx2-camera.0: Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb
+> mx2-camera mx2-camera.0: Camera driver detached from camera 0
+> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
+> frequency: 66500000
+
+Thanks,
+
+Fabio Estevam
