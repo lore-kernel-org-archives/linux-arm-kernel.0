@@ -1,128 +1,120 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 4 Oct 2012 14:52:41 +1000
-Subject: linux-next: manual merge of the signal tree with the modules and
- arm-soc trees
-Message-ID: <20121004145241.fac039e78a15bb614cbd6da0@canb.auug.org.au>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Thu, 4 Oct 2012 14:49:29 +1000
+Subject: [PATCH 1/1] Fix segfault in DTC
+In-Reply-To: <506CAF2A.204@wwwdotorg.org>
+References: <50632F78.4030709@broadcom.com> <5065D9C7.40906@wwwdotorg.org>
+ <E1THfgr-0006Fg-KT@jdl.com> <5065F4FD.4010807@wwwdotorg.org>
+ <20120929235342.GA23078@truffula.fritz.box>
+ <50692B7A.8000405@wwwdotorg.org>
+ <20121001064610.GA5323@truffula.fritz.box>
+ <5069C7A5.8090409@wwwdotorg.org>
+ <20121002000851.GA29302@truffula.fritz.box>
+ <506CAF2A.204@wwwdotorg.org>
+Message-ID: <20121004044929.GP29302@truffula.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+On Wed, Oct 03, 2012 at 03:33:30PM -0600, Stephen Warren wrote:
+> On 10/01/2012 06:08 PM, David Gibson wrote:
+> > On Mon, Oct 01, 2012 at 10:41:09AM -0600, Stephen Warren wrote:
+> >> On 10/01/2012 12:46 AM, David Gibson wrote:
+> >>> On Sun, Sep 30, 2012 at 11:34:50PM -0600, Stephen Warren wrote:
+> >>>> On 09/29/2012 05:53 PM, David Gibson wrote:
+> >>>>> On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
+> >>>>>> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
+> >>>>>>>>>
+> >>>>>>>>> Yeah, seems like the kernel DTC is quite old.
+> >>>>>>>>
+> >>>>>>>> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
+> >>>>>>>
+> >>>>>>> Awesome.  Thank you.
+> >>>>>>>
+> >>>>>>>> I've run a regression test vs. the old dtc in the kernel ...
+> >>>>>>>
+> >>>>>>> Which is the icky step.  Again, thank you.
+> >>>>>>>
+> >>>>>>>> ... and found that
+> >>>>>>>> some of the PowerPC .dts files don't compile with the new dtc (but did
+> >>>>>>>> with the old), all due to non-existent labels/paths being referenced.
+> >>>>>>>> I'll try and track down whether this is a regression in dtc, or simply
+> >>>>>>>> buggy .dts files that weren't noticed before.
+> >>>>>>>
+> >>>>>>> I think you should just smack the PowerPC guys. :-)
+> >>>>>>
+> >>>>>> For the record in this thread, it was a regression I introduced into dtc
+> >>>>>> - the patch I just sent was for this.
+> >>>>>
+> >>>>> I would be nice to add a testcase for this regression into dtc.
+> >>>>
+> >>>> The issue here was caused by uninitialized memory, so it would, I think,
+> >>>> be basically impossible to create a test-case that would be guaranteed
+> >>>> to fail because of this; it'd depend on the internal details of the
+> >>>> malloc library and how/when it re-used previously free()d memory blocks.
+> >>>
+> >>> It doesn't have to be guaranteed to fail to be useful.  Plus, we
+> >>> already have the infrastructure to run the tests under valgrind, which
+> >>> would catch it.
+> >>
+> >> I certainly disagree here; the absolute worst kind of test is one which
+> >> gives different results each time it's run, or statically gives
+> >> different results to different people. People will either ignore the
+> >> test because it's flaky, or it'll end up blaming the wrong person due to
+> >> some entirely unrelated and correct change just happening to tickle the
+> >> test.
+> > 
+> > I'd agree 100% if the test could give false failures.  But in this
+> > case it can only give false passes.
+> 
+> That is true. I still dislike flaky tests irrespective of
+> false-{negative,positive} though.
 
-Today's linux-next merge of the signal tree got conflicts in
-arch/avr32/include/asm/Kbuild, arch/cris/include/asm/Kbuild,
-arch/frv/include/asm/Kbuild, arch/h8300/include/asm/Kbuild,
-arch/ia64/include/asm/Kbuild, arch/m32r/include/asm/Kbuild,
-arch/microblaze/include/asm/Kbuild, arch/mn10300/include/asm/Kbuild and
-arch/xtensa/include/asm/Kbuild between commit e7a570ff7dff ("asm-generic:
-Add default clkdev.h") from the arm-soc tree, commit 786d35d45cc4 ("Make
-most arch asm/module.h files use asm-generic/module.h") from the modules
-tree and commit ddd03a1f7591 ("get rid of generic instances of
-asm/exec.h") from the signal tree.
+I don't love it, but I think a test which can generate false-negatives
+is better than no test.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+> > If the test fails there is a bug
+> > *somewhere*, even if it's not actually in whatever changed last.  The
+> > test framework actually has a "PASS (inconclusive)" result for exactly
+> > this sort of case.
+> > 
+> >> If we were to force any such new test to always run under valgrind, then
+> >> hopefully the test would always fail (assuming the test harness triggers
+> >> failure if valgrind finds problems).
+> > 
+> > Aside: it's supposed to;  if it doesn't, that's a bug.  You can try it
+> > easily enough with "make checkm".
+> 
+> Ah, I didn't know about that make target (or even "make check"; I'd
+> always run run_tests.sh manually).
+> 
+> Incidentally, before commit 317a5d9 "dtc: zero out new label objects"
+> the following two tests fail under make checkm:
+> 
+> dtc -I dts -O dtb -o multilabel.test.dtb multilabel.dts:        FAIL
+> Returned error code 126
+> 
+> dtc -I dts -O dtb -o multilabel_merge.test.dtb multilabel_merge.dts:
+> FAIL Returned error code 126
+> 
+> However, they pass at/after that commit.
+
+Ah, interesting.  Goes to show that neither Jon nor I runs the
+valgrind check as often as we probably should.
+
+> Equally, those failures were introduced with commit 45013d8 "dtc: Add
+> ability to delete nodes and properties", which is exactly what I'd
+> expect given the fix was a fix for that commit.
+> 
+> So, it seems like we already have tests that catch this problem. Do we
+> need to do anything given that?
+
+Hm, I guess not.
+
+> I am slightly surprised that the problem didn't cause all tests to fail
+> make checkm though (I'd expect any usage of a label to trigger the
+> problem); I'll have to think about why some more...
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/avr32/include/asm/Kbuild
-index e3ba7bc,aa47fff..0000000
---- a/arch/avr32/include/asm/Kbuild
-+++ b/arch/avr32/include/asm/Kbuild
-@@@ -1,5 -1,4 +1,6 @@@
-  include include/asm-generic/Kbuild.asm
-  
- +generic-y	+= clkdev.h
-+ generic-y	+= exec.h
- +
-  header-y	+= cachectl.h
-diff --cc arch/cris/include/asm/Kbuild
-index 6900bbf,b68ad4b..0000000
---- a/arch/cris/include/asm/Kbuild
-+++ b/arch/cris/include/asm/Kbuild
-@@@ -8,5 -8,4 +8,6 @@@ header-y += etraxgpio.
-  header-y += rs485.h
-  header-y += sync_serial.h
-  
- +generic-y += module.h
- +generic-y += clkdev.h
-+ generic-y += exec.h
-diff --cc arch/frv/include/asm/Kbuild
-index 13cd044,32c1646..0000000
---- a/arch/frv/include/asm/Kbuild
-+++ b/arch/frv/include/asm/Kbuild
-@@@ -2,4 -2,4 +2,6 @@@ include include/asm-generic/Kbuild.as
-  
-  header-y += registers.h
-  header-y += termios.h
-++
- +generic-y += clkdev.h
-+ generic-y += exec.h
-diff --cc arch/h8300/include/asm/Kbuild
-index 98477e9,3a2af1a..0000000
---- a/arch/h8300/include/asm/Kbuild
-+++ b/arch/h8300/include/asm/Kbuild
-@@@ -1,4 -1,2 +1,5 @@@
-  include include/asm-generic/Kbuild.asm
- +
- +generic-y	+= module.h
- +generic-y	+= clkdev.h
-+ generic-y += exec.h
-diff --cc arch/ia64/include/asm/Kbuild
-index 58f3d14,98efd48..0000000
---- a/arch/ia64/include/asm/Kbuild
-+++ b/arch/ia64/include/asm/Kbuild
-@@@ -13,4 -13,4 +13,6 @@@ header-y += ptrace_offsets.
-  header-y += rse.h
-  header-y += ucontext.h
-  header-y += ustack.h
-++
- +generic-y += clkdev.h
-+ generic-y += exec.h
-diff --cc arch/m32r/include/asm/Kbuild
-index 98477e9,7083403..0000000
---- a/arch/m32r/include/asm/Kbuild
-+++ b/arch/m32r/include/asm/Kbuild
-@@@ -1,4 -1,3 +1,5 @@@
-  include include/asm-generic/Kbuild.asm
-  
- +generic-y	+= module.h
- +generic-y	+= clkdev.h
-+ generic-y += exec.h
-diff --cc arch/microblaze/include/asm/Kbuild
-index 48510f6,5a0e72b..0000000
---- a/arch/microblaze/include/asm/Kbuild
-+++ b/arch/microblaze/include/asm/Kbuild
-@@@ -1,4 -1,4 +1,6 @@@
-  include include/asm-generic/Kbuild.asm
-  
-  header-y  += elf.h
-++
- +generic-y += clkdev.h
-+ generic-y += exec.h
-diff --cc arch/mn10300/include/asm/Kbuild
-index 0d20f55,7083403..0000000
---- a/arch/mn10300/include/asm/Kbuild
-+++ b/arch/mn10300/include/asm/Kbuild
-@@@ -1,3 -1,3 +1,4 @@@
-  include include/asm-generic/Kbuild.asm
-  
- +generic-y += clkdev.h
-+ generic-y += exec.h
-diff --cc arch/xtensa/include/asm/Kbuild
-index 0d20f55,7083403..0000000
---- a/arch/xtensa/include/asm/Kbuild
-+++ b/arch/xtensa/include/asm/Kbuild
-@@@ -1,3 -1,3 +1,4 @@@
-  include include/asm-generic/Kbuild.asm
-  
- +generic-y += clkdev.h
-+ generic-y += exec.h
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121004/c14c4154/attachment.sig>
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
