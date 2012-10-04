@@ -1,85 +1,149 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu,  4 Oct 2012 17:17:45 +0200
-Subject: [PATCH 17/24 v2] ARM: cns3xxx: use OHCI platform driver
-In-Reply-To: <1349363872-27004-1-git-send-email-florian@openwrt.org>
-References: <1349363872-27004-1-git-send-email-florian@openwrt.org>
-Message-ID: <1349363872-27004-18-git-send-email-florian@openwrt.org>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 4 Oct 2012 11:25:09 -0400
+Subject: [PATCH v4 2/6] misc: Generic on-chip SRAM allocation driver
+In-Reply-To: <1347021828-23034-3-git-send-email-p.zabel@pengutronix.de>
+References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+ <1347021828-23034-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20121004152509.GJ11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since both the EHCI and OHCI platform drivers use the same power_{on,off}
-callbacks, rename them to cns3xx_usb_power_{on,off} to show that they are
-shared.
+On Fri, Sep 07, 2012 at 02:43:44PM +0200, Philipp Zabel wrote:
+> This driver requests and remaps a memory region as configured in the
+> device tree. It serves memory from this region via the genalloc API.
+> 
+> Other drivers can retrieve the genalloc pool from a phandle pointing
+> to this drivers' device node in the device tree.
 
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
+<snip>
+
+> +	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
+> +	if (!sram->pool)
+> +		return -ENOMEM;
+
+As mentioned in the uio_pruss/genalloc discussion, removing the
+hardcoded minimum allocation order will allow this to be used for
+a number of other cases. The most notable is moving mach-davinci/
+off of its own genalloc-based SRAM arch driver. Some of the davinci
+SoCs have very small SRAMs and need the ability to allocate a smaller
+chunk.
+
+Here's a build-tested patch to add this option:
+
+>From 6eced8c31eba2f86e72e854cf404d8f58fbeba85 Mon Sep 17 00:00:00 2001
+From: Matt Porter <mporter@ti.com>
+Date: Thu, 4 Oct 2012 11:08:02 -0400
+Subject: [PATCH] misc: sram: add support for configurable allocation order
+
+Adds support for setting the genalloc pool's minimum allocation
+order via DT or platform data. The allocation order is optional
+for both the DT property and platform data case. If it is not
+present then the order defaults to PAGE_SHIFT to preserve the
+current behavior.
+
+Signed-off-by: Matt Porter <mporter@ti.com>
 ---
-No changes since v1
+ Documentation/devicetree/bindings/misc/sram.txt |   12 ++++++++++-
+ drivers/misc/sram.c                             |   14 ++++++++++++-
+ include/linux/platform_data/sram.h              |   25 +++++++++++++++++++++++
+ 3 files changed, 49 insertions(+), 2 deletions(-)
+ create mode 100644 include/linux/platform_data/sram.h
 
- arch/arm/mach-cns3xxx/cns3420vb.c |   18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 906094c..8a00cee8 100644
---- a/arch/arm/mach-cns3xxx/cns3420vb.c
-+++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -25,6 +25,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/mtd/partitions.h>
- #include <linux/usb/ehci_pdriver.h>
-+#include <linux/usb/ohci_pdriver.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/hardware/gic.h>
-@@ -127,7 +128,7 @@ static struct resource cns3xxx_usb_ehci_resources[] = {
+diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
+index b64136c..b1705ec 100644
+--- a/Documentation/devicetree/bindings/misc/sram.txt
++++ b/Documentation/devicetree/bindings/misc/sram.txt
+@@ -8,10 +8,20 @@ Required properties:
  
- static u64 cns3xxx_usb_ehci_dma_mask = DMA_BIT_MASK(32);
+ - reg : SRAM iomem address range
  
--static int csn3xxx_usb_ehci_power_on(struct platform_device *pdev)
-+static int csn3xxx_usb_power_on(struct platform_device *pdev)
- {
- 	/*
- 	 * EHCI and OHCI share the same clock and power,
-@@ -148,7 +149,7 @@ static int csn3xxx_usb_ehci_power_on(struct platform_device *pdev)
- 	return 0;
- }
+-Example:
++Optional properties:
++
++- alloc-order : Minimum allocation order for the SRAM pool
++
++Examples:
++
++sram: sram at 5c000000 {
++	compatible = "sram";
++	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
++};
  
--static void csn3xxx_usb_ehci_power_off(struct platform_device *pdev)
-+static void csn3xxx_usb_power_off(struct platform_device *pdev)
- {
- 	/*
- 	 * EHCI and OHCI share the same clock and power,
-@@ -162,8 +163,8 @@ static void csn3xxx_usb_ehci_power_off(struct platform_device *pdev)
- 
- static struct usb_ehci_pdata cns3xxx_usb_ehci_pdata = {
- 	.port_power_off	= 1,
--	.power_on	= csn3xxx_usb_ehci_power_on,
--	.power_off	= csn3xxx_usb_ehci_power_off,
-+	.power_on	= csn3xxx_usb_power_on,
-+	.power_off	= csn3xxx_usb_power_off,
+ sram: sram at 5c000000 {
+ 	compatible = "sram";
+ 	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
++	alloc-order = <9>; /* Minimum 512 byte allocation */
  };
  
- static struct platform_device cns3xxx_usb_ehci_device = {
-@@ -191,13 +192,20 @@ static struct resource cns3xxx_usb_ohci_resources[] = {
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index 7a363f2..3bf8ed3 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -26,6 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/genalloc.h>
++#include <linux/platform_data/sram.h>
  
- static u64 cns3xxx_usb_ohci_dma_mask = DMA_BIT_MASK(32);
+ struct sram_dev {
+ 	struct gen_pool *pool;
+@@ -37,6 +38,7 @@ static int __devinit sram_probe(struct platform_device *pdev)
+ 	struct sram_dev *sram;
+ 	struct resource *res;
+ 	unsigned long size;
++	u32 alloc_order = PAGE_SHIFT;
+ 	int ret;
  
-+static struct usb_ohci_pdata cns3xxx_usb_ohci_pdata = {
-+	.num_ports	= 1,
-+	.power_on	= csn3xxx_usb_power_on,
-+	.power_off	= csn3xxx_usb_power_off,
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -53,7 +55,17 @@ static int __devinit sram_probe(struct platform_device *pdev)
+ 	if (!sram)
+ 		return -ENOMEM;
+ 
+-	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
++	if (pdev->dev.of_node)
++		of_property_read_u32(pdev->dev.of_node,
++				     "alloc-order", &alloc_order);
++	else
++		if (pdev->dev.platform_data) {
++			struct sram_pdata *pdata = pdev->dev.platform_data;
++			if (pdata->alloc_order)
++				alloc_order = pdata->alloc_order;
++		}
++
++	sram->pool = gen_pool_create(alloc_order, -1);
+ 	if (!sram->pool)
+ 		return -ENOMEM;
+ 
+diff --git a/include/linux/platform_data/sram.h b/include/linux/platform_data/sram.h
+new file mode 100644
+index 0000000..e17bdaa
+--- /dev/null
++++ b/include/linux/platform_data/sram.h
+@@ -0,0 +1,25 @@
++/*
++ * include/linux/platform_data/sram.h
++ *
++ * Platform data for generic sram driver
++ *
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _SRAM_H_
++#define _SRAM_H_
++
++struct sram_pdata {
++	unsigned alloc_order;	/* Optional: driver defaults to PAGE_SHIFT */
 +};
 +
- static struct platform_device cns3xxx_usb_ohci_device = {
--	.name          = "cns3xxx-ohci",
-+	.name          = "ohci-platform",
- 	.num_resources = ARRAY_SIZE(cns3xxx_usb_ohci_resources),
- 	.resource      = cns3xxx_usb_ohci_resources,
- 	.dev           = {
- 		.dma_mask          = &cns3xxx_usb_ohci_dma_mask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data	   = &cns3xxx_usb_ohci_pdata,
- 	},
- };
- 
++#endif /* _SRAM_H_ */
 -- 
 1.7.9.5
