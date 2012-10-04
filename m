@@ -1,138 +1,184 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 04 Oct 2012 21:12:49 +0530
-Subject: [PATCH v1 11/14] drm: exynos: hdmi: add support for exynos5 mixer
+Date: Thu, 04 Oct 2012 21:12:50 +0530
+Subject: [PATCH v1 12/14] drm: exynos: hdmi: replace is_v13 with version check
+ in hdmi
 In-Reply-To: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
 References: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1349365372-21417-12-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1349365372-21417-13-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for exynos5 mixer with device tree enabled.
+This patch removed the is_v13 variable from the hdmi driver context.
+It is replaced with condition check for the hdmi version. This cleans
+the way for handling further hdmi versions.
 
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-Signed-off-by: Fahad Kunnathadi <fahad.k@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_mixer.c |   49 +++++++++++++++++++++++++++++++--
- drivers/gpu/drm/exynos/regs-mixer.h   |    3 ++
- 2 files changed, 49 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/exynos/exynos_hdmi.c |   40 +++++++++++++++++-----------------
+ 1 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index 1677345..39d2b95 100644
---- a/drivers/gpu/drm/exynos/exynos_mixer.c
-+++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -481,6 +481,18 @@ static void vp_video_buffer(struct mixer_context *ctx, int win)
- 	vp_regs_dump(ctx);
- }
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index e3ab840..89e798b 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -47,6 +47,11 @@
+ #define MAX_HEIGHT		1080
+ #define get_hdmi_context(dev)	platform_get_drvdata(to_platform_device(dev))
  
-+static void mixer_layer_update(struct mixer_context *ctx)
-+{
-+	struct mixer_resources *res = &ctx->mixer_res;
-+	u32 val;
-+
-+	val = mixer_reg_read(res, MXR_CFG);
-+
-+	/* allow one update per vsync only */
-+	if (!(val & MXR_CFG_LAYER_UPDATE_COUNT_MASK))
-+		mixer_reg_writemask(res, MXR_CFG, ~0, MXR_CFG_LAYER_UPDATE);
-+}
-+
- static void mixer_graph_buffer(struct mixer_context *ctx, int win)
- {
- 	struct mixer_resources *res = &ctx->mixer_res;
-@@ -561,6 +573,11 @@ static void mixer_graph_buffer(struct mixer_context *ctx, int win)
- 	mixer_cfg_scan(ctx, win_data->mode_height);
- 	mixer_cfg_rgb_fmt(ctx, win_data->mode_height);
- 	mixer_cfg_layer(ctx, win, true);
-+
-+	/* layer update mandatory for mixer 16.0.33.0 */
-+	if (ctx->mxr_ver == MXR_VER_16_0_33_0)
-+		mixer_layer_update(ctx);
-+
- 	mixer_run(ctx);
- 
- 	mixer_vsync_set_update(ctx, true);
-@@ -1065,6 +1082,11 @@ fail:
- 	return ret;
- }
- 
-+static struct mixer_drv_data exynos5_mxr_drv_data = {
-+	.version = MXR_VER_16_0_33_0,
-+	.is_vp_enabled = 0,
++enum hdmi_type {
++	HDMI_TYPE13,
++	HDMI_TYPE14,
 +};
 +
- static struct mixer_drv_data exynos4_mxr_drv_data = {
- 	.version = MXR_VER_0_0_0_16,
- 	.is_vp_enabled = 1,
-@@ -1075,6 +1097,18 @@ static struct platform_device_id mixer_driver_types[] = {
- 		.name		= "s5p-mixer",
- 		.driver_data	= (unsigned long)&exynos4_mxr_drv_data,
- 	}, {
-+		.name		= "exynos5-mixer",
-+		.driver_data	= (unsigned long)&exynos5_mxr_drv_data,
-+	}, {
-+		/* end node */
-+	}
-+};
+ struct hdmi_resources {
+ 	struct clk			*hdmi;
+ 	struct clk			*sclk_hdmi;
+@@ -62,7 +67,6 @@ struct hdmi_context {
+ 	struct drm_device		*drm_dev;
+ 	bool				hpd;
+ 	bool				powered;
+-	bool				is_v13;
+ 	bool				dvi_mode;
+ 	struct mutex			hdmi_mutex;
+ 
+@@ -80,6 +84,8 @@ struct hdmi_context {
+ 	void				*parent_ctx;
+ 
+ 	int				hpd_gpio;
 +
-+static struct of_device_id mixer_match_types[] = {
-+	{
-+		.compatible = "samsung,exynos5-mixer",
-+		.data	= &exynos5_mxr_drv_data,
-+	}, {
- 		/* end node */
- 	}
++	enum hdmi_type			type;
  };
-@@ -1104,8 +1138,16 @@ static int __devinit mixer_probe(struct platform_device *pdev)
  
- 	mutex_init(&ctx->mixer_mutex);
+ /* HDMI Version 1.3 */
+@@ -1211,7 +1217,7 @@ static void hdmi_v14_regs_dump(struct hdmi_context *hdata, char *prefix)
  
--	drv = (struct mixer_drv_data *)platform_get_device_id(
--			pdev)->driver_data;
-+	if (dev->of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(of_match_ptr(mixer_match_types),
-+							  pdev->dev.of_node);
-+		drv = match->data;
-+	} else {
-+		drv = (struct mixer_drv_data *)
-+			platform_get_device_id(pdev)->driver_data;
-+	}
-+
- 	ctx->dev = &pdev->dev;
- 	drm_hdmi_ctx->ctx = (void *)ctx;
- 	ctx->vp_enabled = drv->is_vp_enabled;
-@@ -1167,9 +1209,10 @@ static SIMPLE_DEV_PM_OPS(mixer_pm_ops, mixer_suspend, NULL);
+ static void hdmi_regs_dump(struct hdmi_context *hdata, char *prefix)
+ {
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		hdmi_v13_regs_dump(hdata, prefix);
+ 	else
+ 		hdmi_v14_regs_dump(hdata, prefix);
+@@ -1252,7 +1258,7 @@ static int hdmi_v14_conf_index(struct drm_display_mode *mode)
+ static int hdmi_conf_index(struct hdmi_context *hdata,
+ 			   struct drm_display_mode *mode)
+ {
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		return hdmi_v13_conf_index(mode);
  
- struct platform_driver mixer_driver = {
- 	.driver = {
--		.name = "s5p-mixer",
-+		.name = "exynos-mixer",
- 		.owner = THIS_MODULE,
- 		.pm = &mixer_pm_ops,
-+		.of_match_table = mixer_match_types,
- 	},
- 	.probe = mixer_probe,
- 	.remove = __devexit_p(mixer_remove),
-diff --git a/drivers/gpu/drm/exynos/regs-mixer.h b/drivers/gpu/drm/exynos/regs-mixer.h
-index fd2f4d1..5d8dbc0 100644
---- a/drivers/gpu/drm/exynos/regs-mixer.h
-+++ b/drivers/gpu/drm/exynos/regs-mixer.h
-@@ -69,6 +69,7 @@
- 	(((val) << (low_bit)) & MXR_MASK(high_bit, low_bit))
+ 	return hdmi_v14_conf_index(mode);
+@@ -1348,7 +1354,7 @@ static int hdmi_check_timing(void *ctx, void *timing)
+ 			check_timing->yres, check_timing->refresh,
+ 			check_timing->vmode);
  
- /* bits for MXR_STATUS */
-+#define MXR_STATUS_SOFT_RESET		(1 << 8)
- #define MXR_STATUS_16_BURST		(1 << 7)
- #define MXR_STATUS_BURST_MASK		(1 << 7)
- #define MXR_STATUS_BIG_ENDIAN		(1 << 3)
-@@ -77,6 +78,8 @@
- #define MXR_STATUS_REG_RUN		(1 << 0)
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		return hdmi_v13_check_timing(check_timing);
+ 	else
+ 		return hdmi_v14_check_timing(check_timing);
+@@ -1414,7 +1420,7 @@ static void hdmi_reg_acr(struct hdmi_context *hdata, u8 *acr)
+ 	hdmi_reg_writeb(hdata, HDMI_ACR_CTS1, acr[2]);
+ 	hdmi_reg_writeb(hdata, HDMI_ACR_CTS2, acr[1]);
  
- /* bits for MXR_CFG */
-+#define MXR_CFG_LAYER_UPDATE		(1 << 31)
-+#define MXR_CFG_LAYER_UPDATE_COUNT_MASK (3 << 29)
- #define MXR_CFG_RGB601_0_255		(0 << 9)
- #define MXR_CFG_RGB601_16_235		(1 << 9)
- #define MXR_CFG_RGB709_0_255		(2 << 9)
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		hdmi_reg_writeb(hdata, HDMI_V13_ACR_CON, 4);
+ 	else
+ 		hdmi_reg_writeb(hdata, HDMI_ACR_CON, 4);
+@@ -1518,7 +1524,7 @@ static void hdmi_conf_reset(struct hdmi_context *hdata)
+ {
+ 	u32 reg;
+ 
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		reg = HDMI_V13_CORE_RSTOUT;
+ 	else
+ 		reg = HDMI_CORE_RSTOUT;
+@@ -1550,7 +1556,7 @@ static void hdmi_conf_init(struct hdmi_context *hdata)
+ 				HDMI_VID_PREAMBLE_DIS | HDMI_GUARD_BAND_DIS);
+ 	}
+ 
+-	if (hdata->is_v13) {
++	if (hdata->type == HDMI_TYPE13) {
+ 		/* choose bluescreen (fecal) color */
+ 		hdmi_reg_writeb(hdata, HDMI_V13_BLUE_SCREEN_0, 0x12);
+ 		hdmi_reg_writeb(hdata, HDMI_V13_BLUE_SCREEN_1, 0x34);
+@@ -1832,7 +1838,7 @@ static void hdmi_v14_timing_apply(struct hdmi_context *hdata)
+ 
+ static void hdmi_timing_apply(struct hdmi_context *hdata)
+ {
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		hdmi_v13_timing_apply(hdata);
+ 	else
+ 		hdmi_v14_timing_apply(hdata);
+@@ -1854,7 +1860,7 @@ static void hdmiphy_conf_reset(struct hdmi_context *hdata)
+ 	if (hdata->hdmiphy_port)
+ 		i2c_master_send(hdata->hdmiphy_port, buffer, 2);
+ 
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		reg = HDMI_V13_PHY_RSTOUT;
+ 	else
+ 		reg = HDMI_PHY_RSTOUT;
+@@ -1881,7 +1887,7 @@ static void hdmiphy_conf_apply(struct hdmi_context *hdata)
+ 	}
+ 
+ 	/* pixel clock */
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		hdmiphy_data = hdmi_v13_confs[hdata->cur_conf].hdmiphy_data;
+ 	else
+ 		hdmiphy_data = hdmi_confs[hdata->cur_conf].hdmiphy_data;
+@@ -1949,7 +1955,7 @@ static void hdmi_mode_fixup(void *ctx, struct drm_connector *connector,
+ 
+ 	drm_mode_set_crtcinfo(adjusted_mode, 0);
+ 
+-	if (hdata->is_v13)
++	if (hdata->type == HDMI_TYPE13)
+ 		index = hdmi_v13_conf_index(adjusted_mode);
+ 	else
+ 		index = hdmi_v14_conf_index(adjusted_mode);
+@@ -1963,7 +1969,7 @@ static void hdmi_mode_fixup(void *ctx, struct drm_connector *connector,
+ 	 * to adjusted_mode.
+ 	 */
+ 	list_for_each_entry(m, &connector->modes, head) {
+-		if (hdata->is_v13)
++		if (hdata->type == HDMI_TYPE13)
+ 			index = hdmi_v13_conf_index(m);
+ 		else
+ 			index = hdmi_v14_conf_index(m);
+@@ -2244,11 +2250,6 @@ void hdmi_attach_hdmiphy_client(struct i2c_client *hdmiphy)
+ 		hdmi_hdmiphy = hdmiphy;
+ }
+ 
+-enum hdmi_type {
+-	HDMI_TYPE13,
+-	HDMI_TYPE14,
+-};
+-
+ static struct platform_device_id hdmi_driver_types[] = {
+ 	{
+ 		.name		= "s5pv210-hdmi",
+@@ -2272,7 +2273,6 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
+ 	struct s5p_hdmi_platform_data *pdata;
+ 	struct resource *res;
+ 	int ret;
+-	enum hdmi_type hdmi_type;
+ 
+ 	DRM_DEBUG_KMS("[%d]\n", __LINE__);
+ 
+@@ -2303,8 +2303,8 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, drm_hdmi_ctx);
+ 
+-	hdmi_type = platform_get_device_id(pdev)->driver_data;
+-	hdata->is_v13 = (hdmi_type == HDMI_TYPE13);
++	hdata->type = (enum hdmi_type)platform_get_device_id
++					(pdev)->driver_data;
+ 	hdata->hpd_gpio = pdata->hpd_gpio;
+ 	hdata->dev = dev;
+ 
 -- 
 1.7.0.4
