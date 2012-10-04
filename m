@@ -1,149 +1,80 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 4 Oct 2012 11:25:09 -0400
-Subject: [PATCH v4 2/6] misc: Generic on-chip SRAM allocation driver
-In-Reply-To: <1347021828-23034-3-git-send-email-p.zabel@pengutronix.de>
-References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
- <1347021828-23034-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20121004152509.GJ11149@beef>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 04 Oct 2012 09:41:06 -0600
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
+ parents
+In-Reply-To: <20121004075335.GY31897@kw.sim.vm.gnt>
+References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
+ <20121003154310.GI11837@lunn.ch> <20121003220916.GW31897@kw.sim.vm.gnt>
+ <20121004055443.GK21046@lunn.ch> <20121004075335.GY31897@kw.sim.vm.gnt>
+Message-ID: <506DAE12.7000003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 02:43:44PM +0200, Philipp Zabel wrote:
-> This driver requests and remaps a memory region as configured in the
-> device tree. It serves memory from this region via the genalloc API.
+On 10/04/2012 01:53 AM, Simon Guinot wrote:
+> On Thu, Oct 04, 2012 at 07:54:43AM +0200, Andrew Lunn wrote:
+>>>>> --- a/arch/arm/mach-kirkwood/board-dt.c +++
+>>>>> b/arch/arm/mach-kirkwood/board-dt.c @@ -96,6 +96,11 @@
+>>>>> static void __init kirkwood_dt_init(void) if
+>>>>> (of_machine_is_compatible("keymile,km_kirkwood")) 
+>>>>> km_kirkwood_init();
+>>>>> 
+>>>>> +	if (of_machine_is_compatible("lacie,inetspace_v2") || +
+>>>>> of_machine_is_compatible("lacie,netspace_v2") || +
+>>>>> of_machine_is_compatible("lacie,netspace_max_v2")) +
+>>>>> ns2_init(); + of_platform_populate(NULL,
+>>>>> kirkwood_dt_match_table, kirkwood_auxdata_lookup, NULL);
+>>>> 
+>>>> I'm not a DT policy expert. Could this be one compatibility
+>>>> string for all the boards? Maybe ask on the DT mainline
+>>>> list?
+>>> 
+>>> Maybe I could use "lacie,ns2_common" as a compatibility string.
+>>> But this does not match any existing device. I don't know if it
+>>> is correct.
+>> 
+>> Hi Simon
+>> 
+>> I did a bit of looking around. For kirkwood, we already have two 
+>> boards sharing the same compatibility string. kirkwood-dns320.dts
+>> and kirkwood-dns325.dts both have dlink,dns-kirkwood and this is
+>> what the board-dt.c matches on.
+>> 
+>> For the tegra20 soc, all boards match on nvidia,tegra20, and that
+>> is the only compatibility string in board-dt-tegra20.c.
+
+nvidia,tegra20 is the compatible value for the SoC itself, so
+naturally any Tegra20-based board has that.
+
+>> So i don't see any problem having just one compatibility string
+>> here.
+>> 
+>> The question is, what is the appropriate name. How common is
+>> this common C code? Are there ns2 where this C code is not
+>> appropriate. One thing to remember is that most of this C code
+>> will soon disappear and become DT. All the mpp will be replaced
+>> with pinctrl in 3.8. I hope we can get the Ethernet setup in DT
+>> as well. You are working on ns2_led, so all the C code will be
+>> replaced by DT. So all we are really left with is power off GPIO
+>> handling.
+>> 
+>> So i think the danger of using lacie,ns2_common, and then finding
+>> it does not work with some other ns2 device is quite low.
+
+lacie,ns2_common doesn't sound like a HW description, but rather a SW
+invention. DT should be describing purely the HW. If there's no common
+HW between these compatible boards (which seems unlikely), then there
+shouldn't be a shared compatible value.
+
+>> What do you think?
 > 
-> Other drivers can retrieve the genalloc pool from a phandle pointing
-> to this drivers' device node in the device tree.
+> The status for this ns2 boards is more or less end-of-life. I mean,
+> this boards are no longer in production. So I think it is safe to
+> consider the code inside board-ns2.c as common and shareable
+> between ns2, is2 and ns2max.
+> 
+> Once this file will be removed, the compatibility checks will be
+> removed as well. But one could easily forget to remove the useless
+> compatibility string "lacie,ns2_common" from the dts...
 
-<snip>
-
-> +	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
-> +	if (!sram->pool)
-> +		return -ENOMEM;
-
-As mentioned in the uio_pruss/genalloc discussion, removing the
-hardcoded minimum allocation order will allow this to be used for
-a number of other cases. The most notable is moving mach-davinci/
-off of its own genalloc-based SRAM arch driver. Some of the davinci
-SoCs have very small SRAMs and need the ability to allocate a smaller
-chunk.
-
-Here's a build-tested patch to add this option:
-
->From 6eced8c31eba2f86e72e854cf404d8f58fbeba85 Mon Sep 17 00:00:00 2001
-From: Matt Porter <mporter@ti.com>
-Date: Thu, 4 Oct 2012 11:08:02 -0400
-Subject: [PATCH] misc: sram: add support for configurable allocation order
-
-Adds support for setting the genalloc pool's minimum allocation
-order via DT or platform data. The allocation order is optional
-for both the DT property and platform data case. If it is not
-present then the order defaults to PAGE_SHIFT to preserve the
-current behavior.
-
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- Documentation/devicetree/bindings/misc/sram.txt |   12 ++++++++++-
- drivers/misc/sram.c                             |   14 ++++++++++++-
- include/linux/platform_data/sram.h              |   25 +++++++++++++++++++++++
- 3 files changed, 49 insertions(+), 2 deletions(-)
- create mode 100644 include/linux/platform_data/sram.h
-
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-index b64136c..b1705ec 100644
---- a/Documentation/devicetree/bindings/misc/sram.txt
-+++ b/Documentation/devicetree/bindings/misc/sram.txt
-@@ -8,10 +8,20 @@ Required properties:
- 
- - reg : SRAM iomem address range
- 
--Example:
-+Optional properties:
-+
-+- alloc-order : Minimum allocation order for the SRAM pool
-+
-+Examples:
-+
-+sram: sram at 5c000000 {
-+	compatible = "sram";
-+	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-+};
- 
- sram: sram at 5c000000 {
- 	compatible = "sram";
- 	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-+	alloc-order = <9>; /* Minimum 512 byte allocation */
- };
- 
-diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-index 7a363f2..3bf8ed3 100644
---- a/drivers/misc/sram.c
-+++ b/drivers/misc/sram.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/genalloc.h>
-+#include <linux/platform_data/sram.h>
- 
- struct sram_dev {
- 	struct gen_pool *pool;
-@@ -37,6 +38,7 @@ static int __devinit sram_probe(struct platform_device *pdev)
- 	struct sram_dev *sram;
- 	struct resource *res;
- 	unsigned long size;
-+	u32 alloc_order = PAGE_SHIFT;
- 	int ret;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -53,7 +55,17 @@ static int __devinit sram_probe(struct platform_device *pdev)
- 	if (!sram)
- 		return -ENOMEM;
- 
--	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
-+	if (pdev->dev.of_node)
-+		of_property_read_u32(pdev->dev.of_node,
-+				     "alloc-order", &alloc_order);
-+	else
-+		if (pdev->dev.platform_data) {
-+			struct sram_pdata *pdata = pdev->dev.platform_data;
-+			if (pdata->alloc_order)
-+				alloc_order = pdata->alloc_order;
-+		}
-+
-+	sram->pool = gen_pool_create(alloc_order, -1);
- 	if (!sram->pool)
- 		return -ENOMEM;
- 
-diff --git a/include/linux/platform_data/sram.h b/include/linux/platform_data/sram.h
-new file mode 100644
-index 0000000..e17bdaa
---- /dev/null
-+++ b/include/linux/platform_data/sram.h
-@@ -0,0 +1,25 @@
-+/*
-+ * include/linux/platform_data/sram.h
-+ *
-+ * Platform data for generic sram driver
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _SRAM_H_
-+#define _SRAM_H_
-+
-+struct sram_pdata {
-+	unsigned alloc_order;	/* Optional: driver defaults to PAGE_SHIFT */
-+};
-+
-+#endif /* _SRAM_H_ */
--- 
-1.7.9.5
+If that value is added to the DT, it should not be removed, and the
+kernel should continue to support it indefinitely.
