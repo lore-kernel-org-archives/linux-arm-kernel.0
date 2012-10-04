@@ -1,53 +1,54 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Thu, 04 Oct 2012 21:40:59 +0900
-Subject: [PATCH 03/12] mmc: dw_mmc: fix building exynos driver as a module
-In-Reply-To: <CAFbHwiRGnhEf-3XJJJPrHwmQRj_YE2kCZaGURHDQcu=cj0zSHw@mail.gmail.com>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-4-git-send-email-arnd@arndb.de>
- <CAFbHwiRGnhEf-3XJJJPrHwmQRj_YE2kCZaGURHDQcu=cj0zSHw@mail.gmail.com>
-Message-ID: <001d01cda22d$81a3b4f0$84eb1ed0$%jun@samsung.com>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 4 Oct 2012 08:42:53 -0400
+Subject: [PATCH v3 0/6] uio_pruss cleanup and platform support
+In-Reply-To: <20121004091145.GA3317@pengutronix.de>
+References: <1349276133-26408-1-git-send-email-mporter@ti.com>
+ <20121004091145.GA3317@pengutronix.de>
+Message-ID: <20121004124253.GC11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Monday, October 01, 2012, Will Newton <will.newton@gmail.com> wrote:
-> On Fri, Sep 28, 2012 at 10:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The MODULE_DEVICE_TABLE() entry in the dw_mmc_exynos driver
-> > points to the wrong symbol which results in a link error
-> > when building as a loadable module.
-> >
-> > Further, we get a warning about the driver_data being
-> > marked constant, which requires annotating a few pointers
-> > as const.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> > Cc: Will Newton <will.newton@imgtec.com>
-> > Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> > Cc: Seungwon Jeon <tgih.jun@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > ---
-> >  drivers/mmc/host/dw_mmc-exynos.c |    4 ++--
-> >  drivers/mmc/host/dw_mmc-pltfm.c  |    2 +-
-> >  drivers/mmc/host/dw_mmc-pltfm.h  |    2 +-
-> >  drivers/mmc/host/dw_mmc.c        |    2 +-
-> >  include/linux/mmc/dw_mmc.h       |    2 +-
-> >  5 files changed, 6 insertions(+), 6 deletions(-)
+On Thu, Oct 04, 2012 at 11:11:45AM +0200, Philipp Zabel wrote:
+> Hi Matt,
 > 
-> This looks ok to me, but I'll let one of the Exynos guys ack those
-> specific changes as I don't have the hardware.
+> On 10/3/12, Matt Porter <mporter@ti.com> wrote:
+> > This series enables uio_pruss on DA850 and removes use of the
+> > private SRAM API by the driver. The driver previously was not
+> > enabled by any platform and the private SRAM API was accessing
+> > an invalid SRAM bank.
 > 
-> There's already a patch for the dev_info warning in dw_mmc.c frm
-> Seungwon Jeon, and it seems to me like a separate change but I don't
-> really mind how it gets merged.
+> have you seen my SRAM patch series at https://lkml.org/lkml/2012/9/7/281
+> "Add device tree support for on-chip SRAM" ?
 
-Looks good to me.
-I don't mind it about including 'dev_info warning'.
+Yes.
 
-Acked-by: Seungwon Jeon<tgih.jun@samsung.com>
+> I think the generic SRAM/genalloc driver (https://lkml.org/lkml/2012/9/7/282)
+> could be useful to map the L3RAM on Davinci.
+> With the gen_pool lookup patch (https://lkml.org/lkml/2012/9/7/284) the
+> uio_pruss driver could then use the gen_pool_find_by_phys() (or
+> of_get_named_gen_pool() for initialization from device tree) to
+> retrieve the struct gen_pool*.
+> 
+> This way you could avoid handing it over via platform data and you could
+> get rid of arch/arm/mach-davinci/{sram.c,include/mach/sram.h} completely.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I did miss the gen_pool_find_by_phys() call in that series. That does
+look useful. I actually mentioned your series in an earlier posting
+since I like it, but since the initialization of the driver was inherently
+tied to DT it's not usable for DaVinci that's just starting to convert
+to DT and needs !DT support as well.
+
+I do see it moving to your driver exclusively, but I wanted to make this
+series focused on only getting rid of the private SRAM API using the
+existing pdata framework that's already there. I think once
+gen_pool_find_by_phys() goes upstream we can switch to that and get the
+address from a resource in the !DT case. I guess we should see if Sekhar
+would like to see this happen in two steps or just have us depend on
+the gen_pool_find_by_phys() patch now.
+
+BTW, I was going to post a patch for your driver to allow
+configurability of the allocation order, but have been busy with other
+things.  We'll eventually need that when switching to it as the
+hardcoded page size order isn't going to work for all cases.
+
+-Matt
