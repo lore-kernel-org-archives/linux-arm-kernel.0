@@ -1,40 +1,23 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 04 Oct 2012 19:38:11 +1300
-Subject: usb: uhci-platform driver fails after patch changes during merge
-Message-ID: <1349332691.7583.3.camel@gitbox>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  3 Oct 2012 23:38:52 -0700
+Subject: [PATCH 0/3] Minor fixes for generic clock framework
+Message-ID: <1349332735-20096-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+This is a small set of patches that fixes some documentation
+and fixes return values of functions that aren't used that
+much yet. Noticed while going through this code.
 
-I see someone made changes to the uhci-platform.c driver I submitted
-during v3.7 which results in it not working on mach-vt8500.
+Stephen Boyd (3):
+  clk: Document .is_enabled op
+  clk: Fix documentation typos
+  clk: Don't return negative numbers for unsigned values with !clk
 
-Could you clarify why the changes were made, and what the suggested
-resolution would be to solve the problem that it introduced?
+ drivers/clk/clk.c            | 20 ++++++++++----------
+ include/linux/clk-provider.h | 16 ++++++++++------
+ 2 files changed, 20 insertions(+), 16 deletions(-)
 
-Lines indicated by ---> below were removed from the patch, which means
-that on arch-vt8500 there is no dma_mask set, and its fails to
-communicate with attached devices.
-
-Regards
-
-Tony P
-
-
-static int __devinit uhci_hcd_platform_probe(struct platform_device
-*pdev)
-...
-	if (usb_disabled())
-		return -ENODEV;
---->
-	/* Right now device-tree probed devices don't get dma_mask set.
-	 * Since shared usb code relies on it, set it here for now.
-	 * Once we have dma capability bindings this can go away.
-	 */
-	if (!pdev->dev.dma_mask)
-		pdev->dev.dma_mask = &platform_uhci_dma_mask;
---->
-	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
-				pdev->name);
-...
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
