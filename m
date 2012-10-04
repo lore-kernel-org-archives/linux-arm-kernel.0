@@ -1,29 +1,33 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 04 Oct 2012 22:25:48 +0200
-Subject: [PATCH RFC 1/2] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <CACRpkdYGePft_XvhhoNyRfBm484FD46WGagivQzjh5-OE3VJUA@mail.gmail.com>
-References: <1348780923-27428-1-git-send-email-stigge@antcom.de>
- <CAOY=C6GG6jqqEAAGJjmDG-BFT2eq=9+ck+F_EOcthRgDCDv8=Q@mail.gmail.com>
- <50682402.8020402@antcom.de>
- <CACRpkdYGePft_XvhhoNyRfBm484FD46WGagivQzjh5-OE3VJUA@mail.gmail.com>
-Message-ID: <506DF0CC.9000202@antcom.de>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 4 Oct 2012 16:39:43 -0400
+Subject: [PATCH v3 3/6] ARM: davinci: da850: changed SRAM allocator to
+ shared ram.
+In-Reply-To: <506D79A3.4020506@ti.com>
+References: <1349276133-26408-1-git-send-email-mporter@ti.com>
+ <1349276133-26408-4-git-send-email-mporter@ti.com>
+ <506D79A3.4020506@ti.com>
+Message-ID: <20121004203943.GM11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/10/12 01:07, Linus Walleij wrote:
->> What do others think? JC? Linus? I'm considering this (unsigned int
->> data) a valid option.
+On Thu, Oct 04, 2012 at 05:27:23PM +0530, Sekhar Nori wrote:
+> Matt,
 > 
-> I think we mostly use an unsigned long for such stuff as IRQ flags
-> and ioctl() parameters in the kernel.
+> On 10/3/2012 8:25 PM, Matt Porter wrote:
+> > From: Subhasish Ghosh <subhasish@mistralsolutions.com>
+> > 
+> > This patch modifies the sram allocator to allocate memory
+> > from the DA8XX shared RAM.
+> > 
+> > Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+> > [rebased onto consolidated SRAM patches]
+> > Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+> > [rebased to mainline as consolidated SRAM patches were dropped]
+> > Signed-off-by: Matt Porter <mporter@ti.com>
 > 
-> In this case it has the upside that it will be 32bit on 32bit systems
-> and 64bit on 64bit systems if I'm not mistaken.
+> Were you able to test PM with this change or you need my help?
 
-Fine. Will try to prepare a patch tomorrow, including fallback to single
-GPIO handling (if the driver doesn't implement block operations) and
-omitting the sysfs interface in the first patch.
+I verified suspend/resume is working fine with this change on
+AM180x EVM. Will note this all in v4.
 
-Roland
+-Matt
