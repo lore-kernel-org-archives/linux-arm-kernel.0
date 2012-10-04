@@ -1,56 +1,59 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 4 Oct 2012 07:17:35 +0200
+Date: Thu, 4 Oct 2012 07:54:43 +0200
 Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
  parents
 In-Reply-To: <20121003220916.GW31897@kw.sim.vm.gnt>
 References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
  <20121003154310.GI11837@lunn.ch>
  <20121003220916.GW31897@kw.sim.vm.gnt>
-Message-ID: <20121004051735.GI21046@lunn.ch>
+Message-ID: <20121004055443.GK21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 12:09:16AM +0200, Simon Guinot wrote:
-> On Wed, Oct 03, 2012 at 05:43:10PM +0200, Andrew Lunn wrote:
-> > On Wed, Oct 03, 2012 at 05:14:30PM +0200, Simon Guinot wrote:
-> > > This patch adds DT board setup for LaCie Network Space v2 and parents,
-> > > based the Marvell Kirkwood 6281 SoC. This includes Network Space (Max)
-> > > v2 and Internet Space v2.
+> > > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > > @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
+> > >  	if (of_machine_is_compatible("keymile,km_kirkwood"))
+> > >  		km_kirkwood_init();
+> > >  
+> > > +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
+> > > +	    of_machine_is_compatible("lacie,netspace_v2") ||
+> > > +	    of_machine_is_compatible("lacie,netspace_max_v2"))
+> > > +		ns2_init();
+> > > +
+> > >  	of_platform_populate(NULL, kirkwood_dt_match_table,
+> > >  			     kirkwood_auxdata_lookup, NULL);
 > > 
-> > Hi Simon
-> > 
-> > At a first look, this looks good. Also nice to see you use the new
-> > gpio-fan binding.
+> > I'm not a DT policy expert. Could this be one compatibility string for
+> > all the boards? Maybe ask on the DT mainline list?
 > 
-> Hi Andrew,
-> 
-> It is nice to have this binding. It works fine.
+> Maybe I could use "lacie,ns2_common" as a compatibility string. But this
+> does not match any existing device. I don't know if it is correct.
 
-It good to hear that it works. There is one other board which could
-use it. I plan to convert it over for 3.8.
+Hi Simon
 
-I will take a look at other DT boards and see if there is any patterns
-which might help here, for naming of a shared compatibility string.
+I did a bit of looking around. For kirkwood, we already have two
+boards sharing the same compatibility string. kirkwood-dns320.dts and
+kirkwood-dns325.dts both have dlink,dns-kirkwood and this is what the
+board-dt.c matches on.
 
-> > Have you thought about adding a DT binding for this driver?
-> 
-> Yes. I am on it.
+For the tegra20 soc, all boards match on nvidia,tegra20, and that is the only
+compatibility string in board-dt-tegra20.c.
 
-Great. Please include my CC: when you post it.
+So i don't see any problem having just one compatibility string here.
 
-> > It would be nice if you could respin the patches for -rc1, when it
-> > comes out. There are changes to Makefile.boot at least required.
-> 
-> OK. I will.
-> 
-> Note that this patch is based against the branch kirkwood/boards from
-> the git repository git://git.infradead.org/users/jcooper/linux.git. Is
-> that correct ?
+The question is, what is the appropriate name. How common is this
+common C code? Are there ns2 where this C code is not appropriate. One
+thing to remember is that most of this C code will soon disappear and
+become DT. All the mpp will be replaced with pinctrl in 3.8. I hope we
+can get the Ethernet setup in DT as well. You are working on ns2_led,
+so all the C code will be replaced by DT. So all we are really left
+with is power off GPIO handling.
 
-Its a good start. However, the Makefile.boot changes were merged in in
-arm-soc, and not by the Marvell maintainers in our trees. So changes
-across multiple arm platforms are not in Jason's tree. -rc1 will have
-all these changes, and forms the best base for a new board.
+So i think the danger of using lacie,ns2_common, and then finding it
+does not work with some other ns2 device is quite low.
 
-    Thanks
+What do you think?
+
+     Thanks
 	Andrew
