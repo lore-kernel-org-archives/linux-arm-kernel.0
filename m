@@ -1,159 +1,182 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 04 Oct 2012 21:12:51 +0530
-Subject: [PATCH v1 13/14] drm: exynos: hdmi: add support for exynos5 hdmi
+Date: Thu, 04 Oct 2012 21:12:52 +0530
+Subject: [PATCH v1 14/14] drm: exynos: hdmi: remove drm common hdmi platform
+ data struct
 In-Reply-To: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
 References: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1349365372-21417-14-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1349365372-21417-15-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for exynos5 hdmi with device tree enabled.
+exynos-drm-hdmi need context pointers from hdmi and mixer. These
+pointers were expected from the plf data. Cleaned this dependency
+by exporting i/f which are called by hdmi, mixer driver probes
+for setting their context.
 
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c |   83 ++++++++++++++++++++++++++++++++--
- 1 files changed, 79 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_hdmi.c |   51 +++++++++++++++--------------
+ drivers/gpu/drm/exynos/exynos_drm_hdmi.h |    2 +
+ drivers/gpu/drm/exynos/exynos_hdmi.c     |    3 ++
+ drivers/gpu/drm/exynos/exynos_mixer.c    |    3 ++
+ include/drm/exynos_drm.h                 |   14 --------
+ 5 files changed, 34 insertions(+), 39 deletions(-)
 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_hdmi.c b/drivers/gpu/drm/exynos/exynos_drm_hdmi.c
+index 0584132..85304c4 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_hdmi.c
+@@ -29,6 +29,11 @@
+ #define get_ctx_from_subdrv(subdrv)	container_of(subdrv,\
+ 					struct drm_hdmi_context, subdrv);
+ 
++/* Common hdmi subdrv needs to access the hdmi and mixer though context.
++* These should be initialied by the repective drivers */
++static struct exynos_drm_hdmi_context *hdmi_ctx;
++static struct exynos_drm_hdmi_context *mixer_ctx;
++
+ /* these callback points shoud be set by specific drivers. */
+ static struct exynos_hdmi_ops *hdmi_ops;
+ static struct exynos_mixer_ops *mixer_ops;
+@@ -41,6 +46,18 @@ struct drm_hdmi_context {
+ 	bool	enabled[MIXER_WIN_NR];
+ };
+ 
++void exynos_hdmi_drv_attach(struct exynos_drm_hdmi_context *ctx)
++{
++	if (ctx)
++		hdmi_ctx = ctx;
++}
++
++void exynos_mixer_drv_attach(struct exynos_drm_hdmi_context *ctx)
++{
++	if (ctx)
++		mixer_ctx = ctx;
++}
++
+ void exynos_hdmi_ops_register(struct exynos_hdmi_ops *ops)
+ {
+ 	DRM_DEBUG_KMS("%s\n", __FILE__);
+@@ -303,46 +320,30 @@ static int hdmi_subdrv_probe(struct drm_device *drm_dev,
+ {
+ 	struct exynos_drm_subdrv *subdrv = to_subdrv(dev);
+ 	struct drm_hdmi_context *ctx;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct exynos_drm_common_hdmi_pd *pd;
+ 
+ 	DRM_DEBUG_KMS("%s\n", __FILE__);
+ 
+-	pd = pdev->dev.platform_data;
+-
+-	if (!pd) {
+-		DRM_DEBUG_KMS("platform data is null.\n");
++	if (!hdmi_ctx) {
++		DRM_ERROR("hdmi context not initialized.\n");
+ 		return -EFAULT;
+ 	}
+ 
+-	if (!pd->hdmi_dev) {
+-		DRM_DEBUG_KMS("hdmi device is null.\n");
+-		return -EFAULT;
+-	}
+-
+-	if (!pd->mixer_dev) {
+-		DRM_DEBUG_KMS("mixer device is null.\n");
++	if (!mixer_ctx) {
++		DRM_ERROR("mixer context not initialized.\n");
+ 		return -EFAULT;
+ 	}
+ 
+ 	ctx = get_ctx_from_subdrv(subdrv);
+ 
+-	ctx->hdmi_ctx = (struct exynos_drm_hdmi_context *)
+-				to_context(pd->hdmi_dev);
+-	if (!ctx->hdmi_ctx) {
+-		DRM_DEBUG_KMS("hdmi context is null.\n");
++	if (!ctx) {
++		DRM_ERROR("no drm hdmi context.\n");
+ 		return -EFAULT;
+ 	}
+ 
+-	ctx->hdmi_ctx->drm_dev = drm_dev;
+-
+-	ctx->mixer_ctx = (struct exynos_drm_hdmi_context *)
+-				to_context(pd->mixer_dev);
+-	if (!ctx->mixer_ctx) {
+-		DRM_DEBUG_KMS("mixer context is null.\n");
+-		return -EFAULT;
+-	}
++	ctx->hdmi_ctx = hdmi_ctx;
++	ctx->mixer_ctx = mixer_ctx;
+ 
++	ctx->hdmi_ctx->drm_dev = drm_dev;
+ 	ctx->mixer_ctx->drm_dev = drm_dev;
+ 
+ 	return 0;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_hdmi.h b/drivers/gpu/drm/exynos/exynos_drm_hdmi.h
+index d9f9e9f..2da5ffd 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_hdmi.h
++++ b/drivers/gpu/drm/exynos/exynos_drm_hdmi.h
+@@ -73,6 +73,8 @@ struct exynos_mixer_ops {
+ 	void (*win_disable)(void *ctx, int zpos);
+ };
+ 
++void exynos_hdmi_drv_attach(struct exynos_drm_hdmi_context *ctx);
++void exynos_mixer_drv_attach(struct exynos_drm_hdmi_context *ctx);
+ void exynos_hdmi_ops_register(struct exynos_hdmi_ops *ops);
+ void exynos_mixer_ops_register(struct exynos_mixer_ops *ops);
+ #endif
 diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 89e798b..5caf49f 100644
+index 5caf49f..e6b784d 100644
 --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
 +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -32,6 +32,9 @@
- #include <linux/pm_runtime.h>
- #include <linux/clk.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/io.h>
-+#include <linux/of_gpio.h>
-+#include <plat/gpio-cfg.h>
- 
- #include <drm/exynos_drm.h>
- 
-@@ -2250,6 +2253,41 @@ void hdmi_attach_hdmiphy_client(struct i2c_client *hdmiphy)
- 		hdmi_hdmiphy = hdmiphy;
- }
- 
-+#ifdef CONFIG_OF
-+static struct s5p_hdmi_platform_data *drm_hdmi_dt_parse_pdata
-+					(struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct s5p_hdmi_platform_data *pd;
-+	enum of_gpio_flags flags;
-+	u32 value;
-+
-+	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
-+	if (!pd) {
-+		DRM_ERROR("memory allocation for pdata failed\n");
-+		goto err_data;
-+	}
-+
-+	if (!of_find_property(np, "hpd-gpio", &value)) {
-+		DRM_ERROR("no hpd gpio property found\n");
-+		goto err_data;
-+	}
-+
-+	pd->hpd_gpio = of_get_named_gpio_flags(np, "hpd-gpio", 0, &flags);
-+
-+	return pd;
-+
-+err_data:
-+	return NULL;
-+}
-+#else
-+static struct s5p_hdmi_platform_data *drm_hdmi_dt_parse_pdata
-+					(struct device *dev)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static struct platform_device_id hdmi_driver_types[] = {
- 	{
- 		.name		= "s5pv210-hdmi",
-@@ -2259,7 +2297,19 @@ static struct platform_device_id hdmi_driver_types[] = {
- 		.driver_data    = HDMI_TYPE13,
- 	}, {
- 		.name		= "exynos4-hdmi14",
--		.driver_data    = HDMI_TYPE14,
-+		.driver_data	= HDMI_TYPE14,
-+	}, {
-+		.name		= "exynos5-hdmi",
-+		.driver_data	= HDMI_TYPE14,
-+	}, {
-+		/* end node */
-+	}
-+};
-+
-+static struct of_device_id hdmi_match_types[] = {
-+	{
-+		.compatible = "samsung,exynos5-hdmi",
-+		.data	= (void	*)HDMI_TYPE14,
- 	}, {
- 		/* end node */
- 	}
-@@ -2276,7 +2326,16 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
- 
- 	DRM_DEBUG_KMS("[%d]\n", __LINE__);
- 
--	pdata = pdev->dev.platform_data;
-+	if (pdev->dev.of_node) {
-+		pdata = drm_hdmi_dt_parse_pdata(dev);
-+		if (IS_ERR(pdata)) {
-+			DRM_ERROR("failed to parse dt\n");
-+			return PTR_ERR(pdata);
-+		}
-+	} else {
-+		pdata = pdev->dev.platform_data;
-+	}
-+
- 	if (!pdata) {
- 		DRM_ERROR("no platform data specified\n");
- 		return -EINVAL;
-@@ -2303,18 +2362,33 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, drm_hdmi_ctx);
- 
--	hdata->type = (enum hdmi_type)platform_get_device_id
-+	if (dev->of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(of_match_ptr(hdmi_match_types),
-+					pdev->dev.of_node);
-+		hdata->type = (enum hdmi_type)match->data;
-+	} else {
-+		hdata->type = (enum hdmi_type)platform_get_device_id
- 					(pdev)->driver_data;
-+	}
-+
- 	hdata->hpd_gpio = pdata->hpd_gpio;
- 	hdata->dev = dev;
- 
- 	ret = hdmi_resources_init(hdata);
-+
- 	if (ret) {
- 		ret = -EINVAL;
-+		DRM_ERROR("hdmi_resources_init failed\n");
- 		goto err_data;
+@@ -2454,6 +2454,9 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
+ 		goto err_free_irq;
  	}
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		DRM_ERROR("failed to find registers\n");
-+		ret = -ENOENT;
-+		goto err_resource;
-+	}
++	/* Attach HDMI Driver to common hdmi. */
++	exynos_hdmi_drv_attach(drm_hdmi_ctx);
++
+ 	/* register specific callbacks to common hdmi. */
+ 	exynos_hdmi_ops_register(&hdmi_ops);
  
- 	hdata->regs = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!hdata->regs) {
-@@ -2462,8 +2536,9 @@ struct platform_driver hdmi_driver = {
- 	.remove		= __devexit_p(hdmi_remove),
- 	.id_table = hdmi_driver_types,
- 	.driver		= {
--		.name	= "exynos4-hdmi",
-+		.name	= "exynos-hdmi",
- 		.owner	= THIS_MODULE,
- 		.pm	= &hdmi_pm_ops,
-+		.of_match_table = hdmi_match_types,
- 	},
+diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+index 39d2b95..1a319e4 100644
+--- a/drivers/gpu/drm/exynos/exynos_mixer.c
++++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+@@ -1171,6 +1171,9 @@ static int __devinit mixer_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/* attach mixer driver to common hdmi. */
++	exynos_mixer_drv_attach(drm_hdmi_ctx);
++
+ 	/* register specific callback point to common hdmi. */
+ 	exynos_mixer_ops_register(&mixer_ops);
+ 
+diff --git a/include/drm/exynos_drm.h b/include/drm/exynos_drm.h
+index 8bdd49a..8ac4079 100644
+--- a/include/drm/exynos_drm.h
++++ b/include/drm/exynos_drm.h
+@@ -240,19 +240,5 @@ struct exynos_drm_fimd_pdata {
+ 	unsigned int			bpp;
  };
+ 
+-/**
+- * Platform Specific Structure for DRM based HDMI.
+- *
+- * @hdmi_dev: device point to specific hdmi driver.
+- * @mixer_dev: device point to specific mixer driver.
+- *
+- * this structure is used for common hdmi driver and each device object
+- * would be used to access specific device driver(hdmi or mixer driver)
+- */
+-struct exynos_drm_common_hdmi_pd {
+-	struct device *hdmi_dev;
+-	struct device *mixer_dev;
+-};
+-
+ #endif	/* __KERNEL__ */
+ #endif	/* _EXYNOS_DRM_H_ */
 -- 
 1.7.0.4
