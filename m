@@ -1,155 +1,162 @@
 From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 4 Oct 2012 07:49:14 +0000
-Subject: [PATCH 2/4] mtd: devices: elm: Add support for ELM error
- correction
-In-Reply-To: <alpine.DEB.2.01.1210031701440.32543@pmeerw.net>
+Date: Thu, 4 Oct 2012 08:03:42 +0000
+Subject: [PATCH 3/4] ARM: OMAP2: gpmc: Add support for BCH ECC scheme
+In-Reply-To: <20121003185458.GA27502@parrot.com>
 References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-3-git-send-email-avinashphilip@ti.com>
- <alpine.DEB.2.01.1210031701440.32543@pmeerw.net>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9B48A7@DBDE01.ent.ti.com>
+ <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
+ <20121003185458.GA27502@parrot.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9B4902@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 20:40:46, Peter Meerwald wrote:
+On Thu, Oct 04, 2012 at 00:24:58, Ivan Djelic wrote:
+> On Wed, Oct 03, 2012 at 03:29:48PM +0100, Philip, Avinash wrote:
+> > Add support for BCH ECC scheme to gpmc driver and also enabling multi
+> > sector read/write. This helps in doing single shot NAND page read and
+> > write.
+> > 
+> > ECC engine configurations
+> > BCH 4 bit support
+> > 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
+> > 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
+> > 13 and ecc_size1 as 1.
+> > 
+> > BCH 8 bit support
+> > 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
+> > 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
+> > 26 and ecc_size1 as 2.
+> > 
+> > Note: For BCH8 ECC bytes set to 14 to make compatible with RBL.
+> > 
 > 
-> some minor nitpicks below
+> Hi Philip,
 > 
-> > + *
-> > + * On completion of processing by elm module, error location status
-> > + * register updated with correctable/uncorrectable error information.
-> > + * In case of correctable errors, number of errors located from
-> > + * elm location status register & read the these many positions from
+> I have a few comments/questions below,
 > 
-> should probably be: "... & read the positions from ..."?
+> (...)
+> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> > index 72428bd..c9bc3cf 100644
+> > --- a/arch/arm/mach-omap2/gpmc.c
+> > +++ b/arch/arm/mach-omap2/gpmc.c
+> > @@ -24,6 +24,7 @@
+> >  #include <linux/io.h>
+> >  #include <linux/module.h>
+> >  #include <linux/interrupt.h>
+> > +#include <linux/mtd/nand.h>
+> >  
+> >  #include <asm/mach-types.h>
+> >  #include <plat/gpmc.h>
+> > @@ -83,6 +84,18 @@
+> >  #define ENABLE_PREFETCH		(0x1 << 7)
+> >  #define DMA_MPU_MODE		2
+> >  
+> > +/* GPMC ecc engine settings for read */
+> > +#define BCH_WRAPMODE_1		1	/* BCH wrap mode 6 */
+> 
+> Comment should say "mode 1".
 
 Ok I will correct it.
 
 > 
-> > + * elm error location register.
+> (...)
+> >  /**
+> > + * gpmc_calculate_ecc_bch	- Generate ecc bytes per block of 512 data bytes for entire page
+> > + * @cs:  chip select number
+> > + * @dat: The pointer to data on which ECC is computed
+> > + * @ecc: The ECC output buffer
 > > + */
-> > +static void elm_error_correction(struct elm_info *info,
-> > +		struct elm_errorvec *err_vec)
+> > +int gpmc_calculate_ecc_bch(int cs, const u_char *dat, u_char *ecc)
 > > +{
-> > +	int i, j, errors = 0;
-> > +	void *err_loc_base = info->elm_base + ELM_ERROR_LOCATION_0;
-> > +	elm_error_t *err_loc;
-> > +	void *offset;
-> > +	u32 reg_val;
+> > +	int i, eccbchtsel;
+> > +	u32 nsectors, reg, bch_val1, bch_val2, bch_val3, bch_val4;
 > > +
-> > +	for (i = 0; i < ERROR_VECTOR_MAX; i++) {
-> > +		/* check error reported */
-> > +		if (err_vec[i].error_reported) {
-> > +			offset = info->elm_base + ELM_LOCATION_STATUS +
-> > +				i * ERROR_LOCATION_SIZE;
-> > +			reg_val = elm_read_reg(offset);
-> > +			/* check correctable error or not */
-> > +			if (reg_val & ECC_CORRECTABLE_MASK) {
-> > +				err_loc = err_loc_base +
-> > +					i * ERROR_LOCATION_SIZE;
-> > +				/* read count of correctable errors */
-> > +				err_vec[i].error_count = reg_val &
-> > +					ECC_NB_ERRORS_MASK;
+> > +	if (gpmc_ecc_used != cs)
+> > +		return -EINVAL;
 > > +
-> > +				/* update the error locations in error vector */
-> > +				for (j = 0; j < err_vec[i].error_count; j++) {
+> > +	/* read number of sectors for ecc to be calculated */
+> > +	nsectors = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 4) & 0x7) + 1;
+> > +	/*
+> > +	 * find BCH scheme used
+> > +	 * 0 -> BCH4
+> > +	 * 1 -> BCH8
+> > +	 */
+> > +	eccbchtsel = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 12) & 0x3);
 > > +
-> > +					reg_val = elm_read_reg(*err_loc + j);
-> > +					err_vec[i].error_loc[j] = reg_val &
-> > +						ECC_ERROR_LOCATION_MASK;
-> > +				}
+> > +	/* update ecc bytes for entire page */
+> > +	for (i = 0; i < nsectors; i++) {
 > > +
-> > +				errors += err_vec[i].error_count;
-> > +			} else {
-> > +				err_vec[i].error_uncorrectable++;
-> > +			}
-> 
-> extra braces above
-
-As per coding style
-This does not apply if only one branch of a conditional statement is a single
-statement; in the latter case use braces in both branches:
-
-> 
+> > +		reg = GPMC_ECC_BCH_RESULT_0 + 16 * i;
 > > +
-> > +			/* clearing interrupts for processed error vectors */
-> > +			elm_write_reg(info->elm_base + ELM_IRQSTATUS, BIT(i));
+> > +		/* Read hw-computed remainder */
+> > +		bch_val1 = gpmc_read_reg(reg + 0);
+> > +		bch_val2 = gpmc_read_reg(reg + 4);
+> > +		if (eccbchtsel) {
+> > +			bch_val3 = gpmc_read_reg(reg + 8);
+> > +			bch_val4 = gpmc_read_reg(reg + 12);
+> > +		}
 > > +
-> > +			/* disable page mode */
-> > +			elm_configure_page_mode(info, i, false);
+> > +		if (eccbchtsel) {
+> > +			/* BCH8 ecc scheme */
+> > +			*ecc++ = (bch_val4 & 0xFF);
+> > +			*ecc++ = ((bch_val3 >> 24) & 0xFF);
+> > +			*ecc++ = ((bch_val3 >> 16) & 0xFF);
+> > +			*ecc++ = ((bch_val3 >> 8) & 0xFF);
+> > +			*ecc++ = (bch_val3 & 0xFF);
+> > +			*ecc++ = ((bch_val2 >> 24) & 0xFF);
+> > +			*ecc++ = ((bch_val2 >> 16) & 0xFF);
+> > +			*ecc++ = ((bch_val2 >> 8) & 0xFF);
+> > +			*ecc++ = (bch_val2 & 0xFF);
+> > +			*ecc++ = ((bch_val1 >> 24) & 0xFF);
+> > +			*ecc++ = ((bch_val1 >> 16) & 0xFF);
+> > +			*ecc++ = ((bch_val1 >> 8) & 0xFF);
+> > +			*ecc++ = (bch_val1 & 0xFF);
+> > +			/* 14th byte of ecc not used */
+> > +			*ecc++ = 0;
+> > +		} else {
+> > +			/* BCH4 ecc scheme */
+> > +			*ecc++ = ((bch_val2 >> 12) & 0xFF);
+> > +			*ecc++ = ((bch_val2 >> 4) & 0xFF);
+> > +			*ecc++ = (((bch_val2 & 0xF) << 4) |
+> > +					((bch_val1 >> 28) & 0xF));
+> > +			*ecc++ = ((bch_val1 >> 20) & 0xFF);
+> > +			*ecc++ = ((bch_val1 >> 12) & 0xFF);
+> > +			*ecc++ = ((bch_val1 >> 4) & 0xFF);
+> > +			*ecc++ = ((bch_val1 & 0xF) << 4);
 > > +		}
 > > +	}
 > > +
-> > +	return;
+> > +	gpmc_ecc_used = -EINVAL;
+> > +	return 0;
 > > +}
-> > +
-> > +/**
-> > + * elm_decode_bch_error_page - Locate error position
-> > + * @info:	elm info
+> > +EXPORT_SYMBOL_GPL(gpmc_calculate_ecc_bch);
 > 
-> should be dev, not info
+> Here you introduce a function very similar to gpmc_calculate_ecc_bch4 and
+> gpmc_calculate_ecc_bch8, but without the added benefit (IMHO) of the constant
+> polynomial that allows to get an ecc sequence of 0xFFs for a buffer filled with
+> 0xFFs. Why ?
 
-Ok I will correct it.
+I don't exactly understand what we benefitted/achieve. In my observation,
+this API does spare area also written with 0xFF if data area is 0xFFs.
+So the area looks like erased page again.
 
-> 
-> > + * @ecc_calc:	calculated ECC bytes from GPMC
-> > + * @err_vec:	elm error vectors
-> > + *
-> > + * Called with one or greater reported and is vectors with error reported
-> > + * is updated in err_vec[].error_reported
-> > + */
-> 
-> I do not understand the statement "Called with one ..."
+> If using the ELM prevents you from reusing gpmc_calculate_ecc_bch[48], could you explain in which way ?
 
-elm_decode_bch_error_page() API will called from nand driver if and only if
-errors are present while reading page. Errors can be reported in one or
-multiple error vectors.
+When using gpmc_calculate_ecc_bch[48], calculated ecc values modified.
+The read sequence we following is
+Read 512 byte -> read ECC bytes from spare area
+Now the calculated ECC will be zero if no error is reported. In case of error, a syndrome
+Polynomial is reported. In either case modifying will corrupt the data.
 
-I will reword it as.
+This is valid if we are writing a page with 0xFF also. But this time we were filling a valid
+ecc in spare area not 0xFF as in gpmc_calculate_ecc_bch[48].
 
-Called with one or more error reported vectors & vectors with error reported
-is updated in err_vec[].error_reported
+Additionally to make compatible with RBL ECC layout (14 byte), we were setting ecc[13] as zero.
 
-> 
-[snip]
-> > +
-> > +#define BCH8_ECC_OOB_BYTES		13
-> > +/* RBL requires 14 byte even though BCH8 uses only 13 byte */
-> 
-> not sure what RBL is?
-
-RBL stands for Rom boot Loader
+Thanks
+Avinash  
 
 > 
-> > +#define BCH8_SIZE			(BCH8_ECC_OOB_BYTES + 1)
-> > +#define BCH4_SIZE			7
-> > +
-> > +#define	BCH8_SYNDROME_SIZE		4	/* 13 bytes of ecc */
-> > +#define	BCH4_SYNDROME_SIZE		2	/* 7 bytes of ecc */
-> > +
-> > +/**
-> > + * struct elm_errorvec - error vector for elm
-> > + * @error_reported:		set true for vectors error is reported
-> > + *
-> > + * @error_count:		number of correctable errors in the sector
-> > + * @error_uncorrectable:	number of uncorrectable errors
-> > + * @error_loc:			buffer for error location
-> > + *
-> > + */
-> > +struct elm_errorvec {
-> > +	bool error_reported;
-> > +	int error_count;
-> > +	int error_uncorrectable;
-> > +	int error_loc[ERROR_VECTOR_MAX];
-> > +};
-> > +
-> > +void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
-> > +		struct elm_errorvec *err_vec);
-> > +struct device *elm_request(enum bch_ecc bch_type);
-> > +#endif /* __ELM_H */
-> > 
-> 
-> -- 
-> 
-> Peter Meerwald
-> +43-664-2444418 (mobile)
+> Best regards,
+> --
+> Ivan
 > 
