@@ -1,57 +1,39 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 4 Oct 2012 14:01:57 +0530
-Subject: [PATCH] ARM: OMAP2+: gpmc: annotate exit sections properly
-Message-ID: <1349339517-17882-1-git-send-email-afzal@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 04 Oct 2012 01:41:49 -0700
+Subject: arm-soc maintainer entry
+Message-ID: <506D4BCD.3020402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-compiler complained,
-`gpmc_remove' referenced in section `.data' of arch/arm/mach-omap2/built-in.o: defined in discarded section `.exit.text' of arch/arm/mach-omap2/built-in.o
+Is the arm at kernel.org alias going to be added into the MAINTAINERS file?
+Should anybody be sending mails to this address?
 
-Annotate gpmc_remove function and dependents with __devexit.
+It seems I asked this over a year ago and the response was positive but
+nothing ever happened[1]. Maybe something like below? I only ask because
+get_maintainer.pl isn't picking up this email.
 
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ecd8796..0e1ec23 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -606,6 +606,14 @@ W: http://www.arm.linux.org.uk/
+ S:     Maintained
+ F:     arch/arm/
 
-Hi,
++ARM SUB-ARCHITECTURES
++M:     arm at kernel.org
++L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:     MAINTAINED
++F:     arch/arm/mach-*/
++F:     arch/arm/plat-*/
++T:     git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
++
+ ARM PRIMECELL AACI PL041 DRIVER
+ M:     Russell King <linux@arm.linux.org.uk>
+ S:     Maintained
 
-Section mismatch occured due to my change,
-"ARM: OMAP2+: gpmc: minimal driver support".
-As this change is not yet in vanilla, SHA1 has not been
-mentioned in commit log. Original change that introduced the
-above mentioned warning has as of now swimmed only till
-linux-omap and linux-next.
+[1] https://lkml.org/lkml/2011/7/26/307
 
-This has been generated against linux-next (next-20121003)
-
-Regards
-Afzal
-
- arch/arm/mach-omap2/gpmc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 8ab1e1b..5ac5cf3 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -838,7 +838,7 @@ static int gpmc_setup_irq(void)
- 	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
- }
- 
--static __exit int gpmc_free_irq(void)
-+static __devexit int gpmc_free_irq(void)
- {
- 	int i;
- 
-@@ -944,7 +944,7 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static __exit int gpmc_remove(struct platform_device *pdev)
-+static __devexit int gpmc_remove(struct platform_device *pdev)
- {
- 	gpmc_free_irq();
- 	gpmc_mem_exit();
 -- 
-1.7.12
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
