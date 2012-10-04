@@ -1,66 +1,162 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 3 Oct 2012 18:26:07 -0700
-Subject: [RFC][PATCH v4? 0/7] Adaptive Body-Bias for OMAP
-Message-ID: <1349313974-5473-1-git-send-email-mturquette@ti.com>
+Date: Wed, 3 Oct 2012 18:26:09 -0700
+Subject: [PATCH 2/7] ARM: omap: add ABB PRM_IRQSTATUS handlers
+In-Reply-To: <1349313974-5473-1-git-send-email-mturquette@ti.com>
+References: <1349313974-5473-1-git-send-email-mturquette@ti.com>
+Message-ID: <1349313974-5473-3-git-send-email-mturquette@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Turquette <mturquette@linaro.org>
+Some PRM_IRQSTATUS registers contain a bit to signal that an ABB LDO
+transition has completed.  These tranxdone bits exist for every instance
+of an ABB LDO; thus these tranxdone bits are supported on 36xx variants
+for the MPU voltage domain, and on 44xx variants for the MPU and IVA
+voltage domains.
 
-Adaptive Body-Bias ldos are present for some voltage domains starting
-with OMAP3630.  They have three modes of operation:
+This patch introduces some data structures and helper functions for
+checking on and clearing the TRANXDONE bits.  They are a copy-paste of
+existing VP functions of similar nature and will be used in forthcoming
+patches that control the ABB programming sequence during a DVFS
+transition.
 
- * Bypass - the default, it just follows the vdd voltage
- * Foward Body-Bias - applies voltage bias to increase transistor
-   performance at the cost of power.  Used to operate safely at high
-   OPPs
- * Reverse Body-Bias - applies voltage bias to decrease leakage and save
-   power.  Used to save power at lower OPPs
+Some previous discussion on the design of the ABB PRM handlers can be
+found here:
+http://article.gmane.org/gmane.linux.ports.arm.omap/63609
 
-This series adds the ABB code and per-voltage domain data for OMAP3630
-and OMAP4430.  Newer OMAP4 chips and OMAP5 will need this data populated
-once those platforms have OPP and voltage tables.  The voltage domain
-scaling sequence is modified use these new functions.
+Signed-off-by: Mike Turquette <mturquette@ti.com>
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |   36 +++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    4 ++++
+ arch/arm/mach-omap2/prm44xx.c      |   44 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm44xx.h      |    4 ++++
+ 4 files changed, 88 insertions(+)
 
-This series build on top my previous series, "Introduce .get_voltage
-callback into voltdm"[1].  While not strictly necessary that series does
-take some steps to eliminate one combination of ABB and VP/VC modes that
-is out-of-spec.
-
-[1] http://marc.info/?l=linux-omap&m=134931341818379&w=2
-
-Mike Turquette (7):
-  ARM: omap: add 3630 PRM register definitions
-  ARM: omap: add ABB PRM_IRQSTATUS handlers
-  ARM: omap: Adaptive Body-Bias structures & data
-  ARM: omap: opp: add ABB data to voltage tables
-  ARM: omap: voltage: per-voltage domain ABB data
-  ARM: omap: abb: init & transition functions
-  ARM: omap: voltage: add ABB to voltage scaling
-
- arch/arm/mach-omap2/Makefile                  |    8 +-
- arch/arm/mach-omap2/abb.c                     |  322 +++++++++++++++++++++++++
- arch/arm/mach-omap2/abb.h                     |   94 ++++++++
- arch/arm/mach-omap2/abb36xx_data.c            |   39 +++
- arch/arm/mach-omap2/abb44xx_data.c            |   45 ++++
- arch/arm/mach-omap2/omap_opp_data.h           |    5 +-
- arch/arm/mach-omap2/opp3xxx_data.c            |   37 +--
- arch/arm/mach-omap2/opp4xxx_data.c            |   25 +-
- arch/arm/mach-omap2/prm-regbits-34xx.h        |   34 +++
- arch/arm/mach-omap2/prm2xxx_3xxx.c            |   36 +++
- arch/arm/mach-omap2/prm2xxx_3xxx.h            |    8 +
- arch/arm/mach-omap2/prm44xx.c                 |   44 ++++
- arch/arm/mach-omap2/prm44xx.h                 |    4 +
- arch/arm/mach-omap2/voltage.c                 |   28 ++-
- arch/arm/mach-omap2/voltage.h                 |    1 +
- arch/arm/mach-omap2/voltagedomains3xxx_data.c |    2 +
- arch/arm/mach-omap2/voltagedomains44xx_data.c |    3 +
- arch/arm/plat-omap/include/plat/voltage.h     |    1 +
- 18 files changed, 699 insertions(+), 37 deletions(-)
- create mode 100644 arch/arm/mach-omap2/abb.c
- create mode 100644 arch/arm/mach-omap2/abb.h
- create mode 100644 arch/arm/mach-omap2/abb36xx_data.c
- create mode 100644 arch/arm/mach-omap2/abb44xx_data.c
-
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index a0309de..8d3c63f 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -364,3 +364,39 @@ static int __init omap3xxx_prcm_init(void)
+ 	return ret;
+ }
+ subsys_initcall(omap3xxx_prcm_init);
++
++/* PRM ABB */
++
++/*
++ * struct omap36xx_abb - OMAP3 ABB register access description
++ * @tranxdone_status: ABB_xxx_DONE_ST bitmask in PRM_IRQSTATUS reg
++ */
++struct omap36xx_abb {
++	u32 tranxdone_status;
++};
++
++static struct omap36xx_abb omap36xx_abb[] = {
++	[OMAP3_VP_VDD_MPU_ID] = {
++		.tranxdone_status = OMAP3630_ABB_LDO_TRANXDONE_ST_MASK,
++	},
++};
++
++#define MAX_ABB_ID ARRAY_SIZE(omap36xx_abb);
++
++u32 omap3_prm_abb_check_txdone(u8 abb_id)
++{
++	struct omap36xx_abb *abb = &omap36xx_abb[abb_id];
++	u32 irqstatus;
++
++	irqstatus = omap2_prm_read_mod_reg(OCP_MOD,
++					   OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++	return irqstatus & abb->tranxdone_status;
++}
++
++void omap3_prm_abb_clear_txdone(u8 abb_id)
++{
++	struct omap36xx_abb *abb = &omap36xx_abb[abb_id];
++
++	omap2_prm_write_mod_reg(abb->tranxdone_status,
++				OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++}
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index c9eea9a..c24c039 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -249,6 +249,10 @@ extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
+ u32 omap3_prm_vp_check_txdone(u8 vp_id);
+ void omap3_prm_vp_clear_txdone(u8 vp_id);
+ 
++/* OMAP36xx-specific ABB functions */
++u32 omap3_prm_abb_check_txdone(u8 vp_id);
++void omap3_prm_abb_clear_txdone(u8 vp_id);
++
+ /*
+  * OMAP3 access functions for voltage controller (VC) and
+  * voltage proccessor (VP) in the PRM.
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index bb727c2..9b820d4 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -301,3 +301,47 @@ static int __init omap4xxx_prcm_init(void)
+ 	return 0;
+ }
+ subsys_initcall(omap4xxx_prcm_init);
++
++/* PRM ABB */
++
++/*
++ * struct omap4_vp - OMAP4 VP register access description.
++ * @irqstatus_mpu: offset to IRQSTATUS_MPU register for VP
++ * @tranxdone_status: VP_TRANXDONE_ST bitmask in PRM_IRQSTATUS_MPU reg
++ */
++struct omap4_abb {
++	u32 irqstatus_mpu;
++	u32 tranxdone_status;
++};
++
++static struct omap4_abb omap4_abb[] = {
++	[OMAP4_VP_VDD_MPU_ID] = {
++		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET,
++		.tranxdone_status = OMAP4430_ABB_MPU_DONE_ST_MASK,
++	},
++	[OMAP4_VP_VDD_IVA_ID] = {
++		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_OFFSET,
++		.tranxdone_status = OMAP4430_ABB_IVA_DONE_ST_MASK,
++	},
++};
++
++u32 omap4_prm_abb_check_txdone(u8 abb_id)
++{
++	struct omap4_abb *abb = &omap4_abb[abb_id];
++	u32 irqstatus;
++
++	irqstatus = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
++						OMAP4430_PRM_OCP_SOCKET_INST,
++						abb->irqstatus_mpu);
++	return irqstatus & abb->tranxdone_status;
++}
++
++void omap4_prm_abb_clear_txdone(u8 abb_id)
++{
++	struct omap4_abb *abb = &omap4_abb[abb_id];
++
++	omap4_prminst_write_inst_reg(abb->tranxdone_status,
++				     OMAP4430_PRM_PARTITION,
++				     OMAP4430_PRM_OCP_SOCKET_INST,
++				     abb->irqstatus_mpu);
++};
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index ee72ae6..6a0a00c 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -755,6 +755,10 @@ extern u32 omap4_prm_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
+ u32 omap4_prm_vp_check_txdone(u8 vp_id);
+ void omap4_prm_vp_clear_txdone(u8 vp_id);
+ 
++/* OMAP4-specific ABB functions */
++u32 omap4_prm_abb_check_txdone(u8 abb_id);
++void omap4_prm_abb_clear_txdone(u8 abb_id);
++
+ /*
+  * OMAP4 access functions for voltage controller (VC) and
+  * voltage proccessor (VP) in the PRM.
 -- 
 1.7.9.5
