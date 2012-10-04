@@ -1,75 +1,66 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 3 Oct 2012 18:16:05 -0700
-Subject: [PATCH 5/5] ARM: omap: initialize voltdm->nominal_volt
-In-Reply-To: <1349313365-5262-1-git-send-email-mturquette@ti.com>
-References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
-Message-ID: <1349313365-5262-6-git-send-email-mturquette@ti.com>
+Date: Wed, 3 Oct 2012 18:26:07 -0700
+Subject: [RFC][PATCH v4? 0/7] Adaptive Body-Bias for OMAP
+Message-ID: <1349313974-5473-1-git-send-email-mturquette@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mike Turquette <mturquette@linaro.org>
 
-Populate the .get_voltage callbacks for VC & VP.  Use these callbacks to
-populate voltdm->nominal_volt during boot sequence.
+Adaptive Body-Bias ldos are present for some voltage domains starting
+with OMAP3630.  They have three modes of operation:
 
-This is useful for the Adaptive Body-Bias sequence coming in a
-subsequent series.  Without this patch voltdm->nominal will not be
-populated until after the first call to voltdm_scale.  This is too late
-to be useful to the pre-scale sequence in the ABB series since that
-sequence needs to know the voltage prior to the first transition.
+ * Bypass - the default, it just follows the vdd voltage
+ * Foward Body-Bias - applies voltage bias to increase transistor
+   performance at the cost of power.  Used to operate safely at high
+   OPPs
+ * Reverse Body-Bias - applies voltage bias to decrease leakage and save
+   power.  Used to save power at lower OPPs
 
-Note that the .get_voltage callback will return zero for the corner case
-wherein the bootloader has not scaling the voltage.  In this case it is
-safe to assume that we are running at the PMIC's default power-on
-voltage.  DT data providing the default voltage for each PMIC is needed
-in this case.
+This series adds the ABB code and per-voltage domain data for OMAP3630
+and OMAP4430.  Newer OMAP4 chips and OMAP5 will need this data populated
+once those platforms have OPP and voltage tables.  The voltage domain
+scaling sequence is modified use these new functions.
 
-Signed-off-by: Mike Turquette <mturquette@ti.com>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- arch/arm/mach-omap2/voltage.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+This series build on top my previous series, "Introduce .get_voltage
+callback into voltdm"[1].  While not strictly necessary that series does
+take some steps to eliminate one combination of ABB and VP/VC modes that
+is out-of-spec.
 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 4dc60e8..f45716c 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -244,9 +244,11 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
- 	switch (voltscale_method) {
- 	case VOLTSCALE_VPFORCEUPDATE:
- 		voltdm->scale = omap_vp_forceupdate_scale;
-+		voltdm->get_voltage = omap_vp_get_init_voltage;
- 		return;
- 	case VOLTSCALE_VCBYPASS:
- 		voltdm->scale = omap_vc_bypass_scale;
-+		voltdm->get_voltage = omap_vc_get_bypass_data;
- 		return;
- 	default:
- 		pr_warning("%s: Trying to change the method of voltage scaling"
-@@ -288,13 +290,24 @@ int __init omap_voltage_late_init(void)
- 
- 		if (voltdm->vc) {
- 			voltdm->scale = omap_vc_bypass_scale;
-+			voltdm->get_voltage = omap_vc_get_bypass_data;
- 			omap_vc_init_channel(voltdm);
- 		}
- 
- 		if (voltdm->vp) {
- 			voltdm->scale = omap_vp_forceupdate_scale;
-+			voltdm->get_voltage = omap_vp_get_init_voltage;
- 			omap_vp_init(voltdm);
- 		}
-+
-+		/*
-+		 * XXX If voltdm->nominal_volt is zero after calling
-+		 * voltdm->get_voltage then we are likely running this
-+		 * voltage domain at the default boot voltage of the
-+		 * PMIC.  In such a case it would be best to load this
-+		 * value from DT.
-+		 */
-+		voltdm->nominal_volt = voltdm->get_voltage(voltdm);
- 	}
- 
- 	return 0;
+[1] http://marc.info/?l=linux-omap&m=134931341818379&w=2
+
+Mike Turquette (7):
+  ARM: omap: add 3630 PRM register definitions
+  ARM: omap: add ABB PRM_IRQSTATUS handlers
+  ARM: omap: Adaptive Body-Bias structures & data
+  ARM: omap: opp: add ABB data to voltage tables
+  ARM: omap: voltage: per-voltage domain ABB data
+  ARM: omap: abb: init & transition functions
+  ARM: omap: voltage: add ABB to voltage scaling
+
+ arch/arm/mach-omap2/Makefile                  |    8 +-
+ arch/arm/mach-omap2/abb.c                     |  322 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/abb.h                     |   94 ++++++++
+ arch/arm/mach-omap2/abb36xx_data.c            |   39 +++
+ arch/arm/mach-omap2/abb44xx_data.c            |   45 ++++
+ arch/arm/mach-omap2/omap_opp_data.h           |    5 +-
+ arch/arm/mach-omap2/opp3xxx_data.c            |   37 +--
+ arch/arm/mach-omap2/opp4xxx_data.c            |   25 +-
+ arch/arm/mach-omap2/prm-regbits-34xx.h        |   34 +++
+ arch/arm/mach-omap2/prm2xxx_3xxx.c            |   36 +++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h            |    8 +
+ arch/arm/mach-omap2/prm44xx.c                 |   44 ++++
+ arch/arm/mach-omap2/prm44xx.h                 |    4 +
+ arch/arm/mach-omap2/voltage.c                 |   28 ++-
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains3xxx_data.c |    2 +
+ arch/arm/mach-omap2/voltagedomains44xx_data.c |    3 +
+ arch/arm/plat-omap/include/plat/voltage.h     |    1 +
+ 18 files changed, 699 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/abb.c
+ create mode 100644 arch/arm/mach-omap2/abb.h
+ create mode 100644 arch/arm/mach-omap2/abb36xx_data.c
+ create mode 100644 arch/arm/mach-omap2/abb44xx_data.c
+
 -- 
 1.7.9.5
