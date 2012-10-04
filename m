@@ -1,105 +1,189 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Thu, 4 Oct 2012 14:04:05 +0200
-Subject: [PATCH 3/4] ARM: OMAP2: gpmc: Add support for BCH ECC scheme
-In-Reply-To: <518397C60809E147AF5323E0420B992E3E9B4902@DBDE01.ent.ti.com>
-References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
- <20121003185458.GA27502@parrot.com>
- <518397C60809E147AF5323E0420B992E3E9B4902@DBDE01.ent.ti.com>
-Message-ID: <20121004120405.GA28840@parrot.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 4 Oct 2012 17:52:45 +0530
+Subject: [PATCH v3 5/6] ARM: davinci: Add support for PRUSS on DA850
+In-Reply-To: <1349276133-26408-6-git-send-email-mporter@ti.com>
+References: <1349276133-26408-1-git-send-email-mporter@ti.com>
+ <1349276133-26408-6-git-send-email-mporter@ti.com>
+Message-ID: <506D7F95.2030401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 09:03:42AM +0100, Philip, Avinash wrote:
-(...)
-> > > +int gpmc_calculate_ecc_bch(int cs, const u_char *dat, u_char *ecc)
-> > > +{
-> > > +	int i, eccbchtsel;
-> > > +	u32 nsectors, reg, bch_val1, bch_val2, bch_val3, bch_val4;
-> > > +
-> > > +	if (gpmc_ecc_used != cs)
-> > > +		return -EINVAL;
-> > > +
-> > > +	/* read number of sectors for ecc to be calculated */
-> > > +	nsectors = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 4) & 0x7) + 1;
-> > > +	/*
-> > > +	 * find BCH scheme used
-> > > +	 * 0 -> BCH4
-> > > +	 * 1 -> BCH8
-> > > +	 */
-> > > +	eccbchtsel = ((gpmc_read_reg(GPMC_ECC_CONFIG) >> 12) & 0x3);
-> > > +
-> > > +	/* update ecc bytes for entire page */
-> > > +	for (i = 0; i < nsectors; i++) {
-> > > +
-> > > +		reg = GPMC_ECC_BCH_RESULT_0 + 16 * i;
-> > > +
-> > > +		/* Read hw-computed remainder */
-> > > +		bch_val1 = gpmc_read_reg(reg + 0);
-> > > +		bch_val2 = gpmc_read_reg(reg + 4);
-> > > +		if (eccbchtsel) {
-> > > +			bch_val3 = gpmc_read_reg(reg + 8);
-> > > +			bch_val4 = gpmc_read_reg(reg + 12);
-> > > +		}
-> > > +
-> > > +		if (eccbchtsel) {
-> > > +			/* BCH8 ecc scheme */
-> > > +			*ecc++ = (bch_val4 & 0xFF);
-> > > +			*ecc++ = ((bch_val3 >> 24) & 0xFF);
-> > > +			*ecc++ = ((bch_val3 >> 16) & 0xFF);
-> > > +			*ecc++ = ((bch_val3 >> 8) & 0xFF);
-> > > +			*ecc++ = (bch_val3 & 0xFF);
-> > > +			*ecc++ = ((bch_val2 >> 24) & 0xFF);
-> > > +			*ecc++ = ((bch_val2 >> 16) & 0xFF);
-> > > +			*ecc++ = ((bch_val2 >> 8) & 0xFF);
-> > > +			*ecc++ = (bch_val2 & 0xFF);
-> > > +			*ecc++ = ((bch_val1 >> 24) & 0xFF);
-> > > +			*ecc++ = ((bch_val1 >> 16) & 0xFF);
-> > > +			*ecc++ = ((bch_val1 >> 8) & 0xFF);
-> > > +			*ecc++ = (bch_val1 & 0xFF);
-> > > +			/* 14th byte of ecc not used */
-> > > +			*ecc++ = 0;
-> > > +		} else {
-> > > +			/* BCH4 ecc scheme */
-> > > +			*ecc++ = ((bch_val2 >> 12) & 0xFF);
-> > > +			*ecc++ = ((bch_val2 >> 4) & 0xFF);
-> > > +			*ecc++ = (((bch_val2 & 0xF) << 4) |
-> > > +					((bch_val1 >> 28) & 0xF));
-> > > +			*ecc++ = ((bch_val1 >> 20) & 0xFF);
-> > > +			*ecc++ = ((bch_val1 >> 12) & 0xFF);
-> > > +			*ecc++ = ((bch_val1 >> 4) & 0xFF);
-> > > +			*ecc++ = ((bch_val1 & 0xF) << 4);
-> > > +		}
-> > > +	}
-> > > +
-> > > +	gpmc_ecc_used = -EINVAL;
-> > > +	return 0;
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(gpmc_calculate_ecc_bch);
-> > 
-> > Here you introduce a function very similar to gpmc_calculate_ecc_bch4 and
-> > gpmc_calculate_ecc_bch8, but without the added benefit (IMHO) of the constant
-> > polynomial that allows to get an ecc sequence of 0xFFs for a buffer filled with
-> > 0xFFs. Why ?
+On 10/3/2012 8:25 PM, Matt Porter wrote:
+> Adds PRUSS clock, registers the L3RAM pool, and registers the
+> platform device for uio_pruss on DA850.
 > 
-> I don't exactly understand what we benefitted/achieve. In my observation,
-> this API does spare area also written with 0xFF if data area is 0xFFs.
-> So the area looks like erased page again.
+> Signed-off-by: Matt Porter <mporter@ti.com>
 
-Precisely. It means you can read the page with ECC enabled without having to check if
-the page has been programmed; it also enables bitflip correction on erased pages.
+I am interested in knowing how this patch was tested.
 
-> > If using the ELM prevents you from reusing gpmc_calculate_ecc_bch[48], could you explain in which way ?
+> ---
+>  arch/arm/mach-davinci/board-da850-evm.c    |   12 +++++
+>  arch/arm/mach-davinci/da850.c              |    7 +++
+>  arch/arm/mach-davinci/devices-da8xx.c      |   66 ++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
+>  4 files changed, 87 insertions(+)
 > 
-> When using gpmc_calculate_ecc_bch[48], calculated ecc values modified.
-> The read sequence we following is
-> Read 512 byte -> read ECC bytes from spare area
-> Now the calculated ECC will be zero if no error is reported. In case of error, a syndrome
-> Polynomial is reported. In either case modifying will corrupt the data.
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 1295e61..acc6e84 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/tps6507x.h>
+>  #include <linux/input/tps6507x-ts.h>
+> +#include <linux/platform_data/uio_pruss.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/flash.h>
+>  #include <linux/delay.h>
+> @@ -42,6 +43,7 @@
+>  #include <mach/da8xx.h>
+>  #include <linux/platform_data/mtd-davinci.h>
+>  #include <mach/mux.h>
+> +#include <mach/sram.h>
+>  #include <linux/platform_data/mtd-davinci-aemif.h>
+>  #include <linux/platform_data/spi-davinci.h>
 
-It is still possible to retrieve your original error syndrome, even using the technique transforming ECC on erased pages into 0xFFs.
-But I guess you're not interested if you need RBL compatibility.
+I know you did not introduce the mess, but can you include a patch to
+fix the mixture of mach/ and linux/ includes here? mach/ includes should
+follow the linux/ includes.
 
-BR,
---
-Ivan
+>  
+> @@ -1253,6 +1255,10 @@ static __init int da850_wl12xx_init(void)
+>  
+>  #endif /* CONFIG_DA850_WL12XX */
+>  
+> +struct uio_pruss_pdata da8xx_pruss_uio_pdata = {
+> +	.pintc_base	= 0x4000,
+> +};
+> +
+>  #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+>  
+>  static __init void da850_evm_init(void)
+> @@ -1339,6 +1345,12 @@ static __init void da850_evm_init(void)
+>  		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
+>  				ret);
+>  
+> +	da8xx_pruss_uio_pdata.l3ram_pool = sram_get_gen_pool();
+
+I wonder if this platform data should still be called l3ram pool. L3RAM
+is OMAP terminology. May be just call it sram_pool? Also this patch
+should follow 6/6 to prevent build breakage.
+
+> +	ret = da8xx_register_pruss_uio(&da8xx_pruss_uio_pdata);
+> +	if (ret)
+> +		pr_warning("pruss_uio initialization failed: %d\n",
+> +				ret);
+> +
+>  	/* Handle board specific muxing for LCD here */
+>  	ret = davinci_cfg_reg_list(da850_evm_lcdc_pins);
+>  	if (ret)
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index d8d69de..7c01d31 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+
+Can you separate out board and SoC changes into different patches?
+
+> @@ -212,6 +212,12 @@ static struct clk tptc2_clk = {
+>  	.flags		= ALWAYS_ENABLED,
+>  };
+>  
+> +static struct clk pruss_clk = {
+> +	.name		= "pruss",
+> +	.parent		= &pll0_sysclk2,
+> +	.lpsc		= DA8XX_LPSC0_PRUSS,
+> +};
+> +
+>  static struct clk uart0_clk = {
+>  	.name		= "uart0",
+>  	.parent		= &pll0_sysclk2,
+> @@ -378,6 +384,7 @@ static struct clk_lookup da850_clks[] = {
+>  	CLK(NULL,		"tptc1",	&tptc1_clk),
+>  	CLK(NULL,		"tpcc1",	&tpcc1_clk),
+>  	CLK(NULL,		"tptc2",	&tptc2_clk),
+> +	CLK(NULL,		"pruss",	&pruss_clk),
+
+This is actually incorrect since we should use device name rather than
+con_id for matching the clock. If there is just one clock that the
+driver needs, connection id should be NULL. Looking at the driver now,
+the clk_get() call seems to pass a valid device pointer. So, I wonder
+how you are able to look up the clock even with a NULL device name.
+
+>  	CLK(NULL,		"uart0",	&uart0_clk),
+>  	CLK(NULL,		"uart1",	&uart1_clk),
+>  	CLK(NULL,		"uart2",	&uart2_clk),
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index bd2f72b..7c2e0d2 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -518,6 +518,72 @@ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
+>  	}
+>  }
+>  
+> +#define DA8XX_PRUSS_MEM_BASE		0x01C30000
+
+In this file all base addresses are added at the top of the file. The
+defines are sorted in ascending order of address. If that's broken, its
+all my fault, but please don't add to the breakage when adding this entry :)
+
+> +
+> +static struct resource da8xx_pruss_resources[] = {
+> +	{
+> +		.start	= DA8XX_PRUSS_MEM_BASE,
+> +		.end	= DA8XX_PRUSS_MEM_BASE + 0xFFFF,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT0,
+> +		.end	= IRQ_DA8XX_EVTOUT0,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT1,
+> +		.end	= IRQ_DA8XX_EVTOUT1,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT2,
+> +		.end	= IRQ_DA8XX_EVTOUT2,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT3,
+> +		.end	= IRQ_DA8XX_EVTOUT3,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT4,
+> +		.end	= IRQ_DA8XX_EVTOUT4,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT5,
+> +		.end	= IRQ_DA8XX_EVTOUT5,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT6,
+> +		.end	= IRQ_DA8XX_EVTOUT6,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.start	= IRQ_DA8XX_EVTOUT7,
+> +		.end	= IRQ_DA8XX_EVTOUT7,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device da8xx_pruss_uio_dev = {
+> +	.name		= "pruss_uio",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(da8xx_pruss_resources),
+> +	.resource	= da8xx_pruss_resources,
+> +	.dev	 =	{
+> +		.coherent_dma_mask = 0xffffffff,
+
+DMA_BIT_MASK(32)?
+
+Thanks,
+Sekhar
