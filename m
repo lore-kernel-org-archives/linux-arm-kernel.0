@@ -1,55 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Oct 2012 11:07:03 +0200
-Subject: [PATCH V2 3/3] spi: spi-pl022: Minor simplification for runtime pm
-In-Reply-To: <1349337881-15917-4-git-send-email-ulf.hansson@stericsson.com>
-References: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
- <1349337881-15917-4-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CAPDyKFqZXKtpJ8vSFKfZuD8FGayQUhmYKtZKzkZ15jKRA5nu6Q@mail.gmail.com>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Thu, 4 Oct 2012 11:11:45 +0200
+Subject: [PATCH v3 0/6] uio_pruss cleanup and platform support
+In-Reply-To: <1349276133-26408-1-git-send-email-mporter@ti.com>
+Message-ID: <20121004091145.GA3317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Matt,
 
-Mark, I am not sure this particular patch is actually wanted. Realized
-that when reading up on the driver/base/* patches for PM changes this
-summer. Especially how device probe/suspend/shutdown etc. has been
-changed for runtime PM point of view.
+On 10/3/12, Matt Porter <mporter@ti.com> wrote:
+> This series enables uio_pruss on DA850 and removes use of the
+> private SRAM API by the driver. The driver previously was not
+> enabled by any platform and the private SRAM API was accessing
+> an invalid SRAM bank.
 
-Maybe you can comment?
+have you seen my SRAM patch series at https://lkml.org/lkml/2012/9/7/281
+"Add device tree support for on-chip SRAM" ?
 
-Kind regards
-Ulf Hansson
+I think the generic SRAM/genalloc driver (https://lkml.org/lkml/2012/9/7/282)
+could be useful to map the L3RAM on Davinci.
+With the gen_pool lookup patch (https://lkml.org/lkml/2012/9/7/284) the
+uio_pruss driver could then use the gen_pool_find_by_phys() (or
+of_get_named_gen_pool() for initialization from device tree) to
+retrieve the struct gen_pool*.
 
-On 4 October 2012 10:04, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> In probe pm_runtime_put_autosuspend has the same effect as doing
-> pm_runtime_put. This due to upper layer in driver core is preventing
-> the device from being runtime suspended by a pm_runtime_get*.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/spi/spi-pl022.c |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index a1db91a..51b7a95 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2246,10 +2246,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->                 pm_runtime_set_autosuspend_delay(dev,
->                         platform_info->autosuspend_delay);
->                 pm_runtime_use_autosuspend(dev);
-> -               pm_runtime_put_autosuspend(dev);
-> -       } else {
-> -               pm_runtime_put(dev);
->         }
-> +       pm_runtime_put(dev);
-> +
->         return 0;
->
->   err_spi_register:
-> --
-> 1.7.10
->
+This way you could avoid handing it over via platform data and you could
+get rid of arch/arm/mach-davinci/{sram.c,include/mach/sram.h} completely.
+
+regards
+Philipp
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
