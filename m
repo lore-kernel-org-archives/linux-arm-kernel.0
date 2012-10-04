@@ -1,46 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 4 Oct 2012 21:22:05 +0100
-Subject: [GIT PULL] Disintegrate UAPI for arm64
-In-Reply-To: <17350.1349380264@warthog.procyon.org.uk>
-References: <17350.1349380264@warthog.procyon.org.uk>
-Message-ID: <20121004202204.GA6256@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 4 Oct 2012 22:24:29 +0200
+Subject: [PATCH v2 0/9] add EDO feature for gpmi-nand driver
+In-Reply-To: <1347519480-31106-1-git-send-email-b32955@freescale.com>
+References: <1347519480-31106-1-git-send-email-b32955@freescale.com>
+Message-ID: <201210042224.30095.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 08:51:04PM +0100, David Howells wrote:
-> Can you merge the following branch into the arm64 tree please.
-> 
-> This is to complete part of the UAPI disintegration for which the preparatory
-> patches were pulled recently.
-> 
-> Note that there are some fixup patches which are at the base of the branch
-> aimed at you, plus all arches get the asm-generic branch merged in too.
-> 
-> The following changes since commit 612a9aab56a93533e76e3ad91642db7033e03b69:
-> 
->   Merge branch 'drm-next' of git://people.freedesktop.org/~airlied/linux (2012-10-03 23:29:23 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.infradead.org/users/dhowells/linux-headers.git disintegrate-arm64
-> 
-> for you to fetch changes up to ae4f6c65798014d5d7a88d03e58faba53c0a92e1:
-> 
->   UAPI: (Scripted) Disintegrate arch/arm64/include/asm (2012-10-04 18:20:24 +0100)
-...
->  arch/c6x/Makefile                               |   2 +
->  arch/c6x/include/asm/Kbuild                     |   1 +
->  arch/c6x/include/asm/signal.h                   |  17 -
->  arch/c6x/include/asm/unistd.h                   |   4 -
->  arch/hexagon/include/asm/unistd.h               |   5 -
->  arch/openrisc/include/asm/unistd.h              |   5 -
->  arch/score/include/asm/unistd.h                 |   5 -
->  arch/tile/include/asm/unistd.h                  |   5 -
->  arch/unicore32/include/asm/unistd.h             |   4 -
+Dear Huang Shijie,
 
-It seems that this branch contains more than just arm64 changes. Are
-they going into mainline separately?
+> The ONFI nand supports the EDO (extended data out) feature in
+> asynchronous mode when the host controller(such as gpmi-nand)
+> uses a tRC of less then 30ns.
+> 
+> The gpmi can supports this EDO feature.
+> This patch set adds the EDO support the gpmi-nand driver.
+> 
+> patch 1 ~ patch 2:
+> 	 These two patches provide the infrastructure for the EDO feature.
+>          They add necessary MTD helpers for the ONFI nand set/get features,
+> 	 and the help to get the supportted timing mode.
+> 	 These two patches are new version. The init version has been
+> 	 reviewed by Vikram & Florian.
+> 
+> patch 3 ~ patch 7:
+>          These patches are clean-ups for the gpmi-nand's timing code.
+> 	 Also they make the some preparations for the EDO patch.
+> 
+> patch 8: add the EDO feature to the gpmi-nand.
+> 
+> 
+> patch 9: a small optimization for the timing.
+>          only set the timing registers one time.
+> 
+> I tested this patch set on the IMX6Q-arm2 board with several Micron's
+> ONFI nand chips. Some chips only can supports to mode 4, some chips
+> can supports to mode 5.
+> 
+> The performance is much improved. Take Micron MT29F32G08MAA for example
+> (in mode 5, 100MHz):
+[...]
 
--- 
-Catalin
+Was this ever tested on something else than mx6q? I suspect these broke gpmi 
+nand on mx28. Can you please verify?
