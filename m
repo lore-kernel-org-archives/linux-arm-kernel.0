@@ -1,114 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  3 Oct 2012 23:38:55 -0700
-Subject: [PATCH 3/3] clk: Don't return negative numbers for unsigned values
- with !clk
-In-Reply-To: <1349332735-20096-1-git-send-email-sboyd@codeaurora.org>
-References: <1349332735-20096-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1349332735-20096-4-git-send-email-sboyd@codeaurora.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 04 Oct 2012 19:48:31 +1300
+Subject: usb: uhci-platform driver fails after patch changes during merge
+In-Reply-To: <1349332691.7583.3.camel@gitbox>
+References: <1349332691.7583.3.camel@gitbox>
+Message-ID: <1349333311.7905.0.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the helper functions return negative error codes if
-passed a NULL clock. This can lead to confusing behavior when the
-expected return value is unsigned. Fix up these accessors so that
-they return unsigned values (or bool in the case of is_enabled).
-This way we can't interpret NULL clocks as having valid and
-interesting values.
+On Thu, 2012-10-04 at 19:38 +1300, Tony Prisk wrote:
+> Mike,
+> 
+> I see someone made changes to the uhci-platform.c driver I submitted
+> during v3.7 which results in it not working on mach-vt8500.
+> 
+> Could you clarify why the changes were made, and what the suggested
+> resolution would be to solve the problem that it introduced?
+> 
+> Lines indicated by ---> below were removed from the patch, which means
+> that on arch-vt8500 there is no dma_mask set, and its fails to
+> communicate with attached devices.
+> 
+> Regards
+> 
+> Tony P
+> 
+> 
+> static int __devinit uhci_hcd_platform_probe(struct platform_device
+> *pdev)
+> ...
+> 	if (usb_disabled())
+> 		return -ENODEV;
+> --->
+> 	/* Right now device-tree probed devices don't get dma_mask set.
+> 	 * Since shared usb code relies on it, set it here for now.
+> 	 * Once we have dma capability bindings this can go away.
+> 	 */
+> 	if (!pdev->dev.dma_mask)
+> 		pdev->dev.dma_mask = &platform_uhci_dma_mask;
+> --->
+> 	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
+> 				pdev->name);
+> ...
+> 
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c            | 20 ++++++++++----------
- include/linux/clk-provider.h |  6 +++---
- 2 files changed, 13 insertions(+), 13 deletions(-)
+Apologies Mike,
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 6852809..2847a66 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -262,7 +262,7 @@ inline struct clk_hw *__clk_get_hw(struct clk *clk)
- 
- inline u8 __clk_get_num_parents(struct clk *clk)
- {
--	return !clk ? -EINVAL : clk->num_parents;
-+	return !clk ? 0 : clk->num_parents;
- }
- 
- inline struct clk *__clk_get_parent(struct clk *clk)
-@@ -270,14 +270,14 @@ inline struct clk *__clk_get_parent(struct clk *clk)
- 	return !clk ? NULL : clk->parent;
- }
- 
--inline int __clk_get_enable_count(struct clk *clk)
-+inline unsigned int __clk_get_enable_count(struct clk *clk)
- {
--	return !clk ? -EINVAL : clk->enable_count;
-+	return !clk ? 0 : clk->enable_count;
- }
- 
--inline int __clk_get_prepare_count(struct clk *clk)
-+inline unsigned int __clk_get_prepare_count(struct clk *clk)
- {
--	return !clk ? -EINVAL : clk->prepare_count;
-+	return !clk ? 0 : clk->prepare_count;
- }
- 
- unsigned long __clk_get_rate(struct clk *clk)
-@@ -303,15 +303,15 @@ out:
- 
- inline unsigned long __clk_get_flags(struct clk *clk)
- {
--	return !clk ? -EINVAL : clk->flags;
-+	return !clk ? 0 : clk->flags;
- }
- 
--int __clk_is_enabled(struct clk *clk)
-+bool __clk_is_enabled(struct clk *clk)
- {
- 	int ret;
- 
- 	if (!clk)
--		return -EINVAL;
-+		return false;
- 
- 	/*
- 	 * .is_enabled is only mandatory for clocks that gate
-@@ -324,7 +324,7 @@ int __clk_is_enabled(struct clk *clk)
- 
- 	ret = clk->ops->is_enabled(clk->hw);
- out:
--	return ret;
-+	return !!ret;
- }
- 
- static struct clk *__clk_lookup_subtree(const char *name, struct clk *clk)
-@@ -569,7 +569,7 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
- 	unsigned long parent_rate = 0;
- 
- 	if (!clk)
--		return -EINVAL;
-+		return 0;
- 
- 	if (!clk->ops->round_rate) {
- 		if (clk->flags & CLK_SET_RATE_PARENT)
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 0571261..3593a3c 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -341,11 +341,11 @@ const char *__clk_get_name(struct clk *clk);
- struct clk_hw *__clk_get_hw(struct clk *clk);
- u8 __clk_get_num_parents(struct clk *clk);
- struct clk *__clk_get_parent(struct clk *clk);
--inline int __clk_get_enable_count(struct clk *clk);
--inline int __clk_get_prepare_count(struct clk *clk);
-+inline unsigned int __clk_get_enable_count(struct clk *clk);
-+inline unsigned int __clk_get_prepare_count(struct clk *clk);
- unsigned long __clk_get_rate(struct clk *clk);
- unsigned long __clk_get_flags(struct clk *clk);
--int __clk_is_enabled(struct clk *clk);
-+bool __clk_is_enabled(struct clk *clk);
- struct clk *__clk_lookup(const char *name);
- 
- /*
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+This isn't intended for you.
