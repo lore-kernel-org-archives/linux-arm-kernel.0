@@ -1,127 +1,84 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 4 Oct 2012 10:52:35 -0700
-Subject: usb: uhci-platform driver fails after patch changes during merge
-In-Reply-To: <1349372523.8451.10.camel@gitbox>
-References: <1349332691.7583.3.camel@gitbox> <1349333716.7905.1.camel@gitbox>
- <20121004142617.GA26625@kroah.com>
- <1349372523.8451.10.camel@gitbox>
-Message-ID: <20121004175235.GA14949@kroah.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 4 Oct 2012 11:59:07 -0600
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121004113637.GA2117@linaro.org>
+References: <20120930232116.GC30637@obsidianresearch.com>
+ <20121001153952.GB2100@linaro.org>
+ <20121001160639.GA31620@obsidianresearch.com>
+ <20121001175647.GD2100@linaro.org>
+ <20121001183543.GC22342@obsidianresearch.com>
+ <20121002102346.GB2108@linaro.org>
+ <20121002174759.GC23733@obsidianresearch.com>
+ <20121003104335.GA2254@linaro.org>
+ <20121003184437.GB12231@obsidianresearch.com>
+ <20121004113637.GA2117@linaro.org>
+Message-ID: <20121004175907.GB2994@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 06:42:03AM +1300, Tony Prisk wrote:
-> On Thu, 2012-10-04 at 07:26 -0700, Greg KH wrote:
-> > On Thu, Oct 04, 2012 at 07:55:16PM +1300, Tony Prisk wrote:
-> > > On Thu, 2012-10-04 at 19:38 +1300, Tony Prisk wrote:
-> > > > Mike,
-> > > > 
-> > > > I see someone made changes to the uhci-platform.c driver I submitted
-> > > > during v3.7 which results in it not working on mach-vt8500.
-> > > > 
-> > > > Could you clarify why the changes were made, and what the suggested
-> > > > resolution would be to solve the problem that it introduced?
-> > > > 
-> > > > Lines indicated by ---> below were removed from the patch, which means
-> > > > that on arch-vt8500 there is no dma_mask set, and its fails to
-> > > > communicate with attached devices.
-> > > > 
-> > > > Regards
-> > > > 
-> > > > Tony P
-> > > > 
-> > > > 
-> > > > static int __devinit uhci_hcd_platform_probe(struct platform_device
-> > > > *pdev)
-> > > > ...
-> > > > 	if (usb_disabled())
-> > > > 		return -ENODEV;
-> > > > --->
-> > > > 	/* Right now device-tree probed devices don't get dma_mask set.
-> > > > 	 * Since shared usb code relies on it, set it here for now.
-> > > > 	 * Once we have dma capability bindings this can go away.
-> > > > 	 */
-> > > > 	if (!pdev->dev.dma_mask)
-> > > > 		pdev->dev.dma_mask = &platform_uhci_dma_mask;
-> > > > --->
-> > > > 	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
-> > > > 				pdev->name);
-> > > > ...
-> > > > 
-> > > > 
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > 
-> > > Greg,
-> > > 
-> > > This message was intended for you rather than Mike. Could you clarify
-> > > what happened and the expected resolution?
-> > 
-> > I don't know, this should be directed at the person who made the change
-> > that is causing the problem, and the linux-usb at vger.kernel.org mailing
-> > list.
-> > 
-> > Who changed the patch?  What patch exactly are you referring to?  Who
-> > signed off on it?  Where was it discussed?
-> > 
-> > thanks,
-> > 
-> > greg k-h
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> Greg,
-> 
-> Thats the problem I have - I can't track where the changes came from.
-> 
-> The commit details show:
-> 
-> author
-> Tony Prisk
-> <linux@prisktech.co.nz>
-> 
-> 
-> Sat, 21 Jul 2012
-> 10:58:53 +0000 (22:58
-> +1200)
-> committer
-> Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org>
-> 
-> 
-> Thu, 16 Aug 2012
-> 21:00:37 +0000 (14:00
-> -0700)
-> commit
-> 100d45970327f78584ff4846deeca14bba511e28
-> 
-> But this file -
-> drivers/usb/host/uhci-platform.c
-> 
-> isn't the version I supplied in the patchset. There are no other commits
-> against it so I assume it was changed before it was committed.
+On Thu, Oct 04, 2012 at 12:36:37PM +0100, Dave Martin wrote:
 
-No, this commit matches up exactly with the email I got from you with
- Message-Id: <1342868333-10647-2-git-send-email-linux@prisktech.co.nz>
-which looks to be the patch I applied here.  The diffstat matches up
-exactly with that email.
+> OK, so it is supported, but not for ARM, yet.  I'm not sure that
+> such a patch would be rejected, since building in a DTB is not
+> really that different from building in a command-line.
 
-Do you see that as well?
+Maybe I will be able to look at this in a few months..
 
-You should have gotten an automated email response from me when the
-patch was applied, with the patch in it.  My email system doesn't keep
-those around, but you should have it somewhere, so you could compare it
-to the commit in Linus's tree now, right?  Does it match up?
+> The other solution to this problem is to distribute the dtb
+> alongside the kernel as a supplementary image (similar to
+> initramfs), with the bootloader doing the bare minimum of
+> modifications to it.
 
-If I accidentally applied the incorrect patch (note, this looks like
-it was version 4 of the patch, was there a later version that I
-missed?), please feel free to send an add-on patch that fixes up any
-errors.
+Yes, but we still need rely on complex code like I2C/MTD to create a
+correct DTB, which again puts us back to patching the kernel for that
+functionality.
+ 
+> Naturally, if zero modifications are needed then the bootloader does not
+> need libfdt (or equivalent code) at all.
 
-thanks,
+If only :)
 
-greg k-h
+> One other option open to you would be to provide an ELF image loadable
+> by your bootloader via a simple wrapper.  This would probably be a more
+> robust approach than carrying patches against head.S, since it removes
+> any intimate dependency on the kernel code itself.
+
+This is what I ment by having a 2nd stage loader, but this example is
+not complete because at this point you also have to patch into the DTB
+the initrd address (passed in r0/r1), and the various MAC addresses
+(getting them is the hard part..).
+
+The nice thing about the head.S patch is that it lives right after
+_entry, so there actually are no dependencies on the kernel code, it
+executes in the same environment as the example you presented. 
+
+Anyhow, exploring a CONFIG_ARM_BUILT_IN_DTB.. I think I'd add
+something like this to head.S:
+
+#ifdef CONFIG_ARM_BUILT_IN_DTB
+       adr     r3,bootloader_r0
+       stmia   r3,{r0,r1,r2}
+       mov     r2, #0
+       mov     r1, #0
+       mov     r0, #0
+#else
+       bl      __vet_atags
+#endif
+
+And something like this to early_dt_fixup:
+
+#ifdef CONFIG_ARM_BUILT_IN_DTB
+        for_each_dt_provider(dtp) {
+	      devtree = dtp->get_dtb();
+	      if (devtree)
+	      	   break;
+        }
+#else
+        devtree = phys_to_virt(dt_phys);
+#endif
+
+Where the 'dev tree provider' would use the stored bootloader
+registers and any other information to return the proper DTB. 
+
+Jason
