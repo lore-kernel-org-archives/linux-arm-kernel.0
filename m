@@ -1,58 +1,105 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Oct 2012 22:56:06 +0200
-Subject: [PATCH v2 0/9] add EDO feature for gpmi-nand driver
-In-Reply-To: <201210042224.30095.marex@denx.de>
-References: <1347519480-31106-1-git-send-email-b32955@freescale.com>
- <201210042224.30095.marex@denx.de>
-Message-ID: <201210042256.06286.marex@denx.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 04 Oct 2012 15:04:34 -0700
+Subject: [PATCH 01/16] ARM: OMAP2+: Make board-zoom.h local
+In-Reply-To: <20121004213950.26676.21898.stgit@muffinssi.local>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+Message-ID: <20121004220434.26676.45714.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
+This can be local to mach-omap2.
 
-> > The ONFI nand supports the EDO (extended data out) feature in
-> > asynchronous mode when the host controller(such as gpmi-nand)
-> > uses a tRC of less then 30ns.
-> > 
-> > The gpmi can supports this EDO feature.
-> > This patch set adds the EDO support the gpmi-nand driver.
-> > 
-> > patch 1 ~ patch 2:
-> > 	 These two patches provide the infrastructure for the EDO feature.
-> > 	 
-> >          They add necessary MTD helpers for the ONFI nand set/get
-> >          features,
-> > 	 
-> > 	 and the help to get the supportted timing mode.
-> > 	 These two patches are new version. The init version has been
-> > 	 reviewed by Vikram & Florian.
-> > 
-> > patch 3 ~ patch 7:
-> >          These patches are clean-ups for the gpmi-nand's timing code.
-> > 	 
-> > 	 Also they make the some preparations for the EDO patch.
-> > 
-> > patch 8: add the EDO feature to the gpmi-nand.
-> > 
-> > 
-> > patch 9: a small optimization for the timing.
-> > 
-> >          only set the timing registers one time.
-> > 
-> > I tested this patch set on the IMX6Q-arm2 board with several Micron's
-> > ONFI nand chips. Some chips only can supports to mode 4, some chips
-> > can supports to mode 5.
-> > 
-> > The performance is much improved. Take Micron MT29F32G08MAA for example
-> 
-> > (in mode 5, 100MHz):
-> [...]
-> 
-> Was this ever tested on something else than mx6q? I suspect these broke
-> gpmi nand on mx28. Can you please verify?
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/board-3630sdp.c           |    2 +-
+ arch/arm/mach-omap2/board-ldp.c               |    2 +-
+ arch/arm/mach-omap2/board-zoom-debugboard.c   |    2 +-
+ arch/arm/mach-omap2/board-zoom-display.c      |    2 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |    2 +-
+ arch/arm/mach-omap2/board-zoom.c              |    2 +-
+ arch/arm/mach-omap2/board-zoom.h              |    0 
+ 7 files changed, 6 insertions(+), 6 deletions(-)
+ rename arch/arm/mach-omap2/{include/mach/board-zoom.h => board-zoom.h} (100%)
 
-Hm, this series isnt the problematic one ... poking further ... I recall next 
-20120921 worked fine.
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
+index fc224ad..f1df601 100644
+--- a/arch/arm/mach-omap2/board-3630sdp.c
++++ b/arch/arm/mach-omap2/board-3630sdp.c
+@@ -20,7 +20,7 @@
+ #include "gpmc-smc91x.h"
+ #include <plat/usb.h>
+ 
+-#include <mach/board-zoom.h>
++#include "board-zoom.h"
+ 
+ #include "board-flash.h"
+ #include "mux.h"
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index ee8c3cf..4a784ef 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -36,7 +36,7 @@
+ 
+ #include "common.h"
+ #include <plat/gpmc.h>
+-#include <mach/board-zoom.h>
++#include "board-zoom.h"
+ #include <plat/usb.h>
+ #include "gpmc-smsc911x.h"
+ 
+diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
+index afb2278..36c8767 100644
+--- a/arch/arm/mach-omap2/board-zoom-debugboard.c
++++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
+@@ -20,7 +20,7 @@
+ #include <plat/gpmc.h>
+ #include "gpmc-smsc911x.h"
+ 
+-#include <mach/board-zoom.h>
++#include "board-zoom.h"
+ 
+ #include "soc.h"
+ #include "common.h"
+diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
+index b940ab2..230cb33 100644
+--- a/arch/arm/mach-omap2/board-zoom-display.c
++++ b/arch/arm/mach-omap2/board-zoom-display.c
+@@ -16,7 +16,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <video/omapdss.h>
+-#include <mach/board-zoom.h>
++#include "board-zoom.h"
+ 
+ #include "common.h"
+ 
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index 67f8540..01bfba5 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -28,7 +28,7 @@
+ #include "common.h"
+ #include <plat/usb.h>
+ 
+-#include <mach/board-zoom.h>
++#include "board-zoom.h"
+ 
+ #include "mux.h"
+ #include "hsmmc.h"
+diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
+index 4994438..cbfd9df 100644
+--- a/arch/arm/mach-omap2/board-zoom.c
++++ b/arch/arm/mach-omap2/board-zoom.c
+@@ -24,7 +24,7 @@
+ #include "common.h"
+ #include <plat/usb.h>
+ 
+-#include <mach/board-zoom.h>
++#include "board-zoom.h"
+ 
+ #include "board-flash.h"
+ #include "mux.h"
+diff --git a/arch/arm/mach-omap2/include/mach/board-zoom.h b/arch/arm/mach-omap2/board-zoom.h
+similarity index 100%
+rename from arch/arm/mach-omap2/include/mach/board-zoom.h
+rename to arch/arm/mach-omap2/board-zoom.h
