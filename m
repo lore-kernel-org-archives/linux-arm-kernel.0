@@ -1,85 +1,174 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 4 Oct 2012 15:50:26 -0400
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
- McASP IP Variant
-In-Reply-To: <506C46AD.1090807@gmail.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <506B6A9D.3090100@gmail.com>
- <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
- <506C1E97.1070700@gmail.com>
- <1BAFE6F6C881BF42822005164F1491C33EA99DA8@DBDE01.ent.ti.com>
- <506C46AD.1090807@gmail.com>
-Message-ID: <20121004195025.GL11149@beef>
+From: dhowells@redhat.com (David Howells)
+Date: Thu, 04 Oct 2012 20:51:04 +0100
+Subject: [GIT PULL] Disintegrate UAPI for arm64
+Message-ID: <17350.1349380264@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 04:07:41PM +0200, Daniel Mack wrote:
-> On 03.10.2012 14:57, Hebbar, Gururaja wrote:
-> > On Wed, Oct 03, 2012 at 16:46:39, Daniel Mack wrote:
-> >> On 03.10.2012 09:16, Hebbar, Gururaja wrote:
-> >>> On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
-> >>>> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
-> >>>>> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
-> >>>>> register offset and missing generic SRAM APIs support
-> >>>>>
-> >>>>> Changes
-> >>>>> - Add new MCASP_VERSION_3 to identify new variant. New DT compatible
-> >>>>>   "ti,omap2-mcasp-audio" to identify version 3 controller.
-> >>>>> - The register offsets are handled depending on the version.
-> >>>>> - Provide a config option to indicate missing SRAM API support.
-> >>>>
-> >>>> Could you give some insight which hardware this was tested on? I'm
-> >>>> trying to get this up and running on a AM33xx board, and the patches
-> >>>> look all reasonable to me. My problem is that I can't make the DMA
-> >>>> engine move forward, I fail to receive a single interrupt on this
-> >>>> peripheral after the stream starts. I will continue searching for the
-> >>>> reason of this tomorrow, but maybe you can give me some hint by
-> >>>> explaining your setup?
-> >>>>
-> >>>> Note that I'm using your patches together with Matt's from this series:
-> >>>>
-> >>>>   https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-rfc-v1
-> >>>>
-> >>>> ... but it doesn't work without those either.
-> >>>
-> >>>
-> >>> When I started working on adding DT support to McASP driver, Matt Porter 
-> >>> EDMA port was not yet ready. 
-> >>>
-> >>> So 
-> >>> 1. I took existing edma driver from AM335x Arago release [1] (driver + edma 
-> >>>    device init). 
-> >>> 2. Added this to Vaibhav's Local (linux-next + AM335x patches) tree [2] 
-> >>>
-> >>> 3. Added DT support to McASP driver.
-> >>>
-> >>> I tested this on AM335x EVM board. 
-> >>
-> >> Hmm, so I think there's a tiny bit missing for the EDMA conversion on DT
-> >> kernels.
-> >>
-> >>> If you need the code, I can share it as a patch (I will send the patch as a 
-> >>> private mail since the patch is huge).
-> >>
-> >> Please do :) Or just push your entire tree somewhere.
-> > 
-> > I have pushed the code at below git repo
-> > Repo :https://github.com/hvaibhav/am335x-linux
-> > Branch : am335x-upstream-staging-audio
-> > 
-> > This includes 
-> > 1. (linux-next + AM335x patches)
-> > 2. McASP DT conversion
-> > 3. EDMA hack
-> > 4. AM335x audio specific DT blobs
-> > 5. Am335x dma DT blobs [hack]
-> 
-> Ha, that 5th point was what I was missing, in particular these DMA
-> offset matching bits. Thanks a lot! I'll get back to you soon with some
-> patches for the mcasp driver.
+Can you merge the following branch into the arm64 tree please.
 
-You should be able to replace #3 with https://lkml.org/lkml/2012/9/20/275
-The intention is for McASP to use the private EDMA API on both DaVinci
-and AM33xx until the dmaengine conversion of McASP is ready. 
+This is to complete part of the UAPI disintegration for which the preparatory
+patches were pulled recently.
 
--Matt
+Note that there are some fixup patches which are at the base of the branch
+aimed at you, plus all arches get the asm-generic branch merged in too.
+
+The following changes since commit 612a9aab56a93533e76e3ad91642db7033e03b69:
+
+  Merge branch 'drm-next' of git://people.freedesktop.org/~airlied/linux (2012-10-03 23:29:23 -0700)
+
+are available in the git repository at:
+
+
+  git://git.infradead.org/users/dhowells/linux-headers.git disintegrate-arm64
+
+for you to fetch changes up to ae4f6c65798014d5d7a88d03e58faba53c0a92e1:
+
+  UAPI: (Scripted) Disintegrate arch/arm64/include/asm (2012-10-04 18:20:24 +0100)
+
+----------------------------------------------------------------
+David Howells (6):
+      UAPI: Fix the guards on various asm/unistd.h files
+      UAPI: Split compound conditionals containing __KERNEL__ in Arm64
+      Merge remote-tracking branch 'c6x/for-linux-next' into uapi-prep
+      UAPI: Fix conditional header installation handling (notably kvm_para.h on m68k)
+      UAPI: (Scripted) Disintegrate include/asm-generic
+      UAPI: (Scripted) Disintegrate arch/arm64/include/asm
+
+Mark Salter (2):
+      c6x: make dsk6455 the default config
+      c6x: remove c6x signal.h
+
+ arch/arm64/include/asm/Kbuild                   |   2 -
+ arch/arm64/include/asm/hwcap.h                  |  22 +-
+ arch/arm64/include/asm/ptrace.h                 |  88 +--
+ arch/arm64/include/asm/sigcontext.h             |  40 +-
+ arch/arm64/include/asm/stat.h                   |   5 +-
+ arch/arm64/include/asm/unistd.h                 |  12 +-
+ arch/arm64/include/asm/unistd32.h               |   4 -
+ arch/arm64/include/uapi/asm/Kbuild              |  14 +
+ arch/arm64/include/{ => uapi}/asm/auxvec.h      |   0
+ arch/arm64/include/{ => uapi}/asm/bitsperlong.h |   0
+ arch/arm64/include/{ => uapi}/asm/byteorder.h   |   0
+ arch/arm64/include/{ => uapi}/asm/fcntl.h       |   0
+ arch/arm64/include/uapi/asm/hwcap.h             |  39 +
+ arch/arm64/include/{ => uapi}/asm/param.h       |   0
+ arch/arm64/include/uapi/asm/ptrace.h            | 110 +++
+ arch/arm64/include/{ => uapi}/asm/setup.h       |   0
+ arch/arm64/include/uapi/asm/sigcontext.h        |  57 ++
+ arch/arm64/include/{ => uapi}/asm/siginfo.h     |   0
+ arch/arm64/include/{ => uapi}/asm/signal.h      |   0
+ arch/arm64/include/uapi/asm/stat.h              |  16 +
+ arch/arm64/include/{ => uapi}/asm/statfs.h      |   0
+ arch/arm64/include/uapi/asm/unistd.h            |  16 +
+ arch/c6x/Makefile                               |   2 +
+ arch/c6x/include/asm/Kbuild                     |   1 +
+ arch/c6x/include/asm/signal.h                   |  17 -
+ arch/c6x/include/asm/unistd.h                   |   4 -
+ arch/hexagon/include/asm/unistd.h               |   5 -
+ arch/openrisc/include/asm/unistd.h              |   5 -
+ arch/score/include/asm/unistd.h                 |   5 -
+ arch/tile/include/asm/unistd.h                  |   5 -
+ arch/unicore32/include/asm/unistd.h             |   4 -
+ include/asm-generic/Kbuild                      |  35 -
+ include/asm-generic/bitsperlong.h               |  13 +-
+ include/asm-generic/int-l64.h                   |  26 +-
+ include/asm-generic/int-ll64.h                  |  31 +-
+ include/asm-generic/ioctl.h                     |  95 +--
+ include/asm-generic/kvm_para.h                  |   5 +-
+ include/asm-generic/param.h                     |  17 +-
+ include/asm-generic/resource.h                  |  66 +-
+ include/asm-generic/siginfo.h                   | 297 +-------
+ include/asm-generic/signal.h                    | 117 +--
+ include/asm-generic/statfs.h                    |  81 +--
+ include/asm-generic/termios.h                   |  49 +-
+ include/asm-generic/unistd.h                    | 911 +-----------------------
+ include/linux/Kbuild                            |   9 +-
+ include/uapi/asm-generic/Kbuild                 |  35 +
+ include/{ => uapi}/asm-generic/auxvec.h         |   0
+ include/uapi/asm-generic/bitsperlong.h          |  15 +
+ include/{ => uapi}/asm-generic/errno-base.h     |   0
+ include/{ => uapi}/asm-generic/errno.h          |   0
+ include/{ => uapi}/asm-generic/fcntl.h          |   0
+ include/uapi/asm-generic/int-l64.h              |  34 +
+ include/uapi/asm-generic/int-ll64.h             |  39 +
+ include/uapi/asm-generic/ioctl.h                |  98 +++
+ include/{ => uapi}/asm-generic/ioctls.h         |   0
+ include/{ => uapi}/asm-generic/ipcbuf.h         |   0
+ include/{ => uapi}/asm-generic/mman-common.h    |   0
+ include/{ => uapi}/asm-generic/mman.h           |   0
+ include/{ => uapi}/asm-generic/msgbuf.h         |   0
+ include/uapi/asm-generic/param.h                |  19 +
+ include/{ => uapi}/asm-generic/poll.h           |   0
+ include/{ => uapi}/asm-generic/posix_types.h    |   0
+ include/uapi/asm-generic/resource.h             |  68 ++
+ include/{ => uapi}/asm-generic/sembuf.h         |   0
+ include/{ => uapi}/asm-generic/setup.h          |   0
+ include/{ => uapi}/asm-generic/shmbuf.h         |   0
+ include/{ => uapi}/asm-generic/shmparam.h       |   0
+ include/uapi/asm-generic/siginfo.h              | 298 ++++++++
+ include/{ => uapi}/asm-generic/signal-defs.h    |   0
+ include/uapi/asm-generic/signal.h               | 123 ++++
+ include/{ => uapi}/asm-generic/socket.h         |   0
+ include/{ => uapi}/asm-generic/sockios.h        |   0
+ include/{ => uapi}/asm-generic/stat.h           |   0
+ include/uapi/asm-generic/statfs.h               |  83 +++
+ include/{ => uapi}/asm-generic/swab.h           |   0
+ include/{ => uapi}/asm-generic/termbits.h       |   0
+ include/uapi/asm-generic/termios.h              |  50 ++
+ include/{ => uapi}/asm-generic/types.h          |   0
+ include/{ => uapi}/asm-generic/ucontext.h       |   0
+ include/uapi/asm-generic/unistd.h               | 902 +++++++++++++++++++++++
+ security/apparmor/Makefile                      |   2 +-
+ 81 files changed, 2044 insertions(+), 1947 deletions(-)
+ rename arch/arm64/include/{ => uapi}/asm/auxvec.h (100%)
+ rename arch/arm64/include/{ => uapi}/asm/bitsperlong.h (100%)
+ rename arch/arm64/include/{ => uapi}/asm/byteorder.h (100%)
+ rename arch/arm64/include/{ => uapi}/asm/fcntl.h (100%)
+ create mode 100644 arch/arm64/include/uapi/asm/hwcap.h
+ rename arch/arm64/include/{ => uapi}/asm/param.h (100%)
+ create mode 100644 arch/arm64/include/uapi/asm/ptrace.h
+ rename arch/arm64/include/{ => uapi}/asm/setup.h (100%)
+ create mode 100644 arch/arm64/include/uapi/asm/sigcontext.h
+ rename arch/arm64/include/{ => uapi}/asm/siginfo.h (100%)
+ rename arch/arm64/include/{ => uapi}/asm/signal.h (100%)
+ create mode 100644 arch/arm64/include/uapi/asm/stat.h
+ rename arch/arm64/include/{ => uapi}/asm/statfs.h (100%)
+ create mode 100644 arch/arm64/include/uapi/asm/unistd.h
+ delete mode 100644 arch/c6x/include/asm/signal.h
+ rename include/{ => uapi}/asm-generic/auxvec.h (100%)
+ create mode 100644 include/uapi/asm-generic/bitsperlong.h
+ rename include/{ => uapi}/asm-generic/errno-base.h (100%)
+ rename include/{ => uapi}/asm-generic/errno.h (100%)
+ rename include/{ => uapi}/asm-generic/fcntl.h (100%)
+ create mode 100644 include/uapi/asm-generic/int-l64.h
+ create mode 100644 include/uapi/asm-generic/int-ll64.h
+ create mode 100644 include/uapi/asm-generic/ioctl.h
+ rename include/{ => uapi}/asm-generic/ioctls.h (100%)
+ rename include/{ => uapi}/asm-generic/ipcbuf.h (100%)
+ create mode 100644 include/uapi/asm-generic/kvm_para.h
+ rename include/{ => uapi}/asm-generic/mman-common.h (100%)
+ rename include/{ => uapi}/asm-generic/mman.h (100%)
+ rename include/{ => uapi}/asm-generic/msgbuf.h (100%)
+ create mode 100644 include/uapi/asm-generic/param.h
+ rename include/{ => uapi}/asm-generic/poll.h (100%)
+ rename include/{ => uapi}/asm-generic/posix_types.h (100%)
+ create mode 100644 include/uapi/asm-generic/resource.h
+ rename include/{ => uapi}/asm-generic/sembuf.h (100%)
+ rename include/{ => uapi}/asm-generic/setup.h (100%)
+ rename include/{ => uapi}/asm-generic/shmbuf.h (100%)
+ rename include/{ => uapi}/asm-generic/shmparam.h (100%)
+ create mode 100644 include/uapi/asm-generic/siginfo.h
+ rename include/{ => uapi}/asm-generic/signal-defs.h (100%)
+ create mode 100644 include/uapi/asm-generic/signal.h
+ rename include/{ => uapi}/asm-generic/socket.h (100%)
+ rename include/{ => uapi}/asm-generic/sockios.h (100%)
+ rename include/{ => uapi}/asm-generic/stat.h (100%)
+ create mode 100644 include/uapi/asm-generic/statfs.h
+ rename include/{ => uapi}/asm-generic/swab.h (100%)
+ rename include/{ => uapi}/asm-generic/termbits.h (100%)
+ create mode 100644 include/uapi/asm-generic/termios.h
+ rename include/{ => uapi}/asm-generic/types.h (100%)
+ rename include/{ => uapi}/asm-generic/ucontext.h (100%)
+ create mode 100644 include/uapi/asm-generic/unistd.h
+.
