@@ -1,23 +1,44 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 4 Oct 2012 15:19:10 -0400 (EDT)
-Subject: [PATCH 17/24 v2] ARM: cns3xxx: use OHCI platform driver
-In-Reply-To: <1349363872-27004-18-git-send-email-florian@openwrt.org>
-Message-ID: <Pine.LNX.4.44L0.1210041517091.1441-100000@iolanthe.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 04 Oct 2012 12:22:28 -0700
+Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <506D899C.6010705@gmail.com>
+References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
+ <506D899C.6010705@gmail.com>
+Message-ID: <506DE1F4.9090309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Oct 2012, Florian Fainelli wrote:
+On 10/04/12 06:05, Rob Herring wrote:
+> On 10/04/2012 03:50 AM, Stephen Boyd wrote:
+>> The TWD and SCU configs are selected by default as long as
+>> SCORPIONMP is false and/or MCT is false. Implementing the logic
+>> this way certainly saves lines in the Kconfig but it precludes
+>> those machines which select SCORPIONMP or MCT from participating
+>> in the single zImage effort because when those machines are
+>> combined with other SMP capable machines the TWD and SCU are no
+>> longer selected.
+>>
+>> Push the select out to the machine entries so that we can compile
+>> these machines together and still select the appropriate configs.
+> I think this is the wrong direction as I'd like to see the platform
+> selects shrink. I believe the local timers are run-time enabled now, so
+> can't we just drop the condition and always select TWD and SCU for
+> multi-platform?
 
-> Since both the EHCI and OHCI platform drivers use the same power_{on,off}
-> callbacks, rename them to cns3xx_usb_power_{on,off} to show that they are
-> shared.
+That sounds fine for multi-platform but it penalizes the "optimized"
+images made for a particular device that doesn't want any extra code
+than is necessary. Isn't this why we have the Kconfig language?
 
-This is an example of the sort of thing I complained about before.  
-People who read only the patch description and not the title will
-wonder why this patch adds cns3xxx_usb_ohci_pdata and
-cns3xxx_usb_ohci_device.
+>
+> Or perhaps we need a CortexA9 config symbol that selects V7, GIC, TWD,
+> SCU, SMP, PL310, errata, etc. rather than duplicating those for every
+> platform.
+>
+>
 
-And people who read both will wonder why they talk about different 
-things.
+This sounds like a good consolidation of lines that can be done in
+parallel to this patch. Care to send a patch on top?
 
-Alan Stern
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
