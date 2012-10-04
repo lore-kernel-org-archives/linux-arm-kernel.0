@@ -1,106 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2012 10:32:20 +0000
-Subject: [PATCH 12/17] ARM: iop13xx: mark iop13xx_scan_bus as __devinit
-In-Reply-To: <CAErSpo7rkN_F=AxweoEG3oXj392FvzVGPSKnkXCd=JX6cg0aTA@mail.gmail.com>
-References: <1349195816-2225-1-git-send-email-arnd@arndb.de>
- <1349195816-2225-13-git-send-email-arnd@arndb.de>
- <CAErSpo7rkN_F=AxweoEG3oXj392FvzVGPSKnkXCd=JX6cg0aTA@mail.gmail.com>
-Message-ID: <201210041032.20300.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu,  4 Oct 2012 12:39:51 +0200
+Subject: [PATCH] serial: i.MX: evaluate linux,stdout-path property
+Message-ID: <1349347191-7406-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+Greg)
+devicetrees may have the linux,stdout-path property to specify the
+console. This patch adds support to the i.MX serial driver for this.
 
-On Tuesday 02 October 2012, Bjorn Helgaas wrote:
-> 
-> On Tue, Oct 2, 2012 at 10:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > pci_scan_root_bus is __devinit, so iop13xx_scan_bus has to be the
-> > same in order to safely call it. This is ok because the function
-> > itself is only called from the hwpci->scan callback.
-> >
-> > WARNING: vmlinux.o(.text+0x10138): Section mismatch in reference from the function iop13xx_scan_bus() to the function .devinit.text:pci_scan_root_bus()
-> > The function iop13xx_scan_bus() references
-> > the function __devinit pci_scan_root_bus().
-> > This is often because iop13xx_scan_bus lacks a __devinit
-> > annotation or the annotation of pci_scan_root_bus is wrong.
-> 
-> With CONFIG_HOTPLUG going away (I think the current state is that it
-> is always set to "y"), __devinit will effectively become a no-op, so I
-> expect we'll remove it from pci_scan_root_bus().
-> 
-> Therefore, I would skip this patch and live with the warning a little longer.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
 
-Hmm, I'm just trying to get rid of all build time warnings in the defconfigs
-right now, and modpost still complains about the section mismatches. I have
-a bunch more of these patches, but it would also be fine with me if we can
-patch mostpost to ignore these cases.
+I was originally looking for a more generic way to handle this, but
+since a struct console has no device associated to it, it's not
+possible to match a console with a device in a generic way. So we
+just call add_preferred_console from the driver and let it go down
+to a string matching in the console code.
+If anyone has a better idea how to handle this, please let me know.
+Otherwise I'm happy to see this patch applied aswell.
 
-I've also redone the analysis that Greg cited in the commit message for
-45f035ab9b8 "CONFIG_HOTPLUG should be always on"
+Thanks
+ Sascha
 
-   It is quite hard to disable it these days, and even if you do, it
-    only saves you about 200 bytes.  However, if it is disabled, lots of
-    bugs show up because it is almost never tested if the option is disabled.
+ drivers/tty/serial/imx.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-My test case (ARM omap2plus_defconfig, one of the most common configurations)
-shows these size -A differences:
-
-
-
-section		nohotplug	hotplug		difference
-.head.text	392		392		0
-.text		4829940		4881140		51200
-.rodata		1630360		1633056		2696
-__ksymtab	25720		25720		0
-__ksymtab_gpl	17096		17136		40
-__kcrctab	12860		12860		0
-__kcrctab_gpl	8548		8568		20
-__ksymtab_stri	96427		96509		82
-__init_rodata	0		9800		9800
-__param		2320		2320		0
-__modver	716		364		-352
-.ARM.unwind_idx	160360		160792		432
-.ARM.unwind_tab	24312		24312		0
-.init.text	234632		195688		-38944
-.exit.text	8680		5116		-3564
-.init.proc.info	312		312		0
-.init.arch.info	2964		2964		0
-.init.tagtable	72		72		0
-.init.smpalt	776		776		0
-.init.pv_table	880		880		0
-.init.data	123356		111348		-12008
-.exit.data	0		0		0
-.data..percpu	12928		12928		0
-.data		560160		562688		2528
-.notes		36		36		0
-.bss		5605324		5605580		256
-
-total		13359171	13371357	12186
-after boot	13001183	13054521	53338
-
-That is over 50kb difference after discarding the init sections,
-significantly more than the 200 bytes that Greg found.
-The point about lack of testing is still valid of course, and I'm
-not saying we need to keep the option around, but it's really
-not as obvious as before. An argument in favor of removing the
-__devinit logic is that these 50kb is still just 0.4% of the
-kernel size.
-
-For the five ARM defconfig files that actually turn off hotplug,
-the absolute numbers are a bit lower, but the percentage is similar.
-
-This is the amount of space wasted by enabling on CONFIG_HOTPLUG
-on them, in bytes after discarding the init sections, and as a
-percentage of the vmlinux size:
-
-at91x40_defconfig	3448	0.27%
-edb7211_defconfig	8912	0.41%
-footbridge_defconfig	33347	0.97%
-fortunet_defconfig	4592	0.25%
-pleb_defconfig		7405	0.28%
-
-Footbridge is the only config among these that enables PCI and USB, so
-it has a bunch more drivers that actually have notable functions that 
-can be discarded.
-
-	Arnd
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index e309e8b..b52c4a7 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1397,6 +1397,32 @@ static int serial_imx_resume(struct platform_device *dev)
+ 
+ #ifdef CONFIG_OF
+ /*
++ * Check if this device matches the linux,stdout-path property
++ * in the chosen node. return true if yes, false otherwise
++ */
++static int serial_imx_is_stdoutpath(struct platform_device *pdev)
++{
++	struct device_node *dn;
++	const char *name;
++
++	if (!IS_ENABLED(CONFIG_SERIAL_IMX_CONSOLE))
++		return 0;
++
++	name = of_get_property(of_chosen, "linux,stdout-path", NULL);
++	if (name == NULL)
++		return 0;
++
++	dn = of_find_node_by_path(name);
++	if (!dn)
++		return 0;
++
++	if (dn == pdev->dev.of_node)
++		return 1;
++
++	return 0;
++}
++
++/*
+  * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
+  * could successfully get all information from dt or a negative errno.
+  */
+@@ -1427,6 +1453,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+ 
+ 	sport->devdata = of_id->data;
+ 
++	if (serial_imx_is_stdoutpath(pdev))
++		add_preferred_console(imx_reg.cons->name, sport->port.line, 0);
++
+ 	return 0;
+ }
+ #else
+-- 
+1.7.10.4
