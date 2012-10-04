@@ -1,51 +1,98 @@
 From: hechtb@googlemail.com (Bastian Hecht)
-Date: Thu, 4 Oct 2012 12:07:56 +0200
-Subject: [PATCH 2/2] mtd: sh_flctl: Add device tree support
-In-Reply-To: <201210022047.50064.arnd.bergmann@linaro.org>
+Date: Thu, 4 Oct 2012 12:12:52 +0200
+Subject: [PATCH 1/2] mtd: sh_flctl: Add DMA capabilty
+In-Reply-To: <Pine.LNX.4.64.1210021534570.15778@axis700.grange>
 References: <1349183522-15321-1-git-send-email-hechtb@gmail.com>
- <201210021354.01247.arnd@arndb.de>
- <Pine.LNX.4.64.1210021602250.15778@axis700.grange>
- <201210022047.50064.arnd.bergmann@linaro.org>
-Message-ID: <CABYn4sz_KYQnmz9Ov=cSWEO+s2Hd_RCZpEV8fc6GFSrR9mnqVw@mail.gmail.com>
+ <1349183522-15321-2-git-send-email-hechtb@gmail.com>
+ <Pine.LNX.4.64.1210021534570.15778@axis700.grange>
+Message-ID: <CABYn4swdBX+verPTDKywC_U3xQboSSGFoezCkYth4PXVE1QcbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, hi Guennadi,
+Hey Guennadi,
 
-2012/10/2 Arnd Bergmann <arnd.bergmann@linaro.org>:
-> On Tuesday 02 October 2012, Guennadi Liakhovetski wrote:
->> >
->> > Since you are also adding dma-engine support, I would suggest you specify
->> > a "dmas" and "dma-names" property as well, so the device can find the
->> > right dma channel. The code might not do that yet while you're still
->> > sorting out the dependencies (and the sh dmaengine code is not yet
->> > converted to DT), but I think it would be good to nail down the binding
->> > for this device.
+2012/10/2 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> On Tue, 2 Oct 2012, Bastian Hecht wrote:
+>
+>> The code probes if DMA channels can get allocated and tears them down at
+>> removal/failure if needed.
+>> If available it uses them to transfer the data part (not ECC). On
+>> failure we fall back to PIO mode.
+>>
+>> Based on Guennadi Liakhovetski's code from the sh_mmcif driver.
+>>
+>> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+>
+> Looks mostly good to me, just a couple of cosmetic remarks below. They are
+> not critical, so, I won't be upset, if you fix them later:-) In any case
+>
+> Reviewed-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Ok good, so I will include these field in v2. The FLCTL has support
-for 4 channels, 2 for data read/write and 2 for ECC read/write.
-The driver currently supports only the data part. Should I include the
-ECC part nevertheless?
+Great, will add that to the next version!
 
-Further would you prefer the naming
- - fifo0_rx fifo0_tx fifo1_rx fifo1_tx (close to the datasheet) or
- - data_rx data_tx ecc_rx ecc_tx
+>> ---
+>>  drivers/mtd/nand/sh_flctl.c  |  174 +++++++++++++++++++++++++++++++++++++++++-
+>>  include/linux/mtd/sh_flctl.h |   12 +++
+>>  2 files changed, 183 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/sh_flctl.c b/drivers/mtd/nand/sh_flctl.c
+>> index 4fbfe96..0fead2a 100644
+>> --- a/drivers/mtd/nand/sh_flctl.c
+>> +++ b/drivers/mtd/nand/sh_flctl.c
+>> @@ -24,10 +24,13 @@
+>>  #include <linux/module.h>
+>>  #include <linux/kernel.h>
+>>  #include <linux/delay.h>
+>> +#include <linux/dmaengine.h>
+>> +#include <linux/dma-mapping.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/io.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/pm_runtime.h>
+>> +#include <linux/sh_dma.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/string.h>
+>>
+>> @@ -106,6 +109,84 @@ static void wait_completion(struct sh_flctl *flctl)
+>>       writeb(0x0, FLTRCR(flctl));
+>>  }
+>>
+>> +static void flctl_dma_complete(void *param)
+>> +{
+>> +     struct sh_flctl *flctl = param;
+>> +
+>> +     complete(&flctl->dma_complete);
+>
+> I think I mentioned in the first review, that it is good to include
+> headers everywhere, where they are needed and not rely on pulling them in
+> via other headers. So, it would be good to also include complete.h here
+> directly.
 
-Then the dmas field:
-If I get it right, we have 3 possible DMA controllers to use on the
-sh7372 and we specify the mid/rid value as second argument?
+Ok sure, I will include that as well.
 
-So how about this to add to the docs:
+> [snip]
 
-dmas = <&dma1 0x83 /* fifo0_rx */
-&dma1 0x83 /* fifo0_tx */
-&dma2 0x83 /* fifo0_rx */
-&dma2 0x83 /* fifo0_tx */
-&dma3 0x83 /* fifo0_rx */
-&dma3 0x83>; /* fifo0_tx */
-dma-names = "fifo0_rx", "fifo0_tx", fifo0_rx", "fifo0_tx", fifo0_rx",
-"fifo0_tx";
 
-Many thanks for the help,
 
+>> @@ -308,13 +462,23 @@ static enum flctl_ecc_res_t read_ecfiforeg
+>>  static void write_fiforeg(struct sh_flctl *flctl, int rlen, int offset)
+>>  {
+>>       int i, len_4align;
+>> -     unsigned long *data = (unsigned long *)&flctl->done_buff[offset];
+>> +     unsigned long *buf = (unsigned long *)&flctl->done_buff[offset];
+>>       void *fifo_addr = (void *)FLDTFIFO(flctl);
+>>
+>>       len_4align = (rlen + 3) / 4;
+>> +
+>> +     for (i = 0; i < len_4align; i++)
+>> +                     buf[i] = cpu_to_be32(buf[i]);
+>
+> indentation ran away here.
+
+Ah nice, thanks for the hawk's eye ;)
+
+> Thanks
+> Guennadi
+
+Thanks!
  Bastian
