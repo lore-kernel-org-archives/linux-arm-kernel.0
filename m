@@ -1,79 +1,45 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 04 Oct 2012 21:12:40 +0530
-Subject: [PATCH v1 02/14] drm: exynos: hdmi: support for platform variants
+Date: Thu, 04 Oct 2012 21:12:41 +0530
+Subject: [PATCH v1 03/14] drm: exynos: hdmi: fix interrupt handling
 In-Reply-To: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
 References: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1349365372-21417-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1349365372-21417-4-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Stanislawski <t.stanislaws@samsung.com>
 
-This patch implements check if HDMI is version 1.3 by using a driver variant
-instead of platform data.
+This patch fixes 'unsigned < 0' check in probe. Moreover it
+releases an interrupt at remove.
 
 Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c |   25 ++++++++++++++++++++++++-
- 1 files changed, 24 insertions(+), 1 deletions(-)
+ drivers/gpu/drm/exynos/exynos_hdmi.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index a6aea6f..b3a802b 100644
+index b3a802b..3902917 100644
 --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
 +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -2262,6 +2262,26 @@ void hdmi_attach_hdmiphy_client(struct i2c_client *hdmiphy)
- 		hdmi_hdmiphy = hdmiphy;
- }
+@@ -64,8 +64,8 @@ struct hdmi_context {
+ 	struct mutex			hdmi_mutex;
  
-+enum hdmi_type {
-+	HDMI_TYPE13,
-+	HDMI_TYPE14,
-+};
-+
-+static struct platform_device_id hdmi_driver_types[] = {
-+	{
-+		.name		= "s5pv210-hdmi",
-+		.driver_data    = HDMI_TYPE13,
-+	}, {
-+		.name		= "exynos4-hdmi",
-+		.driver_data    = HDMI_TYPE13,
-+	}, {
-+		.name		= "exynos4-hdmi14",
-+		.driver_data    = HDMI_TYPE14,
-+	}, {
-+		/* end node */
-+	}
-+};
-+
- static int __devinit hdmi_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -2270,6 +2290,7 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
- 	struct exynos_drm_hdmi_pdata *pdata;
- 	struct resource *res;
- 	int ret;
-+	enum hdmi_type hdmi_type;
+ 	void __iomem			*regs;
+-	unsigned int			external_irq;
+-	unsigned int			internal_irq;
++	int				external_irq;
++	int				internal_irq;
  
- 	DRM_DEBUG_KMS("[%d]\n", __LINE__);
+ 	struct i2c_client		*ddc_port;
+ 	struct i2c_client		*hdmiphy_port;
+@@ -2424,6 +2424,7 @@ static int __devexit hdmi_remove(struct platform_device *pdev)
+ 	pm_runtime_disable(dev);
  
-@@ -2300,7 +2321,8 @@ static int __devinit hdmi_probe(struct platform_device *pdev)
+ 	free_irq(hdata->internal_irq, hdata);
++	free_irq(hdata->external_irq, hdata);
  
- 	platform_set_drvdata(pdev, drm_hdmi_ctx);
+ 	hdmi_resources_cleanup(hdata);
  
--	hdata->is_v13 = pdata->is_v13;
-+	hdmi_type = platform_get_device_id(pdev)->driver_data;
-+	hdata->is_v13 = (hdmi_type == HDMI_TYPE13);
- 	hdata->cfg_hpd = pdata->cfg_hpd;
- 	hdata->get_hpd = pdata->get_hpd;
- 	hdata->dev = dev;
-@@ -2447,6 +2469,7 @@ static SIMPLE_DEV_PM_OPS(hdmi_pm_ops, hdmi_suspend, hdmi_resume);
- struct platform_driver hdmi_driver = {
- 	.probe		= hdmi_probe,
- 	.remove		= __devexit_p(hdmi_remove),
-+	.id_table = hdmi_driver_types,
- 	.driver		= {
- 		.name	= "exynos4-hdmi",
- 		.owner	= THIS_MODULE,
 -- 
 1.7.0.4
