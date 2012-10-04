@@ -1,43 +1,28 @@
-From: avi@redhat.com (Avi Kivity)
-Date: Thu, 04 Oct 2012 15:44:50 +0200
-Subject: [kvmarm] [PATCH 06/15] KVM: ARM: Initial skeleton to compile
- KVM support
-In-Reply-To: <20120925152055.GC28728@mudshark.cambridge.arm.com>
-References: <20120915153359.21241.86002.stgit@ubuntu>
- <20120915153508.21241.47712.stgit@ubuntu>
- <20120925152055.GC28728@mudshark.cambridge.arm.com>
-Message-ID: <506D92D2.5020805@redhat.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 4 Oct 2012 15:48:22 +0200
+Subject: [PATCH 1/3] mfd: dbx500: Export prmcu_request_ape_opp_100_voltage
+In-Reply-To: <1348497799-32143-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
+ <1348497799-32143-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121004134822.GA5567@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2012 05:20 PM, Will Deacon wrote:
->> +       case KVM_GET_REG_LIST: {
->> +               struct kvm_reg_list __user *user_list = argp;
->> +               struct kvm_reg_list reg_list;
->> +               unsigned n;
->> +
->> +               if (copy_from_user(&reg_list, user_list, sizeof reg_list))
->> +                       return -EFAULT;
->> +               n = reg_list.n;
->> +               reg_list.n = kvm_arm_num_regs(vcpu);
->> +               if (copy_to_user(user_list, &reg_list, sizeof reg_list))
->> +                       return -EFAULT;
->> +               if (n < reg_list.n)
->> +                       return -E2BIG;
->> +               return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
+Hi Ulf,
+
+On Mon, Sep 24, 2012 at 04:43:17PM +0200, Ulf Hansson wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> kvm_reg_list sounds like it could be done using a regset instead.
+> This function needs to be exported to let clients be able to
+> request the ape opp 100 voltage.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
-Wouldn't those regsets be userspace oriented?
-
-For example, the GPRs returned here include all the shadowed interrupt
-registers (or however they're called) while most user oriented APIs
-would only include the user visible registers.
-
-FWIW, we're trying to move to an architecture independent ABI for KVM
-registers, but that's a lot of work since we need to make sure all the
-weird x86 registers (and non-register state) fit into that.  Maybe that
-ABI will be regset based, but I don't want to block the ARM port on this.
+Cheers,
+Samuel.
 
 -- 
-error compiling committee.c: too many arguments to function
+Intel Open Source Technology Centre
+http://oss.intel.com/
