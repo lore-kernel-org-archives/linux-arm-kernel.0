@@ -1,114 +1,44 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 4 Oct 2012 08:49:35 -0400
-Subject: [PATCH v3 1/6] ARM: davinci: sram: ioremap the davinci_soc_info
- specified sram regions
-In-Reply-To: <506D7799.2090307@ti.com>
+Date: Thu, 4 Oct 2012 08:54:55 -0400
+Subject: [PATCH v3 2/6] ARM: davinci: da850-dm646x: remove the SRAM_VIRT
+ iotable entry
+In-Reply-To: <506D78BE.1000607@ti.com>
 References: <1349276133-26408-1-git-send-email-mporter@ti.com>
- <1349276133-26408-2-git-send-email-mporter@ti.com>
- <506D7799.2090307@ti.com>
-Message-ID: <20121004124935.GD11149@beef>
+ <1349276133-26408-3-git-send-email-mporter@ti.com>
+ <506D78BE.1000607@ti.com>
+Message-ID: <20121004125455.GE11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 05:18:41PM +0530, Sekhar Nori wrote:
+On Thu, Oct 04, 2012 at 05:23:34PM +0530, Sekhar Nori wrote:
 > On 10/3/2012 8:25 PM, Matt Porter wrote:
 > > From: Ben Gardiner <bengardiner@nanometrics.ca>
 > > 
-> > The current davinci init sets up SRAM in iotables. There has been an observed
-> > failure to boot a da850 with 128K specified in the iotable.
+> > The sram regions defined for da850-dm646x in their iotable entries are also
+> > defined in their davinci_soc_info's.
 > > 
-> > Make the davinci sram allocator -- now based on RMK's consolidated SRAM
-> > support -- do an ioremap of the region specified by the entries in
-> 
-> The part about being based on RMK's consolidated SRAM support should be
-> dropped.
-
-Ok, cruft from trying to preserve Ben's original patch comments. Will
-remove.
-
- 
-> > davinci_soc_info before registering with gen_pool_add_virt().
+> > Remove this duplicate information which is now uneccessary since sram
+> > init will ioremap the regions defined by their davinci_soc_info's.
 > > 
-> > This commit breaks runtime of davinci boards since the regions that
-> > the sram init is now trying to ioremap have been iomapped by their
-> > iotable entries. The iotable entries will be removed in the patches
-> > to come.
-> 
-> I would prefer merging 2/6 into this for this reason.
-
-Ok, makes sense. This again comes from me trying to just use the
-original patches. I'll squash these together for v4.
-
-> 
+> > Since this removal completely removes all uses of SRAM_VIRT, also remove
+> > the SRAM_VIRT definition.
 > > 
 > > Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
-> > [rebased to mainline as the consolidated SRAM support was dropped]
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > ---
-> >  arch/arm/mach-davinci/sram.c |   17 ++++++++++++++---
-> >  1 file changed, 14 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
-> > index db0f778..0e8ca4f 100644
-> > --- a/arch/arm/mach-davinci/sram.c
-> > +++ b/arch/arm/mach-davinci/sram.c
-> > @@ -10,6 +10,7 @@
-> >   */
-> >  #include <linux/module.h>
-> >  #include <linux/init.h>
-> > +#include <linux/io.h>
-> >  #include <linux/genalloc.h>
-> >  
-> >  #include <mach/common.h>
-> > @@ -32,7 +33,7 @@ void *sram_alloc(size_t len, dma_addr_t *dma)
-> >  		return NULL;
-> >  
-> >  	if (dma)
-> > -		*dma = dma_base + (vaddr - SRAM_VIRT);
-> > +		*dma = gen_pool_virt_to_phys(sram_pool, vaddr);
-> >  	return (void *)vaddr;
-> >  
-> >  }
-> > @@ -53,8 +54,10 @@ EXPORT_SYMBOL(sram_free);
-> >   */
-> >  static int __init sram_init(void)
-> >  {
-> > +	phys_addr_t phys = davinci_soc_info.sram_dma;
-> >  	unsigned len = davinci_soc_info.sram_len;
-> >  	int status = 0;
-> > +	void *addr;
-> >  
-> >  	if (len) {
-> >  		len = min_t(unsigned, len, SRAM_SIZE);
-> > @@ -62,8 +65,16 @@ static int __init sram_init(void)
-> >  		if (!sram_pool)
-> >  			status = -ENOMEM;
-> >  	}
-> > -	if (sram_pool)
-> > -		status = gen_pool_add(sram_pool, SRAM_VIRT, len, -1);
-> > +
-> > +	if (sram_pool) {
-> > +		addr = ioremap(phys, len);
-> > +		if (!addr)
-> > +			return -ENOMEM;
-> > +		if((status = gen_pool_add_virt(sram_pool, (unsigned)addr,
-> > +					       phys, len, -1)))
+> > Tested-by: Matt Porter <mporter@ti.com>
 > 
-> Nit: prefer to set status outside of if().
+> What testing was done with this patch? Can you please add that
+> information to the commit text as well.
 
-Ok. Will change.
+I have only tested on AM180x with uio_pruss and davinci-pcm (series
+for that posted a short while ago). In the uio_pruss case, I run the
+sample applications from the userspace PRU package that test
+communication with the shared SRAM, DDR, and internal PRU SRAM. For
+davinci-pcm, my series enables shared SRAM ping-pong buffering which is
+working comparably to pcm capture/playback without ping-pong buffering
+enabled on AM180x.
 
-> 
-> Looks good otherwise. Thanks for reviving this.
+I have not tested PM at all...yet.
 
-No problem, I'm just glad we seem to have a workable solution now.
-
-Also, if you could check the conversation with Phillip about
-gen_pool_find_by_phys(), I wonder what you think about depending on that
-now, or waiting to convert to it when it goes upstream.
-
-I'm torn as I see all the pdata going away anyway when Davinci is fully
-converted to DT, and then also any use of find_by_phys() would go away
-in favor of using the of helpers with his driver.
+I'll add this detail to the commit.
 
 -Matt
