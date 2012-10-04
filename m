@@ -1,61 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 4 Oct 2012 11:07:28 -0300
-Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
- camera and eMMA
-In-Reply-To: <CAOMZO5CAvwwGEwbZE2VS49tpWOYxAR_qQkfKhswPaofSrni92A@mail.gmail.com>
-References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
- <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
- <5047013E.30508@gmail.com>
- <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
- <50471187.3040809@gmail.com>
- <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
- <50471CEE.60606@gmail.com>
- <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
- <504769CF.2070904@gmail.com>
- <CAOMZO5DyjdrZYNDMuT1=yuxQcHuP3=6dy_j_ja1vub56_m3pvA@mail.gmail.com>
- <504774B7.8090007@gmail.com>
- <CAOMZO5CAvwwGEwbZE2VS49tpWOYxAR_qQkfKhswPaofSrni92A@mail.gmail.com>
-Message-ID: <CAOMZO5C+NNQr0mo6P2cKx4RxFoQPyYuPZq4eFUZnvi_7gTRkBQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 4 Oct 2012 16:11:57 +0200
+Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
+In-Reply-To: <20121004135130.GC5554@sortiz-mobl>
+References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <11987916.rOoNGcb1ly@dev1>
+ <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
+ <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
+ <20121004135130.GC5554@sortiz-mobl>
+Message-ID: <20121004141157.GK598@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hi,
 
-On Wed, Sep 5, 2012 at 3:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
+On Thu, Oct 04, 2012 at 03:51:30PM +0200, Samuel Ortiz wrote:
+> Did you send it to my samuel.ortiz at intel.com email ? I never look at it when
+> going through my MFD backlog, which is why it was not applied. Which is why it
+> won't be part of the 3.7 merge window, sorry about that.
+I don't know why I picked that one up, but probably it's because this
+address shows up in several commits:
 
-> Sylwester suggested me this patch and it fixed the issue:
-> http://git.linuxtv.org/snawrocki/media.git/commitdiff/458b9b5ab8cb970887c9d1f1fddf88399b2d9ef2
->
-> Now ov2640 probes correctly on mx31pdk, but on mx27pdk I have:
->
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx2-camera mx2-camera.0: Camera driver attached to camera 0
-> ov2640 0-0030: Product ID error fb:fb
-> mx2-camera mx2-camera.0: Camera driver detached from camera 0
-> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
-> frequency: 66500000
->
-> This works fine in 3.4.10 and I suspect this problem is due to the imx
-> clock conversion as the csi clock frequency looks incorrect.
->
-> Javier,
->
-> Can you get your camera working on visstrim board using linux-next or
-> 3.6-rc4? Any patches I am missing?
+	$ git log --grep=samuel.ortiz at intel.com | grep Samuel | sort | uniq -c
+	     18     Acked-by: Samuel Ortiz <samuel.ortiz@intel.com>
+	     12 Author: Samuel Ortiz <sameo@linux.intel.com>
+	     27 Author: Samuel Ortiz <samuel.ortiz@intel.com>
+	      4     Cc: Samuel Ortiz <samuel.ortiz@intel.com>
+	      1     Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
+	     50     Signed-off-by: Samuel Ortiz <samuel.ortiz@intel.com>
 
-Could you please confirm if your camera works with the latest kernel?
+and one of these just happend to be the first I looked at.
 
-If so, could you please your log below?
+hmm, *shrug*
+Uwe
 
-Not sure if the clock frequency below is correct.
-
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx2-camera mx2-camera.0: Camera driver attached to camera 0
-> ov2640 0-0030: Product ID error fb:fb
-> mx2-camera mx2-camera.0: Camera driver detached from camera 0
-> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
-> frequency: 66500000
-
-Thanks,
-
-Fabio Estevam
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
