@@ -1,41 +1,43 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 04 Oct 2012 21:12:43 +0530
-Subject: [PATCH v1 05/14] drm: exynos: hdmi: turn off HPD interrupt in HDMI
- chip
+Date: Thu, 04 Oct 2012 21:12:44 +0530
+Subject: [PATCH v1 06/14] drm: exynos: remove drm hdmi platform data struct
 In-Reply-To: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
 References: <1349365372-21417-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1349365372-21417-6-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1349365372-21417-7-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Stanislawski <t.stanislaws@samsung.com>
+This patch removes the drm hdmi platform data structure which is no
+longer in use by drm hdmi driver after this patch set get merged. s5p
+hdmi platform data structure is used instead.
 
-The plug/unplug interrupt are handled by a separate interrupt.
-So there is no need to replicate this mechanism in HDMI core.
-
-Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c |    5 +----
- 1 files changed, 1 insertions(+), 4 deletions(-)
+ include/drm/exynos_drm.h |   13 -------------
+ 1 files changed, 0 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 90dce8c..e3ab840 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1532,12 +1532,9 @@ static void hdmi_conf_reset(struct hdmi_context *hdata)
+diff --git a/include/drm/exynos_drm.h b/include/drm/exynos_drm.h
+index 0d1c503..8bdd49a 100644
+--- a/include/drm/exynos_drm.h
++++ b/include/drm/exynos_drm.h
+@@ -254,18 +254,5 @@ struct exynos_drm_common_hdmi_pd {
+ 	struct device *mixer_dev;
+ };
  
- static void hdmi_conf_init(struct hdmi_context *hdata)
- {
--	/* enable HPD interrupts */
-+	/* disable HPD interrupts */
- 	hdmi_reg_writemask(hdata, HDMI_INTC_CON, 0, HDMI_INTC_EN_GLOBAL |
- 		HDMI_INTC_EN_HPD_PLUG | HDMI_INTC_EN_HPD_UNPLUG);
--	mdelay(10);
--	hdmi_reg_writemask(hdata, HDMI_INTC_CON, ~0, HDMI_INTC_EN_GLOBAL |
--		HDMI_INTC_EN_HPD_PLUG | HDMI_INTC_EN_HPD_UNPLUG);
- 
- 	/* choose HDMI mode */
- 	hdmi_reg_writemask(hdata, HDMI_MODE_SEL,
+-/**
+- * Platform Specific Structure for DRM based HDMI core.
+- *
+- * @is_v13: set if hdmi version 13 is.
+- * @cfg_hpd: function pointer to configure hdmi hotplug detection pin
+- * @get_hpd: function pointer to get value of hdmi hotplug detection pin
+- */
+-struct exynos_drm_hdmi_pdata {
+-	bool is_v13;
+-	void (*cfg_hpd)(bool external);
+-	int (*get_hpd)(void);
+-};
+-
+ #endif	/* __KERNEL__ */
+ #endif	/* _EXYNOS_DRM_H_ */
 -- 
 1.7.0.4
