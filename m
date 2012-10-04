@@ -1,707 +1,687 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 04 Oct 2012 15:04:36 -0700
-Subject: [PATCH 02/16] ARM: OMAP: Split plat-omap/i2c.c into mach-omap1 and
- mach-omap2
+Date: Thu, 04 Oct 2012 15:04:42 -0700
+Subject: [PATCH 04/16] ARM: OMAP: Make plat/fpga.h local to arch/arm/plat-omap
 In-Reply-To: <20121004213950.26676.21898.stgit@muffinssi.local>
 References: <20121004213950.26676.21898.stgit@muffinssi.local>
-Message-ID: <20121004220436.26676.33938.stgit@muffinssi.local>
+Message-ID: <20121004220442.26676.6232.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to keep the device related things in the
-common i2c.c as omap2+ is using hwmod. Split the code to
-mach-omap1 and mach-omap2 parts and only leave common
-code to plat-omap/i2c.c.
+There's no need to have this file in plat/fpga.h. We can
+make it local to plat-omap replacing fpga_read/write
+functions directly with readb/writeb as that's how
+they are already defined in fpga.h.
 
-Note that as omap1 only has one i2c controller, we can
-now remove the old device related macros.
+Note that 2420 based H4 is also using the fpga, so let's
+keep the led support around in plat-omap until we flip
+over mach-omap2 to device tree.
 
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: linux-usb at vger.kernel.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/common.h               |    3 +
- arch/arm/mach-omap1/i2c.c                  |   59 +++++++++++
- arch/arm/mach-omap2/board-rm680.c          |    1 
- arch/arm/mach-omap2/common.h               |    4 +
- arch/arm/mach-omap2/i2c.c                  |   72 +++++++++++++
- arch/arm/mach-omap2/i2c.h                  |   25 +----
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    4 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    4 +
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    4 +
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 -
- arch/arm/mach-omap2/twl-common.c           |    1 
- arch/arm/plat-omap/i2c.c                   |  152 +---------------------------
- arch/arm/plat-omap/i2c.h                   |   46 ++++++++
- arch/arm/plat-omap/include/plat/common.h   |    1 
- 15 files changed, 202 insertions(+), 181 deletions(-)
- rename arch/arm/{plat-omap/include/plat/i2c.h => mach-omap2/i2c.h} (66%)
- create mode 100644 arch/arm/plat-omap/i2c.h
+ arch/arm/mach-omap1/board-fsample.c         |    6 -
+ arch/arm/mach-omap1/board-innovator.c       |   26 ++--
+ arch/arm/mach-omap1/board-perseus2.c        |    6 -
+ arch/arm/mach-omap1/common.h                |    1 
+ arch/arm/mach-omap1/fpga.c                  |    2 
+ arch/arm/mach-omap1/include/mach/omap1510.h |  113 ++++++++++++++++
+ arch/arm/mach-omap1/serial.c                |    1 
+ arch/arm/plat-omap/debug-leds.c             |    2 
+ arch/arm/plat-omap/fpga.h                   |   74 ++++++++++
+ arch/arm/plat-omap/include/plat/fpga.h      |  193 ---------------------------
+ drivers/usb/host/ohci-omap.c                |    5 -
+ drivers/video/omap/lcd_inn1510.c            |    7 +
+ 12 files changed, 216 insertions(+), 220 deletions(-)
+ create mode 100644 arch/arm/plat-omap/fpga.h
+ delete mode 100644 arch/arm/plat-omap/include/plat/fpga.h
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index c2552b2..306b7ac 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -28,6 +28,9 @@
- 
- #include <plat/common.h>
- #include <linux/mtd/mtd.h>
-+#include <linux/i2c-omap.h>
-+
-+#include "../plat-omap/i2c.h"
- 
- #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
- void omap7xx_map_io(void);
-diff --git a/arch/arm/mach-omap1/i2c.c b/arch/arm/mach-omap1/i2c.c
-index a0551a6..a6f465a 100644
---- a/arch/arm/mach-omap1/i2c.c
-+++ b/arch/arm/mach-omap1/i2c.c
-@@ -19,11 +19,25 @@
-  *
-  */
- 
--#include <plat/i2c.h>
-+#include <linux/i2c-omap.h>
+diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
+index 4b6de70..6f496df 100644
+--- a/arch/arm/mach-omap1/board-fsample.c
++++ b/arch/arm/mach-omap1/board-fsample.c
+@@ -30,7 +30,7 @@
+ #include <plat/tc.h>
  #include <mach/mux.h>
- #include <plat/cpu.h>
+ #include <mach/flash.h>
+-#include <plat/fpga.h>
++#include <../plat-omap/fpga.h>
+ #include <linux/platform_data/keypad-omap.h>
  
--void __init omap1_i2c_mux_pins(int bus_id)
-+#include "../plat-omap/i2c.h"
-+
-+#define OMAP_I2C_SIZE		0x3f
-+#define OMAP1_I2C_BASE		0xfffb3800
-+#define OMAP1_INT_I2C		(32 + 4)
-+
-+static const char name[] = "omap_i2c";
-+
-+static struct resource i2c_resources[2] = {
-+};
-+
-+static struct platform_device omap_i2c_devices[1] = {
-+};
-+
-+static void __init omap1_i2c_mux_pins(int bus_id)
+ #include <mach/hardware.h>
+@@ -123,9 +123,9 @@ static struct resource smc91x_resources[] = {
+ 
+ static void __init fsample_init_smc91x(void)
  {
- 	if (cpu_is_omap7xx()) {
- 		omap_cfg_reg(I2C_7XX_SDA);
-@@ -33,3 +47,44 @@ void __init omap1_i2c_mux_pins(int bus_id)
- 		omap_cfg_reg(I2C_SCL);
- 	}
+-	fpga_write(1, H2P2_DBG_FPGA_LAN_RESET);
++	__raw_writeb(1, H2P2_DBG_FPGA_LAN_RESET);
+ 	mdelay(50);
+-	fpga_write(fpga_read(H2P2_DBG_FPGA_LAN_RESET) & ~1,
++	__raw_writeb(__raw_readb(H2P2_DBG_FPGA_LAN_RESET) & ~1,
+ 		   H2P2_DBG_FPGA_LAN_RESET);
+ 	mdelay(50);
  }
-+
-+int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *pdata,
-+				int bus_id)
-+{
-+	struct platform_device *pdev;
-+	struct resource *res;
-+
-+	omap1_i2c_mux_pins(bus_id);
-+
-+	pdev = &omap_i2c_devices[bus_id - 1];
-+	pdev->id = bus_id;
-+	pdev->name = name;
-+	pdev->num_resources = ARRAY_SIZE(i2c_resources);
-+	res = i2c_resources;
-+	res[0].start = OMAP1_I2C_BASE;
-+	res[0].end = res[0].start + OMAP_I2C_SIZE;
-+	res[0].flags = IORESOURCE_MEM;
-+	res[1].start = OMAP1_INT_I2C;
-+	res[1].flags = IORESOURCE_IRQ;
-+	pdev->resource = res;
-+
-+	/* all OMAP1 have IP version 1 register set */
-+	pdata->rev = OMAP_I2C_IP_VERSION_1;
-+
-+	/* all OMAP1 I2C are implemented like this */
-+	pdata->flags = OMAP_I2C_FLAG_NO_FIFO |
-+		       OMAP_I2C_FLAG_SIMPLE_CLOCK |
-+		       OMAP_I2C_FLAG_16BIT_DATA_REG |
-+		       OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK;
-+
-+	/* how the cpu bus is wired up differs for 7xx only */
-+
-+	if (cpu_is_omap7xx())
-+		pdata->flags |= OMAP_I2C_FLAG_BUS_SHIFT_1;
-+	else
-+		pdata->flags |= OMAP_I2C_FLAG_BUS_SHIFT_2;
-+
-+	pdev->dev.platform_data = pdata;
-+
-+	return platform_device_register(pdev);
-+}
-diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
-index 45997bf..a57ed21 100644
---- a/arch/arm/mach-omap2/board-rm680.c
-+++ b/arch/arm/mach-omap2/board-rm680.c
-@@ -22,7 +22,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-omap1/board-innovator.c b/arch/arm/mach-omap1/board-innovator.c
+index db5f7d2..5804da7 100644
+--- a/arch/arm/mach-omap1/board-innovator.c
++++ b/arch/arm/mach-omap1/board-innovator.c
+@@ -33,7 +33,7 @@
  
--#include <plat/i2c.h>
+ #include <mach/mux.h>
+ #include <mach/flash.h>
+-#include <plat/fpga.h>
++#include <../plat-omap/fpga.h>
+ #include <plat/tc.h>
+ #include <linux/platform_data/keypad-omap.h>
  #include <plat/mmc.h>
- #include <plat/usb.h>
- #include <plat/gpmc.h>
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 7045e4d..a68b421 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -28,7 +28,9 @@
+@@ -215,7 +215,7 @@ static struct platform_device *innovator1510_devices[] __initdata = {
  
- #include <linux/irq.h>
- #include <linux/delay.h>
-+#include <linux/i2c.h>
- #include <linux/i2c/twl.h>
-+#include <linux/i2c-omap.h>
- 
- #include <asm/proc-fns.h>
- 
-@@ -36,6 +38,8 @@
- #include <plat/serial.h>
- #include <plat/common.h>
- 
-+#include "i2c.h"
-+
- #define OMAP_INTC_START		NR_IRQS
- 
- #ifdef CONFIG_SOC_OMAP2420
-diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
-index fc57e67..b15416c 100644
---- a/arch/arm/mach-omap2/i2c.c
-+++ b/arch/arm/mach-omap2/i2c.c
-@@ -19,11 +19,15 @@
-  *
-  */
- 
--#include <plat/i2c.h>
-+#include <linux/i2c-omap.h>
-+
- #include "common.h"
- #include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
-+#include <plat/omap-pm.h>
- 
- #include "mux.h"
-+#include "i2c.h"
- 
- /* In register I2C_CON, Bit 15 is the I2C enable bit */
- #define I2C_EN					BIT(15)
-@@ -33,7 +37,9 @@
- /* Maximum microseconds to wait for OMAP module to softreset */
- #define MAX_MODULE_SOFTRESET_WAIT	10000
- 
--void __init omap2_i2c_mux_pins(int bus_id)
-+#define MAX_OMAP_I2C_HWMOD_NAME_LEN	16
-+
-+static void __init omap2_i2c_mux_pins(int bus_id)
+ static int innovator_get_pendown_state(void)
  {
- 	char mux_name[sizeof("i2c2_scl.i2c2_scl")];
+-	return !(fpga_read(OMAP1510_FPGA_TOUCHSCREEN) & (1 << 5));
++	return !(__raw_readb(OMAP1510_FPGA_TOUCHSCREEN) & (1 << 5));
+ }
  
-@@ -104,3 +110,65 @@ int omap_i2c_reset(struct omap_hwmod *oh)
+ static const struct ads7846_platform_data innovator1510_ts_info = {
+@@ -279,7 +279,7 @@ static struct platform_device *innovator1610_devices[] __initdata = {
+ static void __init innovator_init_smc91x(void)
+ {
+ 	if (cpu_is_omap1510()) {
+-		fpga_write(fpga_read(OMAP1510_FPGA_RST) & ~1,
++		__raw_writeb(__raw_readb(OMAP1510_FPGA_RST) & ~1,
+ 			   OMAP1510_FPGA_RST);
+ 		udelay(750);
+ 	} else {
+@@ -335,10 +335,10 @@ static int mmc_set_power(struct device *dev, int slot, int power_on,
+ 				int vdd)
+ {
+ 	if (power_on)
+-		fpga_write(fpga_read(OMAP1510_FPGA_POWER) | (1 << 3),
++		__raw_writeb(__raw_readb(OMAP1510_FPGA_POWER) | (1 << 3),
+ 				OMAP1510_FPGA_POWER);
+ 	else
+-		fpga_write(fpga_read(OMAP1510_FPGA_POWER) & ~(1 << 3),
++		__raw_writeb(__raw_readb(OMAP1510_FPGA_POWER) & ~(1 << 3),
+ 				OMAP1510_FPGA_POWER);
  
  	return 0;
- }
-+
-+/*
-+ * XXX This function is a temporary compatibility wrapper - only
-+ * needed until the I2C driver can be converted to call
-+ * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
-+ */
-+static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
-+{
-+	omap_pm_set_max_mpu_wakeup_lat(dev, t);
-+}
-+
-+static const char name[] = "omap_i2c";
-+
-+int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
-+				int bus_id)
-+{
-+	int l;
-+	struct omap_hwmod *oh;
-+	struct platform_device *pdev;
-+	char oh_name[MAX_OMAP_I2C_HWMOD_NAME_LEN];
-+	struct omap_i2c_bus_platform_data *pdata;
-+	struct omap_i2c_dev_attr *dev_attr;
-+
-+	omap2_i2c_mux_pins(bus_id);
-+
-+	l = snprintf(oh_name, MAX_OMAP_I2C_HWMOD_NAME_LEN, "i2c%d", bus_id);
-+	WARN(l >= MAX_OMAP_I2C_HWMOD_NAME_LEN,
-+		"String buffer overflow in I2C%d device setup\n", bus_id);
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (!oh) {
-+			pr_err("Could not look up %s\n", oh_name);
-+			return -EEXIST;
-+	}
-+
-+	pdata = i2c_pdata;
-+	/*
-+	 * pass the hwmod class's CPU-specific knowledge of I2C IP revision in
-+	 * use, and functionality implementation flags, up to the OMAP I2C
-+	 * driver via platform data
-+	 */
-+	pdata->rev = oh->class->rev;
-+
-+	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
-+	pdata->flags = dev_attr->flags;
-+
-+	/*
-+	 * When waiting for completion of a i2c transfer, we need to
-+	 * set a wake up latency constraint for the MPU. This is to
-+	 * ensure quick enough wakeup from idle, when transfer
-+	 * completes.
-+	 * Only omap3 has support for constraints
-+	 */
-+	if (cpu_is_omap34xx())
-+		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
-+	pdev = omap_device_build(name, bus_id, oh, pdata,
-+			sizeof(struct omap_i2c_bus_platform_data),
-+			NULL, 0, 0);
-+	WARN(IS_ERR(pdev), "Could not build omap_device for %s\n", name);
-+
-+	return PTR_RET(pdev);
-+}
-+
-diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/mach-omap2/i2c.h
-similarity index 66%
-rename from arch/arm/plat-omap/include/plat/i2c.h
-rename to arch/arm/mach-omap2/i2c.h
-index 7c22b9e..81dbb99 100644
---- a/arch/arm/plat-omap/include/plat/i2c.h
-+++ b/arch/arm/mach-omap2/i2c.h
-@@ -18,24 +18,11 @@
-  * 02110-1301 USA
-  *
+@@ -390,14 +390,14 @@ static void __init innovator_init(void)
+ 		omap_cfg_reg(UART3_TX);
+ 		omap_cfg_reg(UART3_RX);
+ 
+-		reg = fpga_read(OMAP1510_FPGA_POWER);
++		reg = __raw_readb(OMAP1510_FPGA_POWER);
+ 		reg |= OMAP1510_FPGA_PCR_COM1_EN;
+-		fpga_write(reg, OMAP1510_FPGA_POWER);
++		__raw_writeb(reg, OMAP1510_FPGA_POWER);
+ 		udelay(10);
+ 
+-		reg = fpga_read(OMAP1510_FPGA_POWER);
++		reg = __raw_readb(OMAP1510_FPGA_POWER);
+ 		reg |= OMAP1510_FPGA_PCR_COM2_EN;
+-		fpga_write(reg, OMAP1510_FPGA_POWER);
++		__raw_writeb(reg, OMAP1510_FPGA_POWER);
+ 		udelay(10);
+ 
+ 		platform_add_devices(innovator1510_devices, ARRAY_SIZE(innovator1510_devices));
+@@ -437,6 +437,7 @@ static void __init innovator_init(void)
   */
--#ifndef __ASM__ARCH_OMAP_I2C_H
--#define __ASM__ARCH_OMAP_I2C_H
+ static void __init innovator_map_io(void)
+ {
++#ifdef CONFIG_ARCH_OMAP15XX
+ 	omap15xx_map_io();
  
--#include <linux/i2c.h>
--#include <linux/i2c-omap.h>
-+#include "../plat-omap/i2c.h"
+ 	iotable_init(innovator1510_io_desc, ARRAY_SIZE(innovator1510_io_desc));
+@@ -444,9 +445,10 @@ static void __init innovator_map_io(void)
  
--#if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
--extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
--				 struct i2c_board_info const *info,
--				 unsigned len);
--#else
--static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
--				 struct i2c_board_info const *info,
--				 unsigned len)
--{
--	return 0;
--}
--#endif
-+#ifndef __MACH_OMAP2_I2C_H
-+#define __MACH_OMAP2_I2C_H
- 
- /**
-  * i2c_dev_attr - OMAP I2C controller device attributes for omap_hwmod
-@@ -50,10 +37,6 @@ struct omap_i2c_dev_attr {
- 	u32	flags;
- };
- 
--void __init omap1_i2c_mux_pins(int bus_id);
--void __init omap2_i2c_mux_pins(int bus_id);
--
--struct omap_hwmod;
- int omap_i2c_reset(struct omap_hwmod *oh);
- 
--#endif /* __ASM__ARCH_OMAP_I2C_H */
-+#endif	/* __MACH_OMAP2_I2C_H */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index b5db600..1821109 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -12,12 +12,13 @@
-  * XXX handle crossbar/shared link difference for L3?
-  * XXX these should be marked initdata for multi-OMAP kernels
-  */
-+
-+#include <linux/i2c-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- 
- #include <plat/omap_hwmod.h>
- #include <plat/dma.h>
- #include <plat/serial.h>
--#include <plat/i2c.h>
- #include <plat/dmtimer.h>
- #include "l3_2xxx.h"
- #include "l4_2xxx.h"
-@@ -27,6 +28,7 @@
- 
- #include "cm-regbits-24xx.h"
- #include "prm-regbits-24xx.h"
-+#include "i2c.h"
- #include "wd_timer.h"
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index c455e41..f902a18 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -12,13 +12,14 @@
-  * XXX handle crossbar/shared link difference for L3?
-  * XXX these should be marked initdata for multi-OMAP kernels
-  */
-+
-+#include <linux/i2c-omap.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- 
- #include <plat/omap_hwmod.h>
- #include <plat/dma.h>
- #include <plat/serial.h>
--#include <plat/i2c.h>
- #include <plat/dmtimer.h>
- #include <plat/mmc.h>
- #include "l3_2xxx.h"
-@@ -27,6 +28,7 @@
- #include "omap_hwmod_common_data.h"
- #include "prm-regbits-24xx.h"
- #include "cm-regbits-24xx.h"
-+#include "i2c.h"
- #include "wd_timer.h"
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 59d5c1c..67f1ac4 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -14,13 +14,14 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/i2c-omap.h>
-+
- #include <plat/omap_hwmod.h>
- #include <plat/cpu.h>
- #include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include <plat/dma.h>
- #include <plat/mmc.h>
--#include <plat/i2c.h>
- 
- #include "omap_hwmod_common_data.h"
- 
-@@ -28,6 +29,7 @@
- #include "cm33xx.h"
- #include "prm33xx.h"
- #include "prm-regbits-33xx.h"
-+#include "i2c.h"
- 
- /*
-  * IP blocks
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 2857772..e72ccdc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -14,6 +14,8 @@
-  *
-  * XXX these should be marked initdata for multi-OMAP kernels
-  */
-+
-+#include <linux/i2c-omap.h>
- #include <linux/power/smartreflex.h>
- #include <linux/platform_data/gpio-omap.h>
- 
-@@ -22,7 +24,6 @@
- #include <plat/serial.h>
- #include "l3_3xxx.h"
- #include "l4_3xxx.h"
--#include <plat/i2c.h>
- #include <plat/mmc.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
-@@ -35,6 +36,7 @@
- #include "omap_hwmod_common_data.h"
- #include "prm-regbits-34xx.h"
- #include "cm-regbits-34xx.h"
-+#include "i2c.h"
- #include "wd_timer.h"
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 652d028..964d61d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -21,9 +21,9 @@
- #include <linux/io.h>
- #include <linux/platform_data/gpio-omap.h>
- #include <linux/power/smartreflex.h>
-+#include <linux/i2c-omap.h>
- 
- #include <plat/omap_hwmod.h>
--#include <plat/i2c.h>
- #include <plat/dma.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
-@@ -37,6 +37,7 @@
- #include "cm2_44xx.h"
- #include "prm44xx.h"
- #include "prm-regbits-44xx.h"
-+#include "i2c.h"
- #include "wd_timer.h"
- 
- /* Base offset for all OMAP4 interrupts external to MPUSS */
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 974974c..0468814 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -26,7 +26,6 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- 
--#include <plat/i2c.h>
- #include <plat/usb.h>
- 
- #include "soc.h"
-diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-index 6013831..37597a6 100644
---- a/arch/arm/plat-omap/i2c.c
-+++ b/arch/arm/plat-omap/i2c.c
-@@ -32,48 +32,12 @@
- #include <linux/clk.h>
- 
- #include <mach/irqs.h>
--#include <plat/i2c.h>
--#include <plat/omap-pm.h>
--#include <plat/omap_device.h>
-+#include <plat/cpu.h>
- 
--#define OMAP_I2C_SIZE		0x3f
--#define OMAP1_I2C_BASE		0xfffb3800
--#define OMAP1_INT_I2C		(32 + 4)
-+#include "i2c.h"
- 
--static const char name[] = "omap_i2c";
--
--#define I2C_RESOURCE_BUILDER(base, irq)			\
--	{						\
--		.start	= (base),			\
--		.end	= (base) + OMAP_I2C_SIZE,	\
--		.flags	= IORESOURCE_MEM,		\
--	},						\
--	{						\
--		.start	= (irq),			\
--		.flags	= IORESOURCE_IRQ,		\
--	},
--
--static struct resource i2c_resources[][2] = {
--	{ I2C_RESOURCE_BUILDER(0, 0) },
--};
--
--#define I2C_DEV_BUILDER(bus_id, res, data)		\
--	{						\
--		.id	= (bus_id),			\
--		.name	= name,				\
--		.num_resources	= ARRAY_SIZE(res),	\
--		.resource	= (res),		\
--		.dev		= {			\
--			.platform_data	= (data),	\
--		},					\
--	}
--
--#define MAX_OMAP_I2C_HWMOD_NAME_LEN	16
- #define OMAP_I2C_MAX_CONTROLLERS 4
- static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
--static struct platform_device omap_i2c_devices[] = {
--	I2C_DEV_BUILDER(1, i2c_resources[0], &i2c_pdata[0]),
--};
- 
- #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
- 
-@@ -93,114 +57,6 @@ static int __init omap_i2c_nr_ports(void)
- 	return ports;
- }
- 
--static inline int omap1_i2c_add_bus(int bus_id)
--{
--	struct platform_device *pdev;
--	struct omap_i2c_bus_platform_data *pdata;
--	struct resource *res;
--
--	omap1_i2c_mux_pins(bus_id);
--
--	pdev = &omap_i2c_devices[bus_id - 1];
--	res = pdev->resource;
--	res[0].start = OMAP1_I2C_BASE;
--	res[0].end = res[0].start + OMAP_I2C_SIZE;
--	res[1].start = OMAP1_INT_I2C;
--	pdata = &i2c_pdata[bus_id - 1];
--
--	/* all OMAP1 have IP version 1 register set */
--	pdata->rev = OMAP_I2C_IP_VERSION_1;
--
--	/* all OMAP1 I2C are implemented like this */
--	pdata->flags = OMAP_I2C_FLAG_NO_FIFO |
--		       OMAP_I2C_FLAG_SIMPLE_CLOCK |
--		       OMAP_I2C_FLAG_16BIT_DATA_REG |
--		       OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK;
--
--	/* how the cpu bus is wired up differs for 7xx only */
--
--	if (cpu_is_omap7xx())
--		pdata->flags |= OMAP_I2C_FLAG_BUS_SHIFT_1;
--	else
--		pdata->flags |= OMAP_I2C_FLAG_BUS_SHIFT_2;
--
--	return platform_device_register(pdev);
--}
--
--
--#ifdef CONFIG_ARCH_OMAP2PLUS
--/*
-- * XXX This function is a temporary compatibility wrapper - only
-- * needed until the I2C driver can be converted to call
-- * omap_pm_set_max_dev_wakeup_lat() and handle a return code.
-- */
--static void omap_pm_set_max_mpu_wakeup_lat_compat(struct device *dev, long t)
--{
--	omap_pm_set_max_mpu_wakeup_lat(dev, t);
--}
--
--static inline int omap2_i2c_add_bus(int bus_id)
--{
--	int l;
--	struct omap_hwmod *oh;
--	struct platform_device *pdev;
--	char oh_name[MAX_OMAP_I2C_HWMOD_NAME_LEN];
--	struct omap_i2c_bus_platform_data *pdata;
--	struct omap_i2c_dev_attr *dev_attr;
--
--	omap2_i2c_mux_pins(bus_id);
--
--	l = snprintf(oh_name, MAX_OMAP_I2C_HWMOD_NAME_LEN, "i2c%d", bus_id);
--	WARN(l >= MAX_OMAP_I2C_HWMOD_NAME_LEN,
--		"String buffer overflow in I2C%d device setup\n", bus_id);
--	oh = omap_hwmod_lookup(oh_name);
--	if (!oh) {
--			pr_err("Could not look up %s\n", oh_name);
--			return -EEXIST;
--	}
--
--	pdata = &i2c_pdata[bus_id - 1];
--	/*
--	 * pass the hwmod class's CPU-specific knowledge of I2C IP revision in
--	 * use, and functionality implementation flags, up to the OMAP I2C
--	 * driver via platform data
--	 */
--	pdata->rev = oh->class->rev;
--
--	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
--	pdata->flags = dev_attr->flags;
--
--	/*
--	 * When waiting for completion of a i2c transfer, we need to
--	 * set a wake up latency constraint for the MPU. This is to
--	 * ensure quick enough wakeup from idle, when transfer
--	 * completes.
--	 * Only omap3 has support for constraints
--	 */
--	if (cpu_is_omap34xx())
--		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
--	pdev = omap_device_build(name, bus_id, oh, pdata,
--			sizeof(struct omap_i2c_bus_platform_data),
--			NULL, 0, 0);
--	WARN(IS_ERR(pdev), "Could not build omap_device for %s\n", name);
--
--	return PTR_RET(pdev);
--}
--#else
--static inline int omap2_i2c_add_bus(int bus_id)
--{
--	return 0;
--}
--#endif
--
--static int __init omap_i2c_add_bus(int bus_id)
--{
--	if (cpu_class_is_omap1())
--		return omap1_i2c_add_bus(bus_id);
--	else
--		return omap2_i2c_add_bus(bus_id);
--}
--
- /**
-  * omap_i2c_bus_setup - Process command line options for the I2C bus speed
-  * @str: String of options
-@@ -239,7 +95,7 @@ static int __init omap_register_i2c_bus_cmdline(void)
- 	for (i = 0; i < ARRAY_SIZE(i2c_pdata); i++)
- 		if (i2c_pdata[i].clkrate & OMAP_I2C_CMDLINE_SETUP) {
- 			i2c_pdata[i].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
--			err = omap_i2c_add_bus(i + 1);
-+			err = omap_i2c_add_bus(&i2c_pdata[i], i + 1);
- 			if (err)
- 				goto out;
- 		}
-@@ -277,5 +133,5 @@ int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
- 
- 	i2c_pdata[bus_id - 1].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
- 
--	return omap_i2c_add_bus(bus_id);
-+	return omap_i2c_add_bus(&i2c_pdata[bus_id - 1], bus_id);
- }
-diff --git a/arch/arm/plat-omap/i2c.h b/arch/arm/plat-omap/i2c.h
-new file mode 100644
-index 0000000..9ae01a0
---- /dev/null
-+++ b/arch/arm/plat-omap/i2c.h
-@@ -0,0 +1,46 @@
-+/*
-+ * Helper module for board specific I2C bus registration
-+ *
-+ * Copyright (C) 2009 Nokia Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ *
-+ */
-+
-+#ifndef __PLAT_OMAP_I2C_H
-+#define __PLAT_OMAP_I2C_H
-+
-+struct i2c_board_info;
-+
-+int omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
-+			int bus_id);
-+
-+#if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
-+extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
-+				 struct i2c_board_info const *info,
-+				 unsigned len);
-+#else
-+static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
-+				 struct i2c_board_info const *info,
-+				 unsigned len)
-+{
-+	return 0;
-+}
+ 	/* Dump the Innovator FPGA rev early - useful info for support. */
+ 	pr_debug("Innovator FPGA Rev %d.%d Board Rev %d\n",
+-			fpga_read(OMAP1510_FPGA_REV_HIGH),
+-			fpga_read(OMAP1510_FPGA_REV_LOW),
+-			fpga_read(OMAP1510_FPGA_BOARD_REV));
++			__raw_readb(OMAP1510_FPGA_REV_HIGH),
++			__raw_readb(OMAP1510_FPGA_REV_LOW),
++			__raw_readb(OMAP1510_FPGA_BOARD_REV));
 +#endif
-+
-+struct omap_hwmod;
-+int omap_i2c_reset(struct omap_hwmod *oh);
-+
-+#endif /* __PLAT_OMAP_I2C_H */
-diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-index d1cb6f5..55c0f8b 100644
---- a/arch/arm/plat-omap/include/plat/common.h
-+++ b/arch/arm/plat-omap/include/plat/common.h
-@@ -27,7 +27,6 @@
- #ifndef __ARCH_ARM_MACH_OMAP_COMMON_H
- #define __ARCH_ARM_MACH_OMAP_COMMON_H
+ }
  
--#include <plat/i2c.h>
- #include <plat/omap_hwmod.h>
+ MACHINE_START(OMAP_INNOVATOR, "TI-Innovator")
+diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
+index 198b054..a1cdeeb 100644
+--- a/arch/arm/mach-omap1/board-perseus2.c
++++ b/arch/arm/mach-omap1/board-perseus2.c
+@@ -30,7 +30,7 @@
  
- extern int __init omap_init_clocksource_32k(void __iomem *vbase);
+ #include <plat/tc.h>
+ #include <mach/mux.h>
+-#include <plat/fpga.h>
++#include <../plat-omap/fpga.h>
+ #include <mach/flash.h>
+ 
+ #include <mach/hardware.h>
+@@ -231,9 +231,9 @@ static struct omap_lcd_config perseus2_lcd_config __initdata = {
+ 
+ static void __init perseus2_init_smc91x(void)
+ {
+-	fpga_write(1, H2P2_DBG_FPGA_LAN_RESET);
++	__raw_writeb(1, H2P2_DBG_FPGA_LAN_RESET);
+ 	mdelay(50);
+-	fpga_write(fpga_read(H2P2_DBG_FPGA_LAN_RESET) & ~1,
++	__raw_writeb(__raw_readb(H2P2_DBG_FPGA_LAN_RESET) & ~1,
+ 		   H2P2_DBG_FPGA_LAN_RESET);
+ 	mdelay(50);
+ }
+diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+index 9f2d8b6..26e19d3 100644
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -41,6 +41,7 @@ static inline void omap7xx_map_io(void)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_OMAP15XX
++void omap1510_fpga_init_irq(void);
+ void omap15xx_map_io(void);
+ #else
+ static inline void omap15xx_map_io(void)
+diff --git a/arch/arm/mach-omap1/fpga.c b/arch/arm/mach-omap1/fpga.c
+index 29ec50f..4ec220d 100644
+--- a/arch/arm/mach-omap1/fpga.c
++++ b/arch/arm/mach-omap1/fpga.c
+@@ -27,7 +27,7 @@
+ #include <asm/irq.h>
+ #include <asm/mach/irq.h>
+ 
+-#include <plat/fpga.h>
++#include <../plat-omap/fpga.h>
+ 
+ #include <mach/hardware.h>
+ 
+diff --git a/arch/arm/mach-omap1/include/mach/omap1510.h b/arch/arm/mach-omap1/include/mach/omap1510.h
+index 8fe05d6..3d23524 100644
+--- a/arch/arm/mach-omap1/include/mach/omap1510.h
++++ b/arch/arm/mach-omap1/include/mach/omap1510.h
+@@ -45,5 +45,118 @@
+ 
+ #define OMAP1510_DSP_MMU_BASE	(0xfffed200)
+ 
++/*
++ * ---------------------------------------------------------------------------
++ *  OMAP-1510 FPGA
++ * ---------------------------------------------------------------------------
++ */
++#define OMAP1510_FPGA_BASE		0xE8000000		/* VA */
++#define OMAP1510_FPGA_SIZE		SZ_4K
++#define OMAP1510_FPGA_START		0x08000000		/* PA */
++
++/* Revision */
++#define OMAP1510_FPGA_REV_LOW			IOMEM(OMAP1510_FPGA_BASE + 0x0)
++#define OMAP1510_FPGA_REV_HIGH			IOMEM(OMAP1510_FPGA_BASE + 0x1)
++#define OMAP1510_FPGA_LCD_PANEL_CONTROL		IOMEM(OMAP1510_FPGA_BASE + 0x2)
++#define OMAP1510_FPGA_LED_DIGIT			IOMEM(OMAP1510_FPGA_BASE + 0x3)
++#define INNOVATOR_FPGA_HID_SPI			IOMEM(OMAP1510_FPGA_BASE + 0x4)
++#define OMAP1510_FPGA_POWER			IOMEM(OMAP1510_FPGA_BASE + 0x5)
++
++/* Interrupt status */
++#define OMAP1510_FPGA_ISR_LO			IOMEM(OMAP1510_FPGA_BASE + 0x6)
++#define OMAP1510_FPGA_ISR_HI			IOMEM(OMAP1510_FPGA_BASE + 0x7)
++
++/* Interrupt mask */
++#define OMAP1510_FPGA_IMR_LO			IOMEM(OMAP1510_FPGA_BASE + 0x8)
++#define OMAP1510_FPGA_IMR_HI			IOMEM(OMAP1510_FPGA_BASE + 0x9)
++
++/* Reset registers */
++#define OMAP1510_FPGA_HOST_RESET		IOMEM(OMAP1510_FPGA_BASE + 0xa)
++#define OMAP1510_FPGA_RST			IOMEM(OMAP1510_FPGA_BASE + 0xb)
++
++#define OMAP1510_FPGA_AUDIO			IOMEM(OMAP1510_FPGA_BASE + 0xc)
++#define OMAP1510_FPGA_DIP			IOMEM(OMAP1510_FPGA_BASE + 0xe)
++#define OMAP1510_FPGA_FPGA_IO			IOMEM(OMAP1510_FPGA_BASE + 0xf)
++#define OMAP1510_FPGA_UART1			IOMEM(OMAP1510_FPGA_BASE + 0x14)
++#define OMAP1510_FPGA_UART2			IOMEM(OMAP1510_FPGA_BASE + 0x15)
++#define OMAP1510_FPGA_OMAP1510_STATUS		IOMEM(OMAP1510_FPGA_BASE + 0x16)
++#define OMAP1510_FPGA_BOARD_REV			IOMEM(OMAP1510_FPGA_BASE + 0x18)
++#define INNOVATOR_FPGA_CAM_USB_CONTROL		IOMEM(OMAP1510_FPGA_BASE + 0x20c)
++#define OMAP1510P1_PPT_DATA			IOMEM(OMAP1510_FPGA_BASE + 0x100)
++#define OMAP1510P1_PPT_STATUS			IOMEM(OMAP1510_FPGA_BASE + 0x101)
++#define OMAP1510P1_PPT_CONTROL			IOMEM(OMAP1510_FPGA_BASE + 0x102)
++
++#define OMAP1510_FPGA_TOUCHSCREEN		IOMEM(OMAP1510_FPGA_BASE + 0x204)
++
++#define INNOVATOR_FPGA_INFO			IOMEM(OMAP1510_FPGA_BASE + 0x205)
++#define INNOVATOR_FPGA_LCD_BRIGHT_LO		IOMEM(OMAP1510_FPGA_BASE + 0x206)
++#define INNOVATOR_FPGA_LCD_BRIGHT_HI		IOMEM(OMAP1510_FPGA_BASE + 0x207)
++#define INNOVATOR_FPGA_LED_GRN_LO		IOMEM(OMAP1510_FPGA_BASE + 0x208)
++#define INNOVATOR_FPGA_LED_GRN_HI		IOMEM(OMAP1510_FPGA_BASE + 0x209)
++#define INNOVATOR_FPGA_LED_RED_LO		IOMEM(OMAP1510_FPGA_BASE + 0x20a)
++#define INNOVATOR_FPGA_LED_RED_HI		IOMEM(OMAP1510_FPGA_BASE + 0x20b)
++#define INNOVATOR_FPGA_EXP_CONTROL		IOMEM(OMAP1510_FPGA_BASE + 0x20d)
++#define INNOVATOR_FPGA_ISR2			IOMEM(OMAP1510_FPGA_BASE + 0x20e)
++#define INNOVATOR_FPGA_IMR2			IOMEM(OMAP1510_FPGA_BASE + 0x210)
++
++#define OMAP1510_FPGA_ETHR_START		(OMAP1510_FPGA_START + 0x300)
++
++/*
++ * Power up Giga UART driver, turn on HID clock.
++ * Turn off BT power, since we're not using it and it
++ * draws power.
++ */
++#define OMAP1510_FPGA_RESET_VALUE		0x42
++
++#define OMAP1510_FPGA_PCR_IF_PD0		(1 << 7)
++#define OMAP1510_FPGA_PCR_COM2_EN		(1 << 6)
++#define OMAP1510_FPGA_PCR_COM1_EN		(1 << 5)
++#define OMAP1510_FPGA_PCR_EXP_PD0		(1 << 4)
++#define OMAP1510_FPGA_PCR_EXP_PD1		(1 << 3)
++#define OMAP1510_FPGA_PCR_48MHZ_CLK		(1 << 2)
++#define OMAP1510_FPGA_PCR_4MHZ_CLK		(1 << 1)
++#define OMAP1510_FPGA_PCR_RSRVD_BIT0		(1 << 0)
++
++/*
++ * Innovator/OMAP1510 FPGA HID register bit definitions
++ */
++#define OMAP1510_FPGA_HID_SCLK	(1<<0)	/* output */
++#define OMAP1510_FPGA_HID_MOSI	(1<<1)	/* output */
++#define OMAP1510_FPGA_HID_nSS	(1<<2)	/* output 0/1 chip idle/select */
++#define OMAP1510_FPGA_HID_nHSUS	(1<<3)	/* output 0/1 host active/suspended */
++#define OMAP1510_FPGA_HID_MISO	(1<<4)	/* input */
++#define OMAP1510_FPGA_HID_ATN	(1<<5)	/* input  0/1 chip idle/ATN */
++#define OMAP1510_FPGA_HID_rsrvd	(1<<6)
++#define OMAP1510_FPGA_HID_RESETn (1<<7)	/* output - 0/1 USAR reset/run */
++
++/* The FPGA IRQ is cascaded through GPIO_13 */
++#define OMAP1510_INT_FPGA		(IH_GPIO_BASE + 13)
++
++/* IRQ Numbers for interrupts muxed through the FPGA */
++#define OMAP1510_INT_FPGA_ATN		(OMAP_FPGA_IRQ_BASE + 0)
++#define OMAP1510_INT_FPGA_ACK		(OMAP_FPGA_IRQ_BASE + 1)
++#define OMAP1510_INT_FPGA2		(OMAP_FPGA_IRQ_BASE + 2)
++#define OMAP1510_INT_FPGA3		(OMAP_FPGA_IRQ_BASE + 3)
++#define OMAP1510_INT_FPGA4		(OMAP_FPGA_IRQ_BASE + 4)
++#define OMAP1510_INT_FPGA5		(OMAP_FPGA_IRQ_BASE + 5)
++#define OMAP1510_INT_FPGA6		(OMAP_FPGA_IRQ_BASE + 6)
++#define OMAP1510_INT_FPGA7		(OMAP_FPGA_IRQ_BASE + 7)
++#define OMAP1510_INT_FPGA8		(OMAP_FPGA_IRQ_BASE + 8)
++#define OMAP1510_INT_FPGA9		(OMAP_FPGA_IRQ_BASE + 9)
++#define OMAP1510_INT_FPGA10		(OMAP_FPGA_IRQ_BASE + 10)
++#define OMAP1510_INT_FPGA11		(OMAP_FPGA_IRQ_BASE + 11)
++#define OMAP1510_INT_FPGA12		(OMAP_FPGA_IRQ_BASE + 12)
++#define OMAP1510_INT_ETHER		(OMAP_FPGA_IRQ_BASE + 13)
++#define OMAP1510_INT_FPGAUART1		(OMAP_FPGA_IRQ_BASE + 14)
++#define OMAP1510_INT_FPGAUART2		(OMAP_FPGA_IRQ_BASE + 15)
++#define OMAP1510_INT_FPGA_TS		(OMAP_FPGA_IRQ_BASE + 16)
++#define OMAP1510_INT_FPGA17		(OMAP_FPGA_IRQ_BASE + 17)
++#define OMAP1510_INT_FPGA_CAM		(OMAP_FPGA_IRQ_BASE + 18)
++#define OMAP1510_INT_FPGA_RTC_A		(OMAP_FPGA_IRQ_BASE + 19)
++#define OMAP1510_INT_FPGA_RTC_B		(OMAP_FPGA_IRQ_BASE + 20)
++#define OMAP1510_INT_FPGA_CD		(OMAP_FPGA_IRQ_BASE + 21)
++#define OMAP1510_INT_FPGA22		(OMAP_FPGA_IRQ_BASE + 22)
++#define OMAP1510_INT_FPGA23		(OMAP_FPGA_IRQ_BASE + 23)
++
+ #endif /*  __ASM_ARCH_OMAP15XX_H */
+ 
+diff --git a/arch/arm/mach-omap1/serial.c b/arch/arm/mach-omap1/serial.c
+index b9d6834..d1ac080 100644
+--- a/arch/arm/mach-omap1/serial.c
++++ b/arch/arm/mach-omap1/serial.c
+@@ -23,7 +23,6 @@
+ #include <asm/mach-types.h>
+ 
+ #include <mach/mux.h>
+-#include <plat/fpga.h>
+ 
+ #include "pm.h"
+ 
+diff --git a/arch/arm/plat-omap/debug-leds.c b/arch/arm/plat-omap/debug-leds.c
+index ea29bbe..feca128 100644
+--- a/arch/arm/plat-omap/debug-leds.c
++++ b/arch/arm/plat-omap/debug-leds.c
+@@ -20,7 +20,7 @@
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ 
+-#include <plat/fpga.h>
++#include "fpga.h"
+ 
+ /* Many OMAP development platforms reuse the same "debug board"; these
+  * platforms include H2, H3, H4, and Perseus2.  There are 16 LEDs on the
+diff --git a/arch/arm/plat-omap/fpga.h b/arch/arm/plat-omap/fpga.h
+new file mode 100644
+index 0000000..54faaa9
+--- /dev/null
++++ b/arch/arm/plat-omap/fpga.h
+@@ -0,0 +1,74 @@
++/*
++ * arch/arm/plat-omap/include/mach/fpga.h
++ *
++ * Interrupt handler for OMAP-1510 FPGA
++ *
++ * Copyright (C) 2001 RidgeRun, Inc.
++ * Author: Greg Lonnon <glonnon@ridgerun.com>
++ *
++ * Copyright (C) 2002 MontaVista Software, Inc.
++ *
++ * Separated FPGA interrupts from innovator1510.c and cleaned up for 2.6
++ * Copyright (C) 2004 Nokia Corporation by Tony Lindrgen <tony@atomide.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_OMAP_FPGA_H
++#define __ASM_ARCH_OMAP_FPGA_H
++
++/*
++ * ---------------------------------------------------------------------------
++ *  H2/P2 Debug board FPGA
++ * ---------------------------------------------------------------------------
++ */
++/* maps in the FPGA registers and the ETHR registers */
++#define H2P2_DBG_FPGA_BASE		0xE8000000		/* VA */
++#define H2P2_DBG_FPGA_SIZE		SZ_4K			/* SIZE */
++#define H2P2_DBG_FPGA_START		0x04000000		/* PA */
++
++#define H2P2_DBG_FPGA_ETHR_START	(H2P2_DBG_FPGA_START + 0x300)
++#define H2P2_DBG_FPGA_FPGA_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x10)	/* FPGA Revision */
++#define H2P2_DBG_FPGA_BOARD_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x12)	/* Board Revision */
++#define H2P2_DBG_FPGA_GPIO		IOMEM(H2P2_DBG_FPGA_BASE + 0x14)	/* GPIO outputs */
++#define H2P2_DBG_FPGA_LEDS		IOMEM(H2P2_DBG_FPGA_BASE + 0x16)	/* LEDs outputs */
++#define H2P2_DBG_FPGA_MISC_INPUTS	IOMEM(H2P2_DBG_FPGA_BASE + 0x18)	/* Misc inputs */
++#define H2P2_DBG_FPGA_LAN_STATUS	IOMEM(H2P2_DBG_FPGA_BASE + 0x1A)	/* LAN Status line */
++#define H2P2_DBG_FPGA_LAN_RESET		IOMEM(H2P2_DBG_FPGA_BASE + 0x1C)	/* LAN Reset line */
++
++/* NOTE:  most boards don't have a static mapping for the FPGA ... */
++struct h2p2_dbg_fpga {
++	/* offset 0x00 */
++	u16		smc91x[8];
++	/* offset 0x10 */
++	u16		fpga_rev;
++	u16		board_rev;
++	u16		gpio_outputs;
++	u16		leds;
++	/* offset 0x18 */
++	u16		misc_inputs;
++	u16		lan_status;
++	u16		lan_reset;
++	u16		reserved0;
++	/* offset 0x20 */
++	u16		ps2_data;
++	u16		ps2_ctrl;
++	/* plus also 4 rs232 ports ... */
++};
++
++/* LEDs definition on debug board (16 LEDs, all physically green) */
++#define H2P2_DBG_FPGA_LED_GREEN		(1 << 15)
++#define H2P2_DBG_FPGA_LED_AMBER		(1 << 14)
++#define H2P2_DBG_FPGA_LED_RED		(1 << 13)
++#define H2P2_DBG_FPGA_LED_BLUE		(1 << 12)
++/*  cpu0 load-meter LEDs */
++#define H2P2_DBG_FPGA_LOAD_METER	(1 << 0)	// A bit of fun on our board ...
++#define H2P2_DBG_FPGA_LOAD_METER_SIZE	11
++#define H2P2_DBG_FPGA_LOAD_METER_MASK	((1 << H2P2_DBG_FPGA_LOAD_METER_SIZE) - 1)
++
++#define H2P2_DBG_FPGA_P2_LED_TIMER		(1 << 0)
++#define H2P2_DBG_FPGA_P2_LED_IDLE		(1 << 1)
++
++#endif
+diff --git a/arch/arm/plat-omap/include/plat/fpga.h b/arch/arm/plat-omap/include/plat/fpga.h
+deleted file mode 100644
+index bd3c632..0000000
+--- a/arch/arm/plat-omap/include/plat/fpga.h
++++ /dev/null
+@@ -1,193 +0,0 @@
+-/*
+- * arch/arm/plat-omap/include/mach/fpga.h
+- *
+- * Interrupt handler for OMAP-1510 FPGA
+- *
+- * Copyright (C) 2001 RidgeRun, Inc.
+- * Author: Greg Lonnon <glonnon@ridgerun.com>
+- *
+- * Copyright (C) 2002 MontaVista Software, Inc.
+- *
+- * Separated FPGA interrupts from innovator1510.c and cleaned up for 2.6
+- * Copyright (C) 2004 Nokia Corporation by Tony Lindrgen <tony@atomide.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_OMAP_FPGA_H
+-#define __ASM_ARCH_OMAP_FPGA_H
+-
+-extern void omap1510_fpga_init_irq(void);
+-
+-#define fpga_read(reg)			__raw_readb(reg)
+-#define fpga_write(val, reg)		__raw_writeb(val, reg)
+-
+-/*
+- * ---------------------------------------------------------------------------
+- *  H2/P2 Debug board FPGA
+- * ---------------------------------------------------------------------------
+- */
+-/* maps in the FPGA registers and the ETHR registers */
+-#define H2P2_DBG_FPGA_BASE		0xE8000000		/* VA */
+-#define H2P2_DBG_FPGA_SIZE		SZ_4K			/* SIZE */
+-#define H2P2_DBG_FPGA_START		0x04000000		/* PA */
+-
+-#define H2P2_DBG_FPGA_ETHR_START	(H2P2_DBG_FPGA_START + 0x300)
+-#define H2P2_DBG_FPGA_FPGA_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x10)	/* FPGA Revision */
+-#define H2P2_DBG_FPGA_BOARD_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x12)	/* Board Revision */
+-#define H2P2_DBG_FPGA_GPIO		IOMEM(H2P2_DBG_FPGA_BASE + 0x14)	/* GPIO outputs */
+-#define H2P2_DBG_FPGA_LEDS		IOMEM(H2P2_DBG_FPGA_BASE + 0x16)	/* LEDs outputs */
+-#define H2P2_DBG_FPGA_MISC_INPUTS	IOMEM(H2P2_DBG_FPGA_BASE + 0x18)	/* Misc inputs */
+-#define H2P2_DBG_FPGA_LAN_STATUS	IOMEM(H2P2_DBG_FPGA_BASE + 0x1A)	/* LAN Status line */
+-#define H2P2_DBG_FPGA_LAN_RESET		IOMEM(H2P2_DBG_FPGA_BASE + 0x1C)	/* LAN Reset line */
+-
+-/* NOTE:  most boards don't have a static mapping for the FPGA ... */
+-struct h2p2_dbg_fpga {
+-	/* offset 0x00 */
+-	u16		smc91x[8];
+-	/* offset 0x10 */
+-	u16		fpga_rev;
+-	u16		board_rev;
+-	u16		gpio_outputs;
+-	u16		leds;
+-	/* offset 0x18 */
+-	u16		misc_inputs;
+-	u16		lan_status;
+-	u16		lan_reset;
+-	u16		reserved0;
+-	/* offset 0x20 */
+-	u16		ps2_data;
+-	u16		ps2_ctrl;
+-	/* plus also 4 rs232 ports ... */
+-};
+-
+-/* LEDs definition on debug board (16 LEDs, all physically green) */
+-#define H2P2_DBG_FPGA_LED_GREEN		(1 << 15)
+-#define H2P2_DBG_FPGA_LED_AMBER		(1 << 14)
+-#define H2P2_DBG_FPGA_LED_RED		(1 << 13)
+-#define H2P2_DBG_FPGA_LED_BLUE		(1 << 12)
+-/*  cpu0 load-meter LEDs */
+-#define H2P2_DBG_FPGA_LOAD_METER	(1 << 0)	// A bit of fun on our board ...
+-#define H2P2_DBG_FPGA_LOAD_METER_SIZE	11
+-#define H2P2_DBG_FPGA_LOAD_METER_MASK	((1 << H2P2_DBG_FPGA_LOAD_METER_SIZE) - 1)
+-
+-#define H2P2_DBG_FPGA_P2_LED_TIMER		(1 << 0)
+-#define H2P2_DBG_FPGA_P2_LED_IDLE		(1 << 1)
+-
+-/*
+- * ---------------------------------------------------------------------------
+- *  OMAP-1510 FPGA
+- * ---------------------------------------------------------------------------
+- */
+-#define OMAP1510_FPGA_BASE		0xE8000000		/* VA */
+-#define OMAP1510_FPGA_SIZE		SZ_4K
+-#define OMAP1510_FPGA_START		0x08000000		/* PA */
+-
+-/* Revision */
+-#define OMAP1510_FPGA_REV_LOW			IOMEM(OMAP1510_FPGA_BASE + 0x0)
+-#define OMAP1510_FPGA_REV_HIGH			IOMEM(OMAP1510_FPGA_BASE + 0x1)
+-
+-#define OMAP1510_FPGA_LCD_PANEL_CONTROL		IOMEM(OMAP1510_FPGA_BASE + 0x2)
+-#define OMAP1510_FPGA_LED_DIGIT			IOMEM(OMAP1510_FPGA_BASE + 0x3)
+-#define INNOVATOR_FPGA_HID_SPI			IOMEM(OMAP1510_FPGA_BASE + 0x4)
+-#define OMAP1510_FPGA_POWER			IOMEM(OMAP1510_FPGA_BASE + 0x5)
+-
+-/* Interrupt status */
+-#define OMAP1510_FPGA_ISR_LO			IOMEM(OMAP1510_FPGA_BASE + 0x6)
+-#define OMAP1510_FPGA_ISR_HI			IOMEM(OMAP1510_FPGA_BASE + 0x7)
+-
+-/* Interrupt mask */
+-#define OMAP1510_FPGA_IMR_LO			IOMEM(OMAP1510_FPGA_BASE + 0x8)
+-#define OMAP1510_FPGA_IMR_HI			IOMEM(OMAP1510_FPGA_BASE + 0x9)
+-
+-/* Reset registers */
+-#define OMAP1510_FPGA_HOST_RESET		IOMEM(OMAP1510_FPGA_BASE + 0xa)
+-#define OMAP1510_FPGA_RST			IOMEM(OMAP1510_FPGA_BASE + 0xb)
+-
+-#define OMAP1510_FPGA_AUDIO			IOMEM(OMAP1510_FPGA_BASE + 0xc)
+-#define OMAP1510_FPGA_DIP			IOMEM(OMAP1510_FPGA_BASE + 0xe)
+-#define OMAP1510_FPGA_FPGA_IO			IOMEM(OMAP1510_FPGA_BASE + 0xf)
+-#define OMAP1510_FPGA_UART1			IOMEM(OMAP1510_FPGA_BASE + 0x14)
+-#define OMAP1510_FPGA_UART2			IOMEM(OMAP1510_FPGA_BASE + 0x15)
+-#define OMAP1510_FPGA_OMAP1510_STATUS		IOMEM(OMAP1510_FPGA_BASE + 0x16)
+-#define OMAP1510_FPGA_BOARD_REV			IOMEM(OMAP1510_FPGA_BASE + 0x18)
+-#define OMAP1510P1_PPT_DATA			IOMEM(OMAP1510_FPGA_BASE + 0x100)
+-#define OMAP1510P1_PPT_STATUS			IOMEM(OMAP1510_FPGA_BASE + 0x101)
+-#define OMAP1510P1_PPT_CONTROL			IOMEM(OMAP1510_FPGA_BASE + 0x102)
+-
+-#define OMAP1510_FPGA_TOUCHSCREEN		IOMEM(OMAP1510_FPGA_BASE + 0x204)
+-
+-#define INNOVATOR_FPGA_INFO			IOMEM(OMAP1510_FPGA_BASE + 0x205)
+-#define INNOVATOR_FPGA_LCD_BRIGHT_LO		IOMEM(OMAP1510_FPGA_BASE + 0x206)
+-#define INNOVATOR_FPGA_LCD_BRIGHT_HI		IOMEM(OMAP1510_FPGA_BASE + 0x207)
+-#define INNOVATOR_FPGA_LED_GRN_LO		IOMEM(OMAP1510_FPGA_BASE + 0x208)
+-#define INNOVATOR_FPGA_LED_GRN_HI		IOMEM(OMAP1510_FPGA_BASE + 0x209)
+-#define INNOVATOR_FPGA_LED_RED_LO		IOMEM(OMAP1510_FPGA_BASE + 0x20a)
+-#define INNOVATOR_FPGA_LED_RED_HI		IOMEM(OMAP1510_FPGA_BASE + 0x20b)
+-#define INNOVATOR_FPGA_CAM_USB_CONTROL		IOMEM(OMAP1510_FPGA_BASE + 0x20c)
+-#define INNOVATOR_FPGA_EXP_CONTROL		IOMEM(OMAP1510_FPGA_BASE + 0x20d)
+-#define INNOVATOR_FPGA_ISR2			IOMEM(OMAP1510_FPGA_BASE + 0x20e)
+-#define INNOVATOR_FPGA_IMR2			IOMEM(OMAP1510_FPGA_BASE + 0x210)
+-
+-#define OMAP1510_FPGA_ETHR_START		(OMAP1510_FPGA_START + 0x300)
+-
+-/*
+- * Power up Giga UART driver, turn on HID clock.
+- * Turn off BT power, since we're not using it and it
+- * draws power.
+- */
+-#define OMAP1510_FPGA_RESET_VALUE		0x42
+-
+-#define OMAP1510_FPGA_PCR_IF_PD0		(1 << 7)
+-#define OMAP1510_FPGA_PCR_COM2_EN		(1 << 6)
+-#define OMAP1510_FPGA_PCR_COM1_EN		(1 << 5)
+-#define OMAP1510_FPGA_PCR_EXP_PD0		(1 << 4)
+-#define OMAP1510_FPGA_PCR_EXP_PD1		(1 << 3)
+-#define OMAP1510_FPGA_PCR_48MHZ_CLK		(1 << 2)
+-#define OMAP1510_FPGA_PCR_4MHZ_CLK		(1 << 1)
+-#define OMAP1510_FPGA_PCR_RSRVD_BIT0		(1 << 0)
+-
+-/*
+- * Innovator/OMAP1510 FPGA HID register bit definitions
+- */
+-#define OMAP1510_FPGA_HID_SCLK	(1<<0)	/* output */
+-#define OMAP1510_FPGA_HID_MOSI	(1<<1)	/* output */
+-#define OMAP1510_FPGA_HID_nSS	(1<<2)	/* output 0/1 chip idle/select */
+-#define OMAP1510_FPGA_HID_nHSUS	(1<<3)	/* output 0/1 host active/suspended */
+-#define OMAP1510_FPGA_HID_MISO	(1<<4)	/* input */
+-#define OMAP1510_FPGA_HID_ATN	(1<<5)	/* input  0/1 chip idle/ATN */
+-#define OMAP1510_FPGA_HID_rsrvd	(1<<6)
+-#define OMAP1510_FPGA_HID_RESETn (1<<7)	/* output - 0/1 USAR reset/run */
+-
+-/* The FPGA IRQ is cascaded through GPIO_13 */
+-#define OMAP1510_INT_FPGA		(IH_GPIO_BASE + 13)
+-
+-/* IRQ Numbers for interrupts muxed through the FPGA */
+-#define OMAP1510_INT_FPGA_ATN		(OMAP_FPGA_IRQ_BASE + 0)
+-#define OMAP1510_INT_FPGA_ACK		(OMAP_FPGA_IRQ_BASE + 1)
+-#define OMAP1510_INT_FPGA2		(OMAP_FPGA_IRQ_BASE + 2)
+-#define OMAP1510_INT_FPGA3		(OMAP_FPGA_IRQ_BASE + 3)
+-#define OMAP1510_INT_FPGA4		(OMAP_FPGA_IRQ_BASE + 4)
+-#define OMAP1510_INT_FPGA5		(OMAP_FPGA_IRQ_BASE + 5)
+-#define OMAP1510_INT_FPGA6		(OMAP_FPGA_IRQ_BASE + 6)
+-#define OMAP1510_INT_FPGA7		(OMAP_FPGA_IRQ_BASE + 7)
+-#define OMAP1510_INT_FPGA8		(OMAP_FPGA_IRQ_BASE + 8)
+-#define OMAP1510_INT_FPGA9		(OMAP_FPGA_IRQ_BASE + 9)
+-#define OMAP1510_INT_FPGA10		(OMAP_FPGA_IRQ_BASE + 10)
+-#define OMAP1510_INT_FPGA11		(OMAP_FPGA_IRQ_BASE + 11)
+-#define OMAP1510_INT_FPGA12		(OMAP_FPGA_IRQ_BASE + 12)
+-#define OMAP1510_INT_ETHER		(OMAP_FPGA_IRQ_BASE + 13)
+-#define OMAP1510_INT_FPGAUART1		(OMAP_FPGA_IRQ_BASE + 14)
+-#define OMAP1510_INT_FPGAUART2		(OMAP_FPGA_IRQ_BASE + 15)
+-#define OMAP1510_INT_FPGA_TS		(OMAP_FPGA_IRQ_BASE + 16)
+-#define OMAP1510_INT_FPGA17		(OMAP_FPGA_IRQ_BASE + 17)
+-#define OMAP1510_INT_FPGA_CAM		(OMAP_FPGA_IRQ_BASE + 18)
+-#define OMAP1510_INT_FPGA_RTC_A		(OMAP_FPGA_IRQ_BASE + 19)
+-#define OMAP1510_INT_FPGA_RTC_B		(OMAP_FPGA_IRQ_BASE + 20)
+-#define OMAP1510_INT_FPGA_CD		(OMAP_FPGA_IRQ_BASE + 21)
+-#define OMAP1510_INT_FPGA22		(OMAP_FPGA_IRQ_BASE + 22)
+-#define OMAP1510_INT_FPGA23		(OMAP_FPGA_IRQ_BASE + 23)
+-
+-#endif
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 4531d03..439e6e4 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -25,7 +25,6 @@
+ #include <asm/mach-types.h>
+ 
+ #include <mach/mux.h>
+-#include <plat/fpga.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+@@ -93,14 +92,14 @@ static int omap_ohci_transceiver_power(int on)
+ {
+ 	if (on) {
+ 		if (machine_is_omap_innovator() && cpu_is_omap1510())
+-			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL)
++			__raw_writeb(__raw_readb(INNOVATOR_FPGA_CAM_USB_CONTROL)
+ 				| ((1 << 5/*usb1*/) | (1 << 3/*usb2*/)),
+ 			       INNOVATOR_FPGA_CAM_USB_CONTROL);
+ 		else if (machine_is_omap_osk())
+ 			tps65010_set_gpio_out_value(GPIO1, LOW);
+ 	} else {
+ 		if (machine_is_omap_innovator() && cpu_is_omap1510())
+-			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL)
++			__raw_writeb(__raw_readb(INNOVATOR_FPGA_CAM_USB_CONTROL)
+ 				& ~((1 << 5/*usb1*/) | (1 << 3/*usb2*/)),
+ 			       INNOVATOR_FPGA_CAM_USB_CONTROL);
+ 		else if (machine_is_omap_osk())
+diff --git a/drivers/video/omap/lcd_inn1510.c b/drivers/video/omap/lcd_inn1510.c
+index b38b1dd..2ee4232 100644
+--- a/drivers/video/omap/lcd_inn1510.c
++++ b/drivers/video/omap/lcd_inn1510.c
+@@ -23,7 +23,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ 
+-#include <plat/fpga.h>
++#include <mach/hardware.h>
++
+ #include "omapfb.h"
+ 
+ static int innovator1510_panel_init(struct lcd_panel *panel,
+@@ -38,13 +39,13 @@ static void innovator1510_panel_cleanup(struct lcd_panel *panel)
+ 
+ static int innovator1510_panel_enable(struct lcd_panel *panel)
+ {
+-	fpga_write(0x7, OMAP1510_FPGA_LCD_PANEL_CONTROL);
++	__raw_writeb(0x7, OMAP1510_FPGA_LCD_PANEL_CONTROL);
+ 	return 0;
+ }
+ 
+ static void innovator1510_panel_disable(struct lcd_panel *panel)
+ {
+-	fpga_write(0x0, OMAP1510_FPGA_LCD_PANEL_CONTROL);
++	__raw_writeb(0x0, OMAP1510_FPGA_LCD_PANEL_CONTROL);
+ }
+ 
+ static unsigned long innovator1510_panel_get_caps(struct lcd_panel *panel)
