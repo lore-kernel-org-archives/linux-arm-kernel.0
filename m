@@ -1,36 +1,114 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 4 Oct 2012 14:46:48 +0200
-Subject: [PATCH] ARM: ux500: 8500: register LCD VSI pinctrl table
-Message-ID: <1349354808-18299-1-git-send-email-linus.walleij@stericsson.com>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 4 Oct 2012 08:49:35 -0400
+Subject: [PATCH v3 1/6] ARM: davinci: sram: ioremap the davinci_soc_info
+ specified sram regions
+In-Reply-To: <506D7799.2090307@ti.com>
+References: <1349276133-26408-1-git-send-email-mporter@ti.com>
+ <1349276133-26408-2-git-send-email-mporter@ti.com>
+ <506D7799.2090307@ti.com>
+Message-ID: <20121004124935.GD11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+On Thu, Oct 04, 2012 at 05:18:41PM +0530, Sekhar Nori wrote:
+> On 10/3/2012 8:25 PM, Matt Porter wrote:
+> > From: Ben Gardiner <bengardiner@nanometrics.ca>
+> > 
+> > The current davinci init sets up SRAM in iotables. There has been an observed
+> > failure to boot a da850 with 128K specified in the iotable.
+> > 
+> > Make the davinci sram allocator -- now based on RMK's consolidated SRAM
+> > support -- do an ioremap of the region specified by the entries in
+> 
+> The part about being based on RMK's consolidated SRAM support should be
+> dropped.
 
-This fixes up the pins used by the VSI interface to the HDMI
-AV8100 encoder.
+Ok, cruft from trying to preserve Ben's original patch comments. Will
+remove.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-pins.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ 
+> > davinci_soc_info before registering with gen_pool_add_virt().
+> > 
+> > This commit breaks runtime of davinci boards since the regions that
+> > the sram init is now trying to ioremap have been iomapped by their
+> > iotable entries. The iotable entries will be removed in the patches
+> > to come.
+> 
+> I would prefer merging 2/6 into this for this reason.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index a267c6d..8ab8688 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -162,7 +162,10 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
- 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
- 	/* Mux in LCD VSI1 and pull it up for MCDE HDMI output */
--	DB8500_MUX("lcdvsi1_a_1", "lcd", "av8100-hdmi"),
-+	DB8500_MUX("lcdvsi1_a_1", "lcd", "0-0070"),
-+	DB8500_PIN("GPIO69_E2", in_pu, "0-0070"),
-+	/* LCD VSI1 sleep state */
-+	DB8500_PIN_SLEEP("GPIO69_E2", slpm_in_wkup_pdis, "0-0070"),
- 	/* Mux in i2c0 block, default state */
- 	DB8500_MUX("i2c0_a_1", "i2c0", "nmk-i2c.0"),
- 	/* i2c0 sleep state */
--- 
-1.7.11.3
+Ok, makes sense. This again comes from me trying to just use the
+original patches. I'll squash these together for v4.
+
+> 
+> > 
+> > Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+> > [rebased to mainline as the consolidated SRAM support was dropped]
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > ---
+> >  arch/arm/mach-davinci/sram.c |   17 ++++++++++++++---
+> >  1 file changed, 14 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
+> > index db0f778..0e8ca4f 100644
+> > --- a/arch/arm/mach-davinci/sram.c
+> > +++ b/arch/arm/mach-davinci/sram.c
+> > @@ -10,6 +10,7 @@
+> >   */
+> >  #include <linux/module.h>
+> >  #include <linux/init.h>
+> > +#include <linux/io.h>
+> >  #include <linux/genalloc.h>
+> >  
+> >  #include <mach/common.h>
+> > @@ -32,7 +33,7 @@ void *sram_alloc(size_t len, dma_addr_t *dma)
+> >  		return NULL;
+> >  
+> >  	if (dma)
+> > -		*dma = dma_base + (vaddr - SRAM_VIRT);
+> > +		*dma = gen_pool_virt_to_phys(sram_pool, vaddr);
+> >  	return (void *)vaddr;
+> >  
+> >  }
+> > @@ -53,8 +54,10 @@ EXPORT_SYMBOL(sram_free);
+> >   */
+> >  static int __init sram_init(void)
+> >  {
+> > +	phys_addr_t phys = davinci_soc_info.sram_dma;
+> >  	unsigned len = davinci_soc_info.sram_len;
+> >  	int status = 0;
+> > +	void *addr;
+> >  
+> >  	if (len) {
+> >  		len = min_t(unsigned, len, SRAM_SIZE);
+> > @@ -62,8 +65,16 @@ static int __init sram_init(void)
+> >  		if (!sram_pool)
+> >  			status = -ENOMEM;
+> >  	}
+> > -	if (sram_pool)
+> > -		status = gen_pool_add(sram_pool, SRAM_VIRT, len, -1);
+> > +
+> > +	if (sram_pool) {
+> > +		addr = ioremap(phys, len);
+> > +		if (!addr)
+> > +			return -ENOMEM;
+> > +		if((status = gen_pool_add_virt(sram_pool, (unsigned)addr,
+> > +					       phys, len, -1)))
+> 
+> Nit: prefer to set status outside of if().
+
+Ok. Will change.
+
+> 
+> Looks good otherwise. Thanks for reviving this.
+
+No problem, I'm just glad we seem to have a workable solution now.
+
+Also, if you could check the conversation with Phillip about
+gen_pool_find_by_phys(), I wonder what you think about depending on that
+now, or waiting to convert to it when it goes upstream.
+
+I'm torn as I see all the pdata going away anyway when Davinci is fully
+converted to DT, and then also any use of find_by_phys() would go away
+in favor of using the of helpers with his driver.
+
+-Matt
