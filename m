@@ -1,19 +1,127 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 4 Oct 2012 18:50:26 +0100
-Subject: [RESEND][PATCH] ASoC: ams-delta: Convert to use
- snd_soc_register_card()
-In-Reply-To: <1582731.dIkBtAuyKn@vclass>
-References: <20120906073633.GC22330@opensource.wolfsonmicro.com>
- <1582731.dIkBtAuyKn@vclass>
-Message-ID: <20121004175025.GU4360@opensource.wolfsonmicro.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 4 Oct 2012 10:52:35 -0700
+Subject: usb: uhci-platform driver fails after patch changes during merge
+In-Reply-To: <1349372523.8451.10.camel@gitbox>
+References: <1349332691.7583.3.camel@gitbox> <1349333716.7905.1.camel@gitbox>
+ <20121004142617.GA26625@kroah.com>
+ <1349372523.8451.10.camel@gitbox>
+Message-ID: <20121004175235.GA14949@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 12:46:57PM +0200, Janusz Krzysztofik wrote:
-> The old method of registering with the ASoC core by creating a
-> "soc-audio" platform device no longer works for Amstrad Delta sound card
-> after recent changes to drvdata handling (commit
-> 0998d0631001288a5974afc0b2a5f568bcdecb4d, 'device-core: Ensure drvdata =
-> NULL when no driver is bound'.
+On Fri, Oct 05, 2012 at 06:42:03AM +1300, Tony Prisk wrote:
+> On Thu, 2012-10-04 at 07:26 -0700, Greg KH wrote:
+> > On Thu, Oct 04, 2012 at 07:55:16PM +1300, Tony Prisk wrote:
+> > > On Thu, 2012-10-04 at 19:38 +1300, Tony Prisk wrote:
+> > > > Mike,
+> > > > 
+> > > > I see someone made changes to the uhci-platform.c driver I submitted
+> > > > during v3.7 which results in it not working on mach-vt8500.
+> > > > 
+> > > > Could you clarify why the changes were made, and what the suggested
+> > > > resolution would be to solve the problem that it introduced?
+> > > > 
+> > > > Lines indicated by ---> below were removed from the patch, which means
+> > > > that on arch-vt8500 there is no dma_mask set, and its fails to
+> > > > communicate with attached devices.
+> > > > 
+> > > > Regards
+> > > > 
+> > > > Tony P
+> > > > 
+> > > > 
+> > > > static int __devinit uhci_hcd_platform_probe(struct platform_device
+> > > > *pdev)
+> > > > ...
+> > > > 	if (usb_disabled())
+> > > > 		return -ENODEV;
+> > > > --->
+> > > > 	/* Right now device-tree probed devices don't get dma_mask set.
+> > > > 	 * Since shared usb code relies on it, set it here for now.
+> > > > 	 * Once we have dma capability bindings this can go away.
+> > > > 	 */
+> > > > 	if (!pdev->dev.dma_mask)
+> > > > 		pdev->dev.dma_mask = &platform_uhci_dma_mask;
+> > > > --->
+> > > > 	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
+> > > > 				pdev->name);
+> > > > ...
+> > > > 
+> > > > 
+> > > > _______________________________________________
+> > > > linux-arm-kernel mailing list
+> > > > linux-arm-kernel at lists.infradead.org
+> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 
+> > > Greg,
+> > > 
+> > > This message was intended for you rather than Mike. Could you clarify
+> > > what happened and the expected resolution?
+> > 
+> > I don't know, this should be directed at the person who made the change
+> > that is causing the problem, and the linux-usb at vger.kernel.org mailing
+> > list.
+> > 
+> > Who changed the patch?  What patch exactly are you referring to?  Who
+> > signed off on it?  Where was it discussed?
+> > 
+> > thanks,
+> > 
+> > greg k-h
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> Greg,
+> 
+> Thats the problem I have - I can't track where the changes came from.
+> 
+> The commit details show:
+> 
+> author
+> Tony Prisk
+> <linux@prisktech.co.nz>
+> 
+> 
+> Sat, 21 Jul 2012
+> 10:58:53 +0000 (22:58
+> +1200)
+> committer
+> Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org>
+> 
+> 
+> Thu, 16 Aug 2012
+> 21:00:37 +0000 (14:00
+> -0700)
+> commit
+> 100d45970327f78584ff4846deeca14bba511e28
+> 
+> But this file -
+> drivers/usb/host/uhci-platform.c
+> 
+> isn't the version I supplied in the patchset. There are no other commits
+> against it so I assume it was changed before it was committed.
 
-Applied, thanks.
+No, this commit matches up exactly with the email I got from you with
+ Message-Id: <1342868333-10647-2-git-send-email-linux@prisktech.co.nz>
+which looks to be the patch I applied here.  The diffstat matches up
+exactly with that email.
+
+Do you see that as well?
+
+You should have gotten an automated email response from me when the
+patch was applied, with the patch in it.  My email system doesn't keep
+those around, but you should have it somewhere, so you could compare it
+to the commit in Linus's tree now, right?  Does it match up?
+
+If I accidentally applied the incorrect patch (note, this looks like
+it was version 4 of the patch, was there a later version that I
+missed?), please feel free to send an add-on patch that fixes up any
+errors.
+
+thanks,
+
+greg k-h
