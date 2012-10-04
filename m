@@ -1,28 +1,55 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Thu, 4 Oct 2012 14:22:58 +0530
-Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAOh2x=k3aX2VOsNTjgCT8r1Re5T66emvhSmA_MBfS0JmSN9Uqg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Oct 2012 11:07:03 +0200
+Subject: [PATCH V2 3/3] spi: spi-pl022: Minor simplification for runtime pm
+In-Reply-To: <1349337881-15917-4-git-send-email-ulf.hansson@stericsson.com>
+References: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
+ <1349337881-15917-4-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CAPDyKFqZXKtpJ8vSFKfZuD8FGayQUhmYKtZKzkZ15jKRA5nu6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2012 at 2:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->  arch/arm/plat-spear/Kconfig    | 2 ++
+Hi,
 
-> diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
-> index 4404f82..a090ea3 100644
-> --- a/arch/arm/plat-spear/Kconfig
-> +++ b/arch/arm/plat-spear/Kconfig
-> @@ -14,6 +14,8 @@ config ARCH_SPEAR13XX
->         select CPU_V7
->         select USE_OF
->         select HAVE_SMP
-> +       select HAVE_ARM_SCU if SMP
-> +       select HAVE_ARM_TWD if LOCAL_TIMERS
->         select MIGHT_HAVE_CACHE_L2X0
->         select PINCTRL
->         help
+Mark, I am not sure this particular patch is actually wanted. Realized
+that when reading up on the driver/base/* patches for PM changes this
+summer. Especially how device probe/suspend/shutdown etc. has been
+changed for runtime PM point of view.
 
-For SPEAr:
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Maybe you can comment?
+
+Kind regards
+Ulf Hansson
+
+On 4 October 2012 10:04, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> In probe pm_runtime_put_autosuspend has the same effect as doing
+> pm_runtime_put. This due to upper layer in driver core is preventing
+> the device from being runtime suspended by a pm_runtime_get*.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/spi/spi-pl022.c |    5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+> index a1db91a..51b7a95 100644
+> --- a/drivers/spi/spi-pl022.c
+> +++ b/drivers/spi/spi-pl022.c
+> @@ -2246,10 +2246,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+>                 pm_runtime_set_autosuspend_delay(dev,
+>                         platform_info->autosuspend_delay);
+>                 pm_runtime_use_autosuspend(dev);
+> -               pm_runtime_put_autosuspend(dev);
+> -       } else {
+> -               pm_runtime_put(dev);
+>         }
+> +       pm_runtime_put(dev);
+> +
+>         return 0;
+>
+>   err_spi_register:
+> --
+> 1.7.10
+>
