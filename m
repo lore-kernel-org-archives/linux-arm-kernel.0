@@ -1,39 +1,76 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 04 Oct 2012 01:41:49 -0700
-Subject: arm-soc maintainer entry
-Message-ID: <506D4BCD.3020402@codeaurora.org>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 04 Oct 2012 17:47:09 +0900
+Subject: [PATCH v1 01/14] media: s5p-hdmi: add HPD GPIO to platform data
+In-Reply-To: <8952601.531301349336373038.JavaMail.weblogic@epml07>
+References: <8952601.531301349336373038.JavaMail.weblogic@epml07>
+Message-ID: <001301cda20c$d7691db0$863b5910$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is the arm at kernel.org alias going to be added into the MAINTAINERS file?
-Should anybody be sending mails to this address?
+Hello Media guys,
 
-It seems I asked this over a year ago and the response was positive but
-nothing ever happened[1]. Maybe something like below? I only ask because
-get_maintainer.pl isn't picking up this email.
+This is dependent of exynos drm patch set to be merged to mainline so if
+there is no problem then please, give me ack so that I can merge this patch
+with exynos drm patch set.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ecd8796..0e1ec23 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -606,6 +606,14 @@ W: http://www.arm.linux.org.uk/
- S:     Maintained
- F:     arch/arm/
+Thanks,
+Inki Dae
 
-+ARM SUB-ARCHITECTURES
-+M:     arm at kernel.org
-+L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:     MAINTAINED
-+F:     arch/arm/mach-*/
-+F:     arch/arm/plat-*/
-+T:     git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-+
- ARM PRIMECELL AACI PL041 DRIVER
- M:     Russell King <linux@arm.linux.org.uk>
- S:     Maintained
-
-[1] https://lkml.org/lkml/2011/7/26/307
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> -----Original Message-----
+> From: RAHUL SHARMA [mailto:rahul.sharma at samsung.com]
+> Sent: Thursday, October 04, 2012 4:40 PM
+> To: Tomasz Stanislawski; Kyungmin Park; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Cc: In-Ki Dae; SUNIL JOSHI; r.sh.open at gmail.com
+> Subject: Re: [PATCH v1 01/14] media: s5p-hdmi: add HPD GPIO to platform
+> data
+> 
+> Hi Mr. Tomasz, Mr. Park, list,
+> 
+> First patch in the following set belongs to s5p-media, rest to exynos-drm.
+> Please review the media patch so that It can be merged for mainline.
+> 
+> regards,
+> Rahul Sharma
+> 
+> On Thu, Oct 4, 2012 at 9:12 PM, Rahul Sharma <rahul.sharma@samsung.com>
+> wrote:
+> > From: Tomasz Stanislawski <t.stanislaws@samsung.com>
+> >
+> > This patch extends s5p-hdmi platform data by a GPIO identifier for
+> > Hot-Plug-Detection pin.
+> >
+> > Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  include/media/s5p_hdmi.h |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/include/media/s5p_hdmi.h b/include/media/s5p_hdmi.h
+> > index 361a751..181642b 100644
+> > --- a/include/media/s5p_hdmi.h
+> > +++ b/include/media/s5p_hdmi.h
+> > @@ -20,6 +20,7 @@ struct i2c_board_info;
+> >   * @hdmiphy_info: template for HDMIPHY I2C device
+> >   * @mhl_bus: controller id for MHL control bus
+> >   * @mhl_info: template for MHL I2C device
+> > + * @hpd_gpio: GPIO for Hot-Plug-Detect pin
+> >   *
+> >   * NULL pointer for *_info fields indicates that
+> >   * the corresponding chip is not present
+> > @@ -29,6 +30,7 @@ struct s5p_hdmi_platform_data {
+> >         struct i2c_board_info *hdmiphy_info;
+> >         int mhl_bus;
+> >         struct i2c_board_info *mhl_info;
+> > +       int hpd_gpio;
+> >  };
+> >
+> >  #endif /* S5P_HDMI_H */
+> > --
+> > 1.7.0.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
