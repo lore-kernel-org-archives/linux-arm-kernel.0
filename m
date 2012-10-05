@@ -1,80 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 5 Oct 2012 14:42:24 -0400 (EDT)
-Subject: [PATCH 16/16] ARM: pass -marm to gcc by default for both C and
- assembler
-In-Reply-To: <1349448930-23976-17-git-send-email-arnd@arndb.de>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <1349448930-23976-17-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1210051438460.16518@xanadu.home>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 5 Oct 2012 20:56:43 +0200
+Subject: [PATCH 04/10] of/i2c: Add support for I2C_CLIENT_WAKE when
+ booting with Device Tree
+In-Reply-To: <1349451107-8009-5-git-send-email-lee.jones@linaro.org>
+References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
+ <1349451107-8009-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121005185643.GC12462@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Oct 2012, Arnd Bergmann wrote:
-
-> The Linaro cross toolchain and probably others nowadays default to
-> building in THUMB2 mode. When building a kernel for a CPU that does
-> not support THUMB2, the compiler complains about incorrect flags.
-> We can work around this by setting -marm for all non-T2 builds.
+On 16:31 Fri 05 Oct     , Lee Jones wrote:
+> It's important for wakeup sources such as keyboards, power buttons
+> and the like to identify themselves as wakeup devices. Until now
+> this has not been possible when platforms are booting via Device
+> Tree.
 > 
-> Without this patch, building assabet_defconfig results in:
-> 
-> usr/initramfs_data.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
-> arch/arm/nwfpe/entry.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
-> firmware/cis/PCMLM28.cis.gen.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
-> (and many more)
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Dave Martin <dave.martin@linaro.org>
-
-I don't think you need "call cc-option" with -marm.  Those gcc versions 
-that might not accept -marm have not been able to compile the kernel for 
-a long long time now.  Otherwise...
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/Makefile |   13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
+>  drivers/of/of_i2c.c |    3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index a051dfb..4391427 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -21,8 +21,6 @@ endif
->  OBJCOPYFLAGS	:=-O binary -R .comment -S
->  GZFLAGS		:=-9
->  #KBUILD_CFLAGS	+=-pipe
-> -# Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
-> -KBUILD_CFLAGS	+=$(call cc-option,-marm,)
+> diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
+> index 1e173f3..2f20019 100644
+> --- a/drivers/of/of_i2c.c
+> +++ b/drivers/of/of_i2c.c
+> @@ -61,6 +61,9 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
+>  		info.of_node = of_node_get(node);
+>  		info.archdata = &dev_ad;
 >  
->  # Never generate .eh_frame
->  KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
-> @@ -105,17 +103,20 @@ endif
->  ifeq ($(CONFIG_THUMB2_KERNEL),y)
->  AFLAGS_AUTOIT	:=$(call as-option,-Wa$(comma)-mimplicit-it=always,-Wa$(comma)-mauto-it)
->  AFLAGS_NOWARN	:=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
-> -CFLAGS_THUMB2	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
-> -AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
-> +CFLAGS_ISA	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
-> +AFLAGS_ISA	:=$(CFLAGS_ISA) -Wa$(comma)-mthumb
->  # Work around buggy relocation from gas if requested:
->  ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
->  CFLAGS_MODULE	+=-fno-optimize-sibling-calls
->  endif
-> +else
-> +CFLAGS_ISA	:=$(call cc-option,-marm,)
-> +AFLAGS_ISA	:=$(CFLAGS_ISA)
->  endif
->  
->  # Need -Uarm for gcc < 3.x
-> -KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
-> -KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
-> +KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
-> +KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
->  
->  CHECKFLAGS	+= -D__arm__
->  
-> -- 
-> 1.7.10
-> 
+> +		if (of_get_property(node, "i2c-client-wake", NULL))
+> +			info.flags |= I2C_CLIENT_WAKE;
+use of_property_read_bool
+
+Best Regards,
+J.
