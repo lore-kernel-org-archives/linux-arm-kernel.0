@@ -1,40 +1,97 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Oct 2012 08:12:16 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
-Message-ID: <20121005071216.GD4625@n2100.arm.linux.org.uk>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Fri, 5 Oct 2012 16:25:57 +0900
+Subject: [PATCH v1 01/14] media: s5p-hdmi: add HPD GPIO to platform data
+In-Reply-To: <001301cda20c$d7691db0$863b5910$%dae@samsung.com>
+References: <8952601.531301349336373038.JavaMail.weblogic@epml07>
+ <001301cda20c$d7691db0$863b5910$%dae@samsung.com>
+Message-ID: <CAH9JG2V-7H3U35_QNR=MPbNF1Xwqt+3KFKpBcPuexFP84xP7pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
-> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
-> > This struct is the IP header, so a struct ptr is just set to the
-> > beginning of the received data. Since ethernet headers are 14 bytes,
-> > often the IP header is not aligned unless the NIC can place the frame at
-> > a 2 byte offset (which is something I need to investigate). So this
-> > function cannot make any assumptions about the alignment. Does the ABI
-> > define structs have some minimum alignment? Does the struct need to be
-> > declared as packed or something?
-> 
-> The ABI defines the alignment of structs as the maximum alignment of its
-> members.  Since this struct contains 32-bit members, the alignment for the
-> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
-> might be unaligned (in addition to removing any holes within).
+Hi Mauro,
 
-This has come up before in the past.
+If you don't mind can we merge this patch at drm tree? the remainig
+patches will be merged by Tomasz S.
 
-The Linux network folk will _not_ allow - in any shape or form - for
-this struct to be marked packed (it's the struct which needs to be
-marked packed) because by doing so, it causes GCC to issue byte loads/
-stores on architectures where there isn't a problem, and that decreases
-the performance of the Linux IP stack unnecessarily.
+To Marek & Tomasz,
 
-I don't think there's going to be a satisfactory answer to this issue.
-I think we're going to be stuck between GCC people saying that the
-kernel is buggy, and the network people refusing to fix this as they
-have done in the past.
+Can you give your acks?
+
+Thank you,
+Kyungmin Park
+
+On 10/4/12, Inki Dae <inki.dae@samsung.com> wrote:
+> Hello Media guys,
+>
+> This is dependent of exynos drm patch set to be merged to mainline so if
+> there is no problem then please, give me ack so that I can merge this patch
+> with exynos drm patch set.
+>
+> Thanks,
+> Inki Dae
+>
+>> -----Original Message-----
+>> From: RAHUL SHARMA [mailto:rahul.sharma at samsung.com]
+>> Sent: Thursday, October 04, 2012 4:40 PM
+>> To: Tomasz Stanislawski; Kyungmin Park; linux-arm-
+>> kernel at lists.infradead.org; linux-media at vger.kernel.org
+>> Cc: In-Ki Dae; SUNIL JOSHI; r.sh.open at gmail.com
+>> Subject: Re: [PATCH v1 01/14] media: s5p-hdmi: add HPD GPIO to platform
+>> data
+>>
+>> Hi Mr. Tomasz, Mr. Park, list,
+>>
+>> First patch in the following set belongs to s5p-media, rest to
+>> exynos-drm.
+>> Please review the media patch so that It can be merged for mainline.
+>>
+>> regards,
+>> Rahul Sharma
+>>
+>> On Thu, Oct 4, 2012 at 9:12 PM, Rahul Sharma <rahul.sharma@samsung.com>
+>> wrote:
+>> > From: Tomasz Stanislawski <t.stanislaws@samsung.com>
+>> >
+>> > This patch extends s5p-hdmi platform data by a GPIO identifier for
+>> > Hot-Plug-Detection pin.
+>> >
+>> > Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+>> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> > ---
+>> >  include/media/s5p_hdmi.h |    2 ++
+>> >  1 files changed, 2 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/include/media/s5p_hdmi.h b/include/media/s5p_hdmi.h
+>> > index 361a751..181642b 100644
+>> > --- a/include/media/s5p_hdmi.h
+>> > +++ b/include/media/s5p_hdmi.h
+>> > @@ -20,6 +20,7 @@ struct i2c_board_info;
+>> >   * @hdmiphy_info: template for HDMIPHY I2C device
+>> >   * @mhl_bus: controller id for MHL control bus
+>> >   * @mhl_info: template for MHL I2C device
+>> > + * @hpd_gpio: GPIO for Hot-Plug-Detect pin
+>> >   *
+>> >   * NULL pointer for *_info fields indicates that
+>> >   * the corresponding chip is not present
+>> > @@ -29,6 +30,7 @@ struct s5p_hdmi_platform_data {
+>> >         struct i2c_board_info *hdmiphy_info;
+>> >         int mhl_bus;
+>> >         struct i2c_board_info *mhl_info;
+>> > +       int hpd_gpio;
+>> >  };
+>> >
+>> >  #endif /* S5P_HDMI_H */
+>> > --
+>> > 1.7.0.4
+>> >
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
