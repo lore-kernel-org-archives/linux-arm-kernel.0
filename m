@@ -1,48 +1,115 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 5 Oct 2012 04:43:56 +0000
-Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <20121003150058.GB11180@beef>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
- <20121003150058.GB11180@beef>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA9C6B7@DBDE01.ent.ti.com>
+From: raj.khem@gmail.com (Khem Raj)
+Date: Thu, 4 Oct 2012 22:37:03 -0700
+Subject: alignment faults in 3.6
+In-Reply-To: <506E4E23.4020803@gmail.com>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <506E4E23.4020803@gmail.com>
+Message-ID: <69BB808B-1E76-479E-A9EF-9F9C8DDB06BE@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt,
 
-On Wed, Oct 03, 2012 at 20:30:58, Porter, Matt wrote:
-> On Fri, Sep 28, 2012 at 03:37:45PM -0400, Matt Porter wrote:
-> > Changes since v1:
-> > 	- Replaced uio_pruss private SRAM API use with genalloc
-> > 	- Added DA850 platform device and clock support
-> > 	- Added DA850 L3 RAM gen_pool support
-> > 	- Split out DT binding
-> > 
-> > This series enables uio_pruss on both DA850 and AM33xx. The driver
-> > previously was not enabled by any platform and the private SRAM API
-> > was accessing an invalid SRAM bank for use on DA850. For AM33xx,
-> > DT, pinctrl, and runtime PM support are added since AM33xx only
-> > boots via DT.
-> 
-> I'm dropping AM33xx/OMAP support from v3 for this series 
+On Oct 4, 2012, at 8:04 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-Just for my clarification, I believe you will be taking up AM33xx/OMAP 
-SRAM support later once you have completed supporting DaVinci. Right?
+> On 10/04/2012 09:25 PM, Mans Rullgard wrote:
+>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
+>>> On 10/04/2012 08:26 PM, Mans Rullgard wrote:
+>>>> On 5 October 2012 01:58, Michael Hope <michael.hope@linaro.org> wrote:
+>>>>> On 5 October 2012 12:10, Rob Herring <robherring2@gmail.com> wrote:
+>>>>>> I've been scratching my head with a "scheduling while atomic" bug I
+>>>>>> started seeing on 3.6. I can easily reproduce this problem when doing a
+>>>>>> wget on my system. It ultimately seems to be a combination of factors.
+>>>>>> The "scheduling while atomic" bug is triggered in do_alignment which
+>>>>>> gets triggered by this code in net/ipv4/af_inet.c, line 1356:
+>>>>>> 
+>>>>>> id = ntohl(*(__be32 *)&iph->id);
+>>>>>> flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id ^ IP_DF));
+>>>>>> id >>= 16;
+>>>>>> 
+>>>>>> This code compiles into this using "gcc version 4.6.3 (Ubuntu/Linaro
+>>>>>> 4.6.3-1ubuntu5)":
+>>>>>> 
+>>>>>> c02ac020:       e8920840        ldm     r2, {r6, fp}
+>>>>>> c02ac024:       e6bfbf3b        rev     fp, fp
+>>>>>> c02ac028:       e6bf6f36        rev     r6, r6
+>>>>>> c02ac02c:       e22bc901        eor     ip, fp, #16384  ; 0x4000
+>>>>>> c02ac030:       e0266008        eor     r6, r6, r8
+>>>>>> c02ac034:       e18c6006        orr     r6, ip, r6
+>>>>>> 
+>>>>>> which generates alignment faults on the ldm. These are silent until this
+>>>>>> commit is applied:
+>>>>> 
+>>>>> Hi Rob.  I assume that iph is something like:
+>>>>> 
+>>>>> struct foo {
+>>>>>    u32 x;
+>>>>>    char id[8];
+>>>>> };
+>>>>> 
+>>>>> struct foo *iph;
+>>>>> 
+>>>>> GCC merged the two adjacent loads of x and id into one ldm.  This is
+>>>>> an ARM specific optimisation done in load_multiple_sequence() and
+>>>>> enabled with -fpeephole2.
+>>>>> 
+>>>>> I think the assembly is correct - GCC knows that iph is aligned and
+>>>>> knows the offsets of both x and id.  Happy to be corrected if I'm
+>>>>> wrong, but I think the assembly is valid given the C code.
+>>>> 
+>>>> The struct looks like this:
+>>>> 
+>>>> struct iphdr {
+>>>> #if defined(__LITTLE_ENDIAN_BITFIELD)
+>>>>      __u8    ihl:4,
+>>>>              version:4;
+>>>> #elif defined (__BIG_ENDIAN_BITFIELD)
+>>>>      __u8    version:4,
+>>>>              ihl:4;
+>>>> #else
+>>>> #error        "Please fix <asm/byteorder.h>"
+>>>> #endif
+>>>>      __u8    tos;
+>>>>      __be16  tot_len;
+>>>>      __be16  id;
+>>>>      __be16  frag_off;
+>>>>      __u8    ttl;
+>>>>      __u8    protocol;
+>>>>      __sum16 check;
+>>>>      __be32  saddr;
+>>>>      __be32  daddr;
+>>>>      /*The options start here. */
+>>>> };
+>>>> 
+>>>> In a normal build (there's some magic for special checkers) __be32 is a plain
+>>>> __u32 so the struct should be at least 4-byte aligned.  If somehow it is not,
+>>>> that is the real bug.
+>>> 
+>>> This struct is the IP header, so a struct ptr is just set to the
+>>> beginning of the received data. Since ethernet headers are 14 bytes,
+>>> often the IP header is not aligned unless the NIC can place the frame at
+>>> a 2 byte offset (which is something I need to investigate). So this
+>>> function cannot make any assumptions about the alignment. Does the ABI
+>>> define structs have some minimum alignment? Does the struct need to be
+>>> declared as packed or something?
+>> 
+>> The ABI defines the alignment of structs as the maximum alignment of its
+>> members.  Since this struct contains 32-bit members, the alignment for the
+>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
+>> might be unaligned (in addition to removing any holes within).
+> 
+> Unfortunately, declaring the struct or __be32* cast as packed have no
+> effect. I still get an ldm emitted.
 
-> since the
-> focus has turned to fixing Davinci SRAM to provide genalloc support
-> and the associated use of that in the driver.
+what is value of r2 ? and can you pastebin the .i file somewhere ?
+
 > 
-> I'll have a separate series with AM33xx support since dealing cleanly
-> with external resets on OMAP is a bigger issue.
+> Rob
 > 
-> -Matt
 > _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
-
-
-Regards, 
-Gururaja
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
