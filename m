@@ -1,43 +1,90 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 5 Oct 2012 09:43:32 +0200
-Subject: [PATCH] spi/pl022: Activate resourses before deactivate them in
- suspend
-Message-ID: <1349423012-18048-1-git-send-email-ulf.hansson@stericsson.com>
+From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
+Date: Fri, 5 Oct 2012 15:55:33 +0800
+Subject: [RFC] arm/mm: add a protection when flushing anonymous pages
+In-Reply-To: <CANj_sbADwtPR6cgk05QkmvrSUOOQRYXB9vPB6KATKEmwcN8UrA@mail.gmail.com>
+References: <CAGCDX1mY4wbMq4qDJ9vCazShxdWQXVYyWkpLd5u8_xqbEC2BWQ@mail.gmail.com>
+ <CAGCDX1mkPVre6h=9kNbRqCp_wtbOneuRLMXM+mkZWFXPwWkBfg@mail.gmail.com>
+ <CANj_sbADwtPR6cgk05QkmvrSUOOQRYXB9vPB6KATKEmwcN8UrA@mail.gmail.com>
+Message-ID: <CANj_sbDz02NJedA=Hc1Xe5rFe1p3XUtg_BAeys25xVUqZ8utJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Tue, Oct 2, 2012 at 3:07 PM, Andrew Yan-Pai Chen
+<yanpai.chen@gmail.com> wrote:
+> On Mon, Oct 1, 2012 at 11:50 AM, Jason Lin <kernel.jason@gmail.com> wrote:
+>>
+>> Dear all:
+>> By the way, I used the CPU with VIPT cache.
+>> Thanks.
+>>
+>> 2012/10/1 Jason Lin <kernel.jason@gmail.com>:
+>> > Dear all:
+>> > When I do LTP direct I/O tests, it produced a cache coherence issue
+>> > caused by flush_pfn_alias() (arch/arm/mm/flush.c).
+>> > I think we should to disable preemption or lock before setting page
+>> > table and enable preemption or unlock after flushing pages
+>> >
+>> > Any comments are appreciated.
+>> > Thanks.
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> [RFC PATCH] make flush_pfn_alias() nonpreemptible
+>
+> Since flush_pfn_alias() is preemptible, it is possible to be
+> preempted just after set_top_pte() is done. If the process
+> which preempts the previous happened to invoke flush_pfn_alias()
+> with the same colour vaddr as that of the previous, the same
+> top pte will be overwritten. When switching back to the previous,
+> it attempts to flush cache lines with incorrect mapping. Then
+> no lines (or wrong lines) will be flushed because of the nature
+> of vipt caches.
+>
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 40ca11e..bd07918 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -27,6 +27,8 @@ static void flush_pfn_alias(unsigned long pfn,
+> unsigned long vaddr)
+>         unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) <<
+> PAGE_SHIFT);
+>         const int zero = 0;
+>
+> +       preempt_disable();
+> +
+>         set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
+>
+>         asm(    "mcrr   p15, 0, %1, %0, c14\n"
+> @@ -34,6 +36,8 @@ static void flush_pfn_alias(unsigned long pfn,
+> unsigned long vaddr)
+>             :
+>             : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+>             : "cc");
+> +
+> +       preempt_enable();
+>  }
+>
+> --
+> Regards,
+> Andrew
 
-To be able to deactivate resourses in suspend, the resourses must
-first be surely active. This is done with a pm_runtime_get_sync.
-Once the resourses are restored to active state again in resume,
-the runtime pm usage count can be decreased with a pm_runtime_put.
+Hi Russell,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/spi/spi-pl022.c |    3 +++
- 1 file changed, 3 insertions(+)
+We met the problem when running the direct I/O test (diotest03) in LTP
+testsuite on PB1176.
+And we got the error messages:
+bufcmp: offset 224: Expected: 0x1b, got 0x1a
+diotest03    1  TFAIL  :  comparsion failed; child=11 offset=1069056
+diotest03    2  TFAIL  :  Read Direct-child 11 failed
+...
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 9194641..c3590e0 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2350,6 +2350,8 @@ static int pl022_suspend(struct device *dev)
- 		dev_warn(dev, "cannot suspend master\n");
- 		return ret;
- 	}
-+
-+	pm_runtime_get_sync(dev);
- 	pl022_suspend_resources(pl022);
- 
- 	dev_dbg(dev, "suspended\n");
-@@ -2362,6 +2364,7 @@ static int pl022_resume(struct device *dev)
- 	int ret;
- 
- 	pl022_resume_resources(pl022);
-+	pm_runtime_put(dev);
- 
- 	/* Start the queue running */
- 	ret = spi_master_resume(pl022->master);
--- 
-1.7.10
+The error was gone after applying this patch.
+Any idea would be appreciated.
+
+
+--
+Regards,
+Andrew
