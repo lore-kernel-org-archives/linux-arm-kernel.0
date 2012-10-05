@@ -1,32 +1,59 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 5 Oct 2012 21:23:35 +0530
-Subject: [PATCH 03/15] mtd: nand: omap: free region as per resource size
-In-Reply-To: <cover.1349450454.git.afzal@ti.com>
-References: <cover.1349450454.git.afzal@ti.com>
-Message-ID: <011a0d90343de9204cfd977381b36cace032482b.1349450454.git.afzal@ti.com>
+From: bblum@andrew.cmu.edu (Ben Blum)
+Date: Fri, 5 Oct 2012 11:50:06 -0400
+Subject: [PATCH 07/16] cgroup: fix warning when building without any subsys
+In-Reply-To: <1349448930-23976-8-git-send-email-arnd@arndb.de>
+References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
+ <1349448930-23976-8-git-send-email-arnd@arndb.de>
+Message-ID: <20121005155006.GB5124@ghc17.ghc.andrew.cmu.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-memory as is now obtained via resource, upon freeing use
-resource size. This also helps get rid of one macro.
+On Fri, Oct 05, 2012 at 04:55:21PM +0200, Arnd Bergmann wrote:
+> In a configuration where the base cgroup support is enabled but
+> every single cgroup subsys is turned off, CGROUP_BUILTIN_SUBSYS_COUNT
+> is zero, which causes the sanity check code in cgroup_load_subsys
+> to trigger:
+> 
+>        BUG_ON(ss->subsys_id >= CGROUP_BUILTIN_SUBSYS_COUNT);
+>        BUG_ON(subsys[ss->subsys_id] != ss);
+> 
+> Gcc first confirms that subsys_id cannot be 0 or larger and consequently
+> warns in the second line.
+> 
+> kernel/cgroup.c: In function 'cgroup_load_subsys':
+> kernel/cgroup.c:4326:38: warning: array subscript is below array bounds [-Warray-bounds]
+> 
+> Since the subsys_id can never be less than zero, we can just change the
+> type to an unsigned int, which makes the warning go away.
+> 
+> Found by building ARM cns3420vb_defconfig.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Li Zefan <lizefan@huawei.com>
+> Cc: Ben Blum <bblum@andrew.cmu.edu>
+> ---
+>  include/linux/cgroup.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/cgroup.h b/include/linux/cgroup.h
+> index c90eaa8..26b99df 100644
+> --- a/include/linux/cgroup.h
+> +++ b/include/linux/cgroup.h
+> @@ -475,7 +475,7 @@ struct cgroup_subsys {
+>  	void (*post_clone)(struct cgroup *cgrp);
+>  	void (*bind)(struct cgroup *root);
+>  
+> -	int subsys_id;
+> +	unsigned int subsys_id;
+>  	int active;
+>  	int disabled;
+>  	int early_init;
+> -- 
+> 1.7.10
+> 
+> 
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- drivers/mtd/nand/omap2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Oops. Thank you!
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 5b31386..4c33135 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -1513,7 +1513,7 @@ static int omap_nand_remove(struct platform_device *pdev)
- 	/* Release NAND device, its internal structures and partitions */
- 	nand_release(&info->mtd);
- 	iounmap(info->nand.IO_ADDR_R);
--	release_mem_region(info->phys_base, NAND_IO_SIZE);
-+	release_mem_region(info->phys_base, info->mem_size);
- 	kfree(info);
- 	return 0;
- }
--- 
-1.7.12
+Acked-by: Ben Blum <bblum@andrew.cmu.edu>
