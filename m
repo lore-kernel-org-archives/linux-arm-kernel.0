@@ -1,24 +1,87 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  5 Oct 2012 18:12:58 +0200
-Subject: [PATCH v2] Add of helper for linux,stdout-path
-Message-ID: <1349453581-1685-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri,  5 Oct 2012 18:13:00 +0200
+Subject: [PATCH 2/3] serial: i.MX: Make console support non optional
+In-Reply-To: <1349453581-1685-1-git-send-email-s.hauer@pengutronix.de>
+References: <1349453581-1685-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1349453581-1685-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a helper function to match the linux,stdout-path property
-against a struct device and adds support for this property to the i.MX
-serial driver.
+Traditionally console support is optional for serial drivers. This
+makes it non optional for the i.MX driver since it's not worth
+asking questions for a feature virtually every user of this driver
+wants to have.
 
-Sascha
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/tty/serial/Kconfig |   16 +---------------
+ drivers/tty/serial/imx.c   |    8 +-------
+ 2 files changed, 2 insertions(+), 22 deletions(-)
 
-----------------------------------------------------------------
-Sascha Hauer (3):
-      serial_core: Add helper for matching against linux,stdout-path
-      serial: i.MX: Make console support non optional
-      serial: i.MX: evaluate linux,stdout-path property
-
- drivers/tty/serial/Kconfig       |   16 +---------------
- drivers/tty/serial/imx.c         |   11 ++++-------
- drivers/tty/serial/serial_core.c |   30 ++++++++++++++++++++++++++++++
- include/linux/serial_core.h      |    3 +++
- 4 files changed, 38 insertions(+), 22 deletions(-)
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 4720b4b..920dd0d 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -515,26 +515,12 @@ config SERIAL_IMX
+ 	bool "IMX serial port support"
+ 	depends on ARCH_MXC
+ 	select SERIAL_CORE
++	select SERIAL_CORE_CONSOLE
+ 	select RATIONAL
+ 	help
+ 	  If you have a machine based on a Motorola IMX CPU you
+ 	  can enable its onboard serial port by enabling this option.
+ 
+-config SERIAL_IMX_CONSOLE
+-	bool "Console on IMX serial port"
+-	depends on SERIAL_IMX
+-	select SERIAL_CORE_CONSOLE
+-	help
+-	  If you have enabled the serial port on the Motorola IMX
+-	  CPU you can make it the console by answering Y to this option.
+-
+-	  Even if you say Y here, the currently visible virtual console
+-	  (/dev/tty0) will still be used as the system console by default, but
+-	  you can alter that using a kernel command line option such as
+-	  "console=ttySA0". (Try "man bootparam" or see the documentation of
+-	  your boot loader (lilo or loadlin) about how to pass options to the
+-	  kernel at boot time.)
+-
+ config SERIAL_UARTLITE
+ 	tristate "Xilinx uartlite serial port support"
+ 	depends on PPC32 || MICROBLAZE || MFD_TIMBERDALE
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index e309e8b..3a9337e 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1192,7 +1192,6 @@ static struct uart_ops imx_pops = {
+ 
+ static struct imx_port *imx_ports[UART_NR];
+ 
+-#ifdef CONFIG_SERIAL_IMX_CONSOLE
+ static void imx_console_putchar(struct uart_port *port, int ch)
+ {
+ 	struct imx_port *sport = (struct imx_port *)port;
+@@ -1348,11 +1347,6 @@ static struct console imx_console = {
+ 	.data		= &imx_reg,
+ };
+ 
+-#define IMX_CONSOLE	&imx_console
+-#else
+-#define IMX_CONSOLE	NULL
+-#endif
+-
+ static struct uart_driver imx_reg = {
+ 	.owner          = THIS_MODULE,
+ 	.driver_name    = DRIVER_NAME,
+@@ -1360,7 +1354,7 @@ static struct uart_driver imx_reg = {
+ 	.major          = SERIAL_IMX_MAJOR,
+ 	.minor          = MINOR_START,
+ 	.nr             = ARRAY_SIZE(imx_ports),
+-	.cons           = IMX_CONSOLE,
++	.cons           = &imx_console,
+ };
+ 
+ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+-- 
+1.7.10.4
