@@ -1,120 +1,23 @@
-From: archit@ti.com (Archit Taneja)
-Date: Fri, 5 Oct 2012 15:16:49 +0530
-Subject: OMAP4 clock/pm fixes [was: [PATCH v4 2/3] ARM: omap: hwmod: get
- rid of all omap_clk_get_by_name usage
-In-Reply-To: <504075A0.7010708@ti.com>
-References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
- <1346230576-20004-3-git-send-email-rnayak@ti.com>
- <CAJOA=zM2sFsrdohooKp1+zsV_AK6dKnoN37+Gs2oskBUK4J00w@mail.gmail.com>
- <503F26A4.3050902@ti.com> <503F5517.4010100@ti.com>
- <1346344933.2327.43.camel@deskari> <5040586D.2020406@ti.com>
- <1346397309.18766.5.camel@lappyti> <504073CF.6010804@ti.com>
- <1346401643.32389.4.camel@deskari> <504075A0.7010708@ti.com>
-Message-ID: <506EAC89.2070307@ti.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 05 Oct 2012 15:40:16 +0530
+Subject: [PATCH 0/2] Enable ehci and ohci devices for exynos5250
+Message-ID: <1349431818-15639-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Based on for-next branch of linux-samsung.
 
-On Friday 31 August 2012 01:58 PM, Archit Taneja wrote:
-> On Friday 31 August 2012 01:57 PM, Tomi Valkeinen wrote:
->> On Fri, 2012-08-31 at 13:50 +0530, Archit Taneja wrote:
->>> On Friday 31 August 2012 12:45 PM, Tomi Valkeinen wrote:
->>>> On Fri, 2012-08-31 at 11:53 +0530, Archit Taneja wrote:
->>>>
->>>>> The only little problem was that during bootup, when hwmods are setup,
->>>>> only the 'parent' hwmod was able to get reset properly, all the other
->>>>> 'child' hwmods don't have modulemode bits tied to them, and hence
->>>>> weren't able to reset. So we got some error prints.
->>>>>
->>>>> Once DSS driver kicks in, the driver ensures the parent is enabled for
->>>>> any child to be enabled, so we don't face the issue again.
->>>>>
->>>>> So, if DSS driver is not built in, and if the bootloader left DSS in a
->>>>> bad state, the DSS clocks might remain messed up all the time since
->>>>> hwmod fwk wasn't able to reset them.
->>>>>
->>>>> I think this is why we didn't proceed with remove "dss_fck" as a slave
->>>>> clock. If this issue is minor, we could go ahead and remove it.
->>>>
->>>> I wonder if we could handle this with a custom reset function. We
->>>> already have a reset func for dss core. If I remember right, the main
->>>> point for that is the fact that omap4 doesn't have a softreset for dss
->>>> core, so we manually write the default values to registers.
->>>>
->>>> For omap2/3 this would be simple: skip the resets for all other dss
->>>> submodules, and dss core's reset would enable all the clocks and set
->>>> the
->>>> softreset bit. This would reset all the submodules also.
->>>>
->>>> Omap4 is more tricky. I guess we'd need to enable all the clocks, clear
->>>> manually dss core's registers, and then set softreset bits in all the
->>>> submodules. So in this case dss core would need to have information
->>>> about the other submodules.
->>>
->>> The is a good idea. I don't clearly understand your approach though. Are
->>> you saying we have a custom reset function for only dss core? And reset
->>> the submodules in it manually?
->>
->> Yes.
->>
->>> An alternative approach would be to implement custom reset functions for
->>> each submodule(or each hwmod), and in the beginning of every reset
->>> function, add a hack to enable MODULEMODE bits(since we don't want hwmod
->>> fwk to touch MODULEMODE for the DSS submodules), and then set the soft
->>> reset bits.
->>
->> I thought about that also. We'd need reset functions for all of them,
->> and for omap2/3 we'd just reset the submodules again as they have
->> already been reset with the dss core reset.
->>
->> The dss submodule resets are a bit linked. For omap2/3 the connection is
->> obvious as dss core reset resets also the submodules, and for omap4 we
->> have this requirement for the modulemode. That's why I though it'd be
->> perhaps cleaner to handle the reset of the DSS block as a whole, in one
->> place.
->>
->>> Your approach would ensure that we get a clean reset of DSS, but it
->>> would still give the annoying prints when each of the submodule tries to
->>> reset itself.
->>
->> The other submodules would not be reset by the hwmod framework at all,
->> so there wouldn't be prints. I think there's a flag for that.
+Vivek Gautam (2):
+  ARM: Exynos5250: Enabling ehci-s5p driver
+  ARM: Exynos5250: Enabling ohci-exynos driver
 
-Sorry for bringing up an old thread. I was working on cleaning up the 
-OMAP4 DSS related clock/pm issues, hence brought it up.
+ .../devicetree/bindings/usb/exynos-usb.txt         |   40 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 ++
+ arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++++
+ arch/arm/mach-exynos/include/mach/map.h            |    2 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    4 ++
+ 5 files changed, 62 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
 
-We were discussing here on how to setting up and reset the OMAP4 DSS 
-submodules correctly without tying the MODULEMODE bits to the 
-corresponding hwmods.
-
-Tomi, your suggestion was to do soft resets for the submodules manually 
-in the dss_core hwmod's custom reset function itself, and use the flag 
-HWMOD_INIT_NO_RESET to prevent _reset() being called.
-
-However, this won't still resolve the issue of the errors we see a 
-bootup. The function _setup_reset() looks like this:
-
-static int _setup_reset(struct omap_hwmod *oh)
-{
-	...
-	r = _enable(oh);
-	if (r) {
-                  pr_warning("omap_hwmod: %s: cannot be enabled for
-			reset (%d)\n", oh->name, oh->_state);
-                         return -EINVAL;
-                 }
-	...
-
-	if (!(oh->flags & HWMOD_INIT_NO_RESET))
-		r = _reset(oh);
-
-	...
-}
-
-So, even if we have ask hwmod not to reset the DSS submodules, it will 
-still try to enable them, and we can't enable them since MODULEMODE 
-isn't tied to them. I don't see how we can get a clean reset done for 
-the DSS submodules without making some changes in hwmod framework.
-
-Archit
+-- 
+1.7.6.5
