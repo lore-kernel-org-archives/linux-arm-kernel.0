@@ -1,38 +1,45 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 05 Oct 2012 10:48:08 -0400
-Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
-In-Reply-To: <201210022027.45461.arnd@arndb.de> (Arnd Bergmann's message of
- "Tue, 2 Oct 2012 20:27:45 +0000")
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <1347368390-31252-7-git-send-email-arnd@arndb.de>
- <87fw5wofwm.fsf_-_@octavius.laptop.org>
- <201210022027.45461.arnd@arndb.de>
-Message-ID: <87d30xgel3.fsf@octavius.laptop.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  5 Oct 2012 16:55:24 +0200
+Subject: [PATCH 10/16] clk: don't mark clkdev_add_table as init
+In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
+References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+s3c2440_clk_add is a subsys_interface method and calls clkdev_add_table,
+which means we might be calling it after the __init section is
+discarded.
 
-On Tue, Oct 02 2012, Arnd Bergmann wrote:
-> On Tuesday 02 October 2012, Chris Ball wrote:
->> Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
->> renamed arch/arm/mach-mmp/include/mach/sram.h to
->> include/linux/platform_data/dma-mmp_tdma.h, but didn't update
->> mmp-pcm.c which uses the header.  Fix the build error.
->> 
->> Signed-off-by: Chris Ball <cjb@laptop.org>
->> ---
->>  sound/soc/pxa/mmp-pcm.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> Sorry I didn't catch this earlier. The file was only recently added
-> and somehow didn't appear in my build tests.
+Without this patch, building mini2440_defconfig results in:
 
-Thanks.  Do you want to send this to mainline, or should Mark do it?
+WARNING: vmlinux.o(.text+0x9848): Section mismatch in reference from the function s3c2440_clk_add() to the function .init.text:clkdev_add_table()
+The function s3c2440_clk_add() references
+the function __init clkdev_add_table().
+This is often because s3c2440_clk_add lacks a __init
+annotation or the annotation of clkdev_add_table is wrong.
 
-- Chris.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ drivers/clk/clkdev.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..6956857 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -179,7 +179,7 @@ void clkdev_add(struct clk_lookup *cl)
+ }
+ EXPORT_SYMBOL(clkdev_add);
+ 
+-void __init clkdev_add_table(struct clk_lookup *cl, size_t num)
++void clkdev_add_table(struct clk_lookup *cl, size_t num)
+ {
+ 	mutex_lock(&clocks_mutex);
+ 	while (num--) {
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.10
