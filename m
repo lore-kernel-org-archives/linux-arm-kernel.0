@@ -1,40 +1,32 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 5 Oct 2012 21:23:29 +0530
-Subject: [PATCH 02/15] mtd: onenand: omap: cleanup gpmc dependency
+Date: Fri, 5 Oct 2012 21:23:35 +0530
+Subject: [PATCH 03/15] mtd: nand: omap: free region as per resource size
 In-Reply-To: <cover.1349450454.git.afzal@ti.com>
 References: <cover.1349450454.git.afzal@ti.com>
-Message-ID: <77643c064b9d0d639f75f793130bb40768b015e1.1349450454.git.afzal@ti.com>
+Message-ID: <011a0d90343de9204cfd977381b36cace032482b.1349450454.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-requesting, freeing gpmc cs is now handled fully
-by gpmc, remove left out gpmc dependency as well
-as unnecessary include of gpmc.h
+memory as is now obtained via resource, upon freeing use
+resource size. This also helps get rid of one macro.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- drivers/mtd/onenand/omap2.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/mtd/nand/omap2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
-index 1961be9..d7ef2c9 100644
---- a/drivers/mtd/onenand/omap2.c
-+++ b/drivers/mtd/onenand/omap2.c
-@@ -38,7 +38,6 @@
- #include <linux/regulator/consumer.h>
- 
- #include <asm/mach/flash.h>
--#include <plat/gpmc.h>
- #include <linux/platform_data/mtd-onenand-omap2.h>
- #include <asm/gpio.h>
- 
-@@ -803,7 +802,6 @@ static int __devexit omap2_onenand_remove(struct platform_device *pdev)
- 	}
- 	iounmap(c->onenand.base);
- 	release_mem_region(c->phys_base, c->mem_size);
--	gpmc_cs_free(c->gpmc_cs);
- 	kfree(c);
- 
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 5b31386..4c33135 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -1513,7 +1513,7 @@ static int omap_nand_remove(struct platform_device *pdev)
+ 	/* Release NAND device, its internal structures and partitions */
+ 	nand_release(&info->mtd);
+ 	iounmap(info->nand.IO_ADDR_R);
+-	release_mem_region(info->phys_base, NAND_IO_SIZE);
++	release_mem_region(info->phys_base, info->mem_size);
+ 	kfree(info);
  	return 0;
+ }
 -- 
 1.7.12
