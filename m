@@ -1,8 +1,8 @@
-From: archit@ti.com (Archit Taneja)
-Date: Fri, 5 Oct 2012 19:16:28 +0530
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 5 Oct 2012 15:51:50 +0200
 Subject: OMAP4 clock/pm fixes [was: [PATCH v4 2/3] ARM: omap: hwmod: get
  rid of all omap_clk_get_by_name usage
-In-Reply-To: <506EE14E.4080500@ti.com>
+In-Reply-To: <506EDEB3.3050003@ti.com>
 References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
  <1346230576-20004-3-git-send-email-rnayak@ti.com>
  <CAJOA=zM2sFsrdohooKp1+zsV_AK6dKnoN37+Gs2oskBUK4J00w@mail.gmail.com>
@@ -11,33 +11,58 @@ References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
  <1346397309.18766.5.camel@lappyti> <504073CF.6010804@ti.com>
  <1346401643.32389.4.camel@deskari> <504075A0.7010708@ti.com>
  <506EAC89.2070307@ti.com> <506ED079.70700@ti.com> <506ED29E.7070403@ti.com>
- <506ED492.5010709@ti.com> <506EDEB3.3050003@ti.com> <506EE14E.4080500@ti.com>
-Message-ID: <506EE4B4.6010903@ti.com>
+ <506ED492.5010709@ti.com> <506EDEB3.3050003@ti.com>
+Message-ID: <506EE5F6.5020605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 October 2012 07:01 PM, Rajendra Nayak wrote:
->> If the clkdm is in HW_AUTO, I can get DSS in sleep(STBYST and IDLEST all
->> set). Is this helpful? Can we just leave modulemode on all the time?
->> That'll be the best :)
->
-> Is everything around DSS enabled by default in omap2plus? If so, I
-> haven't seen Tero (who has been working on getting OMAP4 to sleep)
-> complain about DSS causing him any trouble. So you should be good
-> with whats already there atleast from 'not-gating-sleep' point of
-> view.
+On 10/05/2012 03:20 PM, Archit Taneja wrote:
+> On Friday 05 October 2012 06:07 PM, Rajendra Nayak wrote:
+>> On Friday 05 October 2012 05:59 PM, Archit Taneja wrote:
+>>> The other not so good option to make DSS PM work would be to add
+>>> OCPIF_SWSUP_IDLE flag to our l3_main_2__dss_* slave interfaces(which
+>>> have the hack "dss_fck" as slave clock). I gave this approach a try,
+>>> that too isn't working so well. When I disable DSS, I get
+>>> CM_DSS_DSS_CLKCTRL.IDLEST as 0x1, and
+>>> CM_DSS_CLKSTCTRL.CLKACTIVITY_DSS_L3_ICLK is set. I wonder why that's
+>>> happening.
+>>
+>> I have seen DSS get stuck in transition, with just a clkdm state toggle
+>> (from say HWSUP to SWWKUP) while its optional clocks are not running.
+>> Thats probably whats happening now.
+> 
+> Oh ok, I can notice that too. So in the _idle() path, the clocks are
+> disabled first, and then we try to change the clkdm state. I guess that
+> could be the reason why DSS doesn't sleep.
+> 
+> But then, I don't understand why this problem isn't seen if I try the
+> alternative option of removing the fake dss_fck slave clock, and tie
+> modulemode to only the parent hwmod. There DSS IDLEST is 0x3 when I
+> disable DSS.
+> 
+> I think with this approach, the problem is with _disable_clocks(), in
+> disable_clocks, main_clk is disabled first, and then the slave clocks.
+> That translates to DSS_FCK opt clock getting disabled first, and then
+> MODULEMODE bits. I think DSS doesn't transition to sleep with this
+> disable sequence.
+> 
+>>
+>> Did you try keeping the modulemode enabled and see if it really gates
+>> DSS/system sleep. I remember testing with Teros CORE ret/off patches
+>> and I was always seeing DSS modulemode enabled but it wasn't gating
+>> sleep.
+> 
+> If the clkdm is in HW_AUTO, I can get DSS in sleep(STBYST and IDLEST all
+> set). Is this helpful? Can we just leave modulemode on all the time?
+> That'll be the best :)
 
-DSS is selected only as a module in omap2plus_defconfig, so the DSS 
-driver would never kick in with the defconfig.
+Well, it is true that in the case of the DSS the modulemode is only
+managing the interface clock. And since the interface clock is doing
+autogating, it will not prevent clockdomain transition.
+But I will not recommend using that, it should not be useful assuming
+the clocks are properly managed by the DSS.
+I think we still have issue dur to the presence of that fake modulemode
+clock node.
 
-The DSS hwmods would be initialised though. If I boot up linux-next with 
-omap2plus_defconfig, I get:
-
-CM_DSS_CLKSTCTRL 0x3
-CM_DSS_DSS_CLKCTRL 0x00060002
-
-So the module is in standby, but IDLEST is 0x2, which says DSS is idle 
-only with respect to the interconnect. In the bootloader, IDLEST was 
-0x3. So I don't know if that's a good thing or not.
-
-Archit
+Regards,
+Benoit
