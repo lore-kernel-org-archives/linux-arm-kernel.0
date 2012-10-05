@@ -1,46 +1,65 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:23 +0200
-Subject: [PATCH 09/16] USB: EHCI: mark ehci_orion_conf_mbus_windows __devinit
+Date: Fri,  5 Oct 2012 16:55:20 +0200
+Subject: [PATCH 06/16] mm/slob: use min_t() to compare ARCH_SLAB_MINALIGN
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-10-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __devinit section is going away soon, but while it's
-still there, we get a correct warning about
-ehci_orion_conf_mbus_windows being discarded before
-its caller, so it should be marked __devinit rather than
-__init.
+The definition of ARCH_SLAB_MINALIGN is architecture dependent
+and can be either of type size_t or int. Comparing that value
+with ARCH_KMALLOC_MINALIGN can cause harmless warnings on
+platforms where they are different. Since both are always
+small positive integer numbers, using the size_t type to compare
+them is safe and gets rid of the warning.
 
-Without this patch, building dove_defconfig results in:
+Without this patch, building ARM collie_defconfig results in:
 
-WARNING: drivers/usb/host/built-in.o(.devinit.text+0x8a4): Section mismatch in reference from the function ehci_orion_drv_probe() to the function .init.text:ehci_orion_conf_mbus_windows()
-The function __devinit ehci_orion_drv_probe() references
-a function __init ehci_orion_conf_mbus_windows().
-If ehci_orion_conf_mbus_windows is only used by ehci_orion_drv_probe then
-annotate ehci_orion_conf_mbus_windows with a matching annotation.
+mm/slob.c: In function '__kmalloc_node':
+mm/slob.c:431:152: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+mm/slob.c: In function 'kfree':
+mm/slob.c:484:153: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+mm/slob.c: In function 'ksize':
+mm/slob.c:503:153: warning: comparison of distinct pointer types lacks a cast [enabled by default]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
+Cc: Christoph Lameter <cl@linux.com>
+Cc: Pekka Enberg <penberg@kernel.org>
 ---
- drivers/usb/host/ehci-orion.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ mm/slob.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 8892d36..1f5dd5e 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -160,7 +160,7 @@ static const struct hc_driver ehci_orion_hc_driver = {
- 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
- };
- 
--static void __init
-+static void __devinit
- ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 			     const struct mbus_dram_target_info *dram)
+diff --git a/mm/slob.c b/mm/slob.c
+index 45d4ca7..497c55e 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -428,7 +428,7 @@ out:
+ void *__kmalloc_node(size_t size, gfp_t gfp, int node)
  {
+ 	unsigned int *m;
+-	int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
++	int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
+ 	void *ret;
+ 
+ 	gfp &= gfp_allowed_mask;
+@@ -481,7 +481,7 @@ void kfree(const void *block)
+ 
+ 	sp = virt_to_page(block);
+ 	if (PageSlab(sp)) {
+-		int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
++		int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
+ 		unsigned int *m = (unsigned int *)(block - align);
+ 		slob_free(m, *m + align);
+ 	} else
+@@ -500,7 +500,7 @@ size_t ksize(const void *block)
+ 
+ 	sp = virt_to_page(block);
+ 	if (PageSlab(sp)) {
+-		int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
++		int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
+ 		unsigned int *m = (unsigned int *)(block - align);
+ 		return SLOB_UNITS(*m) * SLOB_UNIT;
+ 	} else
 -- 
 1.7.10
