@@ -1,39 +1,93 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 5 Oct 2012 18:55:36 -0300
-Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
- camera and eMMA
-In-Reply-To: <CACKLOr1W4PoVUqJ+KEcE1yUOhcRJDR6RDm_Mn=GhQxkfPg-5mQ@mail.gmail.com>
-References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
- <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
- <5047013E.30508@gmail.com>
- <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
- <50471187.3040809@gmail.com>
- <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
- <50471CEE.60606@gmail.com>
- <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
- <504769CF.2070904@gmail.com>
- <CAOMZO5DyjdrZYNDMuT1=yuxQcHuP3=6dy_j_ja1vub56_m3pvA@mail.gmail.com>
- <504774B7.8090007@gmail.com>
- <CAOMZO5CAvwwGEwbZE2VS49tpWOYxAR_qQkfKhswPaofSrni92A@mail.gmail.com>
- <CAOMZO5C+NNQr0mo6P2cKx4RxFoQPyYuPZq4eFUZnvi_7gTRkBQ@mail.gmail.com>
- <CACKLOr1W4PoVUqJ+KEcE1yUOhcRJDR6RDm_Mn=GhQxkfPg-5mQ@mail.gmail.com>
-Message-ID: <CAOMZO5Bh4PGE3fAJytaD4i2hqD2NDDrwETs=PzLPno_hs-5ryw@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 06 Oct 2012 00:30:01 +0200
+Subject: [PATCH 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
+In-Reply-To: <1349431628-2819-4-git-send-email-kishon@ti.com>
+References: <1349431628-2819-1-git-send-email-kishon@ti.com>
+ <1349431628-2819-4-git-send-email-kishon@ti.com>
+Message-ID: <506F5F69.6040104@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hello.
 
-On Fri, Oct 5, 2012 at 3:51 AM, javier Martin
-<javier.martin@vista-silicon.com> wrote:
+On 05-10-2012 12:07, Kishon Vijay Abraham I wrote:
 
-> No, it isn't. Kernel 3.6 works properly in our Visstrim M10 board and
-> the CSI clock frequency is the same as yours:
+> Platfrom device for ocp2scp is created using omap_device_build in
+> devices file. This is used for both omap4(musb) and omap5(dwc3).
+>
+> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+> ---
+>   arch/arm/mach-omap2/devices.c |   72 +++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 72 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index c8c2117..e2ba505 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+[...]
+> @@ -613,6 +614,76 @@ static void omap_init_vout(void)
+[...]
 
-I managed to fix it. Now the CSI clock is the same as in 3.4 kernel
-and ov2640 probes successfully.
+> +static void omap_init_ocp2scp(void)
+> +{
+> +	struct omap_hwmod	*oh;
+> +	struct platform_device	*pdev;
+> +	int			bus_id = -1, dev_cnt = 0, i;
+> +	struct omap_ocp2scp_dev	*ocp2scp_dev;
+> +	const char		*oh_name, *name;
+> +	struct omap_ocp2scp_platform_data *pdata;
+> +
+> +	oh_name = "ocp2scp_usb_phy";
+> +	name	= "omap-ocp2scp";
+> +
+> +	oh = omap_hwmod_lookup(oh_name);
+> +	if (!oh) {
+> +		pr_err("%s: could not find omap_hwmod for %s\n", __func__,
+> +								oh_name);
+> +		return;
+> +	}
+> +
+> +	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		pr_err("%s: No memory for ocp2scp pdata\n", __func__);
+> +		return;
+> +	}
+> +
+> +	ocp2scp_dev = oh->dev_attr;
+> +	dev_cnt = count_ocp2scp_devices(ocp2scp_dev);
+> +
+> +	if (!dev_cnt) {
+> +		pr_err("%s: No devices connected to ocp2scp\n", __func__);
+> +		return;
 
-Just submitted the patches.
+    Don't you leak 'pdata' here?
 
-Regards,
+> +	}
+> +
+> +	pdata->devices = kzalloc(sizeof(struct omap_ocp2scp_dev *)
+> +					* dev_cnt, GFP_KERNEL);
+> +	if (!pdata->devices) {
+> +		pr_err("%s: No memory for ocp2scp pdata devices\n", __func__);
+> +		return;
+> +	}
+> +
+> +	for (i = 0; i<  dev_cnt; i++, ocp2scp_dev++)
+> +		pdata->devices[i] = ocp2scp_dev;
+> +
+> +	pdata->dev_cnt	= dev_cnt;
+> +
+> +	pdev = omap_device_build(name, bus_id, oh, pdata, sizeof(*pdata), NULL,
+> +								0, false);
+> +	if (IS_ERR(pdev)) {
+> +		pr_err("Could not build omap_device for %s %s\n",
+> +						name, oh_name);
+> +		return;
 
-Fabio Estevam
+    Don't you leak 'pdata' and 'pdata->devices' here?
+
+
+> +	}
+> +}
+>
+
+WBR,  Sergei
