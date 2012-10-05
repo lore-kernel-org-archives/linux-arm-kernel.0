@@ -1,63 +1,37 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 5 Oct 2012 17:28:26 -0400
-Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA9C6B7@DBDE01.ent.ti.com>
-References: <1348861072-14507-1-git-send-email-mporter@ti.com>
- <20121003150058.GB11180@beef>
- <1BAFE6F6C881BF42822005164F1491C33EA9C6B7@DBDE01.ent.ti.com>
-Message-ID: <20121005212826.GN11149@beef>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 5 Oct 2012 18:53:01 -0300
+Subject: [PATCH 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
+In-Reply-To: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
+References: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 04:43:56AM +0000, Hebbar, Gururaja wrote:
-> Matt,
-> 
-> On Wed, Oct 03, 2012 at 20:30:58, Porter, Matt wrote:
-> > On Fri, Sep 28, 2012 at 03:37:45PM -0400, Matt Porter wrote:
-> > > Changes since v1:
-> > > 	- Replaced uio_pruss private SRAM API use with genalloc
-> > > 	- Added DA850 platform device and clock support
-> > > 	- Added DA850 L3 RAM gen_pool support
-> > > 	- Split out DT binding
-> > > 
-> > > This series enables uio_pruss on both DA850 and AM33xx. The driver
-> > > previously was not enabled by any platform and the private SRAM API
-> > > was accessing an invalid SRAM bank for use on DA850. For AM33xx,
-> > > DT, pinctrl, and runtime PM support are added since AM33xx only
-> > > boots via DT.
-> > 
-> > I'm dropping AM33xx/OMAP support from v3 for this series 
-> 
-> Just for my clarification, I believe you will be taking up AM33xx/OMAP 
-> SRAM support later once you have completed supporting DaVinci. Right?
+During the clock conversion for mx27 the "per4_gate" clock was missed to get
+registered as a dependency of mx2-camera driver.
 
-There's no SRAM support for uio_pruss to be handled for AM33xx, but I
-will be posting a separate series with the DT portion and some alternate
-hard reset handling implementation. I find the private OMAP reset api to
-be very ugly but we might have to go with that for now. I didn't want
-the OMAP hard reset portion to hold up the more important part of this
-cleanup.
+In the old mx27 clock driver we used to have:
 
--Matt
+DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
 
-> > since the
-> > focus has turned to fixing Davinci SRAM to provide genalloc support
-> > and the associated use of that in the driver.
-> > 
-> > I'll have a separate series with AM33xx support since dealing cleanly
-> > with external resets on OMAP is a bigger issue.
-> > 
-> > -Matt
-> > _______________________________________________
-> > Davinci-linux-open-source mailing list
-> > Davinci-linux-open-source at linux.davincidsp.com
-> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> > 
-> 
-> 
-> Regards, 
-> Gururaja
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+,so does the same in the new clock driver.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx27.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 3b6b640..5ef0f08 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -224,6 +224,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
+ 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
+ 	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "mx2-camera.0");
++	clk_register_clkdev(clk[per4_gate], "per", "mx2-camera.0");
+ 	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
+ 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
+ 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
+-- 
+1.7.9.5
