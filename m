@@ -1,32 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Oct 2012 11:09:22 -0700
-Subject: [PATCH 09/16] ARM: OMAP: Split plat/mmc.h into local headers
- and platform_data
-In-Reply-To: <CAOyx1LpfdM1_BE23-GVvGAcNAHos694J-Ob1cHNkLid31O-sSw@mail.gmail.com>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <20121004220454.26676.10131.stgit@muffinssi.local>
- <CAOyx1LpfdM1_BE23-GVvGAcNAHos694J-Ob1cHNkLid31O-sSw@mail.gmail.com>
-Message-ID: <20121005180922.GO3874@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 05 Oct 2012 13:13:08 -0500
+Subject: [PATCH 04/10] of/i2c: Add support for I2C_CLIENT_WAKE when booting
+ with Device Tree
+In-Reply-To: <1349451107-8009-5-git-send-email-lee.jones@linaro.org>
+References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
+ <1349451107-8009-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <506F2334.1040009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Venkatraman S <svenkatr@ti.com> [121004 23:40]:
-> On Fri, Oct 5, 2012 at 3:34 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > We need to remove this from plat for ARM common zImage
-> > support.
-> >
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Cc: Venkatraman S <svenkatr@ti.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+On 10/05/2012 10:31 AM, Lee Jones wrote:
+> It's important for wakeup sources such as keyboards, power buttons
+> and the like to identify themselves as wakeup devices. Until now
+> this has not been possible when platforms are booting via Device
+> Tree.
+
+A similar feature from Olof already went in for 3.7.
+
+Rob
+
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/of/of_i2c.c |    3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Thanks Tony. I suppose this should go into your tree..
-> Acked-by: Venkatraman S <svenkatr@ti.com>
-
-Thanks yeah it's probably best that I set up some
-minimal immutable branch that Chris can also pull
-in assuming these two MMC patches look OK.
-
-Regards,
-
-Tony
+> diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
+> index 1e173f3..2f20019 100644
+> --- a/drivers/of/of_i2c.c
+> +++ b/drivers/of/of_i2c.c
+> @@ -61,6 +61,9 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
+>  		info.of_node = of_node_get(node);
+>  		info.archdata = &dev_ad;
+>  
+> +		if (of_get_property(node, "i2c-client-wake", NULL))
+> +			info.flags |= I2C_CLIENT_WAKE;
+> +
+>  		request_module("%s%s", I2C_MODULE_PREFIX, info.type);
+>  
+>  		result = i2c_new_device(adap, &info);
+> 
