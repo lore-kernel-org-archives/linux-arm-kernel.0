@@ -1,48 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:18 +0200
-Subject: [PATCH 04/16] SCSI: ARM: make fas216_dumpinfo function conditional
+Date: Fri,  5 Oct 2012 16:55:16 +0200
+Subject: [PATCH 02/16] ARM: binfmt_flat: unused variable 'persistent'
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-5-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fas216_dumpinfo function is only used by __fas216_checkmagic,
-which is conditionally compiled, so we should put both functions
-inside of the same #ifdef.
+The flat_get_addr_from_rp() macro does not use the 'persistent' argument
+on ARM, causing a harmless compiler warning. A cast to void removes
+that warning.
 
-Without this patch, building rpc_defconfig results in:
+Without this patch, building at91x40_defconfig results in:
 
-drivers/scsi/arm/fas216.c:182:13: warning: 'fas216_dumpinfo' defined but not used [-Wunused-function]
+fs/binfmt_flat.c: In function 'load_flat_file':
+fs/binfmt_flat.c:746:17: warning: unused variable 'persistent' [-Wunused-variable]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-scsi at vger.kernel.org
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Bryan Wu <bryan.wu@canonical.com>
 ---
- drivers/scsi/arm/fas216.c |    2 +-
+ arch/arm/include/asm/flat.h |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
-index 6206a66..737554c 100644
---- a/drivers/scsi/arm/fas216.c
-+++ b/drivers/scsi/arm/fas216.c
-@@ -179,6 +179,7 @@ static void print_SCp(struct scsi_pointer *SCp, const char *prefix, const char *
- 		SCp->buffers_residual, suffix);
- }
- 
-+#ifdef CHECK_STRUCTURE
- static void fas216_dumpinfo(FAS216_Info *info)
- {
- 	static int used = 0;
-@@ -223,7 +224,6 @@ static void fas216_dumpinfo(FAS216_Info *info)
- 		info->internal_done, info->magic_end);
- }
- 
--#ifdef CHECK_STRUCTURE
- static void __fas216_checkmagic(FAS216_Info *info, const char *func)
- {
- 	int corruption = 0;
+diff --git a/arch/arm/include/asm/flat.h b/arch/arm/include/asm/flat.h
+index 59426a4..e847d23 100644
+--- a/arch/arm/include/asm/flat.h
++++ b/arch/arm/include/asm/flat.h
+@@ -8,7 +8,7 @@
+ #define	flat_argvp_envp_on_stack()		1
+ #define	flat_old_ram_flag(flags)		(flags)
+ #define	flat_reloc_valid(reloc, size)		((reloc) <= (size))
+-#define	flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
++#define	flat_get_addr_from_rp(rp, relval, flags, persistent) ((void)persistent,get_unaligned(rp))
+ #define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
+ #define	flat_get_relocate_addr(rel)		(rel)
+ #define	flat_set_persistent(relval, p)		0
 -- 
 1.7.10
