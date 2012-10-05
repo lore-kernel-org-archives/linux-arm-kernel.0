@@ -1,73 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Oct 2012 09:50:18 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <CAG5Tg6WSRtwPkz9OEg6xS7X5uV6-U4o3GaxbTRW-jCfuMPdb=g@mail.gmail.com>
-References: <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <CAG5Tg6UabdyCbmMWr5vqyKfgHsYEzGLmx0=uBiPjyGUmVCejcQ@mail.gmail.com>
- <20121005083359.GH4625@n2100.arm.linux.org.uk>
- <CAG5Tg6WSRtwPkz9OEg6xS7X5uV6-U4o3GaxbTRW-jCfuMPdb=g@mail.gmail.com>
-Message-ID: <20121005085018.GJ4625@n2100.arm.linux.org.uk>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 5 Oct 2012 08:51:50 +0000
+Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
+ <20121003192044.GB27502@parrot.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9B8A65@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 09:37:38AM +0100, Mans Rullgard wrote:
-> On 5 October 2012 09:33, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Oct 05, 2012 at 09:33:04AM +0100, Mans Rullgard wrote:
-> >> On 5 October 2012 09:24, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
-> >> >> On 5 October 2012 08:12, Russell King - ARM Linux
-> >> >> <linux@arm.linux.org.uk> wrote:
-> >> >> > On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
-> >> >> >> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
-> >> >> >> > This struct is the IP header, so a struct ptr is just set to the
-> >> >> >> > beginning of the received data. Since ethernet headers are 14 bytes,
-> >> >> >> > often the IP header is not aligned unless the NIC can place the frame at
-> >> >> >> > a 2 byte offset (which is something I need to investigate). So this
-> >> >> >> > function cannot make any assumptions about the alignment. Does the ABI
-> >> >> >> > define structs have some minimum alignment? Does the struct need to be
-> >> >> >> > declared as packed or something?
-> >> >> >>
-> >> >> >> The ABI defines the alignment of structs as the maximum alignment of its
-> >> >> >> members.  Since this struct contains 32-bit members, the alignment for the
-> >> >> >> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
-> >> >> >> might be unaligned (in addition to removing any holes within).
-> >> >> >
-> >> >> > This has come up before in the past.
-> >> >> >
-> >> >> > The Linux network folk will _not_ allow - in any shape or form - for
-> >> >> > this struct to be marked packed (it's the struct which needs to be
-> >> >> > marked packed) because by doing so, it causes GCC to issue byte loads/
-> >> >> > stores on architectures where there isn't a problem, and that decreases
-> >> >> > the performance of the Linux IP stack unnecessarily.
-> >> >>
-> >> >> Which architectures?  I have never seen anything like that.
-> >> >
-> >> > Does it matter?
-> >>
-> >> It matters if we want to fix it.
-> >
-> > I can't help you there.  Ask the networking people.
-> 
-> I'm asking anyone who is listening.  Since you've (apparently) seen the claim
-> being made, perhaps you can point to an email or so with more information.
-> I'd hate to think you're just making up excuses.
+On Thu, Oct 04, 2012 at 15:51:03, Philip, Avinash wrote:
+> On Thu, Oct 04, 2012 at 00:50:45, Ivan Djelic wrote:
+> > On Wed, Oct 03, 2012 at 03:29:49PM +0100, Philip, Avinash wrote:
+> > > ELM module can be used for error correction of BCH 4 & 8 bit. Also
+> > > support read & write page in one shot by adding custom read_page &
+> > > write_page methods. This helps in optimizing code.
+> > > 
+> > > New structure member "is_elm_used" is added to know the status of
+> > > whether the ELM module is used for error correction or not.
+> > > 
+> > > Note:
+> > > ECC layout of BCH8 uses 14 bytes for 512 byte of data to make compatible
+> > > with RBL ECC layout, even though the requirement was only 13 byte. This
+> > > results a common ecc layout across RBL, U-boot & Linux.
+> > > 
+> > 
+> > See a few comments below,
+> > 
+> > (...)
+> > > +static int omap_elm_correct_data(struct mtd_info *mtd, u_char *dat,
+> > > +                               u_char *read_ecc, u_char *calc_ecc)
+> > > +{
+> > > +       struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+> > > +                       mtd);
+> > > +       int eccsteps = info->nand.ecc.steps;
+> > > +       int i , j, stat = 0;
+> > > +       int eccsize, eccflag, size;
+> > > +       struct elm_errorvec err_vec[ERROR_VECTOR_MAX];
+> > > +       u_char *ecc_vec = calc_ecc;
+> > > +       enum bch_ecc type;
+> > > +       bool is_error_reported = false;
+> > > +
+> > > +       /* initialize elm error vector to zero */
+> > > +       memset(err_vec, 0, sizeof(err_vec));
+> > > +       if (info->nand.ecc.strength == BCH8_MAX_ERROR) {
+> > > +               size = BCH8_SIZE;
+> > > +               eccsize = BCH8_ECC_OOB_BYTES;
+> > > +               type = BCH8_ECC;
+> > > +       } else {
+> > > +               size = BCH4_SIZE;
+> > > +               eccsize = BCH4_SIZE;
+> > > +               type = BCH4_ECC;
+> > > +       }
+> > > +
+> > > +       for (i = 0; i < eccsteps ; i++) {
+> > > +               eccflag = 0;    /* initialize eccflag */
+> > > +
+> > > +               for (j = 0; (j < eccsize); j++) {
+> > > +                       if (read_ecc[j] != 0xFF) {
+> > > +                               eccflag = 1;    /* data area is flashed */
+> > 
+> > Just a reminder: this way of checking if a page has been programmed is not robust to bitflips,
+> > so you may get into trouble with UBIFS on a fairly recent device.
 
-Sorry, I'm just not going to bother - especially given your attitude of
-"you're just making up excuses" - you just accused me of being a liar.
-Thanks for that.
+Sorry I missed this point.
 
-We have the merge window open at the moment, and I've only just got back
-from being on holiday for the first half of that - so I have new tree
-conflicts to deal with, and need to finish preparing my tree for Linus.
-I'm not going to waste the precious time that the merge window is open
-for searching lots of mail archives for this when others can do the same,
-or even try sending the Linux networking people a patch adding __packed
-to their structures and seeing the response.
+Here we were checking data in spare area (only in ecc layout 14*4 for BCH8) is 0xFF. If all data
+in spare area is 0xFF, conclude that the page is erased & no need of error correction. In case
+of bit flip present in spare area, page will be reported as uncorrectable.
+But I am not understand understand " trouble with UBIFS on a fairly recent device".
+Can you little elaborativ
+
+Thanks
+Avinash 
