@@ -1,32 +1,27 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 05 Oct 2012 18:56:30 +0530
-Subject: [PATCH] ARM: EXYNOS5: Remove wrongly placed usb2.0 PHY_CFG definition
- from PMU_REG
-Message-ID: <1349443590-29901-1-git-send-email-gautam.vivek@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 5 Oct 2012 19:01:58 +0530
+Subject: OMAP4 clock/pm fixes [was: [PATCH v4 2/3] ARM: omap: hwmod: get
+ rid of all omap_clk_get_by_name usage
+In-Reply-To: <506EDEB3.3050003@ti.com>
+References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
+ <1346230576-20004-3-git-send-email-rnayak@ti.com>
+ <CAJOA=zM2sFsrdohooKp1+zsV_AK6dKnoN37+Gs2oskBUK4J00w@mail.gmail.com>
+ <503F26A4.3050902@ti.com> <503F5517.4010100@ti.com>
+ <1346344933.2327.43.camel@deskari> <5040586D.2020406@ti.com>
+ <1346397309.18766.5.camel@lappyti> <504073CF.6010804@ti.com>
+ <1346401643.32389.4.camel@deskari> <504075A0.7010708@ti.com>
+ <506EAC89.2070307@ti.com> <506ED079.70700@ti.com> <506ED29E.7070403@ti.com>
+ <506ED492.5010709@ti.com> <506EDEB3.3050003@ti.com>
+Message-ID: <506EE14E.4080500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXYNOS5_USB_CFG macro should actually point to USB20PHY_CFG
-system register (base addr + 0x230). It's wrongly placed in regs-pmu.
-Actual register at offset 0x230 in PMU is SEQ_TRANSITION4.
+> If the clkdm is in HW_AUTO, I can get DSS in sleep(STBYST and IDLEST all
+> set). Is this helpful? Can we just leave modulemode on all the time?
+> That'll be the best :)
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
- arch/arm/mach-exynos/include/mach/regs-pmu.h |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index d4e392b..70b2795 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -230,8 +230,6 @@
- 
- /* For EXYNOS5 */
- 
--#define EXYNOS5_USB_CFG						S5P_PMUREG(0x0230)
--
- #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
- #define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
- 
--- 
-1.7.6.5
+Is everything around DSS enabled by default in omap2plus? If so, I
+haven't seen Tero (who has been working on getting OMAP4 to sleep)
+complain about DSS causing him any trouble. So you should be good
+with whats already there atleast from 'not-gating-sleep' point of
+view.
