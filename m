@@ -1,43 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:25 +0200
-Subject: [PATCH 11/16] pcmcia: sharpsl: don't discard sharpsl_pcmcia_ops
+Date: Fri,  5 Oct 2012 16:55:18 +0200
+Subject: [PATCH 04/16] SCSI: ARM: make fas216_dumpinfo function conditional
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-12-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sharpsl_pcmcia_ops structure gets passed into
-sa11xx_drv_pcmcia_probe, where it gets accessed at run-time,
-unlike all other pcmcia drivers that pass their structures
-into platform_device_add_data, which makes a copy.
+The fas216_dumpinfo function is only used by __fas216_checkmagic,
+which is conditionally compiled, so we should put both functions
+inside of the same #ifdef.
 
-This means the gcc warning is valid and the structure
-must not be marked as __initdata.
+Without this patch, building rpc_defconfig results in:
+
+drivers/scsi/arm/fas216.c:182:13: warning: 'fas216_dumpinfo' defined but not used [-Wunused-function]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Dominik Brodowski <linux@dominikbrodowski.net>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Pavel Machek <pavel@suse.cz>
-Cc: linux-pcmcia at lists.infradead.org
-Cc: Jochen Friedrich <jochen@scram.de>
-Cc: stable at vger.kernel.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-scsi at vger.kernel.org
 ---
- drivers/pcmcia/pxa2xx_sharpsl.c |    2 +-
+ drivers/scsi/arm/fas216.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_sharpsl.c b/drivers/pcmcia/pxa2xx_sharpsl.c
-index b066273..7dd879c 100644
---- a/drivers/pcmcia/pxa2xx_sharpsl.c
-+++ b/drivers/pcmcia/pxa2xx_sharpsl.c
-@@ -194,7 +194,7 @@ static void sharpsl_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
- 	sharpsl_pcmcia_init_reset(skt);
+diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
+index 6206a66..737554c 100644
+--- a/drivers/scsi/arm/fas216.c
++++ b/drivers/scsi/arm/fas216.c
+@@ -179,6 +179,7 @@ static void print_SCp(struct scsi_pointer *SCp, const char *prefix, const char *
+ 		SCp->buffers_residual, suffix);
  }
  
--static struct pcmcia_low_level sharpsl_pcmcia_ops __initdata = {
-+static struct pcmcia_low_level sharpsl_pcmcia_ops = {
- 	.owner                  = THIS_MODULE,
- 	.hw_init                = sharpsl_pcmcia_hw_init,
- 	.socket_state           = sharpsl_pcmcia_socket_state,
++#ifdef CHECK_STRUCTURE
+ static void fas216_dumpinfo(FAS216_Info *info)
+ {
+ 	static int used = 0;
+@@ -223,7 +224,6 @@ static void fas216_dumpinfo(FAS216_Info *info)
+ 		info->internal_done, info->magic_end);
+ }
+ 
+-#ifdef CHECK_STRUCTURE
+ static void __fas216_checkmagic(FAS216_Info *info, const char *func)
+ {
+ 	int corruption = 0;
 -- 
 1.7.10
