@@ -1,87 +1,36 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 05 Oct 2012 15:40:18 +0530
-Subject: [PATCH 2/2] ARM: Exynos5250: Enabling ohci-exynos driver
-In-Reply-To: <1349431818-15639-1-git-send-email-gautam.vivek@samsung.com>
-References: <1349431818-15639-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1349431818-15639-3-git-send-email-gautam.vivek@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 5 Oct 2012 15:37:05 +0530
+Subject: [PATCH 0/3] ocp2scp: add non-dt support
+Message-ID: <1349431628-2819-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding OHCI device tree node for Exynos5250 along with
-the device base address.
+This patch series allows ocp2scp driver to create its child devices
+from the platform data.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
- .../devicetree/bindings/usb/exynos-usb.txt         |   15 +++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++++
- arch/arm/mach-exynos/include/mach/map.h            |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 ++
- 4 files changed, 24 insertions(+), 0 deletions(-)
+In omap platforms, usb phy is connected to ocp2scp and usb phy is needed
+for MUSB to be functional. When ocp2scp driver was added, it had only dt
+support which means it wont create usb phy devices for non-dt boot.
 
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index 56e35c7..bff10a8 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -23,3 +23,18 @@ Example:
- 		interrupts = <0 71 0>;
- 		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
- 	};
-+
-+OHCI
-+Required properties:
-+ - compatible: should be "samsung,exynos-ohci" for USB 2.0
-+   OHCI companion controller in host mode.
-+ - reg: physical base address of the controller and length of memory mapped
-+   region.
-+ - interrupts: interrupt number to the cpu.
-+
-+Example:
-+	ohci {
-+		compatible = "samsung,exynos-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 73ea844..bcdfbe2 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -224,6 +224,12 @@
- 		interrupts = <0 71 0>;
- 	};
- 
-+	ohci {
-+		compatible = "samsung,exynos-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 825fe40..cfede1f 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -196,6 +196,7 @@
- #define EXYNOS4_PA_OHCI			0x12590000
- #define EXYNOS4_PA_HSPHY		0x125B0000
- #define EXYNOS5_PA_EHCI			0x12110000
-+#define EXYNOS5_PA_OHCI			0x12120000
- #define EXYNOS4_PA_MFC			0x13400000
- 
- #define EXYNOS4_PA_UART			0x13800000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 6d950d7b..e6c2144 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -74,6 +74,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos-gsc.3", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
- 					"s5p-ehci", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos-ohci", EXYNOS5_PA_OHCI,
-+					"exynos-ohci", NULL),
- 	{},
- };
- 
+This patch series adds non-dt support to ocp2scp and this series is needed
+for getting MUSB functioanl in non-dt boot.
+
+This patch series is rebased on linux-next. Let me know if it had to be
+based on some other tree.
+
+Did a quick testing for g_zero enumeration in panda board.
+
+Kishon Vijay Abraham I (3):
+  drivers: bus: ocp2scp: add pdata support
+  ARM: OMAP4: add _dev_attr_ to ocp2scp for representing usb_phy
+  ARM: OMAP: ocp2scp: create omap device for ocp2scp
+
+ arch/arm/mach-omap2/devices.c              |   72 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   28 +++++++++++
+ drivers/bus/omap-ocp2scp.c                 |   67 ++++++++++++++++++++++++--
+ include/linux/platform_data/omap_ocp2scp.h |   31 ++++++++++++
+ 4 files changed, 195 insertions(+), 3 deletions(-)
+ create mode 100644 include/linux/platform_data/omap_ocp2scp.h
+
 -- 
-1.7.6.5
+1.7.9.5
