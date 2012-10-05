@@ -1,25 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 5 Oct 2012 17:49:42 +0200
-Subject: [PATCH V2 0/3] spi: spi-pl022: Fixup use of runtime pm
-In-Reply-To: <20121005122328.GC4360@opensource.wolfsonmicro.com>
-References: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdbYzr4HH1tFjnZT0A=v_iOGVbkey_vxyAUW+85nw2bEZA@mail.gmail.com>
- <20121005122328.GC4360@opensource.wolfsonmicro.com>
-Message-ID: <CAPDyKFqcHqBdpspAc2GpK0Emmo+r-GiXdBHc_ZUurzW4yJ+QAw@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 5 Oct 2012 17:51:11 +0200
+Subject: [PATCH 1/2] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+Message-ID: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2012 14:23, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Oct 05, 2012 at 02:21:15PM +0200, Linus Walleij wrote:
->
->> I think patch 1/3 and 2/3 needs to go into the -rc fixes.
->
->> Who's funneling this now? Grant or Mark?
->
-> Me still for the moment.
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-I will post a new series, removing the 3/3 patch and updating the
-commitmsg accordingly.
+This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
 
-Kind regards
-Ulf Hansson
+Commit "spi/pl022: enable runtime PM" introduced runtime PM issues.
+Due to that commit, "spi/pl022: fix spi-pl022 pm enable at probe"
+was merged to fix part of those issues.
+
+Instead of adding another fix, let's clean up and revert everything
+back to when it was already fine.
+
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/spi/spi-pl022.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 9194641..5cf0643 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2186,6 +2186,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
+ 	       adev->res.start, pl022->virtbase);
+ 
++	pm_runtime_enable(dev);
+ 	pm_runtime_resume(dev);
+ 
+ 	pl022->clk = devm_clk_get(&adev->dev, NULL);
+-- 
+1.7.10
