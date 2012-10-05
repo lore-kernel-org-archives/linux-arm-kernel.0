@@ -1,41 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:16 +0200
-Subject: [PATCH 02/16] ARM: binfmt_flat: unused variable 'persistent'
+Date: Fri,  5 Oct 2012 16:55:21 +0200
+Subject: [PATCH 07/16] cgroup: fix warning when building without any subsys
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-3-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flat_get_addr_from_rp() macro does not use the 'persistent' argument
-on ARM, causing a harmless compiler warning. A cast to void removes
-that warning.
+In a configuration where the base cgroup support is enabled but
+every single cgroup subsys is turned off, CGROUP_BUILTIN_SUBSYS_COUNT
+is zero, which causes the sanity check code in cgroup_load_subsys
+to trigger:
 
-Without this patch, building at91x40_defconfig results in:
+       BUG_ON(ss->subsys_id >= CGROUP_BUILTIN_SUBSYS_COUNT);
+       BUG_ON(subsys[ss->subsys_id] != ss);
 
-fs/binfmt_flat.c: In function 'load_flat_file':
-fs/binfmt_flat.c:746:17: warning: unused variable 'persistent' [-Wunused-variable]
+Gcc first confirms that subsys_id cannot be 0 or larger and consequently
+warns in the second line.
+
+kernel/cgroup.c: In function 'cgroup_load_subsys':
+kernel/cgroup.c:4326:38: warning: array subscript is below array bounds [-Warray-bounds]
+
+Since the subsys_id can never be less than zero, we can just change the
+type to an unsigned int, which makes the warning go away.
+
+Found by building ARM cns3420vb_defconfig.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Bryan Wu <bryan.wu@canonical.com>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Li Zefan <lizefan@huawei.com>
+Cc: Ben Blum <bblum@andrew.cmu.edu>
 ---
- arch/arm/include/asm/flat.h |    2 +-
+ include/linux/cgroup.h |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/flat.h b/arch/arm/include/asm/flat.h
-index 59426a4..e847d23 100644
---- a/arch/arm/include/asm/flat.h
-+++ b/arch/arm/include/asm/flat.h
-@@ -8,7 +8,7 @@
- #define	flat_argvp_envp_on_stack()		1
- #define	flat_old_ram_flag(flags)		(flags)
- #define	flat_reloc_valid(reloc, size)		((reloc) <= (size))
--#define	flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
-+#define	flat_get_addr_from_rp(rp, relval, flags, persistent) ((void)persistent,get_unaligned(rp))
- #define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
- #define	flat_get_relocate_addr(rel)		(rel)
- #define	flat_set_persistent(relval, p)		0
+diff --git a/include/linux/cgroup.h b/include/linux/cgroup.h
+index c90eaa8..26b99df 100644
+--- a/include/linux/cgroup.h
++++ b/include/linux/cgroup.h
+@@ -475,7 +475,7 @@ struct cgroup_subsys {
+ 	void (*post_clone)(struct cgroup *cgrp);
+ 	void (*bind)(struct cgroup *root);
+ 
+-	int subsys_id;
++	unsigned int subsys_id;
+ 	int active;
+ 	int disabled;
+ 	int early_init;
 -- 
 1.7.10
