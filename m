@@ -1,67 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:19 +0200
-Subject: [PATCH 05/16] vfs: bogus warnings in fs/namei.c
+Date: Fri,  5 Oct 2012 16:55:23 +0200
+Subject: [PATCH 09/16] USB: EHCI: mark ehci_orion_conf_mbus_windows __devinit
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-6-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The follow_link() function always initializes its *p argument,
-or returns an error, but not all versions of gcc figure this
-out, so we have to work around this using the uninitialized_var()
-macro.
+The __devinit section is going away soon, but while it's
+still there, we get a correct warning about
+ehci_orion_conf_mbus_windows being discarded before
+its caller, so it should be marked __devinit rather than
+__init.
 
-Without this patch, building with arm-linux-gnueabi-gcc-4.6 results in:
+Without this patch, building dove_defconfig results in:
 
-fs/namei.c: In function 'link_path_walk':
-fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-fs/namei.c:1544:9: note: 'cookie' was declared here
-fs/namei.c: In function 'path_lookupat':
-fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-fs/namei.c:1934:10: note: 'cookie' was declared here
-fs/namei.c: In function 'path_openat':
-fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-fs/namei.c:2899:9: note: 'cookie' was declared here
+WARNING: drivers/usb/host/built-in.o(.devinit.text+0x8a4): Section mismatch in reference from the function ehci_orion_drv_probe() to the function .init.text:ehci_orion_conf_mbus_windows()
+The function __devinit ehci_orion_drv_probe() references
+a function __init ehci_orion_conf_mbus_windows().
+If ehci_orion_conf_mbus_windows is only used by ehci_orion_drv_probe then
+annotate ehci_orion_conf_mbus_windows with a matching annotation.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: linux-fsdevel at vger.kernel.org
-Cc: Jan Kara <jack@suse.cz>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
 ---
- fs/namei.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/usb/host/ehci-orion.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/fs/namei.c b/fs/namei.c
-index dd1ed1b..62a1725 100644
---- a/fs/namei.c
-+++ b/fs/namei.c
-@@ -1543,7 +1543,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index 8892d36..1f5dd5e 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -160,7 +160,7 @@ static const struct hc_driver ehci_orion_hc_driver = {
+ 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
+ };
  
- 	do {
- 		struct path link = *path;
--		void *cookie;
-+		void *uninitialized_var(cookie);
- 
- 		res = follow_link(&link, nd, &cookie);
- 		if (res)
-@@ -1933,7 +1933,7 @@ static int path_lookupat(int dfd, const char *name,
- 	if (!err && !(flags & LOOKUP_PARENT)) {
- 		err = lookup_last(nd, &path);
- 		while (err > 0) {
--			void *cookie;
-+			void *uninitialized_var(cookie);
- 			struct path link = path;
- 			err = may_follow_link(&link, nd);
- 			if (unlikely(err))
-@@ -2902,7 +2902,7 @@ static struct file *path_openat(int dfd, const char *pathname,
- 	error = do_last(nd, &path, file, op, &opened, pathname);
- 	while (unlikely(error > 0)) { /* trailing symlink */
- 		struct path link = path;
--		void *cookie;
-+		void *uninitialized_var(cookie);
- 		if (!(nd->flags & LOOKUP_FOLLOW)) {
- 			path_put_conditional(&path, nd);
- 			path_put(&nd->path);
+-static void __init
++static void __devinit
+ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
+ 			     const struct mbus_dram_target_info *dram)
+ {
 -- 
 1.7.10
