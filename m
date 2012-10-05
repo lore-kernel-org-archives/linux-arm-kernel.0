@@ -1,63 +1,154 @@
-From: mans.rullgard@linaro.org (Mans Rullgard)
-Date: Fri, 5 Oct 2012 09:37:38 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <20121005083359.GH4625@n2100.arm.linux.org.uk>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <CAG5Tg6UabdyCbmMWr5vqyKfgHsYEzGLmx0=uBiPjyGUmVCejcQ@mail.gmail.com>
- <20121005083359.GH4625@n2100.arm.linux.org.uk>
-Message-ID: <CAG5Tg6WSRtwPkz9OEg6xS7X5uV6-U4o3GaxbTRW-jCfuMPdb=g@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 05 Oct 2012 10:40:17 +0200
+Subject: [PATCH v4 2/6] misc: Generic on-chip SRAM allocation driver
+In-Reply-To: <20121004152509.GJ11149@beef>
+References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+ <1347021828-23034-3-git-send-email-p.zabel@pengutronix.de>
+ <20121004152509.GJ11149@beef>
+Message-ID: <1349426417.2584.6.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2012 09:33, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 05, 2012 at 09:33:04AM +0100, Mans Rullgard wrote:
->> On 5 October 2012 09:24, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
->> >> On 5 October 2012 08:12, Russell King - ARM Linux
->> >> <linux@arm.linux.org.uk> wrote:
->> >> > On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
->> >> >> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
->> >> >> > This struct is the IP header, so a struct ptr is just set to the
->> >> >> > beginning of the received data. Since ethernet headers are 14 bytes,
->> >> >> > often the IP header is not aligned unless the NIC can place the frame at
->> >> >> > a 2 byte offset (which is something I need to investigate). So this
->> >> >> > function cannot make any assumptions about the alignment. Does the ABI
->> >> >> > define structs have some minimum alignment? Does the struct need to be
->> >> >> > declared as packed or something?
->> >> >>
->> >> >> The ABI defines the alignment of structs as the maximum alignment of its
->> >> >> members.  Since this struct contains 32-bit members, the alignment for the
->> >> >> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
->> >> >> might be unaligned (in addition to removing any holes within).
->> >> >
->> >> > This has come up before in the past.
->> >> >
->> >> > The Linux network folk will _not_ allow - in any shape or form - for
->> >> > this struct to be marked packed (it's the struct which needs to be
->> >> > marked packed) because by doing so, it causes GCC to issue byte loads/
->> >> > stores on architectures where there isn't a problem, and that decreases
->> >> > the performance of the Linux IP stack unnecessarily.
->> >>
->> >> Which architectures?  I have never seen anything like that.
->> >
->> > Does it matter?
->>
->> It matters if we want to fix it.
->
-> I can't help you there.  Ask the networking people.
+Am Donnerstag, den 04.10.2012, 11:25 -0400 schrieb Matt Porter:
+> On Fri, Sep 07, 2012 at 02:43:44PM +0200, Philipp Zabel wrote:
+> > This driver requests and remaps a memory region as configured in the
+> > device tree. It serves memory from this region via the genalloc API.
+> > 
+> > Other drivers can retrieve the genalloc pool from a phandle pointing
+> > to this drivers' device node in the device tree.
+> 
+> <snip>
+> 
+> > +	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
+> > +	if (!sram->pool)
+> > +		return -ENOMEM;
+> 
+> As mentioned in the uio_pruss/genalloc discussion, removing the
+> hardcoded minimum allocation order will allow this to be used for
+> a number of other cases. The most notable is moving mach-davinci/
+> off of its own genalloc-based SRAM arch driver. Some of the davinci
+> SoCs have very small SRAMs and need the ability to allocate a smaller
+> chunk.
+> 
+> Here's a build-tested patch to add this option:
 
-I'm asking anyone who is listening.  Since you've (apparently) seen the claim
-being made, perhaps you can point to an email or so with more information.
-I'd hate to think you're just making up excuses.
+Thank you,
 
--- 
-Mans Rullgard / mru
+> From 6eced8c31eba2f86e72e854cf404d8f58fbeba85 Mon Sep 17 00:00:00 2001
+> From: Matt Porter <mporter@ti.com>
+> Date: Thu, 4 Oct 2012 11:08:02 -0400
+> Subject: [PATCH] misc: sram: add support for configurable allocation order
+> 
+> Adds support for setting the genalloc pool's minimum allocation
+> order via DT or platform data. The allocation order is optional
+> for both the DT property and platform data case. If it is not
+> present then the order defaults to PAGE_SHIFT to preserve the
+> current behavior.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+
+Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+> ---
+>  Documentation/devicetree/bindings/misc/sram.txt |   12 ++++++++++-
+>  drivers/misc/sram.c                             |   14 ++++++++++++-
+>  include/linux/platform_data/sram.h              |   25 +++++++++++++++++++++++
+>  3 files changed, 49 insertions(+), 2 deletions(-)
+>  create mode 100644 include/linux/platform_data/sram.h
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
+> index b64136c..b1705ec 100644
+> --- a/Documentation/devicetree/bindings/misc/sram.txt
+> +++ b/Documentation/devicetree/bindings/misc/sram.txt
+> @@ -8,10 +8,20 @@ Required properties:
+>  
+>  - reg : SRAM iomem address range
+>  
+> -Example:
+> +Optional properties:
+> +
+> +- alloc-order : Minimum allocation order for the SRAM pool
+> +
+> +Examples:
+> +
+> +sram: sram at 5c000000 {
+> +	compatible = "sram";
+> +	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
+> +};
+>  
+>  sram: sram at 5c000000 {
+>  	compatible = "sram";
+>  	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
+> +	alloc-order = <9>; /* Minimum 512 byte allocation */
+>  };
+>  
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index 7a363f2..3bf8ed3 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/genalloc.h>
+> +#include <linux/platform_data/sram.h>
+>  
+>  struct sram_dev {
+>  	struct gen_pool *pool;
+> @@ -37,6 +38,7 @@ static int __devinit sram_probe(struct platform_device *pdev)
+>  	struct sram_dev *sram;
+>  	struct resource *res;
+>  	unsigned long size;
+> +	u32 alloc_order = PAGE_SHIFT;
+>  	int ret;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -53,7 +55,17 @@ static int __devinit sram_probe(struct platform_device *pdev)
+>  	if (!sram)
+>  		return -ENOMEM;
+>  
+> -	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
+> +	if (pdev->dev.of_node)
+> +		of_property_read_u32(pdev->dev.of_node,
+> +				     "alloc-order", &alloc_order);
+> +	else
+> +		if (pdev->dev.platform_data) {
+> +			struct sram_pdata *pdata = pdev->dev.platform_data;
+> +			if (pdata->alloc_order)
+> +				alloc_order = pdata->alloc_order;
+> +		}
+> +
+> +	sram->pool = gen_pool_create(alloc_order, -1);
+>  	if (!sram->pool)
+>  		return -ENOMEM;
+>  
+> diff --git a/include/linux/platform_data/sram.h b/include/linux/platform_data/sram.h
+> new file mode 100644
+> index 0000000..e17bdaa
+> --- /dev/null
+> +++ b/include/linux/platform_data/sram.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * include/linux/platform_data/sram.h
+> + *
+> + * Platform data for generic sram driver
+> + *
+> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _SRAM_H_
+> +#define _SRAM_H_
+> +
+> +struct sram_pdata {
+> +	unsigned alloc_order;	/* Optional: driver defaults to PAGE_SHIFT */
+> +};
+> +
+> +#endif /* _SRAM_H_ */
