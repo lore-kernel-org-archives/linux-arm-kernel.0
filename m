@@ -1,9 +1,9 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 5 Oct 2012 21:31:07 +0530
-Subject: [PATCH 2/4] ARM: OMAP2+: onenand: generic timing calculation
+Date: Fri, 5 Oct 2012 21:31:21 +0530
+Subject: [PATCH 4/4] ARM: OMAP2+: tusb6010: generic timing calculation
 In-Reply-To: <cover.1349450723.git.afzal@ti.com>
 References: <cover.1349450723.git.afzal@ti.com>
-Message-ID: <c4042a91fcb834d083a3bb72b24434b0fd1086a5.1349450723.git.afzal@ti.com>
+Message-ID: <f7844b2b61f7432195f5fa30c89a940737e260aa.1349450723.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,178 +12,239 @@ it instead of custom timing calculation.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-onenand.c | 124 +++++++++++++------------------------
- 1 file changed, 43 insertions(+), 81 deletions(-)
+ arch/arm/mach-omap2/usb-tusb6010.c | 182 +++++++++----------------------------
+ 1 file changed, 44 insertions(+), 138 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index 54e2255..94a349e 100644
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -49,6 +49,7 @@ static struct platform_device gpmc_onenand_device = {
+diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
+index 8ee73fc..4c7d7b5 100644
+--- a/arch/arm/mach-omap2/usb-tusb6010.c
++++ b/arch/arm/mach-omap2/usb-tusb6010.c
+@@ -26,182 +26,88 @@ static u8		async_cs, sync_cs;
+ static unsigned		refclk_psec;
  
- static struct gpmc_timings omap2_onenand_calc_async_timings(void)
+ 
+-/* t2_ps, when quantized to fclk units, must happen no earlier than
+- * the clock after after t1_NS.
+- *
+- * Return a possibly updated value of t2_ps, converted to nsec.
+- */
+-static unsigned
+-next_clk(unsigned t1_NS, unsigned t2_ps, unsigned fclk_ps)
+-{
+-	unsigned	t1_ps = t1_NS * 1000;
+-	unsigned	t1_f, t2_f;
+-
+-	if ((t1_ps + fclk_ps) < t2_ps)
+-		return t2_ps / 1000;
+-
+-	t1_f = (t1_ps + fclk_ps - 1) / fclk_ps;
+-	t2_f = (t2_ps + fclk_ps - 1) / fclk_ps;
+-
+-	if (t1_f >= t2_f)
+-		t2_f = t1_f + 1;
+-
+-	return (t2_f * fclk_ps) / 1000;
+-}
+-
+ /* NOTE:  timings are from tusb 6010 datasheet Rev 1.8, 12-Sept 2006 */
+ 
+-static int tusb_set_async_mode(unsigned sysclk_ps, unsigned fclk_ps)
++static int tusb_set_async_mode(unsigned sysclk_ps)
  {
 +	struct gpmc_device_timings dev_t;
- 	struct gpmc_timings t;
- 
- 	const int t_cer = 15;
-@@ -58,35 +59,24 @@ static struct gpmc_timings omap2_onenand_calc_async_timings(void)
- 	const int t_aa = 76;
- 	const int t_oe = 20;
- 	const int t_cez = 20; /* max of t_cez, t_oez */
--	const int t_ds = 30;
- 	const int t_wpl = 40;
- 	const int t_wph = 30;
- 
+ 	struct gpmc_timings	t;
+ 	unsigned		t_acsnh_advnh = sysclk_ps + 3000;
+-	unsigned		tmp;
+-
 -	memset(&t, 0, sizeof(t));
--	t.sync_clk = 0;
--	t.cs_on = 0;
--	t.adv_on = 0;
 -
--	/* Read */
--	t.adv_rd_off = gpmc_round_ns_to_ticks(max_t(int, t_avdp, t_cer));
--	t.oe_on  = t.adv_rd_off + gpmc_round_ns_to_ticks(t_aavdh);
--	t.access = t.adv_on + gpmc_round_ns_to_ticks(t_aa);
--	t.access = max_t(int, t.access, t.cs_on + gpmc_round_ns_to_ticks(t_ce));
--	t.access = max_t(int, t.access, t.oe_on + gpmc_round_ns_to_ticks(t_oe));
--	t.oe_off = t.access + gpmc_round_ns_to_ticks(1);
+-	/* CS_ON = t_acsnh_acsnl */
+-	t.cs_on = 8;
+-	/* ADV_ON = t_acsnh_advnh - t_advn */
+-	t.adv_on = next_clk(t.cs_on, t_acsnh_advnh - 7000, fclk_ps);
+-
+-	/*
+-	 * READ ... from omap2420 TRM fig 12-13
+-	 */
+-
+-	/* ADV_RD_OFF = t_acsnh_advnh */
+-	t.adv_rd_off = next_clk(t.adv_on, t_acsnh_advnh, fclk_ps);
+-
+-	/* OE_ON = t_acsnh_advnh + t_advn_oen (then wait for nRDY) */
+-	t.oe_on = next_clk(t.adv_on, t_acsnh_advnh + 1000, fclk_ps);
+-
+-	/* ACCESS = counters continue only after nRDY */
+-	tmp = t.oe_on * 1000 + 300;
+-	t.access = next_clk(t.oe_on, tmp, fclk_ps);
+-
+-	/* OE_OFF = after data gets sampled */
+-	tmp = t.access * 1000;
+-	t.oe_off = next_clk(t.access, tmp, fclk_ps);
+-
 -	t.cs_rd_off = t.oe_off;
--	t.rd_cycle  = t.cs_rd_off + gpmc_round_ns_to_ticks(t_cez);
 -
--	/* Write */
+-	tmp = t.cs_rd_off * 1000 + 7000 /* t_acsn_rdy_z */;
+-	t.rd_cycle = next_clk(t.cs_rd_off, tmp, fclk_ps);
+-
+-	/*
+-	 * WRITE ... from omap2420 TRM fig 12-15
+-	 */
+ 
+-	/* ADV_WR_OFF = t_acsnh_advnh */
 -	t.adv_wr_off = t.adv_rd_off;
--	t.we_on  = t.oe_on;
--	if (cpu_is_omap34xx()) {
--		t.wr_data_mux_bus = t.we_on;
--		t.wr_access = t.we_on + gpmc_round_ns_to_ticks(t_ds);
--	}
--	t.we_off = t.we_on + gpmc_round_ns_to_ticks(t_wpl);
--	t.cs_wr_off = t.we_off + gpmc_round_ns_to_ticks(t_wph);
--	t.wr_cycle  = t.cs_wr_off + gpmc_round_ns_to_ticks(t_cez);
 +	memset(&dev_t, 0, sizeof(dev_t));
-+
+ 
+-	/* WE_ON = t_acsnh_advnh + t_advn_wen (then wait for nRDY) */
+-	t.we_on = next_clk(t.adv_wr_off, t_acsnh_advnh + 1000, fclk_ps);
 +	dev_t.mux = true;
-+	dev_t.t_avdp_r = max_t(int, t_avdp, t_cer) * 1000;
-+	dev_t.t_avdp_w = dev_t.t_avdp_r;
-+	dev_t.t_aavdh = t_aavdh * 1000;
-+	dev_t.t_aa = t_aa * 1000;
-+	dev_t.t_ce = t_ce * 1000;
-+	dev_t.t_oe = t_oe * 1000;
-+	dev_t.t_cez_r = t_cez * 1000;
+ 
+-	/* WE_OFF = after data gets sampled */
+-	tmp = t.we_on * 1000 + 300;
+-	t.we_off = next_clk(t.we_on, tmp, fclk_ps);
++	dev_t.t_ceasu = 8 * 1000;
++	dev_t.t_avdasu = t_acsnh_advnh - 7000;
++	dev_t.t_ce_avd = 1000;
++	dev_t.t_avdp_r = t_acsnh_advnh;
++	dev_t.t_oeasu = t_acsnh_advnh + 1000;
++	dev_t.t_oe = 300;
++	dev_t.t_cez_r = 7000;
 +	dev_t.t_cez_w = dev_t.t_cez_r;
-+	dev_t.t_wpl = t_wpl * 1000;
-+	dev_t.t_wph = t_wph * 1000;
-+
++	dev_t.t_avdp_w = t_acsnh_advnh;
++	dev_t.t_weasu = t_acsnh_advnh + 1000;
++	dev_t.t_wpl = 300;
++	dev_t.cyc_aavdh_we = 1;
+ 
+-	t.cs_wr_off = t.we_off;
+-
+-	tmp = t.cs_wr_off * 1000 + 7000 /* t_acsn_rdy_z */;
+-	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
 +	gpmc_calc_timings(&t, &dev_t);
  
- 	return t;
+ 	return gpmc_cs_set_timings(async_cs, &t);
  }
-@@ -172,16 +162,15 @@ static struct gpmc_timings
- omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
- 				int freq)
+ 
+-static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
++static int tusb_set_sync_mode(unsigned sysclk_ps)
  {
 +	struct gpmc_device_timings dev_t;
- 	struct gpmc_timings t;
- 	const int t_cer  = 15;
- 	const int t_avdp = 12;
- 	const int t_cez  = 20; /* max of t_cez, t_oez */
--	const int t_ds   = 30;
- 	const int t_wpl  = 40;
- 	const int t_wph  = 30;
- 	int min_gpmc_clk_period, t_ces, t_avds, t_avdh, t_ach, t_aavdh, t_rdyo;
--	int div, fclk_offset_ns, fclk_offset, gpmc_clk_ns;
--	int ticks_cez;
-+	int div, gpmc_clk_ns;
- 
- 	if (cfg->flags & ONENAND_SYNC_READ)
- 		onenand_flags = ONENAND_FLAG_SYNCREAD;
-@@ -248,62 +237,35 @@ omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
- 		latency = 4;
- 
- 	/* Set synchronous read timings */
+ 	struct gpmc_timings	t;
+ 	unsigned		t_scsnh_advnh = sysclk_ps + 3000;
+-	unsigned		tmp;
+-
 -	memset(&t, 0, sizeof(t));
+-	t.cs_on = 8;
 -
--	if (div == 1) {
--		t.bool_timings.cs_extra_delay = true;
--		t.bool_timings.adv_extra_delay = true;
--		t.bool_timings.oe_extra_delay = true;
--		t.bool_timings.we_extra_delay = true;
--	}
-+	memset(&dev_t, 0, sizeof(dev_t));
+-	/* ADV_ON = t_acsnh_advnh - t_advn */
+-	t.adv_on = next_clk(t.cs_on, t_scsnh_advnh - 7000, fclk_ps);
+-
+-	/* GPMC_CLK rate = fclk rate / div */
+-	t.sync_clk = 11100 /* 11.1 nsec */;
+-	tmp = (t.sync_clk + fclk_ps - 1) / fclk_ps;
+-	if (tmp > 4)
+-		return -ERANGE;
+-	if (tmp == 0)
+-		tmp = 1;
+-	t.page_burst_access = (fclk_ps * tmp) / 1000;
+-
+-	/*
+-	 * READ ... based on omap2420 TRM fig 12-19, 12-20
+-	 */
+-
+-	/* ADV_RD_OFF = t_scsnh_advnh */
+-	t.adv_rd_off = next_clk(t.adv_on, t_scsnh_advnh, fclk_ps);
+-
+-	/* OE_ON = t_scsnh_advnh + t_advn_oen * fclk_ps (then wait for nRDY) */
+-	tmp = (t.adv_rd_off * 1000) + (3 * fclk_ps);
+-	t.oe_on = next_clk(t.adv_on, tmp, fclk_ps);
+-
+-	/* ACCESS = number of clock cycles after t_adv_eon */
+-	tmp = (t.oe_on * 1000) + (5 * fclk_ps);
+-	t.access = next_clk(t.oe_on, tmp, fclk_ps);
+-
+-	/* OE_OFF = after data gets sampled */
+-	tmp = (t.access * 1000) + (1 * fclk_ps);
+-	t.oe_off = next_clk(t.access, tmp, fclk_ps);
  
--	t.sync_clk = min_gpmc_clk_period;
--	t.cs_on = 0;
--	t.adv_on = 0;
--	fclk_offset_ns = gpmc_round_ns_to_ticks(max_t(int, t_ces, t_avds));
--	fclk_offset = gpmc_ns_to_ticks(fclk_offset_ns);
--	t.page_burst_access = gpmc_clk_ns;
--
--	/* Read */
--	t.adv_rd_off = gpmc_ticks_to_ns(fclk_offset + gpmc_ns_to_ticks(t_avdh));
--	t.oe_on = gpmc_ticks_to_ns(fclk_offset + gpmc_ns_to_ticks(t_ach));
--	/* Force at least 1 clk between AVD High to OE Low */
--	if (t.oe_on <= t.adv_rd_off)
--		t.oe_on = t.adv_rd_off + gpmc_round_ns_to_ticks(1);
--	t.access = gpmc_ticks_to_ns(fclk_offset + (latency + 1) * div);
--	t.oe_off = t.access + gpmc_round_ns_to_ticks(1);
 -	t.cs_rd_off = t.oe_off;
--	ticks_cez = ((gpmc_ns_to_ticks(t_cez) + div - 1) / div) * div;
--	t.rd_cycle = gpmc_ticks_to_ns(fclk_offset + (latency + 1) * div +
--		     ticks_cez);
 -
--	t.clk_activation = fclk_offset_ns;
+-	tmp = t.cs_rd_off * 1000 + 7000 /* t_scsn_rdy_z */;
+-	t.rd_cycle = next_clk(t.cs_rd_off, tmp, fclk_ps);
 -
--	/* Write */
+-	/*
+-	 * WRITE ... based on omap2420 TRM fig 12-21
+-	 */
+-
+-	/* ADV_WR_OFF = t_scsnh_advnh */
+-	t.adv_wr_off = t.adv_rd_off;
+-
+-	/* WE_ON = t_scsnh_advnh + t_advn_wen * fclk_ps (then wait for nRDY) */
+-	tmp = (t.adv_wr_off * 1000) + (3 * fclk_ps);
+-	t.we_on = next_clk(t.adv_wr_off, tmp, fclk_ps);
+-
+-	/* WE_OFF = number of clock cycles after t_adv_wen */
+-	tmp = (t.we_on * 1000) + (6 * fclk_ps);
+-	t.we_off = next_clk(t.we_on, tmp, fclk_ps);
+-
+-	t.cs_wr_off = t.we_off;
+-
+-	tmp = t.cs_wr_off * 1000 + 7000 /* t_scsn_rdy_z */;
+-	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
+-
+-	t.clk_activation = gpmc_ticks_to_ns(1);
++	memset(&dev_t, 0, sizeof(dev_t));
++
 +	dev_t.mux = true;
 +	dev_t.sync_read = true;
- 	if (onenand_flags & ONENAND_FLAG_SYNCWRITE) {
--		t.adv_wr_off = t.adv_rd_off;
--		t.we_on  = 0;
--		t.we_off = t.cs_rd_off;
--		t.cs_wr_off = t.cs_rd_off;
--		t.wr_cycle  = t.rd_cycle;
--		if (cpu_is_omap34xx()) {
--			t.wr_data_mux_bus = gpmc_ticks_to_ns(fclk_offset +
--					gpmc_ps_to_ticks(min_gpmc_clk_period +
--					t_rdyo * 1000));
--			t.wr_access = t.access;
--		}
-+		dev_t.sync_write = true;
- 	} else {
--		t.adv_wr_off = gpmc_round_ns_to_ticks(max_t(int,
--							t_avdp, t_cer));
--		t.we_on  = t.adv_wr_off + gpmc_round_ns_to_ticks(t_aavdh);
--		t.we_off = t.we_on + gpmc_round_ns_to_ticks(t_wpl);
--		t.cs_wr_off = t.we_off + gpmc_round_ns_to_ticks(t_wph);
--		t.wr_cycle  = t.cs_wr_off + gpmc_round_ns_to_ticks(t_cez);
--		if (cpu_is_omap34xx()) {
--			t.wr_data_mux_bus = t.we_on;
--			t.wr_access = t.we_on + gpmc_round_ns_to_ticks(t_ds);
--		}
-+		dev_t.t_avdp_w = max(t_avdp, t_cer) * 1000;
-+		dev_t.t_wpl = t_wpl * 1000;
-+		dev_t.t_wph = t_wph * 1000;
-+		dev_t.t_aavdh = t_aavdh * 1000;
- 	}
-+	dev_t.ce_xdelay = true;
-+	dev_t.avd_xdelay = true;
-+	dev_t.oe_xdelay = true;
-+	dev_t.we_xdelay = true;
-+	dev_t.clk = min_gpmc_clk_period;
-+	dev_t.t_bacc = dev_t.clk;
-+	dev_t.t_ces = t_ces * 1000;
-+	dev_t.t_avds = t_avds * 1000;
-+	dev_t.t_avdh = t_avdh * 1000;
-+	dev_t.t_ach = t_ach * 1000;
-+	dev_t.cyc_iaa = (latency + 1);
-+	dev_t.t_cez_r = t_cez * 1000;
-+	dev_t.t_cez_w = dev_t.t_cez_r;
-+	dev_t.cyc_aavdh_oe = 1;
-+	dev_t.t_rdyo = t_rdyo * 1000 + min_gpmc_clk_period;
++	dev_t.sync_write = true;
++
++	dev_t.clk = 11100;
++	dev_t.t_bacc = 1000;
++	dev_t.t_ces = 1000;
++	dev_t.t_ceasu = 8 * 1000;
++	dev_t.t_avdasu = t_scsnh_advnh - 7000;
++	dev_t.t_ce_avd = 1000;
++	dev_t.t_avdp_r = t_scsnh_advnh;
++	dev_t.cyc_aavdh_oe = 3;
++	dev_t.cyc_oe = 5;
++	dev_t.t_ce_rdyz = 7000;
++	dev_t.t_avdp_w = t_scsnh_advnh;
++	dev_t.cyc_aavdh_we = 3;
++	dev_t.cyc_wpl = 6;
++	dev_t.t_ce_rdyz = 7000;
 +
 +	gpmc_calc_timings(&t, &dev_t);
  
- 	return t;
+ 	return gpmc_cs_set_timings(sync_cs, &t);
  }
+ 
+-extern unsigned long gpmc_get_fclk_period(void);
+-
+ /* tusb driver calls this when it changes the chip's clocking */
+ int tusb6010_platform_retime(unsigned is_refclk)
+ {
+ 	static const char	error[] =
+ 		KERN_ERR "tusb6010 %s retime error %d\n";
+ 
+-	unsigned	fclk_ps = gpmc_get_fclk_period();
+ 	unsigned	sysclk_ps;
+ 	int		status;
+ 
+-	if (!refclk_psec || fclk_ps == 0)
++	if (!refclk_psec)
+ 		return -ENODEV;
+ 
+ 	sysclk_ps = is_refclk ? refclk_psec : TUSB6010_OSCCLK_60;
+ 
+-	status = tusb_set_async_mode(sysclk_ps, fclk_ps);
++	status = tusb_set_async_mode(sysclk_ps);
+ 	if (status < 0) {
+ 		printk(error, "async", status);
+ 		goto done;
+ 	}
+-	status = tusb_set_sync_mode(sysclk_ps, fclk_ps);
++	status = tusb_set_sync_mode(sysclk_ps);
+ 	if (status < 0)
+ 		printk(error, "sync", status);
+ done:
 -- 
 1.7.12
