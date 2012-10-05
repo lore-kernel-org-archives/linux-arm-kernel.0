@@ -1,36 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Oct 2012 18:57:00 +0000
-Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
-In-Reply-To: <87d30xgel3.fsf@octavius.laptop.org>
-References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
- <201210022027.45461.arnd@arndb.de> <87d30xgel3.fsf@octavius.laptop.org>
-Message-ID: <201210051857.01311.arnd@arndb.de>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 5 Oct 2012 17:28:26 -0400
+Subject: [PATCH v2 0/7] uio_pruss cleanup and platform support
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA9C6B7@DBDE01.ent.ti.com>
+References: <1348861072-14507-1-git-send-email-mporter@ti.com>
+ <20121003150058.GB11180@beef>
+ <1BAFE6F6C881BF42822005164F1491C33EA9C6B7@DBDE01.ent.ti.com>
+Message-ID: <20121005212826.GN11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 October 2012, Chris Ball wrote:
-> On Tue, Oct 02 2012, Arnd Bergmann wrote:
-> > On Tuesday 02 October 2012, Chris Ball wrote:
-> >> Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
-> >> renamed arch/arm/mach-mmp/include/mach/sram.h to
-> >> include/linux/platform_data/dma-mmp_tdma.h, but didn't update
-> >> mmp-pcm.c which uses the header.  Fix the build error.
-> >> 
-> >> Signed-off-by: Chris Ball <cjb@laptop.org>
-> >> ---
-> >>  sound/soc/pxa/mmp-pcm.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> > Sorry I didn't catch this earlier. The file was only recently added
-> > and somehow didn't appear in my build tests.
+On Fri, Oct 05, 2012 at 04:43:56AM +0000, Hebbar, Gururaja wrote:
+> Matt,
 > 
-> Thanks.  Do you want to send this to mainline, or should Mark do it?
+> On Wed, Oct 03, 2012 at 20:30:58, Porter, Matt wrote:
+> > On Fri, Sep 28, 2012 at 03:37:45PM -0400, Matt Porter wrote:
+> > > Changes since v1:
+> > > 	- Replaced uio_pruss private SRAM API use with genalloc
+> > > 	- Added DA850 platform device and clock support
+> > > 	- Added DA850 L3 RAM gen_pool support
+> > > 	- Split out DT binding
+> > > 
+> > > This series enables uio_pruss on both DA850 and AM33xx. The driver
+> > > previously was not enabled by any platform and the private SRAM API
+> > > was accessing an invalid SRAM bank for use on DA850. For AM33xx,
+> > > DT, pinctrl, and runtime PM support are added since AM33xx only
+> > > boots via DT.
+> > 
+> > I'm dropping AM33xx/OMAP support from v3 for this series 
 > 
+> Just for my clarification, I believe you will be taking up AM33xx/OMAP 
+> SRAM support later once you have completed supporting DaVinci. Right?
 
-I think it's better for Mark to queue it up than me. sound/soc/
-is his domain, and I don't have any other patches that would go
-along with this fix.
+There's no SRAM support for uio_pruss to be handled for AM33xx, but I
+will be posting a separate series with the DT portion and some alternate
+hard reset handling implementation. I find the private OMAP reset api to
+be very ugly but we might have to go with that for now. I didn't want
+the OMAP hard reset portion to hold up the more important part of this
+cleanup.
 
-	Arnd
+-Matt
+
+> > since the
+> > focus has turned to fixing Davinci SRAM to provide genalloc support
+> > and the associated use of that in the driver.
+> > 
+> > I'll have a separate series with AM33xx support since dealing cleanly
+> > with external resets on OMAP is a bigger issue.
+> > 
+> > -Matt
+> > _______________________________________________
+> > Davinci-linux-open-source mailing list
+> > Davinci-linux-open-source at linux.davincidsp.com
+> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> > 
+> 
+> 
+> Regards, 
+> Gururaja
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
