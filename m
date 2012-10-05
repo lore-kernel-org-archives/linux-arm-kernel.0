@@ -1,50 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Oct 2012 16:50:46 -0700
-Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in
- HYP mode
-In-Reply-To: <20121005232325.GV3874@atomide.com>
-References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
- <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
- <20121005200822.GQ3874@atomide.com>
- <20121005230908.GC15246@n2100.arm.linux.org.uk>
- <20121005232325.GV3874@atomide.com>
-Message-ID: <20121005235046.GW3874@atomide.com>
+From: snijsure@grid-net.com (Subodh Nijsure)
+Date: Fri, 5 Oct 2012 23:58:26 +0000
+Subject: Kernel panic in mxs_auart_irq_handle with latest kernel?
+Message-ID: <B437D8FD67C39240BFA9DD878702A627EB4BD8@mx2.grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121005 16:27]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121005 16:10]:
-> > On Fri, Oct 05, 2012 at 01:08:22PM -0700, Tony Lindgren wrote:
-> > > Just bisected this down in linux-next for breaking booting of
-> > > my omap2420 ARMv6 based n8x0..
-> > > 
-> > > > --- a/arch/arm/kernel/head.S
-> > > > +++ b/arch/arm/kernel/head.S
-> > > > @@ -83,8 +83,12 @@ ENTRY(stext)
-> > > >   THUMB(	.thumb			)	@ switch to Thumb now.
-> > > >   THUMB(1:			)
-> > > >  
-> > > > -	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
-> > > > -						@ and irqs disabled
-> > > > +#ifdef CONFIG_ARM_VIRT_EXT
-> > > > +	bl	__hyp_stub_install
-> > > > +#endif
-> > > > +	@ ensure svc mode and all interrupts masked
-> > > > +	safe_svcmode_maskall r9
-> > > > +
-> > > >  	mrc	p15, 0, r9, c0, c0		@ get processor id
-> > > >  	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
-> > > >  	movs	r10, r5				@ invalid processor (r5=0)?
-> > > 
-> > > ..and looks like undoing this part fixes it. Any ideas?
-> > > 
-> > > I quickly tried disabling ARCH_OMAP3 and ARCH_OMAP4 so it's
-> > > ARMv6 but that does not help.
 
-The same kernel boots on 2430sdp, which is the same ARMv6 core
-as 2430 if I remember correctly. So this hints that it has something
-to do with the bits set differently by the bootloader?
+On my MX28 based board with top of the Linus's git tree I am consistently getting following kernel panic, anybody else seen this?
+(I will start bisecting and see if I can find a reason this wknd)
 
-Regards,
+-Subodh
 
-Tony
+[    9.700000] [00000118] *pgd=00000000
+[    9.700000] Internal error: Oops: 5 [#1] PREEMPT ARM
+[    9.700000] Modules linked in:
+[    9.700000] CPU: 0    Not tainted  (3.6.0-11641-gbe4ae13-dirty #1)
+[    9.700000] PC is at uart_insert_char+0x38/0x130
+[    9.700000] LR is at mxs_auart_irq_handle+0x198/0x2b0
+[    9.700000] pc : [<c025a3e0>]    lr : [<c0261700>]    psr: 40000093
+[    9.700000] sp : c0549ea0  ip : 00000000  fp : 00000001
+[    9.700000] r10: 00000000  r9 : c057e64e  r8 : 00000020
+[    9.700000] r7 : 00000000  r6 : 00080000  r5 : 00000000  r4 : c39566c0
+[    9.700000] r3 : 00000020  r2 : 00000000  r1 : 00000000  r0 : 00000000
+[    9.700000] Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    9.700000] Control: 0005317f  Table: 40004000  DAC: 00000017
+[    9.700000] Process swapper (pid: 0, stack limit = 0xc0548270)
+[    9.700000] Stack: (0xc0549ea0 to 0xc054a000)
+[    9.700000] 9ea0: c0554c00 00200002 00000000 c39566c0 00000000 0052006d 0052006d c0261700
+[    9.700000] 9ec0: 00000000 c0548000 c398f980 c0548000 00000000 00000000 000000d3 c057e64e
+[    9.700000] 9ee0: c387d700 c0063e74 ffffffff 20000093 00000002 c387d700 c0548000 00000000
+[    9.700000] 9f00: c0549f9c 40004000 41069265 40541cd8 00000000 c006403c 427c4747 00000002
+[    9.700000] 9f20: c0548000 c0548000 c387d700 c00662dc 000000d3 000000d3 00000000 c00637b0
+[    9.700000] 9f40: c0568748 c000ffec f5000000 c0549f68 c0587814 c0008778 c0010144 60000013
+[    9.700000] 9f60: ffffffff c000eda0 00000000 0005317f 0005217f 60000013 c0548000 c05875a8
+[    9.700000] 9f80: c0554300 c0644480 40004000 41069265 40541cd8 00000000 600000d3 c0549fb0
+[    9.700000] 9fa0: c0010138 c0010144 60000013 ffffffff 60000093 c0010308 c05500a8 c0587520
+[    9.700000] 9fc0: c0543150 c0522700 ffffffff ffffffff c05221d0 00000000 00000000 c0543150
+[    9.700000] 9fe0: 00000000 00053175 c055001c c0543120 c05542f4 40008040 00000000 00000000
+[    9.700000] [<c025a3e0>] (uart_insert_char+0x38/0x130) from [<c0261700>] (mxs_auart_irq_handle+0x198/0x2b0)
+[    9.700000] [<c0261700>] (mxs_auart_irq_handle+0x198/0x2b0) from [<c0063e74>] (handle_irq_event_percpu+0x50/0x1c4)
+[    9.700000] [<c0063e74>] (handle_irq_event_percpu+0x50/0x1c4) from [<c006403c>] (handle_irq_event+0x54/0x84)
+[    9.700000] [<c006403c>] (handle_irq_event+0x54/0x84) from [<c00662dc>] (handle_level_irq+0x98/0x14c)
+[    9.700000] [<c00662dc>] (handle_level_irq+0x98/0x14c) from [<c00637b0>] (generic_handle_irq+0x20/0x30)
+[    9.700000] [<c00637b0>] (generic_handle_irq+0x20/0x30) from [<c000ffec>] (handle_IRQ+0x30/0x84)
+[    9.700000] [<c000ffec>] (handle_IRQ+0x30/0x84) from [<c0008778>] (icoll_handle_irq+0x34/0x48)
+[    9.700000] [<c0008778>] (icoll_handle_irq+0x34/0x48) from [<c000eda0>] (__irq_svc+0x40/0x6c)
+[    9.700000] Exception stack(0xc0549f68 to 0xc0549fb0)
+[    9.700000] 9f60:                   00000000 0005317f 0005217f 60000013 c0548000 c05875a8
+[    9.700000] 9f80: c0554300 c0644480 40004000 41069265 40541cd8 00000000 600000d3 c0549fb0
+[    9.700000] 9fa0: c0010138 c0010144 60000013 ffffffff
+[    9.700000] [<c000eda0>] (__irq_svc+0x40/0x6c) from [<c0010144>] (default_idle+0x38/0x40)
+[    9.700000] [<c0010144>] (default_idle+0x38/0x40) from [<c0010308>] (cpu_idle+0x9c/0xd4)
+[    9.700000] [<c0010308>] (cpu_idle+0x9c/0xd4) from [<c0522700>] (start_kernel+0x264/0x2a4)
+[    9.700000] [<c0522700>] (start_kernel+0x264/0x2a4) from [<40008040>] (0x40008040)
+[    9.700000] Code: 1a000012 e59d2020 e5cd3006 e5cd2007 (e5973118) 
+[    9.700000] ---[ end trace 179ba7640a9ebb7c ]---
+[    9.700000] Kernel panic - not syncing: Fatal exception in interrupt
