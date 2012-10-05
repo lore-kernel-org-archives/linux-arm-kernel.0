@@ -1,38 +1,69 @@
-From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
-Date: Fri, 05 Oct 2012 17:34:02 +0200
-Subject: mxc-nand + jffs2 : dir ino #9041 appears to be a hard link
-Message-ID: <506EFDEA.7050305@gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Fri, 5 Oct 2012 21:09:12 +0530
+Subject: [PATCH v8 2/6] ARM: OMAP2+: nand: remove redundant rounding
+In-Reply-To: <cover.1349444935.git.afzal@ti.com>
+References: <cover.1349444935.git.afzal@ti.com>
+Message-ID: <d42eafa8c80ce785d93fbcfd9d3b8b714eee531f.1349444936.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-I am working with iMX27 (3DS) with NAND support (and bbiswap patch : 
-mxc_nand : allow swapping the Bad block Indicator for NFC v1).
+gpmc_cs_set_timings() calculate ticks to be programmed by
+rounding time in ns to next tick value. Hence remove
+redundant rounding of nanosecond timing.
 
-Here is errors that I have sometimes after updating a lot of of files.
-Everything is working good until I power off the board (before that I 
-start that reboot script that sync and umount all filesystems and 
-remount / as ro (sync is also run before remount) before reboot.
-While this update, there is several "ln -sf" because busybox must be 
-updated.
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/mach-omap2/gpmc-nand.c | 30 +++++++++++++-----------------
+ 1 file changed, 13 insertions(+), 17 deletions(-)
 
-Sometimes it works and sometimes filesystem gets corrupted and gives me 
-following kind of errors :
-jffs2: error: (1) jffs2_build_inode_pass1: child dir "share" (ino #9044) 
-of dir ino #9041 appears to be a hard link
-
-
-jffs2: warning: (1022) jffs2_get_inode_nodes: Eep. No valid nodes for 
-ino #9044.
-jffs2: warning: (1022) jffs2_do_read_inode_internal: no data nodes found 
-for ino #9044
-
-This never occurs with kernel 2.6.22 from Freescale but with kernel 
-3.4.4, it occurs.
-I am going to compile kernel 3.4.12 but I don't see anything in commits 
-about this problem.
-
-Does anyone have an idea where the problem is ?
-Thanks for your help.
-Best regards,
-Ga?tan Carlier.
+diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+index 4acf497..4eceaca 100644
+--- a/arch/arm/mach-omap2/gpmc-nand.c
++++ b/arch/arm/mach-omap2/gpmc-nand.c
+@@ -50,31 +50,27 @@ static int omap2_nand_gpmc_retime(struct omap_nand_platform_data *gpmc_nand_data
+ 
+ 	memset(&t, 0, sizeof(t));
+ 	t.sync_clk = gpmc_nand_data->gpmc_t->sync_clk;
+-	t.cs_on = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->cs_on);
+-	t.adv_on = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->adv_on);
++	t.cs_on = gpmc_nand_data->gpmc_t->cs_on;
++	t.adv_on = gpmc_nand_data->gpmc_t->adv_on;
+ 
+ 	/* Read */
+-	t.adv_rd_off = gpmc_round_ns_to_ticks(
+-				gpmc_nand_data->gpmc_t->adv_rd_off);
++	t.adv_rd_off = gpmc_nand_data->gpmc_t->adv_rd_off;
+ 	t.oe_on  = t.adv_on;
+-	t.access = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->access);
+-	t.oe_off = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->oe_off);
+-	t.cs_rd_off = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->cs_rd_off);
+-	t.rd_cycle  = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->rd_cycle);
++	t.access = gpmc_nand_data->gpmc_t->access;
++	t.oe_off = gpmc_nand_data->gpmc_t->oe_off;
++	t.cs_rd_off = gpmc_nand_data->gpmc_t->cs_rd_off;
++	t.rd_cycle = gpmc_nand_data->gpmc_t->rd_cycle;
+ 
+ 	/* Write */
+-	t.adv_wr_off = gpmc_round_ns_to_ticks(
+-				gpmc_nand_data->gpmc_t->adv_wr_off);
++	t.adv_wr_off = gpmc_nand_data->gpmc_t->adv_wr_off;
+ 	t.we_on  = t.oe_on;
+ 	if (cpu_is_omap34xx()) {
+-	    t.wr_data_mux_bus =	gpmc_round_ns_to_ticks(
+-				gpmc_nand_data->gpmc_t->wr_data_mux_bus);
+-	    t.wr_access = gpmc_round_ns_to_ticks(
+-				gpmc_nand_data->gpmc_t->wr_access);
++		t.wr_data_mux_bus = gpmc_nand_data->gpmc_t->wr_data_mux_bus;
++		t.wr_access = gpmc_nand_data->gpmc_t->wr_access;
+ 	}
+-	t.we_off = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->we_off);
+-	t.cs_wr_off = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->cs_wr_off);
+-	t.wr_cycle  = gpmc_round_ns_to_ticks(gpmc_nand_data->gpmc_t->wr_cycle);
++	t.we_off = gpmc_nand_data->gpmc_t->we_off;
++	t.cs_wr_off = gpmc_nand_data->gpmc_t->cs_wr_off;
++	t.wr_cycle = gpmc_nand_data->gpmc_t->wr_cycle;
+ 
+ 	/* Configure GPMC */
+ 	if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
+-- 
+1.7.12
