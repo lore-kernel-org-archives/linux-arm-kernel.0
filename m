@@ -1,42 +1,112 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Oct 2012 16:31:39 +0100
-Subject: [PATCH 03/10] mfd: Correct copy and paste mistake in stmpe
+Date: Fri,  5 Oct 2012 16:31:41 +0100
+Subject: [PATCH 05/10] mfd: Enable the STMPE MFD for Device Tree
 In-Reply-To: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
 References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349451107-8009-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349451107-8009-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When specifying IRQ numbers for the stmpe1601, IRQ defines for the
-stmpe24xx were used instead. Fortunately, the defined numbers are
-the same, hence why it survived testing. This fix is merely an
-aesthetic one.
+This patch allows the STMPE Multi-Functional Device to be correctly
+initialised when booting with Device Tree support enabled. Its
+children are specified by the addition of subordinate devices to the
+STMPE node in the Device Tree file.
 
 Cc: Samuel Ortiz <sameo@linux.intel.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/stmpe.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mfd/stmpe.c |   48 ++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index 5c8d8f2..e50ebdf 100644
+index e50ebdf..ba157d4 100644
 --- a/drivers/mfd/stmpe.c
 +++ b/drivers/mfd/stmpe.c
-@@ -519,12 +519,12 @@ static const u8 stmpe1601_regs[] = {
- static struct stmpe_variant_block stmpe1601_blocks[] = {
- 	{
- 		.cell	= &stmpe_gpio_cell,
--		.irq	= STMPE24XX_IRQ_GPIOC,
-+		.irq	= STMPE1601_IRQ_GPIOC,
- 		.block	= STMPE_BLOCK_GPIO,
- 	},
- 	{
- 		.cell	= &stmpe_keypad_cell,
--		.irq	= STMPE24XX_IRQ_KEYPAD,
-+		.irq	= STMPE1601_IRQ_KEYPAD,
- 		.block	= STMPE_BLOCK_KEYPAD,
- 	},
+@@ -885,18 +885,19 @@ static struct irq_domain_ops stmpe_irq_ops = {
+         .xlate  = irq_domain_xlate_twocell,
  };
+ 
+-static int __devinit stmpe_irq_init(struct stmpe *stmpe)
++static int __devinit stmpe_irq_init(struct stmpe *stmpe,
++				struct device_node *np)
+ {
+ 	int base = stmpe->irq_base;
+ 	int num_irqs = stmpe->variant->num_irqs;
+ 
+ 	if (base) {
+ 		stmpe->domain = irq_domain_add_legacy(
+-			NULL, num_irqs, base, 0, &stmpe_irq_ops, stmpe);
++			np, num_irqs, base, 0, &stmpe_irq_ops, stmpe);
+ 	}
+ 	else {
+ 		stmpe->domain = irq_domain_add_linear(
+-			NULL, num_irqs, &stmpe_irq_ops, stmpe);
++			np, num_irqs, &stmpe_irq_ops, stmpe);
+ 	}
+ 
+ 	if (!stmpe->domain) {
+@@ -1016,15 +1017,50 @@ static int __devinit stmpe_devices_init(struct stmpe *stmpe)
+ 	return ret;
+ }
+ 
++void __devinit stmpe_of_probe(struct stmpe_platform_data *pdata,
++			struct device_node *np)
++{
++	struct device_node *child;
++
++	of_property_read_u32(np, "st,autosleep-timeout",
++			&pdata->autosleep_timeout);
++
++	pdata->autosleep = (pdata->autosleep_timeout) ? true : false;
++
++	for_each_child_of_node(np, child) {
++		if (!strcmp(child->name, "stmpe_gpio")) {
++			pdata->blocks |= STMPE_BLOCK_GPIO;
++		}
++		if (!strcmp(child->name, "stmpe_keypad")) {
++			pdata->blocks |= STMPE_BLOCK_KEYPAD;
++		}
++		if (!strcmp(child->name, "stmpe_touchscreen")) {
++			pdata->blocks |= STMPE_BLOCK_TOUCHSCREEN;
++		}
++		if (!strcmp(child->name, "stmpe_adc")) {
++			pdata->blocks |= STMPE_BLOCK_ADC;
++		}
++	}
++}
++
+ /* Called from client specific probe routines */
+ int __devinit stmpe_probe(struct stmpe_client_info *ci, int partnum)
+ {
+ 	struct stmpe_platform_data *pdata = dev_get_platdata(ci->dev);
++	struct device_node *np = ci->dev->of_node;
+ 	struct stmpe *stmpe;
+ 	int ret;
+ 
+-	if (!pdata)
+-		return -EINVAL;
++	if (!pdata) {
++		if (np) {
++			pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
++			if (!pdata)
++				return -ENOMEM;
++
++			stmpe_of_probe(pdata, np);
++		} else
++			return -EINVAL;
++	}
+ 
+ 	stmpe = kzalloc(sizeof(struct stmpe), GFP_KERNEL);
+ 	if (!stmpe)
+@@ -1080,7 +1116,7 @@ int __devinit stmpe_probe(struct stmpe_client_info *ci, int partnum)
+ 		goto free_gpio;
+ 
+ 	if (stmpe->irq >= 0) {
+-		ret = stmpe_irq_init(stmpe);
++		ret = stmpe_irq_init(stmpe, np);
+ 		if (ret)
+ 			goto free_gpio;
+ 
 -- 
 1.7.9.5
