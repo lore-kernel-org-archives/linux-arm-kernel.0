@@ -1,46 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 05 Oct 2012 09:33:31 -0500
-Subject: alignment faults in 3.6
-In-Reply-To: <20121005140556.GQ4625@n2100.arm.linux.org.uk>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
- <20121005140556.GQ4625@n2100.arm.linux.org.uk>
-Message-ID: <506EEFBB.3060705@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 05 Oct 2012 10:48:08 -0400
+Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
+In-Reply-To: <201210022027.45461.arnd@arndb.de> (Arnd Bergmann's message of
+ "Tue, 2 Oct 2012 20:27:45 +0000")
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <1347368390-31252-7-git-send-email-arnd@arndb.de>
+ <87fw5wofwm.fsf_-_@octavius.laptop.org>
+ <201210022027.45461.arnd@arndb.de>
+Message-ID: <87d30xgel3.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2012 09:05 AM, Russell King - ARM Linux wrote:
-> On Fri, Oct 05, 2012 at 07:24:44AM -0500, Rob Herring wrote:
->> On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
->>> Does it matter?  I'm just relaying the argument against adding __packed
->>> which was used before we were forced (by the networking folk) to implement
->>> the alignment fault handler.
->>
->> It doesn't really matter what will be accepted or not as adding __packed
->> to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
->> The only way I've found to eliminate the alignment fault is adding a
->> barrier between the 2 loads. That seems like a compiler issue to me if
->> there is not a better fix.
-> 
-> Even so, please test the patch I've sent you in the sub-thread - that
-> needs testing whether or not GCC is at fault.  Will's patch to add the
-> warnings _has_ uncovered a potential issue with the use of __get_user()
-> in some parts of the ARM specific kernel, and I really need you to test
-> that while you're experiencing this problem.
+Hi Arnd,
 
-I've tested your patch and it appears to fix things. Thanks!
+On Tue, Oct 02 2012, Arnd Bergmann wrote:
+> On Tuesday 02 October 2012, Chris Ball wrote:
+>> Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
+>> renamed arch/arm/mach-mmp/include/mach/sram.h to
+>> include/linux/platform_data/dma-mmp_tdma.h, but didn't update
+>> mmp-pcm.c which uses the header.  Fix the build error.
+>> 
+>> Signed-off-by: Chris Ball <cjb@laptop.org>
+>> ---
+>>  sound/soc/pxa/mmp-pcm.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Sorry I didn't catch this earlier. The file was only recently added
+> and somehow didn't appear in my build tests.
 
-Now on to getting rid of faults on practically every single received IP
-packet:
+Thanks.  Do you want to send this to mainline, or should Mark do it?
 
-Multi:          9871002
-
-RX packets:9872010 errors:0 dropped:0 overruns:0 frame:0
-
-Rob
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
