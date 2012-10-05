@@ -1,250 +1,111 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 5 Oct 2012 21:31:21 +0530
-Subject: [PATCH 4/4] ARM: OMAP2+: tusb6010: generic timing calculation
-In-Reply-To: <cover.1349450723.git.afzal@ti.com>
-References: <cover.1349450723.git.afzal@ti.com>
-Message-ID: <f7844b2b61f7432195f5fa30c89a940737e260aa.1349450723.git.afzal@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 05 Oct 2012 11:01:24 -0500
+Subject: alignment faults in 3.6
+In-Reply-To: <20590.58864.527467.746403@pilspetsen.it.uu.se>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
+ <20590.58864.527467.746403@pilspetsen.it.uu.se>
+Message-ID: <506F0454.3070304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic gpmc timing calculation helper is available now, use
-it instead of custom timing calculation.
+On 10/05/2012 08:51 AM, Mikael Pettersson wrote:
+> Rob Herring writes:
+>  > On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
+>  > > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
+>  > >> On 5 October 2012 08:12, Russell King - ARM Linux
+>  > >> <linux@arm.linux.org.uk> wrote:
+>  > >>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
+>  > >>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
+>  > >>>>> This struct is the IP header, so a struct ptr is just set to the
+>  > >>>>> beginning of the received data. Since ethernet headers are 14 bytes,
+>  > >>>>> often the IP header is not aligned unless the NIC can place the frame at
+>  > >>>>> a 2 byte offset (which is something I need to investigate). So this
+>  > >>>>> function cannot make any assumptions about the alignment. Does the ABI
+>  > >>>>> define structs have some minimum alignment? Does the struct need to be
+>  > >>>>> declared as packed or something?
+>  > >>>>
+>  > >>>> The ABI defines the alignment of structs as the maximum alignment of its
+>  > >>>> members.  Since this struct contains 32-bit members, the alignment for the
+>  > >>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
+>  > >>>> might be unaligned (in addition to removing any holes within).
+>  > >>>
+>  > >>> This has come up before in the past.
+>  > >>>
+>  > >>> The Linux network folk will _not_ allow - in any shape or form - for
+>  > >>> this struct to be marked packed (it's the struct which needs to be
+>  > >>> marked packed) because by doing so, it causes GCC to issue byte loads/
+>  > >>> stores on architectures where there isn't a problem, and that decreases
+>  > >>> the performance of the Linux IP stack unnecessarily.
+>  > >>
+>  > >> Which architectures?  I have never seen anything like that.
+>  > > 
+>  > > Does it matter?  I'm just relaying the argument against adding __packed
+>  > > which was used before we were forced (by the networking folk) to implement
+>  > > the alignment fault handler.
+>  > 
+>  > It doesn't really matter what will be accepted or not as adding __packed
+>  > to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
+>  > The only way I've found to eliminate the alignment fault is adding a
+>  > barrier between the 2 loads. That seems like a compiler issue to me if
+>  > there is not a better fix.
+> 
+> If you suspect a GCC bug, please prepare a standalone user-space test case
+> and submit it to GCC's bugzilla (I can do the latter if you absolutely do not
+> want to).  It wouldn't be the first alignment-related GCC bug...
+> 
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/usb-tusb6010.c | 182 +++++++++----------------------------
- 1 file changed, 44 insertions(+), 138 deletions(-)
+Here's a testcase. Compiled on ubuntu precise with
+"arm-linux-gnueabihf-gcc -O2 -marm -march=armv7-a test.c".
 
-diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
-index 8ee73fc..4c7d7b5 100644
---- a/arch/arm/mach-omap2/usb-tusb6010.c
-+++ b/arch/arm/mach-omap2/usb-tusb6010.c
-@@ -26,182 +26,88 @@ static u8		async_cs, sync_cs;
- static unsigned		refclk_psec;
- 
- 
--/* t2_ps, when quantized to fclk units, must happen no earlier than
-- * the clock after after t1_NS.
-- *
-- * Return a possibly updated value of t2_ps, converted to nsec.
-- */
--static unsigned
--next_clk(unsigned t1_NS, unsigned t2_ps, unsigned fclk_ps)
--{
--	unsigned	t1_ps = t1_NS * 1000;
--	unsigned	t1_f, t2_f;
--
--	if ((t1_ps + fclk_ps) < t2_ps)
--		return t2_ps / 1000;
--
--	t1_f = (t1_ps + fclk_ps - 1) / fclk_ps;
--	t2_f = (t2_ps + fclk_ps - 1) / fclk_ps;
--
--	if (t1_f >= t2_f)
--		t2_f = t1_f + 1;
--
--	return (t2_f * fclk_ps) / 1000;
--}
--
- /* NOTE:  timings are from tusb 6010 datasheet Rev 1.8, 12-Sept 2006 */
- 
--static int tusb_set_async_mode(unsigned sysclk_ps, unsigned fclk_ps)
-+static int tusb_set_async_mode(unsigned sysclk_ps)
- {
-+	struct gpmc_device_timings dev_t;
- 	struct gpmc_timings	t;
- 	unsigned		t_acsnh_advnh = sysclk_ps + 3000;
--	unsigned		tmp;
--
--	memset(&t, 0, sizeof(t));
--
--	/* CS_ON = t_acsnh_acsnl */
--	t.cs_on = 8;
--	/* ADV_ON = t_acsnh_advnh - t_advn */
--	t.adv_on = next_clk(t.cs_on, t_acsnh_advnh - 7000, fclk_ps);
--
--	/*
--	 * READ ... from omap2420 TRM fig 12-13
--	 */
--
--	/* ADV_RD_OFF = t_acsnh_advnh */
--	t.adv_rd_off = next_clk(t.adv_on, t_acsnh_advnh, fclk_ps);
--
--	/* OE_ON = t_acsnh_advnh + t_advn_oen (then wait for nRDY) */
--	t.oe_on = next_clk(t.adv_on, t_acsnh_advnh + 1000, fclk_ps);
--
--	/* ACCESS = counters continue only after nRDY */
--	tmp = t.oe_on * 1000 + 300;
--	t.access = next_clk(t.oe_on, tmp, fclk_ps);
--
--	/* OE_OFF = after data gets sampled */
--	tmp = t.access * 1000;
--	t.oe_off = next_clk(t.access, tmp, fclk_ps);
--
--	t.cs_rd_off = t.oe_off;
--
--	tmp = t.cs_rd_off * 1000 + 7000 /* t_acsn_rdy_z */;
--	t.rd_cycle = next_clk(t.cs_rd_off, tmp, fclk_ps);
--
--	/*
--	 * WRITE ... from omap2420 TRM fig 12-15
--	 */
- 
--	/* ADV_WR_OFF = t_acsnh_advnh */
--	t.adv_wr_off = t.adv_rd_off;
-+	memset(&dev_t, 0, sizeof(dev_t));
- 
--	/* WE_ON = t_acsnh_advnh + t_advn_wen (then wait for nRDY) */
--	t.we_on = next_clk(t.adv_wr_off, t_acsnh_advnh + 1000, fclk_ps);
-+	dev_t.mux = true;
- 
--	/* WE_OFF = after data gets sampled */
--	tmp = t.we_on * 1000 + 300;
--	t.we_off = next_clk(t.we_on, tmp, fclk_ps);
-+	dev_t.t_ceasu = 8 * 1000;
-+	dev_t.t_avdasu = t_acsnh_advnh - 7000;
-+	dev_t.t_ce_avd = 1000;
-+	dev_t.t_avdp_r = t_acsnh_advnh;
-+	dev_t.t_oeasu = t_acsnh_advnh + 1000;
-+	dev_t.t_oe = 300;
-+	dev_t.t_cez_r = 7000;
-+	dev_t.t_cez_w = dev_t.t_cez_r;
-+	dev_t.t_avdp_w = t_acsnh_advnh;
-+	dev_t.t_weasu = t_acsnh_advnh + 1000;
-+	dev_t.t_wpl = 300;
-+	dev_t.cyc_aavdh_we = 1;
- 
--	t.cs_wr_off = t.we_off;
--
--	tmp = t.cs_wr_off * 1000 + 7000 /* t_acsn_rdy_z */;
--	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
-+	gpmc_calc_timings(&t, &dev_t);
- 
- 	return gpmc_cs_set_timings(async_cs, &t);
- }
- 
--static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
-+static int tusb_set_sync_mode(unsigned sysclk_ps)
- {
-+	struct gpmc_device_timings dev_t;
- 	struct gpmc_timings	t;
- 	unsigned		t_scsnh_advnh = sysclk_ps + 3000;
--	unsigned		tmp;
--
--	memset(&t, 0, sizeof(t));
--	t.cs_on = 8;
--
--	/* ADV_ON = t_acsnh_advnh - t_advn */
--	t.adv_on = next_clk(t.cs_on, t_scsnh_advnh - 7000, fclk_ps);
--
--	/* GPMC_CLK rate = fclk rate / div */
--	t.sync_clk = 11100 /* 11.1 nsec */;
--	tmp = (t.sync_clk + fclk_ps - 1) / fclk_ps;
--	if (tmp > 4)
--		return -ERANGE;
--	if (tmp == 0)
--		tmp = 1;
--	t.page_burst_access = (fclk_ps * tmp) / 1000;
--
--	/*
--	 * READ ... based on omap2420 TRM fig 12-19, 12-20
--	 */
--
--	/* ADV_RD_OFF = t_scsnh_advnh */
--	t.adv_rd_off = next_clk(t.adv_on, t_scsnh_advnh, fclk_ps);
--
--	/* OE_ON = t_scsnh_advnh + t_advn_oen * fclk_ps (then wait for nRDY) */
--	tmp = (t.adv_rd_off * 1000) + (3 * fclk_ps);
--	t.oe_on = next_clk(t.adv_on, tmp, fclk_ps);
--
--	/* ACCESS = number of clock cycles after t_adv_eon */
--	tmp = (t.oe_on * 1000) + (5 * fclk_ps);
--	t.access = next_clk(t.oe_on, tmp, fclk_ps);
--
--	/* OE_OFF = after data gets sampled */
--	tmp = (t.access * 1000) + (1 * fclk_ps);
--	t.oe_off = next_clk(t.access, tmp, fclk_ps);
- 
--	t.cs_rd_off = t.oe_off;
--
--	tmp = t.cs_rd_off * 1000 + 7000 /* t_scsn_rdy_z */;
--	t.rd_cycle = next_clk(t.cs_rd_off, tmp, fclk_ps);
--
--	/*
--	 * WRITE ... based on omap2420 TRM fig 12-21
--	 */
--
--	/* ADV_WR_OFF = t_scsnh_advnh */
--	t.adv_wr_off = t.adv_rd_off;
--
--	/* WE_ON = t_scsnh_advnh + t_advn_wen * fclk_ps (then wait for nRDY) */
--	tmp = (t.adv_wr_off * 1000) + (3 * fclk_ps);
--	t.we_on = next_clk(t.adv_wr_off, tmp, fclk_ps);
--
--	/* WE_OFF = number of clock cycles after t_adv_wen */
--	tmp = (t.we_on * 1000) + (6 * fclk_ps);
--	t.we_off = next_clk(t.we_on, tmp, fclk_ps);
--
--	t.cs_wr_off = t.we_off;
--
--	tmp = t.cs_wr_off * 1000 + 7000 /* t_scsn_rdy_z */;
--	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
--
--	t.clk_activation = gpmc_ticks_to_ns(1);
-+	memset(&dev_t, 0, sizeof(dev_t));
-+
-+	dev_t.mux = true;
-+	dev_t.sync_read = true;
-+	dev_t.sync_write = true;
-+
-+	dev_t.clk = 11100;
-+	dev_t.t_bacc = 1000;
-+	dev_t.t_ces = 1000;
-+	dev_t.t_ceasu = 8 * 1000;
-+	dev_t.t_avdasu = t_scsnh_advnh - 7000;
-+	dev_t.t_ce_avd = 1000;
-+	dev_t.t_avdp_r = t_scsnh_advnh;
-+	dev_t.cyc_aavdh_oe = 3;
-+	dev_t.cyc_oe = 5;
-+	dev_t.t_ce_rdyz = 7000;
-+	dev_t.t_avdp_w = t_scsnh_advnh;
-+	dev_t.cyc_aavdh_we = 3;
-+	dev_t.cyc_wpl = 6;
-+	dev_t.t_ce_rdyz = 7000;
-+
-+	gpmc_calc_timings(&t, &dev_t);
- 
- 	return gpmc_cs_set_timings(sync_cs, &t);
- }
- 
--extern unsigned long gpmc_get_fclk_period(void);
--
- /* tusb driver calls this when it changes the chip's clocking */
- int tusb6010_platform_retime(unsigned is_refclk)
- {
- 	static const char	error[] =
- 		KERN_ERR "tusb6010 %s retime error %d\n";
- 
--	unsigned	fclk_ps = gpmc_get_fclk_period();
- 	unsigned	sysclk_ps;
- 	int		status;
- 
--	if (!refclk_psec || fclk_ps == 0)
-+	if (!refclk_psec)
- 		return -ENODEV;
- 
- 	sysclk_ps = is_refclk ? refclk_psec : TUSB6010_OSCCLK_60;
- 
--	status = tusb_set_async_mode(sysclk_ps, fclk_ps);
-+	status = tusb_set_async_mode(sysclk_ps);
- 	if (status < 0) {
- 		printk(error, "async", status);
- 		goto done;
- 	}
--	status = tusb_set_sync_mode(sysclk_ps, fclk_ps);
-+	status = tusb_set_sync_mode(sysclk_ps);
- 	if (status < 0)
- 		printk(error, "sync", status);
- done:
--- 
-1.7.12
+typedef unsigned short u16;
+typedef unsigned short __sum16;
+typedef unsigned int __u32;
+typedef unsigned char __u8;
+typedef __u32 __be32;
+typedef u16 __be16;
+
+struct iphdr {
+	__u8	ihl:4,
+		version:4;
+	__u8	tos;
+	__be16	tot_len;
+	__be16	id;
+	__be16	frag_off;
+	__u8	ttl;
+	__u8	protocol;
+	__sum16	check;
+	__be32	saddr;
+	__be32	daddr;
+	/*The options start here. */
+};
+
+#define ntohl(x) __swab32((__u32)(__be32)(x))
+#define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
+
+static inline __attribute__((const)) __u32 __swab32(__u32 x)
+{
+	__asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
+	return x;
+}
+
+int main(void * buffer, unsigned int *p_id)
+{
+	unsigned int id;
+	int flush = 1;
+	const struct iphdr *iph = buffer;
+	__u32 len = *p_id;
+	
+	id = ntohl(*(__be32 *)&iph->id);
+	flush = (u16)((ntohl(*(__be32 *)iph) ^ len) | (id ^ IP_DF));
+	id >>= 16;
+	
+	*p_id = id;
+	return flush;
+}
