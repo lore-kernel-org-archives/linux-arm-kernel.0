@@ -1,45 +1,61 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Oct 2012 16:31:45 +0100
-Subject: [PATCH 09/10] ARM: ux500: Apply a Device Tree node for the STMPE MFD
+Date: Fri,  5 Oct 2012 16:31:46 +0100
+Subject: [PATCH 10/10] ARM: ux500: Supply the STMPE keypad Device Tree node to
+ the STUIB DT
 In-Reply-To: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
 References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349451107-8009-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349451107-8009-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we apply the STMPE Multi-Functional Device's node to the
-ST User Interface Board Device Tree file. It includes all of
-the properties required for correct device initialsation.
+This patch allows the STMPE keypad driver to be successfully probed
+and initialised during a Device Tree enabled boot sequence. It
+contains all of the required properties needed to setup and map
+each key on the 6x3 keypad located on the ST User Interface Board.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stuib.dtsi |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/stuib.dtsi |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
-index 62f3ecd..b25663c 100644
+index b25663c..b492e3e 100644
 --- a/arch/arm/boot/dts/stuib.dtsi
 +++ b/arch/arm/boot/dts/stuib.dtsi
-@@ -11,6 +11,19 @@
+@@ -21,6 +21,33 @@
  
- / {
- 	soc-u9500 {
-+		i2c at 80004000 {
-+			stmpe1601: stmpe1601 at 40 {
-+				compatible = "st,stmpe1601";
-+				reg = <0x40>;
-+				interrupts = <26 0x4>;
-+				interrupt-parent = <&gpio6>;
-+				interrupt-controller;
+ 				i2c-client-wake;
+ 				st,autosleep-timeout = <1024>;
 +
-+				i2c-client-wake;
-+				st,autosleep-timeout = <1024>;
-+			};
-+		};
++				stmpe_keypad {
++					compatible = "st,stmpe-keypad";
 +
- 		i2c at 80110000 {
- 			bu21013_tp at 0x5c {
- 				compatible = "rhom,bu21013_tp";
++					debounce-interval = <64>;
++					stericsson,scan-count = <8>;
++					stericsson,no-autorepeat;
++
++					linux,keymap = <0x205006b
++							0x4010074
++							0x3050072
++							0x1030004
++							0x502006a
++							0x500000a
++							0x5008b
++							0x706001c
++							0x405000b
++							0x6070003
++							0x3040067
++							0x303006c
++							0x60400e7
++							0x602009e
++							0x4020073
++							0x5050002
++							0x4030069
++							0x3020008>;
++				};
+ 			};
+ 		};
+ 
 -- 
 1.7.9.5
