@@ -1,91 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 04 Oct 2012 20:56:40 -0500
-Subject: alignment faults in 3.6
-In-Reply-To: <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
-Message-ID: <506E3E58.80703@gmail.com>
+From: mingyu84.kim@samsung.com (Min-gyu Kim)
+Date: Fri, 05 Oct 2012 11:23:30 +0900
+Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
+In-Reply-To: <20121001091042.49198.93241.stgit@ubuntu>
+References: <20121001090945.49198.68950.stgit@ubuntu>
+ <20121001091042.49198.93241.stgit@ubuntu>
+Message-ID: <000401cda2a0$69670a40$3c351ec0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2012 08:26 PM, Mans Rullgard wrote:
-> On 5 October 2012 01:58, Michael Hope <michael.hope@linaro.org> wrote:
->> On 5 October 2012 12:10, Rob Herring <robherring2@gmail.com> wrote:
->>> I've been scratching my head with a "scheduling while atomic" bug I
->>> started seeing on 3.6. I can easily reproduce this problem when doing a
->>> wget on my system. It ultimately seems to be a combination of factors.
->>> The "scheduling while atomic" bug is triggered in do_alignment which
->>> gets triggered by this code in net/ipv4/af_inet.c, line 1356:
->>>
->>> id = ntohl(*(__be32 *)&iph->id);
->>> flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id ^ IP_DF));
->>> id >>= 16;
->>>
->>> This code compiles into this using "gcc version 4.6.3 (Ubuntu/Linaro
->>> 4.6.3-1ubuntu5)":
->>>
->>> c02ac020:       e8920840        ldm     r2, {r6, fp}
->>> c02ac024:       e6bfbf3b        rev     fp, fp
->>> c02ac028:       e6bf6f36        rev     r6, r6
->>> c02ac02c:       e22bc901        eor     ip, fp, #16384  ; 0x4000
->>> c02ac030:       e0266008        eor     r6, r6, r8
->>> c02ac034:       e18c6006        orr     r6, ip, r6
->>>
->>> which generates alignment faults on the ldm. These are silent until this
->>> commit is applied:
->>
->> Hi Rob.  I assume that iph is something like:
->>
->> struct foo {
->>     u32 x;
->>     char id[8];
->> };
->>
->> struct foo *iph;
->>
->> GCC merged the two adjacent loads of x and id into one ldm.  This is
->> an ARM specific optimisation done in load_multiple_sequence() and
->> enabled with -fpeephole2.
->>
->> I think the assembly is correct - GCC knows that iph is aligned and
->> knows the offsets of both x and id.  Happy to be corrected if I'm
->> wrong, but I think the assembly is valid given the C code.
-> 
-> The struct looks like this:
-> 
-> struct iphdr {
-> #if defined(__LITTLE_ENDIAN_BITFIELD)
-> 	__u8	ihl:4,
-> 		version:4;
-> #elif defined (__BIG_ENDIAN_BITFIELD)
-> 	__u8	version:4,
->   		ihl:4;
-> #else
-> #error	"Please fix <asm/byteorder.h>"
-> #endif
-> 	__u8	tos;
-> 	__be16	tot_len;
-> 	__be16	id;
-> 	__be16	frag_off;
-> 	__u8	ttl;
-> 	__u8	protocol;
-> 	__sum16	check;
-> 	__be32	saddr;
-> 	__be32	daddr;
-> 	/*The options start here. */
-> };
-> 
-> In a normal build (there's some magic for special checkers) __be32 is a plain
-> __u32 so the struct should be at least 4-byte aligned.  If somehow it is not,
-> that is the real bug.
 
-This struct is the IP header, so a struct ptr is just set to the
-beginning of the received data. Since ethernet headers are 14 bytes,
-often the IP header is not aligned unless the NIC can place the frame at
-a 2 byte offset (which is something I need to investigate). So this
-function cannot make any assumptions about the alignment. Does the ABI
-define structs have some minimum alignment? Does the struct need to be
-declared as packed or something?
 
-Rob
+> -----Original Message-----
+> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+> Behalf Of Christoffer Dall
+> Sent: Monday, October 01, 2012 6:11 PM
+> To: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> kvmarm at lists.cs.columbia.edu
+> Cc: Marc Zyngier
+> Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
+> 
+> +static void stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache
+> *cache,
+> +			   phys_addr_t addr, const pte_t *new_pte) {
+> +	pgd_t *pgd;
+> +	pud_t *pud;
+> +	pmd_t *pmd;
+> +	pte_t *pte, old_pte;
+> +
+> +	/* Create 2nd stage page table mapping - Level 1 */
+> +	pgd = kvm->arch.pgd + pgd_index(addr);
+> +	pud = pud_offset(pgd, addr);
+> +	if (pud_none(*pud)) {
+> +		if (!cache)
+> +			return; /* ignore calls from kvm_set_spte_hva */
+> +		pmd = mmu_memory_cache_alloc(cache);
+> +		pud_populate(NULL, pud, pmd);
+> +		pmd += pmd_index(addr);
+> +		get_page(virt_to_page(pud));
+> +	} else
+> +		pmd = pmd_offset(pud, addr);
+> +
+> +	/* Create 2nd stage page table mapping - Level 2 */
+> +	if (pmd_none(*pmd)) {
+> +		if (!cache)
+> +			return; /* ignore calls from kvm_set_spte_hva */
+> +		pte = mmu_memory_cache_alloc(cache);
+> +		clean_pte_table(pte);
+> +		pmd_populate_kernel(NULL, pmd, pte);
+> +		pte += pte_index(addr);
+> +		get_page(virt_to_page(pmd));
+> +	} else
+> +		pte = pte_offset_kernel(pmd, addr);
+> +
+> +	/* Create 2nd stage page table mapping - Level 3 */
+> +	old_pte = *pte;
+> +	set_pte_ext(pte, *new_pte, 0);
+> +	if (pte_present(old_pte))
+> +		__kvm_tlb_flush_vmid(kvm);
+> +	else
+> +		get_page(virt_to_page(pte));
+> +}
+
+
+I'm not sure about the 3-level page table, but isn't it necessary to
+clean the page table for 2nd level?
+There are two mmu_memory_cache_alloc calls. One has following clean_pte_table
+and the other doesn't have. 
+
+And why do you ignore calls from kvm_set_spte_hva? It is supposed to happen when
+host moves the page, right? Then you ignore the case because it can be handled
+later when fault actually happens? Is there any other reason that I miss?
