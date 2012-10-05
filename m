@@ -1,48 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:29 +0200
-Subject: [PATCH 15/16] spi/s3c64xx: use correct dma_transfer_direction type
+Date: Fri,  5 Oct 2012 16:55:28 +0200
+Subject: [PATCH 14/16] ARM: pxa: armcore: fix PCI PIO warnings
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-16-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a subtle difference between dma_transfer_direction and
-dma_data_direction: the former is used by the dmaengine framework,
-while the latter is used by the dma-mapping API. Although the
-purpose is comparable, the actual values are different and must
-not be mixed. In this case, the driver just wants to use
-dma_transfer_direction.
+The it8152 PCI host used on the pxa/cm_x2xx machines
+uses the old-style I/O window registration. This should
+eventually get converted to pci_ioremap_io() but for
+now, let's cast the IT8152_IO_BASE constant to an integer
+type to get rid of the warnings.
 
-Without this patch, building s3c6400_defconfig results in:
+Without this patch, building cm_x2xx_defconfig results in:
 
-drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_dmacb':
-drivers/spi/spi-s3c64xx.c:239:21: warning: comparison between
-	'enum dma_data_direction' and 'enum dma_transfer_direction' [-Wenum-compare]
+arch/arm/common/it8152.c: In function 'it8152_pci_setup':
+arch/arm/common/it8152.c:287:18: warning: assignment makes integer from pointer without a cast [enabled by default]
+arch/arm/common/it8152.c:288:16: warning: assignment makes integer from pointer without a cast [enabled by default]
+arch/arm/common/it8152.c:291:17: warning: assignment makes integer from pointer without a cast [enabled by default]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: spi-devel-general at lists.sourceforge.net
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Mike Rapoport <mike@compulab.co.il>
+Cc: Igor Grinberg <grinberg@compulab.co.il>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- drivers/spi/spi-s3c64xx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/common/it8152.c |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index d1c8441f..2e44dd6 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -132,7 +132,7 @@
+diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
+index c4110d1..001f491 100644
+--- a/arch/arm/common/it8152.c
++++ b/arch/arm/common/it8152.c
+@@ -284,11 +284,17 @@ int dma_set_coherent_mask(struct device *dev, u64 mask)
  
- struct s3c64xx_spi_dma_data {
- 	unsigned		ch;
--	enum dma_data_direction direction;
-+	enum dma_transfer_direction direction;
- 	enum dma_ch	dmach;
- 	struct property		*dma_prop;
- };
+ int __init it8152_pci_setup(int nr, struct pci_sys_data *sys)
+ {
+-	it8152_io.start = IT8152_IO_BASE + 0x12000;
+-	it8152_io.end	= IT8152_IO_BASE + 0x12000 + 0x100000;
++	/*
++	 * FIXME: use pci_ioremap_io to remap the IO space here and
++	 * move over to the generic io.h implementation.
++	 * This requires solving the same problem for PXA PCMCIA
++	 * support.
++	 */
++	it8152_io.start = (unsigned long)IT8152_IO_BASE + 0x12000;
++	it8152_io.end	= (unsigned long)IT8152_IO_BASE + 0x12000 + 0x100000;
+ 
+ 	sys->mem_offset = 0x10000000;
+-	sys->io_offset  = IT8152_IO_BASE;
++	sys->io_offset  = (unsigned long)IT8152_IO_BASE;
+ 
+ 	if (request_resource(&ioport_resource, &it8152_io)) {
+ 		printk(KERN_ERR "PCI: unable to allocate IO region\n");
 -- 
 1.7.10
