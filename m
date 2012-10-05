@@ -1,24 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 5 Oct 2012 08:14:34 +0200
-Subject: [PATCH 1/3] mfd: dbx500: Export prmcu_request_ape_opp_100_voltage
-In-Reply-To: <1348497799-32143-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1348497799-32143-1-git-send-email-ulf.hansson@stericsson.com>
- <1348497799-32143-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdac1MJ3ou-vWZ9fFgP8c81+0oag+BYMrJygHRcGwv18YA@mail.gmail.com>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Fri, 5 Oct 2012 12:08:50 +0530
+Subject: [PATCH 09/16] ARM: OMAP: Split plat/mmc.h into local headers and
+ platform_data
+In-Reply-To: <20121004220454.26676.10131.stgit@muffinssi.local>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+ <20121004220454.26676.10131.stgit@muffinssi.local>
+Message-ID: <CAOyx1LpfdM1_BE23-GVvGAcNAHos694J-Ob1cHNkLid31O-sSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2012 at 4:43 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Oct 5, 2012 at 3:34 AM, Tony Lindgren <tony@atomide.com> wrote:
+> We need to remove this from plat for ARM common zImage
+> support.
 >
-> This function needs to be exported to let clients be able to
-> request the ape opp 100 voltage.
->
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Venkatraman S <svenkatr@ti.com>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks Tony. I suppose this should go into your tree..
+Acked-by: Venkatraman S <svenkatr@ti.com>
 
-Yours,
-Linus Walleij
+> ---
+>  arch/arm/mach-omap1/board-h2-mmc.c         |    5 +--
+>  arch/arm/mach-omap1/board-h3-mmc.c         |    3 +-
+>  arch/arm/mach-omap1/board-htcherald.c      |    2 +
+>  arch/arm/mach-omap1/board-innovator.c      |    2 +
+>  arch/arm/mach-omap1/board-nokia770.c       |    2 +
+>  arch/arm/mach-omap1/board-sx1-mmc.c        |    3 +-
+>  arch/arm/mach-omap1/devices.c              |    2 +
+>  arch/arm/mach-omap1/mmc.h                  |   18 +++++++++++
+>  arch/arm/mach-omap2/board-4430sdp.c        |    2 +
+>  arch/arm/mach-omap2/board-n8x0.c           |    2 +
+>  arch/arm/mach-omap2/board-omap4panda.c     |    2 +
+>  arch/arm/mach-omap2/board-rm680.c          |    2 +
+>  arch/arm/mach-omap2/hsmmc.c                |    2 +
+>  arch/arm/mach-omap2/mmc.h                  |   23 ++++++++++++++
+>  arch/arm/mach-omap2/msdi.c                 |    2 +
+>  arch/arm/mach-omap2/omap4-common.c         |    2 +
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c |    2 +
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    2 +
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +
+>  drivers/mmc/host/omap.c                    |    3 +-
+>  drivers/mmc/host/omap_hsmmc.c              |    2 +
+>  include/linux/platform_data/mmc-omap.h     |   45 +---------------------------
+>  24 files changed, 67 insertions(+), 67 deletions(-)
+>  create mode 100644 arch/arm/mach-omap1/mmc.h
+>  create mode 100644 arch/arm/mach-omap2/mmc.h
