@@ -1,51 +1,56 @@
-From: michael.hope@linaro.org (Michael Hope)
-Date: Fri, 5 Oct 2012 13:58:05 +1300
-Subject: alignment faults in 3.6
-In-Reply-To: <506E1762.3010601@gmail.com>
-References: <506E1762.3010601@gmail.com>
-Message-ID: <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 5 Oct 2012 10:12:37 +0900
+Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <506D52D2.9060105@ti.com>
+References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
+ <506D52D2.9060105@ti.com>
+Message-ID: <20121005011237.GA17182@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2012 12:10, Rob Herring <robherring2@gmail.com> wrote:
-> I've been scratching my head with a "scheduling while atomic" bug I
-> started seeing on 3.6. I can easily reproduce this problem when doing a
-> wget on my system. It ultimately seems to be a combination of factors.
-> The "scheduling while atomic" bug is triggered in do_alignment which
-> gets triggered by this code in net/ipv4/af_inet.c, line 1356:
->
-> id = ntohl(*(__be32 *)&iph->id);
-> flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id ^ IP_DF));
-> id >>= 16;
->
-> This code compiles into this using "gcc version 4.6.3 (Ubuntu/Linaro
-> 4.6.3-1ubuntu5)":
->
-> c02ac020:       e8920840        ldm     r2, {r6, fp}
-> c02ac024:       e6bfbf3b        rev     fp, fp
-> c02ac028:       e6bf6f36        rev     r6, r6
-> c02ac02c:       e22bc901        eor     ip, fp, #16384  ; 0x4000
-> c02ac030:       e0266008        eor     r6, r6, r8
-> c02ac034:       e18c6006        orr     r6, ip, r6
->
-> which generates alignment faults on the ldm. These are silent until this
-> commit is applied:
+On Thu, Oct 04, 2012 at 02:41:46PM +0530, Santosh Shilimkar wrote:
+> On Thursday 04 October 2012 02:20 PM, Stephen Boyd wrote:
+> >The TWD and SCU configs are selected by default as long as
+> >SCORPIONMP is false and/or MCT is false. Implementing the logic
+> >this way certainly saves lines in the Kconfig but it precludes
+> >those machines which select SCORPIONMP or MCT from participating
+> >in the single zImage effort because when those machines are
+> >combined with other SMP capable machines the TWD and SCU are no
+> >longer selected.
+> >
+> >Push the select out to the machine entries so that we can compile
+> >these machines together and still select the appropriate configs.
+> >
+> >Signed-off-by: Stephen Boyd<sboyd@codeaurora.org>
+> >Cc: David Brown<davidb@codeaurora.org>
+> >Cc: Kukjin Kim<kgene.kim@samsung.com>
+> >Cc: Linus Walleij<linus.walleij@linaro.org>
+> >Cc: Pawel Moll<pawel.moll@arm.com>
+> >Cc: Rob Herring<rob.herring@calxeda.com>
+> >Cc: Russell King<linux@arm.linux.org.uk>
+> >Cc: Sascha Hauer<kernel@pengutronix.de>
+> >Cc: Shiraz Hashim<shiraz.hashim@st.com>
+> >Cc: Simon Horman<horms@verge.net.au>
+> >Cc: Srinidhi Kasagar<srinidhi.kasagar@stericsson.com>
+> >Cc: Stephen Warren<swarren@wwwdotorg.org>
+> >Cc: Tony Lindgren<tony@atomide.com>
+> >Cc: Viresh Kumar<viresh.linux@gmail.com>
+> >---
+> >
+> >Does OMAP5 need to select TWD? I suspect not if it uses the
+> >architected timers.
+> >
+> Nope. OMAP5 don't use TWD. Infact the external SCU is also used
+> for A9 SOCs. You might want to check other A15 SOCS for SCU as
+> well.
 
-Hi Rob.  I assume that iph is something like:
+In that case I am a bit confused by the following result:
 
-struct foo {
-    u32 x;
-    char id[8];
-};
-
-struct foo *iph;
-
-GCC merged the two adjacent loads of x and id into one ldm.  This is
-an ARM specific optimisation done in load_multiple_sequence() and
-enabled with -fpeephole2.
-
-I think the assembly is correct - GCC knows that iph is aligned and
-knows the offsets of both x and id.  Happy to be corrected if I'm
-wrong, but I think the assembly is valid given the C code.
-
--- Michael
+# git checkout v3.6
+# ARCH=arm make omap2plus_defconfig
+# grep '(SOC_OMAP5|_SCU|_TWD|CONFIG_SMP|CONFIG_LOCAL_TIMERS)=' .config
+CONFIG_SOC_OMAP5=y
+CONFIG_SMP=y
+CONFIG_HAVE_ARM_SCU=y
+CONFIG_HAVE_ARM_TWD=y
+CONFIG_LOCAL_TIMERS=y
