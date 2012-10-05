@@ -1,47 +1,160 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 5 Oct 2012 16:00:15 +0530
-Subject: [PATCH v3 5/6] ARM: davinci: Add support for PRUSS on DA850
-In-Reply-To: <20121004163546.GK11149@beef>
-References: <1349276133-26408-1-git-send-email-mporter@ti.com>
- <1349276133-26408-6-git-send-email-mporter@ti.com> <506D7F95.2030401@ti.com>
- <20121004163546.GK11149@beef>
-Message-ID: <506EB6B7.4050705@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Oct 2012 11:51:33 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <20121005072914.GE4625@n2100.arm.linux.org.uk>
+References: <506E1762.3010601@gmail.com>
+ <20121005072914.GE4625@n2100.arm.linux.org.uk>
+Message-ID: <20121005105133.GP4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/4/2012 10:05 PM, Matt Porter wrote:
-> On Thu, Oct 04, 2012 at 05:52:45PM +0530, Sekhar Nori wrote:
->> On 10/3/2012 8:25 PM, Matt Porter wrote:
->>> +static struct clk pruss_clk = {
->>> +	.name		= "pruss",
->>> +	.parent		= &pll0_sysclk2,
->>> +	.lpsc		= DA8XX_LPSC0_PRUSS,
->>> +};
->>> +
->>>  static struct clk uart0_clk = {
->>>  	.name		= "uart0",
->>>  	.parent		= &pll0_sysclk2,
->>> @@ -378,6 +384,7 @@ static struct clk_lookup da850_clks[] = {
->>>  	CLK(NULL,		"tptc1",	&tptc1_clk),
->>>  	CLK(NULL,		"tpcc1",	&tpcc1_clk),
->>>  	CLK(NULL,		"tptc2",	&tptc2_clk),
->>> +	CLK(NULL,		"pruss",	&pruss_clk),
->>
->> This is actually incorrect since we should use device name rather than
->> con_id for matching the clock. If there is just one clock that the
->> driver needs, connection id should be NULL. Looking at the driver now,
->> the clk_get() call seems to pass a valid device pointer. So, I wonder
->> how you are able to look up the clock even with a NULL device name.
+On Fri, Oct 05, 2012 at 08:29:14AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 04, 2012 at 06:10:26PM -0500, Rob Herring wrote:
+> > I would think the scheduling while atomic messages are harmless in this
+> > case. However, in addition to spewing out BUG messages this commit also
+> > seems to eventually cause a kernel panic in __napi_complete. That panic
+> > seems to go away if I put barrier() between the 2 accesses above which
+> > eliminates the alignment faults. I haven't figured that part out yet.
+> > 
+> > There's at least a couple of problems here:
+> > 
+> > This seems like an overly aggressive compiler optimization considering
+> > unaligned accesses are not supported by ldm/stm.
+> > 
+> > The alignment fault handler should handle kernel address faults atomically.
 > 
-> I doublechecked the clk_get() find implentation to confirm that I indeed
-> did get lucky here. Since pruss has only one instance and the clk_find()
-> implementation looks for the best found match, it's able to find the
-> clock just by the con_id, though it's not the "best possible" match in
-> the find implementation...it's the "best found" match.. As you noted,
-> this is incorrect though for a clock expected to be used from a driver
-> context so I will address this in the update.
+> This is bad news.  do_alignment() can be called in almost any kernel
+> context, and it must work.  die() and oops dumps - specifically dump_mem()
+> and dump_instr() will suffer from exactly the same problem.
 
-Thanks for debugging and clarifying.
+Okay, this should fix the issue...  I've only compile tested it so far.
+Rob, as you have a way to trigger this easily, can you give this patch
+a go and let me know if it solves your problem?  Thanks.
 
-Regards,
-Sekhar
+ arch/arm/kernel/traps.c |   34 +++++++---------------------------
+ arch/arm/mm/alignment.c |   11 ++++-------
+ 2 files changed, 11 insertions(+), 34 deletions(-)
+
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index b0179b8..62f429e 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -89,17 +89,8 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 		     unsigned long top)
+ {
+ 	unsigned long first;
+-	mm_segment_t fs;
+ 	int i;
+ 
+-	/*
+-	 * We need to switch to kernel mode so that we can use __get_user
+-	 * to safely read from kernel space.  Note that we now dump the
+-	 * code first, just in case the backtrace kills us.
+-	 */
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-
+ 	printk("%s%s(0x%08lx to 0x%08lx)\n", lvl, str, bottom, top);
+ 
+ 	for (first = bottom & ~31; first < top; first += 32) {
+@@ -112,7 +103,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 		for (p = first, i = 0; i < 8 && p < top; i++, p += 4) {
+ 			if (p >= bottom && p < top) {
+ 				unsigned long val;
+-				if (__get_user(val, (unsigned long *)p) == 0)
++				if (probe_kernel_address(p, val) == 0)
+ 					sprintf(str + i * 9, " %08lx", val);
+ 				else
+ 					sprintf(str + i * 9, " ????????");
+@@ -120,8 +111,6 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 		}
+ 		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
+ 	}
+-
+-	set_fs(fs);
+ }
+ 
+ static void dump_instr(const char *lvl, struct pt_regs *regs)
+@@ -129,25 +118,18 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ 	unsigned long addr = instruction_pointer(regs);
+ 	const int thumb = thumb_mode(regs);
+ 	const int width = thumb ? 4 : 8;
+-	mm_segment_t fs;
+ 	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
+ 	int i;
+ 
+-	/*
+-	 * We need to switch to kernel mode so that we can use __get_user
+-	 * to safely read from kernel space.  Note that we now dump the
+-	 * code first, just in case the backtrace kills us.
+-	 */
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-
+ 	for (i = -4; i < 1 + !!thumb; i++) {
+ 		unsigned int val, bad;
+ 
+-		if (thumb)
+-			bad = __get_user(val, &((u16 *)addr)[i]);
+-		else
+-			bad = __get_user(val, &((u32 *)addr)[i]);
++		if (thumb) {
++			u16 instr;
++			bad = probe_kernel_address(addr, instr);
++			val = instr;
++		} else
++			bad = probe_kernel_address(addr, val);
+ 
+ 		if (!bad)
+ 			p += sprintf(p, i == 0 ? "(%0*x) " : "%0*x ",
+@@ -158,8 +140,6 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ 		}
+ 	}
+ 	printk("%sCode: %s\n", lvl, str);
+-
+-	set_fs(fs);
+ }
+ 
+ #ifdef CONFIG_ARM_UNWIND
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index b9f60eb..f8f14fc 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -749,7 +749,6 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	unsigned long instr = 0, instrptr;
+ 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
+ 	unsigned int type;
+-	mm_segment_t fs;
+ 	unsigned int fault;
+ 	u16 tinstr = 0;
+ 	int isize = 4;
+@@ -760,16 +759,15 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 
+ 	instrptr = instruction_pointer(regs);
+ 
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+ 	if (thumb_mode(regs)) {
+-		fault = __get_user(tinstr, (u16 *)(instrptr & ~1));
++		unsigned long ptr = instrptr;
++		fault = probe_kernel_address(ptr, tinstr);
+ 		if (!fault) {
+ 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+ 			    IS_T32(tinstr)) {
+ 				/* Thumb-2 32-bit */
+ 				u16 tinst2 = 0;
+-				fault = __get_user(tinst2, (u16 *)(instrptr+2));
++				fault = probe_kernel_address(ptr + 2, tinst2);
+ 				instr = (tinstr << 16) | tinst2;
+ 				thumb2_32b = 1;
+ 			} else {
+@@ -778,8 +776,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 			}
+ 		}
+ 	} else
+-		fault = __get_user(instr, (u32 *)instrptr);
+-	set_fs(fs);
++		fault = probe_kernel_address(instrptr, instr);
+ 
+ 	if (fault) {
+ 		type = TYPE_FAULT;
