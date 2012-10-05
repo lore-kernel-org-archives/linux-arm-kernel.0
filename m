@@ -1,65 +1,72 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:20 +0200
-Subject: [PATCH 06/16] mm/slob: use min_t() to compare ARCH_SLAB_MINALIGN
+Date: Fri,  5 Oct 2012 16:55:22 +0200
+Subject: [PATCH 08/16] ipvs: fix ip_vs_set_timeout debug messages
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-7-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of ARCH_SLAB_MINALIGN is architecture dependent
-and can be either of type size_t or int. Comparing that value
-with ARCH_KMALLOC_MINALIGN can cause harmless warnings on
-platforms where they are different. Since both are always
-small positive integer numbers, using the size_t type to compare
-them is safe and gets rid of the warning.
+The ip_vs_set_timeout function sets timeouts for TCP and UDP, which
+can be enabled independently at compile time. The debug message
+always prints both timeouts that are passed into the function,
+but if one is disabled, the message will show uninitialized data.
 
-Without this patch, building ARM collie_defconfig results in:
+This splits the debug message into two separte IP_VS_DBG statements
+that are in the same #ifdef section to ensure we only print the
+text about what is actually going on.
 
-mm/slob.c: In function '__kmalloc_node':
-mm/slob.c:431:152: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-mm/slob.c: In function 'kfree':
-mm/slob.c:484:153: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-mm/slob.c: In function 'ksize':
-mm/slob.c:503:153: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+Without this patch, building ARM ixp4xx_defconfig results in:
+
+net/netfilter/ipvs/ip_vs_ctl.c: In function 'ip_vs_genl_set_cmd':
+net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.udp_timeout' may be used uninitialized in this function [-Wuninitialized]
+net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.udp_timeout' was declared here
+net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.tcp_fin_timeout' may be used uninitialized in this function [-Wuninitialized]
+net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.tcp_fin_timeout' was declared here
+net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.tcp_timeout' may be used uninitialized in this function [-Wuninitialized]
+net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.tcp_timeout' was declared here
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Christoph Lameter <cl@linux.com>
-Cc: Pekka Enberg <penberg@kernel.org>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: netdev at vger.kernel.org
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Julian Anastasov <ja@ssi.bg>
+Cc: netfilter-devel at vger.kernel.org
+Cc: netfilter at vger.kernel.org
+Cc: coreteam at netfilter.org
 ---
- mm/slob.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ net/netfilter/ipvs/ip_vs_ctl.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/mm/slob.c b/mm/slob.c
-index 45d4ca7..497c55e 100644
---- a/mm/slob.c
-+++ b/mm/slob.c
-@@ -428,7 +428,7 @@ out:
- void *__kmalloc_node(size_t size, gfp_t gfp, int node)
- {
- 	unsigned int *m;
--	int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
-+	int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
- 	void *ret;
+diff --git a/net/netfilter/ipvs/ip_vs_ctl.c b/net/netfilter/ipvs/ip_vs_ctl.c
+index f51013c..f3a66c3 100644
+--- a/net/netfilter/ipvs/ip_vs_ctl.c
++++ b/net/netfilter/ipvs/ip_vs_ctl.c
+@@ -2237,12 +2237,11 @@ static int ip_vs_set_timeout(struct net *net, struct ip_vs_timeout_user *u)
+ 	struct ip_vs_proto_data *pd;
+ #endif
  
- 	gfp &= gfp_allowed_mask;
-@@ -481,7 +481,7 @@ void kfree(const void *block)
+-	IP_VS_DBG(2, "Setting timeout tcp:%d tcpfin:%d udp:%d\n",
++#ifdef CONFIG_IP_VS_PROTO_TCP
++	IP_VS_DBG(2, "Setting timeout tcp:%d tcpfin:%d\n",
+ 		  u->tcp_timeout,
+-		  u->tcp_fin_timeout,
+-		  u->udp_timeout);
++		  u->tcp_fin_timeout);
  
- 	sp = virt_to_page(block);
- 	if (PageSlab(sp)) {
--		int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
-+		int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
- 		unsigned int *m = (unsigned int *)(block - align);
- 		slob_free(m, *m + align);
- 	} else
-@@ -500,7 +500,7 @@ size_t ksize(const void *block)
+-#ifdef CONFIG_IP_VS_PROTO_TCP
+ 	if (u->tcp_timeout) {
+ 		pd = ip_vs_proto_data_get(net, IPPROTO_TCP);
+ 		pd->timeout_table[IP_VS_TCP_S_ESTABLISHED]
+@@ -2257,6 +2256,9 @@ static int ip_vs_set_timeout(struct net *net, struct ip_vs_timeout_user *u)
+ #endif
  
- 	sp = virt_to_page(block);
- 	if (PageSlab(sp)) {
--		int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
-+		int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
- 		unsigned int *m = (unsigned int *)(block - align);
- 		return SLOB_UNITS(*m) * SLOB_UNIT;
- 	} else
+ #ifdef CONFIG_IP_VS_PROTO_UDP
++	IP_VS_DBG(2, "Setting timeout udp:%d\n",
++		  u->udp_timeout);
++
+ 	if (u->udp_timeout) {
+ 		pd = ip_vs_proto_data_get(net, IPPROTO_UDP);
+ 		pd->timeout_table[IP_VS_UDP_S_NORMAL]
 -- 
 1.7.10
