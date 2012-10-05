@@ -1,39 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Oct 2012 16:31:40 +0100
-Subject: [PATCH 04/10] of/i2c: Add support for I2C_CLIENT_WAKE when booting
- with Device Tree
+Date: Fri,  5 Oct 2012 16:31:42 +0100
+Subject: [PATCH 06/10] Documentation: Describe bindings for STMPE
+ Multi-Functional Device driver
 In-Reply-To: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
 References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349451107-8009-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349451107-8009-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's important for wakeup sources such as keyboards, power buttons
-and the like to identify themselves as wakeup devices. Until now
-this has not been possible when platforms are booting via Device
-Tree.
+Here we add the required documentation for the STMPE Multi-Functional
+Device (MFD) Device Tree bindings. It describes all of the bindings
+currently supported by the driver.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: devicetree-discuss at lists.ozlabs.org
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/of/of_i2c.c |    3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/devicetree/bindings/mfd/stmpe.txt |   25 +++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/stmpe.txt
 
-diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
-index 1e173f3..2f20019 100644
---- a/drivers/of/of_i2c.c
-+++ b/drivers/of/of_i2c.c
-@@ -61,6 +61,9 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
- 		info.of_node = of_node_get(node);
- 		info.archdata = &dev_ad;
- 
-+		if (of_get_property(node, "i2c-client-wake", NULL))
-+			info.flags |= I2C_CLIENT_WAKE;
+diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt b/Documentation/devicetree/bindings/mfd/stmpe.txt
+new file mode 100644
+index 0000000..8f0aeda
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
+@@ -0,0 +1,25 @@
++* STMPE Multi-Functional Device
 +
- 		request_module("%s%s", I2C_MODULE_PREFIX, info.type);
- 
- 		result = i2c_new_device(adap, &info);
++Required properties:
++ - compatible                   : "st,stmpe[811|1601|2401|2403]"
++ - reg                          : I2C address of the device
++
++Optional properties:
++ - interrupts                   : The interrupt outputs from the controller
++ - interrupt-controller         : Marks the device node as an interrupt controller
++ - interrupt-parent             : Specifies which IRQ controller we're connected to
++ - i2c-client-wake              : Marks the input device as wakable
++ - st,autosleep-timeout         : Valid entries (ms); 4, 16, 32, 64, 128, 256, 512 and 1024
++
++Example:
++
++	stmpe1601: stmpe1601 at 40 {
++		compatible = "st,stmpe1601";
++		reg = <0x40>;
++		interrupts = <26 0x4>;
++		interrupt-parent = <&gpio6>;
++		interrupt-controller;
++
++		i2c-client-wake;
++		st,autosleep-timeout = <1024>;
++	};
 -- 
 1.7.9.5
