@@ -1,60 +1,61 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 5 Oct 2012 15:51:44 +0200
-Subject: alignment faults in 3.6
-In-Reply-To: <506ED18C.3010009@gmail.com>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <506ED18C.3010009@gmail.com>
-Message-ID: <20590.58864.527467.746403@pilspetsen.it.uu.se>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 5 Oct 2012 08:58:51 -0500
+Subject: [PATCH 07/16] ARM: OMAP: Make plat/sram.h local to plat-omap
+In-Reply-To: <20121004220449.26676.54281.stgit@muffinssi.local>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+ <20121004220449.26676.54281.stgit@muffinssi.local>
+Message-ID: <506EE79B.8040507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring writes:
- > On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
- > > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
- > >> On 5 October 2012 08:12, Russell King - ARM Linux
- > >> <linux@arm.linux.org.uk> wrote:
- > >>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
- > >>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
- > >>>>> This struct is the IP header, so a struct ptr is just set to the
- > >>>>> beginning of the received data. Since ethernet headers are 14 bytes,
- > >>>>> often the IP header is not aligned unless the NIC can place the frame at
- > >>>>> a 2 byte offset (which is something I need to investigate). So this
- > >>>>> function cannot make any assumptions about the alignment. Does the ABI
- > >>>>> define structs have some minimum alignment? Does the struct need to be
- > >>>>> declared as packed or something?
- > >>>>
- > >>>> The ABI defines the alignment of structs as the maximum alignment of its
- > >>>> members.  Since this struct contains 32-bit members, the alignment for the
- > >>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
- > >>>> might be unaligned (in addition to removing any holes within).
- > >>>
- > >>> This has come up before in the past.
- > >>>
- > >>> The Linux network folk will _not_ allow - in any shape or form - for
- > >>> this struct to be marked packed (it's the struct which needs to be
- > >>> marked packed) because by doing so, it causes GCC to issue byte loads/
- > >>> stores on architectures where there isn't a problem, and that decreases
- > >>> the performance of the Linux IP stack unnecessarily.
- > >>
- > >> Which architectures?  I have never seen anything like that.
- > > 
- > > Does it matter?  I'm just relaying the argument against adding __packed
- > > which was used before we were forced (by the networking folk) to implement
- > > the alignment fault handler.
- > 
- > It doesn't really matter what will be accepted or not as adding __packed
- > to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
- > The only way I've found to eliminate the alignment fault is adding a
- > barrier between the 2 loads. That seems like a compiler issue to me if
- > there is not a better fix.
+Hi Tony,
 
-If you suspect a GCC bug, please prepare a standalone user-space test case
-and submit it to GCC's bugzilla (I can do the latter if you absolutely do not
-want to).  It wouldn't be the first alignment-related GCC bug...
+On 10/04/2012 05:04 PM, Tony Lindgren wrote:
+> We can move this from plat to be local to plat-omap
+> for common ARM zImage support.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap1/clock.c                  |    3 -
+>  arch/arm/mach-omap1/clock_data.c             |    3 -
+>  arch/arm/mach-omap1/devices.c                |    2 
+>  arch/arm/mach-omap1/pm.c                     |    3 -
+>  arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |    3 -
+>  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    3 -
+>  arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |    3 -
+>  arch/arm/mach-omap2/io.c                     |    3 -
+>  arch/arm/mach-omap2/omap4-common.c           |    4 -
+>  arch/arm/mach-omap2/pm24xx.c                 |    3 -
+>  arch/arm/mach-omap2/pm34xx.c                 |    3 -
+>  arch/arm/mach-omap2/sdrc.c                   |    2 
+>  arch/arm/mach-omap2/sdrc2xxx.c               |    2 
+>  arch/arm/mach-omap2/sleep34xx.S              |    2 
+>  arch/arm/plat-omap/common.h                  |    2 
+>  arch/arm/plat-omap/include/plat/sram.h       |  105 -------------------------
+>  arch/arm/plat-omap/sram.c                    |    1 
+>  arch/arm/plat-omap/sram.h                    |  109 +++++++++++++++++++++++++-
+>  18 files changed, 130 insertions(+), 126 deletions(-)
+>  delete mode 100644 arch/arm/plat-omap/include/plat/sram.h
+> 
+> diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+> index 638f407..b15d4ee 100644
+> --- a/arch/arm/mach-omap1/clock.c
+> +++ b/arch/arm/mach-omap1/clock.c
+> @@ -24,11 +24,12 @@
+>  #include <plat/cpu.h>
+>  #include <plat/usb.h>
+>  #include <plat/clock.h>
+> -#include <plat/sram.h>
+>  #include <plat/clkdev_omap.h>
+>  
+>  #include <mach/hardware.h>
+>  
+> +#include "../plat-omap/sram.h"
+
+Any reason why you did not put this in
+arch/arm/plat-omap/include/plat-omap/ like we were discussing for dma
+and dmtimers headers? Then it can be just "#include <plat-omap/sram.h>".
+Just curious ...
+
+Cheers
+Jon
