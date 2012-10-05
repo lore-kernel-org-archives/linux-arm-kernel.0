@@ -1,47 +1,91 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:26 +0200
-Subject: [PATCH 12/16] video: mark nuc900fb_map_video_memory as __devinit
+Date: Fri,  5 Oct 2012 16:55:27 +0200
+Subject: [PATCH 13/16] ARM: be really quiet when building with 'make -s'
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-13-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-14-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nuc900fb_map_video_memory is called by an devinit function
-that may be called at run-time, but the function itself is
-marked __init and will be discarded after boot.
+Sometimes we want the kernel build process to only print messages
+on errors, e.g. in automated build testing. This uses the "kecho"
+macro that the build system provides to hide a few informational
+messages. Nothing changes for a regular "make" or "make V=1".
 
-To avoid calling into a function that may have been overwritten,
-mark nuc900fb_map_video_memory itself as __devinit.
+Without this patch, building any ARM kernel results in:
 
-Without this patch, building nuc950_defconfig results in:
-
-WARNING: drivers/video/built-in.o(.devinit.text+0x26c): Section mismatch in reference from the function nuc900fb_probe() to the function .init.text:nuc900fb_map_video_memory()
-The function __devinit nuc900fb_probe() references
-a function __init nuc900fb_map_video_memory().
-If nuc900fb_map_video_memory is only used by nuc900fb_probe then
-annotate nuc900fb_map_video_memory with a matching annotation.
+  Kernel: arch/arm/boot/Image is ready
+  Kernel: arch/arm/boot/zImage is ready
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: linux-fbdev at vger.kernel.org
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Michal Marek <mmarek@suse.cz>
 ---
- drivers/video/nuc900fb.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/Makefile  |   10 +++++-----
+ arch/arm/tools/Makefile |    2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-index e10f551..b31b12b 100644
---- a/drivers/video/nuc900fb.c
-+++ b/drivers/video/nuc900fb.c
-@@ -387,7 +387,7 @@ static int nuc900fb_init_registers(struct fb_info *info)
-  *    The buffer should be a non-cached, non-buffered, memory region
-  *    to allow palette and pixel writes without flushing the cache.
-  */
--static int __init nuc900fb_map_video_memory(struct fb_info *info)
-+static int __devinit nuc900fb_map_video_memory(struct fb_info *info)
- {
- 	struct nuc900fb_info *fbi = info->par;
- 	dma_addr_t map_dma;
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index c877087..89680f2 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -31,7 +31,7 @@ ifeq ($(CONFIG_XIP_KERNEL),y)
+ 
+ $(obj)/xipImage: vmlinux FORCE
+ 	$(call if_changed,objcopy)
+-	@echo '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
++	$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
+ 
+ $(obj)/Image $(obj)/zImage: FORCE
+ 	@echo 'Kernel configured for XIP (CONFIG_XIP_KERNEL=y)'
+@@ -46,14 +46,14 @@ $(obj)/xipImage: FORCE
+ 
+ $(obj)/Image: vmlinux FORCE
+ 	$(call if_changed,objcopy)
+-	@echo '  Kernel: $@ is ready'
++	$(kecho) '  Kernel: $@ is ready'
+ 
+ $(obj)/compressed/vmlinux: $(obj)/Image FORCE
+ 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+ 
+ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+ 	$(call if_changed,objcopy)
+-	@echo '  Kernel: $@ is ready'
++	$(kecho) '  Kernel: $@ is ready'
+ 
+ endif
+ 
+@@ -88,7 +88,7 @@ fi
+ $(obj)/uImage:	$(obj)/zImage FORCE
+ 	@$(check_for_multiple_loadaddr)
+ 	$(call if_changed,uimage)
+-	@echo '  Image $@ is ready'
++	$(kecho) '  Image $@ is ready'
+ 
+ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+ 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
+@@ -96,7 +96,7 @@ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+ 
+ $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
+ 	$(call if_changed,objcopy)
+-	@echo '  Kernel: $@ is ready'
++	$(kecho) '  Kernel: $@ is ready'
+ 
+ PHONY += initrd FORCE
+ initrd:
+diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
+index 635cb18..cd60a81 100644
+--- a/arch/arm/tools/Makefile
++++ b/arch/arm/tools/Makefile
+@@ -5,6 +5,6 @@
+ #
+ 
+ include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types
+-	@echo '  Generating $@'
++	$(kecho) '  Generating $@'
+ 	@mkdir -p $(dir $@)
+ 	$(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
 -- 
 1.7.10
