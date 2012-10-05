@@ -1,82 +1,40 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 5 Oct 2012 08:51:28 +0200
-Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
- camera and eMMA
-In-Reply-To: <CAOMZO5C+NNQr0mo6P2cKx4RxFoQPyYuPZq4eFUZnvi_7gTRkBQ@mail.gmail.com>
-References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
- <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
- <5047013E.30508@gmail.com>
- <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
- <50471187.3040809@gmail.com>
- <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
- <50471CEE.60606@gmail.com>
- <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
- <504769CF.2070904@gmail.com>
- <CAOMZO5DyjdrZYNDMuT1=yuxQcHuP3=6dy_j_ja1vub56_m3pvA@mail.gmail.com>
- <504774B7.8090007@gmail.com>
- <CAOMZO5CAvwwGEwbZE2VS49tpWOYxAR_qQkfKhswPaofSrni92A@mail.gmail.com>
- <CAOMZO5C+NNQr0mo6P2cKx4RxFoQPyYuPZq4eFUZnvi_7gTRkBQ@mail.gmail.com>
-Message-ID: <CACKLOr1W4PoVUqJ+KEcE1yUOhcRJDR6RDm_Mn=GhQxkfPg-5mQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Oct 2012 08:12:16 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+Message-ID: <20121005071216.GD4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
+> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
+> > This struct is the IP header, so a struct ptr is just set to the
+> > beginning of the received data. Since ethernet headers are 14 bytes,
+> > often the IP header is not aligned unless the NIC can place the frame at
+> > a 2 byte offset (which is something I need to investigate). So this
+> > function cannot make any assumptions about the alignment. Does the ABI
+> > define structs have some minimum alignment? Does the struct need to be
+> > declared as packed or something?
+> 
+> The ABI defines the alignment of structs as the maximum alignment of its
+> members.  Since this struct contains 32-bit members, the alignment for the
+> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
+> might be unaligned (in addition to removing any holes within).
 
-On 4 October 2012 16:07, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Javier,
->
-> On Wed, Sep 5, 2012 at 3:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
->
->> Sylwester suggested me this patch and it fixed the issue:
->> http://git.linuxtv.org/snawrocki/media.git/commitdiff/458b9b5ab8cb970887c9d1f1fddf88399b2d9ef2
->>
->> Now ov2640 probes correctly on mx31pdk, but on mx27pdk I have:
->>
->> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
->> mx2-camera mx2-camera.0: Camera driver attached to camera 0
->> ov2640 0-0030: Product ID error fb:fb
->> mx2-camera mx2-camera.0: Camera driver detached from camera 0
->> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
->> frequency: 66500000
->>
->> This works fine in 3.4.10 and I suspect this problem is due to the imx
->> clock conversion as the csi clock frequency looks incorrect.
->>
->> Javier,
->>
-> Could you please confirm if your camera works with the latest kernel?
->
-> If so, could you please your log below?
->
-> Not sure if the clock frequency below is correct.
->
->> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
->> mx2-camera mx2-camera.0: Camera driver attached to camera 0
->> ov2640 0-0030: Product ID error fb:fb
->> mx2-camera mx2-camera.0: Camera driver detached from camera 0
->> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
->> frequency: 66500000
->
+This has come up before in the past.
 
+The Linux network folk will _not_ allow - in any shape or form - for
+this struct to be marked packed (it's the struct which needs to be
+marked packed) because by doing so, it causes GCC to issue byte loads/
+stores on architectures where there isn't a problem, and that decreases
+the performance of the Linux IP stack unnecessarily.
 
-No, it isn't. Kernel 3.6 works properly in our Visstrim M10 board and
-the CSI clock frequency is the same as yours:
-
-soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-mx2-camera mx2-camera.0: Camera driver attached to camera 0
-ov7670 0-0021: chip found @ 0x42 (imx-i2c)
-mx2-camera mx2-camera.0: Invalid format code #1: 4098
-mx2-camera mx2-camera.0: Invalid format code #1: 4098
-mx2-camera mx2-camera.0: Camera driver detached from camera 0
-mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
-frequency: 66500000
-
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+I don't think there's going to be a satisfactory answer to this issue.
+I think we're going to be stuck between GCC people saying that the
+kernel is buggy, and the network people refusing to fix this as they
+have done in the past.
