@@ -1,112 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Oct 2012 16:31:41 +0100
-Subject: [PATCH 05/10] mfd: Enable the STMPE MFD for Device Tree
+Date: Fri,  5 Oct 2012 16:31:40 +0100
+Subject: [PATCH 04/10] of/i2c: Add support for I2C_CLIENT_WAKE when booting
+ with Device Tree
 In-Reply-To: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
 References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349451107-8009-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349451107-8009-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the STMPE Multi-Functional Device to be correctly
-initialised when booting with Device Tree support enabled. Its
-children are specified by the addition of subordinate devices to the
-STMPE node in the Device Tree file.
+It's important for wakeup sources such as keyboards, power buttons
+and the like to identify themselves as wakeup devices. Until now
+this has not been possible when platforms are booting via Device
+Tree.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: devicetree-discuss at lists.ozlabs.org
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/stmpe.c |   48 ++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 42 insertions(+), 6 deletions(-)
+ drivers/of/of_i2c.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index e50ebdf..ba157d4 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -885,18 +885,19 @@ static struct irq_domain_ops stmpe_irq_ops = {
-         .xlate  = irq_domain_xlate_twocell,
- };
+diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
+index 1e173f3..2f20019 100644
+--- a/drivers/of/of_i2c.c
++++ b/drivers/of/of_i2c.c
+@@ -61,6 +61,9 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
+ 		info.of_node = of_node_get(node);
+ 		info.archdata = &dev_ad;
  
--static int __devinit stmpe_irq_init(struct stmpe *stmpe)
-+static int __devinit stmpe_irq_init(struct stmpe *stmpe,
-+				struct device_node *np)
- {
- 	int base = stmpe->irq_base;
- 	int num_irqs = stmpe->variant->num_irqs;
- 
- 	if (base) {
- 		stmpe->domain = irq_domain_add_legacy(
--			NULL, num_irqs, base, 0, &stmpe_irq_ops, stmpe);
-+			np, num_irqs, base, 0, &stmpe_irq_ops, stmpe);
- 	}
- 	else {
- 		stmpe->domain = irq_domain_add_linear(
--			NULL, num_irqs, &stmpe_irq_ops, stmpe);
-+			np, num_irqs, &stmpe_irq_ops, stmpe);
- 	}
- 
- 	if (!stmpe->domain) {
-@@ -1016,15 +1017,50 @@ static int __devinit stmpe_devices_init(struct stmpe *stmpe)
- 	return ret;
- }
- 
-+void __devinit stmpe_of_probe(struct stmpe_platform_data *pdata,
-+			struct device_node *np)
-+{
-+	struct device_node *child;
++		if (of_get_property(node, "i2c-client-wake", NULL))
++			info.flags |= I2C_CLIENT_WAKE;
 +
-+	of_property_read_u32(np, "st,autosleep-timeout",
-+			&pdata->autosleep_timeout);
-+
-+	pdata->autosleep = (pdata->autosleep_timeout) ? true : false;
-+
-+	for_each_child_of_node(np, child) {
-+		if (!strcmp(child->name, "stmpe_gpio")) {
-+			pdata->blocks |= STMPE_BLOCK_GPIO;
-+		}
-+		if (!strcmp(child->name, "stmpe_keypad")) {
-+			pdata->blocks |= STMPE_BLOCK_KEYPAD;
-+		}
-+		if (!strcmp(child->name, "stmpe_touchscreen")) {
-+			pdata->blocks |= STMPE_BLOCK_TOUCHSCREEN;
-+		}
-+		if (!strcmp(child->name, "stmpe_adc")) {
-+			pdata->blocks |= STMPE_BLOCK_ADC;
-+		}
-+	}
-+}
-+
- /* Called from client specific probe routines */
- int __devinit stmpe_probe(struct stmpe_client_info *ci, int partnum)
- {
- 	struct stmpe_platform_data *pdata = dev_get_platdata(ci->dev);
-+	struct device_node *np = ci->dev->of_node;
- 	struct stmpe *stmpe;
- 	int ret;
+ 		request_module("%s%s", I2C_MODULE_PREFIX, info.type);
  
--	if (!pdata)
--		return -EINVAL;
-+	if (!pdata) {
-+		if (np) {
-+			pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+			if (!pdata)
-+				return -ENOMEM;
-+
-+			stmpe_of_probe(pdata, np);
-+		} else
-+			return -EINVAL;
-+	}
- 
- 	stmpe = kzalloc(sizeof(struct stmpe), GFP_KERNEL);
- 	if (!stmpe)
-@@ -1080,7 +1116,7 @@ int __devinit stmpe_probe(struct stmpe_client_info *ci, int partnum)
- 		goto free_gpio;
- 
- 	if (stmpe->irq >= 0) {
--		ret = stmpe_irq_init(stmpe);
-+		ret = stmpe_irq_init(stmpe, np);
- 		if (ret)
- 			goto free_gpio;
- 
+ 		result = i2c_new_device(adap, &info);
 -- 
 1.7.9.5
