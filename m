@@ -1,40 +1,82 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Oct 2012 10:13:24 +0900
-Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20121005011324.GB17182@verge.net.au>
+From: mans.rullgard@linaro.org (Mans Rullgard)
+Date: Fri, 5 Oct 2012 02:26:34 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+Message-ID: <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 01:50:44AM -0700, Stephen Boyd wrote:
-> The TWD and SCU configs are selected by default as long as
-> SCORPIONMP is false and/or MCT is false. Implementing the logic
-> this way certainly saves lines in the Kconfig but it precludes
-> those machines which select SCORPIONMP or MCT from participating
-> in the single zImage effort because when those machines are
-> combined with other SMP capable machines the TWD and SCU are no
-> longer selected.
-> 
-> Push the select out to the machine entries so that we can compile
-> these machines together and still select the appropriate configs.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> ---
+On 5 October 2012 01:58, Michael Hope <michael.hope@linaro.org> wrote:
+> On 5 October 2012 12:10, Rob Herring <robherring2@gmail.com> wrote:
+>> I've been scratching my head with a "scheduling while atomic" bug I
+>> started seeing on 3.6. I can easily reproduce this problem when doing a
+>> wget on my system. It ultimately seems to be a combination of factors.
+>> The "scheduling while atomic" bug is triggered in do_alignment which
+>> gets triggered by this code in net/ipv4/af_inet.c, line 1356:
+>>
+>> id = ntohl(*(__be32 *)&iph->id);
+>> flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id ^ IP_DF));
+>> id >>= 16;
+>>
+>> This code compiles into this using "gcc version 4.6.3 (Ubuntu/Linaro
+>> 4.6.3-1ubuntu5)":
+>>
+>> c02ac020:       e8920840        ldm     r2, {r6, fp}
+>> c02ac024:       e6bfbf3b        rev     fp, fp
+>> c02ac028:       e6bf6f36        rev     r6, r6
+>> c02ac02c:       e22bc901        eor     ip, fp, #16384  ; 0x4000
+>> c02ac030:       e0266008        eor     r6, r6, r8
+>> c02ac034:       e18c6006        orr     r6, ip, r6
+>>
+>> which generates alignment faults on the ldm. These are silent until this
+>> commit is applied:
+>
+> Hi Rob.  I assume that iph is something like:
+>
+> struct foo {
+>     u32 x;
+>     char id[8];
+> };
+>
+> struct foo *iph;
+>
+> GCC merged the two adjacent loads of x and id into one ldm.  This is
+> an ARM specific optimisation done in load_multiple_sequence() and
+> enabled with -fpeephole2.
+>
+> I think the assembly is correct - GCC knows that iph is aligned and
+> knows the offsets of both x and id.  Happy to be corrected if I'm
+> wrong, but I think the assembly is valid given the C code.
 
-The shmobile portion of this change seems fine to me.
+The struct looks like this:
 
-Acked-by: Simon Horman <horms@verge.net.au>
+struct iphdr {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8	ihl:4,
+		version:4;
+#elif defined (__BIG_ENDIAN_BITFIELD)
+	__u8	version:4,
+  		ihl:4;
+#else
+#error	"Please fix <asm/byteorder.h>"
+#endif
+	__u8	tos;
+	__be16	tot_len;
+	__be16	id;
+	__be16	frag_off;
+	__u8	ttl;
+	__u8	protocol;
+	__sum16	check;
+	__be32	saddr;
+	__be32	daddr;
+	/*The options start here. */
+};
+
+In a normal build (there's some magic for special checkers) __be32 is a plain
+__u32 so the struct should be at least 4-byte aligned.  If somehow it is not,
+that is the real bug.
+
+-- 
+Mans Rullgard / mru
