@@ -1,30 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 5 Oct 2012 14:21:15 +0200
-Subject: [PATCH V2 0/3] spi: spi-pl022: Fixup use of runtime pm
-In-Reply-To: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 5 Oct 2012 13:23:04 +0100
+Subject: [PATCH V2 1/3] Revert "spi/pl022: fix spi-pl022 pm enable at
+ probe"
+In-Reply-To: <1349337881-15917-2-git-send-email-ulf.hansson@stericsson.com>
 References: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdbYzr4HH1tFjnZT0A=v_iOGVbkey_vxyAUW+85nw2bEZA@mail.gmail.com>
+ <1349337881-15917-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121005122303.GB4360@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2012 at 10:04 AM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On Thu, Oct 04, 2012 at 10:04:39AM +0200, Ulf Hansson wrote:
 > From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Some old runtime pm patches got merged whiched messed up things.
-> These are now reverted. Additionaly one patch do a simplification
-> of the use of runtime pm functions.
->
-> V2:
-> Rebased patches and updated commit messages.
->
-> Ulf Hansson (3):
->   Revert "spi/pl022: fix spi-pl022 pm enable at probe"
->   Revert "spi/pl022: enable runtime PM"
->   spi: spi-pl022: Minor simplification for runtime pm
+> 
+> This reverts commit 6887237cd7da904184dab2750504040c68f3a080.
+> 
+> This reverts is done due to earlier wrong commit, which is
+> also reverted. "Revert "spi/pl022: enable runtime PM""
 
-I think patch 1/3 and 2/3 needs to go into the -rc fixes.
-
-Who's funneling this now? Grant or Mark?
-
-Yours,
-Linus Walleij
+Why?  "Wrong" isn't terribly detailed...
