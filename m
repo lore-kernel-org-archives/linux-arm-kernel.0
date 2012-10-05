@@ -1,28 +1,73 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Oct 2012 09:45:00 +0100
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121001160639.GA31620@obsidianresearch.com>
-References: <20120930232116.GC30637@obsidianresearch.com>
- <20121001153952.GB2100@linaro.org>
- <20121001160639.GA31620@obsidianresearch.com>
-Message-ID: <20121005084500.GI4625@n2100.arm.linux.org.uk>
+Date: Fri, 5 Oct 2012 09:50:18 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <CAG5Tg6WSRtwPkz9OEg6xS7X5uV6-U4o3GaxbTRW-jCfuMPdb=g@mail.gmail.com>
+References: <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6UabdyCbmMWr5vqyKfgHsYEzGLmx0=uBiPjyGUmVCejcQ@mail.gmail.com>
+ <20121005083359.GH4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6WSRtwPkz9OEg6xS7X5uV6-U4o3GaxbTRW-jCfuMPdb=g@mail.gmail.com>
+Message-ID: <20121005085018.GJ4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 10:06:39AM -0600, Jason Gunthorpe wrote:
-> On Mon, Oct 01, 2012 at 04:39:53PM +0100, Dave Martin wrote:
-> > >   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
-> > >   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
-> > 
-> > Not related directly to your patch, but I wonder why we don't we see
-> > separate r-x and rw- segments?
+On Fri, Oct 05, 2012 at 09:37:38AM +0100, Mans Rullgard wrote:
+> On 5 October 2012 09:33, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Oct 05, 2012 at 09:33:04AM +0100, Mans Rullgard wrote:
+> >> On 5 October 2012 09:24, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
+> >> >> On 5 October 2012 08:12, Russell King - ARM Linux
+> >> >> <linux@arm.linux.org.uk> wrote:
+> >> >> > On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
+> >> >> >> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
+> >> >> >> > This struct is the IP header, so a struct ptr is just set to the
+> >> >> >> > beginning of the received data. Since ethernet headers are 14 bytes,
+> >> >> >> > often the IP header is not aligned unless the NIC can place the frame at
+> >> >> >> > a 2 byte offset (which is something I need to investigate). So this
+> >> >> >> > function cannot make any assumptions about the alignment. Does the ABI
+> >> >> >> > define structs have some minimum alignment? Does the struct need to be
+> >> >> >> > declared as packed or something?
+> >> >> >>
+> >> >> >> The ABI defines the alignment of structs as the maximum alignment of its
+> >> >> >> members.  Since this struct contains 32-bit members, the alignment for the
+> >> >> >> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
+> >> >> >> might be unaligned (in addition to removing any holes within).
+> >> >> >
+> >> >> > This has come up before in the past.
+> >> >> >
+> >> >> > The Linux network folk will _not_ allow - in any shape or form - for
+> >> >> > this struct to be marked packed (it's the struct which needs to be
+> >> >> > marked packed) because by doing so, it causes GCC to issue byte loads/
+> >> >> > stores on architectures where there isn't a problem, and that decreases
+> >> >> > the performance of the Linux IP stack unnecessarily.
+> >> >>
+> >> >> Which architectures?  I have never seen anything like that.
+> >> >
+> >> > Does it matter?
+> >>
+> >> It matters if we want to fix it.
+> >
+> > I can't help you there.  Ask the networking people.
 > 
-> I think this is because the sections are not aligned when the
-> protections change, and the sections are not sorted by protection
-> type.
+> I'm asking anyone who is listening.  Since you've (apparently) seen the claim
+> being made, perhaps you can point to an email or so with more information.
+> I'd hate to think you're just making up excuses.
 
-They aren't sorted by protection type, they're ordered according to what's
-required for the kernel - which is to have the init sections together as
-one complete block so that it can be freed, and to place all of the kernel
-text as close to the beginning of the image as possible.
+Sorry, I'm just not going to bother - especially given your attitude of
+"you're just making up excuses" - you just accused me of being a liar.
+Thanks for that.
+
+We have the merge window open at the moment, and I've only just got back
+from being on holiday for the first half of that - so I have new tree
+conflicts to deal with, and need to finish preparing my tree for Linus.
+I'm not going to waste the precious time that the merge window is open
+for searching lots of mail archives for this when others can do the same,
+or even try sending the Linux networking people a patch adding __packed
+to their structures and seeing the response.
