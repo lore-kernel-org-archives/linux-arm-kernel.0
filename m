@@ -1,56 +1,157 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 05 Oct 2012 07:24:44 -0500
-Subject: alignment faults in 3.6
-In-Reply-To: <20121005082439.GF4625@n2100.arm.linux.org.uk>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk>
-Message-ID: <506ED18C.3010009@gmail.com>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 5 Oct 2012 17:59:18 +0530
+Subject: OMAP4 clock/pm fixes [was: [PATCH v4 2/3] ARM: omap: hwmod: get
+ rid of all omap_clk_get_by_name usage
+In-Reply-To: <506ED079.70700@ti.com>
+References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
+ <1346230576-20004-3-git-send-email-rnayak@ti.com>
+ <CAJOA=zM2sFsrdohooKp1+zsV_AK6dKnoN37+Gs2oskBUK4J00w@mail.gmail.com>
+ <503F26A4.3050902@ti.com> <503F5517.4010100@ti.com>
+ <1346344933.2327.43.camel@deskari> <5040586D.2020406@ti.com>
+ <1346397309.18766.5.camel@lappyti> <504073CF.6010804@ti.com>
+ <1346401643.32389.4.camel@deskari> <504075A0.7010708@ti.com>
+ <506EAC89.2070307@ti.com> <506ED079.70700@ti.com>
+Message-ID: <506ED29E.7070403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
-> On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
->> On 5 October 2012 08:12, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
->>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
->>>>> This struct is the IP header, so a struct ptr is just set to the
->>>>> beginning of the received data. Since ethernet headers are 14 bytes,
->>>>> often the IP header is not aligned unless the NIC can place the frame at
->>>>> a 2 byte offset (which is something I need to investigate). So this
->>>>> function cannot make any assumptions about the alignment. Does the ABI
->>>>> define structs have some minimum alignment? Does the struct need to be
->>>>> declared as packed or something?
->>>>
->>>> The ABI defines the alignment of structs as the maximum alignment of its
->>>> members.  Since this struct contains 32-bit members, the alignment for the
->>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
->>>> might be unaligned (in addition to removing any holes within).
->>>
->>> This has come up before in the past.
->>>
->>> The Linux network folk will _not_ allow - in any shape or form - for
->>> this struct to be marked packed (it's the struct which needs to be
->>> marked packed) because by doing so, it causes GCC to issue byte loads/
->>> stores on architectures where there isn't a problem, and that decreases
->>> the performance of the Linux IP stack unnecessarily.
+On Friday 05 October 2012 05:50 PM, Benoit Cousson wrote:
+> Hi Archit,
+>
+> On 10/05/2012 11:46 AM, Archit Taneja wrote:
+>> Hi,
 >>
->> Which architectures?  I have never seen anything like that.
-> 
-> Does it matter?  I'm just relaying the argument against adding __packed
-> which was used before we were forced (by the networking folk) to implement
-> the alignment fault handler.
+>> On Friday 31 August 2012 01:58 PM, Archit Taneja wrote:
+>>> On Friday 31 August 2012 01:57 PM, Tomi Valkeinen wrote:
+>>>> On Fri, 2012-08-31 at 13:50 +0530, Archit Taneja wrote:
+>>>>> On Friday 31 August 2012 12:45 PM, Tomi Valkeinen wrote:
+>>>>>> On Fri, 2012-08-31 at 11:53 +0530, Archit Taneja wrote:
+>>>>>>
+>>>>>>> The only little problem was that during bootup, when hwmods are
+>>>>>>> setup,
+>>>>>>> only the 'parent' hwmod was able to get reset properly, all the other
+>>>>>>> 'child' hwmods don't have modulemode bits tied to them, and hence
+>>>>>>> weren't able to reset. So we got some error prints.
+>>>>>>>
+>>>>>>> Once DSS driver kicks in, the driver ensures the parent is enabled
+>>>>>>> for
+>>>>>>> any child to be enabled, so we don't face the issue again.
+>>>>>>>
+>>>>>>> So, if DSS driver is not built in, and if the bootloader left DSS
+>>>>>>> in a
+>>>>>>> bad state, the DSS clocks might remain messed up all the time since
+>>>>>>> hwmod fwk wasn't able to reset them.
+>>>>>>>
+>>>>>>> I think this is why we didn't proceed with remove "dss_fck" as a
+>>>>>>> slave
+>>>>>>> clock. If this issue is minor, we could go ahead and remove it.
+>>>>>>
+>>>>>> I wonder if we could handle this with a custom reset function. We
+>>>>>> already have a reset func for dss core. If I remember right, the main
+>>>>>> point for that is the fact that omap 4 doesn't have a softreset for dss
+>>>>>> core, so we manually write the default values to registers.
+>>>>>>
+>>>>>> For omap2/3 this would be simple: skip the resets for all other dss
+>>>>>> submodules, and dss core's reset would enable all the clocks and set
+>>>>>> the
+>>>>>> softreset bit. This would reset all the submodules also.
+>>>>>>
+>>>>>> Omap4 is more tricky. I guess we'd need to enable all the clocks,
+>>>>>> clear
+>>>>>> manually dss core's registers, and then set softreset bits in all the
+>>>>>> submodules. So in this case dss core would need to have information
+>>>>>> about the other submodules.
+>>>>>
+>>>>> The is a good idea. I don't clearly understand your approach though.
+>>>>> Are
+>>>>> you saying we have a custom reset function for only dss core? And reset
+>>>>> the submodules in it manually?
+>>>>
+>>>> Yes.
+>>>>
+>>>>> An alternative approach would be to implement custom reset functions
+>>>>> for
+>>>>> each submodule(or each hwmod), and in the beginning of every reset
+>>>>> function, add a hack to enable MODULEMODE bits(since we don't want
+>>>>> hwmod
+>>>>> fwk to touch MODULEMODE for the DSS submodules), and then set the soft
+>>>>> reset bits.
+>>>>
+>>>> I thought about that also. We'd need reset functions for all of them,
+>>>> and for omap2/3 we'd just reset the submodules again as they have
+>>>> already been reset with the dss core reset.
+>>>>
+>>>> The dss submodule resets are a bit linked. For omap2/3 the connection is
+>>>> obvious as dss core reset resets also the submodules, and for omap4 we
+>>>> have this requirement for the modulemode. That's why I though it'd be
+>>>> perhaps cleaner to handle the reset of the DSS block as a whole, in one
+>>>> place.
+>>>>
+>>>>> Your approach would ensure that we get a clean reset of DSS, but it
+>>>>> would still give the annoying prints when each of the submodule
+>>>>> tries to
+>>>>> reset itself.
+>>>>
+>>>> The other submodules would not be reset by the hwmod framework at all,
+>>>> so there wouldn't be prints. I think there's a flag for that.
+>>
+>> Sorry for bringing up an old thread. I was working on cleaning up the
+>> OMAP4 DSS related clock/pm issues, hence brought it up.
+>>
+>> We were discussing here on how to setting up and reset the OMAP4 DSS
+>> submodules correctly without tying the MODULEMODE bits to the
+>> corresponding hwmods.
+>>
+>> Tomi, your suggestion was to do soft resets for the submodules manually
+>> in the dss_core hwmod's custom reset function itself, and use the flag
+>> HWMOD_INIT_NO_RESET to prevent _reset() being called.
+>
+> Yep, that's the right approach.
+>
+>> However, this won't still resolve the issue of the errors we see a
+>> bootup. The function _setup_reset() looks like this:
+>>
+>> static int _setup_reset(struct omap_hwmod *oh)
+>> {
+>>      ...
+>>      r = _enable(oh);
+>>      if (r) {
+>>                   pr_warning("omap_hwmod: %s: cannot be enabled for
+>>              reset (%d)\n", oh->name, oh->_state);
+>>                          return -EINVAL;
+>>                  }
+>>      ...
+>>
+>>      if (!(oh->flags & HWMOD_INIT_NO_RESET))
+>>          r = _reset(oh);
+>>
+>>      ...
+>> }
+>>
+>> So, even if we have ask hwmod not to reset the DSS submodules, it will
+>> still try to enable them, and we can't enable them since MODULEMODE
+>> isn't tied to them. I don't see how we can get a clean reset done for
+>> the DSS submodules without making some changes in hwmod framework.
+>
+> Yeah, I do agree. Some module cannot but enabled automatically in the fmwk due to PM dependency.
+> This is the case as well for MCPDM, IPU, DSP, ISS, FDIF...
+>
+> In that case the early setup should just be skipped and the DSS driver should take care of that during probe / pm_runtime_enable.
+>
+> I already have a WIP series that delay the setup until the driver probe the device. It will allow the setup to work properly in the case of the DSS assuming the DISPC and other sub IPs are setup in the context of DSS probe. At that time the DSS will be enabled already and thus every sub IPs will be able to get enabled.
+>
+> It is done in the context of DT boot, but should work as well for legacy boot.
+> I can share the current crappy patches as soon as I fixed a couple of regression introduced by the patches :-(
 
-It doesn't really matter what will be accepted or not as adding __packed
-to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
-The only way I've found to eliminate the alignment fault is adding a
-barrier between the 2 loads. That seems like a compiler issue to me if
-there is not a better fix.
+Ah, that will be great!
 
-Rob
+The other not so good option to make DSS PM work would be to add 
+OCPIF_SWSUP_IDLE flag to our l3_main_2__dss_* slave interfaces(which 
+have the hack "dss_fck" as slave clock). I gave this approach a try, 
+that too isn't working so well. When I disable DSS, I get 
+CM_DSS_DSS_CLKCTRL.IDLEST as 0x1, and 
+CM_DSS_CLKSTCTRL.CLKACTIVITY_DSS_L3_ICLK is set. I wonder why that's 
+happening.
+
+Thanks,
+Archit
