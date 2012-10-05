@@ -1,43 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  5 Oct 2012 16:55:15 +0200
-Subject: [PATCH 01/16] ARM: warnings in arch/arm/include/asm/uaccess.h
+Date: Fri,  5 Oct 2012 16:55:26 +0200
+Subject: [PATCH 12/16] video: mark nuc900fb_map_video_memory as __devinit
 In-Reply-To: <1349448930-23976-1-git-send-email-arnd@arndb.de>
 References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349448930-23976-2-git-send-email-arnd@arndb.de>
+Message-ID: <1349448930-23976-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On NOMMU ARM, the __addr_ok() and __range_ok() macros do not evaluate
-their arguments, which may lead to harmless build warnings in some
-code where the variables are not used otherwise. Adding a cast to void
-gets rid of the warning and does not make any semantic changes.
+nuc900fb_map_video_memory is called by an devinit function
+that may be called at run-time, but the function itself is
+marked __init and will be discarded after boot.
 
-Without this patch, building at91x40_defconfig results in:
+To avoid calling into a function that may have been overwritten,
+mark nuc900fb_map_video_memory itself as __devinit.
 
-fs/read_write.c: In function 'rw_copy_check_uvector':
-fs/read_write.c:684:9: warning: unused variable 'buf' [-Wunused-variable]
+Without this patch, building nuc950_defconfig results in:
+
+WARNING: drivers/video/built-in.o(.devinit.text+0x26c): Section mismatch in reference from the function nuc900fb_probe() to the function .init.text:nuc900fb_map_video_memory()
+The function __devinit nuc900fb_probe() references
+a function __init nuc900fb_map_video_memory().
+If nuc900fb_map_video_memory is only used by nuc900fb_probe then
+annotate nuc900fb_map_video_memory with a matching annotation.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 ---
- arch/arm/include/asm/uaccess.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/video/nuc900fb.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 77bd79f..7e1f760 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -200,8 +200,8 @@ extern int __put_user_8(void *, unsigned long long);
- #define USER_DS			KERNEL_DS
- 
- #define segment_eq(a,b)		(1)
--#define __addr_ok(addr)		(1)
--#define __range_ok(addr,size)	(0)
-+#define __addr_ok(addr)		((void)(addr),1)
-+#define __range_ok(addr,size)	((void)(addr),0)
- #define get_fs()		(KERNEL_DS)
- 
- static inline void set_fs(mm_segment_t fs)
+diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+index e10f551..b31b12b 100644
+--- a/drivers/video/nuc900fb.c
++++ b/drivers/video/nuc900fb.c
+@@ -387,7 +387,7 @@ static int nuc900fb_init_registers(struct fb_info *info)
+  *    The buffer should be a non-cached, non-buffered, memory region
+  *    to allow palette and pixel writes without flushing the cache.
+  */
+-static int __init nuc900fb_map_video_memory(struct fb_info *info)
++static int __devinit nuc900fb_map_video_memory(struct fb_info *info)
+ {
+ 	struct nuc900fb_info *fbi = info->par;
+ 	dma_addr_t map_dma;
 -- 
 1.7.10
