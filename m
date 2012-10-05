@@ -1,111 +1,54 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 05 Oct 2012 11:01:24 -0500
+Date: Fri, 05 Oct 2012 11:08:16 -0500
 Subject: alignment faults in 3.6
-In-Reply-To: <20590.58864.527467.746403@pilspetsen.it.uu.se>
+In-Reply-To: <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
 References: <506E1762.3010601@gmail.com>
  <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
- <20590.58864.527467.746403@pilspetsen.it.uu.se>
-Message-ID: <506F0454.3070304@gmail.com>
+Message-ID: <506F05F0.4050401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2012 08:51 AM, Mikael Pettersson wrote:
-> Rob Herring writes:
->  > On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
->  > > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
->  > >> On 5 October 2012 08:12, Russell King - ARM Linux
->  > >> <linux@arm.linux.org.uk> wrote:
->  > >>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
->  > >>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
->  > >>>>> This struct is the IP header, so a struct ptr is just set to the
->  > >>>>> beginning of the received data. Since ethernet headers are 14 bytes,
->  > >>>>> often the IP header is not aligned unless the NIC can place the frame at
->  > >>>>> a 2 byte offset (which is something I need to investigate). So this
->  > >>>>> function cannot make any assumptions about the alignment. Does the ABI
->  > >>>>> define structs have some minimum alignment? Does the struct need to be
->  > >>>>> declared as packed or something?
->  > >>>>
->  > >>>> The ABI defines the alignment of structs as the maximum alignment of its
->  > >>>> members.  Since this struct contains 32-bit members, the alignment for the
->  > >>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
->  > >>>> might be unaligned (in addition to removing any holes within).
->  > >>>
->  > >>> This has come up before in the past.
->  > >>>
->  > >>> The Linux network folk will _not_ allow - in any shape or form - for
->  > >>> this struct to be marked packed (it's the struct which needs to be
->  > >>> marked packed) because by doing so, it causes GCC to issue byte loads/
->  > >>> stores on architectures where there isn't a problem, and that decreases
->  > >>> the performance of the Linux IP stack unnecessarily.
->  > >>
->  > >> Which architectures?  I have never seen anything like that.
->  > > 
->  > > Does it matter?  I'm just relaying the argument against adding __packed
->  > > which was used before we were forced (by the networking folk) to implement
->  > > the alignment fault handler.
->  > 
->  > It doesn't really matter what will be accepted or not as adding __packed
->  > to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
->  > The only way I've found to eliminate the alignment fault is adding a
->  > barrier between the 2 loads. That seems like a compiler issue to me if
->  > there is not a better fix.
+On 10/04/2012 07:58 PM, Michael Hope wrote:
+> On 5 October 2012 12:10, Rob Herring <robherring2@gmail.com> wrote:
+>> I've been scratching my head with a "scheduling while atomic" bug I
+>> started seeing on 3.6. I can easily reproduce this problem when doing a
+>> wget on my system. It ultimately seems to be a combination of factors.
+>> The "scheduling while atomic" bug is triggered in do_alignment which
+>> gets triggered by this code in net/ipv4/af_inet.c, line 1356:
+>>
+>> id = ntohl(*(__be32 *)&iph->id);
+>> flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id ^ IP_DF));
+>> id >>= 16;
+>>
+>> This code compiles into this using "gcc version 4.6.3 (Ubuntu/Linaro
+>> 4.6.3-1ubuntu5)":
+>>
+>> c02ac020:       e8920840        ldm     r2, {r6, fp}
+>> c02ac024:       e6bfbf3b        rev     fp, fp
+>> c02ac028:       e6bf6f36        rev     r6, r6
+>> c02ac02c:       e22bc901        eor     ip, fp, #16384  ; 0x4000
+>> c02ac030:       e0266008        eor     r6, r6, r8
+>> c02ac034:       e18c6006        orr     r6, ip, r6
+>>
+>> which generates alignment faults on the ldm. These are silent until this
+>> commit is applied:
 > 
-> If you suspect a GCC bug, please prepare a standalone user-space test case
-> and submit it to GCC's bugzilla (I can do the latter if you absolutely do not
-> want to).  It wouldn't be the first alignment-related GCC bug...
+> Hi Rob.  I assume that iph is something like:
 > 
+> struct foo {
+>     u32 x;
+>     char id[8];
+> };
+> 
+> struct foo *iph;
+> 
+> GCC merged the two adjacent loads of x and id into one ldm.  This is
+> an ARM specific optimisation done in load_multiple_sequence() and
+> enabled with -fpeephole2.
 
-Here's a testcase. Compiled on ubuntu precise with
-"arm-linux-gnueabihf-gcc -O2 -marm -march=armv7-a test.c".
+I'm probably on some watch list now after searching for peephole...
 
-typedef unsigned short u16;
-typedef unsigned short __sum16;
-typedef unsigned int __u32;
-typedef unsigned char __u8;
-typedef __u32 __be32;
-typedef u16 __be16;
+It's not clear what all turning this off would affect. Is it just struct
+or array loading? Or does this turn off lots of different optimizations?
 
-struct iphdr {
-	__u8	ihl:4,
-		version:4;
-	__u8	tos;
-	__be16	tot_len;
-	__be16	id;
-	__be16	frag_off;
-	__u8	ttl;
-	__u8	protocol;
-	__sum16	check;
-	__be32	saddr;
-	__be32	daddr;
-	/*The options start here. */
-};
-
-#define ntohl(x) __swab32((__u32)(__be32)(x))
-#define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
-
-static inline __attribute__((const)) __u32 __swab32(__u32 x)
-{
-	__asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
-	return x;
-}
-
-int main(void * buffer, unsigned int *p_id)
-{
-	unsigned int id;
-	int flush = 1;
-	const struct iphdr *iph = buffer;
-	__u32 len = *p_id;
-	
-	id = ntohl(*(__be32 *)&iph->id);
-	flush = (u16)((ntohl(*(__be32 *)iph) ^ len) | (id ^ IP_DF));
-	id >>= 16;
-	
-	*p_id = id;
-	return flush;
-}
+Rob
