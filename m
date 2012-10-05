@@ -1,116 +1,63 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 5 Oct 2012 15:37:08 +0530
-Subject: [PATCH 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
-In-Reply-To: <1349431628-2819-1-git-send-email-kishon@ti.com>
-References: <1349431628-2819-1-git-send-email-kishon@ti.com>
-Message-ID: <1349431628-2819-4-git-send-email-kishon@ti.com>
+From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
+Date: Fri, 5 Oct 2012 18:09:53 +0800
+Subject: [RFC] arm/mm: add a protection when flushing anonymous pages
+In-Reply-To: <20121005091006.GM4625@n2100.arm.linux.org.uk>
+References: <CAGCDX1mY4wbMq4qDJ9vCazShxdWQXVYyWkpLd5u8_xqbEC2BWQ@mail.gmail.com>
+ <CAGCDX1mkPVre6h=9kNbRqCp_wtbOneuRLMXM+mkZWFXPwWkBfg@mail.gmail.com>
+ <CANj_sbADwtPR6cgk05QkmvrSUOOQRYXB9vPB6KATKEmwcN8UrA@mail.gmail.com>
+ <20121005091006.GM4625@n2100.arm.linux.org.uk>
+Message-ID: <CANj_sbCV7MGH3dZ8_i3S1SwhPz3WouarEsGxtkUVKiGrGUNVrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platfrom device for ocp2scp is created using omap_device_build in
-devices file. This is used for both omap4(musb) and omap5(dwc3).
+On Fri, Oct 5, 2012 at 5:10 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Oct 02, 2012 at 03:07:33PM +0800, Andrew Yan-Pai Chen wrote:
+>> [RFC PATCH] make flush_pfn_alias() nonpreemptible
+>>
+>> Since flush_pfn_alias() is preemptible, it is possible to be
+>> preempted just after set_top_pte() is done. If the process
+>> which preempts the previous happened to invoke flush_pfn_alias()
+>> with the same colour vaddr as that of the previous, the same
+>> top pte will be overwritten. When switching back to the previous,
+>> it attempts to flush cache lines with incorrect mapping. Then
+>> no lines (or wrong lines) will be flushed because of the nature
+>> of vipt caches.
+>>
+>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+>> index 40ca11e..bd07918 100644
+>> --- a/arch/arm/mm/flush.c
+>> +++ b/arch/arm/mm/flush.c
+>> @@ -27,6 +27,8 @@ static void flush_pfn_alias(unsigned long pfn,
+>> unsigned long vaddr)
+>>         unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) <<
+>> PAGE_SHIFT);
+>>         const int zero = 0;
+>>
+>> +       preempt_disable();
+>> +
+>>         set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
+>>
+>>         asm(    "mcrr   p15, 0, %1, %0, c14\n"
+>> @@ -34,6 +36,8 @@ static void flush_pfn_alias(unsigned long pfn,
+>> unsigned long vaddr)
+>>             :
+>>             : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+>>             : "cc");
+>> +
+>> +       preempt_enable();
+>>  }
+>
+> This looks like it's quite correct, but if you look at the file a little
+> deeper, you'll notice that flush_icache_alias() potentially suffers the
+> same issue.
+>
+> They should probably both also have a comment indicating that they're not
+> to be called for SMP setups (because there's no locking for that.)
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/mach-omap2/devices.c |   72 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+OK. I will resend the patch later.
+Thanks!
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index c8c2117..e2ba505 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -19,6 +19,7 @@
- #include <linux/of.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/omap4-keypad.h>
-+#include <linux/platform_data/omap_ocp2scp.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
-@@ -613,6 +614,76 @@ static void omap_init_vout(void)
- static inline void omap_init_vout(void) {}
- #endif
- 
-+#if defined(CONFIG_OMAP_OCP2SCP) || defined(CONFIG_OMAP_OCP2SCP_MODULE)
-+static int count_ocp2scp_devices(struct omap_ocp2scp_dev *ocp2scp_dev)
-+{
-+	int cnt	= 0;
-+
-+	while (ocp2scp_dev->drv_name != NULL) {
-+		cnt++;
-+		ocp2scp_dev++;
-+	}
-+
-+	return cnt;
-+}
-+
-+static void omap_init_ocp2scp(void)
-+{
-+	struct omap_hwmod	*oh;
-+	struct platform_device	*pdev;
-+	int			bus_id = -1, dev_cnt = 0, i;
-+	struct omap_ocp2scp_dev	*ocp2scp_dev;
-+	const char		*oh_name, *name;
-+	struct omap_ocp2scp_platform_data *pdata;
-+
-+	oh_name = "ocp2scp_usb_phy";
-+	name	= "omap-ocp2scp";
-+
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (!oh) {
-+		pr_err("%s: could not find omap_hwmod for %s\n", __func__,
-+								oh_name);
-+		return;
-+	}
-+
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		pr_err("%s: No memory for ocp2scp pdata\n", __func__);
-+		return;
-+	}
-+
-+	ocp2scp_dev = oh->dev_attr;
-+	dev_cnt = count_ocp2scp_devices(ocp2scp_dev);
-+
-+	if (!dev_cnt) {
-+		pr_err("%s: No devices connected to ocp2scp\n", __func__);
-+		return;
-+	}
-+
-+	pdata->devices = kzalloc(sizeof(struct omap_ocp2scp_dev *)
-+					* dev_cnt, GFP_KERNEL);
-+	if (!pdata->devices) {
-+		pr_err("%s: No memory for ocp2scp pdata devices\n", __func__);
-+		return;
-+	}
-+
-+	for (i = 0; i < dev_cnt; i++, ocp2scp_dev++)
-+		pdata->devices[i] = ocp2scp_dev;
-+
-+	pdata->dev_cnt	= dev_cnt;
-+
-+	pdev = omap_device_build(name, bus_id, oh, pdata, sizeof(*pdata), NULL,
-+								0, false);
-+	if (IS_ERR(pdev)) {
-+		pr_err("Could not build omap_device for %s %s\n",
-+						name, oh_name);
-+		return;
-+	}
-+}
-+#else
-+static inline void omap_init_ocp2scp(void) { }
-+#endif
-+
- /*-------------------------------------------------------------------------*/
- 
- static int __init omap2_init_devices(void)
-@@ -640,6 +711,7 @@ static int __init omap2_init_devices(void)
- 	omap_init_sham();
- 	omap_init_aes();
- 	omap_init_vout();
-+	omap_init_ocp2scp();
- 
- 	return 0;
- }
--- 
-1.7.9.5
+--
+Regards,
+Andrew
