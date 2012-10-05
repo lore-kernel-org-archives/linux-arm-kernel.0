@@ -1,31 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 5 Oct 2012 14:49:44 +0200
-Subject: [PATCH 1/1] mtd: st fsmc_nand: pass the ale and cmd resource via
- resource
-In-Reply-To: <1349356456-13371-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1349356456-13371-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdb10dfKR-sAvbUar+ZsC16uLofhBXuMxfL7QtXLhNg1+Q@mail.gmail.com>
+Date: Fri, 5 Oct 2012 14:52:06 +0200
+Subject: [PATCH 1/2] ARM: nomadik: switch over to using the FSMC driver
+In-Reply-To: <1349335709-13399-1-git-send-email-linus.walleij@linaro.org>
+References: <1349335709-13399-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdYMz05DwtLtHkggvo8VFOtvPLpovwq6fLceeiFK0Wci0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2012 at 3:14 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
+On Thu, Oct 4, 2012 at 9:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> Do not use the platform_data to pass resource and be smart in the drivers.
-> Just pass it via resource
+> The Nomadik NAND driver is really just a subset of the existing
+> FSMC driver, so let's switch over to using that driver instead,
+> since it handles more variants of this chip. The callbacks for
+> setting up the chip is doing stuff now handled by the FSMC
+> driver.
 >
-> Switch to devm_request_and_ioremap at the sametime
->
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Vipin Kumar <vipin.kumar@st.com>
-> Cc: linux-mtd at lists.infradead.org
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I'm requesting Mike Turquette's ACK on this patch so I can merge
+> it through ARM SoC.
 
-This is much better. Actually I was confused by these offsets recently...
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Still requesting Mike's ACK, but not for merging through ARM SoC
+but through MTD.
 
-My patch to convert the Nomadik to the FSMC driver will collide with this,
-but I can sure fix it up as we run into it, no big deal.
+If you apply Jean-Christophe's patch first (please do that) I will
+send a v2 of this patch set to be applied onto MTD as well
+(should be OK).
 
 Yours,
 Linus Walleij
