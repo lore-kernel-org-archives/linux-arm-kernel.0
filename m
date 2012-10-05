@@ -1,33 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Oct 2012 15:05:56 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <506ED18C.3010009@gmail.com>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
-Message-ID: <20121005140556.GQ4625@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 5 Oct 2012 16:20:04 +0200
+Subject: [PATCH 1/1] mtd: st fsmc_nand: pass the ale and cmd resource
+ via resource
+In-Reply-To: <CACRpkdb10dfKR-sAvbUar+ZsC16uLofhBXuMxfL7QtXLhNg1+Q@mail.gmail.com>
+References: <1349356456-13371-1-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdb10dfKR-sAvbUar+ZsC16uLofhBXuMxfL7QtXLhNg1+Q@mail.gmail.com>
+Message-ID: <20121005142004.GB12462@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 07:24:44AM -0500, Rob Herring wrote:
-> On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
-> > Does it matter?  I'm just relaying the argument against adding __packed
-> > which was used before we were forced (by the networking folk) to implement
-> > the alignment fault handler.
+On 14:49 Fri 05 Oct     , Linus Walleij wrote:
 > 
-> It doesn't really matter what will be accepted or not as adding __packed
-> to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
-> The only way I've found to eliminate the alignment fault is adding a
-> barrier between the 2 loads. That seems like a compiler issue to me if
-> there is not a better fix.
+> On Thu, Oct 4, 2012 at 3:14 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> 
+> > Do not use the platform_data to pass resource and be smart in the drivers.
+> > Just pass it via resource
+> >
+> > Switch to devm_request_and_ioremap at the sametime
+> >
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Vipin Kumar <vipin.kumar@st.com>
+> > Cc: linux-mtd at lists.infradead.org
+> 
+> This is much better. Actually I was confused by these offsets recently...
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> My patch to convert the Nomadik to the FSMC driver will collide with this,
+> but I can sure fix it up as we run into it, no big deal.
+ha you did it too
 
-Even so, please test the patch I've sent you in the sub-thread - that
-needs testing whether or not GCC is at fault.  Will's patch to add the
-warnings _has_ uncovered a potential issue with the use of __get_user()
-in some parts of the ARM specific kernel, and I really need you to test
-that while you're experiencing this problem.
+I'll give it a try
+
+Best Regards,
+J.
