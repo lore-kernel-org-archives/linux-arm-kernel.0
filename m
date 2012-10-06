@@ -1,110 +1,105 @@
-From: francescolavra.fl@gmail.com (Francesco Lavra)
-Date: Sat, 06 Oct 2012 16:01:53 +0200
-Subject: [PATCH 1/4] mfd: ab8500: add devicetree support for fuelgauge
-In-Reply-To: <1349064513-31301-2-git-send-email-rajanikanth.hv@stericsson.com>
-References: <1349064513-31301-1-git-send-email-rajanikanth.hv@stericsson.com>
- <1349064513-31301-2-git-send-email-rajanikanth.hv@stericsson.com>
-Message-ID: <507039D1.3010307@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 6 Oct 2012 10:06:00 -0400 (EDT)
+Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
+ mode
+In-Reply-To: <6d3553bfe8a2d1ac88cab852100616a7@localhost>
+References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
+ <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
+ <20121005200822.GQ3874@atomide.com>
+ <6d3553bfe8a2d1ac88cab852100616a7@localhost>
+Message-ID: <alpine.LFD.2.02.1210060955230.16518@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 6 Oct 2012, Marc Zyngier wrote:
 
-On 10/01/2012 06:08 AM, Rajanikanth H.V wrote:
-> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+> Hi Tony,
 > 
-> - This patch adds device tree support for fuelguage driver
-> - optimize bm devices platform_data usage and of_probe(...)
->   Note: of_probe() routine for battery managed devices is made
->   common across all bm drivers.
-[...]
-> +int __devinit
-> +bmdevs_of_probe(struct device *dev,
-> +		struct device_node *np,
-> +		struct abx500_bm_plat_data *pdata)
-> +{
-> +	int	i, ret = 0, thermistor = NTC_INTERNAL;
-> +	const	__be32 *ph;
-> +	const	char *bat_tech;
-> +	struct	abx500_bm_data		 *bat;
-> +	struct	abx500_battery_type	 *btype;
-> +	struct  device_node		 *np_bat_supply;
-> +	struct  abx500_bmdevs_plat_data  *plat_data = pdata->bmdev_pdata;
-> +
-> +	/* get phandle to 'supplied-to' node */
-> +	ph = of_get_property(np, "supplied-to", &plat_data->num_supplicants);
-> +	if (ph == NULL) {
-> +		dev_err(dev, "no supplied_to property specified\n");
-> +		return -EINVAL;
-> +	}
-> +	plat_data->num_supplicants /= sizeof(int);
-> +	plat_data->supplied_to =
-> +		devm_kzalloc(dev, plat_data->num_supplicants *
-> +			sizeof(const char *), GFP_KERNEL);
-> +	if (plat_data->supplied_to == NULL) {
-> +		dev_err(dev, "%s no mem for supplied-to\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +	for (i = 0; i < plat_data->num_supplicants; ++i) {
-> +		np_bat_supply = of_find_node_by_phandle(be32_to_cpup(ph) + i);
-> +		if (np_bat_supply == NULL) {
-> +			dev_err(dev, "invalid supplied_to property\n");
-> +			return -EINVAL;
-> +		}
-> +		ret = of_property_read_string(np_bat_supply, "interface-name",
-> +				(const char **)(plat_data->supplied_to + i));
-> +		if (ret < 0) {
-> +			of_node_put(np_bat_supply);
-> +			dev_err(dev, "supply/interface name not found\n");
-> +			return ret;
-> +		}
+> On Fri, 5 Oct 2012 13:08:22 -0700, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi,
+> > 
+> > * Marc Zyngier <marc.zyngier@arm.com> [120907 10:04]:
+> >> From: Dave Martin <dave.martin@linaro.org>
+> >> 
+> >> This patch does two things:
+> >> 
+> >>   * Ensure that asynchronous aborts are masked at kernel entry.
+> >>     The bootloader should be masking these anyway, but this reduces
+> >>     the damage window just in case it doesn't.
+> >> 
+> >>   * Enter svc mode via exception return to ensure that CPU state is
+> >>     properly serialised.  This does not matter when switching from
+> >>     an ordinary privileged mode ("PL1" modes in ARMv7-AR rev C
+> >>     parlance), but it potentially does matter when switching from a
+> >>     another privileged mode such as hyp mode.
+> >> 
+> >> This should allow the kernel to boot safely either from svc mode or
+> >> hyp mode, even if no support for use of the ARM Virtualization
+> >> Extensions is built into the kernel.
+> >> 
+> >> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > Just bisected this down in linux-next for breaking booting of
+> > my omap2420 ARMv6 based n8x0..
+> > 
+> >> --- a/arch/arm/kernel/head.S
+> >> +++ b/arch/arm/kernel/head.S
+> >> @@ -83,8 +83,12 @@ ENTRY(stext)
+> >>   THUMB(	.thumb			)	@ switch to Thumb now.
+> >>   THUMB(1:			)
+> >>  
+> >> -	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
+> >> -						@ and irqs disabled
+> >> +#ifdef CONFIG_ARM_VIRT_EXT
+> >> +	bl	__hyp_stub_install
+> >> +#endif
+> >> +	@ ensure svc mode and all interrupts masked
+> >> +	safe_svcmode_maskall r9
+> >> +
+> >>  	mrc	p15, 0, r9, c0, c0		@ get processor id
+> >>  	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+> >>  	movs	r10, r5				@ invalid processor (r5=0)?
+> > 
+> > ..and looks like undoing this part fixes it. Any ideas?
+> > 
+> > I quickly tried disabling ARCH_OMAP3 and ARCH_OMAP4 so it's
+> > ARMv6 but that does not help.
+> 
+> If you compiled for v6 only, we can safely exclude __hyp_stub_install, and
+> I assume that you get past the decompressor.
+> 
+> If so, that indicates some side effect of the safe_svcmode_maskall macro,
+> and I suspect the "movs pc, lr" bit.
 
-If an error is encountered here, of_node_put() should be called for all
-nodes previously referenced with of_find_node_by_phandle (or
-of_parse_phandle, as Lee suggested).
-Also, if I'm not mistaken we have a leak here, because the refcount of
-these nodes is never decremented, not even in the driver remove routine.
+That would be surprizing if the "movs pc, lr" was to blame.  This should 
+work on all architectures.
 
-[...]
-> @@ -2446,18 +2444,47 @@ static int __devinit ab8500_fg_probe(struct platform_device *pdev)
->  {
->  	int i, irq;
->  	int ret = 0;
-> -	struct abx500_bm_plat_data *plat_data = pdev->dev.platform_data;
-> +	struct abx500_bm_plat_data *plat_data
-> +				= pdev->dev.platform_data;
-> +	struct device_node *np	= pdev->dev.of_node;
->  	struct ab8500_fg *di;
->  
-> +	di = devm_kzalloc(&pdev->dev, sizeof(*di), GFP_KERNEL);
-> +	if (!di) {
-> +		dev_err(&pdev->dev, "%s no mem for ab8500_fg\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +	if (np) {
-> +		if (!plat_data) {
-> +			plat_data =
-> +			devm_kzalloc(&pdev->dev, sizeof(*plat_data),
-> +					GFP_KERNEL);
-> +			if (!plat_data) {
-> +				dev_err(&pdev->dev,
-> +					"%s no mem for plat_data\n", __func__);
-> +				return -ENOMEM;
-> +			}
-> +			plat_data->bmdev_pdata = devm_kzalloc(&pdev->dev,
-> +				sizeof(*plat_data->bmdev_pdata), GFP_KERNEL);
-> +			if (!plat_data->bmdev_pdata) {
-> +				dev_err(&pdev->dev,
-> +					"%s no mem for pdata->fg\n",
-> +					__func__);
-> +				return -ENOMEM;
-> +			}
-> +		}
-> +		ret = bmdevs_of_probe(&pdev->dev, np, plat_data);
+However the A bit might be to blame.
 
-I think it's better to move allocation of bmdev_pdata and corresponding
-error check to bmdevs_of_probe(), because this code is shared by all
-battery management drivers.
+> Can you try the attached patch? It basically falls back to the previous
+> behaviour if not entered in HYP mode.
 
---
-Francesco
+This is likely to work of course.  However I think we should try to 
+pinpoint the exact problem i.e. whether it is the A bit or the "movs pc, 
+lr" which makes a difference (it is unlikely to be both).
+
+So I was about to suggest to test this patch as well:
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 683a1e6b60..118e22ee46 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -254,8 +254,7 @@
+ 	mov	lr , \reg
+ 	and	lr , lr , #MODE_MASK
+ 	cmp	lr , #HYP_MODE
+-	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
+-	bic	\reg , \reg , #MODE_MASK
++	mov	\reg , #PSR_I_BIT | PSR_F_BIT
+ 	orr	\reg , \reg , #SVC_MODE
+ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	msr	spsr_cxsf, \reg
+
+
+Nicolas
