@@ -1,71 +1,89 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 06 Oct 2012 13:45:27 +0100
-Subject: [RFC 19/24] SERIAL: omap: simplify (2)
+Date: Sat, 06 Oct 2012 13:46:07 +0100
+Subject: [RFC 21/24] SERIAL: omap: use tx buffer allocation API
 In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
 References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-Message-ID: <E1TKTl1-0002ne-8K@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1TKTlf-0002nm-Pn@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify:
-	- set ECB
-	...
-	- LCR mode A
-	- clear TCRTLR
-	- LCR mode B
-	- clear ECB
-	- set ECB and update other bits
-	- LCR mode A
-	- update XONANY
-
-to:
-	- set ECB
-	...
-	- LCR mode B
-	- set ECB and update other bits
-	- LCR mode A
-	- update XONANY and clear TCRTLR
+Rather than working around serial_core, use the newly provided buffer
+allocation API to allow a saner method to manage this buffer.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/tty/serial/omap-serial.c |   11 +++--------
- 1 files changed, 3 insertions(+), 8 deletions(-)
+ drivers/tty/serial/omap-serial.c |   38 +++++++++++++++++++++++++++++---------
+ 1 files changed, 29 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index e786eac..b497187 100644
+index b497187..6054fc8 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -896,11 +896,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 		up->efr &= ~(UART_EFR_CTS | UART_EFR_RTS);
- 	}
+@@ -604,11 +604,6 @@ static int serial_omap_startup(struct uart_port *port)
  
--	/* Disable access to TCR/TLR */
--	serial_out(up, UART_MCR, up->mcr);
--	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
--	serial_out(up, UART_EFR, up->efr);
--
- 	/* clear SW control mode bits */
- 	up->efr &= OMAP_UART_SW_CLR;
+ 	up->msr_saved_flags = 0;
+ 	if (up->use_dma) {
+-		free_page((unsigned long)up->port.state->xmit.buf);
+-		up->port.state->xmit.buf = dma_alloc_coherent(NULL,
+-			UART_XMIT_SIZE,
+-			(dma_addr_t *)&(up->uart_dma.tx_buf_dma_phys),
+-			0);
+ 		init_timer(&(up->uart_dma.rx_timer));
+ 		up->uart_dma.rx_timer.function = serial_omap_rxdma_poll;
+ 		up->uart_dma.rx_timer.data = up->port.line;
+@@ -665,10 +660,6 @@ static void serial_omap_shutdown(struct uart_port *port)
+ 	if (serial_in(up, UART_LSR) & UART_LSR_DR)
+ 		(void) serial_in(up, UART_RX);
+ 	if (up->use_dma) {
+-		dma_free_coherent(up->port.dev,
+-			UART_XMIT_SIZE,	up->port.state->xmit.buf,
+-			up->uart_dma.tx_buf_dma_phys);
+-		up->port.state->xmit.buf = NULL;
+ 		serial_omap_stop_rx(port);
+ 		dma_free_coherent(up->port.dev,
+ 			up->uart_dma.rx_buf_size, up->uart_dma.rx_buf,
+@@ -680,6 +671,33 @@ static void serial_omap_shutdown(struct uart_port *port)
+ 	free_irq(up->port.irq, up);
+ }
  
-@@ -920,9 +915,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 	if (termios->c_iflag & IXOFF)
- 		up->efr |= OMAP_UART_SW_TX;
- 
--	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
--	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
--
- 	/*
- 	 * IXANY Flag:
- 	 * Enable any character to restart output.
-@@ -934,6 +926,9 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 	else
- 		up->mcr &= ~UART_MCR_XONANY;
- 
-+	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-+	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
-+	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
- 	serial_out(up, UART_MCR, up->mcr);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
- 	serial_out(up, UART_EFR, up->efr);
++static int serial_omap_alloc_xmit(struct uart_port *port, struct circ_buf *xmit)
++{
++	struct uart_omap_port *up = (struct uart_omap_port *)port;
++
++	if (up->use_dma) {
++		xmit->buf = dma_alloc_coherent(NULL, UART_XMIT_SIZE,
++				&up->uart_dma.tx_buf_dma_phys, 0);
++	} else {
++		unsigned long page = get_zeroed_page(GFP_KERNEL);
++		xmit->buf = (unsigned char *)page;
++	}
++
++	return xmit->buf ? 0 : -ENOMEM;
++}
++
++static void serial_omap_free_xmit(struct uart_port *port, struct circ_buf *xmit)
++{
++	struct uart_omap_port *up = (struct uart_omap_port *)port;
++
++	if (up->use_dma) {
++		dma_free_coherent(NULL, UART_XMIT_SIZE,
++				  xmit->buf, up->uart_dma.tx_buf_dma_phys);
++	} else {
++		free_page((unsigned long)xmit->buf);
++	}
++}
++
+ static void serial_omap_uart_qos_work(struct work_struct *work)
+ {
+ 	struct uart_omap_port *up = container_of(work, struct uart_omap_port,
+@@ -1193,6 +1211,8 @@ static struct uart_ops serial_omap_pops = {
+ 	.break_ctl	= serial_omap_break_ctl,
+ 	.startup	= serial_omap_startup,
+ 	.shutdown	= serial_omap_shutdown,
++	.alloc_xmit	= serial_omap_alloc_xmit,
++	.free_xmit	= serial_omap_free_xmit,
+ 	.set_termios	= serial_omap_set_termios,
+ 	.pm		= serial_omap_pm,
+ 	.type		= serial_omap_type,
 -- 
 1.7.4.4
