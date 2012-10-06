@@ -1,17 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 6 Oct 2012 16:31:58 +0800
-Subject: [PATCH] ARM: mxs_defconfig: Improve USB related support
-In-Reply-To: <CAOMZO5CXgF-tpFsw_s1UFY7yPdJhcwckMo6Mc_zPQsO-Dgh_7w@mail.gmail.com>
-References: <1348541611-15717-1-git-send-email-festevam@gmail.com>
- <20120925080024.GM27291@S2101-09.ap.freescale.net>
- <CAOMZO5CXgF-tpFsw_s1UFY7yPdJhcwckMo6Mc_zPQsO-Dgh_7w@mail.gmail.com>
-Message-ID: <20121006083156.GC20231@S2101-09.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 6 Oct 2012 09:55:39 +0100
+Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
+In-Reply-To: <201210051857.01311.arnd@arndb.de>
+References: <1347368350-31212-1-git-send-email-arnd@arndb.de>
+ <201210022027.45461.arnd@arndb.de>
+ <87d30xgel3.fsf@octavius.laptop.org>
+ <201210051857.01311.arnd@arndb.de>
+Message-ID: <20121006085539.GC8590@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2012 at 02:29:48PM -0300, Fabio Estevam wrote:
-> Is it OK to send a v2 with USBNET and Language support only?
-> 
-OK.
+On Fri, Oct 05, 2012 at 06:57:00PM +0000, Arnd Bergmann wrote:
+> On Friday 05 October 2012, Chris Ball wrote:
 
-Shawn
+> > Thanks.  Do you want to send this to mainline, or should Mark do it?
+
+> I think it's better for Mark to queue it up than me. sound/soc/
+> is his domain, and I don't have any other patches that would go
+> along with this fix.
+
+Can someone send me the patch please (possibly with a slightly smaller
+CC list)?
