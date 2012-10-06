@@ -1,72 +1,35 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 5 Oct 2012 21:32:09 -0400 (EDT)
-Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
- mode
-In-Reply-To: <20121005235046.GW3874@atomide.com>
-References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
- <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
- <20121005200822.GQ3874@atomide.com>
- <20121005230908.GC15246@n2100.arm.linux.org.uk>
- <20121005232325.GV3874@atomide.com>
- <20121005235046.GW3874@atomide.com>
-Message-ID: <alpine.LFD.2.02.1210052124380.16518@xanadu.home>
+Date: Fri, 5 Oct 2012 21:41:17 -0400 (EDT)
+Subject: alignment faults in 3.6
+In-Reply-To: <20121005224235.GR4625@n2100.arm.linux.org.uk>
+References: <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
+ <20590.58864.527467.746403@pilspetsen.it.uu.se> <506F0454.3070304@gmail.com>
+ <CAG5Tg6XJJ9a4Y+5BXG_T30hQ-xE7pyvyG18rV6A=jmjckcrPUQ@mail.gmail.com>
+ <20121005224235.GR4625@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1210052136020.16518@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Oct 2012, Tony Lindgren wrote:
+On Fri, 5 Oct 2012, Russell King - ARM Linux wrote:
 
-> * Tony Lindgren <tony@atomide.com> [121005 16:27]:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [121005 16:10]:
-> > > On Fri, Oct 05, 2012 at 01:08:22PM -0700, Tony Lindgren wrote:
-> > > > Just bisected this down in linux-next for breaking booting of
-> > > > my omap2420 ARMv6 based n8x0..
-> > > > 
-> > > > > --- a/arch/arm/kernel/head.S
-> > > > > +++ b/arch/arm/kernel/head.S
-> > > > > @@ -83,8 +83,12 @@ ENTRY(stext)
-> > > > >   THUMB(	.thumb			)	@ switch to Thumb now.
-> > > > >   THUMB(1:			)
-> > > > >  
-> > > > > -	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
-> > > > > -						@ and irqs disabled
-> > > > > +#ifdef CONFIG_ARM_VIRT_EXT
-> > > > > +	bl	__hyp_stub_install
-> > > > > +#endif
-> > > > > +	@ ensure svc mode and all interrupts masked
-> > > > > +	safe_svcmode_maskall r9
-> > > > > +
-> > > > >  	mrc	p15, 0, r9, c0, c0		@ get processor id
-> > > > >  	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
-> > > > >  	movs	r10, r5				@ invalid processor (r5=0)?
-> > > > 
-> > > > ..and looks like undoing this part fixes it. Any ideas?
-> > > > 
-> > > > I quickly tried disabling ARCH_OMAP3 and ARCH_OMAP4 so it's
-> > > > ARMv6 but that does not help.
+> On Fri, Oct 05, 2012 at 11:37:40PM +0100, Mans Rullgard wrote:
+> > The problem is the (__be32 *) casts.  This is a normal pointer to a 32-bit,
+> > which is assumed to be aligned, and the cast overrides the packed attribute
+> > from the struct.  Dereferencing these cast expressions must be done with the
+> > macros from asm/unaligned.h
 > 
-> The same kernel boots on 2430sdp, which is the same ARMv6 core
-> as 2430 if I remember correctly. So this hints that it has something
-> to do with the bits set differently by the bootloader?
+> Again, not going to happen.  DaveM is on record for saying as much, but
+> I guess you're going to reject that as well, so I'm not sure why I'm
+> even bothering to reply.
 
-Possibly.
-
-What if you apply this on top:
-
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 683a1e6b60..b276c26e19 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -254,8 +254,7 @@
- 	mov	lr , \reg
- 	and	lr , lr , #MODE_MASK
- 	cmp	lr , #HYP_MODE
--	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
--	bic	\reg , \reg , #MODE_MASK
-+	mov	\reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
- 	orr	\reg , \reg , #SVC_MODE
- THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	msr	spsr_cxsf, \reg
-
+May I suggest to send a recap of this thread to netdev at vger.kernel.org 
+and see what davem has to say this time?  Otherwise we are just going in 
+circle.
 
 
 Nicolas
