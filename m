@@ -1,40 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 6 Oct 2012 17:51:36 +0100
-Subject: [RFC 20/24] SERIAL: core: add xmit buffer allocation callbacks
-In-Reply-To: <20121006164956.2956375c@pyramind.ukuu.org.uk>
-References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
- <E1TKTlL-0002ni-MB@rmk-PC.arm.linux.org.uk>
- <20121006164956.2956375c@pyramind.ukuu.org.uk>
-Message-ID: <20121006165136.GC28061@n2100.arm.linux.org.uk>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Sat, 6 Oct 2012 17:33:43 -0400
+Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
+In-Reply-To: <000401cda2a0$69670a40$3c351ec0$@samsung.com>
+References: <20121001090945.49198.68950.stgit@ubuntu>
+ <20121001091042.49198.93241.stgit@ubuntu>
+ <000401cda2a0$69670a40$3c351ec0$@samsung.com>
+Message-ID: <CANM98qKAFQgfwRuFP2WOP4Af+1Un-wuQPC8-TiGi4B+s3XB2hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 06, 2012 at 04:49:56PM +0100, Alan Cox wrote:
-> On Sat, 06 Oct 2012 13:45:47 +0100
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > This allows drivers (such as OMAP serial) to allocate and free their
-> > transmit buffers in a sane manner, rather than working around the
-> > buffer allocation provided by serial_core.
-> 
-> I think this just illustrates how broken the serial_core layering is in
-> that drivers can't treat it as a library but get constrained by it.
-> 
-> Fine for now and actually probably a useful hook to begin removing the
-> circ buffers for the kernel generic kfifo and other work that needs doing
-> eventually.
+On Thu, Oct 4, 2012 at 10:23 PM, Min-gyu Kim <mingyu84.kim@samsung.com> wrote:
+>
+>
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
+>> Behalf Of Christoffer Dall
+>> Sent: Monday, October 01, 2012 6:11 PM
+>> To: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> kvmarm at lists.cs.columbia.edu
+>> Cc: Marc Zyngier
+>> Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
+>>
+>> +static void stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache
+>> *cache,
+>> +                        phys_addr_t addr, const pte_t *new_pte) {
+>> +     pgd_t *pgd;
+>> +     pud_t *pud;
+>> +     pmd_t *pmd;
+>> +     pte_t *pte, old_pte;
+>> +
+>> +     /* Create 2nd stage page table mapping - Level 1 */
+>> +     pgd = kvm->arch.pgd + pgd_index(addr);
+>> +     pud = pud_offset(pgd, addr);
+>> +     if (pud_none(*pud)) {
+>> +             if (!cache)
+>> +                     return; /* ignore calls from kvm_set_spte_hva */
+>> +             pmd = mmu_memory_cache_alloc(cache);
+>> +             pud_populate(NULL, pud, pmd);
+>> +             pmd += pmd_index(addr);
+>> +             get_page(virt_to_page(pud));
+>> +     } else
+>> +             pmd = pmd_offset(pud, addr);
+>> +
+>> +     /* Create 2nd stage page table mapping - Level 2 */
+>> +     if (pmd_none(*pmd)) {
+>> +             if (!cache)
+>> +                     return; /* ignore calls from kvm_set_spte_hva */
+>> +             pte = mmu_memory_cache_alloc(cache);
+>> +             clean_pte_table(pte);
+>> +             pmd_populate_kernel(NULL, pmd, pte);
+>> +             pte += pte_index(addr);
+>> +             get_page(virt_to_page(pmd));
+>> +     } else
+>> +             pte = pte_offset_kernel(pmd, addr);
+>> +
+>> +     /* Create 2nd stage page table mapping - Level 3 */
+>> +     old_pte = *pte;
+>> +     set_pte_ext(pte, *new_pte, 0);
+>> +     if (pte_present(old_pte))
+>> +             __kvm_tlb_flush_vmid(kvm);
+>> +     else
+>> +             get_page(virt_to_page(pte));
+>> +}
+>
+>
+> I'm not sure about the 3-level page table, but isn't it necessary to
+> clean the page table for 2nd level?
+> There are two mmu_memory_cache_alloc calls. One has following clean_pte_table
+> and the other doesn't have.
 
-Yes, I was thinking about turning the 'default' buffer allocation into
-a library call which drivers would set, but I felt that's just asking
-for a big patch and problems with new drivers appearing.
+hmm, it probably is - I couldn't really find the common case where
+this is done in the kernel normally (except for some custom loop in
+ioremap and idmap), but I added this fix:
 
-We could transition it by providing a default buffer allocation call,
-converting all the drivers, and then making that call mandatory.  That
-probably would then give us a better path to convert to kfifo.
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 5394a52..f11ba27f 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -430,6 +430,7 @@ static void stage2_set_pte(struct kvm *kvm, struct
+kvm_mmu_memory_cache *cache,
+ 		if (!cache)
+ 			return; /* ignore calls from kvm_set_spte_hva */
+ 		pmd = mmu_memory_cache_alloc(cache);
++		clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
+ 		pud_populate(NULL, pud, pmd);
+ 		pmd += pmd_index(addr);
+ 		get_page(virt_to_page(pud));
 
-The view that serial_core should be a library is one that Ted mentioned
-when I created serial_core originally - I disagreed at the time, and
-I still believe it would've ended up being much more complex - and
-hairy - to go that route at that time.  Maybe as things have moved
-forward in the tty layer that's changed, but I've been out of tty stuff
-for too long to properly comment.
+
+>
+> And why do you ignore calls from kvm_set_spte_hva? It is supposed to happen when
+> host moves the page, right? Then you ignore the case because it can be handled
+> later when fault actually happens? Is there any other reason that I miss?
+>
+
+kvm_set_spte_hva tells us that a page at some IPA is going to be
+backed by another physical page, which means we must adjust the stage
+2 mapping. However, if we don't have that page mapped in the stage 2
+page table, we don't need to do anything, and certainly don't want to
+start allocating unnecessary level2 and level3 page tables.
+
+
+Thanks!
+-Christoffer
