@@ -1,10 +1,8 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 6 Oct 2012 12:19:30 -0400 (EDT)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Oct 2012 17:31:00 +0100
 Subject: alignment faults in 3.6
 In-Reply-To: <CAG5Tg6Ut9Q_Sn4xT+owr=ZxCc36NERhg=eATceQKQ=mKj7G-gg@mail.gmail.com>
-References: <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+References: <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
  <20121005071216.GD4625@n2100.arm.linux.org.uk>
  <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
  <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
@@ -12,12 +10,11 @@ References: <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
  <CAG5Tg6XJJ9a4Y+5BXG_T30hQ-xE7pyvyG18rV6A=jmjckcrPUQ@mail.gmail.com>
  <20121005224235.GR4625@n2100.arm.linux.org.uk>
  <CAG5Tg6Ut9Q_Sn4xT+owr=ZxCc36NERhg=eATceQKQ=mKj7G-gg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1210061216280.16518@xanadu.home>
+Message-ID: <20121006163100.GS4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 6 Oct 2012, Mans Rullgard wrote:
-
+On Sat, Oct 06, 2012 at 05:04:33PM +0100, Mans Rullgard wrote:
 > On 5 October 2012 23:42, Russell King - ARM Linux
 > <linux@arm.linux.org.uk> wrote:
 > > On Fri, Oct 05, 2012 at 11:37:40PM +0100, Mans Rullgard wrote:
@@ -35,8 +32,12 @@ On Sat, 6 Oct 2012, Mans Rullgard wrote:
 > 
 > Refusing to do either leaves us with a broken kernel.  Is that what you want?
 
-Once again, please bring this up with davem and also CC 
-netdev at vger.kernel.org as he's the point of contention here.
+How about you start reading the emails that you receive rather than
+seemingly insisting that I somehow fix the Linux networking stack -
+which would involve me talking to someone who has publically tried
+to oust me from being ARM maintainer, and whom would probably reject
+any attempt to fix this _because_ I was the person involved in proposing
+the fix?
 
-
-Nicolas
+It's far better that someone else sorts this out, they are much more
+likely to get a favourable response.
