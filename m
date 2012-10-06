@@ -1,37 +1,39 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 06 Oct 2012 13:40:42 +0100
-Subject: [RFC 05/24] SERIAL: omap: no need to re-read EFR
+Date: Sat, 06 Oct 2012 13:41:02 +0100
+Subject: [RFC 06/24] SERIAL: omap: allow hardware assisted rts/cts modes to
+ be disabled
 In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
 References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-Message-ID: <E1TKTgQ-0002mf-6v@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1TKTgk-0002mj-L2@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to re-read EFR after we've recently written it; the
-register is a configuration register which doesn't change its value
-without us writing to it.
-
-Removing this re-reading avoids the possibility that we end up with
-up->efr having the ECB bit set, which should only be temporarily set
-when accessing the enhanced features.
+There is nothing which clears the auto RTS/CTS bits, so once hardware
+flow control gets enabled, there's no possibility to disable it.
+So, clear these bits when CRTSCTS is cleared.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/tty/serial/omap-serial.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ drivers/tty/serial/omap-serial.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 391087e..654dd78 100644
+index 654dd78..f2535fe 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -872,8 +872,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 		serial_out(up, UART_OMAP_MDR1, up->mdr1);
+@@ -917,6 +917,13 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+ 		serial_out(up, UART_EFR, up->efr);
+ 		serial_out(up, UART_LCR, cval);
++	} else {
++		/* Disable AUTORTS and AUTOCTS */
++		up->efr &= ~(UART_EFR_CTS | UART_EFR_RTS);
++
++		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
++		serial_out(up, UART_EFR, up->efr);
++		serial_out(up, UART_LCR, cval);
+ 	}
  
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
--
--	up->efr = serial_in(up, UART_EFR);
- 	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
- 
- 	serial_out(up, UART_LCR, 0);
+ 	serial_omap_set_mctrl(&up->port, up->port.mctrl);
 -- 
 1.7.4.4
