@@ -1,106 +1,119 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 06 Oct 2012 12:18:23 +0200
-Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
- mode
-In-Reply-To: <20121005200822.GQ3874@atomide.com>
-References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
- <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
- <20121005200822.GQ3874@atomide.com>
-Message-ID: <6d3553bfe8a2d1ac88cab852100616a7@localhost>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Sat, 6 Oct 2012 12:58:49 +0200
+Subject: alignment faults in 3.6
+In-Reply-To: <506F0454.3070304@gmail.com>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <506ED18C.3010009@gmail.com>
+ <20590.58864.527467.746403@pilspetsen.it.uu.se>
+ <506F0454.3070304@gmail.com>
+Message-ID: <20592.3817.788006.973760@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Rob Herring writes:
+ > On 10/05/2012 08:51 AM, Mikael Pettersson wrote:
+ > > Rob Herring writes:
+ > >  > On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
+ > >  > > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
+ > >  > >> On 5 October 2012 08:12, Russell King - ARM Linux
+ > >  > >> <linux@arm.linux.org.uk> wrote:
+ > >  > >>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
+ > >  > >>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
+ > >  > >>>>> This struct is the IP header, so a struct ptr is just set to the
+ > >  > >>>>> beginning of the received data. Since ethernet headers are 14 bytes,
+ > >  > >>>>> often the IP header is not aligned unless the NIC can place the frame at
+ > >  > >>>>> a 2 byte offset (which is something I need to investigate). So this
+ > >  > >>>>> function cannot make any assumptions about the alignment. Does the ABI
+ > >  > >>>>> define structs have some minimum alignment? Does the struct need to be
+ > >  > >>>>> declared as packed or something?
+ > >  > >>>>
+ > >  > >>>> The ABI defines the alignment of structs as the maximum alignment of its
+ > >  > >>>> members.  Since this struct contains 32-bit members, the alignment for the
+ > >  > >>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
+ > >  > >>>> might be unaligned (in addition to removing any holes within).
+ > >  > >>>
+ > >  > >>> This has come up before in the past.
+ > >  > >>>
+ > >  > >>> The Linux network folk will _not_ allow - in any shape or form - for
+ > >  > >>> this struct to be marked packed (it's the struct which needs to be
+ > >  > >>> marked packed) because by doing so, it causes GCC to issue byte loads/
+ > >  > >>> stores on architectures where there isn't a problem, and that decreases
+ > >  > >>> the performance of the Linux IP stack unnecessarily.
+ > >  > >>
+ > >  > >> Which architectures?  I have never seen anything like that.
+ > >  > > 
+ > >  > > Does it matter?  I'm just relaying the argument against adding __packed
+ > >  > > which was used before we were forced (by the networking folk) to implement
+ > >  > > the alignment fault handler.
+ > >  > 
+ > >  > It doesn't really matter what will be accepted or not as adding __packed
+ > >  > to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
+ > >  > The only way I've found to eliminate the alignment fault is adding a
+ > >  > barrier between the 2 loads. That seems like a compiler issue to me if
+ > >  > there is not a better fix.
+ > > 
+ > > If you suspect a GCC bug, please prepare a standalone user-space test case
+ > > and submit it to GCC's bugzilla (I can do the latter if you absolutely do not
+ > > want to).  It wouldn't be the first alignment-related GCC bug...
+ > > 
+ > 
+ > Here's a testcase. Compiled on ubuntu precise with
+ > "arm-linux-gnueabihf-gcc -O2 -marm -march=armv7-a test.c".
+ > 
+ > typedef unsigned short u16;
+ > typedef unsigned short __sum16;
+ > typedef unsigned int __u32;
+ > typedef unsigned char __u8;
+ > typedef __u32 __be32;
+ > typedef u16 __be16;
+ > 
+ > struct iphdr {
+ > 	__u8	ihl:4,
+ > 		version:4;
+ > 	__u8	tos;
+ > 	__be16	tot_len;
+ > 	__be16	id;
+ > 	__be16	frag_off;
+ > 	__u8	ttl;
+ > 	__u8	protocol;
+ > 	__sum16	check;
+ > 	__be32	saddr;
+ > 	__be32	daddr;
+ > 	/*The options start here. */
+ > };
+ > 
+ > #define ntohl(x) __swab32((__u32)(__be32)(x))
+ > #define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
+ > 
+ > static inline __attribute__((const)) __u32 __swab32(__u32 x)
+ > {
+ > 	__asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
+ > 	return x;
+ > }
+ > 
+ > int main(void * buffer, unsigned int *p_id)
+ > {
+ > 	unsigned int id;
+ > 	int flush = 1;
+ > 	const struct iphdr *iph = buffer;
+ > 	__u32 len = *p_id;
+ > 	
+ > 	id = ntohl(*(__be32 *)&iph->id);
+ > 	flush = (u16)((ntohl(*(__be32 *)iph) ^ len) | (id ^ IP_DF));
+ > 	id >>= 16;
+ > 	
+ > 	*p_id = id;
+ > 	return flush;
+ > }
+ > 
 
-On Fri, 5 Oct 2012 13:08:22 -0700, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
-> 
-> * Marc Zyngier <marc.zyngier@arm.com> [120907 10:04]:
->> From: Dave Martin <dave.martin@linaro.org>
->> 
->> This patch does two things:
->> 
->>   * Ensure that asynchronous aborts are masked at kernel entry.
->>     The bootloader should be masking these anyway, but this reduces
->>     the damage window just in case it doesn't.
->> 
->>   * Enter svc mode via exception return to ensure that CPU state is
->>     properly serialised.  This does not matter when switching from
->>     an ordinary privileged mode ("PL1" modes in ARMv7-AR rev C
->>     parlance), but it potentially does matter when switching from a
->>     another privileged mode such as hyp mode.
->> 
->> This should allow the kernel to boot safely either from svc mode or
->> hyp mode, even if no support for use of the ARM Virtualization
->> Extensions is built into the kernel.
->> 
->> Signed-off-by: Dave Martin <dave.martin@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Just bisected this down in linux-next for breaking booting of
-> my omap2420 ARMv6 based n8x0..
-> 
->> --- a/arch/arm/kernel/head.S
->> +++ b/arch/arm/kernel/head.S
->> @@ -83,8 +83,12 @@ ENTRY(stext)
->>   THUMB(	.thumb			)	@ switch to Thumb now.
->>   THUMB(1:			)
->>  
->> -	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
->> -						@ and irqs disabled
->> +#ifdef CONFIG_ARM_VIRT_EXT
->> +	bl	__hyp_stub_install
->> +#endif
->> +	@ ensure svc mode and all interrupts masked
->> +	safe_svcmode_maskall r9
->> +
->>  	mrc	p15, 0, r9, c0, c0		@ get processor id
->>  	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
->>  	movs	r10, r5				@ invalid processor (r5=0)?
-> 
-> ..and looks like undoing this part fixes it. Any ideas?
-> 
-> I quickly tried disabling ARCH_OMAP3 and ARCH_OMAP4 so it's
-> ARMv6 but that does not help.
-
-If you compiled for v6 only, we can safely exclude __hyp_stub_install, and
-I assume that you get past the decompressor.
-
-If so, that indicates some side effect of the safe_svcmode_maskall macro,
-and I suspect the "movs pc, lr" bit.
-
-Can you try the attached patch? It basically falls back to the previous
-behaviour if not entered in HYP mode.
-
-Thanks,
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
--------------- next part --------------
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 658a15d..b21b97f 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -254,16 +254,17 @@
- 	mov	lr , \reg
- 	and	lr , lr , #MODE_MASK
- 	cmp	lr , #HYP_MODE
--	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
-+	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
- 	bic	\reg , \reg , #MODE_MASK
- 	orr	\reg , \reg , #SVC_MODE
- THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
--	msr	spsr_cxsf, \reg
--	adr	lr, BSYM(2f)
- 	bne	1f
-+	orr	\reg, \reg, #PSR_A_BIT
-+	adr	lr, BSYM(2f)
-+	msr	spsr_cxsf, \reg
- 	__MSR_ELR_HYP(14)
- 	__ERET
--1:	movs	pc, lr
-+1:	msr	cpsr_c, \reg
- 2:
- .endm
- 
+I was referring to your statement that adding __packed to the types involved
+didn't prevent GCC from emitting aligned memory accesses. The test case above
+only shows that if the source code lies to GCC then things break...
