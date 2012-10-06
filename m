@@ -1,99 +1,74 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 06 Oct 2012 13:42:44 +0100
-Subject: [RFC 11/24] SERIAL: core: add throttle/unthrottle callbacks for
- hardware assisted flow control
+Date: Sat, 06 Oct 2012 13:45:47 +0100
+Subject: [RFC 20/24] SERIAL: core: add xmit buffer allocation callbacks
 In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
 References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-Message-ID: <E1TKTiO-0002n7-En@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1TKTlL-0002ni-MB@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two callbacks for hardware assisted flow control; we need to know
-when the tty layers want us to stop and restart due to their buffer
-levels.
-
-Call a driver specific throttle/unthrottle function if and only if the
-driver indicates that it is using an enabled hardware assisted flow
-control method, otherwise fall back to the non-hardware assisted
-methods.
+This allows drivers (such as OMAP serial) to allocate and free their
+transmit buffers in a sane manner, rather than working around the
+buffer allocation provided by serial_core.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/tty/serial/serial_core.c |   31 +++++++++++++++++++++++++++----
+ drivers/tty/serial/serial_core.c |   23 ++++++++++++++++-------
  include/linux/serial_core.h      |    2 ++
- 2 files changed, 29 insertions(+), 4 deletions(-)
+ 2 files changed, 18 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index 02b10bc..4dd609e 100644
+index 4dd609e..53274ae 100644
 --- a/drivers/tty/serial/serial_core.c
 +++ b/drivers/tty/serial/serial_core.c
-@@ -610,27 +610,50 @@ static void uart_send_xchar(struct tty_struct *tty, char ch)
- static void uart_throttle(struct tty_struct *tty)
- {
- 	struct uart_state *state = tty->driver_data;
-+	struct uart_port *port = state->uart_port;
-+	uint32_t mask = 0;
+@@ -147,12 +147,18 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
+ 	 * buffer.
+ 	 */
+ 	if (!state->xmit.buf) {
+-		/* This is protected by the per port mutex */
+-		page = get_zeroed_page(GFP_KERNEL);
+-		if (!page)
+-			return -ENOMEM;
++		if (uport->ops->alloc_xmit) {
++			retval = uport->ops->alloc_xmit(uport, &state->xmit);
++			if (retval)
++				return retval;
++		} else {
++			/* This is protected by the per port mutex */
++			page = get_zeroed_page(GFP_KERNEL);
++			if (!page)
++				return -ENOMEM;
  
- 	if (I_IXOFF(tty))
-+		mask |= UPF_SOFT_FLOW;
-+	if (tty->termios->c_cflag & CRTSCTS)
-+		mask |= UPF_HARD_FLOW;
-+
-+	if (port->flags & mask) {
-+		port->ops->throttle(port);
-+		mask &= ~port->flags;
-+	}
-+
-+	if (mask & UPF_SOFT_FLOW)
- 		uart_send_xchar(tty, STOP_CHAR(tty));
- 
--	if (tty->termios->c_cflag & CRTSCTS)
--		uart_clear_mctrl(state->uart_port, TIOCM_RTS);
-+	if (mask & UPF_HARD_FLOW)
-+		uart_clear_mctrl(port, TIOCM_RTS);
- }
- 
- static void uart_unthrottle(struct tty_struct *tty)
- {
- 	struct uart_state *state = tty->driver_data;
- 	struct uart_port *port = state->uart_port;
-+	uint32_t mask = 0;
- 
--	if (I_IXOFF(tty)) {
-+	if (I_IXOFF(tty))
-+		mask |= UPF_SOFT_FLOW;
-+	if (tty->termios->c_cflag & CRTSCTS)
-+		mask |= UPF_HARD_FLOW;
-+
-+	if (port->flags & mask) {
-+		port->ops->unthrottle(port);
-+		mask &= ~port->flags;
-+	}
-+
-+	if (mask & UPF_SOFT_FLOW) {
- 		if (port->x_char)
- 			port->x_char = 0;
- 		else
- 			uart_send_xchar(tty, START_CHAR(tty));
+-		state->xmit.buf = (unsigned char *) page;
++			state->xmit.buf = (unsigned char *) page;
++		}
+ 		uart_circ_clear(&state->xmit);
  	}
  
--	if (tty->termios->c_cflag & CRTSCTS)
-+	if (mask & UPF_HARD_FLOW)
- 		uart_set_mctrl(port, TIOCM_RTS);
+@@ -257,7 +263,10 @@ static void uart_shutdown(struct tty_struct *tty, struct uart_state *state)
+ 	 * Free the transmit buffer page.
+ 	 */
+ 	if (state->xmit.buf) {
+-		free_page((unsigned long)state->xmit.buf);
++		if (uport->ops->free_xmit)
++			uport->ops->free_xmit(uport, &state->xmit);
++		else
++			free_page((unsigned long)state->xmit.buf);
+ 		state->xmit.buf = NULL;
+ 	}
  }
- 
 diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 8e8500e..b17d4c9 100644
+index b17d4c9..ebe9af1 100644
 --- a/include/linux/serial_core.h
 +++ b/include/linux/serial_core.h
-@@ -240,6 +240,8 @@ struct uart_ops {
- 	unsigned int	(*get_mctrl)(struct uart_port *);
- 	void		(*stop_tx)(struct uart_port *);
- 	void		(*start_tx)(struct uart_port *);
-+	void		(*throttle)(struct uart_port *);
-+	void		(*unthrottle)(struct uart_port *);
- 	void		(*send_xchar)(struct uart_port *, char ch);
- 	void		(*stop_rx)(struct uart_port *);
- 	void		(*enable_ms)(struct uart_port *);
+@@ -248,6 +248,8 @@ struct uart_ops {
+ 	void		(*break_ctl)(struct uart_port *, int ctl);
+ 	int		(*startup)(struct uart_port *);
+ 	void		(*shutdown)(struct uart_port *);
++	int		(*alloc_xmit)(struct uart_port *, struct circ_buf *);
++	void		(*free_xmit)(struct uart_port *, struct circ_buf *);
+ 	void		(*flush_buffer)(struct uart_port *);
+ 	void		(*set_termios)(struct uart_port *, struct ktermios *new,
+ 				       struct ktermios *old);
 -- 
 1.7.4.4
