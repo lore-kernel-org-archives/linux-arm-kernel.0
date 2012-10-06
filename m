@@ -1,28 +1,28 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Sat, 6 Oct 2012 15:10:28 +0200
-Subject: [PATCH 1/3] i2c: i2c-mux-gpio: Use devm_kzalloc instead of kzalloc
-In-Reply-To: <1348758784-15245-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1348758784-15245-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348758784-15245-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121006151028.3c9fbd53@endymion.delvare>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 6 Oct 2012 10:16:10 -0300
+Subject: [PATCH] ARM: dts: imx6q-sabreauto: Add basic support
+In-Reply-To: <20121006130344.GE20231@S2101-09.ap.freescale.net>
+References: <1348615018-14465-1-git-send-email-festevam@gmail.com>
+ <20121006130344.GE20231@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5Dk2YKS=RTMKe5jejvtPqw1rNFt2G0EPvYo3uM2rFZYEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Sep 2012 17:13:02 +0200, Maxime Ripard wrote:
-> Use the devm_kzalloc managed function to stripdown the error and remove
-> code.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jean Delvare <khali@linux-fr.org>
-> Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-> ---
->  drivers/i2c/muxes/i2c-mux-gpio.c |   14 +++++---------
->  1 file changed, 5 insertions(+), 9 deletions(-)
-> (...)
+On Sat, Oct 6, 2012 at 10:03 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Note: I ended up applying this patch (it's on its way to Linus already)
-because it did conflict with another patch in my tree. So only patches
-2/3 and 3/3 in this series are left for Wolfram to handle.
+>>  Documentation/devicetree/bindings/arm/fsl.txt |    4 ++
+>>  arch/arm/boot/dts/imx6q-sabreauto.dts         |   65 +++++++++++++++++++++++++
+>
+> Add imx6q-sabreauto.dtb into arch/arm/boot/dts/Makefile.
 
--- 
-Jean Delvare
+Ok, looking at arch/arm/boot/dts/Makefile I see that
+imx6q-sabrelite.dtb, for example appears
+under dtb-$(CONFIG_ARCH_MXC) and dtb-$(CONFIG_SOC_IMX6Q)
+
+Would you like a patch to remove this duplicate entry?
+
+Should we use only CONFIG_SOC?
+
+Regards,
+
+Fabio Estevam
