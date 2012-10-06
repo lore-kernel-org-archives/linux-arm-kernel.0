@@ -1,41 +1,34 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sat, 06 Oct 2012 07:38:16 -0400
-Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
-Message-ID: <87vcenespj.fsf@octavius.laptop.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 6 Oct 2012 13:46:14 +0200
+Subject: [PATCH] ARM: OMAP: convert I2C driver to PM QoS for MPU latency
+ constraints
+In-Reply-To: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
+References: <1348157283-24119-1-git-send-email-j-pihet@ti.com>
+Message-ID: <20121006114614.GB10164@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
-renamed arch/arm/mach-mmp/include/mach/sram.h to
-include/linux/platform_data/dma-mmp_tdma.h, but didn't update
-mmp-pcm.c which uses the header.  Fix the build error.
+On Thu, Sep 20, 2012 at 06:08:03PM +0200, Jean Pihet wrote:
+> Convert the driver from the outdated omap_pm_set_max_mpu_wakeup_lat
+> API to the new PM QoS API.
+> Since the constraint is on the MPU subsystem, use the PM_QOS_CPU_DMA_LATENCY
+> class of PM QoS. The resulting MPU constraints are used by cpuidle to
+> decide the next power state of the MPU subsystem.
+> 
+> The I2C device latency timing is derived from the FIFO size and the
+> clock speed and so is applicable to all OMAP SoCs.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-Signed-off-by: Chris Ball <cjb@laptop.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/pxa/mmp-pcm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
-index 73ac546..e834faf 100644
---- a/sound/soc/pxa/mmp-pcm.c
-+++ b/sound/soc/pxa/mmp-pcm.c
-@@ -15,13 +15,13 @@
- #include <linux/slab.h>
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
-+#include <linux/platform_data/dma-mmp_tdma.h>
- #include <linux/platform_data/mmp_audio.h>
- #include <sound/pxa2xx-lib.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
--#include <mach/sram.h>
- #include <sound/dmaengine_pcm.h>
- 
- struct mmp_dma_data {
+Applied to -next, thanks!
 
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121006/51890e5c/attachment.sig>
