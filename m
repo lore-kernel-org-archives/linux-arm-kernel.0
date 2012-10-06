@@ -1,48 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 06 Oct 2012 18:06:51 +0200
-Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
- mode
-In-Reply-To: <20121006154052.GB3874@atomide.com>
-References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
- <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
- <20121005200822.GQ3874@atomide.com>
- <6d3553bfe8a2d1ac88cab852100616a7@localhost>
- <20121006144252.GY3874@atomide.com>
- <alpine.LFD.2.02.1210061129080.16518@xanadu.home>
- <20121006154052.GB3874@atomide.com>
-Message-ID: <5d2c2df8247d9f028727f9a8b712d3d4@localhost>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 6 Oct 2012 18:14:29 +0200
+Subject: pm: add suspend_mem and suspend_standby support
+Message-ID: <20121006161429.GD12462@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 6 Oct 2012 08:40:52 -0700, Tony Lindgren <tony@atomide.com> wrote:
-> * Nicolas Pitre <nicolas.pitre@linaro.org> [121006 08:33]:
->> On Sat, 6 Oct 2012, Tony Lindgren wrote:
->> 
->> > * Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
->> > 
->> > > If so, that indicates some side effect of the safe_svcmode_maskall
->> > > macro,
->> > > and I suspect the "movs pc, lr" bit.
->> > > 
->> > > Can you try the attached patch? It basically falls back to the
->> > > previous
->> > > behaviour if not entered in HYP mode.
->> > 
->> > Yes, with this it boots OK.
->> 
->> OK. In that case, I suggest this patch be sent to Russell to fix this 
->> issue so he could push the ARM stuff to Linus ASAP.
->> 
->> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Yes we can come back to this:
-> 
-> Tested-by: Tony Lindgren <tony@atomide.com>
+Hi,
 
-Now in Russell's patch system as #7549/1.
+The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
 
-Thanks a lot for your help on this both of you.
+  Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+are available in the git repository at:
+
+
+  git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
+
+for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
+
+  arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
+
+----------------------------------------------------------------
+pm: add suspend_mem and suspend_standby support
+
+Today when we go to suspend we can not knwon at drivers level if we go in
+STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+suspend_standby.
+
+If a bus or drivers does not need to care about this distinction we fallback to
+suspend. This will allow to do not update the current bus or drivers.
+
+This is needed as example by at91 OHCI, UDC and atmel serial
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (6):
+      pm: add suspend_mem and suspend_standby support
+      platform: pm: add suspend_mem and suspend_standby support
+      tty: atmel_serial: switch pm ops
+      usb: ohci-at91: switch pm ops
+      usb: at91_ude: switch pm ops
+      arm: at91: drop at91_suspend_entering_slow_clock
+
+ arch/arm/mach-at91/include/mach/board.h |    3 ---
+ arch/arm/mach-at91/pm.c                 |   24 ------------------------
+ drivers/base/platform.c                 |   40 ++++++++++++++++++++++++++++++++++++++++
+ drivers/base/power/main.c               |   12 ++++++++++++
+ drivers/tty/serial/atmel_serial.c       |   52 +++++++++++++++++++++++++++-------------------------
+ drivers/usb/gadget/at91_udc.c           |   34 +++++++++++++++++++++++-----------
+ drivers/usb/host/ohci-at91.c            |   38 ++++++++++++++++++++++++--------------
+ include/linux/platform_device.h         |    6 ++++++
+ include/linux/pm.h                      |    9 +++++++++
+ kernel/power/suspend.c                  |   16 ++++++++++++++--
+ 10 files changed, 155 insertions(+), 79 deletions(-)
+
+Best Regards,
+J.
