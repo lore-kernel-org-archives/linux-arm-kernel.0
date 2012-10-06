@@ -1,35 +1,41 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 6 Oct 2012 13:25:03 +0200
-Subject: [PATCH 12/19] i2c-nomadik: Register sub-devices when passed via
- Device Tree
-In-Reply-To: <20120919201220.GA5035@gmail.com>
-References: <1347016499-29354-13-git-send-email-lee.jones@linaro.org>
- <CACRpkdaCrus9SOpxyK+kV2gKr3sEZJsHCn6ivn2gA3ri0rcvHw@mail.gmail.com>
- <20120912105202.GD2624@pengutronix.de>
- <20120914082754.GE3374@gmail.com>
- <20120914084141.GA2630@pengutronix.de>
- <20120914090228.GH3374@gmail.com>
- <20120914093945.GB2630@pengutronix.de>
- <20120914101542.GT3374@gmail.com>
- <20120914113212.GD2630@pengutronix.de>
- <20120919201220.GA5035@gmail.com>
-Message-ID: <20121006112503.GA10164@pengutronix.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 06 Oct 2012 07:38:16 -0400
+Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
+Message-ID: <87vcenespj.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
+renamed arch/arm/mach-mmp/include/mach/sram.h to
+include/linux/platform_data/dma-mmp_tdma.h, but didn't update
+mmp-pcm.c which uses the header.  Fix the build error.
 
-> Are you taking these soon? I've rebased on -next, but they're
-> still in my local delta.
+Signed-off-by: Chris Ball <cjb@laptop.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ sound/soc/pxa/mmp-pcm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied to -next now, will push out later today.
+diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
+index 73ac546..e834faf 100644
+--- a/sound/soc/pxa/mmp-pcm.c
++++ b/sound/soc/pxa/mmp-pcm.c
+@@ -15,13 +15,13 @@
+ #include <linux/slab.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
++#include <linux/platform_data/dma-mmp_tdma.h>
+ #include <linux/platform_data/mmp_audio.h>
+ #include <sound/pxa2xx-lib.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
+-#include <mach/sram.h>
+ #include <sound/dmaengine_pcm.h>
+ 
+ struct mmp_dma_data {
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121006/510c5366/attachment.sig>
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
