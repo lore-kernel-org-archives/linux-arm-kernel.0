@@ -1,39 +1,34 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Sat, 6 Oct 2012 11:39:05 -0300
-Subject: [PATCH v2 27/34] media: mx2_camera: remove cpu_is_xxx by using
- platform_device_id
-In-Reply-To: <20121006082638.GB20231@S2101-09.ap.freescale.net>
-References: <1348123547-31082-1-git-send-email-shawn.guo@linaro.org>
- <1348123547-31082-28-git-send-email-shawn.guo@linaro.org>
- <20120927160321.56420910@redhat.com>
- <20121006082638.GB20231@S2101-09.ap.freescale.net>
-Message-ID: <20121006113905.3facece0@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Oct 2012 15:39:27 +0100
+Subject: [RFC 00/24] OMAP serial driver flow control fixes, and
+ preparation for DMA engine conversion
+In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+Message-ID: <20121006143927.GF15246@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sat, 6 Oct 2012 16:26:40 +0800
-Shawn Guo <shawn.guo@linaro.org> escreveu:
+Another potential bug - in serial_omap_set_termios() there is this:
 
-> On Thu, Sep 27, 2012 at 04:03:21PM -0300, Mauro Carvalho Chehab wrote:
-> > It seems that it depends on some stuff that got merged via the arm tree.
-> > 
-> > Not sure what would the better way to handle that, as applying it via -arm
-> > will likely generate conflicts when merging from both trees upstream.
-> > 
-> > If this change is not urgent, maybe it would be better to apply it after
-> > the end of the merge window, via either one of the trees.
-> > 
-> That's the original plan, having it merged via arm-soc tree at the end
-> of 3.7 merge window.  But I was told by arm-soc folks that we already
-> have enough conflicts to sort out for this window, and we do not want
-> any more.  And we have to postpone it to 3.8.
-> 
-> I will publish a topic branch for this series after 3.7-rc1 comes out.
+	if (up->use_dma) {
+                serial_out(up, UART_TI752_TLR, 0);
+                up->scr |= UART_FCR_TRIGGER_4;
+	} else {
+                /* Set receive FIFO threshold to 1 byte */
+                up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
+                up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
+	}
 
-Ok. Btw, as expected, the patch doesn't apply cleanly anymore, due to the
-file renames. Waiting for 3.7-rc1 seems to be the right thing to do here.
+Is that:
+                up->scr |= UART_FCR_TRIGGER_4;
 
+line really correct?  It looks wrong to be using a FCR register mask with
+something that ends up in the OMAP SCR register...
 
--- 
-Regards,
-Mauro
+I'm beginning to wonder how many of the "workarounds" which have been
+applied to this driver, particularly those to do with FIFO triggers and
+idle stuff are actually down to the horribly broken and buggy set_termios
+code.  I'm coming to the conclusion that all those workarounds should be
+removed, and we start again from a clean slate with a properly written
+driver which observes the register access rules - thereby ensuring that
+the correct values get written to the registers that we expect them to.
