@@ -1,63 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 6 Oct 2012 09:00:32 -0700
-Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in
- HYP mode
-In-Reply-To: <6d3553bfe8a2d1ac88cab852100616a7@localhost>
-References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
- <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
- <20121005200822.GQ3874@atomide.com>
- <6d3553bfe8a2d1ac88cab852100616a7@localhost>
-Message-ID: <20121006160031.GC3874@atomide.com>
+From: mans.rullgard@linaro.org (Mans Rullgard)
+Date: Sat, 6 Oct 2012 17:04:33 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <20121005224235.GR4625@n2100.arm.linux.org.uk>
+References: <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <506ED18C.3010009@gmail.com>
+ <20590.58864.527467.746403@pilspetsen.it.uu.se>
+ <506F0454.3070304@gmail.com>
+ <CAG5Tg6XJJ9a4Y+5BXG_T30hQ-xE7pyvyG18rV6A=jmjckcrPUQ@mail.gmail.com>
+ <20121005224235.GR4625@n2100.arm.linux.org.uk>
+Message-ID: <CAG5Tg6Ut9Q_Sn4xT+owr=ZxCc36NERhg=eATceQKQ=mKj7G-gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
-> 
-> If so, that indicates some side effect of the safe_svcmode_maskall macro,
-> and I suspect the "movs pc, lr" bit.
-> 
-> Can you try the attached patch? It basically falls back to the previous
-> behaviour if not entered in HYP mode.
-...
+On 5 October 2012 23:42, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 05, 2012 at 11:37:40PM +0100, Mans Rullgard wrote:
+>> The problem is the (__be32 *) casts.  This is a normal pointer to a 32-bit,
+>> which is assumed to be aligned, and the cast overrides the packed attribute
+>> from the struct.  Dereferencing these cast expressions must be done with the
+>> macros from asm/unaligned.h
+>
+> Again, not going to happen.
 
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index 658a15d..b21b97f 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -254,16 +254,17 @@
->  	mov	lr , \reg
->  	and	lr , lr , #MODE_MASK
->  	cmp	lr , #HYP_MODE
-> -	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
-> +	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
->  	bic	\reg , \reg , #MODE_MASK
->  	orr	\reg , \reg , #SVC_MODE
->  THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
-> -	msr	spsr_cxsf, \reg
-> -	adr	lr, BSYM(2f)
->  	bne	1f
-> +	orr	\reg, \reg, #PSR_A_BIT
-> +	adr	lr, BSYM(2f)
-> +	msr	spsr_cxsf, \reg
->  	__MSR_ELR_HYP(14)
->  	__ERET
-> -1:	movs	pc, lr
-> +1:	msr	cpsr_c, \reg
->  2:
->  .endm
->  
+There are only two options for fixing this:
 
-The minimal version of this that still boots on my n800 is just
-the last change of the above patch:
+1. Ensure the struct is always aligned.
+2. Declare it packed (and fix casts).
 
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -263,7 +263,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	bne	1f
- 	__MSR_ELR_HYP(14)
- 	__ERET
--1:	movs	pc, lr
-+1:	msr	cpsr_c, \reg
- 2:
- .endm
- 
+Refusing to do either leaves us with a broken kernel.  Is that what you want?
+
+-- 
+Mans Rullgard / mru
