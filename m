@@ -1,105 +1,48 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Sat, 6 Oct 2012 17:33:43 -0400
-Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
-In-Reply-To: <000401cda2a0$69670a40$3c351ec0$@samsung.com>
-References: <20121001090945.49198.68950.stgit@ubuntu>
- <20121001091042.49198.93241.stgit@ubuntu>
- <000401cda2a0$69670a40$3c351ec0$@samsung.com>
-Message-ID: <CANM98qKAFQgfwRuFP2WOP4Af+1Un-wuQPC8-TiGi4B+s3XB2hQ@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 07 Oct 2012 00:18:21 +0200
+Subject: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <20121006161429.GD12462@game.jcrosoft.org>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+Message-ID: <17531317.3PGnt12jPY@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2012 at 10:23 PM, Min-gyu Kim <mingyu84.kim@samsung.com> wrote:
->
->
->> -----Original Message-----
->> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On
->> Behalf Of Christoffer Dall
->> Sent: Monday, October 01, 2012 6:11 PM
->> To: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> kvmarm at lists.cs.columbia.edu
->> Cc: Marc Zyngier
->> Subject: [PATCH v2 06/14] KVM: ARM: Memory virtualization setup
->>
->> +static void stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache
->> *cache,
->> +                        phys_addr_t addr, const pte_t *new_pte) {
->> +     pgd_t *pgd;
->> +     pud_t *pud;
->> +     pmd_t *pmd;
->> +     pte_t *pte, old_pte;
->> +
->> +     /* Create 2nd stage page table mapping - Level 1 */
->> +     pgd = kvm->arch.pgd + pgd_index(addr);
->> +     pud = pud_offset(pgd, addr);
->> +     if (pud_none(*pud)) {
->> +             if (!cache)
->> +                     return; /* ignore calls from kvm_set_spte_hva */
->> +             pmd = mmu_memory_cache_alloc(cache);
->> +             pud_populate(NULL, pud, pmd);
->> +             pmd += pmd_index(addr);
->> +             get_page(virt_to_page(pud));
->> +     } else
->> +             pmd = pmd_offset(pud, addr);
->> +
->> +     /* Create 2nd stage page table mapping - Level 2 */
->> +     if (pmd_none(*pmd)) {
->> +             if (!cache)
->> +                     return; /* ignore calls from kvm_set_spte_hva */
->> +             pte = mmu_memory_cache_alloc(cache);
->> +             clean_pte_table(pte);
->> +             pmd_populate_kernel(NULL, pmd, pte);
->> +             pte += pte_index(addr);
->> +             get_page(virt_to_page(pmd));
->> +     } else
->> +             pte = pte_offset_kernel(pmd, addr);
->> +
->> +     /* Create 2nd stage page table mapping - Level 3 */
->> +     old_pte = *pte;
->> +     set_pte_ext(pte, *new_pte, 0);
->> +     if (pte_present(old_pte))
->> +             __kvm_tlb_flush_vmid(kvm);
->> +     else
->> +             get_page(virt_to_page(pte));
->> +}
->
->
-> I'm not sure about the 3-level page table, but isn't it necessary to
-> clean the page table for 2nd level?
-> There are two mmu_memory_cache_alloc calls. One has following clean_pte_table
-> and the other doesn't have.
+On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Hi,
+> 
+> The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
+> 
+>   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
+> 
+> for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
+> 
+>   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
+> 
+> ----------------------------------------------------------------
+> pm: add suspend_mem and suspend_standby support
+> 
+> Today when we go to suspend we can not knwon at drivers level if we go in
+> STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+> suspend_standby.
 
-hmm, it probably is - I couldn't really find the common case where
-this is done in the kernel normally (except for some custom loop in
-ioremap and idmap), but I added this fix:
+No way. Device drivers shouldn't be concerned about that.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 5394a52..f11ba27f 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -430,6 +430,7 @@ static void stage2_set_pte(struct kvm *kvm, struct
-kvm_mmu_memory_cache *cache,
- 		if (!cache)
- 			return; /* ignore calls from kvm_set_spte_hva */
- 		pmd = mmu_memory_cache_alloc(cache);
-+		clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
- 		pud_populate(NULL, pud, pmd);
- 		pmd += pmd_index(addr);
- 		get_page(virt_to_page(pud));
+> If a bus or drivers does not need to care about this distinction we fallback to
+> suspend. This will allow to do not update the current bus or drivers.
+> 
+> This is needed as example by at91 OHCI, UDC and atmel serial
+
+I wonder why.
+
+Thanks,
+Rafael
 
 
->
-> And why do you ignore calls from kvm_set_spte_hva? It is supposed to happen when
-> host moves the page, right? Then you ignore the case because it can be handled
-> later when fault actually happens? Is there any other reason that I miss?
->
-
-kvm_set_spte_hva tells us that a page at some IPA is going to be
-backed by another physical page, which means we must adjust the stage
-2 mapping. However, if we don't have that page mapped in the stage 2
-page table, we don't need to do anything, and certainly don't want to
-start allocating unnecessary level2 and level3 page tables.
-
-
-Thanks!
--Christoffer
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
