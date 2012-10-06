@@ -1,112 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 6 Oct 2012 09:54:15 +0000
-Subject: [PATCH 08/16] ipvs: fix ip_vs_set_timeout debug messages
-In-Reply-To: <alpine.LFD.2.00.1210061052170.1971@ja.ssi.bg>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <201210060645.05225.arnd@arndb.de>
- <alpine.LFD.2.00.1210061052170.1971@ja.ssi.bg>
-Message-ID: <201210060954.15831.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 06 Oct 2012 12:18:23 +0200
+Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
+ mode
+In-Reply-To: <20121005200822.GQ3874@atomide.com>
+References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
+ <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
+ <20121005200822.GQ3874@atomide.com>
+Message-ID: <6d3553bfe8a2d1ac88cab852100616a7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 October 2012, Julian Anastasov wrote:
-> On Sat, 6 Oct 2012, Arnd Bergmann wrote:
-> > > 	Are there any CONFIG_IP_VS_PROTO_xxx options in this
-> > > default config? It is a waste of memory if IPVS is compiled
-> > > without any protocols.
-> > 
-> > They all appear to be turned off:
-> > 
-> > $ grep CONFIG_IP_VS obj-tmp/.config
-> > CONFIG_IP_VS=m
-> > CONFIG_IP_VS_DEBUG=y
-> > CONFIG_IP_VS_TAB_BITS=12
-> > # CONFIG_IP_VS_PROTO_TCP is not set
-> > # CONFIG_IP_VS_PROTO_UDP is not set
-> > # CONFIG_IP_VS_PROTO_AH_ESP is not set
-> > # CONFIG_IP_VS_PROTO_ESP is not set
-> > # CONFIG_IP_VS_PROTO_AH is not set
-> > # CONFIG_IP_VS_PROTO_SCTP is not set
+Hi Tony,
+
+On Fri, 5 Oct 2012 13:08:22 -0700, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
 > 
-> 	Something should be changed here, may be at least
-> TCP/UDP, who knows.
-
-I don't try to read too much into our defconfigs. We have 140 of them
-on ARM, and they are mainly useful to give a reasonable build coverage,
-but I wouldn't expect them to be actually used on that hardware.
-
-I'll leave it up to Krzysztof to send a patch for this if he wants.
-
-> > --- a/net/netfilter/ipvs/ip_vs_ctl.c
-> > +++ b/net/netfilter/ipvs/ip_vs_ctl.c
-> > @@ -2590,6 +2588,7 @@ __ip_vs_get_timeouts(struct net *net, struct ip_vs_timeout_user *u)
-> >  #if defined(CONFIG_IP_VS_PROTO_TCP) || defined(CONFIG_IP_VS_PROTO_UDP)
-> >  	struct ip_vs_proto_data *pd;
-> >  #endif
+> * Marc Zyngier <marc.zyngier@arm.com> [120907 10:04]:
+>> From: Dave Martin <dave.martin@linaro.org>
+>> 
+>> This patch does two things:
+>> 
+>>   * Ensure that asynchronous aborts are masked at kernel entry.
+>>     The bootloader should be masking these anyway, but this reduces
+>>     the damage window just in case it doesn't.
+>> 
+>>   * Enter svc mode via exception return to ensure that CPU state is
+>>     properly serialised.  This does not matter when switching from
+>>     an ordinary privileged mode ("PL1" modes in ARMv7-AR rev C
+>>     parlance), but it potentially does matter when switching from a
+>>     another privileged mode such as hyp mode.
+>> 
+>> This should allow the kernel to boot safely either from svc mode or
+>> hyp mode, even if no support for use of the ARM Virtualization
+>> Extensions is built into the kernel.
+>> 
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> 	That is what we want. If you plan another submission
-> you can add empty line before this memset and to replace
-> the __ip_vs_get_timeouts call in ip_vs_genl_set_config with
-> memset but they are cosmetic changes. Or may be Simon will
-> take care about the coding style when applying the change.
+> Just bisected this down in linux-next for breaking booting of
+> my omap2420 ARMv6 based n8x0..
 > 
-> Acked-by: Julian Anastasov <ja@ssi.bg>
+>> --- a/arch/arm/kernel/head.S
+>> +++ b/arch/arm/kernel/head.S
+>> @@ -83,8 +83,12 @@ ENTRY(stext)
+>>   THUMB(	.thumb			)	@ switch to Thumb now.
+>>   THUMB(1:			)
+>>  
+>> -	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
+>> -						@ and irqs disabled
+>> +#ifdef CONFIG_ARM_VIRT_EXT
+>> +	bl	__hyp_stub_install
+>> +#endif
+>> +	@ ensure svc mode and all interrupts masked
+>> +	safe_svcmode_maskall r9
+>> +
+>>  	mrc	p15, 0, r9, c0, c0		@ get processor id
+>>  	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+>>  	movs	r10, r5				@ invalid processor (r5=0)?
+> 
+> ..and looks like undoing this part fixes it. Any ideas?
+> 
+> I quickly tried disabling ARCH_OMAP3 and ARCH_OMAP4 so it's
+> ARMv6 but that does not help.
 
-I'd prefer Simon to pick up the patch. He should also decide whether he wants
-to add it to stable. In theory, this is a small leak of kernel stack data
-to user space, but as you say in practice it should not happen because it
-only exists for silly configurations that nobody should be using.
+If you compiled for v6 only, we can safely exclude __hyp_stub_install, and
+I assume that you get past the decompressor.
 
-AFAICT, removing the call to __ip_vs_get_timeouts in do_ip_vs_get_ctl would
-be a semantic change for the case where a user sends a IPVS_CMD_SET_CONFIG
-message without without the complete set of attributes inside it. The current
-behavior is to leave the timeouts alone, replacing the __ip_vs_get_timeouts
-with a memset would zero them. I left this part alone then.
+If so, that indicates some side effect of the safe_svcmode_maskall macro,
+and I suspect the "movs pc, lr" bit.
 
-	Arnd
+Can you try the attached patch? It basically falls back to the previous
+behaviour if not entered in HYP mode.
 
-8<-----
-ipvs: initialize returned data in do_ip_vs_get_ctl
+Thanks,
 
-As reported by a gcc warning, the do_ip_vs_get_ctl does not initalize
-all the members of the ip_vs_timeout_user structure it returns if
-at least one of the TCP or UDP protocols is disabled for ipvs. 
-
-This makes sure that the data is always initialized, before it is
-returned as a response to IPVS_CMD_GET_CONFIG or printed as a
-debug message in IPVS_CMD_SET_CONFIG.
-
-Without this patch, building ARM ixp4xx_defconfig results in:
-
-net/netfilter/ipvs/ip_vs_ctl.c: In function 'ip_vs_genl_set_cmd':
-net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.udp_timeout' may be used uninitialized in this function [-Wuninitialized]
-net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.udp_timeout' was declared here
-net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.tcp_fin_timeout' may be used uninitialized in this function [-Wuninitialized]
-net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.tcp_fin_timeout' was declared here
-net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.tcp_timeout' may be used uninitialized in this function [-Wuninitialized]
-net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.tcp_timeout' was declared here
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Julian Anastasov <ja@ssi.bg>
----
-diff --git a/net/netfilter/ipvs/ip_vs_ctl.c b/net/netfilter/ipvs/ip_vs_ctl.c
-index 2770f85..c4ee437 100644
---- a/net/netfilter/ipvs/ip_vs_ctl.c
-+++ b/net/netfilter/ipvs/ip_vs_ctl.c
-@@ -2591,6 +2589,8 @@ __ip_vs_get_timeouts(struct net *net, struct ip_vs_timeout_user *u)
- 	struct ip_vs_proto_data *pd;
- #endif
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
+-------------- next part --------------
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 658a15d..b21b97f 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -254,16 +254,17 @@
+ 	mov	lr , \reg
+ 	and	lr , lr , #MODE_MASK
+ 	cmp	lr , #HYP_MODE
+-	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
++	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
+ 	bic	\reg , \reg , #MODE_MASK
+ 	orr	\reg , \reg , #SVC_MODE
+ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+-	msr	spsr_cxsf, \reg
+-	adr	lr, BSYM(2f)
+ 	bne	1f
++	orr	\reg, \reg, #PSR_A_BIT
++	adr	lr, BSYM(2f)
++	msr	spsr_cxsf, \reg
+ 	__MSR_ELR_HYP(14)
+ 	__ERET
+-1:	movs	pc, lr
++1:	msr	cpsr_c, \reg
+ 2:
+ .endm
  
-+	memset(u, 0, sizeof (*u));
-+
- #ifdef CONFIG_IP_VS_PROTO_TCP
- 	pd = ip_vs_proto_data_get(net, IPPROTO_TCP);
- 	u->tcp_timeout = pd->timeout_table[IP_VS_TCP_S_ESTABLISHED] / HZ;
-@@ -2768,7 +2768,6 @@ do_ip_vs_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
- 	{
- 		struct ip_vs_timeout_user t;
- 
--		memset(&t, 0, sizeof(t));
- 		__ip_vs_get_timeouts(net, &t);
- 		if (copy_to_user(user, &t, sizeof(t)) != 0)
- 			ret = -EFAULT;
