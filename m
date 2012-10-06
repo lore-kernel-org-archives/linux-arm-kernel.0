@@ -1,23 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 6 Oct 2012 23:35:25 +0800
-Subject: [PATCH 1/3] ARM: dts: imx53-qsb: Use pinctrl for gpio-led
-In-Reply-To: <1348702057-2351-1-git-send-email-festevam@gmail.com>
-References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121006153522.GH20231@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Oct 2012 16:35:28 +0100
+Subject: [RFC 00/24] OMAP serial driver flow control fixes, and
+ preparation for DMA engine conversion
+In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+Message-ID: <20121006153528.GA28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 08:27:35PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led driver 
-> has pinctrl support, so setup the gpio led pin via pinctrl and avoid the 
-> following warning:
-> 
-> leds-gpio leds.2: pins are not configured from the driver
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Another issue:
 
-Queued first 2 patches for 3.8, and leave patch #3 to Sascha.
+serial_omap_set_termios()
+{
+...
+        /* FIFOs and DMA Settings */
+ 
+        /* FCR can be changed only when the
+         * baud clock is not running
+         * DLL_REG and DLH_REG set to 0.
+         */
+        serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);     
+        serial_out(up, UART_DLL, 0);
+        serial_out(up, UART_DLM, 0);
+        serial_out(up, UART_LCR, 0);
+...
+        serial_out(up, UART_FCR, up->fcr);
+...
+}
 
-Shawn
+serial_omap_restore_context()
+{
+        serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
+        serial_out(up, UART_DLL, up->dll);
+        serial_out(up, UART_DLM, up->dlh);
+        serial_out(up, UART_LCR, 0x0); /* Operational mode */
+        serial_out(up, UART_IER, up->ier);
+        serial_out(up, UART_FCR, up->fcr);
+}
+
+Either the comment is wrong, or the code in serial_omap_restore_context()
+is wrong; they can't both be right.  Please can someone let me know which
+is the right version so we can fix that inconsistency.
+
+Thanks.
