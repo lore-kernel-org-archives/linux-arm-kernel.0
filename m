@@ -1,5 +1,5 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 6 Oct 2012 08:40:52 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Oct 2012 16:42:41 +0100
 Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in
  HYP mode
 In-Reply-To: <alpine.LFD.2.02.1210061129080.16518@xanadu.home>
@@ -9,13 +9,12 @@ References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
  <6d3553bfe8a2d1ac88cab852100616a7@localhost>
  <20121006144252.GY3874@atomide.com>
  <alpine.LFD.2.02.1210061129080.16518@xanadu.home>
-Message-ID: <20121006154052.GB3874@atomide.com>
+Message-ID: <20121006154241.GB28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [121006 08:33]:
+On Sat, Oct 06, 2012 at 11:32:16AM -0400, Nicolas Pitre wrote:
 > On Sat, 6 Oct 2012, Tony Lindgren wrote:
-> 
 > > * Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
 > > 
 > > > If so, that indicates some side effect of the safe_svcmode_maskall macro,
@@ -31,6 +30,12 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > 
 > Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Yes we can come back to this:
+I've already sent the pull request (it's late enough already for the
+first bunch of stuff... Linus' truely brilliant timing for the N'th
+time sees the merge window open when I'm away - why does he keep doing
+that to me?) for everything _except_ stuff in my 'devel-stable' branch,
+which includes the opcodes, virt, and new cache maintanence stuff.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+I won't be sending Linus another pull request until at least three
+days after he merges the current request, so we'll just have to hope
+that this doesn't turn out to be a short merge window...
