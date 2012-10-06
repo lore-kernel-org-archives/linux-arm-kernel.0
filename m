@@ -1,28 +1,21 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 6 Oct 2012 10:16:10 -0300
-Subject: [PATCH] ARM: dts: imx6q-sabreauto: Add basic support
-In-Reply-To: <20121006130344.GE20231@S2101-09.ap.freescale.net>
-References: <1348615018-14465-1-git-send-email-festevam@gmail.com>
- <20121006130344.GE20231@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Dk2YKS=RTMKe5jejvtPqw1rNFt2G0EPvYo3uM2rFZYEw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 6 Oct 2012 14:42:22 +0100
+Subject: redirecting console output to display
+In-Reply-To: <1349109542.85942.YahooMailNeo@web133201.mail.ir2.yahoo.com>
+References: <1349109542.85942.YahooMailNeo@web133201.mail.ir2.yahoo.com>
+Message-ID: <20121006134222.GA25755@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 6, 2012 at 10:03 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Mon, Oct 01, 2012 at 05:39:02PM +0100, Ellis Andrew wrote:
+> The kernel shows a message "disabling irom" and then the screen is disabled.
 
->>  Documentation/devicetree/bindings/arm/fsl.txt |    4 ++
->>  arch/arm/boot/dts/imx6q-sabreauto.dts         |   65 +++++++++++++++++++++++++
->
-> Add imx6q-sabreauto.dtb into arch/arm/boot/dts/Makefile.
+No idea what that message is.
 
-Ok, looking at arch/arm/boot/dts/Makefile I see that
-imx6q-sabrelite.dtb, for example appears
-under dtb-$(CONFIG_ARCH_MXC) and dtb-$(CONFIG_SOC_IMX6Q)
+> How can I set up my kernel so that it enables the display and outputs a
+> console on tty0?
 
-Would you like a patch to remove this duplicate entry?
-
-Should we use only CONFIG_SOC?
-
-Regards,
-
-Fabio Estevam
+The default (without any console= arguments) and with fbcon enabled is to
+output to the framebuffer console.  There is no difference in this regard
+between running Linux on ARM and running Linux on a PC with a framebuffer
+console.
