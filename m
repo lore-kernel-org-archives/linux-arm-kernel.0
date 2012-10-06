@@ -1,34 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 6 Oct 2012 15:39:27 +0100
-Subject: [RFC 00/24] OMAP serial driver flow control fixes, and
- preparation for DMA engine conversion
-In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
-Message-ID: <20121006143927.GF15246@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 6 Oct 2012 07:42:52 -0700
+Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in
+ HYP mode
+In-Reply-To: <6d3553bfe8a2d1ac88cab852100616a7@localhost>
+References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
+ <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
+ <20121005200822.GQ3874@atomide.com>
+ <6d3553bfe8a2d1ac88cab852100616a7@localhost>
+Message-ID: <20121006144252.GY3874@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another potential bug - in serial_omap_set_termios() there is this:
+Hi,
 
-	if (up->use_dma) {
-                serial_out(up, UART_TI752_TLR, 0);
-                up->scr |= UART_FCR_TRIGGER_4;
-	} else {
-                /* Set receive FIFO threshold to 1 byte */
-                up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
-                up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
-	}
+* Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
+> 
+> If you compiled for v6 only, we can safely exclude __hyp_stub_install, and
+> I assume that you get past the decompressor.
 
-Is that:
-                up->scr |= UART_FCR_TRIGGER_4;
+Yes, by default it's v6 + v7, but making it v6 only did not help.
+ 
+> If so, that indicates some side effect of the safe_svcmode_maskall macro,
+> and I suspect the "movs pc, lr" bit.
+> 
+> Can you try the attached patch? It basically falls back to the previous
+> behaviour if not entered in HYP mode.
 
-line really correct?  It looks wrong to be using a FCR register mask with
-something that ends up in the OMAP SCR register...
+Yes, with this it boots OK.
 
-I'm beginning to wonder how many of the "workarounds" which have been
-applied to this driver, particularly those to do with FIFO triggers and
-idle stuff are actually down to the horribly broken and buggy set_termios
-code.  I'm coming to the conclusion that all those workarounds should be
-removed, and we start again from a clean slate with a properly written
-driver which observes the register access rules - thereby ensuring that
-the correct values get written to the registers that we expect them to.
+Regards,
+
+Tony
+
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 658a15d..b21b97f 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -254,16 +254,17 @@
+>  	mov	lr , \reg
+>  	and	lr , lr , #MODE_MASK
+>  	cmp	lr , #HYP_MODE
+> -	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
+> +	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
+>  	bic	\reg , \reg , #MODE_MASK
+>  	orr	\reg , \reg , #SVC_MODE
+>  THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+> -	msr	spsr_cxsf, \reg
+> -	adr	lr, BSYM(2f)
+>  	bne	1f
+> +	orr	\reg, \reg, #PSR_A_BIT
+> +	adr	lr, BSYM(2f)
+> +	msr	spsr_cxsf, \reg
+>  	__MSR_ELR_HYP(14)
+>  	__ERET
+> -1:	movs	pc, lr
+> +1:	msr	cpsr_c, \reg
+>  2:
+>  .endm
+>  
