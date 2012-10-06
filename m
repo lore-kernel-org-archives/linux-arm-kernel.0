@@ -1,33 +1,23 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 6 Oct 2012 11:32:16 -0400 (EDT)
-Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
- mode
-In-Reply-To: <20121006144252.GY3874@atomide.com>
-References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
- <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
- <20121005200822.GQ3874@atomide.com>
- <6d3553bfe8a2d1ac88cab852100616a7@localhost>
- <20121006144252.GY3874@atomide.com>
-Message-ID: <alpine.LFD.2.02.1210061129080.16518@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 6 Oct 2012 23:35:25 +0800
+Subject: [PATCH 1/3] ARM: dts: imx53-qsb: Use pinctrl for gpio-led
+In-Reply-To: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121006153522.GH20231@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 6 Oct 2012, Tony Lindgren wrote:
-
-> * Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
+On Wed, Sep 26, 2012 at 08:27:35PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> > If so, that indicates some side effect of the safe_svcmode_maskall macro,
-> > and I suspect the "movs pc, lr" bit.
-> > 
-> > Can you try the attached patch? It basically falls back to the previous
-> > behaviour if not entered in HYP mode.
+> Since commit 8fe4554f (leds: leds-gpio: adopt pinctrl support) gpio-led driver 
+> has pinctrl support, so setup the gpio led pin via pinctrl and avoid the 
+> following warning:
 > 
-> Yes, with this it boots OK.
+> leds-gpio leds.2: pins are not configured from the driver
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-OK. In that case, I suggest this patch be sent to Russell to fix this 
-issue so he could push the ARM stuff to Linus ASAP.
+Queued first 2 patches for 3.8, and leave patch #3 to Sascha.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+Shawn
