@@ -1,98 +1,103 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  7 Oct 2012 09:27:20 +0200
-Subject: [PATCH 6/6] arm: at91: drop at91_suspend_entering_slow_clock
+Date: Sun,  7 Oct 2012 09:27:19 +0200
+Subject: [PATCH 5/6] usb: at91_ude: switch pm ops
 In-Reply-To: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20121006161429.GD12462@game.jcrosoft.org>
  <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1349594840-11374-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1349594840-11374-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as the driver needing to knwon if we enter in slow_clock mode (SUSPEND_MEM)
-have been swtich to pm ops
+so we can detect when we enter in slow_clock mode and drop
+at91_suspend_entering_slow_clock
 
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: linux-pm at vger.kernel.org
+Cc: linux-usb at vger.kernel.org 
 ---
- arch/arm/mach-at91/include/mach/board.h |    3 ---
- arch/arm/mach-at91/pm.c                 |   24 ------------------------
- 2 files changed, 27 deletions(-)
+ drivers/usb/gadget/at91_udc.c |   34 +++++++++++++++++++++++-----------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index c55a436..e3ca86a 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -190,7 +190,4 @@ extern void __init at91_add_device_can(struct at91_can_data *data);
- extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
- extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index 89d90b5..ba5b0af 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -1910,10 +1910,10 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ }
  
--/* FIXME: this needs a better location, but gets stuff building again */
--extern int at91_suspend_entering_slow_clock(void);
--
- #endif
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 2c2d865..5e8d770 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -116,15 +116,11 @@ static int at91_pm_valid_state(suspend_state_t state)
+ #ifdef CONFIG_PM
+-static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
++static int at91udc_suspend(struct device *dev, int slow_clock)
+ {
+-	struct at91_udc *udc = platform_get_drvdata(pdev);
+-	int		wake = udc->driver && device_may_wakeup(&pdev->dev);
++	struct at91_udc *udc = dev_get_drvdata(dev);
++	int		wake = udc->driver && device_may_wakeup(dev);
+ 	unsigned long	flags;
+ 
+ 	/* Unless we can act normally to the host (letting it wake us up
+@@ -1923,7 +1923,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 	 */
+ 	if ((!udc->suspended && udc->addr)
+ 			|| !wake
+-			|| at91_suspend_entering_slow_clock()) {
++			|| slow_clock) {
+ 		spin_lock_irqsave(&udc->lock, flags);
+ 		pullup(udc, 0);
+ 		wake = 0;
+@@ -1937,9 +1937,19 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 	return 0;
+ }
+ 
+-static int at91udc_resume(struct platform_device *pdev)
++static int at91udc_suspend_standby(struct device *dev)
+ {
+-	struct at91_udc *udc = platform_get_drvdata(pdev);
++	return at91udc_suspend(dev, 0);
++}
++
++static int at91udc_suspend_mem(struct device *dev)
++{
++	return at91udc_suspend(dev, 1);
++}
++
++static int at91udc_resume(struct device *dev)
++{
++	struct at91_udc *udc = dev_get_drvdata(dev);
+ 	unsigned long	flags;
+ 
+ 	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled &&
+@@ -1956,11 +1966,14 @@ static int at91udc_resume(struct platform_device *pdev)
  	}
- }
- 
--
--static suspend_state_t target_state;
--
- /*
-  * Called after processes are frozen, but before we shutdown devices.
-  */
- static int at91_pm_begin(suspend_state_t state)
- {
--	target_state = state;
  	return 0;
  }
+-#else
+-#define	at91udc_suspend	NULL
+-#define	at91udc_resume	NULL
+ #endif
  
-@@ -172,23 +168,6 @@ static int at91_pm_verify_clocks(void)
- 	return 1;
- }
- 
--/*
-- * Call this from platform driver suspend() to see how deeply to suspend.
-- * For example, some controllers (like OHCI) need one of the PLL clocks
-- * in order to act as a wakeup source, and those are not available when
-- * going into slow clock mode.
-- *
-- * REVISIT: generalize as clk_will_be_available(clk)?  Other platforms have
-- * the very same problem (but not using at91 main_clk), and it'd be better
-- * to add one generic API rather than lots of platform-specific ones.
-- */
--int at91_suspend_entering_slow_clock(void)
--{
--	return (target_state == PM_SUSPEND_MEM);
--}
--EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
--
--
- static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
- 			  void __iomem *ramc1, int memctrl);
- 
-@@ -283,7 +262,6 @@ static int at91_pm_enter(suspend_state_t state)
- 			at91_aic_read(AT91_AIC_IPR) & at91_aic_read(AT91_AIC_IMR));
- 
- error:
--	target_state = PM_SUSPEND_ON;
- 	at91_irq_resume();
- 	at91_gpio_resume();
- 	return 0;
-@@ -294,10 +272,8 @@ error:
-  */
- static void at91_pm_end(void)
- {
--	target_state = PM_SUSPEND_ON;
- }
- 
--
- static const struct platform_suspend_ops at91_pm_ops = {
- 	.valid	= at91_pm_valid_state,
- 	.begin	= at91_pm_begin,
++static struct dev_pm_ops at91_udc_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(at91udc_suspend_standby, at91udc_resume)
++	SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(at91udc_suspend_standby,
++				at91udc_suspend_mem)
++};
++
+ #if defined(CONFIG_OF)
+ static const struct of_device_id at91_udc_dt_ids[] = {
+ 	{ .compatible = "atmel,at91rm9200-udc" },
+@@ -1973,11 +1986,10 @@ MODULE_DEVICE_TABLE(of, at91_udc_dt_ids);
+ static struct platform_driver at91_udc_driver = {
+ 	.remove		= __exit_p(at91udc_remove),
+ 	.shutdown	= at91udc_shutdown,
+-	.suspend	= at91udc_suspend,
+-	.resume		= at91udc_resume,
+ 	.driver		= {
+ 		.name	= (char *) driver_name,
+ 		.owner	= THIS_MODULE,
++		.pm	= &at91_udc_pm_ops,
+ 		.of_match_table	= of_match_ptr(at91_udc_dt_ids),
+ 	},
+ };
 -- 
 1.7.10.4
