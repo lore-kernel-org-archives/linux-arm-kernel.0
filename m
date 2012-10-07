@@ -1,30 +1,87 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun,  7 Oct 2012 14:02:10 +1300
-Subject: [PATCH 0/4] arm-soc: vt8500: Cleanup patches for 3.7
-Message-ID: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
+Date: Sun,  7 Oct 2012 14:02:12 +1300
+Subject: [PATCH 2/4] vt8500: Remove arm/boot/compressed/head-vt8500.S
+In-Reply-To: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
+References: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1349571734-26233-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor cleanup patches for 3.7.
+Converting arch-vt8500 to devicetree-only makes this file redundant.
 
-Tony Prisk (4):
-  vt8500: Remove unused headers from include/mach/
-  vt8500: Remove arm/boot/compressed/head-vt8500.S
-  vt8500: Fix header in mach-vt8500/timer.c
-  vt8500: Fix build warning when no framebuffer selected
-
- arch/arm/boot/compressed/Makefile            |    4 ---
- arch/arm/boot/compressed/head-vt8500.S       |   46 --------------------------
- arch/arm/mach-vt8500/include/mach/hardware.h |   12 -------
- arch/arm/mach-vt8500/include/mach/i8042.h    |   18 ----------
- arch/arm/mach-vt8500/include/mach/restart.h  |   17 ----------
- arch/arm/mach-vt8500/timer.c                 |    2 +-
- arch/arm/mach-vt8500/vt8500.c                |    7 ++--
- 7 files changed, 5 insertions(+), 101 deletions(-)
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/boot/compressed/Makefile      |    4 ---
+ arch/arm/boot/compressed/head-vt8500.S |   46 --------------------------------
+ 2 files changed, 50 deletions(-)
  delete mode 100644 arch/arm/boot/compressed/head-vt8500.S
- delete mode 100644 arch/arm/mach-vt8500/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-vt8500/include/mach/i8042.h
- delete mode 100644 arch/arm/mach-vt8500/include/mach/restart.h
 
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..0bc7a16 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -50,10 +50,6 @@ ifeq ($(CONFIG_ARCH_SA1100),y)
+ OBJS		+= head-sa1100.o
+ endif
+ 
+-ifeq ($(CONFIG_ARCH_VT8500),y)
+-OBJS		+= head-vt8500.o
+-endif
+-
+ ifeq ($(CONFIG_CPU_XSCALE),y)
+ OBJS		+= head-xscale.o
+ endif
+diff --git a/arch/arm/boot/compressed/head-vt8500.S b/arch/arm/boot/compressed/head-vt8500.S
+deleted file mode 100644
+index 1dc1e21..0000000
+--- a/arch/arm/boot/compressed/head-vt8500.S
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/*
+- * linux/arch/arm/boot/compressed/head-vt8500.S
+- *
+- * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+- *
+- * VIA VT8500 specific tweaks. This is merged into head.S by the linker.
+- *
+- */
+-
+-#include <linux/linkage.h>
+-#include <asm/mach-types.h>
+-
+-		.section        ".start", "ax"
+-
+-__VT8500_start:
+-	@ Compare the SCC ID register against a list of known values
+-	ldr	r1, .SCCID
+-	ldr	r3, [r1]
+-
+-	@ VT8500 override
+-	ldr	r4, .VT8500SCC
+-	cmp	r3, r4
+-	ldreq	r7, .ID_BV07
+-	beq	.Lendvt8500
+-
+-	@ WM8505 override
+-	ldr	r4, .WM8505SCC
+-	cmp	r3, r4
+-	ldreq	r7, .ID_8505
+-	beq	.Lendvt8500
+-
+-	@ Otherwise, leave the bootloader's machine id untouched
+-
+-.SCCID:
+-	.word	0xd8120000
+-.VT8500SCC:
+-	.word	0x34000102
+-.WM8505SCC:
+-	.word	0x34260103
+-
+-.ID_BV07:
+-	.word	MACH_TYPE_BV07
+-.ID_8505:
+-	.word	MACH_TYPE_WM8505_7IN_NETBOOK
+-
+-.Lendvt8500:
 -- 
 1.7.9.5
