@@ -1,34 +1,186 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 7 Oct 2012 21:58:55 +0800
-Subject: [PATCH] ARM: OMAP: fix return value check in realtime_counter_init()
-Message-ID: <CAPgLHd_X+vT-AtkHCAmmieEtdQbVz6RcUWogY83qZyvzK_tidA@mail.gmail.com>
+Date: Sun, 7 Oct 2012 22:02:09 +0800
+Subject: [PATCH] clk: fix return value check in sirfsoc_of_clk_init()
+Message-ID: <CAPgLHd8Brw7dEffrj+xAM60ssgi3pJyMTGX+icPR7ZrZKz-vOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-In case of error, the function clk_get() returns ERR_PTR()
-and never returns NULL. The NULL test in the return value
-check should be replaced with IS_ERR().
+In case of error, the function clk_register() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check
+should be replaced with IS_ERR().
 
 dpatch engine is used to auto generate this patch.
 (https://github.com/weiyj/dpatch)
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/mach-omap2/timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/clk-prima2.c | 84 ++++++++++++++++++++++++------------------------
+ 1 file changed, 42 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 8847d6e..44f9aa7 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -378,7 +378,7 @@ static void __init realtime_counter_init(void)
- 		return;
- 	}
- 	sys_clk = clk_get(NULL, "sys_clkin_ck");
--	if (!sys_clk) {
-+	if (IS_ERR(sys_clk)) {
- 		pr_err("%s: failed to get system clock handle\n", __func__);
- 		iounmap(base);
- 		return;
+diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
+index 517874f..a203ecc 100644
+--- a/drivers/clk/clk-prima2.c
++++ b/drivers/clk/clk-prima2.c
+@@ -1054,118 +1054,118 @@ void __init sirfsoc_of_clk_init(void)
+ 	/* These are always available (RTC and 26MHz OSC)*/
+ 	clk = clk_register_fixed_rate(NULL, "rtc", NULL,
+ 		CLK_IS_ROOT, 32768);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register_fixed_rate(NULL, "osc", NULL,
+ 		CLK_IS_ROOT, 26000000);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 
+ 	clk = clk_register(NULL, &clk_pll1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_pll2.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_pll3.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_mem.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_sys.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_security.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b8030000.security");
+ 	clk = clk_register(NULL, &clk_dsp.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_gps.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "a8010000.gps");
+ 	clk = clk_register(NULL, &clk_mf.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_io.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "io");
+ 	clk = clk_register(NULL, &clk_cpu.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "cpu");
+ 	clk = clk_register(NULL, &clk_uart0.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0050000.uart");
+ 	clk = clk_register(NULL, &clk_uart1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0060000.uart");
+ 	clk = clk_register(NULL, &clk_uart2.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0070000.uart");
+ 	clk = clk_register(NULL, &clk_tsc.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0110000.tsc");
+ 	clk = clk_register(NULL, &clk_i2c0.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00e0000.i2c");
+ 	clk = clk_register(NULL, &clk_i2c1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00f0000.i2c");
+ 	clk = clk_register(NULL, &clk_spi0.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00d0000.spi");
+ 	clk = clk_register(NULL, &clk_spi1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0170000.spi");
+ 	clk = clk_register(NULL, &clk_pwmc.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0130000.pwm");
+ 	clk = clk_register(NULL, &clk_efuse.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0140000.efusesys");
+ 	clk = clk_register(NULL, &clk_pulse.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0150000.pulsec");
+ 	clk = clk_register(NULL, &clk_dmac0.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00b0000.dma-controller");
+ 	clk = clk_register(NULL, &clk_dmac1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0160000.dma-controller");
+ 	clk = clk_register(NULL, &clk_nand.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0030000.nand");
+ 	clk = clk_register(NULL, &clk_audio.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0040000.audio");
+ 	clk = clk_register(NULL, &clk_usp0.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0080000.usp");
+ 	clk = clk_register(NULL, &clk_usp1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b0090000.usp");
+ 	clk = clk_register(NULL, &clk_usp2.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00a0000.usp");
+ 	clk = clk_register(NULL, &clk_vip.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00c0000.vip");
+ 	clk = clk_register(NULL, &clk_gfx.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "98000000.graphics");
+ 	clk = clk_register(NULL, &clk_mm.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "a0000000.multimedia");
+ 	clk = clk_register(NULL, &clk_lcd.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "90010000.display");
+ 	clk = clk_register(NULL, &clk_vpp.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "90020000.vpp");
+ 	clk = clk_register(NULL, &clk_mmc01.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_mmc23.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_mmc45.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &usb_pll_clk_hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk = clk_register(NULL, &clk_usb0.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00e0000.usb");
+ 	clk = clk_register(NULL, &clk_usb1.hw);
+-	BUG_ON(!clk);
++	BUG_ON(IS_ERR(clk));
+ 	clk_register_clkdev(clk, NULL, "b00f0000.usb");
+ }
