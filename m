@@ -1,55 +1,22 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 7 Oct 2012 22:02:40 +0800
-Subject: [PATCH] clk: fix return value check in bcm2835_init_clocks()
-Message-ID: <CAPgLHd95ofKiKWC9B67q9mgkjsc6_YJ5x92aY0xKPiohuUMk4Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 7 Oct 2012 07:06:24 -0700
+Subject: [PATCH 1/2] ARM: tegra: fix invalid unit-address in tegra*.dtsi
+In-Reply-To: <1349205048-22228-1-git-send-email-swarren@wwwdotorg.org>
+References: <1349205048-22228-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121007140624.GA24933@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Tue, Oct 02, 2012 at 01:10:47PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Unit addresses, whilst written in hex, don't contain a 0x prefix.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> A couple of small cleanups/tweaks for 3.7 if possible.
 
-In case of error, the function clk_register_fixed_rate() returns
-ERR_PTR() and never returns NULL. The NULL test in the return value
-check should be replaced with IS_ERR().
+Applied 1-2 to fixes.
 
-dpatch engine is used to auto generate this patch.
-(https://github.com/weiyj/dpatch)
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/clk/clk-bcm2835.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-index 67ad16b..b61ee2c 100644
---- a/drivers/clk/clk-bcm2835.c
-+++ b/drivers/clk/clk-bcm2835.c
-@@ -33,17 +33,17 @@ void __init bcm2835_init_clocks(void)
- 
- 	clk = clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT,
- 					250000000);
--	if (!clk)
-+	if (IS_ERR(clk))
- 		pr_err("sys_pclk not registered\n");
- 
- 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
- 					126000000);
--	if (!clk)
-+	if (IS_ERR(clk))
- 		pr_err("apb_pclk not registered\n");
- 
- 	clk = clk_register_fixed_rate(NULL, "uart0_pclk", NULL, CLK_IS_ROOT,
- 					3000000);
--	if (!clk)
-+	if (IS_ERR(clk))
- 		pr_err("uart0_pclk not registered\n");
- 	ret = clk_register_clkdev(clk, NULL, "20201000.uart");
- 	if (ret)
-@@ -51,7 +51,7 @@ void __init bcm2835_init_clocks(void)
- 
- 	clk = clk_register_fixed_rate(NULL, "uart1_pclk", NULL, CLK_IS_ROOT,
- 					125000000);
--	if (!clk)
-+	if (IS_ERR(clk))
- 		pr_err("uart1_pclk not registered\n");
- 	ret = clk_register_clkdev(clk, NULL, "20215000.uart");
- 	if (ret)
+-Olof
