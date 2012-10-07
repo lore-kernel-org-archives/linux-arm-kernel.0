@@ -1,73 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 7 Oct 2012 16:20:04 +0100
-Subject: [PATCH v3] GPIO: Add support for GPIO on CLPS711X-target platform
-In-Reply-To: <20121007191227.f1e74cad.shc_work@mail.ru>
-References: <1349106153-27371-1-git-send-email-shc_work@mail.ru>
- <20121005090204.GL4625@n2100.arm.linux.org.uk>
- <20121007135334.3ed2b9a5.shc_work@mail.ru>
- <20121007102803.GT4625@n2100.arm.linux.org.uk>
- <20121007191227.f1e74cad.shc_work@mail.ru>
-Message-ID: <20121007152004.GU4625@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 7 Oct 2012 17:41:15 +0200
+Subject: [PATCH] ARM: sort select statements alphanumerically
+In-Reply-To: <20121007133048.GE28061@n2100.arm.linux.org.uk>
+References: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
+ <20121007131440.GC12801@game.jcrosoft.org>
+ <20121007133048.GE28061@n2100.arm.linux.org.uk>
+Message-ID: <20121007154115.GD12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 07, 2012 at 07:12:27PM +0400, Alexander Shiyan wrote:
-> On Sun, 7 Oct 2012 11:28:03 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On 14:30 Sun 07 Oct     , Russell King - ARM Linux wrote:
+> On Sun, Oct 07, 2012 at 03:14:40PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 17:22 Sat 06 Oct     , Russell King wrote:
+> > > This commit is likely to change as we get closer to the end of the merge
+> > > window, as other changes get merged into Linus' tree.  I will be refreshing
+> > > this from time to time, and keeping it out of linux-next, as it will cause
+> > > more pain than its worth to put it into linux-next.
+> > > 
+> > > Anyone who wants to give this a review to check that it's correct are welcome,
+> > > but I don't think it would be appropriate to collect attributation tags for
+> > > it, as this won't be the final patch.
+> > > 
+> > > This patch is intentionally broken to prevent Linus from applying it - this
+> > > is information only!
+> > > 
+> > > Anyone who wants to apply it can do so by first running this patch through:
+> > > 
+> > > 	sed 's/^-- /@@ /'
+> > > 
+> > >  arch/arm/Kconfig                  |  399 ++++++++++++++++++-------------------
+> > >  arch/arm/common/Kconfig           |    4 +-
+> > >  arch/arm/mach-at91/Kconfig        |   26 ++--
+> > this maybe conflict with pinctrl support
 > 
-> > > ...
-> > > > > +++ b/arch/arm/mach-clps711x/include/mach/gpio.h
-> > > > > @@ -0,0 +1,27 @@
-> > > > > +/*
-> > > > > + *  This file contains the CLPS711X GPIO definitions.
-> > > > > + *
-> > > > > + *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-> > > > > + *
-> > > > > + * This program is free software; you can redistribute it and/or modify
-> > > > > + * it under the terms of the GNU General Public License as published by
-> > > > > + * the Free Software Foundation; either version 2 of the License, or
-> > > > > + * (at your option) any later version.
-> > > > > + */
-> > > > > +
-> > > > > +/* Simple helper for convert port & pin to GPIO number */
-> > > > > +#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
-> > > > > +
-> > > > > +/* Temporaty definitions for GPIO-ports */
-> > > > > +/* Will be removed after remove clps_read(write) macros */
-> > > > > +#include <mach/hardware.h>
-> > > > > +#define _PADR	(CLPS711X_VIRT_BASE + PADR)
-> > > > > +#define _PBDR	(CLPS711X_VIRT_BASE + PBDR)
-> > > > > +#define _PCDR	(CLPS711X_VIRT_BASE + PCDR)
-> > > > > +#define _PDDR	(CLPS711X_VIRT_BASE + PDDR)
-> > > > > +#define _PADDR	(CLPS711X_VIRT_BASE + PADDR)
-> > > > > +#define _PBDDR	(CLPS711X_VIRT_BASE + PBDDR)
-> > > > > +#define _PCDDR	(CLPS711X_VIRT_BASE + PCDDR)
-> > > > > +#define _PDDDR	(CLPS711X_VIRT_BASE + PDDDR)
-> > > > > +#define _PEDR	(CLPS711X_VIRT_BASE + PEDR)
-> > > > > +#define _PEDDR	(CLPS711X_VIRT_BASE + PEDDR)
-> > > > 
-> > > > Why can't this file (or the bulk of it) live in drivers/gpio ?
-> > > We should have access for macros in gpio.h from board support files
-> > > and other drivers. From drivers/gpio it not possible.
-> > > If you ask about port definitions, as I say before, it will be
-> > > removed later after rework on platform hardware definitions.
-> > 
-> > No other drivers should be directly accessing the GPIO registers -
-> > doing so is likely a bug because of the inherent lack of locking,
-> > which will cause race conditions.
-> > 
-> > All accesses to GPIOs should be done via gpiolib, even from board
-> > support files.
+> Of course it will - and this tells me that you did not read the comments
+> I left before the diffstat.  It's almost guaranteed to conflict with
+> virtually all the changes going into this merge window.
 > 
-> Yes, and I am say only about macro that calculate GPIO-number from
-> port number and bit position. Access to this is a helpful for understand
-> source code.
+> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> And this also confirms that too; I said I didn't want to add attributations
+> to it because you aren't going to be acking the patch which will eventually
+> be committed.
+> 
+> In sort, this patch _will_ be recreated by the script at the end of the
+> merge window, and whatever that patch ends up being is what will get
+> merged.  It's very likely (because of the inherent conflicts in doing
+> this) that it _will_ be different from this one.
+> 
+> What that means is if I add (your) acked-by to it, I will be adding it
+> to a different patch to the one you've sent this to.
+> 
+> What I want people to do with this is review it and make sure that the
+> script hasn't created any obvious mistakes; I've already done that but
+> the more eyes we get on it the better.
 
-Sorry, I don't think you're understanding.
+I did read it I just point it out so if people try to apply over it then known
 
-Why can't you put:
+and just point out that I see no issue on at91
 
-#define _PADR        (CLPS711X_VIRT_BASE + PADR)
-
-and the other macros inside drivers/gpio/gpio-clps711x.c ?  This should
-be the _only_ file which uses them.
+Best Regards,
+J.
