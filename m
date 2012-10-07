@@ -1,44 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 7 Oct 2012 12:17:50 +0800
-Subject: [PATCH] pwm: Get rid of HAVE_PWM
-In-Reply-To: <1349330819-11924-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1349330819-11924-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20121007041748.GN20231@S2101-09.ap.freescale.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 06 Oct 2012 23:22:18 -0600
+Subject: [PATCH 0/6] ARM: Add support for Broadcom BCM476x SoCs
+In-Reply-To: <20121007015300.828366635@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+Message-ID: <5071118A.6040508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 08:06:59AM +0200, Thierry Reding wrote:
-> Now that all drivers have been moved to the PWM subsystem, remove the
-> legacy HAVE_PWM symbol and replace it with the new PWM symbol. While at
-> it, select the PWM subsystem and corresponding PWM driver on boards that
-> require PWM functionality.
+On 10/06/2012 07:53 PM, Domenico Andreoli wrote:
+> Howdy,
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Bryan Wu <bryan.wu@canonical.com>
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Ashish Jangam <ashish.jangam@kpitcummins.com>
-> Cc: Andrew Jones <drjones@redhat.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linux-input at vger.kernel.org
-> Cc: linux-leds at vger.kernel.org
-> ---
->  arch/arm/Kconfig           |  6 ++----
->  arch/arm/mach-mxs/Kconfig  |  6 ++++--
+>   this patchset adds (minimal) support for the Broadcom BCM476x ARM based
+> SoCs to the kernel, not to be confused with the already supported MIPS
+> based BCM47xx SoC and other BCM47xx WiFi and GPS produced by Broadcom.
+> 
+> This BCM476x is a DT-only multi-platform ARM platform and, at this spin,
 
-Shawn Guo <shawn.guo@linaro.org>
+Nice. I was planning on converting bcm2835 to multi-platform in 3.8; I
+assume it'll be pretty simple.
 
->  arch/arm/mach-pxa/Kconfig  | 42 ++++++++++++++++++++++++++++--------------
->  arch/mips/Kconfig          |  3 ++-
->  drivers/input/misc/Kconfig |  4 ++--
->  drivers/leds/Kconfig       |  2 +-
->  include/linux/pwm.h        |  2 +-
->  7 files changed, 40 insertions(+), 25 deletions(-)
+...
+> Additional support is being worked on.... and usb (DWC OTG) only
+> attemped reusing s3c-hsotg.
+
+Hmmm. I believe the bcm2835 uses DWC OTG. I wonder if the same driver
+will work there; USB in particular is a major pain point on the bcm2835...
+
+...
+> It's based on a random pre v3.7-rc1 commit (eb0ad9c) with mainlined
+> multi-platform support and Stephen's patch to add DEBUG_LL to it.
+
+There are two chunks of code related to that; uncompress.h and
+debug-macro.S. Rob/Arnd's multi-platform patches already allowed
+debug-macro.S to exist after multi-platform conversion, and my patches
+were about adding back support for uncompress.h. Given that the only
+reason I cared about uncompress was that Tegra's uncompress.h and
+debug-macro.s were closely coupled, and Nicolas Pitre indicated he
+thought that was a hack, I've re-written the Tegra code so they aren't
+coupled any more (this will be included in 3.8) and so I care much less
+about uncompress.h now. Unless anyone really pipes up and says they'd
+still like me to pursue uncompress.h in multi-platform, I'm inclined to
+drop it.
+
+> Special thanks go to Stephen Warren who, with the recently mainlined
+> BCM2835, showed how to do things cleanly since the beginning and
+> involuntarily spurred me to act.
+
+Thanks! Do note that much of the code I upstreamed was originally
+written by others, although I did make quite a few changes during
+upstream submission.
