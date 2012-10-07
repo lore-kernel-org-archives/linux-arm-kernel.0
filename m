@@ -1,63 +1,59 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 07 Oct 2012 23:35:45 +0200
-Subject: [PATCH V2 3/3] spi: spi-pl022: Minor simplification for runtime pm
-In-Reply-To: <CACRpkdb9mLy1640Y9xuN_EgUd2xCwjpc1ErZaBmLOcJT4ffaxw@mail.gmail.com>
-References: <1349337881-15917-1-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFqZXKtpJ8vSFKfZuD8FGayQUhmYKtZKzkZ15jKRA5nu6Q@mail.gmail.com>
- <CACRpkdb9mLy1640Y9xuN_EgUd2xCwjpc1ErZaBmLOcJT4ffaxw@mail.gmail.com>
-Message-ID: <2601524.77SEIkPWcO@vostro.rjw.lan>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 7 Oct 2012 14:54:36 -0700
+Subject: [PATCH v3] arm: vt8500: Fix build warning in uncompress.h [for
+ 3.7]
+In-Reply-To: <1349645012-28381-1-git-send-email-linux@prisktech.co.nz>
+References: <1349645012-28381-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CAOesGMhTL5pOSmVOLOUnYKGdjUeRDVCJfikAoK6K0j4vtpbSmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 of October 2012 14:19:57 Linus Walleij wrote:
-> On Thu, Oct 4, 2012 at 11:07 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> 
-> > Mark, I am not sure this particular patch is actually wanted. Realized
-> > that when reading up on the driver/base/* patches for PM changes this
-> > summer. Especially how device probe/suspend/shutdown etc. has been
-> > changed for runtime PM point of view.
-> 
-> Mark will get you for top-posting ;-)
-> 
-> >> From: Ulf Hansson <ulf.hansson@linaro.org>
-> >>
-> >> In probe pm_runtime_put_autosuspend has the same effect as doing
-> >> pm_runtime_put. This due to upper layer in driver core is preventing
-> >> the device from being runtime suspended by a pm_runtime_get*.
-> >>
-> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >>  drivers/spi/spi-pl022.c |    5 ++---
-> >>  1 file changed, 2 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> >> index a1db91a..51b7a95 100644
-> >> --- a/drivers/spi/spi-pl022.c
-> >> +++ b/drivers/spi/spi-pl022.c
-> >> @@ -2246,10 +2246,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
-> >>                 pm_runtime_set_autosuspend_delay(dev,
-> >>                         platform_info->autosuspend_delay);
-> >>                 pm_runtime_use_autosuspend(dev);
-> >> -               pm_runtime_put_autosuspend(dev);
-> >> -       } else {
-> >> -               pm_runtime_put(dev);
-> >>         }
-> >> +       pm_runtime_put(dev);
-> >> +
-> >>         return 0;
-> 
-> I'm paging Rafael and Magnus for their comments so we don't
-> overload Mark with runtime PM semantics...
+On Sun, Oct 7, 2012 at 2:23 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> This removes a build-time warning in uncompress.h due to incorrectly
+> cast values being passed to readb/writeb.
+>
+> Removed arm/io.h and readb/writeb. Read/write directly to the serial
+> port with a volatile pointer.
+>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-The change looks OK.  The functional difference is that the .idle() callback
-will be run earlier in the "use autosuspend" case, but that shouldn't be a big
-deal.
+Ok, applied to fixes (I had actually applied v2, so replaced it).
 
-Thanks,
-Rafael
+Btw, if you want to annotate [for 3.7] in the future, put it on the
+front of the patch subject, since it seems that git am doesn't strip
+it off when it's not at the beginning. :-)
 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+-Olof
+
+> ---
+>  arch/arm/mach-vt8500/include/mach/uncompress.h |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-vt8500/include/mach/uncompress.h b/arch/arm/mach-vt8500/include/mach/uncompress.h
+> index bb9e2d2..e6e81fd 100644
+> --- a/arch/arm/mach-vt8500/include/mach/uncompress.h
+> +++ b/arch/arm/mach-vt8500/include/mach/uncompress.h
+> @@ -15,15 +15,15 @@
+>   *
+>   */
+>
+> -#define UART0_PHYS 0xd8200000
+> -#include <asm/io.h>
+> +#define UART0_PHYS     0xd8200000
+> +#define UART0_ADDR(x)  *(volatile unsigned char *)(UART0_PHYS + x)
+>
+>  static void putc(const char c)
+>  {
+> -       while (readb(UART0_PHYS + 0x1c) & 0x2)
+> +       while (UART0_ADDR(0x1c) & 0x2)
+>                 /* Tx busy, wait and poll */;
+>
+> -       writeb(c, UART0_PHYS);
+> +       UART0_ADDR(0) = c;
+>  }
+>
+>  static void flush(void)
+> --
+> 1.7.9.5
+>
