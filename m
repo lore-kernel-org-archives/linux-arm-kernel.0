@@ -1,48 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  7 Oct 2012 14:44:17 -0300
-Subject: [PATCH] ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT
-Message-ID: <1349631857-31556-1-git-send-email-festevam@gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 08 Oct 2012 07:14:52 +1300
+Subject: [PATCH 0/4] arm-soc: vt8500: Cleanup patches for 3.7
+In-Reply-To: <201210071123.39535.arnd@arndb.de>
+References: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
+ <201210071123.39535.arnd@arndb.de>
+Message-ID: <1349633692.9507.7.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sun, 2012-10-07 at 11:23 +0000, Arnd Bergmann wrote:
+> On Sunday 07 October 2012, Tony Prisk wrote:
+> > Minor cleanup patches for 3.7.
+> > 
+> > Tony Prisk (4):
+> >   vt8500: Remove unused headers from include/mach/
+> >   vt8500: Remove arm/boot/compressed/head-vt8500.S
+> >   vt8500: Fix header in mach-vt8500/timer.c
+> >   vt8500: Fix build warning when no framebuffer selected
+> 
+> Hi Tony,
+> 
+> The patches all look good, but they are late for 3.7 now. I would
+> still take the last one since that fixes a build warning, and the
+> separate patch that adds the .dtb files to the Makefile, but leave
+> the other ones for 3.8, unless there is a strong reason to
+> still include them.
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Since commit b4c184e5 (edia] media: reorganize the main Kconfig items),
-it is necessary to select CONFIG_MEDIA_CAMERA_SUPPORT in order to be able
-to use the SoC camera drivers.
+Just to clarify,
 
-Select CONFIG_MEDIA_CAMERA_SUPPORT so that we can use mx2-camera/mx3-camera
-by default as previously.
+Is it only bug-fixes, not cleanup that are being accepted during the
+merge-window?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 78ed575..d100401 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -121,6 +121,7 @@ CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_VIDEO_DEV=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_VIDEO_MX2=y
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 66aa7a6..fcb4b62 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -151,6 +151,7 @@ CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_VIDEO_DEV=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_VIDEO_MX3=y
--- 
-1.7.9.5
+Regards
+Tony P
