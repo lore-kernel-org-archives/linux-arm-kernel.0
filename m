@@ -1,92 +1,109 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Sun, 07 Oct 2012 09:02:34 +0200
-Subject: Mismatched aliases with DMA mappings?
-In-Reply-To: <20120924095242.GA2122@linaro.org>
-References: <20120921152127.GA2106@linaro.org>
- <CAH9JG2XskuxgPwHwF+3SiaMWQhFMf0x3V=d=33cV1oKuppE8PA@mail.gmail.com>
- <20120924095242.GA2122@linaro.org>
-Message-ID: <5071290A.6030902@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun,  7 Oct 2012 09:27:18 +0200
+Subject: [PATCH 4/6] usb: ohci-at91: switch pm ops
+In-Reply-To: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1349594840-11374-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+so we can detect when we enter in slow_clock mode and drop
+at91_suspend_entering_slow_clock
 
-I'm sorry for very late response but I was busy with other urgent items 
-after getting back from holidays.
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
+---
+ drivers/usb/host/ohci-at91.c |   38 ++++++++++++++++++++++++--------------
+ 1 file changed, 24 insertions(+), 14 deletions(-)
 
-On 9/24/2012 11:52 AM, Dave Martin wrote:
-> On Sat, Sep 22, 2012 at 02:22:07PM +0900, Kyungmin Park wrote:
-
->> I just show how CMA addresses mismatched aliases codes.
->>
->> In reserve function, it declares the require memory size with base
->> address. At that time it calles 'dma_contiguous_early_fixup()'. it
->> just registered address and size.
->>
->> void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long
->> size)
->> {
->>         dma_mmu_remap[dma_mmu_remap_num].base = base;
->>         dma_mmu_remap[dma_mmu_remap_num].size = size;
->>         dma_mmu_remap_num++;
->> }
->>
->> These registerd base and size will be remap at dma_contiguous_remap
->> function at paging_init.
->>
->> void __init dma_contiguous_remap(void)
->> {
->>         int i;
->>         for (i = 0; i < dma_mmu_remap_num; i++) {
->>                 phys_addr_t start = dma_mmu_remap[i].base;
->>                 phys_addr_t end = start + dma_mmu_remap[i].size;
->>                 struct map_desc map;
->>                 unsigned long addr;
->>
->>                 if (end > arm_lowmem_limit)
->>                         end = arm_lowmem_limit;
->>                 if (start >= end)
->>                         continue;
->>
->>                 map.pfn = __phys_to_pfn(start);
->>                 map.virtual = __phys_to_virt(start);
->>                 map.length = end - start;
->>                 map.type = MT_MEMORY_DMA_READY;
->>
->>                 /*
->>                  * Clear previous low-memory mapping
->>                  */
->>                 for (addr = __phys_to_virt(start); addr <
->> __phys_to_virt(end);
->>                      addr += PMD_SIZE)
->>                         pmd_clear(pmd_off_k(addr));
->>
->>                 iotable_init(&map, 1);
->>         }
->> }
->
-> OK, so it looks like this is done early and can't happen after the
-> kernel has booted (?)
-
-Right, the changes in the linear mapping for CMA areas are done very 
-early to make sure that the proper mapping will be available for all 
-processes in the system (CMA changes the size of the pages used for 
-holding low memory linear mappings from 1MiB/2MiB 1-level sections to 
-4KiB pages which require 2 levels of pte). Once the kernel has fully 
-started it is not (easily) possible to alter the linear mappings.
-
-> Do you know whether the linear alias for DMA memory is removed when
-> not using CMA?
-
-Nope, when standard page_alloc() implementation of dma mapping is used 
-there exist 2 mappings for each allocated buffer: one in linear low 
-memory kernel mapping (cache'able) and the second created by the 
-dma-mapping subsystem (non-cache'able or writecombined). Right now no 
-one observed any issues caused by such situation assuming that no 
-process is accessing linear cache'able lowmem mappings when dma 
-non-cache'able mapping exist.
-
-Best regards
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 0bf72f9..316897d 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -668,14 +668,12 @@ static int __devexit ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+ }
+ 
+ #ifdef CONFIG_PM
+-
+-static int
+-ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
++static int ohci_hcd_at91_drv_suspend(struct device *dev, int slow_clock)
+ {
+-	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
++	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+ 
+-	if (device_may_wakeup(&pdev->dev))
++	if (device_may_wakeup(dev))
+ 		enable_irq_wake(hcd->irq);
+ 
+ 	/*
+@@ -685,7 +683,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 	 *
+ 	 * REVISIT: some boards will be able to turn VBUS off...
+ 	 */
+-	if (at91_suspend_entering_slow_clock()) {
++	if (slow_clock) {
+ 		ohci_usb_reset (ohci);
+ 		/* flush the writes */
+ 		(void) ohci_readl (ohci, &ohci->regs->control);
+@@ -695,11 +693,21 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 	return 0;
+ }
+ 
+-static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
++static int ohci_hcd_at91_drv_suspend_standby(struct device *dev)
++{
++	return ohci_hcd_at91_drv_suspend(dev, 0);
++}
++
++static int ohci_hcd_at91_drv_suspend_mem(struct device *dev)
++{
++	return ohci_hcd_at91_drv_suspend(dev, 1);
++}
++
++static int ohci_hcd_at91_drv_resume(struct device *dev)
+ {
+-	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
++	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+ 
+-	if (device_may_wakeup(&pdev->dev))
++	if (device_may_wakeup(dev))
+ 		disable_irq_wake(hcd->irq);
+ 
+ 	if (!clocked)
+@@ -708,22 +716,24 @@ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
+ 	ohci_finish_controller_resume(hcd);
+ 	return 0;
+ }
+-#else
+-#define ohci_hcd_at91_drv_suspend NULL
+-#define ohci_hcd_at91_drv_resume  NULL
+ #endif
+ 
++static struct dev_pm_ops ohci_hcd_at91_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(ohci_hcd_at91_drv_suspend_standby, ohci_hcd_at91_drv_resume)
++	SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(ohci_hcd_at91_drv_suspend_standby,
++				ohci_hcd_at91_drv_suspend_mem)
++};
++
+ MODULE_ALIAS("platform:at91_ohci");
+ 
+ static struct platform_driver ohci_hcd_at91_driver = {
+ 	.probe		= ohci_hcd_at91_drv_probe,
+ 	.remove		= __devexit_p(ohci_hcd_at91_drv_remove),
+ 	.shutdown	= usb_hcd_platform_shutdown,
+-	.suspend	= ohci_hcd_at91_drv_suspend,
+-	.resume		= ohci_hcd_at91_drv_resume,
+ 	.driver		= {
+ 		.name	= "at91_ohci",
+ 		.owner	= THIS_MODULE,
++		.pm	= &ohci_hcd_at91_pm_ops,
+ 		.of_match_table	= of_match_ptr(at91_ohci_dt_ids),
+ 	},
+ };
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.10.4
