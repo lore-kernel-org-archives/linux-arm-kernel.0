@@ -1,102 +1,76 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  7 Oct 2012 09:27:16 +0200
-Subject: [PATCH 2/6] platform: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121006161429.GD12462@game.jcrosoft.org>
- <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1349594840-11374-2-git-send-email-plagnioj@jcrosoft.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Sun,  7 Oct 2012 09:43:52 +0200
+Subject: [RFC 0/6] sched: packing small tasks
+Message-ID: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a drivers does not need to care about this distinction we fallback to
-suspend. This will allow to do not update the current drivers.
+Hi,
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: linux-pm at vger.kernel.org
----
- drivers/base/platform.c         |   40 +++++++++++++++++++++++++++++++++++++++
- include/linux/platform_device.h |    6 ++++++
- 2 files changed, 46 insertions(+)
+This patch-set takes advantage of the new statistics that are going to be available in the kernel thanks to the per-entity load-tracking: http://thread.gmane.org/gmane.linux.kernel/1348522. It packs the small tasks in as few as possible CPU/Cluster/Core. The main goal of packing small tasks is to reduce the power consumption by minimizing the number of power domain that are used. The packing is done in 2 steps:
 
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index 8727e9c..f4822e2 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -740,6 +740,46 @@ static int platform_legacy_resume(struct device *dev)
- 
- #ifdef CONFIG_SUSPEND
- 
-+int platform_pm_suspend_mem(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->suspend_mem)
-+			ret = drv->pm->suspend_mem(dev);
-+		else if (drv->pm->suspend)
-+			ret = drv->pm->suspend(dev);
-+	} else {
-+		ret = platform_legacy_suspend(dev, PMSG_SUSPEND);
-+	}
-+
-+	return ret;
-+}
-+
-+int platform_pm_suspend_standby(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->suspend_standby)
-+			ret = drv->pm->suspend_standby(dev);
-+		else if (drv->pm->suspend)
-+			ret = drv->pm->suspend(dev);
-+	} else {
-+		ret = platform_legacy_suspend(dev, PMSG_SUSPEND);
-+	}
-+
-+	return ret;
-+}
-+
- int platform_pm_suspend(struct device *dev)
- {
- 	struct device_driver *drv = dev->driver;
-diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
-index 5711e95..a7c2275 100644
---- a/include/linux/platform_device.h
-+++ b/include/linux/platform_device.h
-@@ -262,9 +262,13 @@ static inline char *early_platform_driver_setup_func(void)		\
- 
- #ifdef CONFIG_SUSPEND
- extern int platform_pm_suspend(struct device *dev);
-+extern int platform_pm_suspend_mem(struct device *dev);
-+extern int platform_pm_suspend_standby(struct device *dev);
- extern int platform_pm_resume(struct device *dev);
- #else
- #define platform_pm_suspend		NULL
-+#define platform_pm_suspend_mem		NULL
-+#define platform_pm_suspend_standby	NULL
- #define platform_pm_resume		NULL
- #endif
- 
-@@ -283,6 +287,8 @@ extern int platform_pm_restore(struct device *dev);
- #ifdef CONFIG_PM_SLEEP
- #define USE_PLATFORM_PM_SLEEP_OPS \
- 	.suspend = platform_pm_suspend, \
-+	.suspend_standby = platform_pm_suspend_standby, \
-+	.suspend_mem = platform_pm_suspend_mem, \
- 	.resume = platform_pm_resume, \
- 	.freeze = platform_pm_freeze, \
- 	.thaw = platform_pm_thaw, \
+The 1st step looks for the best place to pack tasks on a system according to its topology and it defines a pack buddy CPU for each CPU if there is one available. The policy for setting a pack buddy CPU is that we pack at all levels where the power line is not shared by groups of CPUs. For describing this capability, a new flag has been introduced SD_SHARE_POWERLINE that is used to describe where CPUs of a scheduling domain are sharing their power rails. This flag has been set in all sched_domain in order to keep unchanged the default behaviour of the scheduler.
+
+In a 2nd step, the scheduler checks the load level of the task which wakes up and the business of the buddy CPU. Then, It can decide to migrate the task on the buddy.
+
+The patch-set has been tested on ARM platforms: quad CA-9 SMP and TC2 HMP (dual CA-15 and 3xCA-7 cluster). For ARM platform, the results have demonstrated that it's worth packing small tasks at all topology levels.
+
+The performance tests have been done on both platforms with sysbench. The results don't show any performance regressions. These results are aligned with the policy which uses the normal behavior with heavy use cases.
+
+test: sysbench --test=cpu --num-threads=N --max-requests=R run
+
+Results below is the average duration of 3 tests on the quad CA-9.
+default is the current scheduler behavior (pack buddy CPU is -1)
+pack is the scheduler with the pack mecanism
+
+              | default |  pack   |
+-----------------------------------
+N=8;  R=200   |  3.1999 |  3.1921 |
+N=8;  R=2000  | 31.4939 | 31.4844 |
+N=12; R=200   |  3.2043 |  3.2084 |
+N=12; R=2000  | 31.4897 | 31.4831 |
+N=16; R=200   |  3.1774 |  3.1824 |
+N=16; R=2000  | 31.4899 | 31.4897 |
+-----------------------------------
+
+The power consumption tests have been done only on TC2 platform which has got accessible power lines and I have used cyclictest to simulate small tasks. The tests show some power consumption improvements.
+
+test: cyclictest -t 8 -q -e 1000000 -D 20 & cyclictest -t 8 -q -e 1000000 -D 20
+
+The measurements have been done during 16 seconds and the result has been normalized to 100
+
+              | CA15 | CA7  | total |
+-------------------------------------
+default       | 100  |  40  | 140   |
+pack          |  <1  |  45  | <46   |
+-------------------------------------
+
+The A15 cluster is less power efficient than the A7 cluster but if we assume that the tasks is well spread on both clusters, we can guest estimate that the power consumption on a dual cluster of CA7 would have been for a default kernel:
+
+              | CA7  | CA7  | total |
+-------------------------------------
+default       |  40  |  40  |  80   |
+-------------------------------------
+
+
+Vincent Guittot (6):
+  Revert "sched: introduce temporary FAIR_GROUP_SCHED dependency for
+    load-tracking"
+  sched: add a new SD SHARE_POWERLINE flag for sched_domain
+  sched: pack small task@wakeup
+  sched: secure access to other CPU statistics
+  sched: pack the idle load balance
+  ARM: sched: clear SD_SHARE_POWERLINE
+
+ arch/arm/kernel/topology.c       |    5 ++
+ arch/ia64/include/asm/topology.h |    1 +
+ arch/tile/include/asm/topology.h |    1 +
+ include/linux/sched.h            |    9 +--
+ include/linux/topology.h         |    3 +
+ kernel/sched/core.c              |   13 ++--
+ kernel/sched/fair.c              |  155 +++++++++++++++++++++++++++++++++++---
+ kernel/sched/sched.h             |   10 +--
+ 8 files changed, 165 insertions(+), 32 deletions(-)
+
 -- 
-1.7.10.4
+1.7.9.5
