@@ -1,103 +1,140 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  7 Oct 2012 09:27:19 +0200
-Subject: [PATCH 5/6] usb: at91_ude: switch pm ops
-In-Reply-To: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Sun,  7 Oct 2012 09:27:15 +0200
+Subject: [PATCH 1/6] pm: add suspend_mem and suspend_standby support
+In-Reply-To: <20121006161429.GD12462@game.jcrosoft.org>
 References: <20121006161429.GD12462@game.jcrosoft.org>
- <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1349594840-11374-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-so we can detect when we enter in slow_clock mode and drop
-at91_suspend_entering_slow_clock
+Today when we go to suspend we can not knwon at drivers level if we go in
+STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+suspend_standby.
+
+If a bus does not need to care about this distinction we fallback to
+suspend. This will allow to do not update the current bus or drivers.
+
+This is needed as example by at91 OHCI and atmel serial
 
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: linux-pm at vger.kernel.org
-Cc: linux-usb at vger.kernel.org 
 ---
- drivers/usb/gadget/at91_udc.c |   34 +++++++++++++++++++++++-----------
- 1 file changed, 23 insertions(+), 11 deletions(-)
+ drivers/base/power/main.c |   12 ++++++++++++
+ include/linux/pm.h        |    9 +++++++++
+ kernel/power/suspend.c    |   16 ++++++++++++++--
+ 3 files changed, 35 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index 89d90b5..ba5b0af 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1910,10 +1910,10 @@ static int __exit at91udc_remove(struct platform_device *pdev)
- }
- 
- #ifdef CONFIG_PM
--static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
-+static int at91udc_suspend(struct device *dev, int slow_clock)
+diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
+index a3c1404..581e135 100644
+--- a/drivers/base/power/main.c
++++ b/drivers/base/power/main.c
+@@ -218,9 +218,21 @@ static void dpm_wait_for_children(struct device *dev, bool async)
+  */
+ static pm_callback_t pm_op(const struct dev_pm_ops *ops, pm_message_t state)
  {
--	struct at91_udc *udc = platform_get_drvdata(pdev);
--	int		wake = udc->driver && device_may_wakeup(&pdev->dev);
-+	struct at91_udc *udc = dev_get_drvdata(dev);
-+	int		wake = udc->driver && device_may_wakeup(dev);
- 	unsigned long	flags;
- 
- 	/* Unless we can act normally to the host (letting it wake us up
-@@ -1923,7 +1923,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
- 	 */
- 	if ((!udc->suspended && udc->addr)
- 			|| !wake
--			|| at91_suspend_entering_slow_clock()) {
-+			|| slow_clock) {
- 		spin_lock_irqsave(&udc->lock, flags);
- 		pullup(udc, 0);
- 		wake = 0;
-@@ -1937,9 +1937,19 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
- 	return 0;
- }
- 
--static int at91udc_resume(struct platform_device *pdev)
-+static int at91udc_suspend_standby(struct device *dev)
- {
--	struct at91_udc *udc = platform_get_drvdata(pdev);
-+	return at91udc_suspend(dev, 0);
-+}
++	pm_callback_t callback = NULL;
 +
-+static int at91udc_suspend_mem(struct device *dev)
-+{
-+	return at91udc_suspend(dev, 1);
-+}
-+
-+static int at91udc_resume(struct device *dev)
-+{
-+	struct at91_udc *udc = dev_get_drvdata(dev);
- 	unsigned long	flags;
+ 	switch (state.event) {
+ #ifdef CONFIG_SUSPEND
+ 	case PM_EVENT_SUSPEND:
++		switch (state.param) {
++		case PM_SUSPEND_MEM:
++			callback = ops->suspend_mem;
++			break;
++		case PM_SUSPEND_STANDBY:
++			callback = ops->suspend_standby;
++			break;
++		}
++		if (callback)
++			return callback;
+ 		return ops->suspend;
+ 	case PM_EVENT_RESUME:
+ 		return ops->resume;
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 007e687..aff344b 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -49,6 +49,7 @@ extern const char power_group_name[];		/* = "power" */
  
- 	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled &&
-@@ -1956,11 +1966,14 @@ static int at91udc_resume(struct platform_device *pdev)
- 	}
- 	return 0;
- }
--#else
--#define	at91udc_suspend	NULL
--#define	at91udc_resume	NULL
+ typedef struct pm_message {
+ 	int event;
++	int param;
+ } pm_message_t;
+ 
+ /**
+@@ -265,6 +266,8 @@ struct dev_pm_ops {
+ 	int (*prepare)(struct device *dev);
+ 	void (*complete)(struct device *dev);
+ 	int (*suspend)(struct device *dev);
++	int (*suspend_mem)(struct device *dev);
++	int (*suspend_standby)(struct device *dev);
+ 	int (*resume)(struct device *dev);
+ 	int (*freeze)(struct device *dev);
+ 	int (*thaw)(struct device *dev);
+@@ -295,8 +298,12 @@ struct dev_pm_ops {
+ 	.thaw = resume_fn, \
+ 	.poweroff = suspend_fn, \
+ 	.restore = resume_fn,
++#define SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(suspend_standby_fn, suspend_mem_fn) \
++	.suspend_standby = suspend_standby_fn, \
++	.suspend_mem = suspend_mem_fn,
+ #else
+ #define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
++#define SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(suspend_standby_fn, suspend_mem_fn)
  #endif
  
-+static struct dev_pm_ops at91_udc_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(at91udc_suspend_standby, at91udc_resume)
-+	SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(at91udc_suspend_standby,
-+				at91udc_suspend_mem)
-+};
+ #ifdef CONFIG_PM_RUNTIME
+@@ -414,6 +421,8 @@ const struct dev_pm_ops name = { \
+ #define PMSG_FREEZE	((struct pm_message){ .event = PM_EVENT_FREEZE, })
+ #define PMSG_QUIESCE	((struct pm_message){ .event = PM_EVENT_QUIESCE, })
+ #define PMSG_SUSPEND	((struct pm_message){ .event = PM_EVENT_SUSPEND, })
++#define PMSG_SUSPEND_MEM	((struct pm_message){ .event = PM_EVENT_SUSPEND, .param = PM_SUSPEND_MEM, })
++#define PMSG_SUSPEND_STANDBY	((struct pm_message){ .event = PM_EVENT_SUSPEND, .param = PM_SUSPEND_STANDBY, })
+ #define PMSG_HIBERNATE	((struct pm_message){ .event = PM_EVENT_HIBERNATE, })
+ #define PMSG_RESUME	((struct pm_message){ .event = PM_EVENT_RESUME, })
+ #define PMSG_THAW	((struct pm_message){ .event = PM_EVENT_THAW, })
+diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+index c8b7446..9505b55 100644
+--- a/kernel/power/suspend.c
++++ b/kernel/power/suspend.c
+@@ -126,6 +126,18 @@ void __attribute__ ((weak)) arch_suspend_enable_irqs(void)
+ 	local_irq_enable();
+ }
+ 
++static pm_message_t suspend_state_to_pm_state(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		return PMSG_SUSPEND_STANDBY;
++	case PM_SUSPEND_MEM:
++		return PMSG_SUSPEND_MEM;
++	default:
++		return PMSG_SUSPEND;
++	}
++}
 +
- #if defined(CONFIG_OF)
- static const struct of_device_id at91_udc_dt_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-udc" },
-@@ -1973,11 +1986,10 @@ MODULE_DEVICE_TABLE(of, at91_udc_dt_ids);
- static struct platform_driver at91_udc_driver = {
- 	.remove		= __exit_p(at91udc_remove),
- 	.shutdown	= at91udc_shutdown,
--	.suspend	= at91udc_suspend,
--	.resume		= at91udc_resume,
- 	.driver		= {
- 		.name	= (char *) driver_name,
- 		.owner	= THIS_MODULE,
-+		.pm	= &at91_udc_pm_ops,
- 		.of_match_table	= of_match_ptr(at91_udc_dt_ids),
- 	},
- };
+ /**
+  * suspend_enter - Make the system enter the given sleep state.
+  * @state: System sleep state to enter.
+@@ -143,7 +155,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
+ 			goto Platform_finish;
+ 	}
+ 
+-	error = dpm_suspend_end(PMSG_SUSPEND);
++	error = dpm_suspend_end(suspend_state_to_pm_state(state));
+ 	if (error) {
+ 		printk(KERN_ERR "PM: Some devices failed to power down\n");
+ 		goto Platform_finish;
+@@ -215,7 +227,7 @@ int suspend_devices_and_enter(suspend_state_t state)
+ 	suspend_console();
+ 	ftrace_stop();
+ 	suspend_test_start();
+-	error = dpm_suspend_start(PMSG_SUSPEND);
++	error = dpm_suspend_start(suspend_state_to_pm_state(state));
+ 	if (error) {
+ 		printk(KERN_ERR "PM: Some devices failed to suspend\n");
+ 		goto Recover_platform;
 -- 
 1.7.10.4
