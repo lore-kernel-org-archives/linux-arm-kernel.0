@@ -1,20 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 7 Oct 2012 05:37:58 +0200
-Subject: [PATCH] mmc: mxs-mmc: Fix merge issue causing build error
-In-Reply-To: <20121007031224.GK20231@S2101-09.ap.freescale.net>
-References: <1349124763-10840-1-git-send-email-marex@denx.de>
- <20121007031224.GK20231@S2101-09.ap.freescale.net>
-Message-ID: <201210070537.58884.marex@denx.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 6 Oct 2012 21:01:28 -0700
+Subject: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <17531317.3PGnt12jPY@vostro.rjw.lan>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <17531317.3PGnt12jPY@vostro.rjw.lan>
+Message-ID: <20121007040128.GA15898@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> Copy Chris who should be able to help send this fix for 3.7-rc.
+On Sun, Oct 07, 2012 at 12:18:21AM +0200, Rafael J. Wysocki wrote:
+> On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > Hi,
+> > 
+> > The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
+> > 
+> >   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> > 
+> >   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
+> > 
+> > for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
+> > 
+> >   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
+> > 
+> > ----------------------------------------------------------------
+> > pm: add suspend_mem and suspend_standby support
+> > 
+> > Today when we go to suspend we can not knwon at drivers level if we go in
+> > STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+> > suspend_standby.
 > 
-> Shawn
+> No way. Device drivers shouldn't be concerned about that.
+> 
+> > If a bus or drivers does not need to care about this distinction we fallback to
+> > suspend. This will allow to do not update the current bus or drivers.
+> > 
+> > This is needed as example by at91 OHCI, UDC and atmel serial
+> 
+> I wonder why.
 
-Ok, thanks.
+Yes, that's odd, please post the patches, I don't take random git pull
+requests, sorry.
 
-Best regards,
-Marek Vasut
+greg k-h
