@@ -1,47 +1,19 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 6 Oct 2012 21:01:28 -0700
-Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <17531317.3PGnt12jPY@vostro.rjw.lan>
-References: <20121006161429.GD12462@game.jcrosoft.org>
- <17531317.3PGnt12jPY@vostro.rjw.lan>
-Message-ID: <20121007040128.GA15898@kroah.com>
+From: rick@efn.org (rick at efn.org)
+Date: Sat, 6 Oct 2012 21:16:27 -0700
+Subject: imx53 pengutronix kernel
+Message-ID: <1e767002005cb1be061c3ae012c54f03.squirrel@webmail.efn.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 07, 2012 at 12:18:21AM +0200, Rafael J. Wysocki wrote:
-> On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > Hi,
-> > 
-> > The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
-> > 
-> >   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> > 
-> >   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
-> > 
-> > for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
-> > 
-> >   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
-> > 
-> > ----------------------------------------------------------------
-> > pm: add suspend_mem and suspend_standby support
-> > 
-> > Today when we go to suspend we can not knwon at drivers level if we go in
-> > STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
-> > suspend_standby.
-> 
-> No way. Device drivers shouldn't be concerned about that.
-> 
-> > If a bus or drivers does not need to care about this distinction we fallback to
-> > suspend. This will allow to do not update the current bus or drivers.
-> > 
-> > This is needed as example by at91 OHCI, UDC and atmel serial
-> 
-> I wonder why.
+Hi,
 
-Yes, that's odd, please post the patches, I don't take random git pull
-requests, sorry.
+  Lets say I wanted to get the latest kernel from
+git://git.pengutronix.de/git/imx/linux-2.6.git and wanted to use it on
+the imx53 Quick Start board.  What branch should I use?  I tried
+imx-ipu-staging but I don't think that is right as
+arch/arm/mach-imx/devices-imx53.h doesn't exist.  What branch would
+you suggest?
 
-greg k-h
+  Thanks very much for any help.
+
+  Rick
