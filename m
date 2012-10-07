@@ -1,47 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  7 Oct 2012 14:16:23 -0300
-Subject: [PATCH v2] ARM: mxs_defconfig: Improve USB related support
-Message-ID: <1349630183-29297-1-git-send-email-festevam@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun,  7 Oct 2012 10:40:54 -0700
+Subject: [PATCH] of: add stub of_get_child_by_name for non-OF builds
+Message-ID: <1349631654-20931-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Fixes build error on s3c6400_defconfig, introduced by commit
+06455bbcab76e5f5225de5f38ab948d37a1c3587, "dt/s3c64xx/spi: Use
+of_get_child_by_name to get a named child".
 
-Select the following USB related options:
+drivers/spi/spi-s3c64xx.c: In function 's3c64xx_get_slave_ctrldata':
+drivers/spi/spi-s3c64xx.c:838:2: error: implicit declaration of function
+    'of_get_child_by_name' [-Werror=implicit-function-declaration]
 
-- USB Ethernet adapter (needed for mx23-olinuxino)
-- Native language support (needed for mounting USB pen drives, for example)
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
-Changes since v1:
-- Drop USB camera support
- arch/arm/configs/mxs_defconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
+ include/linux/of.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 048aaca..7bf5351 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -61,6 +61,8 @@ CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- CONFIG_ENC28J60=y
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
- # CONFIG_WLAN is not set
-@@ -158,6 +160,10 @@ CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_15=y
- CONFIG_PRINTK_TIME=y
- CONFIG_FRAME_WARN=2048
- CONFIG_MAGIC_SYSRQ=y
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 72843b7..b4e50d5 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -331,6 +331,13 @@ static inline bool of_have_populated_dt(void)
+ #define for_each_child_of_node(parent, child) \
+ 	while (0)
+ 
++static inline struct device_node *of_get_child_by_name(
++					const struct device_node *node,
++					const char *name)
++{
++	return NULL;
++}
++
+ static inline int of_get_child_count(const struct device_node *np)
+ {
+ 	return 0;
 -- 
-1.7.9.5
+1.7.10.1.488.g05fbf7a
