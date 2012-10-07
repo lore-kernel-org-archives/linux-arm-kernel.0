@@ -1,31 +1,54 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 7 Oct 2012 21:25:34 +0800
-Subject: [PATCH] ARM: sa11x0: remove duplicated include from hackkit.c
-Message-ID: <CAPgLHd_a8ne_UXQfBr2cfkVffRUV5qcN_ndcPKJu1QAs1zd_Qw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 7 Oct 2012 14:30:48 +0100
+Subject: [PATCH] ARM: sort select statements alphanumerically
+In-Reply-To: <20121007131440.GC12801@game.jcrosoft.org>
+References: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
+ <20121007131440.GC12801@game.jcrosoft.org>
+Message-ID: <20121007133048.GE28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Sun, Oct 07, 2012 at 03:14:40PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:22 Sat 06 Oct     , Russell King wrote:
+> > This commit is likely to change as we get closer to the end of the merge
+> > window, as other changes get merged into Linus' tree.  I will be refreshing
+> > this from time to time, and keeping it out of linux-next, as it will cause
+> > more pain than its worth to put it into linux-next.
+> > 
+> > Anyone who wants to give this a review to check that it's correct are welcome,
+> > but I don't think it would be appropriate to collect attributation tags for
+> > it, as this won't be the final patch.
+> > 
+> > This patch is intentionally broken to prevent Linus from applying it - this
+> > is information only!
+> > 
+> > Anyone who wants to apply it can do so by first running this patch through:
+> > 
+> > 	sed 's/^-- /@@ /'
+> > 
+> >  arch/arm/Kconfig                  |  399 ++++++++++++++++++-------------------
+> >  arch/arm/common/Kconfig           |    4 +-
+> >  arch/arm/mach-at91/Kconfig        |   26 ++--
+> this maybe conflict with pinctrl support
 
-Remove duplicated include.
+Of course it will - and this tells me that you did not read the comments
+I left before the diffstat.  It's almost guaranteed to conflict with
+virtually all the changes going into this merge window.
 
-dpatch engine is used to auto generate this patch.
-(https://github.com/weiyj/dpatch)
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-sa1100/hackkit.c | 1 -
- 1 file changed, 1 deletion(-)
+And this also confirms that too; I said I didn't want to add attributations
+to it because you aren't going to be acking the patch which will eventually
+be committed.
 
-diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
-index fc106aa..d67a6d3 100644
---- a/arch/arm/mach-sa1100/hackkit.c
-+++ b/arch/arm/mach-sa1100/hackkit.c
-@@ -21,7 +21,6 @@
- #include <linux/serial_core.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
--#include <linux/tty.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
- #include <linux/platform_device.h>
+In sort, this patch _will_ be recreated by the script at the end of the
+merge window, and whatever that patch ends up being is what will get
+merged.  It's very likely (because of the inherent conflicts in doing
+this) that it _will_ be different from this one.
+
+What that means is if I add (your) acked-by to it, I will be adding it
+to a different patch to the one you've sent this to.
+
+What I want people to do with this is review it and make sure that the
+script hasn't created any obvious mistakes; I've already done that but
+the more eyes we get on it the better.
