@@ -1,104 +1,189 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Sun,  7 Oct 2012 09:43:54 +0200
-Subject: [RFC 2/6] sched: add a new SD SHARE_POWERLINE flag for sched_domain
+Date: Sun,  7 Oct 2012 09:43:55 +0200
+Subject: [RFC 3/6] sched: pack small tasks 
 In-Reply-To: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
 References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1349595838-31274-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1349595838-31274-4-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new flag SD SHARE_POWERLINE reflects the sharing of the power rail
-between the members of a domain. As this is the current assumption of the
-scheduler, the flag is added to all sched_domain
+During sched_domain creation, we define a pack buddy CPU if available.
+
+On a system that share the powerline at all level, the buddy is set to -1
+
+On a dual clusters / dual cores system which can powergate each core and
+cluster independantly, the buddy configuration will be :
+      | CPU0 | CPU1 | CPU2 | CPU3 |
+-----------------------------------
+buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+
+Small tasks tend to slip out of the periodic load balance.
+The best place to choose to migrate them is at their wake up.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- arch/ia64/include/asm/topology.h |    1 +
- arch/tile/include/asm/topology.h |    1 +
- include/linux/sched.h            |    1 +
- include/linux/topology.h         |    3 +++
- kernel/sched/core.c              |    5 +++++
- 5 files changed, 11 insertions(+)
+ kernel/sched/core.c  |    1 +
+ kernel/sched/fair.c  |  109 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ kernel/sched/sched.h |    1 +
+ 3 files changed, 111 insertions(+)
 
-diff --git a/arch/ia64/include/asm/topology.h b/arch/ia64/include/asm/topology.h
-index a2496e4..065c720 100644
---- a/arch/ia64/include/asm/topology.h
-+++ b/arch/ia64/include/asm/topology.h
-@@ -65,6 +65,7 @@ void build_cpu_to_node_map(void);
- 				| SD_BALANCE_EXEC	\
- 				| SD_BALANCE_FORK	\
- 				| SD_WAKE_AFFINE,	\
-+				| arch_sd_share_power_line()		\
- 	.last_balance		= jiffies,		\
- 	.balance_interval	= 1,			\
- 	.nr_balance_failed	= 0,			\
-diff --git a/arch/tile/include/asm/topology.h b/arch/tile/include/asm/topology.h
-index 7a7ce39..d39ed0b 100644
---- a/arch/tile/include/asm/topology.h
-+++ b/arch/tile/include/asm/topology.h
-@@ -72,6 +72,7 @@ static inline const struct cpumask *cpumask_of_node(int node)
- 				| 0*SD_PREFER_LOCAL			\
- 				| 0*SD_SHARE_CPUPOWER			\
- 				| 0*SD_SHARE_PKG_RESOURCES		\
-+				| arch_sd_share_power_line()		\
- 				| 0*SD_SERIALIZE			\
- 				,					\
- 	.last_balance		= jiffies,				\
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4786b20..74f2daf 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -862,6 +862,7 @@ enum cpu_idle_type {
- #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
- #define SD_PREFER_LOCAL		0x0040  /* Prefer to keep tasks local to this domain */
- #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
-+#define SD_SHARE_POWERLINE	0x0100	/* Domain members share power domain */
- #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
- #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
- #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
-diff --git a/include/linux/topology.h b/include/linux/topology.h
-index fec12d6..20964ab 100644
---- a/include/linux/topology.h
-+++ b/include/linux/topology.h
-@@ -99,6 +99,7 @@ int arch_update_cpu_topology(void);
- 				| 1*SD_WAKE_AFFINE			\
- 				| 1*SD_SHARE_CPUPOWER			\
- 				| 1*SD_SHARE_PKG_RESOURCES		\
-+				| arch_sd_share_power_line()		\
- 				| 0*SD_SERIALIZE			\
- 				| 0*SD_PREFER_SIBLING			\
- 				| arch_sd_sibling_asym_packing()	\
-@@ -132,6 +133,7 @@ int arch_update_cpu_topology(void);
- 				| 0*SD_PREFER_LOCAL			\
- 				| 0*SD_SHARE_CPUPOWER			\
- 				| 1*SD_SHARE_PKG_RESOURCES		\
-+				| arch_sd_share_power_line()		\
- 				| 0*SD_SERIALIZE			\
- 				,					\
- 	.last_balance		= jiffies,				\
-@@ -163,6 +165,7 @@ int arch_update_cpu_topology(void);
- 				| 0*SD_PREFER_LOCAL			\
- 				| 0*SD_SHARE_CPUPOWER			\
- 				| 0*SD_SHARE_PKG_RESOURCES		\
-+				| arch_sd_share_power_line()		\
- 				| 0*SD_SERIALIZE			\
- 				| 1*SD_PREFER_SIBLING			\
- 				,					\
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index d50fbac..dab7908 100644
+index dab7908..70cadbe 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -6407,6 +6407,11 @@ int __weak arch_sd_sibling_asym_packing(void)
-        return 0*SD_ASYM_PACKING;
+@@ -6131,6 +6131,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
+ 	rcu_assign_pointer(rq->sd, sd);
+ 	destroy_sched_domains(tmp, cpu);
+ 
++	update_packing_domain(cpu);
+ 	update_top_cache_domain(cpu);
  }
  
-+int __weak arch_sd_share_power_line(void)
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 4f4a4f6..8c9d3ed 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -157,6 +157,63 @@ void sched_init_granularity(void)
+ 	update_sysctl();
+ }
+ 
++
++/*
++ * Save the id of the optimal CPU that should be used to pack small tasks
++ * The value -1 is used when no buddy has been found
++ */
++DEFINE_PER_CPU(int, sd_pack_buddy);
++
++/* Look for the best buddy CPU that can be used to pack small tasks
++ * We make the assumption that it doesn't wort to pack on CPU that share the
++ * same powerline. We looks for the 1st sched_domain without the
++ * SD_SHARE_POWERLINE flag. Then We look for the sched_group witht the lowest
++ * power per core based on the assumption that their power efficiency is
++ * better */
++void update_packing_domain(int cpu)
 +{
-+	return 1*SD_SHARE_POWERLINE;
++	struct sched_domain *sd;
++	int id = -1;
++
++	sd = highest_flag_domain(cpu, SD_SHARE_POWERLINE);
++	if (!sd)
++		sd = rcu_dereference_check_sched_domain(cpu_rq(cpu)->sd);
++	else
++		sd = sd->parent;
++
++	while (sd) {
++		struct sched_group *sg = sd->groups;
++		struct sched_group *pack = sg;
++		struct sched_group *tmp = sg->next;
++
++		/* 1st CPU of the sched domain is a good candidate */
++		if (id == -1)
++			id = cpumask_first(sched_domain_span(sd));
++
++		/* loop the sched groups to find the best one */
++		while (tmp != sg) {
++			if (tmp->sgp->power * sg->group_weight <
++					sg->sgp->power * tmp->group_weight)
++				pack = tmp;
++			tmp = tmp->next;
++		}
++
++		/* we have found a better group */
++		if (pack != sg)
++			id = cpumask_first(sched_group_cpus(pack));
++
++		/* Look for another CPU than itself */
++		if ((id != cpu)
++		 || ((sd->parent) && !(sd->parent->flags && SD_LOAD_BALANCE)))
++			break;
++
++		sd = sd->parent;
++	}
++
++	pr_info(KERN_INFO "CPU%d packing on CPU%d\n", cpu, id);
++	per_cpu(sd_pack_buddy, cpu) = id;
++}
++
+ #if BITS_PER_LONG == 32
+ # define WMULT_CONST	(~0UL)
+ #else
+@@ -3073,6 +3130,55 @@ static int select_idle_sibling(struct task_struct *p, int target)
+ 	return target;
+ }
+ 
++static inline bool is_buddy_busy(int cpu)
++{
++	struct rq *rq = cpu_rq(cpu);
++
++	/*
++	 * A busy buddy is a CPU with a high load or a small load with a lot of
++	 * running tasks.
++	 */
++	return ((rq->avg.usage_avg_sum << rq->nr_running) >
++			rq->avg.runnable_avg_period);
++}
++
++static inline bool is_light_task(struct task_struct *p)
++{
++	/* A light task runs less than 25% in average */
++	return ((p->se.avg.usage_avg_sum << 2) < p->se.avg.runnable_avg_period);
++}
++
++static int check_pack_buddy(int cpu, struct task_struct *p)
++{
++	int buddy = per_cpu(sd_pack_buddy, cpu);
++
++	/* No pack buddy for this CPU */
++	if (buddy == -1)
++		return false;
++
++	/*
++	 * If a task is waiting for running on the CPU which is its own buddy,
++	 * let the default behavior to look for a better CPU if available
++	 * The threshold has been set to 37.5%
++	 */
++	if ((buddy == cpu)
++	 && ((p->se.avg.usage_avg_sum << 3) < (p->se.avg.runnable_avg_sum * 5)))
++		return false;
++
++	/* buddy is not an allowed CPU */
++	if (!cpumask_test_cpu(buddy, tsk_cpus_allowed(p)))
++		return false;
++
++	/*
++	 * If the task is a small one and the buddy is not overloaded,
++	 * we use buddy cpu
++	 */
++	 if (!is_light_task(p) || is_buddy_busy(buddy))
++		return false;
++
++	return true;
 +}
 +
  /*
-  * Initializers for schedule domains
-  * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
+  * sched_balance_self: balance the current task (running on cpu) in domains
+  * that have the 'flag' flag set. In practice, this is SD_BALANCE_FORK and
+@@ -3098,6 +3204,9 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
+ 	if (p->nr_cpus_allowed == 1)
+ 		return prev_cpu;
+ 
++	if (check_pack_buddy(cpu, p))
++		return per_cpu(sd_pack_buddy, cpu);
++
+ 	if (sd_flag & SD_BALANCE_WAKE) {
+ 		if (cpumask_test_cpu(cpu, tsk_cpus_allowed(p)))
+ 			want_affine = 1;
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index a95d5c1..086d8bf 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -875,6 +875,7 @@ static inline void idle_balance(int cpu, struct rq *rq)
+ 
+ extern void sysrq_sched_debug_show(void);
+ extern void sched_init_granularity(void);
++extern void update_packing_domain(int cpu);
+ extern void update_max_interval(void);
+ extern void update_group_power(struct sched_domain *sd, int cpu);
+ extern int update_runtime(struct notifier_block *nfb, unsigned long action, void *hcpu);
 -- 
 1.7.9.5
