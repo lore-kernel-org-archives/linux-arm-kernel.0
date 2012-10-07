@@ -1,63 +1,139 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 7 Oct 2012 17:41:15 +0200
-Subject: [PATCH] ARM: sort select statements alphanumerically
-In-Reply-To: <20121007133048.GE28061@n2100.arm.linux.org.uk>
-References: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
- <20121007131440.GC12801@game.jcrosoft.org>
- <20121007133048.GE28061@n2100.arm.linux.org.uk>
-Message-ID: <20121007154115.GD12801@game.jcrosoft.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  7 Oct 2012 14:12:49 -0300
+Subject: [PATCH v2] ARM: dts: imx6q-sabreauto: Add basic support
+Message-ID: <1349629969-29177-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:30 Sun 07 Oct     , Russell King - ARM Linux wrote:
-> On Sun, Oct 07, 2012 at 03:14:40PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 17:22 Sat 06 Oct     , Russell King wrote:
-> > > This commit is likely to change as we get closer to the end of the merge
-> > > window, as other changes get merged into Linus' tree.  I will be refreshing
-> > > this from time to time, and keeping it out of linux-next, as it will cause
-> > > more pain than its worth to put it into linux-next.
-> > > 
-> > > Anyone who wants to give this a review to check that it's correct are welcome,
-> > > but I don't think it would be appropriate to collect attributation tags for
-> > > it, as this won't be the final patch.
-> > > 
-> > > This patch is intentionally broken to prevent Linus from applying it - this
-> > > is information only!
-> > > 
-> > > Anyone who wants to apply it can do so by first running this patch through:
-> > > 
-> > > 	sed 's/^-- /@@ /'
-> > > 
-> > >  arch/arm/Kconfig                  |  399 ++++++++++++++++++-------------------
-> > >  arch/arm/common/Kconfig           |    4 +-
-> > >  arch/arm/mach-at91/Kconfig        |   26 ++--
-> > this maybe conflict with pinctrl support
-> 
-> Of course it will - and this tells me that you did not read the comments
-> I left before the diffstat.  It's almost guaranteed to conflict with
-> virtually all the changes going into this merge window.
-> 
-> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> And this also confirms that too; I said I didn't want to add attributations
-> to it because you aren't going to be acking the patch which will eventually
-> be committed.
-> 
-> In sort, this patch _will_ be recreated by the script at the end of the
-> merge window, and whatever that patch ends up being is what will get
-> merged.  It's very likely (because of the inherent conflicts in doing
-> this) that it _will_ be different from this one.
-> 
-> What that means is if I add (your) acked-by to it, I will be adding it
-> to a different patch to the one you've sent this to.
-> 
-> What I want people to do with this is review it and make sure that the
-> script hasn't created any obvious mistakes; I've already done that but
-> the more eyes we get on it the better.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I did read it I just point it out so if people try to apply over it then known
+mx6qsabreauto is a board based on mx6q SoC with the following features:
+- 2GB of DDR3
+- 2 USB ports
+- 1 HDMI output port
+- SPI NOR
+- 2 LVDS LCD ports
+- Gigabit Ethernet
+- Camera
+- eMMC and SD card slot
+- Multichannel Audio
+- CAN
+- SATA
+- NAND
+- PCIE
+- Video Input
 
-and just point out that I see no issue on at91
+Add very basic support for it. 
 
-Best Regards,
-J.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Add entry to arch/arm/boot/dts/Makefile
+- Change board description name
+- Drop unneeded blank line
+
+ Documentation/devicetree/bindings/arm/fsl.txt |    4 ++
+ arch/arm/boot/dts/Makefile                    |    1 +
+ arch/arm/boot/dts/imx6q-sabreauto.dts         |   64 +++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-sabreauto.dts
+
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index ac9e751..f798187 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -41,6 +41,10 @@ i.MX6 Quad SABRE Smart Device Board
+ Required root node properties:
+     - compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+ 
++i.MX6 Quad SABRE Automotive Board
++Required root node properties:
++    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
++
+ Generic i.MX boards
+ -------------------
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 29f541f..9a5c99d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -57,6 +57,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+ 	imx53-qsb.dtb \
+ 	imx53-smd.dtb \
+ 	imx6q-arm2.dtb \
++	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
+new file mode 100644
+index 0000000..826e4ad
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
+@@ -0,0 +1,64 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx6q.dtsi"
++
++/ {
++	model = "Freescale i.MX6 Quad SABRE Automotive Board";
++	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x80000000>;
++	};
++
++	soc {
++		aips-bus at 02000000 { /* AIPS1 */
++			iomuxc at 020e0000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_hog>;
++
++				hog {
++					pinctrl_hog: hoggrp {
++						fsl,pins = <
++							1376 0x80000000	/* MX6Q_PAD_NANDF_CS2__GPIO_6_15 */
++							13   0x80000000	/* MX6Q_PAD_SD2_DAT2__GPIO_1_13 */
++						>;
++					};
++				};
++			};
++		};
++
++		aips-bus at 02100000 { /* AIPS2 */
++			uart4: serial at 021f0000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart4_1>;
++				status = "okay";
++			};
++
++			ethernet at 02188000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_enet_2>;
++				phy-mode = "rgmii";
++				status = "okay";
++			};
++
++			usdhc at 02198000 { /* uSDHC3 */
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usdhc3_1>;
++				cd-gpios = <&gpio6 15 0>;
++				wp-gpios = <&gpio1 13 0>;
++				status = "okay";
++			};
++		};
++	};
++};
+-- 
+1.7.9.5
