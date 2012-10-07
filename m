@@ -1,48 +1,104 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 07 Oct 2012 00:18:21 +0200
-Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <20121006161429.GD12462@game.jcrosoft.org>
-References: <20121006161429.GD12462@game.jcrosoft.org>
-Message-ID: <17531317.3PGnt12jPY@vostro.rjw.lan>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun,  7 Oct 2012 14:02:11 +1300
+Subject: [PATCH 1/4] vt8500: Remove unused headers from include/mach/
+In-Reply-To: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
+References: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1349571734-26233-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Hi,
-> 
-> The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
-> 
->   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
-> 
-> for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
-> 
->   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
-> 
-> ----------------------------------------------------------------
-> pm: add suspend_mem and suspend_standby support
-> 
-> Today when we go to suspend we can not knwon at drivers level if we go in
-> STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
-> suspend_standby.
+Remove restart.h and reference in vt8500.c - unused.
+Remove hardware.h - empty and now optional.
+Remove i8042.h - not supported now that devicetree-only.
 
-No way. Device drivers shouldn't be concerned about that.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/mach-vt8500/include/mach/hardware.h |   12 ------------
+ arch/arm/mach-vt8500/include/mach/i8042.h    |   18 ------------------
+ arch/arm/mach-vt8500/include/mach/restart.h  |   17 -----------------
+ arch/arm/mach-vt8500/vt8500.c                |    2 --
+ 4 files changed, 49 deletions(-)
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/i8042.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/restart.h
 
-> If a bus or drivers does not need to care about this distinction we fallback to
-> suspend. This will allow to do not update the current bus or drivers.
-> 
-> This is needed as example by at91 OHCI, UDC and atmel serial
-
-I wonder why.
-
-Thanks,
-Rafael
-
-
+diff --git a/arch/arm/mach-vt8500/include/mach/hardware.h b/arch/arm/mach-vt8500/include/mach/hardware.h
+deleted file mode 100644
+index db4163f..0000000
+--- a/arch/arm/mach-vt8500/include/mach/hardware.h
++++ /dev/null
+@@ -1,12 +0,0 @@
+-/* arch/arm/mach-vt8500/include/mach/hardware.h
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+diff --git a/arch/arm/mach-vt8500/include/mach/i8042.h b/arch/arm/mach-vt8500/include/mach/i8042.h
+deleted file mode 100644
+index cd7143c..0000000
+--- a/arch/arm/mach-vt8500/include/mach/i8042.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/* arch/arm/mach-vt8500/include/mach/i8042.h
+- *
+- * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-extern unsigned long wmt_i8042_base __initdata;
+-extern int wmt_i8042_kbd_irq;
+-extern int wmt_i8042_aux_irq;
+diff --git a/arch/arm/mach-vt8500/include/mach/restart.h b/arch/arm/mach-vt8500/include/mach/restart.h
+deleted file mode 100644
+index 7389795..0000000
+--- a/arch/arm/mach-vt8500/include/mach/restart.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/* linux/arch/arm/mach-vt8500/restart.h
+- *
+- * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-void vt8500_setup_restart(void);
+-void vt8500_restart(char mode, const char *cmd);
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 587ea95..7449886 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -31,8 +31,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ 
+-#include <mach/restart.h>
+-
+ #include "common.h"
+ 
+ #define LEGACY_GPIO_BASE	0xD8110000
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.9.5
