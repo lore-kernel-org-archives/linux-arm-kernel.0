@@ -1,42 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun,  7 Oct 2012 10:42:40 -0700
-Subject: [PATCH] ARM: integrator_cp: fix build failure
-Message-ID: <1349631760-21350-1-git-send-email-olof@lixom.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  7 Oct 2012 14:44:17 -0300
+Subject: [PATCH] ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT
+Message-ID: <1349631857-31556-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-integrator/integrator_cp.c:272:32: error: 'of_aliases'
-undeclared (first use in this function)
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Move the OF-only timer init under #ifdef CONFIG_OF, just like
-integrator_ap has it.
+Since commit b4c184e5 (edia] media: reorganize the main Kconfig items),
+it is necessary to select CONFIG_MEDIA_CAMERA_SUPPORT in order to be able
+to use the SoC camera drivers.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Select CONFIG_MEDIA_CAMERA_SUPPORT so that we can use mx2-camera/mx3-camera
+by default as previously.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-integrator/integrator_cp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 6870a1f..5b08e8e 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -261,6 +261,8 @@ static void __init intcp_init_early(void)
- #endif
- }
- 
-+#ifdef CONFIG_OF
-+
- static void __init intcp_timer_init_of(void)
- {
- 	struct device_node *node;
-@@ -297,8 +299,6 @@ static struct sys_timer cp_of_timer = {
- 	.init		= intcp_timer_init_of,
- };
- 
--#ifdef CONFIG_OF
--
- static const struct of_device_id fpga_irq_of_match[] __initconst = {
- 	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
- 	{ /* Sentinel */ }
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 78ed575..d100401 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -121,6 +121,7 @@ CONFIG_REGULATOR_MC13892=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_VIDEO_MX2=y
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 66aa7a6..fcb4b62 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -151,6 +151,7 @@ CONFIG_REGULATOR_MC13892=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_VIDEO_MX3=y
 -- 
-1.7.10.1.488.g05fbf7a
+1.7.9.5
