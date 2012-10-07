@@ -1,87 +1,36 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun,  7 Oct 2012 14:02:12 +1300
-Subject: [PATCH 2/4] vt8500: Remove arm/boot/compressed/head-vt8500.S
+Date: Sun,  7 Oct 2012 14:02:14 +1300
+Subject: [PATCH 4/4] vt8500: Fix build warning when no framebuffer selected
 In-Reply-To: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
 References: <1349571734-26233-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1349571734-26233-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1349571734-26233-5-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Converting arch-vt8500 to devicetree-only makes this file redundant.
+Check for framebuffer defines before declaring variables in vt8500.c
+Removes a compile-time warning about unused variables.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/boot/compressed/Makefile      |    4 ---
- arch/arm/boot/compressed/head-vt8500.S |   46 --------------------------------
- 2 files changed, 50 deletions(-)
- delete mode 100644 arch/arm/boot/compressed/head-vt8500.S
+ arch/arm/mach-vt8500/vt8500.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index bb26756..0bc7a16 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -50,10 +50,6 @@ ifeq ($(CONFIG_ARCH_SA1100),y)
- OBJS		+= head-sa1100.o
- endif
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 7449886..a5bd286 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -75,8 +75,11 @@ static void vt8500_power_off(void)
  
--ifeq ($(CONFIG_ARCH_VT8500),y)
--OBJS		+= head-vt8500.o
--endif
--
- ifeq ($(CONFIG_CPU_XSCALE),y)
- OBJS		+= head-xscale.o
- endif
-diff --git a/arch/arm/boot/compressed/head-vt8500.S b/arch/arm/boot/compressed/head-vt8500.S
-deleted file mode 100644
-index 1dc1e21..0000000
---- a/arch/arm/boot/compressed/head-vt8500.S
-+++ /dev/null
-@@ -1,46 +0,0 @@
--/*
-- * linux/arch/arm/boot/compressed/head-vt8500.S
-- *
-- * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-- *
-- * VIA VT8500 specific tweaks. This is merged into head.S by the linker.
-- *
-- */
--
--#include <linux/linkage.h>
--#include <asm/mach-types.h>
--
--		.section        ".start", "ax"
--
--__VT8500_start:
--	@ Compare the SCC ID register against a list of known values
--	ldr	r1, .SCCID
--	ldr	r3, [r1]
--
--	@ VT8500 override
--	ldr	r4, .VT8500SCC
--	cmp	r3, r4
--	ldreq	r7, .ID_BV07
--	beq	.Lendvt8500
--
--	@ WM8505 override
--	ldr	r4, .WM8505SCC
--	cmp	r3, r4
--	ldreq	r7, .ID_8505
--	beq	.Lendvt8500
--
--	@ Otherwise, leave the bootloader's machine id untouched
--
--.SCCID:
--	.word	0xd8120000
--.VT8500SCC:
--	.word	0x34000102
--.WM8505SCC:
--	.word	0x34260103
--
--.ID_BV07:
--	.word	MACH_TYPE_BV07
--.ID_8505:
--	.word	MACH_TYPE_WM8505_7IN_NETBOOK
--
--.Lendvt8500:
+ void __init vt8500_init(void)
+ {
+-	struct device_node *np, *fb;
++	struct device_node *np;
++#if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
++	struct device_node *fb;
+ 	void __iomem *gpio_base;
++#endif
+ 
+ #ifdef CONFIG_FB_VT8500
+ 	fb = of_find_compatible_node(NULL, NULL, "via,vt8500-fb");
 -- 
 1.7.9.5
