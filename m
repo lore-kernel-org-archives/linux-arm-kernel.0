@@ -1,36 +1,44 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 08 Oct 2012 09:44:49 +1300
-Subject: [PATCH] arm: vt8500: Fix build warning in uncompress.h [for 3.7]
-In-Reply-To: <1349640491-25606-1-git-send-email-linux@prisktech.co.nz>
-References: <1349640491-25606-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1349642689.19187.4.camel@gitbox>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 07 Oct 2012 22:47:20 +0200
+Subject: [PATCH RFC 1/2 v2] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <20121007194717.GE12801@game.jcrosoft.org>
+References: <1349469387-20580-1-git-send-email-stigge@antcom.de>
+ <20121007194717.GE12801@game.jcrosoft.org>
+Message-ID: <5071EA58.1030406@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-08 at 09:08 +1300, Tony Prisk wrote:
-> This removes a build-time warning in uncompress.h due to incorrectly
-> cast values being passed to readb/writeb.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
->  arch/arm/mach-vt8500/include/mach/uncompress.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-vt8500/include/mach/uncompress.h b/arch/arm/mach-vt8500/include/mach/uncompress.h
-> index bb9e2d2..1344d9f 100644
-> --- a/arch/arm/mach-vt8500/include/mach/uncompress.h
-> +++ b/arch/arm/mach-vt8500/include/mach/uncompress.h
-> @@ -15,7 +15,7 @@
->   *
->   */
->  
-> -#define UART0_PHYS 0xd8200000
-> +#define UART0_PHYS	(void *)0xd8200000
->  #include <asm/io.h>
->  
->  static void putc(const char c)
+Hi!
 
-Please ignore this patch - I will correct as per Russell's advice.
+On 07/10/12 21:47, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> +This creates a new block of GPIOs as a list of GPIO numbers with the specified
+>> +size which are accessible via the returned struct gpio_block and the accessor
+>> +functions described below. Please note that you need to request the GPIOs
+>> +separately via gpio_request(). An arbitrary list of globally valid GPIOs can be
+>> +specified, even ranging over several gpio_chips. Actual handling of I/O
+>> +operations will be done on a best effort base, i.e. simultaneous I/O only where
+>> +possible by hardware and implemented in the respective GPIO driver. The number
+>> +of GPIOs in one block is limited to 32 on a 32 bit system, and 64 on a 64 bit
+>> +system.
 
-Regards
-Tony P
+> this limitation is not acceptable
+
+I guess this depends on what you want to do.
+
+For practical reasons, accessing GPIOs collected in a word is
+reasonable, IMO. And according to the replies from Stijn and Linus,
+32/64 bit words are acceptable for them.
+
+Can you please show me in which cases you need >32 bit word access (on a
+32bit machine)? Practical example? Are there any GPIO controllers where
+you can actually get/set 32 lines simultaneously? Then, I'd be happy to
+adjust the API. (Actually, I liked Stijn's approach, which should be
+reflected in my patch.)
+
+If simultaneousness is not necessary, you can define further blocks with
+32 lines each. Since your 32 bit machine will probably do only 32 bits
+maximum at once, I can't see a big limit here.
+
+Thanks for considering,
+
+Roland
