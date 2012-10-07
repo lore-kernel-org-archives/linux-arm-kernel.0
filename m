@@ -1,80 +1,95 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Sun, 7 Oct 2012 10:17:18 -0300
-Subject: [PATCH v2 1/5] [media] omap3isp: Fix compilation error in ispreg.h
-In-Reply-To: <20121002163158.GR4840@atomide.com>
-References: <20120927195526.GP4840@atomide.com>
- <1349131591-10804-1-git-send-email-ido@wizery.com>
- <20121002163158.GR4840@atomide.com>
-Message-ID: <20121007101718.073aed3b@infradead.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 7 Oct 2012 15:14:40 +0200
+Subject: [PATCH] ARM: sort select statements alphanumerically
+In-Reply-To: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
+References: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
+Message-ID: <20121007131440.GC12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 2 Oct 2012 09:31:58 -0700
-Tony Lindgren <tony@atomide.com> escreveu:
-
-> * Ido Yariv <ido@wizery.com> [121001 15:48]:
-> > Commit c49f34bc ("ARM: OMAP2+ Move SoC specific headers to be local to
-> > mach-omap2") moved omap34xx.h to mach-omap2. This broke omap3isp, as it
-> > includes omap34xx.h.
-> > 
-> > Instead of moving omap34xx to platform_data, simply add the two
-> > definitions the driver needs and remove the include altogether.
-> > 
-> > Signed-off-by: Ido Yariv <ido@wizery.com>
+On 17:22 Sat 06 Oct     , Russell King wrote:
+> As suggested by Andrew Morton:
 > 
-> I'm assuming that Mauro picks this one up, sorry
-> for breaking it.
-
-Picked, thanks. 
-
-With regards to the other patches in this series, IMHO, it
-makes more sense to go through arm omap tree, so, for the
-patches on this series that touch at drivers/media/platform/*:
-
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
-
+>   This is a pet peeve of mine.  Any time there's a long list of items
+>   (header file inclusions, kconfig entries, array initalisers, etc) and
+>   someone wants to add a new item, they *always* go and stick it at the
+>   end of the list.
+>   ...
+>   Guys, don't do this.  Either put the new item into a randomly-chosen
+>   position or, probably better, alphanumerically sort the list.
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+>   For this reason it looks like approximately 0% of the patchset will
+>   apply, sorry.
 > 
-> > ---
-> >  drivers/media/platform/omap3isp/ispreg.h | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/media/platform/omap3isp/ispreg.h b/drivers/media/platform/omap3isp/ispreg.h
-> > index 084ea77..e2c57f3 100644
-> > --- a/drivers/media/platform/omap3isp/ispreg.h
-> > +++ b/drivers/media/platform/omap3isp/ispreg.h
-> > @@ -27,13 +27,13 @@
-> >  #ifndef OMAP3_ISP_REG_H
-> >  #define OMAP3_ISP_REG_H
-> >  
-> > -#include <plat/omap34xx.h>
-> > -
-> > -
-> >  #define CM_CAM_MCLK_HZ			172800000	/* Hz */
-> >  
-> >  /* ISP Submodules offset */
-> >  
-> > +#define L4_34XX_BASE			0x48000000
-> > +#define OMAP3430_ISP_BASE		(L4_34XX_BASE + 0xBC000)
-> > +
-> >  #define OMAP3ISP_REG_BASE		OMAP3430_ISP_BASE
-> >  #define OMAP3ISP_REG(offset)		(OMAP3ISP_REG_BASE + (offset))
-> >  
-> > -- 
-> > 1.7.11.4
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> lets sort all our select statements alphanumerically.  This commit was
+> created by the following script:
+> 
+> #!/usr/bin/perl
+> while (<>) {
+> 	while (/\\\s*$/) {
+> 		$_ .= <>;
+> 	}
+> 	undef %selects if /^\s*config\s+/;
+> 	if (/^\s+select\s+(\w+).*/) {
+> 		if (defined($selects{$1})) {
+> 			if ($selects{$1} eq $_) {
+> 				print STDERR "Warning: removing duplicated $1 entry\n";
+> 			} else {
+> 				print STDERR "Error: $1 differently selected\n".
+> 					"\tOld: $selects{$1}\n".
+> 					"\tNew: $_\n";
+> 				exit 1;
+> 			}
+> 		}
+> 		$selects{$1} = $_;
+> 		next;
+> 	}
+> 	if (%selects and (/^\s*$/ or /^\s+help/)) {
+> 		foreach $k (sort (keys %selects)) {
+> 			print "$selects{$k}";
+> 		}
+> 		undef %selects;
+> 	}
+> 	print;
+> }
+> if (%selects) {
+> 	foreach $k (sort (keys %selects)) {
+> 		print "$selects{$k}";
+> 	}
+> }
+> 
+> It found two duplicates:
+> 
+> Warning: removing duplicated S5P_SETUP_MIPIPHY entry
+> Warning: removing duplicated HARDIRQS_SW_RESEND entry
+> 
+> and they are identical duplicates, hence the shrinkage in the diffstat
+> of two lines.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> This commit is likely to change as we get closer to the end of the merge
+> window, as other changes get merged into Linus' tree.  I will be refreshing
+> this from time to time, and keeping it out of linux-next, as it will cause
+> more pain than its worth to put it into linux-next.
+> 
+> Anyone who wants to give this a review to check that it's correct are welcome,
+> but I don't think it would be appropriate to collect attributation tags for
+> it, as this won't be the final patch.
+> 
+> This patch is intentionally broken to prevent Linus from applying it - this
+> is information only!
+> 
+> Anyone who wants to apply it can do so by first running this patch through:
+> 
+> 	sed 's/^-- /@@ /'
+> 
+>  arch/arm/Kconfig                  |  399 ++++++++++++++++++-------------------
+>  arch/arm/common/Kconfig           |    4 +-
+>  arch/arm/mach-at91/Kconfig        |   26 ++--
+this maybe conflict with pinctrl support
 
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-
-
-Cheers,
-Mauro
+Best Regards,
+J.
