@@ -1,140 +1,102 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  7 Oct 2012 09:27:15 +0200
-Subject: [PATCH 1/6] pm: add suspend_mem and suspend_standby support
-In-Reply-To: <20121006161429.GD12462@game.jcrosoft.org>
+Date: Sun,  7 Oct 2012 09:27:16 +0200
+Subject: [PATCH 2/6] platform: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20121006161429.GD12462@game.jcrosoft.org>
-Message-ID: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
+ <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1349594840-11374-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today when we go to suspend we can not knwon at drivers level if we go in
-STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
-suspend_standby.
-
-If a bus does not need to care about this distinction we fallback to
-suspend. This will allow to do not update the current bus or drivers.
-
-This is needed as example by at91 OHCI and atmel serial
+If a drivers does not need to care about this distinction we fallback to
+suspend. This will allow to do not update the current drivers.
 
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: linux-pm at vger.kernel.org
 ---
- drivers/base/power/main.c |   12 ++++++++++++
- include/linux/pm.h        |    9 +++++++++
- kernel/power/suspend.c    |   16 ++++++++++++++--
- 3 files changed, 35 insertions(+), 2 deletions(-)
+ drivers/base/platform.c         |   40 +++++++++++++++++++++++++++++++++++++++
+ include/linux/platform_device.h |    6 ++++++
+ 2 files changed, 46 insertions(+)
 
-diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
-index a3c1404..581e135 100644
---- a/drivers/base/power/main.c
-+++ b/drivers/base/power/main.c
-@@ -218,9 +218,21 @@ static void dpm_wait_for_children(struct device *dev, bool async)
-  */
- static pm_callback_t pm_op(const struct dev_pm_ops *ops, pm_message_t state)
- {
-+	pm_callback_t callback = NULL;
-+
- 	switch (state.event) {
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 8727e9c..f4822e2 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -740,6 +740,46 @@ static int platform_legacy_resume(struct device *dev)
+ 
  #ifdef CONFIG_SUSPEND
- 	case PM_EVENT_SUSPEND:
-+		switch (state.param) {
-+		case PM_SUSPEND_MEM:
-+			callback = ops->suspend_mem;
-+			break;
-+		case PM_SUSPEND_STANDBY:
-+			callback = ops->suspend_standby;
-+			break;
-+		}
-+		if (callback)
-+			return callback;
- 		return ops->suspend;
- 	case PM_EVENT_RESUME:
- 		return ops->resume;
-diff --git a/include/linux/pm.h b/include/linux/pm.h
-index 007e687..aff344b 100644
---- a/include/linux/pm.h
-+++ b/include/linux/pm.h
-@@ -49,6 +49,7 @@ extern const char power_group_name[];		/* = "power" */
  
- typedef struct pm_message {
- 	int event;
-+	int param;
- } pm_message_t;
- 
- /**
-@@ -265,6 +266,8 @@ struct dev_pm_ops {
- 	int (*prepare)(struct device *dev);
- 	void (*complete)(struct device *dev);
- 	int (*suspend)(struct device *dev);
-+	int (*suspend_mem)(struct device *dev);
-+	int (*suspend_standby)(struct device *dev);
- 	int (*resume)(struct device *dev);
- 	int (*freeze)(struct device *dev);
- 	int (*thaw)(struct device *dev);
-@@ -295,8 +298,12 @@ struct dev_pm_ops {
- 	.thaw = resume_fn, \
- 	.poweroff = suspend_fn, \
- 	.restore = resume_fn,
-+#define SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(suspend_standby_fn, suspend_mem_fn) \
-+	.suspend_standby = suspend_standby_fn, \
-+	.suspend_mem = suspend_mem_fn,
- #else
- #define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
-+#define SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(suspend_standby_fn, suspend_mem_fn)
- #endif
- 
- #ifdef CONFIG_PM_RUNTIME
-@@ -414,6 +421,8 @@ const struct dev_pm_ops name = { \
- #define PMSG_FREEZE	((struct pm_message){ .event = PM_EVENT_FREEZE, })
- #define PMSG_QUIESCE	((struct pm_message){ .event = PM_EVENT_QUIESCE, })
- #define PMSG_SUSPEND	((struct pm_message){ .event = PM_EVENT_SUSPEND, })
-+#define PMSG_SUSPEND_MEM	((struct pm_message){ .event = PM_EVENT_SUSPEND, .param = PM_SUSPEND_MEM, })
-+#define PMSG_SUSPEND_STANDBY	((struct pm_message){ .event = PM_EVENT_SUSPEND, .param = PM_SUSPEND_STANDBY, })
- #define PMSG_HIBERNATE	((struct pm_message){ .event = PM_EVENT_HIBERNATE, })
- #define PMSG_RESUME	((struct pm_message){ .event = PM_EVENT_RESUME, })
- #define PMSG_THAW	((struct pm_message){ .event = PM_EVENT_THAW, })
-diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
-index c8b7446..9505b55 100644
---- a/kernel/power/suspend.c
-+++ b/kernel/power/suspend.c
-@@ -126,6 +126,18 @@ void __attribute__ ((weak)) arch_suspend_enable_irqs(void)
- 	local_irq_enable();
- }
- 
-+static pm_message_t suspend_state_to_pm_state(suspend_state_t state)
++int platform_pm_suspend_mem(struct device *dev)
 +{
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		return PMSG_SUSPEND_STANDBY;
-+	case PM_SUSPEND_MEM:
-+		return PMSG_SUSPEND_MEM;
-+	default:
-+		return PMSG_SUSPEND;
++	struct device_driver *drv = dev->driver;
++	int ret = 0;
++
++	if (!drv)
++		return 0;
++
++	if (drv->pm) {
++		if (drv->pm->suspend_mem)
++			ret = drv->pm->suspend_mem(dev);
++		else if (drv->pm->suspend)
++			ret = drv->pm->suspend(dev);
++	} else {
++		ret = platform_legacy_suspend(dev, PMSG_SUSPEND);
 +	}
++
++	return ret;
 +}
 +
- /**
-  * suspend_enter - Make the system enter the given sleep state.
-  * @state: System sleep state to enter.
-@@ -143,7 +155,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
- 			goto Platform_finish;
- 	}
++int platform_pm_suspend_standby(struct device *dev)
++{
++	struct device_driver *drv = dev->driver;
++	int ret = 0;
++
++	if (!drv)
++		return 0;
++
++	if (drv->pm) {
++		if (drv->pm->suspend_standby)
++			ret = drv->pm->suspend_standby(dev);
++		else if (drv->pm->suspend)
++			ret = drv->pm->suspend(dev);
++	} else {
++		ret = platform_legacy_suspend(dev, PMSG_SUSPEND);
++	}
++
++	return ret;
++}
++
+ int platform_pm_suspend(struct device *dev)
+ {
+ 	struct device_driver *drv = dev->driver;
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index 5711e95..a7c2275 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -262,9 +262,13 @@ static inline char *early_platform_driver_setup_func(void)		\
  
--	error = dpm_suspend_end(PMSG_SUSPEND);
-+	error = dpm_suspend_end(suspend_state_to_pm_state(state));
- 	if (error) {
- 		printk(KERN_ERR "PM: Some devices failed to power down\n");
- 		goto Platform_finish;
-@@ -215,7 +227,7 @@ int suspend_devices_and_enter(suspend_state_t state)
- 	suspend_console();
- 	ftrace_stop();
- 	suspend_test_start();
--	error = dpm_suspend_start(PMSG_SUSPEND);
-+	error = dpm_suspend_start(suspend_state_to_pm_state(state));
- 	if (error) {
- 		printk(KERN_ERR "PM: Some devices failed to suspend\n");
- 		goto Recover_platform;
+ #ifdef CONFIG_SUSPEND
+ extern int platform_pm_suspend(struct device *dev);
++extern int platform_pm_suspend_mem(struct device *dev);
++extern int platform_pm_suspend_standby(struct device *dev);
+ extern int platform_pm_resume(struct device *dev);
+ #else
+ #define platform_pm_suspend		NULL
++#define platform_pm_suspend_mem		NULL
++#define platform_pm_suspend_standby	NULL
+ #define platform_pm_resume		NULL
+ #endif
+ 
+@@ -283,6 +287,8 @@ extern int platform_pm_restore(struct device *dev);
+ #ifdef CONFIG_PM_SLEEP
+ #define USE_PLATFORM_PM_SLEEP_OPS \
+ 	.suspend = platform_pm_suspend, \
++	.suspend_standby = platform_pm_suspend_standby, \
++	.suspend_mem = platform_pm_suspend_mem, \
+ 	.resume = platform_pm_resume, \
+ 	.freeze = platform_pm_freeze, \
+ 	.thaw = platform_pm_thaw, \
 -- 
 1.7.10.4
