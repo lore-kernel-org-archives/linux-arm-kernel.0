@@ -1,139 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  7 Oct 2012 14:12:49 -0300
-Subject: [PATCH v2] ARM: dts: imx6q-sabreauto: Add basic support
-Message-ID: <1349629969-29177-1-git-send-email-festevam@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon,  8 Oct 2012 02:10:50 +0900
+Subject: [PATCH v2 0/5] clk: exynos4: migrate to common clock framework
+Message-ID: <1349629855-4962-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+This patch series removes the usage of Samsung specific clock for Exynos4
+based platforms and migrates to use the common clock framework to register
+the clocks. Both legacy and device tree enabled Exynos4 platforms are
+supported. For legacy platforms, the clock instances are statically listed.
+For device tree based platforms, the device tree is searched for clock nodes
+and all available clock nodes are registered.
 
-mx6qsabreauto is a board based on mx6q SoC with the following features:
-- 2GB of DDR3
-- 2 USB ports
-- 1 HDMI output port
-- SPI NOR
-- 2 LVDS LCD ports
-- Gigabit Ethernet
-- Camera
-- eMMC and SD card slot
-- Multichannel Audio
-- CAN
-- SATA
-- NAND
-- PCIE
-- Video Input
+Thomas Abraham (5):
+  clk: samsung: add common clock framework support for Samsung platforms
+  clk: exynos4: register clocks using common clock framework
+  ARM: dts: Add Exynos4210 clock nodes
+  ARM: dts: list the clock providers for serial ports
+  ARM: Exynos4: Migrate clock support to common clock framework
 
-Add very basic support for it. 
+ arch/arm/boot/dts/exynos4-clock.dtsi       |  389 +++++++++++++++++
+ arch/arm/boot/dts/exynos4.dtsi             |    9 +
+ arch/arm/mach-exynos/Kconfig               |    1 +
+ arch/arm/mach-exynos/Makefile              |    3 -
+ arch/arm/mach-exynos/clock-exynos4.h       |   35 --
+ arch/arm/mach-exynos/clock-exynos4210.c    |  188 --------
+ arch/arm/mach-exynos/clock-exynos4212.c    |  192 --------
+ arch/arm/mach-exynos/common.c              |   22 +-
+ arch/arm/mach-exynos/common.h              |    3 +
+ arch/arm/mach-exynos/mach-armlex4210.c     |    1 -
+ arch/arm/mach-exynos/mach-exynos4-dt.c     |    1 -
+ arch/arm/mach-exynos/mach-nuri.c           |    1 -
+ arch/arm/mach-exynos/mach-origen.c         |    1 -
+ arch/arm/mach-exynos/mach-smdk4x12.c       |    1 -
+ arch/arm/mach-exynos/mach-smdkv310.c       |    1 -
+ arch/arm/mach-exynos/mach-universal_c210.c |    1 -
+ arch/arm/mach-exynos/mct.c                 |   11 +-
+ arch/arm/plat-samsung/Kconfig              |    4 +-
+ drivers/clk/Makefile                       |    1 +
+ drivers/clk/samsung/Makefile               |    6 +
+ drivers/clk/samsung/clk-exynos4.c          |  647 ++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk.c                  |  414 ++++++++++++++++++
+ drivers/clk/samsung/clk.h                  |  212 +++++++++
+ 23 files changed, 1696 insertions(+), 448 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos4-clock.dtsi
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4.h
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
+ delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
+ create mode 100644 drivers/clk/samsung/Makefile
+ create mode 100644 drivers/clk/samsung/clk-exynos4.c
+ create mode 100644 drivers/clk/samsung/clk.c
+ create mode 100644 drivers/clk/samsung/clk.h
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Add entry to arch/arm/boot/dts/Makefile
-- Change board description name
-- Drop unneeded blank line
-
- Documentation/devicetree/bindings/arm/fsl.txt |    4 ++
- arch/arm/boot/dts/Makefile                    |    1 +
- arch/arm/boot/dts/imx6q-sabreauto.dts         |   64 +++++++++++++++++++++++++
- 3 files changed, 69 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-sabreauto.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index ac9e751..f798187 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -41,6 +41,10 @@ i.MX6 Quad SABRE Smart Device Board
- Required root node properties:
-     - compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
- 
-+i.MX6 Quad SABRE Automotive Board
-+Required root node properties:
-+    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-+
- Generic i.MX boards
- -------------------
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 29f541f..9a5c99d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -57,6 +57,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
- 	imx53-qsb.dtb \
- 	imx53-smd.dtb \
- 	imx6q-arm2.dtb \
-+	imx6q-sabreauto.dtb \
- 	imx6q-sabrelite.dtb \
- 	imx6q-sabresd.dtb
- dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
-new file mode 100644
-index 0000000..826e4ad
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx6q.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 Quad SABRE Automotive Board";
-+	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x80000000>;
-+	};
-+
-+	soc {
-+		aips-bus at 02000000 { /* AIPS1 */
-+			iomuxc at 020e0000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_hog>;
-+
-+				hog {
-+					pinctrl_hog: hoggrp {
-+						fsl,pins = <
-+							1376 0x80000000	/* MX6Q_PAD_NANDF_CS2__GPIO_6_15 */
-+							13   0x80000000	/* MX6Q_PAD_SD2_DAT2__GPIO_1_13 */
-+						>;
-+					};
-+				};
-+			};
-+		};
-+
-+		aips-bus at 02100000 { /* AIPS2 */
-+			uart4: serial at 021f0000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart4_1>;
-+				status = "okay";
-+			};
-+
-+			ethernet at 02188000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_enet_2>;
-+				phy-mode = "rgmii";
-+				status = "okay";
-+			};
-+
-+			usdhc at 02198000 { /* uSDHC3 */
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_usdhc3_1>;
-+				cd-gpios = <&gpio6 15 0>;
-+				wp-gpios = <&gpio1 13 0>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
 -- 
-1.7.9.5
+1.7.5.4
