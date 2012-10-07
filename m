@@ -1,118 +1,98 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  7 Oct 2012 09:27:17 +0200
-Subject: [PATCH 3/6] tty: atmel_serial: switch pm ops
+Date: Sun,  7 Oct 2012 09:27:20 +0200
+Subject: [PATCH 6/6] arm: at91: drop at91_suspend_entering_slow_clock
 In-Reply-To: <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20121006161429.GD12462@game.jcrosoft.org>
  <1349594840-11374-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1349594840-11374-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1349594840-11374-6-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-so we can detect when we enter in slow_clock mode and drop
-at91_suspend_entering_slow_clock
+as the driver needing to knwon if we enter in slow_clock mode (SUSPEND_MEM)
+have been swtich to pm ops
 
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: linux-pm at vger.kernel.org
-Cc: linux-serial at vger.kernel.org
 ---
- drivers/tty/serial/atmel_serial.c |   52 +++++++++++++++++++------------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
+ arch/arm/mach-at91/include/mach/board.h |    3 ---
+ arch/arm/mach-at91/pm.c                 |   24 ------------------------
+ 2 files changed, 27 deletions(-)
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 3d7e1ee..7a51a0c 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1720,20 +1720,10 @@ static struct uart_driver atmel_uart = {
- };
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index c55a436..e3ca86a 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -190,7 +190,4 @@ extern void __init at91_add_device_can(struct at91_can_data *data);
+ extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
+ extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
  
- #ifdef CONFIG_PM
--static bool atmel_serial_clk_will_stop(void)
-+static int atmel_serial_suspend(struct device *dev, int slow_clock)
- {
--#ifdef CONFIG_ARCH_AT91
--	return at91_suspend_entering_slow_clock();
--#else
--	return false;
--#endif
--}
+-/* FIXME: this needs a better location, but gets stuff building again */
+-extern int at91_suspend_entering_slow_clock(void);
 -
--static int atmel_serial_suspend(struct platform_device *pdev,
--				pm_message_t state)
--{
--	struct uart_port *port = platform_get_drvdata(pdev);
--	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct atmel_uart_port *atmel_port = dev_get_drvdata(dev);
-+	struct uart_port *port = &atmel_port->uart;
- 
- 	if (atmel_is_console_port(port) && console_suspend_enabled) {
- 		/* Drain the TX shifter */
-@@ -1742,30 +1732,43 @@ static int atmel_serial_suspend(struct platform_device *pdev,
- 	}
- 
- 	/* we can not wake up if we're running on slow clock */
--	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
--	if (atmel_serial_clk_will_stop())
--		device_set_wakeup_enable(&pdev->dev, 0);
-+	atmel_port->may_wakeup = device_may_wakeup(dev);
-+	if (slow_clock)
-+		device_set_wakeup_enable(dev, 0);
- 
- 	uart_suspend_port(&atmel_uart, port);
- 
- 	return 0;
- }
- 
--static int atmel_serial_resume(struct platform_device *pdev)
-+static int atmel_serial_suspend_standby(struct device *dev)
- {
--	struct uart_port *port = platform_get_drvdata(pdev);
--	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	return atmel_serial_suspend(dev, 0);
-+}
-+
-+static int atmel_serial_suspend_mem(struct device *dev)
-+{
-+	return atmel_serial_suspend(dev, 1);
-+}
-+
-+static int atmel_serial_resume(struct device *dev)
-+{
-+	struct atmel_uart_port *atmel_port = dev_get_drvdata(dev);
-+	struct uart_port *port = &atmel_port->uart;
- 
- 	uart_resume_port(&atmel_uart, port);
--	device_set_wakeup_enable(&pdev->dev, atmel_port->may_wakeup);
-+	device_set_wakeup_enable(dev, atmel_port->may_wakeup);
- 
- 	return 0;
- }
--#else
--#define atmel_serial_suspend NULL
--#define atmel_serial_resume NULL
  #endif
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 2c2d865..5e8d770 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -116,15 +116,11 @@ static int at91_pm_valid_state(suspend_state_t state)
+ 	}
+ }
  
-+static struct dev_pm_ops atmel_serial_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(atmel_serial_suspend_standby, atmel_serial_resume)
-+	SET_SYSTEM_SLEEP_STANDBY_MEM_PM_OPS(atmel_serial_suspend_standby,
-+				atmel_serial_suspend_mem)
-+};
-+
- static int __devinit atmel_serial_probe(struct platform_device *pdev)
+-
+-static suspend_state_t target_state;
+-
+ /*
+  * Called after processes are frozen, but before we shutdown devices.
+  */
+ static int at91_pm_begin(suspend_state_t state)
  {
- 	struct atmel_uart_port *port;
-@@ -1877,11 +1880,10 @@ static int __devexit atmel_serial_remove(struct platform_device *pdev)
- static struct platform_driver atmel_serial_driver = {
- 	.probe		= atmel_serial_probe,
- 	.remove		= __devexit_p(atmel_serial_remove),
--	.suspend	= atmel_serial_suspend,
--	.resume		= atmel_serial_resume,
- 	.driver		= {
- 		.name	= "atmel_usart",
- 		.owner	= THIS_MODULE,
-+		.pm	= &atmel_serial_pm_ops,
- 		.of_match_table	= of_match_ptr(atmel_serial_dt_ids),
- 	},
- };
+-	target_state = state;
+ 	return 0;
+ }
+ 
+@@ -172,23 +168,6 @@ static int at91_pm_verify_clocks(void)
+ 	return 1;
+ }
+ 
+-/*
+- * Call this from platform driver suspend() to see how deeply to suspend.
+- * For example, some controllers (like OHCI) need one of the PLL clocks
+- * in order to act as a wakeup source, and those are not available when
+- * going into slow clock mode.
+- *
+- * REVISIT: generalize as clk_will_be_available(clk)?  Other platforms have
+- * the very same problem (but not using at91 main_clk), and it'd be better
+- * to add one generic API rather than lots of platform-specific ones.
+- */
+-int at91_suspend_entering_slow_clock(void)
+-{
+-	return (target_state == PM_SUSPEND_MEM);
+-}
+-EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+-
+-
+ static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0,
+ 			  void __iomem *ramc1, int memctrl);
+ 
+@@ -283,7 +262,6 @@ static int at91_pm_enter(suspend_state_t state)
+ 			at91_aic_read(AT91_AIC_IPR) & at91_aic_read(AT91_AIC_IMR));
+ 
+ error:
+-	target_state = PM_SUSPEND_ON;
+ 	at91_irq_resume();
+ 	at91_gpio_resume();
+ 	return 0;
+@@ -294,10 +272,8 @@ error:
+  */
+ static void at91_pm_end(void)
+ {
+-	target_state = PM_SUSPEND_ON;
+ }
+ 
+-
+ static const struct platform_suspend_ops at91_pm_ops = {
+ 	.valid	= at91_pm_valid_state,
+ 	.begin	= at91_pm_begin,
 -- 
 1.7.10.4
