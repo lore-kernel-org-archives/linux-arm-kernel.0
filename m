@@ -1,40 +1,52 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 08 Oct 2012 11:17:10 +0900
-Subject: [PATCH v4 5/5] ARM: EXYNOS: Add arm-pmu DT binding for exynos421x
-In-Reply-To: <1349662630-11607-1-git-send-email-chanho61.park@samsung.com>
-References: <1349662630-11607-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1349662630-11607-6-git-send-email-chanho61.park@samsung.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 8 Oct 2012 10:35:46 +0800
+Subject: [PATCH v2] serial: vt8500: fix possible memory leak in
+ vt8500_serial_probe()
+Message-ID: <CAPgLHd9oM+AnBenTNivOT+w8iK+GvPH+i4xyFjn1qqt65Tys+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a arm-pmu node to bind device tree for exynos4210.
-The exynos4210 and 4212 have two cpus which includes a pmu. In contrast, the
-exynos4412 has 4 cpus and pmus. We need to define two more pmus for this type
-board. However, supporting arm-pmu for the exynos4412 will handle it later
-because there is no dts support for 4412 based board.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+vt8500_port is malloced in vt8500_serial_probe() and should be freed
+before leaving from the error handling cases, otherwise it will
+cause memory leak.
+Fix it by move the allocation of vt8500_port after those test.
+
+dpatch engine is used to auto generate this patch.
+(https://github.com/weiyj/dpatch)
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/boot/dts/exynos4210.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+v1 -> v2: move the allocation of vt8500_port after those test
+---
+ drivers/tty/serial/vt8500_serial.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 214c557..90f9aed 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -42,6 +42,12 @@
- 			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
- 	};
+diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+index 205d4cf..4354fe5 100644
+--- a/drivers/tty/serial/vt8500_serial.c
++++ b/drivers/tty/serial/vt8500_serial.c
+@@ -567,10 +567,6 @@ static int __devinit vt8500_serial_probe(struct platform_device *pdev)
+ 	if (!mmres || !irqres)
+ 		return -ENODEV;
  
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 2>, <3 2>;
-+	};
+-	vt8500_port = kzalloc(sizeof(struct vt8500_port), GFP_KERNEL);
+-	if (!vt8500_port)
+-		return -ENOMEM;
+-
+ 	if (np)
+ 		port = of_alias_get_id(np, "serial");
+ 		if (port > VT8500_MAX_PORTS)
+@@ -593,6 +589,10 @@ static int __devinit vt8500_serial_probe(struct platform_device *pdev)
+ 		return -EBUSY;
+ 	}
+ 
++	vt8500_port = kzalloc(sizeof(struct vt8500_port), GFP_KERNEL);
++	if (!vt8500_port)
++		return -ENOMEM;
 +
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,pinctrl-exynos4210";
- 		reg = <0x11400000 0x1000>;
--- 
-1.7.9.5
+ 	vt8500_port->uart.type = PORT_VT8500;
+ 	vt8500_port->uart.iotype = UPIO_MEM;
+ 	vt8500_port->uart.mapbase = mmres->start;
