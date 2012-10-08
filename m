@@ -1,46 +1,42 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 8 Oct 2012 18:23:57 +0800
-Subject: [PATCH] ARM: tegra: rename the file of "sleep-tXX" to "sleep-tegraXX"
-Message-ID: <1349691837-30488-1-git-send-email-josephl@nvidia.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 8 Oct 2012 11:24:13 +0100
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121005084500.GI4625@n2100.arm.linux.org.uk>
+References: <20120930232116.GC30637@obsidianresearch.com>
+ <20121001153952.GB2100@linaro.org>
+ <20121001160639.GA31620@obsidianresearch.com>
+ <20121005084500.GI4625@n2100.arm.linux.org.uk>
+Message-ID: <20121008102413.GC2302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the naming consistency under the mach-tegra, we re-name the file of
-"sleep-tXX" to "sleep-tegraXX" (e.g., sleep-t30 to sleep-tegra30).
+On Fri, Oct 05, 2012 at 09:45:00AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 01, 2012 at 10:06:39AM -0600, Jason Gunthorpe wrote:
+> > On Mon, Oct 01, 2012 at 04:39:53PM +0100, Dave Martin wrote:
+> > > >   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+> > > >   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
+> > > 
+> > > Not related directly to your patch, but I wonder why we don't we see
+> > > separate r-x and rw- segments?
+> > 
+> > I think this is because the sections are not aligned when the
+> > protections change, and the sections are not sorted by protection
+> > type.
+> 
+> They aren't sorted by protection type, they're ordered according to what's
+> required for the kernel - which is to have the init sections together as
+> one complete block so that it can be freed, and to place all of the kernel
+> text as close to the beginning of the image as possible.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/Makefile                       |    4 ++--
- .../mach-tegra/{sleep-t20.S => sleep-tegra20.S}    |    0
- .../mach-tegra/{sleep-t30.S => sleep-tegra30.S}    |    0
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/mach-tegra/{sleep-t20.S => sleep-tegra20.S} (100%)
- rename arch/arm/mach-tegra/{sleep-t30.S => sleep-tegra30.S} (100%)
+Ah, right.
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 9aa653b..e6929c6 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -13,10 +13,10 @@ obj-$(CONFIG_CPU_IDLE)			+= sleep.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks_data.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
--obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-t20.o
-+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks_data.o
--obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= sleep-t30.o
-+obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= sleep-tegra30.o
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_SMP)                       += reset.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/sleep-t20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-similarity index 100%
-rename from arch/arm/mach-tegra/sleep-t20.S
-rename to arch/arm/mach-tegra/sleep-tegra20.S
-diff --git a/arch/arm/mach-tegra/sleep-t30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-similarity index 100%
-rename from arch/arm/mach-tegra/sleep-t30.S
-rename to arch/arm/mach-tegra/sleep-tegra30.S
--- 
-1.7.0.4
+Partly this came from some side speculation about whether we could do
+things like privileged read-only permissions on newer CPUs, for preventing
+unintended or undesired writes to the kernel's code or read-only data.
+
+There would be various things to solve in order to make that work, so I
+guess there's no great urgency for it right now.
+
+Cheers
+---Dave
