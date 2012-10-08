@@ -1,77 +1,98 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Oct 2012 13:20:45 +0800
-Subject: imx6q: high interrupt latencies
-In-Reply-To: <50676F21.4000705@xenomai.org>
-References: <50676F21.4000705@xenomai.org>
-Message-ID: <20121008052043.GA10023@S2101-09.ap.freescale.net>
+From: kishon@ti.com (kishon)
+Date: Mon, 8 Oct 2012 10:52:33 +0530
+Subject: [PATCH 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
+In-Reply-To: <506F5F69.6040104@mvista.com>
+References: <1349431628-2819-1-git-send-email-kishon@ti.com>
+ <1349431628-2819-4-git-send-email-kishon@ti.com>
+ <506F5F69.6040104@mvista.com>
+Message-ID: <50726319.8050900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2012 at 11:58:57PM +0200, Gilles Chanteperdrix wrote:
-> 
-> Hi,
-> 
-> I have been observing high interrupt latencies on imx6q, the problem
-> seems to be in the FEC driver, function fec_enet_tx. The following line:
-> 
->         while (((status = bdp->cbd_sc) & BD_ENET_TX_READY) == 0) {
-> 
-> can take 100us or more to execute, during which the local timer
-> interrupt are postponed.
-> 
-> As far as I understand, bdp is a pointer to a "struct bufdesc" shared
-> with the hardware and its status member is updated by the hardware when
-> the corresponding ethernet packet transmission is complete.
-> 
-> Adding a call to "mb()" or "outer_sync()" before reading the status
-> seems to avoid the issue, though I do not know if this is the proper fix.
-> 
-> Some more data. The boot logs say:
-> CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d
-> CPU identified as i.MX6Q, silicon rev 1.0
-> l2x0: 16 ways, CACHE_ID 0x410000c7
-> 
-> the kernel is compiled with the following errata enabled:
-> CONFIG_PL310_ERRATA_588369
-> CONFIG_PL310_ERRATA_727915
-> CONFIG_ARM_ERRATA_743622
-> CONFIG_ARM_ERRATA_751472
-> CONFIG_ARM_ERRATA_754322
-> CONFIG_ARM_ERRATA_764369
-> CONFIG_PL310_ERRATA_769419
-> 
-Are you running mainline kernel?  The boot log and the errata settings
-are different from what we have with mainline kernel.
+Hi,
 
-I'm using the following patch to measure the time on with v3.6 kernel,
-and seeing the output is mostly 2 ~ 4 us.
+On Saturday 06 October 2012 04:00 AM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 05-10-2012 12:07, Kishon Vijay Abraham I wrote:
+>
+>> Platfrom device for ocp2scp is created using omap_device_build in
+>> devices file. This is used for both omap4(musb) and omap5(dwc3).
+>>
+>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/devices.c |   72
+>> +++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 72 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/devices.c
+>> b/arch/arm/mach-omap2/devices.c
+>> index c8c2117..e2ba505 100644
+>> --- a/arch/arm/mach-omap2/devices.c
+>> +++ b/arch/arm/mach-omap2/devices.c
+> [...]
+>> @@ -613,6 +614,76 @@ static void omap_init_vout(void)
+> [...]
+>
+>> +static void omap_init_ocp2scp(void)
+>> +{
+>> +    struct omap_hwmod    *oh;
+>> +    struct platform_device    *pdev;
+>> +    int            bus_id = -1, dev_cnt = 0, i;
+>> +    struct omap_ocp2scp_dev    *ocp2scp_dev;
+>> +    const char        *oh_name, *name;
+>> +    struct omap_ocp2scp_platform_data *pdata;
+>> +
+>> +    oh_name = "ocp2scp_usb_phy";
+>> +    name    = "omap-ocp2scp";
+>> +
+>> +    oh = omap_hwmod_lookup(oh_name);
+>> +    if (!oh) {
+>> +        pr_err("%s: could not find omap_hwmod for %s\n", __func__,
+>> +                                oh_name);
+>> +        return;
+>> +    }
+>> +
+>> +    pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+>> +    if (!pdata) {
+>> +        pr_err("%s: No memory for ocp2scp pdata\n", __func__);
+>> +        return;
+>> +    }
+>> +
+>> +    ocp2scp_dev = oh->dev_attr;
+>> +    dev_cnt = count_ocp2scp_devices(ocp2scp_dev);
+>> +
+>> +    if (!dev_cnt) {
+>> +        pr_err("%s: No devices connected to ocp2scp\n", __func__);
+>> +        return;
+>
+>     Don't you leak 'pdata' here?
+>
+>> +    }
+>> +
+>> +    pdata->devices = kzalloc(sizeof(struct omap_ocp2scp_dev *)
+>> +                    * dev_cnt, GFP_KERNEL);
+>> +    if (!pdata->devices) {
+>> +        pr_err("%s: No memory for ocp2scp pdata devices\n", __func__);
+>> +        return;
+>> +    }
+>> +
+>> +    for (i = 0; i<  dev_cnt; i++, ocp2scp_dev++)
+>> +        pdata->devices[i] = ocp2scp_dev;
+>> +
+>> +    pdata->dev_cnt    = dev_cnt;
+>> +
+>> +    pdev = omap_device_build(name, bus_id, oh, pdata, sizeof(*pdata),
+>> NULL,
+>> +                                0, false);
+>> +    if (IS_ERR(pdev)) {
+>> +        pr_err("Could not build omap_device for %s %s\n",
+>> +                        name, oh_name);
+>> +        return;
+>
+>     Don't you leak 'pdata' and 'pdata->devices' here?
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index fffd205..f72955a 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -566,11 +566,13 @@ fec_enet_tx(struct net_device *ndev)
-        struct bufdesc *bdp;
-        unsigned short status;
-        struct  sk_buff *skb;
-+       struct timeval time1, time2;
+Will re-post the patch fixing it.
 
-        fep = netdev_priv(ndev);
-        spin_lock(&fep->hw_lock);
-        bdp = fep->dirty_tx;
-
-+       do_gettimeofday(&time1);
-        while (((status = bdp->cbd_sc) & BD_ENET_TX_READY) == 0) {
-                if (bdp == fep->cur_tx && fep->tx_full == 0)
-                        break;
-@@ -627,6 +629,8 @@ fec_enet_tx(struct net_device *ndev)
-                                netif_wake_queue(ndev);
-                }
-        }
-+       do_gettimeofday(&time2);
-+       printk("*** %s: %lu\n", __func__, timeval_to_ns(&time2) - timeval_to_ns(&time1));
-        fep->dirty_tx = bdp;
-        spin_unlock(&fep->hw_lock);
- }
-
-Shawn
+Thanks
+Kishon
