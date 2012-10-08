@@ -1,39 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 8 Oct 2012 14:14:55 +0200
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <20121007015405.958959522@gmail.com>
-References: <20121007015300.828366635@gmail.com>
- <20121007015405.958959522@gmail.com>
-Message-ID: <20121008141455.324f914b@skate>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 08 Oct 2012 13:15:56 +0100
+Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
+References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1349698556.4322.18.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2012-10-04 at 09:50 +0100, Stephen Boyd wrote:
+> The TWD and SCU configs are selected by default as long as
+> SCORPIONMP is false and/or MCT is false. Implementing the logic
+> this way certainly saves lines in the Kconfig but it precludes
+> those machines which select SCORPIONMP or MCT from participating
+> in the single zImage effort because when those machines are
+> combined with other SMP capable machines the TWD and SCU are no
+> longer selected.
+> 
+> Push the select out to the machine entries so that we can compile
+> these machines together and still select the appropriate configs.
+[...]
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index c952960..4f8e0db 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -11,6 +11,8 @@ config ARCH_VEXPRESS
+>  	select HAVE_CLK
+>  	select HAVE_PATA_PLATFORM
+>  	select HAVE_SMP
+> +	select HAVE_ARM_SCU if SMP
+> +	select HAVE_ARM_TWD if LOCAL_TIMERS
+>  	select ICST
+>  	select MIGHT_HAVE_CACHE_L2X0
+>  	select NO_IOPORT
 
-On Sun, 07 Oct 2012 03:53:01 +0200, Domenico Andreoli wrote:
+If you move these two lines before HAVE_CLK so everything stays in
+alphabetical order ;-) you can add my Acked-by for vexpress:
 
-> Index: b/arch/arm/mach-bcm476x/Makefile.boot
-> ===================================================================
-> --- /dev/null
-> +++ b/arch/arm/mach-bcm476x/Makefile.boot
-> @@ -0,0 +1,5 @@
-> +   zreladdr-y := 0x00008000
-> +params_phys-y := 0x00000100
-> +initrd_phys-y := 0x00800000
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Those params_phys-y and initrd_phys-y lines as useless as you're using
-the Device Tree.
+Thanks!
 
-> +#define BCM476X_PERIPH_PHYS   0x00080000
-> +#define BCM476X_PERIPH_VIRT   0xd0080000
-
-This one should be defined with IOMEM(). Yes, you will have to add a
-cast to make it play nicely with map_desc.virtual.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pawel
