@@ -1,50 +1,152 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 08 Oct 2012 15:24:01 -0700
-Subject: [GIT PULL] ARM: OMAP: PM fixes for v3.7-rc
-Message-ID: <87391o8uwu.fsf@deeprootsystems.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  8 Oct 2012 19:23:58 -0300
+Subject: [PATCH v2] video: imxfb: Do not crash on reboot
+Message-ID: <1349735038-19196-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Please pull the following OMAP PM fixes for v3.7-rc.
+Issuing a "reboot" command after the LCD times out causes the following
+warnings:
 
-Thanks,
+Requesting system reboot
+------------[ cut here ]------------
+WARNING: at drivers/clk/clk.c:471 clk_disable+0x24/0x50()
+Modules linked in:
+[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
+[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
+[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c03960a0>] (clk_disable+0x24/0x50)
+[<c03960a0>] (clk_disable+0x24/0x50) from [<c02695a0>] (imxfb_disable_controller+0x48/0x7c)
+[<c02695a0>] (imxfb_disable_controller+0x48/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
+[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
+[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
+[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
+[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
+[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
+---[ end trace da6b502ca79c854f ]---
+------------[ cut here ]------------
+WARNING: at drivers/clk/clk.c:380 clk_unprepare+0x1c/0x2c()
+Modules linked in:
+[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
+[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
+[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c0396338>] (clk_unprepare+0x1c/0x2c)
+[<c0396338>] (clk_unprepare+0x1c/0x2c) from [<c02695a8>] (imxfb_disable_controller+0x50/0x7c)
+[<c02695a8>] (imxfb_disable_controller+0x50/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
+[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
+[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
+[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
+[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
+[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
+---[ end trace da6b502ca79c8550 ]---
+------------[ cut here ]------------
 
-Kevin
+This happens because "reboot" triggers imxfb_shutdown(), which calls
+imxfb_disable_controller with the clocks already disabled.
 
+To prevent this, add a clock enabled status so that we can check if the clocks
+are enabled before disabling them. 
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Protect the whole function instead of only the clocks
+ drivers/video/imxfb.c |   63 +++++++++++++++++++++++++++----------------------
+ 1 file changed, 35 insertions(+), 28 deletions(-)
 
-The following changes since commit a0d271cbfed1dd50278c6b06bead3d00ba0a88f9:
-
-  Linux 3.6 (2012-09-30 16:47:46 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-fixes-pm
-
-for you to fetch changes up to ce3810cdb4ca31238c87e095d2c494a5eaa4f65d:
-
-  ARM: OMAP: SmartReflex: fix error path in init function (2012-10-02 14:55:31 -0700)
-
-----------------------------------------------------------------
-OMAP PM related fixes for v3.7-rc
-
-----------------------------------------------------------------
-Jean Pihet (2):
-      ARM: OMAP: SmartReflex: select CONFIG_POWER_SUPPLY in Kconfig
-      ARM: OMAP: SmartReflex: fix error path in init function
-
-Wei Yongjun (4):
-      ARM: OMAP: fix return value check in beagle_opp_init()
-      ARM: OMAP: omap_device: fix return value check in omap_device_build_ss()
-      ARM: OMAP2+: SmartReflex: fix return value check in sr_dev_init()
-      ARM: OMAP2+: PM: fix return value check in omap2_set_init_voltage()
-
- arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
- arch/arm/mach-omap2/pm.c                |    2 +-
- arch/arm/mach-omap2/sr_device.c         |    2 +-
- arch/arm/plat-omap/Kconfig              |    1 +
- arch/arm/plat-omap/omap_device.c        |    2 +-
- drivers/power/avs/smartreflex.c         |    8 ++++----
- 6 files changed, 9 insertions(+), 8 deletions(-)
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index cf2688d..32c71e5 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -134,6 +134,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	int			enabled;
+ 
+ 	/*
+ 	 * These are the addresses we mapped
+@@ -513,47 +514,53 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
+-	pr_debug("Enabling LCD controller\n");
++	if (!fbi->enabled) {
++		pr_debug("Enabling LCD controller\n");
+ 
+-	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
++		writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+-	/* panning offset 0 (0 pixel offset)        */
+-	writel(0x00000000, fbi->regs + LCDC_POS);
++		/* panning offset 0 (0 pixel offset)        */
++		writel(0x00000000, fbi->regs + LCDC_POS);
+ 
+-	/* disable hardware cursor */
+-	writel(readl(fbi->regs + LCDC_CPOS) & ~(CPOS_CC0 | CPOS_CC1),
+-		fbi->regs + LCDC_CPOS);
++		/* disable hardware cursor */
++		writel(readl(fbi->regs + LCDC_CPOS) & ~(CPOS_CC0 | CPOS_CC1),
++						fbi->regs + LCDC_CPOS);
+ 
+-	/*
+-	 * RMCR_LCDC_EN_MX1 is present on i.MX1 only, but doesn't hurt
+-	 * on other SoCs
+-	 */
+-	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
++		/*
++		 * RMCR_LCDC_EN_MX1 is present on i.MX1 only, but doesn't hurt
++		 * on other SoCs
++		 */
++		writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+ 
+-	clk_prepare_enable(fbi->clk_ipg);
+-	clk_prepare_enable(fbi->clk_ahb);
+-	clk_prepare_enable(fbi->clk_per);
++		clk_prepare_enable(fbi->clk_ipg);
++		clk_prepare_enable(fbi->clk_ahb);
++		clk_prepare_enable(fbi->clk_per);
++		fbi->enabled = 1;
+ 
+-	if (fbi->backlight_power)
+-		fbi->backlight_power(1);
+-	if (fbi->lcd_power)
+-		fbi->lcd_power(1);
++		if (fbi->backlight_power)
++			fbi->backlight_power(1);
++		if (fbi->lcd_power)
++			fbi->lcd_power(1);
++	}
+ }
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ {
+-	pr_debug("Disabling LCD controller\n");
++	if (fbi->enabled) {
++		pr_debug("Disabling LCD controller\n");
+ 
+-	if (fbi->backlight_power)
+-		fbi->backlight_power(0);
+-	if (fbi->lcd_power)
+-		fbi->lcd_power(0);
++		if (fbi->backlight_power)
++			fbi->backlight_power(0);
++		if (fbi->lcd_power)
++			fbi->lcd_power(0);
+ 
+-	clk_disable_unprepare(fbi->clk_per);
+-	clk_disable_unprepare(fbi->clk_ipg);
+-	clk_disable_unprepare(fbi->clk_ahb);
++		clk_disable_unprepare(fbi->clk_per);
++		clk_disable_unprepare(fbi->clk_ipg);
++		clk_disable_unprepare(fbi->clk_ahb);
++		fbi->enabled = 0;
+ 
+-	writel(0, fbi->regs + LCDC_RMCR);
++		writel(0, fbi->regs + LCDC_RMCR);
++	}
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+-- 
+1.7.9.5
