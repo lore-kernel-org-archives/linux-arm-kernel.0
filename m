@@ -1,75 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Oct 2012 18:10:11 +0100
-Subject: Problem with 64-bit registers on i.MX53
-In-Reply-To: <20121008170124.GZ4625@n2100.arm.linux.org.uk>
-References: <20121008160841.GM19651@pengutronix.de>
- <20121008170124.GZ4625@n2100.arm.linux.org.uk>
-Message-ID: <20121008171011.GA4625@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Oct 2012 09:31:36 -0700
+Subject: [PATCH 07/16] ARM: OMAP: Make plat/sram.h local to plat-omap
+In-Reply-To: <506EE79B.8040507@ti.com>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+ <20121004220449.26676.54281.stgit@muffinssi.local>
+ <506EE79B.8040507@ti.com>
+Message-ID: <20121008163136.GE3874@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 06:01:24PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 08, 2012 at 06:08:41PM +0200, Michael Olbrich wrote:
-> > 
-> > Hi,
-> > 
-> > I have a problem that looks like that 64-bit registers (I think) are not
-> > saved/restored correctly on a context switch. I've reduced it to the
-> > following test case:
-> > 
-> > - Latest Linux mainline kernel (v3.6-8559-ge9eca4d)
-> >   v3.5 is also affected
-> > - imx_v6_v7_defconfig
-> > - arch/arm/boot/dts/imx53-evk.dts
-> > 
-> > The following test program is compiled with "-mcpu=cortex-a8 -mfpu=neon
-> > -O2".
-> > ------------------------>8--------------------------------
-> > #include <inttypes.h>
-> > #include <assert.h>
-> > 
-> > volatile int x = 2;
-> > volatile int64_t y = 2;
-> > 
-> > int main() {
-> > 	volatile int a = 0;
-> > 	volatile int64_t b = 0;
-> > 	while (1) {
-> > 		a = (a + x) % (1 << 30);
-> > 		b = (b + y) % (1 << 30);
-> > 		assert(a == b);
-> > 	}
-> > }
-> > ------------------------>8--------------------------------
-> > The ".. (b + y) .." should result in "vadd.i64 d19, d18, d16" or
-> > something like that.
+* Jon Hunter <jon-hunter@ti.com> [121005 07:00]:
+> Hi Tony,
 > 
-> Hmm.
+> On 10/04/2012 05:04 PM, Tony Lindgren wrote:
+> > We can move this from plat to be local to plat-omap
+> > for common ARM zImage support.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap1/clock.c                  |    3 -
+> >  arch/arm/mach-omap1/clock_data.c             |    3 -
+> >  arch/arm/mach-omap1/devices.c                |    2 
+> >  arch/arm/mach-omap1/pm.c                     |    3 -
+> >  arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |    3 -
+> >  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    3 -
+> >  arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |    3 -
+> >  arch/arm/mach-omap2/io.c                     |    3 -
+> >  arch/arm/mach-omap2/omap4-common.c           |    4 -
+> >  arch/arm/mach-omap2/pm24xx.c                 |    3 -
+> >  arch/arm/mach-omap2/pm34xx.c                 |    3 -
+> >  arch/arm/mach-omap2/sdrc.c                   |    2 
+> >  arch/arm/mach-omap2/sdrc2xxx.c               |    2 
+> >  arch/arm/mach-omap2/sleep34xx.S              |    2 
+> >  arch/arm/plat-omap/common.h                  |    2 
+> >  arch/arm/plat-omap/include/plat/sram.h       |  105 -------------------------
+> >  arch/arm/plat-omap/sram.c                    |    1 
+> >  arch/arm/plat-omap/sram.h                    |  109 +++++++++++++++++++++++++-
+> >  18 files changed, 130 insertions(+), 126 deletions(-)
+> >  delete mode 100644 arch/arm/plat-omap/include/plat/sram.h
+> > 
+> > diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+> > index 638f407..b15d4ee 100644
+> > --- a/arch/arm/mach-omap1/clock.c
+> > +++ b/arch/arm/mach-omap1/clock.c
+> > @@ -24,11 +24,12 @@
+> >  #include <plat/cpu.h>
+> >  #include <plat/usb.h>
+> >  #include <plat/clock.h>
+> > -#include <plat/sram.h>
+> >  #include <plat/clkdev_omap.h>
+> >  
+> >  #include <mach/hardware.h>
+> >  
+> > +#include "../plat-omap/sram.h"
 > 
-> Can you send me the output of 'grep ^Features /proc/cpuinfo' please?
+> Any reason why you did not put this in
+> arch/arm/plat-omap/include/plat-omap/ like we were discussing for dma
+> and dmtimers headers? Then it can be just "#include <plat-omap/sram.h>".
+> Just curious ...
 
-You may also like to try the patch below... it will probably fix your
-problem.
+Because plat-omap/sram.h is still available for (mis)use by drivers
+and there's no need to expose it.
 
-diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
-index a7aadbd..6a6f1e4 100644
---- a/arch/arm/include/asm/vfpmacros.h
-+++ b/arch/arm/include/asm/vfpmacros.h
-@@ -28,7 +28,7 @@
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
- 	tst	\tmp, #HWCAP_VFPv3D16
--	ldceq	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
-@@ -52,7 +52,7 @@
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
- 	tst	\tmp, #HWCAP_VFPv3D16
--	stceq	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
+Eventually our plat-omap/sram.c will be converted to be just a
+device driver using the common sram driver. Then it will need
+a local sram.h and include/platform_data/sram-omap.h for the
+legacy non-dt boot.
+
+Regards,
+
+Tony
