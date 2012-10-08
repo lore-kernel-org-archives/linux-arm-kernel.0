@@ -1,71 +1,77 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Mon, 08 Oct 2012 13:50:16 +0200
-Subject: [PATCH 2/6] ARM: bcm476x: Add system timer
-In-Reply-To: <20121007015406.470633343@gmail.com>
-References: <20121007015300.828366635@gmail.com>
- <20121007015406.470633343@gmail.com>
-Message-ID: <1822741.oh36baA1m8@flexo>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 8 Oct 2012 07:58:43 -0400
+Subject: [PATCH v4 7/7] ARM: davinci: register pruss_uio device on DA850
+ EVM
+In-Reply-To: <5072B091.1040007@ti.com>
+References: <1349456686-22736-1-git-send-email-mporter@ti.com>
+ <1349456686-22736-8-git-send-email-mporter@ti.com>
+ <5072B091.1040007@ti.com>
+Message-ID: <20121008115843.GP11149@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 October 2012 03:53:02 Domenico Andreoli wrote:
-> From: Domenico Andreoli <domenico.andreoli@linux.com>
+On Mon, Oct 08, 2012 at 04:23:05PM +0530, Sekhar Nori wrote:
+> On 10/5/2012 10:34 PM, Matt Porter wrote:
+> > Configures the required pdata and registers the pruss_uio
+> > platform device on the DA850 EVM.
+> > 
+> > Tested on AM180x-EVM using the PRU_memAccessPRUDataRam and
+> > PRU_memAccessL3andDDR examples from the PRU userspace tools
+> > available from http://www.ti.com/tool/sprc940
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > ---
+> >  arch/arm/mach-davinci/board-da850-evm.c |   12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> > index 7359375..6f9478b 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> > @@ -31,6 +31,7 @@
+> >  #include <linux/platform_data/mtd-davinci.h>
+> >  #include <linux/platform_data/mtd-davinci-aemif.h>
+> >  #include <linux/platform_data/spi-davinci.h>
+> > +#include <linux/platform_data/uio_pruss.h>
+> >  #include <linux/regulator/machine.h>
+> >  #include <linux/regulator/tps6507x.h>
+> >  #include <linux/spi/spi.h>
+> > @@ -40,6 +41,7 @@
+> >  #include <mach/cp_intc.h>
+> >  #include <mach/da8xx.h>
+> >  #include <mach/mux.h>
+> > +#include <mach/sram.h>
+> >  
+> >  #include <asm/mach-types.h>
+> >  #include <asm/mach/arch.h>
+> > @@ -1253,6 +1255,10 @@ static __init int da850_wl12xx_init(void)
+> >  
+> >  #endif /* CONFIG_DA850_WL12XX */
+> >  
+> > +struct uio_pruss_pdata da8xx_pruss_uio_pdata = {
+> > +	.pintc_base	= 0x4000,
+> > +};
+> > +
+> >  #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+> >  
+> >  static __init void da850_evm_init(void)
+> > @@ -1339,6 +1345,12 @@ static __init void da850_evm_init(void)
+> >  		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
+> >  				ret);
+> >  
+> > +	da8xx_pruss_uio_pdata.sram_pool = sram_get_gen_pool();
+> > +	ret = da8xx_register_pruss_uio(&da8xx_pruss_uio_pdata);
+> > +	if (ret)
+> > +		pr_warning("pruss_uio initialization failed: %d\n",
+> > +				ret);
 > 
-> System timer implementation for the BCM476x SoCs.
-> 
-> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-> ---
->  Documentation/devicetree/bindings/timer/brcm,bcm476x-system-timer.txt |   22 +
->  arch/arm/boot/dts/bcm476x.dtsi                                        |    8 +
->  arch/arm/mach-bcm476x/bcm476x.c                                       |   10 -
->  drivers/clocksource/Makefile                                          |    1 +
->  drivers/clocksource/bcm476x_timer.c                                   |  188 ++++++++++
->  include/linux/bcm476x_timer.h                                         |   24 +
->  6 files changed, 244 insertions(+), 9 deletions(-)
-> 
-> Index: b/Documentation/devicetree/bindings/timer/brcm,bcm476x-system-timer.txt
-> ===================================================================
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/timer/brcm,bcm476x-system-timer.txt
-> @@ -0,0 +1,22 @@
-> +BCM476x System Timer
-> +
-> +The System Timer peripheral provides either two or four 32-bit timer
-> +channels.  BCM476x has three timers at 0xba000, 0xbb000 and 0xd1000. The
-> +first two provide four channels, the last (in the AON - Always ON power
-> +domain) provides only two.
-> +
-> +Required properties:
-> +
-> +- compatible : should be "brcm,bcm476x-system-timer"
-> +- reg : Specifies base physical address and size of the registers.
-> +- interrupts : A list of 2 or 4 interrupt sinks; one per timer channel.
-> +- clock-frequency : The frequency of the clock that drives the counter, in Hz.
-> +
-> +Example:
-> +
-> +timer {
-> +	compatible = "brcm,bcm476x-system-timer";
-> +	reg = <0xba000 0x1000>;
-> +	interrupts = <4>, <11>;
-> +	clock-frequency = <24000000>;
-> +};
-> Index: b/arch/arm/boot/dts/bcm476x.dtsi
-> ===================================================================
-> --- a/arch/arm/boot/dts/bcm476x.dtsi
-> +++ b/arch/arm/boot/dts/bcm476x.dtsi
-> @@ -14,6 +14,14 @@
->  		#size-cells = <1>;
->  		ranges;
->  
-> +		timer {
-> +			compatible = "brcm,bcm476x-system-timer";
-> +			reg = <0xba000 0x1000>;
-> +			interrupt-parent = <&vic0>;
-> +			interrupts = <4>, <11>;
-> +			clock-frequency = <24000000>;
-> +		};
+> I failed to mention this last time around, but is there any reason
+> platform data will change from board to board? Looks like the pintc_base
+> is SoC specific and that all platforms would use SRAM when using the
+> pruss driver. Looks like you can make da8xx_register_pruss_uio() take no
+> parameters at all.
 
-This should rather be timer: timer at ba0000 for this node to be uniquely named.
---
-Florian
+No reason, just oversight here. I'll update these two patches so this is
+done at the SoC level.
+
+-Matt
