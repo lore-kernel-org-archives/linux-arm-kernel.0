@@ -1,73 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 8 Oct 2012 16:23:05 +0530
-Subject: [PATCH v4 7/7] ARM: davinci: register pruss_uio device on DA850
- EVM
-In-Reply-To: <1349456686-22736-8-git-send-email-mporter@ti.com>
-References: <1349456686-22736-1-git-send-email-mporter@ti.com>
- <1349456686-22736-8-git-send-email-mporter@ti.com>
-Message-ID: <5072B091.1040007@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 8 Oct 2012 12:56:41 +0200
+Subject: [PATCH] ARM: imx: fix the return value check in
+ imx_clk_busy_divider()
+In-Reply-To: <CAPgLHd-0wYjWxWrmLdc+an0RVfEicv3QBEtvsuvQtphti3phdw@mail.gmail.com>
+References: <CAPgLHd-0wYjWxWrmLdc+an0RVfEicv3QBEtvsuvQtphti3phdw@mail.gmail.com>
+Message-ID: <20121008105641.GP1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/5/2012 10:34 PM, Matt Porter wrote:
-> Configures the required pdata and registers the pruss_uio
-> platform device on the DA850 EVM.
+On Fri, Sep 21, 2012 at 02:14:25PM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> Tested on AM180x-EVM using the PRU_memAccessPRUDataRam and
-> PRU_memAccessL3andDDR examples from the PRU userspace tools
-> available from http://www.ti.com/tool/sprc940
+> In case of error, the function clk_register() returns ERR_PTR()
+> no NULL pointer. The NULL test in the return value check should
+> be replaced with IS_ERR().
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
+> dpatch engine is used to auto generated this patch.
+> (https://github.com/weiyj/dpatch)
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+
+Applied, thanks
+
+Sascha
+
 > ---
->  arch/arm/mach-davinci/board-da850-evm.c |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  arch/arm/mach-imx/clk-busy.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 7359375..6f9478b 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -31,6 +31,7 @@
->  #include <linux/platform_data/mtd-davinci.h>
->  #include <linux/platform_data/mtd-davinci-aemif.h>
->  #include <linux/platform_data/spi-davinci.h>
-> +#include <linux/platform_data/uio_pruss.h>
->  #include <linux/regulator/machine.h>
->  #include <linux/regulator/tps6507x.h>
->  #include <linux/spi/spi.h>
-> @@ -40,6 +41,7 @@
->  #include <mach/cp_intc.h>
->  #include <mach/da8xx.h>
->  #include <mach/mux.h>
-> +#include <mach/sram.h>
+> diff --git a/arch/arm/mach-imx/clk-busy.c b/arch/arm/mach-imx/clk-busy.c
+> index 1a7a8dd..1ab91b5 100644
+> --- a/arch/arm/mach-imx/clk-busy.c
+> +++ b/arch/arm/mach-imx/clk-busy.c
+> @@ -108,7 +108,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+>  	busy->div.hw.init = &init;
 >  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -1253,6 +1255,10 @@ static __init int da850_wl12xx_init(void)
+>  	clk = clk_register(NULL, &busy->div.hw);
+> -	if (!clk)
+> +	if (IS_ERR(clk))
+>  		kfree(busy);
 >  
->  #endif /* CONFIG_DA850_WL12XX */
->  
-> +struct uio_pruss_pdata da8xx_pruss_uio_pdata = {
-> +	.pintc_base	= 0x4000,
-> +};
-> +
->  #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
->  
->  static __init void da850_evm_init(void)
-> @@ -1339,6 +1345,12 @@ static __init void da850_evm_init(void)
->  		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
->  				ret);
->  
-> +	da8xx_pruss_uio_pdata.sram_pool = sram_get_gen_pool();
-> +	ret = da8xx_register_pruss_uio(&da8xx_pruss_uio_pdata);
-> +	if (ret)
-> +		pr_warning("pruss_uio initialization failed: %d\n",
-> +				ret);
+>  	return clk;
+> 
+> 
+> 
 
-I failed to mention this last time around, but is there any reason
-platform data will change from board to board? Looks like the pintc_base
-is SoC specific and that all platforms would use SRAM when using the
-pruss driver. Looks like you can make da8xx_register_pruss_uio() take no
-parameters at all.
-
-Thanks,
-Sekhar
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
