@@ -1,43 +1,31 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 08 Oct 2012 13:15:56 +0100
-Subject: [PATCH] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-References: <1349340644-13937-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1349698556.4322.18.camel@hornet>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 8 Oct 2012 20:32:48 +0800
+Subject: [PATCH] [media] s5p-tv: remove unused including <linux/version.h>
+Message-ID: <CAPgLHd-0c4D0cSVQBZA=bbaDvcu4yHBj_2DPPGrQMKQZxxGqBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-04 at 09:50 +0100, Stephen Boyd wrote:
-> The TWD and SCU configs are selected by default as long as
-> SCORPIONMP is false and/or MCT is false. Implementing the logic
-> this way certainly saves lines in the Kconfig but it precludes
-> those machines which select SCORPIONMP or MCT from participating
-> in the single zImage effort because when those machines are
-> combined with other SMP capable machines the TWD and SCU are no
-> longer selected.
-> 
-> Push the select out to the machine entries so that we can compile
-> these machines together and still select the appropriate configs.
-[...]
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index c952960..4f8e0db 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -11,6 +11,8 @@ config ARCH_VEXPRESS
->  	select HAVE_CLK
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select ICST
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select NO_IOPORT
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-If you move these two lines before HAVE_CLK so everything stays in
-alphabetical order ;-) you can add my Acked-by for vexpress:
+Remove including <linux/version.h> that don't need it.
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+dpatch engine is used to auto generate this patch.
+(https://github.com/weiyj/dpatch)
 
-Thanks!
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/media/platform/s5p-tv/mixer_video.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Pawel
+diff --git a/drivers/media/platform/s5p-tv/mixer_video.c b/drivers/media/platform/s5p-tv/mixer_video.c
+index 0c1cd89..9b52f3a 100644
+--- a/drivers/media/platform/s5p-tv/mixer_video.c
++++ b/drivers/media/platform/s5p-tv/mixer_video.c
+@@ -19,7 +19,6 @@
+ #include <linux/videodev2.h>
+ #include <linux/mm.h>
+ #include <linux/module.h>
+-#include <linux/version.h>
+ #include <linux/timer.h>
+ #include <media/videobuf2-dma-contig.h>
+ 
