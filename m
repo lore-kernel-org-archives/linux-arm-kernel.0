@@ -1,44 +1,40 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 8 Oct 2012 11:06:43 +0530
-Subject: [PATCH v2 01/14] ARM: OMAP2+: gpmc: annotate exit sections properly
+Date: Mon, 8 Oct 2012 11:06:50 +0530
+Subject: [PATCH v2 02/14] mtd: onenand: omap: cleanup gpmc dependency
 In-Reply-To: <cover.1349672877.git.afzal@ti.com>
 References: <cover.1349672877.git.afzal@ti.com>
-Message-ID: <a517afd9ed3be069b475caae791156b9c4663849.1349672877.git.afzal@ti.com>
+Message-ID: <77643c064b9d0d639f75f793130bb40768b015e1.1349672877.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-compiler complained,
-`gpmc_remove' referenced in section `.data' of arch/arm/mach-omap2/built-in.o: defined in discarded section `.exit.text' of arch/arm/mach-omap2/built-in.o
+requesting, freeing gpmc cs is now handled fully
+by gpmc, remove left out gpmc dependency as well
+as unnecessary include of gpmc.h
 
-Annotate gpmc_remove function and dependents with __devexit.
-
-Reported-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/onenand/omap2.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 2cbdcb9..163458d 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -886,7 +886,7 @@ static int gpmc_setup_irq(void)
- 	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
- }
+diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
+index 1961be9..d7ef2c9 100644
+--- a/drivers/mtd/onenand/omap2.c
++++ b/drivers/mtd/onenand/omap2.c
+@@ -38,7 +38,6 @@
+ #include <linux/regulator/consumer.h>
  
--static __exit int gpmc_free_irq(void)
-+static __devexit int gpmc_free_irq(void)
- {
- 	int i;
+ #include <asm/mach/flash.h>
+-#include <plat/gpmc.h>
+ #include <linux/platform_data/mtd-onenand-omap2.h>
+ #include <asm/gpio.h>
  
-@@ -992,7 +992,7 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
+@@ -803,7 +802,6 @@ static int __devexit omap2_onenand_remove(struct platform_device *pdev)
+ 	}
+ 	iounmap(c->onenand.base);
+ 	release_mem_region(c->phys_base, c->mem_size);
+-	gpmc_cs_free(c->gpmc_cs);
+ 	kfree(c);
+ 
  	return 0;
- }
- 
--static __exit int gpmc_remove(struct platform_device *pdev)
-+static __devexit int gpmc_remove(struct platform_device *pdev)
- {
- 	gpmc_free_irq();
- 	gpmc_mem_exit();
 -- 
 1.7.12
