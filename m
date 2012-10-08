@@ -1,86 +1,71 @@
-From: jack@suse.cz (Jan Kara)
-Date: Mon, 8 Oct 2012 13:51:16 +0200
-Subject: [PATCH 05/16] vfs: bogus warnings in fs/namei.c
-In-Reply-To: <1349448930-23976-6-git-send-email-arnd@arndb.de>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <1349448930-23976-6-git-send-email-arnd@arndb.de>
-Message-ID: <20121008115116.GA9243@quack.suse.cz>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Mon, 08 Oct 2012 13:50:16 +0200
+Subject: [PATCH 2/6] ARM: bcm476x: Add system timer
+In-Reply-To: <20121007015406.470633343@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015406.470633343@gmail.com>
+Message-ID: <1822741.oh36baA1m8@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 05-10-12 16:55:19, Arnd Bergmann wrote:
-> The follow_link() function always initializes its *p argument,
-> or returns an error, but not all versions of gcc figure this
-> out, so we have to work around this using the uninitialized_var()
-> macro.
-  Well, I'm somewhat sceptical to this approach. I agree that bogus
-warnings are not nice but later when the code is changed and possibly real
-use without initialization is added, we won't notice it. Without changing
-anything, we'd at least have a chance of catching it with gcc versions
-which were clever enough to not warn with the original code. Or
-alternatively if we unconditionally initialized the variable that would get
-rid of the warning and made the code more future-proof (that's what I
-usually end up doing)... I don't really care that much about the chosen
-solution, Al is the one to decide. But I wanted to point out there are
-downsides to your solution.
-
-								Honza
-
+On Sunday 07 October 2012 03:53:02 Domenico Andreoli wrote:
+> From: Domenico Andreoli <domenico.andreoli@linux.com>
 > 
-> Without this patch, building with arm-linux-gnueabi-gcc-4.6 results in:
+> System timer implementation for the BCM476x SoCs.
 > 
-> fs/namei.c: In function 'link_path_walk':
-> fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-> fs/namei.c:1544:9: note: 'cookie' was declared here
-> fs/namei.c: In function 'path_lookupat':
-> fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-> fs/namei.c:1934:10: note: 'cookie' was declared here
-> fs/namei.c: In function 'path_openat':
-> fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-> fs/namei.c:2899:9: note: 'cookie' was declared here
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Al Viro <viro@zeniv.linux.org.uk>
-> Cc: linux-fsdevel at vger.kernel.org
-> Cc: Jan Kara <jack@suse.cz>
+> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
 > ---
->  fs/namei.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/timer/brcm,bcm476x-system-timer.txt |   22 +
+>  arch/arm/boot/dts/bcm476x.dtsi                                        |    8 +
+>  arch/arm/mach-bcm476x/bcm476x.c                                       |   10 -
+>  drivers/clocksource/Makefile                                          |    1 +
+>  drivers/clocksource/bcm476x_timer.c                                   |  188 ++++++++++
+>  include/linux/bcm476x_timer.h                                         |   24 +
+>  6 files changed, 244 insertions(+), 9 deletions(-)
 > 
-> diff --git a/fs/namei.c b/fs/namei.c
-> index dd1ed1b..62a1725 100644
-> --- a/fs/namei.c
-> +++ b/fs/namei.c
-> @@ -1543,7 +1543,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
+> Index: b/Documentation/devicetree/bindings/timer/brcm,bcm476x-system-timer.txt
+> ===================================================================
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/brcm,bcm476x-system-timer.txt
+> @@ -0,0 +1,22 @@
+> +BCM476x System Timer
+> +
+> +The System Timer peripheral provides either two or four 32-bit timer
+> +channels.  BCM476x has three timers at 0xba000, 0xbb000 and 0xd1000. The
+> +first two provide four channels, the last (in the AON - Always ON power
+> +domain) provides only two.
+> +
+> +Required properties:
+> +
+> +- compatible : should be "brcm,bcm476x-system-timer"
+> +- reg : Specifies base physical address and size of the registers.
+> +- interrupts : A list of 2 or 4 interrupt sinks; one per timer channel.
+> +- clock-frequency : The frequency of the clock that drives the counter, in Hz.
+> +
+> +Example:
+> +
+> +timer {
+> +	compatible = "brcm,bcm476x-system-timer";
+> +	reg = <0xba000 0x1000>;
+> +	interrupts = <4>, <11>;
+> +	clock-frequency = <24000000>;
+> +};
+> Index: b/arch/arm/boot/dts/bcm476x.dtsi
+> ===================================================================
+> --- a/arch/arm/boot/dts/bcm476x.dtsi
+> +++ b/arch/arm/boot/dts/bcm476x.dtsi
+> @@ -14,6 +14,14 @@
+>  		#size-cells = <1>;
+>  		ranges;
 >  
->  	do {
->  		struct path link = *path;
-> -		void *cookie;
-> +		void *uninitialized_var(cookie);
->  
->  		res = follow_link(&link, nd, &cookie);
->  		if (res)
-> @@ -1933,7 +1933,7 @@ static int path_lookupat(int dfd, const char *name,
->  	if (!err && !(flags & LOOKUP_PARENT)) {
->  		err = lookup_last(nd, &path);
->  		while (err > 0) {
-> -			void *cookie;
-> +			void *uninitialized_var(cookie);
->  			struct path link = path;
->  			err = may_follow_link(&link, nd);
->  			if (unlikely(err))
-> @@ -2902,7 +2902,7 @@ static struct file *path_openat(int dfd, const char *pathname,
->  	error = do_last(nd, &path, file, op, &opened, pathname);
->  	while (unlikely(error > 0)) { /* trailing symlink */
->  		struct path link = path;
-> -		void *cookie;
-> +		void *uninitialized_var(cookie);
->  		if (!(nd->flags & LOOKUP_FOLLOW)) {
->  			path_put_conditional(&path, nd);
->  			path_put(&nd->path);
-> -- 
-> 1.7.10
-> 
--- 
-Jan Kara <jack@suse.cz>
-SUSE Labs, CR
+> +		timer {
+> +			compatible = "brcm,bcm476x-system-timer";
+> +			reg = <0xba000 0x1000>;
+> +			interrupt-parent = <&vic0>;
+> +			interrupts = <4>, <11>;
+> +			clock-frequency = <24000000>;
+> +		};
+
+This should rather be timer: timer at ba0000 for this node to be uniquely named.
+--
+Florian
