@@ -1,32 +1,54 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 8 Oct 2012 11:25:30 +0200
-Subject: [PATCH V4] MXS: Implement DMA support into mxs-i2c
-In-Reply-To: <1345779871-7677-1-git-send-email-marex@denx.de>
-References: <1345779871-7677-1-git-send-email-marex@denx.de>
-Message-ID: <20121008092530.GA22051@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 8 Oct 2012 11:25:47 +0200
+Subject: [PATCH] ARM: imx: fix return value check in imx3_init_l2x0()
+In-Reply-To: <CAPgLHd8Rma5fSWPtjvLr18TEmmC=8kOjmSJtneO0Ecd1bvOrcg@mail.gmail.com>
+References: <CAPgLHd8Rma5fSWPtjvLr18TEmmC=8kOjmSJtneO0Ecd1bvOrcg@mail.gmail.com>
+Message-ID: <20121008092547.GK1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 05:44:31AM +0200, Marek Vasut wrote:
-> This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
-> via DT. The DMA operation is enabled by default.
+On Thu, Sep 27, 2012 at 01:54:01PM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
+> In case of error, the function ioremap() returns NULL
+> not ERR_PTR(). The IS_ERR() test in the return value
+> check should be replaced with NULL test.
+> 
+> dpatch engine is used to auto generate this patch.
+> (https://github.com/weiyj/dpatch)
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Thanks, applied to -next.
+Appied, thanks
 
-I am meanwhile thinking the driver needs massive changes, probably
-dropping PIOQUEUE entirely. This is probably best done via incremental
-patches to this one. I have sketches which were sadly not ready for this
-merge-window :(
+Sascha
+
+
+> ---
+>  arch/arm/mach-imx/mm-imx3.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+> index 9d2c843..b5deb05 100644
+> --- a/arch/arm/mach-imx/mm-imx3.c
+> +++ b/arch/arm/mach-imx/mm-imx3.c
+> @@ -108,9 +108,8 @@ void __init imx3_init_l2x0(void)
+>  	}
+>  
+>  	l2x0_base = ioremap(MX3x_L2CC_BASE_ADDR, 4096);
+> -	if (IS_ERR(l2x0_base)) {
+> -		printk(KERN_ERR "remapping L2 cache area failed with %ld\n",
+> -				PTR_ERR(l2x0_base));
+> +	if (!l2x0_base) {
+> +		printk(KERN_ERR "remapping L2 cache area failed\n");
+>  		return;
+>  	}
+>  
+> 
+> 
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121008/2e129d13/attachment.sig>
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
