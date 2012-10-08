@@ -1,45 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Oct 2012 13:50:53 -0700
-Subject: [PATCH 1/1] ARM: Add option to configure output line for McSPI
- driver
-In-Reply-To: <1348684467-5707-1-git-send-email-stanhu@gmail.com>
-References: <y>
- <1348684467-5707-1-git-send-email-stanhu@gmail.com>
-Message-ID: <20121008205052.GB13011@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 8 Oct 2012 22:52:48 +0200
+Subject: [PATCH] video: imxfb: Do not crash on reboot
+In-Reply-To: <1349703336-8105-1-git-send-email-fabio.estevam@freescale.com>
+References: <1349703336-8105-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121008205248.GU1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stan Hu <stanhu@gmail.com> [120926 11:36]:
-> McSPI driver previously assumed that D0 was input (MISO) and D1 was output (MOSI).
-> This forces the hardware designer to wire all SPI peripherals in this way when
-> it should be a software configuration option.
+On Mon, Oct 08, 2012 at 10:35:36AM -0300, Fabio Estevam wrote:
+> Issuing a "reboot" command after the LCD times out causes the following
+> warnings:
 > 
-> Signed-off-by: Stan Hu <stanhu@gmail.com>
+> Requesting system reboot
+
+[...]
+
+> 
+> This happens because "reboot" triggers imxfb_shutdown(), which calls
+> imxfb_disable_controller with the clocks already disabled.
+> 
+> To prevent this, add a clock enabled status so that we can check if the clocks
+> are enabled before disabling them. 
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/plat-omap/include/plat/mcspi.h |    2 ++
->  drivers/spi/spi-omap2-mcspi.c           |   11 +++++++++--
->  2 files changed, 11 insertions(+), 2 deletions(-)
+>  drivers/video/imxfb.c |   19 +++++++++++++------
+>  1 file changed, 13 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/plat-omap/include/plat/mcspi.h b/arch/arm/plat-omap/include/plat/mcspi.h
-> index a357eb2..0a6b790 100644
-> --- a/arch/arm/plat-omap/include/plat/mcspi.h
-> +++ b/arch/arm/plat-omap/include/plat/mcspi.h
-> @@ -18,6 +18,8 @@ struct omap2_mcspi_dev_attr {
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index f3363b2..6acf98a 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -134,6 +134,7 @@ struct imxfb_info {
+>  	struct clk		*clk_ipg;
+>  	struct clk		*clk_ahb;
+>  	struct clk		*clk_per;
+> +	int			enabled;
 >  
->  struct omap2_mcspi_device_config {
->  	unsigned turbo_mode:1;
-> +	/* 1 -> [D0 = MOSI, D1 = MISO], otherwise vice versa */
-> +	unsigned d0_is_output:1;
->  };
+>  	/*
+>  	 * These are the addresses we mapped
+> @@ -530,9 +531,12 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  	 */
+>  	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
 >  
->  #endif
+> -	clk_prepare_enable(fbi->clk_ipg);
+> -	clk_prepare_enable(fbi->clk_ahb);
+> -	clk_prepare_enable(fbi->clk_per);
+> +	if (!fbi->enabled) {
+> +		clk_prepare_enable(fbi->clk_ipg);
+> +		clk_prepare_enable(fbi->clk_ahb);
+> +		clk_prepare_enable(fbi->clk_per);
+> +		fbi->enabled = 1;
+> +	}
+>  
+>  	if (fbi->backlight_power)
+>  		fbi->backlight_power(1);
+> @@ -551,9 +555,12 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  
+>  	writel(0, fbi->regs + LCDC_RMCR);
+>  
+> -	clk_disable_unprepare(fbi->clk_per);
+> -	clk_disable_unprepare(fbi->clk_ipg);
+> -	clk_disable_unprepare(fbi->clk_ahb);
+> +	if (fbi->enabled) {
+> +		clk_disable_unprepare(fbi->clk_per);
+> +		clk_disable_unprepare(fbi->clk_ipg);
+> +		clk_disable_unprepare(fbi->clk_ahb);
+> +		fbi->enabled = 0;
+> +	}
 
-FYI, if this did not yet get applied, this header has now been
-moved to linux/platform_data/spi-omap2-mcspi.h. So you may want
-to updated it and repost.
+I think the complete functions should be protected, not only the clocks.
 
-Also, you should probably Cc spi-devel-general at lists.sourceforge.net.
+Sascha
 
-Regards,
-
-Tony
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
