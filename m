@@ -1,50 +1,50 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 08 Oct 2012 15:22:46 -0700
-Subject: [GIT PULL] ARM: OMAP: CPUfreq fixes for v3.7-rc
-Message-ID: <878vbg8uyx.fsf@deeprootsystems.com>
+Date: Mon, 08 Oct 2012 15:24:01 -0700
+Subject: [GIT PULL] ARM: OMAP: PM fixes for v3.7-rc
+Message-ID: <87391o8uwu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 16642a2e7be23bbda013fc32d8f6c68982eab603:
+Tony,
 
-  Merge tag 'pm-for-3.7-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm (2012-10-02 18:32:35 -0700)
+Please pull the following OMAP PM fixes for v3.7-rc.
+
+Thanks,
+
+Kevin
+
+
+
+The following changes since commit a0d271cbfed1dd50278c6b06bead3d00ba0a88f9:
+
+  Linux 3.6 (2012-09-30 16:47:46 -0700)
 
 are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-fixes-pm
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-fixes-cpufreq
+for you to fetch changes up to ce3810cdb4ca31238c87e095d2c494a5eaa4f65d:
 
-for you to fetch changes up to 24d7b40a60cf19008334bcbcbd98da374d4d9c64:
-
-  ARM: OMAP2+: PM: MPU DVFS: use generic CPU device for MPU-SS (2012-10-08 14:59:04 -0700)
-
-----------------------------------------------------------------
-This series a couple bug fixes and a couple fixes that make this
-driver support recently added OMAP-based SoCs.
-
-The 'get_cpu_device' patch is needed due to a change in the OMAP
-OMAP PM core code which enforces use of get_cpu_device() instead of
-a deprecated OMAP-specific API.
-
-The usage of plat/*.h headers breaks single zImage, so platforms are
-cleaning up and/or removing plat/*.h so the driver needs to be fixed
-accordingly.
-
-This series is based on the merge of Rafael's pm-for-3.7-rc1 tag into
-Linus' master branch: commit 16642a2e7be23bbda013fc32d8f6c68982eab603.
+  ARM: OMAP: SmartReflex: fix error path in init function (2012-10-02 14:55:31 -0700)
 
 ----------------------------------------------------------------
-Kevin Hilman (4):
-      cpufreq: OMAP: ensure valid clock rate before scaling
-      cpufreq: OMAP: remove unused <plat/omap-pm.h>
-      cpufreq: OMAP: use get_cpu_device() instead of omap_device API
-      ARM: OMAP2+: PM: MPU DVFS: use generic CPU device for MPU-SS
+OMAP PM related fixes for v3.7-rc
 
-Paul Walmsley (1):
-      cpufreq: OMAP: fix clock usage to be SoC independent, remove plat/ includes
+----------------------------------------------------------------
+Jean Pihet (2):
+      ARM: OMAP: SmartReflex: select CONFIG_POWER_SUPPLY in Kconfig
+      ARM: OMAP: SmartReflex: fix error path in init function
 
- arch/arm/mach-omap2/opp.c        |   23 +++++++++++++++++------
- arch/arm/mach-omap2/pm.c         |   11 ++++++++++-
- arch/arm/mach-omap2/twl-common.c |    2 +-
- drivers/cpufreq/omap-cpufreq.c   |   36 ++++++++++++------------------------
- 4 files changed, 40 insertions(+), 32 deletions(-)
+Wei Yongjun (4):
+      ARM: OMAP: fix return value check in beagle_opp_init()
+      ARM: OMAP: omap_device: fix return value check in omap_device_build_ss()
+      ARM: OMAP2+: SmartReflex: fix return value check in sr_dev_init()
+      ARM: OMAP2+: PM: fix return value check in omap2_set_init_voltage()
+
+ arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
+ arch/arm/mach-omap2/pm.c                |    2 +-
+ arch/arm/mach-omap2/sr_device.c         |    2 +-
+ arch/arm/plat-omap/Kconfig              |    1 +
+ arch/arm/plat-omap/omap_device.c        |    2 +-
+ drivers/power/avs/smartreflex.c         |    8 ++++----
+ 6 files changed, 9 insertions(+), 8 deletions(-)
