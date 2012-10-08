@@ -1,152 +1,186 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  8 Oct 2012 19:23:58 -0300
-Subject: [PATCH v2] video: imxfb: Do not crash on reboot
-Message-ID: <1349735038-19196-1-git-send-email-festevam@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 8 Oct 2012 17:24:15 -0500
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <alpine.DEB.2.00.1208010932270.21488@utopia.booyaka.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+ <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+ <50045D17.9050704@ti.com>
+ <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+ <50171841.40309@ti.com> <501760BF.8070801@ti.com> <5018210A.1040902@ti.com>
+ <50187644.40308@ti.com>
+ <alpine.DEB.2.00.1208010932270.21488@utopia.booyaka.com>
+Message-ID: <5073528F.2020902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Paul,
 
-Issuing a "reboot" command after the LCD times out causes the following
-warnings:
+On 08/01/2012 10:36 AM, Paul Walmsley wrote:
+> Hi Jon et al,
+> 
+> Here's what I'm planning to queue here.  The only changes from what Jon
+> posted are the patch changelog and some checkpatch fixes.  If anyone
+> has any final comments, please let me know.
+> 
+> 
+> - Paul
+> 
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Wed, 1 Aug 2012 09:11:20 -0600
+> Subject: [PATCH] ARM: OMAP2+: clockdomain/hwmod: add workaround for EMU
+>  clockdomain idle problems
 
-Requesting system reboot
-------------[ cut here ]------------
-WARNING: at drivers/clk/clk.c:471 clk_disable+0x24/0x50()
-Modules linked in:
-[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c03960a0>] (clk_disable+0x24/0x50)
-[<c03960a0>] (clk_disable+0x24/0x50) from [<c02695a0>] (imxfb_disable_controller+0x48/0x7c)
-[<c02695a0>] (imxfb_disable_controller+0x48/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace da6b502ca79c854f ]---
-------------[ cut here ]------------
-WARNING: at drivers/clk/clk.c:380 clk_unprepare+0x1c/0x2c()
-Modules linked in:
-[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c0396338>] (clk_unprepare+0x1c/0x2c)
-[<c0396338>] (clk_unprepare+0x1c/0x2c) from [<c02695a8>] (imxfb_disable_controller+0x50/0x7c)
-[<c02695a8>] (imxfb_disable_controller+0x50/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace da6b502ca79c8550 ]---
-------------[ cut here ]------------
+[snip]
 
-This happens because "reboot" triggers imxfb_shutdown(), which calls
-imxfb_disable_controller with the clocks already disabled.
+> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> index f99e65c..3f4b04b 100644
+> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> @@ -248,6 +248,17 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+>  	if (!clkdm->clktrctrl_mask)
+>  		return 0;
+>  
+> +	/*
+> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
+> +	 * more details on the unpleasant problem this is working
+> +	 * around
+> +	 */
+> +	if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
+> +	    (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
+> +		omap3_clkdm_wakeup(clkdm);
+> +		return 0;
+> +	}
+> +
+>  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+>  				clkdm->clktrctrl_mask);
+>  
+> @@ -271,6 +282,17 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+>  	if (!clkdm->clktrctrl_mask)
+>  		return 0;
+>  
+> +	/*
+> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
+> +	 * more details on the unpleasant problem this is working
+> +	 * around
+> +	 */
+> +	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
+> +	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
+> +		_enable_hwsup(clkdm);
+> +		return 0;
+> +	}
+> +
+>  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+>  				clkdm->clktrctrl_mask);
 
-To prevent this, add a clock enabled status so that we can check if the clocks
-are enabled before disabling them. 
+I was looking at what got merged and it appears that the above code was
+added to the omap2 clkdm enable/disable functions and not omap3. I believe
+that is a mistake? If so the below fixes this.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Cheers
+Jon
+
+>From 16db11f3373bc6e03254c4d1d92ee762f69cbacc Mon Sep 17 00:00:00 2001
+From: Jon Hunter <jon-hunter@ti.com>
+Date: Wed, 1 Aug 2012 09:36:13 -0600
+Subject: [PATCH] ARM: OMAP3: fix workaround for EMU clockdomain
+
+Commit b71c721 (ARM: OMAP2+: clockdomain/hwmod: add workaround for EMU
+clockdomain idle problems) added a workaround for the EMU clock domain on
+OMAP3/4 devices to prevent the clock domain for transitioning while it is
+in use.
+
+In the proposed patch [1] code was added to the omap3xxx_clkdm_clk_enable()
+and omap3xxx_clkdm_clk_disable() functions to check for the flag
+CLKDM_MISSING_IDLE_REPORTING and perform the appropriate action. However, in the
+merged patch it appears that this code was added to the omap2_clkdm_clk_enable()
+and omap2_clkdm_clk_disable() functions by mistake.
+
+[1] http://marc.info/?l=linux-arm-kernel&m=134383567112518&w=2
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
-Changes since v1:
-- Protect the whole function instead of only the clocks
- drivers/video/imxfb.c |   63 +++++++++++++++++++++++++++----------------------
- 1 file changed, 35 insertions(+), 28 deletions(-)
+ arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   44 ++++++++++++++--------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index cf2688d..32c71e5 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -134,6 +134,7 @@ struct imxfb_info {
- 	struct clk		*clk_ipg;
- 	struct clk		*clk_ahb;
- 	struct clk		*clk_per;
-+	int			enabled;
- 
- 	/*
- 	 * These are the addresses we mapped
-@@ -513,47 +514,53 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
- 
- static void imxfb_enable_controller(struct imxfb_info *fbi)
- {
--	pr_debug("Enabling LCD controller\n");
-+	if (!fbi->enabled) {
-+		pr_debug("Enabling LCD controller\n");
- 
--	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
-+		writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
- 
--	/* panning offset 0 (0 pixel offset)        */
--	writel(0x00000000, fbi->regs + LCDC_POS);
-+		/* panning offset 0 (0 pixel offset)        */
-+		writel(0x00000000, fbi->regs + LCDC_POS);
- 
--	/* disable hardware cursor */
--	writel(readl(fbi->regs + LCDC_CPOS) & ~(CPOS_CC0 | CPOS_CC1),
--		fbi->regs + LCDC_CPOS);
-+		/* disable hardware cursor */
-+		writel(readl(fbi->regs + LCDC_CPOS) & ~(CPOS_CC0 | CPOS_CC1),
-+						fbi->regs + LCDC_CPOS);
+diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+index 9a7792a..70294f5 100644
+--- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+@@ -183,17 +183,6 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
+ 	if (!clkdm->clktrctrl_mask)
+ 		return 0;
  
 -	/*
--	 * RMCR_LCDC_EN_MX1 is present on i.MX1 only, but doesn't hurt
--	 * on other SoCs
+-	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
+-	 * more details on the unpleasant problem this is working
+-	 * around
 -	 */
--	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
-+		/*
-+		 * RMCR_LCDC_EN_MX1 is present on i.MX1 only, but doesn't hurt
-+		 * on other SoCs
-+		 */
-+		writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+-	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
+-	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
+-		_enable_hwsup(clkdm);
+-		return 0;
+-	}
+-
+ 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 				clkdm->clktrctrl_mask);
  
--	clk_prepare_enable(fbi->clk_ipg);
--	clk_prepare_enable(fbi->clk_ahb);
--	clk_prepare_enable(fbi->clk_per);
-+		clk_prepare_enable(fbi->clk_ipg);
-+		clk_prepare_enable(fbi->clk_ahb);
-+		clk_prepare_enable(fbi->clk_per);
-+		fbi->enabled = 1;
+@@ -217,17 +206,6 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
+ 	if (!clkdm->clktrctrl_mask)
+ 		return 0;
  
--	if (fbi->backlight_power)
--		fbi->backlight_power(1);
--	if (fbi->lcd_power)
--		fbi->lcd_power(1);
-+		if (fbi->backlight_power)
-+			fbi->backlight_power(1);
-+		if (fbi->lcd_power)
-+			fbi->lcd_power(1);
+-	/*
+-	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
+-	 * more details on the unpleasant problem this is working
+-	 * around
+-	 */
+-	if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
+-	    (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
+-		omap3_clkdm_wakeup(clkdm);
+-		return 0;
+-	}
+-
+ 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 				clkdm->clktrctrl_mask);
+ 
+@@ -269,6 +247,17 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ 	if (!clkdm->clktrctrl_mask)
+ 		return 0;
+ 
++	/*
++	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
++	 * more details on the unpleasant problem this is working
++	 * around
++	 */
++	if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
++	    (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
++		omap3_clkdm_wakeup(clkdm);
++		return 0;
 +	}
- }
++
+ 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 				clkdm->clktrctrl_mask);
  
- static void imxfb_disable_controller(struct imxfb_info *fbi)
- {
--	pr_debug("Disabling LCD controller\n");
-+	if (fbi->enabled) {
-+		pr_debug("Disabling LCD controller\n");
+@@ -292,6 +281,17 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+ 	if (!clkdm->clktrctrl_mask)
+ 		return 0;
  
--	if (fbi->backlight_power)
--		fbi->backlight_power(0);
--	if (fbi->lcd_power)
--		fbi->lcd_power(0);
-+		if (fbi->backlight_power)
-+			fbi->backlight_power(0);
-+		if (fbi->lcd_power)
-+			fbi->lcd_power(0);
- 
--	clk_disable_unprepare(fbi->clk_per);
--	clk_disable_unprepare(fbi->clk_ipg);
--	clk_disable_unprepare(fbi->clk_ahb);
-+		clk_disable_unprepare(fbi->clk_per);
-+		clk_disable_unprepare(fbi->clk_ipg);
-+		clk_disable_unprepare(fbi->clk_ahb);
-+		fbi->enabled = 0;
- 
--	writel(0, fbi->regs + LCDC_RMCR);
-+		writel(0, fbi->regs + LCDC_RMCR);
++	/*
++	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
++	 * more details on the unpleasant problem this is working
++	 * around
++	 */
++	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
++	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
++		_enable_hwsup(clkdm);
++		return 0;
 +	}
- }
++
+ 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 				clkdm->clktrctrl_mask);
  
- static int imxfb_blank(int blank, struct fb_info *info)
 -- 
 1.7.9.5
