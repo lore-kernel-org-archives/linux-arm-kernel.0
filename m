@@ -1,57 +1,37 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 08 Oct 2012 09:54:31 +0200
-Subject: [PATCH v2 2/5] clk: exynos4: register clocks using common clock
- framework
-In-Reply-To: <1349629855-4962-3-git-send-email-thomas.abraham@linaro.org>
-References: <1349629855-4962-1-git-send-email-thomas.abraham@linaro.org>
- <1349629855-4962-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <3056568.RZOfOW29pM@amdc1227>
+From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
+Date: Mon, 08 Oct 2012 11:00:30 +0300
+Subject: [PATCH 0/9] ARM: dts/OMAP: Pinmux audio configuration for OMAP4+
+In-Reply-To: <20121005230354.GS3874@atomide.com>
+References: <1349351848-12972-1-git-send-email-peter.ujfalusi@ti.com>
+ <20121005230354.GS3874@atomide.com>
+Message-ID: <5072881E.2040009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-The whole series looks much better now. Although there is still one more 
-thing from my comments to previous version unresolved, see the inline 
-comment.
-
-On Monday 08 of October 2012 02:10:52 Thomas Abraham wrote:
-> For legacy Exynos4 platforms, the available clocks are statically
-> listed and then registered using the common clock framework. On device
-> tree enabled exynos platfotms, the device tree is searched and all
-> clock nodes found are registered. Support for Exynos4210 and
-> Exynos4x12 platforms is included.
+On 10/06/2012 02:03 AM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [121004 04:57]:
+>> Hello,
+>>
+>> u-boot recently stopped configuring 'non essential' pin mux. This change leaves
+>> the audio essential pins in non configured state which prevents the use of audio.
+>> The following series makes sure that the needed pins are configured correctly by
+>> the kernel on OMAP4 and OMAP5.
+>>
+>> Tony: can this series queued for 3.7?
 > 
-> Cc: Mike Turquette <mturquette@ti.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/clk/samsung/Makefile      |    1 +
->  drivers/clk/samsung/clk-exynos4.c |  647
-> +++++++++++++++++++++++++++++++++++++ 2 files changed, 648
-> insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/samsung/clk-exynos4.c
+> Let's see if that's possible to avoid mysterious bug reports
+> of things not working.
 > 
-[snip]
-> +			EXYNOS4_CLKSRC_MASK_CAM, 28, "sclk_csis"),
-> +	GATECLK(NULL, "sclk_cam0", "div_cam0", 0,
-> +			EXYNOS4_CLKSRC_MASK_CAM, 16, NULL),
-> +	GATECLK(NULL, "sclk_cam1", "div_cam1", 0,
-> +			EXYNOS4_CLKSRC_MASK_CAM, 20, NULL),
-> +	GATECLK("exynos4-fimc.0", "sclk_fimc", "div_fimc0", 0,
-> +			EXYNOS4_CLKSRC_MASK_CAM, 0, "sclk_fimc"),
-> +	GATECLK("exynos4-fimc.1", "sclk_fimc", "div_fimc1", 0,
-> +			EXYNOS4_CLKSRC_MASK_CAM, 4, "sclk_fimc"),
-> +	GATECLK("exynos4-fimc.2", "sclk_fimc", "div_fimc2", 0,
-> +			EXYNOS4_CLKSRC_MASK_CAM, 8, "sclk_fimc"),
-> +	GATECLK("exynos4-fimc.3", "sclk_fimc", "div_fimc3", 0,
-> +			EXYNOS4_CLKSRC_MASK_CAM, 12, "sclk_fimc"),
+> If we can't merge it, then it might be worth adding a warning
+> that bails out early after some pin is checked or similar.
 
-You cannot register more than one clock with the same platform name 
-(sclk_fimc). Shouldn't these names be appended with an index, just like 
-with div_fimc{0,1,2,3}?
+With new enough u-boot the twl6040 fails to probe (mux for nirq2 and power
+GPIO is not configured) which leads to no audio on OMAP4/5.
+Adding another warning - and check - does not going to help to clarify the
+situation IMHO.
+We can still enable the CONFIG_SYS_ENABLE_PADS_ALL in u-boot and recompile it,
+but this is disabled as default and to be frank there is no guaranty that this
+is going to be available let's say next week.
 
-Best regards,
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
+P?ter
