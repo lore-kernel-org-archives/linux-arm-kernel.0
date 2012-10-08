@@ -1,186 +1,145 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 8 Oct 2012 17:24:15 -0500
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <alpine.DEB.2.00.1208010932270.21488@utopia.booyaka.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com>
- <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
- <50045D17.9050704@ti.com>
- <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
- <50171841.40309@ti.com> <501760BF.8070801@ti.com> <5018210A.1040902@ti.com>
- <50187644.40308@ti.com>
- <alpine.DEB.2.00.1208010932270.21488@utopia.booyaka.com>
-Message-ID: <5073528F.2020902@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  8 Oct 2012 19:37:03 -0300
+Subject: [PATCH v2 2/2] [media]: mx2_camera: Fix regression caused by clock
+ conversion
+Message-ID: <1349735823-30315-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 08/01/2012 10:36 AM, Paul Walmsley wrote:
-> Hi Jon et al,
-> 
-> Here's what I'm planning to queue here.  The only changes from what Jon
-> posted are the patch changelog and some checkpatch fixes.  If anyone
-> has any final comments, please let me know.
-> 
-> 
-> - Paul
-> 
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Wed, 1 Aug 2012 09:11:20 -0600
-> Subject: [PATCH] ARM: OMAP2+: clockdomain/hwmod: add workaround for EMU
->  clockdomain idle problems
+Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
+to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
 
-[snip]
+By not doing so the camera sensor does not probe correctly:
 
-> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> index f99e65c..3f4b04b 100644
-> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-> @@ -248,6 +248,17 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
->  	if (!clkdm->clktrctrl_mask)
->  		return 0;
->  
-> +	/*
-> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-> +	 * more details on the unpleasant problem this is working
-> +	 * around
-> +	 */
-> +	if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
-> +	    (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
-> +		omap3_clkdm_wakeup(clkdm);
-> +		return 0;
-> +	}
-> +
->  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
->  				clkdm->clktrctrl_mask);
->  
-> @@ -271,6 +282,17 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
->  	if (!clkdm->clktrctrl_mask)
->  		return 0;
->  
-> +	/*
-> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-> +	 * more details on the unpleasant problem this is working
-> +	 * around
-> +	 */
-> +	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
-> +	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
-> +		_enable_hwsup(clkdm);
-> +		return 0;
-> +	}
-> +
->  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
->  				clkdm->clktrctrl_mask);
+soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+mx2-camera mx2-camera.0: Camera driver attached to camera 0
+ov2640 0-0030: Product ID error fb:fb
+mx2-camera mx2-camera.0: Camera driver detached from camera 0
+mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
 
-I was looking at what got merged and it appears that the above code was
-added to the omap2 clkdm enable/disable functions and not omap3. I believe
-that is a mistake? If so the below fixes this.
+Adapt the mx2_camera driver to the new clock framework and make it functional
+again.
 
-Cheers
-Jon
-
->From 16db11f3373bc6e03254c4d1d92ee762f69cbacc Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Wed, 1 Aug 2012 09:36:13 -0600
-Subject: [PATCH] ARM: OMAP3: fix workaround for EMU clockdomain
-
-Commit b71c721 (ARM: OMAP2+: clockdomain/hwmod: add workaround for EMU
-clockdomain idle problems) added a workaround for the EMU clock domain on
-OMAP3/4 devices to prevent the clock domain for transitioning while it is
-in use.
-
-In the proposed patch [1] code was added to the omap3xxx_clkdm_clk_enable()
-and omap3xxx_clkdm_clk_disable() functions to check for the flag
-CLKDM_MISSING_IDLE_REPORTING and perform the appropriate action. However, in the
-merged patch it appears that this code was added to the omap2_clkdm_clk_enable()
-and omap2_clkdm_clk_disable() functions by mistake.
-
-[1] http://marc.info/?l=linux-arm-kernel&m=134383567112518&w=2
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |   44 ++++++++++++++--------------
- 1 file changed, 22 insertions(+), 22 deletions(-)
+Changes since v1:
+- Rebased against linux-next 20121008.
 
-diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-index 9a7792a..70294f5 100644
---- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
-@@ -183,17 +183,6 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
- 	if (!clkdm->clktrctrl_mask)
- 		return 0;
+ drivers/media/platform/soc_camera/mx2_camera.c |   47 +++++++++++++++++-------
+ 1 file changed, 34 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
+index 403d7f1..9f8c5f0 100644
+--- a/drivers/media/platform/soc_camera/mx2_camera.c
++++ b/drivers/media/platform/soc_camera/mx2_camera.c
+@@ -272,7 +272,8 @@ struct mx2_camera_dev {
+ 	struct device		*dev;
+ 	struct soc_camera_host	soc_host;
+ 	struct soc_camera_device *icd;
+-	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
++	struct clk		*clk_emma_ahb, *clk_emma_ipg;
++	struct clk		*clk_csi_ahb, *clk_csi_per;
  
--	/*
--	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
--	 * more details on the unpleasant problem this is working
--	 * around
--	 */
--	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
--	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
--		_enable_hwsup(clkdm);
--		return 0;
--	}
--
- 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 				clkdm->clktrctrl_mask);
+ 	void __iomem		*base_csi, *base_emma;
  
-@@ -217,17 +206,6 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
- 	if (!clkdm->clktrctrl_mask)
- 		return 0;
+@@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+ {
+ 	unsigned long flags;
  
--	/*
--	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
--	 * more details on the unpleasant problem this is working
--	 * around
--	 */
--	if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
--	    (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
--		omap3_clkdm_wakeup(clkdm);
--		return 0;
--	}
--
- 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 				clkdm->clktrctrl_mask);
+-	clk_disable_unprepare(pcdev->clk_csi);
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
++	clk_disable_unprepare(pcdev->clk_csi_per);
+ 	writel(0, pcdev->base_csi + CSICR1);
+ 	if (cpu_is_mx27()) {
+ 		writel(0, pcdev->base_emma + PRP_CNTL);
+@@ -460,7 +462,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+ 	if (pcdev->icd)
+ 		return -EBUSY;
  
-@@ -269,6 +247,17 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
- 	if (!clkdm->clktrctrl_mask)
- 		return 0;
+-	ret = clk_prepare_enable(pcdev->clk_csi);
++	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
++	if (ret < 0)
++		return ret;
++
++	ret = clk_prepare_enable(pcdev->clk_csi_per);
+ 	if (ret < 0)
+ 		return ret;
  
-+	/*
-+	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-+	 * more details on the unpleasant problem this is working
-+	 * around
-+	 */
-+	if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
-+	    (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
-+		omap3_clkdm_wakeup(clkdm);
-+		return 0;
+@@ -1725,11 +1731,18 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+ 		goto exit;
+ 	}
+ 
+-	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
+-	if (IS_ERR(pcdev->clk_csi)) {
+-		dev_err(&pdev->dev, "Could not get csi clock\n");
+-		err = PTR_ERR(pcdev->clk_csi);
+-		goto exit;
++	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
++	if (IS_ERR(pcdev->clk_csi_ahb)) {
++		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
++		err = PTR_ERR(pcdev->clk_csi_ahb);
++		goto exit;
 +	}
 +
- 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 				clkdm->clktrctrl_mask);
++	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(pcdev->clk_csi_per)) {
++		dev_err(&pdev->dev, "Could not get csi per clock\n");
++		err = PTR_ERR(pcdev->clk_csi_per);
++		goto exit_csi_ahb;
+ 	}
  
-@@ -292,6 +281,17 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
- 	if (!clkdm->clktrctrl_mask)
- 		return 0;
+ 	pcdev->pdata = pdev->dev.platform_data;
+@@ -1738,14 +1751,15 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
  
-+	/*
-+	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
-+	 * more details on the unpleasant problem this is working
-+	 * around
-+	 */
-+	if (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING &&
-+	    !(clkdm->flags & CLKDM_CAN_FORCE_SLEEP)) {
-+		_enable_hwsup(clkdm);
-+		return 0;
-+	}
+ 		pcdev->platform_flags = pcdev->pdata->flags;
+ 
+-		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
++		rate = clk_round_rate(pcdev->clk_csi_per,
++						pcdev->pdata->clk * 2);
+ 		if (rate <= 0) {
+ 			err = -ENODEV;
+-			goto exit;
++			goto exit_csi_per;
+ 		}
+-		err = clk_set_rate(pcdev->clk_csi, rate);
++		err = clk_set_rate(pcdev->clk_csi_per, rate);
+ 		if (err < 0)
+-			goto exit;
++			goto exit_csi_per;
+ 	}
+ 
+ 	INIT_LIST_HEAD(&pcdev->capture);
+@@ -1801,7 +1815,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+ 		goto exit_free_emma;
+ 
+ 	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
+-			clk_get_rate(pcdev->clk_csi));
++			clk_get_rate(pcdev->clk_csi_per));
+ 
+ 	return 0;
+ 
+@@ -1812,6 +1826,10 @@ eallocctx:
+ 		clk_disable_unprepare(pcdev->clk_emma_ipg);
+ 		clk_disable_unprepare(pcdev->clk_emma_ahb);
+ 	}
++exit_csi_per:
++	clk_disable_unprepare(pcdev->clk_csi_per);
++exit_csi_ahb:
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
+ exit:
+ 	return err;
+ }
+@@ -1831,6 +1849,9 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
+ 		clk_disable_unprepare(pcdev->clk_emma_ahb);
+ 	}
+ 
++	clk_disable_unprepare(pcdev->clk_csi_per);
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
 +
- 	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 				clkdm->clktrctrl_mask);
+ 	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
  
+ 	return 0;
 -- 
 1.7.9.5
