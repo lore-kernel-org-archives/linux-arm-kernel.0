@@ -1,337 +1,319 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 08 Oct 2012 10:39:09 +0200
-Subject: [PATCH 09/16] pinctrl: exynos: Use one IRQ domain per pin bank
+Date: Mon, 08 Oct 2012 10:39:05 +0200
+Subject: [PATCH 05/16] pinctrl: exynos: Remove static SoC-specific data
 In-Reply-To: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
 References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1349685556-23718-10-git-send-email-t.figa@samsung.com>
+Message-ID: <1349685556-23718-6-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of registering one IRQ domain for all pin banks of a pin
-controller, this patch implements registration of per-bank domains.
+The patch "pinctrl: samsung: Parse pin banks from DT" introduced parsing
+SoC-specific data from device tree, so there is no need to keep the
+previously used definitions in headers and source files.
 
-At a cost of a little memory overhead (~2.5KiB for all GPIO interrupts
-of Exynos4x12) it simplifies driver code and device tree sources,
-because GPIO interrupts can be now specified per banks.
-
-Example:
-	device {
-		/* ... */
-		interrupt-parent = <&gpa1>;
-		interrupts = <3 0>;
-		/* ... */
-	};
+This patch cleans up the pinctrl-exynos driver from unused
+SoC-specific data.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/pinctrl/pinctrl-exynos.c  | 117 +++++++++++---------------------------
- drivers/pinctrl/pinctrl-exynos.h  |  12 ----
- drivers/pinctrl/pinctrl-samsung.c |   5 +-
- drivers/pinctrl/pinctrl-samsung.h |   7 +--
- 4 files changed, 36 insertions(+), 105 deletions(-)
+ drivers/pinctrl/pinctrl-exynos.c  |  96 -----------------------
+ drivers/pinctrl/pinctrl-exynos.h  | 157 --------------------------------------
+ drivers/pinctrl/pinctrl-samsung.h |   1 -
+ 3 files changed, 254 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 340bfc2..53ed5d9 100644
+index e3fa263..134fecf 100644
 --- a/drivers/pinctrl/pinctrl-exynos.c
 +++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -40,46 +40,46 @@ static const struct of_device_id exynos_wkup_irq_ids[] = {
- 
- static void exynos_gpio_irq_unmask(struct irq_data *irqd)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	unsigned long reg_mask = d->ctrl->geint_mask + edata->eint_offset;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = bank->drvdata;
-+	unsigned long reg_mask = d->ctrl->geint_mask + bank->eint_offset;
- 	unsigned long mask;
- 
- 	mask = readl(d->virt_base + reg_mask);
--	mask &= ~(1 << edata->pin);
-+	mask &= ~(1 << irqd->hwirq);
- 	writel(mask, d->virt_base + reg_mask);
- }
- 
- static void exynos_gpio_irq_mask(struct irq_data *irqd)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	unsigned long reg_mask = d->ctrl->geint_mask + edata->eint_offset;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = bank->drvdata;
-+	unsigned long reg_mask = d->ctrl->geint_mask + bank->eint_offset;
- 	unsigned long mask;
- 
- 	mask = readl(d->virt_base + reg_mask);
--	mask |= 1 << edata->pin;
-+	mask |= 1 << irqd->hwirq;
- 	writel(mask, d->virt_base + reg_mask);
- }
- 
- static void exynos_gpio_irq_ack(struct irq_data *irqd)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	unsigned long reg_pend = d->ctrl->geint_pend + edata->eint_offset;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = bank->drvdata;
-+	unsigned long reg_pend = d->ctrl->geint_pend + bank->eint_offset;
- 
--	writel(1 << edata->pin, d->virt_base + reg_pend);
-+	writel(1 << irqd->hwirq, d->virt_base + reg_pend);
- }
- 
- static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- {
--	struct samsung_pinctrl_drv_data *d = irqd->domain->host_data;
-+	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = bank->drvdata;
- 	struct samsung_pin_ctrl *ctrl = d->ctrl;
--	struct exynos_geint_data *edata = irq_data_get_irq_handler_data(irqd);
--	struct samsung_pin_bank *bank = edata->bank;
--	unsigned int shift = EXYNOS_EINT_CON_LEN * edata->pin;
-+	unsigned int pin = irqd->hwirq;
-+	unsigned int shift = EXYNOS_EINT_CON_LEN * pin;
- 	unsigned int con, trig_type;
--	unsigned long reg_con = ctrl->geint_con + edata->eint_offset;
-+	unsigned long reg_con = ctrl->geint_con + bank->eint_offset;
- 	unsigned int mask;
- 
- 	switch (type) {
-@@ -114,7 +114,7 @@ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	writel(con, d->virt_base + reg_con);
- 
- 	reg_con = bank->pctl_offset;
--	shift = edata->pin * bank->func_width;
-+	shift = pin * bank->func_width;
- 	mask = (1 << bank->func_width) - 1;
- 
- 	con = readl(d->virt_base + reg_con);
-@@ -136,81 +136,23 @@ static struct irq_chip exynos_gpio_irq_chip = {
- 	.irq_set_type	= exynos_gpio_irq_set_type,
- };
- 
--/*
-- * given a controller-local external gpio interrupt number, prepare the handler
-- * data for it.
-- */
--static struct exynos_geint_data *exynos_get_eint_data(irq_hw_number_t hw,
--				struct samsung_pinctrl_drv_data *d)
--{
--	struct samsung_pin_bank *bank = d->ctrl->pin_banks;
--	struct exynos_geint_data *eint_data;
--	unsigned int nr_banks = d->ctrl->nr_banks, idx;
--	unsigned int irq_base = 0;
--
--	if (hw >= d->ctrl->nr_gint) {
--		dev_err(d->dev, "unsupported ext-gpio interrupt\n");
--		return NULL;
--	}
--
--	for (idx = 0; idx < nr_banks; idx++, bank++) {
--		if (bank->eint_type != EINT_TYPE_GPIO)
--			continue;
--		if ((hw >= irq_base) && (hw < (irq_base + bank->nr_pins)))
--			break;
--		irq_base += bank->nr_pins;
--	}
--
--	if (idx == nr_banks) {
--		dev_err(d->dev, "pin bank not found for ext-gpio interrupt\n");
--		return NULL;
--	}
--
--	eint_data = devm_kzalloc(d->dev, sizeof(*eint_data), GFP_KERNEL);
--	if (!eint_data) {
--		dev_err(d->dev, "no memory for eint-gpio data\n");
--		return NULL;
--	}
--
--	eint_data->bank	= bank;
--	eint_data->pin = hw - irq_base;
--	eint_data->eint_offset = bank->eint_offset;
--	return eint_data;
--}
--
- static int exynos_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 					irq_hw_number_t hw)
- {
--	struct samsung_pinctrl_drv_data *d = h->host_data;
--	struct exynos_geint_data *eint_data;
--
--	eint_data = exynos_get_eint_data(hw, d);
--	if (!eint_data)
--		return -EINVAL;
-+	struct samsung_pin_bank *b = h->host_data;
- 
--	irq_set_handler_data(virq, eint_data);
--	irq_set_chip_data(virq, h->host_data);
-+	irq_set_chip_data(virq, b);
- 	irq_set_chip_and_handler(virq, &exynos_gpio_irq_chip,
- 					handle_level_irq);
- 	set_irq_flags(virq, IRQF_VALID);
+@@ -504,102 +504,6 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
  	return 0;
  }
  
--static void exynos_gpio_irq_unmap(struct irq_domain *h, unsigned int virq)
--{
--	struct samsung_pinctrl_drv_data *d = h->host_data;
--	struct exynos_geint_data *eint_data;
--
--	eint_data = irq_get_handler_data(virq);
--	devm_kfree(d->dev, eint_data);
--}
--
- /*
-  * irq domain callbacks for external gpio interrupt controller.
-  */
- static const struct irq_domain_ops exynos_gpio_irqd_ops = {
- 	.map	= exynos_gpio_irq_map,
--	.unmap	= exynos_gpio_irq_unmap,
- 	.xlate	= irq_domain_xlate_twocell,
- };
- 
-@@ -229,7 +171,7 @@ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
- 		return IRQ_HANDLED;
- 	bank += (group - 1);
- 
--	virq = irq_linear_revmap(d->gpio_irqd, bank->irq_base + pin);
-+	virq = irq_linear_revmap(bank->irq_domain, pin);
- 	if (!virq)
- 		return IRQ_NONE;
- 	generic_handle_irq(virq);
-@@ -242,8 +184,10 @@ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
-  */
- static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
- {
-+	struct samsung_pin_bank *bank;
- 	struct device *dev = d->dev;
- 	unsigned int ret;
-+	unsigned int i;
- 
- 	if (!d->irq) {
- 		dev_err(dev, "irq number not available\n");
-@@ -257,11 +201,16 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
- 		return -ENXIO;
- 	}
- 
--	d->gpio_irqd = irq_domain_add_linear(dev->of_node, d->ctrl->nr_gint,
--				&exynos_gpio_irqd_ops, d);
--	if (!d->gpio_irqd) {
--		dev_err(dev, "gpio irq domain allocation failed\n");
--		return -ENXIO;
-+	bank = d->ctrl->pin_banks;
-+	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
-+		if (bank->eint_type != EINT_TYPE_GPIO)
-+			continue;
-+		bank->irq_domain = irq_domain_add_linear(bank->of_node,
-+				bank->nr_pins, &exynos_gpio_irqd_ops, bank);
-+		if (!bank->irq_domain) {
-+			dev_err(dev, "gpio irq domain add failed\n");
-+			return -ENXIO;
-+		}
- 	}
- 
- 	return 0;
-diff --git a/drivers/pinctrl/pinctrl-exynos.h b/drivers/pinctrl/pinctrl-exynos.h
-index a72cfc7..30aca2b 100644
---- a/drivers/pinctrl/pinctrl-exynos.h
-+++ b/drivers/pinctrl/pinctrl-exynos.h
-@@ -38,18 +38,6 @@
- #define EXYNOS_EINT_MAX_PER_BANK	8
- 
- /**
-- * struct exynos_geint_data: gpio eint specific data for irq_chip callbacks.
-- * @bank: pin bank from which this gpio interrupt originates.
-- * @pin: pin number within the bank.
-- * @eint_offset: offset to be added to the con/pend/mask register bank base.
-- */
--struct exynos_geint_data {
--	struct samsung_pin_bank	*bank;
--	u32			pin;
--	u32			eint_offset;
+-/* pin banks of exynos4210 pin-controller 0 */
+-static struct samsung_pin_bank exynos4210_pin_banks0[] = {
+-	EXYNOS_PIN_BANK_EINTG(0x000, EXYNOS4210_GPIO_A0, "gpa0"),
+-	EXYNOS_PIN_BANK_EINTG(0x020, EXYNOS4210_GPIO_A1, "gpa1"),
+-	EXYNOS_PIN_BANK_EINTG(0x040, EXYNOS4210_GPIO_B, "gpb"),
+-	EXYNOS_PIN_BANK_EINTG(0x060, EXYNOS4210_GPIO_C0, "gpc0"),
+-	EXYNOS_PIN_BANK_EINTG(0x080, EXYNOS4210_GPIO_C1, "gpc1"),
+-	EXYNOS_PIN_BANK_EINTG(0x0A0, EXYNOS4210_GPIO_D0, "gpd0"),
+-	EXYNOS_PIN_BANK_EINTG(0x0C0, EXYNOS4210_GPIO_D1, "gpd1"),
+-	EXYNOS_PIN_BANK_EINTG(0x0E0, EXYNOS4210_GPIO_E0, "gpe0"),
+-	EXYNOS_PIN_BANK_EINTG(0x100, EXYNOS4210_GPIO_E1, "gpe1"),
+-	EXYNOS_PIN_BANK_EINTG(0x120, EXYNOS4210_GPIO_E2, "gpe2"),
+-	EXYNOS_PIN_BANK_EINTG(0x140, EXYNOS4210_GPIO_E3, "gpe3"),
+-	EXYNOS_PIN_BANK_EINTG(0x160, EXYNOS4210_GPIO_E4, "gpe4"),
+-	EXYNOS_PIN_BANK_EINTG(0x180, EXYNOS4210_GPIO_F0, "gpf0"),
+-	EXYNOS_PIN_BANK_EINTG(0x1A0, EXYNOS4210_GPIO_F1, "gpf1"),
+-	EXYNOS_PIN_BANK_EINTG(0x1C0, EXYNOS4210_GPIO_F2, "gpf2"),
+-	EXYNOS_PIN_BANK_EINTG(0x1E0, EXYNOS4210_GPIO_F3, "gpf3"),
 -};
 -
--/**
-  * struct exynos_weint_data: irq specific data for all the wakeup interrupts
-  * generated by the external wakeup interrupt controller.
-  * @domain: irq domain representing the external wakeup interrupts
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 63c76ec..6ae82d5 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -926,10 +926,8 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
- 		b->drvdata = d;
- 		b->pin_base = ctrl->nr_pins;
- 		ctrl->nr_pins += b->nr_pins;
--		if (b->eint_type == EINT_TYPE_GPIO) {
--			b->irq_base = eint_cnt;
-+		if (b->eint_type == EINT_TYPE_GPIO)
- 			eint_cnt += b->nr_pins;
--		}
- 		++b;
- 	}
- 
-@@ -959,7 +957,6 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
- 
- 	ctrl->pin_banks = banks;
- 	ctrl->nr_banks = bank_cnt;
--	ctrl->nr_gint = eint_cnt;
- 	ctrl->label = node->name;
- 	ctrl->eint_wkup_init = variant->eint_wkup_init;
- 	ctrl->base = pin_base;
-diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index 9e30081..470e11b 100644
---- a/drivers/pinctrl/pinctrl-samsung.h
-+++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -109,10 +109,10 @@ struct samsung_pinctrl_drv_data;
-  * @conpdn_width: width of the sleep mode function selector bin field.
-  * @pudpdn_width: width of the sleep mode pull up/down selector bit field.
-  * @eint_type: type of the external interrupt supported by the bank.
-- * @irq_base: starting controller local irq number of the bank.
-  * @name: name to be prefixed for each pin in this pin bank.
-  * @of_node: node of pin bank in device tree
-  * @drvdata: link to controller driver data
-+ * @irq_domain: IRQ domain of the bank.
+-/* pin banks of exynos4210 pin-controller 1 */
+-static struct samsung_pin_bank exynos4210_pin_banks1[] = {
+-	EXYNOS_PIN_BANK_EINTG(0x000, EXYNOS4210_GPIO_J0, "gpj0"),
+-	EXYNOS_PIN_BANK_EINTG(0x020, EXYNOS4210_GPIO_J1, "gpj1"),
+-	EXYNOS_PIN_BANK_EINTG(0x040, EXYNOS4210_GPIO_K0, "gpk0"),
+-	EXYNOS_PIN_BANK_EINTG(0x060, EXYNOS4210_GPIO_K1, "gpk1"),
+-	EXYNOS_PIN_BANK_EINTG(0x080, EXYNOS4210_GPIO_K2, "gpk2"),
+-	EXYNOS_PIN_BANK_EINTG(0x0A0, EXYNOS4210_GPIO_K3, "gpk3"),
+-	EXYNOS_PIN_BANK_EINTG(0x0C0, EXYNOS4210_GPIO_L0, "gpl0"),
+-	EXYNOS_PIN_BANK_EINTG(0x0E0, EXYNOS4210_GPIO_L1, "gpl1"),
+-	EXYNOS_PIN_BANK_EINTG(0x100, EXYNOS4210_GPIO_L2, "gpl2"),
+-	EXYNOS_PIN_BANK_EINTN(0x120, EXYNOS4210_GPIO_Y0, "gpy0"),
+-	EXYNOS_PIN_BANK_EINTN(0x140, EXYNOS4210_GPIO_Y1, "gpy1"),
+-	EXYNOS_PIN_BANK_EINTN(0x160, EXYNOS4210_GPIO_Y2, "gpy2"),
+-	EXYNOS_PIN_BANK_EINTN(0x180, EXYNOS4210_GPIO_Y3, "gpy3"),
+-	EXYNOS_PIN_BANK_EINTN(0x1A0, EXYNOS4210_GPIO_Y4, "gpy4"),
+-	EXYNOS_PIN_BANK_EINTN(0x1C0, EXYNOS4210_GPIO_Y5, "gpy5"),
+-	EXYNOS_PIN_BANK_EINTN(0x1E0, EXYNOS4210_GPIO_Y6, "gpy6"),
+-	EXYNOS_PIN_BANK_EINTN(0xC00, EXYNOS4210_GPIO_X0, "gpx0"),
+-	EXYNOS_PIN_BANK_EINTN(0xC20, EXYNOS4210_GPIO_X1, "gpx1"),
+-	EXYNOS_PIN_BANK_EINTN(0xC40, EXYNOS4210_GPIO_X2, "gpx2"),
+-	EXYNOS_PIN_BANK_EINTN(0xC60, EXYNOS4210_GPIO_X3, "gpx3"),
+-};
+-
+-/* pin banks of exynos4210 pin-controller 2 */
+-static struct samsung_pin_bank exynos4210_pin_banks2[] = {
+-	EXYNOS_PIN_BANK_EINTN(0x000, EXYNOS4210_GPIO_Z, "gpz"),
+-};
+-
+-/*
+- * Samsung pinctrl driver data for Exynos4210 SoC. Exynos4210 SoC includes
+- * three gpio/pin-mux/pinconfig controllers.
+- */
+-struct samsung_pin_ctrl exynos4210_pin_ctrl[] = {
+-	{
+-		/* pin-controller instance 0 data */
+-		.pin_banks	= exynos4210_pin_banks0,
+-		.nr_banks	= ARRAY_SIZE(exynos4210_pin_banks0),
+-		.base		= EXYNOS4210_GPIO_A0_START,
+-		.nr_pins	= EXYNOS4210_GPIOA_NR_PINS,
+-		.nr_gint	= EXYNOS4210_GPIOA_NR_GINT,
+-		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
+-		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
+-		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+-		.svc		= EXYNOS_SVC_OFFSET,
+-		.eint_gpio_init = exynos_eint_gpio_init,
+-		.label		= "exynos4210-gpio-ctrl0",
+-	}, {
+-		/* pin-controller instance 1 data */
+-		.pin_banks	= exynos4210_pin_banks1,
+-		.nr_banks	= ARRAY_SIZE(exynos4210_pin_banks1),
+-		.base		= EXYNOS4210_GPIOA_NR_PINS,
+-		.nr_pins	= EXYNOS4210_GPIOB_NR_PINS,
+-		.nr_gint	= EXYNOS4210_GPIOB_NR_GINT,
+-		.nr_wint	= 32,
+-		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
+-		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
+-		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+-		.weint_con	= EXYNOS_WKUP_ECON_OFFSET,
+-		.weint_mask	= EXYNOS_WKUP_EMASK_OFFSET,
+-		.weint_pend	= EXYNOS_WKUP_EPEND_OFFSET,
+-		.svc		= EXYNOS_SVC_OFFSET,
+-		.eint_gpio_init = exynos_eint_gpio_init,
+-		.eint_wkup_init = exynos_eint_wkup_init,
+-		.label		= "exynos4210-gpio-ctrl1",
+-	}, {
+-		/* pin-controller instance 2 data */
+-		.pin_banks	= exynos4210_pin_banks2,
+-		.nr_banks	= ARRAY_SIZE(exynos4210_pin_banks2),
+-		.base		= EXYNOS4210_GPIOA_NR_PINS +
+-					EXYNOS4210_GPIOB_NR_PINS,
+-		.nr_pins	= EXYNOS4210_GPIOC_NR_PINS,
+-		.label		= "exynos4210-gpio-ctrl2",
+-	},
+-};
+-
+ struct samsung_pin_ctrl_variant exynos4_pin_ctrl = {
+ 	.eint_gpio_init = exynos_eint_gpio_init,
+ 	.eint_wkup_init = exynos_eint_wkup_init,
+diff --git a/drivers/pinctrl/pinctrl-exynos.h b/drivers/pinctrl/pinctrl-exynos.h
+index 31d0a06..a72cfc7 100644
+--- a/drivers/pinctrl/pinctrl-exynos.h
++++ b/drivers/pinctrl/pinctrl-exynos.h
+@@ -17,133 +17,6 @@
+  * (at your option) any later version.
   */
- struct samsung_pin_bank {
- 	u32		pctl_offset;
-@@ -125,11 +125,11 @@ struct samsung_pin_bank {
- 	u8		pudpdn_width;
- 	enum eint_type	eint_type;
- 	u32		eint_offset;
--	u32		irq_base;
- 	const char	*name;
  
- 	struct device_node *of_node;
- 	struct samsung_pinctrl_drv_data *drvdata;
-+	struct irq_domain *irq_domain;
- };
+-#define EXYNOS_GPIO_START(__gpio)	((__gpio##_START) + (__gpio##_NR))
+-
+-#define EXYNOS4210_GPIO_A0_NR	(8)
+-#define EXYNOS4210_GPIO_A1_NR	(6)
+-#define EXYNOS4210_GPIO_B_NR	(8)
+-#define EXYNOS4210_GPIO_C0_NR	(5)
+-#define EXYNOS4210_GPIO_C1_NR	(5)
+-#define EXYNOS4210_GPIO_D0_NR	(4)
+-#define EXYNOS4210_GPIO_D1_NR	(4)
+-#define EXYNOS4210_GPIO_E0_NR	(5)
+-#define EXYNOS4210_GPIO_E1_NR	(8)
+-#define EXYNOS4210_GPIO_E2_NR	(6)
+-#define EXYNOS4210_GPIO_E3_NR	(8)
+-#define EXYNOS4210_GPIO_E4_NR	(8)
+-#define EXYNOS4210_GPIO_F0_NR	(8)
+-#define EXYNOS4210_GPIO_F1_NR	(8)
+-#define EXYNOS4210_GPIO_F2_NR	(8)
+-#define EXYNOS4210_GPIO_F3_NR	(6)
+-#define EXYNOS4210_GPIO_J0_NR	(8)
+-#define EXYNOS4210_GPIO_J1_NR	(5)
+-#define EXYNOS4210_GPIO_K0_NR	(7)
+-#define EXYNOS4210_GPIO_K1_NR	(7)
+-#define EXYNOS4210_GPIO_K2_NR	(7)
+-#define EXYNOS4210_GPIO_K3_NR	(7)
+-#define EXYNOS4210_GPIO_L0_NR	(8)
+-#define EXYNOS4210_GPIO_L1_NR	(3)
+-#define EXYNOS4210_GPIO_L2_NR	(8)
+-#define EXYNOS4210_GPIO_Y0_NR	(6)
+-#define EXYNOS4210_GPIO_Y1_NR	(4)
+-#define EXYNOS4210_GPIO_Y2_NR	(6)
+-#define EXYNOS4210_GPIO_Y3_NR	(8)
+-#define EXYNOS4210_GPIO_Y4_NR	(8)
+-#define EXYNOS4210_GPIO_Y5_NR	(8)
+-#define EXYNOS4210_GPIO_Y6_NR	(8)
+-#define EXYNOS4210_GPIO_X0_NR	(8)
+-#define EXYNOS4210_GPIO_X1_NR	(8)
+-#define EXYNOS4210_GPIO_X2_NR	(8)
+-#define EXYNOS4210_GPIO_X3_NR	(8)
+-#define EXYNOS4210_GPIO_Z_NR	(7)
+-
+-enum exynos4210_gpio_xa_start {
+-	EXYNOS4210_GPIO_A0_START	= 0,
+-	EXYNOS4210_GPIO_A1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_A0),
+-	EXYNOS4210_GPIO_B_START		= EXYNOS_GPIO_START(EXYNOS4210_GPIO_A1),
+-	EXYNOS4210_GPIO_C0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_B),
+-	EXYNOS4210_GPIO_C1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_C0),
+-	EXYNOS4210_GPIO_D0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_C1),
+-	EXYNOS4210_GPIO_D1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_D0),
+-	EXYNOS4210_GPIO_E0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_D1),
+-	EXYNOS4210_GPIO_E1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E0),
+-	EXYNOS4210_GPIO_E2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E1),
+-	EXYNOS4210_GPIO_E3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E2),
+-	EXYNOS4210_GPIO_E4_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E3),
+-	EXYNOS4210_GPIO_F0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E4),
+-	EXYNOS4210_GPIO_F1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_F0),
+-	EXYNOS4210_GPIO_F2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_F1),
+-	EXYNOS4210_GPIO_F3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_F2),
+-};
+-
+-enum exynos4210_gpio_xb_start {
+-	EXYNOS4210_GPIO_J0_START	= 0,
+-	EXYNOS4210_GPIO_J1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_J0),
+-	EXYNOS4210_GPIO_K0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_J1),
+-	EXYNOS4210_GPIO_K1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K0),
+-	EXYNOS4210_GPIO_K2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K1),
+-	EXYNOS4210_GPIO_K3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K2),
+-	EXYNOS4210_GPIO_L0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K3),
+-	EXYNOS4210_GPIO_L1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_L0),
+-	EXYNOS4210_GPIO_L2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_L1),
+-	EXYNOS4210_GPIO_Y0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_L2),
+-	EXYNOS4210_GPIO_Y1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y0),
+-	EXYNOS4210_GPIO_Y2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y1),
+-	EXYNOS4210_GPIO_Y3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y2),
+-	EXYNOS4210_GPIO_Y4_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y3),
+-	EXYNOS4210_GPIO_Y5_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y4),
+-	EXYNOS4210_GPIO_Y6_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y5),
+-	EXYNOS4210_GPIO_X0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y6),
+-	EXYNOS4210_GPIO_X1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_X0),
+-	EXYNOS4210_GPIO_X2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_X1),
+-	EXYNOS4210_GPIO_X3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_X2),
+-};
+-
+-enum exynos4210_gpio_xc_start {
+-	EXYNOS4210_GPIO_Z_START		= 0,
+-};
+-
+-#define	EXYNOS4210_GPIO_A0_IRQ		EXYNOS4210_GPIO_A0_START
+-#define	EXYNOS4210_GPIO_A1_IRQ		EXYNOS4210_GPIO_A1_START
+-#define	EXYNOS4210_GPIO_B_IRQ		EXYNOS4210_GPIO_B_START
+-#define	EXYNOS4210_GPIO_C0_IRQ		EXYNOS4210_GPIO_C0_START
+-#define	EXYNOS4210_GPIO_C1_IRQ		EXYNOS4210_GPIO_C1_START
+-#define	EXYNOS4210_GPIO_D0_IRQ		EXYNOS4210_GPIO_D0_START
+-#define	EXYNOS4210_GPIO_D1_IRQ		EXYNOS4210_GPIO_D1_START
+-#define	EXYNOS4210_GPIO_E0_IRQ		EXYNOS4210_GPIO_E0_START
+-#define	EXYNOS4210_GPIO_E1_IRQ		EXYNOS4210_GPIO_E1_START
+-#define	EXYNOS4210_GPIO_E2_IRQ		EXYNOS4210_GPIO_E2_START
+-#define	EXYNOS4210_GPIO_E3_IRQ		EXYNOS4210_GPIO_E3_START
+-#define	EXYNOS4210_GPIO_E4_IRQ		EXYNOS4210_GPIO_E4_START
+-#define	EXYNOS4210_GPIO_F0_IRQ		EXYNOS4210_GPIO_F0_START
+-#define	EXYNOS4210_GPIO_F1_IRQ		EXYNOS4210_GPIO_F1_START
+-#define	EXYNOS4210_GPIO_F2_IRQ		EXYNOS4210_GPIO_F2_START
+-#define	EXYNOS4210_GPIO_F3_IRQ		EXYNOS4210_GPIO_F3_START
+-#define	EXYNOS4210_GPIO_J0_IRQ		EXYNOS4210_GPIO_J0_START
+-#define	EXYNOS4210_GPIO_J1_IRQ		EXYNOS4210_GPIO_J1_START
+-#define	EXYNOS4210_GPIO_K0_IRQ		EXYNOS4210_GPIO_K0_START
+-#define	EXYNOS4210_GPIO_K1_IRQ		EXYNOS4210_GPIO_K1_START
+-#define	EXYNOS4210_GPIO_K2_IRQ		EXYNOS4210_GPIO_K2_START
+-#define	EXYNOS4210_GPIO_K3_IRQ		EXYNOS4210_GPIO_K3_START
+-#define	EXYNOS4210_GPIO_L0_IRQ		EXYNOS4210_GPIO_L0_START
+-#define	EXYNOS4210_GPIO_L1_IRQ		EXYNOS4210_GPIO_L1_START
+-#define	EXYNOS4210_GPIO_L2_IRQ		EXYNOS4210_GPIO_L2_START
+-#define	EXYNOS4210_GPIO_Z_IRQ		EXYNOS4210_GPIO_Z_START
+-
+-#define EXYNOS4210_GPIOA_NR_PINS	EXYNOS_GPIO_START(EXYNOS4210_GPIO_F3)
+-#define EXYNOS4210_GPIOA_NR_GINT	EXYNOS_GPIO_START(EXYNOS4210_GPIO_F3)
+-#define EXYNOS4210_GPIOB_NR_PINS	EXYNOS_GPIO_START(EXYNOS4210_GPIO_X3)
+-#define EXYNOS4210_GPIOB_NR_GINT	EXYNOS_GPIO_START(EXYNOS4210_GPIO_L2)
+-#define EXYNOS4210_GPIOC_NR_PINS	EXYNOS_GPIO_START(EXYNOS4210_GPIO_Z)
+-
+-/* External GPIO and wakeup interrupt related definitions */
+-#define EXYNOS_GPIO_ECON_OFFSET		0x700
+-#define EXYNOS_GPIO_EMASK_OFFSET	0x900
+-#define EXYNOS_GPIO_EPEND_OFFSET	0xA00
+-#define EXYNOS_WKUP_ECON_OFFSET		0xE00
+-#define EXYNOS_WKUP_EMASK_OFFSET	0xF00
+-#define EXYNOS_WKUP_EPEND_OFFSET	0xF40
+-#define EXYNOS_SVC_OFFSET		0xB08
+ #define EXYNOS_EINT_FUNC		0xF
+ 
+ /* helpers to access interrupt service register */
+@@ -163,36 +36,6 @@ enum exynos4210_gpio_xc_start {
+ #define EXYNOS_EINT_CON_LEN		4
+ 
+ #define EXYNOS_EINT_MAX_PER_BANK	8
+-#define EXYNOS_EINT_NR_WKUP_EINT
+-
+-#define EXYNOS_PIN_BANK_EINTN(reg, __gpio, id)		\
+-	{						\
+-		.pctl_offset	= reg,			\
+-		.pin_base	= (__gpio##_START),	\
+-		.nr_pins	= (__gpio##_NR),	\
+-		.func_width	= 4,			\
+-		.pud_width	= 2,			\
+-		.drv_width	= 2,			\
+-		.conpdn_width	= 2,			\
+-		.pudpdn_width	= 2,			\
+-		.eint_type	= EINT_TYPE_NONE,	\
+-		.name		= id			\
+-	}
+-
+-#define EXYNOS_PIN_BANK_EINTG(reg, __gpio, id)		\
+-	{						\
+-		.pctl_offset	= reg,			\
+-		.pin_base	= (__gpio##_START),	\
+-		.nr_pins	= (__gpio##_NR),	\
+-		.func_width	= 4,			\
+-		.pud_width	= 2,			\
+-		.drv_width	= 2,			\
+-		.conpdn_width	= 2,			\
+-		.pudpdn_width	= 2,			\
+-		.eint_type	= EINT_TYPE_GPIO,	\
+-		.irq_base	= (__gpio##_IRQ),	\
+-		.name		= id			\
+-	}
  
  /**
-@@ -150,7 +150,6 @@ struct samsung_pin_ctrl_variant {
-  * @nr_banks: number of pin banks.
-  * @base: starting system wide pin number.
-  * @nr_pins: number of pins supported by the controller.
-- * @nr_gint: number of external gpio interrupts supported.
-  * @nr_wint: number of external wakeup interrupts supported.
-  * @geint_con: offset of the ext-gpio controller registers.
-  * @geint_mask: offset of the ext-gpio interrupt mask registers.
-@@ -171,7 +170,6 @@ struct samsung_pin_ctrl {
+  * struct exynos_geint_data: gpio eint specific data for irq_chip callbacks.
+diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
+index 5d59ce6..db1907c 100644
+--- a/drivers/pinctrl/pinctrl-samsung.h
++++ b/drivers/pinctrl/pinctrl-samsung.h
+@@ -246,7 +246,6 @@ struct samsung_pmx_func {
+ };
  
- 	u32		base;
- 	u32		nr_pins;
--	u32		nr_gint;
- 	u32		nr_wint;
+ /* list of all exported SoC specific data */
+-extern struct samsung_pin_ctrl exynos4210_pin_ctrl[];
+ extern struct samsung_pin_ctrl_variant exynos4_pin_ctrl;
  
- 	u32		geint_con;
-@@ -218,7 +216,6 @@ struct samsung_pinctrl_drv_data {
- 	const struct samsung_pmx_func	*pmx_functions;
- 	unsigned int			nr_functions;
- 
--	struct irq_domain		*gpio_irqd;
- 	struct irq_domain		*wkup_irqd;
- 
- 	struct gpio_chip		*gc;
+ #endif /* __PINCTRL_SAMSUNG_H */
 -- 
 1.7.12
