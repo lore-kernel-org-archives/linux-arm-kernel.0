@@ -1,38 +1,25 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon,  8 Oct 2012 10:47:34 +0200
-Subject: [PATCH 1/1] ARM: OMAP: Add maintainer entry for IGEP machines
-Message-ID: <1349686054-7486-1-git-send-email-javier@dowhile0.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 8 Oct 2012 14:22:49 +0530
+Subject: [PATCH 00/16] More omap plat header cleanup for v3.8 merge window
+In-Reply-To: <20121004213950.26676.21898.stgit@muffinssi.local>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+Message-ID: <50729461.8090504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enric and I have been mantained this machine and while we
-are moving to device trees, it is good that people cc us
-when reporting bugs or regression on the board file until
-we have proper DT support.
+Tony,
 
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
----
- MAINTAINERS |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+On Friday 05 October 2012 03:34 AM, Tony Lindgren wrote:
+> Hi all,
+>
+> Here are some more patches for early merging after -rc1 for v3.8
+> merge window to remove more plat includes for the ARM common
+> zImage support. These are based on top of current linux next +
+> kevin's cpufreq fixes.
+>
+Have scanned the series and movement looks fine. For the SRAM movement,
+I just wanted to to check if the builds are fine with errata WA enabled
+for OMAP4. Do you have a branch where you are stacking up these patches?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 63ce2a2..6b3c58d 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -818,6 +818,14 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kristoffer/linux-hpc.git
- F:	arch/arm/mach-sa1100/jornada720.c
- F:	arch/arm/mach-sa1100/include/mach/jornada720.h
- 
-+ARM/IGEP MACHINE SUPPORT
-+M:	Enric Balletbo i Serra <eballetbo@gmail.com>
-+M:	Javier Martinez Canillas <javier@dowhile0.org>
-+L:	linux-omap at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-omap2/board-igep0020.c
-+
- ARM/INCOME PXA270 SUPPORT
- M:	Marek Vasut <marek.vasut@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.7.7.6
+Regards
+santosh
