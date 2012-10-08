@@ -1,96 +1,98 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 8 Oct 2012 10:24:50 +0200
-Subject: Kernel panic in mxs_auart_irq_handle with latest kernel?
-In-Reply-To: <20121008080754.GW4625@n2100.arm.linux.org.uk>
-References: <B437D8FD67C39240BFA9DD878702A627EB4BD8@mx2.grid-net.com>
- <20121008074547.GA18531@pengutronix.de>
- <20121008080754.GW4625@n2100.arm.linux.org.uk>
-Message-ID: <20121008082450.GB18531@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 08 Oct 2012 10:39:00 +0200
+Subject: [PATCH 00/16] pinctrl: samsung: Usability and extensibiltiy
+ improvements
+Message-ID: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+This patch series is a work on improving usability and extensibiltiy of the
+pinctrl-samsung driver. It consists of three main parts:
+ - moving SoC-specific data to device tree
+ - converting the driver to use one GPIO chip and one IRQ domain per pin bank
+ - introducing generic wake-up interrupt capability description
 
-On Mon, Oct 08, 2012 at 09:07:54AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 08, 2012 at 09:45:47AM +0200, Uwe Kleine-K?nig wrote:
-> > On Fri, Oct 05, 2012 at 11:58:26PM +0000, Subodh Nijsure wrote:
-> > > 
-> > > On my MX28 based board with top of the Linus's git tree I am consistently getting following kernel panic, anybody else seen this?
-> > > (I will start bisecting and see if I can find a reason this wknd)
-> > > 
-> > > -Subodh
-> > > 
-> > This dump is not complete, there is at least a line missing that reads
-> > 
-> > 	[   $timestamp] pgd = ....
-> > 
-> > It's a good habit to always provide the full info.
-> > 
-> > > [    9.700000] [00000118] *pgd=00000000
-> 
-> Uwe, yes it is, it is the line above.  It's saying that there is no
-> pgd entry at address 0x118 (which is correct.)
-I'm not sure I got you right, but show_pte() has:
+What the first part does is replacing static platform-specific data in
+pinctrl-samsung driver with data dynamically parsed from device tree.
 
-        printk(KERN_ALERT "pgd = %p\n", mm->pgd);
-        pgd = pgd_offset(mm, addr);
-        printk(KERN_ALERT "[%08lx] *pgd=%08llx",
-                        addr, (long long)pgd_val(*pgd));
+It aims at reducing the SoC-specific part of the driver and thus the
+amount of modifications to driver sources when adding support for next
+SoCs (like Exynos4x12).
 
-So there is indeed missing a line. I don't think it's essential here,
-still I think in general it's advisable to let people know not to
-shorten the output. Probably even let them post the complete kernel log.
-(Isn't there an oops marker, too?)
- 
-> > > [    9.700000] Internal error: Oops: 5 [#1] PREEMPT ARM
-> > > [    9.700000] Modules linked in:
-> > > [    9.700000] CPU: 0    Not tainted  (3.6.0-11641-gbe4ae13-dirty #1)
-> > > [    9.700000] PC is at uart_insert_char+0x38/0x130
-> > > [    9.700000] LR is at mxs_auart_irq_handle+0x198/0x2b0
-> > > [    9.700000] pc : [<c025a3e0>]    lr : [<c0261700>]    psr: 40000093
-> > > [    9.700000] sp : c0549ea0  ip : 00000000  fp : 00000001
-> > > [    9.700000] r10: 00000000  r9 : c057e64e  r8 : 00000020
-> > > [    9.700000] r7 : 00000000  r6 : 00080000  r5 : 00000000  r4 : c39566c0
-> > > [    9.700000] r3 : 00000020  r2 : 00000000  r1 : 00000000  r0 : 00000000
-> > I don't see what should access the address 0x118 here, can you please
-> > provide the output of
-> > 
-> > 	objdump -d vmlinux | sed -nr '/^[0-9]{8} <uart_insert_char/,/^$/p'
-> 
-> 	objdump -d vmlinux --start-addr=0xc025a3a8 | less
-> 
-> will give you the disassembly starting at uart_insert_char().
-> 
-> The faulting instruction is (which is below in the Code: line of the oops
-> dump):
-Ah, I already knew some time ago that the code is included in the dump,
-I just did miss it because there are no address infos included there.
+In addition, it extends the description of SoC-specific attributes to cover all
+mainlined Samsung SoCs, starting from s3c24xx and ending on latest Exynos5
+series, with the exception of 4-bit banks with more than 8 pins on S3C64xx,
+which will be covered by futher patch(es).
 
-> 
-> 	e5973118
-> 
-> It's an "ldr r3, [r7, #280]  ; 0x118" instruction.  r7 is zero, and the
-> instruction has an pre-indexed offset of 0x118.  _That_ is where 0x118
-> is coming from.
-obviously.
+The second part attempts to simplify usage of the driver and fix several
+problems of current implementation, in particular:
 
-> The full code line is:
-> 
->   28:   1a000012        bne     0x78
->   2c:   e59d2020        ldr     r2, [sp, #32]
->   30:   e5cd3006        strb    r3, [sp, #6]
->   34:   e5cd2007        strb    r2, [sp, #7]
->   38:   e5973118        ldr     r3, [r7, #280]  ; 0x118
-> 
-> I suspect the problem is that the mxs serial driver is calling
-> uart_insert_char() when the port has been closed by userland, which
-> means there's no tty associated with it.
-Thanks for your insights. At least my mail wasn't for nothing because I
-learned again something about oopses.
+  - Simplifies GPIO pin specification in device tree by using pin
+    namespace local to pin bank instead of local to pin controller, e.g.
 
-Best regards
-Uwe
+        gpios = <&gpj0 3 0>;
+
+    instead of
+
+        gpios = <&pinctrl0 115 0>;
+
+  - Simplifies GPIO interrupt specification in device tree by using
+    namespace local to pin bank (and equal to GPIO namespace), e.g.
+
+        interrupt-parent = <&gpj0>;
+        interrupts = <3 0>;
+
+    instead of
+
+        interrupt-parent = <&pinctrl0>;
+        interrupts = <115 0>;
+
+  - Simplifies internal GPIO pin to bank translation thanks to
+    correspondence of particular GPIO chips to pin banks. This allows
+    to remove the (costly in case of GPIO bit-banging drivers) lookup
+    over all banks to find the one that the pin is from.
+
+Third part is focused on removing the static, hard-coded description of wake-up
+interrupt controller and wake-up interrupt layout.
+
+It defines a (mostly) generic (in scope of targetted SoCs) wake-up interrupt
+layout specification format that allows to specify which pin banks support
+wake-up interrupts and how they are handled (direct or multiplexed/chained).
+
+See particular patches for more detailed descriptions and the last patch for
+updated device tree bindings.
+
+Tomasz Figa (16):
+  ARM: dts: exynos4210: Replace legacy GPIO bank nodes with pinctrl
+    bank nodes
+  pinctrl: exynos: Parse wakeup-eint parameters from DT
+  pinctrl: samsung: Detect and handle unsupported configuration types
+  pinctrl: samsung: Parse pin banks from DT
+  pinctrl: exynos: Remove static SoC-specific data
+  pinctrl: samsung: Parse bank-specific eint offset from DT
+  pinctrl: samsung: Hold OF node of pin bank in bank struct
+  pinctrl: samsung: Hold pointer to driver data in bank struct
+  pinctrl: exynos: Use one IRQ domain per pin bank
+  pinctrl: samsung: Do not pass gpio_chip to pin_to_reg_bank
+  pinctrl: samsung: Use one GPIO chip per pin bank
+  pinctrl: samsung: Use per-bank IRQ domain for wake-up interrupts
+  pinctrl: exynos: Set pin function to EINT in irq_set_type of wake-up
+    EINT
+  pinctrl: samsung: Parse offsets of particular registers from DT
+  pinctrl: samsung: Add GPIO to IRQ translation
+  Documentation: Update samsung-pinctrl device tree bindings
+    documentation
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           | 212 ++++++++--
+ arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi    | 459 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi          |   2 +
+ arch/arm/boot/dts/exynos4210.dtsi                  | 254 +-----------
+ drivers/pinctrl/pinctrl-exynos.c                   | 399 ++++++++----------
+ drivers/pinctrl/pinctrl-exynos.h                   | 184 +--------
+ drivers/pinctrl/pinctrl-samsung.c                  | 392 ++++++++++++++----
+ drivers/pinctrl/pinctrl-samsung.h                  |  87 ++--
+ 8 files changed, 1205 insertions(+), 784 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl-banks.dtsi
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.12
