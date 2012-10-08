@@ -1,49 +1,47 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 8 Oct 2012 11:25:47 +0200
-Subject: [PATCH] ARM: imx: fix return value check in imx3_init_l2x0()
-In-Reply-To: <CAPgLHd8Rma5fSWPtjvLr18TEmmC=8kOjmSJtneO0Ecd1bvOrcg@mail.gmail.com>
-References: <CAPgLHd8Rma5fSWPtjvLr18TEmmC=8kOjmSJtneO0Ecd1bvOrcg@mail.gmail.com>
-Message-ID: <20121008092547.GK1322@pengutronix.de>
+Date: Mon, 8 Oct 2012 11:27:38 +0200
+Subject: [PATCH 3/3] ARM: imx_v6_v7_defconfig: Add DA9052 regulator support
+In-Reply-To: <1348702057-2351-3-git-send-email-festevam@gmail.com>
+References: <1348702057-2351-1-git-send-email-festevam@gmail.com>
+ <1348702057-2351-3-git-send-email-festevam@gmail.com>
+Message-ID: <20121008092738.GL1322@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 01:54:01PM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Wed, Sep 26, 2012 at 08:27:37PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> In case of error, the function ioremap() returns NULL
-> not ERR_PTR(). The IS_ERR() test in the return value
-> check should be replaced with NULL test.
-> 
-> dpatch engine is used to auto generate this patch.
-> (https://github.com/weiyj/dpatch)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> Add DA9052 regulator support.
+>  
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Appied, thanks
+Applied, thanks
 
 Sascha
 
-
 > ---
->  arch/arm/mach-imx/mm-imx3.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+>  arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-> index 9d2c843..b5deb05 100644
-> --- a/arch/arm/mach-imx/mm-imx3.c
-> +++ b/arch/arm/mach-imx/mm-imx3.c
-> @@ -108,9 +108,8 @@ void __init imx3_init_l2x0(void)
->  	}
->  
->  	l2x0_base = ioremap(MX3x_L2CC_BASE_ADDR, 4096);
-> -	if (IS_ERR(l2x0_base)) {
-> -		printk(KERN_ERR "remapping L2 cache area failed with %ld\n",
-> -				PTR_ERR(l2x0_base));
-> +	if (!l2x0_base) {
-> +		printk(KERN_ERR "remapping L2 cache area failed\n");
->  		return;
->  	}
->  
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 66aa7a6..67620d6 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -142,10 +142,12 @@ CONFIG_GPIO_SYSFS=y
+>  # CONFIG_HWMON is not set
+>  CONFIG_WATCHDOG=y
+>  CONFIG_IMX2_WDT=y
+> +CONFIG_MFD_DA9052_I2C=y
+>  CONFIG_MFD_MC13XXX_SPI=y
+>  CONFIG_MFD_MC13XXX_I2C=y
+>  CONFIG_REGULATOR=y
+>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +CONFIG_REGULATOR_DA9052=y
+>  CONFIG_REGULATOR_MC13783=y
+>  CONFIG_REGULATOR_MC13892=y
+>  CONFIG_MEDIA_SUPPORT=y
+> -- 
+> 1.7.9.5
 > 
 > 
 
