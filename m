@@ -1,52 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 8 Oct 2012 12:56:41 +0200
-Subject: [PATCH] ARM: imx: fix the return value check in
- imx_clk_busy_divider()
-In-Reply-To: <CAPgLHd-0wYjWxWrmLdc+an0RVfEicv3QBEtvsuvQtphti3phdw@mail.gmail.com>
-References: <CAPgLHd-0wYjWxWrmLdc+an0RVfEicv3QBEtvsuvQtphti3phdw@mail.gmail.com>
-Message-ID: <20121008105641.GP1322@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 8 Oct 2012 16:27:20 +0530
+Subject: [PATCH v4 0/7] uio_pruss cleanup and platform support
+In-Reply-To: <1349456686-22736-1-git-send-email-mporter@ti.com>
+References: <1349456686-22736-1-git-send-email-mporter@ti.com>
+Message-ID: <5072B190.1060200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 02:14:25PM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function clk_register() returns ERR_PTR()
-> no NULL pointer. The NULL test in the return value check should
-> be replaced with IS_ERR().
-> 
-> dpatch engine is used to auto generated this patch.
-> (https://github.com/weiyj/dpatch)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 10/5/2012 10:34 PM, Matt Porter wrote:
 
-Applied, thanks
+> This series enables uio_pruss on DA850 and removes use of the
+> private SRAM API by the driver. The driver previously was not
+> enabled by any platform and the private SRAM API was accessing
+> an invalid SRAM bank.
+> 
+> It is regression tested on AM180x EVM with suspend/resume due
+> to the new use of the shared SRAM for both PM and PRUSS. The
+> uio_pruss driver is tested on the same platform using the
+> PRU_memAccessPRUDataRam and PRU_memAccessL3andDDR examples from
+> the PRU userspace tools available from http://www.ti.com/tool/sprc940
 
-Sascha
+I applied patches 2/7, 3/7 and 6/7 of this series for v3.8. I have some
+comments on the board patch. Rest of the patches depend on acceptance of
+1/7 so I will take them only after that is accepted.
 
-> ---
->  arch/arm/mach-imx/clk-busy.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-busy.c b/arch/arm/mach-imx/clk-busy.c
-> index 1a7a8dd..1ab91b5 100644
-> --- a/arch/arm/mach-imx/clk-busy.c
-> +++ b/arch/arm/mach-imx/clk-busy.c
-> @@ -108,7 +108,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
->  	busy->div.hw.init = &init;
->  
->  	clk = clk_register(NULL, &busy->div.hw);
-> -	if (!clk)
-> +	if (IS_ERR(clk))
->  		kfree(busy);
->  
->  	return clk;
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
