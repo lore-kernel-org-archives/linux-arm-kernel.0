@@ -1,216 +1,198 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 8 Oct 2012 17:35:04 +0100
-Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for secondary
- CPUs
-In-Reply-To: <1349691981-31038-4-git-send-email-josephl@nvidia.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-4-git-send-email-josephl@nvidia.com>
-Message-ID: <20121008163504.GC5377@e102568-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Oct 2012 00:43:57 +0800
+Subject: [PATCH v2 3/5] ARM: use generic unaligned.h
+In-Reply-To: <1344129840-16447-4-git-send-email-robherring2@gmail.com>
+References: <1344129840-16447-1-git-send-email-robherring2@gmail.com>
+ <1344129840-16447-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20121008164353.GB6140@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 11:26:17AM +0100, Joseph Lo wrote:
-> This supports power-gated (LP2) idle on secondary CPUs for Tegra30.
-> The secondary CPUs can go into LP2 state independently. When CPU goes
-> into LP2 state, it saves it's state and puts itself to flow controlled
-> WFI state. After that, it will been power gated.
+This patch has been merged into mainline as commit below.
+
+ d25c881 ARM: 7493/1: use generic unaligned.h
+
+It introduces a regression for me.  Check out the commit on mainline,
+build a v7 only kernel (imx5/6) with imx_v6_v7_defconfig, the kernel
+halts in decompressor.  But v6/v7 kernel (imx3/5/6) works fine.  The
+kernel built on the parent commit below works all fine.
+
+ ef1c209 ARM: 7492/1: add strstr declaration for decompressors
+
+Shawn
+
+On Sat, Aug 04, 2012 at 08:23:58PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Based on the work by:
-> Scott Williams <scwilliams@nvidia.com>
+> This moves ARM over to the asm-generic/unaligned.h header. This has the
+> benefit of better code generated especially for ARMv7 on gcc 4.7+
+> compilers.
 > 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> As Arnd Bergmann, points out: The asm-generic version uses the "struct"
+> version for native-endian unaligned access and the "byteshift" version
+> for the opposite endianess. The current ARM version however uses the
+> "byteshift" implementation for both.
+> 
+> Thanks to Nicolas Pitre for the excellent analysis:
+> 
+> Test case:
+> 
+> int foo (int *x) { return get_unaligned(x); }
+> long long bar (long long *x) { return get_unaligned(x); }
+> 
+> With the current ARM version:
+> 
+> foo:
+> 	ldrb	r3, [r0, #2]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 2B], MEM[(const u8 *)x_1(D) + 2B]
+> 	ldrb	r1, [r0, #1]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 1B], MEM[(const u8 *)x_1(D) + 1B]
+> 	ldrb	r2, [r0, #0]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D)], MEM[(const u8 *)x_1(D)]
+> 	mov	r3, r3, asl #16	@ tmp154, MEM[(const u8 *)x_1(D) + 2B],
+> 	ldrb	r0, [r0, #3]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 3B], MEM[(const u8 *)x_1(D) + 3B]
+> 	orr	r3, r3, r1, asl #8	@, tmp155, tmp154, MEM[(const u8 *)x_1(D) + 1B],
+> 	orr	r3, r3, r2	@ tmp157, tmp155, MEM[(const u8 *)x_1(D)]
+> 	orr	r0, r3, r0, asl #24	@,, tmp157, MEM[(const u8 *)x_1(D) + 3B],
+> 	bx	lr	@
+> 
+> bar:
+> 	stmfd	sp!, {r4, r5, r6, r7}	@,
+> 	mov	r2, #0	@ tmp184,
+> 	ldrb	r5, [r0, #6]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 6B], MEM[(const u8 *)x_1(D) + 6B]
+> 	ldrb	r4, [r0, #5]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 5B], MEM[(const u8 *)x_1(D) + 5B]
+> 	ldrb	ip, [r0, #2]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 2B], MEM[(const u8 *)x_1(D) + 2B]
+> 	ldrb	r1, [r0, #4]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 4B], MEM[(const u8 *)x_1(D) + 4B]
+> 	mov	r5, r5, asl #16	@ tmp175, MEM[(const u8 *)x_1(D) + 6B],
+> 	ldrb	r7, [r0, #1]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 1B], MEM[(const u8 *)x_1(D) + 1B]
+> 	orr	r5, r5, r4, asl #8	@, tmp176, tmp175, MEM[(const u8 *)x_1(D) + 5B],
+> 	ldrb	r6, [r0, #7]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 7B], MEM[(const u8 *)x_1(D) + 7B]
+> 	orr	r5, r5, r1	@ tmp178, tmp176, MEM[(const u8 *)x_1(D) + 4B]
+> 	ldrb	r4, [r0, #0]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D)], MEM[(const u8 *)x_1(D)]
+> 	mov	ip, ip, asl #16	@ tmp188, MEM[(const u8 *)x_1(D) + 2B],
+> 	ldrb	r1, [r0, #3]	@ zero_extendqisi2	@ MEM[(const u8 *)x_1(D) + 3B], MEM[(const u8 *)x_1(D) + 3B]
+> 	orr	ip, ip, r7, asl #8	@, tmp189, tmp188, MEM[(const u8 *)x_1(D) + 1B],
+> 	orr	r3, r5, r6, asl #24	@,, tmp178, MEM[(const u8 *)x_1(D) + 7B],
+> 	orr	ip, ip, r4	@ tmp191, tmp189, MEM[(const u8 *)x_1(D)]
+> 	orr	ip, ip, r1, asl #24	@, tmp194, tmp191, MEM[(const u8 *)x_1(D) + 3B],
+> 	mov	r1, r3	@,
+> 	orr	r0, r2, ip	@ tmp171, tmp184, tmp194
+> 	ldmfd	sp!, {r4, r5, r6, r7}
+> 	bx	lr
+> 
+> In both cases the code is slightly suboptimal.  One may wonder why
+> wasting r2 with the constant 0 in the second case for example.  And all
+> the mov's could be folded in subsequent orr's, etc.
+> 
+> Now with the asm-generic version:
+> 
+> foo:
+> 	ldr	r0, [r0, #0]	@ unaligned	@,* x
+> 	bx	lr	@
+> 
+> bar:
+> 	mov	r3, r0	@ x, x
+> 	ldr	r0, [r0, #0]	@ unaligned	@,* x
+> 	ldr	r1, [r3, #4]	@ unaligned	@,
+> 	bx	lr	@
+> 
+> This is way better of course, but only because this was compiled for
+> ARMv7. In this case the compiler knows that the hardware can do
+> unaligned word access.  This isn't that obvious for foo(), but if we
+> remove the get_unaligned() from bar as follows:
+> 
+> long long bar (long long *x) {return *x; }
+> 
+> then the resulting code is:
+> 
+> bar:
+> 	ldmia	r0, {r0, r1}	@ x,,
+> 	bx	lr	@
+> 
+> So this proves that the presumed aligned vs unaligned cases does have
+> influence on the instructions the compiler may use and that the above
+> unaligned code results are not just an accident.
+> 
+> Still... this isn't fully conclusive without at least looking at the
+> resulting assembly fron a pre ARMv6 compilation.  Let's see with an
+> ARMv5 target:
+> 
+> foo:
+> 	ldrb	r3, [r0, #0]	@ zero_extendqisi2	@ tmp139,* x
+> 	ldrb	r1, [r0, #1]	@ zero_extendqisi2	@ tmp140,
+> 	ldrb	r2, [r0, #2]	@ zero_extendqisi2	@ tmp143,
+> 	ldrb	r0, [r0, #3]	@ zero_extendqisi2	@ tmp146,
+> 	orr	r3, r3, r1, asl #8	@, tmp142, tmp139, tmp140,
+> 	orr	r3, r3, r2, asl #16	@, tmp145, tmp142, tmp143,
+> 	orr	r0, r3, r0, asl #24	@,, tmp145, tmp146,
+> 	bx	lr	@
+> 
+> bar:
+> 	stmfd	sp!, {r4, r5, r6, r7}	@,
+> 	ldrb	r2, [r0, #0]	@ zero_extendqisi2	@ tmp139,* x
+> 	ldrb	r7, [r0, #1]	@ zero_extendqisi2	@ tmp140,
+> 	ldrb	r3, [r0, #4]	@ zero_extendqisi2	@ tmp149,
+> 	ldrb	r6, [r0, #5]	@ zero_extendqisi2	@ tmp150,
+> 	ldrb	r5, [r0, #2]	@ zero_extendqisi2	@ tmp143,
+> 	ldrb	r4, [r0, #6]	@ zero_extendqisi2	@ tmp153,
+> 	ldrb	r1, [r0, #7]	@ zero_extendqisi2	@ tmp156,
+> 	ldrb	ip, [r0, #3]	@ zero_extendqisi2	@ tmp146,
+> 	orr	r2, r2, r7, asl #8	@, tmp142, tmp139, tmp140,
+> 	orr	r3, r3, r6, asl #8	@, tmp152, tmp149, tmp150,
+> 	orr	r2, r2, r5, asl #16	@, tmp145, tmp142, tmp143,
+> 	orr	r3, r3, r4, asl #16	@, tmp155, tmp152, tmp153,
+> 	orr	r0, r2, ip, asl #24	@,, tmp145, tmp146,
+> 	orr	r1, r3, r1, asl #24	@,, tmp155, tmp156,
+> 	ldmfd	sp!, {r4, r5, r6, r7}
+> 	bx	lr
+> 
+> Compared to the initial results, this is really nicely optimized and I
+> couldn't do much better if I were to hand code it myself.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
 > ---
->  arch/arm/mach-tegra/Makefile          |    1 +
->  arch/arm/mach-tegra/cpuidle-tegra30.c |   79 +++++++++++++++++++++++++++++-
->  arch/arm/mach-tegra/pm.c              |   88 +++++++++++++++++++++++++++++++++
->  arch/arm/mach-tegra/pm.h              |   30 +++++++++++
->  arch/arm/mach-tegra/reset.h           |    9 +++
->  arch/arm/mach-tegra/sleep-tegra30.S   |   26 ++++++++++
->  arch/arm/mach-tegra/sleep.S           |   66 ++++++++++++++++++++++++
->  arch/arm/mach-tegra/sleep.h           |    2 +
->  8 files changed, 300 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-tegra/pm.c
->  create mode 100644 arch/arm/mach-tegra/pm.h
+>  arch/arm/include/asm/Kbuild      |    1 +
+>  arch/arm/include/asm/unaligned.h |   19 -------------------
+>  2 files changed, 1 insertion(+), 19 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/unaligned.h
 > 
-> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-> index 9b80c1e..6f224f7 100644
-> --- a/arch/arm/mach-tegra/Makefile
-> +++ b/arch/arm/mach-tegra/Makefile
-> @@ -8,6 +8,7 @@ obj-y                                   += pmc.o
->  obj-y                                  += flowctrl.o
->  obj-y                                  += powergate.o
->  obj-y                                  += apbio.o
-> +obj-y                                  += pm.o
->  obj-$(CONFIG_CPU_IDLE)                 += cpuidle.o
->  obj-$(CONFIG_CPU_IDLE)                 += sleep.o
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> index 0f85df8..842fef4 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> @@ -19,21 +19,94 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/clockchips.h>
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index 6cc8a13..a86cabf 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -33,3 +33,4 @@ generic-y += sockios.h
+>  generic-y += termbits.h
+>  generic-y += timex.h
+>  generic-y += types.h
+> +generic-y += unaligned.h
+> diff --git a/arch/arm/include/asm/unaligned.h b/arch/arm/include/asm/unaligned.h
+> deleted file mode 100644
+> index 44593a8..0000000
+> --- a/arch/arm/include/asm/unaligned.h
+> +++ /dev/null
+> @@ -1,19 +0,0 @@
+> -#ifndef _ASM_ARM_UNALIGNED_H
+> -#define _ASM_ARM_UNALIGNED_H
+> -
+> -#include <linux/unaligned/le_byteshift.h>
+> -#include <linux/unaligned/be_byteshift.h>
+> -#include <linux/unaligned/generic.h>
+> -
+> -/*
+> - * Select endianness
+> - */
+> -#ifndef __ARMEB__
+> -#define get_unaligned	__get_unaligned_le
+> -#define put_unaligned	__put_unaligned_le
+> -#else
+> -#define get_unaligned	__get_unaligned_be
+> -#define put_unaligned	__put_unaligned_be
+> -#endif
+> -
+> -#endif /* _ASM_ARM_UNALIGNED_H */
+> -- 
+> 1.7.9.5
 > 
->  #include <asm/cpuidle.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/suspend.h>
-> +
-> +#include "pm.h"
-> +#include "sleep.h"
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int tegra30_idle_lp2(struct cpuidle_device *dev,
-> +                           struct cpuidle_driver *drv,
-> +                           int index);
-> +#endif
 > 
->  static struct cpuidle_driver tegra_idle_driver = {
->         .name = "tegra_idle",
->         .owner = THIS_MODULE,
->         .en_core_tk_irqen = 1,
-> -       .state_count = 1,
-> +       .state_count = 2,
->         .states = {
->                 [0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
-> +#ifdef CONFIG_PM_SLEEP
-> +               [1] = {
-> +                       .enter                  = tegra30_idle_lp2,
-> +                       .exit_latency           = 2000,
-> +                       .target_residency       = 2200,
-> +                       .power_usage            = 0,
-> +                       .flags                  = CPUIDLE_FLAG_TIME_VALID,
-> +                       .name                   = "LP2",
-> +                       .desc                   = "CPU power-gate",
-> +               },
-> +#endif
->         },
->  };
-> 
->  static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-> 
-> +#ifdef CONFIG_PM_SLEEP
-> +static bool tegra30_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
-> +                                        struct cpuidle_driver *drv,
-> +                                        int index)
-> +{
-> +#ifdef CONFIG_SMP
-> +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> +
-> +       smp_wmb();
-> +
-> +       save_cpu_arch_register();
-> +
-> +       cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
-> +
-> +       restore_cpu_arch_register();
-> +
-> +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> +#endif
-
-Can't you factor out this #ifdef out using an inline function ?
-
-> +
-> +       return true;
-> +}
-> +
-> +static int __cpuinit tegra30_idle_lp2(struct cpuidle_device *dev,
-> +                                     struct cpuidle_driver *drv,
-> +                                     int index)
-> +{
-> +       bool entered_lp2 = false;
-> +
-> +       local_fiq_disable();
-> +
-> +       tegra_set_cpu_in_lp2(dev->cpu);
-> +       cpu_pm_enter();
-> +
-> +       if (dev->cpu == 0)
-
-Logical cpu 0 ? Or you need a HW cpu 0 check here ? If you boot on a CPU
-that is different from HW CPU 0 (do not know if that's possible) you
-might have a problem.
-
-[...]
-
-> +bool __cpuinit tegra_set_cpu_in_lp2(int cpu)
-> +{
-> +       bool last_cpu = false;
-> +
-> +       spin_lock(&tegra_lp2_lock);
-> +       BUG_ON(cpumask_test_cpu(cpu, &tegra_in_lp2));
-> +       cpumask_set_cpu(cpu, &tegra_in_lp2);
-> +
-> +       /*
-> +        * Update the IRAM copy used by the reset handler. The IRAM copy
-> +        * can't use used directly by cpumask_set_cpu() because it uses
-> +        * LDREX/STREX which requires the addressed location to be inner
-> +        * cacheable and sharable which IRAM isn't.
-> +        */
-> +       writel(tegra_in_lp2.bits[0], tegra_cpu_lp2_mask);
-> +       dsb();
-> +
-> +       if ((cpu == 0) && cpumask_equal(&tegra_in_lp2, cpu_online_mask))
-> +               last_cpu = true;
-
-For cpu == 0, see above.
-
-[...]
-
-> +ENTRY(tegra_flush_l1_cache)
-> +       stmfd   sp!, {r4-r5, r7, r9-r11, lr}
-> +       dmb                                     @ ensure ordering
-> +
-> +       /* Disable the data cache */
-> +       mrc     p15, 0, r2, c1, c0, 0
-> +       bic     r2, r2, #CR_C
-> +       dsb
-> +       mcr     p15, 0, r2, c1, c0, 0
-> +
-> +       /* Flush data cache */
-> +       mov     r10, #0
-> +#ifdef CONFIG_PREEMPT
-> +       save_and_disable_irqs_notrace r9        @ make cssr&csidr read atomic
-> +#endif
-> +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr
-> +       isb                                     @ isb to sych the new cssr&csidr
-> +       mrc     p15, 1, r1, c0, c0, 0           @ read the new csidr
-> +#ifdef CONFIG_PREEMPT
-> +       restore_irqs_notrace r9
-> +#endif
-> +       and     r2, r1, #7                      @ extract the length of the cache lines
-> +       add     r2, r2, #4                      @ add 4 (line length offset)
-> +       ldr     r4, =0x3ff
-> +       ands    r4, r4, r1, lsr #3              @ find maximum number on the way size
-> +       clz     r5, r4                          @ find bit position of way size increment
-> +       ldr     r7, =0x7fff
-> +       ands    r7, r7, r1, lsr #13             @ extract max number of the index size
-> +loop2:
-> +       mov     r9, r4                          @ create working copy of max way size
-> +loop3:
-> +       orr     r11, r10, r9, lsl r5            @ factor way and cache number into r11
-> +       orr     r11, r11, r7, lsl r2            @ factor index number into r11
-> +       mcr     p15, 0, r11, c7, c14, 2         @ clean & invalidate by set/way
-> +       subs    r9, r9, #1                      @ decrement the way
-> +       bge     loop3
-> +       subs    r7, r7, #1                      @ decrement the index
-> +       bge     loop2
-> +finished:
-> +       mov     r10, #0                         @ swith back to cache level 0
-> +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr
-> +       dsb
-> +       isb
-
-This code is already in the kernel in cache-v7.S, please use that.
-We are just adding the new LoUIS API that probably does what you
-want, even though for Tegra, that is an A9 based platform I fail to
-understand why Level of Coherency differs from L1.
-
-Can you explain to me please why Level of Coherency (LoC) is != from L1
-on Tegra ?
-
-Thanks,
-Lorenzo
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
