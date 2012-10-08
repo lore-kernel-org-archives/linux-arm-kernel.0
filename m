@@ -1,32 +1,39 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon, 8 Oct 2012 08:03:44 -0400
-Subject: [PATCH v4 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <5072B190.1060200@ti.com>
-References: <1349456686-22736-1-git-send-email-mporter@ti.com>
- <5072B190.1060200@ti.com>
-Message-ID: <20121008120344.GQ11149@beef>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 8 Oct 2012 14:14:55 +0200
+Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
+In-Reply-To: <20121007015405.958959522@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015405.958959522@gmail.com>
+Message-ID: <20121008141455.324f914b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 04:27:20PM +0530, Sekhar Nori wrote:
-> On 10/5/2012 10:34 PM, Matt Porter wrote:
-> 
-> > This series enables uio_pruss on DA850 and removes use of the
-> > private SRAM API by the driver. The driver previously was not
-> > enabled by any platform and the private SRAM API was accessing
-> > an invalid SRAM bank.
-> > 
-> > It is regression tested on AM180x EVM with suspend/resume due
-> > to the new use of the shared SRAM for both PM and PRUSS. The
-> > uio_pruss driver is tested on the same platform using the
-> > PRU_memAccessPRUDataRam and PRU_memAccessL3andDDR examples from
-> > the PRU userspace tools available from http://www.ti.com/tool/sprc940
-> 
-> I applied patches 2/7, 3/7 and 6/7 of this series for v3.8. I have some
-> comments on the board patch. Rest of the patches depend on acceptance of
-> 1/7 so I will take them only after that is accepted.
 
-Ok, thanks...and I'll post a v5 of 5/7 and 7/7 and those should be ready
-when 1/7 is accepted.
+On Sun, 07 Oct 2012 03:53:01 +0200, Domenico Andreoli wrote:
 
--Matt
+> Index: b/arch/arm/mach-bcm476x/Makefile.boot
+> ===================================================================
+> --- /dev/null
+> +++ b/arch/arm/mach-bcm476x/Makefile.boot
+> @@ -0,0 +1,5 @@
+> +   zreladdr-y := 0x00008000
+> +params_phys-y := 0x00000100
+> +initrd_phys-y := 0x00800000
+
+Those params_phys-y and initrd_phys-y lines as useless as you're using
+the Device Tree.
+
+> +#define BCM476X_PERIPH_PHYS   0x00080000
+> +#define BCM476X_PERIPH_VIRT   0xd0080000
+
+This one should be defined with IOMEM(). Yes, you will have to add a
+cast to make it play nicely with map_desc.virtual.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
