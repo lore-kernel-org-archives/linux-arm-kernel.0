@@ -1,107 +1,73 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 8 Oct 2012 11:46:49 +0100
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121004175907.GB2994@obsidianresearch.com>
-References: <20121001153952.GB2100@linaro.org>
- <20121001160639.GA31620@obsidianresearch.com>
- <20121001175647.GD2100@linaro.org>
- <20121001183543.GC22342@obsidianresearch.com>
- <20121002102346.GB2108@linaro.org>
- <20121002174759.GC23733@obsidianresearch.com>
- <20121003104335.GA2254@linaro.org>
- <20121003184437.GB12231@obsidianresearch.com>
- <20121004113637.GA2117@linaro.org>
- <20121004175907.GB2994@obsidianresearch.com>
-Message-ID: <20121008104649.GD2302@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 8 Oct 2012 16:23:05 +0530
+Subject: [PATCH v4 7/7] ARM: davinci: register pruss_uio device on DA850
+ EVM
+In-Reply-To: <1349456686-22736-8-git-send-email-mporter@ti.com>
+References: <1349456686-22736-1-git-send-email-mporter@ti.com>
+ <1349456686-22736-8-git-send-email-mporter@ti.com>
+Message-ID: <5072B091.1040007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 11:59:07AM -0600, Jason Gunthorpe wrote:
-> On Thu, Oct 04, 2012 at 12:36:37PM +0100, Dave Martin wrote:
+On 10/5/2012 10:34 PM, Matt Porter wrote:
+> Configures the required pdata and registers the pruss_uio
+> platform device on the DA850 EVM.
 > 
-> > OK, so it is supported, but not for ARM, yet.  I'm not sure that
-> > such a patch would be rejected, since building in a DTB is not
-> > really that different from building in a command-line.
+> Tested on AM180x-EVM using the PRU_memAccessPRUDataRam and
+> PRU_memAccessL3andDDR examples from the PRU userspace tools
+> available from http://www.ti.com/tool/sprc940
 > 
-> Maybe I will be able to look at this in a few months..
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/mach-davinci/board-da850-evm.c |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> > The other solution to this problem is to distribute the dtb
-> > alongside the kernel as a supplementary image (similar to
-> > initramfs), with the bootloader doing the bare minimum of
-> > modifications to it.
-> 
-> Yes, but we still need rely on complex code like I2C/MTD to create a
-> correct DTB, which again puts us back to patching the kernel for that
-> functionality.
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 7359375..6f9478b 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/platform_data/mtd-davinci.h>
+>  #include <linux/platform_data/mtd-davinci-aemif.h>
+>  #include <linux/platform_data/spi-davinci.h>
+> +#include <linux/platform_data/uio_pruss.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/tps6507x.h>
+>  #include <linux/spi/spi.h>
+> @@ -40,6 +41,7 @@
+>  #include <mach/cp_intc.h>
+>  #include <mach/da8xx.h>
+>  #include <mach/mux.h>
+> +#include <mach/sram.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -1253,6 +1255,10 @@ static __init int da850_wl12xx_init(void)
+>  
+>  #endif /* CONFIG_DA850_WL12XX */
+>  
+> +struct uio_pruss_pdata da8xx_pruss_uio_pdata = {
+> +	.pintc_base	= 0x4000,
+> +};
+> +
+>  #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+>  
+>  static __init void da850_evm_init(void)
+> @@ -1339,6 +1345,12 @@ static __init void da850_evm_init(void)
+>  		pr_warning("da850_evm_init: lcdcntl mux setup failed: %d\n",
+>  				ret);
+>  
+> +	da8xx_pruss_uio_pdata.sram_pool = sram_get_gen_pool();
+> +	ret = da8xx_register_pruss_uio(&da8xx_pruss_uio_pdata);
+> +	if (ret)
+> +		pr_warning("pruss_uio initialization failed: %d\n",
+> +				ret);
 
-I'm still confused as to where this complexity is coming from.
+I failed to mention this last time around, but is there any reason
+platform data will change from board to board? Looks like the pintc_base
+is SoC specific and that all platforms would use SRAM when using the
+pruss driver. Looks like you can make da8xx_register_pruss_uio() take no
+parameters at all.
 
-If you need to run some complex I2C and MTD code to generate the DT, what
-is that code doing?  If it is probing to get the information, then can you
-avoid putting the info in the DT at all?  Primarily the DT is to describe
-those aspects of the hardware which can't be probed.
-
-Otherwise, you that have a few static configurations: you could have one
-pre-baked DT per hardware platform, and choose the correct one once you
-have detected the platform.
- 
-> > Naturally, if zero modifications are needed then the bootloader does not
-> > need libfdt (or equivalent code) at all.
-> 
-> If only :)
-> 
-> > One other option open to you would be to provide an ELF image loadable
-> > by your bootloader via a simple wrapper.  This would probably be a more
-> > robust approach than carrying patches against head.S, since it removes
-> > any intimate dependency on the kernel code itself.
-> 
-> This is what I ment by having a 2nd stage loader, but this example is
-> not complete because at this point you also have to patch into the DTB
-> the initrd address (passed in r0/r1), and the various MAC addresses
-> (getting them is the hard part..).
-> 
-> The nice thing about the head.S patch is that it lives right after
-> _entry, so there actually are no dependencies on the kernel code, it
-> executes in the same environment as the example you presented. 
-
-Well, logically there's little difference unless your patch were to be
-merged.  An out-of-tree patch against head.S could be more effort to
-maintain in some situations, but that code doesn't evolve rapidly.
-
-> Anyhow, exploring a CONFIG_ARM_BUILT_IN_DTB.. I think I'd add
-> something like this to head.S:
-> 
-> #ifdef CONFIG_ARM_BUILT_IN_DTB
->        adr     r3,bootloader_r0
->        stmia   r3,{r0,r1,r2}
->        mov     r2, #0
->        mov     r1, #0
->        mov     r0, #0
-> #else
->        bl      __vet_atags
-> #endif
-> 
-> And something like this to early_dt_fixup:
-> 
-> #ifdef CONFIG_ARM_BUILT_IN_DTB
->         for_each_dt_provider(dtp) {
-> 	      devtree = dtp->get_dtb();
-> 	      if (devtree)
-> 	      	   break;
->         }
-> #else
->         devtree = phys_to_virt(dt_phys);
-> #endif
-> 
-> Where the 'dev tree provider' would use the stored bootloader
-> registers and any other information to return the proper DTB. 
-
-It would need developing a bit, but something like that might be
-possible -- it should probably be discussed via devicetree-discuss.
-
-If it is doing anything less trivial than picking a pre-baked DT, the
-rationale would need to be carefully argued.
-
-Cheers
----Dave
+Thanks,
+Sekhar
