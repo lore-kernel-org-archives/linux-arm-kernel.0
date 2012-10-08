@@ -1,60 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Oct 2012 15:13:33 -0700
-Subject: [PATCH] ARM: OMAP: move old debug-devices.c and debug-leds.c
- to be OMAP2+ only for now
-In-Reply-To: <alpine.DEB.2.00.1210080145080.5736@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210080145080.5736@utopia.booyaka.com>
-Message-ID: <20121008221333.GZ13011@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 08 Oct 2012 15:22:46 -0700
+Subject: [GIT PULL] ARM: OMAP: CPUfreq fixes for v3.7-rc
+Message-ID: <878vbg8uyx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121007 18:48]:
-> 
-> Commit 801475ccb2b2c1928b22aec4b9e5285d9e347602 ("ARM: OMAP: move
-> debug_card_init() function") results in the following new sparse[1]
-> warning:
-> 
-> arch/arm/plat-omap/debug-devices.c:71:12: warning: symbol 'debug_card_init' was not declared. Should it be static?
-> 
-> Normally this could be fixed by including the appropriate header file
-> in plat-omap/debug-devices.c, but the header file now exists only in
-> mach-omap2/, so this would require a "sideways include" and is thus
-> impractical.  It turns out that only code in mach-omap2/ currently
-> uses the debug-devices.c and debug-leds.c files, so move them there.
-> In the long term, these devices should be created by DT, and the code
-> should be moved into drivers/ somewhere.
+The following changes since commit 16642a2e7be23bbda013fc32d8f6c68982eab603:
 
-Hmm are you sure that omap1 is not using debug-leds.c?
-At least the initcall seems like it should run on omap1
-if enabled.
+  Merge tag 'pm-for-3.7-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm (2012-10-02 18:32:35 -0700)
 
-The sideways include here is OK, it does not get exposed to
-the drivers, it seems that plat-omap is still the right location
-for at least debug-leds.c code.
+are available in the git repository at:
 
-> rename from arch/arm/plat-omap/debug-leds.c
-> rename to arch/arm/mach-omap2/debug-leds.c
-> index ea29bbe..c12350b 100644
-> --- a/arch/arm/plat-omap/debug-leds.c
-> +++ b/arch/arm/mach-omap2/debug-leds.c
-> @@ -146,11 +146,8 @@ static struct platform_driver led_driver = {
->  
->  static int __init fpga_init(void)
->  {
-> -	if (machine_is_omap_h4()
-> -			|| machine_is_omap_h3()
-> -			|| machine_is_omap_h2()
-> -			|| machine_is_omap_perseus2()
-> -			)
-> +	if (machine_is_omap_h4() || machine_is_omap_h3() ||
-> +	    machine_is_omap_h2() || machine_is_omap_perseus2())
->  		return platform_driver_register(&led_driver);
->  	return 0;
->  }
 
-This looks like it should work fine for the boards using
-the debug leds on omap1 too.
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-fixes-cpufreq
 
-Regards,
+for you to fetch changes up to 24d7b40a60cf19008334bcbcbd98da374d4d9c64:
 
-Tony
+  ARM: OMAP2+: PM: MPU DVFS: use generic CPU device for MPU-SS (2012-10-08 14:59:04 -0700)
+
+----------------------------------------------------------------
+This series a couple bug fixes and a couple fixes that make this
+driver support recently added OMAP-based SoCs.
+
+The 'get_cpu_device' patch is needed due to a change in the OMAP
+OMAP PM core code which enforces use of get_cpu_device() instead of
+a deprecated OMAP-specific API.
+
+The usage of plat/*.h headers breaks single zImage, so platforms are
+cleaning up and/or removing plat/*.h so the driver needs to be fixed
+accordingly.
+
+This series is based on the merge of Rafael's pm-for-3.7-rc1 tag into
+Linus' master branch: commit 16642a2e7be23bbda013fc32d8f6c68982eab603.
+
+----------------------------------------------------------------
+Kevin Hilman (4):
+      cpufreq: OMAP: ensure valid clock rate before scaling
+      cpufreq: OMAP: remove unused <plat/omap-pm.h>
+      cpufreq: OMAP: use get_cpu_device() instead of omap_device API
+      ARM: OMAP2+: PM: MPU DVFS: use generic CPU device for MPU-SS
+
+Paul Walmsley (1):
+      cpufreq: OMAP: fix clock usage to be SoC independent, remove plat/ includes
+
+ arch/arm/mach-omap2/opp.c        |   23 +++++++++++++++++------
+ arch/arm/mach-omap2/pm.c         |   11 ++++++++++-
+ arch/arm/mach-omap2/twl-common.c |    2 +-
+ drivers/cpufreq/omap-cpufreq.c   |   36 ++++++++++++------------------------
+ 4 files changed, 40 insertions(+), 32 deletions(-)
