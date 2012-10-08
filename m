@@ -1,39 +1,38 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon,  8 Oct 2012 14:46:49 +0800
-Subject: [PATCH] MTD: atmel_nand: fix compile error when use
- avr32-atstk1006_defconfig
-Message-ID: <1349678809-12092-1-git-send-email-josh.wu@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 08 Oct 2012 09:31:16 +0200
+Subject: [PATCH 2/2] ARM: Exynos4: Register clocks via common clock
+ framework
+In-Reply-To: <CAJuYYwQCPOFMnQrA-n42hQFtK3TXQtJSjkQZmVgh_4pqnMi8iw@mail.gmail.com>
+References: <1349093361-18820-1-git-send-email-thomas.abraham@linaro.org>
+ <2552746.GKROWAIKW8@amdc1227>
+ <CAJuYYwQCPOFMnQrA-n42hQFtK3TXQtJSjkQZmVgh_4pqnMi8iw@mail.gmail.com>
+Message-ID: <1888016.dshEnlClG6@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fixed the following compile error when use avr32 config:
-drivers/mtd/nand/atmel_nand.c: In function 'pmecc_err_location':
-drivers/mtd/nand/atmel_nand.c:639: error: implicit declaration of function 'writel_relaxed'
+On Monday 08 of October 2012 12:04:18 Thomas Abraham wrote:
+> Hi Tomasz,
+> 
+> On 3 October 2012 19:40, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi Chander, Thomas,
+> > 
+> > I can see one more problem here.
+> > 
+> > Based on the fact that sdhci-s3c driver receives only the endpoint gate
+> > clock (hsmmc), doesn't the following setup make the driver unable to
+> > change the frequency of this clock?
+> 
+> The driver never changes the clock frequency of the core system clocks
+> nor of the endpoint. There are internal dividers inside the sdhci
+> controller which are divide to acheive required clock speed.
 
-Since in ARCH avr32, there is no macro "writel_relaxed" defined. In this patch we use macro "writel" instead.
+What is the use of sdhci_cmu_set_clock (which calls clk_set_rate) in sdhci-
+s3c, then?
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/mtd/nand/atmel_nand_ecc.h |    5 +++++
- 1 file changed, 5 insertions(+)
+I think you are missing CLK_SET_RATE_PARENT flags in clocks of which rate 
+can be changed by the driver.
 
-diff --git a/drivers/mtd/nand/atmel_nand_ecc.h b/drivers/mtd/nand/atmel_nand_ecc.h
-index 8a1e9a6..e87af84 100644
---- a/drivers/mtd/nand/atmel_nand_ecc.h
-+++ b/drivers/mtd/nand/atmel_nand_ecc.h
-@@ -129,8 +129,13 @@
- #define pmerrloc_writel(addr, reg, value) \
- 	writel((value), (addr) + ATMEL_PMERRLOC_##reg)
- 
-+#if defined(CONFIG_ARCH_AT91)
- #define pmerrloc_writel_sigma_relaxed(addr, n, value) \
- 	writel_relaxed((value), (addr) + ATMEL_PMERRLOC_SIGMAx + ((n) * 4))
-+#elif defined(CONFIG_AVR32)
-+#define pmerrloc_writel_sigma_relaxed(addr, n, value) \
-+	writel((value), (addr) + ATMEL_PMERRLOC_SIGMAx + ((n) * 4))
-+#endif
- 
- #define pmerrloc_readl_sigma_relaxed(addr, n) \
- 	readl_relaxed((addr) + ATMEL_PMERRLOC_SIGMAx + ((n) * 4))
+Best regards,
 -- 
-1.7.9.5
+Tomasz Figa
+Samsung Poland R&D Center
