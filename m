@@ -1,31 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 8 Oct 2012 14:54:13 +0530
-Subject: [PATCH 00/16] More omap plat header cleanup for v3.8 merge window
-In-Reply-To: <50729461.8090504@ti.com>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <50729461.8090504@ti.com>
-Message-ID: <50729BBD.2070009@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 8 Oct 2012 11:25:30 +0200
+Subject: [PATCH V4] MXS: Implement DMA support into mxs-i2c
+In-Reply-To: <1345779871-7677-1-git-send-email-marex@denx.de>
+References: <1345779871-7677-1-git-send-email-marex@denx.de>
+Message-ID: <20121008092530.GA22051@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 October 2012 02:22 PM, Santosh Shilimkar wrote:
-> Tony,
->
-> On Friday 05 October 2012 03:34 AM, Tony Lindgren wrote:
->> Hi all,
->>
->> Here are some more patches for early merging after -rc1 for v3.8
->> merge window to remove more plat includes for the ARM common
->> zImage support. These are based on top of current linux next +
->> kevin's cpufreq fixes.
->>
-> Have scanned the series and movement looks fine. For the SRAM movement,
-> I just wanted to to check if the builds are fine with errata WA enabled
-> for OMAP4. Do you have a branch where you are stacking up these patches?
->
-Found the branch 'tmp-testing-header-cleanup' which had these patches.
-Did few build test along with the errata related build. No issues seen.
+On Fri, Aug 24, 2012 at 05:44:31AM +0200, Marek Vasut wrote:
+> This patch implements DMA support into mxs-i2c. DMA transfers are now enabled
+> via DT. The DMA operation is enabled by default.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
 
-Feel free to add my ack for the series.
+Thanks, applied to -next.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+I am meanwhile thinking the driver needs massive changes, probably
+dropping PIOQUEUE entirely. This is probably best done via incremental
+patches to this one. I have sketches which were sadly not ready for this
+merge-window :(
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121008/2e129d13/attachment.sig>
