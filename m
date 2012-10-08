@@ -1,42 +1,85 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 8 Oct 2012 11:24:13 +0100
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121005084500.GI4625@n2100.arm.linux.org.uk>
-References: <20120930232116.GC30637@obsidianresearch.com>
- <20121001153952.GB2100@linaro.org>
- <20121001160639.GA31620@obsidianresearch.com>
- <20121005084500.GI4625@n2100.arm.linux.org.uk>
-Message-ID: <20121008102413.GC2302@linaro.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 8 Oct 2012 18:24:16 +0800
+Subject: [PATCH] ARM: tegra: cpuidle: replace LP3 with ARM_CPUIDLE_WFI_STATE
+Message-ID: <1349691856-30590-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 09:45:00AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 01, 2012 at 10:06:39AM -0600, Jason Gunthorpe wrote:
-> > On Mon, Oct 01, 2012 at 04:39:53PM +0100, Dave Martin wrote:
-> > > >   Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
-> > > >   LOAD           0x008000 0xc0008000 0x00008000 0x372244 0x3a4310 RWE 0x8000
-> > > 
-> > > Not related directly to your patch, but I wonder why we don't we see
-> > > separate r-x and rw- segments?
-> > 
-> > I think this is because the sections are not aligned when the
-> > protections change, and the sections are not sorted by protection
-> > type.
-> 
-> They aren't sorted by protection type, they're ordered according to what's
-> required for the kernel - which is to have the init sections together as
-> one complete block so that it can be freed, and to place all of the kernel
-> text as close to the beginning of the image as possible.
+The Tegra CPU idle LP3 state is doing ARM WFI only. So it's same with
+the common ARM_CPUIDLE_WFI_STATE. Using it to replace LP3 now.
 
-Ah, right.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/cpuidle.c |   44 ++--------------------------------------
+ 1 files changed, 3 insertions(+), 41 deletions(-)
 
-Partly this came from some side speculation about whether we could do
-things like privileged read-only permissions on newer CPUs, for preventing
-unintended or undesired writes to the kernel's code or read-only data.
-
-There would be various things to solve in order to make that work, so I
-guess there's no great urgency for it right now.
-
-Cheers
----Dave
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
+index 566e2f8..4e0b07c 100644
+--- a/arch/arm/mach-tegra/cpuidle.c
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -23,60 +23,22 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+-#include <linux/cpu.h>
+ #include <linux/cpuidle.h>
+-#include <linux/hrtimer.h>
+ 
+-#include <asm/proc-fns.h>
+-
+-#include <mach/iomap.h>
+-
+-static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv, int index);
++#include <asm/cpuidle.h>
+ 
+ struct cpuidle_driver tegra_idle_driver = {
+ 	.name = "tegra_idle",
+ 	.owner = THIS_MODULE,
++	.en_core_tk_irqen = 1,
+ 	.state_count = 1,
+ 	.states = {
+-		[0] = {
+-			.enter			= tegra_idle_enter_lp3,
+-			.exit_latency		= 10,
+-			.target_residency	= 10,
+-			.power_usage		= 600,
+-			.flags			= CPUIDLE_FLAG_TIME_VALID,
+-			.name			= "LP3",
+-			.desc			= "CPU flow-controlled",
+-		},
++		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
+ 	},
+ };
+ 
+ static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
+ 
+-static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
+-	struct cpuidle_driver *drv, int index)
+-{
+-	ktime_t enter, exit;
+-	s64 us;
+-
+-	local_irq_disable();
+-	local_fiq_disable();
+-
+-	enter = ktime_get();
+-
+-	cpu_do_idle();
+-
+-	exit = ktime_sub(ktime_get(), enter);
+-	us = ktime_to_us(exit);
+-
+-	local_fiq_enable();
+-	local_irq_enable();
+-
+-	dev->last_residency = us;
+-
+-	return index;
+-}
+-
+ static int __init tegra_cpuidle_init(void)
+ {
+ 	int ret;
+-- 
+1.7.0.4
