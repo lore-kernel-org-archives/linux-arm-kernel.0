@@ -1,61 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 8 Oct 2012 11:28:38 +0200
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable CONFIG_GPIO_MC9S08DZ60
-In-Reply-To: <1347647145-23798-1-git-send-email-fabio.estevam@freescale.com>
-References: <1347647145-23798-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121008092838.GM1322@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Oct 2012 10:46:31 +0100
+Subject: [PATCH 1/3] i2c: omap: Do not enable the irq always
+In-Reply-To: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
+References: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20121008094631.GX4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2012 at 03:25:45PM -0300, Fabio Estevam wrote:
-> On mx35pdk board there is an 8-bit microcontroller that controls several IOs, such
-> as backlight enable pin, USB host VBUS, etc.
-> 
-> Let it build by default.
-> 
-> mx35pdk also needs CONFIG_LCD_PLATFORM to be selected to activate the display,
-> so also make this the default.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, Oct 08, 2012 at 02:35:14PM +0530, Shubhrajyoti D wrote:
+> Enable the irq in the transfer and disable it after the
+> transfer is done.
 
-Applied, thanks
+This description is missing the most vital bits of information.  In years
+to come, someone will wonder "why has this changed" and there's no reason
+given in the commit log.
 
-Sascha
+Commit logs which are just mere translations from patch to English are
+evil.  Instead, good commit logs briefly state what is being done and
+then go on to describe _why_ the change is necessary.
 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 > ---
-> Changes since v1:
-> - Also select CONFIG_LCD_PLATFORM
->  arch/arm/configs/imx_v6_v7_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/i2c/busses/i2c-omap.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 565132d..8cfd747 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -140,6 +140,7 @@ CONFIG_I2C_IMX=y
->  CONFIG_SPI=y
->  CONFIG_SPI_IMX=y
->  CONFIG_GPIO_SYSFS=y
-> +CONFIG_GPIO_MC9S08DZ60=y
->  # CONFIG_HWMON is not set
->  CONFIG_WATCHDOG=y
->  CONFIG_IMX2_WDT=y
-> @@ -156,6 +157,7 @@ CONFIG_SOC_CAMERA=y
->  CONFIG_SOC_CAMERA_OV2640=y
->  CONFIG_VIDEO_MX3=y
->  CONFIG_FB=y
-> +CONFIG_LCD_PLATFORM=y
->  CONFIG_BACKLIGHT_LCD_SUPPORT=y
->  CONFIG_LCD_CLASS_DEVICE=y
->  CONFIG_LCD_L4F00242T03=y
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index b6c6b95..ce41596 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -625,6 +625,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  	if (IS_ERR_VALUE(r))
+>  		goto out;
+>  
+> +	enable_irq(dev->irq);
+>  	r = omap_i2c_wait_for_bb(dev);
+>  	if (r < 0)
+>  		goto out;
+> @@ -654,6 +655,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  
+>  	omap_i2c_wait_for_bb(dev);
+>  out:
+> +	disable_irq(dev->irq);
+>  	pm_runtime_mark_last_busy(dev->dev);
+>  	pm_runtime_put_autosuspend(dev->dev);
+>  	return r;
+> @@ -1179,6 +1181,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_unuse_clocks;
+>  	}
+>  
+> +	disable_irq(dev->irq);
+>  	adap = &dev->adapter;
+>  	i2c_set_adapdata(adap, dev);
+>  	adap->owner = THIS_MODULE;
 > -- 
-> 1.7.9.5
+> 1.7.5.4
 > 
 > 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
