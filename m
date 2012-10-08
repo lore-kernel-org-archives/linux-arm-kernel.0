@@ -1,99 +1,46 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 8 Oct 2012 11:06:46 +0100
-Subject: Mismatched aliases with DMA mappings?
-In-Reply-To: <5071290A.6030902@samsung.com>
-References: <20120921152127.GA2106@linaro.org>
- <CAH9JG2XskuxgPwHwF+3SiaMWQhFMf0x3V=d=33cV1oKuppE8PA@mail.gmail.com>
- <20120924095242.GA2122@linaro.org> <5071290A.6030902@samsung.com>
-Message-ID: <20121008100646.GB2302@linaro.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 8 Oct 2012 18:23:57 +0800
+Subject: [PATCH] ARM: tegra: rename the file of "sleep-tXX" to "sleep-tegraXX"
+Message-ID: <1349691837-30488-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 07, 2012 at 09:02:34AM +0200, Marek Szyprowski wrote:
-> Hello,
-> 
-> I'm sorry for very late response but I was busy with other urgent
-> items after getting back from holidays.
-> 
-> On 9/24/2012 11:52 AM, Dave Martin wrote:
-> >On Sat, Sep 22, 2012 at 02:22:07PM +0900, Kyungmin Park wrote:
-> 
-> >>I just show how CMA addresses mismatched aliases codes.
-> >>
-> >>In reserve function, it declares the require memory size with base
-> >>address. At that time it calles 'dma_contiguous_early_fixup()'. it
-> >>just registered address and size.
-> >>
-> >>void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long
-> >>size)
-> >>{
-> >>        dma_mmu_remap[dma_mmu_remap_num].base = base;
-> >>        dma_mmu_remap[dma_mmu_remap_num].size = size;
-> >>        dma_mmu_remap_num++;
-> >>}
-> >>
-> >>These registerd base and size will be remap at dma_contiguous_remap
-> >>function at paging_init.
-> >>
-> >>void __init dma_contiguous_remap(void)
-> >>{
-> >>        int i;
-> >>        for (i = 0; i < dma_mmu_remap_num; i++) {
-> >>                phys_addr_t start = dma_mmu_remap[i].base;
-> >>                phys_addr_t end = start + dma_mmu_remap[i].size;
-> >>                struct map_desc map;
-> >>                unsigned long addr;
-> >>
-> >>                if (end > arm_lowmem_limit)
-> >>                        end = arm_lowmem_limit;
-> >>                if (start >= end)
-> >>                        continue;
-> >>
-> >>                map.pfn = __phys_to_pfn(start);
-> >>                map.virtual = __phys_to_virt(start);
-> >>                map.length = end - start;
-> >>                map.type = MT_MEMORY_DMA_READY;
-> >>
-> >>                /*
-> >>                 * Clear previous low-memory mapping
-> >>                 */
-> >>                for (addr = __phys_to_virt(start); addr <
-> >>__phys_to_virt(end);
-> >>                     addr += PMD_SIZE)
-> >>                        pmd_clear(pmd_off_k(addr));
-> >>
-> >>                iotable_init(&map, 1);
-> >>        }
-> >>}
-> >
-> >OK, so it looks like this is done early and can't happen after the
-> >kernel has booted (?)
-> 
-> Right, the changes in the linear mapping for CMA areas are done very
-> early to make sure that the proper mapping will be available for all
-> processes in the system (CMA changes the size of the pages used for
-> holding low memory linear mappings from 1MiB/2MiB 1-level sections
-> to 4KiB pages which require 2 levels of pte). Once the kernel has
-> fully started it is not (easily) possible to alter the linear
-> mappings.
-> 
-> >Do you know whether the linear alias for DMA memory is removed when
-> >not using CMA?
-> 
-> Nope, when standard page_alloc() implementation of dma mapping is
-> used there exist 2 mappings for each allocated buffer: one in linear
-> low memory kernel mapping (cache'able) and the second created by the
-> dma-mapping subsystem (non-cache'able or writecombined). Right now
-> no one observed any issues caused by such situation assuming that no
-> process is accessing linear cache'able lowmem mappings when dma
-> non-cache'able mapping exist.
+For the naming consistency under the mach-tegra, we re-name the file of
+"sleep-tXX" to "sleep-tegraXX" (e.g., sleep-t30 to sleep-tegra30).
 
-Thanks, that clarifies my understanding.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/Makefile                       |    4 ++--
+ .../mach-tegra/{sleep-t20.S => sleep-tegra20.S}    |    0
+ .../mach-tegra/{sleep-t30.S => sleep-tegra30.S}    |    0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename arch/arm/mach-tegra/{sleep-t20.S => sleep-tegra20.S} (100%)
+ rename arch/arm/mach-tegra/{sleep-t30.S => sleep-tegra30.S} (100%)
 
-Eventually, I decided it was not worth attempting to allocate non-
-cacheable memory for my case, and I use normal memory with explicit
-maintenance instead.  This is a little more cumbersome, but so far
-it appears to work.
-
-Cheers
----Dave
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 9aa653b..e6929c6 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -13,10 +13,10 @@ obj-$(CONFIG_CPU_IDLE)			+= sleep.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks_data.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-t20.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks_data.o
+-obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= sleep-t30.o
++obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= sleep-tegra30.o
+ obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+ obj-$(CONFIG_SMP)                       += reset.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+diff --git a/arch/arm/mach-tegra/sleep-t20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+similarity index 100%
+rename from arch/arm/mach-tegra/sleep-t20.S
+rename to arch/arm/mach-tegra/sleep-tegra20.S
+diff --git a/arch/arm/mach-tegra/sleep-t30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+similarity index 100%
+rename from arch/arm/mach-tegra/sleep-t30.S
+rename to arch/arm/mach-tegra/sleep-tegra30.S
+-- 
+1.7.0.4
