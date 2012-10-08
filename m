@@ -1,668 +1,295 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 8 Oct 2012 10:50:00 +0800
-Subject: [PATCH] ARM: sort select statements alphanumerically
-In-Reply-To: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
-References: <E1TKX8k-0006QP-M5@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAMPhdO-SuJwz4uN=1sQWtr3WOn656_M9iEGkMDjtOKTrsMUDpg@mail.gmail.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Mon, 8 Oct 2012 09:38:35 +0530
+Subject: [PATCH 1/1] mtd: st fsmc_nand: pass the ale and cmd resource
+ via resource
+In-Reply-To: <1349356456-13371-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1349356456-13371-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <507251C3.7020506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 7, 2012 at 12:22 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> As suggested by Andrew Morton:
+On 10/4/2012 6:44 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Do not use the platform_data to pass resource and be smart in the drivers.
+> Just pass it via resource
 >
->   This is a pet peeve of mine.  Any time there's a long list of items
->   (header file inclusions, kconfig entries, array initalisers, etc) and
->   someone wants to add a new item, they *always* go and stick it at the
->   end of the list.
->   ...
->   Guys, don't do this.  Either put the new item into a randomly-chosen
->   position or, probably better, alphanumerically sort the list.
+> Switch to devm_request_and_ioremap at the sametime
 >
->   For this reason it looks like approximately 0% of the patchset will
->   apply, sorry.
->
-> lets sort all our select statements alphanumerically.  This commit was
-> created by the following script:
->
-> #!/usr/bin/perl
-> while (<>) {
->         while (/\\\s*$/) {
->                 $_ .= <>;
->         }
->         undef %selects if /^\s*config\s+/;
->         if (/^\s+select\s+(\w+).*/) {
->                 if (defined($selects{$1})) {
->                         if ($selects{$1} eq $_) {
->                                 print STDERR "Warning: removing duplicated $1 entry\n";
->                         } else {
->                                 print STDERR "Error: $1 differently selected\n".
->                                         "\tOld: $selects{$1}\n".
->                                         "\tNew: $_\n";
->                                 exit 1;
->                         }
->                 }
->                 $selects{$1} = $_;
->                 next;
->         }
->         if (%selects and (/^\s*$/ or /^\s+help/)) {
->                 foreach $k (sort (keys %selects)) {
->                         print "$selects{$k}";
->                 }
->                 undef %selects;
->         }
->         print;
-> }
-> if (%selects) {
->         foreach $k (sort (keys %selects)) {
->                 print "$selects{$k}";
->         }
-> }
->
-> It found two duplicates:
->
-> Warning: removing duplicated S5P_SETUP_MIPIPHY entry
-> Warning: removing duplicated HARDIRQS_SW_RESEND entry
->
-> and they are identical duplicates, hence the shrinkage in the diffstat
-> of two lines.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> Cc: Linus Walleij<linus.walleij@linaro.org>
+> Cc: Vipin Kumar<vipin.kumar@st.com>
+> Cc: linux-mtd at lists.infradead.org
 > ---
-> This commit is likely to change as we get closer to the end of the merge
-> window, as other changes get merged into Linus' tree.  I will be refreshing
-> this from time to time, and keeping it out of linux-next, as it will cause
-> more pain than its worth to put it into linux-next.
+>   .../devicetree/bindings/mtd/fsmc-nand.txt          |   12 +++---
+>   arch/arm/boot/dts/spear13xx.dtsi                   |   10 ++---
+>   arch/arm/boot/dts/spear300.dtsi                    |    8 ++--
+>   arch/arm/boot/dts/spear310.dtsi                    |    8 ++--
+>   arch/arm/boot/dts/spear320.dtsi                    |    8 ++--
+>   arch/arm/boot/dts/spear600.dtsi                    |    8 ++--
+>   arch/arm/mach-u300/core.c                          |   14 ++++++-
+>   drivers/mtd/nand/fsmc_nand.c                       |   44 +++++---------------
+>   include/linux/mtd/fsmc.h                           |    3 --
+>   9 files changed, 49 insertions(+), 66 deletions(-)
 >
-> Anyone who wants to give this a review to check that it's correct are welcome,
-> but I don't think it would be appropriate to collect attributation tags for
-> it, as this won't be the final patch.
+> diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+> index e2c663b..e3ea32e 100644
+> --- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+> @@ -3,9 +3,7 @@
+>   Required properties:
+>   - compatible : "st,spear600-fsmc-nand"
+>   - reg : Address range of the mtd chip
+> -- reg-names: Should contain the reg names "fsmc_regs" and "nand_data"
+> -- st,ale-off : Chip specific offset to ALE
+> -- st,cle-off : Chip specific offset to CLE
+> +- reg-names: Should contain the reg names "fsmc_regs", "nand_data", "nand_addr" and "nand_cmd"
 >
-> This patch is intentionally broken to prevent Linus from applying it - this
-> is information only!
+>   Optional properties:
+>   - bank-width : Width (in bytes) of the device.  If not present, the width
+> @@ -19,10 +17,10 @@ Example:
+>   		#address-cells =<1>;
+>   		#size-cells =<1>;
+>   		reg =<0xd1800000 0x1000	/* FSMC Register */
+> -		       0xd2000000 0x4000>;	/* NAND Base */
+> -		reg-names = "fsmc_regs", "nand_data";
+> -		st,ale-off =<0x20000>;
+> -		st,cle-off =<0x10000>;
+> +		       0xd2000000 0x0010	/* NAND Base DATA */
+> +		       0xd2020000 0x0010	/* NAND Base ADDR */
+> +		       0xd2010000 0x0010>;	/* NAND Base CMD */
+> +		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
 >
-> Anyone who wants to apply it can do so by first running this patch through:
+>   		bank-width =<1>;
+>   		nand-skip-bbtscan;
+> diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+> index f7b84ac..14a6d15 100644
+> --- a/arch/arm/boot/dts/spear13xx.dtsi
+> +++ b/arch/arm/boot/dts/spear13xx.dtsi
+> @@ -104,15 +104,15 @@
+>   			compatible = "st,spear600-fsmc-nand";
+>   			#address-cells =<1>;
+>   			#size-cells =<1>;
+> -			reg =<0xb0000000 0x1000	/* FSMC Register */
+> -			       0xb0800000 0x0010>;	/* NAND Base */
+> -			reg-names = "fsmc_regs", "nand_data";
+> +			reg =<0xb0000000 0x1000	/* FSMC Register*/
+> +			       0xb0800000 0x0010	/* NAND Base DATA */
+> +			       0xb0820000 0x0010	/* NAND Base ADDR */
+> +			       0xb0810000 0x0010>;	/* NAND Base CMD */
+> +			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+>   			interrupts =<0 20 0x4
+>   				      0 21 0x4
+>   				      0 22 0x4
+>   				      0 23 0x4>;
+> -			st,ale-off =<0x20000>;
+> -			st,cle-off =<0x10000>;
+>   			status = "disabled";
+>   		};
 >
->         sed 's/^-- /@@ /'
+> diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+> index ed3627c..bc43638 100644
+> --- a/arch/arm/boot/dts/spear300.dtsi
+> +++ b/arch/arm/boot/dts/spear300.dtsi
+> @@ -38,10 +38,10 @@
+>   			#address-cells =<1>;
+>   			#size-cells =<1>;
+>   			reg =<0x94000000 0x1000	/* FSMC Register */
+> -			       0x80000000 0x0010>;	/* NAND Base */
+> -			reg-names = "fsmc_regs", "nand_data";
+> -			st,ale-off =<0x20000>;
+> -			st,cle-off =<0x10000>;
+> +			       0x80000000 0x0010	/* NAND Base DATA */
+> +			       0x80020000 0x0010	/* NAND Base ADDR */
+> +			       0x80010000 0x0010>;	/* NAND Base CMD */
+> +			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+>   			status = "disabled";
+>   		};
 >
->  arch/arm/Kconfig                  |  399 ++++++++++++++++++-------------------
->  arch/arm/common/Kconfig           |    4 +-
->  arch/arm/mach-at91/Kconfig        |   26 ++--
->  arch/arm/mach-clps711x/Kconfig    |    4 +-
->  arch/arm/mach-davinci/Kconfig     |   16 +-
->  arch/arm/mach-exynos/Kconfig      |  181 +++++++++---------
->  arch/arm/mach-footbridge/Kconfig  |    8 +-
->  arch/arm/mach-h720x/Kconfig       |    2 +-
->  arch/arm/mach-imx/Kconfig         |  120 ++++++------
->  arch/arm/mach-ixp4xx/Kconfig      |    2 +-
->  arch/arm/mach-mmp/Kconfig         |    6 +-
->  arch/arm/mach-msm/Kconfig         |   28 ++--
->  arch/arm/mach-nomadik/Kconfig     |    4 +-
->  arch/arm/mach-omap1/Kconfig       |    8 +-
->  arch/arm/mach-omap2/Kconfig       |   68 +++---
->  arch/arm/mach-prima2/Kconfig      |    2 +-
->  arch/arm/mach-pxa/Kconfig         |  124 ++++++------
->  arch/arm/mach-realview/Kconfig    |   12 +-
->  arch/arm/mach-s3c2412/Kconfig     |    2 +-
->  arch/arm/mach-s3c2440/Kconfig     |    2 +-
->  arch/arm/mach-s3c24xx/Kconfig     |   82 ++++----
->  arch/arm/mach-s3c64xx/Kconfig     |   96 +++++-----
->  arch/arm/mach-s5p64x0/Kconfig     |   28 ++--
->  arch/arm/mach-s5pc100/Kconfig     |   12 +-
->  arch/arm/mach-s5pv210/Kconfig     |   50 +++---
->  arch/arm/mach-sa1100/Kconfig      |   12 +-
->  arch/arm/mach-shmobile/Kconfig    |   42 ++--
->  arch/arm/mach-tegra/Kconfig       |   32 ++--
->  arch/arm/mach-u300/Kconfig        |    2 +-
->  arch/arm/mach-ux500/Kconfig       |   16 +-
->  arch/arm/mach-versatile/Kconfig   |    4 +-
->  arch/arm/mm/Kconfig               |  106 +++++-----
->  arch/arm/plat-mxc/Kconfig         |    4 +-
->  arch/arm/plat-mxc/devices/Kconfig |    2 +-
->  arch/arm/plat-nomadik/Kconfig     |    2 +-
->  arch/arm/plat-omap/Kconfig        |    8 +-
->  arch/arm/plat-s3c24xx/Kconfig     |    2 +-
->  arch/arm/plat-samsung/Kconfig     |   14 +-
->  arch/arm/plat-spear/Kconfig       |    4 +-
->  39 files changed, 767 insertions(+), 769 deletions(-)
+> diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
+> index 62fc4fb..7840e52 100644
+> --- a/arch/arm/boot/dts/spear310.dtsi
+> +++ b/arch/arm/boot/dts/spear310.dtsi
+> @@ -32,10 +32,10 @@
+>   			#address-cells =<1>;
+>   			#size-cells =<1>;
+>   			reg =<0x44000000 0x1000	/* FSMC Register */
+> -			       0x40000000 0x0010>;	/* NAND Base */
+> -			reg-names = "fsmc_regs", "nand_data";
+> -			st,ale-off =<0x10000>;
+> -			st,cle-off =<0x20000>;
+> +			       0x40000000 0x0010	/* NAND Base DATA */
+> +			       0x40020000 0x0010	/* NAND Base ADDR */
+> +			       0x40010000 0x0010>;	/* NAND Base CMD */
+> +			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+>   			status = "disabled";
+>   		};
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 7bab17e..4df850c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> -- -1,54 +1,53 @@
->  config ARM
->         bool
->         default y
-> +       select ARCH_BINFMT_ELF_RANDOMIZE_PIE
-> +       select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->         select ARCH_HAVE_CUSTOM_GPIO_H
-> -       select HAVE_AOUT
-> -       select HAVE_DMA_API_DEBUG
-> -       select HAVE_IDE if PCI || ISA || PCMCIA
-> -       select HAVE_DMA_ATTRS
-> -       select HAVE_DMA_CONTIGUOUS if MMU
-> -       select HAVE_MEMBLOCK
-> -       select RTC_LIB
-> -       select SYS_SUPPORTS_APM_EMULATION
-> +       select ARCH_WANT_IPC_PARSE_VERSION
-> +       select CPU_PM if (SUSPEND || CPU_IDLE)
-> +       select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN
->         select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
-> -       select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> -       select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
-> +       select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-> +       select GENERIC_IRQ_PROBE
-> +       select GENERIC_IRQ_SHOW
-> +       select GENERIC_PCI_IOMAP
-> +       select GENERIC_SMP_IDLE_THREAD
-> +       select GENERIC_STRNCPY_FROM_USER
-> +       select GENERIC_STRNLEN_USER
-> +       select HARDIRQS_SW_RESEND
-> +       select HAVE_AOUT
->         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
->         select HAVE_ARCH_KGDB
->         select HAVE_ARCH_TRACEHOOK
-> -       select HAVE_KPROBES if !XIP_KERNEL
-> -       select HAVE_KRETPROBES if (HAVE_KPROBES)
-> -       select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-> -       select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-> +       select HAVE_BPF_JIT
-> +       select HAVE_C_RECORDMCOUNT
-> +       select HAVE_DMA_API_DEBUG
-> +       select HAVE_DMA_ATTRS
-> +       select HAVE_DMA_CONTIGUOUS if MMU
->         select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
-> +       select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
->         select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
-> -       select ARCH_BINFMT_ELF_RANDOMIZE_PIE
-> +       select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
->         select HAVE_GENERIC_DMA_COHERENT
-> +       select HAVE_GENERIC_HARDIRQS
-> +       select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
-> +       select HAVE_IDE if PCI || ISA || PCMCIA
-> +       select HAVE_IRQ_WORK
->         select HAVE_KERNEL_GZIP
-> -       select HAVE_KERNEL_LZO
->         select HAVE_KERNEL_LZMA
-> +       select HAVE_KERNEL_LZO
->         select HAVE_KERNEL_XZ
-> -       select HAVE_IRQ_WORK
-> +       select HAVE_KPROBES if !XIP_KERNEL
-> +       select HAVE_KRETPROBES if (HAVE_KPROBES)
-> +       select HAVE_MEMBLOCK
-> +       select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
->         select HAVE_PERF_EVENTS
-> -       select PERF_USE_VMALLOC
->         select HAVE_REGS_AND_STACK_ACCESS_API
-> -       select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
-> -       select HAVE_C_RECORDMCOUNT
-> -       select HAVE_GENERIC_HARDIRQS
-> -       select HARDIRQS_SW_RESEND
-> -       select GENERIC_IRQ_PROBE
-> -       select GENERIC_IRQ_SHOW
-> -       select ARCH_WANT_IPC_PARSE_VERSION
-> -       select HARDIRQS_SW_RESEND
-> -       select CPU_PM if (SUSPEND || CPU_IDLE)
-> -       select GENERIC_PCI_IOMAP
-> -       select HAVE_BPF_JIT
-> -       select GENERIC_SMP_IDLE_THREAD
->         select KTIME_SCALAR
-> -       select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-> -       select GENERIC_STRNCPY_FROM_USER
-> -       select GENERIC_STRNLEN_USER
-> -       select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN
-> +       select PERF_USE_VMALLOC
-> +       select RTC_LIB
-> +       select SYS_SUPPORTS_APM_EMULATION
->         help
->           The ARM series is a line of low-power-consumption RISC chip designs
->           licensed by ARM Ltd and targeted at embedded applications and
-> -- -64,9 +63,9 @@ config NEED_SG_DMA_LENGTH
->         bool
+> diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
+> index 1f49d69..5ad8206 100644
+> --- a/arch/arm/boot/dts/spear320.dtsi
+> +++ b/arch/arm/boot/dts/spear320.dtsi
+> @@ -38,10 +38,10 @@
+>   			#address-cells =<1>;
+>   			#size-cells =<1>;
+>   			reg =<0x4c000000 0x1000	/* FSMC Register */
+> -			       0x50000000 0x0010>;	/* NAND Base */
+> -			reg-names = "fsmc_regs", "nand_data";
+> -			st,ale-off =<0x20000>;
+> -			st,cle-off =<0x10000>;
+> +			       0x50000000 0x0010	/* NAND Base DATA */
+> +			       0x50020000 0x0010	/* NAND Base ADDR */
+> +			       0x50010000 0x0010>;	/* NAND Base CMD */
+> +			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+>   			status = "disabled";
+>   		};
 >
->  config ARM_DMA_USE_IOMMU
-> -       select NEED_SG_DMA_LENGTH
-> -       select ARM_HAS_SG_CHAIN
->         bool
-> +       select ARM_HAS_SG_CHAIN
-> +       select NEED_SG_DMA_LENGTH
+> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+> index a3c36e4..4ecc66f 100644
+> --- a/arch/arm/boot/dts/spear600.dtsi
+> +++ b/arch/arm/boot/dts/spear600.dtsi
+> @@ -67,10 +67,10 @@
+>   			#address-cells =<1>;
+>   			#size-cells =<1>;
+>   			reg =<0xd1800000 0x1000	/* FSMC Register */
+> -			       0xd2000000 0x4000>;	/* NAND Base */
+> -			reg-names = "fsmc_regs", "nand_data";
+> -			st,ale-off =<0x20000>;
+> -			st,cle-off =<0x10000>;
+> +			       0xd2000000 0x0010	/* NAND Base DATA */
+> +			       0xd2020000 0x0010	/* NAND Base ADDR */
+> +			       0xd2010000 0x0010>;	/* NAND Base CMD */
+> +			reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+>   			status = "disabled";
+>   		};
 >
->  config HAVE_PWM
->         bool
-> -- -258,69 +257,69 @@ choice
+> diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+> index ef6f602..527bcc2 100644
+> --- a/arch/arm/mach-u300/core.c
+> +++ b/arch/arm/mach-u300/core.c
+> @@ -252,6 +252,18 @@ static struct resource rtc_resources[] = {
+>    */
+>   static struct resource fsmc_resources[] = {
+>   	{
+> +		.name  = "nand_addr",
+> +		.start = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_ALE,
+> +		.end   = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_ALE + SZ_16K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.name  = "nand_cmd",
+> +		.start = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_CLE,
+> +		.end   = U300_NAND_CS0_PHYS_BASE + PLAT_NAND_CLE + SZ_16K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	{
+>   		.name  = "nand_data",
+>   		.start = U300_NAND_CS0_PHYS_BASE,
+>   		.end   = U300_NAND_CS0_PHYS_BASE + SZ_16K - 1,
+> @@ -1496,8 +1508,6 @@ static struct fsmc_nand_platform_data nand_platform_data = {
+>   	.nr_partitions = ARRAY_SIZE(u300_partitions),
+>   	.options = NAND_SKIP_BBTSCAN,
+>   	.width = FSMC_NAND_BW8,
+> -	.ale_off = PLAT_NAND_ALE,
+> -	.cle_off = PLAT_NAND_CLE,
+>   };
 >
->  config ARCH_MULTIPLATFORM
->         bool "Allow multiple platforms to be selected"
-> +       depends on MMU
->         select ARM_PATCH_PHYS_VIRT
->         select AUTO_ZRELADDR
->         select COMMON_CLK
->         select MULTI_IRQ_HANDLER
->         select SPARSE_IRQ
->         select USE_OF
-> -       depends on MMU
+>   static struct platform_device nand_device = {
+> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+> index 38d2624..cb86450 100644
+> --- a/drivers/mtd/nand/fsmc_nand.c
+> +++ b/drivers/mtd/nand/fsmc_nand.c
+> @@ -876,8 +876,6 @@ static int __devinit fsmc_nand_probe_config_dt(struct platform_device *pdev,
+>   			return -EINVAL;
+>   		}
+>   	}
+> -	of_property_read_u32(np, "st,ale-off",&pdata->ale_off);
+> -	of_property_read_u32(np, "st,cle-off",&pdata->cle_off);
+>   	if (of_get_property(np, "nand-skip-bbtscan", NULL))
+>   		pdata->options = NAND_SKIP_BBTSCAN;
 >
->  config ARCH_INTEGRATOR
->         bool "ARM Ltd. Integrator family"
-> -       select ARM_AMBA
->         select ARCH_HAS_CPUFREQ
-> +       select ARM_AMBA
->         select COMMON_CLK
->         select COMMON_CLK_VERSATILE
-> +       select GENERIC_CLOCKEVENTS
->         select HAVE_TCM
->         select ICST
-> -       select GENERIC_CLOCKEVENTS
-> +       select MULTI_IRQ_HANDLER
-> +       select NEED_MACH_MEMORY_H
->         select PLAT_VERSATILE
->         select PLAT_VERSATILE_FPGA_IRQ
-> -       select NEED_MACH_MEMORY_H
->         select SPARSE_IRQ
-> -       select MULTI_IRQ_HANDLER
->         help
->           Support for ARM's Integrator platform.
+> @@ -935,41 +933,28 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>   	if (!res)
+>   		return -EINVAL;
 >
->  config ARCH_REALVIEW
->         bool "ARM Ltd. RealView family"
-> +       select ARCH_WANT_OPTIONAL_GPIOLIB
->         select ARM_AMBA
-> +       select ARM_TIMER_SP804
->         select COMMON_CLK
->         select COMMON_CLK_VERSATILE
-> -       select ICST
->         select GENERIC_CLOCKEVENTS
-> -       select ARCH_WANT_OPTIONAL_GPIOLIB
-> -       select PLAT_VERSATILE
-> -       select PLAT_VERSATILE_CLCD
-> -       select ARM_TIMER_SP804
->         select GPIO_PL061 if GPIOLIB
-> +       select ICST
->         select NEED_MACH_MEMORY_H
-> +       select PLAT_VERSATILE
-> +       select PLAT_VERSATILE_CLCD
->         help
->           This enables support for ARM Ltd RealView boards.
+> -	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
+> -				pdev->name)) {
+> -		dev_err(&pdev->dev, "Failed to get memory data resourse\n");
+> -		return -ENOENT;
+> -	}
+> -
+> -	host->data_pa = (dma_addr_t)res->start;
+> -	host->data_va = devm_ioremap(&pdev->dev, res->start,
+> -			resource_size(res));
+> +	host->data_va = devm_request_and_ioremap(&pdev->dev, res);
+>   	if (!host->data_va) {
+>   		dev_err(&pdev->dev, "data ioremap failed\n");
+>   		return -ENOMEM;
+>   	}
+> +	host->data_pa = (dma_addr_t)res->start;
 >
->  config ARCH_VERSATILE
->         bool "ARM Ltd. Versatile family"
-> +       select ARCH_WANT_OPTIONAL_GPIOLIB
->         select ARM_AMBA
-> +       select ARM_TIMER_SP804
->         select ARM_VIC
->         select CLKDEV_LOOKUP
-> +       select GENERIC_CLOCKEVENTS
->         select HAVE_MACH_CLKDEV
->         select ICST
-> -       select GENERIC_CLOCKEVENTS
-> -       select ARCH_WANT_OPTIONAL_GPIOLIB
->         select PLAT_VERSATILE
-> -       select PLAT_VERSATILE_CLOCK
->         select PLAT_VERSATILE_CLCD
-> +       select PLAT_VERSATILE_CLOCK
->         select PLAT_VERSATILE_FPGA_IRQ
-> -       select ARM_TIMER_SP804
->         help
->           This enables support for ARM Ltd Versatile board.
+> -	if (!devm_request_mem_region(&pdev->dev, res->start + pdata->ale_off,
+> -			resource_size(res), pdev->name)) {
+> -		dev_err(&pdev->dev, "Failed to get memory ale resourse\n");
+> -		return -ENOENT;
+> -	}
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nand_addr");
+> +	if (!res)
+> +		return -EINVAL;
 >
->  config ARCH_AT91
->         bool "Atmel AT91"
->         select ARCH_REQUIRE_GPIOLIB
-> -       select HAVE_CLK
->         select CLKDEV_LOOKUP
-> +       select HAVE_CLK
->         select IRQ_DOMAIN
->         select NEED_MACH_GPIO_H
->         select NEED_MACH_IO_H if PCCARD
-> -- -347,19 +346,19 @@ config ARCH_BCM2835
+> -	host->addr_va = devm_ioremap(&pdev->dev, res->start + pdata->ale_off,
+> -			resource_size(res));
+> +	host->addr_va = devm_request_and_ioremap(&pdev->dev, res);
+>   	if (!host->addr_va) {
+>   		dev_err(&pdev->dev, "ale ioremap failed\n");
+>   		return -ENOMEM;
+>   	}
 >
->  config ARCH_CLPS711X
->         bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
-> -       select CPU_ARM720T
->         select ARCH_USES_GETTIMEOFFSET
-> -       select COMMON_CLK
->         select CLKDEV_LOOKUP
-> +       select COMMON_CLK
-> +       select CPU_ARM720T
->         select NEED_MACH_MEMORY_H
->         help
->           Support for Cirrus Logic 711x/721x/731x based boards.
+> -	if (!devm_request_mem_region(&pdev->dev, res->start + pdata->cle_off,
+> -			resource_size(res), pdev->name)) {
+> -		dev_err(&pdev->dev, "Failed to get memory cle resourse\n");
+> -		return -ENOENT;
+> -	}
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nand_cmd");
+> +	if (!res)
+> +		return -EINVAL;
 >
->  config ARCH_CNS3XXX
->         bool "Cavium Networks CNS3XXX family"
-> +       select ARM_GIC
->         select CPU_V6K
->         select GENERIC_CLOCKEVENTS
-> -       select ARM_GIC
->         select MIGHT_HAVE_CACHE_L2X0
->         select MIGHT_HAVE_PCI
->         select PCI_DOMAINS if PCI
-> -- -368,20 +367,20 @@ config ARCH_CNS3XXX
+> -	host->cmd_va = devm_ioremap(&pdev->dev, res->start + pdata->cle_off,
+> -			resource_size(res));
+> +	host->cmd_va = devm_request_and_ioremap(&pdev->dev, res);
+>   	if (!host->cmd_va) {
+>   		dev_err(&pdev->dev, "ale ioremap failed\n");
+>   		return -ENOMEM;
+> @@ -979,14 +964,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>   	if (!res)
+>   		return -EINVAL;
 >
->  config ARCH_GEMINI
->         bool "Cortina Systems Gemini"
-> -       select CPU_FA526
->         select ARCH_REQUIRE_GPIOLIB
->         select ARCH_USES_GETTIMEOFFSET
-> +       select CPU_FA526
->         help
->           Support for the Cortina Systems Gemini family SoCs
+> -	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
+> -			pdev->name)) {
+> -		dev_err(&pdev->dev, "Failed to get memory regs resourse\n");
+> -		return -ENOENT;
+> -	}
+> -
+> -	host->regs_va = devm_ioremap(&pdev->dev, res->start,
+> -			resource_size(res));
+> +	host->regs_va = devm_request_and_ioremap(&pdev->dev, res);
+>   	if (!host->regs_va) {
+>   		dev_err(&pdev->dev, "regs ioremap failed\n");
+>   		return -ENOMEM;
+> diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
+> index b200292..d6ed61e 100644
+> --- a/include/linux/mtd/fsmc.h
+> +++ b/include/linux/mtd/fsmc.h
+> @@ -155,9 +155,6 @@ struct fsmc_nand_platform_data {
+>   	unsigned int		width;
+>   	unsigned int		bank;
 >
->  config ARCH_SIRF
->         bool "CSR SiRF"
-> -       select NO_IOPORT
->         select ARCH_REQUIRE_GPIOLIB
-> -       select GENERIC_CLOCKEVENTS
->         select COMMON_CLK
-> +       select GENERIC_CLOCKEVENTS
->         select GENERIC_IRQ_CHIP
->         select MIGHT_HAVE_CACHE_L2X0
-> +       select NO_IOPORT
->         select PINCTRL
->         select PINCTRL_SIRF
->         select USE_OF
-> -- -390,12 +389,12 @@ config ARCH_SIRF
+> -	/* CLE, ALE offsets */
+> -	unsigned int		cle_off;
+> -	unsigned int		ale_off;
+>   	enum access_mode	mode;
 >
->  config ARCH_EBSA110
->         bool "EBSA-110"
-> +       select ARCH_USES_GETTIMEOFFSET
->         select CPU_SA110
->         select ISA
-> -       select NO_IOPORT
-> -       select ARCH_USES_GETTIMEOFFSET
->         select NEED_MACH_IO_H
->         select NEED_MACH_MEMORY_H
-> +       select NO_IOPORT
->         help
->           This is an evaluation board for the StrongARM processor available
->           from Digital. It has limited hardware on-board, including an
-> -- -404,13 +403,13 @@ config ARCH_EBSA110
->
->  config ARCH_EP93XX
->         bool "EP93xx-based"
-> -       select CPU_ARM920T
-> +       select ARCH_HAS_HOLES_MEMORYMODEL
-> +       select ARCH_REQUIRE_GPIOLIB
-> +       select ARCH_USES_GETTIMEOFFSET
->         select ARM_AMBA
->         select ARM_VIC
->         select CLKDEV_LOOKUP
-> -       select ARCH_REQUIRE_GPIOLIB
-> -       select ARCH_HAS_HOLES_MEMORYMODEL
-> -       select ARCH_USES_GETTIMEOFFSET
-> +       select CPU_ARM920T
->         select NEED_MACH_MEMORY_H
->         help
->           This enables support for the Cirrus EP93xx series of CPUs.
-> -- -429,10 +428,10 @@ config ARCH_FOOTBRIDGE
->
->  config ARCH_MXC
->         bool "Freescale MXC/iMX-based"
-> -       select GENERIC_CLOCKEVENTS
->         select ARCH_REQUIRE_GPIOLIB
->         select CLKDEV_LOOKUP
->         select CLKSRC_MMIO
-> +       select GENERIC_CLOCKEVENTS
->         select GENERIC_IRQ_CHIP
->         select MULTI_IRQ_HANDLER
->         select SPARSE_IRQ
-> -- -442,11 +441,11 @@ config ARCH_MXC
->
->  config ARCH_MXS
->         bool "Freescale MXS-based"
-> -       select GENERIC_CLOCKEVENTS
->         select ARCH_REQUIRE_GPIOLIB
->         select CLKDEV_LOOKUP
->         select CLKSRC_MMIO
->         select COMMON_CLK
-> +       select GENERIC_CLOCKEVENTS
->         select HAVE_CLK_PREPARE
->         select MULTI_IRQ_HANDLER
->         select PINCTRL
-> -- -457,44 +456,44 @@ config ARCH_MXS
->
->  config ARCH_NETX
->         bool "Hilscher NetX based"
-> +       select ARM_VIC
->         select CLKSRC_MMIO
->         select CPU_ARM926T
-> -       select ARM_VIC
->         select GENERIC_CLOCKEVENTS
->         help
->           This enables support for systems based on the Hilscher NetX Soc
->
->  config ARCH_H720X
->         bool "Hynix HMS720x-based"
-> +       select ARCH_USES_GETTIMEOFFSET
->         select CPU_ARM720T
->         select ISA_DMA_API
-> -       select ARCH_USES_GETTIMEOFFSET
->         help
->           This enables support for systems based on the Hynix HMS720x
->
->  config ARCH_IOP13XX
->         bool "IOP13xx-based"
->         depends on MMU
-> -       select CPU_XSC3
-> -       select PLAT_IOP
-> -       select PCI
->         select ARCH_SUPPORTS_MSI
-> -       select VMSPLIT_1G
-> +       select CPU_XSC3
->         select NEED_MACH_MEMORY_H
->         select NEED_RET_TO_USER
-> +       select PCI
-> +       select PLAT_IOP
-> +       select VMSPLIT_1G
->         help
->           Support for Intel's IOP13XX (XScale) family of processors.
->
->  config ARCH_IOP32X
->         bool "IOP32x-based"
->         depends on MMU
-> +       select ARCH_REQUIRE_GPIOLIB
->         select CPU_XSCALE
->         select NEED_MACH_GPIO_H
->         select NEED_MACH_IO_H
->         select NEED_RET_TO_USER
-> -       select PLAT_IOP
->         select PCI
-> -       select ARCH_REQUIRE_GPIOLIB
-> +       select PLAT_IOP
->         help
->           Support for Intel's 80219 and IOP32X (XScale) family of
->           processors.
-> -- -502,13 +501,13 @@ config ARCH_IOP32X
->  config ARCH_IOP33X
->         bool "IOP33x-based"
->         depends on MMU
-> +       select ARCH_REQUIRE_GPIOLIB
->         select CPU_XSCALE
->         select NEED_MACH_GPIO_H
->         select NEED_MACH_IO_H
->         select NEED_RET_TO_USER
-> -       select PLAT_IOP
->         select PCI
-> -       select ARCH_REQUIRE_GPIOLIB
-> +       select PLAT_IOP
->         help
->           Support for Intel's IOP33X (XScale) family of processors.
->
-> -- -516,32 +515,32 @@ config ARCH_IXP4XX
->         bool "IXP4xx-based"
->         depends on MMU
->         select ARCH_HAS_DMA_SET_COHERENT_MASK
-> +       select ARCH_REQUIRE_GPIOLIB
->         select CLKSRC_MMIO
->         select CPU_XSCALE
-> -       select ARCH_REQUIRE_GPIOLIB
-> +       select DMABOUNCE if PCI
->         select GENERIC_CLOCKEVENTS
->         select MIGHT_HAVE_PCI
->         select NEED_MACH_IO_H
-> -       select DMABOUNCE if PCI
->         help
->           Support for Intel's IXP4XX (XScale) family of processors.
->
->  config ARCH_DOVE
->         bool "Marvell Dove"
-> -       select CPU_V7
-> -       select PCI
->         select ARCH_REQUIRE_GPIOLIB
-> +       select CPU_V7
->         select GENERIC_CLOCKEVENTS
-> +       select PCI
->         select PLAT_ORION
->         help
->           Support for the Marvell Dove SoC 88AP510
->
->  config ARCH_KIRKWOOD
->         bool "Marvell Kirkwood"
-> -       select CPU_FEROCEON
-> -       select PCI
->         select ARCH_REQUIRE_GPIOLIB
-> +       select CPU_FEROCEON
->         select GENERIC_CLOCKEVENTS
-> +       select PCI
->         select PLAT_ORION
->         help
->           Support for the following Marvell Kirkwood series SoCs:
-> -- -549,25 +548,25 @@ config ARCH_KIRKWOOD
->
->  config ARCH_LPC32XX
->         bool "NXP LPC32XX"
-> -       select CLKSRC_MMIO
-> -       select CPU_ARM926T
->         select ARCH_REQUIRE_GPIOLIB
-> -       select HAVE_IDE
->         select ARM_AMBA
-> -       select USB_ARCH_HAS_OHCI
->         select CLKDEV_LOOKUP
-> +       select CLKSRC_MMIO
-> +       select CPU_ARM926T
->         select GENERIC_CLOCKEVENTS
-> -       select USE_OF
-> +       select HAVE_IDE
->         select HAVE_PWM
-> +       select USB_ARCH_HAS_OHCI
-> +       select USE_OF
->         help
->           Support for the NXP LPC32XX family of processors
->
->  config ARCH_MV78XX0
->         bool "Marvell MV78xx0"
-> -       select CPU_FEROCEON
-> -       select PCI
->         select ARCH_REQUIRE_GPIOLIB
-> +       select CPU_FEROCEON
->         select GENERIC_CLOCKEVENTS
-> +       select PCI
->         select PLAT_ORION
->         help
->           Support for the following Marvell MV78xx0 series SoCs:
-> -- -576,10 +575,10 @@ config ARCH_MV78XX0
->  config ARCH_ORION5X
->         bool "Marvell Orion"
->         depends on MMU
-> -       select CPU_FEROCEON
-> -       select PCI
->         select ARCH_REQUIRE_GPIOLIB
-> +       select CPU_FEROCEON
->         select GENERIC_CLOCKEVENTS
-> +       select PCI
->         select PLAT_ORION
->         help
->           Support for the following Marvell Orion 5x series SoCs:
-> -- -591,33 +590,33 @@ config ARCH_MMP
->         depends on MMU
->         select ARCH_REQUIRE_GPIOLIB
->         select CLKDEV_LOOKUP
-> +       select GENERIC_ALLOCATOR
->         select GENERIC_CLOCKEVENTS
->         select GPIO_PXA
->         select IRQ_DOMAIN
-> +       select NEED_MACH_GPIO_H
->         select PLAT_PXA
->         select SPARSE_IRQ
-> -       select GENERIC_ALLOCATOR
-> -       select NEED_MACH_GPIO_H
->         help
->           Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
->
->  config ARCH_KS8695
->         bool "Micrel/Kendin KS8695"
-> -       select CPU_ARM922T
->         select ARCH_REQUIRE_GPIOLIB
-> -       select NEED_MACH_MEMORY_H
->         select CLKSRC_MMIO
-> +       select CPU_ARM922T
->         select GENERIC_CLOCKEVENTS
-> +       select NEED_MACH_MEMORY_H
->         help
->           Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
->           System-on-Chip devices.
->
->  config ARCH_W90X900
->         bool "Nuvoton W90X900 CPU"
-> -       select CPU_ARM926T
->         select ARCH_REQUIRE_GPIOLIB
->         select CLKDEV_LOOKUP
->         select CLKSRC_MMIO
-> +       select CPU_ARM926T
->         select GENERIC_CLOCKEVENTS
->         help
->           Support for Nuvoton (Winbond logic dept.) ARM9 processor,
-> -- -630,16 +629,16 @@ config ARCH_W90X900
->
->  config ARCH_TEGRA
->         bool "NVIDIA Tegra"
-> +       select ARCH_HAS_CPUFREQ
->         select CLKDEV_LOOKUP
->         select CLKSRC_MMIO
-> +       select COMMON_CLK
->         select GENERIC_CLOCKEVENTS
->         select GENERIC_GPIO
->         select HAVE_CLK
->         select HAVE_SMP
->         select MIGHT_HAVE_CACHE_L2X0
-> -       select ARCH_HAS_CPUFREQ
->         select USE_OF
-> -       select COMMON_CLK
->         help
->           This enables support for NVIDIA Tegra based systems (Tegra APX,
->           Tegra 6xx and Tegra 2 series).
-> -- -647,29 +646,29 @@ config ARCH_TEGRA
->  config ARCH_PXA
->         bool "PXA2xx/PXA3xx-based"
->         depends on MMU
-> -       select ARCH_MTD_XIP
->         select ARCH_HAS_CPUFREQ
-> +       select ARCH_MTD_XIP
-> +       select ARCH_REQUIRE_GPIOLIB
-> +       select ARM_CPU_SUSPEND if PM
-> +       select AUTO_ZRELADDR
->         select CLKDEV_LOOKUP
->         select CLKSRC_MMIO
-> -       select ARCH_REQUIRE_GPIOLIB
->         select GENERIC_CLOCKEVENTS
->         select GPIO_PXA
-> -       select PLAT_PXA
-> -       select SPARSE_IRQ
-> -       select AUTO_ZRELADDR
-> -       select MULTI_IRQ_HANDLER
-> -       select ARM_CPU_SUSPEND if PM
->         select HAVE_IDE
-> +       select MULTI_IRQ_HANDLER
->         select NEED_MACH_GPIO_H
-> +       select PLAT_PXA
-> +       select SPARSE_IRQ
->         help
->           Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
+>   	void			(*select_bank)(uint32_t bank, uint32_t busw);
 
-The PXA related changes look good to me.
+btw, I also have a few pending patches on this driver which I would be 
+sending soon
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
-
-BTW, maybe we also need to sort the ARCH_XXX in alphanumeric order, so
-new ARCH will find a better place to live?
+Reviewed By: Vipin Kumar <vipin.kumar@st.com>
