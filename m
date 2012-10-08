@@ -1,5 +1,5 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Oct 2012 12:33:03 +0100
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 8 Oct 2012 12:33:32 +0100
 Subject: [PATCH v2 2/7] ARM: virt: allow the kernel to be entered in HYP
  mode
 In-Reply-To: <20121008110109.GE2302@linaro.org>
@@ -7,63 +7,64 @@ References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
  <1347036934-8519-3-git-send-email-marc.zyngier@arm.com>
  <20121005200822.GQ3874@atomide.com>
  <6d3553bfe8a2d1ac88cab852100616a7@localhost>
- <20121006160031.GC3874@atomide.com> <20121008110109.GE2302@linaro.org>
-Message-ID: <5072B9EF.1020005@arm.com>
+ <20121006160031.GC3874@atomide.com>
+ <20121008110109.GE2302@linaro.org>
+Message-ID: <20121008113332.GF2302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/12 12:01, Dave Martin wrote:
+On Mon, Oct 08, 2012 at 12:01:09PM +0100, Dave Martin wrote:
 > On Sat, Oct 06, 2012 at 09:00:32AM -0700, Tony Lindgren wrote:
->> * Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
->>>
->>> If so, that indicates some side effect of the safe_svcmode_maskall macro,
->>> and I suspect the "movs pc, lr" bit.
->>>
->>> Can you try the attached patch? It basically falls back to the previous
->>> behaviour if not entered in HYP mode.
->> ...
->>
->>> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
->>> index 658a15d..b21b97f 100644
->>> --- a/arch/arm/include/asm/assembler.h
->>> +++ b/arch/arm/include/asm/assembler.h
->>> @@ -254,16 +254,17 @@
->>>  	mov	lr , \reg
->>>  	and	lr , lr , #MODE_MASK
->>>  	cmp	lr , #HYP_MODE
->>> -	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
->>> +	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
->>>  	bic	\reg , \reg , #MODE_MASK
->>>  	orr	\reg , \reg , #SVC_MODE
->>>  THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->>> -	msr	spsr_cxsf, \reg
->>> -	adr	lr, BSYM(2f)
->>>  	bne	1f
->>> +	orr	\reg, \reg, #PSR_A_BIT
->>> +	adr	lr, BSYM(2f)
->>> +	msr	spsr_cxsf, \reg
->>>  	__MSR_ELR_HYP(14)
->>>  	__ERET
->>> -1:	movs	pc, lr
->>> +1:	msr	cpsr_c, \reg
->>>  2:
->>>  .endm
->>>  
->>
->> The minimal version of this that still boots on my n800 is just
->> the last change of the above patch:
->>
->> --- a/arch/arm/include/asm/assembler.h
->> +++ b/arch/arm/include/asm/assembler.h
->> @@ -263,7 +263,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->>  	bne	1f
->>  	__MSR_ELR_HYP(14)
->>  	__ERET
->> -1:	movs	pc, lr
->> +1:	msr	cpsr_c, \reg
->>  2:
->>  .endm
->>  
+> > * Marc Zyngier <marc.zyngier@arm.com> [121006 03:19]:
+> > > 
+> > > If so, that indicates some side effect of the safe_svcmode_maskall macro,
+> > > and I suspect the "movs pc, lr" bit.
+> > > 
+> > > Can you try the attached patch? It basically falls back to the previous
+> > > behaviour if not entered in HYP mode.
+> > ...
+> > 
+> > > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> > > index 658a15d..b21b97f 100644
+> > > --- a/arch/arm/include/asm/assembler.h
+> > > +++ b/arch/arm/include/asm/assembler.h
+> > > @@ -254,16 +254,17 @@
+> > >  	mov	lr , \reg
+> > >  	and	lr , lr , #MODE_MASK
+> > >  	cmp	lr , #HYP_MODE
+> > > -	orr	\reg , \reg , #PSR_A_BIT | PSR_I_BIT | PSR_F_BIT
+> > > +	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT
+> > >  	bic	\reg , \reg , #MODE_MASK
+> > >  	orr	\reg , \reg , #SVC_MODE
+> > >  THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+> > > -	msr	spsr_cxsf, \reg
+> > > -	adr	lr, BSYM(2f)
+> > >  	bne	1f
+> > > +	orr	\reg, \reg, #PSR_A_BIT
+> > > +	adr	lr, BSYM(2f)
+> > > +	msr	spsr_cxsf, \reg
+> > >  	__MSR_ELR_HYP(14)
+> > >  	__ERET
+> > > -1:	movs	pc, lr
+> > > +1:	msr	cpsr_c, \reg
+> > >  2:
+> > >  .endm
+> > >  
+> > 
+> > The minimal version of this that still boots on my n800 is just
+> > the last change of the above patch:
+> > 
+> > --- a/arch/arm/include/asm/assembler.h
+> > +++ b/arch/arm/include/asm/assembler.h
+> > @@ -263,7 +263,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+> >  	bne	1f
+> >  	__MSR_ELR_HYP(14)
+> >  	__ERET
+> > -1:	movs	pc, lr
+> > +1:	msr	cpsr_c, \reg
+> >  2:
+> >  .endm
+> >  
 > 
 > In an attempt to narrow this down...
 > 
@@ -108,20 +109,17 @@ On 08/10/12 12:01, Dave Martin wrote:
 > something else we don't understand, but which is cleared by the initial
 > msr cpsr_c which clobbers the processor mode.
 
-Playing with an Integrator-CP with a 1136 tile, the only way I could
-cause the thing to fail was to boot the thing in SYSTEM mode.
 
-Tony, can you possibly also try the attached patch?
+Marc Z also just pointed out to me that there is one architecturally
+valid explanation for why the movs route could fail: if the kernel is
+entered in System mode for some reason -- this causes msr spsr and movs
+pc to become UNPREDICTABLE.  If this is the explanation, then
+(a), (b) and (c) should all work, provided the CPU has already been forced
+out of System mode.
 
-Thanks,
+Of course, we're not supposed to be entered in System mode ... but since
+the whole purpose of this code is to force us into a sane state, we should
+work around it anyway.  I think Marc is busy rolling a patch for that.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: sysmode.patch
-Type: text/x-diff
-Size: 593 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121008/d1635b08/attachment.bin>
+Cheers
+---Dave
