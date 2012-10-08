@@ -1,51 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Oct 2012 11:09:00 -0700
-Subject: [PATCH 1/2] ARM: OMAP: Trivial driver changes to remove
- include plat/cpu.h
-In-Reply-To: <20121008173557.10603.18539.stgit@muffinssi>
-References: <20121008173452.10603.53886.stgit@muffinssi>
- <20121008173557.10603.18539.stgit@muffinssi>
-Message-ID: <20121008180900.GL3874@atomide.com>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Mon, 8 Oct 2012 19:40:16 +0100
+Subject: [PATCH 5/6] ARM: dove: Remove watchdog from DT
+In-Reply-To: <201209251228.25752.arnd@arndb.de>
+References: <1348531338-16624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201209251120.54255.arnd@arndb.de>
+ <87haqmgw6n.fsf@lebrac.rtp-net.org>
+ <201209251228.25752.arnd@arndb.de>
+Message-ID: <20121008184016.GA30416@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121008 10:37]:
-> Drivers should not use cpu_is_omap or cpu_class_is_omap macros,
-> they should be private to the platform init code. And we'll be
-> removing plat/cpu.h and only have a private soc.h for the
-> arch/arm/*omap* code.
-> 
-> This patch is intended as preparation for the core omap changes
-> and removes the need to include plat/cpu.h from several drivers.
-> This is needed for the ARM common zImage support.
-> 
-> These changes are OK to do because:
-> 
-> - omap-rng.c and hsmmc.c don't need plat/cpu.h
-> 
-> - omap-aes.c and omap-sham.c get the proper platform_data
->   passed to them so they don't need extra checks in the driver
-> 
-> - omap-dma.c and omap-pcm.c can test the arch locally as
->   omap1 and omap2 cannot be compiled together because of
->   conflicting compiler flags
+* Arnd Bergmann <arnd@arndb.de> [2012-09-25 12:28]:
+> The hard part is finding those users. Once we know who they are, we can
+> either try to help out by writing a dts file and letting them test it,
+> or by assisting them in the process to write one themselves.
+...
+> We should certainly make sure we don't remove those machines as long
+> as Debian supports them.
 
+Arnaud Patard pointed out this conversation to me.  I added Orion and
+Kirkwood support to Debian.  Unfortunately, I don't have a lot of
+time these days but there are definitely still Debian users on Orion
+and I would like to continue supporting them.
 
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -40,7 +40,6 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/platform_data/mmc-omap.h>
->  #include <mach/hardware.h>
-> -#include <plat/cpu.h>
->  
->  /* OMAP HSMMC Host Controller Registers */
->  #define OMAP_HSMMC_SYSSTATUS	0x0014
+If someone volunteers to keep the Orion code up-to-date and/or port it
+to DT, I can perform tests from time to time.  I have the following
+Orion devices: QNAP TS-209, QNAP TS-409, HP mv2120 and D-Link DNS-323.
 
-Actually I'll fold this mmc change into an earlier patch
-I've posted as "ARM: OMAP: Split plat/mmc.h into local headers
-and platform_data".
+If someone wants to work on Orion kernel support, I can also make a
+QNAP TS-409 main board and a D-Link DNS-323 device available.
 
-Regards,
-
-Tony
+(Please CC me since I'm currently not subscribed.)
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
