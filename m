@@ -1,41 +1,25 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Oct 2012 18:43:40 +0100
-Subject: [PATCH V2 1/2] ARM: remove unnecessary flush of anon pages in
- flush_dcache_page()
-In-Reply-To: <20121008173827.GB11786@schnuecks.de>
+Date: Mon, 8 Oct 2012 18:44:28 +0100
+Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
 References: <1349609352-6408-1-git-send-email-gmbnomis@gmail.com>
- <1349609352-6408-2-git-send-email-gmbnomis@gmail.com>
- <20121008113606.GB31458@arm.com>
- <20121008173827.GB11786@schnuecks.de>
-Message-ID: <20121008174340.GA3204@arm.com>
+ <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
+Message-ID: <20121008174428.GB3204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 06:38:27PM +0100, Simon Baatz wrote:
-> Hi Catalin,
+On Sun, Oct 07, 2012 at 12:29:12PM +0100, Simon Baatz wrote:
+> Commit f8b63c1 made flush_kernel_dcache_page() a no-op assuming that
+> the pages it needs to handle are kernel mapped only.  However, for
+> example when doing direct I/O, pages with user space mappings may
+> occur.
 > 
-> On Mon, Oct 08, 2012 at 12:36:07PM +0100, Catalin Marinas wrote:
-> > On Sun, Oct 07, 2012 at 12:29:11PM +0100, Simon Baatz wrote:
-> > > On non-aliasing VIPT D-caches, there is no need to flush the kernel
-> > > mapping of anon pages in flush_dcache_page() directly.  If the page is
-> > > mapped as executable later, the necessary D/I-cache flush will be done
-> > > in __sync_icache_dcache().
-> > > 
-> > > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> 
-> Thanks for the ack! However, while this improvement is nice to have,
-> I care more about fixing that nasty data corruption on VIVT/VIPT
-> aliasing caches with the second patch.  In case you cannot offer a
-> Acked-by or Reviewed-by for the patch for technical reasons, could
-> you please explain your reservations against the fix?
+> Thus, do lazy flushing like in flush_dcache_page() if there are no user
+> space mappings.  Otherwise, flush the kernel cache lines directly.
 
-I was busy with other things today and didn't have time to get back to
-this thread. I'll post a question though.
+Do you need to fix the VIPT non-aliasing case as well? Does
+flush_kernel_dcache_page() need to handle I-cache?
 
 -- 
 Catalin
