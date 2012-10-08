@@ -1,145 +1,19 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  8 Oct 2012 19:37:03 -0300
-Subject: [PATCH v2 2/2] [media]: mx2_camera: Fix regression caused by clock
- conversion
-Message-ID: <1349735823-30315-1-git-send-email-festevam@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 08 Oct 2012 17:02:13 -0600
+Subject: Single zImage and A15/LPAE
+Message-ID: <50735B75.8070109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+I'm curious what the single-zImage story is for Cortex A15 CPUs with
+LPAE extensions; IIRC, LPAE entails a different page table format and so
+isn't going to co-exist in the same zImage as non-LPAE (although doesn't
+x86 support that now; I though separate LPAE/non-LPAE kernels went away
+there?)
 
-Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
-to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
-
-By not doing so the camera sensor does not probe correctly:
-
-soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-mx2-camera mx2-camera.0: Camera driver attached to camera 0
-ov2640 0-0030: Product ID error fb:fb
-mx2-camera mx2-camera.0: Camera driver detached from camera 0
-mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
-
-Adapt the mx2_camera driver to the new clock framework and make it functional
-again.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Rebased against linux-next 20121008.
-
- drivers/media/platform/soc_camera/mx2_camera.c |   47 +++++++++++++++++-------
- 1 file changed, 34 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
-index 403d7f1..9f8c5f0 100644
---- a/drivers/media/platform/soc_camera/mx2_camera.c
-+++ b/drivers/media/platform/soc_camera/mx2_camera.c
-@@ -272,7 +272,8 @@ struct mx2_camera_dev {
- 	struct device		*dev;
- 	struct soc_camera_host	soc_host;
- 	struct soc_camera_device *icd;
--	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
-+	struct clk		*clk_emma_ahb, *clk_emma_ipg;
-+	struct clk		*clk_csi_ahb, *clk_csi_per;
- 
- 	void __iomem		*base_csi, *base_emma;
- 
-@@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
- {
- 	unsigned long flags;
- 
--	clk_disable_unprepare(pcdev->clk_csi);
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
-+	clk_disable_unprepare(pcdev->clk_csi_per);
- 	writel(0, pcdev->base_csi + CSICR1);
- 	if (cpu_is_mx27()) {
- 		writel(0, pcdev->base_emma + PRP_CNTL);
-@@ -460,7 +462,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
- 	if (pcdev->icd)
- 		return -EBUSY;
- 
--	ret = clk_prepare_enable(pcdev->clk_csi);
-+	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = clk_prepare_enable(pcdev->clk_csi_per);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -1725,11 +1731,18 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
- 		goto exit;
- 	}
- 
--	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
--	if (IS_ERR(pcdev->clk_csi)) {
--		dev_err(&pdev->dev, "Could not get csi clock\n");
--		err = PTR_ERR(pcdev->clk_csi);
--		goto exit;
-+	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(pcdev->clk_csi_ahb)) {
-+		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
-+		err = PTR_ERR(pcdev->clk_csi_ahb);
-+		goto exit;
-+	}
-+
-+	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(pcdev->clk_csi_per)) {
-+		dev_err(&pdev->dev, "Could not get csi per clock\n");
-+		err = PTR_ERR(pcdev->clk_csi_per);
-+		goto exit_csi_ahb;
- 	}
- 
- 	pcdev->pdata = pdev->dev.platform_data;
-@@ -1738,14 +1751,15 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
- 
- 		pcdev->platform_flags = pcdev->pdata->flags;
- 
--		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
-+		rate = clk_round_rate(pcdev->clk_csi_per,
-+						pcdev->pdata->clk * 2);
- 		if (rate <= 0) {
- 			err = -ENODEV;
--			goto exit;
-+			goto exit_csi_per;
- 		}
--		err = clk_set_rate(pcdev->clk_csi, rate);
-+		err = clk_set_rate(pcdev->clk_csi_per, rate);
- 		if (err < 0)
--			goto exit;
-+			goto exit_csi_per;
- 	}
- 
- 	INIT_LIST_HEAD(&pcdev->capture);
-@@ -1801,7 +1815,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
- 		goto exit_free_emma;
- 
- 	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
--			clk_get_rate(pcdev->clk_csi));
-+			clk_get_rate(pcdev->clk_csi_per));
- 
- 	return 0;
- 
-@@ -1812,6 +1826,10 @@ eallocctx:
- 		clk_disable_unprepare(pcdev->clk_emma_ipg);
- 		clk_disable_unprepare(pcdev->clk_emma_ahb);
- 	}
-+exit_csi_per:
-+	clk_disable_unprepare(pcdev->clk_csi_per);
-+exit_csi_ahb:
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
- exit:
- 	return err;
- }
-@@ -1831,6 +1849,9 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
- 		clk_disable_unprepare(pcdev->clk_emma_ahb);
- 	}
- 
-+	clk_disable_unprepare(pcdev->clk_csi_per);
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
-+
- 	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
- 
- 	return 0;
--- 
-1.7.9.5
+Presumably though, the intent is to be able to disable LPAE in Kconfig,
+and create a single zImage with both A9 and A15 support, or to enable
+LPAE and only support A15 with LPAE, and which you'd choose to do simply
+depends on whether you care about LPAE based on how much RAM the boards
+you want to support have (or perhaps also what physical address your
+peripherals are at)?
