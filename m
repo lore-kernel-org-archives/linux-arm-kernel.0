@@ -1,85 +1,53 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 8 Oct 2012 18:24:16 +0800
-Subject: [PATCH] ARM: tegra: cpuidle: replace LP3 with ARM_CPUIDLE_WFI_STATE
-Message-ID: <1349691856-30590-1-git-send-email-josephl@nvidia.com>
+Date: Mon, 8 Oct 2012 18:26:14 +0800
+Subject: [PATCH 0/7] ARM: tegra30: cpuidle: add LP2 support
+Message-ID: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra CPU idle LP3 state is doing ARM WFI only. So it's same with
-the common ARM_CPUIDLE_WFI_STATE. Using it to replace LP3 now.
+The CPU idle LP2 is a power gating idle mode for Tegra30. It supports the
+secondary CPUs (i.e., CPU1-CPU3) to go into LP2 dynamically. When any of
+the secondary CPUs go into LP2, it can be power gated alone. There is a
+limitation on CPU0. The CPU0 can go into LP2 only when all secondary CPUs
+are already in LP2. After CPU0 is in LP2, the CPU rail can be turned off.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/cpuidle.c |   44 ++--------------------------------------
- 1 files changed, 3 insertions(+), 41 deletions(-)
+Verified on Seaboard(Tegra20) and Cardhu(Tegra30).
 
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index 566e2f8..4e0b07c 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -23,60 +23,22 @@
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/cpu.h>
- #include <linux/cpuidle.h>
--#include <linux/hrtimer.h>
- 
--#include <asm/proc-fns.h>
--
--#include <mach/iomap.h>
--
--static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv, int index);
-+#include <asm/cpuidle.h>
- 
- struct cpuidle_driver tegra_idle_driver = {
- 	.name = "tegra_idle",
- 	.owner = THIS_MODULE,
-+	.en_core_tk_irqen = 1,
- 	.state_count = 1,
- 	.states = {
--		[0] = {
--			.enter			= tegra_idle_enter_lp3,
--			.exit_latency		= 10,
--			.target_residency	= 10,
--			.power_usage		= 600,
--			.flags			= CPUIDLE_FLAG_TIME_VALID,
--			.name			= "LP3",
--			.desc			= "CPU flow-controlled",
--		},
-+		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
- 	},
- };
- 
- static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
- 
--static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
--	struct cpuidle_driver *drv, int index)
--{
--	ktime_t enter, exit;
--	s64 us;
--
--	local_irq_disable();
--	local_fiq_disable();
--
--	enter = ktime_get();
--
--	cpu_do_idle();
--
--	exit = ktime_sub(ktime_get(), enter);
--	us = ktime_to_us(exit);
--
--	local_fiq_enable();
--	local_irq_enable();
--
--	dev->last_residency = us;
--
--	return index;
--}
--
- static int __init tegra_cpuidle_init(void)
- {
- 	int ret;
--- 
-1.7.0.4
+This patch set should depend on these two patches:
+d8be3dc ARM: tegra: rename the file of "sleep-tXX" to "sleep-tegraXX"
+7dc7d51 ARM: tegra: cpuidle: replace LP3 with ARM_CPUIDLE_WFI_STATE
+
+Joseph Lo (7):
+  ARM: tegra: cpuidle: separate cpuidle driver for different chips
+  ARM: tegra: cpuidle: add LP2 resume function
+  ARM: tegra30: cpuidle: add LP2 driver for secondary CPUs
+  ARM: tegra30: common: enable csite clock
+  ARM: tegra30: clocks: add CPU low-power function into
+    tegra_cpu_car_ops
+  ARM: tegra30: flowctrl: add cpu_suspend_exter/exit function
+  ARM: tegra30: cpuidle: add LP2 driver for CPU0
+
+ arch/arm/mach-tegra/Makefile                       |    7 +
+ arch/arm/mach-tegra/common.c                       |    1 +
+ .../mach-tegra/{cpuidle.c => cpuidle-tegra20.c}    |   23 +-
+ arch/arm/mach-tegra/cpuidle-tegra30.c              |  171 ++++++++++++++
+ arch/arm/mach-tegra/cpuidle.c                      |   47 +---
+ arch/arm/mach-tegra/cpuidle.h                      |   32 +++
+ arch/arm/mach-tegra/flowctrl.c                     |   47 ++++
+ arch/arm/mach-tegra/flowctrl.h                     |    8 +
+ arch/arm/mach-tegra/headsmp.S                      |   58 +++++
+ arch/arm/mach-tegra/pm.c                           |  240 ++++++++++++++++++++
+ arch/arm/mach-tegra/pm.h                           |   33 +++
+ arch/arm/mach-tegra/reset.c                        |    6 +
+ arch/arm/mach-tegra/reset.h                        |    9 +
+ arch/arm/mach-tegra/sleep-tegra30.S                |   70 ++++++
+ arch/arm/mach-tegra/sleep.S                        |  110 +++++++++
+ arch/arm/mach-tegra/sleep.h                        |    5 +
+ arch/arm/mach-tegra/tegra30_clocks.c               |  107 +++++++++
+ arch/arm/mach-tegra/tegra_cpu_car.h                |   37 +++
+ 18 files changed, 964 insertions(+), 47 deletions(-)
+ copy arch/arm/mach-tegra/{cpuidle.c => cpuidle-tegra20.c} (72%)
+ create mode 100644 arch/arm/mach-tegra/cpuidle-tegra30.c
+ create mode 100644 arch/arm/mach-tegra/cpuidle.h
+ create mode 100644 arch/arm/mach-tegra/pm.c
+ create mode 100644 arch/arm/mach-tegra/pm.h
