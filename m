@@ -1,156 +1,170 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 8 Oct 2012 11:29:41 +0530
-Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
-In-Reply-To: <1349675983-23803-1-git-send-email-kishon@ti.com>
-References: <1349675983-23803-1-git-send-email-kishon@ti.com>
-Message-ID: <1349675983-23803-2-git-send-email-kishon@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  8 Oct 2012 14:06:33 +0800
+Subject: [PATCH] ARM: imx6q: let users input debug uart port number
+Message-ID: <1349676394-25704-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ocp2scp was not having pdata support which makes *musb* fail for non-dt
-boot in OMAP platform. The pdata will have information about the devices
-that is connected to ocp2scp. ocp2scp driver will now make use of this
-information to create the devices that is attached to ocp2scp.
+imx6q gets 5 uart ports in total.  Different board design may choose
+different port as debug uart.  For example, imx6q-sabresd uses UART1,
+imx6q-sabrelite uses UART2 and imx6q-arm2 uses UART4.  Rather than
+bloating DEBUG_LL choice list with all these uart ports, the patch
+introduces DEBUG_IMX6Q_UART_PORT for users to input uart port number
+when DEBUG_IMX6Q_UART is selected inside DEBUG_LL choice.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/bus/omap-ocp2scp.c                 |   67 ++++++++++++++++++++++++++--
- include/linux/platform_data/omap_ocp2scp.h |   31 +++++++++++++
- 2 files changed, 95 insertions(+), 3 deletions(-)
- create mode 100644 include/linux/platform_data/omap_ocp2scp.h
+ arch/arm/Kconfig.debug       |   26 +++++++++++++-------------
+ arch/arm/include/debug/imx.S |   20 ++++++++++++++++----
+ arch/arm/mach-imx/lluart.c   |   28 ++++++++++++++++++----------
+ arch/arm/mach-imx/mx6q.h     |    4 ----
+ 4 files changed, 47 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
-index ff63560..5db8297 100644
---- a/drivers/bus/omap-ocp2scp.c
-+++ b/drivers/bus/omap-ocp2scp.c
-@@ -22,6 +22,26 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/omap_ocp2scp.h>
-+
-+/**
-+ * _count_resources - count for the number of resources
-+ * @res: struct resource *
-+ *
-+ * Count and return the number of resources populated for the device that is
-+ * connected to ocp2scp.
-+ */
-+static unsigned _count_resources(struct resource *res)
-+{
-+	int cnt	= 0;
-+
-+	while (res->start != res->end) {
-+		cnt++;
-+		res++;
-+	}
-+
-+	return cnt;
-+}
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5566520..5dc7109 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -209,20 +209,12 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on i.MX50 or i.MX53.
  
- static int ocp2scp_remove_devices(struct device *dev, void *c)
- {
-@@ -34,20 +54,61 @@ static int ocp2scp_remove_devices(struct device *dev, void *c)
+-	config DEBUG_IMX6Q_UART2
+-		bool "i.MX6Q Debug UART2"
++	config DEBUG_IMX6Q_UART
++		bool "i.MX6Q Debug UART"
+ 		depends on SOC_IMX6Q
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-		  on i.MX6Q UART2. This is correct for e.g. the SabreLite
+-                  board.
+-
+-	config DEBUG_IMX6Q_UART4
+-		bool "i.MX6Q Debug UART4"
+-		depends on SOC_IMX6Q
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on i.MX6Q UART4.
++		  on i.MX6Q.
  
- static int __devinit omap_ocp2scp_probe(struct platform_device *pdev)
- {
--	int			ret;
--	struct device_node	*np = pdev->dev.of_node;
-+	int ret;
-+	unsigned res_cnt, i;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct platform_device *pdev_child;
-+	struct omap_ocp2scp_platform_data *pdata = pdev->dev.platform_data;
-+	struct omap_ocp2scp_dev *dev;
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+@@ -409,6 +401,15 @@ choice
  
- 	if (np) {
- 		ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
- 		if (ret) {
--			dev_err(&pdev->dev, "failed to add resources for ocp2scp child\n");
-+			dev_err(&pdev->dev,
-+			    "failed to add resources for ocp2scp child\n");
- 			goto err0;
- 		}
-+	} else if (pdata) {
-+		for (i = 0, dev = *pdata->devices; i < pdata->dev_cnt; i++,
-+		    dev++) {
-+			res_cnt = _count_resources(dev->res);
-+
-+			pdev_child = platform_device_alloc(dev->drv_name, -1);
-+			if (!pdev_child) {
-+				dev_err(&pdev->dev,
-+				  "failed to allocate mem for ocp2scp child\n");
-+				goto err0;
-+			}
-+
-+			ret = platform_device_add_resources(pdev_child,
-+			    dev->res, res_cnt);
-+			if (ret) {
-+				dev_err(&pdev->dev,
-+				 "failed to add resources for ocp2scp child\n");
-+				goto err1;
-+			}
-+
-+			pdev_child->dev.parent	= &pdev->dev;
-+
-+			ret = platform_device_add(pdev_child);
-+			if (ret) {
-+				dev_err(&pdev->dev,
-+				   "failed to register ocp2scp child device\n");
-+				goto err1;
-+			}
-+		}
-+	} else {
-+		dev_err(&pdev->dev, "OCP2SCP initialized without plat data\n");
-+		return -EINVAL;
- 	}
-+
- 	pm_runtime_enable(&pdev->dev);
+ endchoice
  
- 	return 0;
- 
-+err1:
-+	platform_device_put(pdev_child);
++config DEBUG_IMX6Q_UART_PORT
++	int "i.MX6Q Debug UART Port (1-5)" if DEBUG_IMX6Q_UART
++	range 1 5
++	default 1
++	depends on SOC_IMX6Q
++	help
++	  Choose UART port on which kernel low-level debug messages
++	  should be output.
 +
- err0:
- 	device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
- 
-diff --git a/include/linux/platform_data/omap_ocp2scp.h b/include/linux/platform_data/omap_ocp2scp.h
-new file mode 100644
-index 0000000..5c6c393
---- /dev/null
-+++ b/include/linux/platform_data/omap_ocp2scp.h
-@@ -0,0 +1,31 @@
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/icedcc.S" if DEBUG_ICEDCC
+@@ -418,8 +419,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX31_IMX35_UART || \
+ 				 DEBUG_IMX51_UART || \
+ 				 DEBUG_IMX50_IMX53_UART ||\
+-				 DEBUG_IMX6Q_UART2 || \
+-				 DEBUG_IMX6Q_UART4
++				 DEBUG_IMX6Q_UART
+ 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+diff --git a/arch/arm/include/debug/imx.S b/arch/arm/include/debug/imx.S
+index 0b65d79..0c4e17d 100644
+--- a/arch/arm/include/debug/imx.S
++++ b/arch/arm/include/debug/imx.S
+@@ -10,6 +10,20 @@
+  * published by the Free Software Foundation.
+  *
+  */
++#define IMX6Q_UART1_BASE_ADDR	0x02020000
++#define IMX6Q_UART2_BASE_ADDR	0x021e8000
++#define IMX6Q_UART3_BASE_ADDR	0x021ec000
++#define IMX6Q_UART4_BASE_ADDR	0x021f0000
++#define IMX6Q_UART5_BASE_ADDR	0x021f4000
++
 +/*
-+ * omap_ocp2scp.h -- ocp2scp header file
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * Author: Kishon Vijay Abraham I <kishon@ti.com>
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
++ * IMX6Q_UART_BASE_ADDR is put in the middle to force the expansion
++ * of IMX6Q_UART##n##_BASE_ADDR.
 + */
++#define IMX6Q_UART_BASE_ADDR(n)	IMX6Q_UART##n##_BASE_ADDR
++#define IMX6Q_UART_BASE(n)	IMX6Q_UART_BASE_ADDR(n)
++#define IMX6Q_DEBUG_UART_BASE	IMX6Q_UART_BASE(CONFIG_DEBUG_IMX6Q_UART_PORT)
 +
-+#ifndef __DRIVERS_OMAP_OCP2SCP_H
-+#define __DRIVERS_OMAP_OCP2SCP_H
+ #ifdef CONFIG_DEBUG_IMX1_UART
+ #define UART_PADDR	0x00206000
+ #elif defined (CONFIG_DEBUG_IMX25_UART)
+@@ -22,10 +36,8 @@
+ #define UART_PADDR	0x73fbc000
+ #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
+ #define UART_PADDR	0x53fbc000
+-#elif defined (CONFIG_DEBUG_IMX6Q_UART2)
+-#define UART_PADDR	0x021e8000
+-#elif defined (CONFIG_DEBUG_IMX6Q_UART4)
+-#define UART_PADDR	0x021f0000
++#elif defined (CONFIG_DEBUG_IMX6Q_UART)
++#define UART_PADDR	IMX6Q_DEBUG_UART_BASE
+ #endif
+ 
+ /*
+diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
+index 5f15103..2fdc9bf 100644
+--- a/arch/arm/mach-imx/lluart.c
++++ b/arch/arm/mach-imx/lluart.c
+@@ -17,17 +17,25 @@
+ 
+ #include "hardware.h"
+ 
++#define IMX6Q_UART1_BASE_ADDR	0x02020000
++#define IMX6Q_UART2_BASE_ADDR	0x021e8000
++#define IMX6Q_UART3_BASE_ADDR	0x021ec000
++#define IMX6Q_UART4_BASE_ADDR	0x021f0000
++#define IMX6Q_UART5_BASE_ADDR	0x021f4000
 +
-+struct omap_ocp2scp_dev {
-+	const char			*drv_name;
-+	struct resource			*res;
-+};
++/*
++ * IMX6Q_UART_BASE_ADDR is put in the middle to force the expansion
++ * of IMX6Q_UART##n##_BASE_ADDR.
++ */
++#define IMX6Q_UART_BASE_ADDR(n)	IMX6Q_UART##n##_BASE_ADDR
++#define IMX6Q_UART_BASE(n)	IMX6Q_UART_BASE_ADDR(n)
++#define IMX6Q_DEBUG_UART_BASE	IMX6Q_UART_BASE(CONFIG_DEBUG_IMX6Q_UART_PORT)
 +
-+struct omap_ocp2scp_platform_data {
-+	int				dev_cnt;
-+	struct omap_ocp2scp_dev		**devices;
-+};
-+#endif /* __DRIVERS_OMAP_OCP2SCP_H */
+ static struct map_desc imx_lluart_desc = {
+-#ifdef CONFIG_DEBUG_IMX6Q_UART2
+-	.virtual	= MX6Q_IO_P2V(MX6Q_UART2_BASE_ADDR),
+-	.pfn		= __phys_to_pfn(MX6Q_UART2_BASE_ADDR),
+-	.length		= MX6Q_UART2_SIZE,
+-	.type		= MT_DEVICE,
+-#endif
+-#ifdef CONFIG_DEBUG_IMX6Q_UART4
+-	.virtual	= MX6Q_IO_P2V(MX6Q_UART4_BASE_ADDR),
+-	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
+-	.length		= MX6Q_UART4_SIZE,
++#ifdef CONFIG_DEBUG_IMX6Q_UART
++	.virtual	= IMX_IO_P2V(IMX6Q_DEBUG_UART_BASE),
++	.pfn		= __phys_to_pfn(IMX6Q_DEBUG_UART_BASE),
++	.length		= 0x4000,
+ 	.type		= MT_DEVICE,
+ #endif
+ };
+diff --git a/arch/arm/mach-imx/mx6q.h b/arch/arm/mach-imx/mx6q.h
+index f7e7dba..19d3f54 100644
+--- a/arch/arm/mach-imx/mx6q.h
++++ b/arch/arm/mach-imx/mx6q.h
+@@ -27,9 +27,5 @@
+ #define MX6Q_CCM_SIZE			0x4000
+ #define MX6Q_ANATOP_BASE_ADDR		0x020c8000
+ #define MX6Q_ANATOP_SIZE		0x1000
+-#define MX6Q_UART2_BASE_ADDR		0x021e8000
+-#define MX6Q_UART2_SIZE			0x4000
+-#define MX6Q_UART4_BASE_ADDR		0x021f0000
+-#define MX6Q_UART4_SIZE			0x4000
+ 
+ #endif	/* __MACH_MX6Q_H__ */
 -- 
 1.7.9.5
