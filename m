@@ -1,110 +1,38 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 08 Oct 2012 11:17:07 +0900
-Subject: [PATCH v4 2/5] ARM: EXYNOS: Correct combined IRQs for exynos4
+Date: Mon, 08 Oct 2012 11:17:09 +0900
+Subject: [PATCH v4 4/5] ARM: EXYNOS: Add arm-pmu DT binding for exynos5250
 In-Reply-To: <1349662630-11607-1-git-send-email-chanho61.park@samsung.com>
 References: <1349662630-11607-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1349662630-11607-3-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1349662630-11607-5-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects combined IRQs for exynos4 series platform. The exynos4412
-has four extra combined irq group and the exynos4212 has two more combined irqs
-than exynos4210. Each irq is mapped to IRQ_SPI(xx). Unfortunately, extra 4
-combined IRQs isn't sequential. So, we need to map the irqs manually.
+This patch enables arm-pmu to bind device tree for exynos5250. The exynos5250
+has two pmus which have combiner irq type.
 
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
 Signed-off-by: Chanho Park <chanho61.park@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c            |   42 +++++++++++++++++++++++++-----
- arch/arm/mach-exynos/include/mach/irqs.h |    4 ++-
- 2 files changed, 39 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 709245e..fdd582a 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -560,23 +560,50 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
- 	.map	= combiner_irq_domain_map,
- };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index dddfd6e..fab3eae 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -56,6 +56,12 @@
+ 			     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
+ 	};
  
-+static unsigned int combiner_extra_irq(int group)
-+{
-+	switch (group) {
-+	case 16:
-+		return IRQ_SPI(107);
-+	case 17:
-+		return IRQ_SPI(108);
-+	case 18:
-+		return IRQ_SPI(48);
-+	case 19:
-+		return IRQ_SPI(42);
-+	default:
-+		return 0;
-+	}
-+}
++	pmu {
++		compatible = "arm,cortex-a15-pmu";
++		interrupt-parent = <&combiner>;
++		interrupts = <1 2>, <22 4>;
++	};
 +
-+static unsigned int max_combiner_nr(void)
-+{
-+	if (soc_is_exynos5250())
-+		return EXYNOS5_MAX_COMBINER_NR;
-+	else if (soc_is_exynos4412())
-+		return EXYNOS4_MAX_COMBINER_NR;
-+	else if (soc_is_exynos4212())
-+		return EXYNOS4212_MAX_COMBINER_NR;
-+	else
-+		return EXYNOS4210_MAX_COMBINER_NR;
-+}
-+
- static void __init combiner_init(void __iomem *combiner_base,
- 				 struct device_node *np)
- {
- 	int i, irq, irq_base;
- 	unsigned int max_nr, nr_irq;
- 
-+	max_nr = max_combiner_nr();
-+
- 	if (np) {
- 		if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
- 			pr_warning("%s: number of combiners not specified, "
- 				"setting default as %d.\n",
--				__func__, EXYNOS4_MAX_COMBINER_NR);
--			max_nr = EXYNOS4_MAX_COMBINER_NR;
-+				__func__, max_nr);
- 		}
--	} else {
--		max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
--						EXYNOS4_MAX_COMBINER_NR;
- 	}
-+
- 	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
- 
- 	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
-@@ -593,7 +620,10 @@ static void __init combiner_init(void __iomem *combiner_base,
- 	}
- 
- 	for (i = 0; i < max_nr; i++) {
--		irq = IRQ_SPI(i);
-+		if (i < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
-+			irq = IRQ_SPI(i);
-+		else
-+			irq = combiner_extra_irq(i);
- #ifdef CONFIG_OF
- 		if (np)
- 			irq = irq_of_parse_and_map(np, i);
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index 35bced6..3a83546 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -165,7 +165,9 @@
- #define EXYNOS4_IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
- #define EXYNOS4_IRQ_FIMD0_SYSTEM	COMBINER_IRQ(11, 2)
- 
--#define EXYNOS4_MAX_COMBINER_NR		16
-+#define EXYNOS4210_MAX_COMBINER_NR	16
-+#define EXYNOS4212_MAX_COMBINER_NR	18
-+#define EXYNOS4_MAX_COMBINER_NR		20
- 
- #define EXYNOS4_IRQ_GPIO1_NR_GROUPS	16
- #define EXYNOS4_IRQ_GPIO2_NR_GROUPS	9
+ 	watchdog {
+ 		compatible = "samsung,s3c2410-wdt";
+ 		reg = <0x101D0000 0x100>;
 -- 
 1.7.9.5
