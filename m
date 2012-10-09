@@ -1,23 +1,16 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Tue, 9 Oct 2012 09:20:03 +0300
-Subject: [PATCH 1/2] ARM: OMAP: Trivial driver changes to remove include
- plat/cpu.h
-In-Reply-To: <20121008173557.10603.18539.stgit@muffinssi>
-References: <20121008173452.10603.53886.stgit@muffinssi>
- <20121008173557.10603.18539.stgit@muffinssi>
-Message-ID: <20121009092003.3f3d271a035595ef8fbb1e76@bitmer.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 9 Oct 2012 15:29:38 +0900
+Subject: [PATCH] ARM: pxa: Fix build error caused by sram.h rename
+In-Reply-To: <87vcenespj.fsf@octavius.laptop.org>
+References: <87vcenespj.fsf@octavius.laptop.org>
+Message-ID: <20121009062936.GM8237@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 08 Oct 2012 10:35:57 -0700
-Tony Lindgren <tony@atomide.com> wrote:
+On Sat, Oct 06, 2012 at 07:38:16AM -0400, Chris Ball wrote:
+> Commit 293b2da1b61 ("ARM: pxa: move platform_data definitions")
+> renamed arch/arm/mach-mmp/include/mach/sram.h to
+> include/linux/platform_data/dma-mmp_tdma.h, but didn't update
+> mmp-pcm.c which uses the header.  Fix the build error.
 
-> - omap-dma.c and omap-pcm.c can test the arch locally as
->   omap1 and omap2 cannot be compiled together because of
->   conflicting compiler flags
-...
->  sound/soc/omap/omap-pcm.c         |    9 +++++++--
-
-Build tested above for omap1 and omap2+.
-
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+Applied, thanks.
