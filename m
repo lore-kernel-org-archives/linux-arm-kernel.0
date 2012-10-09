@@ -1,266 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Oct 2012 17:09:51 +0100
-Subject: [PATCH v4] GPIO: Add support for GPIO on CLPS711X-target platform
-In-Reply-To: <1349798756-24777-1-git-send-email-shc_work@mail.ru>
-References: <1349798756-24777-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20121009160951.GI4625@n2100.arm.linux.org.uk>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 9 Oct 2012 17:10:35 +0100
+Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
+In-Reply-To: <201210091539.46274.arnd@arndb.de>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <1349796183-30648-6-git-send-email-arnd@arndb.de>
+ <1349796958.21847.219.camel@zakaz.uk.xensource.com>
+ <201210091539.46274.arnd@arndb.de>
+Message-ID: <1349799035.21847.222.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 08:05:56PM +0400, Alexander Shiyan wrote:
-> The CLPS711X CPUs provide some GPIOs for use in the system. This
-> driver provides support for these via gpiolib. Due to platform
-> limitations, driver does not support interrupts, only inputs and
-> outputs.
+On Tue, 2012-10-09 at 16:39 +0100, Arnd Bergmann wrote:
+> On Tuesday 09 October 2012, Ian Campbell wrote:
+> > > * The tmem hypercall is not available on ARM
+> > > 
+> > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+> > 
+> > missing the end of this sentence?
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Right, I meant to say 
+> 
+> * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+>   Xen grant table code, so we must ensure that Xen support is only built
+>   on ARMv7-only kernels not combined ARMv6/v7 kernels.
+> 
+> This should be fixed differently in the future.
 
-This is much better, thanks.  As it's going via someone elses tree:
+Is this is a build time failure because gcc/gas/etc refuses to generate
+these instructions if it is configured for v6?
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+I ask because if it is only a runtime issue then we can reason that if
+we are running Xen specific grant table code, then we must be running on
+Xen and therefore must necessarily be running on a v7 (because Xen only
+support v7+virt extensions) even if the kernel happens to be capable of
+running on v6 too.
 
-> ---
->  arch/arm/Kconfig                           |    1 +
->  arch/arm/mach-clps711x/include/mach/gpio.h |   13 +++
->  drivers/gpio/Kconfig                       |    4 +
->  drivers/gpio/Makefile                      |    1 +
->  drivers/gpio/gpio-clps711x.c               |  163 ++++++++++++++++++++++++++++
->  5 files changed, 182 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
->  create mode 100644 drivers/gpio/gpio-clps711x.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2867a77..343b0c3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -352,6 +352,7 @@ config ARCH_CLPS711X
->  	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
->  	select CPU_ARM720T
->  	select ARCH_USES_GETTIMEOFFSET
-> +	select ARCH_REQUIRE_GPIOLIB
->  	select COMMON_CLK
->  	select CLKDEV_LOOKUP
->  	select NEED_MACH_MEMORY_H
-> diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
-> new file mode 100644
-> index 0000000..8ac6889
-> --- /dev/null
-> +++ b/arch/arm/mach-clps711x/include/mach/gpio.h
-> @@ -0,0 +1,13 @@
-> +/*
-> + *  This file contains the CLPS711X GPIO definitions.
-> + *
-> + *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +/* Simple helper for convert port & pin to GPIO number */
-> +#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index d055cee..fb76140 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -91,6 +91,10 @@ config GPIO_MAX730X
->  
->  comment "Memory mapped GPIO drivers:"
->  
-> +config GPIO_CLPS711X
-> +	def_bool y
-> +	depends on ARCH_CLPS711X
-> +
->  config GPIO_GENERIC_PLATFORM
->  	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
->  	select GPIO_GENERIC
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index 9aeed67..a28725e 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
->  obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
->  obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
->  obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
-> +obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
->  obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
->  obj-$(CONFIG_GPIO_DA9052)	+= gpio-da9052.o
->  obj-$(CONFIG_ARCH_DAVINCI)	+= gpio-davinci.o
-> diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
-> new file mode 100644
-> index 0000000..ea21822
-> --- /dev/null
-> +++ b/drivers/gpio/gpio-clps711x.c
-> @@ -0,0 +1,163 @@
-> +/*
-> + *  CLPS711X GPIO driver
-> + *
-> + *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/gpio.h>
-> +#include <linux/module.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <mach/hardware.h>
-> +
-> +#define CLPS711X_GPIO_PORTS	5
-> +#define CLPS711X_GPIO_NAME	"gpio-clps711x"
-> +
-> +struct clps711x_gpio {
-> +	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
-> +	spinlock_t		lock;
-> +};
-> +
-> +static void __iomem *clps711x_ports[] = {
-> +	CLPS711X_VIRT_BASE + PADR,
-> +	CLPS711X_VIRT_BASE + PBDR,
-> +	CLPS711X_VIRT_BASE + PCDR,
-> +	CLPS711X_VIRT_BASE + PDDR,
-> +	CLPS711X_VIRT_BASE + PEDR,
-> +};
-> +
-> +static void __iomem *clps711x_pdirs[] = {
-> +	CLPS711X_VIRT_BASE + PADDR,
-> +	CLPS711X_VIRT_BASE + PBDDR,
-> +	CLPS711X_VIRT_BASE + PCDDR,
-> +	CLPS711X_VIRT_BASE + PDDDR,
-> +	CLPS711X_VIRT_BASE + PEDDR,
-> +};
-> +
-> +#define clps711x_port(x)	clps711x_ports[x->base / 8]
-> +#define clps711x_pdir(x)	clps711x_pdirs[x->base / 8]
-> +
-> +static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
-> +{
-> +	return !!readb(clps711x_port(chip)) & (1 << offset);
-> +}
-> +
-> +static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
-> +			      int value)
-> +{
-> +	int tmp;
-> +	unsigned long flags;
-> +	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-> +
-> +	spin_lock_irqsave(&gpio->lock, flags);
-> +	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
-> +	if (value)
-> +		tmp |= 1 << offset;
-> +	writeb(tmp, clps711x_port(chip));
-> +	spin_unlock_irqrestore(&gpio->lock, flags);
-> +}
-> +
-> +static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
-> +{
-> +	int tmp;
-> +	unsigned long flags;
-> +	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-> +
-> +	spin_lock_irqsave(&gpio->lock, flags);
-> +	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
-> +	writeb(tmp, clps711x_pdir(chip));
-> +	spin_unlock_irqrestore(&gpio->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
-> +				       int value)
-> +{
-> +	int tmp;
-> +	unsigned long flags;
-> +	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-> +
-> +	spin_lock_irqsave(&gpio->lock, flags);
-> +	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
-> +	writeb(tmp, clps711x_pdir(chip));
-> +	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
-> +	if (value)
-> +		tmp |= 1 << offset;
-> +	writeb(tmp, clps711x_port(chip));
-> +	spin_unlock_irqrestore(&gpio->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +struct clps711x_gpio_port {
-> +	char	*name;
-> +	int	nr;
-> +};
-> +
-> +static const struct clps711x_gpio_port clps711x_gpio_ports[] __initconst = {
-> +	{ "PORTA", 8, },
-> +	{ "PORTB", 8, },
-> +	{ "PORTC", 8, },
-> +	{ "PORTD", 8, },
-> +	{ "PORTE", 3, },
-> +};
-> +
-> +static int __init gpio_clps711x_init(void)
-> +{
-> +	int i;
-> +	struct platform_device *pdev;
-> +	struct clps711x_gpio *gpio;
-> +
-> +	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
-> +	if (!pdev) {
-> +		pr_err("Cannot create platform device: %s\n",
-> +		       CLPS711X_GPIO_NAME);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	platform_device_add(pdev);
-> +
-> +	gpio = devm_kzalloc(&pdev->dev, sizeof(struct clps711x_gpio),
-> +			    GFP_KERNEL);
-> +	if (!gpio) {
-> +		dev_err(&pdev->dev, "GPIO allocating memory error\n");
-> +		platform_device_del(pdev);
-> +		platform_device_put(pdev);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, gpio);
-> +
-> +	spin_lock_init(&gpio->lock);
-> +
-> +	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
-> +		gpio->chip[i].owner		= THIS_MODULE;
-> +		gpio->chip[i].dev		= &pdev->dev;
-> +		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
-> +		gpio->chip[i].base		= i * 8;
-> +		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
-> +		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
-> +		gpio->chip[i].get		= gpio_clps711x_get;
-> +		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
-> +		gpio->chip[i].set		= gpio_clps711x_set;
-> +		WARN_ON(gpiochip_add(&gpio->chip[i]));
-> +	}
-> +
-> +	dev_info(&pdev->dev, "GPIO driver initialized\n");
-> +
-> +	return 0;
-> +}
-> +arch_initcall(gpio_clps711x_init);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
-> +MODULE_DESCRIPTION("CLPS711X GPIO driver");
-> -- 
-> 1.7.8.6
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Ian.
