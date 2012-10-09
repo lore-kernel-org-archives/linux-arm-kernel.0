@@ -1,79 +1,50 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 10 Oct 2012 00:12:42 +0200
+Date: Wed, 10 Oct 2012 00:18:48 +0200
 Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <20121009151704.GP12801@game.jcrosoft.org>
-References: <20121006161429.GD12462@game.jcrosoft.org>
- <20121009145854.GB14079@kroah.com> <20121009151704.GP12801@game.jcrosoft.org>
-Message-ID: <3430030.rKEkeKmzui@vostro.rjw.lan>
+In-Reply-To: <20121009155241.GQ12801@game.jcrosoft.org>
+References: <20121009151704.GP12801@game.jcrosoft.org>
+ <Pine.LNX.4.44L0.1210091141270.1441-100000@iolanthe.rowland.org>
+ <20121009155241.GQ12801@game.jcrosoft.org>
+Message-ID: <3395599.MgZOPkqiWY@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 of October 2012 17:17:04 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 07:58 Tue 09 Oct     , Greg Kroah-Hartman wrote:
-> > On Tue, Oct 09, 2012 at 01:46:33PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 22:02 Sun 07 Oct     , Rafael J. Wysocki wrote:
-> > > > On Sunday 07 of October 2012 15:12:01 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > On 00:18 Sun 07 Oct     , Rafael J. Wysocki wrote:
-> > > > > > On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > > > Hi,
-> > > > > > > 
-> > > > > > > The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
-> > > > > > > 
-> > > > > > >   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
-> > > > > > > 
-> > > > > > > are available in the git repository at:
-> > > > > > > 
-> > > > > > > 
-> > > > > > >   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
-> > > > > > > 
-> > > > > > > for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
-> > > > > > > 
-> > > > > > >   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
-> > > > > > > 
-> > > > > > > ----------------------------------------------------------------
-> > > > > > > pm: add suspend_mem and suspend_standby support
-> > > > > > > 
-> > > > > > > Today when we go to suspend we can not knwon at drivers level if we go in
-> > > > > > > STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
-> > > > > > > suspend_standby.
-> > > > > > 
-> > > > > > No way. Device drivers shouldn't be concerned about that.
-> > > > > I do need it on at91 as we swith to slow_clock in MEM suspend and some ip
-> > > > > need special handling when switching to slow_clock
-> > > > 
-> > > > Well, my answer to that is: please fix your platform code instead of
-> > > > hacking the PM core to work around its problems.
-> > > how can I fix drivers pm issue when I no way to known at driver level the
-> > > real suspend, the PM core is supposed to proivde the right information to the
-> > > drivers so the driver can put it's in the right pm mode. If the pm core can not
-> > > provide such inforation the PM core is broken as we will have to do dirty
-> > > hack.
+On Tuesday 09 of October 2012 17:52:41 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:44 Tue 09 Oct     , Alan Stern wrote:
+> > On Tue, 9 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > > 
-> > Why do you need to know the difference in your driver?  We used to
-> > provide this information a long time ago, but it turned out to not be
-> > needed at all and just caused problems.
-> because on at91 I need to handle the mem standby at drviers level.
+> > > > Why do you need to know the difference in your driver?  We used to
+> > > > provide this information a long time ago, but it turned out to not be
+> > > > needed at all and just caused problems.
+> > > because on at91 I need to handle the mem standby at drviers level.
+> > > 
+> > > We do it today already by a hack in different drivers at91_udc (usb device),
+> > > atmel_serail and at91_ohci. Those 3 IP have specifci handling when switching
+> > > to mem pm. On at91 when switch to mem we shutdown everything and run form a slow
+> > > clock - this is done at soc level - but those IP have issue and need specific
+> > > care before doing so. Ohterwise when the SoC will wakeup but those IP will not
+> > > 
+> > > in this patch series I send the update of those 3 drivers too
+> > > and kill the hack
+> > 
+> > How about adding a platform-specific callback routine to tell drivers 
+> > whether or not they will run from the slow clock?  Something like:
+> > 
+> > 	bool at91_suspend_will_use_slow_clock(void);
+> > 
+> > That would not involve making any changes to the driver core, and your 
+> > three drivers could still get the information they need.
+> I already do so and I want to drop it as the IP is shared with multiple ARCH
+> and I want to have a clean code no hack
 
-This is not an answer.  You're basically saying "it has to be done this way,
-because it has to be done this way".
+So, what about actually adding a platform layer to your PM instead of doing
+all PM in device drivers?
 
-> We do it today already by a hack in different drivers at91_udc (usb device),
-> atmel_serail and at91_ohci. Those 3 IP have specifci handling when switching
-> to mem pm. On at91 when switch to mem we shutdown everything and run form a slow
-> clock - this is done at soc level - but those IP have issue and need specific
-> care before doing so. Ohterwise when the SoC will wakeup but those IP will not
-> 
-> in this patch series I send the update of those 3 drivers too
-> and kill the hack
-
-Well, let's start over.  What's the difference between "suspend to RAM" (mem)
-and "standby" on your platform?
-
-> > > Any generic framework is supposed to evolve for real user need here I've one
-> > > so I udpate the core to mach a need
-
-Yes, if there are more users needing a change.  If there's only one, I think not
-really.
+ACPI has exactly the same problem that you have, but it's never has to tell
+device drivers what system sleep state is going to be entered.  Drivers just
+call acpi_pm_device_sleep_state() and that tells them what power state to
+put the device into (which depends on the sleep state being entered, but
+drivers really don't need to know that state).
 
 Thanks,
 Rafael
