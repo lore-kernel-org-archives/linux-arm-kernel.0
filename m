@@ -1,80 +1,47 @@
-From: dhowells@redhat.com (David Howells)
-Date: Tue, 09 Oct 2012 10:15:10 +0100
-Subject: [GIT PULL] Disintegrate UAPI for arm [ver #2]
-Message-ID: <21107.1349774110@warthog.procyon.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Oct 2012 09:18:56 +0000
+Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
+In-Reply-To: <20121007015405.958959522@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015405.958959522@gmail.com>
+Message-ID: <201210090918.56725.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can you merge the following branch into the arm tree please.
+Hi Domenico,
 
-This is to complete part of the UAPI disintegration for which the preparatory
-patches were pulled recently.
+Your series looks very nice, thanks for the contribution!
 
-Now that the fixups and the asm-generic chunk have been merged, I've
-regenerated the patches to get rid of those dependencies and to take account of
-any changes made so far in the merge window.  If you have already pulled the
-older version of the branch aimed at you, then please feel free to ignore this
-request.
+Stephen has already covered everything I would have commented and
+more, except for one thing that I found: 
 
-The following changes since commit 9e2d8656f5e8aa214e66b462680cf86b210b74a8:
+On Sunday 07 October 2012, Domenico Andreoli wrote:
+> Index: b/arch/arm/boot/dts/bcm476x.dtsi
+> ===================================================================
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm476x.dtsi
+> @@ -0,0 +1,31 @@
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +       compatible = "brcm,bcm476x";
+> +       model = "Broadcom BCM476x";
+> +
+> ...
+> +               vic0: interrupt-controller at 80000 {
+> +                       compatible = "brcm,bcm476x-pl192", "arm,pl192-vic", "arm,primecell";
+> +                       reg = <0x80000 0x1000>;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <1>;
+> +               };
 
-  Merge branch 'akpm' (Andrew's patch-bomb) (2012-10-09 16:23:15 +0900)
+I suppose that the name of the soc is not actually "bcm476x" but you
+are in fact referring to the family including bcm4760 and bcm4761.
 
-are available in the git repository at:
+The convention in the device tree is to always use specific product
+numbers, rather than wildcards. If one of the two has a superset of
+the hardware of the other, I would recommend you pick that number
+in the device tree and in the drivers, and for the other one, you
+just mark them as compatible to both of them.
 
-
-  git://git.infradead.org/users/dhowells/linux-headers.git tags/disintegrate-arm-20121009
-
-for you to fetch changes up to 86418cab1bb1aa591d48ea51d67aeb54f30732d1:
-
-  UAPI: (Scripted) Disintegrate arch/arm/include/asm (2012-10-09 09:46:32 +0100)
-
-----------------------------------------------------------------
-UAPI Disintegration 2012-10-09
-
-----------------------------------------------------------------
-David Howells (1):
-      UAPI: (Scripted) Disintegrate arch/arm/include/asm
-
- arch/arm/include/asm/Kbuild                   |   2 -
- arch/arm/include/asm/hwcap.h                  |  27 +-
- arch/arm/include/asm/ptrace.h                 | 126 +-------
- arch/arm/include/asm/setup.h                  | 172 +---------
- arch/arm/include/asm/signal.h                 | 127 +-------
- arch/arm/include/asm/swab.h                   |  37 +--
- arch/arm/include/asm/unistd.h                 | 440 +------------------------
- arch/arm/include/uapi/asm/Kbuild              |  16 +
- arch/arm/include/{ => uapi}/asm/a.out.h       |   0
- arch/arm/include/{ => uapi}/asm/byteorder.h   |   0
- arch/arm/include/{ => uapi}/asm/fcntl.h       |   0
- arch/arm/include/uapi/asm/hwcap.h             |  29 ++
- arch/arm/include/{ => uapi}/asm/ioctls.h      |   0
- arch/arm/include/{ => uapi}/asm/kvm_para.h    |   0
- arch/arm/include/{ => uapi}/asm/mman.h        |   0
- arch/arm/include/{ => uapi}/asm/posix_types.h |   0
- arch/arm/include/uapi/asm/ptrace.h            | 137 ++++++++
- arch/arm/include/uapi/asm/setup.h             | 187 +++++++++++
- arch/arm/include/{ => uapi}/asm/sigcontext.h  |   0
- arch/arm/include/uapi/asm/signal.h            | 127 ++++++++
- arch/arm/include/{ => uapi}/asm/stat.h        |   0
- arch/arm/include/{ => uapi}/asm/statfs.h      |   0
- arch/arm/include/uapi/asm/swab.h              |  53 +++
- arch/arm/include/uapi/asm/unistd.h            | 450 ++++++++++++++++++++++++++
- 24 files changed, 1005 insertions(+), 925 deletions(-)
- rename arch/arm/include/{ => uapi}/asm/a.out.h (100%)
- rename arch/arm/include/{ => uapi}/asm/byteorder.h (100%)
- rename arch/arm/include/{ => uapi}/asm/fcntl.h (100%)
- create mode 100644 arch/arm/include/uapi/asm/hwcap.h
- rename arch/arm/include/{ => uapi}/asm/ioctls.h (100%)
- rename arch/arm/include/{ => uapi}/asm/kvm_para.h (100%)
- rename arch/arm/include/{ => uapi}/asm/mman.h (100%)
- rename arch/arm/include/{ => uapi}/asm/posix_types.h (100%)
- create mode 100644 arch/arm/include/uapi/asm/ptrace.h
- create mode 100644 arch/arm/include/uapi/asm/setup.h
- rename arch/arm/include/{ => uapi}/asm/sigcontext.h (100%)
- create mode 100644 arch/arm/include/uapi/asm/signal.h
- rename arch/arm/include/{ => uapi}/asm/stat.h (100%)
- rename arch/arm/include/{ => uapi}/asm/statfs.h (100%)
- create mode 100644 arch/arm/include/uapi/asm/swab.h
- create mode 100644 arch/arm/include/uapi/asm/unistd.h
-.
+	Arnd
