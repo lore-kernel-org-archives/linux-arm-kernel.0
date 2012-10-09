@@ -1,110 +1,56 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 9 Oct 2012 10:42:16 +0100
-Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for secondary
- CPUs
-In-Reply-To: <1349774337.16173.8.camel@jlo-ubuntu-64.nvidia.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-4-git-send-email-josephl@nvidia.com>
- <20121008163504.GC5377@e102568-lin.cambridge.arm.com>
- <1349755995.15153.145.camel@jlo-ubuntu-64.nvidia.com>
- <20121009083804.GA11840@e102568-lin.cambridge.arm.com>
- <1349774337.16173.8.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20121009094215.GC11840@e102568-lin.cambridge.arm.com>
+From: hechtb@googlemail.com (Bastian Hecht)
+Date: Tue,  9 Oct 2012 11:58:47 +0200
+Subject: [PATCH v2 0/2] Add DMA and device tree support to the flash
+ controller FLCTL
+Message-ID: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 10:18:57AM +0100, Joseph Lo wrote:
-> On Tue, 2012-10-09 at 16:38 +0800, Lorenzo Pieralisi wrote:
-> > On Tue, Oct 09, 2012 at 05:13:15AM +0100, Joseph Lo wrote:
-> > 
-> > [...]
-> > 
-> > > > > +ENTRY(tegra_flush_l1_cache)
-> > > > > +       stmfd   sp!, {r4-r5, r7, r9-r11, lr}
-> > > > > +       dmb                                     @ ensure ordering
-> > > > > +
-> > > > > +       /* Disable the data cache */
-> > > > > +       mrc     p15, 0, r2, c1, c0, 0
-> > > > > +       bic     r2, r2, #CR_C
-> > > > > +       dsb
-> > > > > +       mcr     p15, 0, r2, c1, c0, 0
-> > > > > +
-> > > > > +       /* Flush data cache */
-> > > > > +       mov     r10, #0
-> > > > > +#ifdef CONFIG_PREEMPT
-> > > > > +       save_and_disable_irqs_notrace r9        @ make cssr&csidr read atomic
-> > > > > +#endif
-> > > > > +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr
-> > > > > +       isb                                     @ isb to sych the new cssr&csidr
-> > > > > +       mrc     p15, 1, r1, c0, c0, 0           @ read the new csidr
-> > > > > +#ifdef CONFIG_PREEMPT
-> > > > > +       restore_irqs_notrace r9
-> > > > > +#endif
-> > > > > +       and     r2, r1, #7                      @ extract the length of the cache lines
-> > > > > +       add     r2, r2, #4                      @ add 4 (line length offset)
-> > > > > +       ldr     r4, =0x3ff
-> > > > > +       ands    r4, r4, r1, lsr #3              @ find maximum number on the way size
-> > > > > +       clz     r5, r4                          @ find bit position of way size increment
-> > > > > +       ldr     r7, =0x7fff
-> > > > > +       ands    r7, r7, r1, lsr #13             @ extract max number of the index size
-> > > > > +loop2:
-> > > > > +       mov     r9, r4                          @ create working copy of max way size
-> > > > > +loop3:
-> > > > > +       orr     r11, r10, r9, lsl r5            @ factor way and cache number into r11
-> > > > > +       orr     r11, r11, r7, lsl r2            @ factor index number into r11
-> > > > > +       mcr     p15, 0, r11, c7, c14, 2         @ clean & invalidate by set/way
-> > > > > +       subs    r9, r9, #1                      @ decrement the way
-> > > > > +       bge     loop3
-> > > > > +       subs    r7, r7, #1                      @ decrement the index
-> > > > > +       bge     loop2
-> > > > > +finished:
-> > > > > +       mov     r10, #0                         @ swith back to cache level 0
-> > > > > +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr 
-> > > > > +       dsb
-> > > > > +       isb
-> > > > 
-> > > > This code is already in the kernel in cache-v7.S, please use that.
-> > > > We are just adding the new LoUIS API that probably does what you
-> > > > want, even though for Tegra, that is an A9 based platform I fail to
-> > > > understand why Level of Coherency differs from L1.
-> > > > 
-> > > > Can you explain to me please why Level of Coherency (LoC) is != from L1
-> > > > on Tegra ?
-> > > > 
-> > > 
-> > > Thanks for introducing the new LoUIS cache API. Did LoUIS been changed
-> > > by other HW? I checked the new LoUIS API. If LoUIS == 0, it means inner
-> > > shareable then it do nothing just return. But I need to flush L1 data
-> > > cache here to sync the coherency before CPU be power gated. And disable
-> > > data cache before flush is needed.
-> > 
-> > I understand that, that's why I am asking. To me LoUIS and LoC should
-> > both be the same for A9 based platforms and they should both represent
-> > a cache level that *includes* L1.
-> > 
-> > Can you provide me with the CLIDR value for Tegra3 please ?
-> > 
-> 
-> I just checked the CLIDR of both Tegra20 and Tegra30. It's 0x09200003.
-> It looks I can use this new LoUIS api, right? :)
+changelog v2: 	- cosmetic fixes in patch 1
+		- added dmas and dma-names field in patch 2
 
-You do not have to, since LoUIS == LoC, but that would be appreciated.
+This mini-series consists of 2 separately posted patch-sets that shrunk
+to one patch each. It adds DMA support for the data part (not ECC) as
+well as device tree support to the FLCTL flash controller.
+As the 2nd patch is based on the 1st, I've decided to
+collect them here to avoid any confusion.
 
-If you execute:
+The first set contained
+[PATCH 1/2] mtd: sh_flctl: Setup and release DMA channels
+[PATCH 2/2] mtd: sh_flctl: Use DMA for data fifo FLTDFIFO when available
+and was merged after 2 reviews to
+[PATCH] mtd: sh_flctl: Add DMA capabilty (same patch as in here)
 
-v7_flush_dcache_all
+The second set contained
+[PATCH 1/3] mtd: sh_flctl: Probe SNAND_E flag from NAND chip
+[PATCH 2/3] mtd: sh_flctl: Add device tree support
+[PATCH 3/3] mtd: sh_flctl: Add sh7372 device tree config
+and is merged here to
+mtd: sh_flctl: Add device tree support
 
-That would do the same thing on current Tegra(s).
+Patch 1 can be omitted as SNAND_E is handled in the FLCTL source anyway
+correctly in set_cmd_regs() and the flag can be removed from existing board
+codes without this patch.
+Patch 2 without patch 3 may be confusing so I merged them too. Documentation
+is added as well.
 
-If you want to reuse the same code for future A15/A7 processors then yes,
+I've added linux-arm-kernel at lists.infradead.org as recipient for the
+device tree part.
 
-v7_flush_dcache_louis
+The patchset is based on
+l2-mtd	git://git.infradead.org/users/dedekind/l2-mtd.git
+with reverted commit e26c113b4130aefa1d8446602bb5b05cfd646bfe.
 
-is what you want to call, and that works for current Tegra(s) as well since,
-as I mentioned LoUIS == LoC there.
 
-Overall, using the new LoUIS API for single core shutdown is the best
-option, since it should work for current and future cores.
+Bastian Hecht (2):
+  mtd: sh_flctl: Add DMA capabilty
+  mtd: sh_flctl: Add device tree support
 
-Thanks,
-Lorenzo
+ .../devicetree/bindings/mtd/flctl-nand.txt         |   37 +++
+ drivers/mtd/nand/sh_flctl.c                        |  266 +++++++++++++++++++-
+ include/linux/mtd/sh_flctl.h                       |   12 +
+ 3 files changed, 305 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/flctl-nand.txt
+
+-- 
+1.7.5.4
