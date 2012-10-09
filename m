@@ -1,44 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 9 Oct 2012 13:17:01 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
- parents
-In-Reply-To: <506DAE12.7000003@wwwdotorg.org>
-References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
- <20121003154310.GI11837@lunn.ch>
- <20121003220916.GW31897@kw.sim.vm.gnt>
- <20121004055443.GK21046@lunn.ch>
- <20121004075335.GY31897@kw.sim.vm.gnt>
- <506DAE12.7000003@wwwdotorg.org>
-Message-ID: <20121009111701.GQ11837@lunn.ch>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 9 Oct 2012 11:19:28 +0000
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <20121009110049.GB2274@netboy.at.omicron.at>
+References: <20120930082802.GA15392@netboy.at.omicron.at>
+ <50693ECD.4000000@ti.com> <20121008191657.GA3281@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
+ <20121009110049.GB2274@netboy.at.omicron.at>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> The question is, what is the appropriate name. How common is
-> >> this common C code? Are there ns2 where this C code is not
-> >> appropriate. One thing to remember is that most of this C code
-> >> will soon disappear and become DT. All the mpp will be replaced
-> >> with pinctrl in 3.8. I hope we can get the Ethernet setup in DT
-> >> as well. You are working on ns2_led, so all the C code will be
-> >> replaced by DT. So all we are really left with is power off GPIO
-> >> handling.
-> >> 
-> >> So i think the danger of using lacie,ns2_common, and then finding
-> >> it does not work with some other ns2 device is quite low.
+On Tue, Oct 09, 2012 at 16:30:50, Richard Cochran wrote:
+> On Tue, Oct 09, 2012 at 05:57:22AM +0000, Hiremath, Vaibhav wrote:
+> > On Tue, Oct 09, 2012 at 00:46:57, Richard Cochran wrote:
+> > > 2. Can you post your .config?
+> > > 
+> > 
+> > I use omap2plus_defconfig + CONFIG_ARM_APPENDED_DTB + CONFIG_ARM_ATAG_DTB_COMPAT and nothing more.
+>                                          ^
+> -----------------------------------------+  ???
 > 
-> lacie,ns2_common doesn't sound like a HW description, but rather a SW
-> invention. DT should be describing purely the HW. If there's no common
-> HW between these compatible boards (which seems unlikely), then there
-> shouldn't be a shared compatible value.
+> But in the u-boot console example you post, you load the dtb into
+> memory.
+> 
 
-Actually, there is common hardware between these boards:
+Its standard mechanism to boot kernel with DT and it is nothing to do 
+with .config. as mentioned before I have already submitted patch to add dtb 
+target to 'make dtbs'.
 
-NS2 LED driver
-Pinctrl setup
-GPIO used for power off
-Ethernet configuration.
-
-At the moment, we don't have DT for these, so there is C code.  The
-"lacie,ns2_common" compatibility string would be used to enable this C
-code for these boards.
-
-     Andrew
+Thanks,
+Vaibhav
