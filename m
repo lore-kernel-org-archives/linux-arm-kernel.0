@@ -1,53 +1,59 @@
-From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
-Date: Tue, 09 Oct 2012 15:04:35 +0200
-Subject: [PATCH 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
-In-Reply-To: <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
-References: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
- <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <507420E3.2010902@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Oct 2012 13:07:19 +0000
+Subject: [PATCH 05/16] vfs: bogus warnings in fs/namei.c
+In-Reply-To: <201210091227.46324.arnd@arndb.de>
+References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
+ <20121008115116.GA9243@quack.suse.cz> <201210091227.46324.arnd@arndb.de>
+Message-ID: <201210091307.19225.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 10/05/2012 11:53 PM, Fabio Estevam wrote:
-> During the clock conversion for mx27 the "per4_gate" clock was missed to get
-> registered as a dependency of mx2-camera driver.
->
-> In the old mx27 clock driver we used to have:
->
-> DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
->
-> ,so does the same in the new clock driver.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   arch/arm/mach-imx/clk-imx27.c |    1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 3b6b640..5ef0f08 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -224,6 +224,7 @@ int __init mx27_clocks_init(unsigned long fref)
->   	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
->   	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
->   	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "mx2-camera.0");
-> +	clk_register_clkdev(clk[per4_gate], "per", "mx2-camera.0");
->   	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
->   	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
->   	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
->
-I only test detection at kernel boot not streaming using Gstreamer due 
-to lack of time.
+On Tuesday 09 October 2012, Arnd Bergmann wrote:
+> On Monday 08 October 2012, Jan Kara wrote:
+> > On Fri 05-10-12 16:55:19, Arnd Bergmann wrote:
+> > > The follow_link() function always initializes its *p argument,
+> > > or returns an error, but not all versions of gcc figure this
+> > > out, so we have to work around this using the uninitialized_var()
+> > > macro.
+> >   Well, I'm somewhat sceptical to this approach. I agree that bogus
+> > warnings are not nice but later when the code is changed and possibly real
+> > use without initialization is added, we won't notice it. Without changing
+> > anything, we'd at least have a chance of catching it with gcc versions
+> > which were clever enough to not warn with the original code. Or
+> > alternatively if we unconditionally initialized the variable that would get
+> > rid of the warning and made the code more future-proof (that's what I
+> > usually end up doing)... I don't really care that much about the chosen
+> > solution, Al is the one to decide. But I wanted to point out there are
+> > downsides to your solution.
+> 
+> I'll drop the patch for now and won't send it from my tree then. I agree
+> that uninitialized_var() is not ideal, but none of the alternatives seemed
+> better.
+> 
+> With my latest compiler, I don't actually see the warnings any more, so
+> maybe someone fixed gcc instead, or this went away after another change.
+> I'll let you know if it comes back so we can discuss about a better fix then.
+> 
 
-On imx27_3ds board with ov2640 sensor:
-ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
-mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock 
-frequency: 44333333
+Update: I could actually reproduce the problem now, but it only happens when
+building with 'gcc -s' (i.e. CONFIG_CC_OPTIMIZE_FOR_SIZE). It does happen
+with both gcc-4.6 and with gcc-4.8, and on both x86-64 and ARM. An alternative
+patch that would also make it go away is the variant below, but I think that's
+even worse than the first version I suggested because it makes the binary
+output slightly worse by adding an unnecessary initialization when building with
+'make -s'.
 
-On clone imx27_3ds board with mt9v111 sensor (draft driver):
-mt9v111 0-0048: Detected a MT9V111 chip ID 823a
-mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock 
-frequency: 44333333
+	Arnd
 
-Tested-by: Ga?tan Carlier <gcembed@gmail.com>
+diff --git a/fs/namei.c b/fs/namei.c
+index aa30d19..c3612a5 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -810,6 +810,7 @@ follow_link(struct path *link, struct nameidata *nd, void **p)
+ 	return error;
+ 
+ out_put_nd_path:
++	*p = NULL;
+ 	path_put(&nd->path);
+ 	path_put(link);
+ 	return error;
