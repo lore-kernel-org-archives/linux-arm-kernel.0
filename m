@@ -1,50 +1,42 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 9 Oct 2012 13:43:26 +0200
-Subject: Booting vanilla kernel on the beaglebone
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
-References: <20120930082802.GA15392@netboy.at.omicron.at>
- <50693ECD.4000000@ti.com>
- <20121008191657.GA3281@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
- <20121009110049.GB2274@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
-Message-ID: <20121009114326.GA4511@netboy.at.omicron.at>
+From: vasanthananthan@gmail.com (vasanthananthan at gmail.com)
+Date: Tue,  9 Oct 2012 17:17:13 +0530
+Subject: [PATCH 0/6] Adding support for SATA in EXYNO5
+Message-ID: <50740e3a.694c420a.41d4.fffff550@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 11:19:28AM +0000, Hiremath, Vaibhav wrote:
-> On Tue, Oct 09, 2012 at 16:30:50, Richard Cochran wrote:
-> > On Tue, Oct 09, 2012 at 05:57:22AM +0000, Hiremath, Vaibhav wrote:
-> > > 
-> > > I use omap2plus_defconfig + CONFIG_ARM_APPENDED_DTB + CONFIG_ARM_ATAG_DTB_COMPAT and nothing more.
-> >                                          ^
-> > -----------------------------------------+  ???
-> > 
-> > But in the u-boot console example you post, you load the dtb into
-> > memory.
-> > 
-> 
-> Its standard mechanism to boot kernel with DT and it is nothing to do 
-> with .config. as mentioned before I have already submitted patch to add dtb 
-> target to 'make dtbs'.
+From: Vasanth Ananthan <vasanthananthan@gmail.com>
 
-You say that you use CONFIG_ARM_APPENDED_DTB, which means:
+The following set of patches provides drivers for SATA
+and SATA PHY controller and also an interface for the 
+two entity to interact. 
 
-   CONFIG_ARM_APPENDED_DTB:
-   
-   With this option, the boot code will look for a device tree binary
-   (DTB) appended to zImage
-   (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
-   
-   This is meant as a backward compatibility convenience for those
-   systems with a bootloader that can't be upgraded to accommodate
-   the documented boot protocol using a device tree. 
+Vasanth Ananthan (6):
+  ARM: EXYNOS5: Clock settings for SATA and SATA PHY
+  ARM: EXYNOS5: DT Support for SATA and SATA PHY
+  DRIVERS: ATA: SATA PHY utility framework
+  ARM: S3C2410: I2C driver polling mode support
+  ARM: EYNOS5: SATA controller driver
+  ARM: EXYNOS5: SATA PHY controller driver
 
-But in the example you gave, you seem to load the dtb in the "normal"
-way, with a dtb-aware u-boot.
+ arch/arm/boot/dts/exynos5250-smdk5250.dts    |   11 +
+ arch/arm/boot/dts/exynos5250.dtsi            |   20 ++
+ arch/arm/mach-exynos/clock-exynos5.c         |   19 ++-
+ arch/arm/mach-exynos/include/mach/map.h      |    7 +
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    3 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c       |    6 +
+ drivers/ata/Kconfig                          |    9 +
+ drivers/ata/Makefile                         |    1 +
+ drivers/ata/sata_exynos.c                    |  274 +++++++++++++++++++++++
+ drivers/ata/sata_exynos_phy.c                |  303 ++++++++++++++++++++++++++
+ drivers/ata/sata_phy.c                       |   99 +++++++++
+ drivers/ata/sata_phy.h                       |   44 ++++
+ drivers/i2c/busses/i2c-s3c2410.c             |   84 ++++++--
+ 13 files changed, 859 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/ata/sata_exynos.c
+ create mode 100644 drivers/ata/sata_exynos_phy.c
+ create mode 100644 drivers/ata/sata_phy.c
+ create mode 100644 drivers/ata/sata_phy.h
 
-So how do you boot this? With the APPENDED hack? Or just using a
-recent u-boot?
-
-Thanks,
-Richard
+-- 
+1.7.5.4
