@@ -1,33 +1,26 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Tue, 9 Oct 2012 16:14:53 +0530
-Subject: [PATCH 11/11] nand: Increase the ecc placement locations to 640
-In-Reply-To: <cover.1349778820.git.vipin.kumar@st.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
-Message-ID: <67e0aae3b23f37feb30789f5c6cb342b5684911a.1349778821.git.vipin.kumar@st.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 9 Oct 2012 13:00:50 +0200
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
+References: <20120930082802.GA15392@netboy.at.omicron.at>
+ <50693ECD.4000000@ti.com>
+ <20121008191657.GA3281@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
+Message-ID: <20121009110049.GB2274@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Few devices like H27UBG8T2CTR have a writesize/oobsize of 8KB/640B.
-This means that the maximum oobsize has gone up to 640 bytes and consequently
-the maximum ecc placement locations have also gone up to 640.
+On Tue, Oct 09, 2012 at 05:57:22AM +0000, Hiremath, Vaibhav wrote:
+> On Tue, Oct 09, 2012 at 00:46:57, Richard Cochran wrote:
+> > 2. Can you post your .config?
+> > 
+> 
+> I use omap2plus_defconfig + CONFIG_ARM_APPENDED_DTB + CONFIG_ARM_ATAG_DTB_COMPAT and nothing more.
+                                         ^
+-----------------------------------------+  ???
 
-Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
----
- include/linux/mtd/mtd.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+But in the u-boot console example you post, you load the dtb into
+memory.
 
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index 81d61e7..f9ac289 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -98,7 +98,7 @@ struct mtd_oob_ops {
- };
- 
- #define MTD_MAX_OOBFREE_ENTRIES_LARGE	32
--#define MTD_MAX_ECCPOS_ENTRIES_LARGE	448
-+#define MTD_MAX_ECCPOS_ENTRIES_LARGE	640
- /*
-  * Internal ECC layout control structure. For historical reasons, there is a
-  * similar, smaller struct nand_ecclayout_user (in mtd-abi.h) that is retained
--- 
-1.7.11.4
+Confused,
+Richard
