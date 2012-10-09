@@ -1,142 +1,74 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 9 Oct 2012 11:28:28 -0700
-Subject: [PATCH 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
-In-Reply-To: <1349783332-18467-3-git-send-email-vasanthananthan@gmail.com>
-References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
- <1349783332-18467-3-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <20121009182828.GA20879@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Oct 2012 18:40:24 +0000
+Subject: [GIT PULL 0/9] ARM architecture fixes for 3.7
+In-Reply-To: <20121009160814.GH4625@n2100.arm.linux.org.uk>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <20121009160814.GH4625@n2100.arm.linux.org.uk>
+Message-ID: <201210091840.25176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Tue, Oct 09, 2012 at 05:18:48PM +0530, Vasanth Ananthan wrote:
-> This patch adds Device Nodes for SATA and SATA PHY device.
+On Tuesday 09 October 2012, Russell King - ARM Linux wrote:
 > 
-> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |   11 +++++++++++
->  arch/arm/boot/dts/exynos5250.dtsi         |   20 ++++++++++++++++++++
->  arch/arm/mach-exynos/include/mach/map.h   |    7 +++++++
->  arch/arm/mach-exynos/mach-exynos5-dt.c    |    6 ++++++
->  4 files changed, 44 insertions(+), 0 deletions(-)
+> On Tue, Oct 09, 2012 at 05:22:54PM +0200, Arnd Bergmann wrote:
+> > Here are some patches that belong into your domain, I hope you can
+> > just send the lot to Linus the next time you send other patches.
+> > 
+> > These bug fixes all address problems found with automated build testing.
+> > Some of them have been around for a long time, other bugs are
+> > regressions since the merge window.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 8a5e348..bb262ce 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -48,6 +48,17 @@
->  		};
->  	};
->  
-> +	i2c at 121D0000 {
-> +		samsung,i2c-sda-delay = <100>;
-> +                samsung,i2c-max-bus-freq = <40000>;
-> +		samsung,i2c-slave-addr = <0x38>;
+> Apart from the sliced off comment in one commit (which XEN people need
+> to confirm they're happy with the final version), I think these are
+> otherwise fine... I'll hold off pulling them until that can be fixed.
 
-Whitespace is off above.
+Fixed that now, and I also added the Acks that I got in the meantime,
+changed the dependency from Xen on (CPU_v7 && !CPU_V6), and edited the
+description for patch 6 as Dave suggested.
 
-> +
-> +		sataphy at 70 {
+	Arnd
 
-sata-phy would be a more conventional name.
+8<---
+The following changes since commit 0e51793e162ca432fc5f04178cf82b80a92c2659:
 
-> +			compatible = "samsung,i2c-phy";
+  Merge branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm (2012-10-07 21:20:57 +0900)
 
-i2c-phy? Seems like an odd choice of name. What is this device?
-
-> +			reg = <0x38>;
-
-70 is unit address but here it's 0x38? One of them is wrong. No need for a unit
-address if it's a unique name, by the way.
+are available in the git repository at:
 
 
-> +		};
-> +	};
-> +
->  	i2c at 12C80000 {
->  		status = "disabled";
->  	};
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 004aaa8..5a47a8f 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -88,6 +88,18 @@
->  		interrupts = <0 54 0>;
->  	};
->  
-> +	sata at 122F0000 {
-> +                compatible = "samsung,exynos-sata-ahci";
-> +                reg = <0x122F0000 0x1ff>;
-> +		interrupts = <0 115 0>;
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-rmk
 
-More whitespace damage. And need binding.
+for you to fetch changes up to 8e7fc18b5eacc37b6e6fcf486ec4eafbfef91738:
 
-> +        };
-> +
-> +        sata-phy at 12170000 {
-> +                compatible = "samsung,exynos-sata-phy";
-> +                reg = <0x12170000 0x1ff>;
-> +        };
+  ARM: warnings in arch/arm/include/asm/uaccess.h (2012-10-09 20:29:07 +0200)
 
-Should have binding too. How does this relate to the i2c device above.
+----------------------------------------------------------------
+These bug fixes all address problems found with automated build testing.
+Some of them have been around for a long time, other bugs are
+regressions since the merge window.
 
-> +
->  	i2c at 12C60000 {
->  		compatible = "samsung,s3c2440-i2c";
->  		reg = <0x12C60000 0x100>;
-> @@ -152,6 +164,13 @@
->  		#size-cells = <0>;
->  	};
->  
-> +	i2c at 121D0000 {
-> +                compatible = "samsung,s3c2440-sataphy-i2c";
+----------------------------------------------------------------
+Arnd Bergmann (9):
+      ARM: kprobes: make more tests conditional
+      ARM: export set_irq_flags
+      ARM: Fix another build warning in arch/arm/mm/alignment.c
+      ARM: export default read_current_timer
+      ARM: Xen: fix initial build problems
+      ARM: pass -marm to gcc by default for both C and assembler
+      ARM: be really quiet when building with 'make -s'
+      ARM: binfmt_flat: unused variable 'persistent'
+      ARM: warnings in arch/arm/include/asm/uaccess.h
 
-Is this a unique i2c controller, or is it just another one like the others on
-the chip? If it's the latter, it should use the regular compatible string.
-
-> +                reg = <0x121D0000 0x100>;
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +        };
-> +
->  	spi_0: spi at 12d20000 {
->  		compatible = "samsung,exynos4210-spi";
->  		reg = <0x12d20000 0x100>;
-> @@ -460,4 +479,5 @@
->  			#gpio-cells = <4>;
->  		};
->  	};
-> +
-
-Stray whitespace change.
-
->  };
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-> index c72b675..6827190 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -177,9 +177,16 @@
->  #define EXYNOS4_PA_HSOTG		0x12480000
->  #define EXYNOS4_PA_USB_HSPHY		0x125B0000
->  
-> +#ifdef CONFIG_ARCH_EXYNOS4
-
-No need to ifdef since namespace isn't overlapped.
-
->  #define EXYNOS4_PA_SATA			0x12560000
->  #define EXYNOS4_PA_SATAPHY		0x125D0000
->  #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
-> +#endif
-> +#ifdef CONFIG_ARCH_EXYNOS5
-
-Same here.
-
-> +#define EXYNOS5_PA_SATA_PHY_CTRL	0x12170000
-> +#define EXYNOS5_PA_SATA_PHY_I2C		0x121D0000
-> +#define EXYNOS5_PA_SATA_BASE		0x122F0000
-> +#endif
-
-
--Olof
+ arch/arm/Kconfig                   |    1 +
+ arch/arm/Makefile                  |   13 +++++++------
+ arch/arm/boot/Makefile             |   10 +++++-----
+ arch/arm/include/asm/flat.h        |    2 +-
+ arch/arm/include/asm/uaccess.h     |    4 ++--
+ arch/arm/kernel/irq.c              |    2 ++
+ arch/arm/kernel/kprobes-test-arm.c |    4 ++++
+ arch/arm/lib/delay.c               |    1 +
+ arch/arm/mm/alignment.c            |    4 +++-
+ arch/arm/tools/Makefile            |    2 +-
+ drivers/xen/Kconfig                |    2 ++
+ drivers/xen/sys-hypervisor.c       |    1 +
+ 12 files changed, 30 insertions(+), 16 deletions(-)
