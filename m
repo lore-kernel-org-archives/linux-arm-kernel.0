@@ -1,50 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 09 Oct 2012 10:26:42 -0600
-Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
- parents
-In-Reply-To: <20121009111701.GQ11837@lunn.ch>
-References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
- <20121003154310.GI11837@lunn.ch> <20121003220916.GW31897@kw.sim.vm.gnt>
- <20121004055443.GK21046@lunn.ch> <20121004075335.GY31897@kw.sim.vm.gnt>
- <506DAE12.7000003@wwwdotorg.org> <20121009111701.GQ11837@lunn.ch>
-Message-ID: <50745042.2020807@wwwdotorg.org>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 9 Oct 2012 18:47:16 +0200
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9F27CE@DBDE01.ent.ti.com>
+References: <20120930082802.GA15392@netboy.at.omicron.at>
+ <50740AB0.7080102@ti.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9F27CE@DBDE01.ent.ti.com>
+Message-ID: <20121009164716.GA6870@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2012 05:17 AM, Andrew Lunn wrote:
->>>> The question is, what is the appropriate name. How common is
->>>> this common C code? Are there ns2 where this C code is not
->>>> appropriate. One thing to remember is that most of this C code
->>>> will soon disappear and become DT. All the mpp will be replaced
->>>> with pinctrl in 3.8. I hope we can get the Ethernet setup in DT
->>>> as well. You are working on ns2_led, so all the C code will be
->>>> replaced by DT. So all we are really left with is power off GPIO
->>>> handling.
->>>>
->>>> So i think the danger of using lacie,ns2_common, and then finding
->>>> it does not work with some other ns2 device is quite low.
->>
->> lacie,ns2_common doesn't sound like a HW description, but rather a SW
->> invention. DT should be describing purely the HW. If there's no common
->> HW between these compatible boards (which seems unlikely), then there
->> shouldn't be a shared compatible value.
+On Tue, Oct 09, 2012 at 04:27:03PM +0000, N, Mugunthan V wrote:
 > 
-> Actually, there is common hardware between these boards:
-> 
-> NS2 LED driver
-> Pinctrl setup
-> GPIO used for power off
-> Ethernet configuration.
-> 
-> At the moment, we don't have DT for these, so there is C code.  The
-> "lacie,ns2_common" compatibility string would be used to enable this C
-> code for these boards.
+> I have implemented the CPTS hardware clock and will be submitting the
+> patches soon to TI's kernel repo and also planning to submit the patches
+> to Mainline kernel mailing lists soon.
 
-The typical way to support this is to simply include a .dtsi file from
-both board-specific .dts file. That .dtsi file will provide the
-description of the two common pieces of hardware.
+I did see the stuff you added into arago for the DM814x, but it didn't
+look correct to me.
 
-In the interim where you're stilling using some board file C code rather
-than DT for this common part, just trigger that C code from any of the
-compatible values for the boards where it's needed. Don't invent a new
-compatible value that means "run this C code".
+Anyhow, I went ahead and wrote my own from stratch, based on the
+AM335XPSP_04.06.00.08 branch, and it is working well. So go ahead and
+post your driver, and I'll post mine, and we can go from there.
+
+Right now, I can't for the life of me get a mainline kernel to boot on
+the beaglebone, so I think we should focus on getting the mainline
+support on the am335x stable before adding new drivers.
+
+Thanks,
+Richard
