@@ -1,71 +1,249 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Tue, 9 Oct 2012 13:50:35 +0200
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <50738DD0.5090406@wwwdotorg.org>
-References: <20121007015300.828366635@gmail.com>
- <20121007015405.958959522@gmail.com>
- <20121007195759.GG12801@game.jcrosoft.org>
- <20121007225417.GA29996@glitch> <50738DD0.5090406@wwwdotorg.org>
-Message-ID: <20121009115034.GA28817@glitch>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 9 Oct 2012 13:50:23 +0200
+Subject: [PATCH 10/11] fsmc/nand: Add sw bch support for ecc
+ calculation/correction
+In-Reply-To: <3968b65e9aa0a81eca16ce0f20e45504da7ad7fe.1349778821.git.vipin.kumar@st.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <3968b65e9aa0a81eca16ce0f20e45504da7ad7fe.1349778821.git.vipin.kumar@st.com>
+Message-ID: <20121009115023.GK12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 08:37:04PM -0600, Stephen Warren wrote:
-> On 10/07/2012 04:54 PM, Domenico Andreoli wrote:
-> > On Sun, Oct 07, 2012 at 09:57:59PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> On 03:53 Sun 07 Oct     , Domenico Andreoli wrote:
-> >>> From: Domenico Andreoli <domenico.andreoli@linux.com>
+On 16:14 Tue 09 Oct     , Vipin Kumar wrote:
+> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
+> ---
+>  .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +
+>  drivers/mtd/nand/fsmc_nand.c                       | 156 +++++++++++++--------
+>  include/linux/mtd/fsmc.h                           |   3 +
+>  3 files changed, 106 insertions(+), 55 deletions(-)
 > 
-> >>> Index: b/arch/arm/boot/dts/bcm476x.dtsi
-> 
-> >>> +		vic0: interrupt-controller at 80000 {
-> >>> +			compatible = "brcm,bcm476x-pl192", "arm,pl192-vic", "arm,primecell";
-> >> why brcm specific compatbile?
-> > 
-> > Nothing breaks if I drop it. I think it's a future-proof clause, especially
-> > if you consider that the devicetree could be not easy to upgrade and you
-> > may need a way to differentiate the bcm476x's implementation from the
-> > common one. I'm not sure it's an actual requirement with use cases.
-> 
-> Indeed, everything works fine right now if you drop that. However, it is
-> correct practice to include a compatible value for the particular SoC
-> that incorporates the IP so that if in the future some SoC-specific
-> workaround is required, the compatible value needed to trigger this is
-> already in all historical .dts file.
+> diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+> index 598bca2..dcf513b 100644
+> --- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+> @@ -30,6 +30,8 @@ Optional properties:
+>  - st,rb-gpios: When the st,ready-busy is defined as "rb-gpio", a gpio
+>    pin number is defined in this property
+>  
+> +- nand-sw-ecc: boolean indicating whether s/w ecc is supported
+> +
+please use the generic binding
+ - nand-ecc-mode = xx
+>  Example:
+>  
+>  	fsmc: flash at d1800000 {
+> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+> index 762cf83..ff84468 100644
+> --- a/drivers/mtd/nand/fsmc_nand.c
+> +++ b/drivers/mtd/nand/fsmc_nand.c
+> @@ -946,6 +946,9 @@ static int __devinit fsmc_nand_probe_config_dt(struct platform_device *pdev,
+>  	} else
+>  		pdata->rbpin.use_pin = FSMC_RB_WAIT;
+>  
+> +	if (of_property_read_bool(np, "nand-sw-ecc"))
+> +		pdata->sw_ecc = true;
+> +
+of_get_nand_ecc_mode
 
-This matches with what I know but it seems anyway that in the arm,primecell
-cases this is not a great concern, almost none of the dts currently in
-mainline go as far as specifying the machine specific name.
-
-> >>> Index: b/arch/arm/include/debug/bcm476x.S
+>  	return 0;
+>  }
+>  #else
+> @@ -972,6 +975,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>  	dma_cap_mask_t mask;
+>  	int ret = 0;
+>  	u32 pid, bank;
+> +	uint oobeccsize, m;
+>  	int i;
+>  
+>  	if (np) {
+> @@ -1104,9 +1108,24 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>  	nand->cmd_ctrl = fsmc_cmd_ctrl;
+>  	nand->chip_delay = 30;
+>  
+> -	nand->ecc.mode = NAND_ECC_HW;
+> -	nand->ecc.hwctl = fsmc_enable_hwecc;
+> -	nand->ecc.size = 512;
+> +	if (pdata->sw_ecc) {
+> +		nand->ecc.mode = NAND_ECC_SOFT_BCH;
+> +		/*
+> +		 * The recent devices require n-bit correctibility in x bytes.
+> +		 * The values of n and x varies as below
+> +		 * n - 1 to 100
+> +		 * x - 512 to 1K
+> +		 * TODO: For now, take x = 1K for all sw bch mathematics. Think
+> +		 * of a better way to handle other device dependent
+> +		 * requirements. May be it should come from board dts files
+> +		 */
+> +		nand->ecc.size = 1024;
+> +	} else {
+> +		nand->ecc.mode = NAND_ECC_HW;
+> +		nand->ecc.hwctl = fsmc_enable_hwecc;
+> +		nand->ecc.size = 512;
+> +	}
+> +
+>  	nand->options = pdata->options;
+>  	nand->select_chip = fsmc_select_chip;
+>  	nand->badblockbits = 7;
+> @@ -1165,17 +1184,19 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>  				nand->options & NAND_BUSWIDTH_16,
+>  				host->dev_timings, host->rbpin);
+>  
+> -	if (AMBA_REV_BITS(host->pid) >= 8) {
+> -		nand->ecc.read_page = fsmc_read_page_hwecc;
+> -		nand->ecc.calculate = fsmc_read_hwecc_ecc4;
+> -		nand->ecc.correct = fsmc_bch8_correct_data;
+> -		nand->ecc.bytes = 13;
+> -		nand->ecc.strength = 8;
+> -	} else {
+> -		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
+> -		nand->ecc.correct = nand_correct_data;
+> -		nand->ecc.bytes = 3;
+> -		nand->ecc.strength = 1;
+> +	if (nand->ecc.mode != NAND_ECC_SOFT_BCH) {
+> +		if (AMBA_REV_BITS(host->pid) >= 8) {
+> +			nand->ecc.read_page = fsmc_read_page_hwecc;
+> +			nand->ecc.calculate = fsmc_read_hwecc_ecc4;
+> +			nand->ecc.correct = fsmc_bch8_correct_data;
+> +			nand->ecc.bytes = 13;
+> +			nand->ecc.strength = 8;
+> +		} else {
+> +			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
+> +			nand->ecc.correct = nand_correct_data;
+> +			nand->ecc.bytes = 3;
+> +			nand->ecc.strength = 1;
+> +		}
+>  	}
+>  
+>  	/*
+> @@ -1187,48 +1208,73 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>  		goto err_scan_ident;
+>  	}
+>  
+> -	if (AMBA_REV_BITS(host->pid) >= 8) {
+> -		switch (host->mtd.oobsize) {
+> -		case 16:
+> -			nand->ecc.layout = &fsmc_ecc4_16_layout;
+> -			host->ecc_place = &fsmc_ecc4_sp_place;
+> -			break;
+> -		case 64:
+> -			nand->ecc.layout = &fsmc_ecc4_64_layout;
+> -			host->ecc_place = &fsmc_ecc4_lp_place;
+> -			break;
+> -		case 128:
+> -			nand->ecc.layout = &fsmc_ecc4_128_layout;
+> -			host->ecc_place = &fsmc_ecc4_lp_place;
+> -			break;
+> -		case 224:
+> -			nand->ecc.layout = &fsmc_ecc4_224_layout;
+> -			host->ecc_place = &fsmc_ecc4_lp_place;
+> -			break;
+> -		case 256:
+> -			nand->ecc.layout = &fsmc_ecc4_256_layout;
+> -			host->ecc_place = &fsmc_ecc4_lp_place;
+> -			break;
+> -		default:
+> -			printk(KERN_WARNING "No oob scheme defined for "
+> -			       "oobsize %d\n", mtd->oobsize);
+> -			BUG();
+> -		}
+> +	if (nand->ecc.mode == NAND_ECC_SOFT_BCH) {
+> +		/*
+> +		 * Initialize the ecc bytes and strength dynamically based on eccsize
+> +		 * and writesize.
+> +		 *
+> +		 * Parameters @eccsize and @eccbytes are used to compute BCH parameters
+> +		 * m (Galois field order) and t (error correction capability). @eccbytes
+> +		 * should be equal to the number of bytes required to store m*t bits,
+> +		 * where m is such that 2^m-1 > @eccsize*8.
+> +		 *
+> +		 * Example: to configure 4 bit correction per 512 bytes, you should pass
+> +		 * @eccsize = 512  (thus, m=13 is the smallest integer such that 2^m-1 >
+> +		 * 512*8) @eccbytes = 7 (7 bytes are required to store m*t = 13*4 = 52
+> +		 * bits)
+> +		 *
+> +		 * Note: 2 bytes of oob are considered reserved for bad block marking
+> +		 */
+> +		m = fls(1 + 8 * nand->ecc.size);
+> +		oobeccsize = ((host->mtd.oobsize - 2) * \
+> +				nand->ecc.size) / host->mtd.writesize;
+> +		nand->ecc.bytes = (oobeccsize / m) * m;
+> +		nand->ecc.strength = (nand->ecc.bytes * 8) / m;
+> +		nand->ecc.layout = NULL;
+>  	} else {
+> -		switch (host->mtd.oobsize) {
+> -		case 16:
+> -			nand->ecc.layout = &fsmc_ecc1_16_layout;
+> -			break;
+> -		case 64:
+> -			nand->ecc.layout = &fsmc_ecc1_64_layout;
+> -			break;
+> -		case 128:
+> -			nand->ecc.layout = &fsmc_ecc1_128_layout;
+> -			break;
+> -		default:
+> -			printk(KERN_WARNING "No oob scheme defined for "
+> -			       "oobsize %d\n", mtd->oobsize);
+> -			BUG();
+> +		if (AMBA_REV_BITS(host->pid) >= 8) {
+> +			switch (host->mtd.oobsize) {
+> +			case 16:
+> +				nand->ecc.layout = &fsmc_ecc4_16_layout;
+> +				host->ecc_place = &fsmc_ecc4_sp_place;
+> +				break;
+> +			case 64:
+> +				nand->ecc.layout = &fsmc_ecc4_64_layout;
+> +				host->ecc_place = &fsmc_ecc4_lp_place;
+> +				break;
+> +			case 128:
+> +				nand->ecc.layout = &fsmc_ecc4_128_layout;
+> +				host->ecc_place = &fsmc_ecc4_lp_place;
+> +				break;
+> +			case 224:
+> +				nand->ecc.layout = &fsmc_ecc4_224_layout;
+> +				host->ecc_place = &fsmc_ecc4_lp_place;
+> +				break;
+> +			case 256:
+> +				nand->ecc.layout = &fsmc_ecc4_256_layout;
+> +				host->ecc_place = &fsmc_ecc4_lp_place;
+> +				break;
+> +			default:
+> +				printk(KERN_WARNING "No oob scheme defined for "
+> +						"oobsize %d\n", mtd->oobsize);
+> +				BUG();
+> +			}
+> +		} else {
+> +			switch (host->mtd.oobsize) {
+> +			case 16:
+> +				nand->ecc.layout = &fsmc_ecc1_16_layout;
+> +				break;
+> +			case 64:
+> +				nand->ecc.layout = &fsmc_ecc1_64_layout;
+> +				break;
+> +			case 128:
+> +				nand->ecc.layout = &fsmc_ecc1_128_layout;
+> +				break;
+> +			default:
+> +				printk(KERN_WARNING "No oob scheme defined for "
+> +						"oobsize %d\n", mtd->oobsize);
+> +				BUG();
+> +			}
+>  		}
+>  	}
+>  
+> diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
+> index eed22a1..07eee6e 100644
+> --- a/include/linux/mtd/fsmc.h
+> +++ b/include/linux/mtd/fsmc.h
+> @@ -176,6 +176,9 @@ struct fsmc_nand_platform_data {
+>  	/* priv structures for dma accesses */
+>  	void			*read_dma_priv;
+>  	void			*write_dma_priv;
+> +
+> +	/* whether s/w ecc is supported */
+> +	bool			sw_ecc;
+>  };
+>  
+>  extern int __init fsmc_nor_init(struct platform_device *pdev,
+> -- 
+> 1.7.11.4
 > 
-> >>> +#if defined(CONFIG_DEBUG_BCM476X_UART0)
-> >>> +# define BCM476X_DEBUG_PHYS	0x000c0000
-> >>> +# define BCM476X_DEBUG_VIRT	0xd00c0000
-> >>> +#elif defined(CONFIG_DEBUG_BCM476X_UART1)
-> >>> +# define BCM476X_DEBUG_PHYS	0x000c1000
-> >>> +# define BCM476X_DEBUG_VIRT	0xd00c1000
-> >>> +#elif defined(CONFIG_DEBUG_BCM476X_UART2)
-> >>> +# define BCM476X_DEBUG_PHYS	0x000b2000
-> >>> +# define BCM476X_DEBUG_VIRT	0xd00b2000
-> >>> +#else
-> >>> +# error Unknown BCM476x debug port
-> >>> +#endif
-> >>
-> >> can't you detect it?
-> > 
-> > If I can assume that the boot loader will configure and enable only the
-> > console port, I could use the first one in such state.
-> > 
-> > Where could I place such detection, in the maco addruart itself?
-> 
-> Auto-detection is not necessarily a good idea; there's no reason in
-> general to believe that no future board will ever use a UART for any
-> purposes other than console/debug. Being explicit is probably good.
-
-After thinking at it a bit, I also prefer to leave the guessing out. It
-can break things in non-obvious ways. I prefer a full consistent and
-testable behaviour.
-
-Thanks,
-Domenico
