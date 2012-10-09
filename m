@@ -1,29 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 08 Oct 2012 20:48:20 -0600
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <20121007015405.958959522@gmail.com>
-References: <20121007015300.828366635@gmail.com>
- <20121007015405.958959522@gmail.com>
-Message-ID: <50739074.8000001@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 9 Oct 2012 02:49:55 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP: move old debug-devices.c and debug-leds.c to
+ be OMAP2+ only for now
+In-Reply-To: <20121008221333.GZ13011@atomide.com>
+References: <alpine.DEB.2.00.1210080145080.5736@utopia.booyaka.com>
+ <20121008221333.GZ13011@atomide.com>
+Message-ID: <alpine.DEB.2.00.1210090249240.5736@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2012 07:53 PM, Domenico Andreoli wrote:
-> BCM476x's minimal infrastructure, Kernel's great reuse.
+On Mon, 8 Oct 2012, Tony Lindgren wrote:
 
-> Index: b/arch/arm/boot/dts/bcm476x.dtsi
+> * Paul Walmsley <paul@pwsan.com> [121007 18:48]:
+> > 
+> > Commit 801475ccb2b2c1928b22aec4b9e5285d9e347602 ("ARM: OMAP: move
+> > debug_card_init() function") results in the following new sparse[1]
+> > warning:
+> > 
+> > arch/arm/plat-omap/debug-devices.c:71:12: warning: symbol 'debug_card_init' was not declared. Should it be static?
+> > 
+> > Normally this could be fixed by including the appropriate header file
+> > in plat-omap/debug-devices.c, but the header file now exists only in
+> > mach-omap2/, so this would require a "sideways include" and is thus
+> > impractical.  It turns out that only code in mach-omap2/ currently
+> > uses the debug-devices.c and debug-leds.c files, so move them there.
+> > In the long term, these devices should be created by DT, and the code
+> > should be moved into drivers/ somewhere.
+> 
+> Hmm are you sure that omap1 is not using debug-leds.c?
+> At least the initcall seems like it should run on omap1
+> if enabled.
 
-> +	chosen {
-> +		bootargs = "earlyprintk";
-> +	};
+Will drop this one for now until we figure out what to do about it.
 
-> Index: b/arch/arm/configs/bcm476x_defconfig
 
-> +CONFIG_CMDLINE="root=/dev/mmcblk0p2 ro console=ttyAMA1,115200 rootwait init=/bin/bash"
-> +CONFIG_CMDLINE_FROM_BOOTLOADER=y
-
-I'm not sure you need to specify a default command-line in both those
-places. I would be inclined to leave out the root= option as well; it's
-pretty specific to however the user's SD card was partitioned, so there
-could be quite some variation there I think? Oh, especially since I
-think you said there was no SD driver yet anyway?
+- Paul
