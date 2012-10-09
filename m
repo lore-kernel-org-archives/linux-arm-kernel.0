@@ -1,42 +1,78 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 9 Oct 2012 05:57:22 +0000
-Subject: Booting vanilla kernel on the beaglebone
-In-Reply-To: <20121008191657.GA3281@netboy.at.omicron.at>
-References: <20120930082802.GA15392@netboy.at.omicron.at>
- <50693ECD.4000000@ti.com> <20121008191657.GA3281@netboy.at.omicron.at>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
+From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
+Date: Tue, 9 Oct 2012 14:01:54 +0800
+Subject: [RFC] arm/mm: add a protection when flushing anonymous pages
+In-Reply-To: <CANj_sbCV7MGH3dZ8_i3S1SwhPz3WouarEsGxtkUVKiGrGUNVrA@mail.gmail.com>
+References: <CAGCDX1mY4wbMq4qDJ9vCazShxdWQXVYyWkpLd5u8_xqbEC2BWQ@mail.gmail.com>
+ <CAGCDX1mkPVre6h=9kNbRqCp_wtbOneuRLMXM+mkZWFXPwWkBfg@mail.gmail.com>
+ <CANj_sbADwtPR6cgk05QkmvrSUOOQRYXB9vPB6KATKEmwcN8UrA@mail.gmail.com>
+ <20121005091006.GM4625@n2100.arm.linux.org.uk>
+ <CANj_sbCV7MGH3dZ8_i3S1SwhPz3WouarEsGxtkUVKiGrGUNVrA@mail.gmail.com>
+Message-ID: <CANj_sbDsipnv33LyzO-hee8=WQN0wmeHcZSyXAcx8DRtCu5Dvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 00:46:57, Richard Cochran wrote:
-> On Mon, Oct 01, 2012 at 12:27:17PM +0530, Vaibhav Hiremath wrote:
-> 
-> > I have just tested it to cross-check and it boots up fine with
-> > linux-next/master branch. I have pasted boot log below for your reference.
-> > 
-> > 
-> > 
-> > U-Boot#
-> > U-Boot# mmc rescan 0
-> > U-Boot# fatload mmc 0 80000000 am335x-evm.dtb
-> > reading am335x-evm.dtb
-> 
-> Two questions:
-> 
-> 1. Why are you using am335x-evm.dtb and not am335x-bone.dtb here?
-> 
+On Fri, Oct 5, 2012 at 6:09 PM, Andrew Yan-Pai Chen
+<yanpai.chen@gmail.com> wrote:
+> On Fri, Oct 5, 2012 at 5:10 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Oct 02, 2012 at 03:07:33PM +0800, Andrew Yan-Pai Chen wrote:
+>>> [RFC PATCH] make flush_pfn_alias() nonpreemptible
+>>>
+>>> Since flush_pfn_alias() is preemptible, it is possible to be
+>>> preempted just after set_top_pte() is done. If the process
+>>> which preempts the previous happened to invoke flush_pfn_alias()
+>>> with the same colour vaddr as that of the previous, the same
+>>> top pte will be overwritten. When switching back to the previous,
+>>> it attempts to flush cache lines with incorrect mapping. Then
+>>> no lines (or wrong lines) will be flushed because of the nature
+>>> of vipt caches.
+>>>
+>>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+>>> index 40ca11e..bd07918 100644
+>>> --- a/arch/arm/mm/flush.c
+>>> +++ b/arch/arm/mm/flush.c
+>>> @@ -27,6 +27,8 @@ static void flush_pfn_alias(unsigned long pfn,
+>>> unsigned long vaddr)
+>>>         unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) <<
+>>> PAGE_SHIFT);
+>>>         const int zero = 0;
+>>>
+>>> +       preempt_disable();
+>>> +
+>>>         set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
+>>>
+>>>         asm(    "mcrr   p15, 0, %1, %0, c14\n"
+>>> @@ -34,6 +36,8 @@ static void flush_pfn_alias(unsigned long pfn,
+>>> unsigned long vaddr)
+>>>             :
+>>>             : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+>>>             : "cc");
+>>> +
+>>> +       preempt_enable();
+>>>  }
+>>
+>> This looks like it's quite correct, but if you look at the file a little
+>> deeper, you'll notice that flush_icache_alias() potentially suffers the
+>> same issue.
+>>
+>> They should probably both also have a comment indicating that they're not
+>> to be called for SMP setups (because there's no locking for that.)
+>
+> OK. I will resend the patch later.
+> Thanks!
+>
+> --
+> Regards,
+> Andrew
 
-You can very well use bone dtb file, as of now we have very little in that 
-which is specific to particular board.
+Hi Russell,
 
+Is flush_icache_alias() not to be called for SMP setups?
+It seems that processors with a vipt non-aliasing D-cache but a vipt
+aliasing I-cache
+(such like cortex-a9) will call this function.
+So perhaps we should have a lock in this case?
 
-> 2. Can you post your .config?
-> 
-
-I use omap2plus_defconfig + CONFIG_ARM_APPENDED_DTB + CONFIG_ARM_ATAG_DTB_COMPAT and nothing more.
-
-Thanks,
-Vaibhav
-> Thanks,
-> Richard
-> 
+--
+Regards,
+Andrew
