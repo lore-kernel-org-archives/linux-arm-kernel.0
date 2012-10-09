@@ -1,38 +1,38 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 9 Oct 2012 17:10:35 +0100
-Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
-In-Reply-To: <201210091539.46274.arnd@arndb.de>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <1349796183-30648-6-git-send-email-arnd@arndb.de>
- <1349796958.21847.219.camel@zakaz.uk.xensource.com>
- <201210091539.46274.arnd@arndb.de>
-Message-ID: <1349799035.21847.222.camel@zakaz.uk.xensource.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 09 Oct 2012 10:15:54 -0600
+Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
+In-Reply-To: <20121009050109.GD21822@S2101-09.ap.freescale.net>
+References: <20121009031715.GC21822@S2101-09.ap.freescale.net>
+ <alpine.LFD.2.02.1210090018470.16518@xanadu.home>
+ <20121009050109.GD21822@S2101-09.ap.freescale.net>
+Message-ID: <50744DBA.3070900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-09 at 16:39 +0100, Arnd Bergmann wrote:
-> On Tuesday 09 October 2012, Ian Campbell wrote:
-> > > * The tmem hypercall is not available on ARM
-> > > 
-> > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
-> > 
-> > missing the end of this sentence?
-> 
-> Right, I meant to say 
-> 
-> * ARMv6 does not support cmpxchg on 16-bit words that are used in the
->   Xen grant table code, so we must ensure that Xen support is only built
->   on ARMv7-only kernels not combined ARMv6/v7 kernels.
-> 
-> This should be fixed differently in the future.
+On 10/08/2012 11:01 PM, Shawn Guo wrote:
+> On Tue, Oct 09, 2012 at 12:25:44AM -0400, Nicolas Pitre wrote:
+>> On Tue, 9 Oct 2012, Shawn Guo wrote:
+>>
+>>> I have seen this error on mainline for a couple days when
+>>> ARM_ATAG_DTB_COMPAT is enabled.
+>>>
+>>>   CC      arch/arm/boot/compressed/fdt_ro.o
+>>> arch/arm/boot/compressed/fdt_ro.c: In function ?fdt_path_offset?:
+>>> arch/arm/boot/compressed/fdt_ro.c:172:3: error: implicit declaration of function ?fdt_get_alias_namelen? [-Werror=implicit-function-declaration]
+>>> arch/arm/boot/compressed/fdt_ro.c:172:5: warning: assignment makes pointer from integer without a cast [enabled by default]
+>>> arch/arm/boot/compressed/fdt_ro.c: At top level:
+>>> arch/arm/boot/compressed/fdt_ro.c:340:13: error: conflicting types for ?fdt_get_alias_namelen?
+>>> arch/arm/boot/compressed/fdt_ro.c:172:7: note: previous implicit declaration of ?fdt_get_alias_namelen? was here
+>>> cc1: some warnings being treated as errors
+>>
+>> I just tried building mainline now.  It is at commit f5a246eab9.
+>>
+> The build still fails for me at this commit.
 
-Is this is a build time failure because gcc/gas/etc refuses to generate
-these instructions if it is configured for v6?
+I can't reproduce this.
 
-I ask because if it is only a runtime issue then we can reason that if
-we are running Xen specific grant table code, then we must be running on
-Xen and therefore must necessarily be running on a v7 (because Xen only
-support v7+virt extensions) even if the kernel happens to be capable of
-running on v6 too.
-
-Ian.
+I tried both my local next-20121005-based dev branch and that exact
+commit above. I tried both the crosstool-ng-based compiler I normally
+use and Ubuntu 10.04's ARM compiler (possibly from a PPA). In both
+cases, I ran git clean -f -d -x ; git reset --hard HEAD first, and then
+build zImage, dtbs, and modules, and of course used your attached .config.
