@@ -1,43 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  9 Oct 2012 17:23:03 +0200
-Subject: [PATCH 9/9] ARM: warnings in arch/arm/include/asm/uaccess.h
+Date: Tue,  9 Oct 2012 17:23:02 +0200
+Subject: [PATCH 8/9] ARM: binfmt_flat: unused variable 'persistent'
 In-Reply-To: <1349796183-30648-1-git-send-email-arnd@arndb.de>
 References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349796183-30648-10-git-send-email-arnd@arndb.de>
+Message-ID: <1349796183-30648-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On NOMMU ARM, the __addr_ok() and __range_ok() macros do not evaluate
-their arguments, which may lead to harmless build warnings in some
-code where the variables are not used otherwise. Adding a cast to void
-gets rid of the warning and does not make any semantic changes.
+The flat_get_addr_from_rp() macro does not use the 'persistent' argument
+on ARM, causing a harmless compiler warning. A cast to void removes
+that warning.
 
 Without this patch, building at91x40_defconfig results in:
 
-fs/read_write.c: In function 'rw_copy_check_uvector':
-fs/read_write.c:684:9: warning: unused variable 'buf' [-Wunused-variable]
+fs/binfmt_flat.c: In function 'load_flat_file':
+fs/binfmt_flat.c:746:17: warning: unused variable 'persistent' [-Wunused-variable]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Greg Ungerer <gerg@uclinux.org>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Bryan Wu <bryan.wu@canonical.com>
 ---
- arch/arm/include/asm/uaccess.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/flat.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 77bd79f..7e1f760 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -200,8 +200,8 @@ extern int __put_user_8(void *, unsigned long long);
- #define USER_DS			KERNEL_DS
- 
- #define segment_eq(a,b)		(1)
--#define __addr_ok(addr)		(1)
--#define __range_ok(addr,size)	(0)
-+#define __addr_ok(addr)		((void)(addr),1)
-+#define __range_ok(addr,size)	((void)(addr),0)
- #define get_fs()		(KERNEL_DS)
- 
- static inline void set_fs(mm_segment_t fs)
+diff --git a/arch/arm/include/asm/flat.h b/arch/arm/include/asm/flat.h
+index 59426a4..e847d23 100644
+--- a/arch/arm/include/asm/flat.h
++++ b/arch/arm/include/asm/flat.h
+@@ -8,7 +8,7 @@
+ #define	flat_argvp_envp_on_stack()		1
+ #define	flat_old_ram_flag(flags)		(flags)
+ #define	flat_reloc_valid(reloc, size)		((reloc) <= (size))
+-#define	flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
++#define	flat_get_addr_from_rp(rp, relval, flags, persistent) ((void)persistent,get_unaligned(rp))
+ #define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
+ #define	flat_get_relocate_addr(rel)		(rel)
+ #define	flat_set_persistent(relval, p)		0
 -- 
 1.7.10
