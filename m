@@ -1,95 +1,198 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 9 Oct 2012 00:01:05 -0400 (EDT)
-Subject: [PATCH v2 3/5] ARM: use generic unaligned.h
-In-Reply-To: <50738B93.6090704@gmail.com>
-References: <1344129840-16447-1-git-send-email-robherring2@gmail.com>
- <1344129840-16447-4-git-send-email-robherring2@gmail.com>
- <20121008164353.GB6140@S2101-09.ap.freescale.net>
- <507338F1.7030604@gmail.com>
- <20121008232853.GA21822@S2101-09.ap.freescale.net>
- <50738B93.6090704@gmail.com>
-Message-ID: <alpine.LFD.2.02.1210082354210.16518@xanadu.home>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 9 Oct 2012 12:13:15 +0800
+Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for
+ secondary CPUs
+In-Reply-To: <20121008163504.GC5377@e102568-lin.cambridge.arm.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-4-git-send-email-josephl@nvidia.com>
+ <20121008163504.GC5377@e102568-lin.cambridge.arm.com>
+Message-ID: <1349755995.15153.145.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Oct 2012, Rob Herring wrote:
+Hi Lorenzo,
 
-> On 10/08/2012 06:28 PM, Shawn Guo wrote:
-> > On Mon, Oct 08, 2012 at 03:34:57PM -0500, Rob Herring wrote:
-> >> On 10/08/2012 11:43 AM, Shawn Guo wrote:
-> >>> This patch has been merged into mainline as commit below.
-> >>>
-> >>>  d25c881 ARM: 7493/1: use generic unaligned.h
-> >>>
-> >>> It introduces a regression for me.  Check out the commit on mainline,
-> >>> build a v7 only kernel (imx5/6) with imx_v6_v7_defconfig, the kernel
-> >>> halts in decompressor.  But v6/v7 kernel (imx3/5/6) works fine.  The
-> >>> kernel built on the parent commit below works all fine.
-> >>
-> >> It actually fails in the decompressor or that's the last output you get?
-> > 
-> > I think it fails in the decompressor, because what I see is 
-> > 
-> > Uncompressing Linux...
-> > 
-> > not
-> > 
-> > Uncompressing Linux... done, booting the kernel.
-> > 
-> >> I compared the decompressor disassembly of both cases and get the same
-> >> number of ldrb/strb instructions, so I don't think it is directly
-> >> related to alignment.
-> >>
-> >> I tried the XY decompressor as that is one difference, but that works
-> >> fine for me on highbank.
-> >>
-> >> Does it work with an empty uncompress.h functions? That should be the
-> >> only difference in our decompressor code.
-> > 
-> > No, empty putc() in uncompress.h does not help.
-> > 
-> > New finding is that it only fails with LZO decompressor while the other
-> > 3 Gzip, LZMA and XZ all work good.  We happen to have LZO as the default
-> > one in imx_v6_v7_defconfig.
-> 
-> I must have had an old config with XZ. LZO fails because of this:
->  
-> lib/decompress_unlzo.c: version = get_unaligned_be16(parse);
-> lib/decompress_unlzo.c: if (get_unaligned_be32(parse) & HEADER_HAS_FILTER)
-> lib/decompress_unlzo.c:         dst_len = get_unaligned_be32(in_buf);
-> lib/decompress_unlzo.c:         src_len = get_unaligned_be32(in_buf);
-> 
-> This was what I was afraid of. The decompressor runs with the sysctrl
-> register A bit in whatever state the bootloader left it in. In the case
-> of u-boot it is set, and the maintainers are pretty set on not allowing
-> unaligned accesses if you've seen the recent discussion.
+Thanks for your review.
 
-This is not an u-Boot issue.  The kernel code expects misaligned 
-accesses to be handled by the hardware on ARMv6+ now.  So it better 
-enforce proper A bit state itself.
-
-> This should fix things.
+On Tue, 2012-10-09 at 00:35 +0800, Lorenzo Pieralisi wrote:
+> On Mon, Oct 08, 2012 at 11:26:17AM +0100, Joseph Lo wrote:
+> > This supports power-gated (LP2) idle on secondary CPUs for Tegra30.
+> > The secondary CPUs can go into LP2 state independently. When CPU goes
+> > into LP2 state, it saves it's state and puts itself to flow controlled
+> > WFI state. After that, it will been power gated.
+> > 
+> > Based on the work by:
+> > Scott Williams <scwilliams@nvidia.com>
+> > 
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+...
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static bool tegra30_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
+> > +                                        struct cpuidle_driver *drv,
+> > +                                        int index)
+> > +{
+> > +#ifdef CONFIG_SMP
+> > +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+> > +
+> > +       smp_wmb();
+> > +
+> > +       save_cpu_arch_register();
+> > +
+> > +       cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+> > +
+> > +       restore_cpu_arch_register();
+> > +
+> > +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+> > +#endif
 > 
-> Rob
+> Can't you factor out this #ifdef out using an inline function ?
 > 
-> 8<---------------------------------------------------------------------
+OK. Will do.
+
+> > +
+> > +       return true;
+> > +}
+> > +
+> > +static int __cpuinit tegra30_idle_lp2(struct cpuidle_device *dev,
+> > +                                     struct cpuidle_driver *drv,
+> > +                                     int index)
+> > +{
+> > +       bool entered_lp2 = false;
+> > +
+> > +       local_fiq_disable();
+> > +
+> > +       tegra_set_cpu_in_lp2(dev->cpu);
+> > +       cpu_pm_enter();
+> > +
+> > +       if (dev->cpu == 0)
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index bc67cbf..1f87d22 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -654,6 +654,7 @@ __armv7_mmu_cache_on:
->  #endif
->                 mrc     p15, 0, r0, c1, c0, 0   @ read control reg
->                 bic     r0, r0, #1 << 28        @ clear SCTLR.TRE
-> +               bic     r0, r0, #1 << 1         @ clear SCTLR.A
->                 orr     r0, r0, #0x5000         @ I-cache enable, RR cache replacement
->                 orr     r0, r0, #0x003c         @ write buffer
->  #ifdef CONFIG_MMU
+> Logical cpu 0 ? Or you need a HW cpu 0 check here ? If you boot on a CPU
+> that is different from HW CPU 0 (do not know if that's possible) you
+> might have a problem.
+> 
+> [...]
+> 
+For Tegra20 & Tegra30, it's always physical CPU 0 here. And the CPU0 was
+always the first boot CPU. I will change to
+
+cpu = cpu_logical_map(dev->cpu);
+
+Thanks for your remind.
+
+> > +bool __cpuinit tegra_set_cpu_in_lp2(int cpu)
+> > +{
+> > +       bool last_cpu = false;
+> > +
+> > +       spin_lock(&tegra_lp2_lock);
+> > +       BUG_ON(cpumask_test_cpu(cpu, &tegra_in_lp2));
+> > +       cpumask_set_cpu(cpu, &tegra_in_lp2);
+> > +
+> > +       /*
+> > +        * Update the IRAM copy used by the reset handler. The IRAM copy
+> > +        * can't use used directly by cpumask_set_cpu() because it uses
+> > +        * LDREX/STREX which requires the addressed location to be inner
+> > +        * cacheable and sharable which IRAM isn't.
+> > +        */
+> > +       writel(tegra_in_lp2.bits[0], tegra_cpu_lp2_mask);
+> > +       dsb();
+> > +
+> > +       if ((cpu == 0) && cpumask_equal(&tegra_in_lp2, cpu_online_mask))
+> > +               last_cpu = true;
+> 
+> For cpu == 0, see above.
+> 
+> [...]
+> 
+Will use cpu_logical_map to get the physical CPU first, thanks.
+
+> > +ENTRY(tegra_flush_l1_cache)
+> > +       stmfd   sp!, {r4-r5, r7, r9-r11, lr}
+> > +       dmb                                     @ ensure ordering
+> > +
+> > +       /* Disable the data cache */
+> > +       mrc     p15, 0, r2, c1, c0, 0
+> > +       bic     r2, r2, #CR_C
+> > +       dsb
+> > +       mcr     p15, 0, r2, c1, c0, 0
+> > +
+> > +       /* Flush data cache */
+> > +       mov     r10, #0
+> > +#ifdef CONFIG_PREEMPT
+> > +       save_and_disable_irqs_notrace r9        @ make cssr&csidr read atomic
+> > +#endif
+> > +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr
+> > +       isb                                     @ isb to sych the new cssr&csidr
+> > +       mrc     p15, 1, r1, c0, c0, 0           @ read the new csidr
+> > +#ifdef CONFIG_PREEMPT
+> > +       restore_irqs_notrace r9
+> > +#endif
+> > +       and     r2, r1, #7                      @ extract the length of the cache lines
+> > +       add     r2, r2, #4                      @ add 4 (line length offset)
+> > +       ldr     r4, =0x3ff
+> > +       ands    r4, r4, r1, lsr #3              @ find maximum number on the way size
+> > +       clz     r5, r4                          @ find bit position of way size increment
+> > +       ldr     r7, =0x7fff
+> > +       ands    r7, r7, r1, lsr #13             @ extract max number of the index size
+> > +loop2:
+> > +       mov     r9, r4                          @ create working copy of max way size
+> > +loop3:
+> > +       orr     r11, r10, r9, lsl r5            @ factor way and cache number into r11
+> > +       orr     r11, r11, r7, lsl r2            @ factor index number into r11
+> > +       mcr     p15, 0, r11, c7, c14, 2         @ clean & invalidate by set/way
+> > +       subs    r9, r9, #1                      @ decrement the way
+> > +       bge     loop3
+> > +       subs    r7, r7, #1                      @ decrement the index
+> > +       bge     loop2
+> > +finished:
+> > +       mov     r10, #0                         @ swith back to cache level 0
+> > +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr 
+> > +       dsb
+> > +       isb
+> 
+> This code is already in the kernel in cache-v7.S, please use that.
+> We are just adding the new LoUIS API that probably does what you
+> want, even though for Tegra, that is an A9 based platform I fail to
+> understand why Level of Coherency differs from L1.
+> 
+> Can you explain to me please why Level of Coherency (LoC) is != from L1
+> on Tegra ?
 > 
 
-That's OK for ARMv7, but in the ARMv6 case we use __armv4_mmu_cache_on.  
-So this patch is incomplete.
+Thanks for introducing the new LoUIS cache API. Did LoUIS been changed
+by other HW? I checked the new LoUIS API. If LoUIS == 0, it means inner
+shareable then it do nothing just return. But I need to flush L1 data
+cache here to sync the coherency before CPU be power gated. And disable
+data cache before flush is needed.
 
+I can tell you the sequence that why we just do L1 data cache flush
+here. Maybe I need to change the comment to "flush to point of
+coherency" not "level of coherency".
 
-Nicolas
+For secondary CPUs:
+* after cpu_suspend
+* disable data cache and flush L1 data cache
+* Turn off SMP coherency
+* power gate CPU
+
+For CPU0:
+* outer_disable (flush and disable L2)
+* cpu_suspend
+* disable data cache and flush L1 data cache
+* Turn off SMP coherency
+* Turn off MMU
+* shut off the CPU rail
+
+So we only do flush to PoC.
+
+And changing the sequence of secondary CPUs to belows maybe more
+suitable?
+* after cpu_suspend
+* disable data cache and call to v7_flush_dcache_all
+* Turn off SMP coherency
+* power gate CPU
+
+How do you think?
+
+Thanks,
+Joseph
