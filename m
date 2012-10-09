@@ -1,108 +1,116 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 9 Oct 2012 10:32:21 -0300
-Subject: [PATCH v3] video: imxfb: Do not crash on reboot
-Message-ID: <1349789541-5159-1-git-send-email-fabio.estevam@freescale.com>
+From: sourav.poddar@ti.com (Sourav)
+Date: Tue, 9 Oct 2012 19:04:18 +0530
+Subject: [RFC 00/24] OMAP serial driver flow control fixes, and preparation
+ for DMA engine conversion
+In-Reply-To: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+Message-ID: <507427DA.6020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Issuing a "reboot" command after the LCD times out causes the following
-warnings:
+Hi,
 
-Requesting system reboot
-------------[ cut here ]------------
-WARNING: at drivers/clk/clk.c:471 clk_disable+0x24/0x50()
-Modules linked in:
-[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c03960a0>] (clk_disable+0x24/0x50)
-[<c03960a0>] (clk_disable+0x24/0x50) from [<c02695a0>] (imxfb_disable_controller+0x48/0x7c)
-[<c02695a0>] (imxfb_disable_controller+0x48/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace da6b502ca79c854f ]---
-------------[ cut here ]------------
-WARNING: at drivers/clk/clk.c:380 clk_unprepare+0x1c/0x2c()
-Modules linked in:
-[<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-[<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-[<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c0396338>] (clk_unprepare+0x1c/0x2c)
-[<c0396338>] (clk_unprepare+0x1c/0x2c) from [<c02695a8>] (imxfb_disable_controller+0x50/0x7c)
-[<c02695a8>] (imxfb_disable_controller+0x50/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-[<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-[<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-[<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-[<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-[<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
----[ end trace da6b502ca79c8550 ]---
-------------[ cut here ]------------
+On Saturday 06 October 2012 06:08 PM, Russell King - ARM Linux wrote:
+> Hi,
+>
+> This series of patches fixes multiple flow control issues with the OMAP
+> serial driver, and prepares the driver for DMA engine conversion.  We
+> require hardware assisted flow control to work properly for DMA support
+> otherwise we have no way to properly pause the transmitter.
+>
+> This is generated against v3.6, and has been developed mainly by testing
+> on the OMAP4430 SDP platform.
+>
+> Flow control seems to be really broken in the OMAP serial driver as things
+> stand today.  It just about works with software flow control because the
+> generic serial core layer is inserting those characters, but only when the
+> legacy DMA support is not being used.  Otherwise, flow control is
+> completely non-functional.
+>
+> Issues identified in the OMAP serial driver are:
+> - set_mctrl() can only assert modem control lines, once asserted it
+>    is not possible to deassert them.
+> - IXOFF controls sending of XON/XOFF characters, not the reception of
+>    these sequences.
+> - IXON controls the recognition of XON/XOFF characters, not the transmission
+>    of the same.
+> - Wrong bitmasks for hardware assisted software flow control.  Bit 2
+>    in EFR enables sending of XON2/XOFF2 which are never set.
+> - No point comparing received characters against XOFF2 ('special character
+>    detect') as XOFF2 is not set.
+> - Fix multiple places where bits 6 and 5 of MCR are attempted to be
+>    altered, but because EFR ECB is unset, these bits remain unaffected.
+>    This effectively prevents us accessing the right XON/XOFF/TCR/TLR
+>    registers.
+> - Remove unnecessary read-backs of EFR/MCR/LCR registers - these registers
+>    don't change beneath us, they are configuration registers which hold their
+>    values.  Not only does this simplify the code, but it makes it more
+>    readable, and more importantly ensures that we work from a consistent
+>    state where ->efr never has ECB set, and ->mcr never has the TCRTLR
+>    bit set.
+> - Fix disablement of hardware flow control and IXANY modes; once enabled
+>    these could never be disabled because nothing in the code ever clears
+>    these configuration bits.
+>
+> Once that lot is fixed, these patches expand serial_core to permit hardware
+> assisted flow control by:
+> - adding throttle/unthrottle callbacks into low level serial drivers,
+>    which allow them to take whatever action is necessary with hardware
+>    assisted flow control to throttle the remote end.  In the case of
+>    OMAP serial, this means disabling the RX interrupts so that the FIFO
+>    fills to the watermark.
+>
+> We then have a number of cleanups to the OMAP serial code to make the
+> set_termios() function clearer and less prone to the kinds of mistakes
+> identified above.  This results in a great simplification of the flow
+> control configuration code.
+>
+> The OMAP serial driver hacks around with the transmit buffer allocation;
+> lets clean that up so that drivers can cleanly allocate their transmitter
+> buffer using coherent memory if that's what they desire.
+>
+> Finally, the last few patches clean up the plat/omap-serial.h header file,
+> moving most of its contents into the OMAP serial driver itself.  Most of
+> this is private to the OMAP serial driver and should never have been
+> shared with anything else.
+>
+> I have omitted to include the conversion of the transmit paths to DMA
+> engine.  Even with all the above fixed, it has issues when DMA transmit
+> is in progress, and a program issues a TCSETS call (as `less' does after
+> it has written its prompt.)  At the moment, this causes lots of junk to
+> be emitted from the serial port when issuing `dmesg | less' which sometimes
+> brings the port to a complete halt.
+>
+> As the OMAP DMA hardware does not have a clean pause when performing a
+> MEM->DEV transfer (it discards its FIFO) I do not see a solution to this,
+> which probably means that we can _not_ ever support transmit DMA on OMAP
+> platforms.
+>
+> This means the xmit buffer allocation patches are not that useful unless
+> a solution to that can be found.
+>
+> Now, the remaining question is, how much of this patch set do we think
+> about merging, and when.  Given that flow control in this driver has been
+> broken for a very long time, and no one has apparantly noticed, I don't
+> think there's any urgency to this, so given its size, my preference would
+> be to queue it up for the next merge window.  The thing that would worry
+> me about applying some of the initial patches is that they may change
+> the behaviour today and make any problems here more visible.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Boot Tested this patch series against v3.6 tag(applied cleanly) on panda 
+board and
+PM tested(hitting off in Idle and suspend) on omap3630 based beagle board.
 
-This happens because "reboot" triggers imxfb_shutdown(), which calls
-imxfb_disable_controller with the clocks already disabled.
+Note, I also tested the patches against the current master but only 
+after rebasing, since the current master includes serial patches from 
+Felipe Balbi[1].
+[1] https://lkml.org/lkml/2012/8/24/139
 
-To prevent this, add a clock enabled status so that we can check if the clocks
-are enabled before disabling them. 
+Tested-by: Sourav Poddar <sourav.poddar@ti.com>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Use a better naming for the clk enabled variable
-- Return immediately in imxfb_enable_controller/imxfb_disable_controller
-if the the clocks are already enabled/disabled.
-Changes since v1:
-- Protect the whole function instead of only the clocks
- drivers/video/imxfb.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index cf2688d..e0d770f 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -134,6 +134,7 @@ struct imxfb_info {
- 	struct clk		*clk_ipg;
- 	struct clk		*clk_ahb;
- 	struct clk		*clk_per;
-+	int			clks_enabled;
- 
- 	/*
- 	 * These are the addresses we mapped
-@@ -513,6 +514,9 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
- 
- static void imxfb_enable_controller(struct imxfb_info *fbi)
- {
-+	if (fbi->clks_enabled)
-+		return;
-+
- 	pr_debug("Enabling LCD controller\n");
- 
- 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
-@@ -533,6 +537,7 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 	clk_prepare_enable(fbi->clk_ipg);
- 	clk_prepare_enable(fbi->clk_ahb);
- 	clk_prepare_enable(fbi->clk_per);
-+	fbi->clks_enabled = 1;
- 
- 	if (fbi->backlight_power)
- 		fbi->backlight_power(1);
-@@ -542,6 +547,9 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 
- static void imxfb_disable_controller(struct imxfb_info *fbi)
- {
-+	if (!fbi->clks_enabled)
-+		return;
-+
- 	pr_debug("Disabling LCD controller\n");
- 
- 	if (fbi->backlight_power)
-@@ -552,6 +560,7 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
- 	clk_disable_unprepare(fbi->clk_per);
- 	clk_disable_unprepare(fbi->clk_ipg);
- 	clk_disable_unprepare(fbi->clk_ahb);
-+	fbi->clks_enabled = 0;
- 
- 	writel(0, fbi->regs + LCDC_RMCR);
- }
--- 
-1.7.9.5
+Thanks,
+Sourav
