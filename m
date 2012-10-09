@@ -1,122 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Oct 2012 10:48:31 +0900
-Subject: [PATCH 08/16] ipvs: fix ip_vs_set_timeout debug messages
-In-Reply-To: <201210060954.15831.arnd@arndb.de>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <201210060645.05225.arnd@arndb.de>
- <alpine.LFD.2.00.1210061052170.1971@ja.ssi.bg>
- <201210060954.15831.arnd@arndb.de>
-Message-ID: <20121009014831.GI3403@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  8 Oct 2012 23:20:00 -0300
+Subject: [PATCH] ARM: imx: clk-imx27: Fix divider width field
+Message-ID: <1349749200-8332-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 06, 2012 at 09:54:15AM +0000, Arnd Bergmann wrote:
-> On Saturday 06 October 2012, Julian Anastasov wrote:
-> > On Sat, 6 Oct 2012, Arnd Bergmann wrote:
-> > > > 	Are there any CONFIG_IP_VS_PROTO_xxx options in this
-> > > > default config? It is a waste of memory if IPVS is compiled
-> > > > without any protocols.
-> > > 
-> > > They all appear to be turned off:
-> > > 
-> > > $ grep CONFIG_IP_VS obj-tmp/.config
-> > > CONFIG_IP_VS=m
-> > > CONFIG_IP_VS_DEBUG=y
-> > > CONFIG_IP_VS_TAB_BITS=12
-> > > # CONFIG_IP_VS_PROTO_TCP is not set
-> > > # CONFIG_IP_VS_PROTO_UDP is not set
-> > > # CONFIG_IP_VS_PROTO_AH_ESP is not set
-> > > # CONFIG_IP_VS_PROTO_ESP is not set
-> > > # CONFIG_IP_VS_PROTO_AH is not set
-> > > # CONFIG_IP_VS_PROTO_SCTP is not set
-> > 
-> > 	Something should be changed here, may be at least
-> > TCP/UDP, who knows.
-> 
-> I don't try to read too much into our defconfigs. We have 140 of them
-> on ARM, and they are mainly useful to give a reasonable build coverage,
-> but I wouldn't expect them to be actually used on that hardware.
-> 
-> I'll leave it up to Krzysztof to send a patch for this if he wants.
-> 
-> > > --- a/net/netfilter/ipvs/ip_vs_ctl.c
-> > > +++ b/net/netfilter/ipvs/ip_vs_ctl.c
-> > > @@ -2590,6 +2588,7 @@ __ip_vs_get_timeouts(struct net *net, struct ip_vs_timeout_user *u)
-> > >  #if defined(CONFIG_IP_VS_PROTO_TCP) || defined(CONFIG_IP_VS_PROTO_UDP)
-> > >  	struct ip_vs_proto_data *pd;
-> > >  #endif
-> > 
-> > 	That is what we want. If you plan another submission
-> > you can add empty line before this memset and to replace
-> > the __ip_vs_get_timeouts call in ip_vs_genl_set_config with
-> > memset but they are cosmetic changes. Or may be Simon will
-> > take care about the coding style when applying the change.
-> > 
-> > Acked-by: Julian Anastasov <ja@ssi.bg>
-> 
-> I'd prefer Simon to pick up the patch. He should also decide whether he wants
-> to add it to stable. In theory, this is a small leak of kernel stack data
-> to user space, but as you say in practice it should not happen because it
-> only exists for silly configurations that nobody should be using.
-> 
-> AFAICT, removing the call to __ip_vs_get_timeouts in do_ip_vs_get_ctl would
-> be a semantic change for the case where a user sends a IPVS_CMD_SET_CONFIG
-> message without without the complete set of attributes inside it. The current
-> behavior is to leave the timeouts alone, replacing the __ip_vs_get_timeouts
-> with a memset would zero them. I left this part alone then.
-> 
-> 	Arnd
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Hi,
+As per mx27 reference manual, H264DIV and SSI2DIV are 6-bit wide fields in
+register PCDR0.
+ 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx27.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-sorry for being a bit slow, it was a long weekend here.
-This patch looks reasonable and I think it is appropriate for stable.
-I'll see about getting it merged accordingly.
-
-> 
-> 8<-----
-> ipvs: initialize returned data in do_ip_vs_get_ctl
-> 
-> As reported by a gcc warning, the do_ip_vs_get_ctl does not initalize
-> all the members of the ip_vs_timeout_user structure it returns if
-> at least one of the TCP or UDP protocols is disabled for ipvs. 
-> 
-> This makes sure that the data is always initialized, before it is
-> returned as a response to IPVS_CMD_GET_CONFIG or printed as a
-> debug message in IPVS_CMD_SET_CONFIG.
-> 
-> Without this patch, building ARM ixp4xx_defconfig results in:
-> 
-> net/netfilter/ipvs/ip_vs_ctl.c: In function 'ip_vs_genl_set_cmd':
-> net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.udp_timeout' may be used uninitialized in this function [-Wuninitialized]
-> net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.udp_timeout' was declared here
-> net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.tcp_fin_timeout' may be used uninitialized in this function [-Wuninitialized]
-> net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.tcp_fin_timeout' was declared here
-> net/netfilter/ipvs/ip_vs_ctl.c:2238:47: warning: 't.tcp_timeout' may be used uninitialized in this function [-Wuninitialized]
-> net/netfilter/ipvs/ip_vs_ctl.c:3322:28: note: 't.tcp_timeout' was declared here
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Julian Anastasov <ja@ssi.bg>
-> ---
-> diff --git a/net/netfilter/ipvs/ip_vs_ctl.c b/net/netfilter/ipvs/ip_vs_ctl.c
-> index 2770f85..c4ee437 100644
-> --- a/net/netfilter/ipvs/ip_vs_ctl.c
-> +++ b/net/netfilter/ipvs/ip_vs_ctl.c
-> @@ -2591,6 +2589,8 @@ __ip_vs_get_timeouts(struct net *net, struct ip_vs_timeout_user *u)
->  	struct ip_vs_proto_data *pd;
->  #endif
->  
-> +	memset(u, 0, sizeof (*u));
-> +
->  #ifdef CONFIG_IP_VS_PROTO_TCP
->  	pd = ip_vs_proto_data_get(net, IPPROTO_TCP);
->  	u->tcp_timeout = pd->timeout_table[IP_VS_TCP_S_ESTABLISHED] / HZ;
-> @@ -2768,7 +2768,6 @@ do_ip_vs_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
->  	{
->  		struct ip_vs_timeout_user t;
->  
-> -		memset(&t, 0, sizeof(t));
->  		__ip_vs_get_timeouts(net, &t);
->  		if (copy_to_user(user, &t, sizeof(t)) != 0)
->  			ret = -EFAULT;
-> 
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 3b6b640..366e5d5 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -109,7 +109,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk[per3_div] = imx_clk_divider("per3_div", "mpll_main2", CCM_PCDR1, 16, 6);
+ 	clk[per4_div] = imx_clk_divider("per4_div", "mpll_main2", CCM_PCDR1, 24, 6);
+ 	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
+-	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 3);
++	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
+ 	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 28, 3);
+ 	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
+ 	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
+@@ -121,7 +121,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk[ssi1_sel] = imx_clk_mux("ssi1_sel", CCM_CSCR, 22, 1, ssi_sel_clks, ARRAY_SIZE(ssi_sel_clks));
+ 	clk[ssi2_sel] = imx_clk_mux("ssi2_sel", CCM_CSCR, 23, 1, ssi_sel_clks, ARRAY_SIZE(ssi_sel_clks));
+ 	clk[ssi1_div] = imx_clk_divider("ssi1_div", "ssi1_sel", CCM_PCDR0, 16, 6);
+-	clk[ssi2_div] = imx_clk_divider("ssi2_div", "ssi2_sel", CCM_PCDR0, 26, 3);
++	clk[ssi2_div] = imx_clk_divider("ssi2_div", "ssi2_sel", CCM_PCDR0, 26, 6);
+ 	clk[clko_en] = imx_clk_gate("clko_en", "clko_div", CCM_PCCR0, 0);
+ 	clk[ssi2_ipg_gate] = imx_clk_gate("ssi2_ipg_gate", "ipg", CCM_PCCR0, 0);
+ 	clk[ssi1_ipg_gate] = imx_clk_gate("ssi1_ipg_gate", "ipg", CCM_PCCR0, 1);
+-- 
+1.7.9.5
