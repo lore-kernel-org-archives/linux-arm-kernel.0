@@ -1,38 +1,48 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 09 Oct 2012 12:39:59 +0200
-Subject: [PATCH] ARM: dts: exynos4210-trats: Split memory into 4 sections
-Message-ID: <1349779199-30665-1-git-send-email-t.figa@samsung.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Tue, 9 Oct 2012 16:14:42 +0530
+Subject: [PATCH 00/11] mtd/nand: fsmc driver updates
+Message-ID: <cover.1349778820.git.vipin.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the maximum section size on mach-exynos is set to 256MiB, boards
-with memory configuration defined using sections bigger than 256MiB will
-fail to boot with a kernel panic.
+This patch-set contains several fixes and a few enhancements in fsmc driver.
+Modifications include
+- General enhancements
+  * Add ready/busy support through a GPIO pin
+  * Add software bch support
+  * Increase ecc loactions to 640
+  * Support multiple banks
+  * Use relaxed io accessors for increased throughput
+- Enhance DT support
+  * Add timing parameters
+- Several fixes
+  * Fix the type for regs
+  * Replace change_bit routine to handle unaligned addresses
+  * Provide contiguous buffers for DMA operation
 
-This patch modifies the dts file of Samsung Trats board to define four
-sections of 256MiB instead of two of 512MiB to fix the boot problem.
+Vipin Kumar (11):
+  fsmc/nand:FIX: Change the type for regs to void __iomem *
+  fsmc/nand: Rearrange the fsmc_nand_data structure and update comments
+  fsmc/nand: Support multiple banks connected to controller
+  fsmc/nand: Accept nand timing parameters via DT
+  fsmc: Implement ready/busy through gpio pin
+  fsmc/nand: Modify the wait to uninterruptible
+  fsmc/nand: Provide contiguous buffers to dma
+  fsmc/nand: Use relaxed variants of io accessors
+  fsmc/nand:FIX: replace change_bit routine
+  fsmc/nand: Add sw bch support for ecc calculation/correction
+  nand: Increase the ecc placement locations to 640
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/boot/dts/exynos4210-trats.dts | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/mtd/fsmc-nand.txt          |  29 ++
+ arch/arm/boot/dts/spear300.dtsi                    |   1 +
+ arch/arm/boot/dts/spear310.dtsi                    |   1 +
+ arch/arm/boot/dts/spear320.dtsi                    |   1 +
+ arch/arm/boot/dts/spear600.dtsi                    |   1 +
+ arch/arm/mach-u300/core.c                          |   1 +
+ drivers/mtd/nand/fsmc_nand.c                       | 419 ++++++++++++++-------
+ include/linux/mtd/fsmc.h                           |  18 +-
+ include/linux/mtd/mtd.h                            |   2 +-
+ 9 files changed, 332 insertions(+), 141 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 73567b8..a21511c 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -20,8 +20,10 @@
- 	compatible = "samsung,trats", "samsung,exynos4210";
- 
- 	memory {
--		reg =  <0x40000000 0x20000000
--			0x60000000 0x20000000>;
-+		reg =  <0x40000000 0x10000000
-+			0x50000000 0x10000000
-+			0x60000000 0x10000000
-+			0x70000000 0x10000000>;
- 	};
- 
- 	chosen {
 -- 
-1.7.12
+1.7.11.4
