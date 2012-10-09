@@ -1,46 +1,61 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 9 Oct 2012 18:54:05 +0200
-Subject: Booting vanilla kernel on the beaglebone
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB39F42@DBDE01.ent.ti.com>
-References: <20120930082802.GA15392@netboy.at.omicron.at>
- <50693ECD.4000000@ti.com>
- <20121008191657.GA3281@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
- <20121009110049.GB2274@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
- <20121009114326.GA4511@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39F42@DBDE01.ent.ti.com>
-Message-ID: <20121009165405.GB6870@netboy.at.omicron.at>
+From: pistol@cs.duke.edu (Valentin Pistol)
+Date: Tue, 9 Oct 2012 10:05:53 -0700
+Subject: ARM: hw_breakpoint: silent EPERM when setting ARM_DSCR_MDBGEN on
+ ARM_DEBUG_ARCH_V7_ECP14
+In-Reply-To: <20120918100438.GC32204@mudshark.cambridge.arm.com>
+References: <CAPfQmK+jYnVybyrBcnNkbm=Ta+7hjPNh5TqiL2tAFY8YBTyLEw@mail.gmail.com>
+ <20120913214102.GB11399@mudshark.cambridge.arm.com>
+ <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
+ <20120918100438.GC32204@mudshark.cambridge.arm.com>
+Message-ID: <CAPfQmKJAvd2R8Je-uRdKkkhgQRodZFxP1N_QzbjKm8q7q1HgaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 12:17:45PM +0000, Hiremath, Vaibhav wrote:
-> Just with recent u-boot.
+Will,
 
-So this just doesn't work at all for me. It hangs just after:
+On Tue, Sep 18, 2012 at 3:04 AM, Will Deacon <will.deacon@arm.com> wrote:
+>
+> On Fri, Sep 14, 2012 at 09:08:24AM +0100, Valentin Pistol wrote:
+> > Is there a reliable way to determine that they are locked down?
+> > Any particular register/bit I can check to confirm?
+>
+> You can take a look at the DBGAUTHSTATUS register and try to determine the
+> signal values for SPNIDEN, DBGEN and NIDEN.
 
-   U-Boot# bootm 81000000 - 80000000
-   ## Booting kernel from Legacy Image at 81000000 ...
-      Image Name:   Linux-3.6.0-next-20121009
-      Image Type:   ARM Linux Kernel Image (uncompressed)
-      Data Size:    3845136 Bytes = 3.7 MiB
-      Load Address: 80008000
-      Entry Point:  80008000
-      Verifying Checksum ... OK
-   ## Flattened Device Tree blob at 80000000
-      Booting using the fdt blob at 0x80000000
-      Loading Kernel Image ... OK
-   OK
-      Loading Device Tree to 8fe66000, end 8fe6a433 ... OK
-   
-   Starting kernel ...
+DBGAUTHSTATUS=0xaa confirming DBGEN is LOW. Since then I found out
+that there are two types of OMAP devices:
+GP (General Purpose) and HS (High Security) and supposedly Debug
+Capabilities are only available on GP devices.
+Thus, I ordered a Pandaboard ES with OMAP4460 and tested it with a
+prebuilt Ubuntu 12.04 image.
+After boot monitor mode is still not set, the DSCR reads the same
+0x01030002 just as with the previous Galaxy Nexus.
 
-(That was with linux-next-b066f61 from today.)
+I contacted TI and they seem to say hw breakpoints/watchpoints are
+available on Pandaboard but they are confused about monitor mode,
+saying it's not available on Pandaboard GP.
+See http://e2e.ti.com/support/omap/f/849/p/216276/770995.aspx for the
+discussion.
+Isn't monitor mode and DBGEN on HIGH required for access to
+breakpoints/watchpoints?
+Maybe they are thinking about Secure Monitor Mode and TrustZone which
+is not related?
 
-I do have a Rev A6 board. Could that be an issue?
+Have you used a Pandaboard and can comment on how to enable the
+breakpoints/watchpoints?
+Could you also mention a specific development board that you are using
+and recommend for access to these features?
 
-You said that you are carrying along some patches (like the
-defconfig). Are you sure every needed patch is now upstream?
+>
+> > > Completely untested patch below, please let me know how you get on...
+> >
+> > Looks good, I'll give it a try.
+>
+> Great. Let me know if it helps and, if so, I'll merge it.
 
-Thanks,
-Richard
+Sorry I wasn't able to directly apply your patch to the specific
+Android kernel version I was using.
+Manually merging the code seems to perform as expected.
+
+Thanks a lot for your help,
+Valentin
