@@ -1,116 +1,79 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 9 Oct 2012 17:05:17 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
- parents
-In-Reply-To: <506DAE12.7000003@wwwdotorg.org>
-References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
- <20121003154310.GI11837@lunn.ch>
- <20121003220916.GW31897@kw.sim.vm.gnt>
- <20121004055443.GK21046@lunn.ch>
- <20121004075335.GY31897@kw.sim.vm.gnt>
- <506DAE12.7000003@wwwdotorg.org>
-Message-ID: <20121009150517.GA26952@kw.sim.vm.gnt>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 9 Oct 2012 17:17:04 +0200
+Subject: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <20121009145854.GB14079@kroah.com>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <17531317.3PGnt12jPY@vostro.rjw.lan>
+ <20121007131201.GB12801@game.jcrosoft.org>
+ <3272225.kVAjWI8INL@vostro.rjw.lan>
+ <20121009114633.GJ12801@game.jcrosoft.org>
+ <20121009145854.GB14079@kroah.com>
+Message-ID: <20121009151704.GP12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2012 at 09:41:06AM -0600, Stephen Warren wrote:
-> On 10/04/2012 01:53 AM, Simon Guinot wrote:
-> > On Thu, Oct 04, 2012 at 07:54:43AM +0200, Andrew Lunn wrote:
-> >>>>> --- a/arch/arm/mach-kirkwood/board-dt.c +++
-> >>>>> b/arch/arm/mach-kirkwood/board-dt.c @@ -96,6 +96,11 @@
-> >>>>> static void __init kirkwood_dt_init(void) if
-> >>>>> (of_machine_is_compatible("keymile,km_kirkwood")) 
-> >>>>> km_kirkwood_init();
-> >>>>> 
-> >>>>> +	if (of_machine_is_compatible("lacie,inetspace_v2") || +
-> >>>>> of_machine_is_compatible("lacie,netspace_v2") || +
-> >>>>> of_machine_is_compatible("lacie,netspace_max_v2")) +
-> >>>>> ns2_init(); + of_platform_populate(NULL,
-> >>>>> kirkwood_dt_match_table, kirkwood_auxdata_lookup, NULL);
-> >>>> 
-> >>>> I'm not a DT policy expert. Could this be one compatibility
-> >>>> string for all the boards? Maybe ask on the DT mainline
-> >>>> list?
-> >>> 
-> >>> Maybe I could use "lacie,ns2_common" as a compatibility string.
-> >>> But this does not match any existing device. I don't know if it
-> >>> is correct.
-> >> 
-> >> Hi Simon
-> >> 
-> >> I did a bit of looking around. For kirkwood, we already have two 
-> >> boards sharing the same compatibility string. kirkwood-dns320.dts
-> >> and kirkwood-dns325.dts both have dlink,dns-kirkwood and this is
-> >> what the board-dt.c matches on.
-> >> 
-> >> For the tegra20 soc, all boards match on nvidia,tegra20, and that
-> >> is the only compatibility string in board-dt-tegra20.c.
+On 07:58 Tue 09 Oct     , Greg Kroah-Hartman wrote:
+> On Tue, Oct 09, 2012 at 01:46:33PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 22:02 Sun 07 Oct     , Rafael J. Wysocki wrote:
+> > > On Sunday 07 of October 2012 15:12:01 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > On 00:18 Sun 07 Oct     , Rafael J. Wysocki wrote:
+> > > > > On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > > Hi,
+> > > > > > 
+> > > > > > The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
+> > > > > > 
+> > > > > >   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
+> > > > > > 
+> > > > > > are available in the git repository at:
+> > > > > > 
+> > > > > > 
+> > > > > >   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
+> > > > > > 
+> > > > > > for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
+> > > > > > 
+> > > > > >   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
+> > > > > > 
+> > > > > > ----------------------------------------------------------------
+> > > > > > pm: add suspend_mem and suspend_standby support
+> > > > > > 
+> > > > > > Today when we go to suspend we can not knwon at drivers level if we go in
+> > > > > > STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+> > > > > > suspend_standby.
+> > > > > 
+> > > > > No way. Device drivers shouldn't be concerned about that.
+> > > > I do need it on at91 as we swith to slow_clock in MEM suspend and some ip
+> > > > need special handling when switching to slow_clock
+> > > 
+> > > Well, my answer to that is: please fix your platform code instead of
+> > > hacking the PM core to work around its problems.
+> > how can I fix drivers pm issue when I no way to known at driver level the
+> > real suspend, the PM core is supposed to proivde the right information to the
+> > drivers so the driver can put it's in the right pm mode. If the pm core can not
+> > provide such inforation the PM core is broken as we will have to do dirty
+> > hack.
 > 
-> nvidia,tegra20 is the compatible value for the SoC itself, so
-> naturally any Tegra20-based board has that.
-> 
-> >> So i don't see any problem having just one compatibility string
-> >> here.
-> >> 
-> >> The question is, what is the appropriate name. How common is
-> >> this common C code? Are there ns2 where this C code is not
-> >> appropriate. One thing to remember is that most of this C code
-> >> will soon disappear and become DT. All the mpp will be replaced
-> >> with pinctrl in 3.8. I hope we can get the Ethernet setup in DT
-> >> as well. You are working on ns2_led, so all the C code will be
-> >> replaced by DT. So all we are really left with is power off GPIO
-> >> handling.
-> >> 
-> >> So i think the danger of using lacie,ns2_common, and then finding
-> >> it does not work with some other ns2 device is quite low.
-> 
-> lacie,ns2_common doesn't sound like a HW description, but rather a SW
-> invention. DT should be describing purely the HW. If there's no common
-> HW between these compatible boards (which seems unlikely), then there
-> shouldn't be a shared compatible value.
+> Why do you need to know the difference in your driver?  We used to
+> provide this information a long time ago, but it turned out to not be
+> needed at all and just caused problems.
+because on at91 I need to handle the mem standby at drviers level.
 
-Indeed "lacie,ns2_common" is not an hardware description. But actually,
-even if the PCB and the BOM are not exactly the same, there is a lot of
-common HW between this boards. I understand that sharing a compatible
-value between all this boards could be uncertain. For example, the BOMs
-could evolve differently during the production process and at a given
-time, the compatibility could be broken. But as I said, this will not
-happen here because this boards are no longer in production.
+We do it today already by a hack in different drivers at91_udc (usb device),
+atmel_serail and at91_ohci. Those 3 IP have specifci handling when switching
+to mem pm. On at91 when switch to mem we shutdown everything and run form a slow
+clock - this is done at soc level - but those IP have issue and need specific
+care before doing so. Ohterwise when the SoC will wakeup but those IP will not
 
+in this patch series I send the update of those 3 drivers too
+and kill the hack
 > 
-> >> What do you think?
-> > 
-> > The status for this ns2 boards is more or less end-of-life. I mean,
-> > this boards are no longer in production. So I think it is safe to
-> > consider the code inside board-ns2.c as common and shareable
-> > between ns2, is2 and ns2max.
-> > 
-> > Once this file will be removed, the compatibility checks will be
-> > removed as well. But one could easily forget to remove the useless
-> > compatibility string "lacie,ns2_common" from the dts...
+> > Any generic framework is supposed to evolve for real user need here I've one
+> > so I udpate the core to mach a need
 > 
-> If that value is added to the DT, it should not be removed, and the
-> kernel should continue to support it indefinitely.
+> I'll push back and ask again why your driver cares about this?  It
+> shouldn't.
 
-I understand it is a strong requirement. But as I mentioned before, due
-to the production process, one could easily end up with an embedded DTB
-not matching exactly the hardware. It could even be worse. A end-of-life
-device could be replaced by a supposed compatible one. And sometimes the
-compatibility assumption is false. In a such scenario, maybe you don't
-want the kernel to support indefinitely a DT statement.
+I'm doing it right now in the kernel but in a dirty way and want to fix it.
+And honestly If I could not do it I will
 
-Simon
-
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121009/3494bd5b/attachment.sig>
+Best Regards,
+J.
