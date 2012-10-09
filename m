@@ -1,37 +1,25 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 9 Oct 2012 18:39:19 +0530
-Subject: [PATCH 1/1] mtd:nand:clk: preparation for switch to common clock
- framework
-In-Reply-To: <507420A4.8090905@ti.com>
-References: <1347899860-24358-1-git-send-email-m-karicheri2@ti.com>
- <1347899860-24358-2-git-send-email-m-karicheri2@ti.com>
- <507420A4.8090905@ti.com>
-Message-ID: <507421FF.2090309@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Oct 2012 21:11:18 +0800
+Subject: [PATCH v2] ARM: mxs_defconfig: Improve USB related support
+In-Reply-To: <1349630183-29297-1-git-send-email-festevam@gmail.com>
+References: <1349630183-29297-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121009131113.GF21822@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/9/2012 6:33 PM, Sekhar Nori wrote:
-> On 9/17/2012 10:07 PM, Murali Karicheri wrote:
->> As a first step towards migrating davinci platforms to use common clock
->> framework, replace all instances of clk_enable() with clk_prepare_enable()
->> and clk_disable() with clk_disable_unprepare(). Until the platform is
->> switched to use the CONFIG_HAVE_CLK_PREPARE Kconfig variable, this just
->> adds a might_sleep() call and would work without any issues.
->>
->> This will make it easy later to switch to common clk based implementation
->> of clk driver from DaVinci specific driver.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Reviewed-by: Mike Turquette <mturquette@linaro.org>
+On Sun, Oct 07, 2012 at 02:16:23PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Tested this using NAND flash on DA850 EVM.
+> Select the following USB related options:
 > 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> - USB Ethernet adapter (needed for mx23-olinuxino)
+> - Native language support (needed for mounting USB pen drives, for example)
 > 
-> Any chance this can make into the v3.7 kernel?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Just noticed another thread where Artem replied saying this patch is
-pushed. Sorry about the noise.
+Queued for 3.8.
 
-Thanks,
-Sekhar
+Per request from arm-soc folks, we will need to squash defconfig
+changes into 1~2 patches before sending them to arm-soc.
+
+Shawn
