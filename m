@@ -1,21 +1,27 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Tue, 9 Oct 2012 23:12:45 +0530
-Subject: [PATCH 08/11] fsmc/nand: Use relaxed variants of io accessors
-In-Reply-To: <88484dbae96f7db42ce615552a4c758844a5e6cc.1349778821.git.vipin.kumar@st.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
- <88484dbae96f7db42ce615552a4c758844a5e6cc.1349778821.git.vipin.kumar@st.com>
-Message-ID: <CAOh2x=nbiYCvwpiuVikcKB6=M2m0Z031XromT3jcFWOurupZZw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 9 Oct 2012 10:46:31 -0700
+Subject: [PATCH 0/3] new ARM-soc warning fixes
+In-Reply-To: <1349796861-31164-1-git-send-email-arnd@arndb.de>
+References: <1349796861-31164-1-git-send-email-arnd@arndb.de>
+Message-ID: <20121009174631.GA19606@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2012 at 4:14 PM, Vipin Kumar <vipin.kumar@st.com> wrote:
-> Use relaxed variants of readl/writel accessors. readl/writel io accessors use
-> explicit dsb instruction which causes stalls in the processor core resulting
-> several cycles of delay for each access
->
-> Use relaxed variants where ever possible. This also results in an improved
-> read/write performance.
+On Tue, Oct 09, 2012 at 05:34:18PM +0200, Arnd Bergmann wrote:
+> Hi Olof,
+> 
+> Here are three more fixes that I'd like to merge through the arm-soc
+> as time permits. All of them should be completely harmless and they
+> only fix harmless gcc warnings.
+> 
+> I don't know what your plans are for sending the next fixes branch.
+> I've uploaded these into a new "fixes2" branch on top of the patches
+> that are already in "fixes". We can either send them all together,
+> or you send the ones that are already queued first and these ones
+> with the next batch. Feel free to rebase if necessary.
 
-Good change.
+I've pulled it in and will send up with fixes tonight (Tony has OMAP
+fixes coming, others might too).
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-Olof
