@@ -1,40 +1,63 @@
-From: ppokorny@penguincomputing.com (Phil Pokorny)
-Date: Tue, 9 Oct 2012 07:24:28 -0700
-Subject: [PATCH] Add McSPI devices found in AM33xx SoC to dtsi
-In-Reply-To: <518397C60809E147AF5323E0420B992E3E9CA61C@DBDE01.ent.ti.com>
-References: <CAAek22HhtFc-1XOFrQC8DKZ9VdKyuShE_G_j4581WL15JTNJXg@mail.gmail.com>
- <518397C60809E147AF5323E0420B992E3E9CA61C@DBDE01.ent.ti.com>
-Message-ID: <3608180472966131184@unknownmsgid>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 9 Oct 2012 07:58:54 -0700
+Subject: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <20121009114633.GJ12801@game.jcrosoft.org>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <17531317.3PGnt12jPY@vostro.rjw.lan>
+ <20121007131201.GB12801@game.jcrosoft.org>
+ <3272225.kVAjWI8INL@vostro.rjw.lan>
+ <20121009114633.GJ12801@game.jcrosoft.org>
+Message-ID: <20121009145854.GB14079@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 9, 2012, at 3:36 AM, "Philip, Avinash" <avinashphilip@ti.com>
-wrote:
+On Tue, Oct 09, 2012 at 01:46:33PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 22:02 Sun 07 Oct     , Rafael J. Wysocki wrote:
+> > On Sunday 07 of October 2012 15:12:01 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 00:18 Sun 07 Oct     , Rafael J. Wysocki wrote:
+> > > > On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
+> > > > > 
+> > > > >   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
+> > > > > 
+> > > > > are available in the git repository at:
+> > > > > 
+> > > > > 
+> > > > >   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
+> > > > > 
+> > > > > for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
+> > > > > 
+> > > > >   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
+> > > > > 
+> > > > > ----------------------------------------------------------------
+> > > > > pm: add suspend_mem and suspend_standby support
+> > > > > 
+> > > > > Today when we go to suspend we can not knwon at drivers level if we go in
+> > > > > STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+> > > > > suspend_standby.
+> > > > 
+> > > > No way. Device drivers shouldn't be concerned about that.
+> > > I do need it on at91 as we swith to slow_clock in MEM suspend and some ip
+> > > need special handling when switching to slow_clock
+> > 
+> > Well, my answer to that is: please fix your platform code instead of
+> > hacking the PM core to work around its problems.
+> how can I fix drivers pm issue when I no way to known at driver level the
+> real suspend, the PM core is supposed to proivde the right information to the
+> drivers so the driver can put it's in the right pm mode. If the pm core can not
+> provide such inforation the PM core is broken as we will have to do dirty
+> hack.
 
-> On Tue, Oct 09, 2012 at 10:40:58, Phil Pokorny wrote:
->> We're using the BeagleBone for a project and we need the SPI devices
->> available and configured with all available chip selects.
->>
->> Please accept the following patch to add these to the base .dtsi file
->> so they can then be enabled in the beaglebone specific .dts with
->> minimal fuss.
->
-> Patch for adding MCSPI in am33xx.dtsi already been sent by me.
-> https://lkml.org/lkml/2012/9/18/32
+Why do you need to know the difference in your driver?  We used to
+provide this information a long time ago, but it turned out to not be
+needed at all and just caused problems.
 
-Thank you for responding.
+> Any generic framework is supposed to evolve for real user need here I've one
+> so I udpate the core to mach a need
 
-Was that accepted?  It didn't seem to be in the Linux-omap git tree I
-cloned. I need to check the Torvalds mainline kernel.
+I'll push back and ask again why your driver cares about this?  It
+shouldn't.
 
-I believe the number of chip selects on spi1 is incorrect. There is
-only one (1) CS shown in the hardware documentation for AM33xx.
-
-Is OMAP4-McSPI the best match for the hardware?  The mcspi driver
-appears to differ only in the register offset used.  A hard coded zero
-value for omap2 and a named constant for omap4. The hardware manual
-for the AM33xx shows the register map starting at zero.
-
-Thank you,
-Phil P.
->
+greg k-h
