@@ -1,37 +1,117 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Oct 2012 12:27:46 +0000
-Subject: [PATCH 05/16] vfs: bogus warnings in fs/namei.c
-In-Reply-To: <20121008115116.GA9243@quack.suse.cz>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <1349448930-23976-6-git-send-email-arnd@arndb.de>
- <20121008115116.GA9243@quack.suse.cz>
-Message-ID: <201210091227.46324.arnd@arndb.de>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Tue, 9 Oct 2012 12:36:50 +0000
+Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
+In-Reply-To: <20121005142338.GA7199@parrot.com>
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
+ <20121003192044.GB27502@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9B8A65@DBDE01.ent.ti.com>
+ <20121005142338.GA7199@parrot.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9CA829@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 October 2012, Jan Kara wrote:
-> On Fri 05-10-12 16:55:19, Arnd Bergmann wrote:
-> > The follow_link() function always initializes its *p argument,
-> > or returns an error, but not all versions of gcc figure this
-> > out, so we have to work around this using the uninitialized_var()
-> > macro.
->   Well, I'm somewhat sceptical to this approach. I agree that bogus
-> warnings are not nice but later when the code is changed and possibly real
-> use without initialization is added, we won't notice it. Without changing
-> anything, we'd at least have a chance of catching it with gcc versions
-> which were clever enough to not warn with the original code. Or
-> alternatively if we unconditionally initialized the variable that would get
-> rid of the warning and made the code more future-proof (that's what I
-> usually end up doing)... I don't really care that much about the chosen
-> solution, Al is the one to decide. But I wanted to point out there are
-> downsides to your solution.
+On Fri, Oct 05, 2012 at 19:53:38, Ivan Djelic wrote:
+> On Fri, Oct 05, 2012 at 09:51:50AM +0100, Philip, Avinash wrote:
+> > On Thu, Oct 04, 2012 at 15:51:03, Philip, Avinash wrote:
+> > > On Thu, Oct 04, 2012 at 00:50:45, Ivan Djelic wrote:
+> > > > On Wed, Oct 03, 2012 at 03:29:49PM +0100, Philip, Avinash wrote:
+> > > > > ELM module can be used for error correction of BCH 4 & 8 bit. Also
+> > > > > support read & write page in one shot by adding custom read_page &
+> > > > > write_page methods. This helps in optimizing code.
+> > > > > 
+> > > > > New structure member "is_elm_used" is added to know the status of
+> > > > > whether the ELM module is used for error correction or not.
+> > > > > 
+> > > > > Note:
+> > > > > ECC layout of BCH8 uses 14 bytes for 512 byte of data to make compatible
+> > > > > with RBL ECC layout, even though the requirement was only 13 byte. This
+> > > > > results a common ecc layout across RBL, U-boot & Linux.
+> > > > > 
+> > > > 
+> > > > See a few comments below,
+> > > > 
+> > > > (...)
+> > > > > +static int omap_elm_correct_data(struct mtd_info *mtd, u_char *dat,
+> > > > > +                               u_char *read_ecc, u_char *calc_ecc)
+> > > > > +{
+> > > > > +       struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+> > > > > +                       mtd);
+> > > > > +       int eccsteps = info->nand.ecc.steps;
+> > > > > +       int i , j, stat = 0;
+> > > > > +       int eccsize, eccflag, size;
+> > > > > +       struct elm_errorvec err_vec[ERROR_VECTOR_MAX];
+> > > > > +       u_char *ecc_vec = calc_ecc;
+> > > > > +       enum bch_ecc type;
+> > > > > +       bool is_error_reported = false;
+> > > > > +
+> > > > > +       /* initialize elm error vector to zero */
+> > > > > +       memset(err_vec, 0, sizeof(err_vec));
+> > > > > +       if (info->nand.ecc.strength == BCH8_MAX_ERROR) {
+> > > > > +               size = BCH8_SIZE;
+> > > > > +               eccsize = BCH8_ECC_OOB_BYTES;
+> > > > > +               type = BCH8_ECC;
+> > > > > +       } else {
+> > > > > +               size = BCH4_SIZE;
+> > > > > +               eccsize = BCH4_SIZE;
+> > > > > +               type = BCH4_ECC;
+> > > > > +       }
+> > > > > +
+> > > > > +       for (i = 0; i < eccsteps ; i++) {
+> > > > > +               eccflag = 0;    /* initialize eccflag */
+> > > > > +
+> > > > > +               for (j = 0; (j < eccsize); j++) {
+> > > > > +                       if (read_ecc[j] != 0xFF) {
+> > > > > +                               eccflag = 1;    /* data area is flashed */
+> > > > 
+> > > > Just a reminder: this way of checking if a page has been programmed is not robust to bitflips,
+> > > > so you may get into trouble with UBIFS on a fairly recent device.
+> > 
+> > Sorry I missed this point.
+> > 
+> > Here we were checking data in spare area (only in ecc layout 14*4 for BCH8) is 0xFF. If all data
+> > in spare area is 0xFF, conclude that the page is erased & no need of error correction. In case
+> > of bit flip present in spare area, page will be reported as uncorrectable.
+> > But I am not understand understand " trouble with UBIFS on a fairly recent device".
+> > Can you little elaborativ
+> 
+> There are at least 2 potential problems when reading an erased page with bitflips:
+> 
+> 1. bitflip in data area and no bitflip in spare area (all 0xff)
+> Your code will not perform any ECC correction.
+> UBIFS does not like finding bitflips in empty pages, see for instance
+> http://lists.infradead.org/pipermail/linux-mtd/2012-March/040328.html.
 
-I'll drop the patch for now and won't send it from my tree then. I agree
-that uninitialized_var() is not ideal, but none of the alternatives seemed
-better.
+In case of error correction using ELM, syndrome vector calculated after reading
+Data area & OOB area. So handling of erased page requires a software workaround.
+I am planning something as follows.
 
-With my latest compiler, I don't actually see the warnings any more, so
-maybe someone fixed gcc instead, or this went away after another change.
-I'll let you know if it comes back so we can discuss about a better fix then.
+I will first check calculated ecc, which would be zero for non error pages.
+Then I would check 0xFF in OOB area (for erased page) by checking number of
+bit zeros in OOB area.  If it is 0xFF (number of bit zero count is zero),
+set entire page as 0xFF if number of bit zeros is less than max bit flips
+(8 or 4) by counting the number of bit zero's in data area.
 
-	Arnd
+This logic is implemented in fsmc_nand.c
+
+See commit
+mtd: fsmc: Newly erased page read algorithm implemented
+
+> 
+> 2. bitflip in ECC bytes in spare area
+> Your code will report an uncorrectable error upon reading; if this happens while reading a partially programmed UBI block,
+> I guess you will lose data.
+
+In case of uncorrectable errors due to bit flips in spare area,
+I can go on checking number of bit zero's in data area + OOB area
+are less than max bit flips (8 or 4), I can go on setting the entire
+page as 0xFF.
+
+Thanks
+Avinash
+
+> 
+> BR,
+> --
+> Ivan
+> 
