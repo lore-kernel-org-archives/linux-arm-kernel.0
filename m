@@ -1,48 +1,22 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 9 Oct 2012 14:27:20 +0530
-Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-Message-ID: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
+From: peter.ujfalusi@ti.com (=?UTF-8?B?UMOpdGVyIFVqZmFsdXNp?=)
+Date: Tue, 09 Oct 2012 11:03:10 +0200
+Subject: [PATCH 1/2] ARM: OMAP: Trivial driver changes to remove include
+ plat/cpu.h
+In-Reply-To: <20121008173557.10603.18539.stgit@muffinssi>
+References: <20121008173452.10603.53886.stgit@muffinssi>
+ <20121008173557.10603.18539.stgit@muffinssi>
+Message-ID: <5073E84E.4090408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent changes in omap gpmc driver code, in case of DT
-boot mode, where bootloader does not configure gpmc cs space
-will result into kernel BUG() inside gpmc_mem_init() function,
-as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
-gpmc_config7[0].baseaddress is set to '0' on reset.
+On 10/08/2012 07:35 PM, Tony Lindgren wrote:
 
-This use-case is applicable for any board/EVM which doesn't have
-any peripheral connected to gpmc cs0, for example BeagleXM and
-BeagleBone, so DT boot mode fails.
+> - omap-dma.c and omap-pcm.c can test the arch locally as
+>   omap1 and omap2 cannot be compiled together because of
+>   conflicting compiler flags
 
-This patch adds of_have_populated_dt() check before creating
-device, so that for DT boot mode, gpmc probe will not be called
-which is expected behavior, as gpmc is not supported yet from DT.
+>  sound/soc/omap/omap-pcm.c         |    9 +++++++--
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Afzal Mohammed <afzal@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc Paul Walmsley <paul@pwsan.com>
----
-This should go in for rc1, as this breaks AM33xx boot.
+Tony: is this going to be included in 3.7?
 
- arch/arm/mach-omap2/gpmc.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 8ab1e1b..c68f9e1 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -981,6 +981,10 @@ static int __init omap_gpmc_init(void)
- 	struct platform_device *pdev;
- 	char *oh_name = "gpmc";
-
-+	/* If dtb is there, the devices will be created dynamically */
-+	if (of_have_populated_dt())
-+		return -ENODEV;
-+
- 	oh = omap_hwmod_lookup(oh_name);
- 	if (!oh) {
- 		pr_err("Could not look up %s\n", oh_name);
---
-1.7.0.4
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
