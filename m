@@ -1,41 +1,81 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  8 Oct 2012 23:20:00 -0300
-Subject: [PATCH] ARM: imx: clk-imx27: Fix divider width field
-Message-ID: <1349749200-8332-1-git-send-email-festevam@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 08 Oct 2012 21:27:31 -0500
+Subject: [PATCH v2 3/5] ARM: use generic unaligned.h
+In-Reply-To: <20121008232853.GA21822@S2101-09.ap.freescale.net>
+References: <1344129840-16447-1-git-send-email-robherring2@gmail.com>
+ <1344129840-16447-4-git-send-email-robherring2@gmail.com>
+ <20121008164353.GB6140@S2101-09.ap.freescale.net>
+ <507338F1.7030604@gmail.com>
+ <20121008232853.GA21822@S2101-09.ap.freescale.net>
+Message-ID: <50738B93.6090704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 10/08/2012 06:28 PM, Shawn Guo wrote:
+> On Mon, Oct 08, 2012 at 03:34:57PM -0500, Rob Herring wrote:
+>> On 10/08/2012 11:43 AM, Shawn Guo wrote:
+>>> This patch has been merged into mainline as commit below.
+>>>
+>>>  d25c881 ARM: 7493/1: use generic unaligned.h
+>>>
+>>> It introduces a regression for me.  Check out the commit on mainline,
+>>> build a v7 only kernel (imx5/6) with imx_v6_v7_defconfig, the kernel
+>>> halts in decompressor.  But v6/v7 kernel (imx3/5/6) works fine.  The
+>>> kernel built on the parent commit below works all fine.
+>>
+>> It actually fails in the decompressor or that's the last output you get?
+> 
+> I think it fails in the decompressor, because what I see is 
+> 
+> Uncompressing Linux...
+> 
+> not
+> 
+> Uncompressing Linux... done, booting the kernel.
+> 
+>> I compared the decompressor disassembly of both cases and get the same
+>> number of ldrb/strb instructions, so I don't think it is directly
+>> related to alignment.
+>>
+>> I tried the XY decompressor as that is one difference, but that works
+>> fine for me on highbank.
+>>
+>> Does it work with an empty uncompress.h functions? That should be the
+>> only difference in our decompressor code.
+> 
+> No, empty putc() in uncompress.h does not help.
+> 
+> New finding is that it only fails with LZO decompressor while the other
+> 3 Gzip, LZMA and XZ all work good.  We happen to have LZO as the default
+> one in imx_v6_v7_defconfig.
 
-As per mx27 reference manual, H264DIV and SSI2DIV are 6-bit wide fields in
-register PCDR0.
+I must have had an old config with XZ. LZO fails because of this:
  
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clk-imx27.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+lib/decompress_unlzo.c: version = get_unaligned_be16(parse);
+lib/decompress_unlzo.c: if (get_unaligned_be32(parse) & HEADER_HAS_FILTER)
+lib/decompress_unlzo.c:         dst_len = get_unaligned_be32(in_buf);
+lib/decompress_unlzo.c:         src_len = get_unaligned_be32(in_buf);
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 3b6b640..366e5d5 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -109,7 +109,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk[per3_div] = imx_clk_divider("per3_div", "mpll_main2", CCM_PCDR1, 16, 6);
- 	clk[per4_div] = imx_clk_divider("per4_div", "mpll_main2", CCM_PCDR1, 24, 6);
- 	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
--	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 3);
-+	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
- 	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 28, 3);
- 	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
- 	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
-@@ -121,7 +121,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk[ssi1_sel] = imx_clk_mux("ssi1_sel", CCM_CSCR, 22, 1, ssi_sel_clks, ARRAY_SIZE(ssi_sel_clks));
- 	clk[ssi2_sel] = imx_clk_mux("ssi2_sel", CCM_CSCR, 23, 1, ssi_sel_clks, ARRAY_SIZE(ssi_sel_clks));
- 	clk[ssi1_div] = imx_clk_divider("ssi1_div", "ssi1_sel", CCM_PCDR0, 16, 6);
--	clk[ssi2_div] = imx_clk_divider("ssi2_div", "ssi2_sel", CCM_PCDR0, 26, 3);
-+	clk[ssi2_div] = imx_clk_divider("ssi2_div", "ssi2_sel", CCM_PCDR0, 26, 6);
- 	clk[clko_en] = imx_clk_gate("clko_en", "clko_div", CCM_PCCR0, 0);
- 	clk[ssi2_ipg_gate] = imx_clk_gate("ssi2_ipg_gate", "ipg", CCM_PCCR0, 0);
- 	clk[ssi1_ipg_gate] = imx_clk_gate("ssi1_ipg_gate", "ipg", CCM_PCCR0, 1);
--- 
-1.7.9.5
+This was what I was afraid of. The decompressor runs with the sysctrl
+register A bit in whatever state the bootloader left it in. In the case
+of u-boot it is set, and the maintainers are pretty set on not allowing
+unaligned accesses if you've seen the recent discussion.
+
+This should fix things.
+
+Rob
+
+8<---------------------------------------------------------------------
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index bc67cbf..1f87d22 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -654,6 +654,7 @@ __armv7_mmu_cache_on:
+ #endif
+                mrc     p15, 0, r0, c1, c0, 0   @ read control reg
+                bic     r0, r0, #1 << 28        @ clear SCTLR.TRE
++               bic     r0, r0, #1 << 1         @ clear SCTLR.A
+                orr     r0, r0, #0x5000         @ I-cache enable, RR cache replacement
+                orr     r0, r0, #0x003c         @ write buffer
+ #ifdef CONFIG_MMU
