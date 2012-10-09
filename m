@@ -1,61 +1,62 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 10 Oct 2012 11:13:26 +0100
-Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to amba-clcd
- driver
-In-Reply-To: <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
-References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
- <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
-Message-ID: <1349864006.3354.35.camel@linaro1.home>
+From: marek.vasut@gmail.com (=?UTF-8?B?TWFyZWsgVmHFoXV0?=)
+Date: Tue, 9 Oct 2012 17:42:14 +0200
+Subject: [PATCH] mmc: mxs: fix build regression from mismerge
+In-Reply-To: <201210091537.23659.arnd@arndb.de>
+References: <201210091537.23659.arnd@arndb.de>
+Message-ID: <CAMqi2ZPvgu8M4F_fW01v5N6USn8=QP9brdMAEL34v_y69t8pbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-09-19 at 17:04 +0100, Ryan Harkin wrote:
-> Add support to parse the display configuration from device tree.
-> 
-> If the board does not provide platform specific functions in the struct
-> clcd_board contained with the amba device info, then defaults are provided
-> by the driver.
-> 
-> The device tree configuration can either ask for a DMA setup or provide a
-> framebuffer address to be remapped into the driver.
-> 
-> Signed-off-by: Ryan Harkin <ryan.harkin@linaro.org>
-> ---
+I sent a patch for that already, Chris was cced on it recently by Shawn
+too. (Sorry for top posting, Android mail client)
+Dne 9.10.2012 17:39 "Arnd Bergmann" <arnd@arndb.de> napsal(a):
 
-<big snip>
-
->  static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
->  {
->  	struct clcd_board *board = dev->dev.platform_data;
->  	struct clcd_fb *fb;
->  	int ret;
->  
-> +#ifdef CONFIG_OF
-> +	if (dev->dev.of_node) {
-> +		const __be32 *prop;
-> +		int len, na, ns;
-> +		phys_addr_t reg_base;
-> +
-> +		na = of_n_addr_cells(dev->dev.of_node);
-> +		ns = of_n_size_cells(dev->dev.of_node);
-> +
-> +		prop = of_get_property(dev->dev.of_node, "reg", &len);
-> +		if (WARN_ON(!prop || len < (na + ns) * sizeof(*prop)))
-> +			return -EINVAL;
-> +		reg_base = of_read_number(prop, na);
-> +
-> +		if (dev->res.start != reg_base)
-> +			return -EINVAL;
-
-When the motherboard CLCD is used, the CLCD node is under the iofga node
-and has a reg value equal to the offset from the start of the iofgpa,
-however dev->res.start holds the calculated address of the start of the
-iofga region plus the offset of the clcd, this means that the above
-check fails.
-
-The question is, what is the purpose of this check? Can't we rely on the
-value of dev->res.start being consistent with dev->dev.of_node and so
-just drop all the above code from "const __be32 *prop" onwards?
-
--- 
-Tixy
+> From all I can tell, the patches
+>
+> fc108d24 "mmc: mxs-mmc: fix deadlock caused by recursion loop"
+> 829c1bf4 "mmc: spi: Pull out parts shared between MMC and SPI"
+>
+> came in through separate branches and cause this build error when
+> combined.
+>
+> drivers/mmc/host/mxs-mmc.c: In function 'mxs_mmc_enable_sdio_irq':
+> drivers/mmc/host/mxs-mmc.c:527:78: error: 'struct mxs_mmc_host' has no
+> member named 'base'
+> drivers/mmc/host/mxs-mmc.c:527:95: error: 'struct mxs_mmc_host' has no
+> member named 'devid'
+>
+> This does the obvious missing change.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Attila Kinali <attila@kinali.ch>
+> Cc: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> Cc: Marek Vasut <marex@denx.de>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index bb4c2bf..80d1e6d 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -525,7 +525,7 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
+> *mmc, int enable)
+>                 writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+>                        ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+>                 writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
+> -                      host->base + HW_SSP_CTRL1(host) +
+> STMP_OFFSET_REG_SET);
+> +                      ssp->base + HW_SSP_CTRL1(ssp) +
+> STMP_OFFSET_REG_SET);
+>         } else {
+>                 writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+>                        ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121009/2cf2c1ab/attachment-0001.html>
