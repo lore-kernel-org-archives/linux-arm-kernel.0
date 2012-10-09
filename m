@@ -1,32 +1,35 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 9 Oct 2012 11:19:28 +0000
-Subject: Booting vanilla kernel on the beaglebone
-In-Reply-To: <20121009110049.GB2274@netboy.at.omicron.at>
-References: <20120930082802.GA15392@netboy.at.omicron.at>
- <50693ECD.4000000@ti.com> <20121008191657.GA3281@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
- <20121009110049.GB2274@netboy.at.omicron.at>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 9 Oct 2012 17:07:17 +0530
+Subject: [PATCH 1/1] spi:clk: preparation for switch to common clock
+ framework
+In-Reply-To: <1347900122-25101-2-git-send-email-m-karicheri2@ti.com>
+References: <1347900122-25101-1-git-send-email-m-karicheri2@ti.com>
+ <1347900122-25101-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <50740C6D.7070906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 16:30:50, Richard Cochran wrote:
-> On Tue, Oct 09, 2012 at 05:57:22AM +0000, Hiremath, Vaibhav wrote:
-> > On Tue, Oct 09, 2012 at 00:46:57, Richard Cochran wrote:
-> > > 2. Can you post your .config?
-> > > 
-> > 
-> > I use omap2plus_defconfig + CONFIG_ARM_APPENDED_DTB + CONFIG_ARM_ATAG_DTB_COMPAT and nothing more.
->                                          ^
-> -----------------------------------------+  ???
+On 9/17/2012 10:12 PM, Murali Karicheri wrote:
+> As a first step towards migrating davinci platforms to use common clock
+> framework, replace all instances of clk_enable() with clk_prepare_enable()
+> and clk_disable() with clk_disable_unprepare(). Until the platform is
+> switched to use the CONFIG_HAVE_CLK_PREPARE Kconfig variable, this just
+> adds a might_sleep() call and would work without any issues.
 > 
-> But in the u-boot console example you post, you load the dtb into
-> memory.
+> This will make it easy later to switch to common clk based implementation
+> of clk driver from DaVinci specific driver.
 > 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
-Its standard mechanism to boot kernel with DT and it is nothing to do 
-with .config. as mentioned before I have already submitted patch to add dtb 
-target to 'make dtbs'.
+This patch had to be applied manually and with some fuzz when I applied
+it to latest linus/master. There were no conflicts though and once I
+applied it, I was able to test SPI flash on DA850 EVM successfully using it.
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+I am hoping this patch can still go in v3.7. I realize we are in the
+middle of the merge window though.
 
 Thanks,
-Vaibhav
+Sekhar
