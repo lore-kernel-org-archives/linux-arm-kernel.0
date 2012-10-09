@@ -1,117 +1,162 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Tue, 9 Oct 2012 12:36:50 +0000
-Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
-In-Reply-To: <20121005142338.GA7199@parrot.com>
-References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
- <20121003192044.GB27502@parrot.com>
- <518397C60809E147AF5323E0420B992E3E9B8A65@DBDE01.ent.ti.com>
- <20121005142338.GA7199@parrot.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9CA829@DBDE01.ent.ti.com>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Tue, 09 Oct 2012 14:48:08 +0200
+Subject: [PATCH v2 2/2] [media]: mx2_camera: Fix regression caused by
+ clock conversion
+In-Reply-To: <1349735823-30315-1-git-send-email-festevam@gmail.com>
+References: <1349735823-30315-1-git-send-email-festevam@gmail.com>
+Message-ID: <50741D08.1060706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2012 at 19:53:38, Ivan Djelic wrote:
-> On Fri, Oct 05, 2012 at 09:51:50AM +0100, Philip, Avinash wrote:
-> > On Thu, Oct 04, 2012 at 15:51:03, Philip, Avinash wrote:
-> > > On Thu, Oct 04, 2012 at 00:50:45, Ivan Djelic wrote:
-> > > > On Wed, Oct 03, 2012 at 03:29:49PM +0100, Philip, Avinash wrote:
-> > > > > ELM module can be used for error correction of BCH 4 & 8 bit. Also
-> > > > > support read & write page in one shot by adding custom read_page &
-> > > > > write_page methods. This helps in optimizing code.
-> > > > > 
-> > > > > New structure member "is_elm_used" is added to know the status of
-> > > > > whether the ELM module is used for error correction or not.
-> > > > > 
-> > > > > Note:
-> > > > > ECC layout of BCH8 uses 14 bytes for 512 byte of data to make compatible
-> > > > > with RBL ECC layout, even though the requirement was only 13 byte. This
-> > > > > results a common ecc layout across RBL, U-boot & Linux.
-> > > > > 
-> > > > 
-> > > > See a few comments below,
-> > > > 
-> > > > (...)
-> > > > > +static int omap_elm_correct_data(struct mtd_info *mtd, u_char *dat,
-> > > > > +                               u_char *read_ecc, u_char *calc_ecc)
-> > > > > +{
-> > > > > +       struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
-> > > > > +                       mtd);
-> > > > > +       int eccsteps = info->nand.ecc.steps;
-> > > > > +       int i , j, stat = 0;
-> > > > > +       int eccsize, eccflag, size;
-> > > > > +       struct elm_errorvec err_vec[ERROR_VECTOR_MAX];
-> > > > > +       u_char *ecc_vec = calc_ecc;
-> > > > > +       enum bch_ecc type;
-> > > > > +       bool is_error_reported = false;
-> > > > > +
-> > > > > +       /* initialize elm error vector to zero */
-> > > > > +       memset(err_vec, 0, sizeof(err_vec));
-> > > > > +       if (info->nand.ecc.strength == BCH8_MAX_ERROR) {
-> > > > > +               size = BCH8_SIZE;
-> > > > > +               eccsize = BCH8_ECC_OOB_BYTES;
-> > > > > +               type = BCH8_ECC;
-> > > > > +       } else {
-> > > > > +               size = BCH4_SIZE;
-> > > > > +               eccsize = BCH4_SIZE;
-> > > > > +               type = BCH4_ECC;
-> > > > > +       }
-> > > > > +
-> > > > > +       for (i = 0; i < eccsteps ; i++) {
-> > > > > +               eccflag = 0;    /* initialize eccflag */
-> > > > > +
-> > > > > +               for (j = 0; (j < eccsize); j++) {
-> > > > > +                       if (read_ecc[j] != 0xFF) {
-> > > > > +                               eccflag = 1;    /* data area is flashed */
-> > > > 
-> > > > Just a reminder: this way of checking if a page has been programmed is not robust to bitflips,
-> > > > so you may get into trouble with UBIFS on a fairly recent device.
-> > 
-> > Sorry I missed this point.
-> > 
-> > Here we were checking data in spare area (only in ecc layout 14*4 for BCH8) is 0xFF. If all data
-> > in spare area is 0xFF, conclude that the page is erased & no need of error correction. In case
-> > of bit flip present in spare area, page will be reported as uncorrectable.
-> > But I am not understand understand " trouble with UBIFS on a fairly recent device".
-> > Can you little elaborativ
-> 
-> There are at least 2 potential problems when reading an erased page with bitflips:
-> 
-> 1. bitflip in data area and no bitflip in spare area (all 0xff)
-> Your code will not perform any ECC correction.
-> UBIFS does not like finding bitflips in empty pages, see for instance
-> http://lists.infradead.org/pipermail/linux-mtd/2012-March/040328.html.
+Hi,
+On 10/09/2012 12:37 AM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
+> to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
+>
+> By not doing so the camera sensor does not probe correctly:
+>
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx2-camera mx2-camera.0: Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb
+> mx2-camera mx2-camera.0: Camera driver detached from camera 0
+> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
+>
+> Adapt the mx2_camera driver to the new clock framework and make it functional
+> again.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Rebased against linux-next 20121008.
+>
+>   drivers/media/platform/soc_camera/mx2_camera.c |   47 +++++++++++++++++-------
+>   1 file changed, 34 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
+> index 403d7f1..9f8c5f0 100644
+> --- a/drivers/media/platform/soc_camera/mx2_camera.c
+> +++ b/drivers/media/platform/soc_camera/mx2_camera.c
+> @@ -272,7 +272,8 @@ struct mx2_camera_dev {
+>   	struct device		*dev;
+>   	struct soc_camera_host	soc_host;
+>   	struct soc_camera_device *icd;
+> -	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
+> +	struct clk		*clk_emma_ahb, *clk_emma_ipg;
+> +	struct clk		*clk_csi_ahb, *clk_csi_per;
+>
+>   	void __iomem		*base_csi, *base_emma;
+>
+> @@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+>   {
+>   	unsigned long flags;
+>
+> -	clk_disable_unprepare(pcdev->clk_csi);
+> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
+> +	clk_disable_unprepare(pcdev->clk_csi_per);
+>   	writel(0, pcdev->base_csi + CSICR1);
+>   	if (cpu_is_mx27()) {
+>   		writel(0, pcdev->base_emma + PRP_CNTL);
+> @@ -460,7 +462,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+>   	if (pcdev->icd)
+>   		return -EBUSY;
+>
+> -	ret = clk_prepare_enable(pcdev->clk_csi);
+> +	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(pcdev->clk_csi_per);
+>   	if (ret < 0)
+>   		return ret;
+>
+> @@ -1725,11 +1731,18 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+>   		goto exit;
+>   	}
+>
+> -	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
+> -	if (IS_ERR(pcdev->clk_csi)) {
+> -		dev_err(&pdev->dev, "Could not get csi clock\n");
+> -		err = PTR_ERR(pcdev->clk_csi);
+> -		goto exit;
+> +	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
+> +	if (IS_ERR(pcdev->clk_csi_ahb)) {
+> +		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
+> +		err = PTR_ERR(pcdev->clk_csi_ahb);
+> +		goto exit;
+> +	}
+> +
+> +	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
+> +	if (IS_ERR(pcdev->clk_csi_per)) {
+> +		dev_err(&pdev->dev, "Could not get csi per clock\n");
+> +		err = PTR_ERR(pcdev->clk_csi_per);
+> +		goto exit_csi_ahb;
+>   	}
+>
+>   	pcdev->pdata = pdev->dev.platform_data;
+> @@ -1738,14 +1751,15 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+>
+>   		pcdev->platform_flags = pcdev->pdata->flags;
+>
+> -		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
+> +		rate = clk_round_rate(pcdev->clk_csi_per,
+> +						pcdev->pdata->clk * 2);
+>   		if (rate <= 0) {
+>   			err = -ENODEV;
+> -			goto exit;
+> +			goto exit_csi_per;
+>   		}
+> -		err = clk_set_rate(pcdev->clk_csi, rate);
+> +		err = clk_set_rate(pcdev->clk_csi_per, rate);
+>   		if (err < 0)
+> -			goto exit;
+> +			goto exit_csi_per;
+>   	}
+>
+>   	INIT_LIST_HEAD(&pcdev->capture);
+> @@ -1801,7 +1815,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+>   		goto exit_free_emma;
+>
+>   	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
+> -			clk_get_rate(pcdev->clk_csi));
+> +			clk_get_rate(pcdev->clk_csi_per));
+>
+>   	return 0;
+>
+> @@ -1812,6 +1826,10 @@ eallocctx:
+>   		clk_disable_unprepare(pcdev->clk_emma_ipg);
+>   		clk_disable_unprepare(pcdev->clk_emma_ahb);
+>   	}
+> +exit_csi_per:
+> +	clk_disable_unprepare(pcdev->clk_csi_per);
+> +exit_csi_ahb:
+> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
+>   exit:
+>   	return err;
+>   }
+> @@ -1831,6 +1849,9 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
+>   		clk_disable_unprepare(pcdev->clk_emma_ahb);
+>   	}
+>
+> +	clk_disable_unprepare(pcdev->clk_csi_per);
+> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
+> +
+>   	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
+>
+>   	return 0;
+>
+I only test detection at kernel boot not streaming using Gstreamer due 
+to lack of time.
 
-In case of error correction using ELM, syndrome vector calculated after reading
-Data area & OOB area. So handling of erased page requires a software workaround.
-I am planning something as follows.
+On imx27_3ds board with ov2640 sensor:
+ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
+mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock 
+frequency: 44333333
 
-I will first check calculated ecc, which would be zero for non error pages.
-Then I would check 0xFF in OOB area (for erased page) by checking number of
-bit zeros in OOB area.  If it is 0xFF (number of bit zero count is zero),
-set entire page as 0xFF if number of bit zeros is less than max bit flips
-(8 or 4) by counting the number of bit zero's in data area.
+On clone imx27_3ds board with mt9v111 sensor (draft driver):
+mt9v111 0-0048: Detected a MT9V111 chip ID 823a
+mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock 
+frequency: 44333333
 
-This logic is implemented in fsmc_nand.c
-
-See commit
-mtd: fsmc: Newly erased page read algorithm implemented
-
-> 
-> 2. bitflip in ECC bytes in spare area
-> Your code will report an uncorrectable error upon reading; if this happens while reading a partially programmed UBI block,
-> I guess you will lose data.
-
-In case of uncorrectable errors due to bit flips in spare area,
-I can go on checking number of bit zero's in data area + OOB area
-are less than max bit flips (8 or 4), I can go on setting the entire
-page as 0xFF.
-
-Thanks
-Avinash
-
-> 
-> BR,
-> --
-> Ivan
-> 
+Tested-by: Ga?tan Carlier <gcembed@gmail.com>
