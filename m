@@ -1,31 +1,35 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 9 Oct 2012 16:25:13 -0300
-Subject: [PATCH] ARM: mxc: platform-mxc-mmc: Fix register region size
-Message-ID: <1349810713-12307-1-git-send-email-fabio.estevam@freescale.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 9 Oct 2012 19:29:51 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: warnings/hwmod/clock fixes for pre-3.7-rc1
+In-Reply-To: <20121009190252.GD12552@atomide.com>
+References: <alpine.DEB.2.00.1210091602390.5736@utopia.booyaka.com>
+ <20121009190252.GD12552@atomide.com>
+Message-ID: <alpine.DEB.2.00.1210091928180.5736@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not hardcode the register region to SZ_4K as this is not correct for mx31.
+On Tue, 9 Oct 2012, Tony Lindgren wrote:
 
-Use data->iosize instead which works for both mx27 and mx31 cases.
+> * Paul Walmsley <paul@pwsan.com> [121009 09:05]:
+> > 
+> > N800 isn't booting; this is a problem present in the base commit and
+> > is due to serial driver breakage:
+> > 
+> >    http://www.spinics.net/lists/arm-kernel/msg196034.html
+> 
+> This might be related also to the n800 booting in sys mode
+> that causes issues with the recent hyp patches. A fix for
+> that has been queued, for more info see the thread
+> "v2 2/7] ARM: virt: allow the kernel to be entered in HYP mode".
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/devices/platform-mxc-mmc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks for the pointer.  That one would break the boot quite early, right? 
+This one has the same symptoms as the serial issue, where it bombs out 
+after:
 
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c b/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-index 540d3a7..e7b920b 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-+++ b/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-@@ -55,7 +55,7 @@ struct platform_device *__init imx_add_mxc_mmc(
- 	struct resource res[] = {
- 		{
- 			.start = data->iobase,
--			.end = data->iobase + SZ_4K - 1,
-+			.end = data->iobase + data->iosize - 1,
- 			.flags = IORESOURCE_MEM,
- 		}, {
- 			.start = data->irq,
--- 
-1.7.9.5
+[    0.948394] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.974273] omap_uart.0: ttyO0 at MMIO 0x4806a000 (irq = 88) is a OMAP UART0
+[    0.986968] omap_uart.1: ttyO1 at MMIO 0x4806c000 (irq = 89) is a OMAP UART1
+
+(hang)
+
+- Paul
