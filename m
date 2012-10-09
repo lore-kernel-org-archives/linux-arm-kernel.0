@@ -1,35 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 9 Oct 2012 19:10:45 +0200
-Subject: [PATCH] mmc: mxs: fix build regression from mismerge
-In-Reply-To: <877gqzabjy.fsf@octavius.laptop.org>
-References: <201210091537.23659.arnd@arndb.de>
- <877gqzabjy.fsf@octavius.laptop.org>
-Message-ID: <201210091910.45992.marex@denx.de>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Tue, 9 Oct 2012 22:44:40 +0530
+Subject: [PATCH 01/11] fsmc/nand:FIX: Change the type for regs to void
+ __iomem *
+In-Reply-To: <c30a9228d4bff7dbedd5d011f84c79c324736452.1349778820.git.vipin.kumar@st.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <c30a9228d4bff7dbedd5d011f84c79c324736452.1349778820.git.vipin.kumar@st.com>
+Message-ID: <CAOh2x=neFZcdK16_3wHRPHURWDVgfyv2UvX44bSb0hLmvMjHqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chris Ball,
+On Tue, Oct 9, 2012 at 4:14 PM, Vipin Kumar <vipin.kumar@st.com> wrote:
+> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
+> ---
+>  drivers/mtd/nand/fsmc_nand.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+> index 38d2624..e96d7d1 100644
+> --- a/drivers/mtd/nand/fsmc_nand.c
+> +++ b/drivers/mtd/nand/fsmc_nand.c
+> @@ -361,7 +361,7 @@ static void fsmc_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+>         struct nand_chip *this = mtd->priv;
+>         struct fsmc_nand_data *host = container_of(mtd,
+>                                         struct fsmc_nand_data, mtd);
+> -       void *__iomem *regs = host->regs_va;
+> +       void __iomem *regs = host->regs_va;
 
-> Hi,
-> 
-> On Tue, Oct 09 2012, Arnd Bergmann wrote:
-> > From all I can tell, the patches
-> > 
-> > fc108d24 "mmc: mxs-mmc: fix deadlock caused by recursion loop"
-> > 829c1bf4 "mmc: spi: Pull out parts shared between MMC and SPI"
-> > 
-> > came in through separate branches and cause this build error when
-> > combined.
-[...]
-
-> 
-> I'll send Marek's change to Linus once the main MMC merge has been pulled.
-> Thanks,
-> 
-> - Chris.
-
-Thanks! Sorry from my previous reply from Android phone, I just saw what 
-horrible email it generated :-(
-
-Best regards,
-Marek Vasut
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
