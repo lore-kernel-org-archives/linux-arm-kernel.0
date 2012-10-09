@@ -1,43 +1,90 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  9 Oct 2012 17:34:20 +0200
-Subject: [PATCH 2/3] ARM: assabet: fix bogus warning in get_assabet_scr (again)
+Date: Tue,  9 Oct 2012 17:34:21 +0200
+Subject: [PATCH 3/3] ARM: integrator: use __iomem pointers for MMIO, part 2
 In-Reply-To: <1349796861-31164-1-git-send-email-arnd@arndb.de>
 References: <1349796861-31164-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349796861-31164-3-git-send-email-arnd@arndb.de>
+Message-ID: <1349796861-31164-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell fixed this bogus warning before in 2f3eca8b4f "Shut up gcc
-warning in assabet.c", but apparently gcc has become smarter (or dumber)
-since 2005, and the same warning came up again.
-
-This uses the uninitialized_var() macro to convince gcc that the
-variable is actually being initialized. 100 times in fact.
-
-Without this patch, building assabet_defconfig results in:
-
-arch/arm/mach-sa1100/assabet.c: In function 'fixup_assabet':
-arch/arm/mach-sa1100/assabet.c:397:6: warning: 'scr' may be used uninitialized in this function [-Wuninitialized]
-arch/arm/mach-sa1100/assabet.c:389:16: note: 'scr' was declared here
+Due to some interesting merges in the integrator code, not
+all users of mmio pointers were converted before, this
+fixes all warnings that got introduced as a consequence.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/assabet.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-integrator/include/mach/cm.h       |    2 +-
+ arch/arm/mach-integrator/include/mach/platform.h |    6 +++---
+ arch/arm/mach-integrator/integrator_ap.c         |    2 +-
+ arch/arm/mach-integrator/integrator_cp.c         |    4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
-index e1ccda6..6a7ad3c 100644
---- a/arch/arm/mach-sa1100/assabet.c
-+++ b/arch/arm/mach-sa1100/assabet.c
-@@ -388,7 +388,7 @@ static void __init map_sa1100_gpio_regs( void )
+diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
+index 1a78692e..202e6a5 100644
+--- a/arch/arm/mach-integrator/include/mach/cm.h
++++ b/arch/arm/mach-integrator/include/mach/cm.h
+@@ -3,7 +3,7 @@
   */
- static void __init get_assabet_scr(void)
- {
--	unsigned long scr, i;
-+	unsigned long uninitialized_var(scr), i;
+ void cm_control(u32, u32);
  
- 	GPDR |= 0x3fc;			/* Configure GPIO 9:2 as outputs */
- 	GPSR = 0x3fc;			/* Write 0xFF to GPIO 9:2 */
+-#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_CTRL)
++#define CM_CTRL	__io_address(INTEGRATOR_HDR_CTRL)
+ 
+ #define CM_CTRL_LED			(1 << 0)
+ #define CM_CTRL_nMBDET			(1 << 1)
+diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
+index 4c03475..efeac5d 100644
+--- a/arch/arm/mach-integrator/include/mach/platform.h
++++ b/arch/arm/mach-integrator/include/mach/platform.h
+@@ -324,9 +324,9 @@
+  */
+ #define PHYS_PCI_V3_BASE                0x62000000
+ 
+-#define PCI_MEMORY_VADDR		0xe8000000
+-#define PCI_CONFIG_VADDR		0xec000000
+-#define PCI_V3_VADDR			0xed000000
++#define PCI_MEMORY_VADDR		IOMEM(0xe8000000)
++#define PCI_CONFIG_VADDR		IOMEM(0xec000000)
++#define PCI_V3_VADDR			IOMEM(0xed000000)
+ 
+ /* ------------------------------------------------------------------------
+  *  Integrator Interrupt Controllers
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index d5b5435a..e6617c1 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -157,7 +157,7 @@ static struct map_desc ap_io_desc[] __initdata = {
+ static void __init ap_map_io(void)
+ {
+ 	iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
+-	vga_base = PCI_MEMORY_VADDR;
++	vga_base = (unsigned long)PCI_MEMORY_VADDR;
+ 	pci_map_io_early(__phys_to_pfn(PHYS_PCI_IO_BASE));
+ }
+ 
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 6870a1f..5b08e8e 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -261,6 +261,8 @@ static void __init intcp_init_early(void)
+ #endif
+ }
+ 
++#ifdef CONFIG_OF
++
+ static void __init intcp_timer_init_of(void)
+ {
+ 	struct device_node *node;
+@@ -297,8 +299,6 @@ static struct sys_timer cp_of_timer = {
+ 	.init		= intcp_timer_init_of,
+ };
+ 
+-#ifdef CONFIG_OF
+-
+ static const struct of_device_id fpga_irq_of_match[] __initconst = {
+ 	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
+ 	{ /* Sentinel */ }
 -- 
 1.7.10
