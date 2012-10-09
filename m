@@ -1,82 +1,34 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 9 Oct 2012 12:25:14 -0600
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121008104649.GD2302@linaro.org>
-References: <20121001160639.GA31620@obsidianresearch.com>
- <20121001175647.GD2100@linaro.org>
- <20121001183543.GC22342@obsidianresearch.com>
- <20121002102346.GB2108@linaro.org>
- <20121002174759.GC23733@obsidianresearch.com>
- <20121003104335.GA2254@linaro.org>
- <20121003184437.GB12231@obsidianresearch.com>
- <20121004113637.GA2117@linaro.org>
- <20121004175907.GB2994@obsidianresearch.com>
- <20121008104649.GD2302@linaro.org>
-Message-ID: <20121009182514.GF4124@obsidianresearch.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 9 Oct 2012 20:29:42 +0200
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB3A636@DBDE01.ent.ti.com>
+References: <20120930082802.GA15392@netboy.at.omicron.at>
+ <50693ECD.4000000@ti.com>
+ <20121008191657.GA3281@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
+ <20121009110049.GB2274@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
+ <20121009114326.GA4511@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39F42@DBDE01.ent.ti.com>
+ <20121009165405.GB6870@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB3A636@DBDE01.ent.ti.com>
+Message-ID: <20121009182941.GB12235@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 11:46:49AM +0100, Dave Martin wrote:
+On Tue, Oct 09, 2012 at 05:22:15PM +0000, Hiremath, Vaibhav wrote:
 
-> > Yes, but we still need rely on complex code like I2C/MTD to create a
-> > correct DTB, which again puts us back to patching the kernel for that
-> > functionality.
+> https://patchwork.kernel.org/patch/1499271/
+> https://patchwork.kernel.org/patch/1569231/
 > 
-> I'm still confused as to where this complexity is coming from.
+> These patches addresses integration related issues which occurs during merge 
+> window.
 > 
-> If you need to run some complex I2C and MTD code to generate the DT, what
-> is that code doing?  If it is probing to get the information, then can you
-> avoid putting the info in the DT at all?  Primarily the DT is to describe
-> those aspects of the hardware which can't be probed.
+> Please note that, these patches are already submitted to list and expected 
+> to get merged for rc1.
 
-At manufacturing the unit is programmed with a small datastructure that
-contains all the unique ID's (MAC addresses, etc), manufacturing
-variations (ie vendor A or B was used for a socket) and other
-ancillary data.
+Okay, so now it is working. It appears that these two are neither in
+linux-next or in mainline.
 
-So a fair amount of I2C and MTD stack is required just to fetch this
-structure - a full CFI probe, for instance, is needed in the NOR flash
-case just to locate the structure.
-
-Once read, things like MAC addresses are copied into the DTB, and
-certain sections of the DTB are NOP'd out - we have stanzas for chip
-vendor A and vendor B, the one that was not put on the board is
-replaced with NOP.
-
-Similar to the A/B fix, a further fixup is done based on a runtime
-probe of the programmable devices to learn their current
-configuration/memory map.
-
-It seems desirable to present a complete/correct DTB to the kernel,
-it doesn't seem there are great places to hook in custom discovery
-procedures.
-
->From a maintenance perspective we already have to test/etc the kernel
-code for all of this, we don't want to do that twice by duplicating
-this stuff outside the kernel.
-
-> Otherwise, you that have a few static configurations: you could have one
-> pre-baked DT per hardware platform, and choose the correct one once you
-> have detected the platform.
-
-We do that too, for instance the PPC kernel we build supports 4
-different circuit boards, each served by a separate DTB, that needs a
-fixup pass.
-
-I think the biggest DTB describes about 49 devices..
-  
-> > Where the 'dev tree provider' would use the stored bootloader
-> > registers and any other information to return the proper DTB. 
-> 
-> It would need developing a bit, but something like that might be
-> possible -- it should probably be discussed via devicetree-discuss.
-> 
-> If it is doing anything less trivial than picking a pre-baked DT, the
-> rationale would need to be carefully argued.
-
-I'm not sure there is a great interest in this? What are other folks
-working on production embedded stuff doing? I suppose that will be
-more clear as device tree is rolled out.
-
-Jason
+Thanks,
+Richard
