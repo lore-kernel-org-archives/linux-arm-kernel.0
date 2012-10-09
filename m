@@ -1,130 +1,83 @@
-From: scott.bambrough@linaro.org (Scott Bambrough)
-Date: Tue, 09 Oct 2012 10:05:52 -0400
-Subject: alignment faults in 3.6
-In-Reply-To: <506F0454.3070304@gmail.com>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
- <20590.58864.527467.746403@pilspetsen.it.uu.se> <506F0454.3070304@gmail.com>
-Message-ID: <50742F40.4050704@linaro.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 9 Oct 2012 15:05:54 +0100
+Subject: Problem with 64-bit registers on i.MX53
+In-Reply-To: <20121009090237.GI18531@pengutronix.de>
+References: <20121008160841.GM19651@pengutronix.de>
+ <20121008170124.GZ4625@n2100.arm.linux.org.uk>
+ <20121008171011.GA4625@n2100.arm.linux.org.uk>
+ <20121009090237.GI18531@pengutronix.de>
+Message-ID: <20121009140554.GA2122@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-10-05 12:01 PM, Rob Herring wrote:
-> On 10/05/2012 08:51 AM, Mikael Pettersson wrote:
->> Rob Herring writes:
->>   > On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
->>   > > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
->>   > >> On 5 October 2012 08:12, Russell King - ARM Linux
->>   > >> <linux@arm.linux.org.uk> wrote:
->>   > >>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
->>   > >>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
->>   > >>>>> This struct is the IP header, so a struct ptr is just set to the
->>   > >>>>> beginning of the received data. Since ethernet headers are 14 bytes,
->>   > >>>>> often the IP header is not aligned unless the NIC can place the frame at
->>   > >>>>> a 2 byte offset (which is something I need to investigate). So this
->>   > >>>>> function cannot make any assumptions about the alignment. Does the ABI
->>   > >>>>> define structs have some minimum alignment? Does the struct need to be
->>   > >>>>> declared as packed or something?
->>   > >>>>
->>   > >>>> The ABI defines the alignment of structs as the maximum alignment of its
->>   > >>>> members.  Since this struct contains 32-bit members, the alignment for the
->>   > >>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
->>   > >>>> might be unaligned (in addition to removing any holes within).
->>   > >>>
->>   > >>> This has come up before in the past.
->>   > >>>
->>   > >>> The Linux network folk will _not_ allow - in any shape or form - for
->>   > >>> this struct to be marked packed (it's the struct which needs to be
->>   > >>> marked packed) because by doing so, it causes GCC to issue byte loads/
->>   > >>> stores on architectures where there isn't a problem, and that decreases
->>   > >>> the performance of the Linux IP stack unnecessarily.
->>   > >>
->>   > >> Which architectures?  I have never seen anything like that.
->>   > >
->>   > > Does it matter?  I'm just relaying the argument against adding __packed
->>   > > which was used before we were forced (by the networking folk) to implement
->>   > > the alignment fault handler.
->>   >
->>   > It doesn't really matter what will be accepted or not as adding __packed
->>   > to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
->>   > The only way I've found to eliminate the alignment fault is adding a
->>   > barrier between the 2 loads. That seems like a compiler issue to me if
->>   > there is not a better fix.
->>
->> If you suspect a GCC bug, please prepare a standalone user-space test case
->> and submit it to GCC's bugzilla (I can do the latter if you absolutely do not
->> want to).  It wouldn't be the first alignment-related GCC bug...
->>
->
-> Here's a testcase. Compiled on ubuntu precise with
-> "arm-linux-gnueabihf-gcc -O2 -marm -march=armv7-a test.c".
->
-> typedef unsigned short u16;
-> typedef unsigned short __sum16;
-> typedef unsigned int __u32;
-> typedef unsigned char __u8;
-> typedef __u32 __be32;
-> typedef u16 __be16;
->
-> struct iphdr {
-> 	__u8	ihl:4,
-> 		version:4;
-> 	__u8	tos;
-> 	__be16	tot_len;
-> 	__be16	id;
-> 	__be16	frag_off;
-> 	__u8	ttl;
-> 	__u8	protocol;
-> 	__sum16	check;
-> 	__be32	saddr;
-> 	__be32	daddr;
-> 	/*The options start here. */
-> };
+On Tue, Oct 09, 2012 at 11:02:37AM +0200, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Mon, Oct 08, 2012 at 06:10:11PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Oct 08, 2012 at 06:01:24PM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Oct 08, 2012 at 06:08:41PM +0200, Michael Olbrich wrote:
+> > You may also like to try the patch below... it will probably fix your
+> > problem.
+> > 
+> > diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
+> > index a7aadbd..6a6f1e4 100644
+> > --- a/arch/arm/include/asm/vfpmacros.h
+> > +++ b/arch/arm/include/asm/vfpmacros.h
+> > @@ -28,7 +28,7 @@
+> >  	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
+> >  	ldr	\tmp, [\tmp, #0]
+> >  	tst	\tmp, #HWCAP_VFPv3D16
+> > -	ldceq	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
+> > +	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
+> >  	addne	\base, \base, #32*4		    @ step over unused register space
+> >  #else
+> >  	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
+> > @@ -52,7 +52,7 @@
+> >  	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
+> >  	ldr	\tmp, [\tmp, #0]
+> >  	tst	\tmp, #HWCAP_VFPv3D16
+> > -	stceq	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
+> > +	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
+> According to the ARMARM for v7-A and v7-R (ARM DDI 0406B errata 2010 Q2)
+> the syntax is "STC{L}<c> ...", with a note "The pre-UAL syntax STC<c>L
+> is equivalent to STCL<c>.". Maybe the UAL-syntax should better be used?
 
-I was reading this thread with some interest.  AFAIK, with the default 
-alignment rules the above struct is packed; there will be no holes in it.
+The older stc<c>l type of syntax is used all over the place.  Code which
+might need to be built by tools which pre-date unified syntax needs to
+use the old syntax, so it is in common usage in the kernel in general.
 
->
-> #define ntohl(x) __swab32((__u32)(__be32)(x))
-> #define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
->
-> static inline __attribute__((const)) __u32 __swab32(__u32 x)
-> {
-> 	__asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
-> 	return x;
-> }
->
-> int main(void * buffer, unsigned int *p_id)
-> {
-> 	unsigned int id;
-> 	int flush = 1;
-> 	const struct iphdr *iph = buffer;
-> 	__u32 len = *p_id;
-> 	
-> 	id = ntohl(*(__be32 *)&iph->id);
+This code presumably only gets built by new-enough tools for the unified
+syntax to be usable, but support for the old syntax isn't going to
+disappear from the tools any time soon, AFAIK.
 
-The above statement is the problem.  I think it is poorly written 
-networking code.  It takes the address of a 16 bit quantity (aligned on 
-a halfword address), attempts to do a type conversion using pointers, 
-then dereference it.  I would have thought:
 
-id = ntohs(iph->id);
+The bug here was that the presence or absence of the "L" suffix is used
+to encode bit 4 of the starting d-register number for these instructions.
+The comment says d16-d31, but the instructions as written are actually
+saving and restoring d0-d15...which is not so helpful since we already
+handled those registers in the neighbouring code.
 
-would have been enough.
+We could avoid this kind of bug by writing those VFP instructions
+using the unified syntax native mnemonics (vstmia, vldmia -- since d16-
+d31 never existed while the old fldmiad/fstmiad mnemonics were in use,
+and the assembler doesn't accept them), but it is tricky to change the
+assembler's notion of target CPU and FPU on-the-fly inside a header or
+macro without messing things up.
 
-Scott
+Cheers
+---Dave
 
--- 
-Scott Bambrough
-Technical Director, Member Services
-Linaro Ltd.
-email: scott.bambrough at linaro.org
-irc: scottb (freenode, irc.linaro.org)
-web: http://www.linaro.org
-Linaro: The future of Linux on ARM.
+
+
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
