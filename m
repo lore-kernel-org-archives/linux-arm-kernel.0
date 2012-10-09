@@ -1,94 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Oct 2012 15:35:56 +0000
-Subject: [PATCH] pinctrl: sirf: remove sirfsoc_gpio_set_pull function
-Message-ID: <201210091535.56487.arnd@arndb.de>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 9 Oct 2012 16:35:58 +0100
+Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
+In-Reply-To: <1349796183-30648-6-git-send-email-arnd@arndb.de>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <1349796183-30648-6-git-send-email-arnd@arndb.de>
+Message-ID: <1349796958.21847.219.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prima2 platform advertises needing no mach/gpio.h header file,
-but its pinctrl driver now has a sirfsoc_gpio_set_pull function
-that uses constants defined in arch/arm/mach-prima2/include/mach/gpio.h,
-which fails to build.
+On Tue, 2012-10-09 at 16:22 +0100, Arnd Bergmann wrote:
+> * The XEN_BALLOON code requires the balloon infrastructure that is not
+>   getting built on ARM.
 
-Fortunately, the sirfsoc_gpio_set_pull is not used anywhere in the
-kernel, so we can safely remove it. Any out of tree drivers using
-it will have to be converted to use proper pinctrl functions to
-do the same.
+I've got patches to enable this, but not for 3.7 so this looks good for
+now.
 
-Without this patch, building prima2_defconfig results in:
+> * The tmem hypercall is not available on ARM
+> 
+> * ARMv6 does not support cmpxchg on 16-bit words that are used in the
 
-drivers/pinctrl/pinctrl-sirf.c: In function 'sirfsoc_gpio_set_pull':
-drivers/pinctrl/pinctrl-sirf.c:1331:7: error: 'SIRFSOC_GPIO_PULL_NONE' undeclared (first use in this function)
-drivers/pinctrl/pinctrl-sirf.c:1331:7: note: each undeclared identifier is reported only once for each function it appears in
-drivers/pinctrl/pinctrl-sirf.c:1334:7: error: 'SIRFSOC_GPIO_PULL_UP' undeclared (first use in this function)
-drivers/pinctrl/pinctrl-sirf.c:1338:7: error: 'SIRFSOC_GPIO_PULL_DOWN' undeclared (first use in this function)
+missing the end of this sentence?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Barry Song <Baohua.Song@csr.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+> * sys-hypervisor.c needs to include linux/err.h in order to use the
+>   IS_ERR/PTR_ERR/ERR_PTR family of functions.
 
-diff --git a/arch/arm/mach-prima2/include/mach/gpio.h b/arch/arm/mach-prima2/include/mach/gpio.h
-deleted file mode 100644
-index 1904bb0..0000000
---- a/arch/arm/mach-prima2/include/mach/gpio.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--#ifndef __MACH_GPIO_H
--#define __MACH_GPIO_H
--
--/* Pull up/down values */
--enum sirfsoc_gpio_pull {
--	SIRFSOC_GPIO_PULL_NONE,
--	SIRFSOC_GPIO_PULL_UP,
--	SIRFSOC_GPIO_PULL_DOWN,
--};
--
--void sirfsoc_gpio_set_pull(unsigned gpio, unsigned mode);
--
--#endif
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 675497c..9ecacf3 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1323,41 +1323,6 @@ static inline struct sirfsoc_gpio_bank *sirfsoc_gpio_to_bank(unsigned int gpio)
- 	return &sgpio_bank[gpio / SIRFSOC_GPIO_BANK_SIZE];
- }
- 
--void sirfsoc_gpio_set_pull(unsigned gpio, unsigned mode)
--{
--	struct sirfsoc_gpio_bank *bank = sirfsoc_gpio_to_bank(gpio);
--	int idx = sirfsoc_gpio_to_offset(gpio);
--	u32 val, offset;
--	unsigned long flags;
--
--	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
--
--	spin_lock_irqsave(&sgpio_lock, flags);
--
--	val = readl(bank->chip.regs + offset);
--
--	switch (mode) {
--	case SIRFSOC_GPIO_PULL_NONE:
--		val &= ~SIRFSOC_GPIO_CTL_PULL_MASK;
--		break;
--	case SIRFSOC_GPIO_PULL_UP:
--		val |= SIRFSOC_GPIO_CTL_PULL_MASK;
--		val |= SIRFSOC_GPIO_CTL_PULL_HIGH;
--		break;
--	case SIRFSOC_GPIO_PULL_DOWN:
--		val |= SIRFSOC_GPIO_CTL_PULL_MASK;
--		val &= ~SIRFSOC_GPIO_CTL_PULL_HIGH;
--		break;
--	default:
--		break;
--	}
--
--	writel(val, bank->chip.regs + offset);
--
--	spin_unlock_irqrestore(&sgpio_lock, flags);
--}
--EXPORT_SYMBOL(sirfsoc_gpio_set_pull);
--
- static inline struct sirfsoc_gpio_bank *sirfsoc_irqchip_to_bank(struct gpio_chip *chip)
- {
- 	return container_of(to_of_mm_gpio_chip(chip), struct sirfsoc_gpio_bank, chip);
+I tripped over this too. Not sure where that patch got to though.
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
+
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Jeremy Fitzhardinge <jeremy@goop.org>
+> Cc: xen-devel at lists.xensource.com
+> ---
+>  arch/arm/Kconfig             |    1 +
+>  drivers/xen/Kconfig          |    2 ++
+>  drivers/xen/sys-hypervisor.c |    1 +
+>  3 files changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 6d2f7f5..85eaac3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1846,6 +1846,7 @@ config XEN_DOM0
+>  config XEN
+>  	bool "Xen guest support on ARM (EXPERIMENTAL)"
+>  	depends on EXPERIMENTAL && ARM && OF
+> +	depends on !CPU_V6
+>  	help
+>  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+>  
+> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+> index d4dffcd..126d8ce 100644
+> --- a/drivers/xen/Kconfig
+> +++ b/drivers/xen/Kconfig
+> @@ -3,6 +3,7 @@ menu "Xen driver support"
+>  
+>  config XEN_BALLOON
+>  	bool "Xen memory balloon driver"
+> +	depends on !ARM
+>  	default y
+>  	help
+>  	  The balloon driver allows the Xen domain to request more memory from
+> @@ -145,6 +146,7 @@ config SWIOTLB_XEN
+>  
+>  config XEN_TMEM
+>  	bool
+> +	depends on !ARM
+>  	default y if (CLEANCACHE || FRONTSWAP)
+>  	help
+>  	  Shim to interface in-kernel Transcendent Memory hooks
+> diff --git a/drivers/xen/sys-hypervisor.c b/drivers/xen/sys-hypervisor.c
+> index 5e5ad7e..66a0a14 100644
+> --- a/drivers/xen/sys-hypervisor.c
+> +++ b/drivers/xen/sys-hypervisor.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/kobject.h>
+> +#include <linux/err.h>
+>  
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
