@@ -1,35 +1,64 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Tue, 9 Oct 2012 22:50:47 +0530
-Subject: [PATCH 04/11] fsmc/nand: Accept nand timing parameters via DT
-In-Reply-To: <54eda40e56e8ea02ed9c5332ca6d3fb90d617cc7.1349778821.git.vipin.kumar@st.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
- <54eda40e56e8ea02ed9c5332ca6d3fb90d617cc7.1349778821.git.vipin.kumar@st.com>
-Message-ID: <CAOh2x==1UA-9yDX=S6zGtJ-NwGkQuxStE5WTh6qpWAK7Dw68nw@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 9 Oct 2012 17:22:15 +0000
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <20121009165405.GB6870@netboy.at.omicron.at>
+References: <20120930082802.GA15392@netboy.at.omicron.at>
+ <50693ECD.4000000@ti.com> <20121008191657.GA3281@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
+ <20121009110049.GB2274@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
+ <20121009114326.GA4511@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB39F42@DBDE01.ent.ti.com>
+ <20121009165405.GB6870@netboy.at.omicron.at>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB3A636@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2012 at 4:14 PM, Vipin Kumar <vipin.kumar@st.com> wrote:
-> diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+On Tue, Oct 09, 2012 at 22:24:05, Richard Cochran wrote:
+> On Tue, Oct 09, 2012 at 12:17:45PM +0000, Hiremath, Vaibhav wrote:
+> > Just with recent u-boot.
+> 
+> So this just doesn't work at all for me. It hangs just after:
+> 
+>    U-Boot# bootm 81000000 - 80000000
+>    ## Booting kernel from Legacy Image at 81000000 ...
+>       Image Name:   Linux-3.6.0-next-20121009
+>       Image Type:   ARM Linux Kernel Image (uncompressed)
+>       Data Size:    3845136 Bytes = 3.7 MiB
+>       Load Address: 80008000
+>       Entry Point:  80008000
+>       Verifying Checksum ... OK
+>    ## Flattened Device Tree blob at 80000000
+>       Booting using the fdt blob at 0x80000000
+>       Loading Kernel Image ... OK
+>    OK
+>       Loading Device Tree to 8fe66000, end 8fe6a433 ... OK
+>    
+>    Starting kernel ...
+> 
+> (That was with linux-next-b066f61 from today.)
+> 
+> I do have a Rev A6 board. Could that be an issue?
+> 
+> You said that you are carrying along some patches (like the
+> defconfig). Are you sure every needed patch is now upstream?
+> 
 
-> +- nand-timings-enabled: Indicates if the timing parameters are passed
-> +  via DT
-> +- nand-timings,tclr:
-> +- nand-timings,tar:
-> +- nand-timings,thiz:
-> +- nand-timings,thold:
-> +- nand-timings,twait:
-> +- nand-timings,tset: All these timing parameters come from the actual
-> +  nand device specification. Each of this represents a number of time
-> +  period of hclk ie a number 4 in thold with hclk = 166MHz means that
-> +  thold = (1000 / 166) * 4 ns = 24.09ns
+Can you make sure that you have below patches, which I have already 
+submitted to linux-omap and expected to get merged for rc1.
 
-Are they specific to fsmc controller or nand memory type? If to fsmc then
-please add my
+https://patchwork.kernel.org/patch/1499271/
+https://patchwork.kernel.org/patch/1569231/
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+These patches addresses integration related issues which occurs during merge 
+window.
 
-else
-I would suggest to add these to mtd bindings instead, so that same fields
-can be used by multiple drivers....
+Please note that, these patches are already submitted to list and expected 
+to get merged for rc1.
 
-Similar approach is used for mmc controllers too.
+Thanks,
+Vaibhav
+
+> Thanks,
+> Richard
+> 
