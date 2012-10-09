@@ -1,68 +1,77 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 9 Oct 2012 09:12:46 -0300
-Subject: [PATCH v2 2/2] [media]: mx2_camera: Fix regression caused by
- clock conversion
-In-Reply-To: <CACKLOr3stV-Pup_w+DwGO3z842hct4RV+_hCVpL7Pu3QRFwH0w@mail.gmail.com>
-References: <1349735823-30315-1-git-send-email-festevam@gmail.com>
- <CACKLOr3stV-Pup_w+DwGO3z842hct4RV+_hCVpL7Pu3QRFwH0w@mail.gmail.com>
-Message-ID: <CAOMZO5CrhWGBW4z4eoeAviDeBF0bPLcp-7tXGUrdnFWfVGr+cw@mail.gmail.com>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Tue, 9 Oct 2012 17:56:18 +0530
+Subject: [PATCH v3 0/6] omap-am33xx rtc dt support
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9BA4EB@DBDE01.ent.ti.com>
+References: <cover.1343383616.git.afzal@ti.com> <50256797.3020505@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9BA4EB@DBDE01.ent.ti.com>
+Message-ID: <507417EA.3010008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hi Andrew,
 
-On Tue, Oct 9, 2012 at 8:16 AM, javier Martin
-<javier.martin@vista-silicon.com> wrote:
 
-> This patch doesn't fix the BUG it claims to, since I have it working
-> properly in our Visstrim M10 platform without it. Look:
+On Monday 27 August 2012 01:05 PM, Mohammed, Afzal wrote:
+> On Sat, Aug 11, 2012 at 01:27:11, Nori, Sekhar wrote:
+>> On 7/27/2012 5:53 PM, Afzal Mohammed wrote:
 
-Yes, it does fix a real bug. Without this patch the ov2640 cannot be
-probed, as it fails to read the product/vendor ID via I2C. I measure
-with the scope and do not get mclk at all without this patch.
+>>> This series makes rtc-omap driver DT capable, adds AM33xx
+>>> RTC DT support along with a few enchancments to the driver.
+>>>
+>>> rtc-omap driver is made intelligent enough to handle kicker
+>>> mechanism. This helps in removing kicker mechanism support
+>>> done for DaVinci at platform level.
+>>>
+>>> This has been tested on Beaglebone (AM33xx platform) and on
+>>> DaVinci DA850 EVM.
 
-Again, camera probe does work fine on kernel 3.4.
+>> I tested patches 1-5 on AM18x EVM using rtcwake and hwclock commands.
+>> Also tested on DT enabled AM18x EVM using hwclock.
+>>
+>> For patched 1-5:
+>>
+>> Acked-by: Sekhar Nori<nsekhar@ti.com>
+>>
+>> Alessandro,
+>>
+>> I assume you would want me to queue 2/6 through DaVinci tree. That patch
+>> depends on 1/6 being accepted and merged by you. Let me know how you
+>> want to move forward here.
+> Can you please help 1-5 patches in this series to get into mainline.
+> 1-5 of this series is a prerequisite for adding RTC support for AM335X
+> SoC's, which is present in beaglebone, AM335X EVM.
 
-Does the mx27 feed the mclk to your camera?  Which frequency do you
-get if you measure it with a scope.
+This series which adds rtc support for AM335x SoC (ARM
+Cortex-A8 from TI) based boards (like beagle bone) and
+in the process making omap rtc driver device tree capable
+was posted after addressing review comments around
+July end. It seems rtc maintainer is not active and you
+are taking care of the rtc patches.
 
->
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx2-camera mx2-camera.0: Camera driver attached to camera 0
-> ov7670 0-0021: chip found @ 0x42 (imx-i2c)
-> [..]
-> mx2-camera mx2-camera.0: Camera driver detached from camera 0
-> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock
-> frequency: 66500000
+Patches 1-5 has been Acked by DaVinci maintainer.
 
-This 66.5MHz is wrong.
+Can you please help this series reach mainline, let me
+know whether this series needs to be reposted.
 
->
-> Furthermore, it's not correct, since there isn't such "per" clock for
-> the CSI in 3.5 [1], 3.6 [2], linux-next-20121008[3], or
-> next-20121009[4].
+I waited to see response from rtc maintainer, it seems wait went
+too far and this mail should have been sent a couple of weeks
+before start of merge window.
 
-Well, you are looking to all git trees after the conversion to the
-common clock framework.
+As merge window is coming to an end, I feel it may be bad to
+ask you this , but still: would it be possible to get the series in
+during this merge window.
 
-Please look at 3.4 kernel instead and you will see that per4 is indeed
-used for csi.
-"DEFINE_CLOCK1(csi_clk,     0, NULL,   0, parent, &csi_clk1, &per4_clk);"
+A recap of what this series is about,
 
-In fact, the mx27 reference manual is the correct source for such
-information. Please check "Table 39-9. CSI Control Register 1 Field
-Descriptions (continued)":
+omap-rtc driver used by DaVinci and OMAP1 platforms is being
+reused for AM335x. Kicker release mechanism that is handled
+by DaVinci platform code has been moved to rtc driver. AM335x
+also needs to handle kicker mechanism. DT support has been
+added to omap-rtc driver, this was necessitated as AM335x
+supports only DT boot (DaVinci platform is also going DT way)
+Patch 6 adds AM335x DT support (this probably should go
+through omap tree). This series has been tested on beagle bone
+and DaVinci DA850 EVM.
 
-"Sensor Master Clock (MCLK) Divider. This field contains the divisor MCLK.
-The MCLK is derived from the PERCLK4."
-
-Can you let me know if this patch breaks things for you? Or what
-exactly you think is wrong with it?
-
-It seems that you are camera works by pure luck without this patch.
-Maybe you are turning per4 in the bootloader or you get the clock to
-your camera from somewhere else.
-
-Regards,
-
-Fabio Estevam
+Regards
+Afzal
