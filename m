@@ -1,25 +1,27 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 9 Oct 2012 11:37:06 -0600
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121008102413.GC2302@linaro.org>
-References: <20120930232116.GC30637@obsidianresearch.com>
- <20121001153952.GB2100@linaro.org>
- <20121001160639.GA31620@obsidianresearch.com>
- <20121005084500.GI4625@n2100.arm.linux.org.uk>
- <20121008102413.GC2302@linaro.org>
-Message-ID: <20121009173706.GE4124@obsidianresearch.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Tue, 9 Oct 2012 23:11:25 +0530
+Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
+In-Reply-To: <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+Message-ID: <CAOh2x=mwWPyPDQG1NZ-XKXCjxFuPdypUNcn8b-prmrv3f2QxsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 11:24:13AM +0100, Dave Martin wrote:
+On Tue, Oct 9, 2012 at 4:14 PM, Vipin Kumar <vipin.kumar@st.com> wrote:
+> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+> @@ -675,7 +676,8 @@ static void fsmc_read_buf_dma(struct mtd_info *mtd, uint8_t *buf, int len)
+>         struct fsmc_nand_data *host;
+>
+>         host = container_of(mtd, struct fsmc_nand_data, mtd);
+> -       dma_xfer(host, buf, len, DMA_FROM_DEVICE);
+> +       dma_xfer(host, host->dma_buf, len, DMA_FROM_DEVICE);
+> +       memcpy(buf, (const void *)host->dma_buf, len);
 
-> Partly this came from some side speculation about whether we could do
-> things like privileged read-only permissions on newer CPUs, for preventing
-> unintended or undesired writes to the kernel's code or read-only data.
+Ahh.. Too much overhead. Can't you do something better here?
+- DMA can be done to user buffers too, Pratyush has done some work in
+past on this.
+- There must be some other way of sharing kernel buffer to user space.
 
-Some other arches page protect the kernel, but that tends to be at
-odds with the desire to use huge pages for the kernel mapping, and
-independent of the load headers..
-
-Jason
+--
+viresh
