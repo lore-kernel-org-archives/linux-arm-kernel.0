@@ -1,91 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  9 Oct 2012 17:23:01 +0200
-Subject: [PATCH 7/9] ARM: be really quiet when building with 'make -s'
+Date: Tue,  9 Oct 2012 17:22:55 +0200
+Subject: [PATCH 1/9] ARM: kprobes: make more tests conditional
 In-Reply-To: <1349796183-30648-1-git-send-email-arnd@arndb.de>
 References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349796183-30648-8-git-send-email-arnd@arndb.de>
+Message-ID: <1349796183-30648-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes we want the kernel build process to only print messages
-on errors, e.g. in automated build testing. This uses the "kecho"
-macro that the build system provides to hide a few informational
-messages. Nothing changes for a regular "make" or "make V=1".
+The mls instruction is not available in ARMv6K or below, so we
+should make the test conditional on at least ARMv7. ldrexd/strexd
+are available in ARMv6K or ARMv7, which we can test by checking
+the CONFIG_CPU_32v6K symbol.
 
-Without this patch, building any ARM kernel results in:
-
-  Kernel: arch/arm/boot/Image is ready
-  Kernel: arch/arm/boot/zImage is ready
+/tmp/ccuMTZ8D.s: Assembler messages:
+/tmp/ccuMTZ8D.s:22188: Error: selected processor does not support ARM mode `mls r0,r1,r2,r3'
+/tmp/ccuMTZ8D.s:22222: Error: selected processor does not support ARM mode `mlshi r7,r8,r9,r10'
+/tmp/ccuMTZ8D.s:22252: Error: selected processor does not support ARM mode `mls lr,r1,r2,r13'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Jon Medhurst <tixy@yxit.co.uk>
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Michal Marek <mmarek@suse.cz>
+Cc: Leif Lindholm <leif.lindholm@arm.com>
 ---
- arch/arm/boot/Makefile  |   10 +++++-----
- arch/arm/tools/Makefile |    2 +-
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/kernel/kprobes-test-arm.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 3fdab01..f2aa09e 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -33,7 +33,7 @@ ifeq ($(CONFIG_XIP_KERNEL),y)
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+index 38c1a3b..8393129 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -366,7 +366,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word 0xe04f0392 @ umaal r0, pc, r2, r3")
+ 	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
+ 	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
++#endif
  
- $(obj)/xipImage: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@echo '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
-+	$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
- 
- $(obj)/Image $(obj)/zImage: FORCE
- 	@echo 'Kernel configured for XIP (CONFIG_XIP_KERNEL=y)'
-@@ -48,14 +48,14 @@ $(obj)/xipImage: FORCE
- 
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@echo '  Kernel: $@ is ready'
-+	$(kecho) '  Kernel: $@ is ready'
- 
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
- $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@echo '  Kernel: $@ is ready'
-+	$(kecho) '  Kernel: $@ is ready'
- 
- endif
- 
-@@ -90,7 +90,7 @@ fi
- $(obj)/uImage:	$(obj)/zImage FORCE
- 	@$(check_for_multiple_loadaddr)
- 	$(call if_changed,uimage)
--	@echo '  Image $@ is ready'
-+	$(kecho) '  Image $@ is ready'
- 
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
-@@ -98,7 +98,7 @@ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 
- $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
- 	$(call if_changed,objcopy)
--	@echo '  Kernel: $@ is ready'
-+	$(kecho) '  Kernel: $@ is ready'
- 
- PHONY += initrd FORCE
- initrd:
-diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
-index 635cb18..cd60a81 100644
---- a/arch/arm/tools/Makefile
-+++ b/arch/arm/tools/Makefile
-@@ -5,6 +5,6 @@
- #
- 
- include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types
--	@echo '  Generating $@'
-+	$(kecho) '  Generating $@'
- 	@mkdir -p $(dir $@)
- 	$(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
++#if __LINUX_ARM_ARCH__ >= 7
+ 	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
+ 	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
+ 	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
+@@ -456,6 +458,8 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word	0xe1700090") /* Unallocated space */
+ #if __LINUX_ARM_ARCH__ >= 6
+ 	TEST_UNSUPPORTED("ldrex	r2, [sp]")
++#endif
++#if (__LINUX_ARM_ARCH__ >= 7) || defined(CONFIG_CPU_32v6K)
+ 	TEST_UNSUPPORTED("strexd	r0, r2, r3, [sp]")
+ 	TEST_UNSUPPORTED("ldrexd	r2, r3, [sp]")
+ 	TEST_UNSUPPORTED("strexb	r0, r2, [sp]")
 -- 
 1.7.10
