@@ -1,111 +1,50 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 10 Oct 2012 00:31:07 +0800
-Subject: [PATCH] pinctrl: sirf: remove sirfsoc_gpio_set_pull function
-In-Reply-To: <201210091535.56487.arnd@arndb.de>
-References: <201210091535.56487.arnd@arndb.de>
-Message-ID: <CAGsJ_4xemz4EBdWPDrdkhD5HsCXJcO_kkKGugEa9C7_rieyq8A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 09 Oct 2012 10:26:42 -0600
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
+ parents
+In-Reply-To: <20121009111701.GQ11837@lunn.ch>
+References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
+ <20121003154310.GI11837@lunn.ch> <20121003220916.GW31897@kw.sim.vm.gnt>
+ <20121004055443.GK21046@lunn.ch> <20121004075335.GY31897@kw.sim.vm.gnt>
+ <506DAE12.7000003@wwwdotorg.org> <20121009111701.GQ11837@lunn.ch>
+Message-ID: <50745042.2020807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 10/09/2012 05:17 AM, Andrew Lunn wrote:
+>>>> The question is, what is the appropriate name. How common is
+>>>> this common C code? Are there ns2 where this C code is not
+>>>> appropriate. One thing to remember is that most of this C code
+>>>> will soon disappear and become DT. All the mpp will be replaced
+>>>> with pinctrl in 3.8. I hope we can get the Ethernet setup in DT
+>>>> as well. You are working on ns2_led, so all the C code will be
+>>>> replaced by DT. So all we are really left with is power off GPIO
+>>>> handling.
+>>>>
+>>>> So i think the danger of using lacie,ns2_common, and then finding
+>>>> it does not work with some other ns2 device is quite low.
+>>
+>> lacie,ns2_common doesn't sound like a HW description, but rather a SW
+>> invention. DT should be describing purely the HW. If there's no common
+>> HW between these compatible boards (which seems unlikely), then there
+>> shouldn't be a shared compatible value.
+> 
+> Actually, there is common hardware between these boards:
+> 
+> NS2 LED driver
+> Pinctrl setup
+> GPIO used for power off
+> Ethernet configuration.
+> 
+> At the moment, we don't have DT for these, so there is C code.  The
+> "lacie,ns2_common" compatibility string would be used to enable this C
+> code for these boards.
 
-2012/10/9 Arnd Bergmann <arnd@arndb.de>:
-> The prima2 platform advertises needing no mach/gpio.h header file,
-> but its pinctrl driver now has a sirfsoc_gpio_set_pull function
-> that uses constants defined in arch/arm/mach-prima2/include/mach/gpio.h,
-> which fails to build.
->
-> Fortunately, the sirfsoc_gpio_set_pull is not used anywhere in the
-> kernel, so we can safely remove it. Any out of tree drivers using
-> it will have to be converted to use proper pinctrl functions to
-> do the same.
->
+The typical way to support this is to simply include a .dtsi file from
+both board-specific .dts file. That .dtsi file will provide the
+description of the two common pieces of hardware.
 
-i understand we want to delete the mach/gpio.h. originally we had
-sirfsoc_gpio_set_pull() as a prima2 customized pull config function.
-
-i will take care moving to the dt mapping for pullup/down/none.
-
-
-> Without this patch, building prima2_defconfig results in:
->
-> drivers/pinctrl/pinctrl-sirf.c: In function 'sirfsoc_gpio_set_pull':
-> drivers/pinctrl/pinctrl-sirf.c:1331:7: error: 'SIRFSOC_GPIO_PULL_NONE' undeclared (first use in this function)
-> drivers/pinctrl/pinctrl-sirf.c:1331:7: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/pinctrl/pinctrl-sirf.c:1334:7: error: 'SIRFSOC_GPIO_PULL_UP' undeclared (first use in this function)
-> drivers/pinctrl/pinctrl-sirf.c:1338:7: error: 'SIRFSOC_GPIO_PULL_DOWN' undeclared (first use in this function)
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Barry Song <Baohua.Song@csr.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-
-Acked-by: Barry Song <Baohua.Song@csr.com>
-
->
-> diff --git a/arch/arm/mach-prima2/include/mach/gpio.h b/arch/arm/mach-prima2/include/mach/gpio.h
-> deleted file mode 100644
-> index 1904bb0..0000000
-> --- a/arch/arm/mach-prima2/include/mach/gpio.h
-> +++ /dev/null
-> @@ -1,13 +0,0 @@
-> -#ifndef __MACH_GPIO_H
-> -#define __MACH_GPIO_H
-> -
-> -/* Pull up/down values */
-> -enum sirfsoc_gpio_pull {
-> -       SIRFSOC_GPIO_PULL_NONE,
-> -       SIRFSOC_GPIO_PULL_UP,
-> -       SIRFSOC_GPIO_PULL_DOWN,
-> -};
-> -
-> -void sirfsoc_gpio_set_pull(unsigned gpio, unsigned mode);
-> -
-> -#endif
-> diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-> index 675497c..9ecacf3 100644
-> --- a/drivers/pinctrl/pinctrl-sirf.c
-> +++ b/drivers/pinctrl/pinctrl-sirf.c
-> @@ -1323,41 +1323,6 @@ static inline struct sirfsoc_gpio_bank *sirfsoc_gpio_to_bank(unsigned int gpio)
->         return &sgpio_bank[gpio / SIRFSOC_GPIO_BANK_SIZE];
->  }
->
-> -void sirfsoc_gpio_set_pull(unsigned gpio, unsigned mode)
-> -{
-> -       struct sirfsoc_gpio_bank *bank = sirfsoc_gpio_to_bank(gpio);
-> -       int idx = sirfsoc_gpio_to_offset(gpio);
-> -       u32 val, offset;
-> -       unsigned long flags;
-> -
-> -       offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
-> -
-> -       spin_lock_irqsave(&sgpio_lock, flags);
-> -
-> -       val = readl(bank->chip.regs + offset);
-> -
-> -       switch (mode) {
-> -       case SIRFSOC_GPIO_PULL_NONE:
-> -               val &= ~SIRFSOC_GPIO_CTL_PULL_MASK;
-> -               break;
-> -       case SIRFSOC_GPIO_PULL_UP:
-> -               val |= SIRFSOC_GPIO_CTL_PULL_MASK;
-> -               val |= SIRFSOC_GPIO_CTL_PULL_HIGH;
-> -               break;
-> -       case SIRFSOC_GPIO_PULL_DOWN:
-> -               val |= SIRFSOC_GPIO_CTL_PULL_MASK;
-> -               val &= ~SIRFSOC_GPIO_CTL_PULL_HIGH;
-> -               break;
-> -       default:
-> -               break;
-> -       }
-> -
-> -       writel(val, bank->chip.regs + offset);
-> -
-> -       spin_unlock_irqrestore(&sgpio_lock, flags);
-> -}
-> -EXPORT_SYMBOL(sirfsoc_gpio_set_pull);
-> -
->  static inline struct sirfsoc_gpio_bank *sirfsoc_irqchip_to_bank(struct gpio_chip *chip)
->  {
->         return container_of(to_of_mm_gpio_chip(chip), struct sirfsoc_gpio_bank, chip);
-
--barry
+In the interim where you're stilling using some board file C code rather
+than DT for this common part, just trigger that C code from any of the
+compatible values for the boards where it's needed. Don't invent a new
+compatible value that means "run this C code".
