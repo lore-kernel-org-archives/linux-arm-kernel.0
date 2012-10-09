@@ -1,28 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Oct 2012 13:45:27 +0200
-Subject: [PATCH v3] GPIO: Add support for GPIO on CLPS711X-target platform
-In-Reply-To: <1349106153-27371-1-git-send-email-shc_work@mail.ru>
-References: <1349106153-27371-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CACRpkdbCe00TMxyYVF1kfaturQDDxbNFz3iJe9OhcNNcBCGA4g@mail.gmail.com>
+From: vasanthananthan@gmail.com (Vasanth Ananthan)
+Date: Tue,  9 Oct 2012 17:18:46 +0530
+Subject: [PATCH 0/6] Adding support for SATA in EXYNO5 
+Message-ID: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2012 at 5:42 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+The following set of patches provides drivers for SATA
+and SATA PHY controller and also an interface for the 
+two entity to interact. 
 
-> The CLPS711X CPUs provide some GPIOs for use in the system. This
-> driver provides support for these via gpiolib. Due to platform
-> limitations, driver does not support interrupts, only inputs and
-> outputs.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Vasanth Ananthan (6):
+  ARM: EXYNOS5: Clock settings for SATA and SATA PHY
+  ARM: EXYNOS5: DT Support for SATA and SATA PHY
+  DRIVERS: ATA: SATA PHY utility framework
+  ARM: S3C2410: I2C driver polling mode support
+  ARM: EYNOS5: SATA controller driver
+  ARM: EXYNOS5: SATA PHY controller driver
 
-I agree with Russell's comment that all register access macros need
-to be pushed down to drivers/gpio/gpio-clps711x.c.
+ arch/arm/boot/dts/exynos5250-smdk5250.dts    |   11 +
+ arch/arm/boot/dts/exynos5250.dtsi            |   20 ++
+ arch/arm/mach-exynos/clock-exynos5.c         |   19 ++-
+ arch/arm/mach-exynos/include/mach/map.h      |    7 +
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    3 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c       |    6 +
+ drivers/ata/Kconfig                          |    9 +
+ drivers/ata/Makefile                         |    1 +
+ drivers/ata/sata_exynos.c                    |  274 +++++++++++++++++++++++
+ drivers/ata/sata_exynos_phy.c                |  303 ++++++++++++++++++++++++++
+ drivers/ata/sata_phy.c                       |   99 +++++++++
+ drivers/ata/sata_phy.h                       |   44 ++++
+ drivers/i2c/busses/i2c-s3c2410.c             |   84 ++++++--
+ 13 files changed, 859 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/ata/sata_exynos.c
+ create mode 100644 drivers/ata/sata_exynos_phy.c
+ create mode 100644 drivers/ata/sata_phy.c
+ create mode 100644 drivers/ata/sata_phy.h
 
-Preferably they should also be replaced by register #defines
-and ioremap:ed accesses but I'm not going to be pushy about
-that since the driver certainly looks way better after this than
-before, so it can be fixed up later.
-
-Yours,
-Linus Walleij
+-- 
+1.7.5.4
