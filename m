@@ -1,74 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Oct 2012 18:40:24 +0000
-Subject: [GIT PULL 0/9] ARM architecture fixes for 3.7
-In-Reply-To: <20121009160814.GH4625@n2100.arm.linux.org.uk>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <20121009160814.GH4625@n2100.arm.linux.org.uk>
-Message-ID: <201210091840.25176.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 9 Oct 2012 11:46:25 -0700
+Subject: [GIT PULL 1/5] omap fixes for v3.7-rc1
+Message-ID: <pull-1349808387-617119>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 October 2012, Russell King - ARM Linux wrote:
-> 
-> On Tue, Oct 09, 2012 at 05:22:54PM +0200, Arnd Bergmann wrote:
-> > Here are some patches that belong into your domain, I hope you can
-> > just send the lot to Linus the next time you send other patches.
-> > 
-> > These bug fixes all address problems found with automated build testing.
-> > Some of them have been around for a long time, other bugs are
-> > regressions since the merge window.
-> 
-> Apart from the sliced off comment in one commit (which XEN people need
-> to confirm they're happy with the final version), I think these are
-> otherwise fine... I'll hold off pulling them until that can be fixed.
+The following changes since commit 5e090ed7af10729a396a25df43d69a236e789736:
 
-Fixed that now, and I also added the Acks that I got in the meantime,
-changed the dependency from Xen on (CPU_v7 && !CPU_V6), and edited the
-description for patch 6 as Dave suggested.
-
-	Arnd
-
-8<---
-The following changes since commit 0e51793e162ca432fc5f04178cf82b80a92c2659:
-
-  Merge branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm (2012-10-07 21:20:57 +0900)
+  Merge tag 'soc-late' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-10-07 20:55:16 +0900)
 
 are available in the git repository at:
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-rmk
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc1/fixes-signed
 
-for you to fetch changes up to 8e7fc18b5eacc37b6e6fcf486ec4eafbfef91738:
+for you to fetch changes up to 224cd7115abb5b05a5d665551452c271449ce80b:
 
-  ARM: warnings in arch/arm/include/asm/uaccess.h (2012-10-09 20:29:07 +0200)
-
-----------------------------------------------------------------
-These bug fixes all address problems found with automated build testing.
-Some of them have been around for a long time, other bugs are
-regressions since the merge window.
+  arm/omap: Replace board_ref_clock with enum values (2012-10-08 18:09:30 -0700)
 
 ----------------------------------------------------------------
-Arnd Bergmann (9):
-      ARM: kprobes: make more tests conditional
-      ARM: export set_irq_flags
-      ARM: Fix another build warning in arch/arm/mm/alignment.c
-      ARM: export default read_current_timer
-      ARM: Xen: fix initial build problems
-      ARM: pass -marm to gcc by default for both C and assembler
-      ARM: be really quiet when building with 'make -s'
-      ARM: binfmt_flat: unused variable 'persistent'
-      ARM: warnings in arch/arm/include/asm/uaccess.h
+This branch contains one counter locking fix and an
+alignment fix. Other fixes are warning fixes, fixes
+for return value checks.
 
- arch/arm/Kconfig                   |    1 +
- arch/arm/Makefile                  |   13 +++++++------
- arch/arm/boot/Makefile             |   10 +++++-----
- arch/arm/include/asm/flat.h        |    2 +-
- arch/arm/include/asm/uaccess.h     |    4 ++--
- arch/arm/kernel/irq.c              |    2 ++
- arch/arm/kernel/kprobes-test-arm.c |    4 ++++
- arch/arm/lib/delay.c               |    1 +
- arch/arm/mm/alignment.c            |    4 +++-
- arch/arm/tools/Makefile            |    2 +-
- drivers/xen/Kconfig                |    2 ++
- drivers/xen/sys-hypervisor.c       |    1 +
- 12 files changed, 30 insertions(+), 16 deletions(-)
+I've also included removal of some extra semicolons,
+dropping of some duplicate includes, and an a change
+for wl12xx enumeration that are not strictly fixes
+but would be good to get out of the way for -rc1.
+
+----------------------------------------------------------------
+Afzal Mohammed (1):
+      ARM: OMAP2+: gpmc: annotate exit sections properly
+
+Axel Lin (1):
+      ARM: OMAP: OMAP_DEBUG_LEDS needs to select LEDS_CLASS
+
+Colin Cross (1):
+      ARM: OMAP: counter: add locking to read_persistent_clock
+
+Peter Senna Tschudin (3):
+      arch/arm/mach-omap1/devices.c: Remove unecessary semicolon
+      arch/arm/mach-omap2: Remove unecessary semicolon
+      arch/arm/plat-omap/omap-pm-noop.c: Remove unecessary semicolon
+
+R Sricharan (1):
+      ARM: OMAP2+: Round of the carve out memory requested to section_size
+
+Raphael Assenat (1):
+      AM35xx: Add missing hwmod entry for the HDQ/1-Wire present in AM3505/3517 CPUs.
+
+Shubhrajyoti D (1):
+      ARM: OMAP: rx51: Fix a section mismatch warn
+
+Vaibhav Hiremath (1):
+      ARM: OMAP2+: Add am335x evm and bone targets to common Makefile
+
+Vikram Narayanan (1):
+      arm/omap: Replace board_ref_clock with enum values
+
+Wei Yongjun (4):
+      OMAPDSS: fix return value check in create_dss_pdev()
+      ARM: OMAP: hsmmc: fix return value check in omap_hsmmc_init_one()
+      ARM: OMAP: fix return value check in realtime_counter_init()
+      ARM: OMAP2+: remove duplicated include from board-omap3stalker.c
+
+Yegor Yefremov (1):
+      arm: increase FORCE_MAX_ZONEORDER for TI AM33XX
+
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/boot/dts/Makefile                   |    4 +++-
+ arch/arm/mach-omap1/devices.c                |    2 +-
+ arch/arm/mach-omap2/board-flash.c            |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c     |    5 -----
+ arch/arm/mach-omap2/board-omap4panda.c       |    3 +--
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    3 +--
+ arch/arm/mach-omap2/clkt_clksel.c            |    2 +-
+ arch/arm/mach-omap2/display.c                |    2 +-
+ arch/arm/mach-omap2/gpmc.c                   |    4 ++--
+ arch/arm/mach-omap2/hsmmc.c                  |    2 +-
+ arch/arm/mach-omap2/mux.c                    |    2 +-
+ arch/arm/mach-omap2/omap-secure.c            |    4 ++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    7 ++++---
+ arch/arm/mach-omap2/pm-debug.c               |    2 +-
+ arch/arm/mach-omap2/timer.c                  |    2 +-
+ arch/arm/plat-omap/Kconfig                   |    1 +
+ arch/arm/plat-omap/counter_32k.c             |   21 ++++++++++++++-------
+ arch/arm/plat-omap/omap-pm-noop.c            |    8 ++++----
+ 20 files changed, 42 insertions(+), 37 deletions(-)
