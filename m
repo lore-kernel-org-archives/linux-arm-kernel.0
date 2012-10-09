@@ -1,180 +1,242 @@
 From: vipin.kumar@st.com (Vipin Kumar)
-Date: Tue, 9 Oct 2012 16:14:50 +0530
-Subject: [PATCH 08/11] fsmc/nand: Use relaxed variants of io accessors
+Date: Tue, 9 Oct 2012 16:14:52 +0530
+Subject: [PATCH 10/11] fsmc/nand: Add sw bch support for ecc
+ calculation/correction
 In-Reply-To: <cover.1349778820.git.vipin.kumar@st.com>
 References: <cover.1349778820.git.vipin.kumar@st.com>
-Message-ID: <88484dbae96f7db42ce615552a4c758844a5e6cc.1349778821.git.vipin.kumar@st.com>
+Message-ID: <3968b65e9aa0a81eca16ce0f20e45504da7ad7fe.1349778821.git.vipin.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use relaxed variants of readl/writel accessors. readl/writel io accessors use
-explicit dsb instruction which causes stalls in the processor core resulting
-several cycles of delay for each access
-
-Use relaxed variants where ever possible. This also results in an improved
-read/write performance.
-
 Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
 ---
- drivers/mtd/nand/fsmc_nand.c | 54 ++++++++++++++++++++++++--------------------
- 1 file changed, 29 insertions(+), 25 deletions(-)
+ .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +
+ drivers/mtd/nand/fsmc_nand.c                       | 156 +++++++++++++--------
+ include/linux/mtd/fsmc.h                           |   3 +
+ 3 files changed, 106 insertions(+), 55 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+index 598bca2..dcf513b 100644
+--- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+@@ -30,6 +30,8 @@ Optional properties:
+ - st,rb-gpios: When the st,ready-busy is defined as "rb-gpio", a gpio
+   pin number is defined in this property
+ 
++- nand-sw-ecc: boolean indicating whether s/w ecc is supported
++
+ Example:
+ 
+ 	fsmc: flash at d1800000 {
 diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
-index 8de6dcf..f48ee60 100644
+index 762cf83..ff84468 100644
 --- a/drivers/mtd/nand/fsmc_nand.c
 +++ b/drivers/mtd/nand/fsmc_nand.c
-@@ -400,13 +400,13 @@ static void fsmc_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
- 			pc |= FSMC_ENABLE;
- 		else
- 			pc &= ~FSMC_ENABLE;
--		writel(pc, FSMC_NAND_REG(regs, bank, PC));
-+		writel_relaxed(pc, FSMC_NAND_REG(regs, bank, PC));
- 	}
+@@ -946,6 +946,9 @@ static int __devinit fsmc_nand_probe_config_dt(struct platform_device *pdev,
+ 	} else
+ 		pdata->rbpin.use_pin = FSMC_RB_WAIT;
  
- 	mb();
- 
- 	if (cmd != NAND_CMD_NONE)
--		writeb(cmd, this->IO_ADDR_W);
-+		writeb_relaxed(cmd, this->IO_ADDR_W);
- }
- 
- /*
-@@ -433,14 +433,18 @@ static void fsmc_nand_setup(void __iomem *regs, uint32_t bank, uint32_t busw,
- 	tset = (timings->tset & FSMC_TSET_MASK) << FSMC_TSET_SHIFT;
- 
- 	if (busw)
--		writel(value | FSMC_DEVWID_16, FSMC_NAND_REG(regs, bank, PC));
-+		writel_relaxed(value | FSMC_DEVWID_16,
-+				FSMC_NAND_REG(regs, bank, PC));
- 	else
--		writel(value | FSMC_DEVWID_8, FSMC_NAND_REG(regs, bank, PC));
-+		writel_relaxed(value | FSMC_DEVWID_8,
-+				FSMC_NAND_REG(regs, bank, PC));
- 
--	writel(readl(FSMC_NAND_REG(regs, bank, PC)) | tclr | tar,
-+	writel_relaxed(readl(FSMC_NAND_REG(regs, bank, PC)) | tclr | tar,
- 			FSMC_NAND_REG(regs, bank, PC));
--	writel(thiz | thold | twait | tset, FSMC_NAND_REG(regs, bank, COMM));
--	writel(thiz | thold | twait | tset, FSMC_NAND_REG(regs, bank, ATTRIB));
-+	writel_relaxed(thiz | thold | twait | tset,
-+			FSMC_NAND_REG(regs, bank, COMM));
-+	writel_relaxed(thiz | thold | twait | tset,
-+			FSMC_NAND_REG(regs, bank, ATTRIB));
- }
- 
- /*
-@@ -453,11 +457,11 @@ static void fsmc_enable_hwecc(struct mtd_info *mtd, int mode)
- 	void __iomem *regs = host->regs_va;
- 	uint32_t bank = host->bank;
- 
--	writel(readl(FSMC_NAND_REG(regs, bank, PC)) & ~FSMC_ECCPLEN_256,
-+	writel_relaxed(readl(FSMC_NAND_REG(regs, bank, PC)) & ~FSMC_ECCPLEN_256,
- 			FSMC_NAND_REG(regs, bank, PC));
--	writel(readl(FSMC_NAND_REG(regs, bank, PC)) & ~FSMC_ECCEN,
-+	writel_relaxed(readl(FSMC_NAND_REG(regs, bank, PC)) & ~FSMC_ECCEN,
- 			FSMC_NAND_REG(regs, bank, PC));
--	writel(readl(FSMC_NAND_REG(regs, bank, PC)) | FSMC_ECCEN,
-+	writel_relaxed(readl(FSMC_NAND_REG(regs, bank, PC)) | FSMC_ECCEN,
- 			FSMC_NAND_REG(regs, bank, PC));
- }
- 
-@@ -477,7 +481,7 @@ static int fsmc_read_hwecc_ecc4(struct mtd_info *mtd, const uint8_t *data,
- 	unsigned long deadline = jiffies + FSMC_BUSY_WAIT_TIMEOUT;
- 
- 	do {
--		if (readl(FSMC_NAND_REG(regs, bank, STS)) & FSMC_CODE_RDY)
-+		if (readl_relaxed(FSMC_NAND_REG(regs, bank, STS)) & FSMC_CODE_RDY)
- 			break;
- 		else
- 			cond_resched();
-@@ -488,25 +492,25 @@ static int fsmc_read_hwecc_ecc4(struct mtd_info *mtd, const uint8_t *data,
- 		return -ETIMEDOUT;
- 	}
- 
--	ecc_tmp = readl(FSMC_NAND_REG(regs, bank, ECC1));
-+	ecc_tmp = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC1));
- 	ecc[0] = (uint8_t) (ecc_tmp >> 0);
- 	ecc[1] = (uint8_t) (ecc_tmp >> 8);
- 	ecc[2] = (uint8_t) (ecc_tmp >> 16);
- 	ecc[3] = (uint8_t) (ecc_tmp >> 24);
- 
--	ecc_tmp = readl(FSMC_NAND_REG(regs, bank, ECC2));
-+	ecc_tmp = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC2));
- 	ecc[4] = (uint8_t) (ecc_tmp >> 0);
- 	ecc[5] = (uint8_t) (ecc_tmp >> 8);
- 	ecc[6] = (uint8_t) (ecc_tmp >> 16);
- 	ecc[7] = (uint8_t) (ecc_tmp >> 24);
- 
--	ecc_tmp = readl(FSMC_NAND_REG(regs, bank, ECC3));
-+	ecc_tmp = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC3));
- 	ecc[8] = (uint8_t) (ecc_tmp >> 0);
- 	ecc[9] = (uint8_t) (ecc_tmp >> 8);
- 	ecc[10] = (uint8_t) (ecc_tmp >> 16);
- 	ecc[11] = (uint8_t) (ecc_tmp >> 24);
- 
--	ecc_tmp = readl(FSMC_NAND_REG(regs, bank, STS));
-+	ecc_tmp = readl_relaxed(FSMC_NAND_REG(regs, bank, STS));
- 	ecc[12] = (uint8_t) (ecc_tmp >> 16);
- 
++	if (of_property_read_bool(np, "nand-sw-ecc"))
++		pdata->sw_ecc = true;
++
  	return 0;
-@@ -526,7 +530,7 @@ static int fsmc_read_hwecc_ecc1(struct mtd_info *mtd, const uint8_t *data,
- 	uint32_t bank = host->bank;
- 	uint32_t ecc_tmp;
- 
--	ecc_tmp = readl(FSMC_NAND_REG(regs, bank, ECC1));
-+	ecc_tmp = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC1));
- 	ecc[0] = (uint8_t) (ecc_tmp >> 0);
- 	ecc[1] = (uint8_t) (ecc_tmp >> 8);
- 	ecc[2] = (uint8_t) (ecc_tmp >> 16);
-@@ -635,10 +639,10 @@ static void fsmc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
- 		uint32_t *p = (uint32_t *)buf;
- 		len = len >> 2;
- 		for (i = 0; i < len; i++)
--			writel(p[i], chip->IO_ADDR_W);
-+			writel_relaxed(p[i], chip->IO_ADDR_W);
- 	} else {
- 		for (i = 0; i < len; i++)
--			writeb(buf[i], chip->IO_ADDR_W);
-+			writeb_relaxed(buf[i], chip->IO_ADDR_W);
- 	}
  }
+ #else
+@@ -972,6 +975,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 	dma_cap_mask_t mask;
+ 	int ret = 0;
+ 	u32 pid, bank;
++	uint oobeccsize, m;
+ 	int i;
  
-@@ -658,10 +662,10 @@ static void fsmc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 		uint32_t *p = (uint32_t *)buf;
- 		len = len >> 2;
- 		for (i = 0; i < len; i++)
--			p[i] = readl(chip->IO_ADDR_R);
-+			p[i] = readl_relaxed(chip->IO_ADDR_R);
- 	} else {
- 		for (i = 0; i < len; i++)
--			buf[i] = readb(chip->IO_ADDR_R);
-+			buf[i] = readb_relaxed(chip->IO_ADDR_R);
+ 	if (np) {
+@@ -1104,9 +1108,24 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 	nand->cmd_ctrl = fsmc_cmd_ctrl;
+ 	nand->chip_delay = 30;
+ 
+-	nand->ecc.mode = NAND_ECC_HW;
+-	nand->ecc.hwctl = fsmc_enable_hwecc;
+-	nand->ecc.size = 512;
++	if (pdata->sw_ecc) {
++		nand->ecc.mode = NAND_ECC_SOFT_BCH;
++		/*
++		 * The recent devices require n-bit correctibility in x bytes.
++		 * The values of n and x varies as below
++		 * n - 1 to 100
++		 * x - 512 to 1K
++		 * TODO: For now, take x = 1K for all sw bch mathematics. Think
++		 * of a better way to handle other device dependent
++		 * requirements. May be it should come from board dts files
++		 */
++		nand->ecc.size = 1024;
++	} else {
++		nand->ecc.mode = NAND_ECC_HW;
++		nand->ecc.hwctl = fsmc_enable_hwecc;
++		nand->ecc.size = 512;
++	}
++
+ 	nand->options = pdata->options;
+ 	nand->select_chip = fsmc_select_chip;
+ 	nand->badblockbits = 7;
+@@ -1165,17 +1184,19 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 				nand->options & NAND_BUSWIDTH_16,
+ 				host->dev_timings, host->rbpin);
+ 
+-	if (AMBA_REV_BITS(host->pid) >= 8) {
+-		nand->ecc.read_page = fsmc_read_page_hwecc;
+-		nand->ecc.calculate = fsmc_read_hwecc_ecc4;
+-		nand->ecc.correct = fsmc_bch8_correct_data;
+-		nand->ecc.bytes = 13;
+-		nand->ecc.strength = 8;
+-	} else {
+-		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
+-		nand->ecc.correct = nand_correct_data;
+-		nand->ecc.bytes = 3;
+-		nand->ecc.strength = 1;
++	if (nand->ecc.mode != NAND_ECC_SOFT_BCH) {
++		if (AMBA_REV_BITS(host->pid) >= 8) {
++			nand->ecc.read_page = fsmc_read_page_hwecc;
++			nand->ecc.calculate = fsmc_read_hwecc_ecc4;
++			nand->ecc.correct = fsmc_bch8_correct_data;
++			nand->ecc.bytes = 13;
++			nand->ecc.strength = 8;
++		} else {
++			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
++			nand->ecc.correct = nand_correct_data;
++			nand->ecc.bytes = 3;
++			nand->ecc.strength = 1;
++		}
  	}
- }
  
-@@ -792,7 +796,7 @@ static int fsmc_bch8_correct_data(struct mtd_info *mtd, uint8_t *dat,
- 	uint32_t num_err, i;
- 	uint32_t ecc1, ecc2, ecc3, ecc4;
+ 	/*
+@@ -1187,48 +1208,73 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 		goto err_scan_ident;
+ 	}
  
--	num_err = (readl(FSMC_NAND_REG(regs, bank, STS)) >> 10) & 0xF;
-+	num_err = (readl_relaxed(FSMC_NAND_REG(regs, bank, STS)) >> 10) & 0xF;
+-	if (AMBA_REV_BITS(host->pid) >= 8) {
+-		switch (host->mtd.oobsize) {
+-		case 16:
+-			nand->ecc.layout = &fsmc_ecc4_16_layout;
+-			host->ecc_place = &fsmc_ecc4_sp_place;
+-			break;
+-		case 64:
+-			nand->ecc.layout = &fsmc_ecc4_64_layout;
+-			host->ecc_place = &fsmc_ecc4_lp_place;
+-			break;
+-		case 128:
+-			nand->ecc.layout = &fsmc_ecc4_128_layout;
+-			host->ecc_place = &fsmc_ecc4_lp_place;
+-			break;
+-		case 224:
+-			nand->ecc.layout = &fsmc_ecc4_224_layout;
+-			host->ecc_place = &fsmc_ecc4_lp_place;
+-			break;
+-		case 256:
+-			nand->ecc.layout = &fsmc_ecc4_256_layout;
+-			host->ecc_place = &fsmc_ecc4_lp_place;
+-			break;
+-		default:
+-			printk(KERN_WARNING "No oob scheme defined for "
+-			       "oobsize %d\n", mtd->oobsize);
+-			BUG();
+-		}
++	if (nand->ecc.mode == NAND_ECC_SOFT_BCH) {
++		/*
++		 * Initialize the ecc bytes and strength dynamically based on eccsize
++		 * and writesize.
++		 *
++		 * Parameters @eccsize and @eccbytes are used to compute BCH parameters
++		 * m (Galois field order) and t (error correction capability). @eccbytes
++		 * should be equal to the number of bytes required to store m*t bits,
++		 * where m is such that 2^m-1 > @eccsize*8.
++		 *
++		 * Example: to configure 4 bit correction per 512 bytes, you should pass
++		 * @eccsize = 512  (thus, m=13 is the smallest integer such that 2^m-1 >
++		 * 512*8) @eccbytes = 7 (7 bytes are required to store m*t = 13*4 = 52
++		 * bits)
++		 *
++		 * Note: 2 bytes of oob are considered reserved for bad block marking
++		 */
++		m = fls(1 + 8 * nand->ecc.size);
++		oobeccsize = ((host->mtd.oobsize - 2) * \
++				nand->ecc.size) / host->mtd.writesize;
++		nand->ecc.bytes = (oobeccsize / m) * m;
++		nand->ecc.strength = (nand->ecc.bytes * 8) / m;
++		nand->ecc.layout = NULL;
+ 	} else {
+-		switch (host->mtd.oobsize) {
+-		case 16:
+-			nand->ecc.layout = &fsmc_ecc1_16_layout;
+-			break;
+-		case 64:
+-			nand->ecc.layout = &fsmc_ecc1_64_layout;
+-			break;
+-		case 128:
+-			nand->ecc.layout = &fsmc_ecc1_128_layout;
+-			break;
+-		default:
+-			printk(KERN_WARNING "No oob scheme defined for "
+-			       "oobsize %d\n", mtd->oobsize);
+-			BUG();
++		if (AMBA_REV_BITS(host->pid) >= 8) {
++			switch (host->mtd.oobsize) {
++			case 16:
++				nand->ecc.layout = &fsmc_ecc4_16_layout;
++				host->ecc_place = &fsmc_ecc4_sp_place;
++				break;
++			case 64:
++				nand->ecc.layout = &fsmc_ecc4_64_layout;
++				host->ecc_place = &fsmc_ecc4_lp_place;
++				break;
++			case 128:
++				nand->ecc.layout = &fsmc_ecc4_128_layout;
++				host->ecc_place = &fsmc_ecc4_lp_place;
++				break;
++			case 224:
++				nand->ecc.layout = &fsmc_ecc4_224_layout;
++				host->ecc_place = &fsmc_ecc4_lp_place;
++				break;
++			case 256:
++				nand->ecc.layout = &fsmc_ecc4_256_layout;
++				host->ecc_place = &fsmc_ecc4_lp_place;
++				break;
++			default:
++				printk(KERN_WARNING "No oob scheme defined for "
++						"oobsize %d\n", mtd->oobsize);
++				BUG();
++			}
++		} else {
++			switch (host->mtd.oobsize) {
++			case 16:
++				nand->ecc.layout = &fsmc_ecc1_16_layout;
++				break;
++			case 64:
++				nand->ecc.layout = &fsmc_ecc1_64_layout;
++				break;
++			case 128:
++				nand->ecc.layout = &fsmc_ecc1_128_layout;
++				break;
++			default:
++				printk(KERN_WARNING "No oob scheme defined for "
++						"oobsize %d\n", mtd->oobsize);
++				BUG();
++			}
+ 		}
+ 	}
  
- 	/* no bit flipping */
- 	if (likely(num_err == 0))
-@@ -835,10 +839,10 @@ static int fsmc_bch8_correct_data(struct mtd_info *mtd, uint8_t *dat,
- 	 * uint64_t array and error offset indexes are populated in err_idx
- 	 * array
- 	 */
--	ecc1 = readl(FSMC_NAND_REG(regs, bank, ECC1));
--	ecc2 = readl(FSMC_NAND_REG(regs, bank, ECC2));
--	ecc3 = readl(FSMC_NAND_REG(regs, bank, ECC3));
--	ecc4 = readl(FSMC_NAND_REG(regs, bank, STS));
-+	ecc1 = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC1));
-+	ecc2 = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC2));
-+	ecc3 = readl_relaxed(FSMC_NAND_REG(regs, bank, ECC3));
-+	ecc4 = readl_relaxed(FSMC_NAND_REG(regs, bank, STS));
+diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
+index eed22a1..07eee6e 100644
+--- a/include/linux/mtd/fsmc.h
++++ b/include/linux/mtd/fsmc.h
+@@ -176,6 +176,9 @@ struct fsmc_nand_platform_data {
+ 	/* priv structures for dma accesses */
+ 	void			*read_dma_priv;
+ 	void			*write_dma_priv;
++
++	/* whether s/w ecc is supported */
++	bool			sw_ecc;
+ };
  
- 	err_idx[0] = (ecc1 >> 0) & 0x1FFF;
- 	err_idx[1] = (ecc1 >> 13) & 0x1FFF;
+ extern int __init fsmc_nor_init(struct platform_device *pdev,
 -- 
 1.7.11.4
