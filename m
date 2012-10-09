@@ -1,23 +1,20 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 08 Oct 2012 21:08:49 -0600
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <20121007015405.958959522@gmail.com>
-References: <20121007015300.828366635@gmail.com>
- <20121007015405.958959522@gmail.com>
-Message-ID: <50739541.2030603@wwwdotorg.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Oct 2012 11:17:20 +0800
+Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
+Message-ID: <20121009031715.GC21822@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2012 07:53 PM, Domenico Andreoli wrote:
-> BCM476x's minimal infrastructure, Kernel's great reuse.
+I have seen this error on mainline for a couple days when
+ARM_ATAG_DTB_COMPAT is enabled.
 
-> Index: b/arch/arm/configs/bcm476x_defconfig
+  CC      arch/arm/boot/compressed/fdt_ro.o
+arch/arm/boot/compressed/fdt_ro.c: In function ?fdt_path_offset?:
+arch/arm/boot/compressed/fdt_ro.c:172:3: error: implicit declaration of function ?fdt_get_alias_namelen? [-Werror=implicit-function-declaration]
+arch/arm/boot/compressed/fdt_ro.c:172:5: warning: assignment makes pointer from integer without a cast [enabled by default]
+arch/arm/boot/compressed/fdt_ro.c: At top level:
+arch/arm/boot/compressed/fdt_ro.c:340:13: error: conflicting types for ?fdt_get_alias_namelen?
+arch/arm/boot/compressed/fdt_ro.c:172:7: note: previous implicit declaration of ?fdt_get_alias_namelen? was here
+cc1: some warnings being treated as errors
 
-> +CONFIG_DEBUG_BCM476X_UART2=y
-> +CONFIG_DEBUG_LL_INCLUDE="debug/bcm476x.S"
-> +CONFIG_UNCOMPRESS_INCLUDE="debug/bcm476x-uncompress.h"
-
-Was this defconfig file created by "make savedefconfig ; mv defconfig
-arch/arm/configs/bcm476x_defconfig"? If you do that, I think those last
-two lines I quoted above (and many more) will be removed, since those
-values are selected by CONFIG_DEBUG_BCM476X_UART2.
+Shawn
