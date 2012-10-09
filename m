@@ -1,38 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 09 Oct 2012 10:15:54 -0600
-Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
-In-Reply-To: <20121009050109.GD21822@S2101-09.ap.freescale.net>
-References: <20121009031715.GC21822@S2101-09.ap.freescale.net>
- <alpine.LFD.2.02.1210090018470.16518@xanadu.home>
- <20121009050109.GD21822@S2101-09.ap.freescale.net>
-Message-ID: <50744DBA.3070900@wwwdotorg.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 9 Oct 2012 18:20:13 +0200 (CEST)
+Subject: [PATCH 2/9] ARM: export set_irq_flags
+In-Reply-To: <1349796183-30648-3-git-send-email-arnd@arndb.de>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <1349796183-30648-3-git-send-email-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1210091820020.10988@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2012 11:01 PM, Shawn Guo wrote:
-> On Tue, Oct 09, 2012 at 12:25:44AM -0400, Nicolas Pitre wrote:
->> On Tue, 9 Oct 2012, Shawn Guo wrote:
->>
->>> I have seen this error on mainline for a couple days when
->>> ARM_ATAG_DTB_COMPAT is enabled.
->>>
->>>   CC      arch/arm/boot/compressed/fdt_ro.o
->>> arch/arm/boot/compressed/fdt_ro.c: In function ?fdt_path_offset?:
->>> arch/arm/boot/compressed/fdt_ro.c:172:3: error: implicit declaration of function ?fdt_get_alias_namelen? [-Werror=implicit-function-declaration]
->>> arch/arm/boot/compressed/fdt_ro.c:172:5: warning: assignment makes pointer from integer without a cast [enabled by default]
->>> arch/arm/boot/compressed/fdt_ro.c: At top level:
->>> arch/arm/boot/compressed/fdt_ro.c:340:13: error: conflicting types for ?fdt_get_alias_namelen?
->>> arch/arm/boot/compressed/fdt_ro.c:172:7: note: previous implicit declaration of ?fdt_get_alias_namelen? was here
->>> cc1: some warnings being treated as errors
->>
->> I just tried building mainline now.  It is at commit f5a246eab9.
->>
-> The build still fails for me at this commit.
 
-I can't reproduce this.
 
-I tried both my local next-20121005-based dev branch and that exact
-commit above. I tried both the crosstool-ng-based compiler I normally
-use and Ubuntu 10.04's ARM compiler (possibly from a PPA). In both
-cases, I ran git clean -f -d -x ; git reset --hard HEAD first, and then
-build zImage, dtbs, and modules, and of course used your attached .config.
+On Tue, 9 Oct 2012, Arnd Bergmann wrote:
+
+> The recently added Emma Mobile GPIO driver calls set_irq_flags
+> and irq_set_chip_and_handler for the interrupts it exports and
+> it can be built as a module, which currently fails with
+> 
+> ERROR: "set_irq_flags" [drivers/gpio/gpio-em.ko] undefined!
+> 
+> We either need to replace the call to set_irq_flags with something
+> else or export that function. This patch does the latter.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Magnus Damm <damm@opensource.se>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+
+Acked-by-me
+
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/kernel/irq.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 16cedb4..8961650 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/list.h>
+>  #include <linux/kallsyms.h>
+>  #include <linux/proc_fs.h>
+> +#include <linux/export.h>
+>  
+>  #include <asm/exception.h>
+>  #include <asm/mach/arch.h>
+> @@ -109,6 +110,7 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
+>  	/* Order is clear bits in "clr" then set bits in "set" */
+>  	irq_modify_status(irq, clr, set & ~clr);
+>  }
+> +EXPORT_SYMBOL_GPL(set_irq_flags);
+>  
+>  void __init init_IRQ(void)
+>  {
+> -- 
+> 1.7.10
+> 
+> 
