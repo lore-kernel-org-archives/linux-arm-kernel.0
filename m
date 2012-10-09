@@ -1,57 +1,119 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Oct 2012 10:09:03 +0200
-Subject: [PATCH] ARM: imx: clk-imx27: Fix divider width field
-In-Reply-To: <1349749200-8332-1-git-send-email-festevam@gmail.com>
-References: <1349749200-8332-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121009080903.GD27665@pengutronix.de>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 09 Oct 2012 17:27:49 +0900
+Subject: [PATCH 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <1349431818-15639-2-git-send-email-gautam.vivek@samsung.com>
+References: <1349431818-15639-1-git-send-email-gautam.vivek@samsung.com>
+ <1349431818-15639-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <003801cda5f7$f7fd9a30$e7f8ce90$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 11:20:00PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Friday, October 05, 2012 7:10 PM Vivek Gautam wrote
 > 
-> As per mx27 reference manual, H264DIV and SSI2DIV are 6-bit wide fields in
-> register PCDR0.
->  
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Adding EHCI device tree node for Exynos5250 along with
+> the device base adress and gpio line for vbus.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 
-Applied, thanks
+It looks good. Also I have tested this patch with Exynos5250.
 
-Sascha
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
 > ---
->  arch/arm/mach-imx/clk-imx27.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
+>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
+>  5 files changed, 38 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 3b6b640..366e5d5 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -109,7 +109,7 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk[per3_div] = imx_clk_divider("per3_div", "mpll_main2", CCM_PCDR1, 16, 6);
->  	clk[per4_div] = imx_clk_divider("per4_div", "mpll_main2", CCM_PCDR1, 24, 6);
->  	clk[vpu_sel] = imx_clk_mux("vpu_sel", CCM_CSCR, 21, 1, vpu_sel_clks, ARRAY_SIZE(vpu_sel_clks));
-> -	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 3);
-> +	clk[vpu_div] = imx_clk_divider("vpu_div", "vpu_sel", CCM_PCDR0, 10, 6);
->  	clk[usb_div] = imx_clk_divider("usb_div", "spll", CCM_CSCR, 28, 3);
->  	clk[cpu_sel] = imx_clk_mux("cpu_sel", CCM_CSCR, 15, 1, cpu_sel_clks, ARRAY_SIZE(cpu_sel_clks));
->  	clk[clko_sel] = imx_clk_mux("clko_sel", CCM_CCSR, 0, 5, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
-> @@ -121,7 +121,7 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk[ssi1_sel] = imx_clk_mux("ssi1_sel", CCM_CSCR, 22, 1, ssi_sel_clks, ARRAY_SIZE(ssi_sel_clks));
->  	clk[ssi2_sel] = imx_clk_mux("ssi2_sel", CCM_CSCR, 23, 1, ssi_sel_clks, ARRAY_SIZE(ssi_sel_clks));
->  	clk[ssi1_div] = imx_clk_divider("ssi1_div", "ssi1_sel", CCM_PCDR0, 16, 6);
-> -	clk[ssi2_div] = imx_clk_divider("ssi2_div", "ssi2_sel", CCM_PCDR0, 26, 3);
-> +	clk[ssi2_div] = imx_clk_divider("ssi2_div", "ssi2_sel", CCM_PCDR0, 26, 6);
->  	clk[clko_en] = imx_clk_gate("clko_en", "clko_div", CCM_PCCR0, 0);
->  	clk[ssi2_ipg_gate] = imx_clk_gate("ssi2_ipg_gate", "ipg", CCM_PCCR0, 0);
->  	clk[ssi1_ipg_gate] = imx_clk_gate("ssi1_ipg_gate", "ipg", CCM_PCCR0, 1);
-> -- 
-> 1.7.9.5
+> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> new file mode 100644
+> index 0000000..56e35c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> @@ -0,0 +1,25 @@
+> +Samsung Exynos SoC USB controller
+> +
+> +The USB devices interface with USB controllers on Exynos SOCs.
+> +The device node has following properties.
+> +
+> +EHCI
+> +Required properties:
+> + - compatible: should be "samsung,exynos-ehci" for USB 2.0
+> +   EHCI controller in host mode.
+> + - reg: physical base address of the controller and length of memory mapped
+> +   region.
+> + - interrupts: interrupt number to the cpu.
+> +
+> +Optional properties:
+> + - samsung,vbus-gpio:  if present, specifies the GPIO that
+> +   needs to be pulled up for the bus to be powered.
+> +
+> +Example:
+> +
+> +	ehci {
+> +		compatible = "samsung,exynos-ehci";
+> +		reg = <0x12110000 0x100>;
+> +		interrupts = <0 71 0>;
+> +		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+> +	};
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index a352df4..089576b 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -166,4 +166,8 @@
+>  	spi_2: spi at 12d40000 {
+>  		status = "disabled";
+>  	};
+> +
+> +	ehci {
+> +		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index dddfd6e..73ea844 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -218,6 +218,12 @@
+>  		#size-cells = <0>;
+>  	};
 > 
+> +	ehci {
+> +		compatible = "samsung,exynos-ehci";
+> +		reg = <0x12110000 0x100>;
+> +		interrupts = <0 71 0>;
+> +	};
+> +
+>  	amba {
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+> index 8480849..825fe40 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -195,6 +195,7 @@
+>  #define EXYNOS4_PA_EHCI			0x12580000
+>  #define EXYNOS4_PA_OHCI			0x12590000
+>  #define EXYNOS4_PA_HSPHY		0x125B0000
+> +#define EXYNOS5_PA_EHCI			0x12110000
+>  #define EXYNOS4_PA_MFC			0x13400000
 > 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  #define EXYNOS4_PA_UART			0x13800000
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index fee9dcd..6d950d7b 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -72,6 +72,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+>  				"exynos-gsc.2", NULL),
+>  	OF_DEV_AUXDATA("samsung,exynos5-gsc", EXYNOS5_PA_GSC3,
+>  				"exynos-gsc.3", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
+> +					"s5p-ehci", NULL),
+>  	{},
+>  };
+> 
+> --
+> 1.7.6.5
