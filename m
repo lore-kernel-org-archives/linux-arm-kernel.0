@@ -1,43 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 9 Oct 2012 01:21:10 -0300
-Subject: [alsa-devel] [PATCH v2 1/2] ARM: imx: clk: Split SSI clock into
- 'ipg' and 'per'
-In-Reply-To: <CAOMZO5ACVeMwGcjSXcEqyHMc9G3KgyrL-uC=wvjmf1AQOAhgWQ@mail.gmail.com>
-References: <1349725213-11354-1-git-send-email-fabio.estevam@freescale.com>
- <20121008214452.GA27665@pengutronix.de>
- <CAOMZO5ACVeMwGcjSXcEqyHMc9G3KgyrL-uC=wvjmf1AQOAhgWQ@mail.gmail.com>
-Message-ID: <CAOMZO5Beug=Db4_dW9ziNs-M=wUizrRSrDXMAXi0CXpUO1Nvzw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 9 Oct 2012 00:25:44 -0400 (EDT)
+Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
+In-Reply-To: <20121009031715.GC21822@S2101-09.ap.freescale.net>
+References: <20121009031715.GC21822@S2101-09.ap.freescale.net>
+Message-ID: <alpine.LFD.2.02.1210090018470.16518@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
+On Tue, 9 Oct 2012, Shawn Guo wrote:
 
-On Mon, Oct 8, 2012 at 8:47 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Sascha,
->
-> On Mon, Oct 8, 2012 at 6:44 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->
->> I am not sure it's good to work around that issue in the ssi driver. We
->> could also just enable the clock in the clk driver as it seems to be a
->> ccm related issue.
->
-> Yes, it would be better if we could fix this in clk-imx27 instead, but
-> I was not able to provide such fix yet.
+> I have seen this error on mainline for a couple days when
+> ARM_ATAG_DTB_COMPAT is enabled.
+> 
+>   CC      arch/arm/boot/compressed/fdt_ro.o
+> arch/arm/boot/compressed/fdt_ro.c: In function ?fdt_path_offset?:
+> arch/arm/boot/compressed/fdt_ro.c:172:3: error: implicit declaration of function ?fdt_get_alias_namelen? [-Werror=implicit-function-declaration]
+> arch/arm/boot/compressed/fdt_ro.c:172:5: warning: assignment makes pointer from integer without a cast [enabled by default]
+> arch/arm/boot/compressed/fdt_ro.c: At top level:
+> arch/arm/boot/compressed/fdt_ro.c:340:13: error: conflicting types for ?fdt_get_alias_namelen?
+> arch/arm/boot/compressed/fdt_ro.c:172:7: note: previous implicit declaration of ?fdt_get_alias_namelen? was here
+> cc1: some warnings being treated as errors
 
-The ssi1_sel clock is defined as:
+I just tried building mainline now.  It is at commit f5a246eab9.
 
-clk[ssi1_sel] = imx_clk_mux("ssi1_sel", CCM_CSCR, 22, 1, ssi_sel_clks,
-ARRAY_SIZE(ssi_sel_clks));
+  [...]
+  CC      arch/arm/boot/compressed/misc.o
+  CC      arch/arm/boot/compressed/decompress.o
+  CC      arch/arm/boot/compressed/string.o
+  SHIPPED arch/arm/boot/compressed/fdt_rw.c
+  SHIPPED arch/arm/boot/compressed/fdt.h
+  SHIPPED arch/arm/boot/compressed/libfdt.h
+  SHIPPED arch/arm/boot/compressed/libfdt_internal.h
+  CC      arch/arm/boot/compressed/fdt_rw.o
+  SHIPPED arch/arm/boot/compressed/fdt_ro.c
+  CC      arch/arm/boot/compressed/fdt_ro.o
+  SHIPPED arch/arm/boot/compressed/fdt_wip.c
+  CC      arch/arm/boot/compressed/fdt_wip.o
+  SHIPPED arch/arm/boot/compressed/fdt.c
+  CC      arch/arm/boot/compressed/fdt.o
+  CC      arch/arm/boot/compressed/atags_to_fdt.o
+  SHIPPED arch/arm/boot/compressed/lib1funcs.S
+  AS      arch/arm/boot/compressed/lib1funcs.o
+  SHIPPED arch/arm/boot/compressed/ashldi3.S
+  AS      arch/arm/boot/compressed/ashldi3.o
+  LD      arch/arm/boot/compressed/vmlinux
+  OBJCOPY arch/arm/boot/zImage
+  Kernel: arch/arm/boot/zImage is ready
 
-,where ssi_sel_clks is:
-static const char *ssi_sel_clks[] = { "spll", "mpll", }
+What config do you use?
 
-,which matches with the mx27 reference manual.
 
-How do we tell the clk api to select spll or mpll as the source for ssi_sel?
-
-I understand how to do this from register level, but not from the api.
-
-Thanks,
-
-Fabio Estevam
+Nicolas
