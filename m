@@ -1,33 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 9 Oct 2012 20:11:20 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: move old debug-devices.c and debug-leds.c to
- be OMAP2+ only for now
-In-Reply-To: <20121008221333.GZ13011@atomide.com>
-References: <alpine.DEB.2.00.1210080145080.5736@utopia.booyaka.com>
- <20121008221333.GZ13011@atomide.com>
-Message-ID: <alpine.DEB.2.00.1210092008370.5736@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  9 Oct 2012 22:13:57 +0200
+Subject: [PATCH v2 7/8] video: mark nuc900fb_map_video_memory as __devinit
+In-Reply-To: <1349813638-4617-1-git-send-email-arnd@arndb.de>
+References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
+Message-ID: <1349813638-4617-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Oct 2012, Tony Lindgren wrote:
+nuc900fb_map_video_memory is called by an devinit function
+that may be called at run-time, but the function itself is
+marked __init and will be discarded after boot.
 
-> Hmm are you sure that omap1 is not using debug-leds.c?
-> At least the initcall seems like it should run on omap1
-> if enabled.
+To avoid calling into a function that may have been overwritten,
+mark nuc900fb_map_video_memory itself as __devinit.
 
-You're right, it's probably able to run on OMAP1.  Looks like I got 
-confused by the bogus Kconfig dependency from OMAP_DEBUG_LEDS -> 
-OMAP_DEBUG_DEVICES, since debug_card_init() is only called from the H4 
-board init.
+Without this patch, building nuc950_defconfig results in:
 
-> The sideways include here is OK, it does not get exposed to
-> the drivers, it seems that plat-omap is still the right location
-> for at least debug-leds.c code.
+WARNING: drivers/video/built-in.o(.devinit.text+0x26c): Section mismatch in reference from the function nuc900fb_probe() to the function .init.text:nuc900fb_map_video_memory()
+The function __devinit nuc900fb_probe() references
+a function __init nuc900fb_map_video_memory().
+If nuc900fb_map_video_memory is only used by nuc900fb_probe then
+annotate nuc900fb_map_video_memory with a matching annotation.
 
-OK if you want to leave it there, it's fine with me.  Looks like it 
-should go into drivers/ at some point though?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
+---
+ drivers/video/nuc900fb.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will send a patch to do the sideways include to fix the sparse warning.
-
-
-- Paul
+diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+index e10f551..b31b12b 100644
+--- a/drivers/video/nuc900fb.c
++++ b/drivers/video/nuc900fb.c
+@@ -387,7 +387,7 @@ static int nuc900fb_init_registers(struct fb_info *info)
+  *    The buffer should be a non-cached, non-buffered, memory region
+  *    to allow palette and pixel writes without flushing the cache.
+  */
+-static int __init nuc900fb_map_video_memory(struct fb_info *info)
++static int __devinit nuc900fb_map_video_memory(struct fb_info *info)
+ {
+ 	struct nuc900fb_info *fbi = info->par;
+ 	dma_addr_t map_dma;
+-- 
+1.7.10
