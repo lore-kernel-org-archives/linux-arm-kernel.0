@@ -1,72 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 9 Oct 2012 09:45:49 +0200
-Subject: [PATCH] video: imxfb: Do not crash on reboot
-In-Reply-To: <1349703336-8105-1-git-send-email-fabio.estevam@freescale.com>
-References: <1349703336-8105-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121009074549.GG18531@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Oct 2012 07:51:02 +0000
+Subject: Single zImage and A15/LPAE
+In-Reply-To: <alpine.LFD.2.02.1210082201470.16518@xanadu.home>
+References: <50735B75.8070109@wwwdotorg.org>
+ <alpine.LFD.2.02.1210082201470.16518@xanadu.home>
+Message-ID: <2043931.InXdkgrjkp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 10:35:36AM -0300, Fabio Estevam wrote:
-> Issuing a "reboot" command after the LCD times out causes the following
-> warnings:
+On Monday 08 October 2012 22:18:24 Nicolas Pitre wrote:
+> On Mon, 8 Oct 2012, Stephen Warren wrote:
 > 
-> Requesting system reboot
-> ------------[ cut here ]------------
-> WARNING: at drivers/clk/clk.c:471 clk_disable+0x24/0x50()
-> Modules linked in:
-> [<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-> [<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-> [<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c03960a0>] (clk_disable+0x24/0x50)
-> [<c03960a0>] (clk_disable+0x24/0x50) from [<c02695a0>] (imxfb_disable_controller+0x48/0x7c)
-> [<c02695a0>] (imxfb_disable_controller+0x48/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-> [<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-> [<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-> [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-> [<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-> [<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
-> ---[ end trace da6b502ca79c854f ]---
-> ------------[ cut here ]------------
-> WARNING: at drivers/clk/clk.c:380 clk_unprepare+0x1c/0x2c()
-> Modules linked in:
-> [<c001ad90>] (unwind_backtrace+0x0/0xf4) from [<c0025aac>] (warn_slowpath_common+0x48/0x60)
-> [<c0025aac>] (warn_slowpath_common+0x48/0x60) from [<c0025ae0>] (warn_slowpath_null+0x1c/0x24)
-> [<c0025ae0>] (warn_slowpath_null+0x1c/0x24) from [<c0396338>] (clk_unprepare+0x1c/0x2c)
-> [<c0396338>] (clk_unprepare+0x1c/0x2c) from [<c02695a8>] (imxfb_disable_controller+0x50/0x7c)
-> [<c02695a8>] (imxfb_disable_controller+0x50/0x7c) from [<c029d838>] (platform_drv_shutdown+0x18/0x1c)
-> [<c029d838>] (platform_drv_shutdown+0x18/0x1c) from [<c02990fc>] (device_shutdown+0x48/0x14c)
-> [<c02990fc>] (device_shutdown+0x48/0x14c) from [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c)
-> [<c003d09c>] (kernel_restart_prepare+0x2c/0x3c) from [<c003d0e4>] (kernel_restart+0xc/0x48)
-> [<c003d0e4>] (kernel_restart+0xc/0x48) from [<c003d1e8>] (sys_reboot+0xc0/0x1bc)
-> [<c003d1e8>] (sys_reboot+0xc0/0x1bc) from [<c0014ca0>] (ret_fast_syscall+0x0/0x2c)
-> ---[ end trace da6b502ca79c8550 ]---
-> ------------[ cut here ]------------
+> > I'm curious what the single-zImage story is for Cortex A15 CPUs with
+> > LPAE extensions; IIRC, LPAE entails a different page table format and so
+> > isn't going to co-exist in the same zImage as non-LPAE
 > 
-> This happens because "reboot" triggers imxfb_shutdown(), which calls
-> imxfb_disable_controller with the clocks already disabled.
+> LPAE vs non LPAE is an even more invasive change than ARMv6+ vs pre 
+> ARMv6 support.  So no, I don't think we'll ever support LPAE and non 
+> LPAE configs in the same kernel binary.
 > 
-> To prevent this, add a clock enabled status so that we can check if the clocks
-> are enabled before disabling them. 
+> > (although doesn't x86 support that now; I though separate 
+> > LPAE/non-LPAE kernels went away there?)
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/video/imxfb.c |   19 +++++++++++++------
->  1 file changed, 13 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index f3363b2..6acf98a 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -134,6 +134,7 @@ struct imxfb_info {
->  	struct clk		*clk_ipg;
->  	struct clk		*clk_ahb;
->  	struct clk		*clk_per;
-> +	int			enabled;
-I didn't really know the driver, but I wonder if the name "enabled" is a
-tad too generic. Maybe better "clks_enabled"?
+> I don't think so.  At least Ubuntu apparently still carries a PAE and 
+> non PAE kernel packages.  Fedora doesn't, probably because they decided 
+> not to support non PAE capable machines anymore.  We certainly cannot 
+> make this choice on ARM yet.
 
-Uwe
+Fedora 18 still has both PAE and non-PAE kernels. I would really hope
+they could give up the PAE version in favor of a 64 bit kernel in 
+the 32 bit distro, but it seems none of the big distros trust the
+compat code enough yet. On x86, the number of 32 bit machines still
+running with more than 3GB of RAM installed should be very marginal
+now, most people running the PAE kernel actually have 64 bit capable
+CPUs and have some legacy 32 bit applications that are easier to
+run with a 32 bit user space.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maybe we get to the same point on ARM in some 10 years, but for
+the forseeable future, Cortex-a15 machines with lots of RAM will
+be very real and we need to have separate kernels for those.
+
+	Arnd
