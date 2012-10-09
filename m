@@ -1,65 +1,160 @@
-From: jack@suse.cz (Jan Kara)
-Date: Tue, 9 Oct 2012 15:43:20 +0200
-Subject: [PATCH 05/16] vfs: bogus warnings in fs/namei.c
-In-Reply-To: <201210091307.19225.arnd@arndb.de>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <20121008115116.GA9243@quack.suse.cz>
- <201210091227.46324.arnd@arndb.de>
- <201210091307.19225.arnd@arndb.de>
-Message-ID: <20121009134320.GC15790@quack.suse.cz>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 9 Oct 2012 11:02:32 -0300
+Subject: =?UTF-8?q?=5BPATCH=20v3=202/2=5D=20=5Bmedia=5D=3A=20mx2=5Fcamera=3A=20Fix=20regression=20caused=20by=20clock=20conversion?=
+Message-ID: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 09-10-12 13:07:19, Arnd Bergmann wrote:
-> On Tuesday 09 October 2012, Arnd Bergmann wrote:
-> > On Monday 08 October 2012, Jan Kara wrote:
-> > > On Fri 05-10-12 16:55:19, Arnd Bergmann wrote:
-> > > > The follow_link() function always initializes its *p argument,
-> > > > or returns an error, but not all versions of gcc figure this
-> > > > out, so we have to work around this using the uninitialized_var()
-> > > > macro.
-> > >   Well, I'm somewhat sceptical to this approach. I agree that bogus
-> > > warnings are not nice but later when the code is changed and possibly real
-> > > use without initialization is added, we won't notice it. Without changing
-> > > anything, we'd at least have a chance of catching it with gcc versions
-> > > which were clever enough to not warn with the original code. Or
-> > > alternatively if we unconditionally initialized the variable that would get
-> > > rid of the warning and made the code more future-proof (that's what I
-> > > usually end up doing)... I don't really care that much about the chosen
-> > > solution, Al is the one to decide. But I wanted to point out there are
-> > > downsides to your solution.
-> > 
-> > I'll drop the patch for now and won't send it from my tree then. I agree
-> > that uninitialized_var() is not ideal, but none of the alternatives seemed
-> > better.
-> > 
-> > With my latest compiler, I don't actually see the warnings any more, so
-> > maybe someone fixed gcc instead, or this went away after another change.
-> > I'll let you know if it comes back so we can discuss about a better fix then.
-> > 
-> 
-> Update: I could actually reproduce the problem now, but it only happens when
-> building with 'gcc -s' (i.e. CONFIG_CC_OPTIMIZE_FOR_SIZE). It does happen
-> with both gcc-4.6 and with gcc-4.8, and on both x86-64 and ARM. An alternative
-> patch that would also make it go away is the variant below, but I think that's
-> even worse than the first version I suggested because it makes the binary
-> output slightly worse by adding an unnecessary initialization when building with
-> 'make -s'.
-  Hum, dumb compiler... I like this patch better and since the extra
-initialization is on error path only, I don't think it matters. But
-whatever Al likes better.
+Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
+to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
 
-									Honza
+By not doing so the camera sensor does not probe correctly:
 
-> diff --git a/fs/namei.c b/fs/namei.c
-> index aa30d19..c3612a5 100644
-> --- a/fs/namei.c
-> +++ b/fs/namei.c
-> @@ -810,6 +810,7 @@ follow_link(struct path *link, struct nameidata *nd, void **p)
->  	return error;
->  
->  out_put_nd_path:
-> +	*p = NULL;
->  	path_put(&nd->path);
->  	path_put(link);
->  	return error;
+soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+mx2-camera mx2-camera.0: Camera driver attached to camera 0
+ov2640 0-0030: Product ID error fb:fb
+mx2-camera mx2-camera.0: Camera driver detached from camera 0
+mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
+
+Adapt the mx2_camera driver to the new clock framework and make it functional
+again.
+
+Tested-by: Ga?tan Carlier <gcembed@gmail.com>
+Tested-by: Javier Martin <javier.martin@vista-silicon.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Fix clock error handling code as pointed out by Russell King
+Changes since v1:
+- Rebased against linux-next 20121008.
+ drivers/media/platform/soc_camera/mx2_camera.c |   50 ++++++++++++++++++------
+ 1 file changed, 38 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
+index 403d7f1..382b305 100644
+--- a/drivers/media/platform/soc_camera/mx2_camera.c
++++ b/drivers/media/platform/soc_camera/mx2_camera.c
+@@ -272,7 +272,8 @@ struct mx2_camera_dev {
+ 	struct device		*dev;
+ 	struct soc_camera_host	soc_host;
+ 	struct soc_camera_device *icd;
+-	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
++	struct clk		*clk_emma_ahb, *clk_emma_ipg;
++	struct clk		*clk_csi_ahb, *clk_csi_per;
+ 
+ 	void __iomem		*base_csi, *base_emma;
+ 
+@@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+ {
+ 	unsigned long flags;
+ 
+-	clk_disable_unprepare(pcdev->clk_csi);
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
++	clk_disable_unprepare(pcdev->clk_csi_per);
+ 	writel(0, pcdev->base_csi + CSICR1);
+ 	if (cpu_is_mx27()) {
+ 		writel(0, pcdev->base_emma + PRP_CNTL);
+@@ -460,10 +462,14 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+ 	if (pcdev->icd)
+ 		return -EBUSY;
+ 
+-	ret = clk_prepare_enable(pcdev->clk_csi);
++	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
+ 	if (ret < 0)
+ 		return ret;
+ 
++	ret = clk_prepare_enable(pcdev->clk_csi_per);
++	if (ret < 0)
++		goto exit_csi_ahb;
++
+ 	csicr1 = CSICR1_MCLKEN;
+ 
+ 	if (cpu_is_mx27())
+@@ -480,6 +486,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+ 		 icd->devnum);
+ 
+ 	return 0;
++
++exit_csi_ahb:
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
++
++	return ret;
+ }
+ 
+ static void mx2_camera_remove_device(struct soc_camera_device *icd)
+@@ -1725,27 +1736,35 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+ 		goto exit;
+ 	}
+ 
+-	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
+-	if (IS_ERR(pcdev->clk_csi)) {
+-		dev_err(&pdev->dev, "Could not get csi clock\n");
+-		err = PTR_ERR(pcdev->clk_csi);
++	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
++	if (IS_ERR(pcdev->clk_csi_ahb)) {
++		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
++		err = PTR_ERR(pcdev->clk_csi_ahb);
+ 		goto exit;
+ 	}
+ 
++	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(pcdev->clk_csi_per)) {
++		dev_err(&pdev->dev, "Could not get csi per clock\n");
++		err = PTR_ERR(pcdev->clk_csi_per);
++		goto exit_csi_ahb;
++	}
++
+ 	pcdev->pdata = pdev->dev.platform_data;
+ 	if (pcdev->pdata) {
+ 		long rate;
+ 
+ 		pcdev->platform_flags = pcdev->pdata->flags;
+ 
+-		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
++		rate = clk_round_rate(pcdev->clk_csi_per,
++						pcdev->pdata->clk * 2);
+ 		if (rate <= 0) {
+ 			err = -ENODEV;
+-			goto exit;
++			goto exit_csi_per;
+ 		}
+-		err = clk_set_rate(pcdev->clk_csi, rate);
++		err = clk_set_rate(pcdev->clk_csi_per, rate);
+ 		if (err < 0)
+-			goto exit;
++			goto exit_csi_per;
+ 	}
+ 
+ 	INIT_LIST_HEAD(&pcdev->capture);
+@@ -1801,7 +1820,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+ 		goto exit_free_emma;
+ 
+ 	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
+-			clk_get_rate(pcdev->clk_csi));
++			clk_get_rate(pcdev->clk_csi_per));
+ 
+ 	return 0;
+ 
+@@ -1812,6 +1831,10 @@ eallocctx:
+ 		clk_disable_unprepare(pcdev->clk_emma_ipg);
+ 		clk_disable_unprepare(pcdev->clk_emma_ahb);
+ 	}
++exit_csi_per:
++	clk_disable_unprepare(pcdev->clk_csi_per);
++exit_csi_ahb:
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
+ exit:
+ 	return err;
+ }
+@@ -1831,6 +1854,9 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
+ 		clk_disable_unprepare(pcdev->clk_emma_ahb);
+ 	}
+ 
++	clk_disable_unprepare(pcdev->clk_csi_per);
++	clk_disable_unprepare(pcdev->clk_csi_ahb);
++
+ 	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
+ 
+ 	return 0;
+-- 
+1.7.9.5
