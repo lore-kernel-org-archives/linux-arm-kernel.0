@@ -1,64 +1,54 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 9 Oct 2012 17:22:15 +0000
-Subject: Booting vanilla kernel on the beaglebone
-In-Reply-To: <20121009165405.GB6870@netboy.at.omicron.at>
-References: <20120930082802.GA15392@netboy.at.omicron.at>
- <50693ECD.4000000@ti.com> <20121008191657.GA3281@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39685@DBDE01.ent.ti.com>
- <20121009110049.GB2274@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39D66@DBDE01.ent.ti.com>
- <20121009114326.GA4511@netboy.at.omicron.at>
- <79CD15C6BA57404B839C016229A409A83EB39F42@DBDE01.ent.ti.com>
- <20121009165405.GB6870@netboy.at.omicron.at>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB3A636@DBDE01.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 9 Oct 2012 18:25:59 +0100
+Subject: [GIT PULL] Disintegrate UAPI for arm64 [ver #2]
+In-Reply-To: <21110.1349774113@warthog.procyon.org.uk>
+References: <21110.1349774113@warthog.procyon.org.uk>
+Message-ID: <20121009172559.GB13922@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 22:24:05, Richard Cochran wrote:
-> On Tue, Oct 09, 2012 at 12:17:45PM +0000, Hiremath, Vaibhav wrote:
-> > Just with recent u-boot.
-> 
-> So this just doesn't work at all for me. It hangs just after:
-> 
->    U-Boot# bootm 81000000 - 80000000
->    ## Booting kernel from Legacy Image at 81000000 ...
->       Image Name:   Linux-3.6.0-next-20121009
->       Image Type:   ARM Linux Kernel Image (uncompressed)
->       Data Size:    3845136 Bytes = 3.7 MiB
->       Load Address: 80008000
->       Entry Point:  80008000
->       Verifying Checksum ... OK
->    ## Flattened Device Tree blob at 80000000
->       Booting using the fdt blob at 0x80000000
->       Loading Kernel Image ... OK
->    OK
->       Loading Device Tree to 8fe66000, end 8fe6a433 ... OK
->    
->    Starting kernel ...
-> 
-> (That was with linux-next-b066f61 from today.)
-> 
-> I do have a Rev A6 board. Could that be an issue?
-> 
-> You said that you are carrying along some patches (like the
-> defconfig). Are you sure every needed patch is now upstream?
-> 
+On Tue, Oct 09, 2012 at 10:15:13AM +0100, David Howells wrote:
+> David Howells (1):
+>       UAPI: (Scripted) Disintegrate arch/arm64/include/asm
 
-Can you make sure that you have below patches, which I have already 
-submitted to linux-omap and expected to get merged for rc1.
+It still fails on arm64. The reason is that I had a __SYSCALL_COMPAT
+guard to provide either the 32-bit syscalls or the 64-bit (generic) ones
+via asm/unistd.h. With this change:
 
-https://patchwork.kernel.org/patch/1499271/
-https://patchwork.kernel.org/patch/1569231/
+> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+> index 8f03dee..3d43b19 100644
+> --- a/arch/arm64/include/asm/unistd.h
+> +++ b/arch/arm64/include/asm/unistd.h
+> @@ -13,13 +13,7 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> -
+> -#ifndef __SYSCALL_COMPAT
+> -#include <asm-generic/unistd.h>
+> -#endif
+> -
+> -#ifdef __KERNEL__
+>  #ifdef CONFIG_COMPAT
+>  #include <asm/unistd32.h>
+>  #endif
+> -#endif
+> +#include <uapi/asm/unistd.h>
 
-These patches addresses integration related issues which occurs during merge 
-window.
+the guard disappears and I get conflicting entries between unistd32.h
+and unistd.h.
 
-Please note that, these patches are already submitted to list and expected 
-to get merged for rc1.
+The solution is to either keep the __SYSCALL_COMPAT guard in place or
+rename all the __NR_* macros in unistd32.h to __NR_compat_* and include
+unistd32.h explicitly where needed (kernel-only header anyway). Since
+the arm64 kernel would not export 32-bit headers, I would go with the
+second solution (tried it already). But you need to re-generate the
+arm64 headers again.
 
-Thanks,
-Vaibhav
+BTW, I see the script generated some pretty much empty
+uapi/asm/unistd.h. Is it possible to using something like Kbuild and
+just add "generic-y += ..." to just point it to the
+include/uapi/asm-generic header?
 
-> Thanks,
-> Richard
-> 
+-- 
+Catalin
