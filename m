@@ -1,33 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Oct 2012 17:06:47 +0100
-Subject: [PATCH 4/9] ARM: export default read_current_timer
-In-Reply-To: <50744586.6010806@arm.com>
+Date: Tue, 9 Oct 2012 17:08:14 +0100
+Subject: [GIT PULL 0/9] ARM architecture fixes for 3.7
+In-Reply-To: <1349796183-30648-1-git-send-email-arnd@arndb.de>
 References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <1349796183-30648-5-git-send-email-arnd@arndb.de> <50744586.6010806@arm.com>
-Message-ID: <20121009160647.GG4625@n2100.arm.linux.org.uk>
+Message-ID: <20121009160814.GH4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 04:40:54PM +0100, Jonathan Austin wrote:
-> Hi Arnd,
+On Tue, Oct 09, 2012 at 05:22:54PM +0200, Arnd Bergmann wrote:
+> Here are some patches that belong into your domain, I hope you can
+> just send the lot to Linus the next time you send other patches.
 > 
-> On 09/10/12 16:22, Arnd Bergmann wrote:
-> > diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-> > index 9d0a300..0dc5385 100644
-> > --- a/arch/arm/lib/delay.c
-> > +++ b/arch/arm/lib/delay.c
-> > @@ -45,6 +45,7 @@ int read_current_timer(unsigned long *timer_val)
-> >  	*timer_val = delay_timer->read_current_timer();
-> >  	return 0;
-> >  }
-> > +EXPORT_SYMBOL_GPL(read_current_timer);
-> 
-> 
-> Perhaps this fits better in armksyms.c? That way it lives with
-> arm_delay_ops and friends.
+> These bug fixes all address problems found with automated build testing.
+> Some of them have been around for a long time, other bugs are
+> regressions since the merge window.
 
-It's always much better to put things next to where they're defined
-rather than spreading them around.
+Apart from the sliced off comment in one commit (which XEN people need
+to confirm they're happy with the final version), I think these are
+otherwise fine... I'll hold off pulling them until that can be fixed.
 
-armksyms.c is a reminant of the 1.x days of doing things... but still
-remains to allow what are mostly assembly symbols to be exported.
+Thanks.
