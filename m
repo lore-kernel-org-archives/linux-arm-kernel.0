@@ -1,44 +1,52 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Tue, 9 Oct 2012 18:29:44 +0530
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <20121009030126.GB12552@atomide.com>
-References: <cover.1349450723.git.afzal@ti.com>
- <20121009030126.GB12552@atomide.com>
-Message-ID: <50741FC0.4010502@ti.com>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Tue, 09 Oct 2012 15:01:35 +0200
+Subject: [PATCH v2] ARM : i.MX27 : split code for allocation of ressources
+ of camera and eMMA
+In-Reply-To: <20120911111738.GU18243@pengutronix.de>
+References: <1346843175-4166-1-git-send-email-gcembed@gmail.com>
+ <20120911094748.GS18243@pengutronix.de>
+ <CACKLOr11UbRF3cyKZ5p_9K81=KS=AQxQNZv1YmxtC0kJeoz1+g@mail.gmail.com>
+ <20120911111738.GU18243@pengutronix.de>
+Message-ID: <5074202F.2020107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Tuesday 09 October 2012 08:31 AM, Tony Lindgren wrote:
-> * Afzal Mohammed<afzal@ti.com>  [121005 09:02]:
-
->> Proposed generic routine has been tested on OneNAND (async) on
->> OMAP3EVM rev C (as mainline does not have the OneNAND support for this,
->> local patch were used to test). For other cases of custom timing
->> calculation (tusb6010, smc91x non-muxed, OneNAND sync), generic timing
->> calculation routine was verified by simulating on OMAP3EVM.
-> Have you tested to make sure this works if you change the
-> L3 frequency?
-
-With changed L3 frequency it was not tested.
-
-I do not have a single board that is supported in mainline that
-calculates on the run gpmc timing from device timing. What has
-been tested here is OneNAND working in asynchronous mode
-on omap3evm, but it's support is not available in mainline, so
-private patch had to be used to test it. All other peripherals
-were tested by simulation, i.e. by comparing output from existing
-custom timing routine & generic routine for particular frequencies.
-
-> That should probably be tested as a sanity check. Maybe you
-> can force the L3 for some test boots for this, I don't think
-> we scale it by default.
-
-On omap3evm, don't know whether L3 frequency can be
-changed & still have a working Kernel. I am not sure whether
-it is worth attempting as OneNAND on omap3evm is not
-supported in mainline.
-
-Regards
-Afzal
+Hi Sascha,
+On 09/11/2012 01:17 PM, Sascha Hauer wrote:
+> On Tue, Sep 11, 2012 at 01:13:03PM +0200, javier Martin wrote:
+>> Hi,
+>>
+>> On 11 September 2012 11:47, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>>> Hi Javier,
+>>>
+>>> Since you worked in this area recently, can I have your Ack on this?
+>>
+>> Acked-by: Javier Martin <javier.martin@vista-silicon.com>
+>
+> Thanks
+This patch is missing in next-20121008 and seems to be never committed. 
+Is there any reason ?
+>
+>>
+>>> As a side note: Please be prepared that all this should be removed in
+>>> the not-so-far future. It would be good if you start converting your
+>>> boards to devicetree soon. You may be doing so internally already, I
+>>> don't know.
+>>
+>> We made some tests regarding devicetree this summer but we found that
+>> there are some things missing yet:
+>> - pinctrl
+>> - soc-camera and video sensor
+>>
+>> I don't know if people from Linaro is planning to deal with pinctrl
+>> for i.MX27 or not.
+>
+> I don't think Linaro will do anything for the older i.MX like the
+> i.MX27. With soc-camera I'm optimistic that someone will come up
+> with patches soon.
+>
+> Sascha
+>
+Thank you.
+Best regards,
+Ga?tan Carlier.
