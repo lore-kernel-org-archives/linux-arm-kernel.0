@@ -1,24 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Oct 2012 12:04:55 +0200
-Subject: [PATCH] ARM: integrator_cp: fix build failure
-In-Reply-To: <1349631760-21350-1-git-send-email-olof@lixom.net>
-References: <1349631760-21350-1-git-send-email-olof@lixom.net>
-Message-ID: <CACRpkdb_sTqgc6nYa8RpokEBe+kfe2uT9f3SKJQan8iDgefs0Q@mail.gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Tue, 9 Oct 2012 10:35:23 +0000
+Subject: [PATCH] Add McSPI devices found in AM33xx SoC to dtsi
+In-Reply-To: <CAAek22HhtFc-1XOFrQC8DKZ9VdKyuShE_G_j4581WL15JTNJXg@mail.gmail.com>
+References: <CAAek22HhtFc-1XOFrQC8DKZ9VdKyuShE_G_j4581WL15JTNJXg@mail.gmail.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9CA61C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 7, 2012 at 7:42 PM, Olof Johansson <olof@lixom.net> wrote:
+On Tue, Oct 09, 2012 at 10:40:58, Phil Pokorny wrote:
+> We're using the BeagleBone for a project and we need the SPI devices
+> available and configured with all available chip selects.
+> 
+> Please accept the following patch to add these to the base .dtsi file
+> so they can then be enabled in the beaglebone specific .dts with
+> minimal fuss.
 
-> arch/arm/mach-integrator/integrator_cp.c:272:32: error: 'of_aliases'
-> undeclared (first use in this function)
->
-> Move the OF-only timer init under #ifdef CONFIG_OF, just like
-> integrator_ap has it.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+Patch for adding MCSPI in am33xx.dtsi already been sent by me.
+https://lkml.org/lkml/2012/9/18/32
 
-My mistake.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks
+Avinash
 
-Thanks Olof!
-Linus Walleij
+> 
