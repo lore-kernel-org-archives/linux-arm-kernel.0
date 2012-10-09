@@ -1,27 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 9 Oct 2012 10:46:31 -0700
-Subject: [PATCH 0/3] new ARM-soc warning fixes
-In-Reply-To: <1349796861-31164-1-git-send-email-arnd@arndb.de>
-References: <1349796861-31164-1-git-send-email-arnd@arndb.de>
-Message-ID: <20121009174631.GA19606@quad.lixom.net>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 9 Oct 2012 19:11:52 +0100
+Subject: [kvmarm] [PATCH v2 12/14] KVM: ARM: VFP userspace interface
+In-Reply-To: <20121001091125.49198.90819.stgit@ubuntu>
+References: <20121001090945.49198.68950.stgit@ubuntu>
+ <20121001091125.49198.90819.stgit@ubuntu>
+Message-ID: <CAFEAcA8zLr5mPYnd6EzaxyugASWPzvY4RE6LiE-K2uRRGWtFZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 05:34:18PM +0200, Arnd Bergmann wrote:
-> Hi Olof,
-> 
-> Here are three more fixes that I'd like to merge through the arm-soc
-> as time permits. All of them should be completely harmless and they
-> only fix harmless gcc warnings.
-> 
-> I don't know what your plans are for sending the next fixes branch.
-> I've uploaded these into a new "fixes2" branch on top of the patches
-> that are already in "fixes". We can either send them all together,
-> or you send the ones that are already queued first and these ones
-> with the next batch. Feel free to rebase if necessary.
+On 1 October 2012 10:11, Christoffer Dall <c.dall@virtualopensystems.com> wrote:
+> From: Rusty Russell <rusty.russell@linaro.org>
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -1765,6 +1765,12 @@ ARM 64-bit CP15 registers have the following id bit patterns:
+>  ARM CCSIDR registers are demultiplexed by CSSELR value:
+>    0x4002 0000 0011 00 <csselr:8>
+>
+> +ARM 32-bit VFP control registers have the following id bit patterns:
+> +  0x4002 0000 0012 1 <selector:3>
+> +
+> +ARM 64-bit FP registers have the following id bit patterns:
+> +  0x4002 0000 0012 0 <selector:3>
+> +
 
-I've pulled it in and will send up with fixes tonight (Tony has OMAP
-fixes coming, others might too).
+In the other entries in this section, <foo:3> indicates a 3 bit field.
+But I think for these two it's trying to indicate a 3 byte field.
+Compare the include file constants:
 
++#define KVM_REG_ARM_VFP                        (0x0012 <<
+KVM_REG_ARM_COPROC_SHIFT)
++#define KVM_REG_ARM_VFP_MASK           0x000000000000FFFF
++#define KVM_REG_ARM_VFP_BASE_REG       0x0
++#define KVM_REG_ARM_VFP_FPSID          0x1000
++#define KVM_REG_ARM_VFP_FPSCR          0x1001
 
--Olof
+so eg the first control register is
+ 0x4002 0000 0012 1000
+and the first D reg is
+ 0x4002 0000 0012 0000
+
+So my guess is these should be <selector:12>
+(or possibly even something slightly more specific than 'selector'
+like '<regno:12>' ?)
+
+-- PMM
