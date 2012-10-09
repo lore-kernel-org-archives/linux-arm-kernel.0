@@ -1,41 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 9 Oct 2012 14:26:39 -0700
-Subject: [PATCH 0/3] new ARM-soc warning fixes
-In-Reply-To: <201210092001.26947.arnd@arndb.de>
-References: <1349796861-31164-1-git-send-email-arnd@arndb.de>
- <20121009174631.GA19606@quad.lixom.net>
- <201210092001.26947.arnd@arndb.de>
-Message-ID: <20121009212639.GA25765@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 9 Oct 2012 14:43:10 -0700
+Subject: [GIT PULL] ARM: OMAP: warnings/hwmod/clock fixes for pre-3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210091928180.5736@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210091602390.5736@utopia.booyaka.com>
+ <20121009190252.GD12552@atomide.com>
+ <alpine.DEB.2.00.1210091928180.5736@utopia.booyaka.com>
+Message-ID: <20121009214310.GG12552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 08:01:26PM +0000, Arnd Bergmann wrote:
-> On Tuesday 09 October 2012, Olof Johansson wrote:
-> > On Tue, Oct 09, 2012 at 05:34:18PM +0200, Arnd Bergmann wrote:
-> > > Hi Olof,
-> > > 
-> > > Here are three more fixes that I'd like to merge through the arm-soc
-> > > as time permits. All of them should be completely harmless and they
-> > > only fix harmless gcc warnings.
-> > > 
-> > > I don't know what your plans are for sending the next fixes branch.
-> > > I've uploaded these into a new "fixes2" branch on top of the patches
-> > > that are already in "fixes". We can either send them all together,
-> > > or you send the ones that are already queued first and these ones
-> > > with the next batch. Feel free to rebase if necessary.
-> > 
-> > I've pulled it in and will send up with fixes tonight (Tony has OMAP
-> > fixes coming, others might too).
-> > 
+* Paul Walmsley <paul@pwsan.com> [121009 12:31]:
+> On Tue, 9 Oct 2012, Tony Lindgren wrote:
 > 
-> Ok, thanks!
+> > * Paul Walmsley <paul@pwsan.com> [121009 09:05]:
+> > > 
+> > > N800 isn't booting; this is a problem present in the base commit and
+> > > is due to serial driver breakage:
+> > > 
+> > >    http://www.spinics.net/lists/arm-kernel/msg196034.html
+> > 
+> > This might be related also to the n800 booting in sys mode
+> > that causes issues with the recent hyp patches. A fix for
+> > that has been queued, for more info see the thread
+> > "v2 2/7] ARM: virt: allow the kernel to be entered in HYP mode".
 > 
-> I just noticed that I was missing yet another one, which I now added
-> directly. It was part of a longer series I sent last week. I wasn't
-> really sure whether this one would better be included in arm-soc or
-> Russell's arm tree and then I ended up not putting it in either series :(
+> Thanks for the pointer.  That one would break the boot quite early, right? 
+> This one has the same symptoms as the serial issue, where it bombs out 
+> after:
+> 
+> [    0.948394] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+> [    0.974273] omap_uart.0: ttyO0 at MMIO 0x4806a000 (irq = 88) is a OMAP UART0
+> [    0.986968] omap_uart.1: ttyO1 at MMIO 0x4806c000 (irq = 89) is a OMAP UART1
+> 
+> (hang)
 
-OK, I applied on top of the rest.
+Yes the sys mode hangs right away and only prints a few lines
+with earlyprintk.
 
+Regards,
 
--Olof
+Tony
