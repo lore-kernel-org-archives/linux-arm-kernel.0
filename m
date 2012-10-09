@@ -1,27 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 9 Oct 2012 16:19:42 -0700
-Subject: [GIT PULL 1/5] omap fixes for v3.7-rc1
-In-Reply-To: <50747195.25cf320a.259b.ffffd04bSMTPIN_ADDED@mx.google.com>
-References: <50747195.25cf320a.259b.ffffd04bSMTPIN_ADDED@mx.google.com>
-Message-ID: <CAOesGMgBtEL6aPwbVi7pWPsh75Phdsk=ZUePaxNuXRdxniAw5A@mail.gmail.com>
+From: linux@prisktech.co.nz (linux at prisktech.co.nz)
+Date: Wed, 10 Oct 2012 12:26:20 +1300 (NZDT)
+Subject: IRQ code inconsistencies across platforms
+Message-ID: <53814.210.54.1.170.1349825180.squirrel@server.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In arch/arm/common.gic.c:
 
+static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+urq_hw_number_t hw)
+{
+...
+  irq_set_chip_and_handler(irq, &gic_chip, handle_fasteoi_irq);
+  set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+}
 
-On Tue, Oct 9, 2012 at 11:46 AM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit 5e090ed7af10729a396a25df43d69a236e789736:
->
->   Merge tag 'soc-late' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-10-07 20:55:16 +0900)
->
-> are available in the git repository at:
->
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc1/fixes-signed
+but in arch/arm/mach-pxa/irq.c:
 
+static int pxa_irq_map(struct irq_domain *d, unsigned int virq, urq_hw_number_t hw)
+{
+...
+  irq_set_chip_and_handler(hw, &pxa_internal_irq_chip, handle_level_irq);
+  set_irq_flags(hw, IRQF_VALID);
+}
 
-Applied 1-5. Thanks!
+Is it correct to use irq/virq or hw for irq_set_chip_and_handler/set_irq_flags?
 
+Both platforms are adding legacy domains, so while they both presumably work,
+one is slightly incorrect.
 
--Olof
+Regards
+Tony P
