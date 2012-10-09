@@ -1,58 +1,92 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 9 Oct 2012 15:17:36 +0100
-Subject: Single zImage and A15/LPAE
-In-Reply-To: <2043931.InXdkgrjkp@wuerfel>
-References: <50735B75.8070109@wwwdotorg.org>
- <alpine.LFD.2.02.1210082201470.16518@xanadu.home>
- <2043931.InXdkgrjkp@wuerfel>
-Message-ID: <20121009141736.GB2122@linaro.org>
+From: mans.rullgard@linaro.org (Mans Rullgard)
+Date: Tue, 9 Oct 2012 15:18:58 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <50742F40.4050704@linaro.org>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <506ED18C.3010009@gmail.com>
+ <20590.58864.527467.746403@pilspetsen.it.uu.se>
+ <506F0454.3070304@gmail.com> <50742F40.4050704@linaro.org>
+Message-ID: <CAG5Tg6W86iQoSCh4sNHCUSMggVGuXHh7aaKKR7SHyUTRZyNm-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 07:51:02AM +0000, Arnd Bergmann wrote:
-> On Monday 08 October 2012 22:18:24 Nicolas Pitre wrote:
-> > On Mon, 8 Oct 2012, Stephen Warren wrote:
-> > 
-> > > I'm curious what the single-zImage story is for Cortex A15 CPUs with
-> > > LPAE extensions; IIRC, LPAE entails a different page table format and so
-> > > isn't going to co-exist in the same zImage as non-LPAE
-> > 
-> > LPAE vs non LPAE is an even more invasive change than ARMv6+ vs pre 
-> > ARMv6 support.  So no, I don't think we'll ever support LPAE and non 
-> > LPAE configs in the same kernel binary.
-> > 
-> > > (although doesn't x86 support that now; I though separate 
-> > > LPAE/non-LPAE kernels went away there?)
-> > 
-> > I don't think so.  At least Ubuntu apparently still carries a PAE and 
-> > non PAE kernel packages.  Fedora doesn't, probably because they decided 
-> > not to support non PAE capable machines anymore.  We certainly cannot 
-> > make this choice on ARM yet.
-> 
-> Fedora 18 still has both PAE and non-PAE kernels. I would really hope
-> they could give up the PAE version in favor of a 64 bit kernel in 
-> the 32 bit distro, but it seems none of the big distros trust the
-> compat code enough yet. On x86, the number of 32 bit machines still
-> running with more than 3GB of RAM installed should be very marginal
-> now, most people running the PAE kernel actually have 64 bit capable
-> CPUs and have some legacy 32 bit applications that are easier to
-> run with a 32 bit user space.
-> 
-> Maybe we get to the same point on ARM in some 10 years, but for
-> the forseeable future, Cortex-a15 machines with lots of RAM will
-> be very real and we need to have separate kernels for those.
+On 9 October 2012 15:05, Scott Bambrough <scott.bambrough@linaro.org> wrote:
+> On 12-10-05 12:01 PM, Rob Herring wrote:
+>> Here's a testcase. Compiled on ubuntu precise with
+>> "arm-linux-gnueabihf-gcc -O2 -marm -march=armv7-a test.c".
+>>
+>> typedef unsigned short u16;
+>> typedef unsigned short __sum16;
+>> typedef unsigned int __u32;
+>> typedef unsigned char __u8;
+>> typedef __u32 __be32;
+>> typedef u16 __be16;
+>>
+>> struct iphdr {
+>>         __u8    ihl:4,
+>>                 version:4;
+>>         __u8    tos;
+>>         __be16  tot_len;
+>>         __be16  id;
+>>         __be16  frag_off;
+>>         __u8    ttl;
+>>         __u8    protocol;
+>>         __sum16 check;
+>>         __be32  saddr;
+>>         __be32  daddr;
+>>         /*The options start here. */
+>> };
+>
+>
+> I was reading this thread with some interest.  AFAIK, with the default
+> alignment rules the above struct is packed; there will be no holes in it.
 
-In the medium term we could work around this with a fat kernel in
-principle (i.e., bundle a non-LPAE single kernel together with an LPAE
-one and choose the right one at boot time).  This can be solved outside
-the kernel if necessary.
+Correct.  The problem here is that something is passing around a pointer to
+such a struct which is not 4-byte aligned as required by the ABI rules.
 
-This is not great, but the general feeling seems to be that combining
-LPAE and non-LPAE in the same kernel is just not going to be worth the
-pain (either in code or runtime impacts).
+>> #define ntohl(x) __swab32((__u32)(__be32)(x))
+>> #define IP_DF           0x4000          /* Flag: "Don't Fragment"       */
+>>
+>> static inline __attribute__((const)) __u32 __swab32(__u32 x)
+>> {
+>>         __asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
+>>         return x;
+>> }
+>>
+>> int main(void * buffer, unsigned int *p_id)
+>> {
+>>         unsigned int id;
+>>         int flush = 1;
+>>         const struct iphdr *iph = buffer;
+>>         __u32 len = *p_id;
+>>
+>>         id = ntohl(*(__be32 *)&iph->id);
+>
+>
+> The above statement is the problem.  I think it is poorly written networking
+> code.  It takes the address of a 16 bit quantity (aligned on a halfword
+> address),
 
-For AArch64, we obviously have a different kernel binary anyway.
+The 'id' member starts 4 bytes into the struct, so if the struct is properly
+aligned, there will be no fault here.  The problem is that networking code does
+not always align these structs correctly.
 
+> attempts to do a type conversion using pointers, then dereference
+> it.  I would have thought:
+>
+> id = ntohs(iph->id);
+>
+> would have been enough.
 
-Cheers
----Dave
+I'm assuming the is intentionally merging two 16-bit fields into one 32-bit
+value.  What you suggest would do something rather different.
+
+-- 
+Mans Rullgard / mru
