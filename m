@@ -1,55 +1,58 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 10 Oct 2012 00:18:48 +0200
-Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <20121009155241.GQ12801@game.jcrosoft.org>
-References: <20121009151704.GP12801@game.jcrosoft.org>
- <Pine.LNX.4.44L0.1210091141270.1441-100000@iolanthe.rowland.org>
- <20121009155241.GQ12801@game.jcrosoft.org>
-Message-ID: <3395599.MgZOPkqiWY@vostro.rjw.lan>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 09 Oct 2012 16:22:59 -0600
+Subject: [PATCH 1/7] ARM: tegra: cpuidle: separate cpuidle driver for
+ different chips
+In-Reply-To: <1349691981-31038-2-git-send-email-josephl@nvidia.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-2-git-send-email-josephl@nvidia.com>
+Message-ID: <5074A3C3.1080006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 of October 2012 17:52:41 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:44 Tue 09 Oct     , Alan Stern wrote:
-> > On Tue, 9 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > > > Why do you need to know the difference in your driver?  We used to
-> > > > provide this information a long time ago, but it turned out to not be
-> > > > needed at all and just caused problems.
-> > > because on at91 I need to handle the mem standby at drviers level.
-> > > 
-> > > We do it today already by a hack in different drivers at91_udc (usb device),
-> > > atmel_serail and at91_ohci. Those 3 IP have specifci handling when switching
-> > > to mem pm. On at91 when switch to mem we shutdown everything and run form a slow
-> > > clock - this is done at soc level - but those IP have issue and need specific
-> > > care before doing so. Ohterwise when the SoC will wakeup but those IP will not
-> > > 
-> > > in this patch series I send the update of those 3 drivers too
-> > > and kill the hack
-> > 
-> > How about adding a platform-specific callback routine to tell drivers 
-> > whether or not they will run from the slow clock?  Something like:
-> > 
-> > 	bool at91_suspend_will_use_slow_clock(void);
-> > 
-> > That would not involve making any changes to the driver core, and your 
-> > three drivers could still get the information they need.
-> I already do so and I want to drop it as the IP is shared with multiple ARCH
-> and I want to have a clean code no hack
+On 10/08/2012 04:26 AM, Joseph Lo wrote:
+> The different Tegra chips may have different CPU idle states and data.
+> Individual CPU idle driver make it more easy to maintain.
 
-So, what about actually adding a platform layer to your PM instead of doing
-all PM in device drivers?
+> diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+> similarity index 72%
+> copy from arch/arm/mach-tegra/cpuidle.c
+> copy to arch/arm/mach-tegra/cpuidle-tegra20.c
+> index 4e0b07c..e2fc26a 100644
+> --- a/arch/arm/mach-tegra/cpuidle.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+> @@ -1,24 +1,22 @@
+>  /*
+> - * arch/arm/mach-tegra/cpuidle.c
+> + * CPU idle driver for Tegra20 CPUs
+>   *
+> - * CPU idle driver for Tegra CPUs
+> - *
+> - * Copyright (c) 2010-2012, NVIDIA Corporation.
+> + * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
+>   * Copyright (c) 2011 Google, Inc.
+>   * Author: Colin Cross <ccross@android.com>
+>   *         Gary King <gking@nvidia.com>
+>   *
+> - * Rework for 3.3 by Peter De Schrijver <pdeschrijver@nvidia.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+>   *
+>   * This program is distributed in the hope that it will be useful, but WITHOUT
+>   * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>   * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>   * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
 
-ACPI has exactly the same problem that you have, but it's never has to tell
-device drivers what system sleep state is going to be entered.  Drivers just
-call acpi_pm_device_sleep_state() and that tells them what power state to
-put the device into (which depends on the sleep state being entered, but
-drivers really don't need to know that state).
-
-Thanks,
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+While that is the correct (c) header for new work submitted upstream,
+given this file is existing, just renamed and tweaked a bit, I don't
+believe you want to be changing the (c) header at all. Same for
+cpuidle-tegra30.c.
