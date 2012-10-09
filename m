@@ -1,105 +1,79 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Tue,  9 Oct 2012 14:04:05 +0200
-Subject: [PATCH v4 2/8] watchdog: core: dt: add support for the timeout-sec dt
- property
+Date: Tue,  9 Oct 2012 14:04:07 +0200
+Subject: [PATCH v4 4/8] watchdog: pnx4008: add timeout-sec property binding
 In-Reply-To: <1349784251-28261-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1349784251-28261-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1349784251-28261-3-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1349784251-28261-5-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
----
- Documentation/watchdog/watchdog-kernel-api.txt | 10 +++++++
- drivers/watchdog/watchdog_core.c               | 37 ++++++++++++++++++++++++++
- include/linux/watchdog.h                       |  3 +++
- 3 files changed, 50 insertions(+)
+Only compile tested.
 
-diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
-index 086638f..44098c2 100644
---- a/Documentation/watchdog/watchdog-kernel-api.txt
-+++ b/Documentation/watchdog/watchdog-kernel-api.txt
-@@ -212,3 +212,13 @@ driver specific data to and a pointer to the data itself.
- The watchdog_get_drvdata function allows you to retrieve driver specific data.
- The argument of this function is the watchdog device where you want to retrieve
- data from. The function returns the pointer to the driver specific data.
-+
-+To initialize the timeout field use the following function:
-+
-+extern void watchdog_init_timeout(struct watchdog_device *wdd,
-+                                  unsigned int parm_timeout,
-+                                  struct device_node *node);
-+
-+The watchdog_init_timeout function allows you to initialize the timeout field
-+using the module timeout parameter or retrieving the timeout-sec property from
-+the device tree.
-diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-index 3796434..37dde68 100644
---- a/drivers/watchdog/watchdog_core.c
-+++ b/drivers/watchdog/watchdog_core.c
-@@ -36,12 +36,49 @@
- #include <linux/init.h>		/* For __init/__exit/... */
- #include <linux/idr.h>		/* For ida_* macros */
- #include <linux/err.h>		/* For IS_ERR macros */
-+#include <linux/of.h>		/* For of_get_timeout_sec */
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Masanari Iida <standby24x7@gmail.com>
+---
+ Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt | 4 ++++
+ drivers/watchdog/pnx4008_wdt.c                             | 7 +++----
+ 2 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt b/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
+index 7c7f688..556d06c 100644
+--- a/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
+@@ -5,9 +5,13 @@ Required properties:
+ - reg: physical base address of the controller and length of memory mapped
+   region.
  
- #include "watchdog_core.h"	/* For watchdog_dev_register/... */
++Optional properties:
++- timeout-sec: contains the watchdog timeout in seconds.
++
+ Example:
  
- static DEFINE_IDA(watchdog_ida);
- static struct class *watchdog_class;
+ 	watchdog at 4003C000 {
+ 		compatible = "nxp,pnx4008-wdt";
+ 		reg = <0x4003C000 0x1000>;
++		timeout-sec = <10>;
+ 	};
+diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+index 87722e1..152e9fb 100644
+--- a/drivers/watchdog/pnx4008_wdt.c
++++ b/drivers/watchdog/pnx4008_wdt.c
+@@ -142,6 +142,7 @@ static const struct watchdog_ops pnx4008_wdt_ops = {
+ static struct watchdog_device pnx4008_wdd = {
+ 	.info = &pnx4008_wdt_ident,
+ 	.ops = &pnx4008_wdt_ops,
++	.timeout = DEFAULT_HEARTBEAT,
+ 	.min_timeout = 1,
+ 	.max_timeout = MAX_HEARTBEAT,
+ };
+@@ -151,8 +152,7 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	int ret = 0;
  
-+static bool watchdog_is_valid_timeout(struct watchdog_device *wdd,
-+				      unsigned int t)
-+
-+{
-+	if (wdd->min_timeout < wdd->max_timeout)
-+		return (wdd->min_timeout <= t) && (t <= wdd->max_timeout);
-+	else
-+		return (t > 0);
-+}
-+
-+/**
-+ * watchdog_init_timeout() - initialize the timeout field
-+ * @parm: timeout module parameter, it takes precedence over the
-+ *        timeout-sec property.
-+ * @node: Retrieve the timeout-sec property only if the parm_timeout
-+ *        is out of bounds.
-+ */
-+void watchdog_init_timeout(struct watchdog_device *wdd, unsigned int parm,
-+			   struct device_node *node)
-+{
-+	unsigned int t = 0;
-+
-+	if (watchdog_is_valid_timeout(wdd, parm)) {
-+		wdd->timeout = parm;
-+		return;
-+	}
-+
-+	/* try to get the timeout_sec property */
-+	if (!node)
-+		return;
-+	of_get_timeout_sec(node, &t);
-+	if (watchdog_is_valid_timeout(wdd, t))
-+		wdd->timeout = t;
-+}
-+EXPORT_SYMBOL_GPL(watchdog_init_timeout);
-+
- /**
-  * watchdog_register_device() - register a watchdog device
-  * @wdd: watchdog device
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index da70f0f..b8eec8d 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -175,6 +175,9 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
- }
+-	if (heartbeat < 1 || heartbeat > MAX_HEARTBEAT)
+-		heartbeat = DEFAULT_HEARTBEAT;
++	watchdog_init_timeout(&pnx4008_wdd, heartbeat, pdev->dev.of_node);
  
- /* drivers/watchdog/core/watchdog_core.c */
-+extern void watchdog_init_timeout(struct watchdog_device *wdd,
-+				  unsigned int parm_timeout,
-+				  struct device_node *node);
- extern int watchdog_register_device(struct watchdog_device *);
- extern void watchdog_unregister_device(struct watchdog_device *);
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	wdt_base = devm_request_and_ioremap(&pdev->dev, r);
+@@ -167,7 +167,6 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto out;
+ 
+-	pnx4008_wdd.timeout = heartbeat;
+ 	pnx4008_wdd.bootstatus = (readl(WDTIM_RES(wdt_base)) & WDOG_RESET) ?
+ 			WDIOF_CARDRESET : 0;
+ 	watchdog_set_nowayout(&pnx4008_wdd, nowayout);
+@@ -181,7 +180,7 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	dev_info(&pdev->dev, "PNX4008 Watchdog Timer: heartbeat %d sec\n",
+-			heartbeat);
++		 pnx4008_wdd.timeout);
+ 
+ 	return 0;
  
 -- 
 1.7.11.3
