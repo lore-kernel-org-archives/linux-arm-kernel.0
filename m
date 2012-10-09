@@ -1,27 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Oct 2012 20:01:27 -0700
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <cover.1349450723.git.afzal@ti.com>
-References: <cover.1349450723.git.afzal@ti.com>
-Message-ID: <20121009030126.GB12552@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 08 Oct 2012 21:06:51 -0600
+Subject: [PATCH 6/6] ARM: bcm476x: Instantiate console UART
+In-Reply-To: <20121007015407.840781689@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015407.840781689@gmail.com>
+Message-ID: <507394CB.5080300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [121005 09:02]:
+On 10/06/2012 07:53 PM, Domenico Andreoli wrote:
+> From: Domenico Andreoli <domenico.andreoli@linux.com>
 > 
-> Proposed generic routine has been tested on OneNAND (async) on
-> OMAP3EVM rev C (as mainline does not have the OneNAND support for this,
-> local patch were used to test). For other cases of custom timing
-> calculation (tusb6010, smc91x non-muxed, OneNAND sync), generic timing
-> calculation routine was verified by simulating on OMAP3EVM.
+> The BCM476x sports standard PL011 UARTs which are fully described and
+> put to use with these few changes.
 
-Have you tested to make sure this works if you change the
-L3 frequency?
+Given that this SoC uses an interrupt controller for which there's
+already a driver (so there's no need to wait for a later patch before
+interrupts work), and that patch 1/6 adds debug/bcm476x.S anyway, I'd be
+inclined to just squash this patch into the very first one myself.
 
-That should probably be tested as a sanity check. Maybe you
-can force the L3 for some test boots for this, I don't think
-we scale it by default.
-
-Regards,
-
-Tony
+If not, this patch isn't really just instantiating the console UART, but
+also allowing the DEBUG_LL implementation to be selected.
