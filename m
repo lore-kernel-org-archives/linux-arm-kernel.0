@@ -1,35 +1,108 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Tue, 9 Oct 2012 13:54:05 +0200
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <50739074.8000001@wwwdotorg.org>
-References: <20121007015300.828366635@gmail.com>
- <20121007015405.958959522@gmail.com>
- <50739074.8000001@wwwdotorg.org>
-Message-ID: <20121009115405.GC28817@glitch>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 9 Oct 2012 13:52:45 +0200
+Subject: [PATCH 02/11] fsmc/nand: Rearrange the fsmc_nand_data
+ structure and update comments
+In-Reply-To: <2aa2a9c00bcfa62605edfab8fb4c29448612ced3.1349778820.git.vipin.kumar@st.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2aa2a9c00bcfa62605edfab8fb4c29448612ced3.1349778820.git.vipin.kumar@st.com>
+Message-ID: <20121009115245.GL12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 08:48:20PM -0600, Stephen Warren wrote:
-> On 10/06/2012 07:53 PM, Domenico Andreoli wrote:
-> > BCM476x's minimal infrastructure, Kernel's great reuse.
+On 16:14 Tue 09 Oct     , Vipin Kumar wrote:
+> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
+> ---
+>  drivers/mtd/nand/fsmc_nand.c | 51 ++++++++++++++++++++++++++------------------
+>  1 file changed, 30 insertions(+), 21 deletions(-)
 > 
-> > Index: b/arch/arm/boot/dts/bcm476x.dtsi
+> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+> index e96d7d1..bd89580 100644
+> --- a/drivers/mtd/nand/fsmc_nand.c
+> +++ b/drivers/mtd/nand/fsmc_nand.c
+> @@ -278,52 +278,61 @@ static struct fsmc_eccplace fsmc_ecc4_sp_place = {
+>   * struct fsmc_nand_data - structure for FSMC NAND device state
+>   *
+>   * @pid:		Part ID on the AMBA PrimeCell format
+> - * @mtd:		MTD info for a NAND flash.
+> - * @nand:		Chip related info for a NAND flash.
+> - * @partitions:		Partition info for a NAND Flash.
+> - * @nr_partitions:	Total number of partition of a NAND flash.
+> - *
+> - * @ecc_place:		ECC placing locations in oobfree type format.
+> - * @bank:		Bank number for probed device.
+> - * @clk:		Clock structure for FSMC.
+> + * @mtd:		MTD info for a NAND flash
+> + * @nand:		Chip related info for a NAND flash
+> + * @dev:		Device structure pointer
+> + * @clk:		Clock structure for FSMC
+> + * @ecc_place:		ECC placing locations in oobfree type format
+> + * @bank:		Bank number for probed device
+>   *
+>   * @read_dma_chan:	DMA channel for read access
+>   * @write_dma_chan:	DMA channel for write access to NAND
+>   * @dma_access_complete: Completion structure
+>   *
+> - * @data_pa:		NAND Physical port for Data.
+> - * @data_va:		NAND port for Data.
+> - * @cmd_va:		NAND port for Command.
+> - * @addr_va:		NAND port for Address.
+> - * @regs_va:		FSMC regs base address.
+> + * @dev_timings:	Timings to be programmed in controller
+> + * @partitions:		Partition info for a NAND Flash
+> + * @nr_partitions:	Total number of partition of a NAND flash
+> + * @mode:		Defines the NAND device access mode
+> + *			Can be one of:
+> + *			- DMA access
+> + *			- Word access (CPU)
+> + *			- None (Use driver default ie bus width specific
+> + *			  CPU access)
+> + * @select_chip:	Select a particular bank
+> + *
+> + * @data_pa:		NAND Physical port for Data
+> + * @data_va:		NAND port for Data
+> + * @cmd_va:		NAND port for Command
+> + * @addr_va:		NAND port for Address
+> + * @regs_va:		FSMC regs base address
+>   */
+>  struct fsmc_nand_data {
+>  	u32			pid;
+>  	struct mtd_info		mtd;
+>  	struct nand_chip	nand;
+> -	struct mtd_partition	*partitions;
+> -	unsigned int		nr_partitions;
+> -
+> -	struct fsmc_eccplace	*ecc_place;
+> -	unsigned int		bank;
+>  	struct device		*dev;
+> -	enum access_mode	mode;
+>  	struct clk		*clk;
+> +	struct fsmc_eccplace	*ecc_place;
+> +	unsigned int		bank;
+>  
+>  	/* DMA related objects */
+>  	struct dma_chan		*read_dma_chan;
+>  	struct dma_chan		*write_dma_chan;
+>  	struct completion	dma_access_complete;
+>  
+> +	/* Recieved from plat data */
+>  	struct fsmc_nand_timings *dev_timings;
+> +	struct mtd_partition	*partitions;
+> +	unsigned int		nr_partitions;
+where do you use those execpt at probe time
+> +	enum access_mode	mode;
+> +	void			(*select_chip)(uint32_t bank, uint32_t busw);
+>  
+> +	/* Virtual/Physical addresses for CPU/DMA access */
+>  	dma_addr_t		data_pa;
+>  	void __iomem		*data_va;
+>  	void __iomem		*cmd_va;
+>  	void __iomem		*addr_va;
+>  	void __iomem		*regs_va;
+> -
+> -	void			(*select_chip)(uint32_t bank, uint32_t busw);
+>  };
+>  
+>  /* Assert CS signal based on chipnr */
+> -- 
+> 1.7.11.4
 > 
-> > +	chosen {
-> > +		bootargs = "earlyprintk";
-> > +	};
-> 
-> > Index: b/arch/arm/configs/bcm476x_defconfig
-> 
-> > +CONFIG_CMDLINE="root=/dev/mmcblk0p2 ro console=ttyAMA1,115200 rootwait init=/bin/bash"
-> > +CONFIG_CMDLINE_FROM_BOOTLOADER=y
-> 
-> I'm not sure you need to specify a default command-line in both those
-> places. I would be inclined to leave out the root= option as well; it's
-> pretty specific to however the user's SD card was partitioned, so there
-> could be quite some variation there I think? Oh, especially since I
-> think you said there was no SD driver yet anyway?
-
-Right, I'll drop both. Thanks.
-
-Dome
