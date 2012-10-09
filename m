@@ -1,51 +1,74 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Tue, 9 Oct 2012 14:13:09 -0400
-Subject: [kvmarm] [PATCH v2 12/14] KVM: ARM: VFP userspace interface
-In-Reply-To: <CAFEAcA8zLr5mPYnd6EzaxyugASWPzvY4RE6LiE-K2uRRGWtFZA@mail.gmail.com>
-References: <20121001090945.49198.68950.stgit@ubuntu>
- <20121001091125.49198.90819.stgit@ubuntu>
- <CAFEAcA8zLr5mPYnd6EzaxyugASWPzvY4RE6LiE-K2uRRGWtFZA@mail.gmail.com>
-Message-ID: <CANM98qJDhHDBPq=XinLaXJG8e07-HhVBfd-2i3a68CumdXuFaw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Oct 2012 18:19:34 +0000
+Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
+In-Reply-To: <1349799035.21847.222.camel@zakaz.uk.xensource.com>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <201210091539.46274.arnd@arndb.de>
+ <1349799035.21847.222.camel@zakaz.uk.xensource.com>
+Message-ID: <201210091819.34310.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2012 at 2:11 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 1 October 2012 10:11, Christoffer Dall <c.dall@virtualopensystems.com> wrote:
->> From: Rusty Russell <rusty.russell@linaro.org>
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -1765,6 +1765,12 @@ ARM 64-bit CP15 registers have the following id bit patterns:
->>  ARM CCSIDR registers are demultiplexed by CSSELR value:
->>    0x4002 0000 0011 00 <csselr:8>
->>
->> +ARM 32-bit VFP control registers have the following id bit patterns:
->> +  0x4002 0000 0012 1 <selector:3>
->> +
->> +ARM 64-bit FP registers have the following id bit patterns:
->> +  0x4002 0000 0012 0 <selector:3>
->> +
->
-> In the other entries in this section, <foo:3> indicates a 3 bit field.
-> But I think for these two it's trying to indicate a 3 byte field.
-> Compare the include file constants:
->
-> +#define KVM_REG_ARM_VFP                        (0x0012 <<
-> KVM_REG_ARM_COPROC_SHIFT)
-> +#define KVM_REG_ARM_VFP_MASK           0x000000000000FFFF
-> +#define KVM_REG_ARM_VFP_BASE_REG       0x0
-> +#define KVM_REG_ARM_VFP_FPSID          0x1000
-> +#define KVM_REG_ARM_VFP_FPSCR          0x1001
->
-> so eg the first control register is
->  0x4002 0000 0012 1000
-> and the first D reg is
->  0x4002 0000 0012 0000
->
-> So my guess is these should be <selector:12>
-> (or possibly even something slightly more specific than 'selector'
-> like '<regno:12>' ?)
->
-right you are, I'll modify this.
+On Tuesday 09 October 2012, Ian Campbell wrote:
+> On Tue, 2012-10-09 at 16:39 +0100, Arnd Bergmann wrote:
+> > On Tuesday 09 October 2012, Ian Campbell wrote:
+> > > > * The tmem hypercall is not available on ARM
+> > > > 
+> > > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+> > > 
+> > > missing the end of this sentence?
+> > 
+> > Right, I meant to say 
+> > 
+> > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+> >   Xen grant table code, so we must ensure that Xen support is only built
+> >   on ARMv7-only kernels not combined ARMv6/v7 kernels.
+> > 
+> > This should be fixed differently in the future.
+> 
+> Is this is a build time failure because gcc/gas/etc refuses to generate
+> these instructions if it is configured for v6?
+> 
+> I ask because if it is only a runtime issue then we can reason that if
+> we are running Xen specific grant table code, then we must be running on
+> Xen and therefore must necessarily be running on a v7 (because Xen only
+> support v7+virt extensions) even if the kernel happens to be capable of
+> running on v6 too.
 
-Thanks,
--Christoffer
+The underlying reason of course is that ARMv6 doesn't have those
+instructions. The symptom you see is a link error because gcc emits
+a reference to the (intentionally missing) __bad_cmpxchg() function
+from
+
+static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+                                      unsigned long new, int size)
+{
+        unsigned long oldval, res;
+
+        switch (size) {
+#ifndef CONFIG_CPU_V6   /* min ARCH >= ARMv6K */
+        case 1:
+		...
+                break;
+        case 2:
+		...
+                break;
+#endif
+        case 4:
+		...
+                break;
+        default:
+                __bad_cmpxchg(ptr, size);
+                oldval = 0;
+        }
+        return oldval;
+}
+
+The possible solutions I can see for this are:
+
+* change the grant table format to use 32 bits for the flags on ARM
+* change the code to always cmpxchg the entire 32 bit word including the flags.
+* implement your own cmpxchg wrapper that may be implemented using a spinlock
+  rather than cmpxchg if ARMv6 is enabled.
+
+	Arnd
