@@ -1,37 +1,26 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 9 Oct 2012 02:49:55 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: move old debug-devices.c and debug-leds.c to
- be OMAP2+ only for now
-In-Reply-To: <20121008221333.GZ13011@atomide.com>
-References: <alpine.DEB.2.00.1210080145080.5736@utopia.booyaka.com>
- <20121008221333.GZ13011@atomide.com>
-Message-ID: <alpine.DEB.2.00.1210090249240.5736@utopia.booyaka.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 08 Oct 2012 20:54:40 -0600
+Subject: [PATCH 3/6] ARM: bcm476x: Add sched clock
+In-Reply-To: <20121007015406.809888002@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015406.809888002@gmail.com>
+Message-ID: <507391F0.8070609@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Oct 2012, Tony Lindgren wrote:
+On 10/06/2012 07:53 PM, Domenico Andreoli wrote:
+> Sched clock implementation based on the BCM476x's free runner counter.
 
-> * Paul Walmsley <paul@pwsan.com> [121007 18:48]:
-> > 
-> > Commit 801475ccb2b2c1928b22aec4b9e5285d9e347602 ("ARM: OMAP: move
-> > debug_card_init() function") results in the following new sparse[1]
-> > warning:
-> > 
-> > arch/arm/plat-omap/debug-devices.c:71:12: warning: symbol 'debug_card_init' was not declared. Should it be static?
-> > 
-> > Normally this could be fixed by including the appropriate header file
-> > in plat-omap/debug-devices.c, but the header file now exists only in
-> > mach-omap2/, so this would require a "sideways include" and is thus
-> > impractical.  It turns out that only code in mach-omap2/ currently
-> > uses the debug-devices.c and debug-leds.c files, so move them there.
-> > In the long term, these devices should be created by DT, and the code
-> > should be moved into drivers/ somewhere.
-> 
-> Hmm are you sure that omap1 is not using debug-leds.c?
-> At least the initcall seems like it should run on omap1
-> if enabled.
+> Index: b/Documentation/devicetree/bindings/timer/brcm,bcm476x-sched-clock.txt
+> ===================================================================
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/brcm,bcm476x-sched-clock.txt
+> @@ -0,0 +1,18 @@
+> +BCM476x Sched clock
+> +
+> +The BCM476x provides a 63-bit free running counter driven by a separate
+> +32KHz clock line.
 
-Will drop this one for now until we figure out what to do about it.
-
-
-- Paul
+Is "sched clock" really the name of the HW module in the Broadcom
+documentation (well, assuming you have any access to that). DT names
+should derived from HW manuals/... where possible.
