@@ -1,72 +1,252 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 9 Oct 2012 16:03:59 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP: warnings/hwmod/clock fixes for pre-3.7-rc1
-Message-ID: <alpine.DEB.2.00.1210091602390.5736@utopia.booyaka.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue,  9 Oct 2012 20:05:56 +0400
+Subject: [PATCH v4] GPIO: Add support for GPIO on CLPS711X-target platform
+Message-ID: <1349798756-24777-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+The CLPS711X CPUs provide some GPIOs for use in the system. This
+driver provides support for these via gpiolib. Due to platform
+limitations, driver does not support interrupts, only inputs and
+outputs.
 
-The following changes since commit 0e51793e162ca432fc5f04178cf82b80a92c2659:
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/Kconfig                           |    1 +
+ arch/arm/mach-clps711x/include/mach/gpio.h |   13 +++
+ drivers/gpio/Kconfig                       |    4 +
+ drivers/gpio/Makefile                      |    1 +
+ drivers/gpio/gpio-clps711x.c               |  163 ++++++++++++++++++++++++++++
+ 5 files changed, 182 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
+ create mode 100644 drivers/gpio/gpio-clps711x.c
 
-  Merge branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm (2012-10-07 21:20:57 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-a-for-pre3.7
-
-for you to fetch changes up to e9332b6eed82973a8f75f1f3d57babaa331d703c:
-
-  ARM: OMAP4/AM335x: hwmod: fix disable_module regression in hardreset handling (2012-10-08 23:08:15 -0600)
-
-- ----------------------------------------------------------------
-Some OMAP fixes for the 3.7 merge window, fixing mismerges, branch
-integration issues, and bugs after the arm-soc merges.
-
-Basic test logs are available here:
-
-   http://www.pwsan.com/omap/testlogs/devel_late_fixes_3.7/20121009084003/
-
-N800 isn't booting; this is a problem present in the base commit and
-is due to serial driver breakage:
-
-   http://www.spinics.net/lists/arm-kernel/msg196034.html
-
-- ----------------------------------------------------------------
-Jon Hunter (2):
-      ARM: OMAP2+: hwmod data: Fix PMU interrupt definitions
-      ARM: OMAP3: fix workaround for EMU clockdomain
-
-Paul Walmsley (2):
-      ARM: OMAP: omap3evm: fix new sparse warning
-      ARM: OMAP4/AM335x: hwmod: fix disable_module regression in hardreset handling
-
-Vaibhav Hiremath (1):
-      ARM: am33xx: clk: Update clkdev table to add mcasp alias
-
- arch/arm/mach-omap2/board-omap3evm.c               |    3 +-
- arch/arm/mach-omap2/clock33xx_data.c               |    2 +
- arch/arm/mach-omap2/clockdomain2xxx_3xxx.c         |   44 ++++++++++----------
- arch/arm/mach-omap2/omap_hwmod.c                   |   31 ++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2 +-
- 6 files changed, 54 insertions(+), 30 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
-
-iQIcBAEBAgAGBQJQdEqIAAoJEMePsQ0LvSpLjvYP/RlejvRetwDYUSpwjgre/xfz
-BA+we3wgi/wgZ3xbdlcFKfdj2l+jzLxspr1pt6MSFzZqJJVKPj1xgHCPJZe4QFX3
-waurd+p4OUcO7qKoLQo7up9nfzsI4vnxjyDXjEUCLjAaEq18qqMi4YQEdncotrZU
-hOL8yFE9ol6Ds2dLtTulnxMfqbMILa5ek+NSVWizbQbVPh8opklRQwRSbYmAgCze
-USY410kyP/WVXa1hern5UnyEo4nzVpXAFf4+3LVil05p/vWgB4i/JwUINAYNr1sr
-L1ells+x0z9RKybTNsrDxTQmwY8Jr+TyZJ3uikccFTpqo+TfwcfZN++Qrx+/0Q5z
-GCVB4dp2aH4QLas9yTFGp/3X2BiPx5AwKX9mqhnOR3peq1lBS1D9V+BTmKAHoY6n
-w2XzAF3jpE2qNLnxIym46TJYRHGrc1o6U0U5dHxjQZVx796rgUHEIZEfVznWj6lS
-GaU3b8YQKN3EPKbrdIQ2y5bVEf0SnLdiOjJo+tTVBGhQ7eiVMRN6btYt8Fod2Rlq
-TXleGmDGKUKI43omeALn2fJWgNrm1GIPSPU1aa3TMZQN7qa/FHyAimcY5QOqU+HT
-uCUmsSukw6oIfWvV8hyN/R7AovvqaKYpyPUvxOM09G/WnoRGahk3eFHpUcEGQGqD
-6PQY5o1skH1C4B++o0EL
-=Yvqo
------END PGP SIGNATURE-----
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2867a77..343b0c3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -352,6 +352,7 @@ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select CPU_ARM720T
+ 	select ARCH_USES_GETTIMEOFFSET
++	select ARCH_REQUIRE_GPIOLIB
+ 	select COMMON_CLK
+ 	select CLKDEV_LOOKUP
+ 	select NEED_MACH_MEMORY_H
+diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
+new file mode 100644
+index 0000000..8ac6889
+--- /dev/null
++++ b/arch/arm/mach-clps711x/include/mach/gpio.h
+@@ -0,0 +1,13 @@
++/*
++ *  This file contains the CLPS711X GPIO definitions.
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++/* Simple helper for convert port & pin to GPIO number */
++#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d055cee..fb76140 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -91,6 +91,10 @@ config GPIO_MAX730X
+ 
+ comment "Memory mapped GPIO drivers:"
+ 
++config GPIO_CLPS711X
++	def_bool y
++	depends on ARCH_CLPS711X
++
+ config GPIO_GENERIC_PLATFORM
+ 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
+ 	select GPIO_GENERIC
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 9aeed67..a28725e 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
+ obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
++obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
+ obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
+ obj-$(CONFIG_GPIO_DA9052)	+= gpio-da9052.o
+ obj-$(CONFIG_ARCH_DAVINCI)	+= gpio-davinci.o
+diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
+new file mode 100644
+index 0000000..ea21822
+--- /dev/null
++++ b/drivers/gpio/gpio-clps711x.c
+@@ -0,0 +1,163 @@
++/*
++ *  CLPS711X GPIO driver
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/gpio.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/platform_device.h>
++
++#include <mach/hardware.h>
++
++#define CLPS711X_GPIO_PORTS	5
++#define CLPS711X_GPIO_NAME	"gpio-clps711x"
++
++struct clps711x_gpio {
++	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
++	spinlock_t		lock;
++};
++
++static void __iomem *clps711x_ports[] = {
++	CLPS711X_VIRT_BASE + PADR,
++	CLPS711X_VIRT_BASE + PBDR,
++	CLPS711X_VIRT_BASE + PCDR,
++	CLPS711X_VIRT_BASE + PDDR,
++	CLPS711X_VIRT_BASE + PEDR,
++};
++
++static void __iomem *clps711x_pdirs[] = {
++	CLPS711X_VIRT_BASE + PADDR,
++	CLPS711X_VIRT_BASE + PBDDR,
++	CLPS711X_VIRT_BASE + PCDDR,
++	CLPS711X_VIRT_BASE + PDDDR,
++	CLPS711X_VIRT_BASE + PEDDR,
++};
++
++#define clps711x_port(x)	clps711x_ports[x->base / 8]
++#define clps711x_pdir(x)	clps711x_pdirs[x->base / 8]
++
++static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
++{
++	return !!readb(clps711x_port(chip)) & (1 << offset);
++}
++
++static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
++			      int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_port(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++}
++
++static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
++	writeb(tmp, clps711x_pdir(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
++				       int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
++	writeb(tmp, clps711x_pdir(chip));
++	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_port(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++struct clps711x_gpio_port {
++	char	*name;
++	int	nr;
++};
++
++static const struct clps711x_gpio_port clps711x_gpio_ports[] __initconst = {
++	{ "PORTA", 8, },
++	{ "PORTB", 8, },
++	{ "PORTC", 8, },
++	{ "PORTD", 8, },
++	{ "PORTE", 3, },
++};
++
++static int __init gpio_clps711x_init(void)
++{
++	int i;
++	struct platform_device *pdev;
++	struct clps711x_gpio *gpio;
++
++	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
++	if (!pdev) {
++		pr_err("Cannot create platform device: %s\n",
++		       CLPS711X_GPIO_NAME);
++		return -ENOMEM;
++	}
++
++	platform_device_add(pdev);
++
++	gpio = devm_kzalloc(&pdev->dev, sizeof(struct clps711x_gpio),
++			    GFP_KERNEL);
++	if (!gpio) {
++		dev_err(&pdev->dev, "GPIO allocating memory error\n");
++		platform_device_del(pdev);
++		platform_device_put(pdev);
++		return -ENOMEM;
++	}
++
++	platform_set_drvdata(pdev, gpio);
++
++	spin_lock_init(&gpio->lock);
++
++	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
++		gpio->chip[i].owner		= THIS_MODULE;
++		gpio->chip[i].dev		= &pdev->dev;
++		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
++		gpio->chip[i].base		= i * 8;
++		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
++		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
++		gpio->chip[i].get		= gpio_clps711x_get;
++		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
++		gpio->chip[i].set		= gpio_clps711x_set;
++		WARN_ON(gpiochip_add(&gpio->chip[i]));
++	}
++
++	dev_info(&pdev->dev, "GPIO driver initialized\n");
++
++	return 0;
++}
++arch_initcall(gpio_clps711x_init);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
++MODULE_DESCRIPTION("CLPS711X GPIO driver");
+-- 
+1.7.8.6
