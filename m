@@ -1,47 +1,120 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Oct 2012 09:18:56 +0000
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <20121007015405.958959522@gmail.com>
-References: <20121007015300.828366635@gmail.com>
- <20121007015405.958959522@gmail.com>
-Message-ID: <201210090918.56725.arnd@arndb.de>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 9 Oct 2012 17:18:57 +0800
+Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for
+ secondary CPUs
+In-Reply-To: <20121009083804.GA11840@e102568-lin.cambridge.arm.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-4-git-send-email-josephl@nvidia.com>
+ <20121008163504.GC5377@e102568-lin.cambridge.arm.com>
+ <1349755995.15153.145.camel@jlo-ubuntu-64.nvidia.com>
+ <20121009083804.GA11840@e102568-lin.cambridge.arm.com>
+Message-ID: <1349774337.16173.8.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Domenico,
+On Tue, 2012-10-09 at 16:38 +0800, Lorenzo Pieralisi wrote:
+> On Tue, Oct 09, 2012 at 05:13:15AM +0100, Joseph Lo wrote:
+> 
+> [...]
+> 
+> > > > +ENTRY(tegra_flush_l1_cache)
+> > > > +       stmfd   sp!, {r4-r5, r7, r9-r11, lr}
+> > > > +       dmb                                     @ ensure ordering
+> > > > +
+> > > > +       /* Disable the data cache */
+> > > > +       mrc     p15, 0, r2, c1, c0, 0
+> > > > +       bic     r2, r2, #CR_C
+> > > > +       dsb
+> > > > +       mcr     p15, 0, r2, c1, c0, 0
+> > > > +
+> > > > +       /* Flush data cache */
+> > > > +       mov     r10, #0
+> > > > +#ifdef CONFIG_PREEMPT
+> > > > +       save_and_disable_irqs_notrace r9        @ make cssr&csidr read atomic
+> > > > +#endif
+> > > > +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr
+> > > > +       isb                                     @ isb to sych the new cssr&csidr
+> > > > +       mrc     p15, 1, r1, c0, c0, 0           @ read the new csidr
+> > > > +#ifdef CONFIG_PREEMPT
+> > > > +       restore_irqs_notrace r9
+> > > > +#endif
+> > > > +       and     r2, r1, #7                      @ extract the length of the cache lines
+> > > > +       add     r2, r2, #4                      @ add 4 (line length offset)
+> > > > +       ldr     r4, =0x3ff
+> > > > +       ands    r4, r4, r1, lsr #3              @ find maximum number on the way size
+> > > > +       clz     r5, r4                          @ find bit position of way size increment
+> > > > +       ldr     r7, =0x7fff
+> > > > +       ands    r7, r7, r1, lsr #13             @ extract max number of the index size
+> > > > +loop2:
+> > > > +       mov     r9, r4                          @ create working copy of max way size
+> > > > +loop3:
+> > > > +       orr     r11, r10, r9, lsl r5            @ factor way and cache number into r11
+> > > > +       orr     r11, r11, r7, lsl r2            @ factor index number into r11
+> > > > +       mcr     p15, 0, r11, c7, c14, 2         @ clean & invalidate by set/way
+> > > > +       subs    r9, r9, #1                      @ decrement the way
+> > > > +       bge     loop3
+> > > > +       subs    r7, r7, #1                      @ decrement the index
+> > > > +       bge     loop2
+> > > > +finished:
+> > > > +       mov     r10, #0                         @ swith back to cache level 0
+> > > > +       mcr     p15, 2, r10, c0, c0, 0          @ select current cache level in cssr 
+> > > > +       dsb
+> > > > +       isb
+> > > 
+> > > This code is already in the kernel in cache-v7.S, please use that.
+> > > We are just adding the new LoUIS API that probably does what you
+> > > want, even though for Tegra, that is an A9 based platform I fail to
+> > > understand why Level of Coherency differs from L1.
+> > > 
+> > > Can you explain to me please why Level of Coherency (LoC) is != from L1
+> > > on Tegra ?
+> > > 
+> > 
+> > Thanks for introducing the new LoUIS cache API. Did LoUIS been changed
+> > by other HW? I checked the new LoUIS API. If LoUIS == 0, it means inner
+> > shareable then it do nothing just return. But I need to flush L1 data
+> > cache here to sync the coherency before CPU be power gated. And disable
+> > data cache before flush is needed.
+> 
+> I understand that, that's why I am asking. To me LoUIS and LoC should
+> both be the same for A9 based platforms and they should both represent
+> a cache level that *includes* L1.
+> 
+> Can you provide me with the CLIDR value for Tegra3 please ?
+> 
 
-Your series looks very nice, thanks for the contribution!
+I just checked the CLIDR of both Tegra20 and Tegra30. It's 0x09200003.
+It looks I can use this new LoUIS api, right? :)
 
-Stephen has already covered everything I would have commented and
-more, except for one thing that I found: 
+I will give it a try and update to next version. Thanks.
 
-On Sunday 07 October 2012, Domenico Andreoli wrote:
-> Index: b/arch/arm/boot/dts/bcm476x.dtsi
-> ===================================================================
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm476x.dtsi
-> @@ -0,0 +1,31 @@
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +       compatible = "brcm,bcm476x";
-> +       model = "Broadcom BCM476x";
-> +
-> ...
-> +               vic0: interrupt-controller at 80000 {
-> +                       compatible = "brcm,bcm476x-pl192", "arm,pl192-vic", "arm,primecell";
-> +                       reg = <0x80000 0x1000>;
-> +                       interrupt-controller;
-> +                       #interrupt-cells = <1>;
-> +               };
+> > 
+> > I can tell you the sequence that why we just do L1 data cache flush
+> > here. Maybe I need to change the comment to "flush to point of
+> > coherency" not "level of coherency".
+> > 
+> > For secondary CPUs:
+> > * after cpu_suspend
+> > * disable data cache and flush L1 data cache
+>     ^(1)
+> > * Turn off SMP coherency
+>     ^(2)
+> 
+> Two steps above, one assembly function, no access to any data whatsoever
+> please.
+> 
+OK. Will do this and update to next version.
 
-I suppose that the name of the soc is not actually "bcm476x" but you
-are in fact referring to the family including bcm4760 and bcm4761.
+> > * power gate CPU
+> > 
+> > For CPU0:
+> > * outer_disable (flush and disable L2)
+> 
+> I guess L2 cannot be retained on Tegra ?
+> 
+Yes.
 
-The convention in the device tree is to always use specific product
-numbers, rather than wildcards. If one of the two has a superset of
-the hardware of the other, I would recommend you pick that number
-in the device tree and in the drivers, and for the other one, you
-just mark them as compatible to both of them.
+I will give it a test and update later.
 
-	Arnd
+Thanks,
+Joseph
