@@ -1,184 +1,44 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 9 Oct 2012 14:52:43 +0200
-Subject: [PATCH v2 2/2] [media]: mx2_camera: Fix regression caused by
- clock conversion
-In-Reply-To: <50741D08.1060706@gmail.com>
-References: <1349735823-30315-1-git-send-email-festevam@gmail.com>
- <50741D08.1060706@gmail.com>
-Message-ID: <CACKLOr2rW2cceRzKt5HwxgoaVkxUoGh9T5ym4frx83AUOn8ZSw@mail.gmail.com>
+Date: Tue, 9 Oct 2012 14:53:23 +0200
+Subject: [PATCH 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
+In-Reply-To: <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
+References: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
+ <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CACKLOr0wEzzb8vzqexePPG8nDkPOTgPRzPaMXoM1JFF2QADVSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2012 14:48, Ga?tan Carlier <gcembed@gmail.com> wrote:
-> Hi,
+On 5 October 2012 23:53, Fabio Estevam <fabio.estevam@freescale.com> wrote:
+> During the clock conversion for mx27 the "per4_gate" clock was missed to get
+> registered as a dependency of mx2-camera driver.
 >
-> On 10/09/2012 12:37 AM, Fabio Estevam wrote:
->>
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Since mx27 transitioned to the commmon clock framework in 3.5, the correct
->> way
->> to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
->>
->> By not doing so the camera sensor does not probe correctly:
->>
->> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
->> mx2-camera mx2-camera.0: Camera driver attached to camera 0
->> ov2640 0-0030: Product ID error fb:fb
->> mx2-camera mx2-camera.0: Camera driver detached from camera 0
->> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency:
->> 66500000
->>
->> Adapt the mx2_camera driver to the new clock framework and make it
->> functional
->> again.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Changes since v1:
->> - Rebased against linux-next 20121008.
->>
->>   drivers/media/platform/soc_camera/mx2_camera.c |   47
->> +++++++++++++++++-------
->>   1 file changed, 34 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/media/platform/soc_camera/mx2_camera.c
->> b/drivers/media/platform/soc_camera/mx2_camera.c
->> index 403d7f1..9f8c5f0 100644
->> --- a/drivers/media/platform/soc_camera/mx2_camera.c
->> +++ b/drivers/media/platform/soc_camera/mx2_camera.c
->> @@ -272,7 +272,8 @@ struct mx2_camera_dev {
->>         struct device           *dev;
->>         struct soc_camera_host  soc_host;
->>         struct soc_camera_device *icd;
->> -       struct clk              *clk_csi, *clk_emma_ahb, *clk_emma_ipg;
->> +       struct clk              *clk_emma_ahb, *clk_emma_ipg;
->> +       struct clk              *clk_csi_ahb, *clk_csi_per;
->>
->>         void __iomem            *base_csi, *base_emma;
->>
->> @@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct
->> mx2_camera_dev *pcdev)
->>   {
->>         unsigned long flags;
->>
->> -       clk_disable_unprepare(pcdev->clk_csi);
->> +       clk_disable_unprepare(pcdev->clk_csi_ahb);
->> +       clk_disable_unprepare(pcdev->clk_csi_per);
->>         writel(0, pcdev->base_csi + CSICR1);
->>         if (cpu_is_mx27()) {
->>                 writel(0, pcdev->base_emma + PRP_CNTL);
->> @@ -460,7 +462,11 @@ static int mx2_camera_add_device(struct
->> soc_camera_device *icd)
->>         if (pcdev->icd)
->>                 return -EBUSY;
->>
->> -       ret = clk_prepare_enable(pcdev->clk_csi);
->> +       ret = clk_prepare_enable(pcdev->clk_csi_ahb);
->> +       if (ret < 0)
->> +               return ret;
->> +
->> +       ret = clk_prepare_enable(pcdev->clk_csi_per);
->>         if (ret < 0)
->>                 return ret;
->>
->> @@ -1725,11 +1731,18 @@ static int __devinit mx2_camera_probe(struct
->> platform_device *pdev)
->>                 goto exit;
->>         }
->>
->> -       pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
->> -       if (IS_ERR(pcdev->clk_csi)) {
->> -               dev_err(&pdev->dev, "Could not get csi clock\n");
->> -               err = PTR_ERR(pcdev->clk_csi);
->> -               goto exit;
->> +       pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
->> +       if (IS_ERR(pcdev->clk_csi_ahb)) {
->> +               dev_err(&pdev->dev, "Could not get csi ahb clock\n");
->> +               err = PTR_ERR(pcdev->clk_csi_ahb);
->> +               goto exit;
->> +       }
->> +
->> +       pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
->> +       if (IS_ERR(pcdev->clk_csi_per)) {
->> +               dev_err(&pdev->dev, "Could not get csi per clock\n");
->> +               err = PTR_ERR(pcdev->clk_csi_per);
->> +               goto exit_csi_ahb;
->>         }
->>
->>         pcdev->pdata = pdev->dev.platform_data;
->> @@ -1738,14 +1751,15 @@ static int __devinit mx2_camera_probe(struct
->> platform_device *pdev)
->>
->>                 pcdev->platform_flags = pcdev->pdata->flags;
->>
->> -               rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk *
->> 2);
->> +               rate = clk_round_rate(pcdev->clk_csi_per,
->> +                                               pcdev->pdata->clk * 2);
->>                 if (rate <= 0) {
->>                         err = -ENODEV;
->> -                       goto exit;
->> +                       goto exit_csi_per;
->>                 }
->> -               err = clk_set_rate(pcdev->clk_csi, rate);
->> +               err = clk_set_rate(pcdev->clk_csi_per, rate);
->>                 if (err < 0)
->> -                       goto exit;
->> +                       goto exit_csi_per;
->>         }
->>
->>         INIT_LIST_HEAD(&pcdev->capture);
->> @@ -1801,7 +1815,7 @@ static int __devinit mx2_camera_probe(struct
->> platform_device *pdev)
->>                 goto exit_free_emma;
->>
->>         dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock
->> frequency: %ld\n",
->> -                       clk_get_rate(pcdev->clk_csi));
->> +                       clk_get_rate(pcdev->clk_csi_per));
->>
->>         return 0;
->>
->> @@ -1812,6 +1826,10 @@ eallocctx:
->>                 clk_disable_unprepare(pcdev->clk_emma_ipg);
->>                 clk_disable_unprepare(pcdev->clk_emma_ahb);
->>         }
->> +exit_csi_per:
->> +       clk_disable_unprepare(pcdev->clk_csi_per);
->> +exit_csi_ahb:
->> +       clk_disable_unprepare(pcdev->clk_csi_ahb);
->>   exit:
->>         return err;
->>   }
->> @@ -1831,6 +1849,9 @@ static int __devexit mx2_camera_remove(struct
->> platform_device *pdev)
->>                 clk_disable_unprepare(pcdev->clk_emma_ahb);
->>         }
->>
->> +       clk_disable_unprepare(pcdev->clk_csi_per);
->> +       clk_disable_unprepare(pcdev->clk_csi_ahb);
->> +
->>         dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
->>
->>         return 0;
->>
-> I only test detection at kernel boot not streaming using Gstreamer due to
-> lack of time.
+> In the old mx27 clock driver we used to have:
 >
-> On imx27_3ds board with ov2640 sensor:
-> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
-> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency:
-> 44333333
+> DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
 >
-> On clone imx27_3ds board with mt9v111 sensor (draft driver):
-> mt9v111 0-0048: Detected a MT9V111 chip ID 823a
-> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency:
-> 44333333
+> ,so does the same in the new clock driver.
 >
-> Tested-by: Ga?tan Carlier <gcembed@gmail.com>
-
-Sorry I missed patch 1/2.  Both patches are correct:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-imx27.c |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> index 3b6b640..5ef0f08 100644
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -224,6 +224,7 @@ int __init mx27_clocks_init(unsigned long fref)
+>         clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
+>         clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
+>         clk_register_clkdev(clk[csi_ahb_gate], "ahb", "mx2-camera.0");
+> +       clk_register_clkdev(clk[per4_gate], "per", "mx2-camera.0");
+>         clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
+>         clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
+>         clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
+> --
+> 1.7.9.5
+>
+>
 
 Tested-by: Javier Martin <javier.martin@vista-silicon.com>
 
