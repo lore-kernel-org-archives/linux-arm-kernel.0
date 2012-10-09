@@ -1,41 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  9 Oct 2012 17:23:02 +0200
-Subject: [PATCH 8/9] ARM: binfmt_flat: unused variable 'persistent'
+Date: Tue,  9 Oct 2012 17:22:58 +0200
+Subject: [PATCH 4/9] ARM: export default read_current_timer
 In-Reply-To: <1349796183-30648-1-git-send-email-arnd@arndb.de>
 References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349796183-30648-9-git-send-email-arnd@arndb.de>
+Message-ID: <1349796183-30648-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flat_get_addr_from_rp() macro does not use the 'persistent' argument
-on ARM, causing a harmless compiler warning. A cast to void removes
-that warning.
+read_current_timer is used by get_cycles since "ARM: 7538/1: delay:
+add registration mechanism for delay timer sources", and get_cycles
+can be used by device drivers in loadable modules, so it has to
+be exported.
 
-Without this patch, building at91x40_defconfig results in:
+Without this patch, building imote2_defconfig fails with
 
-fs/binfmt_flat.c: In function 'load_flat_file':
-fs/binfmt_flat.c:746:17: warning: unused variable 'persistent' [-Wunused-variable]
+ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Jonathan Austin <jonathan.austin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Bryan Wu <bryan.wu@canonical.com>
 ---
- arch/arm/include/asm/flat.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/lib/delay.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/flat.h b/arch/arm/include/asm/flat.h
-index 59426a4..e847d23 100644
---- a/arch/arm/include/asm/flat.h
-+++ b/arch/arm/include/asm/flat.h
-@@ -8,7 +8,7 @@
- #define	flat_argvp_envp_on_stack()		1
- #define	flat_old_ram_flag(flags)		(flags)
- #define	flat_reloc_valid(reloc, size)		((reloc) <= (size))
--#define	flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
-+#define	flat_get_addr_from_rp(rp, relval, flags, persistent) ((void)persistent,get_unaligned(rp))
- #define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
- #define	flat_get_relocate_addr(rel)		(rel)
- #define	flat_set_persistent(relval, p)		0
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 9d0a300..0dc5385 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -45,6 +45,7 @@ int read_current_timer(unsigned long *timer_val)
+ 	*timer_val = delay_timer->read_current_timer();
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(read_current_timer);
+ 
+ static void __timer_delay(unsigned long cycles)
+ {
 -- 
 1.7.10
