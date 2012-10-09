@@ -1,45 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  9 Oct 2012 22:13:55 +0200
-Subject: [PATCH v2 5/8] clk: don't mark clkdev_add_table as init
-In-Reply-To: <1349813638-4617-1-git-send-email-arnd@arndb.de>
-References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349813638-4617-6-git-send-email-arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 9 Oct 2012 20:29:16 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP: resolve sparse warning concerning debug_card_init()
+Message-ID: <alpine.DEB.2.00.1210092028080.5736@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c2440_clk_add is a subsys_interface method and calls clkdev_add_table,
-which means we might be calling it after the __init section is
-discarded.
 
-Without this patch, building mini2440_defconfig results in:
+Commit 801475ccb2b2c1928b22aec4b9e5285d9e347602 ("ARM: OMAP: move
+debug_card_init() function") results in the following new sparse
+warning:
 
-WARNING: vmlinux.o(.text+0x9848): Section mismatch in reference from the function s3c2440_clk_add() to the function .init.text:clkdev_add_table()
-The function s3c2440_clk_add() references
-the function __init clkdev_add_table().
-This is often because s3c2440_clk_add lacks a __init
-annotation or the annotation of clkdev_add_table is wrong.
+arch/arm/plat-omap/debug-devices.c:71:12: warning: symbol 'debug_card_init' was not declared. Should it be static?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Fix by implementing Tony's suggestion to add a "sideways include" to the
+new location of the debug-devices.h file in arch/arm/mach-omap2/.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Igor Grinberg <grinberg@compulab.co.il>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- drivers/clk/clkdev.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/plat-omap/debug-devices.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 442a313..6956857 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -179,7 +179,7 @@ void clkdev_add(struct clk_lookup *cl)
- }
- EXPORT_SYMBOL(clkdev_add);
+diff --git a/arch/arm/plat-omap/debug-devices.c b/arch/arm/plat-omap/debug-devices.c
+index c7a4c09..5a4678e 100644
+--- a/arch/arm/plat-omap/debug-devices.c
++++ b/arch/arm/plat-omap/debug-devices.c
+@@ -16,6 +16,7 @@
+ #include <linux/smc91x.h>
  
--void __init clkdev_add_table(struct clk_lookup *cl, size_t num)
-+void clkdev_add_table(struct clk_lookup *cl, size_t num)
- {
- 	mutex_lock(&clocks_mutex);
- 	while (num--) {
+ #include <mach/hardware.h>
++#include "../mach-omap2/debug-devices.h"
+ 
+ /* Many OMAP development platforms reuse the same "debug board"; these
+  * platforms include H2, H3, H4, and Perseus2.
 -- 
-1.7.10
+1.7.10.4
