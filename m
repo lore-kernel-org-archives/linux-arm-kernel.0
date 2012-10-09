@@ -1,55 +1,71 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 9 Oct 2012 13:46:33 +0200
-Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <3272225.kVAjWI8INL@vostro.rjw.lan>
-References: <20121006161429.GD12462@game.jcrosoft.org>
- <17531317.3PGnt12jPY@vostro.rjw.lan>
- <20121007131201.GB12801@game.jcrosoft.org>
- <3272225.kVAjWI8INL@vostro.rjw.lan>
-Message-ID: <20121009114633.GJ12801@game.jcrosoft.org>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Tue, 9 Oct 2012 13:50:35 +0200
+Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
+In-Reply-To: <50738DD0.5090406@wwwdotorg.org>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015405.958959522@gmail.com>
+ <20121007195759.GG12801@game.jcrosoft.org>
+ <20121007225417.GA29996@glitch> <50738DD0.5090406@wwwdotorg.org>
+Message-ID: <20121009115034.GA28817@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:02 Sun 07 Oct     , Rafael J. Wysocki wrote:
-> On Sunday 07 of October 2012 15:12:01 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 00:18 Sun 07 Oct     , Rafael J. Wysocki wrote:
-> > > On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > Hi,
-> > > > 
-> > > > The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
-> > > > 
-> > > >   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > > 
-> > > >   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
-> > > > 
-> > > > for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
-> > > > 
-> > > >   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
-> > > > 
-> > > > ----------------------------------------------------------------
-> > > > pm: add suspend_mem and suspend_standby support
-> > > > 
-> > > > Today when we go to suspend we can not knwon at drivers level if we go in
-> > > > STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
-> > > > suspend_standby.
-> > > 
-> > > No way. Device drivers shouldn't be concerned about that.
-> > I do need it on at91 as we swith to slow_clock in MEM suspend and some ip
-> > need special handling when switching to slow_clock
+On Mon, Oct 08, 2012 at 08:37:04PM -0600, Stephen Warren wrote:
+> On 10/07/2012 04:54 PM, Domenico Andreoli wrote:
+> > On Sun, Oct 07, 2012 at 09:57:59PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >> On 03:53 Sun 07 Oct     , Domenico Andreoli wrote:
+> >>> From: Domenico Andreoli <domenico.andreoli@linux.com>
 > 
-> Well, my answer to that is: please fix your platform code instead of
-> hacking the PM core to work around its problems.
-how can I fix drivers pm issue when I no way to known at driver level the
-real suspend, the PM core is supposed to proivde the right information to the
-drivers so the driver can put it's in the right pm mode. If the pm core can not
-provide such inforation the PM core is broken as we will have to do dirty
-hack.
+> >>> Index: b/arch/arm/boot/dts/bcm476x.dtsi
+> 
+> >>> +		vic0: interrupt-controller at 80000 {
+> >>> +			compatible = "brcm,bcm476x-pl192", "arm,pl192-vic", "arm,primecell";
+> >> why brcm specific compatbile?
+> > 
+> > Nothing breaks if I drop it. I think it's a future-proof clause, especially
+> > if you consider that the devicetree could be not easy to upgrade and you
+> > may need a way to differentiate the bcm476x's implementation from the
+> > common one. I'm not sure it's an actual requirement with use cases.
+> 
+> Indeed, everything works fine right now if you drop that. However, it is
+> correct practice to include a compatible value for the particular SoC
+> that incorporates the IP so that if in the future some SoC-specific
+> workaround is required, the compatible value needed to trigger this is
+> already in all historical .dts file.
 
-Any generic framework is supposed to evolve for real user need here I've one
-so I udpate the core to mach a need
+This matches with what I know but it seems anyway that in the arm,primecell
+cases this is not a great concern, almost none of the dts currently in
+mainline go as far as specifying the machine specific name.
 
-Best Regards,
-J.
+> >>> Index: b/arch/arm/include/debug/bcm476x.S
+> 
+> >>> +#if defined(CONFIG_DEBUG_BCM476X_UART0)
+> >>> +# define BCM476X_DEBUG_PHYS	0x000c0000
+> >>> +# define BCM476X_DEBUG_VIRT	0xd00c0000
+> >>> +#elif defined(CONFIG_DEBUG_BCM476X_UART1)
+> >>> +# define BCM476X_DEBUG_PHYS	0x000c1000
+> >>> +# define BCM476X_DEBUG_VIRT	0xd00c1000
+> >>> +#elif defined(CONFIG_DEBUG_BCM476X_UART2)
+> >>> +# define BCM476X_DEBUG_PHYS	0x000b2000
+> >>> +# define BCM476X_DEBUG_VIRT	0xd00b2000
+> >>> +#else
+> >>> +# error Unknown BCM476x debug port
+> >>> +#endif
+> >>
+> >> can't you detect it?
+> > 
+> > If I can assume that the boot loader will configure and enable only the
+> > console port, I could use the first one in such state.
+> > 
+> > Where could I place such detection, in the maco addruart itself?
+> 
+> Auto-detection is not necessarily a good idea; there's no reason in
+> general to believe that no future board will ever use a UART for any
+> purposes other than console/debug. Being explicit is probably good.
+
+After thinking at it a bit, I also prefer to leave the guessing out. It
+can break things in non-obvious ways. I prefer a full consistent and
+testable behaviour.
+
+Thanks,
+Domenico
