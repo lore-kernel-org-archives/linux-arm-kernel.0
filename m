@@ -1,23 +1,41 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 09 Oct 2012 16:26:03 -0600
-Subject: [PATCH 0/7] ARM: tegra30: cpuidle: add LP2 support
-In-Reply-To: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+Date: Tue, 09 Oct 2012 16:29:45 -0600
+Subject: [PATCH 2/7] ARM: tegra: cpuidle: add LP2 resume function
+In-Reply-To: <1349691981-31038-3-git-send-email-josephl@nvidia.com>
 References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
-Message-ID: <5074A47B.3050906@wwwdotorg.org>
+ <1349691981-31038-3-git-send-email-josephl@nvidia.com>
+Message-ID: <5074A559.8030206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/08/2012 04:26 AM, Joseph Lo wrote:
-> The CPU idle LP2 is a power gating idle mode for Tegra30. It supports the
-> secondary CPUs (i.e., CPU1-CPU3) to go into LP2 dynamically. When any of
-> the secondary CPUs go into LP2, it can be power gated alone. There is a
-> limitation on CPU0. The CPU0 can go into LP2 only when all secondary CPUs
-> are already in LP2. After CPU0 is in LP2, the CPU rail can be turned off.
-> 
-> Verified on Seaboard(Tegra20) and Cardhu(Tegra30).
+> LP2 is one of the Tegra low power states that supports power gating both
+> CPU cores and GICs. Adding a resume function for taking care the CPUs that
+> resume from LP2. This function was been hooked to reset handler. We take
+> care everything here before go into kernel.
 
-What's the most comprehensive way to verify this? I booted Cardhu with
-these patches applied and saw that all CPU cores did enter both idle
-states. However, I'm unsure what the best way to stress the system is,
-i.e. how would I stress and test for correct handling of all the L2
-caching/SMP coherency issues, etc.
+> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+
+> +ENTRY(tegra_resume)
+...
+> +	/* Are we on Tegra20? */
+> +	mov32	r6, TEGRA_APB_MISC_BASE
+> +	ldr	r0, [r6, #APB_MISC_GP_HIDREV]
+> +	and	r0, r0, #0xff00
+> +	cmp	r0, #(0x20 << 8)
+> +	beq	1f
+> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> +	/* Clear the flow controller flags for this CPU. */
+> +	mov32	r2, TEGRA_FLOW_CTRL_BASE + FLOW_CTRL_CPU0_CSR	@ CPU0 CSR
+> +	ldr	r1, [r2]
+> +	/* Clear event & intr flag */
+> +	orr	r1, r1, \
+> +		#FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+> +	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
+> +	bic	r1, r1, r0
+> +	str	r1, [r2]
+> +#endif
+> +1:
+
+couldn't that entire quoted chunk go inside the ifdef; all of reading
+the HIDREV register and the 1: label?
