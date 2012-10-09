@@ -1,50 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
 Date: Tue, 9 Oct 2012 11:46:26 -0700
-Subject: [GIT PULL 2/5] omap hwmod and clock fixes for v3.7-rc1
+Subject: [GIT PULL 3/5] omap pm fixes for v3.7-rc1
 In-Reply-To: <pull-1349808387-617119>
-Message-ID: <mailman.19.1349808400.1458.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.20.1349808406.1458.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0e51793e162ca432fc5f04178cf82b80a92c2659:
+The following changes since commit 5e090ed7af10729a396a25df43d69a236e789736:
 
-  Merge branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm (2012-10-07 21:20:57 +0900)
+  Merge tag 'soc-late' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-10-07 20:55:16 +0900)
 
 are available in the git repository at:
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc1/fixes-hwmod-clock-signed-v3
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc1/fixes-pm-signed
 
-for you to fetch changes up to eb20f31f6e7d3ac19738e5a45df9b09b25381e73:
+for you to fetch changes up to fce680e9faaa8acc0ab0a931c5fa823b581cbab0:
 
-  Merge tag 'omap-fixes-a-for-pre3.7' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.7-rc1/fixes-hwmod-clock (2012-10-09 11:07:29 -0700)
-
-----------------------------------------------------------------
-
->From Paul Walmsley <paul@pwsan.com>:
-
-Some OMAP fixes for the 3.7 merge window, fixing mismerges, branch
-integration issues, and bugs after the arm-soc merges.
+  Merge tag 'for_3.7-fixes-pm' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into omap-for-v3.7-rc1/fixes-pm (2012-10-08 15:57:41 -0700)
 
 ----------------------------------------------------------------
-Jon Hunter (2):
-      ARM: OMAP2+: hwmod data: Fix PMU interrupt definitions
-      ARM: OMAP3: fix workaround for EMU clockdomain
 
-Paul Walmsley (2):
-      ARM: OMAP: omap3evm: fix new sparse warning
-      ARM: OMAP4/AM335x: hwmod: fix disable_module regression in hardreset handling
+>From Kevin Hilman <khilman@deeprootsystems.com>:
+
+OMAP PM related fixes for v3.7-rc
+
+----------------------------------------------------------------
+Jean Pihet (2):
+      ARM: OMAP: SmartReflex: select CONFIG_POWER_SUPPLY in Kconfig
+      ARM: OMAP: SmartReflex: fix error path in init function
 
 Tony Lindgren (1):
-      Merge tag 'omap-fixes-a-for-pre3.7' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.7-rc1/fixes-hwmod-clock
+      Merge tag 'for_3.7-fixes-pm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.7-rc1/fixes-pm
 
-Vaibhav Hiremath (1):
-      ARM: am33xx: clk: Update clkdev table to add mcasp alias
+Wei Yongjun (4):
+      ARM: OMAP: fix return value check in beagle_opp_init()
+      ARM: OMAP: omap_device: fix return value check in omap_device_build_ss()
+      ARM: OMAP2+: SmartReflex: fix return value check in sr_dev_init()
+      ARM: OMAP2+: PM: fix return value check in omap2_set_init_voltage()
 
- arch/arm/mach-omap2/board-omap3evm.c               |    3 +-
- arch/arm/mach-omap2/clock33xx_data.c               |    2 +
- arch/arm/mach-omap2/clockdomain2xxx_3xxx.c         |   44 ++++++++++----------
- arch/arm/mach-omap2/omap_hwmod.c                   |   31 ++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2 +-
- 6 files changed, 54 insertions(+), 30 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
+ arch/arm/mach-omap2/pm.c                |    2 +-
+ arch/arm/mach-omap2/sr_device.c         |    2 +-
+ arch/arm/plat-omap/Kconfig              |    1 +
+ arch/arm/plat-omap/omap_device.c        |    2 +-
+ drivers/power/avs/smartreflex.c         |    8 ++++----
+ 6 files changed, 9 insertions(+), 8 deletions(-)
