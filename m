@@ -1,78 +1,52 @@
-From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
-Date: Tue, 9 Oct 2012 14:01:54 +0800
-Subject: [RFC] arm/mm: add a protection when flushing anonymous pages
-In-Reply-To: <CANj_sbCV7MGH3dZ8_i3S1SwhPz3WouarEsGxtkUVKiGrGUNVrA@mail.gmail.com>
-References: <CAGCDX1mY4wbMq4qDJ9vCazShxdWQXVYyWkpLd5u8_xqbEC2BWQ@mail.gmail.com>
- <CAGCDX1mkPVre6h=9kNbRqCp_wtbOneuRLMXM+mkZWFXPwWkBfg@mail.gmail.com>
- <CANj_sbADwtPR6cgk05QkmvrSUOOQRYXB9vPB6KATKEmwcN8UrA@mail.gmail.com>
- <20121005091006.GM4625@n2100.arm.linux.org.uk>
- <CANj_sbCV7MGH3dZ8_i3S1SwhPz3WouarEsGxtkUVKiGrGUNVrA@mail.gmail.com>
-Message-ID: <CANj_sbDsipnv33LyzO-hee8=WQN0wmeHcZSyXAcx8DRtCu5Dvg@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 9 Oct 2012 14:16:27 +0800
+Subject: [PATCH] ARM: tegra: cpuidle: replace LP3 with
+ ARM_CPUIDLE_WFI_STATE
+In-Reply-To: <5072FD25.2020600@wwwdotorg.org>
+References: <1349691856-30590-1-git-send-email-josephl@nvidia.com>
+ <5072FD25.2020600@wwwdotorg.org>
+Message-ID: <1349763387.15153.196.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 5, 2012 at 6:09 PM, Andrew Yan-Pai Chen
-<yanpai.chen@gmail.com> wrote:
-> On Fri, Oct 5, 2012 at 5:10 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Oct 02, 2012 at 03:07:33PM +0800, Andrew Yan-Pai Chen wrote:
->>> [RFC PATCH] make flush_pfn_alias() nonpreemptible
->>>
->>> Since flush_pfn_alias() is preemptible, it is possible to be
->>> preempted just after set_top_pte() is done. If the process
->>> which preempts the previous happened to invoke flush_pfn_alias()
->>> with the same colour vaddr as that of the previous, the same
->>> top pte will be overwritten. When switching back to the previous,
->>> it attempts to flush cache lines with incorrect mapping. Then
->>> no lines (or wrong lines) will be flushed because of the nature
->>> of vipt caches.
->>>
->>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
->>> index 40ca11e..bd07918 100644
->>> --- a/arch/arm/mm/flush.c
->>> +++ b/arch/arm/mm/flush.c
->>> @@ -27,6 +27,8 @@ static void flush_pfn_alias(unsigned long pfn,
->>> unsigned long vaddr)
->>>         unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) <<
->>> PAGE_SHIFT);
->>>         const int zero = 0;
->>>
->>> +       preempt_disable();
->>> +
->>>         set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
->>>
->>>         asm(    "mcrr   p15, 0, %1, %0, c14\n"
->>> @@ -34,6 +36,8 @@ static void flush_pfn_alias(unsigned long pfn,
->>> unsigned long vaddr)
->>>             :
->>>             : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
->>>             : "cc");
->>> +
->>> +       preempt_enable();
->>>  }
->>
->> This looks like it's quite correct, but if you look at the file a little
->> deeper, you'll notice that flush_icache_alias() potentially suffers the
->> same issue.
->>
->> They should probably both also have a comment indicating that they're not
->> to be called for SMP setups (because there's no locking for that.)
->
-> OK. I will resend the patch later.
-> Thanks!
->
+Hi Stephen,
+
+Thanks for your review.
+
+On Tue, 2012-10-09 at 00:19 +0800, Stephen Warren wrote:
+> On 10/08/2012 04:24 AM, Joseph Lo wrote:
+> > The Tegra CPU idle LP3 state is doing ARM WFI only. So it's same with
+> > the common ARM_CPUIDLE_WFI_STATE. Using it to replace LP3 now.
+> 
+> Hmm. This changes the exit_latency/target_residency fields of the
+> cpuidle state definition from 10 to 1, and also replaces
+> tegra_idle_enter_lp3() with just a dsb/wfi as far as I can tell. What
+> are the implications of removing the irq/fiq_disable/enable and
+> ktim-related code? It might be worth explaining why this change is valid
+> in the commit description.
 > --
-> Regards,
-> Andrew
 
-Hi Russell,
+There were some histories about the latency. The legacy LP3 mode called
+to "tegra_cpu_wfi". This func was been removed. We called to
+"cpu_do_idle" right now. In the old "tegra_cpu_wfi", we did back up the
+current flow controller register and set up flow controller to CPU_WFE
+state. It did wait for CPU running to WFI and clock gate it externally.
+We need a time duration to make flow controller to do that.
 
-Is flush_icache_alias() not to be called for SMP setups?
-It seems that processors with a vipt non-aliasing D-cache but a vipt
-aliasing I-cache
-(such like cortex-a9) will call this function.
-So perhaps we should have a lock in this case?
+When any event or interrupt been triggered, it resume the CPU clock. And
+CPU runs after WFI and restore the flow controller. We found this may
+hurt performance, so we drop that. The latency is not true anymore.
 
---
-Regards,
-Andrew
+Now we just using WFI to enter low-power CPU standby state where most
+clocks gated.
+
+About the missing irq/fiq disable/enable call, we enable the
+"en_core_tk_irqen" in this patch. That means we enable time keeping and
+irq enabling in the core cpuidle code. So the cpuidle enter code will
+use the "cpuidle_wrap_enter" in "drivers/cpuidle/cpuidle.c".
+
+After merging these concepts, I think we can use the common
+ARM_CPUIDLE_WFI_STATE to replace the current LP3 code.
+
+Thanks,
+Joseph
