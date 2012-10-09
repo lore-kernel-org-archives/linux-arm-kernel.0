@@ -1,86 +1,42 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 9 Oct 2012 16:35:58 +0100
-Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
-In-Reply-To: <1349796183-30648-6-git-send-email-arnd@arndb.de>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <1349796183-30648-6-git-send-email-arnd@arndb.de>
-Message-ID: <1349796958.21847.219.camel@zakaz.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Oct 2012 15:37:23 +0000
+Subject: [PATCH] mmc: mxs: fix build regression from mismerge
+Message-ID: <201210091537.23659.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-09 at 16:22 +0100, Arnd Bergmann wrote:
-> * The XEN_BALLOON code requires the balloon infrastructure that is not
->   getting built on ARM.
+>From all I can tell, the patches
 
-I've got patches to enable this, but not for 3.7 so this looks good for
-now.
+fc108d24 "mmc: mxs-mmc: fix deadlock caused by recursion loop"
+829c1bf4 "mmc: spi: Pull out parts shared between MMC and SPI"
 
-> * The tmem hypercall is not available on ARM
-> 
-> * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+came in through separate branches and cause this build error when
+combined.
 
-missing the end of this sentence?
+drivers/mmc/host/mxs-mmc.c: In function 'mxs_mmc_enable_sdio_irq':
+drivers/mmc/host/mxs-mmc.c:527:78: error: 'struct mxs_mmc_host' has no member named 'base'
+drivers/mmc/host/mxs-mmc.c:527:95: error: 'struct mxs_mmc_host' has no member named 'devid'
 
-> * sys-hypervisor.c needs to include linux/err.h in order to use the
->   IS_ERR/PTR_ERR/ERR_PTR family of functions.
+This does the obvious missing change.
 
-I tripped over this too. Not sure where that patch got to though.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Attila Kinali <attila@kinali.ch>
+Cc: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+Cc: Marek Vasut <marex@denx.de>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
-
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Jeremy Fitzhardinge <jeremy@goop.org>
-> Cc: xen-devel at lists.xensource.com
-> ---
->  arch/arm/Kconfig             |    1 +
->  drivers/xen/Kconfig          |    2 ++
->  drivers/xen/sys-hypervisor.c |    1 +
->  3 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 6d2f7f5..85eaac3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1846,6 +1846,7 @@ config XEN_DOM0
->  config XEN
->  	bool "Xen guest support on ARM (EXPERIMENTAL)"
->  	depends on EXPERIMENTAL && ARM && OF
-> +	depends on !CPU_V6
->  	help
->  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
->  
-> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-> index d4dffcd..126d8ce 100644
-> --- a/drivers/xen/Kconfig
-> +++ b/drivers/xen/Kconfig
-> @@ -3,6 +3,7 @@ menu "Xen driver support"
->  
->  config XEN_BALLOON
->  	bool "Xen memory balloon driver"
-> +	depends on !ARM
->  	default y
->  	help
->  	  The balloon driver allows the Xen domain to request more memory from
-> @@ -145,6 +146,7 @@ config SWIOTLB_XEN
->  
->  config XEN_TMEM
->  	bool
-> +	depends on !ARM
->  	default y if (CLEANCACHE || FRONTSWAP)
->  	help
->  	  Shim to interface in-kernel Transcendent Memory hooks
-> diff --git a/drivers/xen/sys-hypervisor.c b/drivers/xen/sys-hypervisor.c
-> index 5e5ad7e..66a0a14 100644
-> --- a/drivers/xen/sys-hypervisor.c
-> +++ b/drivers/xen/sys-hypervisor.c
-> @@ -11,6 +11,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/kobject.h>
-> +#include <linux/err.h>
->  
->  #include <asm/xen/hypervisor.h>
->  #include <asm/xen/hypercall.h>
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index bb4c2bf..80d1e6d 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -525,7 +525,7 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+ 		       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ 		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
+-		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
++		       ssp->base + HW_SSP_CTRL1(ssp) + STMP_OFFSET_REG_SET);
+ 	} else {
+ 		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+ 		       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
