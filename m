@@ -1,50 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  9 Oct 2012 17:22:56 +0200
-Subject: [PATCH 2/9] ARM: export set_irq_flags
+Date: Tue,  9 Oct 2012 17:23:00 +0200
+Subject: [PATCH 6/9] ARM: pass -marm to gcc by default for both C and assembler
 In-Reply-To: <1349796183-30648-1-git-send-email-arnd@arndb.de>
 References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
-Message-ID: <1349796183-30648-3-git-send-email-arnd@arndb.de>
+Message-ID: <1349796183-30648-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added Emma Mobile GPIO driver calls set_irq_flags
-and irq_set_chip_and_handler for the interrupts it exports and
-it can be built as a module, which currently fails with
+The Linaro cross toolchain and probably others nowadays default to
+building in THUMB2 mode. When building a kernel for a CPU that does
+not support THUMB2, the compiler complains about incorrect flags.
+We can work around this by setting -marm for all non-T2 builds.
 
-ERROR: "set_irq_flags" [drivers/gpio/gpio-em.ko] undefined!
+Without this patch, building assabet_defconfig results in:
 
-We either need to replace the call to set_irq_flags with something
-else or export that function. This patch does the latter.
+usr/initramfs_data.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
+arch/arm/nwfpe/entry.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
+firmware/cis/PCMLM28.cis.gen.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
+(and many more)
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Magnus Damm <damm@opensource.se>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/kernel/irq.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/Makefile |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 16cedb4..8961650 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -34,6 +34,7 @@
- #include <linux/list.h>
- #include <linux/kallsyms.h>
- #include <linux/proc_fs.h>
-+#include <linux/export.h>
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index f023e3a..5f914fc 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -21,8 +21,6 @@ endif
+ OBJCOPYFLAGS	:=-O binary -R .comment -S
+ GZFLAGS		:=-9
+ #KBUILD_CFLAGS	+=-pipe
+-# Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
+-KBUILD_CFLAGS	+=$(call cc-option,-marm,)
  
- #include <asm/exception.h>
- #include <asm/mach/arch.h>
-@@ -109,6 +110,7 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
- 	/* Order is clear bits in "clr" then set bits in "set" */
- 	irq_modify_status(irq, clr, set & ~clr);
- }
-+EXPORT_SYMBOL_GPL(set_irq_flags);
+ # Never generate .eh_frame
+ KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
+@@ -105,17 +103,20 @@ endif
+ ifeq ($(CONFIG_THUMB2_KERNEL),y)
+ AFLAGS_AUTOIT	:=$(call as-option,-Wa$(comma)-mimplicit-it=always,-Wa$(comma)-mauto-it)
+ AFLAGS_NOWARN	:=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
+-CFLAGS_THUMB2	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
+-AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
++CFLAGS_ISA	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
++AFLAGS_ISA	:=$(CFLAGS_ISA) -Wa$(comma)-mthumb
+ # Work around buggy relocation from gas if requested:
+ ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
+ CFLAGS_MODULE	+=-fno-optimize-sibling-calls
+ endif
++else
++CFLAGS_ISA	:=$(call cc-option,-marm,)
++AFLAGS_ISA	:=$(CFLAGS_ISA)
+ endif
  
- void __init init_IRQ(void)
- {
+ # Need -Uarm for gcc < 3.x
+-KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
+-KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
++KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
++KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+ 
+ CHECKFLAGS	+= -D__arm__
+ 
 -- 
 1.7.10
