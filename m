@@ -1,160 +1,130 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 9 Oct 2012 11:02:32 -0300
-Subject: =?UTF-8?q?=5BPATCH=20v3=202/2=5D=20=5Bmedia=5D=3A=20mx2=5Fcamera=3A=20Fix=20regression=20caused=20by=20clock=20conversion?=
-Message-ID: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
+From: scott.bambrough@linaro.org (Scott Bambrough)
+Date: Tue, 09 Oct 2012 10:05:52 -0400
+Subject: alignment faults in 3.6
+In-Reply-To: <506F0454.3070304@gmail.com>
+References: <506E1762.3010601@gmail.com>
+ <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
+ <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
+ <506E3E58.80703@gmail.com>
+ <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
+ <20590.58864.527467.746403@pilspetsen.it.uu.se> <506F0454.3070304@gmail.com>
+Message-ID: <50742F40.4050704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
-to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
+On 12-10-05 12:01 PM, Rob Herring wrote:
+> On 10/05/2012 08:51 AM, Mikael Pettersson wrote:
+>> Rob Herring writes:
+>>   > On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
+>>   > > On Fri, Oct 05, 2012 at 09:20:56AM +0100, Mans Rullgard wrote:
+>>   > >> On 5 October 2012 08:12, Russell King - ARM Linux
+>>   > >> <linux@arm.linux.org.uk> wrote:
+>>   > >>> On Fri, Oct 05, 2012 at 03:25:16AM +0100, Mans Rullgard wrote:
+>>   > >>>> On 5 October 2012 02:56, Rob Herring <robherring2@gmail.com> wrote:
+>>   > >>>>> This struct is the IP header, so a struct ptr is just set to the
+>>   > >>>>> beginning of the received data. Since ethernet headers are 14 bytes,
+>>   > >>>>> often the IP header is not aligned unless the NIC can place the frame at
+>>   > >>>>> a 2 byte offset (which is something I need to investigate). So this
+>>   > >>>>> function cannot make any assumptions about the alignment. Does the ABI
+>>   > >>>>> define structs have some minimum alignment? Does the struct need to be
+>>   > >>>>> declared as packed or something?
+>>   > >>>>
+>>   > >>>> The ABI defines the alignment of structs as the maximum alignment of its
+>>   > >>>> members.  Since this struct contains 32-bit members, the alignment for the
+>>   > >>>> whole struct becomes 32 bits as well.  Declaring it as packed tells gcc it
+>>   > >>>> might be unaligned (in addition to removing any holes within).
+>>   > >>>
+>>   > >>> This has come up before in the past.
+>>   > >>>
+>>   > >>> The Linux network folk will _not_ allow - in any shape or form - for
+>>   > >>> this struct to be marked packed (it's the struct which needs to be
+>>   > >>> marked packed) because by doing so, it causes GCC to issue byte loads/
+>>   > >>> stores on architectures where there isn't a problem, and that decreases
+>>   > >>> the performance of the Linux IP stack unnecessarily.
+>>   > >>
+>>   > >> Which architectures?  I have never seen anything like that.
+>>   > >
+>>   > > Does it matter?  I'm just relaying the argument against adding __packed
+>>   > > which was used before we were forced (by the networking folk) to implement
+>>   > > the alignment fault handler.
+>>   >
+>>   > It doesn't really matter what will be accepted or not as adding __packed
+>>   > to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
+>>   > The only way I've found to eliminate the alignment fault is adding a
+>>   > barrier between the 2 loads. That seems like a compiler issue to me if
+>>   > there is not a better fix.
+>>
+>> If you suspect a GCC bug, please prepare a standalone user-space test case
+>> and submit it to GCC's bugzilla (I can do the latter if you absolutely do not
+>> want to).  It wouldn't be the first alignment-related GCC bug...
+>>
+>
+> Here's a testcase. Compiled on ubuntu precise with
+> "arm-linux-gnueabihf-gcc -O2 -marm -march=armv7-a test.c".
+>
+> typedef unsigned short u16;
+> typedef unsigned short __sum16;
+> typedef unsigned int __u32;
+> typedef unsigned char __u8;
+> typedef __u32 __be32;
+> typedef u16 __be16;
+>
+> struct iphdr {
+> 	__u8	ihl:4,
+> 		version:4;
+> 	__u8	tos;
+> 	__be16	tot_len;
+> 	__be16	id;
+> 	__be16	frag_off;
+> 	__u8	ttl;
+> 	__u8	protocol;
+> 	__sum16	check;
+> 	__be32	saddr;
+> 	__be32	daddr;
+> 	/*The options start here. */
+> };
 
-By not doing so the camera sensor does not probe correctly:
+I was reading this thread with some interest.  AFAIK, with the default 
+alignment rules the above struct is packed; there will be no holes in it.
 
-soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-mx2-camera mx2-camera.0: Camera driver attached to camera 0
-ov2640 0-0030: Product ID error fb:fb
-mx2-camera mx2-camera.0: Camera driver detached from camera 0
-mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
+>
+> #define ntohl(x) __swab32((__u32)(__be32)(x))
+> #define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
+>
+> static inline __attribute__((const)) __u32 __swab32(__u32 x)
+> {
+> 	__asm__ ("rev %0, %1" : "=r" (x) : "r" (x));
+> 	return x;
+> }
+>
+> int main(void * buffer, unsigned int *p_id)
+> {
+> 	unsigned int id;
+> 	int flush = 1;
+> 	const struct iphdr *iph = buffer;
+> 	__u32 len = *p_id;
+> 	
+> 	id = ntohl(*(__be32 *)&iph->id);
 
-Adapt the mx2_camera driver to the new clock framework and make it functional
-again.
+The above statement is the problem.  I think it is poorly written 
+networking code.  It takes the address of a 16 bit quantity (aligned on 
+a halfword address), attempts to do a type conversion using pointers, 
+then dereference it.  I would have thought:
 
-Tested-by: Ga?tan Carlier <gcembed@gmail.com>
-Tested-by: Javier Martin <javier.martin@vista-silicon.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Fix clock error handling code as pointed out by Russell King
-Changes since v1:
-- Rebased against linux-next 20121008.
- drivers/media/platform/soc_camera/mx2_camera.c |   50 ++++++++++++++++++------
- 1 file changed, 38 insertions(+), 12 deletions(-)
+id = ntohs(iph->id);
 
-diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
-index 403d7f1..382b305 100644
---- a/drivers/media/platform/soc_camera/mx2_camera.c
-+++ b/drivers/media/platform/soc_camera/mx2_camera.c
-@@ -272,7 +272,8 @@ struct mx2_camera_dev {
- 	struct device		*dev;
- 	struct soc_camera_host	soc_host;
- 	struct soc_camera_device *icd;
--	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
-+	struct clk		*clk_emma_ahb, *clk_emma_ipg;
-+	struct clk		*clk_csi_ahb, *clk_csi_per;
- 
- 	void __iomem		*base_csi, *base_emma;
- 
-@@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
- {
- 	unsigned long flags;
- 
--	clk_disable_unprepare(pcdev->clk_csi);
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
-+	clk_disable_unprepare(pcdev->clk_csi_per);
- 	writel(0, pcdev->base_csi + CSICR1);
- 	if (cpu_is_mx27()) {
- 		writel(0, pcdev->base_emma + PRP_CNTL);
-@@ -460,10 +462,14 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
- 	if (pcdev->icd)
- 		return -EBUSY;
- 
--	ret = clk_prepare_enable(pcdev->clk_csi);
-+	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
- 	if (ret < 0)
- 		return ret;
- 
-+	ret = clk_prepare_enable(pcdev->clk_csi_per);
-+	if (ret < 0)
-+		goto exit_csi_ahb;
-+
- 	csicr1 = CSICR1_MCLKEN;
- 
- 	if (cpu_is_mx27())
-@@ -480,6 +486,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
- 		 icd->devnum);
- 
- 	return 0;
-+
-+exit_csi_ahb:
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
-+
-+	return ret;
- }
- 
- static void mx2_camera_remove_device(struct soc_camera_device *icd)
-@@ -1725,27 +1736,35 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
- 		goto exit;
- 	}
- 
--	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
--	if (IS_ERR(pcdev->clk_csi)) {
--		dev_err(&pdev->dev, "Could not get csi clock\n");
--		err = PTR_ERR(pcdev->clk_csi);
-+	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(pcdev->clk_csi_ahb)) {
-+		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
-+		err = PTR_ERR(pcdev->clk_csi_ahb);
- 		goto exit;
- 	}
- 
-+	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(pcdev->clk_csi_per)) {
-+		dev_err(&pdev->dev, "Could not get csi per clock\n");
-+		err = PTR_ERR(pcdev->clk_csi_per);
-+		goto exit_csi_ahb;
-+	}
-+
- 	pcdev->pdata = pdev->dev.platform_data;
- 	if (pcdev->pdata) {
- 		long rate;
- 
- 		pcdev->platform_flags = pcdev->pdata->flags;
- 
--		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
-+		rate = clk_round_rate(pcdev->clk_csi_per,
-+						pcdev->pdata->clk * 2);
- 		if (rate <= 0) {
- 			err = -ENODEV;
--			goto exit;
-+			goto exit_csi_per;
- 		}
--		err = clk_set_rate(pcdev->clk_csi, rate);
-+		err = clk_set_rate(pcdev->clk_csi_per, rate);
- 		if (err < 0)
--			goto exit;
-+			goto exit_csi_per;
- 	}
- 
- 	INIT_LIST_HEAD(&pcdev->capture);
-@@ -1801,7 +1820,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
- 		goto exit_free_emma;
- 
- 	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
--			clk_get_rate(pcdev->clk_csi));
-+			clk_get_rate(pcdev->clk_csi_per));
- 
- 	return 0;
- 
-@@ -1812,6 +1831,10 @@ eallocctx:
- 		clk_disable_unprepare(pcdev->clk_emma_ipg);
- 		clk_disable_unprepare(pcdev->clk_emma_ahb);
- 	}
-+exit_csi_per:
-+	clk_disable_unprepare(pcdev->clk_csi_per);
-+exit_csi_ahb:
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
- exit:
- 	return err;
- }
-@@ -1831,6 +1854,9 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
- 		clk_disable_unprepare(pcdev->clk_emma_ahb);
- 	}
- 
-+	clk_disable_unprepare(pcdev->clk_csi_per);
-+	clk_disable_unprepare(pcdev->clk_csi_ahb);
-+
- 	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
- 
- 	return 0;
+would have been enough.
+
+Scott
+
 -- 
-1.7.9.5
+Scott Bambrough
+Technical Director, Member Services
+Linaro Ltd.
+email: scott.bambrough at linaro.org
+irc: scottb (freenode, irc.linaro.org)
+web: http://www.linaro.org
+Linaro: The future of Linux on ARM.
