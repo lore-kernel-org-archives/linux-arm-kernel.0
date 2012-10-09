@@ -1,57 +1,67 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Tue, 9 Oct 2012 16:27:03 +0000
-Subject: Booting vanilla kernel on the beaglebone
-In-Reply-To: <50740AB0.7080102@ti.com>
-References: <20120930082802.GA15392@netboy.at.omicron.at>
- <50740AB0.7080102@ti.com>
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9F27CE@DBDE01.ent.ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 09 Oct 2012 10:30:15 -0600
+Subject: [PATCH] ARM: kirkwood: DT board setup for Network Space v2 and
+ parents
+In-Reply-To: <20121009150517.GA26952@kw.sim.vm.gnt>
+References: <1349277270-24962-1-git-send-email-simon.guinot@sequanux.org>
+ <20121003154310.GI11837@lunn.ch> <20121003220916.GW31897@kw.sim.vm.gnt>
+ <20121004055443.GK21046@lunn.ch> <20121004075335.GY31897@kw.sim.vm.gnt>
+ <506DAE12.7000003@wwwdotorg.org> <20121009150517.GA26952@kw.sim.vm.gnt>
+Message-ID: <50745117.7030804@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -------- Original Message --------
-> Subject: Booting vanilla kernel on the beaglebone
-> Date: Sun, 30 Sep 2012 10:28:02 +0200
-> From: Richard Cochran <richardcochran@gmail.com>
-> To: <linux-arm-kernel@lists.infradead.org>
+On 10/09/2012 09:05 AM, Simon Guinot wrote:
+> On Thu, Oct 04, 2012 at 09:41:06AM -0600, Stephen Warren wrote:
+>> On 10/04/2012 01:53 AM, Simon Guinot wrote:
+>>> On Thu, Oct 04, 2012 at 07:54:43AM +0200, Andrew Lunn wrote:
+>>>>>>> --- a/arch/arm/mach-kirkwood/board-dt.c +++ 
+>>>>>>> b/arch/arm/mach-kirkwood/board-dt.c @@ -96,6 +96,11 @@ 
+>>>>>>> static void __init kirkwood_dt_init(void) if 
+>>>>>>> (of_machine_is_compatible("keymile,km_kirkwood")) 
+>>>>>>> km_kirkwood_init();
+>>>>>>> 
+>>>>>>> +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
+>>>>>>> + of_machine_is_compatible("lacie,netspace_v2") || + 
+>>>>>>> of_machine_is_compatible("lacie,netspace_max_v2")) + 
+>>>>>>> ns2_init(); + of_platform_populate(NULL, 
+>>>>>>> kirkwood_dt_match_table, kirkwood_auxdata_lookup,
+>>>>>>> NULL);
+>>>>>> 
+>>>>>> I'm not a DT policy expert. Could this be one
+>>>>>> compatibility string for all the boards? Maybe ask on the
+>>>>>> DT mainline list?
+>>>>> 
+>>>>> Maybe I could use "lacie,ns2_common" as a compatibility
+>>>>> string. But this does not match any existing device. I
+>>>>> don't know if it is correct.
+...
+>>> The status for this ns2 boards is more or less end-of-life. I
+>>> mean, this boards are no longer in production. So I think it is
+>>> safe to consider the code inside board-ns2.c as common and
+>>> shareable between ns2, is2 and ns2max.
+>>> 
+>>> Once this file will be removed, the compatibility checks will
+>>> be removed as well. But one could easily forget to remove the
+>>> useless compatibility string "lacie,ns2_common" from the
+>>> dts...
+>> 
+>> If that value is added to the DT, it should not be removed, and
+>> the kernel should continue to support it indefinitely.
 > 
-> 
-> I just received by very own beaglebone, and I would like to add PTP
-> hardware clock support for the CPTS unit, but I naturally want to do
-> this with the latest mainstream kernel and not the hacked up arago 3.2
-> kernel that ships with the board.
-> 
-> Does any vanilla kernel even boot on this board?
-> If so, which ones, and how?
-> 
-> I have tried a few variations of kernel/u-boot without any luck.
-> The u-boot that came with the board is
-> 
->   U-Boot 2011.09-00000-gf63b270-dirty (Apr 24 2012 - 09:51:01)
->   arm-angstrom-linux-gnueabi-gcc (GCC) 4.5.4 20120305 (prerelease)
->   GNU ld (GNU Binutils) 2.20.1.20100303
-> 
-> and I also tried the latest version:
-> 
->   U-Boot 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
->   arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2009q1-203) 4.3.3
->   GNU ld (Sourcery G++ Lite 2009q1-203) 2.19.51.20090205
-> 
+> I understand it is a strong requirement. But as I mentioned before,
+> due to the production process, one could easily end up with an
+> embedded DTB not matching exactly the hardware. It could even be
+> worse. A end-of-life device could be replaced by a supposed
+> compatible one. And sometimes the compatibility assumption is
+> false. In a such scenario, maybe you don't want the kernel to
+> support indefinitely a DT statement.
 
-Richard
-
-I have implemented the CPTS hardware clock and will be submitting the
-patches soon to TI's kernel repo and also planning to submit the patches
-to Mainline kernel mailing lists soon.
-
-Regards
-Mugunthan V N
-
-> Thanks,
-> Richard
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+I'm not sure I fully understand that last paragraph. However, if the
+board is replaced by a new board model, and that new board model is
+not 100% SW-compatible with the old model, then you'll want to invent
+a new compatible value to represent the new board version. Removing
+support from the kernel for the old compatible value, or keeping the
+same compatible value and changing how the kernel handles it in a way
+that prevents the original board and .dts from working, is not
+appropriate.
