@@ -1,289 +1,173 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 10 Oct 2012 19:45:31 +0400
-Subject: [PATCH 5/7] ARM: clps711x: make all virtual addresses definition via
- one macro
+Date: Wed, 10 Oct 2012 19:45:32 +0400
+Subject: [PATCH 6/7] ARM: clps711x: merge all CLPS711X-defconfigs into one
 In-Reply-To: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
 References: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1349883933-8881-5-git-send-email-shc_work@mail.ru>
+Message-ID: <1349883933-8881-6-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch make all virtual addresses definition via one macro.
-This modification allows to avoid warning "BUG: mapping for 0x80000000
-at 0xff000000 out of vmalloc space".
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/autcpu12.c              |   15 +-----
- arch/arm/mach-clps711x/cdb89712.c              |    4 +-
- arch/arm/mach-clps711x/common.c                |    2 +-
- arch/arm/mach-clps711x/edb7211-mm.c            |   16 +++---
- arch/arm/mach-clps711x/include/mach/autcpu12.h |   14 ++----
- arch/arm/mach-clps711x/include/mach/hardware.h |   56 ++++++------------------
- arch/arm/mach-clps711x/include/mach/syspld.h   |    9 +---
- arch/arm/mach-clps711x/p720t.c                 |   16 ++-----
- 8 files changed, 38 insertions(+), 94 deletions(-)
+ arch/arm/configs/clps711x_defconfig |   78 +++++++++++++++++++++++++++++++++++
+ arch/arm/configs/edb7211_defconfig  |   27 ------------
+ arch/arm/configs/fortunet_defconfig |   28 ------------
+ 3 files changed, 78 insertions(+), 55 deletions(-)
+ create mode 100644 arch/arm/configs/clps711x_defconfig
+ delete mode 100644 arch/arm/configs/edb7211_defconfig
+ delete mode 100644 arch/arm/configs/fortunet_defconfig
 
-diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
-index 3287191..214547b 100644
---- a/arch/arm/mach-clps711x/autcpu12.c
-+++ b/arch/arm/mach-clps711x/autcpu12.c
-@@ -39,19 +39,10 @@
- 
- #include "common.h"
- 
--/*
-- * The on-chip registers are given a size of 1MB so that a section can
-- * be used to map them; this saves a page table.  This is the place to
-- * add mappings for ROM, expansion memory, PCMCIA, etc.  (if static
-- * mappings are chosen for those areas).
-- *
--*/
--
- static struct map_desc autcpu12_io_desc[] __initdata = {
--	/* memory-mapped extra io and CS8900A Ethernet chip */
-- 	/* ethernet chip */
-- 	{
--		.virtual	= AUTCPU12_VIRT_CS8900A,
-+	/* Memory-mapped extra io and CS8900A Ethernet chip */
-+	{
-+		.virtual	= IO_ADDRESS(AUTCPU12_PHYS_CS8900A),
- 		.pfn		= __phys_to_pfn(AUTCPU12_PHYS_CS8900A),
- 		.length		= SZ_1M,
- 		.type		= MT_DEVICE
-diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
-index c314f49..d90d25c 100644
---- a/arch/arm/mach-clps711x/cdb89712.c
-+++ b/arch/arm/mach-clps711x/cdb89712.c
-@@ -40,8 +40,8 @@
-  */
- static struct map_desc cdb89712_io_desc[] __initdata = {
- 	{
--		.virtual	= ETHER_BASE,
--		.pfn		=__phys_to_pfn(ETHER_START),
-+		.virtual	= IO_ADDRESS(ETHER_PHYS_BASE),
-+		.pfn		= __phys_to_pfn(ETHER_PHYS_BASE),
- 		.length		= ETHER_SIZE,
- 		.type		= MT_DEVICE
- 	}
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index 38a18ee..0918591 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -45,7 +45,7 @@ static struct map_desc clps711x_io_desc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long)CLPS711X_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(CLPS711X_PHYS_BASE),
--		.length		= SZ_1M,
-+		.length		= SZ_64K,
- 		.type		= MT_DEVICE
- 	}
- };
-diff --git a/arch/arm/mach-clps711x/edb7211-mm.c b/arch/arm/mach-clps711x/edb7211-mm.c
-index 4372f06..054eaa0 100644
---- a/arch/arm/mach-clps711x/edb7211-mm.c
-+++ b/arch/arm/mach-clps711x/edb7211-mm.c
-@@ -51,23 +51,23 @@ extern void clps711x_map_io(void);
-  *     happens).
-  */
- static struct map_desc edb7211_io_desc[] __initdata = {
-- 	{	/* memory-mapped extra keyboard row */
--	 	.virtual 	= EP7211_VIRT_EXTKBD,
-+	{	/* Memory-mapped extra keyboard row */
-+		.virtual 	= IO_ADDRESS(EP7211_PHYS_EXTKBD),
- 		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
- 		.length		= SZ_1M,
- 		.type		= MT_DEVICE,
--	}, {	/* and CS8900A Ethernet chip */
--		.virtual	= EP7211_VIRT_CS8900A,
-+	}, {	/* CS8900A Ethernet chip */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
- 		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
- 		.length		= SZ_1M,
- 		.type		= MT_DEVICE,
--	}, { 	/* flash banks */
--		.virtual	= EP7211_VIRT_FLASH1,
-+	}, {	/* Flash bank 0 */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
- 		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
- 		.length		= SZ_8M,
- 		.type		= MT_DEVICE,
--	}, {
--		.virtual	= EP7211_VIRT_FLASH2,
-+	}, {	/* Flash bank 1 */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH2),
- 		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH2),
- 		.length		= SZ_8M,
- 		.type		= MT_DEVICE,
-diff --git a/arch/arm/mach-clps711x/include/mach/autcpu12.h b/arch/arm/mach-clps711x/include/mach/autcpu12.h
-index 1588a36..f95ce6f 100644
---- a/arch/arm/mach-clps711x/include/mach/autcpu12.h
-+++ b/arch/arm/mach-clps711x/include/mach/autcpu12.h
-@@ -20,12 +20,8 @@
- #ifndef __ASM_ARCH_AUTCPU12_H
- #define __ASM_ARCH_AUTCPU12_H
- 
--/*
-- * The CS8900A ethernet chip has its I/O registers wired to chip select 2
-- * (nCS2). This is the mapping for it.
-- */
--#define AUTCPU12_PHYS_CS8900A		CS2_PHYS_BASE		/* physical */
--#define AUTCPU12_VIRT_CS8900A		(0xfe000000)		/* virtual */
-+/* The CS8900A ethernet chip has its I/O registers wired to chip select 2 */
-+#define AUTCPU12_PHYS_CS8900A		CS2_PHYS_BASE
- 
- /*
-  * The flash bank is wired to chip select 0
-@@ -34,11 +30,9 @@
- 
- /* offset for device specific information structure */
- #define AUTCPU12_LCDINFO_OFFS		(0x00010000)	
--/*
--* Videomemory is the internal SRAM (CS 6)	
--*/
-+
-+/* Videomemory in the internal SRAM (CS 6) */
- #define AUTCPU12_PHYS_VIDEO		CS6_PHYS_BASE
--#define AUTCPU12_VIRT_VIDEO		(0xfd000000)
- 
- /*
- * All special IO's are tied to CS1
-diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
-index 8497775..0a3df25 100644
---- a/arch/arm/mach-clps711x/include/mach/hardware.h
-+++ b/arch/arm/mach-clps711x/include/mach/hardware.h
-@@ -24,7 +24,10 @@
- 
- #include <mach/clps711x.h>
- 
--#define CLPS711X_VIRT_BASE	IOMEM(0xff000000)
-+#define IO_ADDRESS(x)		(0xdc000000 + (((x) & 0x03ffffff) | \
-+				(((x) >> 2) & 0x3c000000)))
-+
-+#define CLPS711X_VIRT_BASE	IOMEM(IO_ADDRESS(CLPS711X_PHYS_BASE))
- 
- #ifndef __ASSEMBLY__
- #define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
-@@ -61,58 +64,25 @@
- #define CS7_PHYS_BASE		(0x00000000)
- #endif
- 
--#define SYSPLD_VIRT_BASE	0xfe000000
--#define SYSPLD_BASE		SYSPLD_VIRT_BASE
--
- #if defined (CONFIG_ARCH_CDB89712)
- 
--#define ETHER_START      0x20000000
--#define ETHER_SIZE       0x1000
--#define ETHER_BASE       0xfe000000
-+#define ETHER_PHYS_BASE		CS2_PHYS_BASE
-+#define ETHER_SIZE		0x1000
- 
- #endif
- 
- 
- #if defined (CONFIG_ARCH_EDB7211)
- 
--/*
-- * The extra 8 lines of the keyboard matrix are wired to chip select 3 (nCS3) 
-- * and repeat across it. This is the mapping for it.
-- *
-- * In jumpered boot mode, nCS3 is mapped to 0x4000000, not 0x3000000. This 
-- * was cause for much consternation and headscratching. This should probably
-- * be made a compile/run time kernel option.
-- */
--#define EP7211_PHYS_EXTKBD		CS3_PHYS_BASE	/* physical */
--
--#define EP7211_VIRT_EXTKBD		(0xfd000000)	/* virtual */
--
--
--/*
-- * The CS8900A ethernet chip has its I/O registers wired to chip select 2 
-- * (nCS2). This is the mapping for it.
-- *
-- * In jumpered boot mode, nCS2 is mapped to 0x5000000, not 0x2000000. This 
-- * was cause for much consternation and headscratching. This should probably
-- * be made a compile/run time kernel option.
-- */
--#define EP7211_PHYS_CS8900A		CS2_PHYS_BASE	/* physical */
--
--#define EP7211_VIRT_CS8900A		(0xfc000000)	/* virtual */
-+/* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
-+#define EP7211_PHYS_EXTKBD	CS3_PHYS_BASE
- 
-+/* The CS8900A ethernet chip has its I/O registers wired to chip select 2 */
-+#define EP7211_PHYS_CS8900A	CS2_PHYS_BASE
- 
--/*
-- * The two flash banks are wired to chip selects 0 and 1. This is the mapping
-- * for them.
-- *
-- * nCS0 and nCS1 are at 0x70000000 and 0x60000000, respectively, when running
-- * in jumpered boot mode.
-- */
--#define EP7211_PHYS_FLASH1		CS0_PHYS_BASE	/* physical */
--#define EP7211_PHYS_FLASH2		CS1_PHYS_BASE	/* physical */
--
--#define EP7211_VIRT_FLASH1		(0xfa000000)	/* virtual */
--#define EP7211_VIRT_FLASH2		(0xfb000000)	/* virtual */
-+/* The two flash banks are wired to chip selects 0 and 1 */
-+#define EP7211_PHYS_FLASH1	CS0_PHYS_BASE
-+#define EP7211_PHYS_FLASH2	CS1_PHYS_BASE
- 
- #endif /* CONFIG_ARCH_EDB7211 */
- 
-diff --git a/arch/arm/mach-clps711x/include/mach/syspld.h b/arch/arm/mach-clps711x/include/mach/syspld.h
-index f7f4c12..9a43315 100644
---- a/arch/arm/mach-clps711x/include/mach/syspld.h
-+++ b/arch/arm/mach-clps711x/include/mach/syspld.h
-@@ -23,14 +23,9 @@
- #define __ASM_ARCH_SYSPLD_H
- 
- #define SYSPLD_PHYS_BASE	(0x10000000)
-+#define SYSPLD_VIRT_BASE	IO_ADDRESS(SYSPLD_PHYS_BASE)
- 
--#ifndef __ASSEMBLY__
--#include <asm/types.h>
--
--#define SYSPLD_REG(type,off)	(*(volatile type *)(SYSPLD_BASE + off))
--#else
--#define SYSPLD_REG(type,off)	(off)
--#endif
-+#define SYSPLD_REG(type, off)	(*(volatile type *)(SYSPLD_VIRT_BASE + (off)))
- 
- #define PLD_INT		SYSPLD_REG(u32, 0x000000)
- #define PLD_INT_PENIRQ		(1 << 5)
-diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index 7680bea..dd89950 100644
---- a/arch/arm/mach-clps711x/p720t.c
-+++ b/arch/arm/mach-clps711x/p720t.c
-@@ -39,22 +39,16 @@
- #include "common.h"
- 
- /*
-- * Map the P720T system PLD.  It occupies two address spaces:
-- *  SYSPLD_PHYS_BASE and SYSPLD_PHYS_BASE + 0x00400000
-- * We map both here.
-+ * Map the P720T system PLD. It occupies two address spaces:
-+ * 0x10000000 and 0x10400000. We map both regions as one.
-  */
- static struct map_desc p720t_io_desc[] __initdata = {
- 	{
- 		.virtual	= SYSPLD_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(SYSPLD_PHYS_BASE),
--		.length		= SZ_1M,
--		.type		= MT_DEVICE
--	}, {
--		.virtual	= 0xfe400000,
--		.pfn		= __phys_to_pfn(0x10400000),
--		.length		= SZ_1M,
--		.type		= MT_DEVICE
--	}
-+		.length		= SZ_8M,
-+		.type		= MT_DEVICE,
-+	},
- };
- 
- static void __init
+diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
+new file mode 100644
+index 0000000..86209d1
+--- /dev/null
++++ b/arch/arm/configs/clps711x_defconfig
+@@ -0,0 +1,78 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_EMBEDDED=y
++CONFIG_PARTITION_ADVANCED=y
++# CONFIG_MSDOS_PARTITION is not set
++CONFIG_ARCH_CLPS711X=y
++CONFIG_ARCH_AUTCPU12=y
++CONFIG_ARCH_CDB89712=y
++CONFIG_ARCH_CLEP7312=y
++CONFIG_ARCH_EDB7211=y
++CONFIG_ARCH_P720T=y
++CONFIG_ARCH_FORTUNET=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_IPV6 is not set
++CONFIG_IRDA=y
++CONFIG_IRTTY_SIR=y
++CONFIG_EP7211_DONGLE=y
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_JEDECPROBE=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_CDB89712=y
++CONFIG_MTD_AUTCPU12=y
++CONFIG_MTD_PLATRAM=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_3COM is not set
++# CONFIG_NET_VENDOR_AMD is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CHELSIO is not set
++CONFIG_CS89x0=y
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_FUJITSU is not set
++# CONFIG_NET_VENDOR_HP is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_RACAL is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++CONFIG_SERIAL_CLPS711X_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++CONFIG_FB=y
++CONFIG_FB_CLPS711X=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_MINIX_FS=y
++# CONFIG_NETWORK_FILESYSTEMS is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++# CONFIG_CRC32 is not set
+diff --git a/arch/arm/configs/edb7211_defconfig b/arch/arm/configs/edb7211_defconfig
+deleted file mode 100644
+index d52ded35..0000000
+--- a/arch/arm/configs/edb7211_defconfig
++++ /dev/null
+@@ -1,27 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_EXPERT=y
+-# CONFIG_HOTPLUG is not set
+-CONFIG_ARCH_CLPS711X=y
+-CONFIG_ARCH_EDB7211=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-# CONFIG_IPV6 is not set
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_NETDEVICES=y
+-# CONFIG_INPUT is not set
+-CONFIG_SERIO_LIBPS2=y
+-# CONFIG_VT is not set
+-CONFIG_SERIAL_CLPS711X=y
+-CONFIG_SERIAL_CLPS711X_CONSOLE=y
+-CONFIG_EXT2_FS=y
+-CONFIG_MINIX_FS=y
+-CONFIG_PARTITION_ADVANCED=y
+-# CONFIG_MSDOS_PARTITION is not set
+-CONFIG_DEBUG_USER=y
+diff --git a/arch/arm/configs/fortunet_defconfig b/arch/arm/configs/fortunet_defconfig
+deleted file mode 100644
+index 840fced..0000000
+--- a/arch/arm/configs/fortunet_defconfig
++++ /dev/null
+@@ -1,28 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_EXPERT=y
+-# CONFIG_HOTPLUG is not set
+-CONFIG_ARCH_CLPS711X=y
+-CONFIG_ARCH_FORTUNET=y
+-# CONFIG_ARM_THUMB is not set
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_FPE_FASTFPE=y
+-CONFIG_BINFMT_AOUT=y
+-CONFIG_NET=y
+-CONFIG_UNIX=y
+-CONFIG_MTD=y
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_CFI=y
+-CONFIG_MTD_CFI_INTELEXT=y
+-CONFIG_BLK_DEV_RAM=y
+-# CONFIG_INPUT is not set
+-# CONFIG_SERIO is not set
+-# CONFIG_VT is not set
+-CONFIG_SERIAL_CLPS711X=y
+-CONFIG_SERIAL_CLPS711X_CONSOLE=y
+-CONFIG_EXT2_FS=y
+-CONFIG_DEBUG_USER=y
 -- 
 1.7.8.6
