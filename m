@@ -1,49 +1,91 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 10 Oct 2012 17:50:52 +0200
-Subject: [PATCH 0/3] ARM: dts: EMIF and LPDDR2 device tree data for OMAP5
- boards
-In-Reply-To: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
-References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <5075995C.4060502@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 10 Oct 2012 09:00:27 -0700
+Subject: [PATCH 5/6] ARM: EXYNOS: Add support for Exynos secure firmware
+In-Reply-To: <1348496913-25422-6-git-send-email-t.figa@samsung.com>
+References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
+ <1348496913-25422-6-git-send-email-t.figa@samsung.com>
+Message-ID: <20121010160027.GA582@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You should CC devicetree-discuss at lists.ozlabs.org for any Device tree
-patches. This is applicable for the whole series.
+Hi,
 
-On 10/10/2012 02:05 PM, Lokesh Vutla wrote:
-> Patch 1:
-> 	Renaming elpida_ecb240abacn.dtsi as lpddr2_data.dtsi
-> Patch 2:
-> 	Correcting size of memory defined for omap5
-> Patch 3:
-> 	EMIF and LPDDR2 device tree data for OMAP5 boards
+On Mon, Sep 24, 2012 at 04:28:32PM +0200, Tomasz Figa wrote:
+> Some Exynos-based boards contain secure firmware and must use firmware
+> operations to set up some hardware.
 > 
-
-There is not point to list the patch subject in a cover letter.
-You should just introduce the series and ideally give details about the
-test like you have done below.
-
-The cover letter should mostly be written like an email.
-
-Benoit
-
-> Testing:
-> - Boot tested on omap5-sevm board
-> - Built emif as a module
+> This patch adds firmware operations for Exynos secure firmware and a way
+> for board code and device tree to specify that they must be used.
 > 
-> Lokesh Vutla (3):
->   ARM: dts: Renaming elpida_ecb240abacn.dts as lpddr2_data.dtsi
->   ARM: dts: Correcting size of memory defined for omap5
->   ARM: dts: EMIF and LPDDR2 device tree data for OMAP5 boards
+> Example of use:
 > 
->  arch/arm/boot/dts/elpida_ecb240abacn.dtsi |   67 ---------------
->  arch/arm/boot/dts/lpddr2_data.dtsi        |  129 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap4-panda.dts         |    2 +-
->  arch/arm/boot/dts/omap4-sdp.dts           |    2 +-
->  arch/arm/boot/dts/omap5-evm.dts           |   13 ++-
->  arch/arm/boot/dts/omap5.dtsi              |   18 ++++
->  6 files changed, 161 insertions(+), 70 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/elpida_ecb240abacn.dtsi
->  create mode 100644 arch/arm/boot/dts/lpddr2_data.dtsi
+> In board code:
 > 
+> 	...MACHINE_START(...)
+> 		/* ... */
+> 		.init_early	= exynos_firmware_init,
+> 		/* ... */
+> 	MACHINE_END
+> 
+> In device tree:
+> 
+> 	/ {
+> 		/* ... */
+> 
+> 		firmware {
+> 			compatible = "samsung,secure-firmware";
+> 		};
+> 
+> 		/* ... */
+> 	};
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
+>  arch/arm/mach-exynos/Makefile                      |  1 +
+>  arch/arm/mach-exynos/common.h                      |  2 +
+>  arch/arm/mach-exynos/firmware.c                    | 54 ++++++++++++++++++++++
+>  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+>  5 files changed, 66 insertions(+)
+>  create mode 100644 arch/arm/mach-exynos/firmware.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> index 0bf68be..f447059 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> @@ -6,3 +6,11 @@ Required root node properties:
+>      - compatible = should be one or more of the following.
+>          (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
+>          (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
+> +
+> +Optional:
+> +    - firmware node, specifying presence and type of secure firmware, currently
+> +        supported value of compatible property is "samsung,secure-firmware":
+> +
+> +	firmware {
+> +		compatible = "samsung,secure-firmware";
+> +	};
+
+If you require the binding to specify the memory area, then you at least allow
+for future work to move to a dynamic mapping without updating the binding and
+all device trees. So, please do that even if the code is hardcoded to the
+static address today.
+
+For extra credit, make sure that the reg property is matching the static mapping
+when you setup your firmware interface on your platform.
+
+
+[...]
+
+> +static int exynos_cpu_boot_reg(int cpu, void __iomem **ptr)
+> +{
+> +	*ptr = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> +	return 0;
+> +}
+
+It would be nice to get a memory map for the SMC area in documentation
+somewhere, but that can be done separately later.
+
+
+-Olof
