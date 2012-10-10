@@ -1,35 +1,44 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 10 Oct 2012 10:36:53 -0400
-Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB3B5BD@DBDE01.ent.ti.com>
-References: <1349879449-22657-1-git-send-email-mporter@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB3B5BD@DBDE01.ent.ti.com>
-Message-ID: <20121010143653.GD13724@beef>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 10 Oct 2012 15:47:23 +0100
+Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
+In-Reply-To: <1349855687.6952.75.camel@dagon.hellion.org.uk>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <1349796183-30648-6-git-send-email-arnd@arndb.de>
+ <alpine.DEB.2.02.1210091630170.29539@kaball.uk.xensource.com>
+ <201210091821.27818.arnd@arndb.de>
+ <1349855687.6952.75.camel@dagon.hellion.org.uk>
+Message-ID: <alpine.DEB.2.02.1210101544500.2689@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 02:33:54PM +0000, Vaibhav Hiremath wrote:
-> On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
-> > 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
-> > exposes a bug in the AM33XX clock data for mcasp. After moving to
-> > clk_get() usage, the _init() of all registered hwmods fails on mcasp0
-> > due to incorrect clock data causing clk_get() to fail. This causes all
-> > successive hwmods to fail to _init() leaving them in a bad state.
+On Wed, 10 Oct 2012, Ian Campbell wrote:
+> On Tue, 2012-10-09 at 19:21 +0100, Arnd Bergmann wrote:
+> > On Tuesday 09 October 2012, Stefano Stabellini wrote:
+> > > >  config XEN
+> > > >       bool "Xen guest support on ARM (EXPERIMENTAL)"
+> > > >       depends on EXPERIMENTAL && ARM && OF
+> > > > +     depends on !CPU_V6
+> > > >       help
+> > > >         Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+> > > 
+> > > Considering that we rely on the virtualization extensions, this one can
+> > > be:
+> > > 
+> > >     depends on CPU_V7
+> > > 
+> > > The rest looks fine. I can submit a second patch to change !CPU_V6 into
+> > > CPU_V7 later, if you prefer.
 > > 
-> > This patch updates the mcasp clock entries so clk_get() will succeed.
-> > It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
-> > boot.
-> > 
+> > CPU_V6 and CPU_V7 are not exclusive, I saw the problem when building a
+> > combined kernel for both V6 and V7. The code also needs to depend on ARMv7
+> > with virtualization extensions, but that is a different issue. We don't
+> > actually have a configuration symbol for that yet, as far as I can tell.
 > 
-> Matt,
+> I don't think the guest kernels (including dom0) need the extensions to
+> run under Xen, they are only need by Xen itself. The guests should just
+> see a relatively normal v7 processor. 
 > 
-> I have already submitted patch for this and it is accepted and merged in 
-> Tony's pull request.
-> 
-> https://patchwork.kernel.org/patch/1499271/
+> Stefano, does that sound right?
 
-Heh, ok. My search skills failed badly when I ran into this.
-
-Thanks :)
-
--Matt
+Keep in mind that we are using HVC to issue hypercalls, and HVC has been
+introduced with the virtualization extensions, if I am not mistaken.
