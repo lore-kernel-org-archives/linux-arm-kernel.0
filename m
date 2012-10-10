@@ -1,129 +1,30 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 10 Oct 2012 19:45:27 +0400
-Subject: [PATCH 1/7] ARM: clps711x: convert to clockevents
-Message-ID: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
+Date: Wed, 10 Oct 2012 19:45:28 +0400
+Subject: [PATCH 2/7] ARM: clps711x: p720t: remove missing #include
+In-Reply-To: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
+References: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1349883933-8881-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts CLPS711X-platform to use modern clockevent API.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/Kconfig                |    2 +-
- arch/arm/mach-clps711x/common.c |   38 +++++++++++++++++---------------------
- 2 files changed, 18 insertions(+), 22 deletions(-)
+ arch/arm/mach-clps711x/p720t.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3ebe71c..1d43127 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -354,9 +354,9 @@ config ARCH_BCM2835
- config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
- 	select CPU_ARM720T
--	select ARCH_USES_GETTIMEOFFSET
- 	select COMMON_CLK
- 	select CLKDEV_LOOKUP
-+	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_MEMORY_H
- 	help
- 	  Support for Cirrus Logic 711x/721x/731x based boards.
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index 509243d..218684f 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -21,13 +21,14 @@
-  */
- #include <linux/io.h>
- #include <linux/init.h>
-+#include <linux/sizes.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/clockchips.h>
- #include <linux/clk-provider.h>
- 
--#include <asm/sizes.h>
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index b752b58..7680bea 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -36,8 +36,6 @@
  #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/system_misc.h>
-@@ -36,7 +37,6 @@
+ #include <mach/syspld.h>
  
- static struct clk *clk_pll, *clk_bus, *clk_uart, *clk_timerl, *clk_timerh,
- 		  *clk_tint, *clk_spi;
--static unsigned long latch;
+-#include <asm/hardware/clps7111.h>
+-
+ #include "common.h"
  
  /*
-  * This maps the generic CLPS711x registers
-@@ -158,32 +158,29 @@ void __init clps711x_init_irq(void)
- 	clps_writel(0, KBDEOI);
- }
- 
--/*
-- * gettimeoffset() returns time since last timer tick, in usecs.
-- *
-- * 'LATCH' is hwclock ticks (see CLOCK_TICK_RATE in timex.h) per jiffy.
-- * 'tick' is usecs per jiffy.
-- */
--static unsigned long clps711x_gettimeoffset(void)
-+static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
-+					 struct clock_event_device *evt)
- {
--	unsigned long hwticks;
--	hwticks = latch - (clps_readl(TC2D) & 0xffff);
--	return (hwticks * (tick_nsec / 1000)) / latch;
- }
- 
--/*
-- * IRQ handler for the timer
-- */
--static irqreturn_t p720t_timer_interrupt(int irq, void *dev_id)
-+static struct clock_event_device clockevent_clps711x = {
-+	.name		= "CLPS711x Clockevents",
-+	.rating		= 300,
-+	.features	= CLOCK_EVT_FEAT_PERIODIC,
-+	.set_mode	= clps711x_clockevent_set_mode,
-+};
-+
-+static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
- {
--	timer_tick();
-+	clockevent_clps711x.event_handler(&clockevent_clps711x);
-+
- 	return IRQ_HANDLED;
- }
- 
- static struct irqaction clps711x_timer_irq = {
- 	.name		= "CLPS711x Timer Tick",
- 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= p720t_timer_interrupt,
-+	.handler	= clps711x_timer_interrupt,
- };
- 
- static void add_fixed_clk(struct clk *clk, const char *name, int rate)
-@@ -244,20 +241,19 @@ static void __init clps711x_timer_init(void)
- 
- 	pr_info("CPU frequency set at %i Hz.\n", cpu);
- 
--	latch = (timh + HZ / 2) / HZ;
-+	clps_writew(DIV_ROUND_CLOSEST(timh, HZ), TC2D);
- 
- 	tmp = clps_readl(SYSCON1);
- 	tmp |= SYSCON1_TC2S | SYSCON1_TC2M;
- 	clps_writel(tmp, SYSCON1);
- 
--	clps_writel(latch - 1, TC2D);
-+	clockevents_config_and_register(&clockevent_clps711x, timh, 1, 0xffff);
- 
- 	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
- }
- 
- struct sys_timer clps711x_timer = {
- 	.init		= clps711x_timer_init,
--	.offset		= clps711x_gettimeoffset,
- };
- 
- void clps711x_restart(char mode, const char *cmd)
 -- 
 1.7.8.6
