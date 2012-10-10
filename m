@@ -1,85 +1,89 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Wed, 10 Oct 2012 20:11:55 +0900
-Subject: [Linaro-mm-sig] [PATCHv9 00/25] Integration of videobuf2 with
- DMABUF
-In-Reply-To: <20121010075418.6a18a867@redhat.com>
-References: <1349188056-4886-1-git-send-email-t.stanislaws@samsung.com>
- <20121010075418.6a18a867@redhat.com>
-Message-ID: <CAH9JG2VBQSmiBYgVTaFYbgeaE35WMB-J4exT3Uqd9+fnsM0d-A@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 10 Oct 2012 12:15:17 +0100
+Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
+In-Reply-To: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
+References: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
+Message-ID: <20121010111517.GC2131@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/12, Mauro Carvalho Chehab <mchehab@redhat.com> wrote:
-> Hi,
->
-> Em Tue, 02 Oct 2012 16:27:11 +0200
-> Tomasz Stanislawski <t.stanislaws@samsung.com> escreveu:
->
->> Hello everyone,
->> This patchset adds support for DMABUF [2] importing and exporting to V4L2
->> stack.
->>
->> v9:
->> - rebase on 3.6
->> - change type for fs to __s32
->> - add support for vb2_ioctl_expbuf
->> - remove patch 'v4l: vb2: add support for DMA_ATTR_NO_KERNEL_MAPPING',
->>   it will be posted as a separate patch
->> - fix typos and style in Documentation (from Hans Verkuil)
->> - only vb2-core and vb2-dma-contig selects DMA_SHARED_BUFFER in Kconfig
->> - use data_offset and length while queueing DMABUF
->> - return the most recently used fd at VIDIOC_DQBUF
->> - use (buffer-type, index, plane) tuple instead of mem_offset
->>   to identify a for exporting (from Hans Verkuil)
->> - support for DMABUF mmap in vb2-dma-contig (from Laurent Pinchart)
->> - add testing alignment of vaddr and size while verifying userptr
->>   against DMA capabilities (from Laurent Pinchart)
->> - substitute VM_DONTDUMP with VM_RESERVED
->> - simplify error handling in vb2_dc_get_dmabuf (from Laurent Pinchart)
->
-> For now, NACK. See below.
+On Tue, Oct 09, 2012 at 11:46:12PM -0700, Todd Poynor wrote:
+> Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
+> on overflow.
+> 
+> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+> ---
+>  arch/arm/kernel/stacktrace.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> index 00f79e5..6315162 100644
+> --- a/arch/arm/kernel/stacktrace.c
+> +++ b/arch/arm/kernel/stacktrace.c
+> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
+>  	high = ALIGN(low, THREAD_SIZE);
+>  
+>  	/* check current frame pointer is within bounds */
+> -	if (fp < (low + 12) || fp + 4 >= high)
+> +	if (fp < (low + 12) || fp >= high - 4)
+>  		return -EINVAL;
+>  
+>  	/* restore the registers from the stack frame */
 
-Sad news!
-It's failed to merge by very poor samsung board support at mainline.
+sp and fp can still be complete garbage in the case of a corrupted frame,
+so low + 12 can still overflow and cause us to read beyond the stack base.
 
-CC arm & samsung mailing list.
+A more robust patch might be as follows.  This also checks for misaligned
+fp and sp values, since those indicate corruption and there can be no
+sensible way to interpret the resulting frame in that case.
 
-Thank you,
-Kyungmin Park
->
-> I spent 4 days trying to setup an environment that would allow testing
-> DMABUF with video4linux without success (long story, see below). Also,
-> Laurent tried the same without any luck, and it seems that it even
-> corrupted his test machine.
->
-> Basically Samsung generously donated me two boards that it could be
-> used on this test (Origen and SMDK310). None of them actually worked
-> with the upstream kernel: patches are needed to avoid OOPSes on
-> Origen; both Origen/SMDK310 defconfigs are completely broken, and drivers
-> don't even boot if someone tries to use the Kernel's defconfigs.
->
-> Even after spending _days_ trying to figure out the needed .config options
-> (as the config files are not easily available), both boards have... issues:
->
-> 	- lack of any display output driver at SMDK310;
->
-> 	- lack of any network driver at Origen: it seems that none of
-> the available network options on Origen was upstreamed: no Bluetooth, no
-> OTG,
-> no Wifi.
->
-> The only test I was able to do (yesterday, late night), the DMABUF caused
-> an OOPS at the Origen board. So, for sure it is not ready for upstream.
->
-> It is now, too late for 3.7. I might consider it to 3.8, if something
-> can be done to fix the existing issues, and setup a proper setup, using
-> the upstream Kernel.
->
-> Regards,
-> Mauro
->
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
->
+Also, according to the definition of current_thread_info(),
+IS_ALIGNED(sp, THREAD_SIZE) indicates a full stack extending from sp
+to sp + THREAD_SIZE, and not an empty stack extending from sp -
+THREAD_SIZE to sp.  We cannot backtrace this situation anyway, since
+that would imply that the frame record extends beyond the stack...
+but this patch tidies it up in the interest of clarity.
+
+Cheers
+---Dave
+
+(untested)
+
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index 00f79e5..fec82be 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -28,10 +28,20 @@ int notrace unwind_frame(struct stackframe *frame)
+ 
+ 	/* only go to a higher address on the stack */
+ 	low = frame->sp;
+-	high = ALIGN(low, THREAD_SIZE);
++	if (!IS_ALIGNED(fp, 4))
++		return -EINVAL;
++
++	/*
++	 * low + 1 here ensures that high > sp, consistent with the
++	 * definition of current_thread_info().
++	 * We subtract 1 to compute the highest allowable byte address.
++	 * Otherwise, we might get high == 0 which would confuse our
++	 * comparisons.
++	 */
++	high = ALIGN(low + 1, THREAD_SIZE) - 1;
+ 
+ 	/* check current frame pointer is within bounds */
+-	if (fp < (low + 12) || fp + 4 >= high)
++	if (fp < 12 || fp - 12 < low || fp > high)
+ 		return -EINVAL;
+ 
+ 	/* restore the registers from the stack frame */
+@@ -39,6 +49,10 @@ int notrace unwind_frame(struct stackframe *frame)
+ 	frame->sp = *(unsigned long *)(fp - 8);
+ 	frame->pc = *(unsigned long *)(fp - 4);
+ 
++	/* Do not claim the frame is valid if if is obviously corrupt: */
++	if (!IS_ALIGNED(frame->fp, 4))
++		return -EINVAL;
++
+ 	return 0;
+ }
+ #endif
