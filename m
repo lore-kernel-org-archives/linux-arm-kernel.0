@@ -1,42 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Oct 2012 18:39:57 +0000
-Subject: [RFC PATCH] arm: vt8500: Convert irq.c for multiplatform
- integration
-In-Reply-To: <1349891673.22215.2.camel@gitbox>
-References: <1349856509-20480-1-git-send-email-linux@prisktech.co.nz>
- <1349891673.22215.2.camel@gitbox>
-Message-ID: <201210101839.58052.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 10 Oct 2012 18:46:44 +0000 (UTC)
+Subject: [PATCH 3.6.0- 0/6] ARM: use module_platform_driver macro
+In-Reply-To: <1349893796-6947-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1349893796-6947-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <alpine.DEB.2.00.1210101837440.5736@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 October 2012, Tony Prisk wrote:
-> I did have one bit I wasn't sure about:
-> 
-> On Wed, 2012-10-10 at 21:08 +1300, Tony Prisk wrote:
-> > This patch converts arch-vt8500/irq.c to MULTI_IRQ_HANDLER and
-> > SPARSE_IRQ. IRQ domain is changed from legacy to linear.
-> > 
-> > Also, remove legacy code in include/mach/entry-macro.S and
-> > include/mach/irq.h to prepare for multiplatform.
-> > 
-> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> > ---
-> >  ...
-> >  
-> > diff --git a/arch/arm/mach-vt8500/common.h b/arch/arm/mach-vt8500/common.h
-> > index 2b24196..6f2b843 100644
-> > --- a/arch/arm/mach-vt8500/common.h
-> > +++ b/arch/arm/mach-vt8500/common.h
-> > @@ -25,4 +25,7 @@ int __init vt8500_irq_init(struct device_node *node,
-> >  /* defined in drivers/clk/clk-vt8500.c */
-> >  void __init vtwm_clk_init(void __iomem *pmc_base);
-> >  
-> > +/* defined in irq.c */
-> > +asmlinkage void vt8500_handle_irq(struct pt_regs *regs);
-> 
-> Should asmlinkage be used here in the header or is it unnecessary?
+Hi
 
-I think it's not technically needed because the function is not called
-from C code anywhere, but IMHO it's better to have it here out of principle.
+On Wed, 10 Oct 2012, Srinivas KANDAGATLA wrote:
 
-	Arnd
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> 
+> Running below Coccinelle lookup pattern like below on the 
+> latest kernel showed about 52 hits. This patch series is a subset 
+> of those 52 patches, so that it will be easy for maintainers to review.
+
+so the idea looks okay to me, but several of the patches aren't addressed 
+to the right people.  You can use the MAINTAINERS file to figure out the 
+right place to send them.
+
+The PXA patches need to go to the appropriate PXA people, who are 
+probably:
+
+M:      Eric Miao <eric.y.miao@gmail.com>
+M:      Russell King <linux@arm.linux.org.uk>
+M:      Haojian Zhuang <haojian.zhuang@gmail.com>
+L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+
+The OMAP RNG patch needs to go to 
+
+M:      Deepak Saxena <dsaxena@plexity.net>
+M:      Matt Mackall <mpm@selenic.com>
+M:      Herbert Xu <herbert@gondor.apana.org.au>
+
+As far as the remaining three OMAP patches go, they look okay to me but 
+Tony Lindgren is the maintainer of these files and so he's the right 
+person to merge them.
+
+> Hopefully these patches will get rid of some code duplication in kernel.
+
+One other comment - the description on the patches isn't quite accurate.  
+The patches don't remove code duplication per se, they just replace some 
+boilerplate code with a macro.
+
+
+- Paul
