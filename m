@@ -1,47 +1,135 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 10 Oct 2012 13:42:22 +0200
-Subject: [PATCH 1/8] ARM: ux500: Remove cpufreq platform device
+Date: Wed, 10 Oct 2012 13:42:25 +0200
+Subject: [PATCH 4/8] cpufreq: db8500: Fetch cpufreq table from platform data
 In-Reply-To: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1349869349-8070-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1349869349-8070-5-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-The cpufreq device is already added from the prcmu driver as
-a mfd child device.
+By fetching the table as platform data we do not need the internally
+hardcoded cpufreq table anymore.
+
+Moreover the corresponding arm_opp idx2opp table, used for mapping
+frequency to correct opp bits is also removed. This due to that the
+opp bits is put directly in the index field of the cpufreq table.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    6 ------
- 1 file changed, 6 deletions(-)
+ drivers/cpufreq/db8500-cpufreq.c |   67 ++++++++++++++------------------------
+ 1 file changed, 25 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index bcdfe6b..41b2779 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -214,9 +214,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
- 	db8500_add_gpios(parent);
- 	db8500_add_usb(parent, usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);
+diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
+index 7d61a6c..dea9a49 100644
+--- a/drivers/cpufreq/db8500-cpufreq.c
++++ b/drivers/cpufreq/db8500-cpufreq.c
+@@ -17,36 +17,7 @@
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <mach/id.h>
  
--	platform_device_register_data(parent,
--		"cpufreq-u8500", -1, NULL, 0);
+-static struct cpufreq_frequency_table freq_table[] = {
+-	[0] = {
+-		.index = 0,
+-		.frequency = 200000,
+-	},
+-	[1] = {
+-		.index = 1,
+-		.frequency = 400000,
+-	},
+-	[2] = {
+-		.index = 2,
+-		.frequency = 800000,
+-	},
+-	[3] = {
+-		/* Used for MAX_OPP, if available */
+-		.index = 3,
+-		.frequency = CPUFREQ_TABLE_END,
+-	},
+-	[4] = {
+-		.index = 4,
+-		.frequency = CPUFREQ_TABLE_END,
+-	},
+-};
 -
- 	for (i = 0; i < ARRAY_SIZE(platform_devs); i++)
- 		platform_devs[i]->dev.parent = parent;
+-static enum arm_opp idx2opp[] = {
+-	ARM_EXTCLK,
+-	ARM_50_OPP,
+-	ARM_100_OPP,
+-	ARM_MAX_OPP
+-};
++static struct cpufreq_frequency_table *freq_table;
  
-@@ -236,9 +233,6 @@ struct device * __init u8500_of_init_devices(void)
+ static struct freq_attr *db8500_cpufreq_attr[] = {
+ 	&cpufreq_freq_attr_scaling_available_freqs,
+@@ -88,7 +59,7 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
+ 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
  
- 	db8500_add_usb(parent, usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);
+ 	/* request the PRCM unit for opp change */
+-	if (prcmu_set_arm_opp(idx2opp[idx])) {
++	if (prcmu_set_arm_opp(freq_table[idx].index)) {
+ 		pr_err("db8500-cpufreq:  Failed to set OPP level\n");
+ 		return -EINVAL;
+ 	}
+@@ -102,25 +73,30 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
  
--	platform_device_register_data(parent,
--		"cpufreq-u8500", -1, NULL, 0);
+ static unsigned int db8500_cpufreq_getspeed(unsigned int cpu)
+ {
+-	int i;
++	int i = 0;
+ 	/* request the prcm to get the current ARM opp */
+-	for (i = 0; prcmu_get_arm_opp() != idx2opp[i]; i++)
+-		;
+-	return freq_table[i].frequency;
++	int opp = prcmu_get_arm_opp();
++
++	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
++		if (opp == freq_table[i].index)
++			return freq_table[i].frequency;
++		i++;
++	}
++
++	/* We could not find a corresponding opp frequency. */
++	return 0;
+ }
+ 
+ static int __cpuinit db8500_cpufreq_init(struct cpufreq_policy *policy)
+ {
+-	int i, res;
 -
- 	u8500_dma40_device.dev.parent = parent;
+-	BUILD_BUG_ON(ARRAY_SIZE(idx2opp) + 1 != ARRAY_SIZE(freq_table));
+-
+-	if (prcmu_has_arm_maxopp())
+-		freq_table[3].frequency = 1000000;
++	int i = 0;
++	int res;
  
- 	/*
+ 	pr_info("db8500-cpufreq : Available frequencies:\n");
+-	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
++	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
+ 		pr_info("  %d Mhz\n", freq_table[i].frequency/1000);
++		i++;
++	}
+ 
+ 	/* get policy fields based on the table */
+ 	res = cpufreq_frequency_table_cpuinfo(policy, freq_table);
+@@ -163,6 +139,13 @@ static struct cpufreq_driver db8500_cpufreq_driver = {
+ 
+ static int db8500_cpufreq_probe(struct platform_device *pdev)
+ {
++	freq_table = dev_get_platdata(&pdev->dev);
++
++	if (!freq_table) {
++		pr_err("db8500-cpufreq: Failed to fetch cpufreq table\n");
++		return -ENODEV;
++	}
++
+ 	return cpufreq_register_driver(&db8500_cpufreq_driver);
+ }
+ 
 -- 
 1.7.10
