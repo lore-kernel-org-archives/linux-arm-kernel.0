@@ -1,43 +1,56 @@
-From: const@MakeLinux.com (Constantine Shulyupin)
-Date: Wed, 10 Oct 2012 12:32:54 +0200
-Subject: [PATCH v2] USB: usb-skeleton.c: fix compilation error and restore
- kref_put on fail in skel_open
-Message-ID: <1349865174-21649-1-git-send-email-const@MakeLinux.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Wed, 10 Oct 2012 16:03:05 +0530
+Subject: [PATCH 10/11] fsmc/nand: Add sw bch support for ecc
+ calculation/correction
+In-Reply-To: <20121009115023.GK12801@game.jcrosoft.org>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <3968b65e9aa0a81eca16ce0f20e45504da7ad7fe.1349778821.git.vipin.kumar@st.com>
+ <20121009115023.GK12801@game.jcrosoft.org>
+Message-ID: <50754EE1.7080905@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Constantine Shulyupin <const@MakeLinux.com>
+On 10/9/2012 5:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 16:14 Tue 09 Oct     , Vipin Kumar wrote:
+>> Signed-off-by: Vipin Kumar<vipin.kumar@st.com>
+>> ---
+>>   .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +
+>>   drivers/mtd/nand/fsmc_nand.c                       | 156 +++++++++++++--------
+>>   include/linux/mtd/fsmc.h                           |   3 +
+>>   3 files changed, 106 insertions(+), 55 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+>> index 598bca2..dcf513b 100644
+>> --- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+>> +++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+>> @@ -30,6 +30,8 @@ Optional properties:
+>>   - st,rb-gpios: When the st,ready-busy is defined as "rb-gpio", a gpio
+>>     pin number is defined in this property
+>>
+>> +- nand-sw-ecc: boolean indicating whether s/w ecc is supported
+>> +
+> please use the generic binding
+>   - nand-ecc-mode = xx
 
-Function skel_open increments usage count for the device with kref_get and the usage count should be decremented on the function failure.
+Thanks for pointing. I will do the needful
 
-Some last changes in function skel_open and finally commit
-52a7499 Revert "USB: usb-skeleton.c: fix open/disconnect race"
-introduced a bug in function skel_open, which this patch fixes.
+>>   Example:
+>>
+>>   	fsmc: flash at d1800000 {
+>> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+>> index 762cf83..ff84468 100644
+>> --- a/drivers/mtd/nand/fsmc_nand.c
+>> +++ b/drivers/mtd/nand/fsmc_nand.c
+>> @@ -946,6 +946,9 @@ static int __devinit fsmc_nand_probe_config_dt(struct platform_device *pdev,
+>>   	} else
+>>   		pdata->rbpin.use_pin = FSMC_RB_WAIT;
+>>
+>> +	if (of_property_read_bool(np, "nand-sw-ecc"))
+>> +		pdata->sw_ecc = true;
+>> +
+> of_get_nand_ecc_mode
+>
 
---
-Changelog:
--- Fixed accordinly feedback of Oliver Neukum oneukum at suse.de: also need to drop the lock.
+Sure
 
-Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
----
- drivers/usb/usb-skeleton.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/usb-skeleton.c b/drivers/usb/usb-skeleton.c
-index 0616f23..2025d03 100644
---- a/drivers/usb/usb-skeleton.c
-+++ b/drivers/usb/usb-skeleton.c
-@@ -113,8 +113,9 @@ static int skel_open(struct inode *inode, struct file *file)
- 	mutex_lock(&dev->io_mutex);
- 
- 	retval = usb_autopm_get_interface(interface);
--	if (retval)
--		goto out_err;
-+	if (retval) {
-+		kref_put(&dev->kref, skel_delete);
-+	}
- 
- 	/* save our object in the file's private structure */
- 	file->private_data = dev;
--- 
-1.7.9.5
+-Vipin
