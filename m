@@ -1,100 +1,55 @@
-From: const@MakeLinux.com (Constantine Shulyupin)
-Date: Wed, 10 Oct 2012 14:33:32 +0200
-Subject: [PATCH v6] Enable USB peripheral mode on dm365 EVM
-Message-ID: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 10 Oct 2012 12:36:00 +0000
+Subject: [PATCH v2 7/8] video: mark nuc900fb_map_video_memory as __devinit
+In-Reply-To: <1349813638-4617-8-git-send-email-arnd@arndb.de>
+References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
+ <1349813638-4617-8-git-send-email-arnd@arndb.de>
+Message-ID: <50756BB0.20005@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Constantine Shulyupin <const@MakeLinux.com>
+On 10/09/2012 08:13 PM, Arnd Bergmann wrote:
+> nuc900fb_map_video_memory is called by an devinit function
+> that may be called at run-time, but the function itself is
+> marked __init and will be discarded after boot.
+> 
+> To avoid calling into a function that may have been overwritten,
+> mark nuc900fb_map_video_memory itself as __devinit.
+> 
+> Without this patch, building nuc950_defconfig results in:
+> 
+> WARNING: drivers/video/built-in.o(.devinit.text+0x26c): Section mismatch in reference from the function nuc900fb_probe() to the function .init.text:nuc900fb_map_video_memory()
+> The function __devinit nuc900fb_probe() references
+> a function __init nuc900fb_map_video_memory().
+> If nuc900fb_map_video_memory is only used by nuc900fb_probe then
+> annotate nuc900fb_map_video_memory with a matching annotation.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> Cc: linux-fbdev at vger.kernel.org
 
-Sets USB PHY clock source to 24 MHz clock and call USB configuration from board initialization.
+Applied.
 
-Tested with OTG configuration, usb gadget g_zero on DM365 EVM connected to PC.
 
-References:
+Thanks,
 
-Definition of USB_PHY_CTRL and PHYCLKFREQ:
-- http://www.makelinux.com/lib/ti/DM36x_ARM/doc-141
+Florian Tobias Schandinat
 
-Original patch by miguel.aguilar at ridgerun.com three years ago:
-- http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
-
-Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
----
-
-Note:
-
-Changelog
-
-Changes since v5 http://www.spinics.net/lists/kernel/msg1413120.html
-accordingy feedback of nsekhar at ti.com http://www.spinics.net/lists/kernel/msg1414914.html
-- phy configuration moved to drivers/usb/musb/davinci.c
-- USB_OTG configuration is submitted in separated patch: http://www.spinics.net/lists/kernel/msg1414964.html
-- Setting current limit to 1000 mA. Any way the current is limited to 510 mA in davinci_setup_usb.
-
-Changes since v4 http://www.spinics.net/lists/kernel/msg1412995.html
-- removed fix of dev_info in musb_init_controller
-
-Changes since v3 http://www.spinics.net/lists/kernel/msg1412544.html:
-- removed optional altering of pr_info
-
-Changes since v1  http://marc.info/?l=linux-kernel&m=130894150803661&w=2:
-- removed optional code and reordered
-- removed alternation of GPIO33, which is multiplexed with DRVVBUS, because is not need for peripheral USB
-
-This patch is based on code from projects Arago, Angstom and RidgeRun.
-
----
- arch/arm/mach-davinci/board-dm365-evm.c |    2 ++
- drivers/usb/musb/davinci.c              |    3 +++
- drivers/usb/musb/davinci.h              |    1 +
- 3 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 688a9c5..ba5ffc1 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -38,6 +38,7 @@
- #include <mach/mmc.h>
- #include <mach/nand.h>
- #include <mach/keyscan.h>
-+#include <mach/usb.h>
- 
- #include <media/tvp514x.h>
- 
-@@ -610,6 +611,7 @@ static __init void dm365_evm_init(void)
- 
- 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
- 			ARRAY_SIZE(dm365_evm_spi_info));
-+	davinci_setup_usb(1000, 8);
- }
- 
- MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
-diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
-index 472c8b4..af09ebf 100644
---- a/drivers/usb/musb/davinci.c
-+++ b/drivers/usb/musb/davinci.c
-@@ -428,6 +428,9 @@ static int davinci_musb_init(struct musb *musb)
- 		__raw_writel(deepsleep, DM355_DEEPSLEEP);
- 	}
- 
-+	if (machine_is_davinci_dm365_evm())
-+		writel(readl(USB_PHY_CTRL) | USBPHY_CLKFREQ_24MHZ, USB_PHY_CTRL);
-+
- 	/* reset the controller */
- 	musb_writel(tibase, DAVINCI_USB_CTRL_REG, 0x1);
- 
-diff --git a/drivers/usb/musb/davinci.h b/drivers/usb/musb/davinci.h
-index 371baa0..e737d97 100644
---- a/drivers/usb/musb/davinci.h
-+++ b/drivers/usb/musb/davinci.h
-@@ -16,6 +16,7 @@
- 
- /* Integrated highspeed/otg PHY */
- #define USBPHY_CTL_PADDR	0x01c40034
-+#define USBPHY_CLKFREQ_24MHZ	BIT(13)
- #define USBPHY_DATAPOL		BIT(11)	/* (dm355) switch D+/D- */
- #define USBPHY_PHYCLKGD		BIT(8)
- #define USBPHY_SESNDEN		BIT(7)	/* v(sess_end) comparator */
--- 
-1.7.9.5
+> ---
+>  drivers/video/nuc900fb.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> index e10f551..b31b12b 100644
+> --- a/drivers/video/nuc900fb.c
+> +++ b/drivers/video/nuc900fb.c
+> @@ -387,7 +387,7 @@ static int nuc900fb_init_registers(struct fb_info *info)
+>   *    The buffer should be a non-cached, non-buffered, memory region
+>   *    to allow palette and pixel writes without flushing the cache.
+>   */
+> -static int __init nuc900fb_map_video_memory(struct fb_info *info)
+> +static int __devinit nuc900fb_map_video_memory(struct fb_info *info)
+>  {
+>  	struct nuc900fb_info *fbi = info->par;
+>  	dma_addr_t map_dma;
