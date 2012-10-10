@@ -1,36 +1,22 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 10 Oct 2012 11:29:03 -0700
-Subject: [RFC 00/24] OMAP serial driver flow control fixes,
- and preparation for DMA engine conversion
-In-Reply-To: <507427DA.6020409@ti.com> (Sourav's message of "Tue, 9 Oct 2012
- 19:04:18 +0530")
-References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
- <507427DA.6020409@ti.com>
-Message-ID: <87mwzuxjtc.fsf@deeprootsystems.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Oct 2012 18:30:44 +0000
+Subject: [PATCH 1/7] ARM: clps711x: convert to clockevents
+In-Reply-To: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
+References: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
+Message-ID: <201210101830.44365.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sourav,
+On Wednesday 10 October 2012, Alexander Shiyan wrote:
+> This patch converts CLPS711X-platform to use modern clockevent API.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/Kconfig                |    2 +-
+>  arch/arm/mach-clps711x/common.c |   38 +++++++++++++++++---------------------
+>  2 files changed, 18 insertions(+), 22 deletions(-)
 
-Sourav <sourav.poddar@ti.com> writes:
+Overall a very nice series, all 7 patches. I just have a few trivial
+comments for patch 5.
 
-[...]
-
-> Boot Tested this patch series against v3.6 tag(applied cleanly) on
-> panda board and
-> PM tested(hitting off in Idle and suspend) on omap3630 based beagle board.
->
-> Note, I also tested the patches against the current master but only
-> after rebasing, since the current master includes serial patches from
-> Felipe Balbi[1].
-> [1] https://lkml.org/lkml/2012/8/24/139
->
-> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-
-Did you test flow control after off-mode transitons?
-
-Russell indicated that the context save/restore is not saving important
-bits related to HW flow control, so I suspect some more testing,
-specifically of flow control after off-mode is needed.
-
-Kevin
+	Arnd
