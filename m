@@ -1,42 +1,90 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 11 Oct 2012 06:54:33 +1300
-Subject: [RFC PATCH] arm: vt8500: Convert irq.c for multiplatform
- integration
-In-Reply-To: <1349856509-20480-1-git-send-email-linux@prisktech.co.nz>
-References: <1349856509-20480-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1349891673.22215.2.camel@gitbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Oct 2012 11:12:53 -0700
+Subject: [PATCH 01/16] ARM: dts: exynos4210: Replace legacy GPIO bank
+ nodes with pinctrl bank nodes
+In-Reply-To: <5075A1EF.60900@wwwdotorg.org>
+References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
+ <1349685556-23718-2-git-send-email-t.figa@samsung.com>
+ <CACRpkdZgH9TSr2uWQW+-8-U7BxJCscQgStVOndGixGmRz74TWw@mail.gmail.com>
+ <5075A1EF.60900@wwwdotorg.org>
+Message-ID: <20121010181253.GQ12552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I did have one bit I wasn't sure about:
-
-On Wed, 2012-10-10 at 21:08 +1300, Tony Prisk wrote:
-> This patch converts arch-vt8500/irq.c to MULTI_IRQ_HANDLER and
-> SPARSE_IRQ. IRQ domain is changed from legacy to linear.
+* Stephen Warren <swarren@wwwdotorg.org> [121010 09:36]:
+> On 10/10/2012 01:26 AM, Linus Walleij wrote:
+> > On Mon, Oct 8, 2012 at 10:39 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > 
+> >> Seuqential patches from this series introduce SoC-specific data parsing
+> >> from device tree.
+> >>
+> >> This patch removes legacy GPIO bank nodes from exynos4210.dtsi and
+> >> replaces them with nodes and properties required for these patches.
+> > 
+> > So to be clear:
+> > 
+> >> +       pinctrl-bank-types {
+> >> +               bank_off: bank-off {
+> >> +                       samsung,reg-names = "func", "dat", "pud",
+> >> +                                               "drv", "conpdn", "pudpdn";
+> >> +                       samsung,reg-params = <0x00 4>, <0x04 1>, <0x08 2>,
+> >> +                                               <0x0C 2>, <0x10 2>, <0x14 2>;
+> >> +               };
+> > 
+> > This is starting to look like a firmware language, I have mixed
+> > feelings about this. Shall this be read:
+> > 
+> > "Poke 4 into 0x00, poke 1 into 0x04, poke 2 into 0x08" etc?
+> > 
+> > We really need to discuss this, Grant has already NACK:ed
+> > such approaches once.
 > 
-> Also, remove legacy code in include/mach/entry-macro.S and
-> include/mach/irq.h to prepare for multiplatform.
+> Well, I don't think he NACK'd Tony Lindgren's generic pinctrl driver,
+> which is doing this exact same thing. I did raise the same point about
+> Tony's driver when he posted it, but nobody seemed inclined to NACK it
+> based on that at the time, IIRC...
+
+To summarize, using reg value pairs in DT makes sense if the amount
+of data is huge. Otherwise we'll be describing indidual hardware bits
+as properties in DT, or have to have huge amounts of static data in
+the kernel.
+
+Where it does not make sense is if there's a sequence of reads
+and writes with test loops in between.. But that's does not look
+to be the case here.
+
+The reg value pairs will be readable when the DT preprocessing is
+available, and that allows the values to be orred together while
+DT properties don't. The alternative is to describe hardware register
+bits as DT properties, which is very bloated.
+
+But considering all this.. Are the samsung,reg-names really needed
+by the kernel?
+
+The pinctrl named modes actually are more generic from the pinctrl
+client driver point of view as you can set up multiple states for
+runtime PM.
+ 
+> BTW, the idea here is IIRC to create a generic Samsung pinctrl driver
+> that works across N different Samsung SoCs, each with different register
+> layout, without having to encode the register layout into tables in the
+> kernel.
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
->  ...
->  
-> diff --git a/arch/arm/mach-vt8500/common.h b/arch/arm/mach-vt8500/common.h
-> index 2b24196..6f2b843 100644
-> --- a/arch/arm/mach-vt8500/common.h
-> +++ b/arch/arm/mach-vt8500/common.h
-> @@ -25,4 +25,7 @@ int __init vt8500_irq_init(struct device_node *node,
->  /* defined in drivers/clk/clk-vt8500.c */
->  void __init vtwm_clk_init(void __iomem *pmc_base);
->  
-> +/* defined in irq.c */
-> +asmlinkage void vt8500_handle_irq(struct pt_regs *regs);
+> > If you're still going to do this, it is mandatory
+> > to NOT use magic hex numbers anymore, because Stephen has
+> > merged preprocessor support to the DTC compiler so you
+> > can use #defined macros.
+> > 
+> > See commit:
+> > cd296721a9645f9f28800a072490fa15458d1fb7
+> 
+> That feature isn't enabled yet. While dtc has been modified to be able
+> to accept input that's been generated/processed by cpp, there is still
+> ongoing discussion about how/whether to actually enable *.dts to use
+> that feature.
 
-Should asmlinkage be used here in the header or is it unnecessary?
+Hey finally! That's good news.
 
-> +
->  #endif
+Regards,
 
-
-Regards
-Tony P
+Tony
