@@ -1,28 +1,102 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 10 Oct 2012 18:15:49 +0530
-Subject: [PATCH 02/13] clk: davinci - add PSC clock driver
-In-Reply-To: <50756B96.1070008@ti.com>
-References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
- <1348682889-9509-3-git-send-email-m-karicheri2@ti.com>
- <50756B96.1070008@ti.com>
-Message-ID: <50756DFD.4070203@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 10 Oct 2012 08:29:27 -0500
+Subject: [PATCH v2 3/5] ARM: use generic unaligned.h
+In-Reply-To: <alpine.LFD.2.02.1210082354210.16518@xanadu.home>
+References: <1344129840-16447-1-git-send-email-robherring2@gmail.com>
+ <1344129840-16447-4-git-send-email-robherring2@gmail.com>
+ <20121008164353.GB6140@S2101-09.ap.freescale.net>
+ <507338F1.7030604@gmail.com>
+ <20121008232853.GA21822@S2101-09.ap.freescale.net>
+ <50738B93.6090704@gmail.com>
+ <alpine.LFD.2.02.1210082354210.16518@xanadu.home>
+Message-ID: <50757837.8050200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2012 6:05 PM, Sekhar Nori wrote:
-
->> +struct clk *clk_register_davinci_psc(struct device *dev, const char *name,
->> +			const char *parent_name,
->> +			struct clk_davinci_psc_data *psc_data,
->> +			spinlock_t *lock)
+On 10/08/2012 11:01 PM, Nicolas Pitre wrote:
+> On Mon, 8 Oct 2012, Rob Herring wrote:
 > 
-> Why do you need the lock to be provided from outside of this file? You
-> can initialize a lock for serializing writes to PSC registers within
-> this file, no?
+>> On 10/08/2012 06:28 PM, Shawn Guo wrote:
+>>> On Mon, Oct 08, 2012 at 03:34:57PM -0500, Rob Herring wrote:
+>>>> On 10/08/2012 11:43 AM, Shawn Guo wrote:
+>>>>> This patch has been merged into mainline as commit below.
+>>>>>
+>>>>>  d25c881 ARM: 7493/1: use generic unaligned.h
+>>>>>
+>>>>> It introduces a regression for me.  Check out the commit on mainline,
+>>>>> build a v7 only kernel (imx5/6) with imx_v6_v7_defconfig, the kernel
+>>>>> halts in decompressor.  But v6/v7 kernel (imx3/5/6) works fine.  The
+>>>>> kernel built on the parent commit below works all fine.
+>>>>
+>>>> It actually fails in the decompressor or that's the last output you get?
+>>>
+>>> I think it fails in the decompressor, because what I see is 
+>>>
+>>> Uncompressing Linux...
+>>>
+>>> not
+>>>
+>>> Uncompressing Linux... done, booting the kernel.
+>>>
+>>>> I compared the decompressor disassembly of both cases and get the same
+>>>> number of ldrb/strb instructions, so I don't think it is directly
+>>>> related to alignment.
+>>>>
+>>>> I tried the XY decompressor as that is one difference, but that works
+>>>> fine for me on highbank.
+>>>>
+>>>> Does it work with an empty uncompress.h functions? That should be the
+>>>> only difference in our decompressor code.
+>>>
+>>> No, empty putc() in uncompress.h does not help.
+>>>
+>>> New finding is that it only fails with LZO decompressor while the other
+>>> 3 Gzip, LZMA and XZ all work good.  We happen to have LZO as the default
+>>> one in imx_v6_v7_defconfig.
+>>
+>> I must have had an old config with XZ. LZO fails because of this:
+>>  
+>> lib/decompress_unlzo.c: version = get_unaligned_be16(parse);
+>> lib/decompress_unlzo.c: if (get_unaligned_be32(parse) & HEADER_HAS_FILTER)
+>> lib/decompress_unlzo.c:         dst_len = get_unaligned_be32(in_buf);
+>> lib/decompress_unlzo.c:         src_len = get_unaligned_be32(in_buf);
+>>
+>> This was what I was afraid of. The decompressor runs with the sysctrl
+>> register A bit in whatever state the bootloader left it in. In the case
+>> of u-boot it is set, and the maintainers are pretty set on not allowing
+>> unaligned accesses if you've seen the recent discussion.
+> 
+> This is not an u-Boot issue.  The kernel code expects misaligned 
+> accesses to be handled by the hardware on ARMv6+ now.  So it better 
+> enforce proper A bit state itself.
+> 
+>> This should fix things.
+>>
+>> Rob
+>>
+>> 8<---------------------------------------------------------------------
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index bc67cbf..1f87d22 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -654,6 +654,7 @@ __armv7_mmu_cache_on:
+>>  #endif
+>>                 mrc     p15, 0, r0, c1, c0, 0   @ read control reg
+>>                 bic     r0, r0, #1 << 28        @ clear SCTLR.TRE
+>> +               bic     r0, r0, #1 << 1         @ clear SCTLR.A
+>>                 orr     r0, r0, #0x5000         @ I-cache enable, RR cache replacement
+>>                 orr     r0, r0, #0x003c         @ write buffer
+>>  #ifdef CONFIG_MMU
+>>
+> 
+> That's OK for ARMv7, but in the ARMv6 case we use __armv4_mmu_cache_on.  
+> So this patch is incomplete.
 
-Looking again, it seems like the common clock framework defines an
-"enable_lock" in drivers/clk/clk.c to serialize the clock enable/disable
-calls. Unless I am missing something, this lock seems unnecessary.
+It is still optional on v6 and the compiler will not emit unaligned
+accesses for v6 (which is why it worked when v6 platforms were enabled).
+That does raise a bigger question. If we're doing combined v6 and v7
+builds, do we want this to require unaligned accesses are enabled and if
+so, can we force that on in the compiler?
 
-Thanks,
-Sekhar
+Rob
