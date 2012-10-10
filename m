@@ -1,185 +1,233 @@
-From: vasanthananthan@gmail.com (Vasanth Ananthan)
-Date: Wed, 10 Oct 2012 14:08:31 +0530
-Subject: [PATCH 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
-In-Reply-To: <20121009182828.GA20879@quad.lixom.net>
-References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
- <1349783332-18467-3-git-send-email-vasanthananthan@gmail.com>
- <20121009182828.GA20879@quad.lixom.net>
-Message-ID: <CAK1UHiyjyp8u-nFwU-19dds1uF7T1kkFNHyYQ6pWLFtUwGtR1w@mail.gmail.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Wed, 10 Oct 2012 15:58:54 +0530
+Subject: [PATCH 03/11] fsmc/nand: Support multiple banks connected to
+ controller
+In-Reply-To: <20121009115523.GM12801@game.jcrosoft.org>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <9748ce2483f539fb32279b8ea9df065cfdbe8ab1.1349778820.git.vipin.kumar@st.com>
+ <20121009115523.GM12801@game.jcrosoft.org>
+Message-ID: <50754DE6.3080409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/9/2012 5:25 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 16:14 Tue 09 Oct     , Vipin Kumar wrote:
+>> Support up to max_banks number of banks in fsmc driver.
+>>
+>> Signed-off-by: Vipin Kumar<vipin.kumar@st.com>
+> please rebase this over my patch that drop -off to resource
 
-On Tue, Oct 9, 2012 at 11:58 PM, Olof Johansson <olof@lixom.net> wrote:
+Sure, I will do that. I actually planned to do it but forgot while 
+sending it
 
-> Hi,
->
->
-> On Tue, Oct 09, 2012 at 05:18:48PM +0530, Vasanth Ananthan wrote:
-> > This patch adds Device Nodes for SATA and SATA PHY device.
-> >
-> > Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5250-smdk5250.dts |   11 +++++++++++
-> >  arch/arm/boot/dts/exynos5250.dtsi         |   20 ++++++++++++++++++++
-> >  arch/arm/mach-exynos/include/mach/map.h   |    7 +++++++
-> >  arch/arm/mach-exynos/mach-exynos5-dt.c    |    6 ++++++
-> >  4 files changed, 44 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > index 8a5e348..bb262ce 100644
-> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > @@ -48,6 +48,17 @@
-> >               };
-> >       };
-> >
-> > +     i2c at 121D0000 {
-> > +             samsung,i2c-sda-delay = <100>;
-> > +                samsung,i2c-max-bus-freq = <40000>;
-> > +             samsung,i2c-slave-addr = <0x38>;
->
-> Whitespace is off above.
->
-> > +
-> > +             sataphy at 70 {
->
-> sata-phy would be a more conventional name.
->
-> > +                     compatible = "samsung,i2c-phy";
->
-> i2c-phy? Seems like an odd choice of name. What is this device?
+>> ---
+>>   .../devicetree/bindings/mtd/fsmc-nand.txt          |  2 ++
+>>   arch/arm/boot/dts/spear300.dtsi                    |  1 +
+>>   arch/arm/boot/dts/spear310.dtsi                    |  1 +
+>>   arch/arm/boot/dts/spear320.dtsi                    |  1 +
+>>   arch/arm/boot/dts/spear600.dtsi                    |  1 +
+>>   arch/arm/mach-u300/core.c                          |  1 +
+>>   drivers/mtd/nand/fsmc_nand.c                       | 26 +++++++++++++++-------
+>>   include/linux/mtd/fsmc.h                           |  2 +-
+>>   8 files changed, 26 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+>> index e2c663b..29d1a2f 100644
+>> --- a/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+>> +++ b/Documentation/devicetree/bindings/mtd/fsmc-nand.txt
+>> @@ -6,6 +6,7 @@ Required properties:
+>>   - reg-names: Should contain the reg names "fsmc_regs" and "nand_data"
+>>   - st,ale-off : Chip specific offset to ALE
+>>   - st,cle-off : Chip specific offset to CLE
+>> +- maxbanks: Number of banks supported by SoC
+> make it optionnal will simplify the binding with 1 by default and will allow
+> to avoid issue
 >
 
-The SATA physical layer controller is both a platform device and a i2c
-slave device.
-This compatible string is for the i2c client driver. Hence I have used
-i2c-phy here.
+hmmm....OK
+I think you are right. May be optional with a default of 1 is a better 
+option
 
-
+>>
+>>   Optional properties:
+>>   - bank-width : Width (in bytes) of the device.  If not present, the width
+>> @@ -23,6 +24,7 @@ Example:
+>>   		reg-names = "fsmc_regs", "nand_data";
+>>   		st,ale-off =<0x20000>;
+>>   		st,cle-off =<0x10000>;
+>> +		maxbanks =<1>;
+>>
+>>   		bank-width =<1>;
+>>   		nand-skip-bbtscan;
+>> diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
+>> index ed3627c..19e2328 100644
+>> --- a/arch/arm/boot/dts/spear300.dtsi
+>> +++ b/arch/arm/boot/dts/spear300.dtsi
+>> @@ -42,6 +42,7 @@
+>>   			reg-names = "fsmc_regs", "nand_data";
+>>   			st,ale-off =<0x20000>;
+>>   			st,cle-off =<0x10000>;
+>> +			maxbanks =<1>;
+>>   			status = "disabled";
+>>   		};
+>>
+>> diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
+>> index 62fc4fb..0272afb3 100644
+>> --- a/arch/arm/boot/dts/spear310.dtsi
+>> +++ b/arch/arm/boot/dts/spear310.dtsi
+>> @@ -36,6 +36,7 @@
+>>   			reg-names = "fsmc_regs", "nand_data";
+>>   			st,ale-off =<0x10000>;
+>>   			st,cle-off =<0x20000>;
+>> +			maxbanks =<1>;
+>>   			status = "disabled";
+>>   		};
+>>
+>> diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
+>> index 1f49d69..69fe50d 100644
+>> --- a/arch/arm/boot/dts/spear320.dtsi
+>> +++ b/arch/arm/boot/dts/spear320.dtsi
+>> @@ -42,6 +42,7 @@
+>>   			reg-names = "fsmc_regs", "nand_data";
+>>   			st,ale-off =<0x20000>;
+>>   			st,cle-off =<0x10000>;
+>> +			maxbanks =<1>;
+>>   			status = "disabled";
+>>   		};
+>>
+>> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+>> index a3c36e4..6ed57c8 100644
+>> --- a/arch/arm/boot/dts/spear600.dtsi
+>> +++ b/arch/arm/boot/dts/spear600.dtsi
+>> @@ -71,6 +71,7 @@
+>>   			reg-names = "fsmc_regs", "nand_data";
+>>   			st,ale-off =<0x20000>;
+>>   			st,cle-off =<0x10000>;
+>> +			maxbanks =<1>;
+>>   			status = "disabled";
+>>   		};
+>>
+>> diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+>> index 03acf18..5ea9f71 100644
+>> --- a/arch/arm/mach-u300/core.c
+>> +++ b/arch/arm/mach-u300/core.c
+>> @@ -1546,6 +1546,7 @@ static struct fsmc_nand_platform_data nand_platform_data = {
+>>   	.width = FSMC_NAND_BW8,
+>>   	.ale_off = PLAT_NAND_ALE,
+>>   	.cle_off = PLAT_NAND_CLE,
+>> +	.max_banks = 1,
+>>   };
+>>
+>>   static struct platform_device nand_device = {
+>> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+>> index bd89580..fc6a044 100644
+>> --- a/drivers/mtd/nand/fsmc_nand.c
+>> +++ b/drivers/mtd/nand/fsmc_nand.c
+>> @@ -298,6 +298,7 @@ static struct fsmc_eccplace fsmc_ecc4_sp_place = {
+>>    *			- Word access (CPU)
+>>    *			- None (Use driver default ie bus width specific
+>>    *			  CPU access)
+>> + * @max_banks:		Maximum number of banks supported
+>>    * @select_chip:	Select a particular bank
+>>    *
+>>    * @data_pa:		NAND Physical port for Data
+>> @@ -325,6 +326,7 @@ struct fsmc_nand_data {
+>>   	struct mtd_partition	*partitions;
+>>   	unsigned int		nr_partitions;
+>>   	enum access_mode	mode;
+>> +	uint32_t		max_banks;
+>>   	void			(*select_chip)(uint32_t bank, uint32_t busw);
+>>
+>>   	/* Virtual/Physical addresses for CPU/DMA access */
+>> @@ -343,6 +345,7 @@ static void fsmc_select_chip(struct mtd_info *mtd, int chipnr)
+>>
+>>   	host = container_of(mtd, struct fsmc_nand_data, mtd);
+>>
+>> +	host->bank = chipnr;
+>>   	switch (chipnr) {
+>>   	case -1:
+>>   		chip->cmd_ctrl(mtd, NAND_CMD_NONE, 0 | NAND_CTRL_CHANGE);
+>> @@ -889,6 +892,7 @@ static int __devinit fsmc_nand_probe_config_dt(struct platform_device *pdev,
+>>   	of_property_read_u32(np, "st,cle-off",&pdata->cle_off);
+>>   	if (of_get_property(np, "nand-skip-bbtscan", NULL))
+>>   		pdata->options = NAND_SKIP_BBTSCAN;
+>> +	of_property_read_u32(np, "maxbanks",&pdata->max_banks);
+>>
+>>   	return 0;
+>>   }
+>> @@ -915,7 +919,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>>   	struct resource *res;
+>>   	dma_cap_mask_t mask;
+>>   	int ret = 0;
+>> -	u32 pid;
+>> +	u32 pid, bank;
+>>   	int i;
+>>
+>>   	if (np) {
+>> @@ -1023,13 +1027,13 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>>   		 AMBA_PART_BITS(pid), AMBA_MANF_BITS(pid),
+>>   		 AMBA_REV_BITS(pid), AMBA_CONFIG_BITS(pid));
+>>
+>> -	host->bank = pdata->bank;
+>>   	host->select_chip = pdata->select_bank;
+>>   	host->partitions = pdata->partitions;
+>>   	host->nr_partitions = pdata->nr_partitions;
+>>   	host->dev =&pdev->dev;
+>>   	host->dev_timings = pdata->nand_timings;
+>>   	host->mode = pdata->mode;
+>> +	host->max_banks = pdata->max_banks;
+>>
+>>   	if (host->mode == USE_DMA_ACCESS)
+>>   		init_completion(&host->dma_access_complete);
+>> @@ -1083,9 +1087,10 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+>>   		break;
+>>   	}
+>>
+>> -	fsmc_nand_setup(host->regs_va, host->bank,
+>> -			nand->options&  NAND_BUSWIDTH_16,
+>> -			host->dev_timings);
+>> +	for (bank = 0; bank<  host->max_banks; bank++)
+>> +		fsmc_nand_setup(host->regs_va, bank,
+>> +				nand->options&  NAND_BUSWIDTH_16,
+>> +				host->dev_timings);
+>>
+>>   	if (AMBA_REV_BITS(host->pid)>= 8) {
+>>   		nand->ecc.read_page = fsmc_read_page_hwecc;
+>> @@ -1230,11 +1235,16 @@ static int fsmc_nand_suspend(struct device *dev)
+>>   static int fsmc_nand_resume(struct device *dev)
+>>   {
+>>   	struct fsmc_nand_data *host = dev_get_drvdata(dev);
+>> +	uint32_t bank;
+>> +
+>>   	if (host) {
+>>   		clk_prepare_enable(host->clk);
+>> -		fsmc_nand_setup(host->regs_va, host->bank,
+>> -				host->nand.options&  NAND_BUSWIDTH_16,
+>> -				host->dev_timings);
+>> +
+>> +		for (bank = 0; bank<  host->max_banks; bank++)
+>> +			fsmc_nand_setup(host->regs_va, bank,
+>> +					host->nand.options&  NAND_BUSWIDTH_16,
+>> +					host->dev_timings);
+>> +
+>>   	}
+>>   	return 0;
+>>   }
+>> diff --git a/include/linux/mtd/fsmc.h b/include/linux/mtd/fsmc.h
+>> index b200292..f0ab734 100644
+>> --- a/include/linux/mtd/fsmc.h
+>> +++ b/include/linux/mtd/fsmc.h
+>> @@ -153,7 +153,7 @@ struct fsmc_nand_platform_data {
+>>   	unsigned int		nr_partitions;
+>>   	unsigned int		options;
+>>   	unsigned int		width;
+>> -	unsigned int		bank;
+>> +	unsigned int		max_banks;
+>>
+>>   	/* CLE, ALE offsets */
+>>   	unsigned int		cle_off;
+>> --
+>> 1.7.11.4
+>>
+> .
 >
-> > +                     reg = <0x38>;
->
-> 70 is unit address but here it's 0x38? One of them is wrong. No need for a
-> unit
-> address if it's a unique name, by the way.
->
->
-> > +             };
-> > +     };
-> > +
-> >       i2c at 12C80000 {
-> >               status = "disabled";
-> >       };
-> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> > index 004aaa8..5a47a8f 100644
-> > --- a/arch/arm/boot/dts/exynos5250.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> > @@ -88,6 +88,18 @@
-> >               interrupts = <0 54 0>;
-> >       };
-> >
-> > +     sata at 122F0000 {
-> > +                compatible = "samsung,exynos-sata-ahci";
-> > +                reg = <0x122F0000 0x1ff>;
-> > +             interrupts = <0 115 0>;
->
-> More whitespace damage. And need binding.
->
-> > +        };
-> > +
-> > +        sata-phy at 12170000 {
-> > +                compatible = "samsung,exynos-sata-phy";
-> > +                reg = <0x12170000 0x1ff>;
-> > +        };
->
-> Should have binding too. How does this relate to the i2c device above.
->
-
-As mentioned earlier SATA physical layer controller is both a platform
-device and also an i2c slave device.
-This Node is for the SATA physical layer platform device, the previous node
-is for i2c slave device.
-Certain initialization settings done directly and other settings has to be
-done through i2c.
-
-
-> > +
-> >       i2c at 12C60000 {
-> >               compatible = "samsung,s3c2440-i2c";
-> >               reg = <0x12C60000 0x100>;
-> > @@ -152,6 +164,13 @@
-> >               #size-cells = <0>;
-> >       };
-> >
-> > +     i2c at 121D0000 {
-> > +                compatible = "samsung,s3c2440-sataphy-i2c";
->
-> Is this a unique i2c controller, or is it just another one like the others
-> on
-> the chip? If it's the latter, it should use the regular compatible string.
->
-
-Yes, its a unique i2c controller which lacks an interrupt line while others
-are interrupt driven.
-Hence I have used a distinct compatible string for the driver to
-distinguish the controller.
-
-
-> > +                reg = <0x121D0000 0x100>;
-> > +                #address-cells = <1>;
-> > +                #size-cells = <0>;
-> > +        };
-> > +
-> >       spi_0: spi at 12d20000 {
-> >               compatible = "samsung,exynos4210-spi";
-> >               reg = <0x12d20000 0x100>;
-> > @@ -460,4 +479,5 @@
-> >                       #gpio-cells = <4>;
-> >               };
-> >       };
-> > +
->
-> Stray whitespace change.
->
-> >  };
-> > diff --git a/arch/arm/mach-exynos/include/mach/map.h
-> b/arch/arm/mach-exynos/include/mach/map.h
-> > index c72b675..6827190 100644
-> > --- a/arch/arm/mach-exynos/include/mach/map.h
-> > +++ b/arch/arm/mach-exynos/include/mach/map.h
-> > @@ -177,9 +177,16 @@
-> >  #define EXYNOS4_PA_HSOTG             0x12480000
-> >  #define EXYNOS4_PA_USB_HSPHY         0x125B0000
-> >
-> > +#ifdef CONFIG_ARCH_EXYNOS4
->
-> No need to ifdef since namespace isn't overlapped.
->
-> >  #define EXYNOS4_PA_SATA                      0x12560000
-> >  #define EXYNOS4_PA_SATAPHY           0x125D0000
-> >  #define EXYNOS4_PA_SATAPHY_CTRL              0x126B0000
-> > +#endif
-> > +#ifdef CONFIG_ARCH_EXYNOS5
->
-> Same here.
->
-> > +#define EXYNOS5_PA_SATA_PHY_CTRL     0x12170000
-> > +#define EXYNOS5_PA_SATA_PHY_I2C              0x121D0000
-> > +#define EXYNOS5_PA_SATA_BASE         0x122F0000
-> > +#endif
->
->
-> -Olof
->
-
-I will incorporate the other comments and resubmit the patch. Thanks.
-
--- 
-Vasanth Ananthan.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121010/7856e75d/attachment-0001.html>
