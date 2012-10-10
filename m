@@ -1,48 +1,319 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Oct 2012 10:04:42 +0200
-Subject: [PATCH] ARM: mxc: platform-mxc-mmc: Fix register region size
-In-Reply-To: <1349810713-12307-1-git-send-email-fabio.estevam@freescale.com>
-References: <1349810713-12307-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121010080442.GO27665@pengutronix.de>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 10 Oct 2012 21:08:29 +1300
+Subject: [RFC PATCH] arm: vt8500: Convert irq.c for multiplatform integration
+Message-ID: <1349856509-20480-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 04:25:13PM -0300, Fabio Estevam wrote:
-> Do not hardcode the register region to SZ_4K as this is not correct for mx31.
-> 
-> Use data->iosize instead which works for both mx27 and mx31 cases.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+This patch converts arch-vt8500/irq.c to MULTI_IRQ_HANDLER and
+SPARSE_IRQ. IRQ domain is changed from legacy to linear.
 
-Applied, thanks
+Also, remove legacy code in include/mach/entry-macro.S and
+include/mach/irq.h to prepare for multiplatform.
 
-Sascha
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/Kconfig                                |    2 +
+ arch/arm/mach-vt8500/common.h                   |    3 +
+ arch/arm/mach-vt8500/include/mach/entry-macro.S |   26 ------
+ arch/arm/mach-vt8500/include/mach/irqs.h        |   22 -----
+ arch/arm/mach-vt8500/irq.c                      |  111 +++++++++++++++--------
+ arch/arm/mach-vt8500/vt8500.c                   |    1 +
+ 6 files changed, 79 insertions(+), 86 deletions(-)
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/irqs.h
 
-> ---
->  arch/arm/plat-mxc/devices/platform-mxc-mmc.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c b/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-> index 540d3a7..e7b920b 100644
-> --- a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-> +++ b/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
-> @@ -55,7 +55,7 @@ struct platform_device *__init imx_add_mxc_mmc(
->  	struct resource res[] = {
->  		{
->  			.start = data->iobase,
-> -			.end = data->iobase + SZ_4K - 1,
-> +			.end = data->iobase + data->iosize - 1,
->  			.flags = IORESOURCE_MEM,
->  		}, {
->  			.start = data->irq,
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 6d2f7f5..32b62ac 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -949,6 +949,8 @@ config ARCH_VT8500
+ 	select COMMON_CLK
+ 	select HAVE_CLK
+ 	select CLKDEV_LOOKUP
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
+ 	help
+ 	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
+ 
+diff --git a/arch/arm/mach-vt8500/common.h b/arch/arm/mach-vt8500/common.h
+index 2b24196..6f2b843 100644
+--- a/arch/arm/mach-vt8500/common.h
++++ b/arch/arm/mach-vt8500/common.h
+@@ -25,4 +25,7 @@ int __init vt8500_irq_init(struct device_node *node,
+ /* defined in drivers/clk/clk-vt8500.c */
+ void __init vtwm_clk_init(void __iomem *pmc_base);
+ 
++/* defined in irq.c */
++asmlinkage void vt8500_handle_irq(struct pt_regs *regs);
++
+ #endif
+diff --git a/arch/arm/mach-vt8500/include/mach/entry-macro.S b/arch/arm/mach-vt8500/include/mach/entry-macro.S
+deleted file mode 100644
+index 367d1b5..0000000
+--- a/arch/arm/mach-vt8500/include/mach/entry-macro.S
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * arch/arm/mach-vt8500/include/mach/entry-macro.S
+- *
+- * Low-level IRQ helper macros for VIA VT8500
+- *
+- * This file is licensed under  the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-	.macro  get_irqnr_preamble, base, tmp
+-	@ physical 0xd8140000 is virtual 0xf8140000
+-	mov	\base, #0xf8000000
+-	orr	\base, \base, #0x00140000
+-	.endm
+-
+-	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	ldr	\irqnr, [\base]
+-	cmp	\irqnr, #63 @ may be false positive, check interrupt status
+-	bne	1001f
+-	ldr	\irqstat, [\base, #0x84]
+-	ands	\irqstat, #0x80000000
+-	moveq	\irqnr, #0
+-1001:
+-	.endm
+-
+diff --git a/arch/arm/mach-vt8500/include/mach/irqs.h b/arch/arm/mach-vt8500/include/mach/irqs.h
+deleted file mode 100644
+index a129fd1..0000000
+--- a/arch/arm/mach-vt8500/include/mach/irqs.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- *  arch/arm/mach-vt8500/include/mach/irqs.h
+- *
+- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-/* This value is just to make the core happy, never used otherwise */
+-#define NR_IRQS 128
+diff --git a/arch/arm/mach-vt8500/irq.c b/arch/arm/mach-vt8500/irq.c
+index f8f9ab9..7e5fee9 100644
+--- a/arch/arm/mach-vt8500/irq.c
++++ b/arch/arm/mach-vt8500/irq.c
+@@ -36,7 +36,7 @@
+ #include <linux/of_address.h>
+ 
+ #include <asm/irq.h>
+-
++#include <asm/exception.h>
+ 
+ #define VT8500_ICPC_IRQ		0x20
+ #define VT8500_ICPC_FIQ		0x24
+@@ -66,30 +66,35 @@
+ #define VT8500_EDGE		( VT8500_TRIGGER_RISING \
+ 				| VT8500_TRIGGER_FALLING)
+ 
+-static int irq_cnt;
++/* vt8500 has 1 intc, wm8505 and wm8650 have 2 */
++#define VT8500_INTC_MAX		2
+ 
+-struct vt8500_irq_priv {
+-	void __iomem *base;
++struct vt8500_irq_data {
++	void __iomem 		*base;		/* IO Memory base address */
++	struct irq_domain	*domain;	/* Domain for this controller */
+ };
+ 
++/* Global variable for accessing io-mem addresses */
++static struct vt8500_irq_data intc[VT8500_INTC_MAX];
++static u32 active_cnt = 0;
++
+ static void vt8500_irq_mask(struct irq_data *d)
+ {
+-	struct vt8500_irq_priv *priv =
+-			(struct vt8500_irq_priv *)(d->domain->host_data);
++	struct vt8500_irq_data *priv = 
++			(struct vt8500_irq_data *)(d->domain->host_data);
+ 	void __iomem *base = priv->base;
+-	u8 edge;
++	void __iomem *stat_reg = base + VT8500_ICIS + (d->hwirq < 32 ? 0 : 4);
++	u8 edge, dctr;
++	u32 status;
+ 
+ 	edge = readb(base + VT8500_ICDC + d->hwirq) & VT8500_EDGE;
+ 	if (edge) {
+-		void __iomem *stat_reg = base + VT8500_ICIS
+-						+ (d->hwirq < 32 ? 0 : 4);
+-		unsigned status = readl(stat_reg);
++		status = readl(stat_reg);
+ 
+ 		status |= (1 << (d->hwirq & 0x1f));
+ 		writel(status, stat_reg);
+ 	} else {
+-		u8 dctr = readb(base + VT8500_ICDC + d->hwirq);
+-
++		dctr = readb(base + VT8500_ICDC + d->hwirq);
+ 		dctr &= ~VT8500_INT_ENABLE;
+ 		writeb(dctr, base + VT8500_ICDC + d->hwirq);
+ 	}
+@@ -97,8 +102,8 @@ static void vt8500_irq_mask(struct irq_data *d)
+ 
+ static void vt8500_irq_unmask(struct irq_data *d)
+ {
+-	struct vt8500_irq_priv *priv =
+-			(struct vt8500_irq_priv *)(d->domain->host_data);
++	struct vt8500_irq_data *priv = 
++			(struct vt8500_irq_data *)(d->domain->host_data);
+ 	void __iomem *base = priv->base;
+ 	u8 dctr;
+ 
+@@ -109,8 +114,8 @@ static void vt8500_irq_unmask(struct irq_data *d)
+ 
+ static int vt8500_irq_set_type(struct irq_data *d, unsigned int flow_type)
+ {
+-	struct vt8500_irq_priv *priv =
+-			(struct vt8500_irq_priv *)(d->domain->host_data);
++	struct vt8500_irq_data *priv = 
++			(struct vt8500_irq_data *)(d->domain->host_data);
+ 	void __iomem *base = priv->base;
+ 	u8 dctr;
+ 
+@@ -148,17 +153,15 @@ static struct irq_chip vt8500_irq_chip = {
+ 
+ static void __init vt8500_init_irq_hw(void __iomem *base)
+ {
+-	unsigned int i;
++	u32 i;
+ 
+ 	/* Enable rotating priority for IRQ */
+ 	writel(ICPC_ROTATE, base + VT8500_ICPC_IRQ);
+ 	writel(0x00, base + VT8500_ICPC_FIQ);
+ 
+-	for (i = 0; i < 64; i++) {
+-		/* Disable all interrupts and route them to IRQ */
+-		writeb(VT8500_INT_DISABLE | ICDC_IRQ,
+-						base + VT8500_ICDC + i);
+-	}
++	/* Disable all interrupts and route them to IRQ */
++	for (i = 0; i < 64; i++)
++		writeb(VT8500_INT_DISABLE | ICDC_IRQ, base + VT8500_ICDC + i);
+ }
+ 
+ static int vt8500_irq_map(struct irq_domain *h, unsigned int virq,
+@@ -175,33 +178,67 @@ static struct irq_domain_ops vt8500_irq_domain_ops = {
+ 	.xlate = irq_domain_xlate_onecell,
+ };
+ 
++asmlinkage void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
++{
++	u32 stat, i;
++	int irqnr, virq;
++	void __iomem *base;
++
++	/* Loop through each active controller */
++	for (i=0; i<active_cnt; i++) {
++		base = intc[i].base;
++		irqnr = readl_relaxed(base) & 0x3F;
++		/*
++		  Highest Priority register default = 63, so check that this
++		  is a real interrupt by checking the status register
++		*/
++		if (irqnr == 63) {
++			stat = readl_relaxed(base + VT8500_ICIS + 4);
++			if (!(stat & BIT(31)))
++				continue;
++		}
++
++		virq = irq_find_mapping(intc[i].domain, irqnr);
++		handle_IRQ(virq, regs);
++	}
++}
++
+ int __init vt8500_irq_init(struct device_node *node, struct device_node *parent)
+ {
+-	struct irq_domain *vt8500_irq_domain;
+-	struct vt8500_irq_priv *priv;
+ 	int irq, i;
+ 	struct device_node *np = node;
+ 
+-	priv = kzalloc(sizeof(struct vt8500_irq_priv), GFP_KERNEL);
+-	priv->base = of_iomap(np, 0);
++	if (active_cnt == VT8500_INTC_MAX) {
++		pr_err("%s: Interrupt controllers > VT8500_INTC_MAX\n",
++								__func__);
++		goto out;
++	}
++
++	intc[active_cnt].base = of_iomap(np, 0);
++	intc[active_cnt].domain = irq_domain_add_linear(node, 64,
++			&vt8500_irq_domain_ops,	&intc[active_cnt]);
+ 
+-	vt8500_irq_domain = irq_domain_add_legacy(node, 64, irq_cnt, 0,
+-				&vt8500_irq_domain_ops, priv);
+-	if (!vt8500_irq_domain)
+-		pr_err("%s: Unable to add wmt irq domain!\n", __func__);
++	if (!intc[active_cnt].base) {
++		pr_err("%s: Unable to map IO memory\n", __func__);
++		goto out;
++	}
++
++	if (!intc[active_cnt].domain) {
++		pr_err("%s: Unable to add irq domain!\n", __func__);
++		goto out;
++	}
+ 
+-	irq_set_default_host(vt8500_irq_domain);
++	vt8500_init_irq_hw(intc[active_cnt].base);
+ 
+-	vt8500_init_irq_hw(priv->base);
++	pr_info("vt8500-irq: Added interrupt controller\n");
+ 
+-	pr_info("Added IRQ Controller @ %x [virq_base = %d]\n",
+-						(u32)(priv->base), irq_cnt);
++	active_cnt++;
+ 
+ 	/* check if this is a slaved controller */
+ 	if (of_irq_count(np) != 0) {
+ 		/* check that we have the correct number of interrupts */
+ 		if (of_irq_count(np) != 8) {
+-			pr_err("%s: Incorrect IRQ map for slave controller\n",
++			pr_err("%s: Incorrect IRQ map for slaved controller\n",
+ 					__func__);
+ 			return -EINVAL;
+ 		}
+@@ -213,9 +250,7 @@ int __init vt8500_irq_init(struct device_node *node, struct device_node *parent)
+ 
+ 		pr_info("vt8500-irq: Enabled slave->parent interrupts\n");
+ 	}
+-
+-	irq_cnt += 64;
+-
++out:
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 8d3871f..14def0f 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -194,5 +194,6 @@ DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
+ 	.timer		= &vt8500_timer,
+ 	.init_machine	= vt8500_init,
+ 	.restart	= vt8500_restart,
++	.handle_irq	= vt8500_handle_irq,
+ MACHINE_END
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
