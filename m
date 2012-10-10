@@ -1,48 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 10 Oct 2012 09:29:48 -0500
-Subject: [PATCH v4 1/8] dt: add helper inline for retrieving timeout-sec
- property
-In-Reply-To: <1349784251-28261-2-git-send-email-fabio.porcedda@gmail.com>
-References: <1349784251-28261-1-git-send-email-fabio.porcedda@gmail.com>
- <1349784251-28261-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <5075865C.3010606@gmail.com>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 10 Oct 2012 10:30:49 -0400
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+Message-ID: <1349879449-22657-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2012 07:04 AM, Fabio Porcedda wrote:
-> The first user of this function is the watchdog framework.
+6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
+exposes a bug in the AM33XX clock data for mcasp. After moving to
+clk_get() usage, the _init() of all registered hwmods fails on mcasp0
+due to incorrect clock data causing clk_get() to fail. This causes all
+successive hwmods to fail to _init() leaving them in a bad state.
 
-Who is the 2nd user because I don't see any others. I don't see this
-being a widely used property.
+This patch updates the mcasp clock entries so clk_get() will succeed.
+It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
+boot.
 
-Rob
+Signed-off-by: Matt Porter <mporter@ti.com>
+---
+ arch/arm/mach-omap2/clock33xx_data.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> ---
->  include/linux/of.h | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 72843b7..5870818 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -470,4 +470,15 @@ static inline int of_property_read_u32(const struct device_node *np,
->  	return of_property_read_u32_array(np, propname, out_value, 1);
->  }
->  
-> +/**
-> + * of_get_timeout_sec() - Helper to read the timeout_sec property
-> + * @np:		device node from which the property value is to be read.
-> + * @timeout:	adress of the output value
-> + */
-> +static inline int of_get_timeout_sec(const struct device_node *np,
-> +				     u32 *timeout)
-> +{
-> +	return of_property_read_u32(np, "timeout-sec", timeout);
-> +}
-> +
->  #endif /* _LINUX_OF_H */
-> 
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index b87b88c..0a64139 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1033,8 +1033,8 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK("481d0000.d_can",	NULL,		&dcan1_fck,	CK_AM33XX),
+ 	CLK(NULL,	"debugss_ick",		&debugss_ick,	CK_AM33XX),
+ 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk,	CK_AM33XX),
+-	CLK("davinci-mcasp.0",  NULL,           &mcasp0_fck,    CK_AM33XX),
+-	CLK("davinci-mcasp.1",  NULL,           &mcasp1_fck,    CK_AM33XX),
++	CLK(NULL,	"mcasp0_fck",		&mcasp0_fck,    CK_AM33XX),
++	CLK(NULL,	"mcasp1_fck",		&mcasp1_fck,    CK_AM33XX),
+ 	CLK("NULL",	"mmc2_fck",		&mmc2_fck,	CK_AM33XX),
+ 	CLK(NULL,	"mmu_fck",		&mmu_fck,	CK_AM33XX),
+ 	CLK(NULL,	"smartreflex0_fck",	&smartreflex0_fck,	CK_AM33XX),
+-- 
+1.7.9.5
