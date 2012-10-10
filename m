@@ -1,30 +1,46 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Tue,  9 Oct 2012 23:46:12 -0700
-Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
-Message-ID: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 10 Oct 2012 14:15:40 +0800
+Subject: [PATCH] ARM: dts: mxs: add the `clock-names` for gpmi-nand
+In-Reply-To: <CAOMZO5A0UX6y3MtHdzZ8V2Z52qsH8Yy-BVtOYEN_OpBezEsvQw@mail.gmail.com>
+References: <CAOMZO5A0UX6y3MtHdzZ8V2Z52qsH8Yy-BVtOYEN_OpBezEsvQw@mail.gmail.com>
+Message-ID: <1349849740-14090-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
-on overflow.
+The current DT nodes for mx23/mx28 miss the `clocks-names` item for gpmi-nand.
+So the gpmi-nand driver could not find the proper clock.
 
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
+This patch fixes this issue.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/kernel/stacktrace.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx23.dtsi |    1 +
+ arch/arm/boot/dts/imx28.dtsi |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 00f79e5..6315162 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
- 	high = ALIGN(low, THREAD_SIZE);
- 
- 	/* check current frame pointer is within bounds */
--	if (fp < (low + 12) || fp + 4 >= high)
-+	if (fp < (low + 12) || fp >= high - 4)
- 		return -EINVAL;
- 
- 	/* restore the registers from the stack frame */
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 9ca4ca7..6d31aa3 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -69,6 +69,7 @@
+ 				interrupts = <13>, <56>;
+ 				interrupt-names = "gpmi-dma", "bch";
+ 				clocks = <&clks 34>;
++				clock-names = "gpmi_io";
+ 				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index e16d631..55c57ea 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -85,6 +85,7 @@
+ 				interrupts = <88>, <41>;
+ 				interrupt-names = "gpmi-dma", "bch";
+ 				clocks = <&clks 50>;
++				clock-names = "gpmi_io";
+ 				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
 -- 
-1.7.7.3
+1.7.0.4
