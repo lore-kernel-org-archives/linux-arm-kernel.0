@@ -1,135 +1,56 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 10 Oct 2012 13:42:25 +0200
-Subject: [PATCH 4/8] cpufreq: db8500: Fetch cpufreq table from platform data
-In-Reply-To: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1349869349-8070-5-git-send-email-ulf.hansson@stericsson.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 10 Oct 2012 12:01:37 +0000
+Subject: [PATCH] Add McSPI devices found in AM33xx SoC to dtsi
+In-Reply-To: <3608180472966131184@unknownmsgid>
+References: <CAAek22HhtFc-1XOFrQC8DKZ9VdKyuShE_G_j4581WL15JTNJXg@mail.gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9CA61C@DBDE01.ent.ti.com>
+ <3608180472966131184@unknownmsgid>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAA078F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Tue, Oct 09, 2012 at 19:54:28, Phil Pokorny wrote:
+> On Oct 9, 2012, at 3:36 AM, "Philip, Avinash" <avinashphilip@ti.com>
+> wrote:
+> 
+> > On Tue, Oct 09, 2012 at 10:40:58, Phil Pokorny wrote:
+> >> We're using the BeagleBone for a project and we need the SPI devices
+> >> available and configured with all available chip selects.
+> >>
+> >> Please accept the following patch to add these to the base .dtsi file
+> >> so they can then be enabled in the beaglebone specific .dts with
+> >> minimal fuss.
+> >
+> > Patch for adding MCSPI in am33xx.dtsi already been sent by me.
+> > https://lkml.org/lkml/2012/9/18/32
+> 
+> Thank you for responding.
+> 
+> Was that accepted?  It didn't seem to be in the Linux-omap git tree I
+> cloned. I need to check the Torvalds mainline kernel.
+> 
+> I believe the number of chip selects on spi1 is incorrect. There is
+> only one (1) CS shown in the hardware documentation for AM33xx.
 
-By fetching the table as platform data we do not need the internally
-hardcoded cpufreq table anymore.
+Which Hardware document are you referring to? TRM shows 2 chip
+selects for McSPI1
 
-Moreover the corresponding arm_opp idx2opp table, used for mapping
-frequency to correct opp bits is also removed. This due to that the
-opp bits is put directly in the index field of the cpufreq table.
+> 
+> Is OMAP4-McSPI the best match for the hardware?  The mcspi driver
+> appears to differ only in the register offset used.  A hard coded zero
+> value for omap2 and a named constant for omap4. The hardware manual
+> for the AM33xx shows the register map starting at zero.
+> 
+> Thank you,
+> Phil P.
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
----
- drivers/cpufreq/db8500-cpufreq.c |   67 ++++++++++++++------------------------
- 1 file changed, 25 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
-index 7d61a6c..dea9a49 100644
---- a/drivers/cpufreq/db8500-cpufreq.c
-+++ b/drivers/cpufreq/db8500-cpufreq.c
-@@ -17,36 +17,7 @@
- #include <linux/mfd/dbx500-prcmu.h>
- #include <mach/id.h>
- 
--static struct cpufreq_frequency_table freq_table[] = {
--	[0] = {
--		.index = 0,
--		.frequency = 200000,
--	},
--	[1] = {
--		.index = 1,
--		.frequency = 400000,
--	},
--	[2] = {
--		.index = 2,
--		.frequency = 800000,
--	},
--	[3] = {
--		/* Used for MAX_OPP, if available */
--		.index = 3,
--		.frequency = CPUFREQ_TABLE_END,
--	},
--	[4] = {
--		.index = 4,
--		.frequency = CPUFREQ_TABLE_END,
--	},
--};
--
--static enum arm_opp idx2opp[] = {
--	ARM_EXTCLK,
--	ARM_50_OPP,
--	ARM_100_OPP,
--	ARM_MAX_OPP
--};
-+static struct cpufreq_frequency_table *freq_table;
- 
- static struct freq_attr *db8500_cpufreq_attr[] = {
- 	&cpufreq_freq_attr_scaling_available_freqs,
-@@ -88,7 +59,7 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
- 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
- 
- 	/* request the PRCM unit for opp change */
--	if (prcmu_set_arm_opp(idx2opp[idx])) {
-+	if (prcmu_set_arm_opp(freq_table[idx].index)) {
- 		pr_err("db8500-cpufreq:  Failed to set OPP level\n");
- 		return -EINVAL;
- 	}
-@@ -102,25 +73,30 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
- 
- static unsigned int db8500_cpufreq_getspeed(unsigned int cpu)
- {
--	int i;
-+	int i = 0;
- 	/* request the prcm to get the current ARM opp */
--	for (i = 0; prcmu_get_arm_opp() != idx2opp[i]; i++)
--		;
--	return freq_table[i].frequency;
-+	int opp = prcmu_get_arm_opp();
-+
-+	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
-+		if (opp == freq_table[i].index)
-+			return freq_table[i].frequency;
-+		i++;
-+	}
-+
-+	/* We could not find a corresponding opp frequency. */
-+	return 0;
- }
- 
- static int __cpuinit db8500_cpufreq_init(struct cpufreq_policy *policy)
- {
--	int i, res;
--
--	BUILD_BUG_ON(ARRAY_SIZE(idx2opp) + 1 != ARRAY_SIZE(freq_table));
--
--	if (prcmu_has_arm_maxopp())
--		freq_table[3].frequency = 1000000;
-+	int i = 0;
-+	int res;
- 
- 	pr_info("db8500-cpufreq : Available frequencies:\n");
--	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
-+	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
- 		pr_info("  %d Mhz\n", freq_table[i].frequency/1000);
-+		i++;
-+	}
- 
- 	/* get policy fields based on the table */
- 	res = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-@@ -163,6 +139,13 @@ static struct cpufreq_driver db8500_cpufreq_driver = {
- 
- static int db8500_cpufreq_probe(struct platform_device *pdev)
- {
-+	freq_table = dev_get_platdata(&pdev->dev);
-+
-+	if (!freq_table) {
-+		pr_err("db8500-cpufreq: Failed to fetch cpufreq table\n");
-+		return -ENODEV;
-+	}
-+
- 	return cpufreq_register_driver(&db8500_cpufreq_driver);
- }
- 
--- 
-1.7.10
+Regards, 
+Gururaja
