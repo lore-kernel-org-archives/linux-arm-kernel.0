@@ -1,29 +1,34 @@
-From: oneukum@suse.de (Oliver Neukum)
-Date: Wed, 10 Oct 2012 14:35:36 +0200
-Subject: [PATCH v2] USB: usb-skeleton.c: fix compilation error and restore
- kref_put on fail in skel_open
-In-Reply-To: <1349865174-21649-1-git-send-email-const@MakeLinux.com>
-References: <1349865174-21649-1-git-send-email-const@MakeLinux.com>
-Message-ID: <1952553.sIPjpLauNn@linux-lqwf.site>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 10 Oct 2012 14:37:59 +0200
+Subject: [PATCH 1/5] ARM: plat-nomadik: Introduce new DB8540 GPIO registers
+Message-ID: <1349872679-31174-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 October 2012 12:32:54 Constantine Shulyupin wrote:
-> From: Constantine Shulyupin <const@MakeLinux.com>
-> 
-> Function skel_open increments usage count for the device with kref_get and the usage count should be decremented on the function failure.
-> 
-> Some last changes in function skel_open and finally commit
-> 52a7499 Revert "USB: usb-skeleton.c: fix open/disconnect race"
-> introduced a bug in function skel_open, which this patch fixes.
-> 
-> --
-> Changelog:
-> -- Fixed accordinly feedback of Oliver Neukum oneukum at suse.de: also need to drop the lock.
+From: Maxime Coquelin <maxime.coquelin@stericsson.com>
 
-Well, touching file->private_data is not nice. It is correct, but
-really dirty. The skeleton driver should be nice. Could you introduce
-a second label for goto at the right place?
+DB8540's GPIO controller introduce level detection
+support for both interrupts and wakeups.
 
-	Regards
-		Oliver
+Signed-off-by: Maxime Coquelin <maxime.coquelin@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/plat-nomadik/include/plat/gpio-nomadik.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
+index c08a54d..cf81111 100644
+--- a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
++++ b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
+@@ -38,6 +38,9 @@
+ #define NMK_GPIO_RWIMSC	0x50
+ #define NMK_GPIO_FWIMSC	0x54
+ #define NMK_GPIO_WKS	0x58
++/* These appear in DB8540 and later ASICs */
++#define NMK_GPIO_EDGELEVEL 0x5C
++#define NMK_GPIO_LEVEL	0x60
+ 
+ /* Alternate functions: function C is set in hw by setting both A and B */
+ #define NMK_GPIO_ALT_GPIO	0
+-- 
+1.7.11.3
