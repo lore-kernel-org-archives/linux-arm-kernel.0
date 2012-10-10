@@ -1,47 +1,64 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 10 Oct 2012 10:49:09 +0200
-Subject: [PATCH 11/16] pinctrl: samsung: Use one GPIO chip per pin bank
-In-Reply-To: <CACRpkdY3rk41xDQbG9Ft8iVYZnyk3vu3Fs9Ehin2Q1oSZ3JO-Q@mail.gmail.com>
-References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
- <1349685556-23718-12-git-send-email-t.figa@samsung.com>
- <CACRpkdY3rk41xDQbG9Ft8iVYZnyk3vu3Fs9Ehin2Q1oSZ3JO-Q@mail.gmail.com>
-Message-ID: <10399745.GY5ZiH5kRN@amdc1227>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 10 Oct 2012 10:51:22 +0200
+Subject: [PATCH] ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT
+In-Reply-To: <1349631857-31556-1-git-send-email-festevam@gmail.com>
+References: <1349631857-31556-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121010085122.GT27665@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 of October 2012 09:43:25 Linus Walleij wrote:
-> On Mon, Oct 8, 2012 at 10:39 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > This patch modifies the pinctrl-samsung driver to register one GPIO
-> > chip
-> > per pin bank, instead of a single chip for all pin banks of the
-> > controller.
-> > 
-> > It simplifies GPIO accesses a lot (constant time instead of looping
-> > through the list of banks to find the right one) and should have a good
-> > effect on performance of any bit-banging driver.
-> > 
-> > In addition it allows to reference GPIO pins by a phandle to the bank
-> > node and a local pin offset inside of the bank (similar to previous
-> > gpiolib driver), which is more clear and readable than using indices
-> > relative to the whole pin controller.
-> > 
-> > Example:
-> >         device {
-> >         
-> >                 /* ... */
-> >                 gpios = <&gpk0 4 0>;
-> >                 /* ... */
-> >         
-> >         };
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+On Sun, Oct 07, 2012 at 02:44:17PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> This also looks good (and I think it has been discussed before)
-> so needs to be applied in isolation from the regs-to-DT stuff.
+> Since commit b4c184e5 (edia] media: reorganize the main Kconfig items),
+> it is necessary to select CONFIG_MEDIA_CAMERA_SUPPORT in order to be able
+> to use the SoC camera drivers.
+> 
+> Select CONFIG_MEDIA_CAMERA_SUPPORT so that we can use mx2-camera/mx3-camera
+> by default as previously.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Please see my reply for patch 9.
+Applied, thanks
 
-Best regards,
+Sascha
+
+> ---
+>  arch/arm/configs/imx_v4_v5_defconfig |    1 +
+>  arch/arm/configs/imx_v6_v7_defconfig |    1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+> index 78ed575..d100401 100644
+> --- a/arch/arm/configs/imx_v4_v5_defconfig
+> +++ b/arch/arm/configs/imx_v4_v5_defconfig
+> @@ -121,6 +121,7 @@ CONFIG_REGULATOR_MC13892=y
+>  CONFIG_MEDIA_SUPPORT=y
+>  CONFIG_VIDEO_DEV=y
+>  CONFIG_V4L_PLATFORM_DRIVERS=y
+> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+>  CONFIG_SOC_CAMERA=y
+>  CONFIG_SOC_CAMERA_OV2640=y
+>  CONFIG_VIDEO_MX2=y
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 66aa7a6..fcb4b62 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -151,6 +151,7 @@ CONFIG_REGULATOR_MC13892=y
+>  CONFIG_MEDIA_SUPPORT=y
+>  CONFIG_VIDEO_DEV=y
+>  CONFIG_V4L_PLATFORM_DRIVERS=y
+> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+>  CONFIG_SOC_CAMERA=y
+>  CONFIG_SOC_CAMERA_OV2640=y
+>  CONFIG_VIDEO_MX3=y
+> -- 
+> 1.7.9.5
+> 
+> 
+
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
