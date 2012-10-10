@@ -1,41 +1,31 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 10 Oct 2012 08:54:47 +0100
-Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
-In-Reply-To: <201210091821.27818.arnd@arndb.de>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <1349796183-30648-6-git-send-email-arnd@arndb.de>
- <alpine.DEB.2.02.1210091630170.29539@kaball.uk.xensource.com>
- <201210091821.27818.arnd@arndb.de>
-Message-ID: <1349855687.6952.75.camel@dagon.hellion.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 10 Oct 2012 10:01:58 +0200
+Subject: [PATCH 2/3] ARM i.MX25 clk: Fix nfc_ipg_per parent
+In-Reply-To: <1349856119-22363-1-git-send-email-s.hauer@pengutronix.de>
+References: <1349856119-22363-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1349856119-22363-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-09 at 19:21 +0100, Arnd Bergmann wrote:
-> On Tuesday 09 October 2012, Stefano Stabellini wrote:
-> > >  config XEN
-> > >       bool "Xen guest support on ARM (EXPERIMENTAL)"
-> > >       depends on EXPERIMENTAL && ARM && OF
-> > > +     depends on !CPU_V6
-> > >       help
-> > >         Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
-> > 
-> > Considering that we rely on the virtualization extensions, this one can
-> > be:
-> > 
-> >     depends on CPU_V7
-> > 
-> > The rest looks fine. I can submit a second patch to change !CPU_V6 into
-> > CPU_V7 later, if you prefer.
-> 
-> CPU_V6 and CPU_V7 are not exclusive, I saw the problem when building a
-> combined kernel for both V6 and V7. The code also needs to depend on ARMv7
-> with virtualization extensions, but that is a different issue. We don't
-> actually have a configuration symbol for that yet, as far as I can tell.
+It's per8, there is no ipg_per clk.
 
-I don't think the guest kernels (including dom0) need the extensions to
-run under Xen, they are only need by Xen itself. The guests should just
-see a relatively normal v7 processor. 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx25.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Stefano, does that sound right?
-
-Ian.
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 334c839..01e2f84 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -128,7 +128,7 @@ int __init mx25_clocks_init(void)
+ 	clk[gpt_ipg_per] = imx_clk_gate("gpt_ipg_per", "per5", ccm(CCM_CGCR0),  5);
+ 	clk[i2c_ipg_per] = imx_clk_gate("i2c_ipg_per", "per6", ccm(CCM_CGCR0),  6);
+ 	clk[lcdc_ipg_per] = imx_clk_gate("lcdc_ipg_per", "per7", ccm(CCM_CGCR0),  7);
+-	clk[nfc_ipg_per] = imx_clk_gate("nfc_ipg_per", "ipg_per", ccm(CCM_CGCR0),  8);
++	clk[nfc_ipg_per] = imx_clk_gate("nfc_ipg_per", "per8", ccm(CCM_CGCR0),  8);
+ 	clk[ssi1_ipg_per] = imx_clk_gate("ssi1_ipg_per", "per13", ccm(CCM_CGCR0), 13);
+ 	clk[ssi2_ipg_per] = imx_clk_gate("ssi2_ipg_per", "per14", ccm(CCM_CGCR0), 14);
+ 	clk[uart_ipg_per] = imx_clk_gate("uart_ipg_per", "per15", ccm(CCM_CGCR0), 15);
+-- 
+1.7.10.4
