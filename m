@@ -1,7 +1,7 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Wed, 10 Oct 2012 19:30:37 +0100
-Subject: [PATCH 3.6.0- 3/6] ARM/pxa: use module_platform_driver macro
-Message-ID: <1349893837-7441-1-git-send-email-srinivas.kandagatla@st.com>
+Date: Wed, 10 Oct 2012 19:30:50 +0100
+Subject: [PATCH 3.6.0- 4/6] ARM/pxa: use module_platform_driver macro
+Message-ID: <1349893850-7480-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +12,31 @@ module_platform_driver.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- arch/arm/mach-pxa/pxa3xx-ulpi.c |   13 +------------
- 1 files changed, 1 insertions(+), 12 deletions(-)
+ arch/arm/mach-pxa/tosa-bt.c |   15 +--------------
+ 1 files changed, 1 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
-index 7dbe3cc..e329cce 100644
---- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
-+++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
-@@ -384,18 +384,7 @@ static struct platform_driver pxa3xx_u2d_ulpi_driver = {
-         .probe          = pxa3xx_u2d_probe,
-         .remove         = pxa3xx_u2d_remove,
+diff --git a/arch/arm/mach-pxa/tosa-bt.c b/arch/arm/mach-pxa/tosa-bt.c
+index b9b1e5c..fe2a9e1 100644
+--- a/arch/arm/mach-pxa/tosa-bt.c
++++ b/arch/arm/mach-pxa/tosa-bt.c
+@@ -132,17 +132,4 @@ static struct platform_driver tosa_bt_driver = {
+ 		.owner = THIS_MODULE,
+ 	},
  };
 -
--static int pxa3xx_u2d_ulpi_init(void)
--{
--	return platform_driver_register(&pxa3xx_u2d_ulpi_driver);
--}
--module_init(pxa3xx_u2d_ulpi_init);
 -
--static void __exit pxa3xx_u2d_ulpi_exit(void)
+-static int __init tosa_bt_init(void)
 -{
--	platform_driver_unregister(&pxa3xx_u2d_ulpi_driver);
+-	return platform_driver_register(&tosa_bt_driver);
 -}
--module_exit(pxa3xx_u2d_ulpi_exit);
-+module_platform_driver(pxa3xx_u2d_ulpi_driver);
- 
- MODULE_DESCRIPTION("PXA3xx U2D ULPI driver");
- MODULE_AUTHOR("Igor Grinberg");
+-
+-static void __exit tosa_bt_exit(void)
+-{
+-	platform_driver_unregister(&tosa_bt_driver);
+-}
+-
+-module_init(tosa_bt_init);
+-module_exit(tosa_bt_exit);
++module_platform_driver(tosa_bt_driver);
 -- 
 1.7.0.4
