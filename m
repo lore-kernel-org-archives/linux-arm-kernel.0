@@ -1,120 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 10 Oct 2012 09:57:57 -0400 (EDT)
-Subject: [PATCH v2 3/5] ARM: use generic unaligned.h
-In-Reply-To: <50757837.8050200@gmail.com>
-References: <1344129840-16447-1-git-send-email-robherring2@gmail.com>
- <1344129840-16447-4-git-send-email-robherring2@gmail.com>
- <20121008164353.GB6140@S2101-09.ap.freescale.net>
- <507338F1.7030604@gmail.com>
- <20121008232853.GA21822@S2101-09.ap.freescale.net>
- <50738B93.6090704@gmail.com> <alpine.LFD.2.02.1210082354210.16518@xanadu.home>
- <50757837.8050200@gmail.com>
-Message-ID: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 10 Oct 2012 10:00:27 -0400
+Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
+In-Reply-To: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
+References: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <20121010140027.GB13724@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Oct 2012, Rob Herring wrote:
-
-> On 10/08/2012 11:01 PM, Nicolas Pitre wrote:
-> > On Mon, 8 Oct 2012, Rob Herring wrote:
-> > 
-> >> On 10/08/2012 06:28 PM, Shawn Guo wrote:
-> >>> On Mon, Oct 08, 2012 at 03:34:57PM -0500, Rob Herring wrote:
-> >>>> On 10/08/2012 11:43 AM, Shawn Guo wrote:
-> >>>>> This patch has been merged into mainline as commit below.
-> >>>>>
-> >>>>>  d25c881 ARM: 7493/1: use generic unaligned.h
-> >>>>>
-> >>>>> It introduces a regression for me.  Check out the commit on mainline,
-> >>>>> build a v7 only kernel (imx5/6) with imx_v6_v7_defconfig, the kernel
-> >>>>> halts in decompressor.  But v6/v7 kernel (imx3/5/6) works fine.  The
-> >>>>> kernel built on the parent commit below works all fine.
-> >>>>
-> >>>> It actually fails in the decompressor or that's the last output you get?
-> >>>
-> >>> I think it fails in the decompressor, because what I see is 
-> >>>
-> >>> Uncompressing Linux...
-> >>>
-> >>> not
-> >>>
-> >>> Uncompressing Linux... done, booting the kernel.
-> >>>
-> >>>> I compared the decompressor disassembly of both cases and get the same
-> >>>> number of ldrb/strb instructions, so I don't think it is directly
-> >>>> related to alignment.
-> >>>>
-> >>>> I tried the XY decompressor as that is one difference, but that works
-> >>>> fine for me on highbank.
-> >>>>
-> >>>> Does it work with an empty uncompress.h functions? That should be the
-> >>>> only difference in our decompressor code.
-> >>>
-> >>> No, empty putc() in uncompress.h does not help.
-> >>>
-> >>> New finding is that it only fails with LZO decompressor while the other
-> >>> 3 Gzip, LZMA and XZ all work good.  We happen to have LZO as the default
-> >>> one in imx_v6_v7_defconfig.
-> >>
-> >> I must have had an old config with XZ. LZO fails because of this:
-> >>  
-> >> lib/decompress_unlzo.c: version = get_unaligned_be16(parse);
-> >> lib/decompress_unlzo.c: if (get_unaligned_be32(parse) & HEADER_HAS_FILTER)
-> >> lib/decompress_unlzo.c:         dst_len = get_unaligned_be32(in_buf);
-> >> lib/decompress_unlzo.c:         src_len = get_unaligned_be32(in_buf);
-> >>
-> >> This was what I was afraid of. The decompressor runs with the sysctrl
-> >> register A bit in whatever state the bootloader left it in. In the case
-> >> of u-boot it is set, and the maintainers are pretty set on not allowing
-> >> unaligned accesses if you've seen the recent discussion.
-> > 
-> > This is not an u-Boot issue.  The kernel code expects misaligned 
-> > accesses to be handled by the hardware on ARMv6+ now.  So it better 
-> > enforce proper A bit state itself.
-> > 
-> >> This should fix things.
-> >>
-> >> Rob
-> >>
-> >> 8<---------------------------------------------------------------------
-> >>
-> >> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> >> index bc67cbf..1f87d22 100644
-> >> --- a/arch/arm/boot/compressed/head.S
-> >> +++ b/arch/arm/boot/compressed/head.S
-> >> @@ -654,6 +654,7 @@ __armv7_mmu_cache_on:
-> >>  #endif
-> >>                 mrc     p15, 0, r0, c1, c0, 0   @ read control reg
-> >>                 bic     r0, r0, #1 << 28        @ clear SCTLR.TRE
-> >> +               bic     r0, r0, #1 << 1         @ clear SCTLR.A
-> >>                 orr     r0, r0, #0x5000         @ I-cache enable, RR cache replacement
-> >>                 orr     r0, r0, #0x003c         @ write buffer
-> >>  #ifdef CONFIG_MMU
-> >>
-> > 
-> > That's OK for ARMv7, but in the ARMv6 case we use __armv4_mmu_cache_on.  
-> > So this patch is incomplete.
+On Tue, Oct 09, 2012 at 02:27:20PM +0530, Vaibhav Hiremath wrote:
+> With recent changes in omap gpmc driver code, in case of DT
+> boot mode, where bootloader does not configure gpmc cs space
+> will result into kernel BUG() inside gpmc_mem_init() function,
+> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
+> gpmc_config7[0].baseaddress is set to '0' on reset.
 > 
-> It is still optional on v6 and the compiler will not emit unaligned
-> accesses for v6 (which is why it worked when v6 platforms were enabled).
+> This use-case is applicable for any board/EVM which doesn't have
+> any peripheral connected to gpmc cs0, for example BeagleXM and
+> BeagleBone, so DT boot mode fails.
+> 
+> This patch adds of_have_populated_dt() check before creating
+> device, so that for DT boot mode, gpmc probe will not be called
+> which is expected behavior, as gpmc is not supported yet from DT.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Afzal Mohammed <afzal@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc Paul Walmsley <paul@pwsan.com>
+> ---
+> This should go in for rc1, as this breaks AM33xx boot.
 
-Hmmm, right. However if you look at commit 8428e84d42, the A bit is 
-cleared whenever we compile for ARMv6 or higher.  Of course, the 
-decompressor doesn't have to deal with unknown user space binaries and 
-in that case we might trust that the compiler will never emit known to 
-be unaligned loads.
+Fixes BeagleBone on mainline.
 
-In that case...
+Tested-by: Matt Porter <mporter@ti.com>
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> That does raise a bigger question. If we're doing combined v6 and v7
-> builds, do we want this to require unaligned accesses are enabled and if
-> so, can we force that on in the compiler?
-
-When we compile ARMv6 and ARMv7 targets together, the compiler is told 
-to compile for ARMv6.  We know that unaligned accesses will be done 
-usingLDRB/STRB in that case.
-
-
-Nicolas
+-Matt
