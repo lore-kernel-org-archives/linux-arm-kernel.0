@@ -1,34 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Oct 2012 11:07:40 +0000
-Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
-In-Reply-To: <1349862394.10070.23.camel@zakaz.uk.xensource.com>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <201210091819.34310.arnd@arndb.de>
- <1349862394.10070.23.camel@zakaz.uk.xensource.com>
-Message-ID: <201210101107.40898.arnd@arndb.de>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Wed, 10 Oct 2012 20:11:55 +0900
+Subject: [Linaro-mm-sig] [PATCHv9 00/25] Integration of videobuf2 with
+ DMABUF
+In-Reply-To: <20121010075418.6a18a867@redhat.com>
+References: <1349188056-4886-1-git-send-email-t.stanislaws@samsung.com>
+ <20121010075418.6a18a867@redhat.com>
+Message-ID: <CAH9JG2VBQSmiBYgVTaFYbgeaE35WMB-J4exT3Uqd9+fnsM0d-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 October 2012, Ian Campbell wrote:
-> > * implement your own cmpxchg wrapper that may be implemented using a spinlock
-> >   rather than cmpxchg if ARMv6 is enabled.
-> 
-> Even if ARMv6 is enabled the grant table code will never be running on
-> one so so it might be ok to just have our own wrapper which
-> unconditionally uses the v7 instruction? That might upset gas though.
+On 10/10/12, Mauro Carvalho Chehab <mchehab@redhat.com> wrote:
+> Hi,
+>
+> Em Tue, 02 Oct 2012 16:27:11 +0200
+> Tomasz Stanislawski <t.stanislaws@samsung.com> escreveu:
+>
+>> Hello everyone,
+>> This patchset adds support for DMABUF [2] importing and exporting to V4L2
+>> stack.
+>>
+>> v9:
+>> - rebase on 3.6
+>> - change type for fs to __s32
+>> - add support for vb2_ioctl_expbuf
+>> - remove patch 'v4l: vb2: add support for DMA_ATTR_NO_KERNEL_MAPPING',
+>>   it will be posted as a separate patch
+>> - fix typos and style in Documentation (from Hans Verkuil)
+>> - only vb2-core and vb2-dma-contig selects DMA_SHARED_BUFFER in Kconfig
+>> - use data_offset and length while queueing DMABUF
+>> - return the most recently used fd at VIDIOC_DQBUF
+>> - use (buffer-type, index, plane) tuple instead of mem_offset
+>>   to identify a for exporting (from Hans Verkuil)
+>> - support for DMABUF mmap in vb2-dma-contig (from Laurent Pinchart)
+>> - add testing alignment of vaddr and size while verifying userptr
+>>   against DMA capabilities (from Laurent Pinchart)
+>> - substitute VM_DONTDUMP with VM_RESERVED
+>> - simplify error handling in vb2_dc_get_dmabuf (from Laurent Pinchart)
+>
+> For now, NACK. See below.
 
-Yes, that would be possible. You can tell gas to ignore the instruction
-set in this case. If you do this, you can implement the update functions
-more efficiently using direct ldrexh/strexh in assembler to avoid doing
-two nested loops. I assume that you don't need the v1 grant table
-code on ARM anyway, so the only code you need to look at is
+Sad news!
+It's failed to merge by very poor samsung board support at mainline.
 
-        while (!((flags = *pflags) & GTF_transfer_committed)) {
-                if (sync_cmpxchg(pflags, flags, 0) == flags)
-                        return 0;
-                cpu_relax();
-        }
+CC arm & samsung mailing list.
 
-which should transform nicely into a few lines of inline assembly.
-
-	Arnd
+Thank you,
+Kyungmin Park
+>
+> I spent 4 days trying to setup an environment that would allow testing
+> DMABUF with video4linux without success (long story, see below). Also,
+> Laurent tried the same without any luck, and it seems that it even
+> corrupted his test machine.
+>
+> Basically Samsung generously donated me two boards that it could be
+> used on this test (Origen and SMDK310). None of them actually worked
+> with the upstream kernel: patches are needed to avoid OOPSes on
+> Origen; both Origen/SMDK310 defconfigs are completely broken, and drivers
+> don't even boot if someone tries to use the Kernel's defconfigs.
+>
+> Even after spending _days_ trying to figure out the needed .config options
+> (as the config files are not easily available), both boards have... issues:
+>
+> 	- lack of any display output driver at SMDK310;
+>
+> 	- lack of any network driver at Origen: it seems that none of
+> the available network options on Origen was upstreamed: no Bluetooth, no
+> OTG,
+> no Wifi.
+>
+> The only test I was able to do (yesterday, late night), the DMABUF caused
+> an OOPS at the Origen board. So, for sure it is not ready for upstream.
+>
+> It is now, too late for 3.7. I might consider it to 3.8, if something
+> can be done to fix the existing issues, and setup a proper setup, using
+> the upstream Kernel.
+>
+> Regards,
+> Mauro
+>
+> _______________________________________________
+> Linaro-mm-sig mailing list
+> Linaro-mm-sig at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+>
