@@ -1,178 +1,125 @@
-From: vasanthananthan@gmail.com (Vasanth Ananthan)
-Date: Wed, 10 Oct 2012 14:50:56 +0530
-Subject: [PATCH 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
-In-Reply-To: <CAK1UHiyjyp8u-nFwU-19dds1uF7T1kkFNHyYQ6pWLFtUwGtR1w@mail.gmail.com>
-References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
- <1349783332-18467-3-git-send-email-vasanthananthan@gmail.com>
- <20121009182828.GA20879@quad.lixom.net>
- <CAK1UHiyjyp8u-nFwU-19dds1uF7T1kkFNHyYQ6pWLFtUwGtR1w@mail.gmail.com>
-Message-ID: <CAK1UHix7tBq-PLv1oX3+2m5xZ2uaocc=XsvN5M1RwFYQScw9Og@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 10 Oct 2012 09:29:56 +0000
+Subject: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <50753DD9.1080105@gmail.com>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <20121009145854.GB14079@kroah.com>
+ <20121009151704.GP12801@game.jcrosoft.org>
+ <3430030.rKEkeKmzui@vostro.rjw.lan> <5075210B.3020309@ti.com>
+ <50753DD9.1080105@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB3AF86@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 10, 2012 at 14:50:25, Daniel Mack wrote:
+> On 10.10.2012 09:17, Vaibhav Hiremath wrote:
+> > On 10/10/2012 3:42 AM, Rafael J. Wysocki wrote:
+> >> On Tuesday 09 of October 2012 17:17:04 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>> On 07:58 Tue 09 Oct     , Greg Kroah-Hartman wrote:
+> >>>> On Tue, Oct 09, 2012 at 01:46:33PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>>> On 22:02 Sun 07 Oct     , Rafael J. Wysocki wrote:
+> >>>>>> On Sunday 07 of October 2012 15:12:01 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>>>>> On 00:18 Sun 07 Oct     , Rafael J. Wysocki wrote:
+> >>>>>>>> On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>>>>>>> Hi,
+> >>>>>>>>>
+> >>>>>>>>> The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
+> >>>>>>>>>
+> >>>>>>>>>   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
+> >>>>>>>>>
+> >>>>>>>>> are available in the git repository at:
+> >>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>>   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
+> >>>>>>>>>
+> >>>>>>>>> for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
+> >>>>>>>>>
+> >>>>>>>>>   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
+> >>>>>>>>>
+> >>>>>>>>> ----------------------------------------------------------------
+> >>>>>>>>> pm: add suspend_mem and suspend_standby support
+> >>>>>>>>>
+> >>>>>>>>> Today when we go to suspend we can not knwon at drivers level if we go in
+> >>>>>>>>> STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
+> >>>>>>>>> suspend_standby.
+> >>>>>>>>
+> >>>>>>>> No way. Device drivers shouldn't be concerned about that.
+> >>>>>>> I do need it on at91 as we swith to slow_clock in MEM suspend and some ip
+> >>>>>>> need special handling when switching to slow_clock
+> >>>>>>
+> >>>>>> Well, my answer to that is: please fix your platform code instead of
+> >>>>>> hacking the PM core to work around its problems.
+> >>>>> how can I fix drivers pm issue when I no way to known at driver level the
+> >>>>> real suspend, the PM core is supposed to proivde the right information to the
+> >>>>> drivers so the driver can put it's in the right pm mode. If the pm core can not
+> >>>>> provide such inforation the PM core is broken as we will have to do dirty
+> >>>>> hack.
+> >>>>
+> >>>> Why do you need to know the difference in your driver?  We used to
+> >>>> provide this information a long time ago, but it turned out to not be
+> >>>> needed at all and just caused problems.
+> >>> because on at91 I need to handle the mem standby at drviers level.
+> >>
+> >> This is not an answer.  You're basically saying "it has to be done this way,
+> >> because it has to be done this way".
+> >>
+> >>> We do it today already by a hack in different drivers at91_udc (usb device),
+> >>> atmel_serail and at91_ohci. Those 3 IP have specifci handling when switching
+> >>> to mem pm. On at91 when switch to mem we shutdown everything and run form a slow
+> >>> clock - this is done at soc level - but those IP have issue and need specific
+> >>> care before doing so. Ohterwise when the SoC will wakeup but those IP will not
+> >>>
+> >>> in this patch series I send the update of those 3 drivers too
+> >>> and kill the hack
+> >>
+> >> Well, let's start over.  What's the difference between "suspend to RAM" (mem)
+> >> and "standby" on your platform?
+> >>
+> >>>>> Any generic framework is supposed to evolve for real user need here I've one
+> >>>>> so I udpate the core to mach a need
+> >>
+> >> Yes, if there are more users needing a change.  If there's only one, I think not
+> >> really.
+> >>
+> > 
+> > We came across such a need while supporting various low-power modes in
+> > AM335x SoC. I also wanted to put similar proposal, its good that Jean
+> > submitted patches and we are having this discussion early.
+> > 
+> > Let me try to describe the need and issue here,
+> > 
+> > In case of AM33xx device, we have different low-power modes supported
+> > by HW, for this discussion I will just talk about DeepSleep-0 and
+> > StandBy mode supported by HW (few other modes also described in spec)-
+> > 
+> > Below is the Spec definition of these two low-power modes,
+> 
+> Thanks for this summary, which raises a question for me that might be
+> slightly unreleated to the general discussion, but still:
+> 
+> I was just looking at the code that ships with the BSP kernel, and the
+> approach there is to load a binary firmare blob to the M3 UMEM and then
+> communicates with mailbox commands in order to put the system to suspend.
+> 
 
-On Tue, Oct 9, 2012 at 11:58 PM, Olof Johansson <olof@lixom.net> wrote:
->
-> Hi,
->
->
-> On Tue, Oct 09, 2012 at 05:18:48PM +0530, Vasanth Ananthan wrote:
-> > This patch adds Device Nodes for SATA and SATA PHY device.
-> >
-> > Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5250-smdk5250.dts |   11 +++++++++++
-> >  arch/arm/boot/dts/exynos5250.dtsi         |   20 ++++++++++++++++++++
-> >  arch/arm/mach-exynos/include/mach/map.h   |    7 +++++++
-> >  arch/arm/mach-exynos/mach-exynos5-dt.c    |    6 ++++++
-> >  4 files changed, 44 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > index 8a5e348..bb262ce 100644
-> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > @@ -48,6 +48,17 @@
-> >               };
-> >       };
-> >
-> > +     i2c at 121D0000 {
-> > +             samsung,i2c-sda-delay = <100>;
-> > +                samsung,i2c-max-bus-freq = <40000>;
-> > +             samsung,i2c-slave-addr = <0x38>;
->
-> Whitespace is off above.
->
-> > +
-> > +             sataphy at 70 {
->
-> sata-phy would be a more conventional name.
->
-> > +                     compatible = "samsung,i2c-phy";
->
-> i2c-phy? Seems like an odd choice of name. What is this device?
+Ohh, Great, then you are aware of AM33xx power management support.
+As you are aware, M3 here works as a soft-PRCM block, so certain things has 
+to be done on M3 while entering into low-power state.
 
+> Is this how it should be done in mainline as well or are there any plans
+> to implement that behaviour natively?
+> 
 
-The SATA physical layer controller is both a platform device and a i2c
-slave device.
-This compatible string is for the i2c client driver. Hence I have used
-i2c-phy here.
-
->
->
-> > +                     reg = <0x38>;
->
-> 70 is unit address but here it's 0x38? One of them is wrong. No need for a unit
-> address if it's a unique name, by the way.
->
->
-> > +             };
-> > +     };
-> > +
-> >       i2c at 12C80000 {
-> >               status = "disabled";
-> >       };
-> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> > index 004aaa8..5a47a8f 100644
-> > --- a/arch/arm/boot/dts/exynos5250.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> > @@ -88,6 +88,18 @@
-> >               interrupts = <0 54 0>;
-> >       };
-> >
-> > +     sata at 122F0000 {
-> > +                compatible = "samsung,exynos-sata-ahci";
-> > +                reg = <0x122F0000 0x1ff>;
-> > +             interrupts = <0 115 0>;
->
-> More whitespace damage. And need binding.
->
-> > +        };
-> > +
-> > +        sata-phy at 12170000 {
-> > +                compatible = "samsung,exynos-sata-phy";
-> > +                reg = <0x12170000 0x1ff>;
-> > +        };
->
-> Should have binding too. How does this relate to the i2c device above.
-
-
-As mentioned earlier SATA physical layer controller is both a platform
-device and also an i2c slave device.
-This Node is for the SATA physical layer platform device, the previous
-node is for i2c slave device.
-Certain initialization settings done directly and other settings has
-to be done through i2c.
-
->
-> > +
-> >       i2c at 12C60000 {
-> >               compatible = "samsung,s3c2440-i2c";
-> >               reg = <0x12C60000 0x100>;
-> > @@ -152,6 +164,13 @@
-> >               #size-cells = <0>;
-> >       };
-> >
-> > +     i2c at 121D0000 {
-> > +                compatible = "samsung,s3c2440-sataphy-i2c";
->
-> Is this a unique i2c controller, or is it just another one like the others on
-> the chip? If it's the latter, it should use the regular compatible string.
+Yes, we will follow similar approach for Mainline, its under development and 
+soon you will see patches getting submitted to the list for review. The 
+first step is to get deepsleep-0 support in Mainline and then other will 
+follow.
 
 
-Yes, its a unique i2c controller which lacks an interrupt line while
-others are interrupt driven.
-Hence I have used a distinct compatible string for the driver to
-distinguish the controller.
-
->
-> > +                reg = <0x121D0000 0x100>;
-> > +                #address-cells = <1>;
-> > +                #size-cells = <0>;
-> > +        };
-> > +
-> >       spi_0: spi at 12d20000 {
-> >               compatible = "samsung,exynos4210-spi";
-> >               reg = <0x12d20000 0x100>;
-> > @@ -460,4 +479,5 @@
-> >                       #gpio-cells = <4>;
-> >               };
-> >       };
-> > +
->
-> Stray whitespace change.
->
-> >  };
-> > diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-> > index c72b675..6827190 100644
-> > --- a/arch/arm/mach-exynos/include/mach/map.h
-> > +++ b/arch/arm/mach-exynos/include/mach/map.h
-> > @@ -177,9 +177,16 @@
-> >  #define EXYNOS4_PA_HSOTG             0x12480000
-> >  #define EXYNOS4_PA_USB_HSPHY         0x125B0000
-> >
-> > +#ifdef CONFIG_ARCH_EXYNOS4
->
-> No need to ifdef since namespace isn't overlapped.
->
-> >  #define EXYNOS4_PA_SATA                      0x12560000
-> >  #define EXYNOS4_PA_SATAPHY           0x125D0000
-> >  #define EXYNOS4_PA_SATAPHY_CTRL              0x126B0000
-> > +#endif
-> > +#ifdef CONFIG_ARCH_EXYNOS5
->
-> Same here.
->
-> > +#define EXYNOS5_PA_SATA_PHY_CTRL     0x12170000
-> > +#define EXYNOS5_PA_SATA_PHY_I2C              0x121D0000
-> > +#define EXYNOS5_PA_SATA_BASE         0x122F0000
-> > +#endif
->
->
-> -Olof
-
-
-I will incorporate the other comments and resubmit the patch. Thanks.
-
---
-Vasanth Ananthan.
+Thanks,
+Vaibhav
+> 
+> Thanks,
+> Daniel
+> 
+> 
