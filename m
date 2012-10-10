@@ -1,62 +1,185 @@
-From: marek.vasut@gmail.com (=?UTF-8?B?TWFyZWsgVmHFoXV0?=)
-Date: Tue, 9 Oct 2012 17:42:14 +0200
-Subject: [PATCH] mmc: mxs: fix build regression from mismerge
-In-Reply-To: <201210091537.23659.arnd@arndb.de>
-References: <201210091537.23659.arnd@arndb.de>
-Message-ID: <CAMqi2ZPvgu8M4F_fW01v5N6USn8=QP9brdMAEL34v_y69t8pbQ@mail.gmail.com>
+From: vasanthananthan@gmail.com (Vasanth Ananthan)
+Date: Wed, 10 Oct 2012 14:08:31 +0530
+Subject: [PATCH 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
+In-Reply-To: <20121009182828.GA20879@quad.lixom.net>
+References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
+ <1349783332-18467-3-git-send-email-vasanthananthan@gmail.com>
+ <20121009182828.GA20879@quad.lixom.net>
+Message-ID: <CAK1UHiyjyp8u-nFwU-19dds1uF7T1kkFNHyYQ6pWLFtUwGtR1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I sent a patch for that already, Chris was cced on it recently by Shawn
-too. (Sorry for top posting, Android mail client)
-Dne 9.10.2012 17:39 "Arnd Bergmann" <arnd@arndb.de> napsal(a):
+Hi,
 
-> From all I can tell, the patches
+On Tue, Oct 9, 2012 at 11:58 PM, Olof Johansson <olof@lixom.net> wrote:
+
+> Hi,
 >
-> fc108d24 "mmc: mxs-mmc: fix deadlock caused by recursion loop"
-> 829c1bf4 "mmc: spi: Pull out parts shared between MMC and SPI"
 >
-> came in through separate branches and cause this build error when
-> combined.
+> On Tue, Oct 09, 2012 at 05:18:48PM +0530, Vasanth Ananthan wrote:
+> > This patch adds Device Nodes for SATA and SATA PHY device.
+> >
+> > Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5250-smdk5250.dts |   11 +++++++++++
+> >  arch/arm/boot/dts/exynos5250.dtsi         |   20 ++++++++++++++++++++
+> >  arch/arm/mach-exynos/include/mach/map.h   |    7 +++++++
+> >  arch/arm/mach-exynos/mach-exynos5-dt.c    |    6 ++++++
+> >  4 files changed, 44 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > index 8a5e348..bb262ce 100644
+> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > @@ -48,6 +48,17 @@
+> >               };
+> >       };
+> >
+> > +     i2c at 121D0000 {
+> > +             samsung,i2c-sda-delay = <100>;
+> > +                samsung,i2c-max-bus-freq = <40000>;
+> > +             samsung,i2c-slave-addr = <0x38>;
 >
-> drivers/mmc/host/mxs-mmc.c: In function 'mxs_mmc_enable_sdio_irq':
-> drivers/mmc/host/mxs-mmc.c:527:78: error: 'struct mxs_mmc_host' has no
-> member named 'base'
-> drivers/mmc/host/mxs-mmc.c:527:95: error: 'struct mxs_mmc_host' has no
-> member named 'devid'
+> Whitespace is off above.
 >
-> This does the obvious missing change.
+> > +
+> > +             sataphy at 70 {
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Attila Kinali <attila@kinali.ch>
-> Cc: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> sata-phy would be a more conventional name.
 >
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index bb4c2bf..80d1e6d 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -525,7 +525,7 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
-> *mmc, int enable)
->                 writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
->                        ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
->                 writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
-> -                      host->base + HW_SSP_CTRL1(host) +
-> STMP_OFFSET_REG_SET);
-> +                      ssp->base + HW_SSP_CTRL1(ssp) +
-> STMP_OFFSET_REG_SET);
->         } else {
->                 writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
->                        ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+> > +                     compatible = "samsung,i2c-phy";
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> i2c-phy? Seems like an odd choice of name. What is this device?
 >
+
+The SATA physical layer controller is both a platform device and a i2c
+slave device.
+This compatible string is for the i2c client driver. Hence I have used
+i2c-phy here.
+
+
+>
+> > +                     reg = <0x38>;
+>
+> 70 is unit address but here it's 0x38? One of them is wrong. No need for a
+> unit
+> address if it's a unique name, by the way.
+>
+>
+> > +             };
+> > +     };
+> > +
+> >       i2c at 12C80000 {
+> >               status = "disabled";
+> >       };
+> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> > index 004aaa8..5a47a8f 100644
+> > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > @@ -88,6 +88,18 @@
+> >               interrupts = <0 54 0>;
+> >       };
+> >
+> > +     sata at 122F0000 {
+> > +                compatible = "samsung,exynos-sata-ahci";
+> > +                reg = <0x122F0000 0x1ff>;
+> > +             interrupts = <0 115 0>;
+>
+> More whitespace damage. And need binding.
+>
+> > +        };
+> > +
+> > +        sata-phy at 12170000 {
+> > +                compatible = "samsung,exynos-sata-phy";
+> > +                reg = <0x12170000 0x1ff>;
+> > +        };
+>
+> Should have binding too. How does this relate to the i2c device above.
+>
+
+As mentioned earlier SATA physical layer controller is both a platform
+device and also an i2c slave device.
+This Node is for the SATA physical layer platform device, the previous node
+is for i2c slave device.
+Certain initialization settings done directly and other settings has to be
+done through i2c.
+
+
+> > +
+> >       i2c at 12C60000 {
+> >               compatible = "samsung,s3c2440-i2c";
+> >               reg = <0x12C60000 0x100>;
+> > @@ -152,6 +164,13 @@
+> >               #size-cells = <0>;
+> >       };
+> >
+> > +     i2c at 121D0000 {
+> > +                compatible = "samsung,s3c2440-sataphy-i2c";
+>
+> Is this a unique i2c controller, or is it just another one like the others
+> on
+> the chip? If it's the latter, it should use the regular compatible string.
+>
+
+Yes, its a unique i2c controller which lacks an interrupt line while others
+are interrupt driven.
+Hence I have used a distinct compatible string for the driver to
+distinguish the controller.
+
+
+> > +                reg = <0x121D0000 0x100>;
+> > +                #address-cells = <1>;
+> > +                #size-cells = <0>;
+> > +        };
+> > +
+> >       spi_0: spi at 12d20000 {
+> >               compatible = "samsung,exynos4210-spi";
+> >               reg = <0x12d20000 0x100>;
+> > @@ -460,4 +479,5 @@
+> >                       #gpio-cells = <4>;
+> >               };
+> >       };
+> > +
+>
+> Stray whitespace change.
+>
+> >  };
+> > diff --git a/arch/arm/mach-exynos/include/mach/map.h
+> b/arch/arm/mach-exynos/include/mach/map.h
+> > index c72b675..6827190 100644
+> > --- a/arch/arm/mach-exynos/include/mach/map.h
+> > +++ b/arch/arm/mach-exynos/include/mach/map.h
+> > @@ -177,9 +177,16 @@
+> >  #define EXYNOS4_PA_HSOTG             0x12480000
+> >  #define EXYNOS4_PA_USB_HSPHY         0x125B0000
+> >
+> > +#ifdef CONFIG_ARCH_EXYNOS4
+>
+> No need to ifdef since namespace isn't overlapped.
+>
+> >  #define EXYNOS4_PA_SATA                      0x12560000
+> >  #define EXYNOS4_PA_SATAPHY           0x125D0000
+> >  #define EXYNOS4_PA_SATAPHY_CTRL              0x126B0000
+> > +#endif
+> > +#ifdef CONFIG_ARCH_EXYNOS5
+>
+> Same here.
+>
+> > +#define EXYNOS5_PA_SATA_PHY_CTRL     0x12170000
+> > +#define EXYNOS5_PA_SATA_PHY_I2C              0x121D0000
+> > +#define EXYNOS5_PA_SATA_BASE         0x122F0000
+> > +#endif
+>
+>
+> -Olof
+>
+
+I will incorporate the other comments and resubmit the patch. Thanks.
+
+-- 
+Vasanth Ananthan.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121009/2cf2c1ab/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121010/7856e75d/attachment-0001.html>
