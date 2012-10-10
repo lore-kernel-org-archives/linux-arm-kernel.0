@@ -1,64 +1,121 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 10 Oct 2012 10:46:34 +0100
-Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
-In-Reply-To: <201210091819.34310.arnd@arndb.de>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <201210091539.46274.arnd@arndb.de>
- <1349799035.21847.222.camel@zakaz.uk.xensource.com>
- <201210091819.34310.arnd@arndb.de>
-Message-ID: <1349862394.10070.23.camel@zakaz.uk.xensource.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 10 Oct 2012 10:55:44 +0100
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121009182514.GF4124@obsidianresearch.com>
+References: <20121001175647.GD2100@linaro.org>
+ <20121001183543.GC22342@obsidianresearch.com>
+ <20121002102346.GB2108@linaro.org>
+ <20121002174759.GC23733@obsidianresearch.com>
+ <20121003104335.GA2254@linaro.org>
+ <20121003184437.GB12231@obsidianresearch.com>
+ <20121004113637.GA2117@linaro.org>
+ <20121004175907.GB2994@obsidianresearch.com>
+ <20121008104649.GD2302@linaro.org>
+ <20121009182514.GF4124@obsidianresearch.com>
+Message-ID: <20121010095544.GB2131@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-09 at 19:19 +0100, Arnd Bergmann wrote:
-> On Tuesday 09 October 2012, Ian Campbell wrote:
-> > On Tue, 2012-10-09 at 16:39 +0100, Arnd Bergmann wrote:
-> > > On Tuesday 09 October 2012, Ian Campbell wrote:
-> > > > > * The tmem hypercall is not available on ARM
-> > > > > 
-> > > > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
-> > > > 
-> > > > missing the end of this sentence?
-> > > 
-> > > Right, I meant to say 
-> > > 
-> > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
-> > >   Xen grant table code, so we must ensure that Xen support is only built
-> > >   on ARMv7-only kernels not combined ARMv6/v7 kernels.
-> > > 
-> > > This should be fixed differently in the future.
+On Tue, Oct 09, 2012 at 12:25:14PM -0600, Jason Gunthorpe wrote:
+> On Mon, Oct 08, 2012 at 11:46:49AM +0100, Dave Martin wrote:
+> 
+> > > Yes, but we still need rely on complex code like I2C/MTD to create a
+> > > correct DTB, which again puts us back to patching the kernel for that
+> > > functionality.
 > > 
-> > Is this is a build time failure because gcc/gas/etc refuses to generate
-> > these instructions if it is configured for v6?
+> > I'm still confused as to where this complexity is coming from.
 > > 
-> > I ask because if it is only a runtime issue then we can reason that if
-> > we are running Xen specific grant table code, then we must be running on
-> > Xen and therefore must necessarily be running on a v7 (because Xen only
-> > support v7+virt extensions) even if the kernel happens to be capable of
-> > running on v6 too.
+> > If you need to run some complex I2C and MTD code to generate the DT, what
+> > is that code doing?  If it is probing to get the information, then can you
+> > avoid putting the info in the DT at all?  Primarily the DT is to describe
+> > those aspects of the hardware which can't be probed.
 > 
-> The underlying reason of course is that ARMv6 doesn't have those
-> instructions. The symptom you see is a link error because gcc emits
-> a reference to the (intentionally missing) __bad_cmpxchg() function
-> from
+> At manufacturing the unit is programmed with a small datastructure that
+> contains all the unique ID's (MAC addresses, etc), manufacturing
+> variations (ie vendor A or B was used for a socket) and other
+> ancillary data.
 
-OK, then your fix is the best one for now.
+As a side comment, some things such as MAC addresses can be probed and
+set from userspace after kernel boot, assuming that you have a way
+to fetch the device description blob from userspace.  If it's accessible
+via MTD I'm guessing you may have some chance of doing that.
 
-> [...]
-> The possible solutions I can see for this are:
+Identifying the board variant is harder to defer though.
+
+> So a fair amount of I2C and MTD stack is required just to fetch this
+> structure - a full CFI probe, for instance, is needed in the NOR flash
+> case just to locate the structure.
 > 
-> * change the grant table format to use 32 bits for the flags on ARM
-> * change the code to always cmpxchg the entire 32 bit word including the flags.
-
-I'd need to check the grant table semantics to see if this will be
-possible.
-
-> * implement your own cmpxchg wrapper that may be implemented using a spinlock
->   rather than cmpxchg if ARMv6 is enabled.
-
-Even if ARMv6 is enabled the grant table code will never be running on
-one so so it might be ok to just have our own wrapper which
-unconditionally uses the v7 instruction? That might upset gas though.
-
+> Once read, things like MAC addresses are copied into the DTB, and
+> certain sections of the DTB are NOP'd out - we have stanzas for chip
+> vendor A and vendor B, the one that was not put on the board is
+> replaced with NOP.
 > 
-> 	Arnd
+> Similar to the A/B fix, a further fixup is done based on a runtime
+> probe of the programmable devices to learn their current
+> configuration/memory map.
+> 
+> It seems desirable to present a complete/correct DTB to the kernel,
+> it doesn't seem there are great places to hook in custom discovery
+> procedures.
+> 
+> From a maintenance perspective we already have to test/etc the kernel
+> code for all of this, we don't want to do that twice by duplicating
+> this stuff outside the kernel.
+
+OK, that gives me a good understanding of what you're trying to achieve
+here.
+
+However, I worry that if you have to run hardware-dependent code in
+order to fetch or generate parts of the DT, then we have a chicken-
+and-egg problem with no guaranteed solution with the frameworks that
+exist today -- although I am not familiar with how DT gets used on
+all other arches, so you might have counterexamples I'm not aware of.
+
+At least in ARM-land, the DT is inherently monolithic and static: the
+DT is not expected to change once you enter the kernel.
+
+Of course, more or less anything can be done with local patches, but
+merging such functionality in a clean way might be a challenge.
+
+> > Otherwise, you that have a few static configurations: you could have one
+> > pre-baked DT per hardware platform, and choose the correct one once you
+> > have detected the platform.
+> 
+> We do that too, for instance the PPC kernel we build supports 4
+> different circuit boards, each served by a separate DTB, that needs a
+> fixup pass.
+> 
+> I think the biggest DTB describes about 49 devices..
+>   
+> > > Where the 'dev tree provider' would use the stored bootloader
+> > > registers and any other information to return the proper DTB. 
+> > 
+> > It would need developing a bit, but something like that might be
+> > possible -- it should probably be discussed via devicetree-discuss.
+> > 
+> > If it is doing anything less trivial than picking a pre-baked DT, the
+> > rationale would need to be carefully argued.
+> 
+> I'm not sure there is a great interest in this? What are other folks
+> working on production embedded stuff doing? I suppose that will be
+> more clear as device tree is rolled out.
+
+For now, the architecturally simplest solution still seems to me to be
+to write your own boot shim which customises the DT before booting the 
+kernel. As discussed, this can continue to look like a simple ELF image
+from the bootloader's point of view -- but I appreciate that it will
+involve effort and some duplication of some low-level driver components.
+
+If we could do dynamic DT properly (either fully dynamic, or dynamic
+in a more constrained way as in your suggested patch), that would
+provided an architected way to solve this problem from within the kernel.
+
+This could certainly be worth raising on devicetree-discuss.
+
+Your problem is unlikely to affect people outside the embedded space
+too much, but it doesn't sound likely to be unique.
+
+Cheers
+---Dave
