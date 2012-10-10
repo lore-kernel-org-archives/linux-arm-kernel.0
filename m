@@ -1,30 +1,25 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 10 Oct 2012 13:01:24 +0800
-Subject: [PATCH] ARM: dts: imx28: add the `clock-names` for gpmi-nand
-In-Reply-To: <CAOMZO5A0UX6y3MtHdzZ8V2Z52qsH8Yy-BVtOYEN_OpBezEsvQw@mail.gmail.com>
-References: <1349837086-21844-1-git-send-email-b32955@freescale.com>
- <CAOMZO5A0UX6y3MtHdzZ8V2Z52qsH8Yy-BVtOYEN_OpBezEsvQw@mail.gmail.com>
-Message-ID: <50750124.5060208@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Oct 2012 06:18:04 +0000
+Subject: [PATCH v4 1/3] Input: egalax_ts: get gpio from devicetree node
+In-Reply-To: <5074EAFC.1010409@gmail.com>
+References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
+ <201210091158.33040.arnd@arndb.de> <5074EAFC.1010409@gmail.com>
+Message-ID: <201210100618.05472.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?10?10? 12:54, Fabio Estevam ??:
-> Hi Huang,
->
-> On Tue, Oct 9, 2012 at 11:44 PM, Huang Shijie<b32955@freescale.com>  wrote:
->> The current DT node misses the `clocks-names` item for gpmi-nand.
->> So the gpmi-nand driver could not find the proper clock.
->>
->> This patch fixes this issue.
->>
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
-> Thanks for the fix.
->
-> Could you please also fix mx23 in the same patch?
-I am just fixing it now. :)
+On Wednesday 10 October 2012, Hui Wang wrote:
+> >
+> > What's the status on this patch? I'm still getting build errors from this
+> > driver, so I guess it was never accepted for the 3.7 merge window.
+> >
+> >       Arnd
+> >
+> >   
+> I forgot to resend this patchset After Dmitry was back to the maillist. 
+> I will rebase the patchset and resend them to review.
+> 
 
-Huang Shijie
-> Regards,
->
-> Fabio Estevam
->
+Ok, thank you!
+
+	Arnd
