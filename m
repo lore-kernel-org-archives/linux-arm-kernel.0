@@ -1,26 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Oct 2012 08:42:57 +0200
-Subject: [PATCH 2/9] ARM: export set_irq_flags
-In-Reply-To: <1349796183-30648-3-git-send-email-arnd@arndb.de>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <1349796183-30648-3-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZ2h-V7c9EnQA6+m9sCaBD+tzU-sWrBLRtBTfgbeNWRXQ@mail.gmail.com>
+From: toddpoynor@google.com (Todd Poynor)
+Date: Tue,  9 Oct 2012 23:46:12 -0700
+Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
+Message-ID: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2012 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
+on overflow.
 
-> The recently added Emma Mobile GPIO driver calls set_irq_flags
-> and irq_set_chip_and_handler for the interrupts it exports and
-> it can be built as a module, which currently fails with
->
-> ERROR: "set_irq_flags" [drivers/gpio/gpio-em.ko] undefined!
->
-> We either need to replace the call to set_irq_flags with something
-> else or export that function. This patch does the latter.
+Signed-off-by: Todd Poynor <toddpoynor@google.com>
+---
+ arch/arm/kernel/stacktrace.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Argh! And I cannot think of anything more elegant so
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index 00f79e5..6315162 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
+ 	high = ALIGN(low, THREAD_SIZE);
+ 
+ 	/* check current frame pointer is within bounds */
+-	if (fp < (low + 12) || fp + 4 >= high)
++	if (fp < (low + 12) || fp >= high - 4)
+ 		return -EINVAL;
+ 
+ 	/* restore the registers from the stack frame */
+-- 
+1.7.7.3
