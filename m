@@ -1,156 +1,100 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 10 Oct 2012 17:35:16 +0530
-Subject: [PATCH 3/3] ARM: dts: EMIF and LPDDR2 device tree data for OMAP5
- boards
-In-Reply-To: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
-References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1349870716-25511-4-git-send-email-lokeshvutla@ti.com>
+From: const@MakeLinux.com (Constantine Shulyupin)
+Date: Wed, 10 Oct 2012 14:33:32 +0200
+Subject: [PATCH v6] Enable USB peripheral mode on dm365 EVM
+Message-ID: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree data for the EMIF sdram controllers in OMAP5
-and LPDDR2 memory devices attached to OMAP5 boards.
+From: Constantine Shulyupin <const@MakeLinux.com>
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Sets USB PHY clock source to 24 MHz clock and call USB configuration from board initialization.
+
+Tested with OTG configuration, usb gadget g_zero on DM365 EVM connected to PC.
+
+References:
+
+Definition of USB_PHY_CTRL and PHYCLKFREQ:
+- http://www.makelinux.com/lib/ti/DM36x_ARM/doc-141
+
+Original patch by miguel.aguilar at ridgerun.com three years ago:
+- http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
+
+Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
 ---
- arch/arm/boot/dts/lpddr2_data.dtsi |   64 +++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/omap5-evm.dts    |   11 +++++++
- arch/arm/boot/dts/omap5.dtsi       |   18 ++++++++++
- 3 files changed, 92 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/lpddr2_data.dtsi b/arch/arm/boot/dts/lpddr2_data.dtsi
-index f97f70f..8e8c1bc 100644
---- a/arch/arm/boot/dts/lpddr2_data.dtsi
-+++ b/arch/arm/boot/dts/lpddr2_data.dtsi
-@@ -3,7 +3,7 @@
-  */
+Note:
+
+Changelog
+
+Changes since v5 http://www.spinics.net/lists/kernel/msg1413120.html
+accordingy feedback of nsekhar at ti.com http://www.spinics.net/lists/kernel/msg1414914.html
+- phy configuration moved to drivers/usb/musb/davinci.c
+- USB_OTG configuration is submitted in separated patch: http://www.spinics.net/lists/kernel/msg1414964.html
+- Setting current limit to 1000 mA. Any way the current is limited to 510 mA in davinci_setup_usb.
+
+Changes since v4 http://www.spinics.net/lists/kernel/msg1412995.html
+- removed fix of dev_info in musb_init_controller
+
+Changes since v3 http://www.spinics.net/lists/kernel/msg1412544.html:
+- removed optional altering of pr_info
+
+Changes since v1  http://marc.info/?l=linux-kernel&m=130894150803661&w=2:
+- removed optional code and reordered
+- removed alternation of GPIO33, which is multiplexed with DRVVBUS, because is not need for peripheral USB
+
+This patch is based on code from projects Arago, Angstom and RidgeRun.
+
+---
+ arch/arm/mach-davinci/board-dm365-evm.c |    2 ++
+ drivers/usb/musb/davinci.c              |    3 +++
+ drivers/usb/musb/davinci.h              |    1 +
+ 3 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 688a9c5..ba5ffc1 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -38,6 +38,7 @@
+ #include <mach/mmc.h>
+ #include <mach/nand.h>
+ #include <mach/keyscan.h>
++#include <mach/usb.h>
  
- / {
--	elpida_ECB240ABACN: lpddr2 {
-+	elpida_ECB240ABACN: lpddr2 at 0 {
- 		compatible	= "Elpida,ECB240ABACN","jedec,lpddr2-s4";
- 		density		= <2048>;
- 		io-width	= <32>;
-@@ -64,4 +64,66 @@
- 			tDQSCK-max-derated = <6000>;
- 		};
- 	};
-+
-+	samsung_K3PE0E000B: lpddr2 at 1 {
-+		compatible	= "Samsung,K3PE0E000B","jedec,lpddr2-s4";
-+		density		= <4096>;
-+		io-width	= <32>;
-+
-+		tRPab-min-tck	= <3>;
-+		tRCD-min-tck	= <3>;
-+		tWR-min-tck	= <3>;
-+		tRASmin-min-tck	= <3>;
-+		tRRD-min-tck	= <2>;
-+		tWTR-min-tck	= <2>;
-+		tXP-min-tck	= <2>;
-+		tRTP-min-tck	= <2>;
-+		tCKE-min-tck	= <3>;
-+		tCKESR-min-tck	= <3>;
-+		tFAW-min-tck	= <8>;
-+
-+		timings_samsung_K3PE0E000B_533mhz: lpddr2-timings at 0 {
-+			compatible	= "jedec,lpddr2-timings";
-+			min-freq	= <10000000>;
-+			max-freq	= <533333333>;
-+			tRPab		= <21000>;
-+			tRCD		= <18000>;
-+			tWR		= <15000>;
-+			tRAS-min	= <42000>;
-+			tRRD		= <10000>;
-+			tWTR		= <7500>;
-+			tXP		= <7500>;
-+			tRTP		= <7500>;
-+			tCKESR		= <15000>;
-+			tDQSCK-max	= <5500>;
-+			tFAW		= <50000>;
-+			tZQCS		= <90000>;
-+			tZQCL		= <360000>;
-+			tZQinit		= <1000000>;
-+			tRAS-max-ns	= <70000>;
-+			tDQSCK-max-derated = <5620>;
-+		};
-+
-+		timings_samsung_K3PE0E000B_266mhz: lpddr2-timings at 1 {
-+			compatible	= "jedec,lpddr2-timings";
-+			min-freq	= <10000000>;
-+			max-freq	= <266666666>;
-+			tRPab		= <21000>;
-+			tRCD		= <18000>;
-+			tWR		= <15000>;
-+			tRAS-min	= <42000>;
-+			tRRD		= <10000>;
-+			tWTR		= <7500>;
-+			tXP		= <7500>;
-+			tRTP		= <7500>;
-+			tCKESR		= <15000>;
-+			tDQSCK-max	= <5500>;
-+			tFAW		= <50000>;
-+			tZQCS		= <90000>;
-+			tZQCL		= <360000>;
-+			tZQinit		= <1000000>;
-+			tRAS-max-ns	= <70000>;
-+			tDQSCK-max-derated = <6000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index 6f87e1a..8a952f8 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -8,6 +8,7 @@
- /dts-v1/;
+ #include <media/tvp514x.h>
  
- /include/ "omap5.dtsi"
-+/include/ "lpddr2_data.dtsi"
+@@ -610,6 +611,7 @@ static __init void dm365_evm_init(void)
  
- / {
- 	model = "TI OMAP5 EVM board";
-@@ -82,3 +83,13 @@
- 			0x020700d9>;	/* SEARCH */
- 	linux,input-no-autorepeat;
- };
+ 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
+ 			ARRAY_SIZE(dm365_evm_spi_info));
++	davinci_setup_usb(1000, 8);
+ }
+ 
+ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
+diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
+index 472c8b4..af09ebf 100644
+--- a/drivers/usb/musb/davinci.c
++++ b/drivers/usb/musb/davinci.c
+@@ -428,6 +428,9 @@ static int davinci_musb_init(struct musb *musb)
+ 		__raw_writel(deepsleep, DM355_DEEPSLEEP);
+ 	}
+ 
++	if (machine_is_davinci_dm365_evm())
++		writel(readl(USB_PHY_CTRL) | USBPHY_CLKFREQ_24MHZ, USB_PHY_CTRL);
 +
-+&emif1 {
-+	cs1-used;
-+	device-handle = <&samsung_K3PE0E000B>;
-+};
-+
-+&emif2 {
-+	cs1-used;
-+	device-handle = <&samsung_K3PE0E000B>;
-+};
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 5db33f4..40b41c2 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -319,5 +319,23 @@
- 			ti,buffer-size = <128>;
- 			ti,hwmods = "mcbsp3";
- 		};
-+
-+		emif1: emif at 0x4c000000 {
-+			compatible	= "ti,emif-4d5";
-+			ti,hwmods	= "emif1";
-+			phy-type	= <2>;
-+			hw-caps-read-idle-ctrl;
-+			hw-caps-ll-interface;
-+			hw-caps-temp-alert;
-+		};
-+
-+		emif2: emif at 0x4d000000 {
-+			compatible	= "ti,emif-4d5";
-+			ti,hwmods	= "emif2";
-+			phy-type	= <2>;
-+			hw-caps-read-idle-ctrl;
-+			hw-caps-ll-interface;
-+			hw-caps-temp-alert;
-+		};
- 	};
- };
+ 	/* reset the controller */
+ 	musb_writel(tibase, DAVINCI_USB_CTRL_REG, 0x1);
+ 
+diff --git a/drivers/usb/musb/davinci.h b/drivers/usb/musb/davinci.h
+index 371baa0..e737d97 100644
+--- a/drivers/usb/musb/davinci.h
++++ b/drivers/usb/musb/davinci.h
+@@ -16,6 +16,7 @@
+ 
+ /* Integrated highspeed/otg PHY */
+ #define USBPHY_CTL_PADDR	0x01c40034
++#define USBPHY_CLKFREQ_24MHZ	BIT(13)
+ #define USBPHY_DATAPOL		BIT(11)	/* (dm355) switch D+/D- */
+ #define USBPHY_PHYCLKGD		BIT(8)
+ #define USBPHY_SESNDEN		BIT(7)	/* v(sess_end) comparator */
 -- 
-1.7.10.4
+1.7.9.5
