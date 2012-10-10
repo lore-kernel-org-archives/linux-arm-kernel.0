@@ -1,42 +1,36 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 10 Oct 2012 11:04:13 +0200
-Subject: [PATCH 00/16] pinctrl: samsung: Usability and extensibiltiy
- improvements
-In-Reply-To: <CACRpkdbUmM2=vhjhCq_qN2v=8RUDeWV4b8A8oXXPE4e8Z9C7zg@mail.gmail.com>
-References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
- <CACRpkdbUmM2=vhjhCq_qN2v=8RUDeWV4b8A8oXXPE4e8Z9C7zg@mail.gmail.com>
-Message-ID: <2232733.TBZrPdcAAF@amdc1227>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 10 Oct 2012 10:18:29 +0100
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121009173706.GE4124@obsidianresearch.com>
+References: <20120930232116.GC30637@obsidianresearch.com>
+ <20121001153952.GB2100@linaro.org>
+ <20121001160639.GA31620@obsidianresearch.com>
+ <20121005084500.GI4625@n2100.arm.linux.org.uk>
+ <20121008102413.GC2302@linaro.org>
+ <20121009173706.GE4124@obsidianresearch.com>
+Message-ID: <20121010091829.GA2131@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 of October 2012 09:46:28 Linus Walleij wrote:
-> On Mon, Oct 8, 2012 at 10:39 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > This patch series is a work on improving usability and extensibiltiy of
-> > the> 
-> > pinctrl-samsung driver. It consists of three main parts:
-> >  - moving SoC-specific data to device tree
-> >  - converting the driver to use one GPIO chip and one IRQ domain per
-> >  pin bank - introducing generic wake-up interrupt capability
-> >  description
+On Tue, Oct 09, 2012 at 11:37:06AM -0600, Jason Gunthorpe wrote:
+> On Mon, Oct 08, 2012 at 11:24:13AM +0100, Dave Martin wrote:
 > 
-> So can you prepare a patch series which does all but the first
-> bullet to begin with, and a SoC-and register offset patch
-> on top of that as a separate series, because it is controversial?
+> > Partly this came from some side speculation about whether we could do
+> > things like privileged read-only permissions on newer CPUs, for preventing
+> > unintended or undesired writes to the kernel's code or read-only data.
 > 
-> I don't like that these two things are mingled together like this
-> in an all-or-nothing manner.
-> 
-> So I'm OK with a patch series for bulle (2) and (3) but not (1).
+> Some other arches page protect the kernel, but that tends to be at
+> odds with the desire to use huge pages for the kernel mapping, and
+> independent of the load headers..
 
-As I already stated in my other replies, patches for (2) and (3) depend on 
-(1), because current architecture of the driver makes it hard to implement 
-in an elegant way, so some code would have to be reworked anyway.
+This wasn't so much about that headers themselves as about fragmentation
+of the page permissions which makes it difficult to map everything using
+huge pages / sections.  But as you say, there are conflicting concerns
+here, and it seems not to be a priority.
 
-I should still have some preliminary work on this in one of my branches in 
-my working tree, but it was heavily incomplete, as it turned out that using 
-DT would simplify some things.
+Privileged write-protect is nice to have if non-disruptive, but not
+essential.
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+Cheers
+---Dave
