@@ -1,91 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 10 Oct 2012 09:00:27 -0700
-Subject: [PATCH 5/6] ARM: EXYNOS: Add support for Exynos secure firmware
-In-Reply-To: <1348496913-25422-6-git-send-email-t.figa@samsung.com>
-References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
- <1348496913-25422-6-git-send-email-t.figa@samsung.com>
-Message-ID: <20121010160027.GA582@quad.lixom.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 10 Oct 2012 17:01:26 +0100
+Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
+In-Reply-To: <1349880826.10070.41.camel@zakaz.uk.xensource.com>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <1349796183-30648-6-git-send-email-arnd@arndb.de>
+ <alpine.DEB.2.02.1210091630170.29539@kaball.uk.xensource.com>
+ <201210091821.27818.arnd@arndb.de>
+ <1349855687.6952.75.camel@dagon.hellion.org.uk>
+ <alpine.DEB.2.02.1210101544500.2689@kaball.uk.xensource.com>
+ <1349880826.10070.41.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1210101655360.2689@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 10 Oct 2012, Ian Campbell wrote:
+> On Wed, 2012-10-10 at 15:47 +0100, Stefano Stabellini wrote:
+> > On Wed, 10 Oct 2012, Ian Campbell wrote:
+> > > On Tue, 2012-10-09 at 19:21 +0100, Arnd Bergmann wrote:
+> > > > On Tuesday 09 October 2012, Stefano Stabellini wrote:
+> > > > > >  config XEN
+> > > > > >       bool "Xen guest support on ARM (EXPERIMENTAL)"
+> > > > > >       depends on EXPERIMENTAL && ARM && OF
+> > > > > > +     depends on !CPU_V6
+> > > > > >       help
+> > > > > >         Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+> > > > > 
+> > > > > Considering that we rely on the virtualization extensions, this one can
+> > > > > be:
+> > > > > 
+> > > > >     depends on CPU_V7
+> > > > > 
+> > > > > The rest looks fine. I can submit a second patch to change !CPU_V6 into
+> > > > > CPU_V7 later, if you prefer.
+> > > > 
+> > > > CPU_V6 and CPU_V7 are not exclusive, I saw the problem when building a
+> > > > combined kernel for both V6 and V7. The code also needs to depend on ARMv7
+> > > > with virtualization extensions, but that is a different issue. We don't
+> > > > actually have a configuration symbol for that yet, as far as I can tell.
+> > > 
+> > > I don't think the guest kernels (including dom0) need the extensions to
+> > > run under Xen, they are only need by Xen itself. The guests should just
+> > > see a relatively normal v7 processor. 
+> > > 
+> > > Stefano, does that sound right?
+> > 
+> > Keep in mind that we are using HVC to issue hypercalls, and HVC has been
+> > introduced with the virtualization extensions, if I am not mistaken.
+> 
+> I think we can ignore that in this context since it is only used by bits
+> which are already virtualisation aware -- i.e. you wouldn't want to add
+> it to the Kconfig as a dependency for Xen.
 
-On Mon, Sep 24, 2012 at 04:28:32PM +0200, Tomasz Figa wrote:
-> Some Exynos-based boards contain secure firmware and must use firmware
-> operations to set up some hardware.
-> 
-> This patch adds firmware operations for Exynos secure firmware and a way
-> for board code and device tree to specify that they must be used.
-> 
-> Example of use:
-> 
-> In board code:
-> 
-> 	...MACHINE_START(...)
-> 		/* ... */
-> 		.init_early	= exynos_firmware_init,
-> 		/* ... */
-> 	MACHINE_END
-> 
-> In device tree:
-> 
-> 	/ {
-> 		/* ... */
-> 
-> 		firmware {
-> 			compatible = "samsung,secure-firmware";
-> 		};
-> 
-> 		/* ... */
-> 	};
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
->  arch/arm/mach-exynos/Makefile                      |  1 +
->  arch/arm/mach-exynos/common.h                      |  2 +
->  arch/arm/mach-exynos/firmware.c                    | 54 ++++++++++++++++++++++
->  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
->  5 files changed, 66 insertions(+)
->  create mode 100644 arch/arm/mach-exynos/firmware.c
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> index 0bf68be..f447059 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> @@ -6,3 +6,11 @@ Required root node properties:
->      - compatible = should be one or more of the following.
->          (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
->          (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
-> +
-> +Optional:
-> +    - firmware node, specifying presence and type of secure firmware, currently
-> +        supported value of compatible property is "samsung,secure-firmware":
-> +
-> +	firmware {
-> +		compatible = "samsung,secure-firmware";
-> +	};
+Considering that ARM CPU_V* symbols are not mutually exclusive, if Linux
+had a CPU_V7_VIRTEXT symbol I don't see why we shouldn't add it to our
+list of dependencies. It is more accurate than CPU_V7 after all.
 
-If you require the binding to specify the memory area, then you at least allow
-for future work to move to a dynamic mapping without updating the binding and
-all device trees. So, please do that even if the code is hardcoded to the
-static address today.
-
-For extra credit, make sure that the reg property is matching the static mapping
-when you setup your firmware interface on your platform.
-
-
-[...]
-
-> +static int exynos_cpu_boot_reg(int cpu, void __iomem **ptr)
-> +{
-> +	*ptr = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-> +	return 0;
-> +}
-
-It would be nice to get a memory map for the SMC area in documentation
-somewhere, but that can be done separately later.
-
-
--Olof
+But I don't think that it is necessary to introduce one now only for
+Xen, because like you said, we only need HVC and that is only used in
+virtualization aware code.
