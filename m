@@ -1,44 +1,63 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 10 Oct 2012 15:47:23 +0100
-Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
-In-Reply-To: <1349855687.6952.75.camel@dagon.hellion.org.uk>
-References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
- <1349796183-30648-6-git-send-email-arnd@arndb.de>
- <alpine.DEB.2.02.1210091630170.29539@kaball.uk.xensource.com>
- <201210091821.27818.arnd@arndb.de>
- <1349855687.6952.75.camel@dagon.hellion.org.uk>
-Message-ID: <alpine.DEB.2.02.1210101544500.2689@kaball.uk.xensource.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 10 Oct 2012 16:48:00 +0200
+Subject: [PATCH 1/3] ARM: dts: Renaming elpida_ecb240abacn.dtsi as
+ lpddr2_data.dtsi
+In-Reply-To: <1349870716-25511-2-git-send-email-lokeshvutla@ti.com>
+References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
+ <1349870716-25511-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <50758AA0.5080307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Oct 2012, Ian Campbell wrote:
-> On Tue, 2012-10-09 at 19:21 +0100, Arnd Bergmann wrote:
-> > On Tuesday 09 October 2012, Stefano Stabellini wrote:
-> > > >  config XEN
-> > > >       bool "Xen guest support on ARM (EXPERIMENTAL)"
-> > > >       depends on EXPERIMENTAL && ARM && OF
-> > > > +     depends on !CPU_V6
-> > > >       help
-> > > >         Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
-> > > 
-> > > Considering that we rely on the virtualization extensions, this one can
-> > > be:
-> > > 
-> > >     depends on CPU_V7
-> > > 
-> > > The rest looks fine. I can submit a second patch to change !CPU_V6 into
-> > > CPU_V7 later, if you prefer.
-> > 
-> > CPU_V6 and CPU_V7 are not exclusive, I saw the problem when building a
-> > combined kernel for both V6 and V7. The code also needs to depend on ARMv7
-> > with virtualization extensions, but that is a different issue. We don't
-> > actually have a configuration symbol for that yet, as far as I can tell.
-> 
-> I don't think the guest kernels (including dom0) need the extensions to
-> run under Xen, they are only need by Xen itself. The guests should just
-> see a relatively normal v7 processor. 
-> 
-> Stefano, does that sound right?
+Hi Lokesh,
 
-Keep in mind that we are using HVC to issue hypercalls, and HVC has been
-introduced with the virtualization extensions, if I am not mistaken.
+On 10/10/2012 02:05 PM, Lokesh Vutla wrote:
+> Renaming elpida_ecb240abacn.dtsi file generic, so that the
+> same file can be reused for other parts from different vendors.
+
+Could you elaborate a little bit?
+Are these settings purely reflecting lpddr2 spec timings?
+
+Regards,
+Benoit
+
+
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/boot/dts/{elpida_ecb240abacn.dtsi => lpddr2_data.dtsi} |    0
+>  arch/arm/boot/dts/omap4-panda.dts                               |    2 +-
+>  arch/arm/boot/dts/omap4-sdp.dts                                 |    2 +-
+>  3 files changed, 2 insertions(+), 2 deletions(-)
+>  rename arch/arm/boot/dts/{elpida_ecb240abacn.dtsi => lpddr2_data.dtsi} (100%)
+> 
+> diff --git a/arch/arm/boot/dts/elpida_ecb240abacn.dtsi b/arch/arm/boot/dts/lpddr2_data.dtsi
+> similarity index 100%
+> rename from arch/arm/boot/dts/elpida_ecb240abacn.dtsi
+> rename to arch/arm/boot/dts/lpddr2_data.dtsi
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index 20b966e..09d3a32 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -8,7 +8,7 @@
+>  /dts-v1/;
+>  
+>  /include/ "omap4.dtsi"
+> -/include/ "elpida_ecb240abacn.dtsi"
+> +/include/ "lpddr2_data.dtsi"
+>  
+>  / {
+>  	model = "TI OMAP4 PandaBoard";
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 94a23b3..dd749fc 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -8,7 +8,7 @@
+>  /dts-v1/;
+>  
+>  /include/ "omap4.dtsi"
+> -/include/ "elpida_ecb240abacn.dtsi"
+> +/include/ "lpddr2_data.dtsi"
+>  
+>  / {
+>  	model = "TI OMAP4 SDP board";
+> 
