@@ -1,54 +1,35 @@
 From: mporter@ti.com (Matt Porter)
-Date: Wed, 10 Oct 2012 10:37:42 -0400
-Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <20121010143501.GC13724@beef>
-References: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
- <20121010140027.GB13724@beef>
- <79CD15C6BA57404B839C016229A409A83EB3B573@DBDE01.ent.ti.com>
- <20121010143501.GC13724@beef>
-Message-ID: <20121010143742.GE13724@beef>
+Date: Wed, 10 Oct 2012 10:36:53 -0400
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB3B5BD@DBDE01.ent.ti.com>
+References: <1349879449-22657-1-git-send-email-mporter@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB3B5BD@DBDE01.ent.ti.com>
+Message-ID: <20121010143653.GD13724@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 10:35:01AM -0400, Matt Porter wrote:
-> On Wed, Oct 10, 2012 at 02:19:40PM +0000, Vaibhav Hiremath wrote:
-> > On Wed, Oct 10, 2012 at 19:30:27, Porter, Matt wrote:
-> > > On Tue, Oct 09, 2012 at 02:27:20PM +0530, Vaibhav Hiremath wrote:
-> > > > With recent changes in omap gpmc driver code, in case of DT
-> > > > boot mode, where bootloader does not configure gpmc cs space
-> > > > will result into kernel BUG() inside gpmc_mem_init() function,
-> > > > as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
-> > > > gpmc_config7[0].baseaddress is set to '0' on reset.
-> > > > 
-> > > > This use-case is applicable for any board/EVM which doesn't have
-> > > > any peripheral connected to gpmc cs0, for example BeagleXM and
-> > > > BeagleBone, so DT boot mode fails.
-> > > > 
-> > > > This patch adds of_have_populated_dt() check before creating
-> > > > device, so that for DT boot mode, gpmc probe will not be called
-> > > > which is expected behavior, as gpmc is not supported yet from DT.
-> > > > 
-> > > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > > > Cc: Afzal Mohammed <afzal@ti.com>
-> > > > Cc: Tony Lindgren <tony@atomide.com>
-> > > > Cc Paul Walmsley <paul@pwsan.com>
-> > > > ---
-> > > > This should go in for rc1, as this breaks AM33xx boot.
-> > > 
-> > > Fixes BeagleBone on mainline.
-> > > 
-> > > Tested-by: Matt Porter <mporter@ti.com>
-> > > 
+On Wed, Oct 10, 2012 at 02:33:54PM +0000, Vaibhav Hiremath wrote:
+> On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
+> > 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
+> > exposes a bug in the AM33XX clock data for mcasp. After moving to
+> > clk_get() usage, the _init() of all registered hwmods fails on mcasp0
+> > due to incorrect clock data causing clk_get() to fail. This causes all
+> > successive hwmods to fail to _init() leaving them in a bad state.
 > > 
-> > Thanks Matt and Afzal,
+> > This patch updates the mcasp clock entries so clk_get() will succeed.
+> > It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
+> > boot.
 > > 
-> > Tony can this be picked up for rc1?? I know you have already sent pull 
-> > request for rc1, but by any chance you are planning to send another request?
 > 
-> I also found a separate problem with the mcasp clock data that's needed
-> for rc1. I just posted a patch for that as I need both this patch and the
-> clock data fix to boot from current mainline.
+> Matt,
+> 
+> I have already submitted patch for this and it is accepted and merged in 
+> Tony's pull request.
+> 
+> https://patchwork.kernel.org/patch/1499271/
 
-Disregard now that you got me pointed to the pull request with this :)
+Heh, ok. My search skills failed badly when I ran into this.
+
+Thanks :)
 
 -Matt
