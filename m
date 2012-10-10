@@ -1,35 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Oct 2012 19:22:04 +0200
-Subject: [PATCH 09/11] fsmc/nand:FIX: replace change_bit routine
-In-Reply-To: <ec169eb041e87e66c06108e85ea4a67e5797cecc.1349778821.git.vipin.kumar@st.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
- <ec169eb041e87e66c06108e85ea4a67e5797cecc.1349778821.git.vipin.kumar@st.com>
-Message-ID: <CACRpkdaot3DKCoJOBpUcJFVrJ89xRx2T58fDe4YKY_r4NFqEag@mail.gmail.com>
+Date: Wed, 10 Oct 2012 19:32:15 +0200
+Subject: [RESEND PATCH 1/2] mmc: mmci: Fix incorrect handling of HW flow
+ control for SDIO
+In-Reply-To: <1349885000-22887-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1349885000-22887-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdYarGEzYoJwHggQh2O=hw_wyhP9KQ2GRruWh64SwnH=VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2012 at 12:44 PM, Vipin Kumar <vipin.kumar@st.com> wrote:
+On Wed, Oct 10, 2012 at 6:03 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-> change_bit routine accepts only ulong pointers as buffer, so an unaligned char
-> pointer passed to change_bit may lead to a crash.
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 >
-> Fix this bug by accessing the buffer as char pointer.
+> For data writes <= 8 bytes, HW flow control was disabled but
+> never re-enabled when the transfer was completed. This meant
+> that a following read request would give buffer overrun errors.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Why not see if we can fix change_bit() instead?
-Since I suspect this is on ARM I bet Russell and Nico
-want to hear about this if there is a problem.
+Looks correct to me:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Can the ARM change_bit() not be fixed, so that
-long arguments are the only option?
-
->                 if (err_idx[i] < chip->ecc.size * 8) {
-> -                       change_bit(err_idx[i], (unsigned long *)dat);
-> +                       uint8_t *p = dat + err_idx[i] / 8;
-> +                       *p = *p ^ (1 << (err_idx[i] % 8));
-
-I'm one of these people who would write >>3 and
-&7 rather than /8 or %8 but I guess we are all
-different. Atleast consider it if you stick with this...
+I guess this goes into Russell's patch tracker.
 
 Yours,
 Linus Walleij
