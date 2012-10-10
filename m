@@ -1,148 +1,64 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 10 Oct 2012 11:43:53 +0200
-Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <5075210B.3020309@ti.com>
-References: <20121006161429.GD12462@game.jcrosoft.org>
- <20121009145854.GB14079@kroah.com>
- <20121009151704.GP12801@game.jcrosoft.org>
- <3430030.rKEkeKmzui@vostro.rjw.lan> <5075210B.3020309@ti.com>
-Message-ID: <20121010094353.GR12801@game.jcrosoft.org>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Wed, 10 Oct 2012 10:46:34 +0100
+Subject: [Xen-devel] [PATCH 5/9] ARM: Xen: fix initial build problems:
+In-Reply-To: <201210091819.34310.arnd@arndb.de>
+References: <1349796183-30648-1-git-send-email-arnd@arndb.de>
+ <201210091539.46274.arnd@arndb.de>
+ <1349799035.21847.222.camel@zakaz.uk.xensource.com>
+ <201210091819.34310.arnd@arndb.de>
+Message-ID: <1349862394.10070.23.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:47 Wed 10 Oct     , Vaibhav Hiremath wrote:
-> 
-> 
-> On 10/10/2012 3:42 AM, Rafael J. Wysocki wrote:
-> > On Tuesday 09 of October 2012 17:17:04 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> On 07:58 Tue 09 Oct     , Greg Kroah-Hartman wrote:
-> >>> On Tue, Oct 09, 2012 at 01:46:33PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>> On 22:02 Sun 07 Oct     , Rafael J. Wysocki wrote:
-> >>>>> On Sunday 07 of October 2012 15:12:01 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>>>> On 00:18 Sun 07 Oct     , Rafael J. Wysocki wrote:
-> >>>>>>> On Saturday 06 of October 2012 18:14:29 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>>>>>> Hi,
-> >>>>>>>>
-> >>>>>>>> The following changes since commit 5f3d2f2e1a63679cf1c4a4210f2f1cc2f335bef6:
-> >>>>>>>>
-> >>>>>>>>   Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2012-10-06 03:16:12 +0900)
-> >>>>>>>>
-> >>>>>>>> are available in the git repository at:
-> >>>>>>>>
-> >>>>>>>>
-> >>>>>>>>   git://git.jcrosoft.org/linux-2.6.git tags/pm_suspend_standby_mem
-> >>>>>>>>
-> >>>>>>>> for you to fetch changes up to b73c8f97aa8e720bd3b921159687d00626c99d63:
-> >>>>>>>>
-> >>>>>>>>   arm: at91: drop at91_suspend_entering_slow_clock (2012-10-06 18:06:25 +0800)
-> >>>>>>>>
-> >>>>>>>> ----------------------------------------------------------------
-> >>>>>>>> pm: add suspend_mem and suspend_standby support
-> >>>>>>>>
-> >>>>>>>> Today when we go to suspend we can not knwon at drivers level if we go in
-> >>>>>>>> STANDBY or MEM. Fix this by introducing two new callback suspend_mem and
-> >>>>>>>> suspend_standby.
-> >>>>>>>
-> >>>>>>> No way. Device drivers shouldn't be concerned about that.
-> >>>>>> I do need it on at91 as we swith to slow_clock in MEM suspend and some ip
-> >>>>>> need special handling when switching to slow_clock
-> >>>>>
-> >>>>> Well, my answer to that is: please fix your platform code instead of
-> >>>>> hacking the PM core to work around its problems.
-> >>>> how can I fix drivers pm issue when I no way to known at driver level the
-> >>>> real suspend, the PM core is supposed to proivde the right information to the
-> >>>> drivers so the driver can put it's in the right pm mode. If the pm core can not
-> >>>> provide such inforation the PM core is broken as we will have to do dirty
-> >>>> hack.
-> >>>
-> >>> Why do you need to know the difference in your driver?  We used to
-> >>> provide this information a long time ago, but it turned out to not be
-> >>> needed at all and just caused problems.
-> >> because on at91 I need to handle the mem standby at drviers level.
+On Tue, 2012-10-09 at 19:19 +0100, Arnd Bergmann wrote:
+> On Tuesday 09 October 2012, Ian Campbell wrote:
+> > On Tue, 2012-10-09 at 16:39 +0100, Arnd Bergmann wrote:
+> > > On Tuesday 09 October 2012, Ian Campbell wrote:
+> > > > > * The tmem hypercall is not available on ARM
+> > > > > 
+> > > > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+> > > > 
+> > > > missing the end of this sentence?
+> > > 
+> > > Right, I meant to say 
+> > > 
+> > > * ARMv6 does not support cmpxchg on 16-bit words that are used in the
+> > >   Xen grant table code, so we must ensure that Xen support is only built
+> > >   on ARMv7-only kernels not combined ARMv6/v7 kernels.
+> > > 
+> > > This should be fixed differently in the future.
 > > 
-> > This is not an answer.  You're basically saying "it has to be done this way,
-> > because it has to be done this way".
+> > Is this is a build time failure because gcc/gas/etc refuses to generate
+> > these instructions if it is configured for v6?
 > > 
-> >> We do it today already by a hack in different drivers at91_udc (usb device),
-> >> atmel_serail and at91_ohci. Those 3 IP have specifci handling when switching
-> >> to mem pm. On at91 when switch to mem we shutdown everything and run form a slow
-> >> clock - this is done at soc level - but those IP have issue and need specific
-> >> care before doing so. Ohterwise when the SoC will wakeup but those IP will not
-> >>
-> >> in this patch series I send the update of those 3 drivers too
-> >> and kill the hack
-> > 
-> > Well, let's start over.  What's the difference between "suspend to RAM" (mem)
-> > and "standby" on your platform?
-> > 
-> >>>> Any generic framework is supposed to evolve for real user need here I've one
-> >>>> so I udpate the core to mach a need
-> > 
-> > Yes, if there are more users needing a change.  If there's only one, I think not
-> > really.
-> > 
+> > I ask because if it is only a runtime issue then we can reason that if
+> > we are running Xen specific grant table code, then we must be running on
+> > Xen and therefore must necessarily be running on a v7 (because Xen only
+> > support v7+virt extensions) even if the kernel happens to be capable of
+> > running on v6 too.
 > 
-> We came across such a need while supporting various low-power modes in
-> AM335x SoC. I also wanted to put similar proposal, its good that Jean
-> submitted patches and we are having this discussion early.
-> 
-> Let me try to describe the need and issue here,
-> 
-> In case of AM33xx device, we have different low-power modes supported
-> by HW, for this discussion I will just talk about DeepSleep-0 and
-> StandBy mode supported by HW (few other modes also described in spec)-
-> 
-> Below is the Spec definition of these two low-power modes,
-> 
-> PowerMode    Application state             States
-> ========================================================================
-> DeepSleep0   Everything is preserved       Master Oscillator = OFF
->              including SDRAM.              VDD_MPU = 0.95v
->                                            VDD_CORE = 0.95v
->                                            PD_WKUP = ON
->                                            PD_MPU = OFF
->                                            PD_PER = OFF
->                                            PD_GFX = OFF
->                                            All IOs & RTC supplies are ON
-> 
-> 
-> Standby      Everything is preserved       Master Oscillator = ON
->              including SDRAM.              One PLL is ON
->              Only required module clocks   VDD_MPU = 0.95v
->              are enabled rest are clock    VDD_CORE = OPP50
->              gated                         PD_WKUP = ON
->                                            PD_MPU = ON
->                                            PD_PER = ON
->                                            PD_GFX = OFF
->                                            All IOs & RTC supplies are ON
->                                            If more PLLs /power domains/
->                                            modules are required, the
->                                            power will increase
->                                            accordingly
-> 
-> 
-> 
-> Now we have two major parameters here, Power Consumption and Latency
-> (Sleep + Wakeup). Since DeepSleep-0 is as good as off state, it gives
-> very less power consumption Vs huge Latency number, whereas, in case of
-> standby the power consumption is more but the Latency is reduced.
-> 
-> In addition to that, there are certain HW related parameters and issues
-> contribute to these parameters. For example,
-> 
-> In case of LCD driver the suspend/resume latency is in the range of
-> 10msec, which can be reduced if driver knows that he is not entering or
-> entered in DeepSleep-0 and choose not to do certain things.
-> Another example would be, USB driver, we have seen Latency numbers in
-> the range of 200msec, and of which 100 msec can simply be taken away if
-> driver knows about the sleep state.
-> 
-> 
-> I understand that, there is trade-off between power and latency numbers,
-> but for certain use-cases latency is more important and it is not
-> possible without telling driver about the low-power state.
+> The underlying reason of course is that ARMv6 doesn't have those
+> instructions. The symptom you see is a link error because gcc emits
+> a reference to the (intentionally missing) __bad_cmpxchg() function
+> from
 
-I work on ST SoC where I have also such standby mode too and similar issue
+OK, then your fix is the best one for now.
 
-Best Regards,
-J.
+> [...]
+> The possible solutions I can see for this are:
+> 
+> * change the grant table format to use 32 bits for the flags on ARM
+> * change the code to always cmpxchg the entire 32 bit word including the flags.
+
+I'd need to check the grant table semantics to see if this will be
+possible.
+
+> * implement your own cmpxchg wrapper that may be implemented using a spinlock
+>   rather than cmpxchg if ARMv6 is enabled.
+
+Even if ARMv6 is enabled the grant table code will never be running on
+one so so it might be ok to just have our own wrapper which
+unconditionally uses the v7 instruction? That might upset gas though.
+
+> 
+> 	Arnd
