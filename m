@@ -1,36 +1,40 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 10 Oct 2012 10:51:37 +0200
-Subject: [PATCH 10/16] pinctrl: samsung: Do not pass gpio_chip to
- pin_to_reg_bank
-In-Reply-To: <CACRpkdYinRRictTsH-zp=Y7FPAd92NP6E1WMU6YoupJDeYre8A@mail.gmail.com>
+Date: Wed, 10 Oct 2012 11:04:13 +0200
+Subject: [PATCH 00/16] pinctrl: samsung: Usability and extensibiltiy
+ improvements
+In-Reply-To: <CACRpkdbUmM2=vhjhCq_qN2v=8RUDeWV4b8A8oXXPE4e8Z9C7zg@mail.gmail.com>
 References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
- <1349685556-23718-11-git-send-email-t.figa@samsung.com>
- <CACRpkdYinRRictTsH-zp=Y7FPAd92NP6E1WMU6YoupJDeYre8A@mail.gmail.com>
-Message-ID: <1519398.vRBS8CYjxJ@amdc1227>
+ <CACRpkdbUmM2=vhjhCq_qN2v=8RUDeWV4b8A8oXXPE4e8Z9C7zg@mail.gmail.com>
+Message-ID: <2232733.TBZrPdcAAF@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 of October 2012 09:42:10 Linus Walleij wrote:
+On Wednesday 10 of October 2012 09:46:28 Linus Walleij wrote:
 > On Mon, Oct 8, 2012 at 10:39 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > The pointer to gpio_chip passed to pin_to_reg_bank utility function is
-> > used only to retrieve a pointer to samsung_pinctrl_drv_data structure.
-> > 
-> > This patch modifies the function and its users to pass a pointer to
-> > samsung_pinctrl_drv_data directly.
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > This patch series is a work on improving usability and extensibiltiy of
+> > the> 
+> > pinctrl-samsung driver. It consists of three main parts:
+> >  - moving SoC-specific data to device tree
+> >  - converting the driver to use one GPIO chip and one IRQ domain per
+> >  pin bank - introducing generic wake-up interrupt capability
+> >  description
 > 
-> Looks good, can it be applied without the others?
+> So can you prepare a patch series which does all but the first
+> bullet to begin with, and a SoC-and register offset patch
+> on top of that as a separate series, because it is controversial?
+> 
+> I don't like that these two things are mingled together like this
+> in an all-or-nothing manner.
+> 
+> So I'm OK with a patch series for bulle (2) and (3) but not (1).
 
-Yes, I think this one should apply fine.
+As I already stated in my other replies, patches for (2) and (3) depend on 
+(1), because current architecture of the driver makes it hard to implement 
+in an elegant way, so some code would have to be reworked anyway.
 
-> Maybe you can make a patch series without all the
-> stuff moving register offsets to the DT so I can begin
-> with merging that and we can discuss the movement
-> of register info separately?
-
-I already considered this approach, but it introduces some problems, as I 
-mentioned in my other replies.
+I should still have some preliminary work on this in one of my branches in 
+my working tree, but it was heavily incomplete, as it turned out that using 
+DT would simplify some things.
 
 Best regards,
 -- 
