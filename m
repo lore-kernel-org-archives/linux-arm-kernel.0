@@ -1,40 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Oct 2012 08:35:05 +0000
-Subject: [RFC PATCH] arm: vt8500: Convert irq.c for multiplatform
- integration
-In-Reply-To: <1349856509-20480-1-git-send-email-linux@prisktech.co.nz>
-References: <1349856509-20480-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <201210100835.05898.arnd@arndb.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 10 Oct 2012 10:39:30 +0200
+Subject: [PATCH 04/16] pinctrl: samsung: Parse pin banks from DT
+In-Reply-To: <CACRpkdafuxbO_peOBgmrjXk7ioVBF6D-D7d=shUd-GpHOdNxqg@mail.gmail.com>
+References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
+ <1349685556-23718-5-git-send-email-t.figa@samsung.com>
+ <CACRpkdafuxbO_peOBgmrjXk7ioVBF6D-D7d=shUd-GpHOdNxqg@mail.gmail.com>
+Message-ID: <1983938.6eHV2XjAIK@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 October 2012, Tony Prisk wrote:
-> This patch converts arch-vt8500/irq.c to MULTI_IRQ_HANDLER and
-> SPARSE_IRQ. IRQ domain is changed from legacy to linear.
+On Wednesday 10 of October 2012 09:34:05 Linus Walleij wrote:
+> On Mon, Oct 8, 2012 at 10:39 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Currently SoC-specific properties such as list of pin banks, register
+> > offsets and bitfield sizes are being taken from static data structures
+> > residing in pinctrl-exynos.c.
+> > 
+> > This patch modifies the pinctrl-samsung driver to parse all
+> > SoC-specific
+> > data from device tree, which will allow to remove the static data
+> > structures and facilitate adding of further SoC variants to the
+> > pinctrl-samsung driver.
 > 
-> Also, remove legacy code in include/mach/entry-macro.S and
-> include/mach/irq.h to prepare for multiplatform.
+> So why? Two approaches:
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> - Put as much info as possible into the device tree
+> - Put as much info as possible into the driver
+> 
+> The first approach is currently only used by pinctrl-single.c.
+> 
+> That driver is designed for the case where all info about
+> the hardware arrives in some description language that
+> can be translated into a simple DT description.
+> 
+> If you want to use that approach, you should use that
+> driver. If that driver does not work for you, then it's not
+> fulfilling it's purpose as a one-stop shop for simple
+> pin controllers entirely contained within the device tree,
+> and should be renamed or redesigned.
+> 
+> If you will end up with a hybrid approach with some
+> stuff in the device tree and some stuff in the code,
+> it's better to keep the old driver.
 
-Excellent!
+This will allow us to cover all the existing Samsung SoCs, starting from 
+S3C24xx, through S3C64xx, S5P*, all supported Exynos SoCs and ending on any 
+future SoCs using this kind of pin controller, without bloating the driver 
+with hardly readable macros, lots of (often duplicated) static data and 
+similar.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+If there are some serious problems with this approach, just let me know and 
+I will reconsider it, but if not, I'd like to keep it, because of the 
+benefits it gives.
 
-One small style comment for a preexisting issue I had not noticed before:
+(Even if I moved all those SoC-specific data to static structures located 
+in the driver, to keep the most readable way of GPIO specification in DT, I 
+would have to create nodes for all banks in DT anyway and the driver would 
+have to match particular nodes with their static data. I don't like this 
+kind of approach.)
 
->  static void vt8500_irq_mask(struct irq_data *d)
->  {
-> -	struct vt8500_irq_priv *priv =
-> -			(struct vt8500_irq_priv *)(d->domain->host_data);
-> +	struct vt8500_irq_data *priv = 
-> +			(struct vt8500_irq_data *)(d->domain->host_data);
-
-host_data is a void pointer, so you don't need the type cast. Writing this
-as 
-
-	struct vt8500_irq_priv *priv = d->domain->host_data;
-
-is both the common convention and easier to read.
-
-	Arnd
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
