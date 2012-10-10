@@ -1,66 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Oct 2012 00:29:30 -0300
-Subject: [PATCH 2/2] ARM: mx27_3ds: Add VPU support
-In-Reply-To: <1349839770-13848-1-git-send-email-festevam@gmail.com>
-References: <1349839770-13848-1-git-send-email-festevam@gmail.com>
-Message-ID: <1349839770-13848-2-git-send-email-festevam@gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 10 Oct 2012 04:09:22 +0000
+Subject: [PATCH] Add McSPI devices found in AM33xx SoC to dtsi
+In-Reply-To: <3608180472966131184@unknownmsgid>
+References: <CAAek22HhtFc-1XOFrQC8DKZ9VdKyuShE_G_j4581WL15JTNJXg@mail.gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9CA61C@DBDE01.ent.ti.com>
+ <3608180472966131184@unknownmsgid>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9CABEF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Oct 09, 2012 at 19:54:28, Phil Pokorny wrote:
+> On Oct 9, 2012, at 3:36 AM, "Philip, Avinash" <avinashphilip@ti.com>
+> wrote:
+> 
+> > On Tue, Oct 09, 2012 at 10:40:58, Phil Pokorny wrote:
+> >> We're using the BeagleBone for a project and we need the SPI devices
+> >> available and configured with all available chip selects.
+> >>
+> >> Please accept the following patch to add these to the base .dtsi file
+> >> so they can then be enabled in the beaglebone specific .dts with
+> >> minimal fuss.
+> >
+> > Patch for adding MCSPI in am33xx.dtsi already been sent by me.
+> > https://lkml.org/lkml/2012/9/18/32
+> 
+> Thank you for responding.
+> 
+> Was that accepted?  It didn't seem to be in the Linux-omap git tree I
+> cloned. I need to check the Torvalds mainline kernel.
 
-mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
-decoding and encoding in hardware.
+It's not accepted.
+> 
+> I believe the number of chip selects on spi1 is incorrect. There is
+> only one (1) CS shown in the hardware documentation for AM33xx.
 
-Add support for it.
+No, number of chip select for SPI 1 is 2. AM33xx TRM says
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-mx27_3ds.c |   18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+TRM section
+24.1.2 Unsupported McSPI Features
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index d3b9a60..3ef8548 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -500,6 +500,21 @@ static void __init mx27pdk_init_camera(void)
- 		return;
- }
- 
-+static void __init mx27pdk_init_vpu(void)
-+{
-+	struct platform_device *pdev;
-+	int dma;
-+
-+	pdev = imx27_add_coda();
-+	dma = dma_declare_coherent_memory(&pdev->dev,
-+					  mx2_camera_base + MX27PDK_CAM_BUF_SIZE,
-+					  mx2_camera_base + MX27PDK_CAM_BUF_SIZE,
-+					  MX27PDK_CAM_BUF_SIZE,
-+					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-+	if (!(dma & DMA_MEMORY_MAP))
-+		return;
-+}
-+
- static const struct imxi2c_platform_data mx27_3ds_i2c0_data __initconst = {
- 	.bitrate = 100000,
- };
-@@ -553,6 +568,7 @@ static void __init mx27pdk_init(void)
- 	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
- 
- 	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
-+	mx27pdk_init_vpu();
- }
- 
- static void __init mx27pdk_timer_init(void)
-@@ -567,7 +583,7 @@ static struct sys_timer mx27pdk_timer = {
- static void __init mx27pdk_reserve(void)
- {
- 	/* reserve MX27_3DS_CAMERA_BUF_SIZE bytes for mx2-camera */
--	mx2_camera_base = arm_memblock_steal(MX27PDK_CAM_BUF_SIZE,
-+	mx2_camera_base = arm_memblock_steal(3 * MX27PDK_CAM_BUF_SIZE,
- 						MX27PDK_CAM_BUF_SIZE);
- }
- 
--- 
-1.7.9.5
+Feature 			Reason
+Chip selects 2 and 3	Not pinned out
+
+Also you can see soc pin outs.
+
+> 
+> Is OMAP4-McSPI the best match for the hardware?
+
+Yes.
+
+> The mcspi driver appears to differ only in the register offset used.
+> A hard coded zero value for omap2 and a named constant for omap4.
+> The hardware manual for the AM33xx shows the register map
+>starting at zero.
+
+You can see register offset for am33xx (it is defined at offset 0x100).
+Hence offset is required in am33xx.
+
+Thanks
+Avinash
+
+> Thank you,
+> Phil P.
+> >
+> 
