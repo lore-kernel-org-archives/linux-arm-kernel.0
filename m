@@ -1,173 +1,290 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 10 Oct 2012 19:45:32 +0400
-Subject: [PATCH 6/7] ARM: clps711x: merge all CLPS711X-defconfigs into one
+Date: Wed, 10 Oct 2012 19:45:33 +0400
+Subject: [PATCH 7/7] ARM: clps711x: merge files related to EDB7211-board into
+ one
 In-Reply-To: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
 References: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1349883933-8881-6-git-send-email-shc_work@mail.ru>
+Message-ID: <1349883933-8881-7-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/configs/clps711x_defconfig |   78 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/edb7211_defconfig  |   27 ------------
- arch/arm/configs/fortunet_defconfig |   28 ------------
- 3 files changed, 78 insertions(+), 55 deletions(-)
- create mode 100644 arch/arm/configs/clps711x_defconfig
- delete mode 100644 arch/arm/configs/edb7211_defconfig
- delete mode 100644 arch/arm/configs/fortunet_defconfig
+ arch/arm/mach-clps711x/Makefile       |    2 +-
+ arch/arm/mach-clps711x/edb7211-arch.c |   66 ------------------------
+ arch/arm/mach-clps711x/edb7211-mm.c   |   82 ------------------------------
+ arch/arm/mach-clps711x/edb7211.c      |   88 +++++++++++++++++++++++++++++++++
+ 4 files changed, 89 insertions(+), 149 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/edb7211-arch.c
+ delete mode 100644 arch/arm/mach-clps711x/edb7211-mm.c
+ create mode 100644 arch/arm/mach-clps711x/edb7211.c
 
-diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
+diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
+index 6da6940..9cf2d1c 100644
+--- a/arch/arm/mach-clps711x/Makefile
++++ b/arch/arm/mach-clps711x/Makefile
+@@ -12,6 +12,6 @@ obj-			:=
+ obj-$(CONFIG_ARCH_AUTCPU12) += autcpu12.o
+ obj-$(CONFIG_ARCH_CDB89712) += cdb89712.o
+ obj-$(CONFIG_ARCH_CLEP7312) += clep7312.o
+-obj-$(CONFIG_ARCH_EDB7211)  += edb7211-arch.o edb7211-mm.o
++obj-$(CONFIG_ARCH_EDB7211)  += edb7211.o
+ obj-$(CONFIG_ARCH_FORTUNET) += fortunet.o
+ obj-$(CONFIG_ARCH_P720T)    += p720t.o
+diff --git a/arch/arm/mach-clps711x/edb7211-arch.c b/arch/arm/mach-clps711x/edb7211-arch.c
+deleted file mode 100644
+index 5fad0b4..0000000
+--- a/arch/arm/mach-clps711x/edb7211-arch.c
++++ /dev/null
+@@ -1,66 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-clps711x/arch-edb7211.c
+- *
+- *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#include <linux/init.h>
+-#include <linux/memblock.h>
+-#include <linux/types.h>
+-#include <linux/string.h>
+-
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-
+-extern void edb7211_map_io(void);
+-
+-/* Reserve screen memory region at the start of main system memory. */
+-static void __init edb7211_reserve(void)
+-{
+-	memblock_reserve(PHYS_OFFSET, 0x00020000);
+-}
+-
+-static void __init
+-fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
+-{
+-	/*
+-	 * Bank start addresses are not present in the information
+-	 * passed in from the boot loader.  We could potentially
+-	 * detect them, but instead we hard-code them.
+-	 *
+-	 * Banks sizes _are_ present in the param block, but we're
+-	 * not using that information yet.
+-	 */
+-	mi->bank[0].start = 0xc0000000;
+-	mi->bank[0].size = 8*1024*1024;
+-	mi->bank[1].start = 0xc1000000;
+-	mi->bank[1].size = 8*1024*1024;
+-	mi->nr_banks = 2;
+-}
+-
+-MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+-	/* Maintainer: Jon McClintock */
+-	.atag_offset	= 0x20100,	/* 0xc0000000 - 0xc001ffff can be video RAM */
+-	.fixup		= fixup_edb7211,
+-	.map_io		= edb7211_map_io,
+-	.reserve	= edb7211_reserve,
+-	.init_irq	= clps711x_init_irq,
+-	.timer		= &clps711x_timer,
+-	.restart	= clps711x_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-clps711x/edb7211-mm.c b/arch/arm/mach-clps711x/edb7211-mm.c
+deleted file mode 100644
+index 054eaa0..0000000
+--- a/arch/arm/mach-clps711x/edb7211-mm.c
++++ /dev/null
+@@ -1,82 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-clps711x/mm.c
+- *
+- *  Extra MM routines for the EDB7211 board
+- *
+- *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/bug.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/page.h>
+-#include <asm/sizes.h>
+- 
+-#include <asm/mach/map.h>
+-
+-extern void clps711x_map_io(void);
+-
+-/*
+- * The on-chip registers are given a size of 1MB so that a section can
+- * be used to map them; this saves a page table.  This is the place to
+- * add mappings for ROM, expansion memory, PCMCIA, etc.  (if static
+- * mappings are chosen for those areas).
+- *
+- * Here is a physical memory map (to be fleshed out later):
+- *
+- * Physical Address  Size  Description
+- * ----------------- ----- ---------------------------------
+- * c0000000-c001ffff 128KB reserved for video RAM [1]
+- * c0020000-c0023fff  16KB parameters (see Documentation/arm/Setup)
+- * c0024000-c0027fff  16KB swapper_pg_dir (task 0 page directory)
+- * c0028000-...            kernel image (TEXTADDR)
+- *
+- * [1] Unused pages should be given back to the VM; they are not yet.
+- *     The parameter block should also be released (not sure if this
+- *     happens).
+- */
+-static struct map_desc edb7211_io_desc[] __initdata = {
+-	{	/* Memory-mapped extra keyboard row */
+-		.virtual 	= IO_ADDRESS(EP7211_PHYS_EXTKBD),
+-		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE,
+-	}, {	/* CS8900A Ethernet chip */
+-		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
+-		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE,
+-	}, {	/* Flash bank 0 */
+-		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
+-		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
+-		.length		= SZ_8M,
+-		.type		= MT_DEVICE,
+-	}, {	/* Flash bank 1 */
+-		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH2),
+-		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH2),
+-		.length		= SZ_8M,
+-		.type		= MT_DEVICE,
+-	}
+-};
+-
+-void __init edb7211_map_io(void)
+-{
+-        clps711x_map_io();
+-        iotable_init(edb7211_io_desc, ARRAY_SIZE(edb7211_io_desc));
+-}
+-
+diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
 new file mode 100644
-index 0000000..86209d1
+index 0000000..88f4690
 --- /dev/null
-+++ b/arch/arm/configs/clps711x_defconfig
-@@ -0,0 +1,78 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_EMBEDDED=y
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_MSDOS_PARTITION is not set
-+CONFIG_ARCH_CLPS711X=y
-+CONFIG_ARCH_AUTCPU12=y
-+CONFIG_ARCH_CDB89712=y
-+CONFIG_ARCH_CLEP7312=y
-+CONFIG_ARCH_EDB7211=y
-+CONFIG_ARCH_P720T=y
-+CONFIG_ARCH_FORTUNET=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+# CONFIG_IPV6 is not set
-+CONFIG_IRDA=y
-+CONFIG_IRTTY_SIR=y
-+CONFIG_EP7211_DONGLE=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_CDB89712=y
-+CONFIG_MTD_AUTCPU12=y
-+CONFIG_MTD_PLATRAM=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_VENDOR_3COM is not set
-+# CONFIG_NET_VENDOR_AMD is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CHELSIO is not set
-+CONFIG_CS89x0=y
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_FUJITSU is not set
-+# CONFIG_NET_VENDOR_HP is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_RACAL is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+CONFIG_SERIAL_CLPS711X_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+CONFIG_FB=y
-+CONFIG_FB_CLPS711X=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_MINIX_FS=y
-+# CONFIG_NETWORK_FILESYSTEMS is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
-+# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/edb7211_defconfig b/arch/arm/configs/edb7211_defconfig
-deleted file mode 100644
-index d52ded35..0000000
---- a/arch/arm/configs/edb7211_defconfig
-+++ /dev/null
-@@ -1,27 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_EXPERT=y
--# CONFIG_HOTPLUG is not set
--CONFIG_ARCH_CLPS711X=y
--CONFIG_ARCH_EDB7211=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--# CONFIG_IPV6 is not set
--CONFIG_BLK_DEV_RAM=y
--CONFIG_NETDEVICES=y
--# CONFIG_INPUT is not set
--CONFIG_SERIO_LIBPS2=y
--# CONFIG_VT is not set
--CONFIG_SERIAL_CLPS711X=y
--CONFIG_SERIAL_CLPS711X_CONSOLE=y
--CONFIG_EXT2_FS=y
--CONFIG_MINIX_FS=y
--CONFIG_PARTITION_ADVANCED=y
--# CONFIG_MSDOS_PARTITION is not set
--CONFIG_DEBUG_USER=y
-diff --git a/arch/arm/configs/fortunet_defconfig b/arch/arm/configs/fortunet_defconfig
-deleted file mode 100644
-index 840fced..0000000
---- a/arch/arm/configs/fortunet_defconfig
-+++ /dev/null
-@@ -1,28 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_EXPERT=y
--# CONFIG_HOTPLUG is not set
--CONFIG_ARCH_CLPS711X=y
--CONFIG_ARCH_FORTUNET=y
--# CONFIG_ARM_THUMB is not set
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_FPE_FASTFPE=y
--CONFIG_BINFMT_AOUT=y
--CONFIG_NET=y
--CONFIG_UNIX=y
--CONFIG_MTD=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_CFI_INTELEXT=y
--CONFIG_BLK_DEV_RAM=y
--# CONFIG_INPUT is not set
--# CONFIG_SERIO is not set
--# CONFIG_VT is not set
--CONFIG_SERIAL_CLPS711X=y
--CONFIG_SERIAL_CLPS711X_CONSOLE=y
--CONFIG_EXT2_FS=y
--CONFIG_DEBUG_USER=y
++++ b/arch/arm/mach-clps711x/edb7211.c
+@@ -0,0 +1,88 @@
++/*
++ *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/init.h>
++#include <linux/memblock.h>
++#include <linux/types.h>
++
++#include <asm/setup.h>
++#include <asm/mach/map.h>
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++
++#include <mach/hardware.h>
++
++#include "common.h"
++
++#define VIDEORAM_SIZE	SZ_128K
++
++static struct map_desc edb7211_io_desc[] __initdata = {
++	{	/* Memory-mapped extra keyboard row */
++		.virtual	= IO_ADDRESS(EP7211_PHYS_EXTKBD),
++		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
++		.length		= SZ_1M,
++		.type		= MT_DEVICE,
++	}, {	/* CS8900A Ethernet chip */
++		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
++		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
++		.length		= SZ_1M,
++		.type		= MT_DEVICE,
++	}, {	/* Flash bank 0 */
++		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
++		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
++		.length		= SZ_8M,
++		.type		= MT_DEVICE,
++	}, {	/* Flash bank 1 */
++		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH2),
++		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH2),
++		.length		= SZ_8M,
++		.type		= MT_DEVICE,
++	},
++};
++
++void __init edb7211_map_io(void)
++{
++	clps711x_map_io();
++	iotable_init(edb7211_io_desc, ARRAY_SIZE(edb7211_io_desc));
++}
++
++/* Reserve screen memory region at the start of main system memory. */
++static void __init edb7211_reserve(void)
++{
++	memblock_reserve(PHYS_OFFSET, VIDEORAM_SIZE);
++}
++
++static void __init
++fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
++{
++	/*
++	 * Bank start addresses are not present in the information
++	 * passed in from the boot loader.  We could potentially
++	 * detect them, but instead we hard-code them.
++	 *
++	 * Banks sizes _are_ present in the param block, but we're
++	 * not using that information yet.
++	 */
++	mi->bank[0].start = 0xc0000000;
++	mi->bank[0].size = SZ_8M;
++	mi->bank[1].start = 0xc1000000;
++	mi->bank[1].size = SZ_8M;
++	mi->nr_banks = 2;
++}
++
++MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
++	/* Maintainer: Jon McClintock */
++	.atag_offset	= VIDEORAM_SIZE + 0x100,
++	.fixup		= fixup_edb7211,
++	.map_io		= edb7211_map_io,
++	.reserve	= edb7211_reserve,
++	.init_irq	= clps711x_init_irq,
++	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
++MACHINE_END
 -- 
 1.7.8.6
