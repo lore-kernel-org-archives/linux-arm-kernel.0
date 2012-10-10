@@ -1,34 +1,54 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 10 Oct 2012 14:37:59 +0200
-Subject: [PATCH 1/5] ARM: plat-nomadik: Introduce new DB8540 GPIO registers
-Message-ID: <1349872679-31174-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 10 Oct 2012 14:38:18 +0200
+Subject: [PATCH 3/5] pinctrl/nomadik: allow to support several ranges per GPIO
+ bank
+Message-ID: <1349872698-31245-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Coquelin <maxime.coquelin@stericsson.com>
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-DB8540's GPIO controller introduce level detection
-support for both interrupts and wakeups.
+With DB8500 the number of GPIO chips = number GPIO bank =
+number of GPIO ranges.
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@stericsson.com>
+With DB8540, a new GPIO range configuration is used, some GPIO
+banks can have several GPIO ranges.
+
+For example, DB8540 GPIO bank0 (GPIO0 to GPIO32) have 2 GPIO
+ranges:
+    - GPIO0 to GPIO17  : routed
+    - GPIO18 to GPIO21 : hole
+    - GPIO22 to GPIO28 : routed
+    - GPIO29 to GPIO32 : hole
+
+Previously, during nmk_pinctrl_probe(), all GPIO ranges were
+parsed, as GPIO ranges are larger than the number of GPIO chips,
+a warning occurs. This commit allows each bank to have several
+GPIO ranges.
+
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/plat-nomadik/include/plat/gpio-nomadik.h | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/pinctrl/pinctrl-nomadik.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
-index c08a54d..cf81111 100644
---- a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
-+++ b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
-@@ -38,6 +38,9 @@
- #define NMK_GPIO_RWIMSC	0x50
- #define NMK_GPIO_FWIMSC	0x54
- #define NMK_GPIO_WKS	0x58
-+/* These appear in DB8540 and later ASICs */
-+#define NMK_GPIO_EDGELEVEL 0x5C
-+#define NMK_GPIO_LEVEL	0x60
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 334cd2f..e4d3778 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1837,11 +1837,11 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+ 	 * need this to proceed.
+ 	 */
+ 	for (i = 0; i < npct->soc->gpio_num_ranges; i++) {
+-		if (!nmk_gpio_chips[i]) {
++		if (!nmk_gpio_chips[npct->soc->gpio_ranges[i].id]) {
+ 			dev_warn(&pdev->dev, "GPIO chip %d not registered yet\n", i);
+ 			return -EPROBE_DEFER;
+ 		}
+-		npct->soc->gpio_ranges[i].gc = &nmk_gpio_chips[i]->chip;
++		npct->soc->gpio_ranges[i].gc = &nmk_gpio_chips[npct->soc->gpio_ranges[i].id]->chip;
+ 	}
  
- /* Alternate functions: function C is set in hw by setting both A and B */
- #define NMK_GPIO_ALT_GPIO	0
+ 	nmk_pinctrl_desc.pins = npct->soc->pins;
 -- 
 1.7.11.3
