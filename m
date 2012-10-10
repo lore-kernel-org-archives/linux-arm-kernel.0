@@ -1,44 +1,47 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Wed, 10 Oct 2012 14:19:30 +0000
-Subject: [PATCH 02/13] clk: davinci - add PSC clock driver
-In-Reply-To: <50756DFD.4070203@ti.com>
-References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
- <1348682889-9509-3-git-send-email-m-karicheri2@ti.com>
- <50756B96.1070008@ti.com> <50756DFD.4070203@ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7041FB6AA@DFLE12.ent.ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 10 Oct 2012 14:19:40 +0000
+Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
+In-Reply-To: <20121010140027.GB13724@beef>
+References: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
+ <20121010140027.GB13724@beef>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB3B573@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> -----Original Message-----
->> From: Nori, Sekhar
->> Sent: Wednesday, October 10, 2012 8:46 AM
->> To: Nori, Sekhar
->> Cc: Karicheri, Muralidharan; Hilman, Kevin; davinci-linux-open-
->> source at linux.davincidsp.com; mturquette at linaro.org; linux-c6x-dev at linux-c6x.org;
->> arnd at arndb.de; linus.walleij at linaro.org; linux-kernel at vger.kernel.org;
->> rob.herring at calxeda.com; linux-keystone at list.ti.com - Linux developers for Keystone
->> family of devices (May contain non-TIers); viresh.linux at gmail.com;
->> linux at arm.linux.org.uk; akpm at linux-foundation.org; shawn.guo at linaro.org; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH 02/13] clk: davinci - add PSC clock driver
->> 
->> On 10/10/2012 6:05 PM, Sekhar Nori wrote:
->> 
->> >> +struct clk *clk_register_davinci_psc(struct device *dev, const char *name,
->> >> +			const char *parent_name,
->> >> +			struct clk_davinci_psc_data *psc_data,
->> >> +			spinlock_t *lock)
->> >
->> > Why do you need the lock to be provided from outside of this file? You
->> > can initialize a lock for serializing writes to PSC registers within
->> > this file, no?
->> 
->> Looking again, it seems like the common clock framework defines an "enable_lock" in
->> drivers/clk/clk.c to serialize the clock enable/disable calls. Unless I am missing something,
->> this lock seems unnecessary.
->> 
+On Wed, Oct 10, 2012 at 19:30:27, Porter, Matt wrote:
+> On Tue, Oct 09, 2012 at 02:27:20PM +0530, Vaibhav Hiremath wrote:
+> > With recent changes in omap gpmc driver code, in case of DT
+> > boot mode, where bootloader does not configure gpmc cs space
+> > will result into kernel BUG() inside gpmc_mem_init() function,
+> > as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
+> > gpmc_config7[0].baseaddress is set to '0' on reset.
+> > 
+> > This use-case is applicable for any board/EVM which doesn't have
+> > any peripheral connected to gpmc cs0, for example BeagleXM and
+> > BeagleBone, so DT boot mode fails.
+> > 
+> > This patch adds of_have_populated_dt() check before creating
+> > device, so that for DT boot mode, gpmc probe will not be called
+> > which is expected behavior, as gpmc is not supported yet from DT.
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Afzal Mohammed <afzal@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc Paul Walmsley <paul@pwsan.com>
+> > ---
+> > This should go in for rc1, as this breaks AM33xx boot.
+> 
+> Fixes BeagleBone on mainline.
+> 
+> Tested-by: Matt Porter <mporter@ti.com>
+> 
 
-I think you are right. For enable() api, enable_lock is sufficient and I will remove this.
+Thanks Matt and Afzal,
 
->> Thanks,
->> Sekhar
+Tony can this be picked up for rc1?? I know you have already sent pull 
+request for rc1, but by any chance you are planning to send another request?
+
+Thanks,
+Vaibhav
+> -Matt
+> 
