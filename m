@@ -1,22 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Oct 2012 18:30:44 +0000
-Subject: [PATCH 1/7] ARM: clps711x: convert to clockevents
-In-Reply-To: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
-References: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201210101830.44365.arnd@arndb.de>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Wed, 10 Oct 2012 19:29:56 +0100
+Subject: [PATCH 3.6.0- 0/6] ARM: use module_platform_driver macro
+Message-ID: <1349893796-6947-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 October 2012, Alexander Shiyan wrote:
-> This patch converts CLPS711X-platform to use modern clockevent API.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/Kconfig                |    2 +-
->  arch/arm/mach-clps711x/common.c |   38 +++++++++++++++++---------------------
->  2 files changed, 18 insertions(+), 22 deletions(-)
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Overall a very nice series, all 7 patches. I just have a few trivial
-comments for patch 5.
+Running below Coccinelle lookup pattern like below on the 
+latest kernel showed about 52 hits. This patch series is a subset 
+of those 52 patches, so that it will be easy for maintainers to review.
+Hopefully these patches will get rid of some code duplication in kernel.
 
-	Arnd
+@  @
+- initfunc(void)
+- { return platform_driver_register(&dr); }
+
+...
+
+- module_init(initfunc);
+...
+
+- exitfunc(void)
+- { platform_driver_unregister(&dr); }
+
+...
+
+- module_exit(exitfunc);
++ module_platform_driver(dr); 
+
+
+Srinivas Kandagatla (6):
+  ARM/omap1: use module_platform_driver macro
+  ARM/omap2: use module_platform_driver macro
+  ARM/pxa: use module_platform_driver macro
+  ARM/pxa: use module_platform_driver macro
+  ARM/omap: use module_platform_driver macro
+  omap_rng: use module_platform_driver macro
+
+ arch/arm/mach-omap1/mailbox.c     |   14 +-------------
+ arch/arm/mach-omap2/mailbox.c     |   14 +-------------
+ arch/arm/mach-pxa/pxa3xx-ulpi.c   |   13 +------------
+ arch/arm/mach-pxa/tosa-bt.c       |   15 +--------------
+ arch/arm/plat-omap/dmtimer.c      |   13 +------------
+ drivers/char/hw_random/omap-rng.c |   14 +-------------
+ 6 files changed, 6 insertions(+), 77 deletions(-)
