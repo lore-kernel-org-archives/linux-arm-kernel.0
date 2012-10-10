@@ -1,63 +1,54 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Oct 2012 16:18:52 +0100
-Subject: [PATCH 3/6] ARM: ux500: Add support for ST-Ericsson's u9540 SoC
+Date: Wed, 10 Oct 2012 16:18:51 +0100
+Subject: [PATCH 2/6] ARM: ux500: Add skeleton DTS file for the u9540
 In-Reply-To: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
 References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349882335-6786-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1349882335-6786-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First level board support for the u9540.
+This patch sees the creation of a sparse Device Tree file for
+ST-Ericsson's latest development board supporting the latest
+dual-core Cortex-a9 u9540 SoC.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/u9540.dts |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 arch/arm/boot/dts/u9540.dts
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 3d8e321..6b7f970 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -17,6 +17,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/mfd/abx500/ab8500.h>
-+#include <linux/mfd/dbx500-prcmu.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/regulator/machine.h>
-@@ -319,6 +320,8 @@ static void __init u8500_init_machine(void)
- 		snowball_pinmaps_init();
- 	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
- 		hrefv60_pinmaps_init();
-+	else if (of_machine_is_compatible("st-ericsson,u9540")) {}
-+		/* TODO: Add u9540 pinmaps. */
- 
- 	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
- 	parent = u8500_of_init_devices();
-@@ -331,6 +334,7 @@ static const char * u8500_dt_board_compat[] = {
- 	"calaosystems,snowball-a9500",
- 	"st-ericsson,hrefv60+",
- 	"st-ericsson,mop500",
-+	"st-ericsson,u9540",
- 	NULL,
- };
- 
-@@ -345,4 +349,14 @@ DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
- 	.dt_compat      = u8500_dt_board_compat,
- MACHINE_END
- 
-+DT_MACHINE_START(U9540_DT, "ST-Ericsson 9540 platform (Device Tree Support)")
-+	.map_io		= u8500_map_io,
-+	.init_irq	= ux500_init_irq,
-+	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
-+	.init_machine	= u8500_init_machine,
-+	.init_late	= NULL,
-+	.dt_compat      = u8500_dt_board_compat,
-+MACHINE_END
+diff --git a/arch/arm/boot/dts/u9540.dts b/arch/arm/boot/dts/u9540.dts
+new file mode 100644
+index 0000000..0a66f34
+--- /dev/null
++++ b/arch/arm/boot/dts/u9540.dts
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2012 ST-Ericsson AB
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
- #endif
++/dts-v1/;
++/include/ "dbx5x0.dtsi"
++
++/ {
++	model = "ST-Ericsson U9540 platform with Device Tree";
++	compatible = "st-ericsson,u9540";
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	soc-u9500 {
++	};
++
++};
 -- 
 1.7.9.5
