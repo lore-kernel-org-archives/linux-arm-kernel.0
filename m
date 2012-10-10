@@ -1,43 +1,95 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Wed, 10 Oct 2012 11:26:52 +0800
-Subject: [PATCH v4 1/3] Input: egalax_ts: get gpio from devicetree node
-In-Reply-To: <201210091158.33040.arnd@arndb.de>
-References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
- <1345114051-3052-2-git-send-email-jason77.wang@gmail.com>
- <20120817003125.GA24242@S2101-09.ap.freescale.net>
- <201210091158.33040.arnd@arndb.de>
-Message-ID: <5074EAFC.1010409@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Oct 2012 00:29:29 -0300
+Subject: [PATCH 1/2] ARM: mx27_3ds: Reserve memory for camera usage
+Message-ID: <1349839770-13848-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> On Friday 17 August 2012, Shawn Guo wrote:
->   
->> On Thu, Aug 16, 2012 at 06:47:29PM +0800, Hui Wang wrote:
->>     
->>> The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
->>> and don't support this API anymore.
->>>
->>> The i.MX6q sabrelite platform equips an egalax touchscreen controller,
->>> and this platform already transfered to GENERIC_GPIO framework, to
->>> support this driver, we use a more generic way to get gpio.
->>>
->>> Add a return value checking for waking up the controller in the probe
->>> function, this guarantee only a workable device can pass init.
->>>
->>> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
->>>       
->> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
->>     
->
-> What's the status on this patch? I'm still getting build errors from this
-> driver, so I guess it was never accepted for the 3.7 merge window.
->
-> 	Arnd
->
->   
-I forgot to resend this patchset After Dmitry was back to the maillist. 
-I will rebase the patchset and resend them to review.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Regards,
-Hui.
+Reserve dedicated memory block for camera usage.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-mx27_3ds.c |   32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+index 05996f3..d3b9a60 100644
+--- a/arch/arm/mach-imx/mach-mx27_3ds.c
++++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+@@ -30,6 +30,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/spi/l4f00242t03.h>
++#include <asm/memblock.h>
+ 
+ #include <media/soc_camera.h>
+ 
+@@ -165,6 +166,9 @@ static const int mx27pdk_pins[] __initconst = {
+ 	PC19_PF_SSI4_CLK,
+ };
+ 
++static phys_addr_t mx2_camera_base __initdata;
++#define MX27PDK_CAM_BUF_SIZE	SZ_8M
++
+ static struct gpio mx27_3ds_camera_gpios[] = {
+ 	{ CSI_PWRDWN, GPIOF_OUT_INIT_HIGH, "camera-power" },
+ 	{ CSI_RESET, GPIOF_OUT_INIT_HIGH, "camera-reset" },
+@@ -478,6 +482,24 @@ static const struct mx2_camera_platform_data mx27_3ds_cam_pdata __initconst = {
+ 	.clk = 26000000,
+ };
+ 
++static void __init mx27pdk_init_camera(void)
++{
++	struct platform_device *pdev;
++	int dma;
++
++	pdev = imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
++
++	if (IS_ERR(pdev))
++		return;
++
++	dma = dma_declare_coherent_memory(&pdev->dev,
++				mx2_camera_base, mx2_camera_base,
++				MX27PDK_CAM_BUF_SIZE,
++				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++	if (!(dma & DMA_MEMORY_MAP))
++		return;
++}
++
+ static const struct imxi2c_platform_data mx27_3ds_i2c0_data __initconst = {
+ 	.bitrate = 100000,
+ };
+@@ -527,7 +549,7 @@ static void __init mx27pdk_init(void)
+ 		iclink_ov2640.power = NULL;
+ 	}
+ 
+-	imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
++	mx27pdk_init_camera();
+ 	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
+ 
+ 	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+@@ -542,6 +564,13 @@ static struct sys_timer mx27pdk_timer = {
+ 	.init	= mx27pdk_timer_init,
+ };
+ 
++static void __init mx27pdk_reserve(void)
++{
++	/* reserve MX27_3DS_CAMERA_BUF_SIZE bytes for mx2-camera */
++	mx2_camera_base = arm_memblock_steal(MX27PDK_CAM_BUF_SIZE,
++						MX27PDK_CAM_BUF_SIZE);
++}
++
+ MACHINE_START(MX27_3DS, "Freescale MX27PDK")
+ 	/* maintainer: Freescale Semiconductor, Inc. */
+ 	.atag_offset = 0x100,
+@@ -551,5 +580,6 @@ MACHINE_START(MX27_3DS, "Freescale MX27PDK")
+ 	.handle_irq = imx27_handle_irq,
+ 	.timer = &mx27pdk_timer,
+ 	.init_machine = mx27pdk_init,
++	.reserve = mx27pdk_reserve,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+-- 
+1.7.9.5
