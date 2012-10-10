@@ -1,290 +1,49 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 10 Oct 2012 19:45:33 +0400
-Subject: [PATCH 7/7] ARM: clps711x: merge files related to EDB7211-board into
- one
-In-Reply-To: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
-References: <1349883933-8881-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1349883933-8881-7-git-send-email-shc_work@mail.ru>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 10 Oct 2012 17:50:52 +0200
+Subject: [PATCH 0/3] ARM: dts: EMIF and LPDDR2 device tree data for OMAP5
+ boards
+In-Reply-To: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
+References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <5075995C.4060502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+You should CC devicetree-discuss at lists.ozlabs.org for any Device tree
+patches. This is applicable for the whole series.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-clps711x/Makefile       |    2 +-
- arch/arm/mach-clps711x/edb7211-arch.c |   66 ------------------------
- arch/arm/mach-clps711x/edb7211-mm.c   |   82 ------------------------------
- arch/arm/mach-clps711x/edb7211.c      |   88 +++++++++++++++++++++++++++++++++
- 4 files changed, 89 insertions(+), 149 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/edb7211-arch.c
- delete mode 100644 arch/arm/mach-clps711x/edb7211-mm.c
- create mode 100644 arch/arm/mach-clps711x/edb7211.c
+On 10/10/2012 02:05 PM, Lokesh Vutla wrote:
+> Patch 1:
+> 	Renaming elpida_ecb240abacn.dtsi as lpddr2_data.dtsi
+> Patch 2:
+> 	Correcting size of memory defined for omap5
+> Patch 3:
+> 	EMIF and LPDDR2 device tree data for OMAP5 boards
+> 
 
-diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
-index 6da6940..9cf2d1c 100644
---- a/arch/arm/mach-clps711x/Makefile
-+++ b/arch/arm/mach-clps711x/Makefile
-@@ -12,6 +12,6 @@ obj-			:=
- obj-$(CONFIG_ARCH_AUTCPU12) += autcpu12.o
- obj-$(CONFIG_ARCH_CDB89712) += cdb89712.o
- obj-$(CONFIG_ARCH_CLEP7312) += clep7312.o
--obj-$(CONFIG_ARCH_EDB7211)  += edb7211-arch.o edb7211-mm.o
-+obj-$(CONFIG_ARCH_EDB7211)  += edb7211.o
- obj-$(CONFIG_ARCH_FORTUNET) += fortunet.o
- obj-$(CONFIG_ARCH_P720T)    += p720t.o
-diff --git a/arch/arm/mach-clps711x/edb7211-arch.c b/arch/arm/mach-clps711x/edb7211-arch.c
-deleted file mode 100644
-index 5fad0b4..0000000
---- a/arch/arm/mach-clps711x/edb7211-arch.c
-+++ /dev/null
-@@ -1,66 +0,0 @@
--/*
-- *  linux/arch/arm/mach-clps711x/arch-edb7211.c
-- *
-- *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#include <linux/init.h>
--#include <linux/memblock.h>
--#include <linux/types.h>
--#include <linux/string.h>
--
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--
--#include "common.h"
--
--extern void edb7211_map_io(void);
--
--/* Reserve screen memory region at the start of main system memory. */
--static void __init edb7211_reserve(void)
--{
--	memblock_reserve(PHYS_OFFSET, 0x00020000);
--}
--
--static void __init
--fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
--{
--	/*
--	 * Bank start addresses are not present in the information
--	 * passed in from the boot loader.  We could potentially
--	 * detect them, but instead we hard-code them.
--	 *
--	 * Banks sizes _are_ present in the param block, but we're
--	 * not using that information yet.
--	 */
--	mi->bank[0].start = 0xc0000000;
--	mi->bank[0].size = 8*1024*1024;
--	mi->bank[1].start = 0xc1000000;
--	mi->bank[1].size = 8*1024*1024;
--	mi->nr_banks = 2;
--}
--
--MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
--	/* Maintainer: Jon McClintock */
--	.atag_offset	= 0x20100,	/* 0xc0000000 - 0xc001ffff can be video RAM */
--	.fixup		= fixup_edb7211,
--	.map_io		= edb7211_map_io,
--	.reserve	= edb7211_reserve,
--	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
--	.restart	= clps711x_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-clps711x/edb7211-mm.c b/arch/arm/mach-clps711x/edb7211-mm.c
-deleted file mode 100644
-index 054eaa0..0000000
---- a/arch/arm/mach-clps711x/edb7211-mm.c
-+++ /dev/null
-@@ -1,82 +0,0 @@
--/*
-- *  linux/arch/arm/mach-clps711x/mm.c
-- *
-- *  Extra MM routines for the EDB7211 board
-- *
-- *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/bug.h>
--
--#include <mach/hardware.h>
--#include <asm/page.h>
--#include <asm/sizes.h>
-- 
--#include <asm/mach/map.h>
--
--extern void clps711x_map_io(void);
--
--/*
-- * The on-chip registers are given a size of 1MB so that a section can
-- * be used to map them; this saves a page table.  This is the place to
-- * add mappings for ROM, expansion memory, PCMCIA, etc.  (if static
-- * mappings are chosen for those areas).
-- *
-- * Here is a physical memory map (to be fleshed out later):
-- *
-- * Physical Address  Size  Description
-- * ----------------- ----- ---------------------------------
-- * c0000000-c001ffff 128KB reserved for video RAM [1]
-- * c0020000-c0023fff  16KB parameters (see Documentation/arm/Setup)
-- * c0024000-c0027fff  16KB swapper_pg_dir (task 0 page directory)
-- * c0028000-...            kernel image (TEXTADDR)
-- *
-- * [1] Unused pages should be given back to the VM; they are not yet.
-- *     The parameter block should also be released (not sure if this
-- *     happens).
-- */
--static struct map_desc edb7211_io_desc[] __initdata = {
--	{	/* Memory-mapped extra keyboard row */
--		.virtual 	= IO_ADDRESS(EP7211_PHYS_EXTKBD),
--		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
--		.length		= SZ_1M,
--		.type		= MT_DEVICE,
--	}, {	/* CS8900A Ethernet chip */
--		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
--		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
--		.length		= SZ_1M,
--		.type		= MT_DEVICE,
--	}, {	/* Flash bank 0 */
--		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
--		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
--		.length		= SZ_8M,
--		.type		= MT_DEVICE,
--	}, {	/* Flash bank 1 */
--		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH2),
--		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH2),
--		.length		= SZ_8M,
--		.type		= MT_DEVICE,
--	}
--};
--
--void __init edb7211_map_io(void)
--{
--        clps711x_map_io();
--        iotable_init(edb7211_io_desc, ARRAY_SIZE(edb7211_io_desc));
--}
--
-diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
-new file mode 100644
-index 0000000..88f4690
---- /dev/null
-+++ b/arch/arm/mach-clps711x/edb7211.c
-@@ -0,0 +1,88 @@
-+/*
-+ *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/memblock.h>
-+#include <linux/types.h>
-+
-+#include <asm/setup.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/hardware.h>
-+
-+#include "common.h"
-+
-+#define VIDEORAM_SIZE	SZ_128K
-+
-+static struct map_desc edb7211_io_desc[] __initdata = {
-+	{	/* Memory-mapped extra keyboard row */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_EXTKBD),
-+		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
-+		.length		= SZ_1M,
-+		.type		= MT_DEVICE,
-+	}, {	/* CS8900A Ethernet chip */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
-+		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
-+		.length		= SZ_1M,
-+		.type		= MT_DEVICE,
-+	}, {	/* Flash bank 0 */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
-+		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
-+		.length		= SZ_8M,
-+		.type		= MT_DEVICE,
-+	}, {	/* Flash bank 1 */
-+		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH2),
-+		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH2),
-+		.length		= SZ_8M,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+void __init edb7211_map_io(void)
-+{
-+	clps711x_map_io();
-+	iotable_init(edb7211_io_desc, ARRAY_SIZE(edb7211_io_desc));
-+}
-+
-+/* Reserve screen memory region at the start of main system memory. */
-+static void __init edb7211_reserve(void)
-+{
-+	memblock_reserve(PHYS_OFFSET, VIDEORAM_SIZE);
-+}
-+
-+static void __init
-+fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
-+{
-+	/*
-+	 * Bank start addresses are not present in the information
-+	 * passed in from the boot loader.  We could potentially
-+	 * detect them, but instead we hard-code them.
-+	 *
-+	 * Banks sizes _are_ present in the param block, but we're
-+	 * not using that information yet.
-+	 */
-+	mi->bank[0].start = 0xc0000000;
-+	mi->bank[0].size = SZ_8M;
-+	mi->bank[1].start = 0xc1000000;
-+	mi->bank[1].size = SZ_8M;
-+	mi->nr_banks = 2;
-+}
-+
-+MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
-+	/* Maintainer: Jon McClintock */
-+	.atag_offset	= VIDEORAM_SIZE + 0x100,
-+	.fixup		= fixup_edb7211,
-+	.map_io		= edb7211_map_io,
-+	.reserve	= edb7211_reserve,
-+	.init_irq	= clps711x_init_irq,
-+	.timer		= &clps711x_timer,
-+	.restart	= clps711x_restart,
-+MACHINE_END
--- 
-1.7.8.6
+There is not point to list the patch subject in a cover letter.
+You should just introduce the series and ideally give details about the
+test like you have done below.
+
+The cover letter should mostly be written like an email.
+
+Benoit
+
+> Testing:
+> - Boot tested on omap5-sevm board
+> - Built emif as a module
+> 
+> Lokesh Vutla (3):
+>   ARM: dts: Renaming elpida_ecb240abacn.dts as lpddr2_data.dtsi
+>   ARM: dts: Correcting size of memory defined for omap5
+>   ARM: dts: EMIF and LPDDR2 device tree data for OMAP5 boards
+> 
+>  arch/arm/boot/dts/elpida_ecb240abacn.dtsi |   67 ---------------
+>  arch/arm/boot/dts/lpddr2_data.dtsi        |  129 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap4-panda.dts         |    2 +-
+>  arch/arm/boot/dts/omap4-sdp.dts           |    2 +-
+>  arch/arm/boot/dts/omap5-evm.dts           |   13 ++-
+>  arch/arm/boot/dts/omap5.dtsi              |   18 ++++
+>  6 files changed, 161 insertions(+), 70 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/elpida_ecb240abacn.dtsi
+>  create mode 100644 arch/arm/boot/dts/lpddr2_data.dtsi
+> 
