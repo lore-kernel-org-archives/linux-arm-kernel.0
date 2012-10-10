@@ -1,121 +1,61 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 10 Oct 2012 10:55:44 +0100
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121009182514.GF4124@obsidianresearch.com>
-References: <20121001175647.GD2100@linaro.org>
- <20121001183543.GC22342@obsidianresearch.com>
- <20121002102346.GB2108@linaro.org>
- <20121002174759.GC23733@obsidianresearch.com>
- <20121003104335.GA2254@linaro.org>
- <20121003184437.GB12231@obsidianresearch.com>
- <20121004113637.GA2117@linaro.org>
- <20121004175907.GB2994@obsidianresearch.com>
- <20121008104649.GD2302@linaro.org>
- <20121009182514.GF4124@obsidianresearch.com>
-Message-ID: <20121010095544.GB2131@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 10 Oct 2012 11:13:26 +0100
+Subject: [RFC PATCH 1/3] amba-clcd: Add Device Tree support to amba-clcd
+ driver
+In-Reply-To: <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
+References: <1348070666-9153-1-git-send-email-ryan.harkin@linaro.org>
+ <1348070666-9153-2-git-send-email-ryan.harkin@linaro.org>
+Message-ID: <1349864006.3354.35.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 12:25:14PM -0600, Jason Gunthorpe wrote:
-> On Mon, Oct 08, 2012 at 11:46:49AM +0100, Dave Martin wrote:
+On Wed, 2012-09-19 at 17:04 +0100, Ryan Harkin wrote:
+> Add support to parse the display configuration from device tree.
 > 
-> > > Yes, but we still need rely on complex code like I2C/MTD to create a
-> > > correct DTB, which again puts us back to patching the kernel for that
-> > > functionality.
-> > 
-> > I'm still confused as to where this complexity is coming from.
-> > 
-> > If you need to run some complex I2C and MTD code to generate the DT, what
-> > is that code doing?  If it is probing to get the information, then can you
-> > avoid putting the info in the DT at all?  Primarily the DT is to describe
-> > those aspects of the hardware which can't be probed.
+> If the board does not provide platform specific functions in the struct
+> clcd_board contained with the amba device info, then defaults are provided
+> by the driver.
 > 
-> At manufacturing the unit is programmed with a small datastructure that
-> contains all the unique ID's (MAC addresses, etc), manufacturing
-> variations (ie vendor A or B was used for a socket) and other
-> ancillary data.
-
-As a side comment, some things such as MAC addresses can be probed and
-set from userspace after kernel boot, assuming that you have a way
-to fetch the device description blob from userspace.  If it's accessible
-via MTD I'm guessing you may have some chance of doing that.
-
-Identifying the board variant is harder to defer though.
-
-> So a fair amount of I2C and MTD stack is required just to fetch this
-> structure - a full CFI probe, for instance, is needed in the NOR flash
-> case just to locate the structure.
+> The device tree configuration can either ask for a DMA setup or provide a
+> framebuffer address to be remapped into the driver.
 > 
-> Once read, things like MAC addresses are copied into the DTB, and
-> certain sections of the DTB are NOP'd out - we have stanzas for chip
-> vendor A and vendor B, the one that was not put on the board is
-> replaced with NOP.
-> 
-> Similar to the A/B fix, a further fixup is done based on a runtime
-> probe of the programmable devices to learn their current
-> configuration/memory map.
-> 
-> It seems desirable to present a complete/correct DTB to the kernel,
-> it doesn't seem there are great places to hook in custom discovery
-> procedures.
-> 
-> From a maintenance perspective we already have to test/etc the kernel
-> code for all of this, we don't want to do that twice by duplicating
-> this stuff outside the kernel.
+> Signed-off-by: Ryan Harkin <ryan.harkin@linaro.org>
+> ---
 
-OK, that gives me a good understanding of what you're trying to achieve
-here.
+<big snip>
 
-However, I worry that if you have to run hardware-dependent code in
-order to fetch or generate parts of the DT, then we have a chicken-
-and-egg problem with no guaranteed solution with the frameworks that
-exist today -- although I am not familiar with how DT gets used on
-all other arches, so you might have counterexamples I'm not aware of.
+>  static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
+>  {
+>  	struct clcd_board *board = dev->dev.platform_data;
+>  	struct clcd_fb *fb;
+>  	int ret;
+>  
+> +#ifdef CONFIG_OF
+> +	if (dev->dev.of_node) {
+> +		const __be32 *prop;
+> +		int len, na, ns;
+> +		phys_addr_t reg_base;
+> +
+> +		na = of_n_addr_cells(dev->dev.of_node);
+> +		ns = of_n_size_cells(dev->dev.of_node);
+> +
+> +		prop = of_get_property(dev->dev.of_node, "reg", &len);
+> +		if (WARN_ON(!prop || len < (na + ns) * sizeof(*prop)))
+> +			return -EINVAL;
+> +		reg_base = of_read_number(prop, na);
+> +
+> +		if (dev->res.start != reg_base)
+> +			return -EINVAL;
 
-At least in ARM-land, the DT is inherently monolithic and static: the
-DT is not expected to change once you enter the kernel.
+When the motherboard CLCD is used, the CLCD node is under the iofga node
+and has a reg value equal to the offset from the start of the iofgpa,
+however dev->res.start holds the calculated address of the start of the
+iofga region plus the offset of the clcd, this means that the above
+check fails.
 
-Of course, more or less anything can be done with local patches, but
-merging such functionality in a clean way might be a challenge.
+The question is, what is the purpose of this check? Can't we rely on the
+value of dev->res.start being consistent with dev->dev.of_node and so
+just drop all the above code from "const __be32 *prop" onwards?
 
-> > Otherwise, you that have a few static configurations: you could have one
-> > pre-baked DT per hardware platform, and choose the correct one once you
-> > have detected the platform.
-> 
-> We do that too, for instance the PPC kernel we build supports 4
-> different circuit boards, each served by a separate DTB, that needs a
-> fixup pass.
-> 
-> I think the biggest DTB describes about 49 devices..
->   
-> > > Where the 'dev tree provider' would use the stored bootloader
-> > > registers and any other information to return the proper DTB. 
-> > 
-> > It would need developing a bit, but something like that might be
-> > possible -- it should probably be discussed via devicetree-discuss.
-> > 
-> > If it is doing anything less trivial than picking a pre-baked DT, the
-> > rationale would need to be carefully argued.
-> 
-> I'm not sure there is a great interest in this? What are other folks
-> working on production embedded stuff doing? I suppose that will be
-> more clear as device tree is rolled out.
-
-For now, the architecturally simplest solution still seems to me to be
-to write your own boot shim which customises the DT before booting the 
-kernel. As discussed, this can continue to look like a simple ELF image
-from the bootloader's point of view -- but I appreciate that it will
-involve effort and some duplication of some low-level driver components.
-
-If we could do dynamic DT properly (either fully dynamic, or dynamic
-in a more constrained way as in your suggested patch), that would
-provided an architected way to solve this problem from within the kernel.
-
-This could certainly be worth raising on devicetree-discuss.
-
-Your problem is unlikely to affect people outside the embedded space
-too much, but it doesn't sound likely to be unique.
-
-Cheers
----Dave
+-- 
+Tixy
