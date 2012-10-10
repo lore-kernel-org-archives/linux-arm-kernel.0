@@ -1,18 +1,103 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Wed, 10 Oct 2012 12:19:11 +0530
-Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
-References: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <50751A67.2000800@ti.com>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Wed, 10 Oct 2012 08:51:00 +0200
+Subject: [PATCH 1/2] ARM: mx27_3ds: Reserve memory for camera usage
+In-Reply-To: <1349839770-13848-1-git-send-email-festevam@gmail.com>
+References: <1349839770-13848-1-git-send-email-festevam@gmail.com>
+Message-ID: <50751AD4.3000002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Tuesday 09 October 2012 02:27 PM, Vaibhav Hiremath wrote:
-
-> This patch adds of_have_populated_dt() check before creating
-
-> Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
-> Cc: Afzal Mohammed<afzal@ti.com>
-
-Reviewed-by: Afzal Mohammed <afzal@ti.com>
+Hi Fabio,
+On 10/10/2012 05:29 AM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Reserve dedicated memory block for camera usage.
+Why camera need to have a dedicated memory block reserved in the 
+platform file ?
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>   arch/arm/mach-imx/mach-mx27_3ds.c |   32 +++++++++++++++++++++++++++++++-
+>   1 file changed, 31 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+> index 05996f3..d3b9a60 100644
+> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+> @@ -30,6 +30,7 @@
+>   #include <linux/spi/spi.h>
+>   #include <linux/regulator/machine.h>
+>   #include <linux/spi/l4f00242t03.h>
+> +#include <asm/memblock.h>
+>
+>   #include <media/soc_camera.h>
+>
+> @@ -165,6 +166,9 @@ static const int mx27pdk_pins[] __initconst = {
+>   	PC19_PF_SSI4_CLK,
+>   };
+>
+> +static phys_addr_t mx2_camera_base __initdata;
+> +#define MX27PDK_CAM_BUF_SIZE	SZ_8M
+> +
+>   static struct gpio mx27_3ds_camera_gpios[] = {
+>   	{ CSI_PWRDWN, GPIOF_OUT_INIT_HIGH, "camera-power" },
+>   	{ CSI_RESET, GPIOF_OUT_INIT_HIGH, "camera-reset" },
+> @@ -478,6 +482,24 @@ static const struct mx2_camera_platform_data mx27_3ds_cam_pdata __initconst = {
+>   	.clk = 26000000,
+>   };
+>
+> +static void __init mx27pdk_init_camera(void)
+> +{
+> +	struct platform_device *pdev;
+> +	int dma;
+> +
+> +	pdev = imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
+> +
+> +	if (IS_ERR(pdev))
+> +		return;
+> +
+> +	dma = dma_declare_coherent_memory(&pdev->dev,
+> +				mx2_camera_base, mx2_camera_base,
+> +				MX27PDK_CAM_BUF_SIZE,
+> +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> +	if (!(dma & DMA_MEMORY_MAP))
+> +		return;
+> +}
+> +
+>   static const struct imxi2c_platform_data mx27_3ds_i2c0_data __initconst = {
+>   	.bitrate = 100000,
+>   };
+> @@ -527,7 +549,7 @@ static void __init mx27pdk_init(void)
+>   		iclink_ov2640.power = NULL;
+>   	}
+>
+> -	imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
+> +	mx27pdk_init_camera();
+>   	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
+>
+>   	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+> @@ -542,6 +564,13 @@ static struct sys_timer mx27pdk_timer = {
+>   	.init	= mx27pdk_timer_init,
+>   };
+>
+> +static void __init mx27pdk_reserve(void)
+> +{
+> +	/* reserve MX27_3DS_CAMERA_BUF_SIZE bytes for mx2-camera */
+> +	mx2_camera_base = arm_memblock_steal(MX27PDK_CAM_BUF_SIZE,
+> +						MX27PDK_CAM_BUF_SIZE);
+> +}
+> +
+>   MACHINE_START(MX27_3DS, "Freescale MX27PDK")
+>   	/* maintainer: Freescale Semiconductor, Inc. */
+>   	.atag_offset = 0x100,
+> @@ -551,5 +580,6 @@ MACHINE_START(MX27_3DS, "Freescale MX27PDK")
+>   	.handle_irq = imx27_handle_irq,
+>   	.timer = &mx27pdk_timer,
+>   	.init_machine = mx27pdk_init,
+> +	.reserve = mx27pdk_reserve,
+>   	.restart	= mxc_restart,
+>   MACHINE_END
+>
+Thank you.
+Best regards,
+Ga?tan Carlier.
