@@ -1,31 +1,48 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Oct 2012 10:01:57 +0200
-Subject: [PATCH 1/3] ARM i.MX25: Fix lcdc_ipg_per parent clock
-In-Reply-To: <1349856119-22363-1-git-send-email-s.hauer@pengutronix.de>
-References: <1349856119-22363-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1349856119-22363-2-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 10 Oct 2012 10:04:42 +0200
+Subject: [PATCH] ARM: mxc: platform-mxc-mmc: Fix register region size
+In-Reply-To: <1349810713-12307-1-git-send-email-fabio.estevam@freescale.com>
+References: <1349810713-12307-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121010080442.GO27665@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's per7, not per6.
+On Tue, Oct 09, 2012 at 04:25:13PM -0300, Fabio Estevam wrote:
+> Do not hardcode the register region to SZ_4K as this is not correct for mx31.
+> 
+> Use data->iosize instead which works for both mx27 and mx31 cases.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx25.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Applied, thanks
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index d20d479..334c839 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -127,7 +127,7 @@ int __init mx25_clocks_init(void)
- 	clk[esdhc2_ipg_per] = imx_clk_gate("esdhc2_ipg_per", "per4", ccm(CCM_CGCR0),  4);
- 	clk[gpt_ipg_per] = imx_clk_gate("gpt_ipg_per", "per5", ccm(CCM_CGCR0),  5);
- 	clk[i2c_ipg_per] = imx_clk_gate("i2c_ipg_per", "per6", ccm(CCM_CGCR0),  6);
--	clk[lcdc_ipg_per] = imx_clk_gate("lcdc_ipg_per", "per8", ccm(CCM_CGCR0),  7);
-+	clk[lcdc_ipg_per] = imx_clk_gate("lcdc_ipg_per", "per7", ccm(CCM_CGCR0),  7);
- 	clk[nfc_ipg_per] = imx_clk_gate("nfc_ipg_per", "ipg_per", ccm(CCM_CGCR0),  8);
- 	clk[ssi1_ipg_per] = imx_clk_gate("ssi1_ipg_per", "per13", ccm(CCM_CGCR0), 13);
- 	clk[ssi2_ipg_per] = imx_clk_gate("ssi2_ipg_per", "per14", ccm(CCM_CGCR0), 14);
+Sascha
+
+> ---
+>  arch/arm/plat-mxc/devices/platform-mxc-mmc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c b/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
+> index 540d3a7..e7b920b 100644
+> --- a/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
+> +++ b/arch/arm/plat-mxc/devices/platform-mxc-mmc.c
+> @@ -55,7 +55,7 @@ struct platform_device *__init imx_add_mxc_mmc(
+>  	struct resource res[] = {
+>  		{
+>  			.start = data->iobase,
+> -			.end = data->iobase + SZ_4K - 1,
+> +			.end = data->iobase + data->iosize - 1,
+>  			.flags = IORESOURCE_MEM,
+>  		}, {
+>  			.start = data->irq,
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
