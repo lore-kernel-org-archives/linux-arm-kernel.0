@@ -1,44 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Oct 2012 09:34:05 +0200
-Subject: [PATCH 04/16] pinctrl: samsung: Parse pin banks from DT
-In-Reply-To: <1349685556-23718-5-git-send-email-t.figa@samsung.com>
+Date: Wed, 10 Oct 2012 09:37:42 +0200
+Subject: [PATCH 03/16] pinctrl: samsung: Detect and handle unsupported
+ configuration types
+In-Reply-To: <1349685556-23718-4-git-send-email-t.figa@samsung.com>
 References: <1349685556-23718-1-git-send-email-t.figa@samsung.com>
- <1349685556-23718-5-git-send-email-t.figa@samsung.com>
-Message-ID: <CACRpkdafuxbO_peOBgmrjXk7ioVBF6D-D7d=shUd-GpHOdNxqg@mail.gmail.com>
+ <1349685556-23718-4-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkda8mBsetmkWSfed0VpGA_Aw4vNUSGZcTx=bY8LDRzxFdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Oct 8, 2012 at 10:39 AM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-> Currently SoC-specific properties such as list of pin banks, register
-> offsets and bitfield sizes are being taken from static data structures
-> residing in pinctrl-exynos.c.
+> This patch modifies the pinctrl-samsung driver to detect when width of a
+> bit field is set to zero (which means that such configuraton type is not
+> supported) and return an error instead of trying to modify an inexistent
+> register.
 >
-> This patch modifies the pinctrl-samsung driver to parse all SoC-specific
-> data from device tree, which will allow to remove the static data
-> structures and facilitate adding of further SoC variants to the
-> pinctrl-samsung driver.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  drivers/pinctrl/pinctrl-samsung.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+> index dd108a9..c660fa5 100644
+> --- a/drivers/pinctrl/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/pinctrl-samsung.c
+> @@ -391,6 +391,9 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
+>                 return -EINVAL;
+>         }
+>
+> +       if (!width)
+> +               return -EINVAL;
+> +
 
-So why? Two approaches:
-
-- Put as much info as possible into the device tree
-- Put as much info as possible into the driver
-
-The first approach is currently only used by pinctrl-single.c.
-
-That driver is designed for the case where all info about
-the hardware arrives in some description language that
-can be translated into a simple DT description.
-
-If you want to use that approach, you should use that
-driver. If that driver does not work for you, then it's not
-fulfilling it's purpose as a one-stop shop for simple
-pin controllers entirely contained within the device tree,
-and should be renamed or redesigned.
-
-If you will end up with a hybrid approach with some
-stuff in the device tree and some stuff in the code,
-it's better to keep the old driver.
+Can this patch be applied in isolation from the others?
+Thomas A: can you ACK this so I can apply it in that case?
 
 Yours,
 Linus Walleij
