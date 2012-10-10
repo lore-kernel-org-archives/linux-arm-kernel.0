@@ -1,47 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 10 Oct 2012 14:19:40 +0000
-Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <20121010140027.GB13724@beef>
-References: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
- <20121010140027.GB13724@beef>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB3B573@DBDE01.ent.ti.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Wed, 10 Oct 2012 16:25:58 +0200
+Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
+Message-ID: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 19:30:27, Porter, Matt wrote:
-> On Tue, Oct 09, 2012 at 02:27:20PM +0530, Vaibhav Hiremath wrote:
-> > With recent changes in omap gpmc driver code, in case of DT
-> > boot mode, where bootloader does not configure gpmc cs space
-> > will result into kernel BUG() inside gpmc_mem_init() function,
-> > as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
-> > gpmc_config7[0].baseaddress is set to '0' on reset.
-> > 
-> > This use-case is applicable for any board/EVM which doesn't have
-> > any peripheral connected to gpmc cs0, for example BeagleXM and
-> > BeagleBone, so DT boot mode fails.
-> > 
-> > This patch adds of_have_populated_dt() check before creating
-> > device, so that for DT boot mode, gpmc probe will not be called
-> > which is expected behavior, as gpmc is not supported yet from DT.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Afzal Mohammed <afzal@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc Paul Walmsley <paul@pwsan.com>
-> > ---
-> > This should go in for rc1, as this breaks AM33xx boot.
-> 
-> Fixes BeagleBone on mainline.
-> 
-> Tested-by: Matt Porter <mporter@ti.com>
-> 
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Thanks Matt and Afzal,
+If the i2c message length is zero, i2c-at91 will directly return an error
+instead of trying to send a zero-length message.
 
-Tony can this be picked up for rc1?? I know you have already sent pull 
-request for rc1, but by any chance you are planning to send another request?
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
 
-Thanks,
-Vaibhav
-> -Matt
-> 
+fix for 3.7
+
+ drivers/i2c/busses/i2c-at91.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index aa59a25..eaddc77 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -263,6 +263,9 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+ 	unsigned int_addr_flag = 0;
+ 	struct i2c_msg *m_start = msg;
+ 
++	if (!msg->len)
++		return -EINVAL;
++
+ 	dev_dbg(&adap->dev, "at91_xfer: processing %d messages:\n", num);
+ 
+ 	/*
+-- 
+1.7.11.3
