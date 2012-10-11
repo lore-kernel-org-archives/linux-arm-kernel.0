@@ -1,53 +1,54 @@
-From: linux@prisktech.co.nz (linux at prisktech.co.nz)
-Date: Fri, 12 Oct 2012 11:33:54 +1300 (NZDT)
-Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
-In-Reply-To: <201210112029.05572.arnd@arndb.de>
-References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
- <201210110747.46682.arnd@arndb.de> <1349979450.16017.3.camel@gitbox>
- <201210112029.05572.arnd@arndb.de>
-Message-ID: <57461.210.54.1.170.1349994834.squirrel@server.prisktech.co.nz>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 11 Oct 2012 15:40:17 -0700
+Subject: [GIT PULL] Versatile Express clk
+In-Reply-To: <1348501568.27071.5.camel@hornet>
+References: <1348501568.27071.5.camel@hornet>
+Message-ID: <20121011224017.2941.11303@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thursday 11 October 2012, Tony Prisk wrote:
->> > config VT8500
->> >       bool "Via/Wondermedia VT8500 / WM8505 / WM8650" if ARCH_MULTIPLATFORM
->> >       default VT8500_SINGLE
->> >
->> >       Arnd
->>
->> Alexey (or anyone else),
->>
->> Do you want it kept in the meantime?
->>
->> I think the easiest way to add/keep it would be to create:
->>
->> ARCH_VT8500_SINGLE (arm/Kconfig) and ARCH_VT8500_MULTI
->> (arch-vt8500/Kconfig) and have them both select ARCH_VT8500 as an option
->> to make drivers available.
->
-> You only need one new symbol, not too. Keeping CONFIG_VT8500 as the
-> user-selectable option as I outlined in the example means that
-> existing .config files keep working, which is sometimes useful.
->
-> 	Arnd
->
+Quoting Pawel Moll (2012-09-24 08:46:08)
+> Hi Mike,
+> 
+> Would you be so kind and pull the VE clocking stuff? They are rebased on
+> top of Linus' Realview patch.
+> 
 
-To clarify what you said (because I'm not sure I got it the first time)...
+Hi Pawel,
 
-Keep ARCH_VT8500 as the single-platform Kconfig option.
-Add a new ARCH_VT8500_MULTI (for example) as the multiplatform Kconfig option.
+I've taken these into my new clk-next towards 3.8.  That branch is not
+yet pushed out publicly but will be after -rc1 is released.
 
-Have ARCH_VT8500_MULTI select ARCH_VT8500??
+Regards,
+Mike
 
-The last bit confuses me (and seems a little backwards, although I suspect it
-would work since none of the options would cause conflicts). Without ARCH_VT8500
-selected, we have no driver options without changing all the Kconfig's.
-
-If this is correct, we are basically using _MULTI to add more options on top of
-_VT8500.
-
-Am I close or did I completely misunderstand? :)
-
-Regards
-Tony P
+> Thanks!
+> 
+> Pawel
+> 
+> 
+> The following changes since commit b9f8a0f8e255919bdcfb96a8d50d1523233a458a:
+> 
+>   clk: convert ARM RealView to common clk (2012-09-24 16:28:29 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/pawelmoll/linux.git clk-v3.6-rc7
+> 
+> for you to fetch changes up to b262f1ed394218f9327b72e7d1d17a5e62074be0:
+> 
+>   clk: Common clocks implementation for Versatile Express (2012-09-24 16:28:30 +0100)
+> 
+> ----------------------------------------------------------------
+> Pawel Moll (2):
+>       clk: Versatile Express clock generators ("osc") driver
+>       clk: Common clocks implementation for Versatile Express
+> 
+>  arch/arm/include/asm/hardware/sp810.h    |    2 +
+>  drivers/clk/Kconfig                      |    8 +-
+>  drivers/clk/versatile/Makefile           |    2 +
+>  drivers/clk/versatile/clk-vexpress-osc.c |  150 ++++++++++++++++++++++++++++++
+>  drivers/clk/versatile/clk-vexpress.c     |  142 ++++++++++++++++++++++++++++
+>  5 files changed, 301 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
+>  create mode 100644 drivers/clk/versatile/clk-vexpress.c
