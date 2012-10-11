@@ -1,62 +1,95 @@
 From: vipin.kumar@st.com (Vipin Kumar)
-Date: Thu, 11 Oct 2012 09:50:05 +0530
-Subject: [PATCH 09/11] fsmc/nand:FIX: replace change_bit routine
-In-Reply-To: <20121010204546.GK4625@n2100.arm.linux.org.uk>
+Date: Thu, 11 Oct 2012 09:54:26 +0530
+Subject: [PATCH 02/11] fsmc/nand: Rearrange the fsmc_nand_data structure
+ and update comments
+In-Reply-To: <20121009115245.GL12801@game.jcrosoft.org>
 References: <cover.1349778820.git.vipin.kumar@st.com>
- <ec169eb041e87e66c06108e85ea4a67e5797cecc.1349778821.git.vipin.kumar@st.com>
- <CACRpkdaot3DKCoJOBpUcJFVrJ89xRx2T58fDe4YKY_r4NFqEag@mail.gmail.com>
- <20121010204546.GK4625@n2100.arm.linux.org.uk>
-Message-ID: <507648F5.1030404@st.com>
+ <2aa2a9c00bcfa62605edfab8fb4c29448612ced3.1349778820.git.vipin.kumar@st.com>
+ <20121009115245.GL12801@game.jcrosoft.org>
+Message-ID: <507649FA.1060308@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 2:15 AM, Russell King - ARM Linux wrote:
-> On Wed, Oct 10, 2012 at 07:22:04PM +0200, Linus Walleij wrote:
->> On Tue, Oct 9, 2012 at 12:44 PM, Vipin Kumar<vipin.kumar@st.com>  wrote:
+On 10/9/2012 5:22 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 16:14 Tue 09 Oct     , Vipin Kumar wrote:
+>> Signed-off-by: Vipin Kumar<vipin.kumar@st.com>
+>> ---
+>>   drivers/mtd/nand/fsmc_nand.c | 51 ++++++++++++++++++++++++++------------------
+>>   1 file changed, 30 insertions(+), 21 deletions(-)
 >>
->>> change_bit routine accepts only ulong pointers as buffer, so an unaligned char
->>> pointer passed to change_bit may lead to a crash.
->>>
->>> Fix this bug by accessing the buffer as char pointer.
+>> diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+>> index e96d7d1..bd89580 100644
+>> --- a/drivers/mtd/nand/fsmc_nand.c
+>> +++ b/drivers/mtd/nand/fsmc_nand.c
+>> @@ -278,52 +278,61 @@ static struct fsmc_eccplace fsmc_ecc4_sp_place = {
+>>    * struct fsmc_nand_data - structure for FSMC NAND device state
+>>    *
+>>    * @pid:		Part ID on the AMBA PrimeCell format
+>> - * @mtd:		MTD info for a NAND flash.
+>> - * @nand:		Chip related info for a NAND flash.
+>> - * @partitions:		Partition info for a NAND Flash.
+>> - * @nr_partitions:	Total number of partition of a NAND flash.
+>> - *
+>> - * @ecc_place:		ECC placing locations in oobfree type format.
+>> - * @bank:		Bank number for probed device.
+>> - * @clk:		Clock structure for FSMC.
+>> + * @mtd:		MTD info for a NAND flash
+>> + * @nand:		Chip related info for a NAND flash
+>> + * @dev:		Device structure pointer
+>> + * @clk:		Clock structure for FSMC
+>> + * @ecc_place:		ECC placing locations in oobfree type format
+>> + * @bank:		Bank number for probed device
+>>    *
+>>    * @read_dma_chan:	DMA channel for read access
+>>    * @write_dma_chan:	DMA channel for write access to NAND
+>>    * @dma_access_complete: Completion structure
+>>    *
+>> - * @data_pa:		NAND Physical port for Data.
+>> - * @data_va:		NAND port for Data.
+>> - * @cmd_va:		NAND port for Command.
+>> - * @addr_va:		NAND port for Address.
+>> - * @regs_va:		FSMC regs base address.
+>> + * @dev_timings:	Timings to be programmed in controller
+>> + * @partitions:		Partition info for a NAND Flash
+>> + * @nr_partitions:	Total number of partition of a NAND flash
+>> + * @mode:		Defines the NAND device access mode
+>> + *			Can be one of:
+>> + *			- DMA access
+>> + *			- Word access (CPU)
+>> + *			- None (Use driver default ie bus width specific
+>> + *			  CPU access)
+>> + * @select_chip:	Select a particular bank
+>> + *
+>> + * @data_pa:		NAND Physical port for Data
+>> + * @data_va:		NAND port for Data
+>> + * @cmd_va:		NAND port for Command
+>> + * @addr_va:		NAND port for Address
+>> + * @regs_va:		FSMC regs base address
+>>    */
+>>   struct fsmc_nand_data {
+>>   	u32			pid;
+>>   	struct mtd_info		mtd;
+>>   	struct nand_chip	nand;
+>> -	struct mtd_partition	*partitions;
+>> -	unsigned int		nr_partitions;
+>> -
+>> -	struct fsmc_eccplace	*ecc_place;
+>> -	unsigned int		bank;
+>>   	struct device		*dev;
+>> -	enum access_mode	mode;
+>>   	struct clk		*clk;
+>> +	struct fsmc_eccplace	*ecc_place;
+>> +	unsigned int		bank;
 >>
->> Why not see if we can fix change_bit() instead?
->> Since I suspect this is on ARM I bet Russell and Nico
->> want to hear about this if there is a problem.
->
-> Not particularly.  There's a reason the argument to change_bit() is typed
-> 'unsigned long' and that's not because it can take a void, char, or a
-> short.  It's because it _expects_ the buffer to be aligned to an
-> "unsigned long" quantity.
->
-> That's because on many architectures, misaligned loads and stores are
-> not atomic operations - and in this case, load/store exclusive will
-> fail when they're misalighed.
->
-> So...
->
-> -                       change_bit(err_idx[i], (unsigned long *)dat);
->
-> is highly invalid code.
->
+>>   	/* DMA related objects */
+>>   	struct dma_chan		*read_dma_chan;
+>>   	struct dma_chan		*write_dma_chan;
+>>   	struct completion	dma_access_complete;
+>>
+>> +	/* Recieved from plat data */
+>>   	struct fsmc_nand_timings *dev_timings;
+>> +	struct mtd_partition	*partitions;
+>> +	unsigned int		nr_partitions;
+> where do you use those execpt at probe time
 
-Thanks. Got your point
-
->> Can the ARM change_bit() not be fixed, so that
->> long arguments are the only option?
->
-> Spot the intentional cast:
->
->>> -                       change_bit(err_idx[i], (unsigned long *)dat);
->
-> which tries to work around this.  Remember my attitude towards casts:
-> if you're having to use a cast, you are _probably_ doing something
-> wrong.  In this case, it's hiding a warning which was saying that
-> the code is doing something wrong, and then the result blows up.
-> By adding that cast, the wrong wire was cut... you get to keep the
-> remains. ;)
-> .
-
-I agree with you. Although I was a bit relaxed this time, I would really 
-think before adding a cast explicitly just to avoid a warning
-
--Vipin
+Yes, I can remove it completely. Thanks for that
