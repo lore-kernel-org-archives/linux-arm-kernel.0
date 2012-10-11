@@ -1,149 +1,92 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 11 Oct 2012 10:11:10 +0200
-Subject: [PATCH 04/15] pinctrl: samsung: Remove static pin enumerations
-In-Reply-To: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-References: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1349943081-27939-5-git-send-email-t.figa@samsung.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 11 Oct 2012 10:11:46 +0200
+Subject: [PATCH 3/3] ARM: dts: EMIF and LPDDR2 device tree data for OMAP5
+ boards
+In-Reply-To: <5076644A.10504@ti.com>
+References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
+ <1349870716-25511-4-git-send-email-lokeshvutla@ti.com>
+ <50758DC7.3070408@ti.com> <5076644A.10504@ti.com>
+Message-ID: <50767F42.9000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since pin numbers are now assigned dynamically, those are not needed
-anymore.
+Hi Lokesh,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- drivers/pinctrl/pinctrl-exynos.h | 119 ---------------------------------------
- 1 file changed, 119 deletions(-)
+On 10/11/2012 08:16 AM, Lokesh Vutla wrote:
+> + devicetree-discuss
+> 
+> Hi Benoit,
+> 
+> On Wednesday 10 October 2012 08:31 PM, Benoit Cousson wrote:
+>> On 10/10/2012 02:05 PM, Lokesh Vutla wrote:
+>>> Device tree data for the EMIF sdram controllers in OMAP5
+>>> and LPDDR2 memory devices attached to OMAP5 boards.
+>>
+>> Nit: Could you make a sentence with a verb to explain what you are doing
+>> in this patch.
+> I am really sorry about this.
+> I ll make sure that all patch descriptions will be clear in V2 of this
+> patch series.
+> 
+> In this patch I am adding device tree data for LPDDR2 memory devices
+> attached to omap5-sevm and also adding device tree data for EMIF sdram
+> controllers in OMAP5.
+>>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/lpddr2_data.dtsi |   64
+>>> +++++++++++++++++++++++++++++++++++-
+>>>   arch/arm/boot/dts/omap5-evm.dts    |   11 +++++++
+>>>   arch/arm/boot/dts/omap5.dtsi       |   18 ++++++++++
+>>>   3 files changed, 92 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/lpddr2_data.dtsi
+>>> b/arch/arm/boot/dts/lpddr2_data.dtsi
+>>> index f97f70f..8e8c1bc 100644
+>>> --- a/arch/arm/boot/dts/lpddr2_data.dtsi
+>>> +++ b/arch/arm/boot/dts/lpddr2_data.dtsi
+>>> @@ -3,7 +3,7 @@
+>>>    */
+>>>
+>>>   / {
+>>> -    elpida_ECB240ABACN: lpddr2 {
+>>> +    elpida_ECB240ABACN: lpddr2 at 0 {
+>>>           compatible    = "Elpida,ECB240ABACN","jedec,lpddr2-s4";
+>>>           density        = <2048>;
+>>>           io-width    = <32>;
+>>> @@ -64,4 +64,66 @@
+>>>               tDQSCK-max-derated = <6000>;
+>>>           };
+>>>       };
+>>> +
+>>> +    samsung_K3PE0E000B: lpddr2 at 1 {
+>>
+>> I'm confused now, why are you reusing the same lpddr2_data.dtsi file?
+>> You should create a file per memory. That will make the reuse much
+>> easier.
+>>
+>> If the goal of your first patch was to do that, it is then the wrong
+>> approach.
+> Yes, I wanted to group data for all lppdr2 devices in a single file than
+> creating separate file for each device.
+> May be a dumb question, Why can't we group data for all the lpddr2
+> devices in a single file?
 
-diff --git a/drivers/pinctrl/pinctrl-exynos.h b/drivers/pinctrl/pinctrl-exynos.h
-index 1788467..2de4a29 100644
---- a/drivers/pinctrl/pinctrl-exynos.h
-+++ b/drivers/pinctrl/pinctrl-exynos.h
-@@ -17,125 +17,6 @@
-  * (at your option) any later version.
-  */
- 
--#define EXYNOS_GPIO_START(__gpio)	((__gpio##_START) + (__gpio##_NR))
--
--#define EXYNOS4210_GPIO_A0_NR	(8)
--#define EXYNOS4210_GPIO_A1_NR	(6)
--#define EXYNOS4210_GPIO_B_NR	(8)
--#define EXYNOS4210_GPIO_C0_NR	(5)
--#define EXYNOS4210_GPIO_C1_NR	(5)
--#define EXYNOS4210_GPIO_D0_NR	(4)
--#define EXYNOS4210_GPIO_D1_NR	(4)
--#define EXYNOS4210_GPIO_E0_NR	(5)
--#define EXYNOS4210_GPIO_E1_NR	(8)
--#define EXYNOS4210_GPIO_E2_NR	(6)
--#define EXYNOS4210_GPIO_E3_NR	(8)
--#define EXYNOS4210_GPIO_E4_NR	(8)
--#define EXYNOS4210_GPIO_F0_NR	(8)
--#define EXYNOS4210_GPIO_F1_NR	(8)
--#define EXYNOS4210_GPIO_F2_NR	(8)
--#define EXYNOS4210_GPIO_F3_NR	(6)
--#define EXYNOS4210_GPIO_J0_NR	(8)
--#define EXYNOS4210_GPIO_J1_NR	(5)
--#define EXYNOS4210_GPIO_K0_NR	(7)
--#define EXYNOS4210_GPIO_K1_NR	(7)
--#define EXYNOS4210_GPIO_K2_NR	(7)
--#define EXYNOS4210_GPIO_K3_NR	(7)
--#define EXYNOS4210_GPIO_L0_NR	(8)
--#define EXYNOS4210_GPIO_L1_NR	(3)
--#define EXYNOS4210_GPIO_L2_NR	(8)
--#define EXYNOS4210_GPIO_Y0_NR	(6)
--#define EXYNOS4210_GPIO_Y1_NR	(4)
--#define EXYNOS4210_GPIO_Y2_NR	(6)
--#define EXYNOS4210_GPIO_Y3_NR	(8)
--#define EXYNOS4210_GPIO_Y4_NR	(8)
--#define EXYNOS4210_GPIO_Y5_NR	(8)
--#define EXYNOS4210_GPIO_Y6_NR	(8)
--#define EXYNOS4210_GPIO_X0_NR	(8)
--#define EXYNOS4210_GPIO_X1_NR	(8)
--#define EXYNOS4210_GPIO_X2_NR	(8)
--#define EXYNOS4210_GPIO_X3_NR	(8)
--#define EXYNOS4210_GPIO_Z_NR	(7)
--
--enum exynos4210_gpio_xa_start {
--	EXYNOS4210_GPIO_A0_START	= 0,
--	EXYNOS4210_GPIO_A1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_A0),
--	EXYNOS4210_GPIO_B_START		= EXYNOS_GPIO_START(EXYNOS4210_GPIO_A1),
--	EXYNOS4210_GPIO_C0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_B),
--	EXYNOS4210_GPIO_C1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_C0),
--	EXYNOS4210_GPIO_D0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_C1),
--	EXYNOS4210_GPIO_D1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_D0),
--	EXYNOS4210_GPIO_E0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_D1),
--	EXYNOS4210_GPIO_E1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E0),
--	EXYNOS4210_GPIO_E2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E1),
--	EXYNOS4210_GPIO_E3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E2),
--	EXYNOS4210_GPIO_E4_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E3),
--	EXYNOS4210_GPIO_F0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_E4),
--	EXYNOS4210_GPIO_F1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_F0),
--	EXYNOS4210_GPIO_F2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_F1),
--	EXYNOS4210_GPIO_F3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_F2),
--};
--
--enum exynos4210_gpio_xb_start {
--	EXYNOS4210_GPIO_J0_START	= 0,
--	EXYNOS4210_GPIO_J1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_J0),
--	EXYNOS4210_GPIO_K0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_J1),
--	EXYNOS4210_GPIO_K1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K0),
--	EXYNOS4210_GPIO_K2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K1),
--	EXYNOS4210_GPIO_K3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K2),
--	EXYNOS4210_GPIO_L0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_K3),
--	EXYNOS4210_GPIO_L1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_L0),
--	EXYNOS4210_GPIO_L2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_L1),
--	EXYNOS4210_GPIO_Y0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_L2),
--	EXYNOS4210_GPIO_Y1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y0),
--	EXYNOS4210_GPIO_Y2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y1),
--	EXYNOS4210_GPIO_Y3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y2),
--	EXYNOS4210_GPIO_Y4_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y3),
--	EXYNOS4210_GPIO_Y5_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y4),
--	EXYNOS4210_GPIO_Y6_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y5),
--	EXYNOS4210_GPIO_X0_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_Y6),
--	EXYNOS4210_GPIO_X1_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_X0),
--	EXYNOS4210_GPIO_X2_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_X1),
--	EXYNOS4210_GPIO_X3_START	= EXYNOS_GPIO_START(EXYNOS4210_GPIO_X2),
--};
--
--enum exynos4210_gpio_xc_start {
--	EXYNOS4210_GPIO_Z_START		= 0,
--};
--
--#define	EXYNOS4210_GPIO_A0_IRQ		EXYNOS4210_GPIO_A0_START
--#define	EXYNOS4210_GPIO_A1_IRQ		EXYNOS4210_GPIO_A1_START
--#define	EXYNOS4210_GPIO_B_IRQ		EXYNOS4210_GPIO_B_START
--#define	EXYNOS4210_GPIO_C0_IRQ		EXYNOS4210_GPIO_C0_START
--#define	EXYNOS4210_GPIO_C1_IRQ		EXYNOS4210_GPIO_C1_START
--#define	EXYNOS4210_GPIO_D0_IRQ		EXYNOS4210_GPIO_D0_START
--#define	EXYNOS4210_GPIO_D1_IRQ		EXYNOS4210_GPIO_D1_START
--#define	EXYNOS4210_GPIO_E0_IRQ		EXYNOS4210_GPIO_E0_START
--#define	EXYNOS4210_GPIO_E1_IRQ		EXYNOS4210_GPIO_E1_START
--#define	EXYNOS4210_GPIO_E2_IRQ		EXYNOS4210_GPIO_E2_START
--#define	EXYNOS4210_GPIO_E3_IRQ		EXYNOS4210_GPIO_E3_START
--#define	EXYNOS4210_GPIO_E4_IRQ		EXYNOS4210_GPIO_E4_START
--#define	EXYNOS4210_GPIO_F0_IRQ		EXYNOS4210_GPIO_F0_START
--#define	EXYNOS4210_GPIO_F1_IRQ		EXYNOS4210_GPIO_F1_START
--#define	EXYNOS4210_GPIO_F2_IRQ		EXYNOS4210_GPIO_F2_START
--#define	EXYNOS4210_GPIO_F3_IRQ		EXYNOS4210_GPIO_F3_START
--#define	EXYNOS4210_GPIO_J0_IRQ		EXYNOS4210_GPIO_J0_START
--#define	EXYNOS4210_GPIO_J1_IRQ		EXYNOS4210_GPIO_J1_START
--#define	EXYNOS4210_GPIO_K0_IRQ		EXYNOS4210_GPIO_K0_START
--#define	EXYNOS4210_GPIO_K1_IRQ		EXYNOS4210_GPIO_K1_START
--#define	EXYNOS4210_GPIO_K2_IRQ		EXYNOS4210_GPIO_K2_START
--#define	EXYNOS4210_GPIO_K3_IRQ		EXYNOS4210_GPIO_K3_START
--#define	EXYNOS4210_GPIO_L0_IRQ		EXYNOS4210_GPIO_L0_START
--#define	EXYNOS4210_GPIO_L1_IRQ		EXYNOS4210_GPIO_L1_START
--#define	EXYNOS4210_GPIO_L2_IRQ		EXYNOS4210_GPIO_L2_START
--#define	EXYNOS4210_GPIO_Z_IRQ		EXYNOS4210_GPIO_Z_START
--
--#define EXYNOS4210_GPIOA_NR_PINS	EXYNOS_GPIO_START(EXYNOS4210_GPIO_F3)
--#define EXYNOS4210_GPIOA_NR_GINT	EXYNOS_GPIO_START(EXYNOS4210_GPIO_F3)
--#define EXYNOS4210_GPIOB_NR_PINS	EXYNOS_GPIO_START(EXYNOS4210_GPIO_X3)
--#define EXYNOS4210_GPIOB_NR_GINT	EXYNOS_GPIO_START(EXYNOS4210_GPIO_L2)
--#define EXYNOS4210_GPIOC_NR_PINS	EXYNOS_GPIO_START(EXYNOS4210_GPIO_Z)
--
- /* External GPIO and wakeup interrupt related definitions */
- #define EXYNOS_GPIO_ECON_OFFSET		0x700
- #define EXYNOS_GPIO_EMASK_OFFSET	0x900
--- 
-1.7.12
+Well, why should we do that? What will be the advantage?
+
+That will increase the size of the DTS/DTB with data nobody will care if
+only one type of memory is used on a given platform.
+
+Going in the same direction you can consider adding every OMAP
+description into a single DTS... Does that really make sense?
+
+So clearly there is no point doing that, it will cluttered the OMAP4 DTB
+with useless Samsung memory data. And the same issue for OMAP5 board
+that will contain Elpida memory information. And it will get worst each
+time someone will want to add a new memory in this file.
+
+You should just include the data you need for a given board.
+
+
+Regards,
+Benoit
