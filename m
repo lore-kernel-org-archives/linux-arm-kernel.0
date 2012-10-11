@@ -1,57 +1,72 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 11 Oct 2012 10:08:04 -0600
-Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
-In-Reply-To: <20121011072428.GA26298@S2101-09.ap.freescale.net>
-References: <20121009031715.GC21822@S2101-09.ap.freescale.net>
- <alpine.LFD.2.02.1210090018470.16518@xanadu.home>
- <20121009050109.GD21822@S2101-09.ap.freescale.net>
- <50744DBA.3070900@wwwdotorg.org>
- <CAOMZO5BgJ0eSPvhnjCx_DVAUdLKpEhp-amJQw-8NZDX9AfCDeA@mail.gmail.com>
- <20121011072428.GA26298@S2101-09.ap.freescale.net>
-Message-ID: <5076EEE4.6000007@wwwdotorg.org>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 11 Oct 2012 18:15:45 +0200
+Subject: alignment faults in 3.6
+In-Reply-To: <5076E472.8030703@gmail.com>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <20121011103257.GO4625@n2100.arm.linux.org.uk>
+ <1349952574.21172.8604.camel@edumazet-glaptop>
+ <201210111228.25995.arnd@arndb.de>
+ <1349959248.21172.8970.camel@edumazet-glaptop> <5076C78E.1020408@gmail.com>
+ <1349963227.21172.9188.camel@edumazet-glaptop> <5076E472.8030703@gmail.com>
+Message-ID: <1349972145.21172.9685.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 01:24 AM, Shawn Guo wrote:
-> On Tue, Oct 09, 2012 at 01:21:02PM -0300, Fabio Estevam wrote:
->> On Tue, Oct 9, 2012 at 1:15 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>
->>>>> I just tried building mainline now.  It is at commit f5a246eab9.
->>>>>
->>>> The build still fails for me at this commit.
->>>
->>> I can't reproduce this.
->>
->> Same here. It builds fine for me.
->>
-> Thanks all for confirming it works.
-> 
-> I just figured it out on my end.  Here is how it gets broken for me.
-> 
-> - Before commit cd29672 (dtc: import latest upstream dtc) gets in,
->   I did a build without O=<output_dir>.  It results in a copy of those
->   libfdt files in arch/arm/boot/compressed.
-> 
-> - After the commit gets in, I start a build with O=imx parameter.  When
->   compiling imx/arch/arm/boot/compressed/fdt_ro.c, the #include <libfdt.h>
->   in fdt_ro.c seems to match the one left in arch/arm/boot/compressed/
->   from last build rather than imx/arch/arm/boot/compressed/libfdt.h.
-> 
-> Cleaning the libfdt copies in arch/arm/boot/compressed fixes the
-> problem.
+On Thu, 2012-10-11 at 10:23 -0500, Rob Herring wrote:
+> On 10/11/2012 08:47 AM, Eric Dumazet wrote:
 
-> Not sure why it's not "libfdt.h" but <libfdt.h> is used as
-> the inclusion though, since the .h and .c are in the same folder.
+> > Compiler is asked to perform a 32bit load, it does it.
+> 
+> Not exactly. It is asked to to perform 2 32-bit loads which are combined
+> into a single ldm (load multiple) which cannot handle unaligned
+> accesses. Here's a simple example that does the same thing:
 
-I imagine that's because the libfdt code is set up to support being
-built as a standalone library. In that case, <fdt.h> and <libfdt.h> are
-presumably the public interface to the library, and would hence be
-installed into /usr/include or similar. Still, I guess the libfdt source
-itself would still work with "libfdt.h" rather than <libfdt.h>.
 
-Note that looking at git history, fdt_ro.c included <libfdt.h> even
-before cd29672 (dtc: import latest upstream dtc), and
-arch/arm/boot/compressed/Makefile included fdt_ro.c before that commit,
-so I'm not sure why the problem only shows up now? Perhaps anything that
-caused your objects to be stale, and hence get rebuilt, would have
-caused the issue.
+Thats simply not true. You are severely mistaken.
+
+ldm does a load of seeral 32bit words.
+
+And the compiler would not use it if the alignment was not matching the
+prereq (alignment >= 4)
+
+
+
+> 
+> void test(char * buf)
+> {
+> 	printf("%d, %d\n", *((unsigned int *)&buf[0]), *((unsigned int *)&buf[4]));
+> }
+
+But you completely miss the fact that network doesnt pass a "char *buf"
+but a "be32 *buf". Your example is not relevant at all.
+
+So the compiler is absolutely right, and network stack is _right_ too.
+
+The prereq is that IP header are aligned to 4 bytes boundary.
+
+Denying this fact is not going to help you
+
+
+> 
+> So I guess the only ABI legal unaligned access is in a packed struct.
+> 
+> > There is no questionable optimization here. Really.
+> > Please stop pretending this, this makes no sense.
+> 
+> I'm not the one calling the networking stack bad code.
+
+Once you understand the issues, you can explain us where is the bad
+code. But given you say "Bug is in compiler, and/or network stack, but
+my driver is fine", its not very wise.
+
+For the moment, the bug is in your driver.
+
+> 
+> I can fix my h/w, so I'll stop caring about this. Others can all get
+> bitten by this new behavior in gcc 4.7.
+
+Again compiler is fine. How should we say that so that you stop your
+rants ?
+
+Stop trying to find an excuse, dont try to fool us, this is really
+embarrassing. Just fix the driver, there is no shame to fix an error.
