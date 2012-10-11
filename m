@@ -1,76 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Oct 2012 17:59:44 -0700
-Subject: [PATCH 1/4] usb: phy: add a new driver for usb3 phy
-In-Reply-To: <1348054229-27362-2-git-send-email-kishon@ti.com>
-References: <1348054229-27362-1-git-send-email-kishon@ti.com>
- <1348054229-27362-2-git-send-email-kishon@ti.com>
-Message-ID: <20121011005944.GX12552@atomide.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Thu, 11 Oct 2012 01:06:56 +0000
+Subject: [PATCH 1/2] video: Add support for the Solomon SSD1307 OLED
+ Controller
+In-Reply-To: <50618242.2070302@free-electrons.com>
+References: <1348158800-23039-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1348158800-23039-2-git-send-email-maxime.ripard@free-electrons.com>
+ <505C73D1.7030800@free-electrons.com> <50618242.2070302@free-electrons.com>
+Message-ID: <50761BB0.3080507@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-* Kishon Vijay Abraham I <kishon@ti.com> [120919 04:32]:
-> Added a driver for usb3 phy that handles the interaction between usb phy
-> device and dwc3 controller.
+On 09/25/2012 10:06 AM, Maxime Ripard wrote:
+> Hello Florian,
 > 
-> This also includes device tree support for usb3 phy driver and
-> the documentation with device tree binding information is updated.
+> Le 21/09/2012 16:04, Maxime Ripard a ?crit :
+>> Le 20/09/2012 18:33, Maxime Ripard a ?crit :
+>>> This patch adds support for the Solomon SSD1307 OLED
+>>> controller found on the Crystalfontz CFA10036 board.
+>>>
+>>> This controller can drive a display with a resolution up
+>>> to 128x39 and can operate over I2C or SPI.
+>>>
+>>> The current driver has only been tested on the CFA-10036,
+>>> that is using this controller over I2C to driver a 96x16
+>>> OLED screen.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> Cc: Brian Lilly <brian@crystalfontz.com>
+>>
+>> Would you consider merging this patch or review it?
+>> It has been around for quite some time now and has not received any
+>> comments for at least the 2 last versions, so I guess there is not much
+>> left holding it back (unless, of course, if you have some comments to
+>> address), and I really would like to have it in 3.7.
 > 
-> Currently writing to control module register is taken care in this
-> driver which will be removed once the control module driver is in place.
+> I guess we missed the 3.7 merge here. That's no big deal, but I sent the
+> patch series on a regular basis, starting 07/17 (sent new versions on
+> 07/31, 08/23, 09/05 and 09/20), addressed all the issues that were
+> raised, and never got any feedback from you, either positive or
+> negative. The patches affecting the MX28 device trees have already been
+> merged by Shawn Guo into its tree, so only the driver and the bindings
+> remain to be merged. So I'm kind of lost on what should I do here?
+> 
+> Is it because I have an obviously broken driver or you don't have enough
+> time, or you don't want to merge drivers for such type of low resolution
+> controllers, or any other reason?
 
-You may be able to set up the control module register with one
-of the following Linux standard frameworks:
+I don't see any reason to not support low resolutions, might be a nice
+status monitor for embedded devices.
+It's not your fault. It's just that for the past two months writing my
+thesis reduced my free time (and hence the time that I could potentially
+use for reviewing patches) to approximately zero. While I managed to get
+some smaller patches done, there really wasn't any time to process the
+3-4 completely new things pending and some scarier patches which touch
+the core infrastructure.
+I think that it should be better soon, at least my thesis is now done,
+but I also have to fix up the rest of my life that was neglected while
+writing, including my paid jobs.
 
-1. Fixed regulator defined in mach-omap2/control.c
 
-   In this case the PHY driver can pick up the regulator by name.
+Best regards,
 
-2. A mux mapped with pinctrl framework using pinctrl-single,bits
-   binding
-
-   And in this case the PHY driver can request the named pinctrl
-   states like "enabled" and "disabled".
-
-> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
-> @@ -15,3 +15,21 @@ usb2phy at 4a0ad080 {
->  	reg = <0x4a0ad080 0x58>,
->  	      <0x4a002300 0x4>;
->  };
-
-The comments also apply to the omap_usb2.c driver for
-0x4a002300 above.
-
-> +
-> +OMAP USB3 PHY
-> +
-> +Required properties:
-> + - compatible: Should be "ti,omap-usb3"
-> + - reg : Address and length of the register set for the device. Also
-> +add the address of control module phy power register until a driver for
-> +control module is added
-> +
-> +This is usually a subnode of ocp2scp to which it is connected.
-> +
-> +usb3phy at 4a084400 {
-> +	compatible = "ti,omap-usb3";
-> +	reg = <0x0x4a084400 0x80>,
-> +	      <0x4a084800 0x64>,
-> +	      <0x4a084c00 0x40>,
-> +	      <0x4a002370 0x4>;
-> +};
-
-And register 0x4a002370 here. Care to post some info what the
-0x4a002370 register bits do? Is that same as CONTROL_DEV_CONF
-on omap4, or does it have other bits there too?
-
-The advantage for using regulator fwk and pinctrl fwk is
-that the regulator and mux can be children of the SCM
-core driver when we have it. And no direct register tinkering
-or omap specific custom exported functions are needed ;)
-
-Regards,
-
-Tony
+Florian Tobias Schandinat
