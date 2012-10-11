@@ -1,67 +1,56 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 11 Oct 2012 08:35:47 +0200
-Subject: [PATCH] usb: remove CONFIG_USB_MUSB_HOST etc
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3E9CA495@DBDE01.ent.ti.com>
-References: <A73F36158E33644199EB82C5EC81C7BC3E9CA495@DBDE01.ent.ti.com>
-Message-ID: <507668C3.6080908@denx.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 11 Oct 2012 08:36:38 +0200
+Subject: [PATCH 3.6.0- 3/6] ARM/pxa: use module_platform_driver macro
+In-Reply-To: <1349893837-7441-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1349893837-7441-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <507668F6.5000003@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Manjunathappa
+On 10/10/12 20:30, Srinivas KANDAGATLA wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> 
+> This patch removes some code duplication by using
+> module_platform_driver.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-On 11.10.2012 07:42, Manjunathappa, Prakash wrote:
-> Hi,
-> On Mon, Oct 08, 2012 at 18:47:07, Constantine Shulyupin wrote:
->> From: Constantine Shulyupin<const@MakeLinux.com>
->>
->> Remove USB configuration in arch/arm/mach-davinci/usb.c accordingly
->> CONFIG_USB_MUSB_OTG CONFIG_USB_MUSB_PERIPHERAL CONFIG_USB_MUSB_HOST
->> and set MUSB_OTG configuration by default
->> because this configuration options are removed from Kconfig.
->>
->> Signed-off-by: Constantine Shulyupin<const@MakeLinux.com>
->>
->> ---
->>   arch/arm/mach-davinci/usb.c |    6 ------
->>   1 file changed, 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
->> index f77b953..34509ff 100644
->> --- a/arch/arm/mach-davinci/usb.c
->> +++ b/arch/arm/mach-davinci/usb.c
->> @@ -42,14 +42,8 @@ static struct musb_hdrc_config musb_config = {
->>   };
->>
->>   static struct musb_hdrc_platform_data usb_data = {
->> -#if defined(CONFIG_USB_MUSB_OTG)
->>   	/* OTG requires a Mini-AB connector */
->>   	.mode           = MUSB_OTG,
->> -#elif defined(CONFIG_USB_MUSB_PERIPHERAL)
->> -	.mode           = MUSB_PERIPHERAL,
->> -#elif defined(CONFIG_USB_MUSB_HOST)
->> -	.mode           = MUSB_HOST,
->> -#endif
->>   	.clock		= "usb",
->>   	.config		=&musb_config,
->>   };
->
-> Tested it on DM6446-EVM for host mode with MSC thumb drive and gadget
-> mode with g-ether. It works.
->
-> Acked-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+Cc'ed Haojian,
 
-I sent a similiar patch here:
+I agree on Paul's comment about the description.
 
-http://comments.gmane.org/gmane.linux.usb.general/54512
+Otherwise looks fine to me:
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-If the issues, mentioned from Sergei for my patch, nullified I add my:
+> ---
+>  arch/arm/mach-pxa/pxa3xx-ulpi.c |   13 +------------
+>  1 files changed, 1 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> index 7dbe3cc..e329cce 100644
+> --- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> +++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> @@ -384,18 +384,7 @@ static struct platform_driver pxa3xx_u2d_ulpi_driver = {
+>          .probe          = pxa3xx_u2d_probe,
+>          .remove         = pxa3xx_u2d_remove,
+>  };
+> -
+> -static int pxa3xx_u2d_ulpi_init(void)
+> -{
+> -	return platform_driver_register(&pxa3xx_u2d_ulpi_driver);
+> -}
+> -module_init(pxa3xx_u2d_ulpi_init);
+> -
+> -static void __exit pxa3xx_u2d_ulpi_exit(void)
+> -{
+> -	platform_driver_unregister(&pxa3xx_u2d_ulpi_driver);
+> -}
+> -module_exit(pxa3xx_u2d_ulpi_exit);
+> +module_platform_driver(pxa3xx_u2d_ulpi_driver);
+>  
+>  MODULE_DESCRIPTION("PXA3xx U2D ULPI driver");
+>  MODULE_AUTHOR("Igor Grinberg");
 
-Acked-by: Heiko Schocher <hs@denx.de>
-
-for this patch.
-
-bye,
-Heiko
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Regards,
+Igor.
