@@ -1,33 +1,43 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 11 Oct 2012 17:55:06 +0530
-Subject: [PATCH v2 09/13] ARM: davinci - update the dm644x soc code to
- use common clk drivers
-In-Reply-To: <1348683037-9705-10-git-send-email-m-karicheri2@ti.com>
-References: <1348683037-9705-1-git-send-email-m-karicheri2@ti.com>
- <1348683037-9705-10-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5076BAA2.6010404@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Oct 2012 12:28:25 +0000
+Subject: alignment faults in 3.6
+In-Reply-To: <1349952574.21172.8604.camel@edumazet-glaptop>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <20121011103257.GO4625@n2100.arm.linux.org.uk>
+ <1349952574.21172.8604.camel@edumazet-glaptop>
+Message-ID: <201210111228.25995.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Murali,
-
-On 9/26/2012 11:40 PM, Murali Karicheri wrote:
-> The clock tree for dm644x is defined using the new structure davinci_clk.
-> The SoC specific code re-uses clk-fixed-rate, clk-divider and clk-mux
-> drivers in addition to the davinci specific clk drivers, clk-davinci-pll
-> and clk-davinci-psc. Macros are defined to define the various clocks in
-> the SoC.
+On Thursday 11 October 2012, Eric Dumazet wrote:
+> On Thu, 2012-10-11 at 11:32 +0100, Russell King - ARM Linux wrote:
+> > On Thu, Oct 11, 2012 at 12:22:06PM +0200, Eric Dumazet wrote:
+> > > I took a look, and I dont see why/how gcc could use a ldm instruction
+> > > 
+> > > Doing so assumed the alignment of the structure was 8 bytes, but its
+> > > not.
+> > > 
+> > > Networking stack mandates that IP headers are aligned on 4 bytes
+> > > boundaries, not 8 bytes.
+> > 
+> > Err, no.  ldm is "load multiple" not "load double".  It loads multiple
+> > 32-bit registers, and its requirement for non-faulting behaviour is for
+> > the pointer to be 4 byte aligned.  However, "load double" requires 8
+> > byte alignment.
 > 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> So if you have an alignment fault, thats because IP header is not
+> aligned on 4 bytes ?
+> 
+> If so a driver is buggy and must be fixed.
+> 
+> Please send us full stack trace
 
-You have chosen to keep all clock related data in platform files while
-using the common clock framework to provide just the infrastructure. If
-you look at how mxs and spear have been migrated, they have migrated the
-soc specific clock data to drivers/clk as well. See
-"drivers/clk/spear/spear3xx_clock.c" or "drivers/clk/mxs/clk-imx23.c". I
-feel the latter way is better and I also think it will simplify some of
-the look-up infrastructure you had to build. This will also help some
-real code reduction from arch/arm/mach-davinci/.
+Rob Herring as the original reporter has dropped off the Cc list, adding
+him back.
 
-Thanks,
-Sekhar
+I assume that the calxeda xgmac driver is the culprit then. It uses
+netdev_alloc_skb() rather than netdev_alloc_skb_ip_align() in
+xgmac_rx_refill but it is not clear whether it does so intentionally
+or by accident.
+
+	Arnd
