@@ -1,33 +1,36 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 11 Oct 2012 17:49:30 -0400
-Subject: [RFC PATCH v2 00/16] DMA Engine support for AM33xx
-In-Reply-To: <CACxGe6vL2ieaYN_YhZn9=e7=prwdfwZtgPr4Ei3VMNnViib6XA@mail.gmail.com>
-References: <1349982281-10785-1-git-send-email-mporter@ti.com>
- <CACxGe6vL2ieaYN_YhZn9=e7=prwdfwZtgPr4Ei3VMNnViib6XA@mail.gmail.com>
-Message-ID: <20121011214930.GF13724@beef>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Oct 2012 23:51:25 +0200
+Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
+In-Reply-To: <CAOh2x=mr4jQ1WQTC50H6OsN_E+7gtVSy_UMwjrt6Rj-QbQRtOA@mail.gmail.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+ <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
+ <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
+ <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
+ <CAOh2x=mr4jQ1WQTC50H6OsN_E+7gtVSy_UMwjrt6Rj-QbQRtOA@mail.gmail.com>
+Message-ID: <CACRpkdZvO3Df58UxFDc_T10JDhE=O5KKHZTzd9g0BOn60NWZcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 10:31:58PM +0100, Grant Likely wrote:
-> Hey Matt,
-> 
-> Do you know now similar are the EDMA engines on the am33xx and am389x? I've
-> been working on am389x upstreaming and I'll try these patches out if it is
-> the same engine.
+On Thu, Oct 11, 2012 at 7:07 PM, viresh kumar <viresh.kumar@linaro.org> wrote:
+> On Thu, Oct 11, 2012 at 9:36 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>> And the block layer of the subsystem should take care
+>> of only handing the driver buffers that are contiguous
+>
+> But why should that be a constraint on block layer? It is working in virtual
+> space and is concerned about that onlly.
 
-Hi Grant,
+Not the block layer, the block layer of the subsystem.
 
-It's the same one. am389x/ti816x and am387x/ti814x are part of the same
-architectural family as am33xx. They've just never had a lot of upstream
-support from TI. I heard rumors that you might be working with am389x
-and I'm glad you're confirming that for me! ;)
+It has to pick out the chunks that get transferred down to the drivers.
 
-The only differences between am33xx's implementation and the others is
-going to be the number PaRAM slots, number of TCs, the channel mapping,
-and then the crossbar mapping. As you can see from the TODO list, I
-don't yet support the crossbar, but it'll be in the next version of this
-series. The other items are already covered in the DT binding so it
-should be straightforward to hook this up for am389x assuming your hwmod
-and clock data is good for that part.
+For example drivers/mmc/card/block.c will convert transfers into
+sglists and pass down to the MMC drivers. mmc_queue_map_sg()
+calls blk_rq_map_sg() to do the job. It's even documented in
+Documentation/block/biodoc.txt
 
--Matt
+I don't know how that works in MTD...
+
+Yours,
+Linus Walleij
