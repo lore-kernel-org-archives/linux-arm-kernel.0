@@ -1,43 +1,79 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 11 Oct 2012 15:21:07 -0700
-Subject: [RFC][PATCH v4? 0/7] Adaptive Body-Bias for OMAP
-In-Reply-To: <20121011133304.GA19170@kahuna>
-References: <1349313974-5473-1-git-send-email-mturquette@ti.com>
- <20121011133304.GA19170@kahuna>
-Message-ID: <20121011222107.2941.62545@nucleus>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Oct 2012 00:23:02 +0200
+Subject: [PATCH] ARM: nomadik: fixup some FSMC merge problems
+Message-ID: <1349994182-26116-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nishanth Menon (2012-10-11 06:33:04)
-> On 18:26-20121003, Mike Turquette wrote:
-> > From: Mike Turquette <mturquette@linaro.org>
-> [...]
-> > 
-> >  arch/arm/mach-omap2/Makefile                  |    8 +-
-> >  arch/arm/mach-omap2/abb.c                     |  322 +++++++++++++++++++++++++
-> >  arch/arm/mach-omap2/abb.h                     |   94 ++++++++
-> [...]
-> >  arch/arm/plat-omap/include/plat/voltage.h     |    1 +
-> >  18 files changed, 699 insertions(+), 37 deletions(-)
-> >  create mode 100644 arch/arm/mach-omap2/abb.c
-> >  create mode 100644 arch/arm/mach-omap2/abb.h
-> >  create mode 100644 arch/arm/mach-omap2/abb36xx_data.c
-> >  create mode 100644 arch/arm/mach-omap2/abb44xx_data.c
-> 
-> dumb question: with the request to move everything out of mach-omap2
-> directory, do we still want to add more files into mach-omap2?
-> 
+Due to a clash between refactoring and due to loss of a header
+file that remained in my working tree the Nomadik stopped
+compiling after switching to the FSMC driver. This patch fixes
+it up.
 
-Not a dumb question at all.  I approached this problem by modeling it
-after existing voltage layer code (in particular the vp and vc drivers).
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-nomadik/board-nhk8815.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
 
-My hope is to get it merged as-is and then bundle the abb code up with
-the vp/vc migration to drivers/* when that happens some day.  People
-using omap36xx and above need this code now, so it seems prudent to take
-this approach today.
-
-Regards,
-Mike
-
-> Regards,
-> NM
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index a105d1b..3f97ef4 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -37,14 +37,15 @@
+ #include <plat/mtu.h>
+ #include <plat/pincfg.h>
+ 
+-#include <mach/fsmc.h>
+-
+ #include "cpu-8815.h"
+ 
+ /* Initial value for SRC control register: all timers use MXTAL/8 source */
+ #define SRC_CR_INIT_MASK	0x00007fff
+ #define SRC_CR_INIT_VAL		0x2aaa8000
+ 
++#define ALE_OFF 0x1000000
++#define CLE_OFF 0x800000
++
+ /* These addresses span 16MB, so use three individual pages */
+ static struct resource nhk8815_nand_resources[] = {
+ 	{
+@@ -53,6 +54,16 @@ static struct resource nhk8815_nand_resources[] = {
+ 		.end = 0x40000000 + SZ_16K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	}, {
++		.name = "nand_addr",
++		.start = 0x40000000 + ALE_OFF,
++		.end = 0x40000000 +ALE_OFF + SZ_16K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.name = "nand_cmd",
++		.start = 0x40000000 + CLE_OFF,
++		.end = 0x40000000 + CLE_OFF + SZ_16K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
+ 		.name  = "fsmc_regs",
+ 		.start = NOMADIK_FSMC_BASE,
+ 		.end   = NOMADIK_FSMC_BASE + SZ_4K - 1,
+@@ -105,8 +116,6 @@ static struct fsmc_nand_platform_data nhk8815_nand_platform_data = {
+ 	.partitions = nhk8815_partitions,
+ 	.nr_partitions = ARRAY_SIZE(nhk8815_partitions),
+ 	.width = FSMC_NAND_BW8,
+-	.ale_off = 0x1000000,
+-	.cle_off = 0x800000,
+ };
+ 
+ static struct platform_device nhk8815_nand_device = {
+@@ -171,6 +180,10 @@ static struct platform_device nhk8815_onenand_device = {
+ 	.num_resources	= ARRAY_SIZE(nhk8815_onenand_resource),
+ };
+ 
++/* bus control reg. and bus timing reg. for CS0..CS3 */
++#define FSMC_BCR(x)	(NOMADIK_FSMC_VA + (x << 3))
++#define FSMC_BTR(x)	(NOMADIK_FSMC_VA + (x << 3) + 0x04)
++
+ static void __init nhk8815_onenand_init(void)
+ {
+ #ifdef CONFIG_MTD_ONENAND
+-- 
+1.7.11.4
