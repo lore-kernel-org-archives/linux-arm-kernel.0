@@ -1,30 +1,52 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 11 Oct 2012 11:16:16 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <yw1xpq4ppcju.fsf@unicorn.mansr.com>
-References: <506E1762.3010601@gmail.com><CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com><CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com><506E3E58.80703@gmail.com><CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com><20121005071216.GD4625@n2100.arm.linux.org.uk><CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com><20121005082439.GF4625@n2100.arm.linux.org.uk><506ED18C.3010009@gmail.com><20121005140556.GQ4625@n2100.arm.linux.org.uk><506EEFBB.3060705@gmail.com>
- <507619FA.6080001@jonmasters.org><yw1xtxu1pwtv.fsf@unicorn.mansr.com><AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
- <yw1xpq4ppcju.fsf@unicorn.mansr.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B703B@saturn3.aculab.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Oct 2012 11:19:43 +0100
+Subject: [PATCH v4 RESEND 1/3] Input: egalax_ts: get gpio from devicetree
+In-Reply-To: <20121011085535.GA31464@S2101-09.ap.freescale.net>
+References: <1349860323-12786-1-git-send-email-jason77.wang@gmail.com>
+ <1349860323-12786-2-git-send-email-jason77.wang@gmail.com>
+ <20121010163036.GC19335@core.coreip.homeip.net>
+ <20121011085535.GA31464@S2101-09.ap.freescale.net>
+Message-ID: <20121011101943.GN4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > It might be enough to use __attribute__((aligned(2))) on some structure
-> > members (actually does 'ldm' need 8 byte alignment?? - in which case
-> > aligned(4) is enough).
+On Thu, Oct 11, 2012 at 04:55:40PM +0800, Shawn Guo wrote:
+> Add LAKML ...
 > 
-> The aligned attribute can only increase alignment.
+> On Wed, Oct 10, 2012 at 09:30:36AM -0700, Dmitry Torokhov wrote:
+> > Hi Hui,
+> > 
+> > On Wed, Oct 10, 2012 at 05:12:01PM +0800, Hui Wang wrote:
+> > > The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
+> > > and don't support this API anymore.
+> > > 
+> > > The i.MX6q sabrelite platform equips an egalax touchscreen controller,
+> > > and this platform already transfered to GENERIC_GPIO framework, to
+> > > support this driver, we use a more generic way to get gpio.
+> > 
+> > Unfortunately this does break the driver for platforms that do still
+> > support irq_to_gpio and have not transitioned to device tree (yet?).
+> > It looks like the API suffered from premature deletion...
+> > 
+> > I really do not want to add a new platform data structure with only gpio
+> > in it, is there a better way to detect if irq_to_gpio() (even if only a
+> > stub) is available?
+> > 
+> If CONFIG_ARCH_HAVE_CUSTOM_GPIO_H is not enabled for an architecture,
+> the irq_to_gpio() in include/linux/gpio.h will tell unavailability by
+> returning -EINVAL.  But ARM architecture still selects ARCH_HAVE_CUSTOM_GPIO_H
+> because there are still some platforms having mach/gpio.h.
+> 
+> We may also need a stub irq_to_gpio simply returning -EINVAL into
+> arch/arm/include/asm/gpio.h when platform does not provide irq_to_gpio,
+> so that driver can detect if irq_to_gpio() is available.  And that
+> stub can be removed later when we deselect ARCH_HAVE_CUSTOM_GPIO_H
+> for ARM architecture.
 
-Not true.
-If you have:
+Or fix the drivers using irq_to_gpio() not to use it.  I thought we had
+resolved to do that already, with Grant's agreement that irq_to_gpio()
+needed to die.
 
-struct foo {
-    short   a;
-    int     b __attribute__((aligned(2)));
-    short   c;
-};
-
-You'll find sizeof (struct foo) is 8, and that, on arm/sparc etc,
-gcc will generate 2 16bit accesses (and shifts) for foo.b;
-
-	David
+(Mainly because neither gpiolib nor the IRQ layer provides any assistance
+for irq_to_gpio(), so it's not possible to make it work for all GPIOs in
+the system, especially when GPIOs are allocated dynamically.)
