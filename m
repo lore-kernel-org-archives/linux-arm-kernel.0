@@ -1,82 +1,40 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 11 Oct 2012 14:51:21 +0200
-Subject: alignment faults in 3.6
-In-Reply-To: <1349956456.21172.8820.camel@edumazet-glaptop>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
- <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
- <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
- <yw1xpq4ppcju.fsf@unicorn.mansr.com>
- <1349949638.21172.8445.camel@edumazet-glaptop>
- <1349950926.21172.8521.camel@edumazet-glaptop>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <1349952970.1232.5.camel@sakura.staff.proxad.net>
- <1349954899.21172.8728.camel@edumazet-glaptop>
- <1349956055.1232.9.camel@sakura.staff.proxad.net>
- <1349956456.21172.8820.camel@edumazet-glaptop>
-Message-ID: <1349959881.1232.44.camel@sakura.staff.proxad.net>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Thu, 11 Oct 2012 14:54:13 +0200
+Subject: bug with 3.4.6, 3.5.3, 3.6.1
+In-Reply-To: <20121011103637.GC30598@mudshark.cambridge.arm.com>
+References: <50765D3B.6000909@xenomai.org>
+ <20121011103637.GC30598@mudshark.cambridge.arm.com>
+Message-ID: <5076C175.1070103@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Thu, 2012-10-11 at 13:54 +0200, Eric Dumazet wrote:
-
-> Of course, if you use a forwarding setup, and the tx driver is not SG
-> capable, performance will be bad (You have to copy the data into a
-> single skb (linearize the skb)) 
+On 10/11/2012 12:36 PM, Will Deacon wrote:
+> On Thu, Oct 11, 2012 at 06:46:35AM +0100, Gilles Chanteperdrix wrote:
+>> Hi,
 > 
-> But in 2012, having to use hardware without SG for a router sounds a bad
-> joke (if cpu speed is _also_ too low)
-
-Hey I cannot go back in time, when that hardware was built in 2004 (mips
-@250Mhz), it was considered good, and we did manufacture a lot of it, so
-it's still maintained.
-
-People run recent kernels on older hardware because they are *encouraged
-to do so*.
-
-I fought inside my company to be good kernel citizen, not using
-proprietary BSP, rewrite & mainline the drivers, because that was the
-community promise: mainline it, we will support it for you, you will get
-the latest kernel features for free.
-
-
-That worked, but with some drawbacks:
-
- - kernel footprint grew that much (we started from 2.4) that it does
-not fit in device flash anymore
-
- - performance took a hit each time we upgrade, mostly because of cache
-footprint growth.
-
- - as kernel footprint grew, available RAM for conntrack & route cache
-entries was smaller each time
-
-
-But I had to stop upgrading after 2.6.20. Everything below is not
-anybody's fault. Bloat is unavoidable for software project that big.
-
-I'm perfectly ok with that, but I don't want to be ridiculed for running
-mainline kernel on old hardware.
-
-
-> Adding get_unaligned() everywhere in linux network stacks is not an
-> option.
+> Hi Gilles,
 > 
-> We actually want to be able to read the code and fix the bugs, not only
-> run it on a cheap low end router.
+>> when booting Linux v3.4.6, v3.5.3, or v3.6.1 on a pandaboard with an 
+>> OMAP4430 ES2.1, compiled with the following configuration:
+>> http://xenomai.org/~gch/config-panda
+>>
+>> I get the bug below after mounting the root filesystem.
+>>
+>> CONFIG_VMSPLIT_2G and CONFIG_THUMB2_KERNEL disabled seems to be the 
+>> combination which triggers the bug.
+>>
+>> With this configuration, it seems the init_mm.mm_count incrementation
+>> done at the beginning of secondary_start_kernel() is "lost" after the
+>> calls to cpu_switch_mm() and local_flush_tlb().
+>>
+>> Modifying the secondary_startup() function in head.S to pass the 
+>> swapper pgdir instead of the idmap pgdir in r4 also avoids the issue.
+> 
+> What's your PHYS_OFFSET? I suspect it's >= 2GB, in which case I have some
+> ideas about this problem.
 
-That was not a request, I just needed a clarification. 
-
-Documentation/unaligned-memory-access.txt does not say it's a big no-no,
-it says you can give unaligned pointers to the networking stack if you
-arch can do unaligned access (with an "efficiency" notion).
-
-MIPS and ARM have a software handler for this, and performance wise in
-my case it's better to take the faults, a driver writer may think a
-benchmark will dictate what to do.
+You mean the physical address of RAM ? I believe it is 0x80000000, will
+check.
 
 -- 
-Maxime
+					    Gilles.
