@@ -1,56 +1,37 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 11 Oct 2012 16:36:37 +0200
-Subject: [PATCH] pinctrl/nomadik: always use the simple irqdomain
-Message-ID: <1349966197-18777-1-git-send-email-linus.walleij@stericsson.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Oct 2012 07:41:37 -0700
+Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
+In-Reply-To: <20121011082149.GA15609@parrot.com>
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
+ <20121003192044.GB27502@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9B8A65@DBDE01.ent.ti.com>
+ <20121005142338.GA7199@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9CA829@DBDE01.ent.ti.com>
+ <20121010170806.GB13585@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9CB751@DBDE01.ent.ti.com>
+ <20121011082149.GA15609@parrot.com>
+Message-ID: <20121011144137.GA12552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+* Ivan Djelic <ivan.djelic@parrot.com> [121011 01:23]:
+> 
+> I don't know which way is better for the OMAP community:
+> 1. Unifying ECC modes = loosing the constant polynomial benefits, but gaining RBL compat and simplifying code
+> 2. Keeping separate ECC modes = code bloat
+> 
+> Tony, do you have an opinion on this ?
 
-Since the simple irqdomain will fall back to a linear domain
-if the first_irq provided is <= 0, just use this, just make
-sure the first_irq is negative in the device tree case.
+Well right now I'm mostly interested in making device
+drivers independent of the arch/arm/*omap*/* code.
+That's where Afzal's patches help quite a bit, so let's
+get those in first. So from that point of view, option #1
+above sounds better as the first step :)
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+Ideally of course option #1 should not limit us from
+adding extra features in the long run.
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 992982c..a4a4247 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1277,6 +1277,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 	struct clk *clk;
- 	int secondary_irq;
- 	void __iomem *base;
-+	int irq_start = -1;
- 	int irq;
- 	int ret;
- 
-@@ -1380,19 +1381,11 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 
- 	platform_set_drvdata(dev, nmk_chip);
- 
--	if (np) {
--		/* The DT case will just grab a set of IRQ numbers */
--		nmk_chip->domain = irq_domain_add_linear(np, NMK_GPIO_PER_CHIP,
--				&nmk_gpio_irq_simple_ops, nmk_chip);
--	} else {
--		/* Non-DT legacy mode, use hardwired IRQ numbers */
--		int irq_start;
--
-+	if (!np)
- 		irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
--		nmk_chip->domain = irq_domain_add_simple(NULL,
-+	nmk_chip->domain = irq_domain_add_simple(NULL,
- 				NMK_GPIO_PER_CHIP, irq_start,
- 				&nmk_gpio_irq_simple_ops, nmk_chip);
--	}
- 	if (!nmk_chip->domain) {
- 		dev_err(&dev->dev, "failed to create irqdomain\n");
- 		ret = -ENOSYS;
--- 
-1.7.11.3
+Regards,
+
+Tony 
