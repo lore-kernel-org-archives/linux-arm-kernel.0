@@ -1,47 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Oct 2012 13:20:00 +0000
-Subject: [PATCH v2] vfs: bogus warnings in fs/namei.c
-In-Reply-To: <20121011043734.GE2616@ZenIV.linux.org.uk>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <201210091307.19225.arnd@arndb.de> <20121011043734.GE2616@ZenIV.linux.org.uk>
-Message-ID: <201210111320.01047.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Oct 2012 08:20:14 -0500
+Subject: alignment faults in 3.6
+In-Reply-To: <1349959248.21172.8970.camel@edumazet-glaptop>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <20121011103257.GO4625@n2100.arm.linux.org.uk>
+ <1349952574.21172.8604.camel@edumazet-glaptop>
+ <201210111228.25995.arnd@arndb.de>
+ <1349959248.21172.8970.camel@edumazet-glaptop>
+Message-ID: <5076C78E.1020408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The follow_link() function always initializes its *p argument,
-or returns an error, but when building with 'gcc -s', the compiler
-gets confused by the __always_inline attribute to the function
-and can no longer detect where the cookie was initialized.
+On 10/11/2012 07:40 AM, Eric Dumazet wrote:
+> On Thu, 2012-10-11 at 12:28 +0000, Arnd Bergmann wrote:
+> 
+>>
+>> Rob Herring as the original reporter has dropped off the Cc list, adding
+>> him back.
+>>
+>> I assume that the calxeda xgmac driver is the culprit then. It uses
+>> netdev_alloc_skb() rather than netdev_alloc_skb_ip_align() in
+>> xgmac_rx_refill but it is not clear whether it does so intentionally
+>> or by accident.
 
-The solution is to always initialize the pointer from follow_link,
-even in the error path. When building with -O2, this has zero impact
-on generated code and adds a single instruction in the error path
-for a -Os build on ARM.
+This in fact does work and eliminates the unaligned traps. However, not
+all h/w can do IP aligned DMA (i.MX FEC for example), so I still think
+this is a questionable optimization by the compiler. We're saving 1 load
+instruction here for data that is likely already in the cache. It may be
+legal per the ABI, but the downside of this optimization is much greater
+than the upside.
 
-Without this patch, building with gcc-4.6 through gcc-4.8 and
-CONFIG_CC_OPTIMIZE_FOR_SIZE results in:
+> 
+> Thanks Arnd
+> 
+> It seems an accident, since driver doesnt check skb->data alignment at
+> all (this can change with SLAB debug on/off)
+> 
+> It also incorrectly adds 64 bytes to bfsize, there is no need for this.
 
-fs/namei.c: In function 'link_path_walk':
-fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-fs/namei.c:1544:9: note: 'cookie' was declared here
-fs/namei.c: In function 'path_lookupat':
-fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-fs/namei.c:1934:10: note: 'cookie' was declared here
-fs/namei.c: In function 'path_openat':
-fs/namei.c:649:24: warning: 'cookie' may be used uninitialized in this function [-Wuninitialized]
-fs/namei.c:2899:9: note: 'cookie' was declared here
+I'm pretty sure this was needed as the h/w writes out full bursts of
+data, but I'll go back and check.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Rob
 
-diff --git a/fs/namei.c b/fs/namei.c
-index 6d47fac..c1f18e4 100644
---- a/fs/namei.c
-+++ b/fs/namei.c
-@@ -810,6 +810,7 @@ follow_link(struct path *link, struct nameidata *nd, void **p)
- 	return error;
- 
- out_put_nd_path:
-+	*p = NULL;
- 	path_put(&nd->path);
- 	path_put(link);
- 	return error;
+> (or if its needed, a comment would be nice, because on prior kernels,
+> this makes skb->head allocations uses kmalloc-4096 instead of
+> kmalloc-2048 slab cache... With 3.7 its less an issue now we use order-3
+> pages to deliver fragments for rx skbs
+>
+> So the following patch should fix the alignment, and makes driver uses
+> half memory than before for stable kernels
+> 
+> diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
+> index 16814b3..a895e18 100644
+> --- a/drivers/net/ethernet/calxeda/xgmac.c
+> +++ b/drivers/net/ethernet/calxeda/xgmac.c
+> @@ -671,7 +671,8 @@ static void xgmac_rx_refill(struct xgmac_priv *priv)
+>  		p = priv->dma_rx + entry;
+>  
+>  		if (priv->rx_skbuff[entry] == NULL) {
+> -			skb = netdev_alloc_skb(priv->dev, priv->dma_buf_sz);
+> +			skb = netdev_alloc_skb_ip_align(priv->dev,
+> +							priv->dma_buf_sz);
+>  			if (unlikely(skb == NULL))
+>  				break;
+>  
+> @@ -703,7 +704,7 @@ static int xgmac_dma_desc_rings_init(struct net_device *dev)
+>  	/* Set the Buffer size according to the MTU;
+>  	 * indeed, in case of jumbo we need to bump-up the buffer sizes.
+>  	 */
+> -	bfsize = ALIGN(dev->mtu + ETH_HLEN + ETH_FCS_LEN + NET_IP_ALIGN + 64,
+> +	bfsize = ALIGN(dev->mtu + ETH_HLEN + ETH_FCS_LEN,
+>  		       64);
+>  
+>  	netdev_dbg(priv->dev, "mtu [%d] bfsize [%d]\n", dev->mtu, bfsize);
+> 
+> 
