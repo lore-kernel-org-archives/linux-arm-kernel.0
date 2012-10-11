@@ -1,47 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Oct 2012 16:49:44 +0100
-Subject: [PATCH 4/8] cpufreq: db8500: Fetch cpufreq table from platform
- data
-In-Reply-To: <20121011134140.GA15428@gmail.com>
-References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
- <1349869349-8070-5-git-send-email-ulf.hansson@stericsson.com>
- <20121011134140.GA15428@gmail.com>
-Message-ID: <20121011154944.GG15428@gmail.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Thu, 11 Oct 2012 16:39:38 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <5076E472.8030703@gmail.com>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <20121011103257.GO4625@n2100.arm.linux.org.uk>
+ <1349952574.21172.8604.camel@edumazet-glaptop>
+ <201210111228.25995.arnd@arndb.de>
+ <1349959248.21172.8970.camel@edumazet-glaptop> <5076C78E.1020408@gmail.com>
+ <1349963227.21172.9188.camel@edumazet-glaptop> <5076E472.8030703@gmail.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Oct 2012, Lee Jones wrote:
-
-> > -static struct cpufreq_frequency_table freq_table[] = {
-> > -	[0] = {
-> > -		.index = 0,
-> > -		.frequency = 200000,
-> > -	},
-> > -	[1] = {
-> > -		.index = 1,
-> > -		.frequency = 400000,
-> > -	},
-> > -	[2] = {
-> > -		.index = 2,
-> > -		.frequency = 800000,
-> > -	},
-> > -	[3] = {
-> > -		/* Used for MAX_OPP, if available */
-> > -		.index = 3,
-> > -		.frequency = CPUFREQ_TABLE_END,
-> > -	},
-> > -	[4] = {
-> > -		.index = 4,
-> > -		.frequency = CPUFREQ_TABLE_END,
-> > -	},
-> > -};
+ 
+> Not exactly. It is asked to to perform 2 32-bit loads which are combined
+> into a single ldm (load multiple) which cannot handle unaligned
+> accesses. Here's a simple example that does the same thing:
 > 
-> So where has this table gone? Am I missing a patch?
+> void test(char * buf)
+> {
+> 	printf("%d, %d\n", *((unsigned int *)&buf[0]), *((unsigned int *)&buf[4]));
+> }
 
-Ah, I see it now. Nice!
+Have you actually looked at what an ARM processor traditionally did
+with misaligned memory reads?
+While useful, it probably wasn't what was intended.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Actually, and IIRC, some very recent ARM cpus will do the 'expected'
+thing for single-word loads from misaligned addesses.
+However they almost certainly won't for ldm/stm.
+
+The 'ldm' optimisation for adjacent memory loads is also dubious.
+On at least some ARMs it is very slow (might only be strongarms).
+
+> So I guess the only ABI legal unaligned access is in a packed struct.
+
+Correct. And you mustn't try casting the address, the compiler is
+allowed to remember where it came from.
+(This causes a lot of grief...)
+
+If you are targeting the ARM cpu that can do misaligned transfers,
+then gcc should generate single instructions for misaligned structure
+members, and never do the 'ldm' optimisations.
+
+But, the IP header is expected to be aligned.
+
+	David
