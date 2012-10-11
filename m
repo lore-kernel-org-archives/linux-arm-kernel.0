@@ -1,83 +1,67 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 11 Oct 2012 11:46:45 +0530
-Subject: [PATCH 1/3] ARM: dts: Renaming elpida_ecb240abacn.dtsi as
- lpddr2_data.dtsi
-In-Reply-To: <50758AA0.5080307@ti.com>
-References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
- <1349870716-25511-2-git-send-email-lokeshvutla@ti.com>
- <50758AA0.5080307@ti.com>
-Message-ID: <5076644D.5050703@ti.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 11 Oct 2012 08:35:47 +0200
+Subject: [PATCH] usb: remove CONFIG_USB_MUSB_HOST etc
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3E9CA495@DBDE01.ent.ti.com>
+References: <A73F36158E33644199EB82C5EC81C7BC3E9CA495@DBDE01.ent.ti.com>
+Message-ID: <507668C3.6080908@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ devicetree-discuss
+Hello Manjunathappa
 
-Hi Benoit,
-
-On Wednesday 10 October 2012 08:18 PM, Benoit Cousson wrote:
-> Hi Lokesh,
->
-> On 10/10/2012 02:05 PM, Lokesh Vutla wrote:
->> Renaming elpida_ecb240abacn.dtsi file generic, so that the
->> same file can be reused for other parts from different vendors.
->
-> Could you elaborate a little bit?
-> Are these settings purely reflecting lpddr2 spec timings?
-
-The basic idea is to group data for all the lpddr2 devices in a single 
-file instead of creating separate file for each lpddr2 device.
-
-Right now the file elpida_ecb240abacn.dtsi contains only data for 
-lpddr2-s4 2G parts from Elpida.
-I wanted to add data for lpddr2-s4 4G parts from Samsung.
-So I renamed the file elpida_ecb240abacn.dtsi as lpddr2_data.dtsi.
-
-Please let me know if more clarification is needed.
-
-Thanks,
-Lokesh
->
-> Regards,
-> Benoit
->
->
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+On 11.10.2012 07:42, Manjunathappa, Prakash wrote:
+> Hi,
+> On Mon, Oct 08, 2012 at 18:47:07, Constantine Shulyupin wrote:
+>> From: Constantine Shulyupin<const@MakeLinux.com>
+>>
+>> Remove USB configuration in arch/arm/mach-davinci/usb.c accordingly
+>> CONFIG_USB_MUSB_OTG CONFIG_USB_MUSB_PERIPHERAL CONFIG_USB_MUSB_HOST
+>> and set MUSB_OTG configuration by default
+>> because this configuration options are removed from Kconfig.
+>>
+>> Signed-off-by: Constantine Shulyupin<const@MakeLinux.com>
+>>
 >> ---
->>   arch/arm/boot/dts/{elpida_ecb240abacn.dtsi => lpddr2_data.dtsi} |    0
->>   arch/arm/boot/dts/omap4-panda.dts                               |    2 +-
->>   arch/arm/boot/dts/omap4-sdp.dts                                 |    2 +-
->>   3 files changed, 2 insertions(+), 2 deletions(-)
->>   rename arch/arm/boot/dts/{elpida_ecb240abacn.dtsi => lpddr2_data.dtsi} (100%)
+>>   arch/arm/mach-davinci/usb.c |    6 ------
+>>   1 file changed, 6 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/elpida_ecb240abacn.dtsi b/arch/arm/boot/dts/lpddr2_data.dtsi
->> similarity index 100%
->> rename from arch/arm/boot/dts/elpida_ecb240abacn.dtsi
->> rename to arch/arm/boot/dts/lpddr2_data.dtsi
->> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
->> index 20b966e..09d3a32 100644
->> --- a/arch/arm/boot/dts/omap4-panda.dts
->> +++ b/arch/arm/boot/dts/omap4-panda.dts
->> @@ -8,7 +8,7 @@
->>   /dts-v1/;
+>> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+>> index f77b953..34509ff 100644
+>> --- a/arch/arm/mach-davinci/usb.c
+>> +++ b/arch/arm/mach-davinci/usb.c
+>> @@ -42,14 +42,8 @@ static struct musb_hdrc_config musb_config = {
+>>   };
 >>
->>   /include/ "omap4.dtsi"
->> -/include/ "elpida_ecb240abacn.dtsi"
->> +/include/ "lpddr2_data.dtsi"
->>
->>   / {
->>   	model = "TI OMAP4 PandaBoard";
->> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
->> index 94a23b3..dd749fc 100644
->> --- a/arch/arm/boot/dts/omap4-sdp.dts
->> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->> @@ -8,7 +8,7 @@
->>   /dts-v1/;
->>
->>   /include/ "omap4.dtsi"
->> -/include/ "elpida_ecb240abacn.dtsi"
->> +/include/ "lpddr2_data.dtsi"
->>
->>   / {
->>   	model = "TI OMAP4 SDP board";
->>
+>>   static struct musb_hdrc_platform_data usb_data = {
+>> -#if defined(CONFIG_USB_MUSB_OTG)
+>>   	/* OTG requires a Mini-AB connector */
+>>   	.mode           = MUSB_OTG,
+>> -#elif defined(CONFIG_USB_MUSB_PERIPHERAL)
+>> -	.mode           = MUSB_PERIPHERAL,
+>> -#elif defined(CONFIG_USB_MUSB_HOST)
+>> -	.mode           = MUSB_HOST,
+>> -#endif
+>>   	.clock		= "usb",
+>>   	.config		=&musb_config,
+>>   };
 >
+> Tested it on DM6446-EVM for host mode with MSC thumb drive and gadget
+> mode with g-ether. It works.
+>
+> Acked-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+
+I sent a similiar patch here:
+
+http://comments.gmane.org/gmane.linux.usb.general/54512
+
+If the issues, mentioned from Sergei for my patch, nullified I add my:
+
+Acked-by: Heiko Schocher <hs@denx.de>
+
+for this patch.
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
