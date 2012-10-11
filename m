@@ -1,51 +1,41 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 11 Oct 2012 14:00:33 +0200
-Subject: alignment faults in 3.6
-In-Reply-To: <1349956456.21172.8820.camel@edumazet-glaptop>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
- <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
- <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
- <yw1xpq4ppcju.fsf@unicorn.mansr.com>
- <1349949638.21172.8445.camel@edumazet-glaptop>
- <1349950926.21172.8521.camel@edumazet-glaptop>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <1349952970.1232.5.camel@sakura.staff.proxad.net>
- <1349954899.21172.8728.camel@edumazet-glaptop>
- <1349956055.1232.9.camel@sakura.staff.proxad.net>
- <1349956456.21172.8820.camel@edumazet-glaptop>
-Message-ID: <1349956833.21172.8841.camel@edumazet-glaptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Oct 2012 12:10:11 +0000
+Subject: [PATCH] pinctrl/nomadik: support other alternate-C functions
+In-Reply-To: <1349185041-1810-1-git-send-email-linus.walleij@stericsson.com>
+References: <1349185041-1810-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201210111210.12122.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-11 at 13:54 +0200, Eric Dumazet wrote:
-> On Thu, 2012-10-11 at 13:47 +0200, Maxime Bizon wrote:
-> > On Thu, 2012-10-11 at 13:28 +0200, Eric Dumazet wrote:
-> > 
-> > > You probably are aware that a driver can use : 
-> > > 
-> > > - a fragment to hold the frame given by the hardware, with whatever
-> > > alignment is needed by the hardware.
-> > > 
-> > > Then allocate an skb with enough room (128 bytes) to pull the headers as
-> > > needed later.
-> > > 
-> > > skb = netdev_alloc_skb_ip_align(dev, 128);
-> > 
-> > What happen at tx time, supposing that same hardware cannot do SG ?
-> > 
-> > Aren't we going to memcpy the data into the head ?
-> > 
-> 
-> Of course, if you use a forwarding setup, and the tx driver is not SG
-> capable, performance will be bad (You have to copy the data into a
-> single skb (linearize the skb)) 
+On Tuesday 02 October 2012, Linus Walleij wrote:
+> --- a/drivers/pinctrl/pinctrl-nomadik.c
+> +++ b/drivers/pinctrl/pinctrl-nomadik.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/pinctrl/pinconf.h>
+>  /* Since we request GPIOs from ourself */
+>  #include <linux/pinctrl/consumer.h>
+> +#include <linux/mfd/dbx500-prcmu.h>
+>  
+>  #include <asm/mach/irq.h>
+>  
 
-By the way, if said driver also has alignments issues, it will probably
-copy the packet given by the stack. (Think you added an IPIP
-encapsulation)
+This patch just showed up in linux-next and caused this error
+when building nhk8815_defconfig:
 
-It would be better for such driver to still pretend it can do SG,
-and it does the copy itself, avoiding the prior copies in core stack.
+In file included from /home/arnd/linux-arm/drivers/pinctrl/pinctrl-nomadik.c:33:0:
+/home/arnd/linux-arm/include/linux/mfd/dbx500-prcmu.h:459:90: error: redefinition of 'prcmu_abb_read'
+/home/arnd/linux-arm/include/linux/mfd/db8500-prcmu.h:673:90: note: previous definition of 'prcmu_abb_read' was here
+/home/arnd/linux-arm/include/linux/mfd/dbx500-prcmu.h:464:90: error: redefinition of 'prcmu_abb_write'
+/home/arnd/linux-arm/include/linux/mfd/db8500-prcmu.h:678:90: note: previous definition of 'prcmu_abb_write' was here
+/home/arnd/linux-arm/include/linux/mfd/dbx500-prcmu.h:475:90: error: redefinition of 'prcmu_config_clkout'
+/home/arnd/linux-arm/include/linux/mfd/db8500-prcmu.h:643:90: note: previous definition of 'prcmu_config_clkout' was here
+/home/arnd/linux-arm/include/linux/mfd/dbx500-prcmu.h:537:90: error: redefinition of 'prcmu_ac_wake_req'
+/home/arnd/linux-arm/include/linux/mfd/db8500-prcmu.h:683:90: note: previous definition of 'prcmu_ac_wake_req' was here
+/home/arnd/linux-arm/include/linux/mfd/dbx500-prcmu.h:542:91: error: redefinition of 'prcmu_ac_sleep_req'
+/home/arnd/linux-arm/include/linux/mfd/db8500-prcmu.h:688:91: note: previous definition of 'prcmu_ac_sleep_req' was here
+make[2]: *** [drivers/pinctrl/pinctrl-nomadik.o] Error 1
+make[1]: *** [drivers/pinctrl/] Error 2
+make: *** [sub-make] Error 2
+
+
+	Arnd
