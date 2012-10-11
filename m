@@ -1,34 +1,77 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Oct 2012 17:28:00 +0200
-Subject: [PATCH v2 2/4] net: mvneta: update MAINTAINERS file for the mvneta
- maintainers
+Date: Thu, 11 Oct 2012 17:28:01 +0200
+Subject: [PATCH v2 3/4] arm: mvebu: add Ethernet controllers using mvneta
+ driver for Armada 370/XP
 In-Reply-To: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1349969282-12676-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1349969282-12676-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Armada 370 SoC has two network units, while the Armada XP has four
+network units. The first two network units are common to both the
+Armada XP and Armada 370, so they are added to armada-370-xp.dtsi,
+while the other two network units are specific to the Armada XP and
+therefore added to armada-xp.dtsi.
+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- MAINTAINERS |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/armada-370-xp.dtsi |   16 ++++++++++++++++
+ arch/arm/boot/dts/armada-xp.dtsi     |   16 ++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9a6c4da..163533c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4438,6 +4438,12 @@ S:	Maintained
- F:	drivers/net/ethernet/marvell/mv643xx_eth.*
- F:	include/linux/mv643xx.h
- 
-+MARVELL MVNETA ETHERNET DRIVER
-+M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+L:	netdev at vger.kernel.org
-+S:	Maintained
-+F:	drivers/net/ethernet/marvell/mvneta.*
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 6b6b932..52af710 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -63,6 +63,22 @@
+ 			       reg = <0xd0020300 0x30>;
+ 			       interrupts = <37>, <38>, <39>, <40>;
+ 		};
 +
- MARVELL MWIFIEX WIRELESS DRIVER
- M:	Bing Zhao <bzhao@marvell.com>
- L:	linux-wireless at vger.kernel.org
++                eth at d0070000 {
++                               compatible = "marvell,neta";
++                               reg = <0xd0070000 0x2500>;
++                               interrupts = <8>;
++                               device_type = "network";
++                               status = "disabled";
++                };
++
++                eth at d0074000 {
++                               compatible = "marvell,neta";
++                               reg = <0xd0074000 0x2500>;
++                               interrupts = <10>;
++                               device_type = "network";
++                               status = "disabled";
++                };
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 71d6b5d..59167dc 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -51,5 +51,21 @@
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0xd0018200 0x500>;
+ 		};
++
++                eth at d0030000 {
++                               compatible = "marvell,neta";
++                               reg = <0xd0030000 0x2500>;
++                               interrupts = <12>;
++                               device_type = "network";
++                               status = "disabled";
++                };
++
++                eth at d0034000 {
++                               compatible = "marvell,neta";
++                               reg = <0xd0034000 0x2500>;
++                               interrupts = <14>;
++                               device_type = "network";
++                               status = "disabled";
++                };
+ 	};
+ };
 -- 
 1.7.9.5
