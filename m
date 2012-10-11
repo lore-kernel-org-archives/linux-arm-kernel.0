@@ -1,92 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Oct 2012 15:15:27 +0100
-Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
-In-Reply-To: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
-References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Oct 2012 16:20:40 +0200
+Subject: [PATCH v2 00/15] pinctrl: samsung: Usability and extensibiltiy
+ improvements
+In-Reply-To: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
+References: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkdZEi85QjM9OH2zVet=E7whdc_cfCyOtdmumUio-ccrZ-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
+On Thu, Oct 11, 2012 at 10:11 AM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
-Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
----
- drivers/input/keyboard/gpio_keys.c |   16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+> This patch series is a work on improving usability and extensibiltiy of
+> the pinctrl-samsung driver. It consists of three main parts:
+>  - improving flexibility of SoC-specific data specification
+>  - converting the driver to one GPIO chip and IRQ domain per pin bank
+>  - improving wake-up IRQ setup and handling
 
-diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
-index 7947315..78de557 100644
---- a/drivers/input/keyboard/gpio_keys.c
-+++ b/drivers/input/keyboard/gpio_keys.c
-@@ -29,6 +29,7 @@
- #include <linux/of_platform.h>
- #include <linux/of_gpio.h>
- #include <linux/spinlock.h>
-+#include <linux/pm_runtime.h>
- 
- struct gpio_button_data {
- 	const struct gpio_keys_button *button;
-@@ -526,6 +527,7 @@ static int gpio_keys_open(struct input_dev *input)
- {
- 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
- 
-+	pm_runtime_get_sync(input->dev.parent);
- 	ddata->enabled = true;
- 	return ddata->enable ? ddata->enable(input->dev.parent) : 0;
- }
-@@ -537,6 +539,7 @@ static void gpio_keys_close(struct input_dev *input)
- 	if (ddata->disable)
- 		ddata->disable(input->dev.parent);
- 	ddata->enabled = false;
-+	pm_runtime_put(input->dev.parent);
- }
- 
- /*
-@@ -695,6 +698,8 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
- 	input->id.product = 0x0001;
- 	input->id.version = 0x0100;
- 
-+	pm_runtime_enable(&pdev->dev);
-+
- 	/* Enable auto repeat feature of Linux input subsystem */
- 	if (pdata->rep)
- 		__set_bit(EV_REP, input->evbit);
-@@ -760,6 +765,8 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
- 	struct input_dev *input = ddata->input;
- 	int i;
- 
-+	pm_runtime_disable(&pdev->dev);
-+
- 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
- 
- 	device_init_wakeup(&pdev->dev, 0);
-@@ -796,8 +803,8 @@ static int gpio_keys_suspend(struct device *dev)
- 		}
- 	} else {
- 		ddata->enable_after_suspend = ddata->enabled;
--		if (ddata->enabled)
--			gpio_keys_close(ddata->input);
-+		if (ddata->enabled && ddata->disable)
-+			ddata->disable(dev);
- 	}
- 
- 	return 0;
-@@ -817,8 +824,9 @@ static int gpio_keys_resume(struct device *dev)
- 			gpio_keys_gpio_report_event(bdata);
- 	}
- 
--	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
--		gpio_keys_open(ddata->input);
-+	if (!device_may_wakeup(dev) && ddata->enable_after_suspend
-+	    && ddata->enable)
-+		ddata->enable(dev);
- 
- 	input_sync(ddata->input);
- 
--- 
-1.7.9.5
+OK I managed to apply this series (I have a separate "samsung"
+branch in the pinctrl tree now) and merged into for-next for some
+testing in linux-next.
+
+Applied Kyungmin's reviewed-by and Thomas' acked-by on all.
+
+Thanks!
+Linus Walleij
