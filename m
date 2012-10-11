@@ -1,51 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 11 Oct 2012 10:46:57 -0500
-Subject: [PATCH v2 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5076E9F1.60200@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Oct 2012 16:49:44 +0100
+Subject: [PATCH 4/8] cpufreq: db8500: Fetch cpufreq table from platform
+ data
+In-Reply-To: <20121011134140.GA15428@gmail.com>
+References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
+ <1349869349-8070-5-git-send-email-ulf.hansson@stericsson.com>
+ <20121011134140.GA15428@gmail.com>
+Message-ID: <20121011154944.GG15428@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 10:27 AM, Thomas Petazzoni wrote:
-> This patch contains a new network driver for the network unit of the
-> ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
-> processor, a Marvell-developed ARM core that implements the ARMv7
-> instruction set.
+On Thu, 11 Oct 2012, Lee Jones wrote:
 
+> > -static struct cpufreq_frequency_table freq_table[] = {
+> > -	[0] = {
+> > -		.index = 0,
+> > -		.frequency = 200000,
+> > -	},
+> > -	[1] = {
+> > -		.index = 1,
+> > -		.frequency = 400000,
+> > -	},
+> > -	[2] = {
+> > -		.index = 2,
+> > -		.frequency = 800000,
+> > -	},
+> > -	[3] = {
+> > -		/* Used for MAX_OPP, if available */
+> > -		.index = 3,
+> > -		.frequency = CPUFREQ_TABLE_END,
+> > -	},
+> > -	[4] = {
+> > -		.index = 4,
+> > -		.frequency = CPUFREQ_TABLE_END,
+> > -	},
+> > -};
+> 
+> So where has this table gone? Am I missing a patch?
 
-> diff --git a/Documentation/devicetree/bindings/net/marvell-neta.txt b/Documentation/devicetree/bindings/net/marvell-neta.txt
-> new file mode 100644
-> index 0000000..a031978
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/marvell-neta.txt
-> @@ -0,0 +1,24 @@
-> +* Marvell Armada 370 / Armada XP Ethernet Controller (NETA)
-> +
-> +Required properties:
-> +- compatible: should be "marvell,neta".
+Ah, I see it now. Nice!
 
-This should be more specific such as "marvell,armada-xp-neta".
-
-Or use 370 instead of xp. It should be which ever chip came first.
-
-> +- reg: address and length of the register set for the device.
-> +- interrupts: interrupt for the device
-> +- phy-mode: String, operation mode of the PHY interface. Supported
-> +  values are "sgmii" and "rmii".
-> +- phy-addr: Integer, address of the PHY.
-> +- device_type: should be "network".
-
-Drop this. device_type is not used for FDT.
-
-> +- clock-frequency: frequency of the peripheral clock of the SoC.
-> +
-> +Example:
-> +
-> +eth at d0070000 {
-
-Should be ethernet at ...
-
-Rob
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
