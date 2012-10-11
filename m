@@ -1,74 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 11 Oct 2012 14:20:24 +0530
-Subject: [PATCH] usb: remove CONFIG_USB_MUSB_HOST etc
-In-Reply-To: <507668C3.6080908@denx.de>
-References: <A73F36158E33644199EB82C5EC81C7BC3E9CA495@DBDE01.ent.ti.com>
- <507668C3.6080908@denx.de>
-Message-ID: <50768850.7030607@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 11 Oct 2012 10:50:02 +0200
+Subject: [PATCH 4/6] ARM: ux500: Add UART support to the u9540 Device Tree
+In-Reply-To: <20121011072927.GR9707@gmail.com>
+References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
+ <1349882335-6786-5-git-send-email-lee.jones@linaro.org>
+ <20121010190325.GT12801@game.jcrosoft.org>
+ <20121011072927.GR9707@gmail.com>
+Message-ID: <20121011085002.GV12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 12:05 PM, Heiko Schocher wrote:
-> Hello Manjunathappa
+On 08:29 Thu 11 Oct     , Lee Jones wrote:
+> On Wed, 10 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-> On 11.10.2012 07:42, Manjunathappa, Prakash wrote:
->> Hi,
->> On Mon, Oct 08, 2012 at 18:47:07, Constantine Shulyupin wrote:
->>> From: Constantine Shulyupin<const@MakeLinux.com>
->>>
->>> Remove USB configuration in arch/arm/mach-davinci/usb.c accordingly
->>> CONFIG_USB_MUSB_OTG CONFIG_USB_MUSB_PERIPHERAL CONFIG_USB_MUSB_HOST
->>> and set MUSB_OTG configuration by default
->>> because this configuration options are removed from Kconfig.
->>>
->>> Signed-off-by: Constantine Shulyupin<const@MakeLinux.com>
->>>
->>> ---
->>>   arch/arm/mach-davinci/usb.c |    6 ------
->>>   1 file changed, 6 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
->>> index f77b953..34509ff 100644
->>> --- a/arch/arm/mach-davinci/usb.c
->>> +++ b/arch/arm/mach-davinci/usb.c
->>> @@ -42,14 +42,8 @@ static struct musb_hdrc_config musb_config = {
->>>   };
->>>
->>>   static struct musb_hdrc_platform_data usb_data = {
->>> -#if defined(CONFIG_USB_MUSB_OTG)
->>>       /* OTG requires a Mini-AB connector */
->>>       .mode           = MUSB_OTG,
->>> -#elif defined(CONFIG_USB_MUSB_PERIPHERAL)
->>> -    .mode           = MUSB_PERIPHERAL,
->>> -#elif defined(CONFIG_USB_MUSB_HOST)
->>> -    .mode           = MUSB_HOST,
->>> -#endif
->>>       .clock        = "usb",
->>>       .config        =&musb_config,
->>>   };
->>
->> Tested it on DM6446-EVM for host mode with MSC thumb drive and gadget
->> mode with g-ether. It works.
->>
->> Acked-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+> > On 16:18 Wed 10 Oct     , Lee Jones wrote:
+> > > Add the 3 UART nodes required to enable serial ports on the u9540.
+> > > 
+> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  arch/arm/boot/dts/u9540.dts |   13 ++++++++++++-
+> > dts? it's dtsi
 > 
-> I sent a similiar patch here:
-> 
-> http://comments.gmane.org/gmane.linux.usb.general/54512
-> 
-> If the issues, mentioned from Sergei for my patch, nullified I add my:
+> No it's not.
+so the name of the file is wrong s u9540 is a SoC name
 
-The last outstanding issue from Sergei seems to be additional comments
-describing why MUSB_OTG is OK to use.
-
-Prakash/Constantine,
-
-Did you have to make any hardware changes when testing host/gadget on
-DM6446 EVM? Or change in kernel configuration?
-
-It appears that there is no way to choose any of the config option
-affecting the mode setting. Right now it seems to be just defaulting to
-MUSB_UNDEFINED. Setting it to MUSB_OTG would be better than that.
-
-Thanks,
-Sekhar
+Best Regards,
+J.
