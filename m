@@ -1,33 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Oct 2012 15:03:55 +0100
-Subject: bug with 3.4.6, 3.5.3, 3.6.1
-In-Reply-To: <5076D12A.1070700@xenomai.org>
-References: <50765D3B.6000909@xenomai.org>
- <20121011103637.GC30598@mudshark.cambridge.arm.com>
- <5076CA56.3020006@xenomai.org>
- <20121011135905.GL30598@mudshark.cambridge.arm.com>
- <5076D12A.1070700@xenomai.org>
-Message-ID: <20121011140355.GM30598@mudshark.cambridge.arm.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 11 Oct 2012 09:05:22 -0500
+Subject: [RFC 00/24] OMAP serial driver flow control fixes, and preparation
+ for DMA engine conversion
+In-Reply-To: <50769D8C.8030401@ti.com>
+References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
+ <507427DA.6020409@ti.com> <87mwzuxjtc.fsf@deeprootsystems.com>
+ <507694CF.3020204@ti.com> <20121011095443.GH28061@n2100.arm.linux.org.uk>
+ <50769D8C.8030401@ti.com>
+Message-ID: <5076D222.5080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 03:01:14PM +0100, Gilles Chanteperdrix wrote:
-> On 10/11/2012 03:59 PM, Will Deacon wrote:
-> > On Thu, Oct 11, 2012 at 02:32:06PM +0100, Gilles Chanteperdrix wrote:
-> >> So, PHYS_OFFSET is 0x80000000 that is, 2GB.
-> > 
-> > Argh, then there's something fishy with the interaction between the idmap
-> > and swapper. The overwritten entries *should* be identical, but something is
-> > causing us to corrupt the initial tables from pgd_alloc(). Perhaps something
-> > to do with us mapping in sections...
-> > 
-> > I'll have to do some digging and get back to you.
-> 
-> To satisfy my curiosity, what is the difference between VMSPLIT_3G and
-> VMSPLIT_2G? The fact that with VMSPLIT_2G with have physical == virtual?
+Hi Sourav,
 
-Yup, but we still create an idmap in that case (we could detect this case
-and avoid doing it instead) and somehow it's corrupting the underlying
-kernel mapping, despite mapping the same stuff.
+On 10/11/2012 05:21 AM, Sourav wrote:
 
-Will
+[snip]
+
+> I already enable software flow control and did the testing on beagle,
+> where things are working fine
+> after off mode.
+> But if I enable hardware flow control, the teraterm does not allow me to
+> load my fs and uImage from mmc.
+> If you have any pointers on how to test hardware flow control, I will
+> like to do that on my beagle board.
+
+For h/w flow control, you need to check if the CTS and RTS signals are
+being brought out to the serial header on the beagle-board. Looking at
+the schematics for the 3430 beagle board, it appears that only the UART
+RX and TX signals are available on the serial header. Therefore, I don't
+believe you can test h/w flow control using the console with that board.
+
+I do see that you can access all the UART2 signals (RX/TX/CTS/RTS) via
+the expansion connector on the beagle. However, to connect to a serial
+port on a PC you need to have a voltage level-shifter in-between. There
+are some companies out there that make them [1], but you need to make
+sure you have one that can support a 1.8V input.
+
+Cheers
+Jon
+
+[1] http://elinux.org/RS232_Level_Shifter
