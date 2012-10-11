@@ -1,96 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 11 Oct 2012 13:45:00 +0530
-Subject: [PATCH 3/3] ARM: dts: EMIF and LPDDR2 device tree data for OMAP5
- boards
-In-Reply-To: <50767F42.9000807@ti.com>
-References: <1349870716-25511-1-git-send-email-lokeshvutla@ti.com>
- <1349870716-25511-4-git-send-email-lokeshvutla@ti.com>
- <50758DC7.3070408@ti.com> <5076644A.10504@ti.com> <50767F42.9000807@ti.com>
-Message-ID: <50768004.80503@ti.com>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Thu, 11 Oct 2012 10:21:49 +0200
+Subject: [PATCH 4/4] mtd: nand: omap2: Add data correction support
+In-Reply-To: <518397C60809E147AF5323E0420B992E3E9CB751@DBDE01.ent.ti.com>
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-5-git-send-email-avinashphilip@ti.com>
+ <20121003192044.GB27502@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9B8A65@DBDE01.ent.ti.com>
+ <20121005142338.GA7199@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9CA829@DBDE01.ent.ti.com>
+ <20121010170806.GB13585@parrot.com>
+ <518397C60809E147AF5323E0420B992E3E9CB751@DBDE01.ent.ti.com>
+Message-ID: <20121011082149.GA15609@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 October 2012 01:41 PM, Benoit Cousson wrote:
-> Hi Lokesh,
->
-> On 10/11/2012 08:16 AM, Lokesh Vutla wrote:
->> + devicetree-discuss
->>
->> Hi Benoit,
->>
->> On Wednesday 10 October 2012 08:31 PM, Benoit Cousson wrote:
->>> On 10/10/2012 02:05 PM, Lokesh Vutla wrote:
->>>> Device tree data for the EMIF sdram controllers in OMAP5
->>>> and LPDDR2 memory devices attached to OMAP5 boards.
->>>
->>> Nit: Could you make a sentence with a verb to explain what you are doing
->>> in this patch.
->> I am really sorry about this.
->> I ll make sure that all patch descriptions will be clear in V2 of this
->> patch series.
->>
->> In this patch I am adding device tree data for LPDDR2 memory devices
->> attached to omap5-sevm and also adding device tree data for EMIF sdram
->> controllers in OMAP5.
->>>
->>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>> ---
->>>>    arch/arm/boot/dts/lpddr2_data.dtsi |   64
->>>> +++++++++++++++++++++++++++++++++++-
->>>>    arch/arm/boot/dts/omap5-evm.dts    |   11 +++++++
->>>>    arch/arm/boot/dts/omap5.dtsi       |   18 ++++++++++
->>>>    3 files changed, 92 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/lpddr2_data.dtsi
->>>> b/arch/arm/boot/dts/lpddr2_data.dtsi
->>>> index f97f70f..8e8c1bc 100644
->>>> --- a/arch/arm/boot/dts/lpddr2_data.dtsi
->>>> +++ b/arch/arm/boot/dts/lpddr2_data.dtsi
->>>> @@ -3,7 +3,7 @@
->>>>     */
->>>>
->>>>    / {
->>>> -    elpida_ECB240ABACN: lpddr2 {
->>>> +    elpida_ECB240ABACN: lpddr2 at 0 {
->>>>            compatible    = "Elpida,ECB240ABACN","jedec,lpddr2-s4";
->>>>            density        = <2048>;
->>>>            io-width    = <32>;
->>>> @@ -64,4 +64,66 @@
->>>>                tDQSCK-max-derated = <6000>;
->>>>            };
->>>>        };
->>>> +
->>>> +    samsung_K3PE0E000B: lpddr2 at 1 {
->>>
->>> I'm confused now, why are you reusing the same lpddr2_data.dtsi file?
->>> You should create a file per memory. That will make the reuse much
->>> easier.
->>>
->>> If the goal of your first patch was to do that, it is then the wrong
->>> approach.
->> Yes, I wanted to group data for all lppdr2 devices in a single file than
->> creating separate file for each device.
->> May be a dumb question, Why can't we group data for all the lpddr2
->> devices in a single file?
->
-> Well, why should we do that? What will be the advantage?
->
-> That will increase the size of the DTS/DTB with data nobody will care if
-> only one type of memory is used on a given platform.
->
-> Going in the same direction you can consider adding every OMAP
-> description into a single DTS... Does that really make sense?
->
-> So clearly there is no point doing that, it will cluttered the OMAP4 DTB
-> with useless Samsung memory data. And the same issue for OMAP5 board
-> that will contain Elpida memory information. And it will get worst each
-> time someone will want to add a new memory in this file.
->
-> You should just include the data you need for a given board.
->
-I agree with Benoit. Keeping the memory data files separate will be
-better and also if some non-omap boards is using the memory parts,
-the separate files can be re-used.
+On Thu, Oct 11, 2012 at 06:27:13AM +0100, Philip, Avinash wrote:
+(...)
+> > Another simple strategy could use the fact that you add a 14th zero byte to
+> > the 13 BCH bytes for RBL compatibility:
+> 
+> RBL compatibility (14th byte) is applicable only for BCH8 ecc scheme.
+> 
+> So I am planning adding an extra byte (0) for BCH4 ecc scheme. So with this
+> we can go for same approaches in BCH4 & BCH8 ecc scheme.
+> 
+> If I understood correctly, software BCH ecc scheme is modifying calculated
+> ecc data to handle bit flips in erased pages.
+> 
+> If that is the only reason, whether same logic can go for same ECC calculation
+> (remove modification of calculated ecc in case of software ecc correction)
+> by adding an extra byte (0) in spare area to handle erased pages.
+> 
+> So can you share if I am missing something?
 
-Regards
-Santosh
+Yes, the only reason why a constant polynomial is added to hw-generated ECC bytes is to transparently handle bitflips in erased pages.
+Handling erased pages this way has several benefits over the zero byte hack:
+- cleaner code, no checking of the zero byte
+- no expensive scan of data+spare area when reading an erased block: this step can significantly slow down the initial UBI scan (lots of erased pages to read)
+- no need to worry about the (very unlikely) possibility of having more than 4 bitflips in the zero byte
+
+OTOH, having the same ECC codes for both ELM and non-ELM chips with RBL compatibility sounds nice and would also simplify things.
+Note: on platforms where we use SW BCH correction, we also use the MLC OMAP boot mode, which is more robust and not compatible with 8-bit/4-bit BCH layouts.
+
+I don't know which way is better for the OMAP community:
+1. Unifying ECC modes = loosing the constant polynomial benefits, but gaining RBL compat and simplifying code
+2. Keeping separate ECC modes = code bloat
+
+Tony, do you have an opinion on this ?
+
+BTW, Afzal is submitting a series of patches [1] which are not compatible with your series; is there any plan to merge your patches ?
+
+BR,
+--
+Ivan
+
+[1] http://lists.infradead.org/pipermail/linux-mtd/2012-October/044374.html
