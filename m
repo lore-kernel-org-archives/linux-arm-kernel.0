@@ -1,96 +1,44 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu, 11 Oct 2012 22:58:31 +0200
-Subject: bug with 3.4.6, 3.5.3, 3.6.1
-In-Reply-To: <20121011195033.GA31946@mudshark.cambridge.arm.com>
-References: <50765D3B.6000909@xenomai.org>
- <20121011103637.GC30598@mudshark.cambridge.arm.com>
- <5076CA56.3020006@xenomai.org>
- <20121011135905.GL30598@mudshark.cambridge.arm.com>
- <5076D12A.1070700@xenomai.org>
- <20121011195033.GA31946@mudshark.cambridge.arm.com>
-Message-ID: <507732F7.9010800@xenomai.org>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Thu, 11 Oct 2012 21:20:24 +0000
+Subject: Booting vanilla kernel on the beaglebone
+In-Reply-To: <5076B2FE.8040000@ti.com>
+References: <20121011050948.GA2577@netboy.at.omicron.at>
+ <5076B2FE.8040000@ti.com>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9F451D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 09:50 PM, Will Deacon wrote:
+> -------- Original Message --------
+> Subject: Re: Booting vanilla kernel on the beaglebone
+> Date: Thu, 11 Oct 2012 07:09:48 +0200
+> From: Richard Cochran <richardcochran@gmail.com>
+> To: Hiremath, Vaibhav <hvaibhav@ti.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> <linux-arm-kernel@lists.infradead.org>
+> 
+> On Tue, Oct 09, 2012 at 06:34:18PM +0000, Hiremath, Vaibhav wrote:
+> >
+> > As I mentioned they are expected to get merged for rc1 and result of
+> > integration during merge window.
+> 
+> There is a DT binding document
+> 
+>    Documentation/devicetree/bindings/net/cpsw.txt
+> 
+> but cpsw does not appear in either am335x-bone.dts, am335x-evm.dts, or
+> am33xx.dtsi, or for that matter, in *any* dts file anywhere. I have
+> looked in mainline master, linux-next, and in the master branch of
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> 
+> Is there an issue keeping the cpsw/DT combination from working?
+> If not, is there a file dts for the bealgebone somewhere?
 
-> On 10/11/2012 03:59 PM, Will Deacon wrote:
->> I'll have to do some digging and get back to you.
-> 
-> Ok, so here's what I think is going on (although note that I'm at home now,
-> so I've not been able to test anything):
-> 
-> 	- Your PHYS_OFFSET is at 2GB, so your static idmap is as follows:
-> 	  idmap: 0x8029c638 - 0x8029c66c and I think your init_mm lives
-> 	  at 0x8037f2b4.
-> 
-> 	- The idmap takes up two sections, so actually spans from:
-> 	  0x80200000 - 0x80400000 and is mapped as *strongly ordered*.
-> 
-> This means that the atomic_inc(&mm->mm_count); in secondary_start_kernel
-> is UNPREDICTABLE, because it results in an exclusive access to
-> strongly-ordered memory.
-> 
-> There are several ways to solve this:
-> 
-> 	1. Avoid exclusives with the idmap (see patch below)
-> 	2. Set idmap_pgd to swapper when VA == PA
-> 	3. Map idmap with pages and round up text section
-> 	4. Switch to swapper before entering secondary_start_kernel
-> 	5. Make idmap normal (cacheable?) shared memory
-> 
-> However, these have some problems:
-> 
-> 	(2) means the idmap is cacheable. This is probably not an issue
-> 	when VA == PA, but it's still an oddity compared to other setups
-> 
-> 	(3) is really messy
-> 
-> 	(4,5) probably have serious issues with SMP
-> 
-> so I've had a crack at (1) below. Please see if it fixes your problem.
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index d100eac..aa55580 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -290,18 +290,24 @@ static void percpu_timer_setup(void);
->  asmlinkage void __cpuinit secondary_start_kernel(void)
->  {
->  	struct mm_struct *mm = &init_mm;
-> -	unsigned int cpu = smp_processor_id();
-> +	unsigned int cpu;
-> +
-> +	/*
-> +	 * The identity mapping is uncached (strongly ordered), so
-> +	 * switch away from it before attempting any exclusive accesses.
-> +	 */
-> +	cpu_switch_mm(mm->pgd, mm);
-> +	enter_lazy_tlb(mm, current);
-> +	local_flush_tlb_all();
->  
->  	/*
->  	 * All kernel threads share the same mm context; grab a
->  	 * reference and switch to it.
->  	 */
-> +	cpu = smp_processor_id();
->  	atomic_inc(&mm->mm_count);
->  	current->active_mm = mm;
->  	cpumask_set_cpu(cpu, mm_cpumask(mm));
-> -	cpu_switch_mm(mm->pgd, mm);
-> -	enter_lazy_tlb(mm, current);
-> -	local_flush_tlb_all();
->  
->  	printk("CPU%u: Booted secondary processor\n", cpu);
+Richard
 
+I have a working branch for CPSW which is based on 3.5.0-rc6 in the following git repo
+Repo: https://github.com/hvaibhav/am335x-linux.git
+Branch: am335x-linux-next-master-cpsw
 
-Works for me. But note that now the comment is wrong.
-
--- 
-                                                                Gilles.
+Regards
+Mugunthan V N
