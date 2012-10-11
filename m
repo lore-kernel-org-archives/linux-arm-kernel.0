@@ -1,66 +1,115 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 11 Oct 2012 14:42:11 +0800
-Subject: [PATCH 1/7] ARM: tegra: cpuidle: separate cpuidle driver for
- different chips
-In-Reply-To: <5074A3C3.1080006@wwwdotorg.org>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-2-git-send-email-josephl@nvidia.com>
- <5074A3C3.1080006@wwwdotorg.org>
-Message-ID: <1349937731.19413.80.camel@jlo-ubuntu-64.nvidia.com>
+From: vasanthananthan@gmail.com (Vasanth Ananthan)
+Date: Thu, 11 Oct 2012 12:19:04 +0530
+Subject: [PATCH 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
+In-Reply-To: <20121010163127.GA19433@quad.lixom.net>
+References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
+ <1349783332-18467-3-git-send-email-vasanthananthan@gmail.com>
+ <20121009182828.GA20879@quad.lixom.net>
+ <CAK1UHiyjyp8u-nFwU-19dds1uF7T1kkFNHyYQ6pWLFtUwGtR1w@mail.gmail.com>
+ <20121010163127.GA19433@quad.lixom.net>
+Message-ID: <CAK1UHiwCQZJ--+urJmn6CURAYLx3-8uKPPLcdy7ufmKHTAm1sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-10 at 06:22 +0800, Stephen Warren wrote:
-> On 10/08/2012 04:26 AM, Joseph Lo wrote:
-> > The different Tegra chips may have different CPU idle states and data.
-> > Individual CPU idle driver make it more easy to maintain.
-> 
-> > diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> > similarity index 72%
-> > copy from arch/arm/mach-tegra/cpuidle.c
-> > copy to arch/arm/mach-tegra/cpuidle-tegra20.c
-> > index 4e0b07c..e2fc26a 100644
-> > --- a/arch/arm/mach-tegra/cpuidle.c
-> > +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> > @@ -1,24 +1,22 @@
-> >  /*
-> > - * arch/arm/mach-tegra/cpuidle.c
-> > + * CPU idle driver for Tegra20 CPUs
-> >   *
-> > - * CPU idle driver for Tegra CPUs
-> > - *
-> > - * Copyright (c) 2010-2012, NVIDIA Corporation.
-> > + * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
-> >   * Copyright (c) 2011 Google, Inc.
-> >   * Author: Colin Cross <ccross@android.com>
-> >   *         Gary King <gking@nvidia.com>
-> >   *
-> > - * Rework for 3.3 by Peter De Schrijver <pdeschrijver@nvidia.com>
-> > - *
-> > - * This program is free software; you can redistribute it and/or modify
-> > - * it under the terms of the GNU General Public License as published by
-> > - * the Free Software Foundation; either version 2 of the License, or
-> > - * (at your option) any later version.
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms and conditions of the GNU General Public License,
-> > + * version 2, as published by the Free Software Foundation.
-> >   *
-> >   * This program is distributed in the hope that it will be useful, but WITHOUT
-> >   * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> >   * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> >   * more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> 
-> While that is the correct (c) header for new work submitted upstream,
-> given this file is existing, just renamed and tweaked a bit, I don't
-> believe you want to be changing the (c) header at all. Same for
-> cpuidle-tegra30.c.
+Hi,
 
-OK. I would just remove this line.
-- * arch/arm/mach-tegra/cpuidle.c
+On Wed, Oct 10, 2012 at 10:01 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Wed, Oct 10, 2012 at 02:08:31PM +0530, Vasanth Ananthan wrote:
+>
+>> > > +
+>> > > +             sataphy at 70 {
+>> >
+>> > sata-phy would be a more conventional name.
+>> >
+>> > > +                     compatible = "samsung,i2c-phy";
+>> >
+>> > i2c-phy? Seems like an odd choice of name. What is this device?
+>> >
+>>
+>> The SATA physical layer controller is both a platform device and a i2c
+>> slave device.
+>> This compatible string is for the i2c client driver. Hence I have used
+>> i2c-phy here.
+>
+> Ok, but samsung,i2c-phy is much too generic. Maybe something like
+> samsung,exynos5-sata-phy  (and rename the MMIO-controlled phy controls
+> to ...sata-phy-controller below).
+>
 
-Thanks,
-Joseph
+I'll do so..
+
+>
+>> > > +        };
+>> > > +
+>> > > +        sata-phy at 12170000 {
+>> > > +                compatible = "samsung,exynos-sata-phy";
+>> > > +                reg = <0x12170000 0x1ff>;
+>> > > +        };
+>> >
+>> > Should have binding too. How does this relate to the i2c device above.
+>> >
+>>
+>> As mentioned earlier SATA physical layer controller is both a platform
+>> device and also an i2c slave device.
+>> This Node is for the SATA physical layer platform device, the previous node
+>> is for i2c slave device.
+>> Certain initialization settings done directly and other settings has to be
+>> done through i2c.
+>
+> Wow, that's quite awkward. What needs to be done over i2c? I think I have
+> seen use of SATA without touching the i2c side but it might have been for
+> a simple setup.
+
+40 bit Interface setting is done through i2c. Internal setting address
+0x3A and data 0x0B.
+
+>
+>> > > +
+>> > >       i2c at 12C60000 {
+>> > >               compatible = "samsung,s3c2440-i2c";
+>> > >               reg = <0x12C60000 0x100>;
+>> > > @@ -152,6 +164,13 @@
+>> > >               #size-cells = <0>;
+>> > >       };
+>> > >
+>> > > +     i2c at 121D0000 {
+>> > > +                compatible = "samsung,s3c2440-sataphy-i2c";
+>> >
+>> > Is this a unique i2c controller, or is it just another one like the others
+>> > on
+>> > the chip? If it's the latter, it should use the regular compatible string.
+>> >
+>>
+>> Yes, its a unique i2c controller which lacks an interrupt line while others
+>> are interrupt driven.
+>> Hence I have used a distinct compatible string for the driver to
+>> distinguish the controller.
+>
+> It would be better to just make the i2c bus driver handle the case where there
+> is no interrupt specifier and just use polling in those cases, especially if
+> the rest of the device is identical and doesn't need special handling.
+>
+> As a matter of fact, if that had been done for the hdmi phy, then you could
+> have done this patch without modifying the driver at all, just device tree
+> contents. And the same would go for the next time down the road when
+> a "special" i2c bus is added.
+>
+
+
+Yes, It is the i2c bus driver thats handles this case. There is a
+subsequent patch
+that provides the polling support to the driver. As far as I know, the
+i2c controller for
+HDMI PHY is also interrupt driven.
+
+>
+> -Olof
+
+
+
+-- 
+Regards,
+
+Vasanth K A
