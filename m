@@ -1,53 +1,64 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 11 Oct 2012 14:41:42 +0200
-Subject: [PATCH] pinctrl/nomadik: provide stubs for legacy Nomadik
-Message-ID: <1349959302-12151-1-git-send-email-linus.walleij@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Oct 2012 07:43:22 -0500
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+Message-ID: <1349959402-24164-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Rob Herring <rob.herring@calxeda.com>
 
-The compilation of the pinctrl driver failed on the legacy
-Nomadik NHK8815 platform because it was not providing the PRCMU
-interfaces needed to support the extended alternate functions
-used by the ux500 series.
+With recent compilers and move to generic unaligned.h in commit d25c881
+(ARM: 7493/1: use generic unaligned.h), unaligned accesses will be used
+by the LZO decompressor on v7 cores. So we need to make sure unaligned
+accesses are allowed by clearing the SCTLR A bit.
 
-Solve this by providing some stubs for the legacy platform, to
-avoid too much #ifdefs in the code per se. Theoretically this
-actually allows the Nomadik and Ux500 to have a single kernel
-image with support for the PRCM registers on the Ux500 (though
-they have incompatible archs, but the spirit is there).
+While v6 can support unaligned accesses, it is optional and current
+compilers won't emit unaligned accesses. So we don't clear the A bit for
+v6.
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/pinctrl/pinctrl-nomadik.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index fec9c30..f640f13 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -30,7 +30,20 @@
- #include <linux/pinctrl/pinconf.h>
- /* Since we request GPIOs from ourself */
- #include <linux/pinctrl/consumer.h>
-+/*
-+ * For the U8500 archs, use the PRCMU register interface, for the older
-+ * Nomadik, provide some stubs. The functions using these will only be
-+ * called on the U8500 series.
-+ */
-+#ifdef CONFIG_ARCH_U8500
- #include <linux/mfd/dbx500-prcmu.h>
-+#else
-+static inline u32 prcmu_read(unsigned int reg) {
-+	return 0;
-+}
-+static inline void prcmu_write(unsigned int reg, u32 value) {}
-+static inline void prcmu_write_masked(unsigned int reg, u32 mask, u32 value) {}
-+#endif
- 
- #include <asm/mach/irq.h>
- 
+The contents of this were already reviewed on this thread, so I sent this
+to the patch system and this was Russell's reply:
+
+> NAK for two reasons.
+> 
+> 1. It hasn't been on the list (I can't find a match for "clear SCTLR.A"
+> in my mailbox)
+> 
+> 2. The behaviour of unaligned accesses vary depending on CPU.  Some
+> fix-up the access, others load the word and then rotate it.  If we have
+> decompressors which perform unaligned accesses, we need to fix this
+> properly to avoid the CPU specific behaviour, rather than tweaking
+> control bits to hide the problem.
+
+I'm simply matching the behavior of the kernel itself. The A bit is cleared
+for v7 kernels and compilers only generate unaligned accesses for v7.
+Without this the initial state of the A bit is undefined as a bootloader
+could have cleared it already. We should document the required state or set
+it to what we want.
+
+Rob
+
+ arch/arm/boot/compressed/head.S |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index bc67cbf..b2e30b8 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -654,6 +654,7 @@ __armv7_mmu_cache_on:
+ #endif
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+ 		bic	r0, r0, #1 << 28	@ clear SCTLR.TRE
++		bic	r0, r0, #1 << 1		@ clear SCTLR.A
+ 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+ 		orr	r0, r0, #0x003c		@ write buffer
+ #ifdef CONFIG_MMU
 -- 
-1.7.11.3
+1.7.9.5
