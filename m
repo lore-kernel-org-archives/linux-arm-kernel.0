@@ -1,49 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Oct 2012 18:06:49 +0200
-Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
-In-Reply-To: <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
- <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
- <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
- <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
-Message-ID: <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Oct 2012 10:08:04 -0600
+Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
+In-Reply-To: <20121011072428.GA26298@S2101-09.ap.freescale.net>
+References: <20121009031715.GC21822@S2101-09.ap.freescale.net>
+ <alpine.LFD.2.02.1210090018470.16518@xanadu.home>
+ <20121009050109.GD21822@S2101-09.ap.freescale.net>
+ <50744DBA.3070900@wwwdotorg.org>
+ <CAOMZO5BgJ0eSPvhnjCx_DVAUdLKpEhp-amJQw-8NZDX9AfCDeA@mail.gmail.com>
+ <20121011072428.GA26298@S2101-09.ap.freescale.net>
+Message-ID: <5076EEE4.6000007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 6:15 AM, viresh kumar <viresh.kumar@linaro.org> wrote:
-> On Wed, Oct 10, 2012 at 10:37 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
+On 10/11/2012 01:24 AM, Shawn Guo wrote:
+> On Tue, Oct 09, 2012 at 01:21:02PM -0300, Fabio Estevam wrote:
+>> On Tue, Oct 9, 2012 at 1:15 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>
+>>>>> I just tried building mainline now.  It is at commit f5a246eab9.
+>>>>>
+>>>> The build still fails for me at this commit.
+>>>
+>>> I can't reproduce this.
+>>
+>> Same here. It builds fine for me.
+>>
+> Thanks all for confirming it works.
+> 
+> I just figured it out on my end.  Here is how it gets broken for me.
+> 
+> - Before commit cd29672 (dtc: import latest upstream dtc) gets in,
+>   I did a build without O=<output_dir>.  It results in a copy of those
+>   libfdt files in arch/arm/boot/compressed.
+> 
+> - After the commit gets in, I start a build with O=imx parameter.  When
+>   compiling imx/arch/arm/boot/compressed/fdt_ro.c, the #include <libfdt.h>
+>   in fdt_ro.c seems to match the one left in arch/arm/boot/compressed/
+>   from last build rather than imx/arch/arm/boot/compressed/libfdt.h.
+> 
+> Cleaning the libfdt copies in arch/arm/boot/compressed fixes the
+> problem.
 
->> dma_sync_single_for_device() is translating the virtual
->> address to physical for every chunk BTW.
->
-> I pray that i am wrong here, otherwise i would be thrown out from
-> the maintainers list for this driver :)
->
-> dma_sync_single_for_device() is not doing anything on the buffer, but
-> on the LLI item. Actually it is flushing LLI struct so that DMA h/w can get
-> the correct values.
+> Not sure why it's not "libfdt.h" but <libfdt.h> is used as
+> the inclusion though, since the .h and .c are in the same folder.
 
-Sorry no, I'm the one who's wrong...
+I imagine that's because the libfdt code is set up to support being
+built as a standalone library. In that case, <fdt.h> and <libfdt.h> are
+presumably the public interface to the library, and would hence be
+installed into /usr/include or similar. Still, I guess the libfdt source
+itself would still work with "libfdt.h" rather than <libfdt.h>.
 
-So the DMA engine memcpy() is not mapping virt->phys
-but expects physical addresses to be provided.
-
-So dma_map_single() needs to be called on the stuff
-passed in to dev->device_prep_dma_memcpy().
-
-And currently there is indeed a dma_map_single() in
-dma_xfer() in fsmc_nand.c which should work just fine.
-
-dma_map_single() will only work if the buffer is
-physically contiguous.
-
-And the block layer of the subsystem should take care
-of only handing the driver buffers that are contiguous
-I think? Not that I'm an expert here ... more some
-guesswork :-/
-
-Artem will know I hope!
-
-Yours,
-Linus Walleij
+Note that looking at git history, fdt_ro.c included <libfdt.h> even
+before cd29672 (dtc: import latest upstream dtc), and
+arch/arm/boot/compressed/Makefile included fdt_ro.c before that commit,
+so I'm not sure why the problem only shows up now? Perhaps anything that
+caused your objects to be stale, and hence get rebuilt, would have
+caused the issue.
