@@ -1,45 +1,126 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Oct 2012 14:09:56 +0100
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <1349959402-24164-1-git-send-email-robherring2@gmail.com>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20121011130955.GP4625@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 11 Oct 2012 15:18:54 +0200
+Subject: [PATCH 5/6] ARM: EXYNOS: Add support for Exynos secure firmware
+In-Reply-To: <20121010160027.GA582@quad.lixom.net>
+References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
+ <1348496913-25422-6-git-send-email-t.figa@samsung.com>
+ <20121010160027.GA582@quad.lixom.net>
+Message-ID: <2052356.3jlgOizW0Z@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
-> The contents of this were already reviewed on this thread, so I sent this
-> to the patch system and this was Russell's reply:
+Hi Olof,
 
-So that's why I couldn't find it - the mailing list thread has a different
-subject line to the patch.  Don't do that.  Given the amount of list
-traffic we have today, that's as good as not having been posted at all.
-
-> > NAK for two reasons.
-> > 
-> > 1. It hasn't been on the list (I can't find a match for "clear SCTLR.A"
-> > in my mailbox)
-> > 
-> > 2. The behaviour of unaligned accesses vary depending on CPU.  Some
-> > fix-up the access, others load the word and then rotate it.  If we have
-> > decompressors which perform unaligned accesses, we need to fix this
-> > properly to avoid the CPU specific behaviour, rather than tweaking
-> > control bits to hide the problem.
+On Wednesday 10 of October 2012 09:00:27 Olof Johansson wrote:
+> Hi,
 > 
-> I'm simply matching the behavior of the kernel itself. The A bit is cleared
-> for v7 kernels and compilers only generate unaligned accesses for v7.
-> Without this the initial state of the A bit is undefined as a bootloader
-> could have cleared it already. We should document the required state or set
-> it to what we want.
+> On Mon, Sep 24, 2012 at 04:28:32PM +0200, Tomasz Figa wrote:
+> > Some Exynos-based boards contain secure firmware and must use firmware
+> > operations to set up some hardware.
+> > 
+> > This patch adds firmware operations for Exynos secure firmware and a
+> > way
+> > for board code and device tree to specify that they must be used.
+> > 
+> > Example of use:
+> > 
+> > In board code:
+> > 	...MACHINE_START(...)
+> > 	
+> > 		/* ... */
+> > 		.init_early	= exynos_firmware_init,
+> > 		/* ... */
+> > 	
+> > 	MACHINE_END
+> > 
+> > In device tree:
+> > 	/ {
+> > 	
+> > 		/* ... */
+> > 		
+> > 		firmware {
+> > 		
+> > 			compatible = "samsung,secure-firmware";
+> > 		
+> > 		};
+> > 		
+> > 		/* ... */
+> > 	
+> > 	};
+> > 
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/arm/samsung-boards.txt     |  8 ++++
+> >  arch/arm/mach-exynos/Makefile                      |  1 +
+> >  arch/arm/mach-exynos/common.h                      |  2 +
+> >  arch/arm/mach-exynos/firmware.c                    | 54
+> >  ++++++++++++++++++++++ arch/arm/mach-exynos/mach-exynos4-dt.c        
+> >      |  1 +
+> >  5 files changed, 66 insertions(+)
+> >  create mode 100644 arch/arm/mach-exynos/firmware.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> > b/Documentation/devicetree/bindings/arm/samsung-boards.txt index
+> > 0bf68be..f447059 100644
+> > --- a/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> > +++ b/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> > 
+> > @@ -6,3 +6,11 @@ Required root node properties:
+> >      - compatible = should be one or more of the following.
+> >      
+> >          (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
+> >          (b) "samsung,exynos4210"  - for boards based on Exynos4210
+> >          SoC.
+> > 
+> > +
+> > +Optional:
+> > +    - firmware node, specifying presence and type of secure firmware,
+> > currently +        supported value of compatible property is
+> > "samsung,secure-firmware": +
+> > +	firmware {
+> > +		compatible = "samsung,secure-firmware";
+> > +	};
+> 
+> If you require the binding to specify the memory area, then you at least
+> allow for future work to move to a dynamic mapping without updating the
+> binding and all device trees. So, please do that even if the code is
+> hardcoded to the static address today.
 
-Irrespective of this, (2) still stands.  Unaligned accesses in the
-decompressor without a fixup (which will be very hard to provide)
-will return different data depending on the CPU as I mention in point
-2.
+All right.
 
-So, using unaligned accesses in the decompressor may not give expected
-results in all cases, so they're best avoided.
+> For extra credit, make sure that the reg property is matching the static
+> mapping when you setup your firmware interface on your platform.
 
-And if they're avoided, then we don't care about the setting of the A
-bit.
+Hmm, do you know a way to look up physical address of such static mapping, 
+given only the virtual address? Additional problem is that the code is 
+executed very early (in init_early callback), before most of VM 
+initialization code.
+
+I could do something like
+
+	if (soc_is_exynos4210())
+		paddr = EXYNOS4210_PA_SYSRAM_NS;
+	else if (soc_is_exynos4212() || soc_is_exynos4412())
+		paddr = EXYNOS4x12_PA_SYSRAM_NS;
+	...
+
+and compare paddr with address received from device tree, but I don't 
+really like this construct.
+ 
+> > +static int exynos_cpu_boot_reg(int cpu, void __iomem **ptr)
+> > +{
+> > +	*ptr = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> > +	return 0;
+> > +}
+> 
+> It would be nice to get a memory map for the SMC area in documentation
+> somewhere, but that can be done separately later.
+
+OK.
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
