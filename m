@@ -1,30 +1,52 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 11 Oct 2012 20:13:13 +0200
-Subject: [PATCH v2 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121011181312.GB3850@tarshish>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 12 Oct 2012 07:17:30 +1300
+Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
+In-Reply-To: <201210110747.46682.arnd@arndb.de>
+References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
+ <CABjd4YzdwXmAeTrULWOGdFBg8xKXK4FN7fGJegjFZYmmxhrP2A@mail.gmail.com>
+ <201210110747.46682.arnd@arndb.de>
+Message-ID: <1349979450.16017.3.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, 2012-10-11 at 07:47 +0000, Arnd Bergmann wrote:
+> On Thursday 11 October 2012, Alexey Charkov wrote:
+> > Does this imply that early printk won't be supported any longer, or am
+> > I missing something?
+> 
+> You are correct. However, there is work under way to bring it back.
+> If you want to keep it around in the meantime, you could let the user
+> enable VT8500 either in MULTIPLATFORM or standalone using some Kconfig
+> logic like:
+> 
+> choice "Platform selection"
+> 
+> ...
+> 
+> config VT8500_SINGLE
+> 	bool "Via/Wondermedia VT8500 / WM8505 / WM8650"
+> 
+> ...
+> 
+> endchoice
+> 
+> ...
+> 
+> config VT8500
+> 	bool "Via/Wondermedia VT8500 / WM8505 / WM8650" if ARCH_MULTIPLATFORM
+> 	default VT8500_SINGLE
+> 
+> 	Arnd
 
-On Thu, Oct 11, 2012 at 05:27:59PM +0200, Thomas Petazzoni wrote:
-> +module_param(mvneta_rxq_number, int, S_IRUGO);
-> +module_param(mvneta_txq_number, int, S_IRUGO);
-> +
-> +module_param(mvneta_rxq_def, int, S_IRUGO);
-> +module_param(mvneta_txq_def, int, S_IRUGO);
+Alexey (or anyone else),
 
-Since these are module params they need the driver name prefix when referenced 
-in the kernel command line, so there should be no need for another "mvneta" 
-prefix.
+Do you want it kept in the meantime?
 
-baruch
+I think the easiest way to add/keep it would be to create:
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+ARCH_VT8500_SINGLE (arm/Kconfig) and ARCH_VT8500_MULTI
+(arch-vt8500/Kconfig) and have them both select ARCH_VT8500 as an option
+to make drivers available.
+
+Regards
+Tony P
