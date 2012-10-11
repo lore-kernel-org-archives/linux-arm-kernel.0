@@ -1,37 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Oct 2012 07:47:46 +0000
-Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
-In-Reply-To: <CABjd4YzdwXmAeTrULWOGdFBg8xKXK4FN7fGJegjFZYmmxhrP2A@mail.gmail.com>
-References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
- <CABjd4YzdwXmAeTrULWOGdFBg8xKXK4FN7fGJegjFZYmmxhrP2A@mail.gmail.com>
-Message-ID: <201210110747.46682.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 11 Oct 2012 15:49:16 +0800
+Subject: [PATCH] ARM: dts: mxs: add the "clock-names" for gpmi-nand
+In-Reply-To: <1349864829-19565-1-git-send-email-b32955@freescale.com>
+References: <201210101237.13640.marex@denx.de>
+ <1349864829-19565-1-git-send-email-b32955@freescale.com>
+Message-ID: <20121011074912.GB26298@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 October 2012, Alexey Charkov wrote:
-> Does this imply that early printk won't be supported any longer, or am
-> I missing something?
+On Wed, Oct 10, 2012 at 06:27:09PM +0800, Huang Shijie wrote:
+> The current DT nodes for mx23/mx28 miss the `clocks-names` item for gpmi-nand.
+> So the gpmi-nand driver could not find the proper clock.
+> 
+> This patch fixes this issue.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-You are correct. However, there is work under way to bring it back.
-If you want to keep it around in the meantime, you could let the user
-enable VT8500 either in MULTIPLATFORM or standalone using some Kconfig
-logic like:
+Applied, thanks.
 
-choice "Platform selection"
-
-...
-
-config VT8500_SINGLE
-	bool "Via/Wondermedia VT8500 / WM8505 / WM8650"
-
-...
-
-endchoice
-
-...
-
-config VT8500
-	bool "Via/Wondermedia VT8500 / WM8505 / WM8650" if ARCH_MULTIPLATFORM
-	default VT8500_SINGLE
-
-	Arnd
+Shawn
