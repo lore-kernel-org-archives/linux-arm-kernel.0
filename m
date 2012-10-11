@@ -1,114 +1,82 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 11 Oct 2012 20:50:39 +0800
-Subject: [PATCH v2 00/15] pinctrl: samsung: Usability and extensibiltiy
- improvements
-In-Reply-To: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-References: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAJuYYwSnAAqxbBf06051St4Zo89nUH+yFHkWCSfHm0dzoqU9pA@mail.gmail.com>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Thu, 11 Oct 2012 14:51:21 +0200
+Subject: alignment faults in 3.6
+In-Reply-To: <1349956456.21172.8820.camel@edumazet-glaptop>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
+ <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
+ <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
+ <yw1xpq4ppcju.fsf@unicorn.mansr.com>
+ <1349949638.21172.8445.camel@edumazet-glaptop>
+ <1349950926.21172.8521.camel@edumazet-glaptop>
+ <20121011103257.GO4625@n2100.arm.linux.org.uk>
+ <1349952574.21172.8604.camel@edumazet-glaptop>
+ <1349952970.1232.5.camel@sakura.staff.proxad.net>
+ <1349954899.21172.8728.camel@edumazet-glaptop>
+ <1349956055.1232.9.camel@sakura.staff.proxad.net>
+ <1349956456.21172.8820.camel@edumazet-glaptop>
+Message-ID: <1349959881.1232.44.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2012 16:11, Tomasz Figa <t.figa@samsung.com> wrote:
-> This patch series is a work on improving usability and extensibiltiy of
-> the pinctrl-samsung driver. It consists of three main parts:
->  - improving flexibility of SoC-specific data specification
->  - converting the driver to one GPIO chip and IRQ domain per pin bank
->  - improving wake-up IRQ setup and handling
->
-> 1) What the first part does, in addition to various related fixes, is
-> removing any unnecessary static data from pinctrl-exynos driver.
->
-> This is achieved mostly thanks to assigning pin numbers dynamically,
-> with help of only pin counts of particular banks. It also simplifies
-> adding next SoC variants, since much less static data needs to be
-> specified.
->
-> 2) The second part attempts to simplify usage of the driver and fix several
-> problems of current implementation, in particular:
->
->   - Simplifies GPIO pin specification in device tree by using pin
->     namespace local to pin bank instead of local to pin controller, e.g.
->
->         gpios = <&gpj0 3 0>;
->
->     instead of
->
->         gpios = <&pinctrl0 115 0>;
->
->   - Simplifies GPIO interrupt specification in device tree by using
->     namespace local to pin bank (and equal to GPIO namespace), e.g.
->
->         interrupt-parent = <&gpj0>;
->         interrupts = <3 0>;
->
->     instead of
->
->         interrupt-parent = <&pinctrl0>;
->         interrupts = <115 0>;
->
->   - Simplifies internal GPIO pin to bank translation thanks to
->     correspondence of particular GPIO chips to pin banks. This allows
->     to remove the (costly in case of GPIO bit-banging drivers) lookup
->     over all banks to find the one that the pin is from.
->
-> 3) Third part is focused on removing the hard-coded description of wake-up
-> interrupt layout.
->
-> It moves wake-up interrupt description to bank struct and device tree,
-> which allows to specify which pin banks support wake-up interrupts and
-> how they are handled (direct or multiplexed/chained).
->
-> See particular patches for more detailed descriptions and the last patch for
-> updated device tree bindings.
->
-> Changes since v1:
->  - dropped moving SoC-specific data to device tree
->    (might be added in further patches)
->  - dropped per-bank specification of configuration register offsets
->    (thus limiting scope of the driver to Exynos SoCs; will be added in
->     further patches)
->
-> Tomasz Figa (15):
->   pinctrl: samsung: Detect and handle unsupported configuration types
->   pinctrl: samsung: Do not pass gpio_chip to pin_to_reg_bank
->   pinctrl: samsung: Assing pin numbers dynamically
->   pinctrl: samsung: Remove static pin enumerations
->   pinctrl: samsung: Distinguish between pin group and bank nodes
->   ARM: dts: exynos4210-pinctrl: Add nodes for pin banks
->   pinctrl: samsung: Match pin banks with their device nodes
->   pinctrl: samsung: Hold pointer to driver data in bank struct
->   pinctrl: samsung: Include bank-specific eint offset in bank struct
->   pinctrl: exynos: Use one IRQ domain per pin bank
->   pinctrl: samsung: Use one GPIO chip per pin bank
->   pinctrl: samsung: Use per-bank IRQ domain for wake-up interrupts
->   pinctrl: exynos: Set pin function to EINT in irq_set_type of wake-up
->     EINT
->   pinctrl: samsung: Add GPIO to IRQ translation
->   Documentation: Update samsung-pinctrl device tree bindings
->     documentation
->
->  .../bindings/pinctrl/samsung-pinctrl.txt           | 118 +++++--
->  arch/arm/boot/dts/exynos4210-pinctrl.dtsi          | 278 ++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi                  | 241 +-------------
->  drivers/pinctrl/pinctrl-exynos.c                   | 367 ++++++++++-----------
->  drivers/pinctrl/pinctrl-exynos.h                   | 170 ++--------
->  drivers/pinctrl/pinctrl-samsung.c                  | 203 ++++++++----
->  drivers/pinctrl/pinctrl-samsung.h                  |  29 +-
->  7 files changed, 741 insertions(+), 665 deletions(-)
 
-Hi Tomasz,
+On Thu, 2012-10-11 at 13:54 +0200, Eric Dumazet wrote:
 
-Thanks for this excellent series. This is a nice improvement for the
-samsung pinctrl driver.
+> Of course, if you use a forwarding setup, and the tx driver is not SG
+> capable, performance will be bad (You have to copy the data into a
+> single skb (linearize the skb)) 
+> 
+> But in 2012, having to use hardware without SG for a router sounds a bad
+> joke (if cpu speed is _also_ too low)
 
-For this series:
-Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+Hey I cannot go back in time, when that hardware was built in 2004 (mips
+@250Mhz), it was considered good, and we did manufacture a lot of it, so
+it's still maintained.
+
+People run recent kernels on older hardware because they are *encouraged
+to do so*.
+
+I fought inside my company to be good kernel citizen, not using
+proprietary BSP, rewrite & mainline the drivers, because that was the
+community promise: mainline it, we will support it for you, you will get
+the latest kernel features for free.
 
 
-Regards,
-Thomas.
+That worked, but with some drawbacks:
 
->
-> --
-> 1.7.12
->
+ - kernel footprint grew that much (we started from 2.4) that it does
+not fit in device flash anymore
+
+ - performance took a hit each time we upgrade, mostly because of cache
+footprint growth.
+
+ - as kernel footprint grew, available RAM for conntrack & route cache
+entries was smaller each time
+
+
+But I had to stop upgrading after 2.6.20. Everything below is not
+anybody's fault. Bloat is unavoidable for software project that big.
+
+I'm perfectly ok with that, but I don't want to be ridiculed for running
+mainline kernel on old hardware.
+
+
+> Adding get_unaligned() everywhere in linux network stacks is not an
+> option.
+> 
+> We actually want to be able to read the code and fix the bugs, not only
+> run it on a cheap low end router.
+
+That was not a request, I just needed a clarification. 
+
+Documentation/unaligned-memory-access.txt does not say it's a big no-no,
+it says you can give unaligned pointers to the networking stack if you
+arch can do unaligned access (with an "efficiency" notion).
+
+MIPS and ARM have a software handler for this, and performance wise in
+my case it's better to take the faults, a driver writer may think a
+benchmark will dictate what to do.
+
+-- 
+Maxime
