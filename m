@@ -1,60 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 11 Oct 2012 15:45:47 +0530
-Subject: [PATCH 01/13] calk: davinci - add Main PLL clock driver
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B7041FB712@DFLE12.ent.ti.com>
-References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
- <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
- <507563C3.2000305@ti.com>
- <3E54258959B69E4282D79E01AB1F32B7041FB712@DFLE12.ent.ti.com>
-Message-ID: <50769C53.8030405@ti.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Thu, 11 Oct 2012 11:16:16 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <yw1xpq4ppcju.fsf@unicorn.mansr.com>
+References: <506E1762.3010601@gmail.com><CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com><CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com><506E3E58.80703@gmail.com><CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com><20121005071216.GD4625@n2100.arm.linux.org.uk><CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com><20121005082439.GF4625@n2100.arm.linux.org.uk><506ED18C.3010009@gmail.com><20121005140556.GQ4625@n2100.arm.linux.org.uk><506EEFBB.3060705@gmail.com>
+ <507619FA.6080001@jonmasters.org><yw1xtxu1pwtv.fsf@unicorn.mansr.com><AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
+ <yw1xpq4ppcju.fsf@unicorn.mansr.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B703B@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2012 8:04 PM, Karicheri, Muralidharan wrote:
-
->>>> +struct clk *clk_register_davinci_pll(struct device *dev, const char *name,
->>>> +			const char *parent_name,
->>>> +			struct clk_davinci_pll_data *pll_data) {
->>>> +	struct clk_init_data init;
->>>> +	struct clk_davinci_pll *pll;
->>>> +	struct clk *clk;
->>>> +
->>>> +	if (!pll_data)
->>>> +		return ERR_PTR(-ENODEV);
->>>> +
->>>> +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
->>>> +	if (!pll)
->>>> +		return ERR_PTR(-ENOMEM);
->>>> +	init.name = name;
->>>> +	init.ops = &clk_pll_ops;
->>>> +	init.flags = pll_data->flags;
->>>> +	init.parent_names = (parent_name ? &parent_name : NULL);
->>>> +	init.num_parents = (parent_name ? 1 : 0);
->>>> +
->>>> +	pll->pll_data	= pll_data;
->>>> +	pll->hw.init = &init;
->>>> +
->>>> +	clk = clk_register(NULL, &pll->hw);
->>>> +	if (IS_ERR(clk))
->>>> +		kfree(pll);
->>>> +
->>>> +	return clk;
->>>> +}
->>>
->>> I guess there is an an "unregister" required as well which will free the pll memory
->>> allocated above and unregister the clock? Not sure if you would ever unregister a PLL,
->>> but providing this will probably help symmetry.
-> Sekhar,
+> > It might be enough to use __attribute__((aligned(2))) on some structure
+> > members (actually does 'ldm' need 8 byte alignment?? - in which case
+> > aligned(4) is enough).
 > 
-> clk_unregister() itself is a null statement in clk.c. Besides none of the clk drivers presently have implemented the unregister(). So I believe this is unnecessary. 
+> The aligned attribute can only increase alignment.
 
-I am ok with this.
+Not true.
+If you have:
 
-> BTW, please review the v2 patch for the rest of the series. For the one you have already reviewed, it should be fine.
+struct foo {
+    short   a;
+    int     b __attribute__((aligned(2)));
+    short   c;
+};
 
-Okay. I see those now. BTW, this series also has a v2 in its 0/13. Are
-there any differences between this and the other v2, or is that merely a
-resend?
+You'll find sizeof (struct foo) is 8, and that, on arm/sparc etc,
+gcc will generate 2 16bit accesses (and shifts) for foo.b;
 
-Thanks,
-Sekhar
+	David
