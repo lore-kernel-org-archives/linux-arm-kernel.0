@@ -1,37 +1,35 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 11 Oct 2012 15:17:35 -0500
-Subject: [PATCH] Boottime: A tool for automatic measurement of
- kernel/bootloader boot time
-In-Reply-To: <1349966545-19340-1-git-send-email-lee.jones@linaro.org>
-References: <1349966545-19340-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121011201735.GA15313@kahuna>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 11 Oct 2012 22:27:17 +0200
+Subject: [PATCH RFC 2/7] cpsw: add missing fields to the CPSW_SS register bank.
+In-Reply-To: <cover.1349985570.git.richardcochran@gmail.com>
+References: <cover.1349985570.git.richardcochran@gmail.com>
+Message-ID: <be9290b7284afcc8fe859f4290ef392c247fd191.1349985570.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:42-20121011, Lee Jones wrote:
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
-> 
-> The overhead is very low and the results will be found under
-> sysfs/bootime, as well as detailed results in debugfs under
-> boottime/. The bootgraph* files are compatible with
-> scripts/bootgraph.pl. The reason for this patch is to provide
-> data (sysfs/boottime) suitable for automatic testcases as
-> well as help for developers to reduce the boot time (debugfs).
-Tried master:
-250d8 Merge branch 'i2c-embedded/for-next' of git://git.pengutronix.de/git/wsa/linux
-and v3.6-rc7
-with omap2plus_defconfig + CONFIG_BOOTTIME enabled:
+Signed-off-by: Richard Cochran <richardcochran@gmail.com>
+---
+ drivers/net/ethernet/ti/cpsw.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-init/boottime.c:47:9: error: ?cpu_usage_stat? defined as wrong kind of tag
-init/boottime.c:47:24: error: array type has incomplete element type
-init/boottime.c: In function ?boottime_mark_core?:
-init/boottime.c:127:313: error: ?struct kernel_stat? has no member named ?cpustat?
-init/boottime.c:128:311: error: ?struct kernel_stat? has no member named ?cpustat?
-init/boottime.c:129:313: error: ?struct kernel_stat? has no member named ?cpustat?
-init/boottime.c:130:310: error: ?struct kernel_stat? has no member named ?cpustat?
-
-if it depended on some other patch or a specific maintainer branch,
-it was'nt clear.
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index a996188..24304e8 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -146,6 +146,14 @@ struct cpsw_ss_regs {
+ 	u32	soft_reset;
+ 	u32	stat_port_en;
+ 	u32	ptype;
++	u32	soft_idle;
++	u32	thru_rate;
++	u32	gap_thresh;
++	u32	tx_start_wds;
++	u32	flow_control;
++	u32	vlan_ltype;
++	u32	ts_ltype;
++	u32	dlr_ltype;
+ };
+ 
+ struct cpsw_slave_regs {
 -- 
-Regards,
-Nishanth Menon
+1.7.2.5
