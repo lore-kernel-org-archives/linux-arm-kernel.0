@@ -1,85 +1,45 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 11 Oct 2012 14:59:12 +0200
-Subject: alignment faults in 3.6
-In-Reply-To: <1349959881.1232.44.camel@sakura.staff.proxad.net>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
- <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
- <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
- <yw1xpq4ppcju.fsf@unicorn.mansr.com>
- <1349949638.21172.8445.camel@edumazet-glaptop>
- <1349950926.21172.8521.camel@edumazet-glaptop>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <1349952970.1232.5.camel@sakura.staff.proxad.net>
- <1349954899.21172.8728.camel@edumazet-glaptop>
- <1349956055.1232.9.camel@sakura.staff.proxad.net>
- <1349956456.21172.8820.camel@edumazet-glaptop>
- <1349959881.1232.44.camel@sakura.staff.proxad.net>
-Message-ID: <1349960352.21172.9033.camel@edumazet-glaptop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Oct 2012 14:09:56 +0100
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20121011130955.GP4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-11 at 14:51 +0200, Maxime Bizon wrote:
+On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
+> The contents of this were already reviewed on this thread, so I sent this
+> to the patch system and this was Russell's reply:
 
-> Hey I cannot go back in time, when that hardware was built in 2004 (mips
-> @250Mhz), it was considered good, and we did manufacture a lot of it, so
-> it's still maintained.
-> 
-> People run recent kernels on older hardware because they are *encouraged
-> to do so*.
-> 
-> I fought inside my company to be good kernel citizen, not using
-> proprietary BSP, rewrite & mainline the drivers, because that was the
-> community promise: mainline it, we will support it for you, you will get
-> the latest kernel features for free.
-> 
-> 
-> That worked, but with some drawbacks:
-> 
->  - kernel footprint grew that much (we started from 2.4) that it does
-> not fit in device flash anymore
-> 
->  - performance took a hit each time we upgrade, mostly because of cache
-> footprint growth.
-> 
->  - as kernel footprint grew, available RAM for conntrack & route cache
-> entries was smaller each time
-> 
-> 
-> But I had to stop upgrading after 2.6.20. Everything below is not
-> anybody's fault. Bloat is unavoidable for software project that big.
-> 
-> I'm perfectly ok with that, but I don't want to be ridiculed for running
-> mainline kernel on old hardware.
+So that's why I couldn't find it - the mailing list thread has a different
+subject line to the patch.  Don't do that.  Given the amount of list
+traffic we have today, that's as good as not having been posted at all.
 
-Hmm, I am sorry if you felt that, it was not my intent.
-
-> 
-> 
-> > Adding get_unaligned() everywhere in linux network stacks is not an
-> > option.
+> > NAK for two reasons.
 > > 
-> > We actually want to be able to read the code and fix the bugs, not only
-> > run it on a cheap low end router.
+> > 1. It hasn't been on the list (I can't find a match for "clear SCTLR.A"
+> > in my mailbox)
+> > 
+> > 2. The behaviour of unaligned accesses vary depending on CPU.  Some
+> > fix-up the access, others load the word and then rotate it.  If we have
+> > decompressors which perform unaligned accesses, we need to fix this
+> > properly to avoid the CPU specific behaviour, rather than tweaking
+> > control bits to hide the problem.
 > 
-> That was not a request, I just needed a clarification. 
-> 
-> Documentation/unaligned-memory-access.txt does not say it's a big no-no,
-> it says you can give unaligned pointers to the networking stack if you
-> arch can do unaligned access (with an "efficiency" notion).
-> 
-> MIPS and ARM have a software handler for this, and performance wise in
-> my case it's better to take the faults, a driver writer may think a
-> benchmark will dictate what to do.
-> 
+> I'm simply matching the behavior of the kernel itself. The A bit is cleared
+> for v7 kernels and compilers only generate unaligned accesses for v7.
+> Without this the initial state of the A bit is undefined as a bootloader
+> could have cleared it already. We should document the required state or set
+> it to what we want.
 
-Sure, but all this discussion started because one arch apparently did
-not like these mis alignments, and some people complained that network
-guys would not add _needed_ get_unaligned_xxx() wrappers ...
+Irrespective of this, (2) still stands.  Unaligned accesses in the
+decompressor without a fixup (which will be very hard to provide)
+will return different data depending on the CPU as I mention in point
+2.
 
-So far, linux is 20 years old, I dont think we are going to add wrappers
-right now. Machines that could have cared are dying anyway.
+So, using unaligned accesses in the decompressor may not give expected
+results in all cases, so they're best avoided.
 
-Please note we still support NET_IP_ALIGN, even if its 0 on x86.
+And if they're avoided, then we don't care about the setting of the A
+bit.
