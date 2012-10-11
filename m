@@ -1,85 +1,96 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 11 Oct 2012 22:27:16 +0200
-Subject: [PATCH RFC 1/7] cpsw: rename register banks to match the reference
- manual
-In-Reply-To: <cover.1349985570.git.richardcochran@gmail.com>
-References: <cover.1349985570.git.richardcochran@gmail.com>
-Message-ID: <a20526f70cad9da003541627b934b689003adc60.1349985570.git.richardcochran@gmail.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Thu, 11 Oct 2012 22:58:31 +0200
+Subject: bug with 3.4.6, 3.5.3, 3.6.1
+In-Reply-To: <20121011195033.GA31946@mudshark.cambridge.arm.com>
+References: <50765D3B.6000909@xenomai.org>
+ <20121011103637.GC30598@mudshark.cambridge.arm.com>
+ <5076CA56.3020006@xenomai.org>
+ <20121011135905.GL30598@mudshark.cambridge.arm.com>
+ <5076D12A.1070700@xenomai.org>
+ <20121011195033.GA31946@mudshark.cambridge.arm.com>
+Message-ID: <507732F7.9010800@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code mixes up the CPSW_SS and the CPSW_WR register naming. This patch
-changes the names to conform to the published Technical Reference Manual
-from TI, in order to make working on the code less confusing.
+On 10/11/2012 09:50 PM, Will Deacon wrote:
 
-Signed-off-by: Richard Cochran <richardcochran@gmail.com>
----
- drivers/net/ethernet/ti/cpsw.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+> On 10/11/2012 03:59 PM, Will Deacon wrote:
+>> I'll have to do some digging and get back to you.
+> 
+> Ok, so here's what I think is going on (although note that I'm at home now,
+> so I've not been able to test anything):
+> 
+> 	- Your PHYS_OFFSET is at 2GB, so your static idmap is as follows:
+> 	  idmap: 0x8029c638 - 0x8029c66c and I think your init_mm lives
+> 	  at 0x8037f2b4.
+> 
+> 	- The idmap takes up two sections, so actually spans from:
+> 	  0x80200000 - 0x80400000 and is mapped as *strongly ordered*.
+> 
+> This means that the atomic_inc(&mm->mm_count); in secondary_start_kernel
+> is UNPREDICTABLE, because it results in an exclusive access to
+> strongly-ordered memory.
+> 
+> There are several ways to solve this:
+> 
+> 	1. Avoid exclusives with the idmap (see patch below)
+> 	2. Set idmap_pgd to swapper when VA == PA
+> 	3. Map idmap with pages and round up text section
+> 	4. Switch to swapper before entering secondary_start_kernel
+> 	5. Make idmap normal (cacheable?) shared memory
+> 
+> However, these have some problems:
+> 
+> 	(2) means the idmap is cacheable. This is probably not an issue
+> 	when VA == PA, but it's still an oddity compared to other setups
+> 
+> 	(3) is really messy
+> 
+> 	(4,5) probably have serious issues with SMP
+> 
+> so I've had a crack at (1) below. Please see if it fixes your problem.
+> 
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index d100eac..aa55580 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -290,18 +290,24 @@ static void percpu_timer_setup(void);
+>  asmlinkage void __cpuinit secondary_start_kernel(void)
+>  {
+>  	struct mm_struct *mm = &init_mm;
+> -	unsigned int cpu = smp_processor_id();
+> +	unsigned int cpu;
+> +
+> +	/*
+> +	 * The identity mapping is uncached (strongly ordered), so
+> +	 * switch away from it before attempting any exclusive accesses.
+> +	 */
+> +	cpu_switch_mm(mm->pgd, mm);
+> +	enter_lazy_tlb(mm, current);
+> +	local_flush_tlb_all();
+>  
+>  	/*
+>  	 * All kernel threads share the same mm context; grab a
+>  	 * reference and switch to it.
+>  	 */
+> +	cpu = smp_processor_id();
+>  	atomic_inc(&mm->mm_count);
+>  	current->active_mm = mm;
+>  	cpumask_set_cpu(cpu, mm_cpumask(mm));
+> -	cpu_switch_mm(mm->pgd, mm);
+> -	enter_lazy_tlb(mm, current);
+> -	local_flush_tlb_all();
+>  
+>  	printk("CPU%u: Booted secondary processor\n", cpu);
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index df55e24..a996188 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -129,7 +129,7 @@ static int rx_packet_max = CPSW_MAX_PACKET_SIZE;
- module_param(rx_packet_max, int, 0);
- MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
- 
--struct cpsw_ss_regs {
-+struct cpsw_wr_regs {
- 	u32	id_ver;
- 	u32	soft_reset;
- 	u32	control;
-@@ -140,7 +140,7 @@ struct cpsw_ss_regs {
- 	u32	misc_en;
- };
- 
--struct cpsw_regs {
-+struct cpsw_ss_regs {
- 	u32	id_ver;
- 	u32	control;
- 	u32	soft_reset;
-@@ -202,8 +202,8 @@ struct cpsw_priv {
- 	struct napi_struct		napi;
- 	struct device			*dev;
- 	struct cpsw_platform_data	data;
--	struct cpsw_regs __iomem	*regs;
--	struct cpsw_ss_regs __iomem	*ss_regs;
-+	struct cpsw_ss_regs __iomem	*regs;
-+	struct cpsw_wr_regs __iomem	*wr_regs;
- 	struct cpsw_host_regs __iomem	*host_port_regs;
- 	u32				msg_enable;
- 	struct net_device_stats		stats;
-@@ -230,8 +230,8 @@ struct cpsw_priv {
- 
- static void cpsw_intr_enable(struct cpsw_priv *priv)
- {
--	__raw_writel(0xFF, &priv->ss_regs->tx_en);
--	__raw_writel(0xFF, &priv->ss_regs->rx_en);
-+	__raw_writel(0xFF, &priv->wr_regs->tx_en);
-+	__raw_writel(0xFF, &priv->wr_regs->rx_en);
- 
- 	cpdma_ctlr_int_ctrl(priv->dma, true);
- 	return;
-@@ -239,8 +239,8 @@ static void cpsw_intr_enable(struct cpsw_priv *priv)
- 
- static void cpsw_intr_disable(struct cpsw_priv *priv)
- {
--	__raw_writel(0, &priv->ss_regs->tx_en);
--	__raw_writel(0, &priv->ss_regs->rx_en);
-+	__raw_writel(0, &priv->wr_regs->tx_en);
-+	__raw_writel(0, &priv->wr_regs->rx_en);
- 
- 	cpdma_ctlr_int_ctrl(priv->dma, false);
- 	return;
-@@ -972,7 +972,7 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
- 		dev_err(priv->dev, "unable to map i/o region\n");
- 		goto clean_cpsw_ss_iores_ret;
- 	}
--	priv->ss_regs = regs;
-+	priv->wr_regs = regs;
- 
- 	for_each_slave(priv, cpsw_slave_init, priv);
- 
+
+Works for me. But note that now the comment is wrong.
+
 -- 
-1.7.2.5
+                                                                Gilles.
