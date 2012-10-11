@@ -1,29 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Oct 2012 11:32:57 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <1349950926.21172.8521.camel@edumazet-glaptop>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
- <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
- <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
- <yw1xpq4ppcju.fsf@unicorn.mansr.com>
- <1349949638.21172.8445.camel@edumazet-glaptop>
- <1349950926.21172.8521.camel@edumazet-glaptop>
-Message-ID: <20121011103257.GO4625@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 11 Oct 2012 16:05:10 +0530
+Subject: [PATCH 01/13] clk: davinci - add Main PLL clock driver
+In-Reply-To: <507563C3.2000305@ti.com>
+References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
+ <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
+ <507563C3.2000305@ti.com>
+Message-ID: <5076A0DE.4070900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 12:22:06PM +0200, Eric Dumazet wrote:
-> I took a look, and I dont see why/how gcc could use a ldm instruction
+On 10/10/2012 5:32 PM, Sekhar Nori wrote:
+> Hi Murali,
 > 
-> Doing so assumed the alignment of the structure was 8 bytes, but its
-> not.
+> On 9/26/2012 11:37 PM, Murali Karicheri wrote:
+>> This is the driver for the main PLL clock hardware found on DM SoCs.
+>> This driver borrowed code from arch/arm/mach-davinci/clock.c and
+>> implemented the driver as per common clock provider API. The main PLL
+>> hardware typically has a multiplier, a pre-divider and a post-divider.
+>> Some of the SoCs has the divider fixed meaning they can not be
+>> configured through a register. HAS_PREDIV and HAS_POSTDIV flags are used
+>> to tell the driver if a hardware has these dividers present or not.
+>> Driver is configured through the structure clk_davinci_pll_data
+>> that has the platform data for the driver.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 > 
-> Networking stack mandates that IP headers are aligned on 4 bytes
-> boundaries, not 8 bytes.
+> Are you using git-format-patch to generate the patches? It should have
+> added a diffstat here by default which is very useful in quickly
+> understanding what the patch is touching.
+>>
+>> diff --git a/drivers/clk/davinci/clk-davinci-pll.c b/drivers/clk/davinci/clk-davinci-pll.c
 
-Err, no.  ldm is "load multiple" not "load double".  It loads multiple
-32-bit registers, and its requirement for non-faulting behaviour is for
-the pointer to be 4 byte aligned.  However, "load double" requires 8
-byte alignment.
+Looking at how common clock framework for mxs has been implemented, this
+file should simply be clk-pll.c. That makes sense as you are creating a
+davinci folder anyway. Similar change required for psc as well.
+
+Thanks,
+Sekhar
