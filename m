@@ -1,51 +1,46 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 11 Oct 2012 15:04:35 -0400
-Subject: [RFC PATCH v2 10/16] mmc: omap_hsmmc: convert to
- dma_request_slave_channel_compat()
+Date: Thu, 11 Oct 2012 15:04:36 -0400
+Subject: [RFC PATCH v2 11/16] mmc: omap_hsmmc: limit max_segs with the EDMA
+ DMAC
 In-Reply-To: <1349982281-10785-1-git-send-email-mporter@ti.com>
 References: <1349982281-10785-1-git-send-email-mporter@ti.com>
-Message-ID: <1349982281-10785-11-git-send-email-mporter@ti.com>
+Message-ID: <1349982281-10785-12-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert dmaengine channel requests to use
-dma_request_slave_channel_compat(). This supports the DT case of
-platforms requiring channel selection from either the OMAP DMA or
-the EDMA engine. AM33xx only boots from DT and is the only user
-implementing EDMA so in the !DT case we can default to the OMAP DMA
-filter.
+The EDMA DMAC has a hardware limitation that prevents supporting
+scatter gather lists with any number of segments. Since the EDMA
+DMA Engine driver sets the maximum segments to 16, we do the
+same.
+
+TODO: this will be replaced once the DMA Engine API supports an
+API to query the DMAC's segment size limit.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 54bfd0c..b327cd0 100644
+index b327cd0..52bab01 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1866,14 +1866,20 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
+@@ -1828,6 +1828,16 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+ 	 * as we want. */
+ 	mmc->max_segs = 1024;
  
--	host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
-+	host->rx_chan =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &rx_req, &pdev->dev, "rx");
++	/* Eventually we should get our max_segs limitation for EDMA by
++	 * querying the dmaengine API */
++	if (pdev->dev.of_node) {
++		struct device_node *parent = pdev->dev.of_node->parent;
++		struct device_node *node;
++		node = of_find_node_by_name(parent, "edma");
++		if (node)
++			mmc->max_segs = 16;
++	}
 +
- 	if (!host->rx_chan) {
- 		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
- 		ret = -ENXIO;
- 		goto err_irq;
- 	}
- 
--	host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
-+	host->tx_chan =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &tx_req, &pdev->dev, "tx");
-+
- 	if (!host->tx_chan) {
- 		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
- 		ret = -ENXIO;
+ 	mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+ 	mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
+ 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
 -- 
 1.7.9.5
