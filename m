@@ -1,39 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Oct 2012 10:22:22 +0100
-Subject: [PATCH 4/6] ARM: ux500: Add UART support to the u9540 Device Tree
-In-Reply-To: <20121011085002.GV12801@game.jcrosoft.org>
-References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
- <1349882335-6786-5-git-send-email-lee.jones@linaro.org>
- <20121010190325.GT12801@game.jcrosoft.org>
- <20121011072927.GR9707@gmail.com>
- <20121011085002.GV12801@game.jcrosoft.org>
-Message-ID: <20121011092222.GW9707@gmail.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Thu, 11 Oct 2012 17:23:11 +0800
+Subject: [PATCH v4 RESEND 1/3] Input: egalax_ts: get gpio from devicetree
+In-Reply-To: <20121011085535.GA31464@S2101-09.ap.freescale.net>
+References: <1349860323-12786-1-git-send-email-jason77.wang@gmail.com>
+ <1349860323-12786-2-git-send-email-jason77.wang@gmail.com>
+ <20121010163036.GC19335@core.coreip.homeip.net>
+ <20121011085535.GA31464@S2101-09.ap.freescale.net>
+Message-ID: <50768FFF.9060702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Shawn Guo wrote:
+> Add LAKML ...
+>
+> On Wed, Oct 10, 2012 at 09:30:36AM -0700, Dmitry Torokhov wrote:
+>   
+>> Hi Hui,
+>>
+>> On Wed, Oct 10, 2012 at 05:12:01PM +0800, Hui Wang wrote:
+>>     
+>>> The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
+>>> and don't support this API anymore.
+>>>
+>>> The i.MX6q sabrelite platform equips an egalax touchscreen controller,
+>>> and this platform already transfered to GENERIC_GPIO framework, to
+>>> support this driver, we use a more generic way to get gpio.
+>>>       
+>> Unfortunately this does break the driver for platforms that do still
+>> support irq_to_gpio and have not transitioned to device tree (yet?).
+>> It looks like the API suffered from premature deletion...
+>>
+>> I really do not want to add a new platform data structure with only gpio
+>> in it, is there a better way to detect if irq_to_gpio() (even if only a
+>> stub) is available?
+>>
+>>     
+> If CONFIG_ARCH_HAVE_CUSTOM_GPIO_H is not enabled for an architecture,
+> the irq_to_gpio() in include/linux/gpio.h will tell unavailability by
+> returning -EINVAL.  But ARM
+>   
+So far, the only way i can figure out is to add following in the 
+arch/arm/include/asm/gpio.h
 
-> On 08:29 Thu 11 Oct     , Lee Jones wrote:
-> > On Wed, 10 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > > On 16:18 Wed 10 Oct     , Lee Jones wrote:
-> > > > Add the 3 UART nodes required to enable serial ports on the u9540.
-> > > > 
-> > > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > ---
-> > > >  arch/arm/boot/dts/u9540.dts |   13 ++++++++++++-
-> > > dts? it's dtsi
-> > 
-> > No it's not.
-> so the name of the file is wrong s u9540 is a SoC name
+static inline int arm_irq_to_gpio(unsigned int irq)
+{
+return -EINVAL;
+}
 
-The board could actually be called either ccu9540, or just 
-u9540. I picked one and went with it. The full name is the
-u9540 development board.
+#ifndef irq_to_gpio
+#define irq_to_gpio arm_irq_to_gpio
+#endif
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+And remove all irq_to_gpio() function definitions in the arch/arm/, if 
+mach want a specific irq_to_gpio, they can use macro to define their own.
+
+Regards,
+Hui.
