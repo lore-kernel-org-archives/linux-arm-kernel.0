@@ -1,60 +1,51 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 11 Oct 2012 15:04:32 -0400
-Subject: [RFC PATCH v2 07/16] ARM: dts: add AM33XX EDMA support
+Date: Thu, 11 Oct 2012 15:04:33 -0400
+Subject: [RFC PATCH v2 08/16] ARM: omap: add hsmmc am33xx specific init
 In-Reply-To: <1349982281-10785-1-git-send-email-mporter@ti.com>
 References: <1349982281-10785-1-git-send-email-mporter@ti.com>
-Message-ID: <1349982281-10785-8-git-send-email-mporter@ti.com>
+Message-ID: <1349982281-10785-9-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds AM33XX EDMA support to the am33xx.dtsi as documented in
-Documentation/devicetree/bindings/dma/ti-edma.txt
+AM33xx requires special handling in hsmmc initialization
+platform glue.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/mach-omap2/hsmmc.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index bb31bff..2ddb31b 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -62,6 +62,36 @@
- 			reg = <0x48200000 0x1000>;
- 		};
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index 4d3a632..42ce988 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -365,7 +365,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 	else
+ 		mmc->slots[0].ocr_mask = c->ocr_mask;
  
-+		edma: edma at 49000000 {
-+			compatible = "ti,edma3";
-+			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-+			reg = <0x49000000 0x10000>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <12 13 14>;
-+			#dma-cells = <1>;
-+			dma-channels = <64>;
-+			ti,edma-regions = <4>;
-+			ti,edma-slots = <256>;
-+			ti,edma-reserved-channels = <0  2
-+						     14 2
-+						     26 6
-+						     48 4
-+						     56 8>;
-+			ti,edma-reserved-slots = <0  2
-+						  14 2
-+						  26 6
-+						  48 4
-+						  56 8
-+						  64 127>;
-+			ti,edma-queue-tc-map = <0 0
-+						1 1
-+						2 2>;
-+			ti,edma-queue-priority-map = <0 0
-+						      1 1
-+						      2 2>;
-+			ti,edma-default-queue = <0>;
-+		};
-+
- 		gpio1: gpio at 44e07000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio1";
+-	if (!soc_is_am35xx())
++	if (!soc_is_am35xx() && !soc_is_am33xx())
+ 		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
+ 
+ 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
+@@ -388,7 +388,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 			}
+ 		}
+ 
+-		if (soc_is_am35xx())
++		if (soc_is_am35xx() || soc_is_am33xx())
+ 			mmc->slots[0].set_power = nop_mmc_set_power;
+ 
+ 		/* OMAP3630 HSMMC1 supports only 4-bit */
+@@ -489,7 +489,8 @@ static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
+ 	if (res < 0)
+ 		goto free_mmc;
+ 
+-	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
++	if (!soc_is_am33xx())
++		omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
+ 
+ 	name = "omap_hsmmc";
+ 	res = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
 -- 
 1.7.9.5
