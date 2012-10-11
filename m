@@ -1,42 +1,103 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 11 Oct 2012 15:24:32 +0800
-Subject: ARM_ATAG_DTB_COMPAT fails on fdt_ro.c compiling
-In-Reply-To: <CAOMZO5BgJ0eSPvhnjCx_DVAUdLKpEhp-amJQw-8NZDX9AfCDeA@mail.gmail.com>
-References: <20121009031715.GC21822@S2101-09.ap.freescale.net>
- <alpine.LFD.2.02.1210090018470.16518@xanadu.home>
- <20121009050109.GD21822@S2101-09.ap.freescale.net>
- <50744DBA.3070900@wwwdotorg.org>
- <CAOMZO5BgJ0eSPvhnjCx_DVAUdLKpEhp-amJQw-8NZDX9AfCDeA@mail.gmail.com>
-Message-ID: <20121011072428.GA26298@S2101-09.ap.freescale.net>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Thu, 11 Oct 2012 11:25:33 +0400
+Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
+In-Reply-To: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
+References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CABjd4YzdwXmAeTrULWOGdFBg8xKXK4FN7fGJegjFZYmmxhrP2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 01:21:02PM -0300, Fabio Estevam wrote:
-> On Tue, Oct 9, 2012 at 1:15 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> 
-> >>> I just tried building mainline now.  It is at commit f5a246eab9.
-> >>>
-> >> The build still fails for me at this commit.
-> >
-> > I can't reproduce this.
-> 
-> Same here. It builds fine for me.
-> 
-Thanks all for confirming it works.
+2012/10/11 Tony Prisk <linux@prisktech.co.nz>:
+> This patch completes the conversion to ARCH_MULTI_V5 for arch-vt8500.
+> Removed /mach/include/ and remaining unneeded files.
+>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>  arch/arm/Kconfig                                |   18 ++----------
+>  arch/arm/mach-vt8500/include/mach/debug-macro.S |   31 -------------------
+>  arch/arm/mach-vt8500/include/mach/timex.h       |   26 ----------------
+>  arch/arm/mach-vt8500/include/mach/uncompress.h  |   36 -----------------------
+>  4 files changed, 2 insertions(+), 109 deletions(-)
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/debug-macro.S
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/timex.h
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/uncompress.h
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 32b62ac..e71ad2c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -938,22 +938,6 @@ config PLAT_SPEAR
+>         help
+>           Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
+>
+> -config ARCH_VT8500
+> -       bool "VIA/WonderMedia 85xx"
+> -       select CPU_ARM926T
+> -       select GENERIC_GPIO
+> -       select ARCH_HAS_CPUFREQ
+> -       select GENERIC_CLOCKEVENTS
+> -       select ARCH_REQUIRE_GPIOLIB
+> -       select USE_OF
+> -       select COMMON_CLK
+> -       select HAVE_CLK
+> -       select CLKDEV_LOOKUP
+> -       select MULTI_IRQ_HANDLER
+> -       select SPARSE_IRQ
+> -       help
+> -         Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
+> -
+>  config ARCH_ZYNQ
+>         bool "Xilinx Zynq ARM Cortex A9 Platform"
+>         select CPU_V7
+> @@ -1125,6 +1109,8 @@ source "arch/arm/mach-versatile/Kconfig"
+>  source "arch/arm/mach-vexpress/Kconfig"
+>  source "arch/arm/plat-versatile/Kconfig"
+>
+> +source "arch/arm/mach-vt8500/Kconfig"
+> +
+>  source "arch/arm/mach-w90x900/Kconfig"
+>
+>  # Definitions to make life easier
+> diff --git a/arch/arm/mach-vt8500/include/mach/debug-macro.S b/arch/arm/mach-vt8500/include/mach/debug-macro.S
+> deleted file mode 100644
+> index ca292f2..0000000
+> --- a/arch/arm/mach-vt8500/include/mach/debug-macro.S
+> +++ /dev/null
+> @@ -1,31 +0,0 @@
+> -/*
+> - * arch/arm/mach-vt8500/include/mach/debug-macro.S
+> - *
+> - *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+> - *
+> - * Debugging macro include header
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> -*/
+> -
+> -       .macro  addruart, rp, rv, tmp
+> -       mov     \rp,      #0x00200000
+> -       orr     \rv, \rp, #0xf8000000
+> -       orr     \rp, \rp, #0xd8000000
+> -       .endm
+> -
+> -       .macro  senduart,rd,rx
+> -       strb    \rd, [\rx, #0]
+> -       .endm
+> -
+> -       .macro  busyuart,rd,rx
+> -1001:  ldr     \rd, [\rx, #0x1c]
+> -       ands    \rd, \rd, #0x2
+> -       bne     1001b
+> -       .endm
+> -
+> -       .macro  waituart,rd,rx
+> -       .endm
 
-I just figured it out on my end.  Here is how it gets broken for me.
+Does this imply that early printk won't be supported any longer, or am
+I missing something?
 
-- Before commit cd29672 (dtc: import latest upstream dtc) gets in,
-  I did a build without O=<output_dir>.  It results in a copy of those
-  libfdt files in arch/arm/boot/compressed.
-
-- After the commit gets in, I start a build with O=imx parameter.  When
-  compiling imx/arch/arm/boot/compressed/fdt_ro.c, the #include <libfdt.h>
-  in fdt_ro.c seems to match the one left in arch/arm/boot/compressed/
-  from last build rather than imx/arch/arm/boot/compressed/libfdt.h.
-
-Cleaning the libfdt copies in arch/arm/boot/compressed fixes the
-problem.  Not sure why it's not "libfdt.h" but <libfdt.h> is used as
-the inclusion though, since the .h and .c are in the same folder.
-
-Shawn
+Thanks,
+Alexey
