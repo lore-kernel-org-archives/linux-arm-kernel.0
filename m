@@ -1,78 +1,55 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 11 Oct 2012 08:20:14 -0500
-Subject: alignment faults in 3.6
-In-Reply-To: <1349959248.21172.8970.camel@edumazet-glaptop>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <201210111228.25995.arnd@arndb.de>
- <1349959248.21172.8970.camel@edumazet-glaptop>
-Message-ID: <5076C78E.1020408@gmail.com>
+Date: Thu, 11 Oct 2012 08:31:47 -0500
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <20121011130955.GP4625@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+ <20121011130955.GP4625@n2100.arm.linux.org.uk>
+Message-ID: <5076CA43.9070503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 07:40 AM, Eric Dumazet wrote:
-> On Thu, 2012-10-11 at 12:28 +0000, Arnd Bergmann wrote:
+On 10/11/2012 08:09 AM, Russell King - ARM Linux wrote:
+> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
+>> The contents of this were already reviewed on this thread, so I sent this
+>> to the patch system and this was Russell's reply:
 > 
+> So that's why I couldn't find it - the mailing list thread has a different
+> subject line to the patch.  Don't do that.  Given the amount of list
+> traffic we have today, that's as good as not having been posted at all.
+> 
+>>> NAK for two reasons.
+>>>
+>>> 1. It hasn't been on the list (I can't find a match for "clear SCTLR.A"
+>>> in my mailbox)
+>>>
+>>> 2. The behaviour of unaligned accesses vary depending on CPU.  Some
+>>> fix-up the access, others load the word and then rotate it.  If we have
+>>> decompressors which perform unaligned accesses, we need to fix this
+>>> properly to avoid the CPU specific behaviour, rather than tweaking
+>>> control bits to hide the problem.
 >>
->> Rob Herring as the original reporter has dropped off the Cc list, adding
->> him back.
->>
->> I assume that the calxeda xgmac driver is the culprit then. It uses
->> netdev_alloc_skb() rather than netdev_alloc_skb_ip_align() in
->> xgmac_rx_refill but it is not clear whether it does so intentionally
->> or by accident.
-
-This in fact does work and eliminates the unaligned traps. However, not
-all h/w can do IP aligned DMA (i.MX FEC for example), so I still think
-this is a questionable optimization by the compiler. We're saving 1 load
-instruction here for data that is likely already in the cache. It may be
-legal per the ABI, but the downside of this optimization is much greater
-than the upside.
-
+>> I'm simply matching the behavior of the kernel itself. The A bit is cleared
+>> for v7 kernels and compilers only generate unaligned accesses for v7.
+>> Without this the initial state of the A bit is undefined as a bootloader
+>> could have cleared it already. We should document the required state or set
+>> it to what we want.
 > 
-> Thanks Arnd
-> 
-> It seems an accident, since driver doesnt check skb->data alignment at
-> all (this can change with SLAB debug on/off)
-> 
-> It also incorrectly adds 64 bytes to bfsize, there is no need for this.
+> Irrespective of this, (2) still stands.  Unaligned accesses in the
+> decompressor without a fixup (which will be very hard to provide)
+> will return different data depending on the CPU as I mention in point
+> 2.
 
-I'm pretty sure this was needed as the h/w writes out full bursts of
-data, but I'll go back and check.
+This only affects v7 cores. It should not vary for v7 cores as unaligned
+access is a required feature. So how is it going to vary on v7 CPUs?
+We've got bigger problems if there are v7 cores that don't handle
+unaligned accesses.
 
 Rob
 
-> (or if its needed, a comment would be nice, because on prior kernels,
-> this makes skb->head allocations uses kmalloc-4096 instead of
-> kmalloc-2048 slab cache... With 3.7 its less an issue now we use order-3
-> pages to deliver fragments for rx skbs
+> So, using unaligned accesses in the decompressor may not give expected
+> results in all cases, so they're best avoided.
 >
-> So the following patch should fix the alignment, and makes driver uses
-> half memory than before for stable kernels
-> 
-> diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
-> index 16814b3..a895e18 100644
-> --- a/drivers/net/ethernet/calxeda/xgmac.c
-> +++ b/drivers/net/ethernet/calxeda/xgmac.c
-> @@ -671,7 +671,8 @@ static void xgmac_rx_refill(struct xgmac_priv *priv)
->  		p = priv->dma_rx + entry;
->  
->  		if (priv->rx_skbuff[entry] == NULL) {
-> -			skb = netdev_alloc_skb(priv->dev, priv->dma_buf_sz);
-> +			skb = netdev_alloc_skb_ip_align(priv->dev,
-> +							priv->dma_buf_sz);
->  			if (unlikely(skb == NULL))
->  				break;
->  
-> @@ -703,7 +704,7 @@ static int xgmac_dma_desc_rings_init(struct net_device *dev)
->  	/* Set the Buffer size according to the MTU;
->  	 * indeed, in case of jumbo we need to bump-up the buffer sizes.
->  	 */
-> -	bfsize = ALIGN(dev->mtu + ETH_HLEN + ETH_FCS_LEN + NET_IP_ALIGN + 64,
-> +	bfsize = ALIGN(dev->mtu + ETH_HLEN + ETH_FCS_LEN,
->  		       64);
->  
->  	netdev_dbg(priv->dev, "mtu [%d] bfsize [%d]\n", dev->mtu, bfsize);
-> 
+> And if they're avoided, then we don't care about the setting of the A
+> bit.
 > 
