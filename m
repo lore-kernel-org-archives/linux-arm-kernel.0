@@ -1,46 +1,60 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Thu, 11 Oct 2012 13:09:59 +0300
-Subject: [REMINDER: PATCH 1/1] mtd:nand:clk: preparation for switch to
- common clock framework
-In-Reply-To: <50769A45.5030105@ti.com>
-References: <1347899860-24358-1-git-send-email-m-karicheri2@ti.com>
- <1347899860-24358-2-git-send-email-m-karicheri2@ti.com>
- <3E54258959B69E4282D79E01AB1F32B7041EF679@DFLE12.ent.ti.com>
- <1349949469.20594.67.camel@sauron.fi.intel.com> <50769A45.5030105@ti.com>
-Message-ID: <1349950199.12014.2.camel@sauron.fi.intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 11 Oct 2012 15:45:47 +0530
+Subject: [PATCH 01/13] calk: davinci - add Main PLL clock driver
+In-Reply-To: <3E54258959B69E4282D79E01AB1F32B7041FB712@DFLE12.ent.ti.com>
+References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
+ <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
+ <507563C3.2000305@ti.com>
+ <3E54258959B69E4282D79E01AB1F32B7041FB712@DFLE12.ent.ti.com>
+Message-ID: <50769C53.8030405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-11 at 15:37 +0530, Sekhar Nori wrote:
-> Hi Artem,
-> 
-> On 10/11/2012 3:27 PM, Artem Bityutskiy wrote:
-> > On Fri, 2012-09-28 at 16:10 +0000, Karicheri, Muralidharan wrote:
-> >>>> -----Original Message-----
-> >>>> From: Karicheri, Muralidharan
-> >>>> Sent: Monday, September 17, 2012 12:38 PM
-> >>>> To: dwmw2 at infradead.org; artem.bityutskiy at linux.intel.com; hs at denx.de;
-> >>>> mikedunn at newsguy.com; linux-mtd at lists.infradead.org; linux-kernel at vger.kernel.org;
-> >>>> davinci-linux-open-source at linux.davincidsp.com; linux-arm-kernel at lists.infradead.org
-> >>>> Cc: Karicheri, Muralidharan
-> >>>> Subject: [PATCH 1/1] mtd:nand:clk: preparation for switch to common clock framework
-> > 
-> > I do not see this patch in my mailbox. Can you please re-send with all
-> > the acks?
-> 
-> This patch is already applied to linux-next. Do you need it still?
-> 
-> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commit;h=ea73fe7f0d562154975a77fe77ae3da6ab4d3e77
+On 10/10/2012 8:04 PM, Karicheri, Muralidharan wrote:
 
-Ah, right, no, I don't, thanks!
+>>>> +struct clk *clk_register_davinci_pll(struct device *dev, const char *name,
+>>>> +			const char *parent_name,
+>>>> +			struct clk_davinci_pll_data *pll_data) {
+>>>> +	struct clk_init_data init;
+>>>> +	struct clk_davinci_pll *pll;
+>>>> +	struct clk *clk;
+>>>> +
+>>>> +	if (!pll_data)
+>>>> +		return ERR_PTR(-ENODEV);
+>>>> +
+>>>> +	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+>>>> +	if (!pll)
+>>>> +		return ERR_PTR(-ENOMEM);
+>>>> +	init.name = name;
+>>>> +	init.ops = &clk_pll_ops;
+>>>> +	init.flags = pll_data->flags;
+>>>> +	init.parent_names = (parent_name ? &parent_name : NULL);
+>>>> +	init.num_parents = (parent_name ? 1 : 0);
+>>>> +
+>>>> +	pll->pll_data	= pll_data;
+>>>> +	pll->hw.init = &init;
+>>>> +
+>>>> +	clk = clk_register(NULL, &pll->hw);
+>>>> +	if (IS_ERR(clk))
+>>>> +		kfree(pll);
+>>>> +
+>>>> +	return clk;
+>>>> +}
+>>>
+>>> I guess there is an an "unregister" required as well which will free the pll memory
+>>> allocated above and unregister the clock? Not sure if you would ever unregister a PLL,
+>>> but providing this will probably help symmetry.
+> Sekhar,
+> 
+> clk_unregister() itself is a null statement in clk.c. Besides none of the clk drivers presently have implemented the unregister(). So I believe this is unnecessary. 
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121011/684817ab/attachment.sig>
+I am ok with this.
+
+> BTW, please review the v2 patch for the rest of the series. For the one you have already reviewed, it should be fine.
+
+Okay. I see those now. BTW, this series also has a v2 in its 0/13. Are
+there any differences between this and the other v2, or is that merely a
+resend?
+
+Thanks,
+Sekhar
