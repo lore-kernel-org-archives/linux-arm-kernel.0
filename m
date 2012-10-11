@@ -1,191 +1,172 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 11 Oct 2012 20:59:13 +1300
-Subject: [RFC PATCHv2] ARM: vt8500: Convert arch-vt8500 to multiplatform
-Message-ID: <1349942353-14972-1-git-send-email-linux@prisktech.co.nz>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Oct 2012 09:10:21 +0100
+Subject: [PATCH 07/10] input: Enable STMPE keypad driver for Device Tree
+In-Reply-To: <20121010165004.GE19335@core.coreip.homeip.net>
+References: <1349451107-8009-1-git-send-email-lee.jones@linaro.org>
+ <1349451107-8009-8-git-send-email-lee.jones@linaro.org>
+ <20121010165004.GE19335@core.coreip.homeip.net>
+Message-ID: <20121011081021.GT9707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch completes the conversion to ARCH_MULTI_V5 for arch-vt8500.
-Removed /mach/include/ and remaining unneeded files.
+On Wed, 10 Oct 2012, Dmitry Torokhov wrote:
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
-v2	Added the missing arch/arm/mach-vt8500/Kconfig
+> Hi Lee,
+> 
+> On Fri, Oct 05, 2012 at 04:31:43PM +0100, Lee Jones wrote:
+> > This patch allows the STMPE driver to be successfully probed and
+> > initialised when Device Tree support is enabled. Besides the usual
+> > platform data changes, we also separate the process of filling in
+> > the 'in use' pin bitmap, as we have to extract the information from
+> > Device Tree in the DT boot case.
+> 
+> 
+> This generally looks OK although I wonder if we could not unify DT and
+> non-DT case by doing:
+> 
+> 	for (row = 0; row < STMPE_KEYPAD_MAX_ROWS; row++) {
+> 		if (col = 0; col < STMPE_KEYPAD_MAX_COLS; col++) {
+> 			int code = MATRIX_SCAN_CODE(row, col,
+> 						STMPE_KEYPAD_ROW_SHIFT);
+> 			if (keypad->keymap[code] != KEY_RESERVED) {
+> 				keypad->rows |= 1 << row;
+> 				keypad->cols |= 1 << col;
+> 			}
+> 		}
+> 	}
 
- arch/arm/Kconfig                                |   18 ++----------
- arch/arm/mach-vt8500/Kconfig                    |   11 +++++++
- arch/arm/mach-vt8500/include/mach/debug-macro.S |   31 -------------------
- arch/arm/mach-vt8500/include/mach/timex.h       |   26 ----------------
- arch/arm/mach-vt8500/include/mach/uncompress.h  |   36 -----------------------
- 5 files changed, 13 insertions(+), 109 deletions(-)
- create mode 100644 arch/arm/mach-vt8500/Kconfig
- delete mode 100644 arch/arm/mach-vt8500/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-vt8500/include/mach/timex.h
- delete mode 100644 arch/arm/mach-vt8500/include/mach/uncompress.h
+Looks like it could work. I have a quite a long TODO list at the
+moment, but I will add testing this to it.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 32b62ac..e71ad2c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -938,22 +938,6 @@ config PLAT_SPEAR
- 	help
- 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
- 
--config ARCH_VT8500
--	bool "VIA/WonderMedia 85xx"
--	select CPU_ARM926T
--	select GENERIC_GPIO
--	select ARCH_HAS_CPUFREQ
--	select GENERIC_CLOCKEVENTS
--	select ARCH_REQUIRE_GPIOLIB
--	select USE_OF
--	select COMMON_CLK
--	select HAVE_CLK
--	select CLKDEV_LOOKUP
--	select MULTI_IRQ_HANDLER
--	select SPARSE_IRQ
--	help
--	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
--
- config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform"
- 	select CPU_V7
-@@ -1125,6 +1109,8 @@ source "arch/arm/mach-versatile/Kconfig"
- source "arch/arm/mach-vexpress/Kconfig"
- source "arch/arm/plat-versatile/Kconfig"
- 
-+source "arch/arm/mach-vt8500/Kconfig"
-+
- source "arch/arm/mach-w90x900/Kconfig"
- 
- # Definitions to make life easier
-diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
-new file mode 100644
-index 0000000..fa0c9fa
---- /dev/null
-+++ b/arch/arm/mach-vt8500/Kconfig
-@@ -0,0 +1,11 @@
-+config ARCH_VT8500
-+	bool "VIA/WonderMedia 85xx" if ARCH_MULTI_V5
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+	select CPU_ARM926T
-+	select GENERIC_CLOCKEVENTS
-+	select GENERIC_GPIO
-+	select HAVE_CLK
-+	help
-+	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
-diff --git a/arch/arm/mach-vt8500/include/mach/debug-macro.S b/arch/arm/mach-vt8500/include/mach/debug-macro.S
-deleted file mode 100644
-index ca292f2..0000000
---- a/arch/arm/mach-vt8500/include/mach/debug-macro.S
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * arch/arm/mach-vt8500/include/mach/debug-macro.S
-- *
-- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-- *
-- * Debugging macro include header
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
--*/
--
--	.macro	addruart, rp, rv, tmp
--	mov	\rp,      #0x00200000
--	orr	\rv, \rp, #0xf8000000
--	orr	\rp, \rp, #0xd8000000
--	.endm
--
--	.macro	senduart,rd,rx
--	strb	\rd, [\rx, #0]
--	.endm
--
--	.macro	busyuart,rd,rx
--1001:	ldr	\rd, [\rx, #0x1c]
--	ands	\rd, \rd, #0x2
--	bne	1001b
--	.endm
--
--	.macro	waituart,rd,rx
--	.endm
-diff --git a/arch/arm/mach-vt8500/include/mach/timex.h b/arch/arm/mach-vt8500/include/mach/timex.h
-deleted file mode 100644
-index 8487e4c..0000000
---- a/arch/arm/mach-vt8500/include/mach/timex.h
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- *  arch/arm/mach-vt8500/include/mach/timex.h
-- *
-- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--
--#ifndef MACH_TIMEX_H
--#define MACH_TIMEX_H
--
--#define CLOCK_TICK_RATE		(3000000)
--
--#endif /* MACH_TIMEX_H */
-diff --git a/arch/arm/mach-vt8500/include/mach/uncompress.h b/arch/arm/mach-vt8500/include/mach/uncompress.h
-deleted file mode 100644
-index a9b6cae..0000000
---- a/arch/arm/mach-vt8500/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,36 +0,0 @@
--/* arch/arm/mach-vt8500/include/mach/uncompress.h
-- *
-- * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-- *
-- * Based on arch/arm/mach-dove/include/mach/uncompress.h
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--#define UART0_PHYS     0xd8200000
--#define UART0_ADDR(x)  *(volatile unsigned char *)(UART0_PHYS + x)
--
--static void putc(const char c)
--{
--	while (UART0_ADDR(0x1c) & 0x2)
--		/* Tx busy, wait and poll */;
--
--	UART0_ADDR(0) = c;
--}
--
--static void flush(void)
--{
--}
--
--/*
-- * nothing to do
-- */
--#define arch_decomp_setup()
--#define arch_decomp_wdog()
+> BTW, am I supposed to merge it or ack it?
+
+If you Ack it, I can carry it for you no problem.
+
+> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: linux-input at vger.kernel.org
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/input/keyboard/stmpe-keypad.c |   67 ++++++++++++++++++++++++++++-----
+> >  drivers/mfd/stmpe.c                   |    1 +
+> >  2 files changed, 59 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/input/keyboard/stmpe-keypad.c b/drivers/input/keyboard/stmpe-keypad.c
+> > index 470a877..c722d23 100644
+> > --- a/drivers/input/keyboard/stmpe-keypad.c
+> > +++ b/drivers/input/keyboard/stmpe-keypad.c
+> > @@ -257,19 +257,73 @@ static int __devinit stmpe_keypad_chip_init(struct stmpe_keypad *keypad)
+> >  			      (plat->debounce_ms << 1));
+> >  }
+> >  
+> > +static int stmpe_keypad_fill_used_pins(struct platform_device *pdev,
+> > +				struct stmpe_keypad *keypad,
+> > +				struct stmpe_keypad_platform_data *plat)
+> > +{
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	unsigned int proplen;
+> > +	const __be32 *prop;
+> > +	int i;
+> > +
+> > +	if (np) {
+> > +		prop = of_get_property(np, "linux,keymap", &proplen);
+> > +		if (!prop) {
+> > +			dev_err(&pdev->dev,
+> > +				"linux,keymap property not defined\n");
+> > +			return -EINVAL;
+> > +		}
+> > +
+> > +		for (i = 0; i < proplen / sizeof(u32); i++) {
+> > +			unsigned int key = be32_to_cpup(prop + i);
+> > +
+> > +			keypad->cols |= 1 << KEY_COL(key);
+> > +			keypad->rows |= 1 << KEY_ROW(key);
+> > +		}
+> > +	} else {
+> > +		for (i = 0; i < plat->keymap_data->keymap_size; i++) {
+> > +			unsigned int key = plat->keymap_data->keymap[i];
+> > +
+> > +			keypad->cols |= 1 << KEY_COL(key);
+> > +			keypad->rows |= 1 << KEY_ROW(key);
+> > +		}
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void __devinit stmpe_keypad_of_probe(struct device_node *np,
+> > +				struct stmpe_keypad_platform_data *plat)
+> > +{
+> > +	of_property_read_u32(np, "debounce-interval", &plat->debounce_ms);
+> > +	of_property_read_u32(np, "stericsson,scan-count", &plat->scan_count);
+> > +
+> > +	if (of_get_property(np, "stericsson,no-autorepeat", NULL))
+> > +		plat->no_autorepeat = true;
+> > +}
+> > +
+> >  static int __devinit stmpe_keypad_probe(struct platform_device *pdev)
+> >  {
+> >  	struct stmpe *stmpe = dev_get_drvdata(pdev->dev.parent);
+> >  	struct stmpe_keypad_platform_data *plat;
+> > +	struct device_node *np = pdev->dev.of_node;
+> >  	struct stmpe_keypad *keypad;
+> >  	struct input_dev *input;
+> >  	int ret;
+> >  	int irq;
+> > -	int i;
+> >  
+> >  	plat = stmpe->pdata->keypad;
+> > -	if (!plat)
+> > -		return -ENODEV;
+> > +	if (!plat) {
+> > +		if (np) {
+> > +			plat = devm_kzalloc(&pdev->dev,
+> > +					sizeof(*plat), GFP_KERNEL);
+> > +			if (!plat)
+> > +				return -ENOMEM;
+> > +
+> > +			stmpe_keypad_of_probe(np, plat);
+> > +		} else
+> > +			return -ENODEV;
+> > +	}
+> >  
+> >  	irq = platform_get_irq(pdev, 0);
+> >  	if (irq < 0)
+> > @@ -300,12 +354,7 @@ static int __devinit stmpe_keypad_probe(struct platform_device *pdev)
+> >  	if (!plat->no_autorepeat)
+> >  		__set_bit(EV_REP, input->evbit);
+> >  
+> > -	for (i = 0; i < plat->keymap_data->keymap_size; i++) {
+> > -		unsigned int key = plat->keymap_data->keymap[i];
+> > -
+> > -		keypad->cols |= 1 << KEY_COL(key);
+> > -		keypad->rows |= 1 << KEY_ROW(key);
+> > -	}
+> > +	stmpe_keypad_fill_used_pins(pdev, keypad, plat);
+> >  
+> >  	keypad->stmpe = stmpe;
+> >  	keypad->plat = plat;
+> > diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> > index ba157d4..b03cc64 100644
+> > --- a/drivers/mfd/stmpe.c
+> > +++ b/drivers/mfd/stmpe.c
+> > @@ -321,6 +321,7 @@ static struct resource stmpe_keypad_resources[] = {
+> >  
+> >  static struct mfd_cell stmpe_keypad_cell = {
+> >  	.name		= "stmpe-keypad",
+> > +	.of_compatible  = "st,stmpe-keypad",
+> >  	.resources	= stmpe_keypad_resources,
+> >  	.num_resources	= ARRAY_SIZE(stmpe_keypad_resources),
+> >  };
+> > -- 
+> > 1.7.9.5
+> > 
+> 
+> -- 
+> Dmitry
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
