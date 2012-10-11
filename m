@@ -1,107 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Oct 2012 12:56:41 +0000
-Subject: [PATCH] pinctrl/nomadik: provide stubs for legacy Nomadik
-In-Reply-To: <1349959302-12151-1-git-send-email-linus.walleij@stericsson.com>
-References: <1349959302-12151-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201210111256.41600.arnd@arndb.de>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 11 Oct 2012 14:59:12 +0200
+Subject: alignment faults in 3.6
+In-Reply-To: <1349959881.1232.44.camel@sakura.staff.proxad.net>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
+ <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
+ <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
+ <yw1xpq4ppcju.fsf@unicorn.mansr.com>
+ <1349949638.21172.8445.camel@edumazet-glaptop>
+ <1349950926.21172.8521.camel@edumazet-glaptop>
+ <20121011103257.GO4625@n2100.arm.linux.org.uk>
+ <1349952574.21172.8604.camel@edumazet-glaptop>
+ <1349952970.1232.5.camel@sakura.staff.proxad.net>
+ <1349954899.21172.8728.camel@edumazet-glaptop>
+ <1349956055.1232.9.camel@sakura.staff.proxad.net>
+ <1349956456.21172.8820.camel@edumazet-glaptop>
+ <1349959881.1232.44.camel@sakura.staff.proxad.net>
+Message-ID: <1349960352.21172.9033.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 October 2012, Linus Walleij wrote:
+On Thu, 2012-10-11 at 14:51 +0200, Maxime Bizon wrote:
+
+> Hey I cannot go back in time, when that hardware was built in 2004 (mips
+> @250Mhz), it was considered good, and we did manufacture a lot of it, so
+> it's still maintained.
 > 
-> From: Linus Walleij <linus.walleij@linaro.org>
+> People run recent kernels on older hardware because they are *encouraged
+> to do so*.
 > 
-> The compilation of the pinctrl driver failed on the legacy
-> Nomadik NHK8815 platform because it was not providing the PRCMU
-> interfaces needed to support the extended alternate functions
-> used by the ux500 series.
+> I fought inside my company to be good kernel citizen, not using
+> proprietary BSP, rewrite & mainline the drivers, because that was the
+> community promise: mainline it, we will support it for you, you will get
+> the latest kernel features for free.
 > 
-> Solve this by providing some stubs for the legacy platform, to
-> avoid too much #ifdefs in the code per se. Theoretically this
-> actually allows the Nomadik and Ux500 to have a single kernel
-> image with support for the PRCM registers on the Ux500 (though
-> they have incompatible archs, but the spirit is there).
 > 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> That worked, but with some drawbacks:
+> 
+>  - kernel footprint grew that much (we started from 2.4) that it does
+> not fit in device flash anymore
+> 
+>  - performance took a hit each time we upgrade, mostly because of cache
+> footprint growth.
+> 
+>  - as kernel footprint grew, available RAM for conntrack & route cache
+> entries was smaller each time
+> 
+> 
+> But I had to stop upgrading after 2.6.20. Everything below is not
+> anybody's fault. Bloat is unavoidable for software project that big.
+> 
+> I'm perfectly ok with that, but I don't want to be ridiculed for running
+> mainline kernel on old hardware.
 
-Thanks for the quick reply!
+Hmm, I am sorry if you felt that, it was not my intent.
 
-This looks like it will work correctly, but I've also just
-looked into the problem deeper and found that we actually have
-too many inline function alternatives in the !UX500 case.
+> 
+> 
+> > Adding get_unaligned() everywhere in linux network stacks is not an
+> > option.
+> > 
+> > We actually want to be able to read the code and fix the bugs, not only
+> > run it on a cheap low end router.
+> 
+> That was not a request, I just needed a clarification. 
+> 
+> Documentation/unaligned-memory-access.txt does not say it's a big no-no,
+> it says you can give unaligned pointers to the networking stack if you
+> arch can do unaligned access (with an "efficiency" notion).
+> 
+> MIPS and ARM have a software handler for this, and performance wise in
+> my case it's better to take the faults, a driver writer may think a
+> benchmark will dictate what to do.
+> 
 
-The below is what I just added locally. I don't care which version
-you end up using though, as you maintain both the driver and the
-platform sides of the problem.
+Sure, but all this discussion started because one arch apparently did
+not like these mis alignments, and some people complained that network
+guys would not add _needed_ get_unaligned_xxx() wrappers ...
 
-	Arnd
+So far, linux is 20 years old, I dont think we are going to add wrappers
+right now. Machines that could have cared are dying anyway.
 
-commit c386dcea42be85822ef5a9ab5ab1785a063da889
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Thu Oct 11 12:39:07 2012 +0000
-
-    mfd: db8500-prcmu: remove duplicate declarations
-    
-    These are already present in dbx500-prcmu.h, so we must not define them
-    here or nomadik won't build.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index b82f6ee..7ef550b 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -521,16 +521,12 @@ void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
- 	struct prcmu_auto_pm_config *idle);
- bool prcmu_is_auto_pm_enabled(void);
- 
--int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
- int prcmu_set_clock_divider(u8 clock, u8 divider);
- int db8500_prcmu_config_hotdog(u8 threshold);
- int db8500_prcmu_config_hotmon(u8 low, u8 high);
- int db8500_prcmu_start_temp_sense(u16 cycles32k);
- int db8500_prcmu_stop_temp_sense(void);
--int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
--int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
- 
--int prcmu_ac_wake_req(void);
- void prcmu_ac_sleep_req(void);
- void db8500_prcmu_modem_reset(void);
- 
-@@ -640,11 +636,6 @@ static inline bool prcmu_is_auto_pm_enabled(void)
- 	return false;
- }
- 
--static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
--{
--	return 0;
--}
--
- static inline int prcmu_set_clock_divider(u8 clock, u8 divider)
- {
- 	return 0;
-@@ -670,23 +661,6 @@ static inline int db8500_prcmu_stop_temp_sense(void)
- 	return 0;
- }
- 
--static inline int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size)
--{
--	return -ENOSYS;
--}
--
--static inline int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
--{
--	return -ENOSYS;
--}
--
--static inline int prcmu_ac_wake_req(void)
--{
--	return 0;
--}
--
--static inline void prcmu_ac_sleep_req(void) {}
--
- static inline void db8500_prcmu_modem_reset(void) {}
- 
- static inline void db8500_prcmu_system_reset(u16 reset_code) {}
+Please note we still support NET_IP_ALIGN, even if its 0 on x86.
