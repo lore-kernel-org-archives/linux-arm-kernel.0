@@ -1,25 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Oct 2012 16:05:43 +0200
-Subject: [PATCH v2 00/15] pinctrl: samsung: Usability and extensibiltiy
- improvements
-In-Reply-To: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
+Date: Thu, 11 Oct 2012 16:06:51 +0200
+Subject: [PATCH 01/15] pinctrl: samsung: Detect and handle unsupported
+ configuration types
+In-Reply-To: <CAH9JG2UGFeF362amWEZAqah45K2_a-k4-n_uGs=t+3-DQf6xaQ@mail.gmail.com>
 References: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CACRpkdZvhKEHHZrhHobes+7iYkv+eCYbQqa8Y8R3yejzxEYUxw@mail.gmail.com>
+ <1349943081-27939-2-git-send-email-t.figa@samsung.com>
+ <CACRpkdbRNfic7LYkcRWQSJjWop+OH7ap_z0UpPco6+m_AASYPA@mail.gmail.com>
+ <CAH9JG2UGFeF362amWEZAqah45K2_a-k4-n_uGs=t+3-DQf6xaQ@mail.gmail.com>
+Message-ID: <CACRpkdYEeSSWrXnEX-2iNgBekdroorSUnJwowUxbZyh-ggQFDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 10:11 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+On Thu, Oct 11, 2012 at 4:00 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Thu, Oct 11, 2012 at 10:57 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
 
-> This patch series is a work on improving usability and extensibiltiy of
-> the pinctrl-samsung driver. It consists of three main parts:
->  - improving flexibility of SoC-specific data specification
->  - converting the driver to one GPIO chip and IRQ domain per pin bank
->  - improving wake-up IRQ setup and handling
+>> I'm quite happy with these 17 patches, but I'd like to have Thomas
+>> Abraham's definitive ACK before I merge anything.
+> Thomas did ACK at [00/17] ... mail.
 
-Oh I see Thomas and Kyungmin has ACKed this on patch 0,
-sorry for being so confused :-/
-
-Looking into applying this using a separate samsung branch
+Yeah I missed this because of too much mail, I'm applying & testing
 now...
 
+Thanks!
 Linus Walleij
