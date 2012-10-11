@@ -1,66 +1,33 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Thu, 11 Oct 2012 01:06:56 +0000
-Subject: [PATCH 1/2] video: Add support for the Solomon SSD1307 OLED
- Controller
-In-Reply-To: <50618242.2070302@free-electrons.com>
-References: <1348158800-23039-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348158800-23039-2-git-send-email-maxime.ripard@free-electrons.com>
- <505C73D1.7030800@free-electrons.com> <50618242.2070302@free-electrons.com>
-Message-ID: <50761BB0.3080507@gmx.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 10 Oct 2012 18:36:31 -0700
+Subject: [PATCH] clk: fix return value check in bcm2835_init_clocks()
+In-Reply-To: <CAPgLHd-msJkHz5KxsxVhr0u8ainXU0t53XHeiwSeW2ShJkRbwg@mail.gmail.com>
+References: <CAPgLHd95ofKiKWC9B67q9mgkjsc6_YJ5x92aY0xKPiohuUMk4Q@mail.gmail.com>
+ <50738C7A.9060905@wwwdotorg.org>
+ <CAPgLHd-msJkHz5KxsxVhr0u8ainXU0t53XHeiwSeW2ShJkRbwg@mail.gmail.com>
+Message-ID: <20121011013631.11595.26416@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On 09/25/2012 10:06 AM, Maxime Ripard wrote:
-> Hello Florian,
+Quoting Wei Yongjun (2012-10-08 19:44:47)
+> On 10/09/2012 10:31 AM, Stephen Warren wrote:
+> > On 10/07/2012 08:02 AM, Wei Yongjun wrote:
+> >> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> >>
+> >> In case of error, the function clk_register_fixed_rate() returns
+> >> ERR_PTR() and never returns NULL. The NULL test in the return value
+> >> check should be replaced with IS_ERR().
+> >>
+> >> dpatch engine is used to auto generate this patch.
+> >> (https://github.com/weiyj/dpatch)
+> > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> >
+> > Mike, this driver was added through arm-soc; I assume it's simplest to
+> > take this fixup through there too for 3.7-rc*? If so, Wei, could you
+> > resend this patch with my ack to arm at kernel.org? Thanks.
 > 
-> Le 21/09/2012 16:04, Maxime Ripard a ?crit :
->> Le 20/09/2012 18:33, Maxime Ripard a ?crit :
->>> This patch adds support for the Solomon SSD1307 OLED
->>> controller found on the Crystalfontz CFA10036 board.
->>>
->>> This controller can drive a display with a resolution up
->>> to 128x39 and can operate over I2C or SPI.
->>>
->>> The current driver has only been tested on the CFA-10036,
->>> that is using this controller over I2C to driver a 96x16
->>> OLED screen.
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Cc: Brian Lilly <brian@crystalfontz.com>
->>
->> Would you consider merging this patch or review it?
->> It has been around for quite some time now and has not received any
->> comments for at least the 2 last versions, so I guess there is not much
->> left holding it back (unless, of course, if you have some comments to
->> address), and I really would like to have it in 3.7.
-> 
-> I guess we missed the 3.7 merge here. That's no big deal, but I sent the
-> patch series on a regular basis, starting 07/17 (sent new versions on
-> 07/31, 08/23, 09/05 and 09/20), addressed all the issues that were
-> raised, and never got any feedback from you, either positive or
-> negative. The patches affecting the MX28 device trees have already been
-> merged by Shawn Guo into its tree, so only the driver and the bindings
-> remain to be merged. So I'm kind of lost on what should I do here?
-> 
-> Is it because I have an obviously broken driver or you don't have enough
-> time, or you don't want to merge drivers for such type of low resolution
-> controllers, or any other reason?
+> Will do, thanks.
 
-I don't see any reason to not support low resolutions, might be a nice
-status monitor for embedded devices.
-It's not your fault. It's just that for the past two months writing my
-thesis reduced my free time (and hence the time that I could potentially
-use for reviewing patches) to approximately zero. While I managed to get
-some smaller patches done, there really wasn't any time to process the
-3-4 completely new things pending and some scarier patches which touch
-the core infrastructure.
-I think that it should be better soon, at least my thesis is now done,
-but I also have to fix up the rest of my life that was neglected while
-writing, including my paid jobs.
+Works for me.
 
-
-Best regards,
-
-Florian Tobias Schandinat
+Mike
