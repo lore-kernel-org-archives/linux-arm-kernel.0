@@ -1,44 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 11 Oct 2012 16:55:40 +0800
-Subject: [PATCH v4 RESEND 1/3] Input: egalax_ts: get gpio from devicetree
-In-Reply-To: <20121010163036.GC19335@core.coreip.homeip.net>
-References: <1349860323-12786-1-git-send-email-jason77.wang@gmail.com>
- <1349860323-12786-2-git-send-email-jason77.wang@gmail.com>
- <20121010163036.GC19335@core.coreip.homeip.net>
-Message-ID: <20121011085535.GA31464@S2101-09.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Oct 2012 09:59:51 +0100
+Subject: [PATCH 6/6] mfd: Differentiate between u8500 and u9540 TCDM
+ address mapping
+In-Reply-To: <201210101834.40749.arnd@arndb.de>
+References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
+ <1349882335-6786-7-git-send-email-lee.jones@linaro.org>
+ <201210101834.40749.arnd@arndb.de>
+Message-ID: <20121011085951.GU9707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add LAKML ...
+On Wed, 10 Oct 2012, Arnd Bergmann wrote:
 
-On Wed, Oct 10, 2012 at 09:30:36AM -0700, Dmitry Torokhov wrote:
-> Hi Hui,
+> On Wednesday 10 October 2012, Lee Jones wrote:
+> > @@ -2688,7 +2688,11 @@ void __init db8500_prcmu_early_init(void)
+> >                         iounmap(tcpm_base);
+> >                 }
+> >  
+> > -               tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
+> > +               if (cpu_is_u9540())
+> > +                       tcdm_base = ioremap_nocache(U8500_PRCMU_TCDM_BASE,
+> > +                                               SZ_4K + SZ_8K) + SZ_8K;
+> > +               else
+> > +                       tcdm_base = __io_address(U8500_PRCMU_TCDM_BASE);
+> >         } else {
+> >                 pr_err("prcmu: Unsupported chip version\n");
+> >                 BUG();
 > 
-> On Wed, Oct 10, 2012 at 05:12:01PM +0800, Hui Wang wrote:
-> > The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
-> > and don't support this API anymore.
-> > 
-> > The i.MX6q sabrelite platform equips an egalax touchscreen controller,
-> > and this platform already transfered to GENERIC_GPIO framework, to
-> > support this driver, we use a more generic way to get gpio.
-> 
-> Unfortunately this does break the driver for platforms that do still
-> support irq_to_gpio and have not transitioned to device tree (yet?).
-> It looks like the API suffered from premature deletion...
-> 
-> I really do not want to add a new platform data structure with only gpio
-> in it, is there a better way to detect if irq_to_gpio() (even if only a
-> stub) is available?
-> 
-If CONFIG_ARCH_HAVE_CUSTOM_GPIO_H is not enabled for an architecture,
-the irq_to_gpio() in include/linux/gpio.h will tell unavailability by
-returning -EINVAL.  But ARM architecture still selects ARCH_HAVE_CUSTOM_GPIO_H
-because there are still some platforms having mach/gpio.h.
+> Would it be possible to get the base out of the device tree and always
+> map it from there? Adding another dependency on a fixed constant is
+> just going to make the conversion to multiplatform harder, since it
+> was decided that device drivers should not have access to platform
+> header files in the multiplatform case.
 
-We may also need a stub irq_to_gpio simply returning -EINVAL into
-arch/arm/include/asm/gpio.h when platform does not provide irq_to_gpio,
-so that driver can detect if irq_to_gpio() is available.  And that
-stub can be removed later when we deselect ARCH_HAVE_CUSTOM_GPIO_H
-for ARM architecture.
+>From what I understand, this code has to be called before Device
+Tree kicks in. Actually, this code is mearly a stand-in until Loic
+has finished with the PRCMU re-vamp. Once that's complete, this
+stuff will be passed from init_IRQ(), which is invoked directly in
+start_kernel().
 
-Shawn
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
