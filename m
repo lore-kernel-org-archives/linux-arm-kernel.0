@@ -1,79 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Oct 2012 00:23:02 +0200
-Subject: [PATCH] ARM: nomadik: fixup some FSMC merge problems
-Message-ID: <1349994182-26116-1-git-send-email-linus.walleij@linaro.org>
+From: linux@prisktech.co.nz (linux at prisktech.co.nz)
+Date: Fri, 12 Oct 2012 11:33:54 +1300 (NZDT)
+Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
+In-Reply-To: <201210112029.05572.arnd@arndb.de>
+References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
+ <201210110747.46682.arnd@arndb.de> <1349979450.16017.3.camel@gitbox>
+ <201210112029.05572.arnd@arndb.de>
+Message-ID: <57461.210.54.1.170.1349994834.squirrel@server.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to a clash between refactoring and due to loss of a header
-file that remained in my working tree the Nomadik stopped
-compiling after switching to the FSMC driver. This patch fixes
-it up.
+> On Thursday 11 October 2012, Tony Prisk wrote:
+>> > config VT8500
+>> >       bool "Via/Wondermedia VT8500 / WM8505 / WM8650" if ARCH_MULTIPLATFORM
+>> >       default VT8500_SINGLE
+>> >
+>> >       Arnd
+>>
+>> Alexey (or anyone else),
+>>
+>> Do you want it kept in the meantime?
+>>
+>> I think the easiest way to add/keep it would be to create:
+>>
+>> ARCH_VT8500_SINGLE (arm/Kconfig) and ARCH_VT8500_MULTI
+>> (arch-vt8500/Kconfig) and have them both select ARCH_VT8500 as an option
+>> to make drivers available.
+>
+> You only need one new symbol, not too. Keeping CONFIG_VT8500 as the
+> user-selectable option as I outlined in the example means that
+> existing .config files keep working, which is sometimes useful.
+>
+> 	Arnd
+>
 
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-nomadik/board-nhk8815.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+To clarify what you said (because I'm not sure I got it the first time)...
 
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index a105d1b..3f97ef4 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -37,14 +37,15 @@
- #include <plat/mtu.h>
- #include <plat/pincfg.h>
- 
--#include <mach/fsmc.h>
--
- #include "cpu-8815.h"
- 
- /* Initial value for SRC control register: all timers use MXTAL/8 source */
- #define SRC_CR_INIT_MASK	0x00007fff
- #define SRC_CR_INIT_VAL		0x2aaa8000
- 
-+#define ALE_OFF 0x1000000
-+#define CLE_OFF 0x800000
-+
- /* These addresses span 16MB, so use three individual pages */
- static struct resource nhk8815_nand_resources[] = {
- 	{
-@@ -53,6 +54,16 @@ static struct resource nhk8815_nand_resources[] = {
- 		.end = 0x40000000 + SZ_16K - 1,
- 		.flags = IORESOURCE_MEM,
- 	}, {
-+		.name = "nand_addr",
-+		.start = 0x40000000 + ALE_OFF,
-+		.end = 0x40000000 +ALE_OFF + SZ_16K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "nand_cmd",
-+		.start = 0x40000000 + CLE_OFF,
-+		.end = 0x40000000 + CLE_OFF + SZ_16K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
- 		.name  = "fsmc_regs",
- 		.start = NOMADIK_FSMC_BASE,
- 		.end   = NOMADIK_FSMC_BASE + SZ_4K - 1,
-@@ -105,8 +116,6 @@ static struct fsmc_nand_platform_data nhk8815_nand_platform_data = {
- 	.partitions = nhk8815_partitions,
- 	.nr_partitions = ARRAY_SIZE(nhk8815_partitions),
- 	.width = FSMC_NAND_BW8,
--	.ale_off = 0x1000000,
--	.cle_off = 0x800000,
- };
- 
- static struct platform_device nhk8815_nand_device = {
-@@ -171,6 +180,10 @@ static struct platform_device nhk8815_onenand_device = {
- 	.num_resources	= ARRAY_SIZE(nhk8815_onenand_resource),
- };
- 
-+/* bus control reg. and bus timing reg. for CS0..CS3 */
-+#define FSMC_BCR(x)	(NOMADIK_FSMC_VA + (x << 3))
-+#define FSMC_BTR(x)	(NOMADIK_FSMC_VA + (x << 3) + 0x04)
-+
- static void __init nhk8815_onenand_init(void)
- {
- #ifdef CONFIG_MTD_ONENAND
--- 
-1.7.11.4
+Keep ARCH_VT8500 as the single-platform Kconfig option.
+Add a new ARCH_VT8500_MULTI (for example) as the multiplatform Kconfig option.
+
+Have ARCH_VT8500_MULTI select ARCH_VT8500??
+
+The last bit confuses me (and seems a little backwards, although I suspect it
+would work since none of the options would cause conflicts). Without ARCH_VT8500
+selected, we have no driver options without changing all the Kconfig's.
+
+If this is correct, we are basically using _MULTI to add more options on top of
+_VT8500.
+
+Am I close or did I completely misunderstand? :)
+
+Regards
+Tony P
