@@ -1,79 +1,62 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 11 Oct 2012 15:04:38 -0400
-Subject: [RFC PATCH v2 13/16] ARM: dts: add AM33XX MMC support
+Date: Thu, 11 Oct 2012 15:04:40 -0400
+Subject: [RFC PATCH v2 15/16] spi: omap2-mcspi: add generic DMA request
+ support to the DT binding
 In-Reply-To: <1349982281-10785-1-git-send-email-mporter@ti.com>
 References: <1349982281-10785-1-git-send-email-mporter@ti.com>
-Message-ID: <1349982281-10785-14-git-send-email-mporter@ti.com>
+Message-ID: <1349982281-10785-16-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds AM33XX MMC support to the am33xx.dtsi and the BeagleBone
-dts.
+The binding definition is based on the generic DMA request binding.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
- arch/arm/boot/dts/am33xx.dtsi     |   27 +++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index c634f87..5510979 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -70,6 +70,8 @@
- 		};
+diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
+index 81df374..11aff04 100644
+--- a/Documentation/devicetree/bindings/spi/omap-spi.txt
++++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
+@@ -7,8 +7,18 @@ Required properties:
+ - ti,spi-num-cs : Number of chipselect supported  by the instance.
+ - ti,hwmods: Name of the hwmod associated to the McSPI
  
- 		ldo3_reg: regulator at 5 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
++Optional properties:
++- dmas: List of DMA controller phandle and DMA request ordered
++	pairs. One tx and one rx pair is required for each chip
++	select.
++- dma-names: List of DMA request names. These strings correspond
++	1:1 with the ordered pairs in dmas. The string naming is
++	to be "rxN" and "txN" for RX and TX requests,
++	respectively, where N equals the chip select number.
  
-@@ -78,3 +80,7 @@
- 		};
- 	};
+-Example:
++Examples:
++
++[hwmod populated DMA resources]
+ 
+ mcspi1: mcspi at 1 {
+     #address-cells = <1>;
+@@ -18,3 +28,18 @@ mcspi1: mcspi at 1 {
+     ti,spi-num-cs = <4>;
  };
-+
-+&mmc1 {
-+	vmmc-supply = <&ldo3_reg>;
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 2ddb31b..ef8e105 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -233,6 +233,33 @@
- 			status = "disabled";
- 		};
  
-+		mmc1: mmc at 48060000 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc1";
-+			ti,dual-volt;
-+			ti,needs-special-reset;
-+			dmas = <&edma 24
-+				&edma 25>;
-+			dma-names = "tx", "rx";
-+		};
++[generic DMA request binding]
 +
-+		mmc2: mmc at 481d8000 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc2";
-+			ti,needs-special-reset;
-+			dmas = <&edma 2
-+				&edma 3>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
++mcspi1: mcspi at 1 {
++    #address-cells = <1>;
++    #size-cells = <0>;
++    compatible = "ti,omap4-mcspi";
++    ti,hwmods = "mcspi1";
++    ti,spi-num-cs = <2>;
++    dmas = <&edma 42
++	    &edma 43
++	    &edma 44
++	    &edma 45>;
++    dma-names = "tx0", "rx0", "tx1", "rx1";
++};
 +
-+		mmc3: mmc at 47810000 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc3";
-+			ti,needs-special-reset;
-+			status = "disabled";
-+		};
-+
- 		wdt2: wdt at 44e35000 {
- 			compatible = "ti,omap3-wdt";
- 			ti,hwmods = "wd_timer2";
 -- 
 1.7.9.5
