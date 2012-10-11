@@ -1,62 +1,76 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Wed, 10 Oct 2012 20:59:38 -0400
-Subject: alignment faults in 3.6
-In-Reply-To: <506EEFBB.3060705@gmail.com>
-References: <506E1762.3010601@gmail.com>
- <CANLjY-no-L9=LRCvCetC5XCHicOoSWOfRZmUd7itAiUHWBhAyw@mail.gmail.com>
- <CAG5Tg6Wuybruc31x1eh6mFafsg=7cOgYLgpZUBuJUo75ap3osQ@mail.gmail.com>
- <506E3E58.80703@gmail.com>
- <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
- <20121005071216.GD4625@n2100.arm.linux.org.uk>
- <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
- <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
- <20121005140556.GQ4625@n2100.arm.linux.org.uk> <506EEFBB.3060705@gmail.com>
-Message-ID: <507619FA.6080001@jonmasters.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Oct 2012 17:59:44 -0700
+Subject: [PATCH 1/4] usb: phy: add a new driver for usb3 phy
+In-Reply-To: <1348054229-27362-2-git-send-email-kishon@ti.com>
+References: <1348054229-27362-1-git-send-email-kishon@ti.com>
+ <1348054229-27362-2-git-send-email-kishon@ti.com>
+Message-ID: <20121011005944.GX12552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Hi,
 
-On 10/05/2012 10:33 AM, Rob Herring wrote:
-> On 10/05/2012 09:05 AM, Russell King - ARM Linux wrote:
->> On Fri, Oct 05, 2012 at 07:24:44AM -0500, Rob Herring wrote:
->>> On 10/05/2012 03:24 AM, Russell King - ARM Linux wrote:
->>>> Does it matter?  I'm just relaying the argument against adding __packed
->>>> which was used before we were forced (by the networking folk) to implement
->>>> the alignment fault handler.
->>>
->>> It doesn't really matter what will be accepted or not as adding __packed
->>> to struct iphdr doesn't fix the problem anyway. gcc still emits a ldm.
->>> The only way I've found to eliminate the alignment fault is adding a
->>> barrier between the 2 loads. That seems like a compiler issue to me if
->>> there is not a better fix.
->>
->> Even so, please test the patch I've sent you in the sub-thread - that
->> needs testing whether or not GCC is at fault.  Will's patch to add the
->> warnings _has_ uncovered a potential issue with the use of __get_user()
->> in some parts of the ARM specific kernel, and I really need you to test
->> that while you're experiencing this problem.
+* Kishon Vijay Abraham I <kishon@ti.com> [120919 04:32]:
+> Added a driver for usb3 phy that handles the interaction between usb phy
+> device and dwc3 controller.
 > 
-> I've tested your patch and it appears to fix things. Thanks!
-
-Ok. I'm looking for a short term solution in the Fedora kernel because
-we've been bitten by this bug (I've been following this thread). I
-considered just reverting Will's patch, but that only sweeps the issue
-under the rug back to where we were in our 3.4 kernel. So, should we
-pull in rmk's fix? It seems there are two problems here:
-
-1). Missaligned access fault handling atomicity in general
-2). Assumptions around struct alignment that turn out not to be true at
-runtime due to the way that the structs are actually then aligned.
-
-> Now on to getting rid of faults on practically every single received IP
-> packet:
+> This also includes device tree support for usb3 phy driver and
+> the documentation with device tree binding information is updated.
 > 
-> Multi:          9871002
-> 
-> RX packets:9872010 errors:0 dropped:0 overruns:0 frame:0
+> Currently writing to control module register is taken care in this
+> driver which will be removed once the control module driver is in place.
 
-This will still be a problem, indeed. At least we can be aware we're
-taking a large number of faults and hope for a netdev solution.
+You may be able to set up the control module register with one
+of the following Linux standard frameworks:
 
-Jon.
+1. Fixed regulator defined in mach-omap2/control.c
+
+   In this case the PHY driver can pick up the regulator by name.
+
+2. A mux mapped with pinctrl framework using pinctrl-single,bits
+   binding
+
+   And in this case the PHY driver can request the named pinctrl
+   states like "enabled" and "disabled".
+
+> --- a/Documentation/devicetree/bindings/usb/usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
+> @@ -15,3 +15,21 @@ usb2phy at 4a0ad080 {
+>  	reg = <0x4a0ad080 0x58>,
+>  	      <0x4a002300 0x4>;
+>  };
+
+The comments also apply to the omap_usb2.c driver for
+0x4a002300 above.
+
+> +
+> +OMAP USB3 PHY
+> +
+> +Required properties:
+> + - compatible: Should be "ti,omap-usb3"
+> + - reg : Address and length of the register set for the device. Also
+> +add the address of control module phy power register until a driver for
+> +control module is added
+> +
+> +This is usually a subnode of ocp2scp to which it is connected.
+> +
+> +usb3phy at 4a084400 {
+> +	compatible = "ti,omap-usb3";
+> +	reg = <0x0x4a084400 0x80>,
+> +	      <0x4a084800 0x64>,
+> +	      <0x4a084c00 0x40>,
+> +	      <0x4a002370 0x4>;
+> +};
+
+And register 0x4a002370 here. Care to post some info what the
+0x4a002370 register bits do? Is that same as CONTROL_DEV_CONF
+on omap4, or does it have other bits there too?
+
+The advantage for using regulator fwk and pinctrl fwk is
+that the regulator and mux can be children of the SCM
+core driver when we have it. And no direct register tinkering
+or omap specific custom exported functions are needed ;)
+
+Regards,
+
+Tony
