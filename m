@@ -1,56 +1,83 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Thu, 11 Oct 2012 14:10:16 +0000
-Subject: [PATCH 01/13] clk: davinci - add Main PLL clock driver
-In-Reply-To: <5076A0DE.4070900@ti.com>
-References: <1348682889-9509-1-git-send-email-m-karicheri2@ti.com>
- <1348682889-9509-2-git-send-email-m-karicheri2@ti.com>
- <507563C3.2000305@ti.com> <5076A0DE.4070900@ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7041FDA2E@DFLE12.ent.ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Oct 2012 15:15:26 +0100
+Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
+Message-ID: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> -----Original Message-----
->> From: Nori, Sekhar
->> Sent: Thursday, October 11, 2012 6:35 AM
->> To: Nori, Sekhar
->> Cc: Karicheri, Muralidharan; Hilman, Kevin; davinci-linux-open-
->> source at linux.davincidsp.com; mturquette at linaro.org; linux-c6x-dev at linux-c6x.org;
->> arnd at arndb.de; linus.walleij at linaro.org; linux-kernel at vger.kernel.org;
->> rob.herring at calxeda.com; linux-keystone at list.ti.com - Linux developers for Keystone
->> family of devices (May contain non-TIers); viresh.linux at gmail.com;
->> linux at arm.linux.org.uk; akpm at linux-foundation.org; shawn.guo at linaro.org; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH 01/13] clk: davinci - add Main PLL clock driver
->> 
->> On 10/10/2012 5:32 PM, Sekhar Nori wrote:
->> > Hi Murali,
->> >
->> > On 9/26/2012 11:37 PM, Murali Karicheri wrote:
->> >> This is the driver for the main PLL clock hardware found on DM SoCs.
->> >> This driver borrowed code from arch/arm/mach-davinci/clock.c and
->> >> implemented the driver as per common clock provider API. The main PLL
->> >> hardware typically has a multiplier, a pre-divider and a post-divider.
->> >> Some of the SoCs has the divider fixed meaning they can not be
->> >> configured through a register. HAS_PREDIV and HAS_POSTDIV flags are
->> >> used to tell the driver if a hardware has these dividers present or not.
->> >> Driver is configured through the structure clk_davinci_pll_data that
->> >> has the platform data for the driver.
->> >>
->> >> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> >
->> > Are you using git-format-patch to generate the patches? It should have
->> > added a diffstat here by default which is very useful in quickly
->> > understanding what the patch is touching.
->> >>
->> >> diff --git a/drivers/clk/davinci/clk-davinci-pll.c
->> >> b/drivers/clk/davinci/clk-davinci-pll.c
->> 
->> Looking at how common clock framework for mxs has been implemented, this file should
->> simply be clk-pll.c. That makes sense as you are creating a davinci folder anyway. Similar
->> change required for psc as well.
->> 
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-Alternately, do we need  a davinci folder? Can't we just add it to the clk/ directory? These IPs are re-used in c6x and keystone architectures. So it make sense to keep in the clk folder. If agree, I can make this change in v3.
+Disable hardware if active when suspending if the hw can not
+wake the system from suspend.
 
->> Thanks,
->> Sekhar
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
+---
+ drivers/input/keyboard/gpio_keys.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index cbb1add..7947315 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -46,6 +46,8 @@ struct gpio_keys_drvdata {
+ 	struct input_dev *input;
+ 	struct mutex disable_lock;
+ 	unsigned int n_buttons;
++	bool enabled;
++	bool enable_after_suspend;
+ 	int (*enable)(struct device *dev);
+ 	void (*disable)(struct device *dev);
+ 	struct gpio_button_data data[0];
+@@ -524,6 +526,7 @@ static int gpio_keys_open(struct input_dev *input)
+ {
+ 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
+ 
++	ddata->enabled = true;
+ 	return ddata->enable ? ddata->enable(input->dev.parent) : 0;
+ }
+ 
+@@ -533,6 +536,7 @@ static void gpio_keys_close(struct input_dev *input)
+ 
+ 	if (ddata->disable)
+ 		ddata->disable(input->dev.parent);
++	ddata->enabled = false;
+ }
+ 
+ /*
+@@ -674,6 +678,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
+ 	ddata->n_buttons = pdata->nbuttons;
+ 	ddata->enable = pdata->enable;
+ 	ddata->disable = pdata->disable;
++	ddata->enabled = false;
+ 	mutex_init(&ddata->disable_lock);
+ 
+ 	platform_set_drvdata(pdev, ddata);
+@@ -789,6 +794,10 @@ static int gpio_keys_suspend(struct device *dev)
+ 			if (bdata->button->wakeup)
+ 				enable_irq_wake(bdata->irq);
+ 		}
++	} else {
++		ddata->enable_after_suspend = ddata->enabled;
++		if (ddata->enabled)
++			gpio_keys_close(ddata->input);
+ 	}
+ 
+ 	return 0;
+@@ -807,6 +816,10 @@ static int gpio_keys_resume(struct device *dev)
+ 		if (gpio_is_valid(bdata->button->gpio))
+ 			gpio_keys_gpio_report_event(bdata);
+ 	}
++
++	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
++		gpio_keys_open(ddata->input);
++
+ 	input_sync(ddata->input);
+ 
+ 	return 0;
+-- 
+1.7.9.5
