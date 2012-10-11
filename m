@@ -1,48 +1,32 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 11 Oct 2012 16:39:38 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <5076E472.8030703@gmail.com>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <201210111228.25995.arnd@arndb.de>
- <1349959248.21172.8970.camel@edumazet-glaptop> <5076C78E.1020408@gmail.com>
- <1349963227.21172.9188.camel@edumazet-glaptop> <5076E472.8030703@gmail.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 11 Oct 2012 11:58:15 -0400 (EDT)
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <20121011135925.GR4625@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+ <20121011130955.GP4625@n2100.arm.linux.org.uk> <5076CA43.9070503@gmail.com>
+ <20121011135925.GR4625@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1210111152580.16518@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> Not exactly. It is asked to to perform 2 32-bit loads which are combined
-> into a single ldm (load multiple) which cannot handle unaligned
-> accesses. Here's a simple example that does the same thing:
+On Thu, 11 Oct 2012, Russell King - ARM Linux wrote:
+
+> On Thu, Oct 11, 2012 at 08:31:47AM -0500, Rob Herring wrote:
+> > This only affects v7 cores. It should not vary for v7 cores as unaligned
+> > access is a required feature. So how is it going to vary on v7 CPUs?
+> > We've got bigger problems if there are v7 cores that don't handle
+> > unaligned accesses.
 > 
-> void test(char * buf)
-> {
-> 	printf("%d, %d\n", *((unsigned int *)&buf[0]), *((unsigned int *)&buf[4]));
-> }
+> Oh, and this gives me a third reason to NAK this patch.  Why only ensure
+> that the A bit is clear for v7 CPUs?  Why not v6, v5, v4 too?  Why does
+> ARMv7 get this special treatment?
 
-Have you actually looked at what an ARM processor traditionally did
-with misaligned memory reads?
-While useful, it probably wasn't what was intended.
+As I said, gcc knows that ARMv7 can perform word sized accesses even 
+with misaligned pointers.  So when it is passed a pointer marked with 
+the packed attribute, it will generate a series of byte accesses when 
+compiling for anything but ARMv7, and use a single ldr or str when 
+compiling for ARMv7.
 
-Actually, and IIRC, some very recent ARM cpus will do the 'expected'
-thing for single-word loads from misaligned addesses.
-However they almost certainly won't for ldm/stm.
 
-The 'ldm' optimisation for adjacent memory loads is also dubious.
-On at least some ARMs it is very slow (might only be strongarms).
-
-> So I guess the only ABI legal unaligned access is in a packed struct.
-
-Correct. And you mustn't try casting the address, the compiler is
-allowed to remember where it came from.
-(This causes a lot of grief...)
-
-If you are targeting the ARM cpu that can do misaligned transfers,
-then gcc should generate single instructions for misaligned structure
-members, and never do the 'ldm' optimisations.
-
-But, the IP header is expected to be aligned.
-
-	David
+Nicolas
