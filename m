@@ -1,71 +1,98 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 11 Oct 2012 10:11:13 +0200
-Subject: [PATCH 07/15] pinctrl: samsung: Match pin banks with their device
- nodes
+Date: Thu, 11 Oct 2012 10:11:14 +0200
+Subject: [PATCH 08/15] pinctrl: samsung: Hold pointer to driver data in bank
+ struct
 In-Reply-To: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
 References: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1349943081-27939-8-git-send-email-t.figa@samsung.com>
+Message-ID: <1349943081-27939-9-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch is a preparation for converting the pinctrl-samsung driver to
-one GPIO chip and IRQ domain per bank. It binds banks defined by
-internal driver data with bank nodes in device tree.
+one GPIO chip and IRQ domain per bank. It allows one having only
+a pointer to particular bank struct to access driver data struct.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/pinctrl/pinctrl-samsung.c | 13 +++++++++++++
+ drivers/pinctrl/pinctrl-samsung.c | 18 ++++++++++--------
  drivers/pinctrl/pinctrl-samsung.h |  2 ++
- 2 files changed, 15 insertions(+)
+ 2 files changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 94e1378..f266710 100644
+index f266710..53493c3 100644
 --- a/drivers/pinctrl/pinctrl-samsung.c
 +++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -794,6 +794,7 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
+@@ -789,17 +789,18 @@ static const struct of_device_id samsung_pinctrl_dt_match[];
+ 
+ /* retrieve the soc specific data */
+ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
++				struct samsung_pinctrl_drv_data *d,
+ 				struct platform_device *pdev)
+ {
  	int id;
  	const struct of_device_id *match;
- 	const struct device_node *node = pdev->dev.of_node;
-+	struct device_node *np;
+-	const struct device_node *node = pdev->dev.of_node;
++	struct device_node *node = pdev->dev.of_node;
+ 	struct device_node *np;
  	struct samsung_pin_ctrl *ctrl;
  	struct samsung_pin_bank *bank;
  	int i;
-@@ -816,6 +817,18 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
- 		}
+ 
+-	id = of_alias_get_id(pdev->dev.of_node, "pinctrl");
++	id = of_alias_get_id(node, "pinctrl");
+ 	if (id < 0) {
+ 		dev_err(&pdev->dev, "failed to get alias id\n");
+ 		return NULL;
+@@ -809,6 +810,7 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
+ 
+ 	bank = ctrl->pin_banks;
+ 	for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
++		bank->drvdata = d;
+ 		bank->pin_base = ctrl->nr_pins;
+ 		ctrl->nr_pins += bank->nr_pins;
+ 		if (bank->eint_type == EINT_TYPE_GPIO) {
+@@ -848,18 +850,18 @@ static int __devinit samsung_pinctrl_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
  
-+	for_each_child_of_node(node, np) {
-+		if (!of_find_property(np, "gpio-controller", NULL))
-+			continue;
-+		bank = ctrl->pin_banks;
-+		for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
-+			if (!strcmp(bank->name, np->name)) {
-+				bank->of_node = np;
-+				break;
-+			}
-+		}
-+	}
+-	ctrl = samsung_pinctrl_get_soc_data(pdev);
+-	if (!ctrl) {
+-		dev_err(&pdev->dev, "driver data not available\n");
+-		return -EINVAL;
+-	}
+-
+ 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+ 	if (!drvdata) {
+ 		dev_err(dev, "failed to allocate memory for driver's "
+ 				"private data\n");
+ 		return -ENOMEM;
+ 	}
 +
- 	ctrl->base = pin_base;
- 	pin_base += ctrl->nr_pins;
++	ctrl = samsung_pinctrl_get_soc_data(drvdata, pdev);
++	if (!ctrl) {
++		dev_err(&pdev->dev, "driver data not available\n");
++		return -EINVAL;
++	}
+ 	drvdata->ctrl = ctrl;
+ 	drvdata->dev = dev;
  
 diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index b895693..5c53f32 100644
+index 5c53f32..ea5dadd 100644
 --- a/drivers/pinctrl/pinctrl-samsung.h
 +++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -111,6 +111,7 @@ struct samsung_pinctrl_drv_data;
-  * @eint_type: type of the external interrupt supported by the bank.
+@@ -112,6 +112,7 @@ struct samsung_pinctrl_drv_data;
   * @irq_base: starting controller local irq number of the bank.
   * @name: name to be prefixed for each pin in this pin bank.
-+ * @of_node: OF node of the bank.
+  * @of_node: OF node of the bank.
++ * @drvdata: link to controller driver data
   */
  struct samsung_pin_bank {
  	u32		pctl_offset;
-@@ -124,6 +125,7 @@ struct samsung_pin_bank {
- 	enum eint_type	eint_type;
+@@ -126,6 +127,7 @@ struct samsung_pin_bank {
  	u32		irq_base;
  	char		*name;
-+	struct device_node *of_node;
+ 	struct device_node *of_node;
++	struct samsung_pinctrl_drv_data *drvdata;
  };
  
  /**
