@@ -1,75 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Oct 2012 17:28:01 +0200
-Subject: [PATCH v2 3/4] arm: mvebu: add Ethernet controllers using mvneta
- driver for Armada 370/XP
+Date: Thu, 11 Oct 2012 17:28:02 +0200
+Subject: [PATCH v2 4/4] arm: mvebu: enable Ethernet controllers on Armada
+ 370/XP eval boards
 In-Reply-To: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1349969282-12676-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1349969282-12676-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 SoC has two network units, while the Armada XP has four
-network units. The first two network units are common to both the
-Armada XP and Armada 370, so they are added to armada-370-xp.dtsi,
-while the other two network units are specific to the Armada XP and
-therefore added to armada-xp.dtsi.
+This patch enables the two network interfaces of the Armada 370
+official Marvell evaluation platform, and the four network interfaces
+of the Armada XP official Marvell evaluation platform.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi |   16 ++++++++++++++++
- arch/arm/boot/dts/armada-xp.dtsi     |   16 ++++++++++++++++
- 2 files changed, 32 insertions(+)
+ arch/arm/boot/dts/armada-370-db.dts |   12 ++++++++++++
+ arch/arm/boot/dts/armada-xp-db.dts  |   24 ++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 6b6b932..52af710 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -63,6 +63,22 @@
- 			       reg = <0xd0020300 0x30>;
- 			       interrupts = <37>, <38>, <39>, <40>;
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index fffd5c2..bb18b0d 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -38,5 +38,17 @@
+ 			clock-frequency = <600000000>;
+ 			status = "okay";
  		};
-+
 +                eth at d0070000 {
-+                               compatible = "marvell,neta";
-+                               reg = <0xd0070000 0x2500>;
-+                               interrupts = <8>;
-+                               device_type = "network";
-+                               status = "disabled";
++                        clock-frequency = <200000000>;
++                        status = "okay";
++                        phy-mode = "rgmii";
++                        phy-addr = <0>;
 +                };
-+
 +                eth at d0074000 {
-+                               compatible = "marvell,neta";
-+                               reg = <0xd0074000 0x2500>;
-+                               interrupts = <10>;
-+                               device_type = "network";
-+                               status = "disabled";
++                        clock-frequency = <200000000>;
++                        status = "okay";
++                        phy-mode = "rgmii";
++                        phy-addr = <1>;
 +                };
  	};
  };
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 71d6b5d..59167dc 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -51,5 +51,21 @@
- 				compatible = "marvell,armada-370-xp-system-controller";
- 				reg = <0xd0018200 0x500>;
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index f97040d..d1a4173 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -46,5 +46,29 @@
+ 			clock-frequency = <250000000>;
+ 			status = "okay";
  		};
-+
-+                eth at d0030000 {
-+                               compatible = "marvell,neta";
-+                               reg = <0xd0030000 0x2500>;
-+                               interrupts = <12>;
-+                               device_type = "network";
-+                               status = "disabled";
++                eth at d0070000 {
++                        clock-frequency = <250000000>;
++                        status = "okay";
++                        phy-mode = "rgmii";
++                        phy-addr = <0>;
 +                };
-+
++                eth at d0074000 {
++                        clock-frequency = <250000000>;
++                        status = "okay";
++                        phy-mode = "rgmii";
++                        phy-addr = <1>;
++                };
++                eth at d0030000 {
++                        clock-frequency = <250000000>;
++                        status = "okay";
++                        phy-mode = "sgmii";
++                        phy-addr = <25>;
++                };
 +                eth at d0034000 {
-+                               compatible = "marvell,neta";
-+                               reg = <0xd0034000 0x2500>;
-+                               interrupts = <14>;
-+                               device_type = "network";
-+                               status = "disabled";
++                        clock-frequency = <250000000>;
++                        status = "okay";
++                        phy-mode = "sgmii";
++                        phy-addr = <27>;
 +                };
  	};
  };
