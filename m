@@ -1,31 +1,38 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Thu, 11 Oct 2012 12:12:58 +1030
-Subject: [kvmarm] [PATCH v2 12/14] KVM: ARM: VFP userspace interface
-In-Reply-To: <CANM98qJDhHDBPq=XinLaXJG8e07-HhVBfd-2i3a68CumdXuFaw@mail.gmail.com>
-References: <20121001090945.49198.68950.stgit@ubuntu>
- <20121001091125.49198.90819.stgit@ubuntu>
- <CAFEAcA8zLr5mPYnd6EzaxyugASWPzvY4RE6LiE-K2uRRGWtFZA@mail.gmail.com>
- <CANM98qJDhHDBPq=XinLaXJG8e07-HhVBfd-2i3a68CumdXuFaw@mail.gmail.com>
-Message-ID: <87626h942l.fsf@rustcorp.com.au>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 11 Oct 2012 09:55:25 +0800
+Subject: [PATCH 1/3] dmaengine: sirf: fix a typo in dma_prep_interleaved
+In-Reply-To: <1348734938-20014-1-git-send-email-Barry.Song@csr.com>
+References: <1348734938-20014-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <CAGsJ_4yeztpGDRmFzh=ebbx0Eka2+s9DSasFf9r6kucivnBJ3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <c.dall@virtualopensystems.com> writes:
-> On Tue, Oct 9, 2012 at 2:11 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 1 October 2012 10:11, Christoffer Dall <c.dall@virtualopensystems.com> wrote:
->>> From: Rusty Russell <rusty.russell@linaro.org>
-...
->>> +ARM 32-bit VFP control registers have the following id bit patterns:
->>> +  0x4002 0000 0012 1 <selector:3>
->>> +
->>> +ARM 64-bit FP registers have the following id bit patterns:
->>> +  0x4002 0000 0012 0 <selector:3>
->>> +
->>
->> In the other entries in this section, <foo:3> indicates a 3 bit field.
->> But I think for these two it's trying to indicate a 3 byte field.
-...
-> right you are, I'll modify this.
+ping
 
-Thanks!
-Rusty.
+2012/9/27 Barry Song <Barry.Song@csr.com>:
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> either DEV_TO_MEM or MEM_TO_DEV is supported, so change
+> OR to AND.
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  drivers/dma/sirf-dma.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index 434ad31..35a329d 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -428,7 +428,7 @@ static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
+>         unsigned long iflags;
+>         int ret;
+>
+> -       if ((xt->dir != DMA_MEM_TO_DEV) || (xt->dir != DMA_DEV_TO_MEM)) {
+> +       if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM)) {
+>                 ret = -EINVAL;
+>                 goto err_dir;
+>         }
+> --
+> 1.7.0.4
+>
