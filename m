@@ -1,73 +1,108 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 11 Oct 2012 17:18:16 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
- (David Laight's message of "Thu, 11 Oct 2012 16:39:38 +0100")
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <201210111228.25995.arnd@arndb.de>
- <1349959248.21172.8970.camel@edumazet-glaptop>
- <5076C78E.1020408@gmail.com>
- <1349963227.21172.9188.camel@edumazet-glaptop>
- <5076E472.8030703@gmail.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
-Message-ID: <yw1xtxu1nfsn.fsf@unicorn.mansr.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Oct 2012 10:24:14 -0600
+Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for secondary
+ CPUs
+In-Reply-To: <1349946918.19413.130.camel@jlo-ubuntu-64.nvidia.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-4-git-send-email-josephl@nvidia.com>
+ <5074A74A.8010803@wwwdotorg.org>
+ <1349946918.19413.130.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <5076F2AE.6030509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"David Laight" <David.Laight@ACULAB.COM> writes:
+On 10/11/2012 03:15 AM, Joseph Lo wrote:
+> On Wed, 2012-10-10 at 06:38 +0800, Stephen Warren wrote:
+>> On 10/08/2012 04:26 AM, Joseph Lo wrote:
+>>> This supports power-gated (LP2) idle on secondary CPUs for Tegra30.
+>>> The secondary CPUs can go into LP2 state independently. When CPU goes
+>>> into LP2 state, it saves it's state and puts itself to flow controlled
+>>> WFI state. After that, it will been power gated.
+>>
+>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+>>
+>>>  static struct cpuidle_driver tegra_idle_driver = {
+>>>  	.name = "tegra_idle",
+>>>  	.owner = THIS_MODULE,
+>>>  	.en_core_tk_irqen = 1,
+>>> -	.state_count = 1,
+>>> +	.state_count = 2,
+>>
+>> Doesn't that assignment need to be ifdef'd just like the array entry
+>> setup below:
+>>
+>>>  	.states = {
+>>>  		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
+>>> +#ifdef CONFIG_PM_SLEEP
+>>> +		[1] = {
+>>> +			.enter			= tegra30_idle_lp2,
+>>> +			.exit_latency		= 2000,
+>>> +			.target_residency	= 2200,
+>>> +			.power_usage		= 0,
+>>> +			.flags			= CPUIDLE_FLAG_TIME_VALID,
+>>> +			.name			= "LP2",
+>>> +			.desc			= "CPU power-gate",
+>>> +		},
+>>> +#endif
+>>>  	},
+>>>  };
+>>
+>>> @@ -41,6 +114,10 @@ int __init tegra30_cpuidle_init(void)
+>>>  	struct cpuidle_device *dev;
+>>>  	struct cpuidle_driver *drv = &tegra_idle_driver;
+>>>  
+>>> +#ifndef CONFIG_PM_SLEEP
+>>> +	drv->state_count = 1;	/* support clockgating only */
+>>> +#endif
+>>
+>> Oh, I see it's done here. Just fixing the static initialization seems a
+>> lot simpler?
+>>
+> OK. Will do.
+> 
+>>> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+>>
+>>> +void __cpuinit tegra_clear_cpu_in_lp2(int cpu)
+>>> +{
+>>> +	spin_lock(&tegra_lp2_lock);
+>>> +	BUG_ON(!cpumask_test_cpu(cpu, &tegra_in_lp2));
+>>> +	cpumask_clear_cpu(cpu, &tegra_in_lp2);
+>>> +
+>>> +	/*
+>>> +	 * Update the IRAM copy used by the reset handler. The IRAM copy
+>>> +	 * can't use used directly by cpumask_clear_cpu() because it uses
+>>> +	 * LDREX/STREX which requires the addressed location to be inner
+>>> +	 * cacheable and sharable which IRAM isn't.
+>>> +	 */
+>>> +	writel(tegra_in_lp2.bits[0], tegra_cpu_lp2_mask);
+>>> +	dsb();
+>>
+>> Why not /just/ store the data in IRAM, and read/write directly to it,
+>> rather than maintaining an SDRAM-based copy of it?
+>>
+>> Then, wouldn't the body of this function be simply:
+>>
+>> spin_lock();
+>> BUG_ON(!(tegra_cpu_lp2_mask & BIT(cpu)));
+>> tegra_cpu_lp2_mask |= BIT(cpu);
+>> spin_unlock();
+>>
+> 
+> It may not simple like this. To maintain it identical to a cpumask. It
+> may look likes below. Because I need to compare it with cpu_online_mask.
 
->> Not exactly. It is asked to to perform 2 32-bit loads which are combined
->> into a single ldm (load multiple) which cannot handle unaligned
->> accesses. Here's a simple example that does the same thing:
->> 
->> void test(char * buf)
->> {
->> 	printf("%d, %d\n", *((unsigned int *)&buf[0]), *((unsigned int *)&buf[4]));
->> }
->
-> Have you actually looked at what an ARM processor traditionally did
-> with misaligned memory reads?
-> While useful, it probably wasn't what was intended.
->
-> Actually, and IIRC, some very recent ARM cpus will do the 'expected'
-> thing for single-word loads from misaligned addesses.
+Oh, the comparison against cpu_online_mask() is what I was missing. I
+guess that offline CPUs don't go into LP2, so you can't just check that
+tegra_cpu_lp2_mask == (1 << num_cpus()) - 1.
 
-What various CPUs do with unaligned accesses is not the issue here.  The
-casts in the code above act as a promise to the compiler that the
-address is in fact properly align for the pointer type.
+One way to avoid that might be to maintain a cpu_in_lp2_count variable
+alongside the mask, and simply compare that against num_online_cpus()
+rather than comparing the two masks. At least that would avoid the
+following line:
 
-> However they almost certainly won't for ldm/stm.
->
-> The 'ldm' optimisation for adjacent memory loads is also dubious.
+>>> +	writel(tegra_in_lp2.bits[0], tegra_cpu_lp2_mask);
 
-There is nothing whatsoever dubious about the compiler using the most
-efficient instruction sequence to accomplish what the code asks for.
+... making use of knowledge of the internal structure of the struct
+cpumask type.
 
-> On at least some ARMs it is very slow (might only be strongarms).
-
-The compiler will pick instructions suitable for the CPU you specify.
-
->> So I guess the only ABI legal unaligned access is in a packed struct.
->
-> Correct. And you mustn't try casting the address, the compiler is
-> allowed to remember where it came from.
-> (This causes a lot of grief...)
-
-It is only a problem when you try to outsmart the compiler.
-
-> If you are targeting the ARM cpu that can do misaligned transfers,
-> then gcc should generate single instructions for misaligned structure
-> members, and never do the 'ldm' optimisations.
-
-That is exactly how gcc works.
-
-> But, the IP header is expected to be aligned.
-
-Everything tells the compiler the struct is perfectly aligned.  When the
-buggy driver passes a misaligned pointer, bad things happen.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+However, given the comparison requirement, either way is probably fine.
