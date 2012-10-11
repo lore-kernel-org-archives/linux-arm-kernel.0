@@ -1,40 +1,107 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu, 11 Oct 2012 14:54:13 +0200
-Subject: bug with 3.4.6, 3.5.3, 3.6.1
-In-Reply-To: <20121011103637.GC30598@mudshark.cambridge.arm.com>
-References: <50765D3B.6000909@xenomai.org>
- <20121011103637.GC30598@mudshark.cambridge.arm.com>
-Message-ID: <5076C175.1070103@xenomai.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Oct 2012 12:56:41 +0000
+Subject: [PATCH] pinctrl/nomadik: provide stubs for legacy Nomadik
+In-Reply-To: <1349959302-12151-1-git-send-email-linus.walleij@stericsson.com>
+References: <1349959302-12151-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201210111256.41600.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 12:36 PM, Will Deacon wrote:
-> On Thu, Oct 11, 2012 at 06:46:35AM +0100, Gilles Chanteperdrix wrote:
->> Hi,
+On Thursday 11 October 2012, Linus Walleij wrote:
 > 
-> Hi Gilles,
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
->> when booting Linux v3.4.6, v3.5.3, or v3.6.1 on a pandaboard with an 
->> OMAP4430 ES2.1, compiled with the following configuration:
->> http://xenomai.org/~gch/config-panda
->>
->> I get the bug below after mounting the root filesystem.
->>
->> CONFIG_VMSPLIT_2G and CONFIG_THUMB2_KERNEL disabled seems to be the 
->> combination which triggers the bug.
->>
->> With this configuration, it seems the init_mm.mm_count incrementation
->> done at the beginning of secondary_start_kernel() is "lost" after the
->> calls to cpu_switch_mm() and local_flush_tlb().
->>
->> Modifying the secondary_startup() function in head.S to pass the 
->> swapper pgdir instead of the idmap pgdir in r4 also avoids the issue.
+> The compilation of the pinctrl driver failed on the legacy
+> Nomadik NHK8815 platform because it was not providing the PRCMU
+> interfaces needed to support the extended alternate functions
+> used by the ux500 series.
 > 
-> What's your PHYS_OFFSET? I suspect it's >= 2GB, in which case I have some
-> ideas about this problem.
+> Solve this by providing some stubs for the legacy platform, to
+> avoid too much #ifdefs in the code per se. Theoretically this
+> actually allows the Nomadik and Ux500 to have a single kernel
+> image with support for the PRCM registers on the Ux500 (though
+> they have incompatible archs, but the spirit is there).
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-You mean the physical address of RAM ? I believe it is 0x80000000, will
-check.
+Thanks for the quick reply!
 
--- 
-					    Gilles.
+This looks like it will work correctly, but I've also just
+looked into the problem deeper and found that we actually have
+too many inline function alternatives in the !UX500 case.
+
+The below is what I just added locally. I don't care which version
+you end up using though, as you maintain both the driver and the
+platform sides of the problem.
+
+	Arnd
+
+commit c386dcea42be85822ef5a9ab5ab1785a063da889
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Thu Oct 11 12:39:07 2012 +0000
+
+    mfd: db8500-prcmu: remove duplicate declarations
+    
+    These are already present in dbx500-prcmu.h, so we must not define them
+    here or nomadik won't build.
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
+index b82f6ee..7ef550b 100644
+--- a/include/linux/mfd/db8500-prcmu.h
++++ b/include/linux/mfd/db8500-prcmu.h
+@@ -521,16 +521,12 @@ void prcmu_configure_auto_pm(struct prcmu_auto_pm_config *sleep,
+ 	struct prcmu_auto_pm_config *idle);
+ bool prcmu_is_auto_pm_enabled(void);
+ 
+-int prcmu_config_clkout(u8 clkout, u8 source, u8 div);
+ int prcmu_set_clock_divider(u8 clock, u8 divider);
+ int db8500_prcmu_config_hotdog(u8 threshold);
+ int db8500_prcmu_config_hotmon(u8 low, u8 high);
+ int db8500_prcmu_start_temp_sense(u16 cycles32k);
+ int db8500_prcmu_stop_temp_sense(void);
+-int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size);
+-int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size);
+ 
+-int prcmu_ac_wake_req(void);
+ void prcmu_ac_sleep_req(void);
+ void db8500_prcmu_modem_reset(void);
+ 
+@@ -640,11 +636,6 @@ static inline bool prcmu_is_auto_pm_enabled(void)
+ 	return false;
+ }
+ 
+-static inline int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
+-{
+-	return 0;
+-}
+-
+ static inline int prcmu_set_clock_divider(u8 clock, u8 divider)
+ {
+ 	return 0;
+@@ -670,23 +661,6 @@ static inline int db8500_prcmu_stop_temp_sense(void)
+ 	return 0;
+ }
+ 
+-static inline int prcmu_abb_read(u8 slave, u8 reg, u8 *value, u8 size)
+-{
+-	return -ENOSYS;
+-}
+-
+-static inline int prcmu_abb_write(u8 slave, u8 reg, u8 *value, u8 size)
+-{
+-	return -ENOSYS;
+-}
+-
+-static inline int prcmu_ac_wake_req(void)
+-{
+-	return 0;
+-}
+-
+-static inline void prcmu_ac_sleep_req(void) {}
+-
+ static inline void db8500_prcmu_modem_reset(void) {}
+ 
+ static inline void db8500_prcmu_system_reset(u16 reset_code) {}
