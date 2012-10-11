@@ -1,39 +1,64 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 11 Oct 2012 12:56:10 +0200
-Subject: alignment faults in 3.6
-In-Reply-To: <1349952574.21172.8604.camel@edumazet-glaptop>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <506ED18C.3010009@gmail.com> <20121005140556.GQ4625@n2100.arm.linux.org.uk>
- <506EEFBB.3060705@gmail.com> <507619FA.6080001@jonmasters.org>
- <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
- <yw1xpq4ppcju.fsf@unicorn.mansr.com>
- <1349949638.21172.8445.camel@edumazet-glaptop>
- <1349950926.21172.8521.camel@edumazet-glaptop>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
-Message-ID: <1349952970.1232.5.camel@sakura.staff.proxad.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 11 Oct 2012 16:33:58 +0530
+Subject: [PATCH v2 01/13] clk: davinci - add Main PLL clock driver
+In-Reply-To: <1348683037-9705-2-git-send-email-m-karicheri2@ti.com>
+References: <1348683037-9705-1-git-send-email-m-karicheri2@ti.com>
+ <1348683037-9705-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5076A79E.80502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 9/26/2012 11:40 PM, Murali Karicheri wrote:
 
-On Thu, 2012-10-11 at 12:49 +0200, Eric Dumazet wrote:
+> +struct clk_davinci_pll_data {
+> +	/* physical addresses set by platform code */
+> +	u32 phy_pllm;
+> +	/* if PLL has a prediv register this should be non zero */
+> +	u32 phy_prediv;
+> +	/* if PLL has a postdiv register this should be non zero */
+> +	u32 phy_postdiv;
 
+"phys" is typically used for physical addresses. I couldn't immediately
+related this to physical address when I looked at this variable outside
+of this file.
 
-> So if you have an alignment fault, thats because IP header is not
-> aligned on 4 bytes ?
-> 
-> If so a driver is buggy and must be fixed.
+Also, physical addresses should be of type phys_addr_t.
 
-So a driver that does not align the ip header is buggy ?
+> +	/* mapped addresses. should be initialized by  */
+> +	void __iomem *pllm;
+> +	void __iomem *prediv;
+> +	void __iomem *postdiv;
+> +	u32 pllm_mask;
+> +	u32 prediv_mask;
+> +	u32 postdiv_mask;
+> +	u32 num;
 
-I always thought it was ok not to do so (with a potential performance
-penalty).
+Wondering what num is for? May be it will be clear once you document the
+complete structure as Linus suggested.
 
-I have some MIPS hardware that is not able to DMA on anything but 32bits
-aligned addresses (bcm63xx). I tried once to add a memcpy instead of
-taking unaligned faults and the result was *much slower* on a ipv4
-forwarding test (which is what the hardware is used for).
+> +	/* framework flags */
+> +	u32 flags;
+> +	/* pll flags */
+> +	u32 pll_flags;
+> +       /* use this value for prediv */
+> +	u32 fixed_prediv;
 
--- 
-Maxime
+Why is this called "fixed". Isn't this the pre-divider value that user
+can configure? Also, shouldn't there be a post-divider value that you
+need as well.
+
+> +	/* multiply PLLM by this factor. By default most SOC set this to zero
+> +	 * that translates to a multiplier of 1 and incrementer of 1.
+> +	 * To override default, set this factor
+> +	 */
+> +	u32 pllm_multiplier;
+
+'m' in pllm stands for multiplier. So, instead of calling it
+"pllm_multiplier", call it "pllm_val" instead?
+
+Sorry about late comments on this, looks like I missed looking at this
+structure altogether yesterday and had to go back to this only when I
+tried understanding whats going on in 4/13
+
+Thanks,
+Sekhar
