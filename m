@@ -1,33 +1,31 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 10 Oct 2012 18:36:31 -0700
-Subject: [PATCH] clk: fix return value check in bcm2835_init_clocks()
-In-Reply-To: <CAPgLHd-msJkHz5KxsxVhr0u8ainXU0t53XHeiwSeW2ShJkRbwg@mail.gmail.com>
-References: <CAPgLHd95ofKiKWC9B67q9mgkjsc6_YJ5x92aY0xKPiohuUMk4Q@mail.gmail.com>
- <50738C7A.9060905@wwwdotorg.org>
- <CAPgLHd-msJkHz5KxsxVhr0u8ainXU0t53XHeiwSeW2ShJkRbwg@mail.gmail.com>
-Message-ID: <20121011013631.11595.26416@nucleus>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Thu, 11 Oct 2012 12:12:58 +1030
+Subject: [kvmarm] [PATCH v2 12/14] KVM: ARM: VFP userspace interface
+In-Reply-To: <CANM98qJDhHDBPq=XinLaXJG8e07-HhVBfd-2i3a68CumdXuFaw@mail.gmail.com>
+References: <20121001090945.49198.68950.stgit@ubuntu>
+ <20121001091125.49198.90819.stgit@ubuntu>
+ <CAFEAcA8zLr5mPYnd6EzaxyugASWPzvY4RE6LiE-K2uRRGWtFZA@mail.gmail.com>
+ <CANM98qJDhHDBPq=XinLaXJG8e07-HhVBfd-2i3a68CumdXuFaw@mail.gmail.com>
+Message-ID: <87626h942l.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Wei Yongjun (2012-10-08 19:44:47)
-> On 10/09/2012 10:31 AM, Stephen Warren wrote:
-> > On 10/07/2012 08:02 AM, Wei Yongjun wrote:
-> >> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> >>
-> >> In case of error, the function clk_register_fixed_rate() returns
-> >> ERR_PTR() and never returns NULL. The NULL test in the return value
-> >> check should be replaced with IS_ERR().
-> >>
-> >> dpatch engine is used to auto generate this patch.
-> >> (https://github.com/weiyj/dpatch)
-> > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> >
-> > Mike, this driver was added through arm-soc; I assume it's simplest to
-> > take this fixup through there too for 3.7-rc*? If so, Wei, could you
-> > resend this patch with my ack to arm at kernel.org? Thanks.
-> 
-> Will do, thanks.
+Christoffer Dall <c.dall@virtualopensystems.com> writes:
+> On Tue, Oct 9, 2012 at 2:11 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+>> On 1 October 2012 10:11, Christoffer Dall <c.dall@virtualopensystems.com> wrote:
+>>> From: Rusty Russell <rusty.russell@linaro.org>
+...
+>>> +ARM 32-bit VFP control registers have the following id bit patterns:
+>>> +  0x4002 0000 0012 1 <selector:3>
+>>> +
+>>> +ARM 64-bit FP registers have the following id bit patterns:
+>>> +  0x4002 0000 0012 0 <selector:3>
+>>> +
+>>
+>> In the other entries in this section, <foo:3> indicates a 3 bit field.
+>> But I think for these two it's trying to indicate a 3 byte field.
+...
+> right you are, I'll modify this.
 
-Works for me.
-
-Mike
+Thanks!
+Rusty.
