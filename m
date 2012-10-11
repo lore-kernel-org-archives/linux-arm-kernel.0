@@ -1,50 +1,66 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 11 Oct 2012 10:11:19 +0200
-Subject: [PATCH 13/15] pinctrl: exynos: Set pin function to EINT in
- irq_set_type of wake-up EINT
+Date: Thu, 11 Oct 2012 10:11:20 +0200
+Subject: [PATCH 14/15] pinctrl: samsung: Add GPIO to IRQ translation
 In-Reply-To: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
 References: <1349943081-27939-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1349943081-27939-14-git-send-email-t.figa@samsung.com>
+Message-ID: <1349943081-27939-15-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pins used as wake-up interrupts need to be configured as EINTs. This
-patch adds the required configuration code to exynos_wkup_irq_set_type,
-to set the pin as EINT when its interrupt trigger type is configured.
+Some drivers require a way to translate GPIO pins to their IRQ numbers.
+
+This patch adds the .to_irq() gpiolib callback to pinctrl-samsung
+driver, which creates (if not present yet) and returns an IRQ mapping
+for given GPIO pin.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/pinctrl/pinctrl-exynos.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pinctrl/pinctrl-samsung.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 4bf2fc4..73a0aa2 100644
---- a/drivers/pinctrl/pinctrl-exynos.c
-+++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -257,6 +257,7 @@ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	unsigned long reg_con = d->ctrl->weint_con + bank->eint_offset;
- 	unsigned long shift = EXYNOS_EINT_CON_LEN * pin;
- 	unsigned long con, trig_type;
-+	unsigned int mask;
+diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+index 0a38368..0db88bb 100644
+--- a/drivers/pinctrl/pinctrl-samsung.c
++++ b/drivers/pinctrl/pinctrl-samsung.c
+@@ -26,6 +26,7 @@
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
++#include <linux/irqdomain.h>
  
- 	switch (type) {
- 	case IRQ_TYPE_EDGE_RISING:
-@@ -288,6 +289,16 @@ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	con &= ~(EXYNOS_EINT_CON_MASK << shift);
- 	con |= trig_type << shift;
- 	writel(con, d->virt_base + reg_con);
-+
-+	reg_con = bank->pctl_offset;
-+	shift = pin * bank->func_width;
-+	mask = (1 << bank->func_width) - 1;
-+
-+	con = readl(d->virt_base + reg_con);
-+	con &= ~(mask << shift);
-+	con |= EXYNOS_EINT_FUNC << shift;
-+	writel(con, d->virt_base + reg_con);
-+
- 	return 0;
+ #include "core.h"
+ #include "pinctrl-samsung.h"
+@@ -528,6 +529,23 @@ static int samsung_gpio_direction_output(struct gpio_chip *gc, unsigned offset,
  }
+ 
+ /*
++ * gpiolib gpio_to_irq callback function. Creates a mapping between a GPIO pin
++ * and a virtual IRQ, if not already present.
++ */
++static int samsung_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
++{
++	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
++	unsigned int virq;
++
++	if (!bank->irq_domain)
++		return -ENXIO;
++
++	virq = irq_create_mapping(bank->irq_domain, offset);
++
++	return (virq) ? : -ENXIO;
++}
++
++/*
+  * Parse the pin names listed in the 'samsung,pins' property and convert it
+  * into a list of gpio numbers are create a pin group from it.
+  */
+@@ -755,6 +773,7 @@ static const struct gpio_chip samsung_gpiolib_chip = {
+ 	.get = samsung_gpio_get,
+ 	.direction_input = samsung_gpio_direction_input,
+ 	.direction_output = samsung_gpio_direction_output,
++	.to_irq = samsung_gpio_to_irq,
+ 	.owner = THIS_MODULE,
+ };
  
 -- 
 1.7.12
