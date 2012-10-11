@@ -1,44 +1,52 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 11 Oct 2012 12:47:22 +0000
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <5076B166.2020006@gmail.com>
-References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 11 Oct 2012 18:17:48 +0530
+Subject: [PATCH V2 2/3] ARM: dts: omap5: EMIF device tree data for OMAP5 boards
+In-Reply-To: <1349959669-16366-1-git-send-email-lokeshvutla@ti.com>
+References: <1349959669-16366-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1349959669-16366-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Adding EMIF device tree data for OMAP5 boards.
 
-On Thu, Oct 11, 2012 at 17:15:42, Daniel Mack wrote:
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/boot/dts/omap5.dtsi |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-> Admittedly, I lost track on the multiple GPMC series here, and they also
-> cause major merge conflicts with Linus' current master branch.
-> 
-> Could you tell me which patches I need on top of soon-to-be-3.7-rc1? I
-
-Series [1-2] plus this series would be the required.
-Note that 1st patch of series [2] has already reached mainline.
-
-Another easy way would be, pull,
-git://gitorious.org/x0148406-public/linux-kernel.git gpmc-timing
-
-git checkout -b gpmc <myremote/gpmc-timing>
-git rebase --onto <Linus-current-master> next-20121005 (or "080aa9c")
-
-> would like to augment this to make GPMC attached NAND probable in DT, in
-> case this is still an open topic.
-
-I would be doing gpmc DT conversion next. Hoping that this
-series too will be picked up by Tony, as once this series is
-accepted, during DT conversion we need not rely on
-auxdata (a last resort option) for timings.
-
-> Thanks for you hard work,
-
-Thanks, it was a pleasure to read the above.
-
-Regards
-Afzal
-
-[1] http://marc.info/?l=linux-omap&m=134945131602622&w=2
-[2] http://marc.info/?l=linux-omap&m=134967458329531&w=2
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 5db33f4..445aeea 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -319,5 +319,29 @@
+ 			ti,buffer-size = <128>;
+ 			ti,hwmods = "mcbsp3";
+ 		};
++
++		emif1: emif at 0x4c000000 {
++			compatible	= "ti,emif-4d5";
++			ti,hwmods	= "emif1";
++			phy-type	= <2>;
++			reg = <0x4c000000 0x3ff>;
++			interrupts = <0 110 0x4>;
++			interrupt-parent = <&gic>;
++			hw-caps-read-idle-ctrl;
++			hw-caps-ll-interface;
++			hw-caps-temp-alert;
++		};
++
++		emif2: emif at 0x4d000000 {
++			compatible	= "ti,emif-4d5";
++			ti,hwmods	= "emif2";
++			phy-type	= <2>;
++			reg = <0x4d000000 0x3ff>;
++			interrupts = <0 111 0x4>;
++			interrupt-parent = <&gic>;
++			hw-caps-read-idle-ctrl;
++			hw-caps-ll-interface;
++			hw-caps-temp-alert;
++		};
+ 	};
+ };
+-- 
+1.7.10.4
