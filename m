@@ -1,63 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Oct 2012 16:15:53 +0100
-Subject: [PATCH] pinctrl/nomadik: always use the simple irqdomain
-In-Reply-To: <1349966197-18777-1-git-send-email-linus.walleij@stericsson.com>
-References: <1349966197-18777-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20121011151553.GC15428@gmail.com>
+Date: Thu, 11 Oct 2012 16:19:47 +0100
+Subject: [PATCH 0/8] clk: ux500: Fixup smp_twd clk for clk notifiers
+In-Reply-To: <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
+References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121011134458.GB15428@gmail.com>
+ <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
+Message-ID: <20121011151947.GD15428@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Since the simple irqdomain will fall back to a linear domain
-> if the first_irq provided is <= 0, just use this, just make
-> sure the first_irq is negative in the device tree case.
-> 
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/pinctrl-nomadik.c | 13 +++----------
->  1 file changed, 3 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-> index 992982c..a4a4247 100644
-> --- a/drivers/pinctrl/pinctrl-nomadik.c
-> +++ b/drivers/pinctrl/pinctrl-nomadik.c
-> @@ -1277,6 +1277,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
->  	struct clk *clk;
->  	int secondary_irq;
->  	void __iomem *base;
-> +	int irq_start = -1;
->  	int irq;
->  	int ret;
->  
-> @@ -1380,19 +1381,11 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
->  
->  	platform_set_drvdata(dev, nmk_chip);
->  
-> -	if (np) {
-> -		/* The DT case will just grab a set of IRQ numbers */
-> -		nmk_chip->domain = irq_domain_add_linear(np, NMK_GPIO_PER_CHIP,
-> -				&nmk_gpio_irq_simple_ops, nmk_chip);
-> -	} else {
-> -		/* Non-DT legacy mode, use hardwired IRQ numbers */
-> -		int irq_start;
-> -
-> +	if (!np)
->  		irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
-> -		nmk_chip->domain = irq_domain_add_simple(NULL,
-> +	nmk_chip->domain = irq_domain_add_simple(NULL,
->  				NMK_GPIO_PER_CHIP, irq_start,
->  				&nmk_gpio_irq_simple_ops, nmk_chip);
-> -	}
->  	if (!nmk_chip->domain) {
->  		dev_err(&dev->dev, "failed to create irqdomain\n");
->  		ret = -ENOSYS;
+On Thu, 11 Oct 2012, Linus Walleij wrote:
 
-Looks good:
+> On Thu, Oct 11, 2012 at 3:44 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> >> Patches are based on Linus Torvalds tree with latest commit as of okt 10.
+> >
+> > Hmm... I get:
+> >
+> > Applying: clk: ux500: Support for prcmu_scalable_rate clock
+> > error: drivers/clk/ux500/clk-prcmu.c: does not exist in index
+> > error: drivers/clk/ux500/clk.h: does not exist in index
+> > Patch failed at 0001 clk: ux500: Support for prcmu_scalable_rate clock
+> >
+> > So when did drivers/clk/ux500/* arrive?
+> 
+> Exactly here, 10 days ago on Torvalds' master branch:
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Ah I see. Basing patches on commits half way through the merge
+window. Good move! ;)
 
 -- 
 Lee Jones
