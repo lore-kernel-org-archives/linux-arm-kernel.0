@@ -1,29 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 11 Oct 2012 10:50:02 +0200
-Subject: [PATCH 4/6] ARM: ux500: Add UART support to the u9540 Device Tree
-In-Reply-To: <20121011072927.GR9707@gmail.com>
-References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
- <1349882335-6786-5-git-send-email-lee.jones@linaro.org>
- <20121010190325.GT12801@game.jcrosoft.org>
- <20121011072927.GR9707@gmail.com>
-Message-ID: <20121011085002.GV12801@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Oct 2012 09:53:02 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
+References: <CAG5Tg6V0Vj9HTy3=AU-q+Qa3DuJs6R1Kw+3uOWU_jOGfkgyXzw@mail.gmail.com>
+ <20121005071216.GD4625@n2100.arm.linux.org.uk>
+ <CAG5Tg6VciuxJ=k+fatzLugcehF54mGNOLHpUwdMX99oCnAVg8Q@mail.gmail.com>
+ <20121005082439.GF4625@n2100.arm.linux.org.uk> <506ED18C.3010009@gmail.com>
+ <20121005140556.GQ4625@n2100.arm.linux.org.uk> <506EEFBB.3060705@gmail.com>
+ <507619FA.6080001@jonmasters.org> <yw1xtxu1pwtv.fsf@unicorn.mansr.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B7038@saturn3.aculab.com>
+Message-ID: <20121011085302.GM4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:29 Thu 11 Oct     , Lee Jones wrote:
-> On Wed, 10 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > On 16:18 Wed 10 Oct     , Lee Jones wrote:
-> > > Add the 3 UART nodes required to enable serial ports on the u9540.
-> > > 
-> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  arch/arm/boot/dts/u9540.dts |   13 ++++++++++++-
-> > dts? it's dtsi
-> 
-> No it's not.
-so the name of the file is wrong s u9540 is a SoC name
+On Thu, Oct 11, 2012 at 09:21:35AM +0100, David Laight wrote:
+> It might be enough to use __attribute__((aligned(2))) on some structure
+> members (actually does 'ldm' need 8 byte alignment?? - in which case
+> aligned(4) is enough).
 
-Best Regards,
-J.
+No, ldm just needs 4 byte alignment, the same as normal word loads/stores
+not to fault.  The only instructions which needs 8 byte alignment not to
+fault are the double-word load/stores.
+
+> One on my bugbears is hardware that will once receive ethernet frames
+> onto a 4n boundary - it needs to be 4n+2. two bytes of 'junk' will do.
+
+Indeed, but remember that is just a mere optimisation for IPv4.  What
+may be true of IPv4 is not necessarily true of other protocols, though
+IPv4 is currently the dominant protocol today.  IPv6 follows the same
+alignment rules as IPv4, so it's unlikely to change.
