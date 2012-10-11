@@ -1,32 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Oct 2012 20:29:05 +0000
-Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
-In-Reply-To: <1349979450.16017.3.camel@gitbox>
-References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
- <201210110747.46682.arnd@arndb.de> <1349979450.16017.3.camel@gitbox>
-Message-ID: <201210112029.05572.arnd@arndb.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 11 Oct 2012 22:27:15 +0200
+Subject: [PATCH RFC 0/7] support the cpts found on am335x devices
+Message-ID: <cover.1349985570.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 October 2012, Tony Prisk wrote:
-> > config VT8500
-> >       bool "Via/Wondermedia VT8500 / WM8505 / WM8650" if ARCH_MULTIPLATFORM
-> >       default VT8500_SINGLE
-> > 
-> >       Arnd
-> 
-> Alexey (or anyone else),
-> 
-> Do you want it kept in the meantime?
-> 
-> I think the easiest way to add/keep it would be to create:
-> 
-> ARCH_VT8500_SINGLE (arm/Kconfig) and ARCH_VT8500_MULTI
-> (arch-vt8500/Kconfig) and have them both select ARCH_VT8500 as an option
-> to make drivers available.
+This patch series, based on today's mainline master 12250d8, is a RFC
+adding support for the Common Platform Time Sync (CPTS) found on the
+popular BeagleBone. The code enables hardware time stamping and a PTP
+Hardware Clock.
 
-You only need one new symbol, not too. Keeping CONFIG_VT8500 as the
-user-selectable option as I outlined in the example means that
-existing .config files keep working, which is sometimes useful.
+Due to DT problems with the most current CPSW driver, this work has
+been compiled and booted, but not tested. However, I have tested work
+similar to this, based on the AM335XPSP_04.06.00.08 branch in TI's
+arago repo, and found it to work well.
 
-	Arnd
+There are two open issue with this driver, which will hopefully soon
+be resolved.
+
+1. ATM it is not possible to adjust the clock frequency. I heard a
+   rumor that the fractional multipliers on the am335x do not work
+   when changed, but I have not yet verified this myself. Even if it
+   turns out to be true, still the driver will be useful for 802.1AS
+   applications, since they will typically use a free running clock.
+
+2. Time stamping only works on UDP packets. Although Layer 2 is
+   supposed to work according to the TRM, I have not yet figured out
+   how. The UDP only works when setting an undocumented bit, so maybe
+   someone from TI can fill me in on this.
+
+Thanks,
+Richard
+
+
+Richard Cochran (7):
+  cpsw: rename register banks to match the reference manual
+  cpsw: add missing fields to the CPSW_SS register bank.
+  cpsw: correct the CPSW_PORT register bank declaration
+  cpsw: add a common header file for regsiter declarations
+  cpts: introduce time stamping code and a PTP hardware clock.
+  cpsw: add a DT field for the cpts offset
+  cpsw: use the time stamping capabilities of the cpts
+
+ Documentation/devicetree/bindings/net/cpsw.txt |   11 +-
+ drivers/net/ethernet/ti/Kconfig                |    8 +
+ drivers/net/ethernet/ti/Makefile               |    2 +-
+ drivers/net/ethernet/ti/cpsw.c                 |   80 ++++-
+ drivers/net/ethernet/ti/cpsw_reg.h             |   81 ++++
+ drivers/net/ethernet/ti/cpts.c                 |  469 ++++++++++++++++++++++++
+ drivers/net/ethernet/ti/cpts.h                 |  148 ++++++++
+ include/linux/platform_data/cpsw.h             |    1 +
+ 8 files changed, 785 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/net/ethernet/ti/cpsw_reg.h
+ create mode 100644 drivers/net/ethernet/ti/cpts.c
+ create mode 100644 drivers/net/ethernet/ti/cpts.h
+
+-- 
+1.7.2.5
