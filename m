@@ -1,32 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 11 Oct 2012 11:58:15 -0400 (EDT)
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <20121011135925.GR4625@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121011130955.GP4625@n2100.arm.linux.org.uk> <5076CA43.9070503@gmail.com>
- <20121011135925.GR4625@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1210111152580.16518@xanadu.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Oct 2012 18:06:49 +0200
+Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
+In-Reply-To: <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+ <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
+ <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
+Message-ID: <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Oct 2012, Russell King - ARM Linux wrote:
+On Thu, Oct 11, 2012 at 6:15 AM, viresh kumar <viresh.kumar@linaro.org> wrote:
+> On Wed, Oct 10, 2012 at 10:37 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
 
-> On Thu, Oct 11, 2012 at 08:31:47AM -0500, Rob Herring wrote:
-> > This only affects v7 cores. It should not vary for v7 cores as unaligned
-> > access is a required feature. So how is it going to vary on v7 CPUs?
-> > We've got bigger problems if there are v7 cores that don't handle
-> > unaligned accesses.
-> 
-> Oh, and this gives me a third reason to NAK this patch.  Why only ensure
-> that the A bit is clear for v7 CPUs?  Why not v6, v5, v4 too?  Why does
-> ARMv7 get this special treatment?
+>> dma_sync_single_for_device() is translating the virtual
+>> address to physical for every chunk BTW.
+>
+> I pray that i am wrong here, otherwise i would be thrown out from
+> the maintainers list for this driver :)
+>
+> dma_sync_single_for_device() is not doing anything on the buffer, but
+> on the LLI item. Actually it is flushing LLI struct so that DMA h/w can get
+> the correct values.
 
-As I said, gcc knows that ARMv7 can perform word sized accesses even 
-with misaligned pointers.  So when it is passed a pointer marked with 
-the packed attribute, it will generate a series of byte accesses when 
-compiling for anything but ARMv7, and use a single ldr or str when 
-compiling for ARMv7.
+Sorry no, I'm the one who's wrong...
 
+So the DMA engine memcpy() is not mapping virt->phys
+but expects physical addresses to be provided.
 
-Nicolas
+So dma_map_single() needs to be called on the stuff
+passed in to dev->device_prep_dma_memcpy().
+
+And currently there is indeed a dma_map_single() in
+dma_xfer() in fsmc_nand.c which should work just fine.
+
+dma_map_single() will only work if the buffer is
+physically contiguous.
+
+And the block layer of the subsystem should take care
+of only handing the driver buffers that are contiguous
+I think? Not that I'm an expert here ... more some
+guesswork :-/
+
+Artem will know I hope!
+
+Yours,
+Linus Walleij
