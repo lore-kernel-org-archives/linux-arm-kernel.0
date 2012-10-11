@@ -1,95 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 11 Oct 2012 10:52:23 +0200
-Subject: [PATCH 3/6] ARM: ux500: Add support for ST-Ericsson's u9540 SoC
-In-Reply-To: <20121011073820.GS9707@gmail.com>
-References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
- <1349882335-6786-4-git-send-email-lee.jones@linaro.org>
- <20121010190144.GS12801@game.jcrosoft.org>
- <20121011073820.GS9707@gmail.com>
-Message-ID: <20121011085223.GW12801@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 11 Oct 2012 16:55:40 +0800
+Subject: [PATCH v4 RESEND 1/3] Input: egalax_ts: get gpio from devicetree
+In-Reply-To: <20121010163036.GC19335@core.coreip.homeip.net>
+References: <1349860323-12786-1-git-send-email-jason77.wang@gmail.com>
+ <1349860323-12786-2-git-send-email-jason77.wang@gmail.com>
+ <20121010163036.GC19335@core.coreip.homeip.net>
+Message-ID: <20121011085535.GA31464@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:38 Thu 11 Oct     , Lee Jones wrote:
-> On Wed, 10 Oct 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > On 16:18 Wed 10 Oct     , Lee Jones wrote:
-> > > First level board support for the u9540.
-> > > 
-> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  arch/arm/mach-ux500/cpu-db8500.c |   14 ++++++++++++++
-> > >  1 file changed, 14 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> > > index 3d8e321..6b7f970 100644
-> > > --- a/arch/arm/mach-ux500/cpu-db8500.c
-> > > +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> > > @@ -17,6 +17,7 @@
-> > >  #include <linux/platform_device.h>
-> > >  #include <linux/io.h>
-> > >  #include <linux/mfd/abx500/ab8500.h>
-> > > +#include <linux/mfd/dbx500-prcmu.h>
-> > >  #include <linux/of.h>
-> > >  #include <linux/of_platform.h>
-> > >  #include <linux/regulator/machine.h>
-> > > @@ -319,6 +320,8 @@ static void __init u8500_init_machine(void)
-> > >  		snowball_pinmaps_init();
-> > >  	else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
-> > >  		hrefv60_pinmaps_init();
-> > > +	else if (of_machine_is_compatible("st-ericsson,u9540")) {}
-> > > +		/* TODO: Add u9540 pinmaps. */
-> > do you via DT no here
-> 
-> We don't support pinctrl yet. It will come, it's just not available yet.
-so stop to add more and update the drviers
+Add LAKML ...
 
-and u9540 is a SoC name not a baord name
+On Wed, Oct 10, 2012 at 09:30:36AM -0700, Dmitry Torokhov wrote:
+> Hi Hui,
 > 
-> > >  	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
-> > >  	parent = u8500_of_init_devices();
-> > > @@ -331,6 +334,7 @@ static const char * u8500_dt_board_compat[] = {
-> > >  	"calaosystems,snowball-a9500",
-> > >  	"st-ericsson,hrefv60+",
-> > >  	"st-ericsson,mop500",
-> > > +	"st-ericsson,u9540",
-> > stop to add more compatible sue a more generic one
+> On Wed, Oct 10, 2012 at 05:12:01PM +0800, Hui Wang wrote:
+> > The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
+> > and don't support this API anymore.
+> > 
+> > The i.MX6q sabrelite platform equips an egalax touchscreen controller,
+> > and this platform already transfered to GENERIC_GPIO framework, to
+> > support this driver, we use a more generic way to get gpio.
 > 
-> Not entirely sure what you mean here.
+> Unfortunately this does break the driver for platforms that do still
+> support irq_to_gpio and have not transitioned to device tree (yet?).
+> It looks like the API suffered from premature deletion...
 > 
-> These are the only four boards we officially support.
+> I really do not want to add a new platform data structure with only gpio
+> in it, is there a better way to detect if irq_to_gpio() (even if only a
+> stub) is available?
 > 
-> There are other uXXXX boards that we do not.
-you do not need it just mach a global compatbile
-> 
-> > >  	NULL,
-> > >  };
-> > >  
-> > > @@ -345,4 +349,14 @@ DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
-> > >  	.dt_compat      = u8500_dt_board_compat,
-> > >  MACHINE_END
-> > >  
-> > > +DT_MACHINE_START(U9540_DT, "ST-Ericsson 9540 platform (Device Tree Support)")
-> > > +	.map_io		= u8500_map_io,
-> > > +	.init_irq	= ux500_init_irq,
-> > > +	.timer		= &ux500_timer,
-> > > +	.handle_irq	= gic_handle_irq,
-> > > +	.init_machine	= u8500_init_machine,
-> > > +	.init_late	= NULL,
-> > > +	.dt_compat      = u8500_dt_board_compat,
-> > > +MACHINE_END
-> > really?
-> > no need drop it for a more generic on
-> 
-> This may look the same as the previous MACHINE_START now, but
-> it will have differences in the future as more u9540 support is
-> upstreamed. I think it should stick around as a separate entity
-> for the time being. If we can consolidate the init functions at
-> a later date, believe me I will make sure it happens.
-> 
-> -- 
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+If CONFIG_ARCH_HAVE_CUSTOM_GPIO_H is not enabled for an architecture,
+the irq_to_gpio() in include/linux/gpio.h will tell unavailability by
+returning -EINVAL.  But ARM architecture still selects ARCH_HAVE_CUSTOM_GPIO_H
+because there are still some platforms having mach/gpio.h.
+
+We may also need a stub irq_to_gpio simply returning -EINVAL into
+arch/arm/include/asm/gpio.h when platform does not provide irq_to_gpio,
+so that driver can detect if irq_to_gpio() is available.  And that
+stub can be removed later when we deselect ARCH_HAVE_CUSTOM_GPIO_H
+for ARM architecture.
+
+Shawn
