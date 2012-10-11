@@ -1,61 +1,53 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 11 Oct 2012 14:40:48 +0200
-Subject: alignment faults in 3.6
-In-Reply-To: <201210111228.25995.arnd@arndb.de>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <20121011103257.GO4625@n2100.arm.linux.org.uk>
- <1349952574.21172.8604.camel@edumazet-glaptop>
- <201210111228.25995.arnd@arndb.de>
-Message-ID: <1349959248.21172.8970.camel@edumazet-glaptop>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 11 Oct 2012 14:41:42 +0200
+Subject: [PATCH] pinctrl/nomadik: provide stubs for legacy Nomadik
+Message-ID: <1349959302-12151-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-11 at 12:28 +0000, Arnd Bergmann wrote:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> 
-> Rob Herring as the original reporter has dropped off the Cc list, adding
-> him back.
-> 
-> I assume that the calxeda xgmac driver is the culprit then. It uses
-> netdev_alloc_skb() rather than netdev_alloc_skb_ip_align() in
-> xgmac_rx_refill but it is not clear whether it does so intentionally
-> or by accident.
+The compilation of the pinctrl driver failed on the legacy
+Nomadik NHK8815 platform because it was not providing the PRCMU
+interfaces needed to support the extended alternate functions
+used by the ux500 series.
 
-Thanks Arnd
+Solve this by providing some stubs for the legacy platform, to
+avoid too much #ifdefs in the code per se. Theoretically this
+actually allows the Nomadik and Ux500 to have a single kernel
+image with support for the PRCM registers on the Ux500 (though
+they have incompatible archs, but the spirit is there).
 
-It seems an accident, since driver doesnt check skb->data alignment at
-all (this can change with SLAB debug on/off)
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-It also incorrectly adds 64 bytes to bfsize, there is no need for this.
-
-(or if its needed, a comment would be nice, because on prior kernels,
-this makes skb->head allocations uses kmalloc-4096 instead of
-kmalloc-2048 slab cache... With 3.7 its less an issue now we use order-3
-pages to deliver fragments for rx skbs
-
-So the following patch should fix the alignment, and makes driver uses
-half memory than before for stable kernels
-
-diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
-index 16814b3..a895e18 100644
---- a/drivers/net/ethernet/calxeda/xgmac.c
-+++ b/drivers/net/ethernet/calxeda/xgmac.c
-@@ -671,7 +671,8 @@ static void xgmac_rx_refill(struct xgmac_priv *priv)
- 		p = priv->dma_rx + entry;
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index fec9c30..f640f13 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -30,7 +30,20 @@
+ #include <linux/pinctrl/pinconf.h>
+ /* Since we request GPIOs from ourself */
+ #include <linux/pinctrl/consumer.h>
++/*
++ * For the U8500 archs, use the PRCMU register interface, for the older
++ * Nomadik, provide some stubs. The functions using these will only be
++ * called on the U8500 series.
++ */
++#ifdef CONFIG_ARCH_U8500
+ #include <linux/mfd/dbx500-prcmu.h>
++#else
++static inline u32 prcmu_read(unsigned int reg) {
++	return 0;
++}
++static inline void prcmu_write(unsigned int reg, u32 value) {}
++static inline void prcmu_write_masked(unsigned int reg, u32 mask, u32 value) {}
++#endif
  
- 		if (priv->rx_skbuff[entry] == NULL) {
--			skb = netdev_alloc_skb(priv->dev, priv->dma_buf_sz);
-+			skb = netdev_alloc_skb_ip_align(priv->dev,
-+							priv->dma_buf_sz);
- 			if (unlikely(skb == NULL))
- 				break;
+ #include <asm/mach/irq.h>
  
-@@ -703,7 +704,7 @@ static int xgmac_dma_desc_rings_init(struct net_device *dev)
- 	/* Set the Buffer size according to the MTU;
- 	 * indeed, in case of jumbo we need to bump-up the buffer sizes.
- 	 */
--	bfsize = ALIGN(dev->mtu + ETH_HLEN + ETH_FCS_LEN + NET_IP_ALIGN + 64,
-+	bfsize = ALIGN(dev->mtu + ETH_HLEN + ETH_FCS_LEN,
- 		       64);
- 
- 	netdev_dbg(priv->dev, "mtu [%d] bfsize [%d]\n", dev->mtu, bfsize);
+-- 
+1.7.11.3
