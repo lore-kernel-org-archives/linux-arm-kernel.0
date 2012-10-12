@@ -1,53 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Oct 2012 12:19:06 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <20121012110750.GE21164@n2100.arm.linux.org.uk>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
- <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
- <20121012090321.GA21164@n2100.arm.linux.org.uk>
- <yw1xhaq0nefg.fsf@unicorn.mansr.com>
- <20121012110750.GE21164@n2100.arm.linux.org.uk>
-Message-ID: <20121012111906.GF21164@n2100.arm.linux.org.uk>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 12 Oct 2012 14:25:32 +0300
+Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <CAKohponxbjTTDMOA_0=MT36wRh1NpzTAH4LdkaE=Z-ahup4BFg@mail.gmail.com>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
+ <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
+ <1350030203.10584.139.camel@smile>
+ <CAOh2x=m8OVNfMm5Fn+cr9Gxuh6oyt+8d4n-bkG8Xiw5zGncLiA@mail.gmail.com>
+ <CAHp75VffAwZjfQLf=wS+nBhiRoMFOoyPeUCfrzF1G=+Kh7HHTA@mail.gmail.com>
+ <CAKohponxbjTTDMOA_0=MT36wRh1NpzTAH4LdkaE=Z-ahup4BFg@mail.gmail.com>
+Message-ID: <CAHp75Vcte64KF5k5gDjMtyff8KsOof-yT7iVWc3Gz_ECL+0+Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 12:07:50PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Oct 12, 2012 at 12:00:03PM +0100, M?ns Rullg?rd wrote:
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > 
-> > > On Fri, Oct 12, 2012 at 08:11:42AM +0000, Arnd Bergmann wrote:
-> > >> On Thursday 11 October 2012, M?ns Rullg?rd wrote:
-> > >> > > But, the IP header is expected to be aligned.
-> > >> > 
-> > >> > Everything tells the compiler the struct is perfectly aligned.  When the
-> > >> > buggy driver passes a misaligned pointer, bad things happen.
-> > >> 
-> > >> Would it be appropriate to add a WARN_ON_ONCE() in the alignment fault path
-> > >> then?
-> > 
-> > I think that's an excellent idea.
-> 
-> Well, I get the last word here and it's no.
-> 
-> > >> If all alignment faults in the kernel are caused by broken drivers,
-> > >> that would at least give us some hope of finding those drivers while
-> > >> at the same time not causing much overhead in the case where we need
-> > >> to do the fixup in the meantime.
-> > >
-> > > No.  It is my understanding that various IP option processing can also
-> > > cause the alignment fault handler to be invoked, even when the packet is
-> > > properly aligned, and then there's jffs2/mtd which also relies upon
-> > > alignment faults being fixed up.
-> > 
-> > As far as I'm concerned, this is all hearsay, and I've only ever heard
-> > it from you.  Why can't you let those who care fix these bugs instead?
-> 
-> You know, I'm giving you the benefit of my _knowledge_ which has been
-> built over the course of the last 20 years.  I've been in these
-> discussions with networking people before.  I ended up having to develop
-> the alignment fault handler because of those discussions.
+On Fri, Oct 12, 2012 at 2:01 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 12 October 2012 16:10, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>>>>> +     if (!found) {
+>>>>> +             last_dw = dw;
+>>>>> +             last_bus_id = param;
+>>>>> +             return false;
+>>>> Because of return here you could eliminate 'found' flag at all.
+>
+> Here is the stuff copied from you ;)
+>
+>
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+> index a4ff04c..c24859e 100644
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
+> @@ -1184,7 +1184,7 @@ bool dw_generic_filter(struct dma_chan *chan, void *param)
+>         struct dw_dma *dw = to_dw_dma(chan->device);
+>         static struct dw_dma *last_dw;
+>         static char *last_bus_id;
+> -       int found = 0, i = -1;
+> +       int i = -1;
+>
+>         /*
+>          * dmaengine framework calls this routine for all channels of all dma
+> @@ -1212,22 +1212,17 @@ bool dw_generic_filter(struct dma_chan *chan,
+> void *param)
+>
+>         while (++i < dw->sd_count) {
+>                 if (!strcmp(dw->sd[i].bus_id, param)) {
+> -                       found = 1;
+> -                       break;
+> -               }
+> -       }
+> +                       chan->private = &dw->sd[i];
+> +                       last_dw = NULL;
+> +                       last_bus_id = NULL;
+>
+> -       if (!found) {
+> -               last_dw = dw;
+> -               last_bus_id = param;
+> -               return false;
+> +                       return true;
+> +               }
+>         }
+>
+> -       chan->private = &dw->sd[i];
+> -       last_dw = NULL;
+> -       last_bus_id = NULL;
+> -
+> -       return true;
+> +       last_dw = dw;
+> +       last_bus_id = param;
+> +       return false;
+>  }
+Yes, that what I refer to.
 
-Correction: San Mehat at Corel Inc had to develop it, but I was involved
-in those discussions over it nevertheless, as I was the person who merged
-the code and then subsequently maintained it.
+>  EXPORT_SYMBOL(dw_generic_filter);
+Could we change a name to be more precise, like dw_dma_generic_filter ?
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
