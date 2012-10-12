@@ -1,35 +1,47 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Oct 2012 23:15:21 +0200
-Subject: [PATCH 4/6] ARM: ux500: Add UART support to the u9540 Device Tree
-In-Reply-To: <20121011180612.GY12801@game.jcrosoft.org>
-References: <1349882335-6786-1-git-send-email-lee.jones@linaro.org>
- <1349882335-6786-5-git-send-email-lee.jones@linaro.org>
- <20121010190325.GT12801@game.jcrosoft.org>
- <20121011072927.GR9707@gmail.com>
- <20121011085002.GV12801@game.jcrosoft.org>
- <20121011092222.GW9707@gmail.com>
- <20121011180612.GY12801@game.jcrosoft.org>
-Message-ID: <CACRpkdb9xCzpsidy9Ro+yauzwV7r+xPYOb8NAG8mfn=h8fuKVw@mail.gmail.com>
+Date: Fri, 12 Oct 2012 23:22:44 +0200
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdaaG1d4C9n7=2A_au0D99bVTGW1s2KX4hFHbaDAkeiK0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 8:06 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 10:22 Thu 11 Oct     , Lee Jones wrote:
+On Fri, Oct 12, 2012 at 4:02 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
->> The board could actually be called either ccu9540, or just
->> u9540. I picked one and went with it. The full name is the
->> u9540 development board.
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 >
-> so use ccu9540 as u9540 is the soc name so if we use u9540 as compatible we
-> expect to mach the soc and not a board
+> For the ux500v2 variant non power of two block sizes are supported.
+> This will make it possible to decrease data overhead for SDIO
+> transfers. Although we need to put some constraints to the alignment
+> of the buffers when enabling this feature.
+>
+> Buffers must be 4 bytes aligned due to restrictions that the PL18x
+> FIFO accesses must be done in a 4 byte aligned manner. Moreover we
+> need to enable DMA_REQCTL for SDIO to support write of non 32 bytes
+> aligned sg element lengths. In PIO mode any buffer length can be
+> handled as long as the buffer address is 4 byte aligned.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
 
-I basically agree.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-However the SoC (digital ASIC) is named DB9540.
+I finally understand how this works now.
 
-U9540 is the entire chipset (DB9540, AB9540 etc) a variant
-of the NovaThor series.
+Bonus for comments like this:
+
+> +/*
+> + * DMA request control is required for write
+> + * if transfer size is not 32 byte aligned.
+> + * DMA request control is also needed if the total
+> + * transfer size is 32 byte aligned but any of the
+> + * sg element lengths are not aligned with 32 byte.
+> + */
+>  #define MCI_ST_DPSM_DMAREQCTL  (1 << 12)
+
+Which make you understand what is actually happening.
 
 Yours,
 Linus Walleij
