@@ -1,66 +1,31 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 12 Oct 2012 07:31:59 -0700
-Subject: [PATCH 1/3] i2c: omap: Do not enable the irq always
-In-Reply-To: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Mon, 8 Oct 2012 14:35:14 +0530")
-References: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87lifb7odc.fsf@deeprootsystems.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 12 Oct 2012 20:01:41 +0530
+Subject: [PATCH V2 1/3] dmaengine: dw_dmac: Update documentation style
+ comments for dw_dma_platform_data
+Message-ID: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Kalle, Grygorii, Huzefa
+Documentation style comments were missing for few fields in struct
+dw_dma_platform_data. Add these.
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ include/linux/dw_dmac.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> Enable the irq in the transfer and disable it after the
-> transfer is done.
->
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index b6c6b95..ce41596 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -625,6 +625,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  	if (IS_ERR_VALUE(r))
->  		goto out;
->  
-> +	enable_irq(dev->irq);
->  	r = omap_i2c_wait_for_bb(dev);
->  	if (r < 0)
->  		goto out;
-> @@ -654,6 +655,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  
->  	omap_i2c_wait_for_bb(dev);
->  out:
-> +	disable_irq(dev->irq);
-
-When using runtime PM with auto-suspend timeouts, why would you disable
-the IRQ before the runtime suspend handlers have run?   
-
-If you really want to do this, you probably should have these in the
-runtime PM callbacks.  But I'll wait until you add a more descriptive
-changelog before I can really tell why this is being done.  Based on the
-discussion in the patch from Kalle, I'm assuming this is to prevent
-interrups when I2C is being used by co-processors.  If so, plese
-describe in the changelog.
-
-That being said, doesn't the runtime suspend callback already disable
-IRQs at the device level instead of the INTC level?
-
-Kevin
-
->  	pm_runtime_mark_last_busy(dev->dev);
->  	pm_runtime_put_autosuspend(dev->dev);
->  	return r;
-> @@ -1179,6 +1181,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  		goto err_unuse_clocks;
->  	}
->  
-> +	disable_irq(dev->irq);
->  	adap = &dev->adapter;
->  	i2c_set_adapdata(adap, dev);
->  	adap->owner = THIS_MODULE;
+diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
+index e1c8c9e..62a6190 100644
+--- a/include/linux/dw_dmac.h
++++ b/include/linux/dw_dmac.h
+@@ -19,6 +19,8 @@
+  * @nr_channels: Number of channels supported by hardware (max 8)
+  * @is_private: The device channels should be marked as private and not for
+  *	by the general purpose DMA channel allocator.
++ * @chan_allocation_order: Allocate channels starting from 0 or 7
++ * @chan_priority: Set channel priority increasing from 0 to 7 or 7 to 0.
+  * @block_size: Maximum block size supported by the controller
+  * @nr_masters: Number of AHB masters supported by the controller
+  * @data_width: Maximum data width supported by hardware per AHB master
+-- 
+1.7.12.rc2.18.g61b472e
