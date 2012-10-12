@@ -1,86 +1,30 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 11 Oct 2012 20:06:16 -0500
-Subject: [PATCH v3 6/6] arm/dts: OMAP3/4: Add iommu nodes
-In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1350003977-32744-12-git-send-email-omar.luna@linaro.org>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 12 Oct 2012 10:34:18 +0800
+Subject: [PATCH] i2c: change the id to let the i2c device work
+Message-ID: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for iommu DT, to interface with hwmods.
+As the old method will use platform device id, change the id to
+let the i2c device work
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
- arch/arm/boot/dts/omap3.dtsi |   12 +++++++++++-
- arch/arm/boot/dts/omap4.dtsi |   17 ++++++++++++++++-
- 2 files changed, 27 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index f38ea87..c76872e 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -37,12 +37,17 @@
- 		};
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 5c5966a..aad76b7 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -471,7 +471,7 @@ static struct i2c_gpio_platform_data pdata = {
  
- 		iva {
--			compatible = "ti,iva2.2";
-+			compatible = "ti,iva2.2", "simple-bus";
- 			ti,hwmods = "iva";
+ static struct platform_device at91sam9260_twi_device = {
+ 	.name			= "i2c-gpio",
+-	.id			= -1,
++	.id			= 0,
+ 	.dev.platform_data	= &pdata,
+ };
  
- 			dsp {
- 				compatible = "ti,omap3-c64";
- 			};
-+
-+			mmu_iva: mmu_iva at 5d000000 {
-+				compatible = "ti,omap3-iommu";
-+				ti,hwmods = "mmu_iva";
-+			};
- 		};
- 	};
- 
-@@ -227,6 +232,11 @@
- 			ti,hwmods = "mmc3";
- 		};
- 
-+		mmu_isp: mmu_isp at 480bd400 {
-+			compatible = "ti,omap3-iommu";
-+			ti,hwmods = "mmu_isp";
-+		};
-+
- 		wdt2: wdt at 48314000 {
- 			compatible = "ti,omap3-wdt";
- 			ti,hwmods = "wd_timer2";
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 3883f94..f084418 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -71,8 +71,23 @@
- 		};
- 
- 		dsp {
--			compatible = "ti,omap3-c64";
-+			compatible = "ti,omap3-c64", "simple-bus";
- 			ti,hwmods = "dsp";
-+
-+			mmu_dsp: mmu_dsp at 4a066000 {
-+				compatible = "ti,omap4-iommu";
-+				ti,hwmods = "mmu_dsp";
-+			};
-+		};
-+
-+		ipu {
-+			compatible = "ti,omap4-ipu", "simple-bus";
-+			ti,hwmods = "ipu";
-+
-+			mmu_ipu: mmu_ipu at 55082000 {
-+				compatible = "ti,omap4-iommu";
-+				ti,hwmods = "mmu_ipu";
-+			};
- 		};
- 
- 		iva {
 -- 
 1.7.9.5
