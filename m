@@ -1,45 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Oct 2012 15:54:02 +0800
-Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
-In-Reply-To: <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
-Message-ID: <20121012075358.GA4962@S2101-09.ap.freescale.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 12 Oct 2012 15:55:32 +0800
+Subject: [PATCH] i2c: change the id to let the i2c device work
+In-Reply-To: <20121012091427.0d7b2bed@endymion.delvare>
+References: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
+ <20121012044042.GI11726@opensource.wolfsonmicro.com>
+ <5077A33E.4080801@atmel.com>
+ <20121012051419.GJ11726@opensource.wolfsonmicro.com>
+ <5077AE8C.5040605@atmel.com>
+ <20121012055301.GM11726@opensource.wolfsonmicro.com>
+ <20121012091427.0d7b2bed@endymion.delvare>
+Message-ID: <5077CCF4.7070104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 09:48:45AM -0700, Colin Cross wrote:
-> As is, coupled cpuidle will work on Tegra30, but it will unnecessarily
-> wake up the secondary cpus during the transitions to off and back on
-> again.  Those cpus will immediately go back to single-cpu LP2,
+Hi Jean Delvare,
 
-I'm sure coupled cpuidle will work like that.  We have the following
-code at the end of  cpuidle_enter_state_coupled() to wait until all
-coupled cpus have exited idle.
+On 10/12/2012 15:14, Jean Delvare wrote:
+> On Fri, 12 Oct 2012 14:53:02 +0900, Mark Brown wrote:
+>> On Fri, Oct 12, 2012 at 01:45:48PM +0800, Bo Shen wrote:
+>>> So, in this case, if the id = -1, i2c core will dynamically assign a
+>>> bus id to this bus when running, the dynamically assigned bus id is
+>>> unknown when writing the code. So, when we use
+>>> i2c_register_board_info(int busnum, ...) to register device on
+>>> busnum. we don't know which value to be use.
+>>
+>> The I2C bus number assigned to the controller should be independant of
+>> the platform device ID used to register the device; a better fix if this
+>> is an issue would be to update the i2c-gpio driver to allow a fixed bus
+>> number to be specified in platform data.
+>
+> i2c-gpio does support this already.
 
-        while (!cpuidle_coupled_no_cpus_ready(coupled))
-                cpu_relax();
+vim I only see the i2c-gpio platform data structure as following:
+--<---------------------
+struct i2c_gpio_platform_data {
+	unsigned int	sda_pin;
+	unsigned int	scl_pin;
+	int		udelay;
+	int		timeout;
+	unsigned int	sda_is_open_drain:1;
+	unsigned int	scl_is_open_drain:1;
+	unsigned int	scl_is_output_only:1;
+};
+-->---------------------
 
-The cpu woken up during the transitions will just loop there until all
-other 3 cpus exit from idle function.
-
-Shawn
-
-> so it
-> may not be a big deal, but there is a small optimization I've
-> discussed with a few other people that could avoid waking them up.  I
-> suggest adding an extra pre-idle hook to the Tegra30 that is called by
-> coupled cpuidle on the last cpu to go down.  It would return a cpumask
-> of cpus that have been prepared for idle by guaranteeing that they
-> will not wake up from an interrupt, and therefore don't need to be
-> woken up for the transitions.  I haven't worked with a cpu that needs
-> this optimization yet, so I haven't done it.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+So, how to allow a fixed bus number to be specified in platform data?
