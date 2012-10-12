@@ -1,184 +1,167 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 11 Oct 2012 20:06:13 -0500
-Subject: [PATCH 4/6] ARM: OMAP: iommu: optimize save and restore routines
+Date: Thu, 11 Oct 2012 20:06:14 -0500
+Subject: [PATCH v3 5/6] ARM: OMAP: iommu: add device tree support
 In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
 References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1350003977-32744-9-git-send-email-omar.luna@linaro.org>
+Message-ID: <1350003977-32744-10-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions save and restore registers irrespectively of their
-read or write permissions, this ends up in registers being saved
-that can't be restored because of read only attributes. OTOH, so
-far only 3 of them need to be saved.
-
-In future GP_REG (which is present only on OMAP4 ipu) needs to be
-saved but right now there is no API that can alter its value. Also,
-protected TLB entries must be saved but this can be in a separate
-patch as the original code didn't implement the loop to traverse
-protected TLB entries.
+Adapt driver to use DT if provided.
 
 Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 ---
- arch/arm/mach-omap2/iommu2.c             |   38 ++++++++++++++----------------
- arch/arm/plat-omap/include/plat/iommu.h  |   10 +++++++-
- arch/arm/plat-omap/include/plat/iommu2.h |    2 --
- drivers/iommu/omap-iommu.c               |    3 +--
- 4 files changed, 28 insertions(+), 25 deletions(-)
+ .../devicetree/bindings/arm/omap/iommu.txt         |   10 +++
+ arch/arm/mach-omap2/omap-iommu.c                   |    4 ++
+ drivers/iommu/omap-iommu.c                         |   65 +++++++++++++++++++-
+ 3 files changed, 78 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/iommu.txt
 
-diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
-index 3e47786..cd77abb 100644
---- a/arch/arm/mach-omap2/iommu2.c
-+++ b/arch/arm/mach-omap2/iommu2.c
-@@ -19,6 +19,7 @@
- #include <linux/stringify.h>
- 
- #include <plat/iommu.h>
-+#include <plat/omap-pm.h>
- 
- /*
-  * omap2 architecture specific register bit definitions
-@@ -55,20 +56,26 @@
- 
- static void __iommu_set_twl(struct omap_iommu *obj, bool on)
- {
--	u32 l = iommu_read_reg(obj, MMU_CNTL);
-+	u32 l;
- 
- 	if (on)
--		iommu_write_reg(obj, MMU_IRQ_TWL_MASK, MMU_IRQENABLE);
-+		l = MMU_IRQ_TWL_MASK;
- 	else
--		iommu_write_reg(obj, MMU_IRQ_TLB_MISS_MASK, MMU_IRQENABLE);
-+		l = MMU_IRQ_TLB_MISS_MASK;
+diff --git a/Documentation/devicetree/bindings/arm/omap/iommu.txt b/Documentation/devicetree/bindings/arm/omap/iommu.txt
+new file mode 100644
+index 0000000..2bb780f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/iommu.txt
+@@ -0,0 +1,10 @@
++* MMU (Memory Management Unit)
 +
-+	iommu_write_reg(obj, l, MMU_IRQENABLE);
-+	obj->context.irqen = l;
- 
-+	l = iommu_read_reg(obj, MMU_CNTL);
- 	l &= ~MMU_CNTL_MASK;
++MMU present in OMAP subsystems.
 +
- 	if (on)
- 		l |= (MMU_CNTL_MMU_EN | MMU_CNTL_TWL_EN);
- 	else
- 		l |= (MMU_CNTL_MMU_EN);
- 
- 	iommu_write_reg(obj, l, MMU_CNTL);
-+	obj->context.cntl = l;
- }
- 
- 
-@@ -88,6 +95,7 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
- 		 (l >> 4) & 0xf, l & 0xf);
- 
- 	iommu_write_reg(obj, pa, MMU_TTB);
-+	obj->context.ttb = pa;
- 
- 	__iommu_set_twl(obj, true);
- 
-@@ -100,6 +108,7 @@ static void omap2_iommu_disable(struct omap_iommu *obj)
- 
- 	l &= ~MMU_CNTL_MASK;
- 	iommu_write_reg(obj, l, MMU_CNTL);
-+	obj->context.cntl = l;
- 
- 	dev_dbg(obj->dev, "%s is shutting down\n", obj->name);
- }
-@@ -249,28 +258,17 @@ out:
- 
- static void omap2_iommu_save_ctx(struct omap_iommu *obj)
- {
--	int i;
--	u32 *p = obj->ctx;
--
--	for (i = 0; i < (MMU_REG_SIZE / sizeof(u32)); i++) {
--		p[i] = iommu_read_reg(obj, i * sizeof(u32));
--		dev_dbg(obj->dev, "%s\t[%02d] %08x\n", __func__, i, p[i]);
--	}
--
--	BUG_ON(p[0] != IOMMU_ARCH_VERSION);
-+	obj->ctx_loss_cnt = omap_pm_get_dev_context_loss_count(obj->dev);
- }
- 
- static void omap2_iommu_restore_ctx(struct omap_iommu *obj)
- {
--	int i;
--	u32 *p = obj->ctx;
--
--	for (i = 0; i < (MMU_REG_SIZE / sizeof(u32)); i++) {
--		iommu_write_reg(obj, p[i], i * sizeof(u32));
--		dev_dbg(obj->dev, "%s\t[%02d] %08x\n", __func__, i, p[i]);
--	}
-+	if (omap_pm_get_dev_context_loss_count(obj->dev) == obj->ctx_loss_cnt)
-+		return;
- 
--	BUG_ON(p[0] != IOMMU_ARCH_VERSION);
-+	iommu_write_reg(obj, obj->context.ttb, MMU_TTB);
-+	iommu_write_reg(obj, obj->context.irqen, MMU_IRQENABLE);
-+	iommu_write_reg(obj, obj->context.cntl, MMU_CNTL);
- }
- 
- static void omap2_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e)
-diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-index 902d193..af14486 100644
---- a/arch/arm/plat-omap/include/plat/iommu.h
-+++ b/arch/arm/plat-omap/include/plat/iommu.h
-@@ -27,6 +27,13 @@ struct iotlb_entry {
- 	};
- };
- 
-+/* context registers */
-+struct iommu_regs {
-+	u32 irqen;
-+	u32 cntl;
-+	u32 ttb;
-+};
++Required properties:
++ compatible : should be "ti,omap3-iommu" for OMAP3 MMUs
++ compatible : should be "ti,omap4-iommu" for OMAP4 MMUs
 +
- struct omap_iommu {
- 	const char	*name;
- 	struct module	*owner;
-@@ -50,7 +57,8 @@ struct omap_iommu {
- 	struct list_head	mmap;
- 	struct mutex		mmap_lock; /* protect mmap */
- 
--	void *ctx; /* iommu context: registres saved area */
-+	struct iommu_regs context;
-+	int ctx_loss_cnt;
- 	u32 da_start;
- 	u32 da_end;
- };
-diff --git a/arch/arm/plat-omap/include/plat/iommu2.h b/arch/arm/plat-omap/include/plat/iommu2.h
-index 1579694..bc43d41 100644
---- a/arch/arm/plat-omap/include/plat/iommu2.h
-+++ b/arch/arm/plat-omap/include/plat/iommu2.h
-@@ -35,8 +35,6 @@
- #define MMU_READ_RAM		0x6c
- #define MMU_EMU_FAULT_AD	0x70
- 
--#define MMU_REG_SIZE		256
--
- /*
-  * MMU Register bit definitions
++Optional properties:
++ None
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+index 82a422a..4d6145d 100644
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ b/arch/arm/mach-omap2/omap-iommu.c
+@@ -11,6 +11,7 @@
   */
+ 
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
+@@ -29,6 +30,9 @@ static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
+ 	struct omap_mmu_dev_attr *a = (struct omap_mmu_dev_attr *)oh->dev_attr;
+ 	static int i;
+ 
++	if (of_have_populated_dt())
++		return 0;
++
+ 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+ 		return -ENOMEM;
 diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index 875e894..e266ad7 100644
+index e266ad7..946366f 100644
 --- a/drivers/iommu/omap-iommu.c
 +++ b/drivers/iommu/omap-iommu.c
-@@ -924,14 +924,13 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
+@@ -21,12 +21,15 @@
+ #include <linux/mutex.h>
+ #include <linux/spinlock.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+ #include <plat/iommu.h>
+ 
+ #include <plat/iopgtable.h>
++#include <plat/omap_device.h>
++#include <plat/omap_hwmod.h>
+ 
+ #define for_each_iotlb_cr(obj, n, __i, cr)				\
+ 	for (__i = 0;							\
+@@ -916,13 +919,63 @@ static void omap_iommu_detach(struct omap_iommu *obj)
+ /*
+  *	OMAP Device MMU(IOMMU) detection
+  */
++static int __devinit
++iommu_add_platform_data_from_dt(struct platform_device *pdev)
++{
++	struct iommu_platform_data *pdata;
++	struct device_node *node = pdev->dev.of_node;
++	struct omap_hwmod *oh;
++	struct omap_mmu_dev_attr *a;
++	int ret = 0;
++
++	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
++
++	of_property_read_string(node, "ti,hwmods", &pdata->name);
++	oh = omap_hwmod_lookup(pdata->name);
++	if (!oh) {
++		dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n", pdata->name);
++		ret = -ENODEV;
++		goto out;
++	}
++
++	a = (struct omap_mmu_dev_attr *)oh->dev_attr;
++	pdata->nr_tlb_entries = a->nr_tlb_entries;
++	pdata->da_start = a->da_start;
++	pdata->da_end = a->da_end;
++
++	if (oh->rst_lines_cnt == 1) {
++		pdata->reset_name = oh->rst_lines->name;
++		pdata->assert_reset = omap_device_assert_hardreset;
++		pdata->deassert_reset = omap_device_deassert_hardreset;
++	}
++
++	ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
++	if (ret)
++		dev_err(&pdev->dev, "Cannot add pdata for %s\n", pdata->name);
++
++out:
++	kfree(pdata);
++
++	return ret;
++}
++
+ static int __devinit omap_iommu_probe(struct platform_device *pdev)
+ {
+ 	int err = -ENODEV;
+ 	int irq;
+ 	struct omap_iommu *obj;
  	struct resource *res;
- 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
+-	struct iommu_platform_data *pdata = pdev->dev.platform_data;
++	struct iommu_platform_data *pdata;
++
++	if (of_have_populated_dt()) {
++		err = iommu_add_platform_data_from_dt(pdev);
++		if (err)
++			return err;
++	}
++
++	pdata = pdev->dev.platform_data;
  
--	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
-+	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
+ 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
  	if (!obj)
- 		return -ENOMEM;
+@@ -1031,12 +1084,22 @@ static const struct dev_pm_ops iommu_pm_ops = {
+ 			   NULL)
+ };
  
- 	obj->nr_tlb_entries = pdata->nr_tlb_entries;
- 	obj->name = pdata->name;
- 	obj->dev = &pdev->dev;
--	obj->ctx = (void *)obj + sizeof(*obj);
- 	obj->da_start = pdata->da_start;
- 	obj->da_end = pdata->da_end;
++#if defined(CONFIG_OF)
++static const struct of_device_id omap_iommu_of_match[] = {
++	{ .compatible = "ti,omap3-iommu" },
++	{ .compatible = "ti,omap4-iommu" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, omap_iommu_of_match);
++#endif
++
+ static struct platform_driver omap_iommu_driver = {
+ 	.probe	= omap_iommu_probe,
+ 	.remove	= __devexit_p(omap_iommu_remove),
+ 	.driver	= {
+ 		.name	= "omap-iommu",
+ 		.pm	= &iommu_pm_ops,
++		.of_match_table = of_match_ptr(omap_iommu_of_match),
+ 	},
+ };
  
 -- 
 1.7.9.5
