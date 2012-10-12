@@ -1,37 +1,54 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 11 Oct 2012 17:52:26 -0700
-Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
- ARM_UNWIND
-In-Reply-To: <1346021216-21979-3-git-send-email-ccross@android.com>
-References: <1346021216-21979-1-git-send-email-ccross@android.com>
- <1346021216-21979-3-git-send-email-ccross@android.com>
-Message-ID: <507769CA.6090903@codeaurora.org>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Thu, 11 Oct 2012 20:06:05 -0500
+Subject: [PATCH v3 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
+Message-ID: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+These patches are needed for remoteproc to work on OMAP4.
 
-On 8/26/2012 3:46 PM, Colin Cross wrote:
-> Unwinding with CONFIG_ARM_UNWIND is much more complicated than
-> unwinding with CONFIG_FRAME_POINTER, but there are only a few points
-> that require validation in order to avoid faults or infinite loops.
-> Avoiding faults is easy by adding checks to verify that all accesses
-> relative to the frame's stack pointer remain inside the stack.
->
-> When CONFIG_FRAME_POINTER is not set it is possible for two frames to
-> have the same SP, so there is no way to avoid repeated calls to
-> unwind_frame continuing forever.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
+Introduced iommu hwmod support for OMAP3 (iva, isp) and
+OMAP4 (ipu, dsp), along with the corresponding runtime PM
+and routines to deassert reset lines, enable/disable clocks
+and configure sysc registers.
 
-This is a feature we've wanted for a long time. I ran some test with 
-repeated catting of stacks with processes dying and the results looked good.
+Although IOMMU hwmod patches were already submitted in the past,
+this series adds few more changes, like:
+- New reset handling.
+- Save and restore context code rework.
+- Device tree bindings for OMAP3 and OMAP4.
 
-You can add a Tested-by: Laura Abbott <lauraa@codeaurora.org>
+For this series I just dropped the patches already included in
+mainline.
 
-Laura
+Previous work can be found at:
+[v2]
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg75701.html
+[v1]
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70447.html
+
+[old iteration without reset, save/restore and device tree]
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60133.html
+
+Omar Ramirez Luna (6):
+  ARM: OMAP3/4: iommu: migrate to hwmod framework
+  ARM: OMAP3/4: iommu: adapt to runtime pm
+  ARM: OMAP: iommu: pm runtime save and restore context
+  ARM: OMAP: iommu: optimize save and restore routines
+  ARM: OMAP: iommu: add device tree support
+  arm/dts: OMAP3/4: Add iommu nodes
+
+ .../devicetree/bindings/arm/omap/iommu.txt         |   10 ++
+ arch/arm/boot/dts/omap3.dtsi                       |   12 +-
+ arch/arm/boot/dts/omap4.dtsi                       |   17 +-
+ arch/arm/mach-omap2/devices.c                      |    2 +-
+ arch/arm/mach-omap2/iommu2.c                       |   74 ++------
+ arch/arm/mach-omap2/omap-iommu.c                   |  176 +++++---------------
+ arch/arm/plat-omap/include/plat/iommu.h            |   20 ++-
+ arch/arm/plat-omap/include/plat/iommu2.h           |    4 -
+ drivers/iommu/omap-iommu.c                         |  163 ++++++++++++++----
+ 9 files changed, 245 insertions(+), 233 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/iommu.txt
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
