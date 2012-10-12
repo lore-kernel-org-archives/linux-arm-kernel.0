@@ -1,25 +1,34 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 12 Oct 2012 20:29:14 +0530
-Subject: [PATCH 1/3] i2c: omap: Do not enable the irq always
-In-Reply-To: <87lifb7odc.fsf@deeprootsystems.com>
-References: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
- <87lifb7odc.fsf@deeprootsystems.com>
-Message-ID: <50783042.2040609@ti.com>
+From: bcrl@kvack.org (Benjamin LaHaise)
+Date: Fri, 12 Oct 2012 11:00:45 -0400
+Subject: alignment faults in 3.6
+In-Reply-To: <1350053300.21172.12319.camel@edumazet-glaptop>
+References: <yw1xtxu1nfsn.fsf@unicorn.mansr.com>
+ <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+ <yw1xhaq0nefg.fsf@unicorn.mansr.com>
+ <20121012110750.GE21164@n2100.arm.linux.org.uk>
+ <yw1x8vbcndlb.fsf@unicorn.mansr.com>
+ <20121012114443.GG21164@n2100.arm.linux.org.uk>
+ <1350043692.21172.11815.camel@edumazet-glaptop>
+ <20121012142254.GG5453@kvack.org>
+ <1350053300.21172.12319.camel@edumazet-glaptop>
+Message-ID: <20121012150045.GH5453@kvack.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 October 2012 08:01 PM, Kevin Hilman wrote:
-> When using runtime PM with auto-suspend timeouts, why would you disable
-> the IRQ before the runtime suspend handlers have run?   
->
-> If you really want to do this, you probably should have these in the
-> runtime PM callbacks.  But I'll wait until you add a more descriptive
-> changelog before I can really tell why this is being done.  Based on the
-> discussion in the patch from Kalle, I'm assuming this is to prevent
-> interrups when I2C is being used by co-processors.  If so, plese
-> describe in the changelog.
->
-> That being said, doesn't the runtime suspend callback already disable
-> IRQs at the device level instead of the INTC level?
-I thought of not relying on the intc as the registers may be reconfigured.
-> Kevin
+On Fri, Oct 12, 2012 at 04:48:20PM +0200, Eric Dumazet wrote:
+> > Somehow, I doubt anyone would be willing to walk through all the noise the 
+> > faults would likely trigger.
+> 
+> If this can be mapped to an event that can be used by perf tool, that
+> might be useful ?
+
+There are performance counters for the various different types of alignment 
+faults supported by perf. Modern x86 makes the vast majority of unaligned 
+accesses very low overhead -- the only ones that really hurt are those 
+straddling different vm pages, but even those have little cost compared to 
+obsolete microarchitectures (*cough* P4 *cough*).
+
+		-ben
+-- 
+"Thought is the essence of where you are now."
