@@ -1,74 +1,84 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 12 Oct 2012 10:59:22 -0700
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <20121012164202.GQ28061@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 12 Oct 2012 17:42:02 +0100")
-References: <20120925083029.GG31374@n2100.arm.linux.org.uk>
- <20120925083118.GI9137@arwen.pp.htv.fi>
- <20120925091228.GI31374@n2100.arm.linux.org.uk>
- <20120925091112.GK9137@arwen.pp.htv.fi>
- <20120925092118.GJ31374@n2100.arm.linux.org.uk>
- <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
- <87ipas2y4h.fsf@deeprootsystems.com>
- <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
- <50784458.9080806@ti.com> <877gqv7imt.fsf@deeprootsystems.com>
- <20121012164202.GQ28061@n2100.arm.linux.org.uk>
-Message-ID: <877gqv4lmt.fsf@deeprootsystems.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Fri, 12 Oct 2012 23:30:05 +0530
+Subject: [PATCH 1/3] i2c: omap: Do not enable the irq always
+In-Reply-To: <87txtz7on9.fsf@deeprootsystems.com>
+References: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
+ <87txtz7on9.fsf@deeprootsystems.com>
+Message-ID: <CAM=Q2cu+Qx-X3=2U_p1UbrM3jf18b_XPWLsZGX=9rwEa711NWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-
-> On Fri, Oct 12, 2012 at 09:35:54AM -0700, Kevin Hilman wrote:
->> Sourav <sourav.poddar@ti.com> writes:
->> > diff --git a/drivers/tty/serial/omap-serial.c
->> > b/drivers/tty/serial/omap-serial.c
->> > index 6ede6fd..3fbc7f7 100644
->> > --- a/drivers/tty/serial/omap-serial.c
->> > +++ b/drivers/tty/serial/omap-serial.c
->> > @@ -1414,6 +1414,7 @@ static int __devinit serial_omap_probe(struct
->> > platform_device *pdev)
->> >         INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
->> >
->> >         platform_set_drvdata(pdev, up);
->> > +       pm_runtime_set_active(&pdev->dev);
->> 
->> NAK.
->> 
->> This will obviously break platforms where the UARTs are not active
->> before driver loads.
+On Fri, Oct 12, 2012 at 7:56 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> +Kalle, Grygorii, Huzefa
 >
-> I thought I had proposed a solution for this issue, which was this
-> sequence:
+> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 >
->         omap_device_enable(dev);                                                
->         pm_runtime_set_active(dev);                                             
->         pm_runtime_enable(dev);                                                 
+>> Enable the irq in the transfer and disable it after the
+>> transfer is done.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>>  drivers/i2c/busses/i2c-omap.c |    3 +++
+>>  1 files changed, 3 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index b6c6b95..ce41596 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -625,6 +625,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>>       if (IS_ERR_VALUE(r))
+>>               goto out;
+>>
+>> +     enable_irq(dev->irq);
+>>       r = omap_i2c_wait_for_bb(dev);
+>>       if (r < 0)
+>>               goto out;
+>> @@ -654,6 +655,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>>
+>>       omap_i2c_wait_for_bb(dev);
+>>  out:
+>> +     disable_irq(dev->irq);
 >
-> Yes, I can understand people not liking the omap_device_enable()
-> there, but I also notice that the email suggesting that never got a
-> reply either - not even a "I tried this and it doesn't work" or "it
-> does work".
+> When using runtime PM with auto-suspend timeouts, why would you disable
+> the IRQ before the runtime suspend handlers have run?
+>
+> If you really want to do this, you probably should have these in the
+> runtime PM callbacks.
 
-Yes, that solution would work (though I didn't actually try it.)
+OK.
 
-However, we can't use omap_device_enable() in the driver.  We're trying
-to clean all the drivers of OMAP-specific APIs.  That being said,
-something similar could be done in the device/board init code to ensure
-the UART HW is in the state that the driver is expecting it, but again,
-that would just mask the real problem which is that a (re)init of the
-console UART on 2420/n800 is causing output to disappear.
+>  But I'll wait until you add a more descriptive
+> changelog before I can really tell why this is being done.  Based on the
+> discussion in the patch from Kalle, I'm assuming this is to prevent
+> interrups when I2C is being used by co-processors.  If so, plese
+> describe in the changelog.
 
-As I detailed in an earlier response, I still think it's the fact that
-the pinmux is not setup correctly for the console UART pins in the board
-file, so when the UART is initialized, its mux settings are changed from
-the bootloader defaults, causing output to disappear.
+OK.
 
-> As such, it seems this issue isn't making any progress as we had
-> already established that merely doing a "pm_runtime_set_active()"
-> before "pm_runtime_enable()" was going to break other platforms.
+>
+> That being said, doesn't the runtime suspend callback already disable
+> IRQs at the device level instead of the INTC level?
 
-Agreed.
+My idea is that the device may get reconfigured by the other processor.
+I felt intc is the only way. do you agree?
 
-Kevin
+
+>
+> Kevin
+>
+>>       pm_runtime_mark_last_busy(dev->dev);
+>>       pm_runtime_put_autosuspend(dev->dev);
+>>       return r;
+>> @@ -1179,6 +1181,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>>               goto err_unuse_clocks;
+>>       }
+>>
+>> +     disable_irq(dev->irq);
+>>       adap = &dev->adapter;
+>>       i2c_set_adapdata(adap, dev);
+>>       adap->owner = THIS_MODULE;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
