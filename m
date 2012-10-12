@@ -1,52 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 12 Oct 2012 10:37:07 +0100
-Subject: [PATCH] Boottime: A tool for automatic measurement of
- kernel/bootloader boot time
-In-Reply-To: <20121011201735.GA15313@kahuna>
-References: <1349966545-19340-1-git-send-email-lee.jones@linaro.org>
- <20121011201735.GA15313@kahuna>
-Message-ID: <20121012093707.GC12567@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 12 Oct 2012 11:37:30 +0200
+Subject: [PATCH] ARM: nomadik: fixup some FSMC merge problems
+In-Reply-To: <1349994182-26116-1-git-send-email-linus.walleij@linaro.org>
+References: <1349994182-26116-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121012093730.GA12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Oct 2012, Nishanth Menon wrote:
-
-> On 15:42-20121011, Lee Jones wrote:
-> > From: Jonas Aaberg <jonas.aberg@stericsson.com>
-> > 
-> > The overhead is very low and the results will be found under
-> > sysfs/bootime, as well as detailed results in debugfs under
-> > boottime/. The bootgraph* files are compatible with
-> > scripts/bootgraph.pl. The reason for this patch is to provide
-> > data (sysfs/boottime) suitable for automatic testcases as
-> > well as help for developers to reduce the boot time (debugfs).
-> Tried master:
-> 250d8 Merge branch 'i2c-embedded/for-next' of git://git.pengutronix.de/git/wsa/linux
-> and v3.6-rc7
-> with omap2plus_defconfig + CONFIG_BOOTTIME enabled:
+On 00:23 Fri 12 Oct     , Linus Walleij wrote:
 > 
-> init/boottime.c:47:9: error: ?cpu_usage_stat? defined as wrong kind of tag
-> init/boottime.c:47:24: error: array type has incomplete element type
-> init/boottime.c: In function ?boottime_mark_core?:
-> init/boottime.c:127:313: error: ?struct kernel_stat? has no member named ?cpustat?
-> init/boottime.c:128:311: error: ?struct kernel_stat? has no member named ?cpustat?
-> init/boottime.c:129:313: error: ?struct kernel_stat? has no member named ?cpustat?
-> init/boottime.c:130:310: error: ?struct kernel_stat? has no member named ?cpustat?
+> Due to a clash between refactoring and due to loss of a header
+> file that remained in my working tree the Nomadik stopped
+> compiling after switching to the FSMC driver. This patch fixes
+> it up.
 > 
-> if it depended on some other patch or a specific maintainer branch,
-> it was'nt clear.
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-No, this is completely my fault.
-
-There are added dependencies and fixups that I missed.
-
-I'll fixup and resubmit.
-
-Unfortunately, there are now other authors involved, so I need to
-seek permission before squashing them in. Please bear with me.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards,
+J.
+> ---
+>  arch/arm/mach-nomadik/board-nhk8815.c | 21 +++++++++++++++++----
+>  1 file changed, 17 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+> index a105d1b..3f97ef4 100644
+> --- a/arch/arm/mach-nomadik/board-nhk8815.c
+> +++ b/arch/arm/mach-nomadik/board-nhk8815.c
+> @@ -37,14 +37,15 @@
+>  #include <plat/mtu.h>
+>  #include <plat/pincfg.h>
+>  
+> -#include <mach/fsmc.h>
+> -
+>  #include "cpu-8815.h"
+>  
+>  /* Initial value for SRC control register: all timers use MXTAL/8 source */
+>  #define SRC_CR_INIT_MASK	0x00007fff
+>  #define SRC_CR_INIT_VAL		0x2aaa8000
+>  
+> +#define ALE_OFF 0x1000000
+> +#define CLE_OFF 0x800000
+> +
+>  /* These addresses span 16MB, so use three individual pages */
+>  static struct resource nhk8815_nand_resources[] = {
+>  	{
+> @@ -53,6 +54,16 @@ static struct resource nhk8815_nand_resources[] = {
+>  		.end = 0x40000000 + SZ_16K - 1,
+>  		.flags = IORESOURCE_MEM,
+>  	}, {
+> +		.name = "nand_addr",
+> +		.start = 0x40000000 + ALE_OFF,
+> +		.end = 0x40000000 +ALE_OFF + SZ_16K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	}, {
+> +		.name = "nand_cmd",
+> +		.start = 0x40000000 + CLE_OFF,
+> +		.end = 0x40000000 + CLE_OFF + SZ_16K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	}, {
+>  		.name  = "fsmc_regs",
+>  		.start = NOMADIK_FSMC_BASE,
+>  		.end   = NOMADIK_FSMC_BASE + SZ_4K - 1,
+> @@ -105,8 +116,6 @@ static struct fsmc_nand_platform_data nhk8815_nand_platform_data = {
+>  	.partitions = nhk8815_partitions,
+>  	.nr_partitions = ARRAY_SIZE(nhk8815_partitions),
+>  	.width = FSMC_NAND_BW8,
+> -	.ale_off = 0x1000000,
+> -	.cle_off = 0x800000,
+>  };
+>  
+>  static struct platform_device nhk8815_nand_device = {
+> @@ -171,6 +180,10 @@ static struct platform_device nhk8815_onenand_device = {
+>  	.num_resources	= ARRAY_SIZE(nhk8815_onenand_resource),
+>  };
+>  
+> +/* bus control reg. and bus timing reg. for CS0..CS3 */
+> +#define FSMC_BCR(x)	(NOMADIK_FSMC_VA + (x << 3))
+> +#define FSMC_BTR(x)	(NOMADIK_FSMC_VA + (x << 3) + 0x04)
+> +
+>  static void __init nhk8815_onenand_init(void)
+>  {
+>  #ifdef CONFIG_MTD_ONENAND
+> -- 
+> 1.7.11.4
+> 
