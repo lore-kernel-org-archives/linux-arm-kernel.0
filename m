@@ -1,9 +1,9 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 11 Oct 2012 20:06:10 -0500
-Subject: [PATCH v3 3/6] ARM: OMAP: iommu: pm runtime save and restore context
+Date: Thu, 11 Oct 2012 20:06:11 -0500
+Subject: [PATCH 3/6] ARM: OMAP: iommu: pm runtime save and restore context
 In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
 References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1350003977-32744-6-git-send-email-omar.luna@linaro.org>
+Message-ID: <1350003977-32744-7-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
