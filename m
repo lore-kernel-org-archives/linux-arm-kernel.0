@@ -1,150 +1,137 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 12 Oct 2012 14:26:40 +0100
-Subject: [PATCH 2/2] ARM: config: make sure that platforms are ordered by
- option string
-In-Reply-To: <20121012132553.GK28061@n2100.arm.linux.org.uk>
-References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
-Message-ID: <E1TMfGC-0001Kx-9v@rmk-PC.arm.linux.org.uk>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 12 Oct 2012 16:27:19 +0300
+Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
+ <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
+Message-ID: <1350047732.10584.155.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The large platform selection choice should be sorted by option string
-so it's easy to find the platform you're looking for.  Fix the few
-options which are out of this order.
+On Fri, 2012-10-12 at 11:14 +0530, Viresh Kumar wrote: 
+> dw_dmac driver already supports device tree but it used to have its platform
+> data passed the non-DT way.
+Another portion of comments.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/Kconfig |   76 +++++++++++++++++++++++++++---------------------------
- 1 files changed, 38 insertions(+), 38 deletions(-)
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bd12ddd..1bc092e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -348,16 +348,6 @@ config ARCH_BCM2835
- 	  This enables support for the Broadcom BCM2835 SoC. This SoC is
- 	  use in the Raspberry Pi, and Roku 2 devices.
- 
--config ARCH_CLPS711X
--	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
--	select ARCH_USES_GETTIMEOFFSET
--	select CLKDEV_LOOKUP
--	select COMMON_CLK
--	select CPU_ARM720T
--	select NEED_MACH_MEMORY_H
--	help
--	  Support for Cirrus Logic 711x/721x/731x based boards.
--
- config ARCH_CNS3XXX
- 	bool "Cavium Networks CNS3XXX family"
- 	select ARM_GIC
-@@ -369,6 +359,16 @@ config ARCH_CNS3XXX
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
- 
-+config ARCH_CLPS711X
-+	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
-+	select ARCH_USES_GETTIMEOFFSET
-+	select CLKDEV_LOOKUP
-+	select COMMON_CLK
-+	select CPU_ARM720T
-+	select NEED_MACH_MEMORY_H
-+	help
-+	  Support for Cirrus Logic 711x/721x/731x based boards.
-+
- config ARCH_GEMINI
- 	bool "Cortina Systems Gemini"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -549,21 +549,6 @@ config ARCH_KIRKWOOD
- 	  Support for the following Marvell Kirkwood series SoCs:
- 	  88F6180, 88F6192 and 88F6281.
- 
--config ARCH_LPC32XX
--	bool "NXP LPC32XX"
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_AMBA
--	select CLKDEV_LOOKUP
--	select CLKSRC_MMIO
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
--	select HAVE_IDE
--	select HAVE_PWM
--	select USB_ARCH_HAS_OHCI
--	select USE_OF
--	help
--	  Support for the NXP LPC32XX family of processors
--
- config ARCH_MV78XX0
- 	bool "Marvell MV78xx0"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -630,6 +615,21 @@ config ARCH_W90X900
- 	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
- 		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
- 
-+config ARCH_LPC32XX
-+	bool "NXP LPC32XX"
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select CLKDEV_LOOKUP
-+	select CLKSRC_MMIO
-+	select CPU_ARM926T
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_IDE
-+	select HAVE_PWM
-+	select USB_ARCH_HAS_OHCI
-+	select USE_OF
-+	help
-+	  Support for the NXP LPC32XX family of processors
-+
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra"
- 	select ARCH_HAS_CPUFREQ
-@@ -823,7 +823,7 @@ config ARCH_S5PV210
- 	  Samsung S5PV210/S5PC110 series based systems
- 
- config ARCH_EXYNOS
--	bool "SAMSUNG EXYNOS"
-+	bool "Samsung EXYNOS"
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_SPARSEMEM_ENABLE
-@@ -899,6 +899,18 @@ config ARCH_NOMADIK
- 	help
- 	  Support for the Nomadik platform by ST-Ericsson
- 
-+config PLAT_SPEAR
-+	bool "ST SPEAr"
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select CLKDEV_LOOKUP
-+	select CLKSRC_MMIO
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_CLK
-+	help
-+	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
-+
- config ARCH_DAVINCI
- 	bool "TI DaVinci"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-@@ -926,18 +938,6 @@ config ARCH_OMAP
- 	help
- 	  Support for TI's OMAP platform (OMAP1/2/3/4).
- 
--config PLAT_SPEAR
--	bool "ST SPEAr"
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_AMBA
--	select CLKDEV_LOOKUP
--	select CLKSRC_MMIO
--	select COMMON_CLK
--	select GENERIC_CLOCKEVENTS
--	select HAVE_CLK
--	help
--	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
--
- config ARCH_VT8500
- 	bool "VIA/WonderMedia 85xx"
- 	select ARCH_HAS_CPUFREQ
+> +static struct dw_dma_platform_data *
+> +__devinit dw_dma_parse_dt(struct platform_device *pdev)
+> +{
+> +	struct device_node *sn, *cn, *np = pdev->dev.of_node;
+> +	struct dw_dma_platform_data *pdata;
+> +	struct dw_dma_slave *sd;
+> +	u32 count, val, arr[4];
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "Missing DT data\n");
+> +		return NULL;
+> +	}
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return NULL;
+> +
+> +	if (of_property_read_u32(np, "nr_channels", &pdata->nr_channels))
+> +		return NULL;
+> +
+> +	if (of_property_read_bool(np, "is_private"))
+> +		pdata->is_private = true;
+> +
+> +	if (!of_property_read_u32(np, "chan_allocation_order",
+> +				&val))
+Fits one line?
+
+> +		pdata->chan_allocation_order = (unsigned char)val;
+do we really need explicit casting here?
+
+> +
+> +	if (!of_property_read_u32(np, "chan_priority", &val))
+> +		pdata->chan_priority = (unsigned char)val;
+ditto
+
+> +
+> +	if (!of_property_read_u32(np, "block_size", &val))
+> +		pdata->block_size = (unsigned short)val;
+ditto 
+> +
+> +	if (!of_property_read_u32(np, "nr_masters", &val)) {
+> +		if (val > 4)
+I thought once that we might introduce constant like #define
+DW_MAX_AHB_MASTERS 4. It seems a bit useless because hw is designed for
+that number anyway, but maybe you have another opinion. 
+
+> +			return NULL;
+> +
+> +		pdata->nr_masters = (unsigned char)val;
+> +	}
+> +
+> +	if (!of_property_read_u32_array(np, "data_width", arr,
+> +				pdata->nr_masters))
+> +		for (count = 0; count < pdata->nr_masters; count++)
+> +			pdata->data_width[count] = arr[count];
+Ah, it would be nice to have of_property_read_u8_array and so on...
+
+> +
+> +	/* parse slave data */
+> +	sn = of_find_node_by_name(np, "slave_info");
+> +	if (!sn)
+> +		return pdata;
+> +
+> +	count = 0;
+> +	/* calculate number of slaves */
+> +	for_each_child_of_node(sn, cn)
+> +		count++;
+
+of.h: static inline int of_get_child_count(const struct device_node *np)
+
+
+> +
+> +	if (!count)
+> +		return NULL;
+> +
+> +	sd = devm_kzalloc(&pdev->dev, sizeof(*sd) * count, GFP_KERNEL);
+> +	if (!sd)
+> +		return NULL;
+> +
+> +	count = 0;
+> +	for_each_child_of_node(sn, cn) {
+> +		of_property_read_string(cn, "bus_id", &sd[count].bus_id);
+> +		of_property_read_u32(cn, "cfg_hi", &sd[count].cfg_hi);
+> +		of_property_read_u32(cn, "cfg_lo", &sd[count].cfg_lo);
+> +		if (!of_property_read_u32(cn, "src_master", &val))
+> +			sd[count].src_master = (u8)val;
+Explicit casting?
+
+> +
+> +		if (!of_property_read_u32(cn, "dst_master", &val))
+> +			sd[count].dst_master = (u8)val;
+ditto 
+> +
+> +		sd[count].dma_dev = &pdev->dev;
+> +		count++;
+> +	}
+
+what about to define sd as sd[0]; in the platform_data structure and
+then use smth like following
+
+struct ... *sd = pdata->sd;
+for_each... {
+sd->... = ;
+sd++;
+}
+
+it will probably require to split this part in a separate function and
+calculate count of slave_info children before pdata memory allocation.
+
+
+> +
+> +	pdata->sd = sd;
+> +	pdata->sd_count = count;
+> +
+> +	return pdata;
+> +}
+
 -- 
-1.7.4.4
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
