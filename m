@@ -1,120 +1,142 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 12 Oct 2012 16:22:51 +0200
-Subject: [PATCH 3/4] ARM: AT91: Add AT91RM9200 support to DT board
-In-Reply-To: <1349993126-9519-3-git-send-email-manabian@gmail.com>
+Date: Fri, 12 Oct 2012 16:23:30 +0200
+Subject: [PATCH 1/4] ARM: AT91: Add DT support to AT91RM9200 System Timer
+In-Reply-To: <1349993126-9519-1-git-send-email-manabian@gmail.com>
 References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
- <1349993126-9519-3-git-send-email-manabian@gmail.com>
-Message-ID: <20121012142251.GC12801@game.jcrosoft.org>
+Message-ID: <20121012142330.GD12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
+> Based on AT91 PIT DT patch from Jean-Christophe PLAGNIOL-VILLARD.
+ok for this one
+> 
 > Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 > ---
+>  .../devicetree/bindings/arm/atmel-at91.txt         |  6 +++
+>  arch/arm/mach-at91/at91rm9200_time.c               | 63 +++++++++++++++++++++-
+>  2 files changed, 67 insertions(+), 2 deletions(-)
 > 
-> Hi,
-> 
-> This patch has some potential issues.
-> Before this patch board-dt would fail building when only AT91RM9200 was enabled because at91sam926x_timer symbol would be missing. This patch uses the at91rm9200_timer which
-> will fail if AT91RM9200 is not enabled.
-this need work with ot wtihout rm9200
-> 
-> Any thoughts on solving this? As mention above this bug exists in mainline now.
-duplicate the board-dt with one for rm9200 only
-as rm9200 ans sam9 are 2 distict familly
-> 
-> I had to create a new at91rm9200_dt_initialize since at91_dt_initialize will panic when it tries to add rstc and shdwc.
-> Is it okay to add at91rm9200_dt_initialize or should we fix at91_dt_rstc and at91_dt_shdwc to not panic when DT nodes are not found?
-it's ok
-> 
-
-can you add a board too rm9200ek will be good
-
-Best Regards,
-J.
-> regards
-> Joachim Eastwood
-> 
->  arch/arm/mach-at91/board-dt.c | 15 +++++++++++++++
->  arch/arm/mach-at91/generic.h  |  1 +
->  arch/arm/mach-at91/setup.c    | 14 ++++++++++++++
->  3 files changed, 30 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-> index e8f45c4..0e73317 100644
-> --- a/arch/arm/mach-at91/board-dt.c
-> +++ b/arch/arm/mach-at91/board-dt.c
-> @@ -45,11 +45,26 @@ static void __init at91_dt_device_init(void)
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index ecc81e3..8adc9a8 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -7,6 +7,12 @@ PIT Timer required properties:
+>  - interrupts: Should contain interrupt for the PIT which is the IRQ line
+>    shared across all System Controller members.
 >  
-> +static const char *at91rm9200_dt_board_compat[] __initdata = {
-> +	"atmel,at91rm9200",
-> +	NULL
-> +};
+> +System Timer (ST) required properties:
+> +- compatible: Should be "atmel,at91rm9200-st"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain interrupt for the ST which is the IRQ line
+> +  shared across all System Controller members.
 > +
->  static const char *at91_dt_board_compat[] __initdata = {
->  	"atmel,at91sam9",
->  	NULL
+>  TC/TCLIB Timer required properties:
+>  - compatible: Should be "atmel,<chip>-pit".
+>    <chip> can be "at91rm9200" or "at91sam9x5"
+> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+> index aaa443b..cafe988 100644
+> --- a/arch/arm/mach-at91/at91rm9200_time.c
+> +++ b/arch/arm/mach-at91/at91rm9200_time.c
+> @@ -24,6 +24,9 @@
+>  #include <linux/irq.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/export.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  
+>  #include <asm/mach/time.h>
+>  
+> @@ -91,7 +94,8 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+>  static struct irqaction at91rm9200_timer_irq = {
+>  	.name		= "at91_tick",
+>  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> -	.handler	= at91rm9200_timer_interrupt
+> +	.handler	= at91rm9200_timer_interrupt,
+> +	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
 >  };
 >  
-> +DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
-> +	.timer		= &at91rm9200_timer,
-> +	.map_io		= at91_map_io,
-> +	.handle_irq	= at91_aic_handle_irq,
-> +	.init_early	= at91rm9200_dt_initialize,
-> +	.init_irq	= at91_dt_init_irq,
-> +	.init_machine	= at91_dt_device_init,
-> +	.dt_compat	= at91rm9200_dt_board_compat,
-> +MACHINE_END
+>  static cycle_t read_clk32k(struct clocksource *cs)
+> @@ -179,8 +183,60 @@ static struct clock_event_device clkevt = {
+>  void __iomem *at91_st_base;
+>  EXPORT_SYMBOL_GPL(at91_st_base);
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id at91rm9200_st_timer_ids[] = {
+> +	{ .compatible = "atmel,at91rm9200-st" },
+> +	{ /* sentinel */ }
+> +};
 > +
->  DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
->  	/* Maintainer: Atmel */
->  	.timer		= &at91sam926x_timer,
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index f496506..9bb5ce5 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -20,6 +20,7 @@ extern void __init at91_init_sram(int bank, unsigned long base,
->  extern void __init at91rm9200_set_type(int type);
->  extern void __init at91_initialize(unsigned long main_clock);
->  extern void __init at91x40_initialize(unsigned long main_clock);
-> +extern void __init at91rm9200_dt_initialize(void);
->  extern void __init at91_dt_initialize(void);
->  
->   /* Interrupts */
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index da9881b..2c1fdd4 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -338,6 +338,7 @@ static void at91_dt_rstc(void)
->  }
->  
->  static struct of_device_id ramc_ids[] = {
-> +	{ .compatible = "atmel,at91rm9200-sdramc" },
->  	{ .compatible = "atmel,at91sam9260-sdramc" },
->  	{ .compatible = "atmel,at91sam9g45-ddramc" },
->  	{ /*sentinel*/ }
-> @@ -436,6 +437,19 @@ end:
->  	of_node_put(np);
->  }
->  
-> +void __init at91rm9200_dt_initialize(void)
+> +static int __init of_at91rm9200_st_init(void)
 > +{
-> +	at91_dt_ramc();
+> +	struct device_node *np;
+> +	int ret;
 > +
-> +	/* Init clock subsystem */
-> +	at91_dt_clock_init();
+> +	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
+> +	if (!np)
+> +		goto err;
 > +
-> +	/* Register the processor-specific clocks */
-> +	at91_boot_soc.register_clocks();
+> +	at91_st_base = of_iomap(np, 0);
+> +	if (!at91_st_base)
+> +		goto node_err;
 > +
-> +	at91_boot_soc.init();
+> +	/* Get the interrupts property */
+> +	ret = irq_of_parse_and_map(np, 0);
+> +	if (!ret)
+> +		goto ioremap_err;
+> +	at91rm9200_timer_irq.irq = ret;
+> +
+> +	of_node_put(np);
+> +
+> +	return 0;
+> +
+> +ioremap_err:
+> +	iounmap(at91_st_base);
+> +node_err:
+> +	of_node_put(np);
+> +err:
+> +	return -EINVAL;
 > +}
+> +#else
+> +static int __init of_at91rm9200_st_init(void)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
 > +
->  void __init at91_dt_initialize(void)
+>  void __init at91rm9200_ioremap_st(u32 addr)
 >  {
->  	at91_dt_rstc();
+> +#ifdef CONFIG_OF
+> +	struct device_node *np;
+> +
+> +	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
+> +	if (np) {
+> +		of_node_put(np);
+> +		return;
+> +	}
+> +#endif
+>  	at91_st_base = ioremap(addr, 256);
+>  	if (!at91_st_base)
+>  		panic("Impossible to ioremap ST\n");
+> @@ -191,13 +247,16 @@ void __init at91rm9200_ioremap_st(u32 addr)
+>   */
+>  void __init at91rm9200_timer_init(void)
+>  {
+> +	/* For device tree enabled device: initialize here */
+> +	of_at91rm9200_st_init();
+> +
+>  	/* Disable all timer interrupts, and clear any pending ones */
+>  	at91_st_write(AT91_ST_IDR,
+>  		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
+>  	at91_st_read(AT91_ST_SR);
+>  
+>  	/* Make IRQs happen for the system timer */
+> -	setup_irq(NR_IRQS_LEGACY + AT91_ID_SYS, &at91rm9200_timer_irq);
+> +	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
+>  
+>  	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
+>  	 * directly for the clocksource and all clockevents, after adjusting
 > -- 
 > 1.7.12.2
 > 
