@@ -1,63 +1,102 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 12 Oct 2012 19:42:16 +0200
-Subject: [PATCH v2] i2c: change the id to let the i2c-gpio work
-In-Reply-To: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
-References: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <CAGhQ9VxRGQ8JAygxJreNDJY=tJ67yt2CM9NHvW3VyhjxooXuig@mail.gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Fri, 12 Oct 2012 12:46:09 -0500
+Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
+In-Reply-To: <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
+References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
+ <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
+ <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
+Message-ID: <CALLhW=5k=tAXo_5ri2WgetRgju9rC_Wm-o9-pfHSNqpe6FU5qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bo Shen,
+On 12 October 2012 02:48, Felipe Contreras <felipe.contreras@gmail.com> wrote:
+> I already made most of these comments, but here they go again.
 
-On Fri, Oct 12, 2012 at 11:42 AM, Bo Shen <voice.shen@atmel.com> wrote:
-> The i2c-gpio driver will turn the platform device ID to busnum.
-> When using platfrom device ID as -1, it means dynamically assigned
-> the busnum. When writing code, we need to make sure the busnum,
-> and call i2c_register_board_info(int busnum, ...) to register device
-> if using -1, we do not know the value of busnum.
+I replied to all, but here it goes again:
+
+>> @@ -142,11 +142,10 @@ static int iommu_enable(struct omap_iommu *obj)
+>>                 }
+>>         }
+>>
+>> -       clk_enable(obj->clk);
+>> +       pm_runtime_get_sync(obj->dev);
+>>
+>>         err = arch_iommu->enable(obj);
+>>
+>> -       clk_disable(obj->clk);
 >
-> In order to solve this issue, set the platform device ID as a fix number
-> Here using 0 to match the busnum used in i2c_regsiter_board_info().
+> The device will never go to sleep, until iommu_disable is called.
+> clk_enable -> pm_runtime_get_sync, clk_disable pm_runtime_put.
 
-I have been bitten by this myself on RM9200.
+Which is what you want... why would you want your iommu to be disabled
+if the client of that iommu could request a translation?
 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
-> Change since v1
->   Make the commit message more clear
-> ---
->  arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+Remember that these iommus, sit along of other processors not on the
+main processor side. So, this code should enable it for the other
+processor to use, and there is no point where the processor can say
+"I'm not using it, shut it down" or "I'm using it, turn it on" in the
+middle of execution, other than suspend/resume and if supported,
+autosuspend.
 
-This pattern exist in at91rm9200_devices.c, at91sam9261_devices.c,
-at91sam9263_devices.c and at91sam9rl_devices.c you might want to fix
-them as well.
-
-I assume we have the same problem if CONFIG_I2C_AT91 is set?
-See further down in at91sam9260_devices.c we have another:  ".id = -1,"
-
-regards
-Joachim Eastwood
-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> @@ -288,7 +285,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
+>>         if (!obj || !obj->nr_tlb_entries || !e)
+>>                 return -EINVAL;
+>>
+>> -       clk_enable(obj->clk);
+>> +       pm_runtime_get_sync(obj->dev);
+>>
+>>         iotlb_lock_get(obj, &l);
+>>         if (l.base == obj->nr_tlb_entries) {
+>> @@ -318,7 +315,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
+>>
+>>         cr = iotlb_alloc_cr(obj, e);
+>>         if (IS_ERR(cr)) {
+>> -               clk_disable(obj->clk);
+>> +               pm_runtime_put_sync(obj->dev);
+>>                 return PTR_ERR(cr);
+>>         }
 >
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index 0f24cfb..805ef95 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -389,7 +389,7 @@ static struct i2c_gpio_platform_data pdata = {
+> If I'm correct, the above pm_runtime_get/put are redundant, because
+> the count can't possibly reach 0 because of the reason I explained
+> before.
 >
->  static struct platform_device at91sam9260_twi_device = {
->         .name                   = "i2c-gpio",
-> -       .id                     = -1,
-> +       .id                     = 0,
->         .dev.platform_data      = &pdata,
->  };
+> The same for all the cases below.
+
+You can access this paths through debugfs, some of them doesn't work
+if the module is not enabled first, but in future if you just want to
+idle the iommu withouth freeing, these are needed to debug.
+
+BTW, the next patch in the series: ARM: OMAP: iommu: pm runtime save
+and restore context, let's you do a pm_runtime_[enable|put] through
+save/restore ctx functions, which is just for compatibility on how isp
+code uses the save and restore code.
+
+>> @@ -1009,7 +1001,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
+>>         release_mem_region(res->start, resource_size(res));
+>>         iounmap(obj->regbase);
+>>
+>> -       clk_put(obj->clk);
+>> +       pm_runtime_disable(obj->dev);
 >
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> This will turn on the device unnecessarily, wasting power, and there's
+> no need for that, kfree will take care of that without resuming.
+
+Left aside the aesthetics of having balanced calls, the device will be
+enabled if there was a pending resume to be executed, otherwise it
+won't, kfree won't increment the disable_depth counter and I don't
+think that freeing the pointer is enough reason to ignore
+pm_runtime_disable.
+
+> Also, I still think that something like this is needed:
+...
+> +static struct clk cam_fck = {
+> +       .name           = "cam_fck",
+> +       .ops            = &clkops_omap2_iclk_dflt,
+> +       .parent         = &l3_ick,
+> +       .enable_reg     = OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
+
+a cam_fck name to enable the ick?
+
+Cheers,
+
+Omar
