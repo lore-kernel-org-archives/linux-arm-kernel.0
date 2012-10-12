@@ -1,34 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 12 Oct 2012 13:01:39 +0200
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <201210121048.24998.arnd@arndb.de>
-References: <20121007015300.828366635@gmail.com>
- <201210120803.54539.arnd@arndb.de> <20121012101252.6c3b7dce@skate>
- <201210121048.24998.arnd@arndb.de>
-Message-ID: <20121012130139.6c3079c5@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Oct 2012 11:05:09 +0000
+Subject: [PATCH v2 5/8] clk: don't mark clkdev_add_table as init
+In-Reply-To: <20121012091535.GD21164@n2100.arm.linux.org.uk>
+References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
+ <1349813638-4617-6-git-send-email-arnd@arndb.de>
+ <20121012091535.GD21164@n2100.arm.linux.org.uk>
+Message-ID: <201210121105.09517.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Fri, 12 Oct 2012 10:48:24 +0000, Arnd Bergmann wrote:
-
-> The main thing to watch out for are mappings that are not for MMIO,
-> such as the call to create_mapping() in map_lowmem() or in
-> devicemaps_init().
+On Friday 12 October 2012, Russell King - ARM Linux wrote:
+> On Tue, Oct 09, 2012 at 10:13:55PM +0200, Arnd Bergmann wrote:
+> > s3c2440_clk_add is a subsys_interface method and calls clkdev_add_table,
+> > which means we might be calling it after the __init section is
+> > discarded.
+> > 
+> > Without this patch, building mini2440_defconfig results in:
+> > 
+> > WARNING: vmlinux.o(.text+0x9848): Section mismatch in reference from the function s3c2440_clk_add() to the function .init.text:clkdev_add_table()
+> > The function s3c2440_clk_add() references
+> > the function __init clkdev_add_table().
+> > This is often because s3c2440_clk_add lacks a __init
+> > annotation or the annotation of clkdev_add_table is wrong.
 > 
-> I would suggest making struct map_desc specific to callers of
-> iotable_init() and changing the prototype for create_mapping() to
-> 
-> void __init create_mapping(unsigned long virtual, unsigned long pfn,
-> 			   size_t length, unsigned int type);
+> I'm not sure this is the right thing to do.  I suspect this comes from the
+> stupidly complex samsung code, and that this is actually safe - I suspect
+> that s3c2440_clk_add() needs to be appropriately marked, but then you end
+> up having to trace its call path through various structures etc.
 
-Yes, this is exactly what I've done. I'll rebase my work, test and send
-it.
+Yes, you are right. I have verified now that the only code path into
+s3c2440_clk_add() is from "int __init s3c2440_init(void)", so 
+s3c2440_clk_add can be marked __init_refok.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I'll follow up with a new patch to replace this one.
+
+	Arnd
