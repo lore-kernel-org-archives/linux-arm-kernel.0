@@ -1,80 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Oct 2012 08:03:43 -0700
-Subject: [PATCH 1/4] usb: phy: add a new driver for usb3 phy
-In-Reply-To: <5077DE0A.4000301@ti.com>
-References: <1348054229-27362-1-git-send-email-kishon@ti.com>
- <1348054229-27362-2-git-send-email-kishon@ti.com>
- <20121011005944.GX12552@atomide.com> <5077DE0A.4000301@ti.com>
-Message-ID: <20121012150342.GA30339@atomide.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 12 Oct 2012 16:04:14 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <1350053300.21172.12319.camel@edumazet-glaptop>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+ <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+ <yw1xhaq0nefg.fsf@unicorn.mansr.com>
+ <20121012110750.GE21164@n2100.arm.linux.org.uk>
+ <yw1x8vbcndlb.fsf@unicorn.mansr.com>
+ <20121012114443.GG21164@n2100.arm.linux.org.uk>
+ <1350043692.21172.11815.camel@edumazet-glaptop>
+ <20121012142254.GG5453@kvack.org>
+ <1350053300.21172.12319.camel@edumazet-glaptop>
+Message-ID: <1350054254.2819.3.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* kishon <kishon@ti.com> [121012 02:10]:
-> Hi Tony,
+On Fri, 2012-10-12 at 16:48 +0200, Eric Dumazet wrote:
+> On Fri, 2012-10-12 at 10:22 -0400, Benjamin LaHaise wrote:
+> > On Fri, Oct 12, 2012 at 02:08:12PM +0200, Eric Dumazet wrote:
+> > > So yes, we built network stack with the prereq that IP headers are
+> > > aligned, but unfortunately many developers use x86 which doesnt care, so
+> > > its possible some bugs are added.
+> > 
+> > x86 does have an alignment check flag that can be set in the flags register.  
+> > Somehow, I doubt anyone would be willing to walk through all the noise the 
+> > faults would likely trigger.
 > 
-> On Thursday 11 October 2012 06:29 AM, Tony Lindgren wrote:
-> >Hi,
-> >
-> >* Kishon Vijay Abraham I <kishon@ti.com> [120919 04:32]:
-> >>Added a driver for usb3 phy that handles the interaction between usb phy
-> >>device and dwc3 controller.
-> >>
-> >>This also includes device tree support for usb3 phy driver and
-> >>the documentation with device tree binding information is updated.
-> >>
-> >>Currently writing to control module register is taken care in this
-> >>driver which will be removed once the control module driver is in place.
-> >
-> >You may be able to set up the control module register with one
-> >of the following Linux standard frameworks:
-> >
-> >1. Fixed regulator defined in mach-omap2/control.c
-> 
-> Is it control.c?
+> If this can be mapped to an event that can be used by perf tool, that
+> might be useful ?
 
-Hmm after looking into it more we're missing one piece of the puzzle
-to handle SCM regulators, which is omap-scm-regulator.c :)
-I'll do a minimal DT only version of that.
+AC was so useless that it has now been reallocated to use by SMAP
+<https://lwn.net/Articles/517251/>.
 
-> >    In this case the PHY driver can pick up the regulator by name.
-> 
-> Do you mean we have to define something like fixed_voltage_config
-> defined in board-4430sdp.c?
-> From whatever I could make out from regulator/fixed.c,
-> enabling/disabling of regulator is done using only gpio. I'm not
-> sure how we can use that to write to control module register.
+Ben.
 
-Yes you're right, we're missing omap-scm-regulator.c, then it will
-be trivial to select the regulator from DT like we have for the
-twl-regulator.c.
-
-> >>+usb3phy at 4a084400 {
-> >>+	compatible = "ti,omap-usb3";
-> >>+	reg = <0x0x4a084400 0x80>,
-> >>+	      <0x4a084800 0x64>,
-> >>+	      <0x4a084c00 0x40>,
-> >>+	      <0x4a002370 0x4>;
-> >>+};
-> >
-> >And register 0x4a002370 here. Care to post some info what the
-> >0x4a002370 register bits do? Is that same as CONTROL_DEV_CONF
-> >on omap4, or does it have other bits there too?
-> 
-> It's CONTROL_PHY_POWER_USB register and it's structure looks like this.
-> 31:22 USB_PWRCTL_CLK_FREQ
-> 21:14 USB_PWRCTL_CLK_CMD
-> 13:0 RESERVED
-> 
-> CLK_CMD takes values to power up/down the TX and RX in various combinations.
-> 
-> And CLK_FREQ takes values for clock configuration.
-
-Oh, it's a clock. Then it would be best to set it up using the
-common clock framework and have the clock registered by the
-SCM core driver when those are available.
-
-Maybe please just add a comment for that for later on?
-
-Regards,
-
-Tony
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
