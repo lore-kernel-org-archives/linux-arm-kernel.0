@@ -1,10 +1,10 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 12 Oct 2012 16:27:19 +0300
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Fri, 12 Oct 2012 13:28:43 +0000
 Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
 In-Reply-To: <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
 References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
  <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
-Message-ID: <1350047732.10584.155.camel@smile>
+Message-ID: <1350048519.10584.158.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -135,3 +135,17 @@ calculate count of slave_info children before pdata memory allocation.
 -- 
 Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 Intel Finland Oy
+
+-- 
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
