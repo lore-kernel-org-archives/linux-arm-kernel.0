@@ -1,58 +1,25 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 12 Oct 2012 16:59:19 +0200
-Subject: [PATCH v2 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <20121012143131.GP12330@titan.lakedaemon.net>
-References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121011212629.GA14171@electric-eye.fr.zoreil.com>
- <20121012143131.GP12330@titan.lakedaemon.net>
-Message-ID: <20121012165919.0dd085dd@skate>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 12 Oct 2012 20:29:14 +0530
+Subject: [PATCH 1/3] i2c: omap: Do not enable the irq always
+In-Reply-To: <87lifb7odc.fsf@deeprootsystems.com>
+References: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
+ <87lifb7odc.fsf@deeprootsystems.com>
+Message-ID: <50783042.2040609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On Fri, 12 Oct 2012 10:31:31 -0400, Jason Cooper wrote:
-
-> I agree with Francois on most of these.  I prefer readability over
-> hard 80 column limits.
-
-Sure, but checkpatch.pl is warning on every line exceeding the 80
-columns. Not that I think that all checkpatch.pl warnings should
-necessarily be religiously respected, but if you have gazillions of
-warnings regarding line exceeding 80 columns, it is very likely that
-you will miss more important warnings.
-
-> Although, 80 columns is still sound
-> guidance.  For example, a majority of the broken lines are due to
-> long macro and constant names.  I did a 'git grep NETA' and didn't
-> see anything alarming.  So, above could become
-> 
-> 			val |= rx_filled << NETA_RXQ_ADD_NONOCC_SHIFT;
-
-I don't mind, but then I would like to keep things consistent:
-
- * The driver file would be neta.c
-
- * All functions and data structure would be prefixed neta_ and not
-   mvneta_
-
- * The Kconfig option would become CONFIG_NETA. Do we really want such
-   a "simple" Kconfig option name for a driver?
-
-Also, this is entirely not consistent with the existing mv643xx_eth
-driver, which has kept the "mv" part of the prefix.
-
-Maybe the fact that those long macros are making long lines is also due
-to the code having sometimes a too deep indentation, and I need to fix
-that by using more auxiliary functions or something like that?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+On Friday 12 October 2012 08:01 PM, Kevin Hilman wrote:
+> When using runtime PM with auto-suspend timeouts, why would you disable
+> the IRQ before the runtime suspend handlers have run?   
+>
+> If you really want to do this, you probably should have these in the
+> runtime PM callbacks.  But I'll wait until you add a more descriptive
+> changelog before I can really tell why this is being done.  Based on the
+> discussion in the patch from Kalle, I'm assuming this is to prevent
+> interrups when I2C is being used by co-processors.  If so, plese
+> describe in the changelog.
+>
+> That being said, doesn't the runtime suspend callback already disable
+> IRQs at the device level instead of the INTC level?
+I thought of not relying on the intc as the registers may be reconfigured.
+> Kevin
