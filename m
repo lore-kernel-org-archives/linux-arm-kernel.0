@@ -1,26 +1,61 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 12 Oct 2012 17:51:51 +0300
-Subject: [RFC 00/24] OMAP serial driver flow control fixes, and
- preparation for DMA engine conversion
-In-Reply-To: <50769D8C.8030401@ti.com>
-References: <20121006123803.GD15246@n2100.arm.linux.org.uk>
- <507427DA.6020409@ti.com> <87mwzuxjtc.fsf@deeprootsystems.com>
- <507694CF.3020204@ti.com>
- <20121011095443.GH28061@n2100.arm.linux.org.uk>
- <50769D8C.8030401@ti.com>
-Message-ID: <CANOLnOOewDVnsTmh9YyYCyG-5BrwDsTbSqDahazPsnM-6wBQYw@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 12 Oct 2012 07:52:21 -0700
+Subject: [PATCH 4/6] ARM: bcm476x: Add stub clock driver
+In-Reply-To: <20121007015407.154476821@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015407.154476821@gmail.com>
+Message-ID: <20121012145221.2941.35101@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 1:21 PM, Sourav <sourav.poddar@ti.com> wrote:
-> If you have any pointers on how to test hardware flow control, I will like
-> to do that on my beagle board.
+Quoting Domenico Andreoli (2012-10-06 18:53:04)
+> Index: b/drivers/clk/clk-bcm476x.c
+> ===================================================================
+> --- /dev/null
+> +++ b/drivers/clk/clk-bcm476x.c
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Broadcom BCM476x SoCs clocks
+> + *
+> + * Copyright (C) 2011-2012 Domenico Andreoli <domenico.andreoli@linux.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-private.h>
 
-If you can find some board with BT chip connected to UART, that would
-be a good test as they usually have flow control lines connected and
-can run at high bitrates. I think some EVM or Zoom boards have BT
-chips.
+Why clk-private.h?  That is deprecated and should not be used unless
+absolutely necessary.  It will be removed once Tegra and OMAP stop using
+it.
 
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/bcm476x.h>
+> +
+> +/*
+> + * These are fixed clocks (and device tree doesn't support clk!).
+> + *
+> + * They're probably not all root clocks and it may be possible to
+> + * turn them on and off but until this is mapped out better it's
+> + * the only way they can be used.
+> + */
+> +DEFINE_CLK_FIXED_RATE(sys_pclk,   CLK_IS_ROOT, 312000000, 0);
+> +DEFINE_CLK_FIXED_RATE(apb_pclk,   CLK_IS_ROOT, 156000000, 0);
+> +DEFINE_CLK_FIXED_RATE(uart0_pclk, CLK_IS_ROOT, 78000000, 0);
+> +DEFINE_CLK_FIXED_RATE(uart1_pclk, CLK_IS_ROOT, 78000000, 0);
+> +DEFINE_CLK_FIXED_RATE(uart2_pclk, CLK_IS_ROOT, 78000000, 0);
+> +
 
--- 
-Gra?vydas
+Can you use clk_register_fixed_rate instead?
+
+Regards,
+Mike
