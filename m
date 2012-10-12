@@ -1,24 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Oct 2012 08:11:42 +0000
-Subject: alignment faults in 3.6
-In-Reply-To: <yw1xtxu1nfsn.fsf@unicorn.mansr.com>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
- <yw1xtxu1nfsn.fsf@unicorn.mansr.com>
-Message-ID: <201210120811.43290.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 12 Oct 2012 10:12:52 +0200
+Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
+In-Reply-To: <201210120803.54539.arnd@arndb.de>
+References: <20121007015300.828366635@gmail.com>
+ <20121012070651.GA17511@glitch> <20121012092617.37e82610@skate>
+ <201210120803.54539.arnd@arndb.de>
+Message-ID: <20121012101252.6c3b7dce@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 October 2012, M?ns Rullg?rd wrote:
-> > But, the IP header is expected to be aligned.
+Arnd,
+
+On Fri, 12 Oct 2012 08:03:54 +0000, Arnd Bergmann wrote:
+
+> I would certainly like to see this, yes. I had a patch for it ages
+> ago, but would start over again if I did this now.
 > 
-> Everything tells the compiler the struct is perfectly aligned.  When the
-> buggy driver passes a misaligned pointer, bad things happen.
+> I don't have time to do the conversion at the moment, but I would
+> certainly welcome a patch that does it. I can give some details about
+> the problems with that and how I think they should be solved.
 
-Would it be appropriate to add a WARN_ON_ONCE() in the alignment fault path
-then? If all alignment faults in the kernel are caused by broken drivers,
-that would at least give us some hope of finding those drivers while at the
-same time not causing much overhead in the case where we need to do the
-fixup in the meantime.
+I did start working on such a patch a few weeks ago, but converting all
+the platforms to use IOMEM() was really boring. But now you did that, I
+can try to revive my patch, see if it works, and post it if you're
+interested.
 
-	Arnd
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
