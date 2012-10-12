@@ -1,35 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Oct 2012 15:41:20 +0100
-Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
-In-Reply-To: <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
-References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
- <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
- <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
-Message-ID: <20121012144119.GM28061@n2100.arm.linux.org.uk>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Fri, 12 Oct 2012 15:36:13 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <20121012142254.GG5453@kvack.org>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+ <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+ <yw1xhaq0nefg.fsf@unicorn.mansr.com>
+ <20121012110750.GE21164@n2100.arm.linux.org.uk>
+ <yw1x8vbcndlb.fsf@unicorn.mansr.com>
+ <20121012114443.GG21164@n2100.arm.linux.org.uk>
+ <1350043692.21172.11815.camel@edumazet-glaptop>
+ <20121012142254.GG5453@kvack.org>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B703F@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 04:04:28PM +0200, Linus Walleij wrote:
-> On Fri, Oct 12, 2012 at 3:26 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > As suggested by Andrew Morton:
-> >
-> >   This is a pet peeve of mine.  Any time there's a long list of items
-> >   (header file inclusions, kconfig entries, array initalisers, etc) and
-> >   someone wants to add a new item, they *always* go and stick it at the
-> >   end of the list.
-> >
-> >   Guys, don't do this.  Either put the new item into a randomly-chosen
-> >   position or, probably better, alphanumerically sort the list.
-> >
-> > lets sort all our select statements alphanumerically.  This commit was
-> > created by the following perl:
-> 
-> I applied this and tried to configure the Nomadik defconfig,
-> and I get this, sadly:
+> x86 does have an alignment check flag that can be set in the flags register.
+> Somehow, I doubt anyone would be willing to walk through all the noise the
+> faults would likely trigger.
 
-Yes, I've just fixed those.  Unfortunately, the patch is soo large that
-it trips the mailing list size limit, and has to be manually approved,
-so I'm not sure I can call on the list maintainers again today to do the
-approval thing.
+Someone has tried to set that (in userspace) on NetBSD.
+The fault reporting has been fixed, but really nothing
+works since optimised parts of libc deliberately do
+misaligned transfers.
+
+	David
