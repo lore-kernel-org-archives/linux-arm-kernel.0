@@ -1,61 +1,25 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 12 Oct 2012 14:24:16 +0200
-Subject: [RESEND PATCH 1/2] mmc: mmci: Fix incorrect handling of HW	flow
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Oct 2012 13:35:36 +0100
+Subject: [RESEND PATCH 1/2] mmc: mmci: Fix incorrect handling of HW flow
  control for SDIO
-In-Reply-To: <20121012115448.GH21164@n2100.arm.linux.org.uk>
+In-Reply-To: <50780BF0.3070907@stericsson.com>
 References: <1349885000-22887-1-git-send-email-ulf.hansson@stericsson.com>
  <20121012091322.GC21164@n2100.arm.linux.org.uk>
  <20121012115448.GH21164@n2100.arm.linux.org.uk>
-Message-ID: <50780BF0.3070907@stericsson.com>
+ <50780BF0.3070907@stericsson.com>
+Message-ID: <20121012123536.GJ21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2012 01:54 PM, Russell King - ARM Linux wrote:
-> On Fri, Oct 12, 2012 at 10:13:22AM +0100, Russell King - ARM Linux wrote:
->> On Wed, Oct 10, 2012 at 06:03:19PM +0200, Ulf Hansson wrote:
->>> From: Ulf Hansson<ulf.hansson@linaro.org>
->>>
->>> For data writes<= 8 bytes, HW flow control was disabled but
->>> never re-enabled when the transfer was completed. This meant
->>> that a following read request would give buffer overrun errors.
->>>
->>> Signed-off-by: Ulf Hansson<ulf.hansson@linaro.org>
->>
->> Both look fine to me too.  Linus' has already said what needs to happen
->> with these two.  Thanks.
+On Fri, Oct 12, 2012 at 02:24:16PM +0200, Ulf Hansson wrote:
+> Hi Russell,
 >
-> Ulf,
+> Our IT department is slow, too slow. :-)
 >
-> I see you've tried three times to get a replacement password for the
-> patch system today.  If it's not getting through, you need to complain
-> to your IT department, and get them to complain to Google:
->
-> 2012-10-12 11:09:21 1TMcBE-0005ED-VS<= apache at arm.linux.org.uk H=n2100.arm.linux.org.uk [2002:4e20:1eda:1:214:fdff:fe10:4f86]:55740 I=[2002:4e20:1eda:1:24c:69ff:fe6e:7578]:25 P=esmtpsa X=TLSv1:AES256-SHA:256 A=cram:n2100.arm.linux.org.uk S=1065 id=E1TMcBD-00061o-HP at n2100.arm.linux.org.uk T="Your new password" for ulf.hansson@stericsson.com
-> 2012-10-12 11:09:24 1TMcBE-0005ED-VS =>  ulf.hansson at stericsson.com R=verp_dnslookup T=verp_smtp S=1097 H=stericsson.com.s200a1.psmtp.com [207.126.147.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
-> 2012-10-12 11:25:13 1TMcQb-0005EY-8d<= apache at arm.linux.org.uk H=n2100.arm.linux.org.uk [2002:4e20:1eda:1:214:fdff:fe10:4f86]:37918 I=[2002:4e20:1eda:1:24c:69ff:fe6e:7578]:25 P=esmtpsa X=TLSv1:AES256-SHA:256 A=cram:n2100.arm.linux.org.uk S=1065 id=E1TMcQZ-00066s-2O at n2100.arm.linux.org.uk T="Your new password" for ulf.hansson@stericsson.com
-> 2012-10-12 11:25:17 1TMcQb-0005EY-8d =>  ulf.hansson at stericsson.com R=verp_dnslookup T=verp_smtp S=1097 H=stericsson.com.s200a1.psmtp.com [207.126.147.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
-> 2012-10-12 12:25:56 1TMdNM-0005IG-8u<= apache at arm.linux.org.uk H=n2100.arm.linux.org.uk [2002:4e20:1eda:1:214:fdff:fe10:4f86]:57521 I=[2002:4e20:1eda:1:24c:69ff:fe6e:7578]:25 P=esmtpsa X=TLSv1:AES256-SHA:256 A=cram:n2100.arm.linux.org.uk S=1065 id=E1TMdNK-0006XU-SG at n2100.arm.linux.org.uk T="Your new password" for ulf.hansson@stericsson.com
-> 2012-10-12 12:25:59 1TMdNM-0005IG-8u =>  ulf.hansson at stericsson.com R=verp_dnslookup T=verp_smtp S=1097 H=stericsson.com.s200a1.psmtp.com [207.126.147.10] X=TLSv1:AES256-SHA:256 DN="/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.psmtp.com" C="250 Thanks"
->
-> You are not the first to encounter this problem.  psmtp.com seems to
-> put the password reminders into a big black hole, and this is inspite
-> of them trying to follow every possible RFC concerning auto-generated
-> mail, and being DKIM signed too.
->
-> Unfortunately, what this means is that effectively the spammers have
-> won the arms race: it is becoming increasingly difficult to get email
-> through to the intended destination due to all the filtering that
-> people now impose (not that it ever has been guaranteed.)
+> As an option, would it be possible for you to "manually" send me a new  
+> password? Another option would be to change the mail for my account to  
+> ulf.hansson at linaro.org
 
-Hi Russell,
-
-Our IT department is slow, too slow. :-)
-
-As an option, would it be possible for you to "manually" send me a new 
-password? Another option would be to change the mail for my account to 
-ulf.hansson at linaro.org
-
-Any help appreciated!
-
-Kind regards
-Ulf Hansson
+Updated the email address; that's easier than trying to generate a new
+password manually.  Please ask the site for a replacement password using
+your linaro address and hopefully you should get it.
