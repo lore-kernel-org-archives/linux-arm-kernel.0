@@ -1,167 +1,74 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 11 Oct 2012 20:06:14 -0500
-Subject: [PATCH v3 5/6] ARM: OMAP: iommu: add device tree support
-In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1350003977-32744-10-git-send-email-omar.luna@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 12 Oct 2012 03:07:53 +0200
+Subject: [PATCH v2 1/5] [media] omap3isp: Fix compilation error in ispreg.h
+In-Reply-To: <20121007101718.073aed3b@infradead.org>
+References: <20120927195526.GP4840@atomide.com>
+ <20121002163158.GR4840@atomide.com> <20121007101718.073aed3b@infradead.org>
+Message-ID: <1748868.I6tVCYli6M@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt driver to use DT if provided.
+Hi Mauro,
 
-Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
----
- .../devicetree/bindings/arm/omap/iommu.txt         |   10 +++
- arch/arm/mach-omap2/omap-iommu.c                   |    4 ++
- drivers/iommu/omap-iommu.c                         |   65 +++++++++++++++++++-
- 3 files changed, 78 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/iommu.txt
+On Sunday 07 October 2012 10:17:18 Mauro Carvalho Chehab wrote:
+> Em Tue, 2 Oct 2012 09:31:58 -0700 Tony Lindgren escreveu:
+> > * Ido Yariv <ido@wizery.com> [121001 15:48]:
+> > > Commit c49f34bc ("ARM: OMAP2+ Move SoC specific headers to be local to
+> > > mach-omap2") moved omap34xx.h to mach-omap2. This broke omap3isp, as it
+> > > includes omap34xx.h.
+> > > 
+> > > Instead of moving omap34xx to platform_data, simply add the two
+> > > definitions the driver needs and remove the include altogether.
+> > > 
+> > > Signed-off-by: Ido Yariv <ido@wizery.com>
+> > 
+> > I'm assuming that Mauro picks this one up, sorry
+> > for breaking it.
+> 
+> Picked, thanks.
+> 
+> With regards to the other patches in this series, IMHO, it
+> makes more sense to go through arm omap tree, so, for the
+> patches on this series that touch at drivers/media/platform/*:
+> 
+> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+> 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > > ---
+> > > 
+> > >  drivers/media/platform/omap3isp/ispreg.h | 6 +++---
+> > >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/platform/omap3isp/ispreg.h
+> > > b/drivers/media/platform/omap3isp/ispreg.h index 084ea77..e2c57f3
+> > > 100644
+> > > --- a/drivers/media/platform/omap3isp/ispreg.h
+> > > +++ b/drivers/media/platform/omap3isp/ispreg.h
+> > > @@ -27,13 +27,13 @@
+> > > 
+> > >  #ifndef OMAP3_ISP_REG_H
+> > >  #define OMAP3_ISP_REG_H
+> > > 
+> > > -#include <plat/omap34xx.h>
+> > > -
+> > > -
+> > > 
+> > >  #define CM_CAM_MCLK_HZ			172800000	/* Hz */
+> > >  
+> > >  /* ISP Submodules offset */
+> > > 
+> > > +#define L4_34XX_BASE			0x48000000
+> > > +#define OMAP3430_ISP_BASE		(L4_34XX_BASE + 0xBC000)
+> > > +
+> > > 
+> > >  #define OMAP3ISP_REG_BASE		OMAP3430_ISP_BASE
+> > >  #define OMAP3ISP_REG(offset)		(OMAP3ISP_REG_BASE + (offset))
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/iommu.txt b/Documentation/devicetree/bindings/arm/omap/iommu.txt
-new file mode 100644
-index 0000000..2bb780f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/omap/iommu.txt
-@@ -0,0 +1,10 @@
-+* MMU (Memory Management Unit)
-+
-+MMU present in OMAP subsystems.
-+
-+Required properties:
-+ compatible : should be "ti,omap3-iommu" for OMAP3 MMUs
-+ compatible : should be "ti,omap4-iommu" for OMAP4 MMUs
-+
-+Optional properties:
-+ None
-diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
-index 82a422a..4d6145d 100644
---- a/arch/arm/mach-omap2/omap-iommu.c
-+++ b/arch/arm/mach-omap2/omap-iommu.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/err.h>
- #include <linux/slab.h>
-@@ -29,6 +30,9 @@ static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
- 	struct omap_mmu_dev_attr *a = (struct omap_mmu_dev_attr *)oh->dev_attr;
- 	static int i;
- 
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata)
- 		return -ENOMEM;
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index e266ad7..946366f 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -21,12 +21,15 @@
- #include <linux/mutex.h>
- #include <linux/spinlock.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of.h>
- 
- #include <asm/cacheflush.h>
- 
- #include <plat/iommu.h>
- 
- #include <plat/iopgtable.h>
-+#include <plat/omap_device.h>
-+#include <plat/omap_hwmod.h>
- 
- #define for_each_iotlb_cr(obj, n, __i, cr)				\
- 	for (__i = 0;							\
-@@ -916,13 +919,63 @@ static void omap_iommu_detach(struct omap_iommu *obj)
- /*
-  *	OMAP Device MMU(IOMMU) detection
-  */
-+static int __devinit
-+iommu_add_platform_data_from_dt(struct platform_device *pdev)
-+{
-+	struct iommu_platform_data *pdata;
-+	struct device_node *node = pdev->dev.of_node;
-+	struct omap_hwmod *oh;
-+	struct omap_mmu_dev_attr *a;
-+	int ret = 0;
-+
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	of_property_read_string(node, "ti,hwmods", &pdata->name);
-+	oh = omap_hwmod_lookup(pdata->name);
-+	if (!oh) {
-+		dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n", pdata->name);
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	a = (struct omap_mmu_dev_attr *)oh->dev_attr;
-+	pdata->nr_tlb_entries = a->nr_tlb_entries;
-+	pdata->da_start = a->da_start;
-+	pdata->da_end = a->da_end;
-+
-+	if (oh->rst_lines_cnt == 1) {
-+		pdata->reset_name = oh->rst_lines->name;
-+		pdata->assert_reset = omap_device_assert_hardreset;
-+		pdata->deassert_reset = omap_device_deassert_hardreset;
-+	}
-+
-+	ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
-+	if (ret)
-+		dev_err(&pdev->dev, "Cannot add pdata for %s\n", pdata->name);
-+
-+out:
-+	kfree(pdata);
-+
-+	return ret;
-+}
-+
- static int __devinit omap_iommu_probe(struct platform_device *pdev)
- {
- 	int err = -ENODEV;
- 	int irq;
- 	struct omap_iommu *obj;
- 	struct resource *res;
--	struct iommu_platform_data *pdata = pdev->dev.platform_data;
-+	struct iommu_platform_data *pdata;
-+
-+	if (of_have_populated_dt()) {
-+		err = iommu_add_platform_data_from_dt(pdev);
-+		if (err)
-+			return err;
-+	}
-+
-+	pdata = pdev->dev.platform_data;
- 
- 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
- 	if (!obj)
-@@ -1031,12 +1084,22 @@ static const struct dev_pm_ops iommu_pm_ops = {
- 			   NULL)
- };
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id omap_iommu_of_match[] = {
-+	{ .compatible = "ti,omap3-iommu" },
-+	{ .compatible = "ti,omap4-iommu" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, omap_iommu_of_match);
-+#endif
-+
- static struct platform_driver omap_iommu_driver = {
- 	.probe	= omap_iommu_probe,
- 	.remove	= __devexit_p(omap_iommu_remove),
- 	.driver	= {
- 		.name	= "omap-iommu",
- 		.pm	= &iommu_pm_ops,
-+		.of_match_table = of_match_ptr(omap_iommu_of_match),
- 	},
- };
- 
+I'll send a follow-up patch that removes all those definitions as they're 
+actually not needed.
+
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
