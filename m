@@ -1,47 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Oct 2012 23:22:44 +0200
-Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
- ux500v2 variant
-In-Reply-To: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdaaG1d4C9n7=2A_au0D99bVTGW1s2KX4hFHbaDAkeiK0A@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 12 Oct 2012 15:24:06 -0600
+Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
+ program headers
+In-Reply-To: <20121010095544.GB2131@linaro.org>
+References: <20121001183543.GC22342@obsidianresearch.com>
+ <20121002102346.GB2108@linaro.org>
+ <20121002174759.GC23733@obsidianresearch.com>
+ <20121003104335.GA2254@linaro.org>
+ <20121003184437.GB12231@obsidianresearch.com>
+ <20121004113637.GA2117@linaro.org>
+ <20121004175907.GB2994@obsidianresearch.com>
+ <20121008104649.GD2302@linaro.org>
+ <20121009182514.GF4124@obsidianresearch.com>
+ <20121010095544.GB2131@linaro.org>
+Message-ID: <20121012212406.GN4124@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 4:02 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On Wed, Oct 10, 2012 at 10:55:44AM +0100, Dave Martin wrote:
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> For the ux500v2 variant non power of two block sizes are supported.
-> This will make it possible to decrease data overhead for SDIO
-> transfers. Although we need to put some constraints to the alignment
-> of the buffers when enabling this feature.
->
-> Buffers must be 4 bytes aligned due to restrictions that the PL18x
-> FIFO accesses must be done in a 4 byte aligned manner. Moreover we
-> need to enable DMA_REQCTL for SDIO to support write of non 32 bytes
-> aligned sg element lengths. In PIO mode any buffer length can be
-> handled as long as the buffer address is 4 byte aligned.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+> As a side comment, some things such as MAC addresses can be probed and
+> set from userspace after kernel boot, assuming that you have a way
+> to fetch the device description blob from userspace.  If it's accessible
+> via MTD I'm guessing you may have some chance of doing that.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Yes, there is a whole wack of other data in this structure (serial
+numbers, etc) that are captured and used by userspace, so access is
+always made possible.
 
-I finally understand how this works now.
+Setting the MAC via userspace is interesting, I will bear that in
+mind. However, we have several development-support boot scenarios that
+enable the ethernet before the userspace code to fetch the data
+structure is loaded - one of interest has the kernel's initramfs
+perform a NBD mount of the actual application filesystem. So having
+the kernel tend to this is very convenient.
+ 
+> However, I worry that if you have to run hardware-dependent code in
+> order to fetch or generate parts of the DT, then we have a chicken-
+> and-egg problem with no guaranteed solution with the frameworks that
+> exist today -- although I am not familiar with how DT gets used on
+> all other arches, so you might have counterexamples I'm not aware of.
 
-Bonus for comments like this:
+Certainly, in some cases, (like what I have done) such kernels are
+non-generic and could only work with the hardware they are intended
+for.
 
-> +/*
-> + * DMA request control is required for write
-> + * if transfer size is not 32 byte aligned.
-> + * DMA request control is also needed if the total
-> + * transfer size is 32 byte aligned but any of the
-> + * sg element lengths are not aligned with 32 byte.
-> + */
->  #define MCI_ST_DPSM_DMAREQCTL  (1 << 12)
+However, if you assume the bootloader provides a dtb (even an
+incomplete one would do) then fixups/replacements/whatever could be
+run based on tags in the dtb without creating a chicken-and-egg
+problem.
 
-Which make you understand what is actually happening.
+> At least in ARM-land, the DT is inherently monolithic and static: the
+> DT is not expected to change once you enter the kernel.
 
-Yours,
-Linus Walleij
+Sort of, it is the same on all arches, the DT block is expected to
+remain valid, but all the of_node pointers go directly into the block
+so you can alter values but not the structure without breaking any
+invariants. As an example our DTBs all have mac address blocks, with a
+0 value. The fixup simply overwrites with the correct value before the
+ethernet driver reads from it.
+
+> > I'm not sure there is a great interest in this? What are other folks
+> > working on production embedded stuff doing? I suppose that will be
+> > more clear as device tree is rolled out.
+> 
+> For now, the architecturally simplest solution still seems to me to be
+> to write your own boot shim which customises the DT before booting the 
+> kernel. As discussed, this can continue to look like a simple ELF image
+> from the bootloader's point of view -- but I appreciate that it will
+> involve effort and some duplication of some low-level driver components.
+
+I admit, I am a bit conflicted. Viewing from the kernel perspective, I
+definitely think this kind of very low level extremely board specific
+stuff should not be in the kernel. That could be a maintenance
+nightmare. However, as an OEM, I need the smallest, simplest boot
+loader possible so I want to push this into the kernel to lighten my
+development load.
+
+> Your problem is unlikely to affect people outside the embedded space
+> too much, but it doesn't sound likely to be unique.
+
+Agreed..
+
+This thread has left the original topic, what do you think I should do
+with the linker patch?
+
+Jason
