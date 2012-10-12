@@ -1,40 +1,94 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Fri, 12 Oct 2012 16:04:12 +0200
-Subject: [PATCH 1/1] pinctrl/at91: fix compatible order
-In-Reply-To: <1350033790-31028-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1350033790-31028-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <5078235C.1040204@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Oct 2012 16:04:28 +0200
+Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
+In-Reply-To: <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
+References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
+ <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/12/2012 11:23 AM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> the sam9x5 is new version of the rm9200 not the invert
->
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
->   drivers/pinctrl/pinctrl-at91.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 9c0fe11..bdb152b 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1331,8 +1331,8 @@ static void __devinit at91_gpio_probe_fixup(void)
->   }
->
->   static struct of_device_id at91_gpio_of_match[] __devinitdata = {
-> -	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
->   	{ .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops, },
-> +	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
->   	{ /* sentinel */ }
->   };
->
->
+On Fri, Oct 12, 2012 at 3:26 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
 
+> As suggested by Andrew Morton:
+>
+>   This is a pet peeve of mine.  Any time there's a long list of items
+>   (header file inclusions, kconfig entries, array initalisers, etc) and
+>   someone wants to add a new item, they *always* go and stick it at the
+>   end of the list.
+>
+>   Guys, don't do this.  Either put the new item into a randomly-chosen
+>   position or, probably better, alphanumerically sort the list.
+>
+> lets sort all our select statements alphanumerically.  This commit was
+> created by the following perl:
 
-Do it also for at91_pinctrl_of_match[], there is the same issue.
+I applied this and tried to configure the Nomadik defconfig,
+and I get this, sadly:
 
-Regards
+make -f Makefile ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-
+KBUILD_OUTPUT=/var/linus/linux/build-nomadik nhk8815_defconfig
+make[1]: Entering directory `/var/linus/linux'
+  GEN     /var/linus/linux/build-nomadik/Makefile
+arch/arm/mach-footbridge/Kconfig:29: syntax error
+arch/arm/mach-footbridge/Kconfig:28: unknown option "Saying"
+arch/arm/mach-footbridge/Kconfig:31: syntax error
+arch/arm/mach-footbridge/Kconfig:30: unknown option "The"
+arch/arm/mach-footbridge/Kconfig:31: unknown option "There"
+arch/arm/mach-footbridge/Kconfig:32: unknown option "prototypes"
+arch/arm/mach-footbridge/Kconfig:35: syntax error
+arch/arm/mach-footbridge/Kconfig:34: unknown option "http"
+arch/arm/mach-footbridge/Kconfig:37: syntax error
+arch/arm/mach-footbridge/Kconfig:36: unknown option "If"
+arch/arm/mach-footbridge/Kconfig:37: unknown option "Server"
+arch/arm/mach-pxa/Kconfig:18: syntax error
+arch/arm/mach-pxa/Kconfig:3: missing end statement for this entry
+arch/arm/mach-pxa/Kconfig:3: missing end statement for this entry
+arch/arm/Kconfig:245: missing end statement for this entry
+arch/arm/mach-pxa/Kconfig:17: invalid statement
+arch/arm/mach-pxa/Kconfig:632: unexpected end statement
+arch/arm/mach-pxa/Kconfig:634: syntax error
+arch/arm/mach-pxa/Kconfig:633: unexpected option "select"
+arch/arm/mach-pxa/Kconfig:634: unexpected option "select"
+arch/arm/mach-pxa/Kconfig:733: unexpected end statement
+arch/arm/Kconfig:1416: unexpected end statement
+make[3]: *** [nhk8815_defconfig] Error 1
+make[2]: *** [nhk8815_defconfig] Error 2
+make[1]: *** [sub-make] Error 2
+make[1]: Leaving directory `/var/linus/linux'
+make: *** [config-base] Error 2make -f Makefile ARCH=arm
+CROSS_COMPILE=arm-linux-gnueabi-
+KBUILD_OUTPUT=/var/linus/linux/build-nomadik nhk8815_defconfig
+make[1]: Entering directory `/var/linus/linux'
+  GEN     /var/linus/linux/build-nomadik/Makefile
+arch/arm/mach-footbridge/Kconfig:29: syntax error
+arch/arm/mach-footbridge/Kconfig:28: unknown option "Saying"
+arch/arm/mach-footbridge/Kconfig:31: syntax error
+arch/arm/mach-footbridge/Kconfig:30: unknown option "The"
+arch/arm/mach-footbridge/Kconfig:31: unknown option "There"
+arch/arm/mach-footbridge/Kconfig:32: unknown option "prototypes"
+arch/arm/mach-footbridge/Kconfig:35: syntax error
+arch/arm/mach-footbridge/Kconfig:34: unknown option "http"
+arch/arm/mach-footbridge/Kconfig:37: syntax error
+arch/arm/mach-footbridge/Kconfig:36: unknown option "If"
+arch/arm/mach-footbridge/Kconfig:37: unknown option "Server"
+arch/arm/mach-pxa/Kconfig:18: syntax error
+arch/arm/mach-pxa/Kconfig:3: missing end statement for this entry
+arch/arm/mach-pxa/Kconfig:3: missing end statement for this entry
+arch/arm/Kconfig:245: missing end statement for this entry
+arch/arm/mach-pxa/Kconfig:17: invalid statement
+arch/arm/mach-pxa/Kconfig:632: unexpected end statement
+arch/arm/mach-pxa/Kconfig:634: syntax error
+arch/arm/mach-pxa/Kconfig:633: unexpected option "select"
+arch/arm/mach-pxa/Kconfig:634: unexpected option "select"
+arch/arm/mach-pxa/Kconfig:733: unexpected end statement
+arch/arm/Kconfig:1416: unexpected end statement
+make[3]: *** [nhk8815_defconfig] Error 1
+make[2]: *** [nhk8815_defconfig] Error 2
+make[1]: *** [sub-make] Error 2
+make[1]: Leaving directory `/var/linus/linux'
+make: *** [config-base] Error 2
 
-Ludovic
+Yours,
+Linus Walleij
