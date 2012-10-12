@@ -1,142 +1,66 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 12 Oct 2012 16:23:30 +0200
-Subject: [PATCH 1/4] ARM: AT91: Add DT support to AT91RM9200 System Timer
-In-Reply-To: <1349993126-9519-1-git-send-email-manabian@gmail.com>
-References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
-Message-ID: <20121012142330.GD12801@game.jcrosoft.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 12 Oct 2012 07:26:02 -0700
+Subject: [PATCH 1/3] i2c: omap: Do not enable the irq always
+In-Reply-To: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Mon, 8 Oct 2012 14:35:14 +0530")
+References: <1349687116-14463-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87txtz7on9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
-> Based on AT91 PIT DT patch from Jean-Christophe PLAGNIOL-VILLARD.
-ok for this one
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
++Kalle, Grygorii, Huzefa
+
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+
+> Enable the irq in the transfer and disable it after the
+> transfer is done.
+>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 > ---
->  .../devicetree/bindings/arm/atmel-at91.txt         |  6 +++
->  arch/arm/mach-at91/at91rm9200_time.c               | 63 +++++++++++++++++++++-
->  2 files changed, 67 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index ecc81e3..8adc9a8 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -7,6 +7,12 @@ PIT Timer required properties:
->  - interrupts: Should contain interrupt for the PIT which is the IRQ line
->    shared across all System Controller members.
+>  drivers/i2c/busses/i2c-omap.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index b6c6b95..ce41596 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -625,6 +625,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  	if (IS_ERR_VALUE(r))
+>  		goto out;
 >  
-> +System Timer (ST) required properties:
-> +- compatible: Should be "atmel,at91rm9200-st"
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain interrupt for the ST which is the IRQ line
-> +  shared across all System Controller members.
-> +
->  TC/TCLIB Timer required properties:
->  - compatible: Should be "atmel,<chip>-pit".
->    <chip> can be "at91rm9200" or "at91sam9x5"
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> index aaa443b..cafe988 100644
-> --- a/arch/arm/mach-at91/at91rm9200_time.c
-> +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> @@ -24,6 +24,9 @@
->  #include <linux/irq.h>
->  #include <linux/clockchips.h>
->  #include <linux/export.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
+> +	enable_irq(dev->irq);
+>  	r = omap_i2c_wait_for_bb(dev);
+>  	if (r < 0)
+>  		goto out;
+> @@ -654,6 +655,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 >  
->  #include <asm/mach/time.h>
+>  	omap_i2c_wait_for_bb(dev);
+>  out:
+> +	disable_irq(dev->irq);
+
+When using runtime PM with auto-suspend timeouts, why would you disable
+the IRQ before the runtime suspend handlers have run?   
+
+If you really want to do this, you probably should have these in the
+runtime PM callbacks.  But I'll wait until you add a more descriptive
+changelog before I can really tell why this is being done.  Based on the
+discussion in the patch from Kalle, I'm assuming this is to prevent
+interrups when I2C is being used by co-processors.  If so, plese
+describe in the changelog.
+
+That being said, doesn't the runtime suspend callback already disable
+IRQs at the device level instead of the INTC level?
+
+Kevin
+
+>  	pm_runtime_mark_last_busy(dev->dev);
+>  	pm_runtime_put_autosuspend(dev->dev);
+>  	return r;
+> @@ -1179,6 +1181,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_unuse_clocks;
+>  	}
 >  
-> @@ -91,7 +94,8 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
->  static struct irqaction at91rm9200_timer_irq = {
->  	.name		= "at91_tick",
->  	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> -	.handler	= at91rm9200_timer_interrupt
-> +	.handler	= at91rm9200_timer_interrupt,
-> +	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
->  };
->  
->  static cycle_t read_clk32k(struct clocksource *cs)
-> @@ -179,8 +183,60 @@ static struct clock_event_device clkevt = {
->  void __iomem *at91_st_base;
->  EXPORT_SYMBOL_GPL(at91_st_base);
->  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id at91rm9200_st_timer_ids[] = {
-> +	{ .compatible = "atmel,at91rm9200-st" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static int __init of_at91rm9200_st_init(void)
-> +{
-> +	struct device_node *np;
-> +	int ret;
-> +
-> +	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
-> +	if (!np)
-> +		goto err;
-> +
-> +	at91_st_base = of_iomap(np, 0);
-> +	if (!at91_st_base)
-> +		goto node_err;
-> +
-> +	/* Get the interrupts property */
-> +	ret = irq_of_parse_and_map(np, 0);
-> +	if (!ret)
-> +		goto ioremap_err;
-> +	at91rm9200_timer_irq.irq = ret;
-> +
-> +	of_node_put(np);
-> +
-> +	return 0;
-> +
-> +ioremap_err:
-> +	iounmap(at91_st_base);
-> +node_err:
-> +	of_node_put(np);
-> +err:
-> +	return -EINVAL;
-> +}
-> +#else
-> +static int __init of_at91rm9200_st_init(void)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif
-> +
->  void __init at91rm9200_ioremap_st(u32 addr)
->  {
-> +#ifdef CONFIG_OF
-> +	struct device_node *np;
-> +
-> +	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
-> +	if (np) {
-> +		of_node_put(np);
-> +		return;
-> +	}
-> +#endif
->  	at91_st_base = ioremap(addr, 256);
->  	if (!at91_st_base)
->  		panic("Impossible to ioremap ST\n");
-> @@ -191,13 +247,16 @@ void __init at91rm9200_ioremap_st(u32 addr)
->   */
->  void __init at91rm9200_timer_init(void)
->  {
-> +	/* For device tree enabled device: initialize here */
-> +	of_at91rm9200_st_init();
-> +
->  	/* Disable all timer interrupts, and clear any pending ones */
->  	at91_st_write(AT91_ST_IDR,
->  		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
->  	at91_st_read(AT91_ST_SR);
->  
->  	/* Make IRQs happen for the system timer */
-> -	setup_irq(NR_IRQS_LEGACY + AT91_ID_SYS, &at91rm9200_timer_irq);
-> +	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
->  
->  	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
->  	 * directly for the clocksource and all clockevents, after adjusting
-> -- 
-> 1.7.12.2
-> 
+> +	disable_irq(dev->irq);
+>  	adap = &dev->adapter;
+>  	i2c_set_adapdata(adap, dev);
+>  	adap->owner = THIS_MODULE;
