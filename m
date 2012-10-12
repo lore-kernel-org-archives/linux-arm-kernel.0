@@ -1,111 +1,44 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 12 Oct 2012 09:48:33 +0200
-Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
- <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
-Message-ID: <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Oct 2012 07:52:25 +0000
+Subject: [RFC PATCH] ARM: vt8500: Convert arch-vt8500 to multiplatform
+In-Reply-To: <57461.210.54.1.170.1349994834.squirrel@server.prisktech.co.nz>
+References: <1349939831-12939-1-git-send-email-linux@prisktech.co.nz>
+ <201210112029.05572.arnd@arndb.de>
+ <57461.210.54.1.170.1349994834.squirrel@server.prisktech.co.nz>
+Message-ID: <201210120752.25450.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 3:06 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
-> Use runtime PM functionality interfaced with hwmod enable/idle
-> functions, to replace direct clock operations and sysconfig
-> handling.
->
-> Dues to reset sequence, pm_runtime_put_sync must be used, to avoid
-> possible operations with the module under reset.
+On Thursday 11 October 2012, linux at prisktech.co.nz wrote:
+> To clarify what you said (because I'm not sure I got it the first time)...
+> 
+> Keep ARCH_VT8500 as the single-platform Kconfig option.
+> Add a new ARCH_VT8500_MULTI (for example) as the multiplatform Kconfig option.
+> 
+> Have ARCH_VT8500_MULTI select ARCH_VT8500??
+> 
+> The last bit confuses me (and seems a little backwards, although I suspect it
+> would work since none of the options would cause conflicts). Without ARCH_VT8500
+> selected, we have no driver options without changing all the Kconfig's.
+> 
+> If this is correct, we are basically using _MULTI to add more options on top of
+> _VT8500.
 
-I already made most of these comments, but here they go again.
+No, this would not work, because Kconfig does not let you 'select' a symbol
+that is inside of a 'choice' list.
 
-> @@ -142,11 +142,10 @@ static int iommu_enable(struct omap_iommu *obj)
->                 }
->         }
->
-> -       clk_enable(obj->clk);
-> +       pm_runtime_get_sync(obj->dev);
->
->         err = arch_iommu->enable(obj);
->
-> -       clk_disable(obj->clk);
+The other way round works though: rename the existing ARCH_VT8500 to
+ARCH_VT8500_SINGLE, and add a new symbol in arch/arm/mach-vt8500/Kconfig
+like
 
-The device will never go to sleep, until iommu_disable is called.
-clk_enable -> pm_runtime_get_sync, clk_disable pm_runtime_put.
+config VT8500
+       bool "Via/Wondermedia VT8500 / WM8505 / WM8650" if ARCH_MULTI_V5
+       default ARCH_VT8500_SINGLE
 
-> @@ -288,7 +285,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
->         if (!obj || !obj->nr_tlb_entries || !e)
->                 return -EINVAL;
->
-> -       clk_enable(obj->clk);
-> +       pm_runtime_get_sync(obj->dev);
->
->         iotlb_lock_get(obj, &l);
->         if (l.base == obj->nr_tlb_entries) {
-> @@ -318,7 +315,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
->
->         cr = iotlb_alloc_cr(obj, e);
->         if (IS_ERR(cr)) {
-> -               clk_disable(obj->clk);
-> +               pm_runtime_put_sync(obj->dev);
->                 return PTR_ERR(cr);
->         }
+This one becomes visible when ARCH_MULTI_V5 is set but invisible in a
+other cases. The 'default ARCH_VT8500_SINGLE' statement means it is
+automatically enabled (but still invisible) if ARCH_VT8500_SINGLE
+is selected in the 'choice', and it's invisible and disabled in all
+other cases.
 
-If I'm correct, the above pm_runtime_get/put are redundant, because
-the count can't possibly reach 0 because of the reason I explained
-before.
-
-The same for all the cases below.
-
-> @@ -1009,7 +1001,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
->         release_mem_region(res->start, resource_size(res));
->         iounmap(obj->regbase);
->
-> -       clk_put(obj->clk);
-> +       pm_runtime_disable(obj->dev);
-
-This will turn on the device unnecessarily, wasting power, and there's
-no need for that, kfree will take care of that without resuming.
-
->         dev_info(&pdev->dev, "%s removed\n", obj->name);
->         kfree(obj);
->         return 0;
-
-Also, I still think that something like this is needed:
-
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -2222,8 +2222,17 @@ static struct clk cam_mclk = {
-        .recalc         = &followparent_recalc,
- };
-
-+static struct clk cam_fck = {
-+       .name           = "cam_fck",
-+       .ops            = &clkops_omap2_iclk_dflt,
-+       .parent         = &l3_ick,
-+       .enable_reg     = OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
-+       .enable_bit     = OMAP3430_EN_CAM_SHIFT,
-+       .clkdm_name     = "cam_clkdm",
-+       .recalc         = &followparent_recalc,
-+};
-+
- static struct clk cam_ick = {
--       /* Handles both L3 and L4 clocks */
-        .name           = "cam_ick",
-        .ops            = &clkops_omap2_iclk_dflt,
-        .parent         = &l4_ick,
-@@ -3394,6 +3403,7 @@ static struct omap_clk omap3xxx_clks[] = {
-        CLK("omapdss_dss",      "ick",          &dss_ick_3430es2,
- CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
-        CLK(NULL,       "dss_ick",              &dss_ick_3430es2,
- CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
-        CLK(NULL,       "cam_mclk",     &cam_mclk,      CK_34XX | CK_36XX),
-+       CLK(NULL,       "cam_fck",      &cam_fck,       CK_34XX | CK_36XX),
-        CLK(NULL,       "cam_ick",      &cam_ick,       CK_34XX | CK_36XX),
-        CLK(NULL,       "csi2_96m_fck", &csi2_96m_fck,  CK_34XX | CK_36XX),
-        CLK(NULL,       "usbhost_120m_fck", &usbhost_120m_fck,
-CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
-
-Cheers.
-
--- 
-Felipe Contreras
+	Arnd
