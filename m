@@ -1,25 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 12 Oct 2012 21:25:18 +0530
-Subject: [PATCH V2 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <CAHp75VdNVyWxvnHDFjg_5vC95M_LwJYUDLQb+NmBA6GRVsea9g@mail.gmail.com>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
- <9688d98010716880c1bbd966ead312c446282204.1350051925.git.viresh.kumar@linaro.org>
- <1350053897.10584.172.camel@smile>
- <CAKohponS+mkj6rN6hzJC1FrbpSS+jWZBii4xQgN+4z2h=zFTWA@mail.gmail.com>
- <CAHp75VdNVyWxvnHDFjg_5vC95M_LwJYUDLQb+NmBA6GRVsea9g@mail.gmail.com>
-Message-ID: <CAKohponCD3tFNom_JjBmP3vxQ5us39uPi2bp1JyjCALcmhmSYw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 12 Oct 2012 12:03:29 -0400
+Subject: [PATCH v2 1/4] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <20121012165919.0dd085dd@skate>
+References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121011212629.GA14171@electric-eye.fr.zoreil.com>
+ <20121012143131.GP12330@titan.lakedaemon.net>
+ <20121012165919.0dd085dd@skate>
+Message-ID: <20121012160329.GQ12330@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2012 21:23, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
-> 1. This is an equivalent of
-> if (last_dw && (last_bus_id == ... ) && (last_dw == dw))
->  return false;
-> 2. In case dw is always non-NULL the last_dw == dw is false if last_dw is NULL.
->
-> Where am I wrong?
+On Fri, Oct 12, 2012 at 04:59:19PM +0200, Thomas Petazzoni wrote:
+> Jason,
+> 
+> On Fri, 12 Oct 2012 10:31:31 -0400, Jason Cooper wrote:
+> 
+> > I agree with Francois on most of these.  I prefer readability over
+> > hard 80 column limits.
+> 
+> Sure, but checkpatch.pl is warning on every line exceeding the 80
+> columns. Not that I think that all checkpatch.pl warnings should
+> necessarily be religiously respected, but if you have gazillions of
+> warnings regarding line exceeding 80 columns, it is very likely that
+> you will miss more important warnings.
 
-Nowhere, I am drunk ;)
+./scripts/checkpatch.pl --ignore LONG_LINE ...
 
---
-viresh
+Will yield the 'more important' warnings/errors.  After those are
+cleared, you can run without --ignore to check for over-indentation,
+etc.
+
+> > Although, 80 columns is still sound
+> > guidance.  For example, a majority of the broken lines are due to
+> > long macro and constant names.  I did a 'git grep NETA' and didn't
+> > see anything alarming.  So, above could become
+> > 
+> > 			val |= rx_filled << NETA_RXQ_ADD_NONOCC_SHIFT;
+> 
+> I don't mind, but then I would like to keep things consistent:
+> 
+>  * The driver file would be neta.c
+> 
+>  * All functions and data structure would be prefixed neta_ and not
+>    mvneta_
+> 
+>  * The Kconfig option would become CONFIG_NETA. Do we really want such
+>    a "simple" Kconfig option name for a driver?
+
+Well, you could do mv_neta.c and CONFIG_MV_NETA, but at the end of the
+day, we were both trying to put lipstick on a pig.  Your last paragraph
+is the most important.
+
+> Maybe the fact that those long macros are making long lines is also due
+> to the code having sometimes a too deep indentation, and I need to fix
+> that by using more auxiliary functions or something like that?
+
+This is the intent of the 80 column warning.  Please review the patch
+for over-indentation, and consider shortening the macros, eg
+MVNETA_RXQ_ADD_NONOCC_SHFT.
+
+thx,
+
+Jason.
