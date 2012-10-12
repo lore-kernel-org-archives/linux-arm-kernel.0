@@ -1,8 +1,7 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 12 Oct 2012 08:11:08 +0100
-Subject: [RESEND] [PATCH 3.6.0- 1/6] ARM/omap1: use module_platform_driver
- macro
-Message-ID: <1350025868-30482-1-git-send-email-srinivas.kandagatla@st.com>
+Date: Fri, 12 Oct 2012 08:11:40 +0100
+Subject: [RESEND] [PATCH 3.6.0- 6/6] omap_rng: use module_platform_driver macro
+Message-ID: <1350025900-30658-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,33 +12,33 @@ module_platform_driver.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- arch/arm/mach-omap1/mailbox.c |   14 +-------------
+ drivers/char/hw_random/omap-rng.c |   14 +-------------
  1 files changed, 1 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index e962926..45c8719 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -179,19 +179,7 @@ static struct platform_driver omap1_mbox_driver = {
- 		.name	= "omap-mailbox",
- 	},
+diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+index a5effd8..29732c6 100644
+--- a/drivers/char/hw_random/omap-rng.c
++++ b/drivers/char/hw_random/omap-rng.c
+@@ -217,19 +217,7 @@ static struct platform_driver omap_rng_driver = {
+ 	.probe		= omap_rng_probe,
+ 	.remove		= __exit_p(omap_rng_remove),
  };
 -
--static int __init omap1_mbox_init(void)
+-static int __init omap_rng_init(void)
 -{
--	return platform_driver_register(&omap1_mbox_driver);
+-	return platform_driver_register(&omap_rng_driver);
 -}
 -
--static void __exit omap1_mbox_exit(void)
+-static void __exit omap_rng_exit(void)
 -{
--	platform_driver_unregister(&omap1_mbox_driver);
+-	platform_driver_unregister(&omap_rng_driver);
 -}
 -
--module_init(omap1_mbox_init);
--module_exit(omap1_mbox_exit);
-+module_platform_driver(omap1_mbox_driver);
+-module_init(omap_rng_init);
+-module_exit(omap_rng_exit);
++module_platform_driver(omap_rng_driver);
  
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("omap mailbox: omap1 architecture specific functions");
+ MODULE_AUTHOR("Deepak Saxena (and others)");
+ MODULE_LICENSE("GPL");
 -- 
 1.7.0.4
