@@ -1,43 +1,37 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 11 Oct 2012 16:49:52 -0700
-Subject: [PATCH 1/2] ARM: nomadik: switch over to using the FSMC driver
-In-Reply-To: <CACRpkdYMz05DwtLtHkggvo8VFOtvPLpovwq6fLceeiFK0Wci0Q@mail.gmail.com>
-References: <1349335709-13399-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdYMz05DwtLtHkggvo8VFOtvPLpovwq6fLceeiFK0Wci0Q@mail.gmail.com>
-Message-ID: <20121011234952.2941.18793@nucleus>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 11 Oct 2012 17:52:26 -0700
+Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
+ ARM_UNWIND
+In-Reply-To: <1346021216-21979-3-git-send-email-ccross@android.com>
+References: <1346021216-21979-1-git-send-email-ccross@android.com>
+ <1346021216-21979-3-git-send-email-ccross@android.com>
+Message-ID: <507769CA.6090903@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2012-10-05 05:52:06)
-> On Thu, Oct 4, 2012 at 9:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 
-> > The Nomadik NAND driver is really just a subset of the existing
-> > FSMC driver, so let's switch over to using that driver instead,
-> > since it handles more variants of this chip. The callbacks for
-> > setting up the chip is doing stuff now handled by the FSMC
-> > driver.
-> >
-> > Cc: Alessandro Rubini <rubini@unipv.it>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> > I'm requesting Mike Turquette's ACK on this patch so I can merge
-> > it through ARM SoC.
-> 
-> Still requesting Mike's ACK, but not for merging through ARM SoC
-> but through MTD.
-> 
+Hi,
 
-Sorry for the late response but I just returned from vacation.  Might be
-too late but:
+On 8/26/2012 3:46 PM, Colin Cross wrote:
+> Unwinding with CONFIG_ARM_UNWIND is much more complicated than
+> unwinding with CONFIG_FRAME_POINTER, but there are only a few points
+> that require validation in order to avoid faults or infinite loops.
+> Avoiding faults is easy by adding checks to verify that all accesses
+> relative to the frame's stack pointer remain inside the stack.
+>
+> When CONFIG_FRAME_POINTER is not set it is possible for two frames to
+> have the same SP, so there is no way to avoid repeated calls to
+> unwind_frame continuing forever.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+This is a feature we've wanted for a long time. I ran some test with 
+repeated catting of stacks with processes dying and the results looked good.
 
-Thanks,
-Mike
+You can add a Tested-by: Laura Abbott <lauraa@codeaurora.org>
 
-> If you apply Jean-Christophe's patch first (please do that) I will
-> send a v2 of this patch set to be applied onto MTD as well
-> (should be OK).
-> 
-> Yours,
-> Linus Walleij
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
