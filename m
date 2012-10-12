@@ -1,33 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Oct 2012 09:51:49 -0700
-Subject: [PATCH] ARM: OMAP4: Fix twd_local_timer_register regression
-Message-ID: <20121012165149.GE30339@atomide.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 12 Oct 2012 19:08:34 +0200
+Subject: [PATCH 3/4] ARM: AT91: Add AT91RM9200 support to DT board
+In-Reply-To: <20121012162706.GI12801@game.jcrosoft.org>
+References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
+ <1349993126-9519-3-git-send-email-manabian@gmail.com>
+ <20121012142251.GC12801@game.jcrosoft.org>
+ <50783714.2000702@atmel.com>
+ <20121012162706.GI12801@game.jcrosoft.org>
+Message-ID: <CAGhQ9VzOQ2V6Cn5tY1REcGzpjjs53Lu6tT7=fNKqJQkBhR8HDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7d7e1eba (ARM: OMAP2+: Prepare for irqs.h removal)
-changed the interrupts to allow enabling sparse IRQ, but
-accidentally added the omap3 INTC base to the local IRQ.
-This causes the following:
+On Fri, Oct 12, 2012 at 6:27 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 17:28 Fri 12 Oct     , ludovic.desroches wrote:
+>> Le 10/12/2012 04:22 PM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+>> >On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
+>> >>Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> >>---
+>> >>
+>> >>Hi,
+>> >>
+>> >>This patch has some potential issues.
+>> >>Before this patch board-dt would fail building when only AT91RM9200 was enabled because at91sam926x_timer symbol would be missing. This patch uses the at91rm9200_timer which
+>> >>will fail if AT91RM9200 is not enabled.
+>> >this need work with ot wtihout rm9200
 
-twd: can't register interrupt 45 (-22)
-twd_local_timer_register failed -22
+btw, to solve the build issue with board-dt in mainline now we need to
+add a select CONFIG_SOC_AT91SAM9 to config MACH_AT91SAM_DT.
 
-The right fix is to not add any base, as it is a local
-timer. For the OMAP44XX_IRQ_LOCALWDT we had defined earlier
-there are no users, so no need to fix that.
+>> >>
+>> >>Any thoughts on solving this? As mention above this bug exists in mainline now.
+>> >duplicate the board-dt with one for rm9200 only
+>> >as rm9200 ans sam9 are 2 distict familly
+>>
+>> Why not adding a new machine descriptor for rm9200 in order to
+>> prevent file duplication?
+> because the soc are different and can only be compile if the timer is enable
+> and I do not want to enable the rm9200 timer on sam9 so instead of a ifdef i
+> the board-dt create a new board is better as we have a 50 lines file
+>
+> with different board_compat and different machine descriptor
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+I am okey with either approach, but I would like to hear what Nicolas
+Ferre has to say since he is the on the one that added board-dt. It
+would be nice to have everything in one board DT file, but I
+understand your concern with the RM9200 timer.
 
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -467,7 +467,7 @@ OMAP_SYS_TIMER(3_am33xx)
- #ifdef CONFIG_ARCH_OMAP4
- #ifdef CONFIG_LOCAL_TIMERS
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer,
--			      OMAP44XX_LOCAL_TWD_BASE, 29 + OMAP_INTC_START);
-+			      OMAP44XX_LOCAL_TWD_BASE, 29);
- #endif
- 
- static void __init omap4_timer_init(void)
+We will also bump into this again on AT91X40 I guess.
+
+regards
+Joachim Eastwood
