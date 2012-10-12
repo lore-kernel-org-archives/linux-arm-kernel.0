@@ -1,42 +1,31 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 12 Oct 2012 08:11:27 +0100
-Subject: [RESEND] [PATCH 3.6.0- 4/6] ARM/pxa: use module_platform_driver macro
-Message-ID: <1350025887-30591-1-git-send-email-srinivas.kandagatla@st.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 12 Oct 2012 09:14:27 +0200
+Subject: [PATCH] i2c: change the id to let the i2c device work
+In-Reply-To: <20121012055301.GM11726@opensource.wolfsonmicro.com>
+References: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
+ <20121012044042.GI11726@opensource.wolfsonmicro.com>
+ <5077A33E.4080801@atmel.com>
+ <20121012051419.GJ11726@opensource.wolfsonmicro.com>
+ <5077AE8C.5040605@atmel.com>
+ <20121012055301.GM11726@opensource.wolfsonmicro.com>
+Message-ID: <20121012091427.0d7b2bed@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Fri, 12 Oct 2012 14:53:02 +0900, Mark Brown wrote:
+> On Fri, Oct 12, 2012 at 01:45:48PM +0800, Bo Shen wrote:
+> > So, in this case, if the id = -1, i2c core will dynamically assign a
+> > bus id to this bus when running, the dynamically assigned bus id is
+> > unknown when writing the code. So, when we use
+> > i2c_register_board_info(int busnum, ...) to register device on
+> > busnum. we don't know which value to be use.
+> 
+> The I2C bus number assigned to the controller should be independant of
+> the platform device ID used to register the device; a better fix if this
+> is an issue would be to update the i2c-gpio driver to allow a fixed bus
+> number to be specified in platform data.
 
-This patch removes some code duplication by using
-module_platform_driver.
+i2c-gpio does support this already.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/mach-pxa/tosa-bt.c |   15 +--------------
- 1 files changed, 1 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/tosa-bt.c b/arch/arm/mach-pxa/tosa-bt.c
-index b9b1e5c..fe2a9e1 100644
---- a/arch/arm/mach-pxa/tosa-bt.c
-+++ b/arch/arm/mach-pxa/tosa-bt.c
-@@ -132,17 +132,4 @@ static struct platform_driver tosa_bt_driver = {
- 		.owner = THIS_MODULE,
- 	},
- };
--
--
--static int __init tosa_bt_init(void)
--{
--	return platform_driver_register(&tosa_bt_driver);
--}
--
--static void __exit tosa_bt_exit(void)
--{
--	platform_driver_unregister(&tosa_bt_driver);
--}
--
--module_init(tosa_bt_init);
--module_exit(tosa_bt_exit);
-+module_platform_driver(tosa_bt_driver);
 -- 
-1.7.0.4
+Jean Delvare
