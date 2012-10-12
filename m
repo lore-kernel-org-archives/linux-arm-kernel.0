@@ -1,27 +1,75 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 12 Oct 2012 18:21:48 +0200
-Subject: [PATCH V2 3/3] ARM: SPEAr13xx: Pass DW DMAC platform data from DT
-In-Reply-To: <CAKohpo=vMchmiz70evBB5bPqt4O4DWUocd5M1o9gc8fsY_Fkiw@mail.gmail.com>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
- <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
- <20121012144837.GE12801@game.jcrosoft.org>
- <CAKohpo=vMchmiz70evBB5bPqt4O4DWUocd5M1o9gc8fsY_Fkiw@mail.gmail.com>
-Message-ID: <20121012162148.GH12801@game.jcrosoft.org>
+From: sourav.poddar@ti.com (Sourav)
+Date: Fri, 12 Oct 2012 21:54:56 +0530
+Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
+ suspended.
+In-Reply-To: <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
+References: <1347972050-3509-1-git-send-email-sourav.poddar@ti.com>
+ <CAKdam572krJZcayRdJ_AciCUZH3LuzD9yoHenhxrB6j9xDZ6JQ@mail.gmail.com>
+ <20120925083029.GG31374@n2100.arm.linux.org.uk>
+ <20120925083118.GI9137@arwen.pp.htv.fi>
+ <20120925091228.GI31374@n2100.arm.linux.org.uk>
+ <20120925091112.GK9137@arwen.pp.htv.fi>
+ <20120925092118.GJ31374@n2100.arm.linux.org.uk>
+ <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
+ <87ipas2y4h.fsf@deeprootsystems.com>
+ <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
+Message-ID: <50784458.9080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:22 Fri 12 Oct     , Viresh Kumar wrote:
-> On 12 October 2012 20:18, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> >>  static struct of_dev_auxdata spear1310_auxdata_lookup[] __initdata = {
-> >> -     OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_dma_priv),
-> >> -     OF_DEV_AUXDATA("snps,dma-spear1340", DMAC0_BASE, NULL, &dmac_plat_data),
-> >> -     OF_DEV_AUXDATA("snps,dma-spear1340", DMAC1_BASE, NULL, &dmac_plat_data),
-> >> +     OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, "cf"),
-> > ?/
-> 
-> Sorry. can't get it :(
-what is the "cf" as paltfrom data
+Hi Paul,
 
-Best Regards,
-J.
+There are
+On Thursday 11 October 2012 11:58 PM, Paul Walmsley wrote:
+> Hi Sourav, Felipe,
+>
+> any progress on fixing the N800 problem?  Would be good to keep it booting
+> since we use it as our primary 2420 test platform.
+>
+>
+> - Paul
+The patch sent inlined below might help us to get rid of the serial init 
+issue.
+Unfortunately, I dont have a N800 board with me to test it and will require
+your help to do so.
+-----------
+From: Sourav Poddar <sourav.poddar@ti.com>
+Date: Wed, 1 Aug 2012 15:44:12 +0530
+Subject: [RFT/PATCH] serial: omap: Fix N800 serial init issue.
+
+
+This patch might solve the N800 serial init issue.
+
+This patch will also give pointers if there is any mux settings issue 
+with N800 OR
+a mismatch between the initial harware state, runtime PM state and omap 
+hwmod state.
+
+I don't have a N800 schematics to check about the mux settings getting used.
+
+The observation on beagle board XM with this patch on different boards 
+looks flaky,
+so your feedback on beagle board will also be very helpful.
+
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+  drivers/tty/serial/omap-serial.c |    1 +
+  1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/tty/serial/omap-serial.c 
+b/drivers/tty/serial/omap-serial.c
+index 6ede6fd..3fbc7f7 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1414,6 +1414,7 @@ static int __devinit serial_omap_probe(struct 
+platform_device *pdev)
+         INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
+
+         platform_set_drvdata(pdev, up);
++       pm_runtime_set_active(&pdev->dev);
+         pm_runtime_enable(&pdev->dev);
+         pm_runtime_use_autosuspend(&pdev->dev);
+         pm_runtime_set_autosuspend_delay(&pdev->dev,
+-- 
+1.7.1
