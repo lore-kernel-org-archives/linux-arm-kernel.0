@@ -1,26 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Oct 2012 08:03:54 +0000
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <20121012092617.37e82610@skate>
-References: <20121007015300.828366635@gmail.com>
- <20121012070651.GA17511@glitch> <20121012092617.37e82610@skate>
-Message-ID: <201210120803.54539.arnd@arndb.de>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 12 Oct 2012 10:05:21 +0200
+Subject: [PATCH] i2c: change the id to let the i2c device work
+In-Reply-To: <5077CCF4.7070104@atmel.com>
+References: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
+ <20121012044042.GI11726@opensource.wolfsonmicro.com>
+ <5077A33E.4080801@atmel.com>
+ <20121012051419.GJ11726@opensource.wolfsonmicro.com>
+ <5077AE8C.5040605@atmel.com>
+ <20121012055301.GM11726@opensource.wolfsonmicro.com>
+ <20121012091427.0d7b2bed@endymion.delvare>
+ <5077CCF4.7070104@atmel.com>
+Message-ID: <20121012100521.64cb9adb@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 October 2012, Thomas Petazzoni wrote:
-> My understanding is that all virtual address constants should now be
-> defined to have the void __iomem * type (i.e, using IOMEM). In the
-> future, the idea is that map_desc.virtual might be switched to the void
-> __iomem * type as well.
-> 
-> But others (Arnd?) will confirm (or not) this.
+On Fri, 12 Oct 2012 15:55:32 +0800, Bo Shen wrote:
+> vim I only see the i2c-gpio platform data structure as following:
+> --<---------------------
+> struct i2c_gpio_platform_data {
+> 	unsigned int	sda_pin;
+> 	unsigned int	scl_pin;
+> 	int		udelay;
+> 	int		timeout;
+> 	unsigned int	sda_is_open_drain:1;
+> 	unsigned int	scl_is_open_drain:1;
+> 	unsigned int	scl_is_output_only:1;
+> };
+> -->---------------------
 
-I would certainly like to see this, yes. I had a patch for it ages ago,
-but would start over again if I did this now.
+Ah sorry I misread Mark's request. i2c-gpio will turn the platform
+device ID into bus number, it can indeed not be forced through platform
+data. But I don't think any other i2c bus driver allows this either. I
+don't quite see the problem with setting a platform device ID even if
+there's only one instance of the platform device. I have many examples
+of this on my machine:
+Fixed MDIO bus.0
+coretemp.0
+vesafb.0
 
-I don't have time to do the conversion at the moment, but I would certainly
-welcome a patch that does it. I can give some details about the problems
-with that and how I think they should be solved.
+So please just set the platform device ID to 0 (or whatever i2c adapter
+number you want) and your problem is solved. As you just proposed
+initially, actually :)
 
-	Arnd
+-- 
+Jean Delvare
