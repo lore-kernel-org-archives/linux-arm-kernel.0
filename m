@@ -1,52 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Oct 2012 17:42:02 +0100
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <877gqv7imt.fsf@deeprootsystems.com>
-References: <20120925083029.GG31374@n2100.arm.linux.org.uk>
- <20120925083118.GI9137@arwen.pp.htv.fi>
- <20120925091228.GI31374@n2100.arm.linux.org.uk>
- <20120925091112.GK9137@arwen.pp.htv.fi>
- <20120925092118.GJ31374@n2100.arm.linux.org.uk>
- <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
- <87ipas2y4h.fsf@deeprootsystems.com>
- <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
- <50784458.9080806@ti.com> <877gqv7imt.fsf@deeprootsystems.com>
-Message-ID: <20121012164202.GQ28061@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Oct 2012 09:51:49 -0700
+Subject: [PATCH] ARM: OMAP4: Fix twd_local_timer_register regression
+Message-ID: <20121012165149.GE30339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 09:35:54AM -0700, Kevin Hilman wrote:
-> Sourav <sourav.poddar@ti.com> writes:
-> > diff --git a/drivers/tty/serial/omap-serial.c
-> > b/drivers/tty/serial/omap-serial.c
-> > index 6ede6fd..3fbc7f7 100644
-> > --- a/drivers/tty/serial/omap-serial.c
-> > +++ b/drivers/tty/serial/omap-serial.c
-> > @@ -1414,6 +1414,7 @@ static int __devinit serial_omap_probe(struct
-> > platform_device *pdev)
-> >         INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
-> >
-> >         platform_set_drvdata(pdev, up);
-> > +       pm_runtime_set_active(&pdev->dev);
-> 
-> NAK.
-> 
-> This will obviously break platforms where the UARTs are not active
-> before driver loads.
+Commit 7d7e1eba (ARM: OMAP2+: Prepare for irqs.h removal)
+changed the interrupts to allow enabling sparse IRQ, but
+accidentally added the omap3 INTC base to the local IRQ.
+This causes the following:
 
-I thought I had proposed a solution for this issue, which was this
-sequence:
+twd: can't register interrupt 45 (-22)
+twd_local_timer_register failed -22
 
-        omap_device_enable(dev);                                                
-        pm_runtime_set_active(dev);                                             
-        pm_runtime_enable(dev);                                                 
+The right fix is to not add any base, as it is a local
+timer. For the OMAP44XX_IRQ_LOCALWDT we had defined earlier
+there are no users, so no need to fix that.
 
-Yes, I can understand people not liking the omap_device_enable()
-there, but I also notice that the email suggesting that never got a
-reply either - not even a "I tried this and it doesn't work" or "it
-does work".
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-As such, it seems this issue isn't making any progress as we had
-already established that merely doing a "pm_runtime_set_active()"
-before "pm_runtime_enable()" was going to break other platforms.
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -467,7 +467,7 @@ OMAP_SYS_TIMER(3_am33xx)
+ #ifdef CONFIG_ARCH_OMAP4
+ #ifdef CONFIG_LOCAL_TIMERS
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer,
+-			      OMAP44XX_LOCAL_TWD_BASE, 29 + OMAP_INTC_START);
++			      OMAP44XX_LOCAL_TWD_BASE, 29);
+ #endif
+ 
+ static void __init omap4_timer_init(void)
