@@ -1,56 +1,43 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Fri, 12 Oct 2012 11:21:05 +0530
-Subject: [PATCH] clk: SPEAr: Vco-pll: Fix compilation warning
-In-Reply-To: <670019c51d5205a7ae85ada48986303e691faa9c.1349343959.git.viresh.kumar@linaro.org>
-References: <670019c51d5205a7ae85ada48986303e691faa9c.1349343959.git.viresh.kumar@linaro.org>
-Message-ID: <CAOh2x=npo5A0gvk75Cc5MMzp_qfA4GUeETdCwN-wvA4LCsSVYw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 12 Oct 2012 14:53:02 +0900
+Subject: [PATCH] i2c: change the id to let the i2c device work
+In-Reply-To: <5077AE8C.5040605@atmel.com>
+References: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
+ <20121012044042.GI11726@opensource.wolfsonmicro.com>
+ <5077A33E.4080801@atmel.com>
+ <20121012051419.GJ11726@opensource.wolfsonmicro.com>
+ <5077AE8C.5040605@atmel.com>
+Message-ID: <20121012055301.GM11726@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Fri, Oct 12, 2012 at 01:45:48PM +0800, Bo Shen wrote:
+> On 10/12/2012 13:14, Mark Brown wrote:
 
-Because you are back now, can you please push this patch?
+> >No, this still makes no sense to me.  This is clearly a non-DT device
+> >registration, what does DT have to do with anything here?  What is the
 
-On Thu, Oct 4, 2012 at 3:19 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Currently we are getting following warning for SPEAr clk-vco-pll.
->
-> "warning: i is used uninitialized in this function."
->
-> This is because we are getting value of i by passing its pointer to another
-> routine.
->
-> The variables here are really not used uninitialized.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->
-> Andrew,
->
-> I know this must have gone through Mike Turquette. But he is not around for a
-> week. As, this is a pretty small change, can you take it upstream?
->
-> drivers/clk/spear/clk-vco-pll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/spear/clk-vco-pll.c b/drivers/clk/spear/clk-vco-pll.c
-> index 5f1b6ba..1b9b65b 100644
-> --- a/drivers/clk/spear/clk-vco-pll.c
-> +++ b/drivers/clk/spear/clk-vco-pll.c
-> @@ -147,7 +147,7 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long drate,
->         struct clk_pll *pll = to_clk_pll(hw);
->         struct pll_rate_tbl *rtbl = pll->vco->rtbl;
->         unsigned long flags = 0, val;
-> -       int i;
-> +       int uninitialized_var(i);
->
->         clk_pll_round_rate_index(hw, drate, NULL, &i);
->
-> --
-> 1.7.12.rc2.18.g61b472e
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Yes, this is non-DT device registration.
+> As the Linux kernel code is transferring to DT which doesn't use
+> platform device id. however here, modified unconsciously. So correct
+> this error.
+
+What error and what does DT have to do with any of this?  DT has no
+impact on non-DT systems.
+
+> >practical problem you are seeing in your system and how does this help
+> >with it?
+
+> In non-DT kernel, we use platform device id to distinguish between
+> each device.
+
+> So, in this case, if the id = -1, i2c core will dynamically assign a
+> bus id to this bus when running, the dynamically assigned bus id is
+> unknown when writing the code. So, when we use
+> i2c_register_board_info(int busnum, ...) to register device on
+> busnum. we don't know which value to be use.
+
+The I2C bus number assigned to the controller should be independant of
+the platform device ID used to register the device; a better fix if this
+is an issue would be to update the i2c-gpio driver to allow a fixed bus
+number to be specified in platform data.
