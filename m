@@ -1,34 +1,80 @@
-From: bcrl@kvack.org (Benjamin LaHaise)
-Date: Fri, 12 Oct 2012 11:00:45 -0400
-Subject: alignment faults in 3.6
-In-Reply-To: <1350053300.21172.12319.camel@edumazet-glaptop>
-References: <yw1xtxu1nfsn.fsf@unicorn.mansr.com>
- <201210120811.43290.arnd@arndb.de>
- <20121012090321.GA21164@n2100.arm.linux.org.uk>
- <yw1xhaq0nefg.fsf@unicorn.mansr.com>
- <20121012110750.GE21164@n2100.arm.linux.org.uk>
- <yw1x8vbcndlb.fsf@unicorn.mansr.com>
- <20121012114443.GG21164@n2100.arm.linux.org.uk>
- <1350043692.21172.11815.camel@edumazet-glaptop>
- <20121012142254.GG5453@kvack.org>
- <1350053300.21172.12319.camel@edumazet-glaptop>
-Message-ID: <20121012150045.GH5453@kvack.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Oct 2012 08:03:43 -0700
+Subject: [PATCH 1/4] usb: phy: add a new driver for usb3 phy
+In-Reply-To: <5077DE0A.4000301@ti.com>
+References: <1348054229-27362-1-git-send-email-kishon@ti.com>
+ <1348054229-27362-2-git-send-email-kishon@ti.com>
+ <20121011005944.GX12552@atomide.com> <5077DE0A.4000301@ti.com>
+Message-ID: <20121012150342.GA30339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 04:48:20PM +0200, Eric Dumazet wrote:
-> > Somehow, I doubt anyone would be willing to walk through all the noise the 
-> > faults would likely trigger.
+* kishon <kishon@ti.com> [121012 02:10]:
+> Hi Tony,
 > 
-> If this can be mapped to an event that can be used by perf tool, that
-> might be useful ?
+> On Thursday 11 October 2012 06:29 AM, Tony Lindgren wrote:
+> >Hi,
+> >
+> >* Kishon Vijay Abraham I <kishon@ti.com> [120919 04:32]:
+> >>Added a driver for usb3 phy that handles the interaction between usb phy
+> >>device and dwc3 controller.
+> >>
+> >>This also includes device tree support for usb3 phy driver and
+> >>the documentation with device tree binding information is updated.
+> >>
+> >>Currently writing to control module register is taken care in this
+> >>driver which will be removed once the control module driver is in place.
+> >
+> >You may be able to set up the control module register with one
+> >of the following Linux standard frameworks:
+> >
+> >1. Fixed regulator defined in mach-omap2/control.c
+> 
+> Is it control.c?
 
-There are performance counters for the various different types of alignment 
-faults supported by perf. Modern x86 makes the vast majority of unaligned 
-accesses very low overhead -- the only ones that really hurt are those 
-straddling different vm pages, but even those have little cost compared to 
-obsolete microarchitectures (*cough* P4 *cough*).
+Hmm after looking into it more we're missing one piece of the puzzle
+to handle SCM regulators, which is omap-scm-regulator.c :)
+I'll do a minimal DT only version of that.
 
-		-ben
--- 
-"Thought is the essence of where you are now."
+> >    In this case the PHY driver can pick up the regulator by name.
+> 
+> Do you mean we have to define something like fixed_voltage_config
+> defined in board-4430sdp.c?
+> From whatever I could make out from regulator/fixed.c,
+> enabling/disabling of regulator is done using only gpio. I'm not
+> sure how we can use that to write to control module register.
+
+Yes you're right, we're missing omap-scm-regulator.c, then it will
+be trivial to select the regulator from DT like we have for the
+twl-regulator.c.
+
+> >>+usb3phy at 4a084400 {
+> >>+	compatible = "ti,omap-usb3";
+> >>+	reg = <0x0x4a084400 0x80>,
+> >>+	      <0x4a084800 0x64>,
+> >>+	      <0x4a084c00 0x40>,
+> >>+	      <0x4a002370 0x4>;
+> >>+};
+> >
+> >And register 0x4a002370 here. Care to post some info what the
+> >0x4a002370 register bits do? Is that same as CONTROL_DEV_CONF
+> >on omap4, or does it have other bits there too?
+> 
+> It's CONTROL_PHY_POWER_USB register and it's structure looks like this.
+> 31:22 USB_PWRCTL_CLK_FREQ
+> 21:14 USB_PWRCTL_CLK_CMD
+> 13:0 RESERVED
+> 
+> CLK_CMD takes values to power up/down the TX and RX in various combinations.
+> 
+> And CLK_FREQ takes values for clock configuration.
+
+Oh, it's a clock. Then it would be best to set it up using the
+common clock framework and have the clock registered by the
+SCM core driver when those are available.
+
+Maybe please just add a comment for that for later on?
+
+Regards,
+
+Tony
