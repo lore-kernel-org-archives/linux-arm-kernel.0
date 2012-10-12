@@ -1,59 +1,25 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Fri, 12 Oct 2012 09:25:34 +0530
-Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
-In-Reply-To: <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
- <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
- <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
- <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
- <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
-Message-ID: <507794B6.2000107@st.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 12 Oct 2012 13:40:58 +0900
+Subject: [PATCH] i2c: change the id to let the i2c device work
+In-Reply-To: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
+References: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121012044042.GI11726@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2012 9:36 PM, Linus Walleij wrote:
-> On Thu, Oct 11, 2012 at 6:15 AM, viresh kumar<viresh.kumar@linaro.org>  wrote:
->> On Wed, Oct 10, 2012 at 10:37 PM, Linus Walleij
->> <linus.walleij@linaro.org>  wrote:
->
->>> dma_sync_single_for_device() is translating the virtual
->>> address to physical for every chunk BTW.
->>
->> I pray that i am wrong here, otherwise i would be thrown out from
->> the maintainers list for this driver :)
->>
->> dma_sync_single_for_device() is not doing anything on the buffer, but
->> on the LLI item. Actually it is flushing LLI struct so that DMA h/w can get
->> the correct values.
->
-> Sorry no, I'm the one who's wrong...
->
-> So the DMA engine memcpy() is not mapping virt->phys
-> but expects physical addresses to be provided.
->
-> So dma_map_single() needs to be called on the stuff
-> passed in to dev->device_prep_dma_memcpy().
->
-> And currently there is indeed a dma_map_single() in
-> dma_xfer() in fsmc_nand.c which should work just fine.
->
-> dma_map_single() will only work if the buffer is
-> physically contiguous.
->
-> And the block layer of the subsystem should take care
-> of only handing the driver buffers that are contiguous
-> I think? Not that I'm an expert here ... more some
-> guesswork :-/
+On Fri, Oct 12, 2012 at 10:34:18AM +0800, Bo Shen wrote:
+> As the old method will use platform device id, change the id to
+> let the i2c device work
 
-The buffers provided to the driver are actually user buffers. The reason 
-I say that is because the generic nand test modules eg 
-drivers/mtd/nand/mtd_stresstest.c calls mtd->_read with a user buffer as 
-an argument
+What are "the old method" and new method?  You're not explaining why
+this is needed...
 
-This same buffer directly trickles down to the driver
+>  static struct platform_device at91sam9260_twi_device = {
+>  	.name			= "i2c-gpio",
+> -	.id			= -1,
+> +	.id			= 0,
+>  	.dev.platform_data	= &pdata,
 
-Artem, should we clearly cast this buffer as a user pointer instead of 
-just a 'uint8_t *'.
-
-Regards
-Vipin
+This looks like a regression, if there's only one of a given type of
+device in the system it should have no numeric ID in the display name so
+having -1 is appropriate.
