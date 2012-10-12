@@ -1,35 +1,37 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 12 Oct 2012 14:53:00 +0800
-Subject: When will unwind_backtrace end?
-Message-ID: <20121012065259.GA15907@b20223-02.ap.freescale.net>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Fri, 12 Oct 2012 09:06:51 +0200
+Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
+In-Reply-To: <20121007015405.958959522@gmail.com>
+References: <20121007015300.828366635@gmail.com>
+ <20121007015405.958959522@gmail.com>
+Message-ID: <20121012070651.GA17511@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi there,
+Thomas,
 
-kernel 3.0.35, memory begin from 0x80000000, which happens to be same
-as virtual address.
+On Sun, Oct 07, 2012 at 03:53:01AM +0200, Domenico Andreoli wrote:
+>
+> Index: b/arch/arm/mach-bcm476x/bcm476x.c
+> ===================================================================
+> --- /dev/null
+> +++ b/arch/arm/mach-bcm476x/bcm476x.c
+...
+> +
+> +#define BCM476X_PERIPH_PHYS   0x00080000
+> +#define BCM476X_PERIPH_VIRT   0xd0080000
 
-When enable CONFIG_LOCKDEP, it keep printing
+Are you sure I should use IOMEM() here? The only place I use these macros
+is here below, for which I should add a cast to silent the compiler. All
+the other accesses go throught ioremap/readl/writel, if not I want to fix it.
 
-unwind: Unknown symbol address 80008040
-unwind: Index not found 80008040
-unwind: Unknown symbol address 80008040
-unwind: Index not found 80008040
-unwind: Unknown symbol address 80008040
-unwind: Index not found 80008040
-unwind: Unknown symbol address 80008040
+> +
+> +static struct map_desc io_map __initdata = {
+> +	.virtual = BCM476X_PERIPH_VIRT,
+> +	.pfn = __phys_to_pfn(BCM476X_PERIPH_PHYS),
+> +	.length = BCM476X_PERIPH_SIZE,
+> +	.type = MT_DEVICE,
+> +};
 
-I did some investigation. It looks like:
-unwind_frame didn't fail at:
-if (!kernel_text_address(frame->pc))
-                return -URC_FAILURE;
-
-When it backtrace to 0x80008040, it took it as kernel text address.
-But it's a physical address, which point to
-"1:      b       __enable_mmu" in stext.
-
-Is it a known issue?
-
-Thanks
-Richard
+Regards,
+Domenico
