@@ -1,31 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 12 Oct 2012 14:14:21 +0900
-Subject: [PATCH] i2c: change the id to let the i2c device work
-In-Reply-To: <5077A33E.4080801@atmel.com>
-References: <1350009258-10044-1-git-send-email-voice.shen@atmel.com>
- <20121012044042.GI11726@opensource.wolfsonmicro.com>
- <5077A33E.4080801@atmel.com>
-Message-ID: <20121012051419.GJ11726@opensource.wolfsonmicro.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 12 Oct 2012 11:13:40 +0530
+Subject: [PATCH 1/3] dmaengine: dw_dmac: Update documentation style comments
+ for dw_dma_platform_data
+Message-ID: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 12:57:34PM +0800, Bo Shen wrote:
-> On 10/12/2012 12:40, Mark Brown wrote:
-> >On Fri, Oct 12, 2012 at 10:34:18AM +0800, Bo Shen wrote:
+Documentation style comments were missing for few fields in struct
+dw_dma_platform_data. Add these.
 
-> >>As the old method will use platform device id, change the id to
-> >>let the i2c device work
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ include/linux/dw_dmac.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> >What are "the old method" and new method?  You're not explaining why
-> >this is needed...
-
-> Maybe use the 'legacy method' will be better (I am not sure). Now,
-> the Linux kernel is transferring to device tree which doesn't use
-> platform device id. So, change the id to let the legacy code work.
-
-> May you understand.
-
-No, this still makes no sense to me.  This is clearly a non-DT device
-registration, what does DT have to do with anything here?  What is the
-practical problem you are seeing in your system and how does this help
-with it?
+diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
+index e1c8c9e..62a6190 100644
+--- a/include/linux/dw_dmac.h
++++ b/include/linux/dw_dmac.h
+@@ -19,6 +19,8 @@
+  * @nr_channels: Number of channels supported by hardware (max 8)
+  * @is_private: The device channels should be marked as private and not for
+  *	by the general purpose DMA channel allocator.
++ * @chan_allocation_order: Allocate channels starting from 0 or 7
++ * @chan_priority: Set channel priority increasing from 0 to 7 or 7 to 0.
+  * @block_size: Maximum block size supported by the controller
+  * @nr_masters: Number of AHB masters supported by the controller
+  * @data_width: Maximum data width supported by hardware per AHB master
+-- 
+1.7.12.rc2.18.g61b472e
