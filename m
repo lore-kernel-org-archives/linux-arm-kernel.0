@@ -1,32 +1,30 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 12 Oct 2012 20:17:49 +0530
-Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <1350052912.10584.167.camel@smile>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
- <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
- <1350048519.10584.158.camel@smile>
- <CAKohpok=nv2XnFdPkD_yJgUsDqx2gEh=mG_Xhbe-BvT7swVsyg@mail.gmail.com>
- <1350052912.10584.167.camel@smile>
-Message-ID: <CAKohpokNE4Pao+tbAFvMC_Yyo-oNvwjbGjV2XKdard4=616e6Q@mail.gmail.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 12 Oct 2012 16:48:20 +0200
+Subject: alignment faults in 3.6
+In-Reply-To: <20121012142254.GG5453@kvack.org>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+ <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+ <yw1xhaq0nefg.fsf@unicorn.mansr.com>
+ <20121012110750.GE21164@n2100.arm.linux.org.uk>
+ <yw1x8vbcndlb.fsf@unicorn.mansr.com>
+ <20121012114443.GG21164@n2100.arm.linux.org.uk>
+ <1350043692.21172.11815.camel@edumazet-glaptop>
+ <20121012142254.GG5453@kvack.org>
+Message-ID: <1350053300.21172.12319.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2012 20:11, Shevchenko, Andriy
-<andriy.shevchenko@intel.com> wrote:
-> On Fri, 2012-10-12 at 19:36 +0530, Viresh Kumar wrote:
-> I meant is to use that constant instead of hard coding 4 everywhere.
-> It's a maximum value, not the SoC specific.
+On Fri, 2012-10-12 at 10:22 -0400, Benjamin LaHaise wrote:
+> On Fri, Oct 12, 2012 at 02:08:12PM +0200, Eric Dumazet wrote:
+> > So yes, we built network stack with the prereq that IP headers are
+> > aligned, but unfortunately many developers use x86 which doesnt care, so
+> > its possible some bugs are added.
+> 
+> x86 does have an alignment check flag that can be set in the flags register.  
+> Somehow, I doubt anyone would be willing to walk through all the noise the 
+> faults would likely trigger.
 
-Can be done.
-
->> +     u32 val, arr[4];
-> what about to use tmp name instead of val? It's really minor, but I
-> think val name is little bit unrelated to a loop counter.
-
-Its not minor at all, its major. Even when i was coding it, i thought
-about renaming
-it several times during this last patch. But couldn't find a better name.
-
-I don't like tmp. Give me something better.
-
-viresh
+If this can be mapped to an event that can be used by perf tool, that
+might be useful ?
