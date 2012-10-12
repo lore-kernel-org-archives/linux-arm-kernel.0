@@ -1,45 +1,62 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 12 Oct 2012 11:57:07 +0200
-Subject: [PATCH v2] i2c: change the id to let the i2c-gpio work
-In-Reply-To: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
-References: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121012115707.76cc7511@endymion.delvare>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 12 Oct 2012 11:02:42 +0100
+Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
+ ARM_UNWIND
+In-Reply-To: <20121012090807.GB21164@n2100.arm.linux.org.uk>
+References: <1346021216-21979-1-git-send-email-ccross@android.com>
+ <1346021216-21979-3-git-send-email-ccross@android.com>
+ <20121012090807.GB21164@n2100.arm.linux.org.uk>
+Message-ID: <20121012100242.GA2126@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Oct 2012 17:42:51 +0800, Bo Shen wrote:
-> The i2c-gpio driver will turn the platform device ID to busnum.
-> When using platfrom device ID as -1, it means dynamically assigned
-> the busnum. When writing code, we need to make sure the busnum,
-> and call i2c_register_board_info(int busnum, ...) to register device
-> if using -1, we do not know the value of busnum. 
+On Fri, Oct 12, 2012 at 10:08:07AM +0100, Russell King - ARM Linux wrote:
+> On Sun, Aug 26, 2012 at 03:46:56PM -0700, Colin Cross wrote:
+> > Unwinding with CONFIG_ARM_UNWIND is much more complicated than
+> > unwinding with CONFIG_FRAME_POINTER, but there are only a few points
+> > that require validation in order to avoid faults or infinite loops.
+> > Avoiding faults is easy by adding checks to verify that all accesses
+> > relative to the frame's stack pointer remain inside the stack.
+> > 
+> > When CONFIG_FRAME_POINTER is not set it is possible for two frames to
+> > have the same SP, so there is no way to avoid repeated calls to
+> > unwind_frame continuing forever.
 > 
-> In order to solve this issue, set the platform device ID as a fix number
-> Here using 0 to match the busnum used in i2c_regsiter_board_info().
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
-> Change since v1
->   Make the commit message more clear
-> ---
->  arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index 0f24cfb..805ef95 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -389,7 +389,7 @@ static struct i2c_gpio_platform_data pdata = {
->  
->  static struct platform_device at91sam9260_twi_device = {
->  	.name			= "i2c-gpio",
-> -	.id			= -1,
-> +	.id			= 0,
->  	.dev.platform_data	= &pdata,
->  };
->  
+> So here you admit that this patch can cause the unwinder to loop forever,
+> which would provide no way out of that.  Why do you think this patch is
+> suitable for mainline with such a problem?
 
-Acked-by: Jean Delvare <khali@linux-fr.org>
+With CONFIG_FRAME_POINTER we have a straightforward definition of
+progress: the sp must increase per frame, and cannot increase beyond the
+limit of the tasks stack.  We get this property from the fact that
+each frame record consumes actual space on the stack.  If we parse a
+frame record which does not both increase the sp and provide a frame
+address greater than that sp, we know that frame is garbage and we must
+stop.
 
--- 
-Jean Delvare
+
+With CONFIG_ARM_UNWIND, we have no straightforward definition of
+progress.  However, sp must _normally_ still increase, because compiler-
+generated non-leaf functions must store the lr somewhere, and the
+compiler always uses the stack.  Even if lr is stashed in r4, an ABI
+compliant would then have needed to save r4 on the stack beforehand.
+
+We can assume that we will never parse a garbage unwind table because of
+the way the table lookup works (though we may parse a valid table which
+has nothing whatever to do with the code that was executing in the case
+of a corrupted stack).  So we only need to worry about what the unwind
+tables will look like for valid functions.
+
+Nonetheless, tail-call-optimised and manually-annotated functions may
+have unusual frames which don't consume any stack.  Stackless tail-
+call-optimised functions shouldn't be a problem, since their frames
+are completely missing from the backtrace and won't dump us into a loop.
+Stackless assembler functions are overwhelmingly likely to be leaf
+functions, giving us just one stackless frame.
+
+
+Would it make sense if we place some small sanity limit on the number
+of frames the unwinder will process with the same sp before giving up?
+
+Cheers
+---Dave
