@@ -1,9 +1,9 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 11 Oct 2012 20:06:08 -0500
-Subject: [PATCH v3 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
+Date: Thu, 11 Oct 2012 20:06:09 -0500
+Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
 In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
 References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1350003977-32744-4-git-send-email-omar.luna@linaro.org>
+Message-ID: <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
