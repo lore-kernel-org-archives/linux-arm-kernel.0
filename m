@@ -1,77 +1,92 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 12 Oct 2012 14:25:32 +0300
-Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <CAKohponxbjTTDMOA_0=MT36wRh1NpzTAH4LdkaE=Z-ahup4BFg@mail.gmail.com>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
- <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
- <1350030203.10584.139.camel@smile>
- <CAOh2x=m8OVNfMm5Fn+cr9Gxuh6oyt+8d4n-bkG8Xiw5zGncLiA@mail.gmail.com>
- <CAHp75VffAwZjfQLf=wS+nBhiRoMFOoyPeUCfrzF1G=+Kh7HHTA@mail.gmail.com>
- <CAKohponxbjTTDMOA_0=MT36wRh1NpzTAH4LdkaE=Z-ahup4BFg@mail.gmail.com>
-Message-ID: <CAHp75Vcte64KF5k5gDjMtyff8KsOof-yT7iVWc3Gz_ECL+0+Mw@mail.gmail.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Fri, 12 Oct 2012 12:26:12 +0100
+Subject: ARM: hw_breakpoint: silent EPERM when setting ARM_DSCR_MDBGEN
+ on ARM_DEBUG_ARCH_V7_ECP14
+In-Reply-To: <CAPfQmKJAvd2R8Je-uRdKkkhgQRodZFxP1N_QzbjKm8q7q1HgaQ@mail.gmail.com>
+References: <CAPfQmK+jYnVybyrBcnNkbm=Ta+7hjPNh5TqiL2tAFY8YBTyLEw@mail.gmail.com>
+ <20120913214102.GB11399@mudshark.cambridge.arm.com>
+ <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
+ <20120918100438.GC32204@mudshark.cambridge.arm.com>
+ <CAPfQmKJAvd2R8Je-uRdKkkhgQRodZFxP1N_QzbjKm8q7q1HgaQ@mail.gmail.com>
+Message-ID: <5077FE54.7030103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 2:01 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 12 October 2012 16:10, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
->>>>> +     if (!found) {
->>>>> +             last_dw = dw;
->>>>> +             last_bus_id = param;
->>>>> +             return false;
->>>> Because of return here you could eliminate 'found' flag at all.
+On 09/10/12 18:05, Valentin Pistol wrote:
+> Will,
 >
-> Here is the stuff copied from you ;)
+> On Tue, Sep 18, 2012 at 3:04 AM, Will Deacon <will.deacon@arm.com> wrote:
+>>
+>> On Fri, Sep 14, 2012 at 09:08:24AM +0100, Valentin Pistol wrote:
+>>> Is there a reliable way to determine that they are locked down?
+>>> Any particular register/bit I can check to confirm?
+>>
+>> You can take a look at the DBGAUTHSTATUS register and try to determine the
+>> signal values for SPNIDEN, DBGEN and NIDEN.
 >
+> DBGAUTHSTATUS=0xaa confirming DBGEN is LOW. Since then I found out
+> that there are two types of OMAP devices:
+> GP (General Purpose) and HS (High Security) and supposedly Debug
+> Capabilities are only available on GP devices.
+> Thus, I ordered a Pandaboard ES with OMAP4460 and tested it with a
+> prebuilt Ubuntu 12.04 image.
+> After boot monitor mode is still not set, the DSCR reads the same
+> 0x01030002 just as with the previous Galaxy Nexus.
 >
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index a4ff04c..c24859e 100644
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-> @@ -1184,7 +1184,7 @@ bool dw_generic_filter(struct dma_chan *chan, void *param)
->         struct dw_dma *dw = to_dw_dma(chan->device);
->         static struct dw_dma *last_dw;
->         static char *last_bus_id;
-> -       int found = 0, i = -1;
-> +       int i = -1;
+> I contacted TI and they seem to say hw breakpoints/watchpoints are
+> available on Pandaboard but they are confused about monitor mode,
+> saying it's not available on Pandaboard GP.
+> See http://e2e.ti.com/support/omap/f/849/p/216276/770995.aspx for the
+> discussion.
+> Isn't monitor mode and DBGEN on HIGH required for access to
+> breakpoints/watchpoints?
+> Maybe they are thinking about Secure Monitor Mode and TrustZone which
+> is not related?
 >
->         /*
->          * dmaengine framework calls this routine for all channels of all dma
-> @@ -1212,22 +1212,17 @@ bool dw_generic_filter(struct dma_chan *chan,
-> void *param)
->
->         while (++i < dw->sd_count) {
->                 if (!strcmp(dw->sd[i].bus_id, param)) {
-> -                       found = 1;
-> -                       break;
-> -               }
-> -       }
-> +                       chan->private = &dw->sd[i];
-> +                       last_dw = NULL;
-> +                       last_bus_id = NULL;
->
-> -       if (!found) {
-> -               last_dw = dw;
-> -               last_bus_id = param;
-> -               return false;
-> +                       return true;
-> +               }
->         }
->
-> -       chan->private = &dw->sd[i];
-> -       last_dw = NULL;
-> -       last_bus_id = NULL;
-> -
-> -       return true;
-> +       last_dw = dw;
-> +       last_bus_id = param;
-> +       return false;
->  }
-Yes, that what I refer to.
+> Have you used a Pandaboard and can comment on how to enable the
+> breakpoints/watchpoints?
+> Could you also mention a specific development board that you are using
+> and recommend for access to these features?
 
->  EXPORT_SYMBOL(dw_generic_filter);
-Could we change a name to be more precise, like dw_dma_generic_filter ?
+I'm running Linaro 12.08 on Pandaboard (Rev A1) and on this board 
+DBGAUTHSTATUS.NSNE and DBGAUTHSTATUS.NSE are set.
 
+With additional logs in enable_monitor_mode() 
+[arch/arm/kernel/hw_breakpoint.c]:
 
--- 
-With Best Regards,
-Andy Shevchenko
+root at linaro-nano:~# dmesg | grep hw-break
+[    0.321380] hw-breakpoint: arch_hw_breakpoint_init cpu0 debug_arch=3
+[    0.321441] hw-breakpoint: enable_monitor_mode cpu1 
+DBGDSCR=03070002
+[    0.321441] hw-breakpoint: enable_monitor_mode cpu1 
+DBGAUTHSTATUS=000000af
+[    0.321502] hw-breakpoint: enable_monitor_mode cpu0 
+DBGDSCR=03070002
+[    0.321533] hw-breakpoint: enable_monitor_mode cpu0 
+DBGAUTHSTATUS=000000af
+[    0.321533] hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 
+watchpoint registers.
+[    0.321563] hw-breakpoint: maximum watchpoint size is 4 bytes.
+
+-- Dietmar
+
+>
+>>
+>>>> Completely untested patch below, please let me know how you get on...
+>>>
+>>> Looks good, I'll give it a try.
+>>
+>> Great. Let me know if it helps and, if so, I'll merge it.
+>
+> Sorry I wasn't able to directly apply your patch to the specific
+> Android kernel version I was using.
+> Manually merging the code seems to perform as expected.
+>
+> Thanks a lot for your help,
+> Valentin
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
